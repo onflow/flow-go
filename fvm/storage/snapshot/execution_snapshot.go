@@ -1,6 +1,8 @@
 package snapshot
 
 import (
+	"strings"
+
 	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/fvm/meter"
@@ -29,12 +31,20 @@ func (snapshot *ExecutionSnapshot) UpdatedRegisters() flow.RegisterEntries {
 		entries = append(entries, flow.RegisterEntry{Key: key, Value: value})
 	}
 
-	slices.SortFunc(entries, func(a, b flow.RegisterEntry) bool {
-		return (a.Key.Owner < b.Key.Owner) ||
-			(a.Key.Owner == b.Key.Owner && a.Key.Key < b.Key.Key)
+	slices.SortFunc(entries, func(a, b flow.RegisterEntry) int {
+		ownerCmp := strings.Compare(a.Key.Owner, b.Key.Owner)
+		if ownerCmp != 0 {
+			return ownerCmp
+		}
+		return strings.Compare(a.Key.Key, b.Key.Key)
 	})
 
 	return entries
+}
+
+// UpdatedRegisterSet returns all registers that were updated by this view.
+func (snapshot *ExecutionSnapshot) UpdatedRegisterSet() map[flow.RegisterID]flow.RegisterValue {
+	return snapshot.WriteSet
 }
 
 // UpdatedRegisterIDs returns all register ids that were updated by this

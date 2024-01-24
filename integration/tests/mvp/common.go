@@ -13,7 +13,7 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go-sdk/templates"
 
-	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 )
@@ -55,7 +55,7 @@ func RunMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork, acc
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
 		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
 		SetPayer(serviceAddress).
-		SetGasLimit(9999)
+		SetComputeLimit(9999)
 
 	childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	err = serviceAccountClient.SignAndSendTransaction(childCtx, createAccountTx)
@@ -76,6 +76,8 @@ func RunMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork, acc
 		}
 	}
 	require.NotEqual(t, sdk.EmptyAddress, newAccountAddress)
+
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 	t.Log(">> new account address: ", newAccountAddress)
 
@@ -100,13 +102,14 @@ func RunMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork, acc
 				receiverRef.deposit(from: <-self.sentVault)
 			  }
 			}`,
-			fvm.FungibleTokenAddress(chain).Hex(),
-			fvm.FlowTokenAddress(chain).Hex()))).
+			sc.FungibleToken.Address.Hex(),
+			sc.FlowToken.Address.Hex(),
+		))).
 		AddAuthorizer(serviceAddress).
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
 		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
 		SetPayer(serviceAddress).
-		SetGasLimit(9999)
+		SetComputeLimit(9999)
 
 	err = fundAccountTx.AddArgument(cadence.UFix64(1_0000_0000))
 	require.NoError(t, err)
@@ -147,7 +150,7 @@ func RunMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork, acc
 		SetProposalKey(newAccountAddress, 0, 0).
 		SetPayer(newAccountAddress).
 		AddAuthorizer(newAccountAddress).
-		SetGasLimit(9999)
+		SetComputeLimit(9999)
 
 	t.Log(">> creating counter...")
 

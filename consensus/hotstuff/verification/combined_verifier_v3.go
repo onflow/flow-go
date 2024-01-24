@@ -1,16 +1,14 @@
-//go:build relic
-// +build relic
-
 package verification
 
 import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"

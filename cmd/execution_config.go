@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/provider"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/utils/grpcutils"
@@ -27,6 +28,7 @@ type ExecutionConfig struct {
 	rpcConf                              rpc.Config
 	triedir                              string
 	executionDataDir                     string
+	registerDir                          string
 	mTrieCacheSize                       uint32
 	transactionResultsCacheSize          uint
 	checkpointDistance                   uint
@@ -51,6 +53,7 @@ type ExecutionConfig struct {
 	blobstoreBurstLimit                  int
 	chunkDataPackRequestWorkers          uint
 	maxGracefulStopDuration              time.Duration
+	importCheckpointWorkerCount          int
 
 	computationConfig        computation.ComputationConfig
 	receiptRequestWorkers    uint   // common provider engine workers
@@ -60,7 +63,9 @@ type ExecutionConfig struct {
 	// It works around an issue where some collection nodes are not configured with enough
 	// this works around an issue where some collection nodes are not configured with enough
 	// file descriptors causing connection failures.
-	onflowOnlyLNs bool
+	onflowOnlyLNs    bool
+	enableStorehouse bool
+	enableChecker    bool
 }
 
 func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
@@ -69,8 +74,9 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.StringVarP(&exeConf.rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
 	flags.UintVar(&exeConf.rpcConf.MaxMsgSize, "rpc-max-message-size", grpcutils.DefaultMaxMsgSize, "the maximum message size in bytes for messages sent or received over grpc")
 	flags.BoolVar(&exeConf.rpcConf.RpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
-	flags.StringVar(&exeConf.triedir, "triedir", datadir, "directory to store the execution State")
+	flags.StringVar(&exeConf.triedir, "triedir", filepath.Join(datadir, "trie"), "directory to store the execution State")
 	flags.StringVar(&exeConf.executionDataDir, "execution-data-dir", filepath.Join(datadir, "execution_data"), "directory to use for storing Execution Data")
+	flags.StringVar(&exeConf.registerDir, "register-dir", filepath.Join(datadir, "register"), "directory to use for storing registers Data")
 	flags.Uint32Var(&exeConf.mTrieCacheSize, "mtrie-cache-size", 500, "cache size for MTrie")
 	flags.UintVar(&exeConf.checkpointDistance, "checkpoint-distance", 20, "number of WAL segments between checkpoints")
 	flags.UintVar(&exeConf.checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
@@ -89,6 +95,8 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 		"threshold for logging script execution")
 	flags.DurationVar(&exeConf.computationConfig.QueryConfig.ExecutionTimeLimit, "script-execution-time-limit", query.DefaultExecutionTimeLimit,
 		"script execution time limit")
+	flags.Uint64Var(&exeConf.computationConfig.QueryConfig.ComputationLimit, "script-execution-computation-limit", fvm.DefaultComputationLimit,
+		"script execution computation limit")
 	flags.UintVar(&exeConf.transactionResultsCacheSize, "transaction-results-cache-size", 10000, "number of transaction results to be cached")
 	flags.BoolVar(&exeConf.extensiveLog, "extensive-logging", false, "extensive logging logs tx contents and block headers")
 	flags.DurationVar(&exeConf.chunkDataPackQueryTimeout, "chunk-data-pack-query-timeout", exeprovider.DefaultChunkDataPackQueryTimeout, "timeout duration to determine a chunk data pack query being slow")
@@ -107,8 +115,12 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.IntVar(&exeConf.blobstoreRateLimit, "blobstore-rate-limit", 0, "per second outgoing rate limit for Execution Data blobstore")
 	flags.IntVar(&exeConf.blobstoreBurstLimit, "blobstore-burst-limit", 0, "outgoing burst limit for Execution Data blobstore")
 	flags.DurationVar(&exeConf.maxGracefulStopDuration, "max-graceful-stop-duration", stop.DefaultMaxGracefulStopDuration, "the maximum amount of time stop control will wait for ingestion engine to gracefully shutdown before crashing")
+	flags.IntVar(&exeConf.importCheckpointWorkerCount, "import-checkpoint-worker-count", 10, "number of workers to import checkpoint file during bootstrap")
 
 	flags.BoolVar(&exeConf.onflowOnlyLNs, "temp-onflow-only-lns", false, "do not use unless required. forces node to only request collections from onflow collection nodes")
+	flags.BoolVar(&exeConf.enableStorehouse, "enable-storehouse", false, "enable storehouse to store registers on disk, default is false")
+	flags.BoolVar(&exeConf.enableChecker, "enable-checker", true, "enable checker to check the correctness of the execution result, default is true")
+
 }
 
 func (exeConf *ExecutionConfig) ValidateFlags() error {

@@ -13,10 +13,10 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -37,7 +37,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 			// create the transaction
 			txBody := tt.createTxBody(t, tctx)
 			// set the computation limit
-			txBody.SetGasLimit(computationLimit)
+			txBody.SetComputeLimit(computationLimit)
 
 			// sign the transaction
 			err := testutil.SignEnvelope(
@@ -220,10 +220,12 @@ const fuzzTestsInclusionFees = uint64(1_000)
 func getDeductedFees(tb testing.TB, tctx transactionTypeContext, results fuzzResults) (fees cadence.UFix64, deducted bool) {
 	tb.Helper()
 
+	sc := systemcontracts.SystemContractsForChain(tctx.chain.ChainID())
+
 	var ok bool
 	var feesDeductedEvent cadence.Event
 	for _, e := range results.output.Events {
-		if string(e.Type) == fmt.Sprintf("A.%s.FlowFees.FeesDeducted", environment.FlowFeesAddress(tctx.chain)) {
+		if string(e.Type) == fmt.Sprintf("A.%s.FlowFees.FeesDeducted", sc.FlowFees.Address.Hex()) {
 			data, err := ccf.Decode(nil, e.Payload)
 			require.NoError(tb, err)
 			feesDeductedEvent, ok = data.(cadence.Event)

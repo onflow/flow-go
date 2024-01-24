@@ -81,14 +81,22 @@ func ContractRegisterID(address Address, contractName string) RegisterID {
 
 func CadenceRegisterID(owner []byte, key []byte) RegisterID {
 	return RegisterID{
-		Owner: string(BytesToAddress(owner).Bytes()),
+		Owner: addressToOwner(BytesToAddress(owner)),
 		Key:   string(key),
 	}
 }
 
-func NewRegisterID(owner, key string) RegisterID {
+func NewRegisterID(owner Address, key string) RegisterID {
+	// global registers have an empty owner field
+	ownerString := ""
+
+	// all other registers have the account's address
+	if owner != EmptyAddress {
+		ownerString = addressToOwner(owner)
+	}
+
 	return RegisterID{
-		Owner: addressToOwner(BytesToAddress([]byte(owner))),
+		Owner: ownerString,
 		Key:   key,
 	}
 }

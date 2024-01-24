@@ -5,7 +5,8 @@ import (
 	"crypto/sha256"
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/ledger"
 )
 
@@ -97,7 +98,7 @@ func PayloadsToValues(payloads []*ledger.Payload) ([]ledger.Value, error) {
 }
 
 // PathsFromPayloads constructs paths from an slice of payload
-func PathsFromPayloads(payloads []ledger.Payload, version uint8) ([]ledger.Path, error) {
+func PathsFromPayloads(payloads []*ledger.Payload, version uint8) ([]ledger.Path, error) {
 	paths := make([]ledger.Path, len(payloads))
 	for i, pay := range payloads {
 		k, err := pay.Key()

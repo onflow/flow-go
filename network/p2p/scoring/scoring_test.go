@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
+	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -12,6 +13,7 @@ import (
 	mocktestify "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -22,8 +24,8 @@ import (
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
-	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -45,10 +47,6 @@ func (m *mockInspectorSuite) AddInvalidControlMessageConsumer(consumer p2p.Gossi
 }
 func (m *mockInspectorSuite) ActiveClustersChanged(_ flow.ChainIDList) {
 	// no-op
-}
-func (m *mockInspectorSuite) SetTopicOracle(_ func() []string) error {
-	// no-op
-	return nil
 }
 
 // newMockInspectorSuite creates a new mockInspectorSuite.
@@ -93,21 +91,28 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		irrecoverable.SignalerContext,
 		zerolog.Logger,
 		flow.Identifier,
-		*p2pconf.GossipSubRPCInspectorsConfig,
+		*p2pconfig.RpcInspectorParameters,
 		module.GossipSubMetrics,
 		metrics.HeroCacheMetricsFactory,
 		flownet.NetworkingType,
-		module.IdentityProvider) (p2p.GossipSubInspectorSuite, error) {
+		module.IdentityProvider,
+		func() p2p.TopicProvider) (p2p.GossipSubInspectorSuite, error) {
 		// override the gossipsub rpc inspector suite factory to return the mock inspector suite
 		return inspectorSuite1, nil
 	}
+
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+
+	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond // speed up the test
+
 	node1, id1 := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
-		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
+		p2ptest.OverrideFlowConfig(cfg),
 		p2ptest.OverrideGossipSubRpcInspectorSuiteFactory(factory))
 
 	node2, id2 := p2ptest.NodeFixture(
@@ -116,7 +121,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
-		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
+		p2ptest.OverrideFlowConfig(cfg))
 
 	ids := flow.IdentityList{&id1, &id2}
 	nodes := []p2p.LibP2PNode{node1, node2}
@@ -135,19 +140,22 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-	// checks end-to-end message delivery works on GossipSub
+	// checks end-to-end message delivery works on GossipSub.
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
 		return unittest.ProposalFixture()
 	})
 
-	// now simulates node2 spamming node1 with invalid gossipsub control messages.
-	for i := 0; i < 30; i++ {
+	// simulates node2 spamming node1 with invalid gossipsub control messages until node2 gets dissallow listed.
+	// since the decay will start lower than .99 and will only be incremented by default .01, we need to spam a lot of messages so that the node gets disallow listed
+	for i := 0; i < 750; i++ {
 		inspectorSuite1.consumer.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 			PeerID:  node2.ID(),
 			MsgType: p2pmsg.ControlMessageTypes()[rand.Intn(len(p2pmsg.ControlMessageTypes()))],
 			Error:   fmt.Errorf("invalid control message"),
 		})
 	}
+
+	time.Sleep(1 * time.Second) // wait for app-specific score to be updated in the cache (remember that we need at least 100 ms for the score to be updated (ScoreTTL))
 
 	// checks no GossipSub message exchange should no longer happen between node1 and node2.
 	p2ptest.EnsureNoPubsubExchangeBetweenGroups(

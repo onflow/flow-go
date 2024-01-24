@@ -7,12 +7,12 @@ import (
 	"strings"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/crypto"
 	"github.com/spf13/cobra"
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -16,11 +17,13 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	discoveryBackoff "github.com/libp2p/go-libp2p/p2p/discovery/backoff"
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
+	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/rand"
 
 	"github.com/onflow/flow-go/config"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -30,11 +33,11 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
+	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
+	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	"github.com/onflow/flow-go/network/p2p/tracer"
+	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
@@ -55,6 +58,11 @@ const (
 	// expected to be necessary. Any failure to start a node within this timeout is likely to be
 	// caused by a bug in the code.
 	libp2pNodeShutdownTimeout = 10 * time.Second
+
+	// topicIDFixtureLen is the length of the topic ID fixture for testing.
+	topicIDFixtureLen = 10
+	// messageIDFixtureLen is the length of the message ID fixture for testing.
+	messageIDFixtureLen = 10
 )
 
 // NetworkingKeyFixtures is a test helper that generates a ECDSA flow key pair.
@@ -67,30 +75,19 @@ func NetworkingKeyFixtures(t *testing.T) crypto.PrivateKey {
 
 // NodeFixture is a test fixture that creates a single libp2p node with the given key, spork id, and options.
 // It returns the node and its identity.
-func NodeFixture(
-	t *testing.T, sporkID flow.Identifier, dhtPrefix string, idProvider module.IdentityProvider, opts ...NodeFixtureParameterOption,
-) (p2p.LibP2PNode, flow.Identity) {
+func NodeFixture(t *testing.T,
+	sporkID flow.Identifier,
+	dhtPrefix string,
+	idProvider module.IdentityProvider,
+	opts ...NodeFixtureParameterOption) (p2p.LibP2PNode, flow.Identity) {
+
 	defaultFlowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-
-	logger := unittest.Logger().Level(zerolog.WarnLevel)
 	require.NotNil(t, idProvider)
-	connectionGater := NewConnectionGater(
-		idProvider, func(p peer.ID) error {
-			return nil
-		})
+	connectionGater := NewConnectionGater(idProvider, func(p peer.ID) error {
+		return nil
+	})
 	require.NotNil(t, connectionGater)
-
-	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                             unittest.Logger(),
-		Metrics:                            metrics.NewNoopCollector(),
-		IDProvider:                         idProvider,
-		LoggerInterval:                     time.Second,
-		HeroCacheMetricsFactory:            metrics.NewNoopHeroCacheMetricsFactory(),
-		RpcSentTrackerCacheSize:            defaultFlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
-		RpcSentTrackerWorkerQueueCacheSize: defaultFlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
-		RpcSentTrackerNumOfWorkers:         defaultFlowConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
-	}
 
 	parameters := &NodeFixtureParameters{
 		NetworkingType: flownet.PrivateNetwork,
@@ -98,22 +95,17 @@ func NodeFixture(
 		Unicasts:       nil,
 		Key:            NetworkingKeyFixtures(t),
 		Address:        unittest.DefaultAddress,
-		Logger:         logger,
+		Logger:         unittest.Logger().Level(zerolog.WarnLevel),
 		Role:           flow.RoleCollection,
 		IdProvider:     idProvider,
-		MetricsCfg: &p2pconfig.MetricsConfig{
+		MetricsCfg: &p2pbuilderconfig.MetricsConfig{
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 			Metrics:          metrics.NewNoopCollector(),
 		},
-		ResourceManager:                  &network.NullResourceManager{},
-		GossipSubPeerScoreTracerInterval: 0, // disabled by default
-		ConnGater:                        connectionGater,
-		PeerManagerConfig:                PeerManagerConfigFixture(), // disabled by default
-		FlowConfig:                       defaultFlowConfig,
-		PubSubTracer:                     tracer.NewGossipSubMeshTracer(meshTracerCfg),
-		UnicastConfig: &p2pconfig.UnicastConfig{
-			UnicastConfig: defaultFlowConfig.NetworkConfig.UnicastConfig,
-		},
+		ResourceManager:   &network.NullResourceManager{},
+		ConnGater:         connectionGater,
+		PeerManagerConfig: PeerManagerConfigFixture(), // disabled by default
+		FlowConfig:        defaultFlowConfig,
 	}
 
 	for _, opt := range opts {
@@ -124,32 +116,31 @@ func NodeFixture(
 		unittest.WithAddress(parameters.Address),
 		unittest.WithRole(parameters.Role))
 
-	logger = parameters.Logger.With().Hex("node_id", logging.ID(identity.NodeID)).Logger()
+	logger := parameters.Logger.With().Hex("node_id", logging.ID(identity.NodeID)).Logger()
 
-	connManager, err := connection.NewConnManager(
-		logger,
-		parameters.MetricsCfg.Metrics,
-		&defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
+	connManager, err := connection.NewConnManager(logger, parameters.MetricsCfg.Metrics, &parameters.FlowConfig.NetworkConfig.ConnectionManager)
 	require.NoError(t, err)
 
-	builder := p2pbuilder.NewNodeBuilder(logger,
+	builder := p2pbuilder.NewNodeBuilder(
+		logger,
+		&parameters.FlowConfig.NetworkConfig.GossipSub,
 		parameters.MetricsCfg,
 		parameters.NetworkingType,
 		parameters.Address,
 		parameters.Key,
 		sporkID,
 		parameters.IdProvider,
-		&defaultFlowConfig.NetworkConfig.ResourceManagerConfig,
-		&parameters.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
+		&parameters.FlowConfig.NetworkConfig.ResourceManager,
 		parameters.PeerManagerConfig,
 		&p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
 		},
-		parameters.PubSubTracer,
-		parameters.UnicastConfig).
+		&p2pbuilderconfig.UnicastConfig{
+			Unicast:                parameters.FlowConfig.NetworkConfig.Unicast,
+			RateLimiterDistributor: parameters.UnicastRateLimiterDistributor,
+		}).
 		SetConnectionManager(connManager).
-		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
 		SetResourceManager(parameters.ResourceManager)
 
 	if parameters.DhtOptions != nil && (parameters.Role != flow.RoleAccess && parameters.Role != flow.RoleExecution) {
@@ -160,16 +151,14 @@ func NodeFixture(
 		// Only access and execution nodes need to run DHT;
 		// Access nodes and execution nodes need DHT to run a blob service.
 		// Moreover, access nodes run a DHT to let un-staked (public) access nodes find each other on the public network.
-		builder.SetRoutingSystem(
-			func(ctx context.Context, host host.Host) (routing.Routing, error) {
-				return p2pdht.NewDHT(
-					ctx,
-					host,
-					protocol.ID(protocols.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix),
-					logger,
-					parameters.MetricsCfg.Metrics,
-					parameters.DhtOptions...)
-			})
+		builder.SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
+			return p2pdht.NewDHT(ctx,
+				host,
+				protocol.ID(protocols.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix),
+				logger,
+				parameters.MetricsCfg.Metrics,
+				parameters.DhtOptions...)
+		})
 	}
 
 	if parameters.GossipSubRpcInspectorSuiteFactory != nil {
@@ -185,7 +174,7 @@ func NodeFixture(
 	}
 
 	if parameters.PeerScoringEnabled {
-		builder.EnableGossipSubScoringWithOverride(parameters.PeerScoringConfigOverride)
+		builder.OverrideGossipSubScoringConfig(parameters.PeerScoringConfigOverride)
 	}
 
 	if parameters.GossipSubFactory != nil && parameters.GossipSubConfig != nil {
@@ -195,12 +184,6 @@ func NodeFixture(
 	if parameters.ConnManager != nil {
 		builder.SetConnectionManager(parameters.ConnManager)
 	}
-
-	if parameters.PubSubTracer != nil {
-		builder.SetGossipSubTracer(parameters.PubSubTracer)
-	}
-
-	builder.SetGossipSubScoreTracerInterval(parameters.GossipSubPeerScoreTracerInterval)
 
 	n, err := builder.Build()
 	require.NoError(t, err)
@@ -222,13 +205,32 @@ func NodeFixture(
 	return n, *identity
 }
 
+// RegisterPeerProviders registers the peer provider for all the nodes in the input slice.
+// All node ids are registered as the peers provider for all the nodes.
+// This means that every node will be connected to every other node by the peer manager.
+// This is useful for suppressing the "peer provider not set" verbose warning logs in tests scenarios where
+// it is desirable to have all nodes connected to each other.
+// Args:
+// - t: testing.T- the test object; not used, but included in the signature to defensively prevent misuse of the test utility in production.
+// - nodes: nodes to register the peer provider for, each node will be connected to all other nodes.
+func RegisterPeerProviders(_ *testing.T, nodes []p2p.LibP2PNode) {
+	ids := peer.IDSlice{}
+	for _, node := range nodes {
+		ids = append(ids, node.ID())
+	}
+	for _, node := range nodes {
+		node.WithPeersProvider(func() peer.IDSlice {
+			return ids
+		})
+	}
+}
+
 type NodeFixtureParameterOption func(*NodeFixtureParameters)
 
 type NodeFixtureParameters struct {
 	HandlerFunc                       network.StreamHandler
 	NetworkingType                    flownet.NetworkingType
 	Unicasts                          []protocols.ProtocolName
-	UnicastConfig                     *p2pconfig.UnicastConfig
 	Key                               crypto.PrivateKey
 	Address                           string
 	DhtOptions                        []dht.Option
@@ -237,23 +239,22 @@ type NodeFixtureParameters struct {
 	PeerScoringEnabled                bool
 	IdProvider                        module.IdentityProvider
 	PeerScoringConfigOverride         *p2p.PeerScoringConfigOverride
-	PeerManagerConfig                 *p2pconfig.PeerManagerConfig
+	PeerManagerConfig                 *p2pbuilderconfig.PeerManagerConfig
 	PeerProvider                      p2p.PeersProvider // peer manager parameter
 	ConnGater                         p2p.ConnectionGater
 	ConnManager                       connmgr.ConnManager
 	GossipSubFactory                  p2p.GossipSubFactoryFunc
 	GossipSubConfig                   p2p.GossipSubAdapterConfigFunc
-	MetricsCfg                        *p2pconfig.MetricsConfig
+	MetricsCfg                        *p2pbuilderconfig.MetricsConfig
 	ResourceManager                   network.ResourceManager
-	PubSubTracer                      p2p.PubSubTracer
-	GossipSubPeerScoreTracerInterval  time.Duration // intervals at which the peer score is updated and logged.
 	GossipSubRpcInspectorSuiteFactory p2p.GossipSubRpcInspectorSuiteFactoryFunc
 	FlowConfig                        *config.FlowConfig
+	UnicastRateLimiterDistributor     p2p.UnicastRateLimiterDistributor
 }
 
 func WithUnicastRateLimitDistributor(distributor p2p.UnicastRateLimiterDistributor) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
-		p.UnicastConfig.RateLimiterDistributor = distributor
+		p.UnicastRateLimiterDistributor = distributor
 	}
 }
 
@@ -266,12 +267,6 @@ func OverrideGossipSubRpcInspectorSuiteFactory(factory p2p.GossipSubRpcInspector
 func OverrideFlowConfig(cfg *config.FlowConfig) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.FlowConfig = cfg
-	}
-}
-
-func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption {
-	return func(p *NodeFixtureParameters) {
-		p.UnicastConfig.CreateStreamBackoffDelay = delay
 	}
 }
 
@@ -293,19 +288,13 @@ func EnablePeerScoringWithOverride(override *p2p.PeerScoringConfigOverride) Node
 	}
 }
 
-func WithGossipSubTracer(tracer p2p.PubSubTracer) NodeFixtureParameterOption {
-	return func(p *NodeFixtureParameters) {
-		p.PubSubTracer = tracer
-	}
-}
-
 func WithDefaultStreamHandler(handler network.StreamHandler) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.HandlerFunc = handler
 	}
 }
 
-func WithPeerManagerEnabled(cfg *p2pconfig.PeerManagerConfig, peerProvider p2p.PeersProvider) NodeFixtureParameterOption {
+func WithPeerManagerEnabled(cfg *p2pbuilderconfig.PeerManagerConfig, peerProvider p2p.PeersProvider) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.PeerManagerConfig = cfg
 		p.PeerProvider = peerProvider
@@ -372,12 +361,6 @@ func WithMetricsCollector(metrics module.NetworkMetrics) NodeFixtureParameterOpt
 	}
 }
 
-func WithPeerScoreTracerInterval(interval time.Duration) NodeFixtureParameterOption {
-	return func(p *NodeFixtureParameters) {
-		p.GossipSubPeerScoreTracerInterval = interval
-	}
-}
-
 // WithDefaultResourceManager sets the resource manager to nil, which will cause the node to use the default resource manager.
 // Otherwise, it uses the resource manager provided by the test (the infinite resource manager).
 func WithDefaultResourceManager() NodeFixtureParameterOption {
@@ -401,8 +384,8 @@ func WithUnicastHandlerFunc(handler network.StreamHandler) NodeFixtureParameterO
 }
 
 // PeerManagerConfigFixture is a test fixture that sets the default config for the peer manager.
-func PeerManagerConfigFixture(opts ...func(*p2pconfig.PeerManagerConfig)) *p2pconfig.PeerManagerConfig {
-	cfg := &p2pconfig.PeerManagerConfig{
+func PeerManagerConfigFixture(opts ...func(*p2pbuilderconfig.PeerManagerConfig)) *p2pbuilderconfig.PeerManagerConfig {
+	cfg := &p2pbuilderconfig.PeerManagerConfig{
 		ConnectionPruning: true,
 		UpdateInterval:    1 * time.Second,
 		ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
@@ -415,8 +398,8 @@ func PeerManagerConfigFixture(opts ...func(*p2pconfig.PeerManagerConfig)) *p2pco
 
 // WithZeroJitterAndZeroBackoff is a test fixture that sets the default config for the peer manager.
 // It uses a backoff connector with zero jitter and zero backoff.
-func WithZeroJitterAndZeroBackoff(t *testing.T) func(*p2pconfig.PeerManagerConfig) {
-	return func(cfg *p2pconfig.PeerManagerConfig) {
+func WithZeroJitterAndZeroBackoff(t *testing.T) func(*p2pbuilderconfig.PeerManagerConfig) {
+	return func(cfg *p2pbuilderconfig.PeerManagerConfig) {
 		cfg.ConnectorFactory = func(host host.Host) (p2p.Connector, error) {
 			cacheSize := 100
 			dialTimeout := time.Minute * 2
@@ -432,15 +415,12 @@ func WithZeroJitterAndZeroBackoff(t *testing.T) func(*p2pconfig.PeerManagerConfi
 
 // NodesFixture is a test fixture that creates a number of libp2p nodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
-func NodesFixture(
-	t *testing.T,
+func NodesFixture(t *testing.T,
 	sporkID flow.Identifier,
 	dhtPrefix string,
 	count int,
 	idProvider module.IdentityProvider,
-	opts ...NodeFixtureParameterOption) (
-	[]p2p.LibP2PNode,
-	flow.IdentityList) {
+	opts ...NodeFixtureParameterOption) ([]p2p.LibP2PNode, flow.IdentityList) {
 	var nodes []p2p.LibP2PNode
 
 	// creating nodes
@@ -563,23 +543,22 @@ func TryConnectionAndEnsureConnected(t *testing.T, ctx context.Context, nodes []
 // - tick: the tick duration
 // - timeout: the timeout duration
 func RequireConnectedEventually(t *testing.T, nodes []p2p.LibP2PNode, tick time.Duration, timeout time.Duration) {
-	require.Eventually(
-		t, func() bool {
-			for _, node := range nodes {
-				for _, other := range nodes {
-					if node == other {
-						continue
-					}
-					if node.Host().Network().Connectedness(other.ID()) != network.Connected {
-						return false
-					}
-					if len(node.Host().Network().ConnsToPeer(other.ID())) == 0 {
-						return false
-					}
+	require.Eventually(t, func() bool {
+		for _, node := range nodes {
+			for _, other := range nodes {
+				if node == other {
+					continue
+				}
+				if node.Host().Network().Connectedness(other.ID()) != network.Connected {
+					return false
+				}
+				if len(node.Host().Network().ConnsToPeer(other.ID())) == 0 {
+					return false
 				}
 			}
-			return true
-		}, timeout, tick)
+		}
+		return true
+	}, timeout, tick)
 }
 
 // RequireEventuallyNotConnected ensures eventually that the given groups of nodes are not connected to each other.
@@ -589,26 +568,20 @@ func RequireConnectedEventually(t *testing.T, nodes []p2p.LibP2PNode, tick time.
 // - groupB: the second group of nodes
 // - tick: the tick duration
 // - timeout: the timeout duration
-func RequireEventuallyNotConnected(
-	t *testing.T,
-	groupA []p2p.LibP2PNode,
-	groupB []p2p.LibP2PNode,
-	tick time.Duration,
-	timeout time.Duration) {
-	require.Eventually(
-		t, func() bool {
-			for _, node := range groupA {
-				for _, other := range groupB {
-					if node.Host().Network().Connectedness(other.ID()) == network.Connected {
-						return false
-					}
-					if len(node.Host().Network().ConnsToPeer(other.ID())) > 0 {
-						return false
-					}
+func RequireEventuallyNotConnected(t *testing.T, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode, tick time.Duration, timeout time.Duration) {
+	require.Eventually(t, func() bool {
+		for _, node := range groupA {
+			for _, other := range groupB {
+				if node.Host().Network().Connectedness(other.ID()) == network.Connected {
+					return false
+				}
+				if len(node.Host().Network().ConnsToPeer(other.ID())) > 0 {
+					return false
 				}
 			}
-			return true
-		}, timeout, tick)
+		}
+		return true
+	}, timeout, tick)
 }
 
 // EnsureStreamCreationInBothDirections ensure that between each pair of nodes in the given list, a stream is created in both directions.
@@ -619,12 +592,11 @@ func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nod
 				continue
 			}
 			// stream creation should pass without error
-			err := this.OpenProtectedStream(
-				ctx, other.ID(), t.Name(), func(stream network.Stream) error {
-					// do nothing
-					require.NotNil(t, stream)
-					return nil
-				})
+			err := this.OpenAndWriteOnStream(ctx, other.ID(), t.Name(), func(stream network.Stream) error {
+				// do nothing
+				require.NotNil(t, stream)
+				return nil
+			})
 			require.NoError(t, err)
 
 		}
@@ -642,13 +614,7 @@ func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nod
 //
 // Note-1: this function assumes a timeout of 5 seconds for each message to be received.
 // Note-2: TryConnectionAndEnsureConnected() must be called to connect all nodes before calling this function.
-func EnsurePubsubMessageExchange(
-	t *testing.T,
-	ctx context.Context,
-	nodes []p2p.LibP2PNode,
-	topic channels.Topic,
-	count int,
-	messageFactory func() interface{}) {
+func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, topic channels.Topic, count int, messageFactory func() interface{}) {
 	subs := make([]p2p.Subscription, len(nodes))
 	for i, node := range nodes {
 		ps, err := node.Subscribe(topic, validator.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter()))
@@ -692,16 +658,14 @@ func EnsurePubsubMessageExchange(
 // - topic: the topic to exchange messages on.
 // - count: the number of messages to exchange from `sender` to `receiver`.
 // - messageFactory: a function that creates a unique message to be published by the node.
-func EnsurePubsubMessageExchangeFromNode(
-	t *testing.T,
+func EnsurePubsubMessageExchangeFromNode(t *testing.T,
 	ctx context.Context,
 	sender p2p.LibP2PNode,
 	receiverNode p2p.LibP2PNode,
 	receiverIdentifier flow.Identifier,
 	topic channels.Topic,
 	count int,
-	messageFactory func() interface{},
-) {
+	messageFactory func() interface{}) {
 	_, err := sender.Subscribe(topic, validator.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter()))
 	require.NoError(t, err)
 
@@ -747,16 +711,14 @@ func EnsureNotConnectedBetweenGroups(t *testing.T, ctx context.Context, groupA [
 // - topic: the topic to exchange messages on.
 // - count: the number of messages to exchange from each node.
 // - messageFactory: a function that creates a unique message to be published by the node.
-func EnsureNoPubsubMessageExchange(
-	t *testing.T,
+func EnsureNoPubsubMessageExchange(t *testing.T,
 	ctx context.Context,
 	from []p2p.LibP2PNode,
 	to []p2p.LibP2PNode,
 	toIdentifiers flow.IdentifierList,
 	topic channels.Topic,
 	count int,
-	messageFactory func() interface{},
-) {
+	messageFactory func() interface{}) {
 	subs := make([]p2p.Subscription, len(to))
 	tv := validator.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter())
 	var err error
@@ -811,8 +773,7 @@ func EnsureNoPubsubMessageExchange(
 // - topic: pubsub topic- no message should be exchanged on this topic.
 // - count: number of messages to be exchanged- no message should be exchanged.
 // - messageFactory: function to create a unique message to be published by the node.
-func EnsureNoPubsubExchangeBetweenGroups(
-	t *testing.T,
+func EnsureNoPubsubExchangeBetweenGroups(t *testing.T,
 	ctx context.Context,
 	groupANodes []p2p.LibP2PNode,
 	groupAIdentifiers flow.IdentifierList,
@@ -820,8 +781,7 @@ func EnsureNoPubsubExchangeBetweenGroups(
 	groupBIdentifiers flow.IdentifierList,
 	topic channels.Topic,
 	count int,
-	messageFactory func() interface{},
-) {
+	messageFactory func() interface{}) {
 	// ensure no message exchange from group A to group B
 	EnsureNoPubsubMessageExchange(t, ctx, groupANodes, groupBNodes, groupBIdentifiers, topic, count, messageFactory)
 	// ensure no message exchange from group B to group A
@@ -846,9 +806,230 @@ func PeerIdSliceFixture(t *testing.T, n int) peer.IDSlice {
 // NewConnectionGater creates a new connection gater for testing with given allow listing filter.
 func NewConnectionGater(idProvider module.IdentityProvider, allowListFilter p2p.PeerFilter) p2p.ConnectionGater {
 	filters := []p2p.PeerFilter{allowListFilter}
-	return connection.NewConnGater(
-		unittest.Logger(),
-		idProvider,
-		connection.WithOnInterceptPeerDialFilters(filters),
-		connection.WithOnInterceptSecuredFilters(filters))
+	return connection.NewConnGater(unittest.Logger(), idProvider, connection.WithOnInterceptPeerDialFilters(filters), connection.WithOnInterceptSecuredFilters(filters))
+}
+
+// MockInspectorNotificationDistributorReadyDoneAware mocks the Ready and Done methods of the distributor to return a channel that is already closed,
+// so that the distributor is considered ready and done when the test needs.
+func MockInspectorNotificationDistributorReadyDoneAware(d *mockp2p.GossipSubInspectorNotificationDistributor) {
+	d.On("Start", mockery.Anything).Return().Maybe()
+	d.On("Ready").Return(func() <-chan struct{} {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}()).Maybe()
+	d.On("Done").Return(func() <-chan struct{} {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}()).Maybe()
+}
+
+// MockScoringRegistrySubscriptionValidatorReadyDoneAware mocks the Ready and Done methods of the subscription validator to return a channel that is already closed,
+// so that the distributor is considered ready and done when the test needs.
+func MockScoringRegistrySubscriptionValidatorReadyDoneAware(s *mockp2p.SubscriptionValidator) {
+	s.On("Start", mockery.Anything).Return().Maybe()
+	s.On("Ready").Return(func() <-chan struct{} {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}()).Maybe()
+	s.On("Done").Return(func() <-chan struct{} {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}()).Maybe()
+}
+
+// GossipSubRpcFixtures returns a slice of random message IDs for testing.
+// Args:
+// - t: *testing.T instance
+// - count: number of message IDs to generate
+// Returns:
+// - []string: slice of message IDs.
+// Note: evey other parameters that are not explicitly set are set to 10. This function suites applications that need to generate a large number of RPC messages with
+// filled random data. For a better control over the generated data, use GossipSubRpcFixture.
+func GossipSubRpcFixtures(t *testing.T, count int) []*pb.RPC {
+	c := 10
+	rpcs := make([]*pb.RPC, 0)
+	for i := 0; i < count; i++ {
+		rpcs = append(rpcs,
+			GossipSubRpcFixture(t,
+				c,
+				WithPrune(c, GossipSubTopicIdFixture()),
+				WithGraft(c, GossipSubTopicIdFixture()),
+				WithIHave(c, c, GossipSubTopicIdFixture()),
+				WithIWant(c, c)))
+	}
+	return rpcs
+}
+
+// GossipSubRpcFixture returns a random GossipSub RPC message. An RPC message is the GossipSub-level message that is exchanged between nodes.
+// It contains individual messages, subscriptions, and control messages.
+// Args:
+// - t: *testing.T instance
+// - msgCnt: number of messages to generate
+// - opts: options to customize control messages (not having an option means no control message).
+// Returns:
+// - *pb.RPC: a random GossipSub RPC message
+// Note: the message is not signed.
+func GossipSubRpcFixture(t *testing.T, msgCnt int, opts ...GossipSubCtrlOption) *pb.RPC {
+	rand.Seed(uint64(time.Now().UnixNano()))
+
+	// creates a random number of Subscriptions
+	numSubscriptions := 10
+	topicIdSize := 10
+	subscriptions := make([]*pb.RPC_SubOpts, numSubscriptions)
+	for i := 0; i < numSubscriptions; i++ {
+		subscribe := rand.Intn(2) == 1
+		topicID := unittest.RandomStringFixture(t, topicIdSize)
+		subscriptions[i] = &pb.RPC_SubOpts{
+			Subscribe: &subscribe,
+			Topicid:   &topicID,
+		}
+	}
+
+	// generates random messages
+	messages := make([]*pb.Message, msgCnt)
+	for i := 0; i < msgCnt; i++ {
+		messages[i] = GossipSubMessageFixture(t)
+	}
+
+	// Create a Control Message
+	controlMessages := GossipSubCtrlFixture(opts...)
+
+	// Create the RPC
+	rpc := &pb.RPC{
+		Subscriptions: subscriptions,
+		Publish:       messages,
+		Control:       controlMessages,
+	}
+
+	return rpc
+}
+
+type GossipSubCtrlOption func(*pb.ControlMessage)
+
+// GossipSubCtrlFixture returns a ControlMessage with the given options.
+func GossipSubCtrlFixture(opts ...GossipSubCtrlOption) *pb.ControlMessage {
+	msg := &pb.ControlMessage{}
+	for _, opt := range opts {
+		opt(msg)
+	}
+	return msg
+}
+
+// WithIHave adds iHave control messages of the given size and number to the control message.
+func WithIHave(msgCount, msgIDCount int, topicId string) GossipSubCtrlOption {
+	return func(msg *pb.ControlMessage) {
+		iHaves := make([]*pb.ControlIHave, msgCount)
+		for i := 0; i < msgCount; i++ {
+			iHaves[i] = &pb.ControlIHave{
+				TopicID:    &topicId,
+				MessageIDs: GossipSubMessageIdsFixture(msgIDCount),
+			}
+		}
+		msg.Ihave = iHaves
+	}
+}
+
+// WithIHaveMessageIDs adds iHave control messages with the given message IDs to the control message.
+func WithIHaveMessageIDs(msgIDs []string, topicId string) GossipSubCtrlOption {
+	return func(msg *pb.ControlMessage) {
+		msg.Ihave = []*pb.ControlIHave{
+			{
+				TopicID:    &topicId,
+				MessageIDs: msgIDs,
+			},
+		}
+	}
+}
+
+// WithIWant adds iWant control messages of the given size and number to the control message.
+// The message IDs are generated randomly.
+// Args:
+//
+//	msgCount: number of iWant messages to add.
+//	msgIdsPerIWant: number of message IDs to add to each iWant message.
+//
+// Returns:
+// A GossipSubCtrlOption that adds iWant messages to the control message.
+// Example: WithIWant(2, 3) will add 2 iWant messages, each with 3 message IDs.
+func WithIWant(iWantCount int, msgIdsPerIWant int) GossipSubCtrlOption {
+	return func(msg *pb.ControlMessage) {
+		iWants := make([]*pb.ControlIWant, iWantCount)
+		for i := 0; i < iWantCount; i++ {
+			iWants[i] = &pb.ControlIWant{
+				MessageIDs: GossipSubMessageIdsFixture(msgIdsPerIWant),
+			}
+		}
+		msg.Iwant = iWants
+	}
+}
+
+// WithGraft adds GRAFT control messages with given topicID to the control message.
+func WithGraft(msgCount int, topicId string) GossipSubCtrlOption {
+	return func(msg *pb.ControlMessage) {
+		grafts := make([]*pb.ControlGraft, msgCount)
+		for i := 0; i < msgCount; i++ {
+			grafts[i] = &pb.ControlGraft{
+				TopicID: &topicId,
+			}
+		}
+		msg.Graft = grafts
+	}
+}
+
+// WithPrune adds PRUNE control messages with given topicID to the control message.
+func WithPrune(msgCount int, topicId string) GossipSubCtrlOption {
+	return func(msg *pb.ControlMessage) {
+		prunes := make([]*pb.ControlPrune, msgCount)
+		for i := 0; i < msgCount; i++ {
+			prunes[i] = &pb.ControlPrune{
+				TopicID: &topicId,
+			}
+		}
+		msg.Prune = prunes
+	}
+}
+
+// gossipSubMessageIdFixture returns a random gossipSub message ID.
+func gossipSubMessageIdFixture() string {
+	// TODO: messageID length should be a parameter.
+	return unittest.GenerateRandomStringWithLen(messageIDFixtureLen)
+}
+
+// GossipSubTopicIdFixture returns a random gossipSub topic ID.
+func GossipSubTopicIdFixture() string {
+	// TODO: topicID length should be a parameter.
+	return unittest.GenerateRandomStringWithLen(topicIDFixtureLen)
+}
+
+// GossipSubMessageIdsFixture returns a slice of random gossipSub message IDs of the given size.
+func GossipSubMessageIdsFixture(count int) []string {
+	msgIds := make([]string, count)
+	for i := 0; i < count; i++ {
+		msgIds[i] = gossipSubMessageIdFixture()
+	}
+	return msgIds
+}
+
+// GossipSubMessageFixture returns a random gossipSub message; this contains a single pubsub message that is exchanged between nodes.
+// The message is generated randomly.
+// Args:
+// - t: *testing.T instance
+// Returns:
+// - *pb.Message: a random gossipSub message
+// Note: the message is not signed.
+func GossipSubMessageFixture(t *testing.T) *pb.Message {
+	byteSize := 100
+	topic := unittest.RandomStringFixture(t, byteSize)
+	return &pb.Message{
+		From:      unittest.RandomBytes(byteSize),
+		Data:      unittest.RandomBytes(byteSize),
+		Seqno:     unittest.RandomBytes(byteSize),
+		Topic:     &topic,
+		Signature: unittest.RandomBytes(byteSize),
+		Key:       unittest.RandomBytes(byteSize),
+	}
 }

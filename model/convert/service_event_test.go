@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/convert"
@@ -36,6 +35,55 @@ func TestEventConversion(t *testing.T) {
 
 			assert.Equal(t, expected, actual)
 
+		},
+	)
+
+	t.Run(
+		"epoch setup with random source with leading zeroes", func(t *testing.T) {
+
+			fixture, _ := unittest.EpochSetupFixtureByChainID(chainID)
+			// all zero source to cover all cases of endiannesses
+			randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
+			// update the random source in event fixture
+			fixture.Payload = unittest.EpochSetupFixtureCCF(randomSource)
+
+			// convert Cadence types to Go types
+			event, err := convert.ServiceEvent(chainID, fixture)
+			require.NoError(t, err)
+			require.NotNil(t, event)
+
+			// cast event type to epoch setup
+			_, ok := event.Event.(*flow.EpochSetup)
+			require.True(t, ok)
+		},
+	)
+
+	t.Run(
+		"epoch setup with short random source", func(t *testing.T) {
+
+			fixture, _ := unittest.EpochSetupFixtureByChainID(chainID)
+			// update the random source in event fixture
+			randomSource := unittest.EpochSetupRandomSourceFixture()
+			fixture.Payload = unittest.EpochSetupFixtureCCF(randomSource[:flow.EpochSetupRandomSourceLength-1])
+
+			// convert Cadence types to Go types
+			event, err := convert.ServiceEvent(chainID, fixture)
+			require.Error(t, err)
+			require.Nil(t, event)
+		},
+	)
+
+	t.Run(
+		"epoch setup with non-hex random source", func(t *testing.T) {
+
+			fixture, _ := unittest.EpochSetupFixtureByChainID(chainID)
+			// update the random source in event fixture
+			fixture.Payload = unittest.EpochSetupCCFWithNonHexRandomSource()
+
+			// convert Cadence types to Go types
+			event, err := convert.ServiceEvent(chainID, fixture)
+			require.Error(t, err)
+			require.Nil(t, event)
 		},
 	)
 
@@ -182,11 +230,9 @@ func TestVersionBeaconEventConversion(t *testing.T) {
 	runVersionBeaconTestCase := func(t *testing.T, test vbTestCase) {
 		chainID := flow.Emulator
 		t.Run(test.name, func(t *testing.T) {
-			events, err := systemcontracts.ServiceEventsForChain(chainID)
-			if err != nil {
-				panic(err)
-			}
+			events := systemcontracts.ServiceEventsForChain(chainID)
 
+			var err error
 			event := unittest.EventFixture(events.VersionBeacon.EventType(), 1, 1, unittest.IdentifierFixture(), 0)
 			event.Payload, err = ccf.Encode(test.event)
 			require.NoError(t, err)

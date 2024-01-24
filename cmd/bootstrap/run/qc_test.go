@@ -4,12 +4,11 @@ import (
 	"crypto/rand"
 	"testing"
 
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -45,12 +44,12 @@ func TestGenerateRootQCWithSomeInvalidVotes(t *testing.T) {
 }
 
 func createSignerData(t *testing.T, n int) *ParticipantData {
-	identities := unittest.IdentityListFixture(n).Sort(order.Canonical)
+	identities := unittest.IdentityListFixture(n).Sort(flow.Canonical)
 
 	networkingKeys := unittest.NetworkingKeys(n)
 	stakingKeys := unittest.StakingKeys(n)
 
-	seed := make([]byte, crypto.SeedMinLenDKG)
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
 	_, err := rand.Read(seed)
 	require.NoError(t, err)
 	randomBSKs, randomBPKs, groupKey, err := crypto.BLSThresholdKeyGen(n,

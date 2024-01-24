@@ -90,7 +90,7 @@ jobs:
 
     steps:
     - name: Setup Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v4
       with:
         go-version: '1.19'
 
@@ -114,7 +114,7 @@ jobs:
     - name: Build/Push ${{ matrix.role }} images
       env:
         IMAGE_TAG: ${{ inputs.docker_tag }}
-        GITHUB_CREDS: "machine github.com login ${{ secrets.REPO_SYNC_USER }} password ${{ secrets.REPO_SYNC }}"
+        CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
       run: |
         make docker-build-${{ matrix.role }} docker-push-${{ matrix.role }}
 
@@ -122,6 +122,6 @@ jobs:
       if: ${{ inputs.include_without_netgo }}
       env:
         IMAGE_TAG: ${{ inputs.docker_tag }}
-        GITHUB_CREDS: "machine github.com login ${{ secrets.REPO_SYNC_USER }} password ${{ secrets.REPO_SYNC }}"
+        CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
       run: |
         make docker-build-${{ matrix.role }}-without-netgo docker-push-${{ matrix.role }}-without-netgo

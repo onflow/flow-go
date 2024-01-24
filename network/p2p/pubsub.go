@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 type ValidationResult int
@@ -54,6 +55,13 @@ type PubSubAdapter interface {
 	// subscribed peers for topics A and B, and querying for topic C will return an empty list.
 	ListPeers(topic string) []peer.ID
 
+	// GetLocalMeshPeers returns the list of peers in the local mesh for the given topic.
+	// Args:
+	// - topic: the topic.
+	// Returns:
+	// - []peer.ID: the list of peers in the local mesh for the given topic.
+	GetLocalMeshPeers(topic channels.Topic) []peer.ID
+
 	// PeerScoreExposer returns the peer score exposer for the gossipsub adapter. The exposer is a read-only interface
 	// for querying peer scores and returns the local scoring table of the underlying gossipsub node.
 	// The exposer is only available if the gossipsub adapter was configured with a score tracer.
@@ -76,11 +84,6 @@ type PubSubAdapterConfig interface {
 	// This is used to expose the local scoring table of the GossipSub node to its higher level components.
 	WithScoreTracer(tracer PeerScoreTracer)
 	WithInspectorSuite(GossipSubInspectorSuite)
-}
-
-// GossipSubControlMetricsObserver funcs used to observe gossipsub related metrics.
-type GossipSubControlMetricsObserver interface {
-	ObserveRPC(peer.ID, *pubsub.RPC)
 }
 
 // GossipSubRPCInspector app specific RPC inspector used to inspect and validate incoming RPC messages before they are processed by libp2p.
@@ -128,6 +131,7 @@ type Topic interface {
 
 // ScoreOptionBuilder abstracts the configuration for the underlying pubsub score implementation.
 type ScoreOptionBuilder interface {
+	component.Component
 	// BuildFlowPubSubScoreOption builds the pubsub score options as pubsub.Option for the Flow network.
 	BuildFlowPubSubScoreOption() (*pubsub.PeerScoreParams, *pubsub.PeerScoreThresholds)
 	// TopicScoreParams returns the topic score params for the given topic.
@@ -171,6 +175,12 @@ type PubSubTracer interface {
 	component.Component
 	pubsub.RawTracer
 	RpcControlTracking
+	// GetLocalMeshPeers returns the list of peers in the mesh for the given topic.
+	// Args:
+	// - topic: the topic.
+	// Returns:
+	// - []peer.ID: the list of peers in the mesh for the given topic.
+	GetLocalMeshPeers(topic channels.Topic) []peer.ID
 }
 
 // RpcControlTracking is the abstraction of the underlying libp2p control message tracker used to track message ids advertised by the iHave control messages.

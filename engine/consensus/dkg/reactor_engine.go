@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -348,7 +348,7 @@ func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, erro
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch dkg final views: %w", err)
 	}
-	seed := make([]byte, crypto.SeedMinLenDKG)
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
 	_, err = rand.Read(seed)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate random seed: %w", err)

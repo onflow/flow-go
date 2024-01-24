@@ -6,12 +6,13 @@ import (
 	"io"
 	"time"
 
-	"github.com/sony/gobreaker"
-
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
+	"github.com/sony/gobreaker"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	_ "google.golang.org/grpc/encoding/gzip" //required for gRPC compression
 	"google.golang.org/grpc/keepalive"
@@ -86,16 +87,22 @@ func NewManager(
 // GetConnection returns a gRPC client connection for the given grpcAddress and timeout.
 // If a cache is used, it retrieves a cached connection, otherwise creates a new connection.
 // It returns the client connection and an io.Closer to close the connection when done.
-func (m *Manager) GetConnection(grpcAddress string, timeout time.Duration, clientType clientType) (*grpc.ClientConn, io.Closer, error) {
+// The networkPubKey is the public key used for creating secure gRPC connection. Can be nil for an unsecured connection.
+func (m *Manager) GetConnection(
+	grpcAddress string,
+	timeout time.Duration,
+	clientType clientType,
+	networkPubKey crypto.PublicKey,
+) (*grpc.ClientConn, io.Closer, error) {
 	if m.cache != nil {
-		conn, err := m.retrieveConnection(grpcAddress, timeout, clientType)
+		conn, err := m.retrieveConnection(grpcAddress, timeout, clientType, networkPubKey)
 		if err != nil {
 			return nil, nil, err
 		}
 		return conn, &noopCloser{}, nil
 	}
 
-	conn, err := m.createConnection(grpcAddress, timeout, nil, clientType)
+	conn, err := m.createConnection(grpcAddress, timeout, nil, clientType, networkPubKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -135,7 +142,13 @@ func (m *Manager) HasCache() bool {
 // retrieveConnection retrieves the CachedClient for the given grpcAddress from the cache or adds a new one if not present.
 // If the connection is already cached, it waits for the lock and returns the connection from the cache.
 // Otherwise, it creates a new connection and caches it.
-func (m *Manager) retrieveConnection(grpcAddress string, timeout time.Duration, clientType clientType) (*grpc.ClientConn, error) {
+// The networkPubKey is the public key used for retrieving secure gRPC connection. Can be nil for an unsecured connection.
+func (m *Manager) retrieveConnection(
+	grpcAddress string,
+	timeout time.Duration,
+	clientType clientType,
+	networkPubKey crypto.PublicKey,
+) (*grpc.ClientConn, error) {
 	client, ok := m.cache.GetOrAdd(grpcAddress, timeout)
 	if ok {
 		// The client was retrieved from the cache, wait for the lock
@@ -157,7 +170,7 @@ func (m *Manager) retrieveConnection(grpcAddress string, timeout time.Duration, 
 	}
 
 	// The connection is not cached or is closed, create a new connection and cache it
-	conn, err := m.createConnection(grpcAddress, timeout, client, clientType)
+	conn, err := m.createConnection(grpcAddress, timeout, client, clientType, networkPubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +187,15 @@ func (m *Manager) retrieveConnection(grpcAddress string, timeout time.Duration, 
 // createConnection creates a new gRPC connection to the remote node at the given address with the specified timeout.
 // If the cachedClient is not nil, it means a new entry in the cache is being created, so it's locked to give priority
 // to the caller working with the new client, allowing it to create the underlying connection.
-func (m *Manager) createConnection(address string, timeout time.Duration, cachedClient *CachedClient, clientType clientType) (*grpc.ClientConn, error) {
+// The networkPubKey is optional and configures a connection level security for gRPC connection. If it is not nil,
+// it means that it used for creating secure gRPC connection. If it is nil, it means unsecure gRPC connection is being created.
+func (m *Manager) createConnection(
+	address string,
+	timeout time.Duration,
+	cachedClient *CachedClient,
+	clientType clientType,
+	networkPubKey crypto.PublicKey,
+) (*grpc.ClientConn, error) {
 	if timeout == 0 {
 		timeout = DefaultClientTimeout
 	}
@@ -212,12 +233,21 @@ func (m *Manager) createConnection(address string, timeout time.Duration, cached
 	// https://grpc.io/blog/grpc-on-http2/#keeping-connections-alive
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(m.maxMsgSize))))
-	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	opts = append(opts, grpc.WithKeepaliveParams(keepaliveParams))
 	opts = append(opts, grpc.WithChainUnaryInterceptor(connInterceptors...))
 
 	if m.compressorName != grpcutils.NoCompressor {
 		opts = append(opts, grpc.WithDefaultCallOptions(grpc.UseCompressor(m.compressorName)))
+	}
+
+	if networkPubKey != nil {
+		tlsConfig, err := grpcutils.DefaultClientTLSConfig(networkPubKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get default TLS client config using public flow networking key %s %w", networkPubKey.String(), err)
+		}
+		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
+	} else {
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
 
 	conn, err := grpc.Dial(
@@ -368,6 +398,25 @@ func (m *Manager) createCircuitBreakerInterceptor() grpc.UnaryClientInterceptor 
 			// MaxRequests defines the max number of concurrent requests while the circuit breaker is in the HalfClosed
 			// state.
 			MaxRequests: m.circuitBreakerConfig.MaxRequests,
+			// IsSuccessful defines gRPC status codes that should be treated as a successful result for the circuit breaker.
+			IsSuccessful: func(err error) bool {
+				if se, ok := status.FromError(err); ok {
+					if se == nil {
+						return true
+					}
+
+					// There are several error cases that may occur during normal operation and should be considered
+					// as "successful" from the perspective of the circuit breaker.
+					switch se.Code() {
+					case codes.OK, codes.Canceled, codes.InvalidArgument, codes.NotFound, codes.Unimplemented, codes.OutOfRange:
+						return true
+					default:
+						return false
+					}
+				}
+
+				return false
+			},
 		})
 
 		circuitBreakerInterceptor := func(

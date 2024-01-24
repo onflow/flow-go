@@ -11,11 +11,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -71,7 +71,7 @@ func toNodeInfos(confs []ContainerConfig) []bootstrap.NodeInfo {
 }
 
 func getSeed() ([]byte, error) {
-	seedLen := int(math.Max(crypto.SeedMinLenDKG, crypto.KeyGenSeedMinLen))
+	seedLen := int(math.Max(crypto.KeyGenSeedMinLen, crypto.KeyGenSeedMinLen))
 	seed := make([]byte, seedLen)
 	n, err := rand.Read(seed)
 	if err != nil || n != seedLen {

@@ -14,6 +14,8 @@ import (
 
 	"golang.org/x/exp/slices"
 
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -24,6 +26,7 @@ import (
 	mockstatestream "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 type testType struct {
@@ -36,12 +39,15 @@ type testType struct {
 	contracts  []string
 
 	heartbeatInterval uint64
+
+	headers http.Header
 }
 
+var chainID = flow.Testnet
 var testEventTypes = []flow.EventType{
-	"A.0123456789abcdef.flow.event",
-	"B.0123456789abcdef.flow.event",
-	"C.0123456789abcdef.flow.event",
+	unittest.EventTypeFixture(chainID),
+	unittest.EventTypeFixture(chainID),
+	unittest.EventTypeFixture(chainID),
 }
 
 type SubscribeEventsSuite struct {
@@ -64,6 +70,9 @@ func (s *SubscribeEventsSuite) SetupTest() {
 	s.blocks = make([]*flow.Block, 0, blockCount)
 	s.blockEvents = make(map[flow.Identifier]flow.EventsList, blockCount)
 
+	// by default, events are in CCF encoding
+	eventsGenerator := generator.EventGenerator(generator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
+
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
@@ -71,6 +80,13 @@ func (s *SubscribeEventsSuite) SetupTest() {
 
 		result := unittest.ExecutionResultFixture()
 		blockEvents := unittest.BlockEventsFixture(block.Header, (i%len(testEventTypes))*3+1, testEventTypes...)
+
+		// update payloads with valid CCF encoded data
+		for i := range blockEvents.Events {
+			blockEvents.Events[i].Payload = eventsGenerator.New().Payload
+
+			s.T().Logf("block events %d %v => %v", block.Header.Height, block.ID(), blockEvents.Events[i].Type)
+		}
 
 		s.blocks = append(s.blocks, block)
 		s.blockEvents[block.ID()] = blockEvents.Events
@@ -120,8 +136,16 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 			startHeight:       request.EmptyHeight,
 			heartbeatInterval: 2,
 		},
+		{
+			name:              "happy path - all origins allowed",
+			startBlockID:      flow.ZeroID,
+			startHeight:       request.EmptyHeight,
+			heartbeatInterval: 1,
+			headers: http.Header{
+				"Origin": []string{"https://example.com"},
+			},
+		},
 	}
-	chain := flow.MonotonicEmulator.Chain()
 
 	// create variations for each of the base test
 	tests := make([]testType, 0, len(testVectors)*2)
@@ -137,7 +161,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 
 		t3 := test
 		t3.name = fmt.Sprintf("%s - non existing events", test.name)
-		t3.eventTypes = []string{"A.0123456789abcdff.flow.event"}
+		t3.eventTypes = []string{fmt.Sprintf("%s_new", testEventTypes[0])}
 		tests = append(tests, t3)
 	}
 
@@ -148,7 +172,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 
 			filter, err := state_stream.NewEventFilter(
 				state_stream.DefaultEventFilterConfig,
-				chain,
+				chainID.Chain(),
 				test.eventTypes,
 				test.addresses,
 				test.contracts)
@@ -160,26 +184,35 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 
 			// construct expected event responses based on the provided test configuration
 			for i, block := range s.blocks {
-				if startBlockFound || block.ID() == test.startBlockID {
+				blockID := block.ID()
+				if startBlockFound || blockID == test.startBlockID {
 					startBlockFound = true
 					if test.startHeight == request.EmptyHeight || block.Header.Height >= test.startHeight {
-						eventsForBlock := flow.EventsList{}
-						for _, event := range s.blockEvents[block.ID()] {
+						// track 2 lists, one for the expected results and one that is passed back
+						// from the subscription to the handler. These cannot be shared since the
+						// response struct is passed by reference from the mock to the handler, so
+						// a bug within the handler could go unnoticed
+						expectedEvents := flow.EventsList{}
+						subscriptionEvents := flow.EventsList{}
+						for _, event := range s.blockEvents[blockID] {
 							if slices.Contains(test.eventTypes, string(event.Type)) ||
-								len(test.eventTypes) == 0 { //Include all events
-								eventsForBlock = append(eventsForBlock, event)
+								len(test.eventTypes) == 0 { // Include all events
+								expectedEvents = append(expectedEvents, event)
+								subscriptionEvents = append(subscriptionEvents, event)
 							}
 						}
-						eventResponse := &backend.EventsResponse{
+						if len(expectedEvents) > 0 || (i+1)%int(test.heartbeatInterval) == 0 {
+							expectedEventsResponses = append(expectedEventsResponses, &backend.EventsResponse{
+								Height:  block.Header.Height,
+								BlockID: blockID,
+								Events:  expectedEvents,
+							})
+						}
+						subscriptionEventsResponses = append(subscriptionEventsResponses, &backend.EventsResponse{
 							Height:  block.Header.Height,
-							BlockID: block.ID(),
-							Events:  eventsForBlock,
-						}
-
-						if len(eventsForBlock) > 0 || (i+1)%int(test.heartbeatInterval) == 0 {
-							expectedEventsResponses = append(expectedEventsResponses, eventResponse)
-						}
-						subscriptionEventsResponses = append(subscriptionEventsResponses, eventResponse)
+							BlockID: blockID,
+							Events:  subscriptionEvents,
+						})
 					}
 				}
 			}
@@ -208,15 +241,15 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 				On("SubscribeEvents", mocks.Anything, test.startBlockID, startHeight, filter).
 				Return(subscription)
 
-			req, err := getSubscribeEventsRequest(s.T(), test.startBlockID, test.startHeight, test.eventTypes, test.addresses, test.contracts, test.heartbeatInterval)
+			req, err := getSubscribeEventsRequest(s.T(), test.startBlockID, test.startHeight, test.eventTypes, test.addresses, test.contracts, test.heartbeatInterval, test.headers)
 			require.NoError(s.T(), err)
 			respRecorder := newTestHijackResponseRecorder()
 			// closing the connection after 1 second
 			go func() {
 				time.Sleep(1 * time.Second)
-				close(respRecorder.closed)
+				respRecorder.Close()
 			}()
-			executeWsRequest(req, stateStreamBackend, respRecorder)
+			executeWsRequest(req, stateStreamBackend, respRecorder, chainID.Chain())
 			requireResponse(s.T(), respRecorder, expectedEventsResponses)
 		})
 	}
@@ -225,10 +258,10 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 	s.Run("returns error for block id and height", func() {
 		stateStreamBackend := mockstatestream.NewAPI(s.T())
-		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), s.blocks[0].Header.Height, nil, nil, nil, 1)
+		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), s.blocks[0].Header.Height, nil, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := newTestHijackResponseRecorder()
-		executeWsRequest(req, stateStreamBackend, respRecorder)
+		executeWsRequest(req, stateStreamBackend, respRecorder, chainID.Chain())
 		requireError(s.T(), respRecorder, "can only provide either block ID or start height")
 	})
 
@@ -250,19 +283,19 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 			On("SubscribeEvents", mocks.Anything, invalidBlock.ID(), uint64(0), mocks.Anything).
 			Return(subscription)
 
-		req, err := getSubscribeEventsRequest(s.T(), invalidBlock.ID(), request.EmptyHeight, nil, nil, nil, 1)
+		req, err := getSubscribeEventsRequest(s.T(), invalidBlock.ID(), request.EmptyHeight, nil, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := newTestHijackResponseRecorder()
-		executeWsRequest(req, stateStreamBackend, respRecorder)
+		executeWsRequest(req, stateStreamBackend, respRecorder, chainID.Chain())
 		requireError(s.T(), respRecorder, "stream encountered an error: subscription error")
 	})
 
 	s.Run("returns error for invalid event filter", func() {
 		stateStreamBackend := mockstatestream.NewAPI(s.T())
-		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, []string{"foo"}, nil, nil, 1)
+		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, []string{"foo"}, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := newTestHijackResponseRecorder()
-		executeWsRequest(req, stateStreamBackend, respRecorder)
+		executeWsRequest(req, stateStreamBackend, respRecorder, chainID.Chain())
 		requireError(s.T(), respRecorder, "invalid event type format")
 	})
 
@@ -284,10 +317,10 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 			On("SubscribeEvents", mocks.Anything, s.blocks[0].ID(), uint64(0), mocks.Anything).
 			Return(subscription)
 
-		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil, 1)
+		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := newTestHijackResponseRecorder()
-		executeWsRequest(req, stateStreamBackend, respRecorder)
+		executeWsRequest(req, stateStreamBackend, respRecorder, chainID.Chain())
 		requireError(s.T(), respRecorder, "subscription channel closed")
 	})
 }
@@ -299,6 +332,7 @@ func getSubscribeEventsRequest(t *testing.T,
 	addresses []string,
 	contracts []string,
 	heartbeatInterval uint64,
+	header http.Header,
 ) (*http.Request, error) {
 	u, _ := url.Parse("/v1/subscribe_events")
 	q := u.Query()
@@ -331,11 +365,17 @@ func getSubscribeEventsRequest(t *testing.T,
 	}
 
 	req, err := http.NewRequest("GET", u.String(), nil)
+	require.NoError(t, err)
+
 	req.Header.Set("Connection", "upgrade")
 	req.Header.Set("Upgrade", "websocket")
 	req.Header.Set("Sec-Websocket-Version", "13")
 	req.Header.Set("Sec-Websocket-Key", key)
-	require.NoError(t, err)
+
+	for k, v := range header {
+		req.Header.Set(k, v[0])
+	}
+
 	return req, nil
 }
 
@@ -392,7 +432,11 @@ func requireResponse(t *testing.T, recorder *testHijackResponseRecorder, expecte
 			require.Equal(t, expectedEvent.TransactionID, actualEvent.TransactionID)
 			require.Equal(t, expectedEvent.TransactionIndex, actualEvent.TransactionIndex)
 			require.Equal(t, expectedEvent.EventIndex, actualEvent.EventIndex)
-			require.Equal(t, expectedEvent.Payload, actualEvent.Payload)
+			// payload is not expected to match, but it should decode
+
+			// payload must decode to valid json-cdc encoded data
+			_, err := jsoncdc.Decode(nil, actualEvent.Payload)
+			require.NoError(t, err)
 		}
 	}
 }

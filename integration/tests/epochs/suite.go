@@ -14,26 +14,26 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onflow/cadence"
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/cadence"
+	"github.com/onflow/crypto"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
-	"github.com/onflow/flow-go/fvm/blueprints"
-	"github.com/onflow/flow-go/state/protocol"
-
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/ghost/client"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -64,10 +64,16 @@ type Suite struct {
 	// Whether approvals are required for sealing (we only enable for VN tests because
 	// requiring approvals requires a longer DKG period to avoid flakiness)
 	RequiredSealApprovals uint // defaults to 0 (no approvals required)
+	// Consensus Node proposal duration
+	ConsensusProposalDuration time.Duration
 }
 
 // SetupTest is run automatically by the testing framework before each test case.
 func (s *Suite) SetupTest() {
+	// If unset, use default value 100ms
+	if s.ConsensusProposalDuration == 0 {
+		s.ConsensusProposalDuration = time.Millisecond * 100
+	}
 
 	minEpochLength := s.StakingAuctionLen + s.DKGPhaseLen*3 + 20
 	// ensure epoch lengths are set correctly
@@ -85,7 +91,7 @@ func (s *Suite) SetupTest() {
 		testnet.WithLogLevel(zerolog.WarnLevel)}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=100ms"),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--cruise-ctl-fallback-proposal-duration=%s", s.ConsensusProposalDuration)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", s.RequiredSealApprovals)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", s.RequiredSealApprovals)),
 		testnet.WithLogLevel(zerolog.WarnLevel)}
@@ -336,7 +342,7 @@ func (s *Suite) SubmitSetApprovedListTx(ctx context.Context, env templates.Envir
 	idTableAddress := sdk.HexToAddress(env.IDTableAddress)
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateSetApprovedNodesScript(env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
 		SetProposalKey(s.Client.SDKServiceAddress(), 0, s.Client.Account().Keys[0].SequenceNumber).
 		SetPayer(s.Client.SDKServiceAddress()).
@@ -451,18 +457,20 @@ func (s *Suite) getContainerToReplace(role flow.Role) *testnet.Container {
 
 // AwaitEpochPhase waits for the given phase, in the given epoch.
 func (s *Suite) AwaitEpochPhase(ctx context.Context, expectedEpoch uint64, expectedPhase flow.EpochPhase, waitFor, tick time.Duration) {
+	var actualEpoch uint64
+	var actualPhase flow.EpochPhase
 	condition := func() bool {
 		snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
 		require.NoError(s.T(), err)
 
-		actualEpoch, err := snapshot.Epochs().Current().Counter()
+		actualEpoch, err = snapshot.Epochs().Current().Counter()
 		require.NoError(s.T(), err)
-		actualPhase, err := snapshot.Phase()
+		actualPhase, err = snapshot.Phase()
 		require.NoError(s.T(), err)
 
 		return actualEpoch == expectedEpoch && actualPhase == expectedPhase
 	}
-	require.Eventuallyf(s.T(), condition, waitFor, tick, "did not reach expectedEpoch %d phase %s within %s", expectedEpoch, expectedPhase, waitFor)
+	require.Eventuallyf(s.T(), condition, waitFor, tick, "did not reach expectedEpoch %d phase %s within %s. Last saw epoch=%d and phase=%s", expectedEpoch, expectedPhase, waitFor, actualEpoch, actualPhase)
 }
 
 // AssertInEpochPhase checks if we are in the phase of the given epoch.
@@ -640,7 +648,7 @@ func (s *Suite) RunTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 
 	// wait for epoch setup phase before we start our container and pause the old container
 	s.TimedLogf("waiting for EpochSetup phase of first epoch to begin")
-	s.AwaitEpochPhase(s.Ctx, 0, flow.EpochPhaseSetup, 3*time.Minute, 500*time.Millisecond)
+	s.AwaitEpochPhase(s.Ctx, 0, flow.EpochPhaseSetup, time.Minute, 500*time.Millisecond)
 	s.TimedLogf("successfully reached EpochSetup phase of first epoch")
 
 	// get the latest snapshot and start new container with it

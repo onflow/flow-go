@@ -8,7 +8,6 @@ on:
   push:
     paths:
       - '.github/workflows/flaky-test-monitor.yml'
-      - '.github/workflows/ci.yml'
 
 env:
   BIGQUERY_DATASET: production_src_flow_test_metrics
@@ -37,7 +36,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -58,7 +57,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -83,18 +82,15 @@ jobs:
       matrix:
         include:
           - name: crypto
-            make1: -C crypto setup
-            make2: unittest
+            setup: noop
             race: 1
             test_category: unit-crypto
           - name: insecure
-            make1: install-tools
-            make2: test
+            setup: install-tools
             race: 0
             test_category: unit-insecure
           - name: integration
-            make1: install-tools
-            make2: test
+            setup: install-tools
             race: 0
             test_category: unit-integration
     runs-on: ubuntu-latest
@@ -102,16 +98,16 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
       - name: Setup tests (${{ matrix.name }})
-        run: make ${{ matrix.make1 }}
+        run: make ${{ matrix.setup }}
       - name: Run tests (${{ matrix.name }})
         env:
           RACE_DETECTOR: ${{ matrix.race }}
-        run: make -es -C ${{ matrix.name }} ${{ matrix.make2 }} > test-output
+        run: make -es -C ${{ matrix.name }} test > test-output
         timeout-minutes: 100
         continue-on-error: true
       - name: Process test results (${{ matrix.name }})
@@ -164,12 +160,10 @@ jobs:
           # all tags are needed for integration tests
           fetch-depth: 0
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-      - name: Build relic
-        run: make crypto_setup_gopath
       - name: Docker build
         run: make docker-build-flow docker-build-flow-corrupt
       - name: Run tests

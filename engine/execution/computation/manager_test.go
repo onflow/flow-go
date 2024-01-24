@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -67,7 +68,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain)
 	tx1.SetProposalKey(chain.ServiceAddress(), 0, 0).
-		SetGasLimit(1000).
+		SetComputeLimit(1000).
 		SetPayer(chain.ServiceAddress())
 
 	err = testutil.SignPayload(tx1, accounts[0], privateKeys[0])
@@ -78,7 +79,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	tx2 := testutil.CreateCounterTransaction(accounts[0], accounts[1])
 	tx2.SetProposalKey(chain.ServiceAddress(), 0, 0).
-		SetGasLimit(1000).
+		SetComputeLimit(1000).
 		SetPayer(chain.ServiceAddress())
 
 	err = testutil.SignPayload(tx2, accounts[1], privateKeys[1])
@@ -240,13 +241,15 @@ func TestExecuteScript(t *testing.T) {
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx, fvm.WithExecutionMemoryLimit(math.MaxUint64))
 
+	sc := systemcontracts.SystemContractsForChain(execCtx.Chain.ChainID())
+
 	script := []byte(fmt.Sprintf(
 		`
 			import FungibleToken from %s
 
 			pub fun main() {}
 		`,
-		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
+		sc.FungibleToken.Address.HexWithPrefix(),
 	))
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
@@ -305,13 +308,15 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 			return nil, fmt.Errorf("error getting register")
 		})
 
+	sc := systemcontracts.SystemContractsForChain(execCtx.Chain.ChainID())
+
 	script := []byte(fmt.Sprintf(
 		`
 			pub fun main(): UFix64 {
 				return getAccount(%s).balance
 			}
 		`,
-		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
+		sc.FungibleToken.Address.HexWithPrefix(),
 	))
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))

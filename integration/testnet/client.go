@@ -47,7 +47,7 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 
 	acc, err := flowClient.GetAccount(context.Background(), accountAddr)
 	if err != nil {
-		return nil, fmt.Errorf("could not get the account %x: %w", accountAddr, err)
+		return nil, fmt.Errorf("could not get the account %v: %w", accountAddr, err)
 	}
 	accountKey := acc.Keys[0]
 
@@ -366,7 +366,7 @@ func (c *Client) CreateAccount(
 	if err != nil {
 		return sdk.Address{}, fmt.Errorf("failed cusnctruct create account transaction %w", err)
 	}
-	tx.SetGasLimit(1000).
+	tx.SetComputeLimit(1000).
 		SetReferenceBlockID(latestBlockID).
 		SetProposalKey(payer, 0, c.GetSeqNumber()).
 		SetPayer(payer)

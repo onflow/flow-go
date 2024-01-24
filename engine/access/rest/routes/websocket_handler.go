@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -158,6 +159,18 @@ func (wsController *WebsocketController) writeEvents(sub state_stream.Subscripti
 				blocksSinceLastMessage = 0
 			}
 
+			// EventsResponse contains CCF encoded events, and this API returns JSON-CDC events.
+			// convert event payload formats.
+			for i, e := range resp.Events {
+				payload, err := convert.CcfPayloadToJsonPayload(e.Payload)
+				if err != nil {
+					err = fmt.Errorf("could not convert event payload from CCF to Json: %w", err)
+					wsController.wsErrorHandler(err)
+					return
+				}
+				resp.Events[i].Payload = payload
+			}
+
 			// Write the response to the WebSocket connection
 			err = wsController.conn.WriteJSON(event)
 			if err != nil {
@@ -266,7 +279,12 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Upgrade the HTTP connection to a WebSocket connection
-	upgrader := websocket.Upgrader{}
+	upgrader := websocket.Upgrader{
+		// allow all origins by default, operators can override using a proxy
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	}
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		h.errorHandler(w, models.NewRestError(http.StatusInternalServerError, "webSocket upgrade error: ", err), logger)

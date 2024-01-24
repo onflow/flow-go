@@ -1,7 +1,8 @@
 package convert_test
 
 import (
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -13,10 +14,7 @@ import (
 // EpochSetupFixture returns an EpochSetup service event as a Cadence event
 // representation and as a protocol model representation.
 func EpochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
-	events, err := systemcontracts.ServiceEventsForChain(chain)
-	if err != nil {
-		panic(err)
-	}
+	events := systemcontracts.ServiceEventsForChain(chain)
 
 	event := unittest.EventFixture(events.EpochSetup.EventType(), 1, 1, unittest.IdentifierFixture(), 0)
 	event.Payload = []byte(epochSetupFixtureJSON)
@@ -112,10 +110,7 @@ func EpochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 // representation and as a protocol model representation.
 func EpochCommitFixture(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
 
-	events, err := systemcontracts.ServiceEventsForChain(chain)
-	if err != nil {
-		panic(err)
-	}
+	events := systemcontracts.ServiceEventsForChain(chain)
 
 	event := unittest.EventFixture(events.EpochCommit.EventType(), 1, 1, unittest.IdentifierFixture(), 0)
 	event.Payload = []byte(epochCommitFixtureJSON)

@@ -117,7 +117,7 @@ func (h *Handler) GetBlockHeaderByID(
 ) (*access.BlockHeaderResponse, error) {
 	id, err := convert.BlockID(req.GetId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 	header, status, err := h.api.GetBlockHeaderByID(ctx, id)
 	if err != nil {
@@ -157,7 +157,7 @@ func (h *Handler) GetBlockByID(
 ) (*access.BlockResponse, error) {
 	id, err := convert.BlockID(req.GetId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 	block, status, err := h.api.GetBlockByID(ctx, id)
 	if err != nil {
@@ -175,7 +175,7 @@ func (h *Handler) GetCollectionByID(
 
 	id, err := convert.CollectionID(req.GetId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid collection id: %v", err)
 	}
 
 	col, err := h.api.GetCollectionByID(ctx, id)
@@ -230,7 +230,7 @@ func (h *Handler) GetTransaction(
 
 	id, err := convert.TransactionID(req.GetId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid transaction id: %v", err)
 	}
 
 	tx, err := h.api.GetTransaction(ctx, id)
@@ -253,7 +253,7 @@ func (h *Handler) GetTransactionResult(
 
 	transactionID, err := convert.TransactionID(req.GetId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid transaction id: %v", err)
 	}
 
 	blockId := flow.ZeroID
@@ -261,7 +261,7 @@ func (h *Handler) GetTransactionResult(
 	if requestBlockId != nil {
 		blockId, err = convert.BlockID(requestBlockId)
 		if err != nil {
-			return nil, err
+			return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 		}
 	}
 
@@ -270,7 +270,7 @@ func (h *Handler) GetTransactionResult(
 	if requestCollectionId != nil {
 		collectionId, err = convert.CollectionID(requestCollectionId)
 		if err != nil {
-			return nil, err
+			return nil, status.Errorf(codes.InvalidArgument, "invalid collection id: %v", err)
 		}
 	}
 
@@ -294,7 +294,7 @@ func (h *Handler) GetTransactionResultsByBlockID(
 
 	id, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
@@ -310,6 +310,50 @@ func (h *Handler) GetTransactionResultsByBlockID(
 	return message, nil
 }
 
+func (h *Handler) GetSystemTransaction(
+	ctx context.Context,
+	req *access.GetSystemTransactionRequest,
+) (*access.TransactionResponse, error) {
+	metadata := h.buildMetadataResponse()
+
+	id, err := convert.BlockID(req.GetBlockId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
+	}
+
+	tx, err := h.api.GetSystemTransaction(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.TransactionResponse{
+		Transaction: convert.TransactionToMessage(*tx),
+		Metadata:    metadata,
+	}, nil
+}
+
+func (h *Handler) GetSystemTransactionResult(
+	ctx context.Context,
+	req *access.GetSystemTransactionResultRequest,
+) (*access.TransactionResultResponse, error) {
+	metadata := h.buildMetadataResponse()
+
+	id, err := convert.BlockID(req.GetBlockId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
+	}
+
+	result, err := h.api.GetSystemTransactionResult(ctx, id, req.GetEventEncodingVersion())
+	if err != nil {
+		return nil, err
+	}
+
+	message := TransactionResultToMessage(result)
+	message.Metadata = metadata
+
+	return message, nil
+}
+
 func (h *Handler) GetTransactionsByBlockID(
 	ctx context.Context,
 	req *access.GetTransactionsByBlockIDRequest,
@@ -318,7 +362,7 @@ func (h *Handler) GetTransactionsByBlockID(
 
 	id, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 
 	transactions, err := h.api.GetTransactionsByBlockID(ctx, id)
@@ -342,7 +386,7 @@ func (h *Handler) GetTransactionResultByIndex(
 
 	blockID, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
@@ -365,7 +409,10 @@ func (h *Handler) GetAccount(
 ) (*access.GetAccountResponse, error) {
 	metadata := h.buildMetadataResponse()
 
-	address := flow.BytesToAddress(req.GetAddress())
+	address, err := convert.Address(req.GetAddress(), h.chain)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
+	}
 
 	account, err := h.api.GetAccount(ctx, address)
 	if err != nil {
@@ -392,7 +439,7 @@ func (h *Handler) GetAccountAtLatestBlock(
 
 	address, err := convert.Address(req.GetAddress(), h.chain)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
 	account, err := h.api.GetAccountAtLatestBlock(ctx, address)
@@ -419,7 +466,7 @@ func (h *Handler) GetAccountAtBlockHeight(
 
 	address, err := convert.Address(req.GetAddress(), h.chain)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
 	account, err := h.api.GetAccountAtBlockHeight(ctx, address, req.GetBlockHeight())
@@ -575,6 +622,38 @@ func (h *Handler) GetLatestProtocolStateSnapshot(ctx context.Context, req *acces
 	metadata := h.buildMetadataResponse()
 
 	snapshot, err := h.api.GetLatestProtocolStateSnapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.ProtocolStateSnapshotResponse{
+		SerializedSnapshot: snapshot,
+		Metadata:           metadata,
+	}, nil
+}
+
+// GetProtocolStateSnapshotByBlockID returns serializable Snapshot by blockID
+func (h *Handler) GetProtocolStateSnapshotByBlockID(ctx context.Context, req *access.GetProtocolStateSnapshotByBlockIDRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	metadata := h.buildMetadataResponse()
+
+	blockID := convert.MessageToIdentifier(req.GetBlockId())
+
+	snapshot, err := h.api.GetProtocolStateSnapshotByBlockID(ctx, blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.ProtocolStateSnapshotResponse{
+		SerializedSnapshot: snapshot,
+		Metadata:           metadata,
+	}, nil
+}
+
+// GetProtocolStateSnapshotByHeight returns serializable Snapshot by block height
+func (h *Handler) GetProtocolStateSnapshotByHeight(ctx context.Context, req *access.GetProtocolStateSnapshotByHeightRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	metadata := h.buildMetadataResponse()
+
+	snapshot, err := h.api.GetProtocolStateSnapshotByHeight(ctx, req.GetBlockHeight())
 	if err != nil {
 		return nil, err
 	}

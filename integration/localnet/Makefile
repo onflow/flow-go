@@ -7,9 +7,10 @@ VERIFICATION = 1
 ACCESS = 1
 OBSERVER = 0
 NCLUSTERS=1
-EPOCHLEN=10000   # 0 means use default
-STAKINGLEN=2000 # 0 means use default
-DKGLEN=2000     # 0 means use default
+EPOCHLEN=10000                  # 0 means use default
+STAKINGLEN=2000                 # 0 means use default
+DKGLEN=2000                     # 0 means use default
+EPOCHCOMMITSAFETYTHRESHOLD=1000 # 0 means use default
 CONSENSUS_DELAY=800ms
 COLLECTION_DELAY=950ms
 
@@ -47,7 +48,7 @@ ifeq ($(strip $(VALID_EXECUTION)), 1)
 else ifeq ($(strip $(VALID_CONSENSUS)), 1)
 	$(error Number of Consensus nodes should be no less than 2)
 else
-	go run -tags relic \
+	go run \
 		-ldflags="-X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' \
 		-X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
 		builder/*.go \
@@ -62,6 +63,7 @@ else
 		-epoch-length=$(EPOCHLEN) \
 		-epoch-staking-phase-length=$(STAKINGLEN) \
 		-epoch-dkg-phase-length=$(DKGLEN) \
+		-epoch-commit-safety-threshold=$(EPOCHCOMMITSAFETYTHRESHOLD) \
 		-profiler=$(PROFILER) \
 		-profile-uploader=$(PROFILE_UPLOADER) \
 		-tracing=$(TRACING) \
@@ -85,7 +87,7 @@ bootstrap-ci:
 # Creates a version of localnet configured with short epochs
 .PHONY: bootstrap-short-epochs
 bootstrap-short-epochs:
-	$(MAKE) -e EPOCHLEN=200 STAKINGLEN=10 DKGLEN=50 bootstrap
+	$(MAKE) -e EPOCHLEN=200 STAKINGLEN=5 DKGLEN=50 EPOCHCOMMITSAFETYTHRESHOLD=20 bootstrap
 
 # Starts the network - must have been bootstrapped first. Builds fresh images.
 .PHONY: start
@@ -123,15 +125,15 @@ stop:
 
 .PHONY: load
 load:
-	go run --tags relic ../benchmark/cmd/manual -log-level info -tps 1,10,100 -tps-durations 30s,30s
+	go run ../benchmark/cmd/manual -log-level info -tps 1,10,100 -tps-durations 30s,30s
 
 .PHONY: tps-ci-smoke
 tps-ci-smoke:
-	go run --tags relic ../benchmark/cmd/ci -log-level info -tps-initial 1 -tps-min 1 -tps-max 10 -duration 20s -tps-adjust-interval 1s -stat-interval 1s -bigquery-upload=false
+	go run ../benchmark/cmd/ci -log-level info -tps-initial 1 -tps-min 1 -tps-max 10 -duration 20s -tps-adjust-interval 1s -stat-interval 1s -bigquery-upload=false
 
 .PHONY: tps-ci
 tps-ci: bootstrap-ci build-flow start-flow
-	go run --tags relic ../benchmark/cmd/ci -log-level info -tps-initial $(TPS_INIT) -tps-min $(TPS_MIN) -tps-max $(TPS_MAX) -duration $(DURATION)
+	go run ../benchmark/cmd/ci -log-level info -tps-initial $(TPS_INIT) -tps-min $(TPS_MIN) -tps-max $(TPS_MAX) -duration $(DURATION)
 
 .PHONY: clean-data
 clean-data:

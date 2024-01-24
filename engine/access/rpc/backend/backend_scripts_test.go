@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
@@ -34,6 +35,8 @@ var (
 
 	cadenceErr    = fvmerrors.NewCodedError(fvmerrors.ErrCodeCadenceRunTimeError, "cadence error")
 	fvmFailureErr = fvmerrors.NewCodedError(fvmerrors.FailureCodeBlockFinderFailure, "fvm error")
+	ctxCancelErr  = fvmerrors.NewCodedError(fvmerrors.ErrCodeScriptExecutionCancelledError, "context canceled error")
+	timeoutErr    = fvmerrors.NewCodedError(fvmerrors.ErrCodeScriptExecutionTimedOutError, "timeout error")
 )
 
 // Create a suite similar to GetAccount that covers each of the modes
@@ -155,7 +158,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_HappyPath() {
 	s.setupENSuccessResponse(s.block.ID())
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeExecutionNodesOnly
+	backend.scriptExecMode = IndexQueryModeExecutionNodesOnly
 
 	s.Run("GetAccount", func() {
 		s.testExecuteScriptAtLatestBlock(ctx, backend, codes.OK)
@@ -183,7 +186,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_Fails() {
 	s.setupENFailingResponse(s.block.ID(), errToReturn)
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeExecutionNodesOnly
+	backend.scriptExecMode = IndexQueryModeExecutionNodesOnly
 
 	s.Run("GetAccount", func() {
 		s.testExecuteScriptAtLatestBlock(ctx, backend, statusCode)
@@ -208,7 +211,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_HappyPath() {
 		Return(expectedResponse, nil)
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeLocalOnly
+	backend.scriptExecMode = IndexQueryModeLocalOnly
 	backend.scriptExecutor = scriptExecutor
 
 	s.Run("GetAccount - happy path", func() {
@@ -232,7 +235,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeLocalOnly
+	backend.scriptExecMode = IndexQueryModeLocalOnly
 	backend.scriptExecutor = scriptExecutor
 
 	testCases := []struct {
@@ -297,7 +300,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeFailover
+	backend.scriptExecMode = IndexQueryModeFailover
 	backend.scriptExecutor = scriptExecutor
 
 	for _, errToReturn := range errors {
@@ -319,31 +322,49 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 	}
 }
 
-// TestExecuteScriptWithFailover_SkippedForInvalidArgument tests that failover is skipped for
-// FVM errors that result in InvalidArgument errors
-func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForInvalidArgument() {
+// TestExecuteScriptWithFailover_SkippedForCorrectCodes tests that failover is skipped for
+// FVM errors that result in InvalidArgument or Canceled errors
+func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCodes() {
 	ctx := context.Background()
 
 	// configure local script executor to fail
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-	scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Header.Height).
-		Return(nil, cadenceErr)
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeFailover
+	backend.scriptExecMode = IndexQueryModeFailover
 	backend.scriptExecutor = scriptExecutor
 
-	s.Run("ExecuteScriptAtLatestBlock", func() {
-		s.testExecuteScriptAtLatestBlock(ctx, backend, codes.InvalidArgument)
-	})
+	testCases := []struct {
+		err        error
+		statusCode codes.Code
+	}{
+		{
+			err:        cadenceErr,
+			statusCode: codes.InvalidArgument,
+		},
+		{
+			err:        ctxCancelErr,
+			statusCode: codes.Canceled,
+		},
+	}
 
-	s.Run("ExecuteScriptAtBlockID", func() {
-		s.testExecuteScriptAtBlockID(ctx, backend, codes.InvalidArgument)
-	})
+	for _, tt := range testCases {
+		scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Header.Height).
+			Return(nil, tt.err).
+			Times(3)
 
-	s.Run("ExecuteScriptAtBlockHeight", func() {
-		s.testExecuteScriptAtBlockHeight(ctx, backend, codes.InvalidArgument)
-	})
+		s.Run(fmt.Sprintf("ExecuteScriptAtLatestBlock - %s", tt.statusCode), func() {
+			s.testExecuteScriptAtLatestBlock(ctx, backend, tt.statusCode)
+		})
+
+		s.Run(fmt.Sprintf("ExecuteScriptAtBlockID - %s", tt.statusCode), func() {
+			s.testExecuteScriptAtBlockID(ctx, backend, tt.statusCode)
+		})
+
+		s.Run(fmt.Sprintf("ExecuteScriptAtBlockHeight - %s", tt.statusCode), func() {
+			s.testExecuteScriptAtBlockHeight(ctx, backend, tt.statusCode)
+		})
+	}
 }
 
 // TestExecuteScriptWithFailover_ReturnsENErrors tests that when an error is returned from the execution
@@ -365,7 +386,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 		Return(nil, execution.ErrDataNotAvailable)
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeFailover
+	backend.scriptExecMode = IndexQueryModeFailover
 	backend.scriptExecutor = scriptExecutor
 
 	s.Run("ExecuteScriptAtLatestBlock", func() {
@@ -378,6 +399,31 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 
 	s.Run("ExecuteScriptAtBlockHeight", func() {
 		s.testExecuteScriptAtBlockHeight(ctx, backend, statusCode)
+	})
+}
+
+// TestExecuteScriptAtLatestBlockFromStorage_InconsistentState tests that signaler context received error when node state is
+// inconsistent
+func (s *BackendScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_InconsistentState() {
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
+
+	backend := s.defaultBackend()
+	backend.scriptExecMode = IndexQueryModeLocalOnly
+	backend.scriptExecutor = scriptExecutor
+
+	s.Run(fmt.Sprintf("ExecuteScriptAtLatestBlock - fails with %v", "inconsistent node's state"), func() {
+		s.state.On("Sealed").Return(s.snapshot, nil)
+
+		err := fmt.Errorf("inconsistent node's state")
+		s.snapshot.On("Head").Return(nil, err)
+
+		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
+			irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), signCtxErr))
+
+		actual, err := backend.ExecuteScriptAtLatestBlock(signalerCtx, s.script, s.arguments)
+		s.Require().Error(err)
+		s.Require().Nil(actual)
 	})
 }
 

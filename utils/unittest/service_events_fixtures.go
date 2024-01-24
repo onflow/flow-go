@@ -1,33 +1,37 @@
 package unittest
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/crypto"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 // This file contains service event fixtures for testing purposes.
 
-// EpochSetupFixtureByChainID returns an EpochSetup service event as a Cadence event
-// representation and as a protocol model representation.
-func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
-	events, err := systemcontracts.ServiceEventsForChain(chain)
+func EpochSetupRandomSourceFixture() []byte {
+	source := make([]byte, flow.EpochSetupRandomSourceLength)
+	_, err := rand.Read(source)
 	if err != nil {
 		panic(err)
 	}
+	return source
+}
+
+// EpochSetupFixtureByChainID returns an EpochSetup service event as a Cadence event
+// representation and as a protocol model representation.
+func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
+	events := systemcontracts.ServiceEventsForChain(chain)
 
 	event := EventFixture(events.EpochSetup.EventType(), 1, 1, IdentifierFixture(), 0)
-	event.Payload = EpochSetupFixtureCCF
-
-	// randomSource is [0,0,...,1,2,3,4]
-	randomSource := make([]uint8, flow.EpochSetupRandomSourceLength)
-	for i := 0; i < 4; i++ {
-		randomSource[flow.EpochSetupRandomSourceLength-1-i] = uint8(4 - i)
-	}
+	randomSource := EpochSetupRandomSourceFixture()
+	event.Payload = EpochSetupFixtureCCF(randomSource)
 
 	expected := &flow.EpochSetup{
 		Counter:            1,
@@ -114,10 +118,7 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 // representation and as a protocol model representation.
 func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
 
-	events, err := systemcontracts.ServiceEventsForChain(chain)
-	if err != nil {
-		panic(err)
-	}
+	events := systemcontracts.ServiceEventsForChain(chain)
 
 	event := EventFixture(events.EpochCommit.EventType(), 1, 1, IdentifierFixture(), 0)
 	event.Payload = EpochCommitFixtureCCF
@@ -153,10 +154,7 @@ func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCom
 // representation and as a protocol model representation.
 func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.VersionBeacon) {
 
-	events, err := systemcontracts.ServiceEventsForChain(chain)
-	if err != nil {
-		panic(err)
-	}
+	events := systemcontracts.ServiceEventsForChain(chain)
 
 	event := EventFixture(events.VersionBeacon.EventType(), 1, 1, IdentifierFixture(), 0)
 	event.Payload = VersionBeaconFixtureCCF
@@ -174,7 +172,8 @@ func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.Versio
 	return event, expected
 }
 
-func createEpochSetupEvent() cadence.Event {
+func createEpochSetupEvent(randomSource []byte) cadence.Event {
+	randomSourceHex := hex.EncodeToString(randomSource)
 
 	return cadence.NewEvent([]cadence.Value{
 		// counter
@@ -193,7 +192,7 @@ func createEpochSetupEvent() cadence.Event {
 		createEpochCollectors(),
 
 		// randomSource
-		cadence.String("01020304"),
+		cadence.String(randomSourceHex),
 
 		// DKGPhase1FinalView
 		cadence.UInt64(150),
@@ -1028,8 +1027,8 @@ func ufix64FromString(s string) cadence.UFix64 {
 	return f
 }
 
-var EpochSetupFixtureCCF = func() []byte {
-	b, err := ccf.Encode(createEpochSetupEvent())
+func EpochSetupFixtureCCF(randomSource []byte) []byte {
+	b, err := ccf.Encode(createEpochSetupEvent(randomSource))
 	if err != nil {
 		panic(err)
 	}
@@ -1038,7 +1037,54 @@ var EpochSetupFixtureCCF = func() []byte {
 		panic(err)
 	}
 	return b
-}()
+}
+
+func EpochSetupCCFWithNonHexRandomSource() []byte {
+	// randomSource of correct length but made of non hex characters
+	randomSource := "ZZ"
+	for len(randomSource) != 2*flow.EpochSetupRandomSourceLength {
+		randomSource = randomSource + "aa"
+	}
+
+	event := cadence.NewEvent([]cadence.Value{
+		// counter
+		cadence.NewUInt64(1),
+
+		// nodeInfo
+		createEpochNodes(),
+
+		// firstView
+		cadence.NewUInt64(100),
+
+		// finalView
+		cadence.NewUInt64(200),
+
+		// collectorClusters
+		createEpochCollectors(),
+
+		// randomSource
+		cadence.String(randomSource),
+
+		// DKGPhase1FinalView
+		cadence.UInt64(150),
+
+		// DKGPhase2FinalView
+		cadence.UInt64(160),
+
+		// DKGPhase3FinalView
+		cadence.UInt64(170),
+	}).WithType(newFlowEpochEpochSetupEventType())
+
+	b, err := ccf.Encode(event)
+	if err != nil {
+		panic(err)
+	}
+	_, err = ccf.Decode(nil, b)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
 
 var EpochCommitFixtureCCF = func() []byte {
 	b, err := ccf.Encode(createEpochCommittedEvent())

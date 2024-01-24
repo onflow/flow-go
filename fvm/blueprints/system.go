@@ -2,7 +2,6 @@ package blueprints
 
 import (
 	_ "embed"
-	"fmt"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
@@ -11,8 +10,6 @@ import (
 )
 
 const SystemChunkTransactionGasLimit = 100_000_000
-
-// TODO (Ramtin) after changes to this method are merged into master move them here.
 
 // systemChunkTransactionTemplate looks for the epoch and version beacon heartbeat resources
 // and calls them.
@@ -23,26 +20,19 @@ var systemChunkTransactionTemplate string
 // SystemChunkTransaction creates and returns the transaction corresponding to the
 // system chunk for the given chain.
 func SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
-	contracts, err := systemcontracts.SystemContractsForChain(chain.ChainID())
-	if err != nil {
-		return nil, fmt.Errorf("could not get system contracts for chain: %w", err)
-	}
+	contracts := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 	tx := flow.NewTransactionBody().
 		SetScript(
 			[]byte(templates.ReplaceAddresses(
 				systemChunkTransactionTemplate,
-				templates.Environment{
-					EpochAddress:               contracts.Epoch.Address.Hex(),
-					NodeVersionBeaconAddress:   contracts.NodeVersionBeacon.Address.Hex(),
-					RandomBeaconHistoryAddress: contracts.RandomBeaconHistory.Address.Hex(),
-				},
+				contracts.AsTemplateEnv(),
 			)),
 		).
 		// The heartbeat resources needed by the system tx have are on the service account,
 		// therefore, the service account is the only authorizer needed.
 		AddAuthorizer(chain.ServiceAddress()).
-		SetGasLimit(SystemChunkTransactionGasLimit)
+		SetComputeLimit(SystemChunkTransactionGasLimit)
 
 	return tx, nil
 }

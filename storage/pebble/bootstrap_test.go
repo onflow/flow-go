@@ -28,13 +28,14 @@ func TestRegisterBootstrap_NewBootstrap(t *testing.T) {
 	t.Parallel()
 	unittest.RunWithTempDir(t, func(dir string) {
 		rootHeight := uint64(1)
+		rootHash := ledger.RootHash(unittest.StateCommitmentFixture())
 		log := zerolog.New(io.Discard)
 		p, err := OpenRegisterPebbleDB(dir)
 		require.NoError(t, err)
 		// set heights
 		require.NoError(t, initHeights(p, rootHeight))
 		// errors if FirstHeight or LastHeight are populated
-		_, err = NewRegisterBootstrap(p, dir, rootHeight, log)
+		_, err = NewRegisterBootstrap(p, dir, rootHeight, rootHash, log)
 		require.ErrorIs(t, err, ErrAlreadyBootstrapped)
 	})
 }
@@ -45,14 +46,15 @@ func TestRegisterBootstrap_IndexCheckpointFile_Happy(t *testing.T) {
 	rootHeight := uint64(10000)
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries, registerIDs := simpleTrieWithValidRegisterIDs(t)
+		rootHash := tries[0].RootHash()
 		fileName := "simple-checkpoint"
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
 		checkpointFile := path.Join(dir, fileName)
 		pb, dbDir := createPebbleForTest(t)
 
-		bootstrap, err := NewRegisterBootstrap(pb, checkpointFile, rootHeight, log)
+		bootstrap, err := NewRegisterBootstrap(pb, checkpointFile, rootHeight, rootHash, log)
 		require.NoError(t, err)
-		err = bootstrap.IndexCheckpointFile(context.Background())
+		err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
 		require.NoError(t, err)
 
 		// create registers instance and check values
@@ -79,14 +81,15 @@ func TestRegisterBootstrap_IndexCheckpointFile_Empty(t *testing.T) {
 	rootHeight := uint64(10000)
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := []*trie.MTrie{trie.NewEmptyMTrie()}
+		rootHash := tries[0].RootHash()
 		fileName := "empty-checkpoint"
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
 		checkpointFile := path.Join(dir, fileName)
 		pb, dbDir := createPebbleForTest(t)
 
-		bootstrap, err := NewRegisterBootstrap(pb, checkpointFile, rootHeight, log)
+		bootstrap, err := NewRegisterBootstrap(pb, checkpointFile, rootHeight, rootHash, log)
 		require.NoError(t, err)
-		err = bootstrap.IndexCheckpointFile(context.Background())
+		err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
 		require.NoError(t, err)
 
 		// create registers instance and check values
@@ -113,6 +116,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_FormatIssue(t *testing.T) {
 	emptyTrie := trie.NewEmptyMTrie()
 	trieWithInvalidEntry, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
 	require.NoError(t, err)
+	rootHash := trieWithInvalidEntry.RootHash()
 	log := zerolog.New(io.Discard)
 
 	unittest.RunWithTempDir(t, func(dir string) {
@@ -122,9 +126,9 @@ func TestRegisterBootstrap_IndexCheckpointFile_FormatIssue(t *testing.T) {
 		checkpointFile := path.Join(dir, fileName)
 		pb, dbDir := createPebbleForTest(t)
 
-		bootstrap, err := NewRegisterBootstrap(pb, checkpointFile, rootHeight, log)
+		bootstrap, err := NewRegisterBootstrap(pb, checkpointFile, rootHeight, rootHash, log)
 		require.NoError(t, err)
-		err = bootstrap.IndexCheckpointFile(context.Background())
+		err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
 		require.ErrorContains(t, err, "unexpected ledger key format")
 		require.NoError(t, pb.Close())
 		require.NoError(t, os.RemoveAll(dbDir))
@@ -138,6 +142,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_CorruptedCheckpointFile(t *testin
 	log := zerolog.New(io.Discard)
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries, _ := largeTrieWithValidRegisterIDs(t)
+		rootHash := tries[0].RootHash()
 		checkpointFileName := "large-checkpoint-incomplete"
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, checkpointFileName, log), "fail to store checkpoint")
 		// delete 2nd part of the file (2nd subtrie)
@@ -145,9 +150,9 @@ func TestRegisterBootstrap_IndexCheckpointFile_CorruptedCheckpointFile(t *testin
 		err := os.RemoveAll(fileToDelete)
 		require.NoError(t, err)
 		pb, dbDir := createPebbleForTest(t)
-		bootstrap, err := NewRegisterBootstrap(pb, checkpointFileName, rootHeight, log)
+		bootstrap, err := NewRegisterBootstrap(pb, checkpointFileName, rootHeight, rootHash, log)
 		require.NoError(t, err)
-		err = bootstrap.IndexCheckpointFile(context.Background())
+		err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
 		require.ErrorIs(t, err, os.ErrNotExist)
 		require.NoError(t, os.RemoveAll(dbDir))
 	})
@@ -159,13 +164,14 @@ func TestRegisterBootstrap_IndexCheckpointFile_MultipleBatch(t *testing.T) {
 	rootHeight := uint64(10000)
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries, registerIDs := largeTrieWithValidRegisterIDs(t)
+		rootHash := tries[0].RootHash()
 		fileName := "large-checkpoint"
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
 		checkpointFile := path.Join(dir, fileName)
 		pb, dbDir := createPebbleForTest(t)
-		bootstrap, err := NewRegisterBootstrap(pb, checkpointFile, rootHeight, log)
+		bootstrap, err := NewRegisterBootstrap(pb, checkpointFile, rootHeight, rootHash, log)
 		require.NoError(t, err)
-		err = bootstrap.IndexCheckpointFile(context.Background())
+		err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
 		require.NoError(t, err)
 
 		// create registers instance and check values
@@ -191,9 +197,11 @@ func simpleTrieWithValidRegisterIDs(t *testing.T) ([]*trie.MTrie, []*flow.Regist
 	return trieWithValidRegisterIDs(t, 2)
 }
 
+const workerCount = 10
+
 func largeTrieWithValidRegisterIDs(t *testing.T) ([]*trie.MTrie, []*flow.RegisterID) {
 	// large enough trie so every worker should have something to index
-	largeTrieSize := 2 * pebbleBootstrapRegisterBatchLen * pebbleBootstrapWorkerCount
+	largeTrieSize := 2 * pebbleBootstrapRegisterBatchLen * workerCount
 	return trieWithValidRegisterIDs(t, uint16(largeTrieSize))
 }
 

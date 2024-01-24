@@ -63,8 +63,9 @@ func (s *Registers) Get(
 		UseL6Filters: true,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create pebble iterator: %w", err)
+		return nil, err
 	}
+
 	defer iter.Close()
 
 	encoded := newLookupKey(height, reg).Bytes()

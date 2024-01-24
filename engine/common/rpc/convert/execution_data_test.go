@@ -21,7 +21,12 @@ import (
 func TestConvertBlockExecutionDataEventPayloads(t *testing.T) {
 	// generators will produce identical event payloads (before encoding)
 	ccfEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_CCF_V0)
-	jsonEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_JSON_CDC_V0)
+	jsonEvents := make([]flow.Event, len(ccfEvents))
+	for i, e := range ccfEvents {
+		jsonEvent, err := convert.CcfEventToJsonEvent(e)
+		require.NoError(t, err)
+		jsonEvents[i] = *jsonEvent
+	}
 
 	// generate BlockExecutionData with CCF encoded events
 	executionData := unittest.BlockExecutionDataFixture(
@@ -170,4 +175,82 @@ func TestConvertChunkExecutionData(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMessageToRegisterID(t *testing.T) {
+	chain := flow.Testnet.Chain()
+	tests := []struct {
+		name  string
+		regID flow.RegisterID
+	}{
+		{
+			name:  "service level register id",
+			regID: flow.UUIDRegisterID(0),
+		},
+		{
+			name:  "account level register id",
+			regID: flow.AccountStatusRegisterID(unittest.AddressFixture()),
+		},
+		{
+			name:  "regular register id",
+			regID: unittest.RegisterIDFixture(),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			msg := convert.RegisterIDToMessage(test.regID)
+			converted, err := convert.MessageToRegisterID(msg, chain)
+			require.NoError(t, err)
+			assert.Equal(t, test.regID, converted)
+		})
+	}
+
+	t.Run("nil owner converts to empty string", func(t *testing.T) {
+		msg := &entities.RegisterID{
+			Owner: nil,
+			Key:   []byte("key"),
+		}
+		converted, err := convert.MessageToRegisterID(msg, chain)
+		require.NoError(t, err)
+		assert.Equal(t, "", converted.Owner)
+		assert.Equal(t, "key", converted.Key)
+	})
+
+	t.Run("nil message returns error", func(t *testing.T) {
+		_, err := convert.MessageToRegisterID(nil, chain)
+		require.ErrorIs(t, err, convert.ErrEmptyMessage)
+	})
+
+	t.Run("invalid address returns error", func(t *testing.T) {
+		// addresses for other chains are invalid
+		registerID := flow.NewRegisterID(
+			unittest.RandomAddressFixtureForChain(flow.Mainnet),
+			"key",
+		)
+
+		msg := convert.RegisterIDToMessage(registerID)
+		_, err := convert.MessageToRegisterID(msg, chain)
+		require.Error(t, err)
+	})
+
+	t.Run("multiple registerIDs", func(t *testing.T) {
+		expected := flow.RegisterIDs{
+			flow.UUIDRegisterID(0),
+			flow.AccountStatusRegisterID(unittest.AddressFixture()),
+			unittest.RegisterIDFixture(),
+		}
+
+		messages := make([]*entities.RegisterID, len(expected))
+		for i, regID := range expected {
+			regID := regID
+			messages[i] = convert.RegisterIDToMessage(regID)
+			require.Equal(t, regID.Owner, string(messages[i].Owner))
+			require.Equal(t, regID.Key, string(messages[i].Key))
+		}
+
+		actual, err := convert.MessagesToRegisterIDs(messages, chain)
+		require.NoError(t, err)
+		assert.Equal(t, expected, actual)
+	})
 }

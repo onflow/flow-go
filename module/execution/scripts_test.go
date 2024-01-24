@@ -15,6 +15,7 @@ import (
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/computation/query/mock"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
@@ -155,7 +156,7 @@ func (s *scriptTestSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.registerIndex = pebbleRegisters
 
-	index, err := indexer.New(logger, metrics.NewNoopCollector(), nil, s.registerIndex, headers, nil, nil)
+	index, err := indexer.New(logger, metrics.NewNoopCollector(), nil, s.registerIndex, headers, nil, nil, func(originID flow.Identifier, entity flow.Entity) {})
 	s.Require().NoError(err)
 
 	scripts, err := NewScripts(
@@ -165,6 +166,7 @@ func (s *scriptTestSuite) SetupTest() {
 		entropyBlock,
 		headers,
 		index.RegisterValue,
+		query.NewDefaultConfig(),
 	)
 	s.Require().NoError(err)
 	s.scripts = scripts

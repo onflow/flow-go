@@ -58,22 +58,6 @@ func withExpectedNotificationDissemination(expectedNumOfTotalNotif int, f onNoti
 	}
 }
 
-// mockDistributorReadyDoneAware mocks the Ready and Done methods of the distributor to return a channel that is already closed,
-// so that the distributor is considered ready and done when the test needs.
-func mockDistributorReadyDoneAware(d *mockp2p.GossipSubInspectorNotificationDistributor) {
-	d.On("Start", mockery.Anything).Return().Maybe()
-	d.On("Ready").Return(func() <-chan struct{} {
-		ch := make(chan struct{})
-		close(ch)
-		return ch
-	}()).Maybe()
-	d.On("Done").Return(func() <-chan struct{} {
-		ch := make(chan struct{})
-		close(ch)
-		return ch
-	}()).Maybe()
-}
-
 func meshTracerFixture(flowConfig *config.FlowConfig, idProvider module.IdentityProvider) *tracer.GossipSubMeshTracer {
 	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
 		Logger:                             unittest.Logger(),
@@ -81,9 +65,9 @@ func meshTracerFixture(flowConfig *config.FlowConfig, idProvider module.Identity
 		IDProvider:                         idProvider,
 		LoggerInterval:                     time.Second,
 		HeroCacheMetricsFactory:            metrics.NewNoopHeroCacheMetricsFactory(),
-		RpcSentTrackerCacheSize:            flowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
-		RpcSentTrackerWorkerQueueCacheSize: flowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
-		RpcSentTrackerNumOfWorkers:         flowConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
+		RpcSentTrackerCacheSize:            flowConfig.NetworkConfig.GossipSub.RpcTracer.RPCSentTrackerCacheSize,
+		RpcSentTrackerWorkerQueueCacheSize: flowConfig.NetworkConfig.GossipSub.RpcTracer.RPCSentTrackerQueueCacheSize,
+		RpcSentTrackerNumOfWorkers:         flowConfig.NetworkConfig.GossipSub.RpcTracer.RpcSentTrackerNumOfWorkers,
 	}
 	return tracer.NewGossipSubMeshTracer(meshTracerCfg)
 }

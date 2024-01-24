@@ -26,6 +26,7 @@ import (
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
+	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/grpcserver"
@@ -62,11 +63,13 @@ type SameGRPCPortTestSuite struct {
 	// storage
 	blocks       *storagemock.Blocks
 	headers      *storagemock.Headers
+	events       *storagemock.Events
 	collections  *storagemock.Collections
 	transactions *storagemock.Transactions
 	receipts     *storagemock.ExecutionReceipts
 	seals        *storagemock.Seals
 	results      *storagemock.ExecutionResults
+	registers    *execution.RegistersAsyncStore
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
@@ -90,6 +93,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 	params := new(protocol.Params)
+	suite.registers = execution.NewRegistersAsyncStore()
 
 	suite.epochQuery = new(protocol.EpochQuery)
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
@@ -98,6 +102,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	suite.snapshot.On("Epochs").Return(suite.epochQuery).Maybe()
 	suite.blocks = new(storagemock.Blocks)
 	suite.headers = new(storagemock.Headers)
+	suite.events = new(storagemock.Events)
 	suite.transactions = new(storagemock.Transactions)
 	suite.collections = new(storagemock.Collections)
 	suite.receipts = new(storagemock.ExecutionReceipts)
@@ -238,6 +243,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		conf,
 		suite.state,
 		suite.headers,
+		suite.events,
 		suite.seals,
 		suite.results,
 		nil,
@@ -245,6 +251,8 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		nil,
 		rootBlock.Header.Height,
 		rootBlock.Header.Height,
+		suite.registers,
+		false,
 	)
 	assert.NoError(suite.T(), err)
 

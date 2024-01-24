@@ -14,12 +14,12 @@ import (
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/onflow/cadence"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -33,7 +33,6 @@ import (
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
@@ -43,6 +42,7 @@ import (
 	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -72,9 +72,13 @@ func AddressFixture() flow.Address {
 }
 
 func RandomAddressFixture() flow.Address {
+	return RandomAddressFixtureForChain(flow.Testnet)
+}
+
+func RandomAddressFixtureForChain(chainID flow.ChainID) flow.Address {
 	// we use a 32-bit index - since the linear address generator uses 45 bits,
 	// this won't error
-	addr, err := flow.Testnet.Chain().AddressAtIndex(uint64(rand.Uint32()))
+	addr, err := chainID.Chain().AddressAtIndex(uint64(rand.Uint32()))
 	if err != nil {
 		panic(err)
 	}
@@ -1426,6 +1430,11 @@ func TransactionDSLFixture(chain flow.Chain) dsl.Transaction {
 	}
 }
 
+// RegisterIDFixture returns a RegisterID with a fixed key and owner
+func RegisterIDFixture() flow.RegisterID {
+	return flow.NewRegisterID(RandomAddressFixture(), "key")
+}
+
 // VerifiableChunkDataFixture returns a complete verifiable chunk with an
 // execution receipt referencing the block/collections.
 func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunkData {
@@ -1704,6 +1713,11 @@ func EventsFixture(
 	return events
 }
 
+func EventTypeFixture(chainID flow.ChainID) flow.EventType {
+	eventType := fmt.Sprintf("A.%s.TestContract.TestEvent1", RandomAddressFixtureForChain(chainID))
+	return flow.EventType(eventType)
+}
+
 // EventFixture returns an event
 func EventFixture(
 	eType flow.EventType,
@@ -1724,7 +1738,8 @@ func EventFixture(
 func EmulatorRootKey() (*flow.AccountPrivateKey, error) {
 
 	// TODO seems this key literal doesn't decode anymore
-	emulatorRootKey, err := crypto.DecodePrivateKey(crypto.ECDSAP256, []byte("f87db87930770201010420ae2cc975dcbdd0ebc56f268b1d8a95834c2955970aea27042d35ec9f298b9e5aa00a06082a8648ce3d030107a1440342000417f5a527137785d2d773fee84b4c7ee40266a1dd1f36ddd46ecf25db6df6a499459629174de83256f2a44ebd4325b9def67d523b755a8926218c4efb7904f8ce0203"))
+	emulatorRootKey, err := crypto.DecodePrivateKey(crypto.ECDSAP256,
+		[]byte("f87db87930770201010420ae2cc975dcbdd0ebc56f268b1d8a95834c2955970aea27042d35ec9f298b9e5aa00a06082a8648ce3d030107a1440342000417f5a527137785d2d773fee84b4c7ee40266a1dd1f36ddd46ecf25db6df6a499459629174de83256f2a44ebd4325b9def67d523b755a8926218c4efb7904f8ce0203"))
 	if err != nil {
 		return nil, err
 	}
@@ -1960,7 +1975,7 @@ func VoteWithBeaconSig() func(*hotstuff.Vote) {
 
 func WithParticipants(participants flow.IdentityList) func(*flow.EpochSetup) {
 	return func(setup *flow.EpochSetup) {
-		setup.Participants = participants.Sort(order.Canonical)
+		setup.Participants = participants.Sort(flow.Canonical)
 		setup.Assignments = ClusterAssignment(1, participants)
 	}
 }
@@ -1992,7 +2007,7 @@ func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 		Counter:            uint64(rand.Uint32()),
 		FirstView:          uint64(0),
 		FinalView:          uint64(rand.Uint32() + 1000),
-		Participants:       participants.Sort(order.Canonical),
+		Participants:       participants.Sort(flow.Canonical),
 		RandomSource:       SeedFixture(flow.EpochSetupRandomSourceLength),
 		DKGPhase1FinalView: 100,
 		DKGPhase2FinalView: 200,
@@ -2170,7 +2185,7 @@ func RootSnapshotFixtureWithChainID(
 	chainID flow.ChainID,
 	opts ...func(*flow.Block),
 ) *inmem.Snapshot {
-	block, result, seal := BootstrapFixtureWithChainID(participants.Sort(order.Canonical), chainID, opts...)
+	block, result, seal := BootstrapFixtureWithChainID(participants.Sort(flow.Canonical), chainID, opts...)
 	qc := QuorumCertificateFixture(QCWithRootBlockID(block.ID()))
 	root, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
 	if err != nil {
@@ -2619,7 +2634,7 @@ func P2PRPCPruneFixture(topic *string) *pubsub_pb.ControlPrune {
 	}
 }
 
-// P2PRPCIHaveFixtures returns n number of control message rpc iHave fixtures with m number of message ids each.
+// P2PRPCIHaveFixtures returns n number of control message where n = len(topics) rpc iHave fixtures with m number of message ids each.
 func P2PRPCIHaveFixtures(m int, topics ...string) []*pubsub_pb.ControlIHave {
 	n := len(topics)
 	ihaves := make([]*pubsub_pb.ControlIHave, n)
@@ -2704,14 +2719,14 @@ func P2PRPCFixture(opts ...RPCFixtureOpt) *pubsub.RPC {
 	return rpc
 }
 
-func WithTopic(topic string) func(*pubsub_pb.Message) {
+func WithFrom(pid peer.ID) func(*pubsub_pb.Message) {
 	return func(msg *pubsub_pb.Message) {
-		msg.Topic = &topic
+		msg.From = []byte(pid)
 	}
 }
 
 // GossipSubMessageFixture returns a gossip sub message fixture for the specified topic.
-func GossipSubMessageFixture(t *testing.T, s string, opts ...func(*pubsub_pb.Message)) *pubsub_pb.Message {
+func GossipSubMessageFixture(s string, opts ...func(*pubsub_pb.Message)) *pubsub_pb.Message {
 	pb := &pubsub_pb.Message{
 		From:      RandomBytes(32),
 		Data:      RandomBytes(32),
@@ -2729,10 +2744,47 @@ func GossipSubMessageFixture(t *testing.T, s string, opts ...func(*pubsub_pb.Mes
 }
 
 // GossipSubMessageFixtures returns a list of gossipsub message fixtures.
-func GossipSubMessageFixtures(t *testing.T, n int, topic string, opts ...func(*pubsub_pb.Message)) []*pubsub_pb.Message {
+func GossipSubMessageFixtures(n int, topic string, opts ...func(*pubsub_pb.Message)) []*pubsub_pb.Message {
 	msgs := make([]*pubsub_pb.Message, n)
 	for i := 0; i < n; i++ {
-		msgs[i] = GossipSubMessageFixture(t, topic, opts...)
+		msgs[i] = GossipSubMessageFixture(topic, opts...)
 	}
 	return msgs
+}
+
+// LibP2PResourceLimitOverrideFixture returns a random resource limit override for testing.
+// The values are not guaranteed to be valid between 0 and 1000.
+// Returns:
+//   - p2pconf.ResourceManagerOverrideLimit: a random resource limit override.
+func LibP2PResourceLimitOverrideFixture() p2pconfig.ResourceManagerOverrideLimit {
+	return p2pconfig.ResourceManagerOverrideLimit{
+		StreamsInbound:      rand.Intn(1000),
+		StreamsOutbound:     rand.Intn(1000),
+		ConnectionsInbound:  rand.Intn(1000),
+		ConnectionsOutbound: rand.Intn(1000),
+		FD:                  rand.Intn(1000),
+		Memory:              rand.Intn(1000),
+	}
+}
+
+func RegisterEntryFixture() flow.RegisterEntry {
+	val := make([]byte, 4)
+	_, _ = crand.Read(val)
+	return flow.RegisterEntry{
+		Key: flow.RegisterID{
+			Owner: "owner",
+			Key:   "key1",
+		},
+		Value: val,
+	}
+}
+
+func MakeOwnerReg(key string, value string) flow.RegisterEntry {
+	return flow.RegisterEntry{
+		Key: flow.RegisterID{
+			Owner: "owner",
+			Key:   key,
+		},
+		Value: []byte(value),
+	}
 }

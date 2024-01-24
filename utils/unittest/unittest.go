@@ -1,7 +1,6 @@
 package unittest
 
 import (
-	crand "crypto/rand"
 	"encoding/json"
 	"math"
 	"math/rand"
@@ -18,7 +17,7 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/multiformats/go-multihash"
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -27,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/topology"
 )
 
@@ -453,15 +453,43 @@ func GenerateRandomStringWithLen(commentLen uint) string {
 	return string(bytes)
 }
 
-// PeerIdFixture returns a random peer ID for testing.
-// peer ID is the identifier of a node on the libp2p network.
-func PeerIdFixture(t testing.TB) peer.ID {
-	buf := make([]byte, 16)
-	n, err := crand.Read(buf)
-	require.NoError(t, err)
-	require.Equal(t, 16, n)
-	h, err := multihash.Sum(buf, multihash.SHA2_256, -1)
-	require.NoError(t, err)
+// PeerIdFixture creates a random and unique peer ID (libp2p node ID).
+func PeerIdFixture(tb testing.TB) peer.ID {
+	peerID, err := peerIDFixture()
+	require.NoError(tb, err)
+	return peerID
+}
 
-	return peer.ID(h)
+func peerIDFixture() (peer.ID, error) {
+	key, err := generateNetworkingKey(IdentifierFixture())
+	if err != nil {
+		return "", err
+	}
+	pubKey, err := keyutils.LibP2PPublicKeyFromFlow(key.PublicKey())
+	if err != nil {
+		return "", err
+	}
+
+	peerID, err := peer.IDFromPublicKey(pubKey)
+	if err != nil {
+		return "", err
+	}
+
+	return peerID, nil
+}
+
+// generateNetworkingKey generates a Flow ECDSA key using the given seed
+func generateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
+	copy(seed, s[:])
+	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
+}
+
+// PeerIdFixtures creates random and unique peer IDs (libp2p node IDs).
+func PeerIdFixtures(t *testing.T, n int) []peer.ID {
+	peerIDs := make([]peer.ID, n)
+	for i := 0; i < n; i++ {
+		peerIDs[i] = PeerIdFixture(t)
+	}
+	return peerIDs
 }

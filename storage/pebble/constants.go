@@ -11,10 +11,6 @@ const (
 	// register bootstrap process
 	pebbleBootstrapRegisterBatchLen = 1000
 
-	// pebbleBootstrapWorkerCount is the maximum number of concurrent goroutines that read and index
-	// checkpoint leaf nodes
-	pebbleBootstrapWorkerCount = 10
-
 	// placeHolderHeight is an element of the height lookup keys of length HeightSuffixLen
 	// 10 bits per key yields a filter with <1% false positive rate.
 	placeHolderHeight = uint64(0)
