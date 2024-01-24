@@ -349,6 +349,7 @@ func (proc *procedure) deployAt(
 func (proc *procedure) runDirect(msg *gethCore.Message, txType uint8) (*types.Result, error) {
 	// set the nonce for the message (needed for some opeartions like deployment)
 	msg.Nonce = proc.state.GetNonce(msg.From)
+	proc.evm.TxContext.Origin = msg.From
 	return proc.run(msg, types.DirectCallTxType)
 }
 
