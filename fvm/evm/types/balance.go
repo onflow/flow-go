@@ -20,11 +20,13 @@ var (
 )
 
 // Balance represents the balance of an address
-// in the evm environment, balances are kept in attoflow (1e10^-18 flow),
+// in the evm environment (Flow EVM), balances are kept in attoflow (1e10^-18 flow);
 // the smallest denomination of FLOW token (similar to how Wei is used to store Eth)
-// But on the FLOW Vaults, we use Cadence.UFix64 to store values in Flow.
-// this could result in accidental conversion mistakes, the balance object here would
-// do the conversions and does appropriate checks.
+// But A Cadence FLOW Vault uses a Cadence.UFix64 to store values in Flow, which means
+// 1e18^-8 is the smallest value that can be stored on the vault.
+// The balance here considers the highest precision (attoflow) but utility
+// function has been provided for conversion from/to UFix64 to prevent accidental
+// conversion errors and dealing with rounding errors.
 type Balance *big.Int
 
 // NewBalanceconstructs a new balance from an atto flow value
