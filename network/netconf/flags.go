@@ -103,19 +103,19 @@ func AllFlagNames() []string {
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.MessageErrorThresholdKey),
 
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.DisabledKey),
-		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.GraftKey, p2pconfig.DisabledKey),
-		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.PruneKey, p2pconfig.DisabledKey),
-		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.IHaveKey, p2pconfig.DisabledKey),
-		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.IWantKey, p2pconfig.DisabledKey),
-		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.PublishKey, p2pconfig.DisabledKey),
+		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.EnableKey, p2pconfig.GraftKey),
+		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.EnableKey, p2pconfig.PruneKey),
+		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.EnableKey, p2pconfig.IHaveKey),
+		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.EnableKey, p2pconfig.IWantKey),
+		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.EnableKey, p2pconfig.PublishKey),
 
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.DisabledKey),
-		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.GraftKey, p2pconfig.DisabledKey),
-		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.PruneKey, p2pconfig.DisabledKey),
-		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.IHaveKey, p2pconfig.DisabledKey),
-		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.IHaveKey, p2pconfig.MessageIDKey, p2pconfig.DisabledKey),
+		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.EnableKey, p2pconfig.GraftKey),
+		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.EnableKey, p2pconfig.PruneKey),
+		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.EnableKey, p2pconfig.IHaveKey),
+		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.EnableKey, p2pconfig.IHaveKey, p2pconfig.MessageIDKey),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.IWantKey, p2pconfig.DisabledKey),
-		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.IWantKey, p2pconfig.MessageIDKey, p2pconfig.DisabledKey),
+		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.EnableKey, p2pconfig.IWantKey, p2pconfig.MessageIDKey),
 
 		BuildFlagName(gossipsubKey, p2pconfig.SubscriptionProviderKey, p2pconfig.UpdateIntervalKey),
 		BuildFlagName(gossipsubKey, p2pconfig.SubscriptionProviderKey, p2pconfig.CacheSizeKey),
@@ -314,42 +314,42 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.DisabledKey),
 		config.GossipSub.RpcInspector.Validation.InspectionProcess.Inspect.Disabled,
 		"disable rpc inspection for all control message types")
-	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.GraftKey, p2pconfig.DisabledKey),
-		config.GossipSub.RpcInspector.Validation.InspectionProcess.Inspect.GraftDisabled,
+	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.EnableKey, p2pconfig.GraftKey),
+		config.GossipSub.RpcInspector.Validation.InspectionProcess.Inspect.EnableGraft,
 		"disable graft control message inspection")
-	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.PruneKey, p2pconfig.DisabledKey),
-		config.GossipSub.RpcInspector.Validation.InspectionProcess.Inspect.PruneDisabled,
+	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.EnableKey, p2pconfig.PruneKey),
+		config.GossipSub.RpcInspector.Validation.InspectionProcess.Inspect.EnablePrune,
 		"disable prune control message inspection")
-	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.IHaveKey, p2pconfig.DisabledKey),
-		config.GossipSub.RpcInspector.Validation.InspectionProcess.Inspect.IHaveDisabled,
+	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.EnableKey, p2pconfig.IHaveKey),
+		config.GossipSub.RpcInspector.Validation.InspectionProcess.Inspect.EnableIHave,
 		"disable ihave control message inspection")
-	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.IWantKey, p2pconfig.DisabledKey),
-		config.GossipSub.RpcInspector.Validation.InspectionProcess.Inspect.IWantDisabled,
+	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.EnableKey, p2pconfig.IWantKey),
+		config.GossipSub.RpcInspector.Validation.InspectionProcess.Inspect.EnableIWant,
 		"disable iwant control message inspection")
-	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.PublishKey, p2pconfig.DisabledKey),
-		config.GossipSub.RpcInspector.Validation.InspectionProcess.Inspect.PublishDisabled,
+	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.EnableKey, p2pconfig.PublishKey),
+		config.GossipSub.RpcInspector.Validation.InspectionProcess.Inspect.EnablePublish,
 		"disable rpc publish message inspection")
 
 	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.DisabledKey),
 		config.GossipSub.RpcInspector.Validation.InspectionProcess.Truncate.Disabled,
 		"disable rpc truncation for all control message types")
-	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.GraftKey, p2pconfig.DisabledKey),
-		config.GossipSub.RpcInspector.Validation.InspectionProcess.Truncate.GraftDisabled,
+	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.EnableKey, p2pconfig.GraftKey),
+		config.GossipSub.RpcInspector.Validation.InspectionProcess.Truncate.EnableGraft,
 		"disable graft control message truncation")
-	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.PruneKey, p2pconfig.DisabledKey),
-		config.GossipSub.RpcInspector.Validation.InspectionProcess.Truncate.PruneDisabled,
+	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.EnableKey, p2pconfig.PruneKey),
+		config.GossipSub.RpcInspector.Validation.InspectionProcess.Truncate.EnablePrune,
 		"disable prune control message truncation")
-	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.IHaveKey, p2pconfig.DisabledKey),
-		config.GossipSub.RpcInspector.Validation.InspectionProcess.Truncate.IHaveDisabled,
+	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.EnableKey, p2pconfig.IHaveKey),
+		config.GossipSub.RpcInspector.Validation.InspectionProcess.Truncate.EnableIHave,
 		"disable ihave control message truncation")
-	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.IHaveKey, p2pconfig.MessageIDKey, p2pconfig.DisabledKey),
-		config.GossipSub.RpcInspector.Validation.InspectionProcess.Truncate.IHaveMessageIdsDisabled,
+	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.EnableKey, p2pconfig.IHaveKey, p2pconfig.MessageIDKey),
+		config.GossipSub.RpcInspector.Validation.InspectionProcess.Truncate.EnableIHaveMessageIds,
 		"disable ihave message id truncation")
 	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.IWantKey, p2pconfig.DisabledKey),
-		config.GossipSub.RpcInspector.Validation.InspectionProcess.Truncate.IWantDisabled,
+		config.GossipSub.RpcInspector.Validation.InspectionProcess.Truncate.EnableIWant,
 		"disable iwant control message truncation")
-	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.IWantKey, p2pconfig.MessageIDKey, p2pconfig.DisabledKey),
-		config.GossipSub.RpcInspector.Validation.InspectionProcess.Truncate.IWantMessageIdsDisabled,
+	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.EnableKey, p2pconfig.IWantKey, p2pconfig.MessageIDKey),
+		config.GossipSub.RpcInspector.Validation.InspectionProcess.Truncate.EnableIWantMessageIds,
 		"disable iwant message id truncation")
 
 	flags.Duration(BuildFlagName(gossipsubKey, p2pconfig.SubscriptionProviderKey, p2pconfig.UpdateIntervalKey),

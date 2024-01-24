@@ -182,33 +182,39 @@ network-config:
           hard-threshold: 100
         process:
           inspection:
-            # Disables rpc inspection for all control message types.
+            # Serves as a fail-safe mechanism to globally deactivate inspection logic. When this fail-safe is activated it disables all
+            # aspects of the inspection logic, irrespective of individual configurations like inspection.enable-graft, inspection.enable-prune, etc.
+            # It is important to note that activating this fail-safe results in a comprehensive deactivation inspection features.
+            # Please use this setting judiciously, considering its broad impact on the behavior of control message handling.
             disabled: false
-            # Disables graft control message inspection.
-            graft-disabled: false
-            # Disables prune control message inspection.
-            prune-disabled: false
-            # Disables ihave control message inspection.
-            ihave-disabled: false
-            # Disables iwant control message inspection.
-            iwant-disabled: false
-            # Disables publish message inspection.
-            publish-disabled: false
+            # Enables graft control message inspection.
+            enable-graft: true
+            # Enables prune control message inspection.
+            enable-prune: true
+            # Enables ihave control message inspection.
+            enable-ihave: true
+            # Enables iwant control message inspection.
+            enable-iwant: true
+            # Enables publish message inspection.
+            enable-publish: true
           truncation:
-            # Disables rpc truncation for all control message types.
+            # Serves as a fail-safe mechanism to globally deactivate truncation logic. When this fail-safe is activated it disables all
+            # aspects of the truncation logic, irrespective of individual configurations like truncation.enable-graft, truncation.enable-prune, etc.
+            # It is important to note that activating this fail-safe results in a comprehensive deactivation truncation features.
+            # Please use this setting judiciously, considering its broad impact on the behavior of control message handling.
             disabled: false
-            # Disables graft control message truncation.
-            graft-disabled: false
-            # Disables prune control message truncation.
-            prune-disabled: false
-            # Disables ihave control message truncation.
-            ihave-disabled: false
-            # Disables ihave message id truncation.
-            ihave-message-id-disabled: false
-            # Disables iwant control message truncation.
-            iwant-disabled: false
-            # Disables iwant message id truncation.
-            iwant-message-id-disabled: false
+            # Enables graft control message truncation.
+            enable-graft: true
+            # Enables prune control message truncation.
+            enable-prune: true
+            # Enables ihave control message truncation.
+            enable-ihave: true
+            # Enables ihave message id truncation.
+            enable-ihave-message-id: true
+            # Enables iwant control message truncation.
+            enable-iwant: true
+            # Enables iwant message id truncation.
+            enable-iwant-message-id: true
     rpc-tracer:
       # The default interval at which the mesh tracer logs the mesh topology. This is used for debugging and forensics purposes.
       #	Note that we purposefully choose this logging interval high enough to avoid spamming the logs. Moreover, the
