@@ -1,6 +1,7 @@
 package block_queue
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -281,7 +282,7 @@ func TestOnBlockWithMissingParentCommit(t *testing.T) {
 	require.Empty(t, executables)
 	requireCollectionHas(t, missing, c1)
 
-	// block A is executable
+	// block A has all the collections and become executable
 	executables, err = q.OnCollection(c1)
 	require.NoError(t, err)
 	requireExecutableHas(t, executables, blockA)
@@ -294,11 +295,30 @@ func TestOnBlockWithMissingParentCommit(t *testing.T) {
 	requireExecutableHas(t, executables)
 	requireQueueIsEmpty(t, q)
 
-	missing, executables, err = q.OnBlock(blockB, nil)
+	// verify when race condition happens, ErrMissingParent will be returned
+	_, _, err = q.OnBlock(blockB, nil)
+	require.True(t, errors.Is(err, ErrMissingParent), err)
+
+	// verify if called again with parent commit, it will be successful
+	missing, executables, err = q.OnBlock(blockB, commitFor("A"))
 	require.NoError(t, err)
 	require.Empty(t, executables)
 	requireCollectionHas(t, missing, c2, c3)
 
+	// verify after receiving all collections, B becomes executable
+	executables, err = q.OnCollection(c2)
+	require.NoError(t, err)
+	require.Empty(t, executables)
+
+	executables, err = q.OnCollection(c3)
+	require.NoError(t, err)
+	requireExecutableHas(t, executables, blockB)
+
+	// verify after B is executed, the queue is empty
+	executables, err = q.OnBlockExecuted(blockB.ID(), *commitFor("B"))
+	require.NoError(t, err)
+	requireExecutableHas(t, executables)
+	requireQueueIsEmpty(t, q)
 }
 
 /* ==== Test utils ==== */
