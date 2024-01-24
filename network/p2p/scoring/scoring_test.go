@@ -144,13 +144,14 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
 		return unittest.ProposalFixture()
 	})
+
 	// simulates node2 spamming node1 with invalid gossipsub control messages until node2 gets dissallow listed.
 	// since the decay will start lower than .99 and will only be incremented by default .01, we need to spam a lot of messages so that the node gets disallow listed
 	for i := 0; i < 750; i++ {
 		inspectorSuite1.consumer.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 			PeerID:  node2.ID(),
 			MsgType: p2pmsg.ControlMessageTypes()[rand.Intn(len(p2pmsg.ControlMessageTypes()))],
-			Errors:  randomInvCtlMsgErrs(300),
+			Error:   fmt.Errorf("invalid control message"),
 		})
 	}
 
@@ -169,17 +170,4 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		func() interface{} {
 			return unittest.ProposalFixture()
 		})
-}
-
-// randomInvCtlMsgErrs returns n amount of invalid control message errors. Each error returned is set to p2p.CtrlMsgNonClusterTopicType by default.
-// Args:
-// - int: the number of errors to create.
-// Returns:
-// - p2p.InvCtrlMsgErrs: list of errors.
-func randomInvCtlMsgErrs(n int) p2p.InvCtrlMsgErrs {
-	errs := make(p2p.InvCtrlMsgErrs, n)
-	for i := 0; i < n; i++ {
-		errs[i] = p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid control message"), p2p.CtrlMsgNonClusterTopicType)
-	}
-	return errs
 }
