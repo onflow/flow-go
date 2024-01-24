@@ -5,10 +5,11 @@ import (
 	"fmt"
 
 	"github.com/coreos/go-semver/semver"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
+	"github.com/onflow/crypto"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/assignment"
