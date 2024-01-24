@@ -5,7 +5,7 @@
 // This package should be used instead of `math/rand` for any use-case requiring
 // a secure randomness. It provides similar APIs to the ones provided by `math/rand`.
 // This package does not implement any determinstic RNG (Pseudo-RNG) based on
-// user input seeds. For the deterministic use-cases please use `crypto/random`.
+// user input seeds. For the deterministic use-cases please use `github.com/onflow/crypto/random`.
 //
 // Functions in this package may return an error if the underlying system implementation fails
 // to read new randoms. When that happens, this package considers it an irrecoverable exception.
