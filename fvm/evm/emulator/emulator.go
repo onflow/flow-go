@@ -116,7 +116,7 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 		}
 		fallthrough
 	default:
-		return proc.run(call.Message(), types.DirectCallTxType)
+		return proc.runDirect(call.Message(), types.DirectCallTxType)
 	}
 }
 
@@ -346,13 +346,16 @@ func (proc *procedure) deployAt(
 	return res, proc.commit()
 }
 
+func (proc *procedure) runDirect(msg *gethCore.Message, txType uint8) (*types.Result, error) {
+	// set the nonce for the message (needed for some opeartions like deployment)
+	msg.Nonce = proc.state.GetNonce(msg.From)
+	return proc.run(msg, types.DirectCallTxType)
+}
+
 func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, error) {
 	res := types.Result{
 		TxType: txType,
 	}
-
-	// set the nonce for the message (needed for some opeartions like deployment)
-	msg.Nonce = proc.state.GetNonce(msg.From)
 
 	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
 	execResult, err := gethCore.NewStateTransition(
