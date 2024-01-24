@@ -425,8 +425,8 @@ func (t *TestRandomGenerator) ReadRandom(buffer []byte) error {
 func getSimpleRandomGenerator() *TestRandomGenerator {
 	return &TestRandomGenerator{
 		ReadRandomFunc: func(buffer []byte) error {
-			rand.Read(buffer)
-			return nil
+			_, err := rand.Read(buffer)
+			return err
 		},
 	}
 }
