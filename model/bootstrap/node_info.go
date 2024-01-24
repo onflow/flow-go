@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/onflow/crypto"
 	"golang.org/x/exp/slices"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 )

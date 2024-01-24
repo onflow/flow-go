@@ -3091,7 +3091,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 	handler := &testContractHandler{
 
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.False(t, isAuthorized)
 
 			return &testFlowAccount{
@@ -3127,10 +3127,9 @@ func TestEVMAddressDeposit(t *testing.T) {
           let vault <- minter.mintTokens(amount: 1.23)
           destroy minter
 
-          let address = EVM.EVMAddress(
-              bytes: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-          )
-          address.deposit(from: <-vault)
+          let bridgedAccount <- EVM.createBridgedAccount()
+          bridgedAccount.deposit(from: <-vault)
+		  destroy bridgedAccount
       }
    `)
 
@@ -3252,7 +3251,7 @@ func TestBridgedAccountWithdraw(t *testing.T) {
           destroy minter
 
           let bridgedAccount <- EVM.createBridgedAccount()
-          bridgedAccount.address().deposit(from: <-vault)
+          bridgedAccount.deposit(from: <-vault)
 
           let vault2 <- bridgedAccount.withdraw(balance: EVM.Balance(flow: 1.23))
           let balance = vault2.balance

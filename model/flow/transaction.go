@@ -3,10 +3,10 @@ package flow
 import (
 	"fmt"
 
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	"golang.org/x/exp/slices"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/fingerprint"
 )
 
@@ -125,8 +125,8 @@ func (tb *TransactionBody) SetReferenceBlockID(blockID Identifier) *TransactionB
 	return tb
 }
 
-// SetGasLimit sets the gas limit for this transaction.
-func (tb *TransactionBody) SetGasLimit(limit uint64) *TransactionBody {
+// SetComputeLimit sets the gas limit for this transaction.
+func (tb *TransactionBody) SetComputeLimit(limit uint64) *TransactionBody {
 	tb.GasLimit = limit
 	return tb
 }
