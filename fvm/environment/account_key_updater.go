@@ -8,8 +8,9 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
 
-	fgcrypto "github.com/onflow/flow-go/crypto"
-	fghash "github.com/onflow/flow-go/crypto/hash"
+	fgcrypto "github.com/onflow/crypto"
+	fghash "github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/state"

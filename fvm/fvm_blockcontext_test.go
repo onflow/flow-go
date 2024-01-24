@@ -13,11 +13,10 @@ import (
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
@@ -913,7 +912,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 		t.Run(tt.label, func(t *testing.T) {
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(tt.script)).
-				SetGasLimit(tt.gasLimit)
+				SetComputeLimit(tt.gasLimit)
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)

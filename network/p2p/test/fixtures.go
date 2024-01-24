@@ -17,13 +17,13 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	discoveryBackoff "github.com/libp2p/go-libp2p/p2p/discovery/backoff"
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
 
 	"github.com/onflow/flow-go/config"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -930,6 +930,18 @@ func WithIHave(msgCount, msgIDCount int, topicId string) GossipSubCtrlOption {
 			}
 		}
 		msg.Ihave = iHaves
+	}
+}
+
+// WithIHaveMessageIDs adds iHave control messages with the given message IDs to the control message.
+func WithIHaveMessageIDs(msgIDs []string, topicId string) GossipSubCtrlOption {
+	return func(msg *pb.ControlMessage) {
+		msg.Ihave = []*pb.ControlIHave{
+			{
+				TopicID:    &topicId,
+				MessageIDs: msgIDs,
+			},
+		}
 	}
 }
 

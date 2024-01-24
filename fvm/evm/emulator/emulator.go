@@ -39,6 +39,7 @@ func newConfig(ctx types.BlockContext) *Config {
 		WithBlockNumber(new(big.Int).SetUint64(ctx.BlockNumber)),
 		WithCoinbase(ctx.GasFeeCollector.ToCommon()),
 		WithDirectCallBaseGasUsage(ctx.DirectCallBaseGasUsage),
+		WithExtraPrecompiles(ctx.ExtraPrecompiles),
 	)
 }
 
@@ -53,6 +54,7 @@ func (em *Emulator) NewReadOnlyBlockView(ctx types.BlockContext) (types.ReadOnly
 // NewBlockView constructs a new block view (mutable)
 func (em *Emulator) NewBlockView(ctx types.BlockContext) (types.BlockView, error) {
 	cfg := newConfig(ctx)
+	SetupPrecompile(cfg)
 	return &BlockView{
 		config:   cfg,
 		rootAddr: em.rootAddr,
@@ -278,4 +280,26 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 		return &res, commitErr
 	}
 	return &res, err
+}
+
+func SetupPrecompile(cfg *Config) {
+	rules := cfg.ChainRules()
+	// captures the pointer to the map that has to be augmented
+	var precompiles map[gethCommon.Address]gethVM.PrecompiledContract
+	switch {
+	case rules.IsCancun:
+		precompiles = gethVM.PrecompiledContractsCancun
+	case rules.IsBerlin:
+		precompiles = gethVM.PrecompiledContractsBerlin
+	case rules.IsIstanbul:
+		precompiles = gethVM.PrecompiledContractsIstanbul
+	case rules.IsByzantium:
+		precompiles = gethVM.PrecompiledContractsByzantium
+	default:
+		precompiles = gethVM.PrecompiledContractsHomestead
+	}
+	for addr, contract := range cfg.ExtraPrecompiles {
+		// we override if exist since we call this method on every block
+		precompiles[addr] = contract
+	}
 }

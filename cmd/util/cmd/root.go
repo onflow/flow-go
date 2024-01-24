@@ -11,6 +11,7 @@ import (
 
 	checkpoint_collect_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-collect-stats"
 	checkpoint_list_tries "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-list-tries"
+	checkpoint_trie_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-trie-stats"
 	epochs "github.com/onflow/flow-go/cmd/util/cmd/epochs/cmd"
 	export "github.com/onflow/flow-go/cmd/util/cmd/exec-data-json-export"
 	edbs "github.com/onflow/flow-go/cmd/util/cmd/execution-data-blobstore/cmd"
@@ -65,6 +66,7 @@ func addCommands() {
 	rootCmd.AddCommand(extract.Cmd)
 	rootCmd.AddCommand(export.Cmd)
 	rootCmd.AddCommand(checkpoint_list_tries.Cmd)
+	rootCmd.AddCommand(checkpoint_trie_stats.Cmd)
 	rootCmd.AddCommand(checkpoint_collect_stats.Cmd)
 	rootCmd.AddCommand(truncate_database.Cmd)
 	rootCmd.AddCommand(read_badger.RootCmd)
