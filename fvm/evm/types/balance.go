@@ -82,3 +82,8 @@ func SubBalance(bal1 Balance, bal2 Balance) (Balance, error) {
 func AddBalance(bal1 Balance, bal2 Balance) (Balance, error) {
 	return new(big.Int).Add(bal1, bal2), nil
 }
+
+// MakeABalanceInFlow makes a balance object that has `amount` Flow Token in it
+func MakeABalanceInFlow(amount uint64) Balance {
+	return NewBalance(new(big.Int).Mul(OneFlowBalance, new(big.Int).SetUint64(amount)))
+}

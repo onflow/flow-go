@@ -2,14 +2,12 @@ package testutils
 
 import (
 	cryptoRand "crypto/rand"
-	"math"
 	"math/big"
 	"math/rand"
 	"testing"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -59,9 +57,4 @@ func GetRandomLogFixture(t testing.TB) *gethTypes.Log {
 		},
 		Data: RandomData(t),
 	}
-}
-
-// MakeABalanceInFlow makes a balance object that has `amount` Flow Token in it
-func MakeABalanceInFlow(amount uint64) types.Balance {
-	return types.NewBalanceFromUFix64(cadence.UFix64(uint64(math.Pow(10, float64(types.UFixedScale))) * amount))
 }
