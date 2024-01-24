@@ -39,7 +39,7 @@ func TestDebugger_RunTransaction(t *testing.T) {
 
 	script := []byte(fmt.Sprintf(scriptTemplate, chain.ServiceAddress()))
 	txBody := flow.NewTransactionBody().
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetScript([]byte(script)).
 		SetPayer(chain.ServiceAddress()).
 		SetProposalKey(chain.ServiceAddress(), 0, 0)
