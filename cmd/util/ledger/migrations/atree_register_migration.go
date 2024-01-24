@@ -420,14 +420,16 @@ var domains = []string{
 	common.PathDomainPublic.Identifier(),
 	runtime.StorageDomainContract,
 	stdlib.InboxStorageDomain,
+	stdlib.CapabilityControllerStorageDomain,
 }
 
 var domainsLookupMap = map[string]struct{}{
-	common.PathDomainStorage.Identifier(): {},
-	common.PathDomainPrivate.Identifier(): {},
-	common.PathDomainPublic.Identifier():  {},
-	runtime.StorageDomainContract:         {},
-	stdlib.InboxStorageDomain:             {},
+	common.PathDomainStorage.Identifier():    {},
+	common.PathDomainPrivate.Identifier():    {},
+	common.PathDomainPublic.Identifier():     {},
+	runtime.StorageDomainContract:            {},
+	stdlib.InboxStorageDomain:                {},
+	stdlib.CapabilityControllerStorageDomain: {},
 }
 
 // migrationProblem is a struct for reporting errors
