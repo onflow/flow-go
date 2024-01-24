@@ -473,6 +473,32 @@ func (_m *Client) GetLatestProtocolStateSnapshot(ctx context.Context) ([]byte, e
 	return r0, r1
 }
 
+// GetNetworkParameters provides a mock function with given fields: ctx
+func (_m *Client) GetNetworkParameters(ctx context.Context) (*flow.NetworkParameters, error) {
+	ret := _m.Called(ctx)
+
+	var r0 *flow.NetworkParameters
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (*flow.NetworkParameters, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) *flow.NetworkParameters); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.NetworkParameters)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetTransaction provides a mock function with given fields: ctx, txID
 func (_m *Client) GetTransaction(ctx context.Context, txID flow.Identifier) (*flow.Transaction, error) {
 	ret := _m.Called(ctx, txID)
