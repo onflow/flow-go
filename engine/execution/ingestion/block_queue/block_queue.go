@@ -34,6 +34,16 @@ type BlockQueue struct {
 	blockIDsByHeight map[uint64]map[flow.Identifier]*entity.ExecutableBlock // for finding next executable block
 }
 
+type MissingCollection struct {
+	BlockID   flow.Identifier
+	Height    uint64
+	Guarantee *flow.CollectionGuarantee
+}
+
+func (m *MissingCollection) ID() flow.Identifier {
+	return m.Guarantee.ID()
+}
+
 // collectionInfo is an internal struct used to keep track of the state of a collection,
 // and the blocks that include the collection
 type collectionInfo struct {
@@ -58,7 +68,7 @@ func NewBlockQueue(logger zerolog.Logger) *BlockQueue {
 // if its parent is not executed, then the parent must be added to the queue first.
 // if its parent is executed, then the parent's finalState must be passed in.
 func (q *BlockQueue) OnBlock(block *flow.Block, parentFinalState *flow.StateCommitment) (
-	[]*flow.CollectionGuarantee, // missing collections
+	[]*MissingCollection, // missing collections
 	[]*entity.ExecutableBlock, // blocks ready to execute
 	error, // exceptions
 ) {
@@ -75,9 +85,10 @@ func (q *BlockQueue) OnBlock(block *flow.Block, parentFinalState *flow.StateComm
 			return nil, nil, nil
 		}
 
-		// this is an edge case where parentFinalState is provided, but its parent block has not been
-		// marked as executed yet (OnBlockExecuted(parent) is not called),
-		// in this edge case, we will internally call OnBlockExecuted(parentBlockID, parentFinalState) first
+		// this is an edge case where parentFinalState is provided, and its parent block exists
+		// in the queue but has not been marked as executed yet (OnBlockExecuted(parent) is not called),
+		// in this case, we will internally call OnBlockExecuted(parentBlockID, parentFinalState).
+		// there is no need to create the executable block again, since it's already created.
 		if executable.StartState == nil && parentFinalState != nil {
 			executables, err := q.onBlockExecuted(block.Header.ParentID, *parentFinalState)
 			if err != nil {
@@ -132,7 +143,7 @@ func (q *BlockQueue) OnBlock(block *flow.Block, parentFinalState *flow.StateComm
 	executable.CompleteCollections = colls
 
 	// find missing collections and update collection index
-	missingCollections := make([]*flow.CollectionGuarantee, 0, len(block.Payload.Guarantees))
+	missingCollections := make([]*MissingCollection, 0, len(block.Payload.Guarantees))
 
 	for _, guarantee := range block.Payload.Guarantees {
 		colID := guarantee.ID()
@@ -155,7 +166,7 @@ func (q *BlockQueue) OnBlock(block *flow.Block, parentFinalState *flow.StateComm
 				},
 			}
 
-			missingCollections = append(missingCollections, guarantee)
+			missingCollections = append(missingCollections, missingCollectionForBlock(executable, guarantee))
 		}
 	}
 
@@ -318,7 +329,7 @@ func (q *BlockQueue) checkIfChildBlockBecomeExecutable(
 // GetMissingCollections returns the missing collections and the start state
 // It returns an error if the block is not found
 func (q *BlockQueue) GetMissingCollections(blockID flow.Identifier) (
-	[]*flow.CollectionGuarantee, *flow.StateCommitment, error) {
+	[]*MissingCollection, *flow.StateCommitment, error) {
 	q.Lock()
 	defer q.Unlock()
 	block, ok := q.blocks[blockID]
@@ -326,14 +337,22 @@ func (q *BlockQueue) GetMissingCollections(blockID flow.Identifier) (
 		return nil, nil, fmt.Errorf("block %s not found", blockID)
 	}
 
-	missingCollections := make([]*flow.CollectionGuarantee, 0, len(block.Block.Payload.Guarantees))
+	missingCollections := make([]*MissingCollection, 0, len(block.Block.Payload.Guarantees))
 	for _, col := range block.CompleteCollections {
 		// check if the collection is already received
 		if col.IsCompleted() {
 			continue
 		}
-		missingCollections = append(missingCollections, col.Guarantee)
+		missingCollections = append(missingCollections, missingCollectionForBlock(block, col.Guarantee))
 	}
 
 	return missingCollections, block.StartState, nil
+}
+
+func missingCollectionForBlock(block *entity.ExecutableBlock, guarantee *flow.CollectionGuarantee) *MissingCollection {
+	return &MissingCollection{
+		BlockID:   block.ID(),
+		Height:    block.Block.Header.Height,
+		Guarantee: guarantee,
+	}
 }

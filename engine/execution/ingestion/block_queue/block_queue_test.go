@@ -20,7 +20,7 @@ func TestSingleBlockBecomeReady(t *testing.T) {
 	blockA := block("A")
 	c1, c2 := coll(1), coll(2)
 
-	q := NewBlockQueue()
+	q := NewBlockQueue(unittest.Logger())
 
 	// verify receving a collection (C1) before its block (A) will be ignored
 	executables, err := q.OnCollection(c1)
@@ -62,7 +62,7 @@ func TestMultipleBlockBecomesReady(t *testing.T) {
 		block("A"), block("B"), block("C"), block("D"), block("E"), block("F"), block("G")
 	c1, c2, c3, c4, c5, c6 := coll(1), coll(2), coll(3), coll(4), coll(5), coll(6)
 
-	q := NewBlockQueue()
+	q := NewBlockQueue(unittest.Logger())
 
 	// verify receiving blocks without collections will return missing collections and no executables
 	missing, executables, err := q.OnBlock(blockA, commitFor("R"))
@@ -178,7 +178,7 @@ func TestOnForksWithSameCollections(t *testing.T) {
 		block("A"), block("B"), block("C"), block("D"), block("E"), block("F")
 	c1, c2, c3 := coll(1), coll(2), coll(3)
 
-	q := NewBlockQueue()
+	q := NewBlockQueue(unittest.Logger())
 
 	missing, executables, err := q.OnBlock(blockA, commitFor("R"))
 	require.NoError(t, err)
@@ -261,6 +261,44 @@ func TestOnForksWithSameCollections(t *testing.T) {
 	requireExecutableHas(t, executables)
 
 	requireQueueIsEmpty(t, q)
+}
+
+func TestOnBlockWithMissingParentCommit(t *testing.T) {
+	t.Parallel()
+	// Given a chain
+	// R <- A(C1) <- B(C2,C3) <- C() <- D()
+	// -    ^------- E(C4,C5) <- F(C6)
+	// -             ^-----------G()
+
+	block, coll, commitFor := makeChainABCDEFG()
+	blockA, blockB := block("A"), block("B")
+	c1, c2, c3 := coll(1), coll(2), coll(3)
+
+	q := NewBlockQueue(unittest.Logger())
+
+	missing, executables, err := q.OnBlock(blockA, commitFor("R"))
+	require.NoError(t, err)
+	require.Empty(t, executables)
+	requireCollectionHas(t, missing, c1)
+
+	// block A is executable
+	executables, err = q.OnCollection(c1)
+	require.NoError(t, err)
+	requireExecutableHas(t, executables, blockA)
+
+	// the following two calls create an edge case where A is executed,
+	// and B is received, however, due to race condition, the parent commit
+	// was not saved in the database yet
+	executables, err = q.OnBlockExecuted(blockA.ID(), *commitFor("A"))
+	require.NoError(t, err)
+	requireExecutableHas(t, executables)
+	requireQueueIsEmpty(t, q)
+
+	missing, executables, err = q.OnBlock(blockB, nil)
+	require.NoError(t, err)
+	require.Empty(t, executables)
+	requireCollectionHas(t, missing, c2, c3)
+
 }
 
 /* ==== Test utils ==== */
@@ -416,16 +454,16 @@ func requireExecutableHas(t *testing.T, executables []*entity.ExecutableBlock, b
 	require.Equal(t, 0, len(blocks))
 }
 
-func requireCollectionHas(t *testing.T, missing []*flow.CollectionGuarantee, cs ...*flow.Collection) {
+func requireCollectionHas(t *testing.T, missing []*MissingCollection, cs ...*flow.Collection) {
 	collections := make(map[flow.Identifier]*flow.Collection, len(cs))
 	for _, c := range cs {
 		collections[c.ID()] = c
 	}
 
 	for _, m := range missing {
-		_, ok := collections[m.CollectionID]
+		_, ok := collections[m.Guarantee.CollectionID]
 		require.True(t, ok)
-		delete(collections, m.CollectionID)
+		delete(collections, m.Guarantee.CollectionID)
 	}
 
 	require.Equal(t, len(cs), len(missing))
