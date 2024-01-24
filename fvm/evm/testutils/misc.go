@@ -9,9 +9,9 @@ import (
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
