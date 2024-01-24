@@ -116,7 +116,10 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 		}
 		fallthrough
 	default:
-		return proc.run(call.Message(), types.DirectCallTxType)
+		// set message nonce (needed for deploy)
+		msg := call.Message()
+		msg.Nonce = proc.state.GetNonce(call.From.ToCommon())
+		return proc.run(msg, types.DirectCallTxType)
 	}
 }
 

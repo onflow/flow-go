@@ -508,14 +508,15 @@ func TestHandler_COA(t *testing.T) {
 				require.NotNil(t, foa)
 
 				// deposit 10000 flow
-				vault := types.NewFlowTokenVault(testutils.MakeABalanceInFlow(10000))
+				bal := testutils.MakeABalanceInFlow(10000)
+				vault := types.NewFlowTokenVault(bal)
 				foa.Deposit(vault)
+				require.Equal(t, bal, foa.Balance())
 
 				testContract := testutils.GetStorageTestContract(t)
 				addr := foa.Deploy(testContract.ByteCode, math.MaxUint64, types.Balance(0))
 
 				num := big.NewInt(22)
-
 				_ = foa.Call(
 					addr,
 					testContract.MakeCallData(t, "store", num),
