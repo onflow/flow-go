@@ -985,10 +985,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 		Component("public execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			opts := []network.BlobServiceOption{
 				blob.WithBitswapOptions(
-					// Only allow block requests from staked ENs and ANs
-					bitswap.WithPeerBlockRequestFilter(
-						blob.AuthorizedRequester(nil, builder.IdentityProvider, builder.Logger),
-					),
 					bitswap.WithTracer(
 						blob.NewTracer(node.Logger.With().Str("public_blob_service", channels.PublicExecutionDataService.String()).Logger()),
 					),

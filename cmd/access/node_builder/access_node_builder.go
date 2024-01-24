@@ -21,6 +21,8 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
@@ -34,7 +36,6 @@ import (
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
@@ -672,10 +673,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		builder.Component("public network execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			opts := []network.BlobServiceOption{
 				blob.WithBitswapOptions(
-					// Rate limit blob requests by peer
-					bitswap.WithPeerBlockRequestFilter(
-						blob.AuthorizedRequester(nil, builder.IdentityProvider, builder.Logger),
-					),
 					bitswap.WithTracer(
 						blob.NewTracer(node.Logger.With().Str("public_blob_service", channels.PublicExecutionDataService.String()).Logger()),
 					),
