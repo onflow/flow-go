@@ -1434,9 +1434,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("backend script executor", func(node *cmd.NodeConfig) error {
-			builder.ScriptExecutor = backend.NewScriptExecutor()
-			builder.ScriptExecutor.SetMinCompatibleHeight(builder.scriptExecMinBlock)
-			builder.ScriptExecutor.SetMaxCompatibleHeight(builder.scriptExecMaxBlock)
+			builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
 			return nil
 		}).
 		Module("async register store", func(node *cmd.NodeConfig) error {
