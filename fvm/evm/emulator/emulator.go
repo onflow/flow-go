@@ -111,15 +111,12 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 	case types.WithdrawCallSubType:
 		return proc.withdrawFrom(call.From, call.Value)
 	case types.DeployCallSubType:
-		if call.HasNonEmptyToField() {
+		if !call.EmptyToField() {
 			return proc.deployAt(call.From, call.To, call.Data, call.GasLimit, call.Value)
 		}
 		fallthrough
 	default:
-		// set message nonce (needed for deploy)
-		msg := call.Message()
-		msg.Nonce = proc.state.GetNonce(call.From.ToCommon())
-		return proc.run(msg, types.DirectCallTxType)
+		return proc.run(call.Message(), types.DirectCallTxType)
 	}
 }
 
@@ -353,6 +350,9 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 	res := types.Result{
 		TxType: txType,
 	}
+
+	// set the nonce for the message (needed for some opeartions like deployment)
+	msg.Nonce = proc.state.GetNonce(msg.From)
 
 	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
 	execResult, err := gethCore.NewStateTransition(

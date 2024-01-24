@@ -24,8 +24,8 @@ import (
 
 // ContractHandler handles operations on the evm environment
 type ContractHandler interface {
-	// Deploys a cadence-owned-account
-	DeployACOAAccount() Address
+	// DeployCOA deploys a Cadence owned account and return the address
+	DeployCOA() Address
 
 	// AccountByAddress returns an account by address
 	// if isAuthorized is set, it allows for functionality like `call`, `deploy`

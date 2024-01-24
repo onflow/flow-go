@@ -56,7 +56,7 @@ func (dc *DirectCall) Hash() (gethCommon.Hash, error) {
 // Message constructs a core.Message from the direct call
 func (dc *DirectCall) Message() *gethCore.Message {
 	var to *gethCommon.Address
-	if dc.HasNonEmptyToField() {
+	if !dc.EmptyToField() {
 		ct := dc.To.ToCommon()
 		to = &ct
 	}
@@ -74,9 +74,9 @@ func (dc *DirectCall) Message() *gethCore.Message {
 	}
 }
 
-// HasNonEmptyTo returns true if to has a non empty value
-func (dc *DirectCall) HasNonEmptyToField() bool {
-	return dc.To != EmptyAddress
+// EmptyToField returns true if `to` field contains an empty address
+func (dc *DirectCall) EmptyToField() bool {
+	return dc.To == EmptyAddress
 }
 
 func NewDepositCall(address Address, amount *big.Int) *DirectCall {

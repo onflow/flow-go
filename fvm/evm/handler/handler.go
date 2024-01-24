@@ -60,8 +60,8 @@ func getPrecompiles(
 	return []types.Precompile{archContract}
 }
 
-// DeployACOAAccount deploys a cadence-owned-account and returns the address
-func (h *ContractHandler) DeployACOAAccount() types.Address {
+// DeployCOA deploys a cadence-owned-account and returns the address
+func (h *ContractHandler) DeployCOA() types.Address {
 	target, err := h.addressAllocator.AllocateCOAAddress()
 	gaslimit := types.GasLimit(COAContractDeploymentRequiredGas)
 	handleError(err)

@@ -1,12 +1,14 @@
 package emulator_test
 
 import (
+	"fmt"
 	"math"
 	"math/big"
 	"testing"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethVM "github.com/ethereum/go-ethereum/core/vm"
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/stretchr/testify/require"
 
@@ -344,7 +346,7 @@ func TestDeployAtFunctionality(t *testing.T) {
 								math.MaxUint64,
 								amountToBeTransfered),
 						)
-						require.Error(t, err)
+						require.Equal(t, gethVM.ErrContractAddressCollision, err)
 					})
 					// test deployment with not enough gas
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
@@ -356,7 +358,7 @@ func TestDeployAtFunctionality(t *testing.T) {
 								100,
 								new(big.Int)),
 						)
-						require.Error(t, err)
+						require.Equal(t, fmt.Errorf("out of gas"), err)
 					})
 				})
 			})

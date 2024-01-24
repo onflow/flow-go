@@ -37,7 +37,7 @@ func (t *testContractHandler) FlowTokenAddress() common.Address {
 
 var _ types.ContractHandler = &testContractHandler{}
 
-func (t *testContractHandler) DeployACOAAccount() types.Address {
+func (t *testContractHandler) DeployCOA() types.Address {
 	if t.allocateAddress == nil {
 		t.addressIndex++
 		var address types.Address
@@ -3349,7 +3349,7 @@ func TestBridgedAccountDeploy(t *testing.T) {
 					assert.Equal(t, types.GasLimit(9999), limit)
 					assert.Equal(t, types.Balance(expectedBalance), balance)
 
-					return handler.DeployACOAAccount()
+					return handler.DeployCOA()
 				},
 			}
 		},
