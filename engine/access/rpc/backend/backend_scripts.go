@@ -69,13 +69,13 @@ func (b *backendScripts) ExecuteScriptAtLatestBlock(
 	ctx context.Context,
 	script []byte,
 	arguments [][]byte,
-) ([]byte, uint64, error) {
+) ([]byte, error) {
 	latestHeader, err := b.state.Sealed().Head()
 	if err != nil {
 		// the latest sealed header MUST be available
 		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		irrecoverable.Throw(ctx, err)
-		return nil, 0, err
+		return nil, err
 	}
 
 	return b.executeScript(ctx, newScriptExecutionRequest(latestHeader.ID(), latestHeader.Height, script, arguments))
@@ -87,10 +87,10 @@ func (b *backendScripts) ExecuteScriptAtBlockID(
 	blockID flow.Identifier,
 	script []byte,
 	arguments [][]byte,
-) ([]byte, uint64, error) {
+) ([]byte, error) {
 	header, err := b.headers.ByBlockID(blockID)
 	if err != nil {
-		return nil, 0, rpc.ConvertStorageError(err)
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	return b.executeScript(ctx, newScriptExecutionRequest(blockID, header.Height, script, arguments))
@@ -102,10 +102,10 @@ func (b *backendScripts) ExecuteScriptAtBlockHeight(
 	blockHeight uint64,
 	script []byte,
 	arguments [][]byte,
-) ([]byte, uint64, error) {
+) ([]byte, error) {
 	header, err := b.headers.ByHeight(blockHeight)
 	if err != nil {
-		return nil, 0, rpc.ConvertStorageError(err)
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	return b.executeScript(ctx, newScriptExecutionRequest(header.ID(), blockHeight, script, arguments))
@@ -116,24 +116,24 @@ func (b *backendScripts) ExecuteScriptAtBlockHeight(
 func (b *backendScripts) executeScript(
 	ctx context.Context,
 	scriptRequest *scriptExecutionRequest,
-) ([]byte, uint64, error) {
+) ([]byte, error) {
 	switch b.scriptExecMode {
 	case IndexQueryModeExecutionNodesOnly:
-		result, compUsage, _, err := b.executeScriptOnAvailableExecutionNodes(ctx, scriptRequest)
-		return result, compUsage, err
+		result, _, err := b.executeScriptOnAvailableExecutionNodes(ctx, scriptRequest)
+		return result, err
 
 	case IndexQueryModeLocalOnly:
-		result, compUsage, _, err := b.executeScriptLocally(ctx, scriptRequest)
-		return result, compUsage, err
+		result, _, err := b.executeScriptLocally(ctx, scriptRequest)
+		return result, err
 
 	case IndexQueryModeFailover:
-		localResult, compUsage, localDuration, localErr := b.executeScriptLocally(ctx, scriptRequest)
+		localResult, localDuration, localErr := b.executeScriptLocally(ctx, scriptRequest)
 		if localErr == nil || isInvalidArgumentError(localErr) || status.Code(localErr) == codes.Canceled {
-			return localResult, compUsage, localErr
+			return localResult, localErr
 		}
 		// Note: scripts that timeout are retried on the execution nodes since ANs may have performance
 		// issues for some scripts.
-		execResult, compUsage, execDuration, execErr := b.executeScriptOnAvailableExecutionNodes(ctx, scriptRequest)
+		execResult, execDuration, execErr := b.executeScriptOnAvailableExecutionNodes(ctx, scriptRequest)
 
 		resultComparer := newScriptResultComparison(b.log, b.metrics, scriptRequest)
 		_ = resultComparer.compare(
@@ -141,17 +141,17 @@ func (b *backendScripts) executeScript(
 			newScriptResult(localResult, localDuration, localErr),
 		)
 
-		return execResult, compUsage, execErr
+		return execResult, execErr
 
 	case IndexQueryModeCompare:
-		execResult, compUsage, execDuration, execErr := b.executeScriptOnAvailableExecutionNodes(ctx, scriptRequest)
+		execResult, execDuration, execErr := b.executeScriptOnAvailableExecutionNodes(ctx, scriptRequest)
 		// we can only compare the results if there were either no errors or a cadence error
 		// since we cannot distinguish the EN error as caused by the block being pruned or some other reason,
 		// which may produce a valid RN output but an error for the EN
 		if execErr != nil && !isInvalidArgumentError(execErr) {
-			return nil, compUsage, execErr
+			return nil, execErr
 		}
-		localResult, compUsage, localDuration, localErr := b.executeScriptLocally(ctx, scriptRequest)
+		localResult, localDuration, localErr := b.executeScriptLocally(ctx, scriptRequest)
 
 		resultComparer := newScriptResultComparison(b.log, b.metrics, scriptRequest)
 		_ = resultComparer.compare(
@@ -160,10 +160,10 @@ func (b *backendScripts) executeScript(
 		)
 
 		// always return EN results
-		return execResult, compUsage, execErr
+		return execResult, execErr
 
 	default:
-		return nil, 0, status.Errorf(codes.Internal, "unknown script execution mode: %v", b.scriptExecMode)
+		return nil, status.Errorf(codes.Internal, "unknown script execution mode: %v", b.scriptExecMode)
 	}
 }
 
@@ -171,7 +171,7 @@ func (b *backendScripts) executeScript(
 func (b *backendScripts) executeScriptLocally(
 	ctx context.Context,
 	r *scriptExecutionRequest,
-) ([]byte, uint64, time.Duration, error) {
+) ([]byte, time.Duration, error) {
 	execStartTime := time.Now()
 
 	result, compUsage, err := b.scriptExecutor.ExecuteAtBlockHeight(ctx, r.script, r.arguments, r.height)
@@ -202,7 +202,7 @@ func (b *backendScripts) executeScriptLocally(
 			b.metrics.ScriptExecutionErrorLocal()
 		}
 
-		return nil, compUsage, execDuration, convertedErr
+		return nil, execDuration, convertedErr
 	}
 
 	if b.log.GetLevel() == zerolog.DebugLevel && b.shouldLogScript(execEndTime, r.insecureScriptHash) {
@@ -215,18 +215,18 @@ func (b *backendScripts) executeScriptLocally(
 	// log execution time
 	b.metrics.ScriptExecuted(execDuration, len(r.script))
 
-	return result, compUsage, execDuration, nil
+	return result, execDuration, nil
 }
 
 // executeScriptOnAvailableExecutionNodes executes the provided script using available execution nodes.
 func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 	ctx context.Context,
 	r *scriptExecutionRequest,
-) ([]byte, uint64, time.Duration, error) {
+) ([]byte, time.Duration, error) {
 	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
 	executors, err := executionNodesForBlockID(ctx, r.blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
-		return nil, 0, 0, status.Errorf(codes.Internal, "failed to find script executors at blockId %v: %v", r.blockID.String(), err)
+		return nil, 0, status.Errorf(codes.Internal, "failed to find script executors at blockId %v: %v", r.blockID.String(), err)
 	}
 
 	lg := b.log.With().
@@ -236,13 +236,12 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 
 	var result []byte
 	var execDuration time.Duration
-	var compUsage uint64
 	errToReturn := b.nodeCommunicator.CallAvailableNode(
 		executors,
 		func(node *flow.Identity) error {
 			execStartTime := time.Now()
 
-			result, compUsage, err = b.tryExecuteScriptOnExecutionNode(ctx, node.Address, r)
+			result, err = b.tryExecuteScriptOnExecutionNode(ctx, node.Address, r)
 
 			executionTime := time.Now()
 			execDuration = executionTime.Sub(execStartTime)
@@ -285,10 +284,10 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 			b.log.Error().Err(errToReturn).Msg("script execution failed for execution node internal reasons")
 		}
 		// TODO:
-		return nil, 0, execDuration, rpc.ConvertError(errToReturn, "failed to execute script on execution nodes", codes.Internal)
+		return nil, execDuration, rpc.ConvertError(errToReturn, "failed to execute script on execution nodes", codes.Internal)
 	}
 
-	return result, compUsage, execDuration, nil
+	return result, execDuration, nil
 }
 
 // tryExecuteScriptOnExecutionNode attempts to execute the script on the given execution node.
@@ -296,10 +295,10 @@ func (b *backendScripts) tryExecuteScriptOnExecutionNode(
 	ctx context.Context,
 	executorAddress string,
 	r *scriptExecutionRequest,
-) ([]byte, uint64, error) {
+) ([]byte, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(executorAddress)
 	if err != nil {
-		return nil, 0, status.Errorf(codes.Internal, "failed to create client for execution node %s: %v",
+		return nil, status.Errorf(codes.Internal, "failed to create client for execution node %s: %v",
 			executorAddress, err)
 	}
 	defer closer.Close()
@@ -310,11 +309,10 @@ func (b *backendScripts) tryExecuteScriptOnExecutionNode(
 		Arguments: r.arguments,
 	})
 	if err != nil {
-		return nil, 0, status.Errorf(status.Code(err), "failed to execute the script on the execution node %s: %v", executorAddress, err)
+		return nil, status.Errorf(status.Code(err), "failed to execute the script on the execution node %s: %v", executorAddress, err)
 	}
-	// TODO: return the proper comp usage when exec RPC is updated
-	compUsage := uint64(0)
-	return execResp.GetValue(), compUsage, nil
+
+	return execResp.GetValue(), nil
 }
 
 // isInvalidArgumentError checks if the error is from an invalid argument
