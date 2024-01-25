@@ -221,11 +221,6 @@ func TestHandleRuntimeError(t *testing.T) {
 				actualCoded, failureCoded = SplitErrorTypes(coded)
 
 			case CodedFailure:
-				if tc.failureCode == FailureCodeUnknownFailure {
-
-					return
-				}
-
 				actualCoded, failureCoded = SplitErrorTypes(coded)
 
 			default:
