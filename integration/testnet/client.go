@@ -366,7 +366,7 @@ func (c *Client) CreateAccount(
 	if err != nil {
 		return sdk.Address{}, fmt.Errorf("failed cusnctruct create account transaction %w", err)
 	}
-	tx.SetGasLimit(1000).
+	tx.SetComputeLimit(1000).
 		SetReferenceBlockID(latestBlockID).
 		SetProposalKey(payer, 0, c.GetSeqNumber()).
 		SetPayer(payer)

@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
@@ -21,6 +22,7 @@ type ContractHandler struct {
 	addressAllocator types.AddressAllocator
 	backend          types.Backend
 	emulator         types.Emulator
+	precompiles      []types.Precompile
 }
 
 func (h *ContractHandler) FlowTokenAddress() common.Address {
@@ -42,12 +44,25 @@ func NewContractHandler(
 		addressAllocator: addressAllocator,
 		backend:          backend,
 		emulator:         emulator,
+		precompiles:      getPrecompiles(addressAllocator, backend),
 	}
+}
+
+func getPrecompiles(
+	addressAllocator types.AddressAllocator,
+	backend types.Backend,
+) []types.Precompile {
+	archAddress := addressAllocator.AllocatePrecompileAddress(1)
+	archContract := precompiles.ArchContract(
+		archAddress,
+		backend.GetCurrentBlockHeight,
+	)
+	return []types.Precompile{archContract}
 }
 
 // AllocateAddress allocates an address to be used by the bridged accounts
 func (h *ContractHandler) AllocateAddress() types.Address {
-	target, err := h.addressAllocator.AllocateAddress()
+	target, err := h.addressAllocator.AllocateCOAAddress()
 	handleError(err)
 	return target
 }
@@ -141,6 +156,7 @@ func (h *ContractHandler) getBlockContext() types.BlockContext {
 	return types.BlockContext{
 		BlockNumber:            bp.Height,
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
+		ExtraPrecompiles:       h.precompiles,
 	}
 }
 

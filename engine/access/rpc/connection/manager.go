@@ -6,6 +6,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/sony/gobreaker"
 	"google.golang.org/grpc"
@@ -17,7 +18,6 @@ import (
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/crypto"
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/deflate" //required for gRPC compression
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  //required for gRPC compression
 	"github.com/onflow/flow-go/module"

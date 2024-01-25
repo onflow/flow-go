@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/gammazero/workerpool"
+	"github.com/onflow/crypto/hash"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/engine/consensus/approvals"

@@ -3,9 +3,9 @@ package badger
 import (
 	"testing"
 
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
