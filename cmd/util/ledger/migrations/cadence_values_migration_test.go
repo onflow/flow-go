@@ -92,7 +92,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 	checkReporters(t, valueMigration, address, rResourceType)
 
 	// Check error logs.
-	checkErrorLogs(t, logWriter, true)
+	checkErrorLogs(t, logWriter)
 }
 
 func TestCadenceValuesMigrationWithSwappedOrder(t *testing.T) {
@@ -134,7 +134,15 @@ func TestCadenceValuesMigrationWithSwappedOrder(t *testing.T) {
 					Reporter:      reporter,
 				},
 				string_normalization.NewStringNormalizingMigration(),
-				statictypes.NewStaticTypeMigration(),
+				statictypes.NewStaticTypeMigration().
+					WithCompositeTypeConverter(func(staticType *interpreter.CompositeStaticType) interpreter.StaticType {
+						// Returning `nil` indicates the type wasn't converted.
+						return nil
+					}).
+					WithInterfaceTypeConverter(func(staticType *interpreter.InterfaceStaticType) interpreter.StaticType {
+						// Returning `nil` indicates the type wasn't converted.
+						return nil
+					}),
 
 				// Run this at the end
 				entitlements.NewEntitlementsMigration(inter),
@@ -162,7 +170,7 @@ func TestCadenceValuesMigrationWithSwappedOrder(t *testing.T) {
 	// Check error logs.
 	// Given entitlement migration was run at the end,
 	// we shouldn't get the deprecated-type errors
-	checkErrorLogs(t, logWriter, false)
+	require.Empty(t, logWriter.logs)
 }
 
 func checkMigratedPayloads(
@@ -417,35 +425,17 @@ func checkAccountID(t *testing.T, mr *migratorRuntime, address common.Address) {
 	assert.Equal(t, uint64(1), accountStatus.AccountIdCounter())
 }
 
-func checkErrorLogs(t *testing.T, logWriter *writer, expectDeprecatedTypesErrors bool) {
-	if expectDeprecatedTypesErrors {
-		require.Len(t, logWriter.logs, 8)
-	} else {
-		require.Len(t, logWriter.logs, 1)
-	}
-
-	// Error due to un-migrated contract.
-	assert.Contains(
-		t,
-		logWriter.logs[0],
-		fmt.Sprintf(
-			"failed to run EntitlementsMigration for path {%s /storage/flowTokenVault}",
-			testAccountAddress,
-		),
-	)
-
-	if expectDeprecatedTypesErrors {
-		return
-	}
+func checkErrorLogs(t *testing.T, logWriter *writer) {
+	require.Len(t, logWriter.logs, 7)
 
 	// Error due to deprecated types.
-	for _, line := range logWriter.logs[1:] {
+	for _, line := range logWriter.logs {
 		assert.Contains(
 			t,
 			line,
 			fmt.Sprintf(
-				"failed to run EntitlementsMigration for path {%s /storage/dictionary_with_account_type_keys}:"+
-					" internal error: cannot convert deprecated type",
+				"failed to run EntitlementsMigration for path /storage/dictionary_with_account_type_keys"+
+					" in account %s: internal error: cannot convert deprecated type",
 				testAccountAddress,
 			),
 		)

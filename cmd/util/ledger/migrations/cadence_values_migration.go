@@ -156,7 +156,15 @@ func NewCadenceValueMigrator(
 				},
 				entitlements.NewEntitlementsMigration(inter),
 				string_normalization.NewStringNormalizingMigration(),
-				statictypes.NewStaticTypeMigration(),
+				statictypes.NewStaticTypeMigration().
+					WithCompositeTypeConverter(func(staticType *interpreter.CompositeStaticType) interpreter.StaticType {
+						// Returning `nil` indicates the type wasn't converted.
+						return nil
+					}).
+					WithInterfaceTypeConverter(func(staticType *interpreter.InterfaceStaticType) interpreter.StaticType {
+						// Returning `nil` indicates the type wasn't converted.
+						return nil
+					}),
 			}
 		},
 	}
