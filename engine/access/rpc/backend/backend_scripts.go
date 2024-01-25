@@ -174,7 +174,7 @@ func (b *backendScripts) executeScriptLocally(
 ) ([]byte, time.Duration, error) {
 	execStartTime := time.Now()
 
-	result, compUsage, err := b.scriptExecutor.ExecuteAtBlockHeight(ctx, r.script, r.arguments, r.height)
+	result, err := b.scriptExecutor.ExecuteAtBlockHeight(ctx, r.script, r.arguments, r.height)
 
 	execEndTime := time.Now()
 	execDuration := execEndTime.Sub(execStartTime)
@@ -183,7 +183,6 @@ func (b *backendScripts) executeScriptLocally(
 		Str("script_executor_addr", "localhost").
 		Hex("block_id", logging.ID(r.blockID)).
 		Uint64("height", r.height).
-		Uint64("computaion_used", compUsage).
 		Hex("script_hash", r.insecureScriptHash[:]).
 		Dur("execution_dur_ms", execDuration).
 		Logger()
