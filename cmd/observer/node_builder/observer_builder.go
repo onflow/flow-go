@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"os"
 	"path"
 	"path/filepath"
@@ -39,7 +40,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	"github.com/onflow/flow-go/engine/access/rest"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
-	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -225,7 +225,6 @@ type ObserverServiceBuilder struct {
 	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
 	ExecutionIndexer           *indexer.Indexer
 	ExecutionIndexerCore       *indexer.IndexerCore
-	ScriptExecutor             *backend.ScriptExecutor
 	RegistersAsyncStore        *execution.RegistersAsyncStore
 	IndexerDependencies        *cmd.DependencyList
 
@@ -796,6 +795,9 @@ func (builder *ObserverServiceBuilder) Initialize() error {
 
 	builder.enqueueConnectWithStakedAN()
 
+	if builder.executionDataSyncEnabled {
+		builder.BuildExecutionSyncComponents()
+	}
 	builder.enqueueRPCServer()
 
 	if builder.BaseConfig.MetricsEnabled {
@@ -931,9 +933,6 @@ func (builder *ObserverServiceBuilder) initObserverLocal() func(node *cmd.NodeCo
 // Currently, the observer only runs the follower engine.
 func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 	builder.BuildConsensusFollower()
-	if builder.executionDataSyncEnabled {
-		builder.BuildExecutionSyncComponents()
-	}
 	return builder.FlowNodeBuilder.Build()
 }
 
@@ -1116,15 +1115,11 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	if builder.executionDataIndexingEnabled {
 		var indexedBlockHeight storage.ConsumerProgress
 
-		builder.
-			AdminCommand("execute-script", func(config *cmd.NodeConfig) commands.AdminCommand {
-				return stateSyncCommands.NewExecuteScriptCommand(builder.ScriptExecutor)
-			}).
-			Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
-				// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
-				indexedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
-				return nil
-			}).Module("transaction results storage", func(node *cmd.NodeConfig) error {
+		builder.Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
+			// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
+			indexedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
+			return nil
+		}).Module("transaction results storage", func(node *cmd.NodeConfig) error {
 			builder.Storage.LightTransactionResults = bstorage.NewLightTransactionResults(node.Metrics.Cache, node.DB, bstorage.DefaultCacheSize)
 			return nil
 		}).DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -1228,23 +1223,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 			// setup requester to notify indexer when new execution data is received
 			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
-
-			// create script execution module, this depends on the indexer being initialized and the
-			// having the register storage bootstrapped
-			scripts, err := execution.NewScripts(
-				builder.Logger,
-				metrics.NewExecutionCollector(builder.Tracer),
-				builder.RootChainID,
-				query.NewProtocolStateWrapper(builder.State),
-				builder.Storage.Headers,
-				builder.ExecutionIndexerCore.RegisterValue,
-				builder.scriptExecutorConfig,
-			)
-			if err != nil {
-				return nil, err
-			}
-
-			builder.ScriptExecutor.InitReporter(builder.ExecutionIndexer, scripts)
 
 			return builder.ExecutionIndexer, nil
 		}, builder.IndexerDependencies)
@@ -1352,6 +1330,20 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		builder.BlocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
 		return err
 	})
+	builder.Module("rest metrics", func(node *cmd.NodeConfig) error {
+		m, err := metrics.NewRestCollector(routes.URLToRoute, node.MetricsRegisterer)
+		if err != nil {
+			return err
+		}
+		builder.RestMetrics = m
+		return nil
+	})
+	builder.Module("access metrics", func(node *cmd.NodeConfig) error {
+		builder.AccessMetrics = metrics.NewAccessCollector(
+			metrics.WithRestMetrics(builder.RestMetrics),
+		)
+		return nil
+	})
 	builder.Module("server certificate", func(node *cmd.NodeConfig) error {
 		// generate the server certificate that will be served by the GRPC server
 		x509Certificate, err := grpcutils.X509Certificate(node.NetworkKey)
@@ -1380,28 +1372,13 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 
 		return nil
 	})
-	builder.Module("rest metrics", func(node *cmd.NodeConfig) error {
-		m, err := metrics.NewRestCollector(routes.URLToRoute, node.MetricsRegisterer)
-		if err != nil {
-			return err
-		}
-		builder.RestMetrics = m
+
+	builder.Module("async register store", func(node *cmd.NodeConfig) error {
+		builder.RegistersAsyncStore = execution.NewRegistersAsyncStore()
 		return nil
 	})
-	builder.Module("access metrics", func(node *cmd.NodeConfig) error {
-		builder.AccessMetrics = metrics.NewAccessCollector(
-			metrics.WithRestMetrics(builder.RestMetrics),
-		)
-		return nil
-	})
-	builder.Module("server certificate", func(node *cmd.NodeConfig) error {
-		// generate the server certificate that will be served by the GRPC server
-		x509Certificate, err := grpcutils.X509Certificate(node.NetworkKey)
-		if err != nil {
-			return err
-		}
-		tlsConfig := grpcutils.DefaultServerTLSConfig(x509Certificate)
-		builder.rpcConf.TransportCredentials = credentials.NewTLS(tlsConfig)
+	builder.Module("events storage", func(node *cmd.NodeConfig) error {
+		builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
 		return nil
 	})
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -1536,7 +1513,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			node.Me,
 			node.State,
 			channels.RequestCollections,
-			filter.HasRole(flow.RoleCollection),
+			filter.HasRole(flow.RoleAccess),
 			func() flow.Entity { return &flow.Collection{} },
 		)
 		if err != nil {
@@ -1548,7 +1525,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			node.EngineRegistry,
 			node.State,
 			node.Me,
-			builder.RequestEng,
+			nil,
 			node.Storage.Blocks,
 			node.Storage.Headers,
 			node.Storage.Collections,
