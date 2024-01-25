@@ -53,9 +53,9 @@ require (
 	github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f
 	github.com/onflow/cadence v1.0.0-preview.2.0.20240122125204-5ce1f36f95bb
 	github.com/onflow/flow v0.3.4
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20240125001520-7204ba8f720f
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20240125001520-7204ba8f720f
-	github.com/onflow/flow-go-sdk v0.44.1-0.20240124213231-78d9f08eeae1
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20240125013952-df76aaf4136f
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20240125013952-df76aaf4136f
+	github.com/onflow/flow-go-sdk v1.0.0-M1
 	github.com/onflow/flow-go/crypto v0.25.0
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231213135419-ae911cc351a2
 	github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d
@@ -106,7 +106,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.2
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20240125000944-01706d1b6a69
-	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20240125000928-4973179638e1
+	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20240125012012-2118663ca817
 	github.com/onflow/wal v0.0.0-20230529184820-bc9f8244608d
 	github.com/slok/go-http-metrics v0.10.0
 	github.com/sony/gobreaker v0.5.0
