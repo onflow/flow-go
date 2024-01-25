@@ -340,11 +340,10 @@ func (b *bootstrapExecutor) Execute() error {
 	service := b.createServiceAccount()
 
 	b.deployViewResolver(service)
+	b.deployBurner(service)
 
-	fungibleToken := b.deployFungibleToken(service)
+	fungibleToken := b.deployFungibleToken(service, service)
 	nonFungibleToken := b.deployNonFungibleToken(service, service)
-
-	b.deployMultipleNFT(service, nonFungibleToken)
 
 	b.deployMetadataViews(fungibleToken, nonFungibleToken, service)
 
@@ -386,7 +385,7 @@ func (b *bootstrapExecutor) Execute() error {
 
 	b.deployQC(service)
 
-	b.deployIDTableStaking(service, fungibleToken, flowToken, feeContract)
+	b.deployIDTableStaking(service, fungibleToken, flowToken, feeContract, service)
 
 	b.deployEpoch(service, fungibleToken, flowToken, feeContract)
 
@@ -433,13 +432,13 @@ func (b *bootstrapExecutor) createServiceAccount() flow.Address {
 	return address
 }
 
-func (b *bootstrapExecutor) deployFungibleToken(viewResolver flow.Address) flow.Address {
+func (b *bootstrapExecutor) deployFungibleToken(viewResolver, burner flow.Address) flow.Address {
 	fungibleToken := b.createAccount(b.accountKeys.FungibleTokenAccountPublicKeys)
 
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployFungibleTokenContractTransaction(fungibleToken, viewResolver),
+			blueprints.DeployFungibleTokenContractTransaction(fungibleToken, viewResolver, burner),
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy fungible token contract: %s", txError, err)
@@ -469,15 +468,15 @@ func (b *bootstrapExecutor) deployViewResolver(deployTo flow.Address) {
 	panicOnMetaInvokeErrf("failed to deploy view resolver contract: %s", txError, err)
 }
 
-func (b *bootstrapExecutor) deployMultipleNFT(deployTo, nonFungibleToken flow.Address) {
+func (b *bootstrapExecutor) deployBurner(deployTo flow.Address) {
 
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployMultipleNFTContractTransaction(deployTo, nonFungibleToken),
+			blueprints.DeployBurnerContractTransaction(deployTo),
 			0),
 	)
-	panicOnMetaInvokeErrf("failed to deploy MultipleNFT contract: %s", txError, err)
+	panicOnMetaInvokeErrf("failed to deploy burner contract: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) deployMetadataViews(fungibleToken, nonFungibleToken, viewResolver flow.Address) {
@@ -589,12 +588,13 @@ func (b *bootstrapExecutor) deployQC(service flow.Address) {
 	panicOnMetaInvokeErrf("failed to deploy QC contract: %s", txError, err)
 }
 
-func (b *bootstrapExecutor) deployIDTableStaking(service, fungibleToken, flowToken, flowFees flow.Address) {
+func (b *bootstrapExecutor) deployIDTableStaking(service, fungibleToken, flowToken, flowFees, burner flow.Address) {
 
 	contract := contracts.FlowIDTableStaking(
 		fungibleToken.HexWithPrefix(),
 		flowToken.HexWithPrefix(),
 		flowFees.HexWithPrefix(),
+		burner.HexWithPrefix(),
 		true)
 
 	txError, err := b.invokeMetaTransaction(
