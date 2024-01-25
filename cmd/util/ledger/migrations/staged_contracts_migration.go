@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/old_parser"
 	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/cadence/runtime/stdlib"
 
@@ -184,14 +185,12 @@ func (m *StagedContractsMigration) checkUpdateValidity(contractName, newCode str
 		return err
 	}
 
-	// TODO: Use the old parser
-	oldProgram, err := parser.ParseProgram(nil, oldCode, parser.Config{})
+	oldProgram, err := old_parser.ParseProgram(nil, oldCode, old_parser.Config{})
 	if err != nil {
 		return err
 	}
 
-	// TODO: Use new update validator
-	validator := stdlib.NewContractUpdateValidator(
+	validator := stdlib.NewLegacyContractUpdateValidator(
 		nil,
 		contractName,
 		oldProgram,

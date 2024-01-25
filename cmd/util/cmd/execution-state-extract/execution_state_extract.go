@@ -102,6 +102,8 @@ func extractExecutionState(
 
 					&migrators.DeduplicateContractNamesMigration{},
 
+					migrators.NewStagedContractsMigration(migrators.GetStagedContracts),
+
 					// This will fix storage used discrepancies caused by the
 					// DeduplicateContractNamesMigration.
 					&migrators.AccountUsageMigrator{},
