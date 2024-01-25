@@ -21,8 +21,8 @@ require (
 	github.com/ipfs/go-ipfs-blockstore v1.3.0
 	github.com/onflow/cadence v1.0.0-M3
 	github.com/onflow/crypto v0.25.0
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20240125013952-df76aaf4136f
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20240125013952-df76aaf4136f
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20240125214229-b7a95136dd0d
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20240125214229-b7a95136dd0d
 	github.com/onflow/flow-emulator v0.59.1-0.20240125162502-f1971b5d4630
 	github.com/onflow/flow-go v0.33.2-0.20240125033624-f3bd7a6004cf
 	github.com/onflow/flow-go-sdk v1.0.0-M1
