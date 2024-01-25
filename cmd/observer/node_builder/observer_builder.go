@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"os"
 	"path"
 	"path/filepath"
@@ -46,6 +47,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
+	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/protocol"
@@ -208,21 +210,24 @@ type ObserverServiceBuilder struct {
 	*ObserverServiceConfig
 
 	// components
-	LibP2PNode             p2p.LibP2PNode
-	FollowerState          stateprotocol.FollowerState
-	SyncCore               *chainsync.Core
-	RpcEng                 *rpc.Engine
-	FollowerDistributor    *pubsub.FollowerDistributor
-	Committee              hotstuff.DynamicCommittee
-	Finalized              *flow.Header
-	Pending                []*flow.Header
-	FollowerCore           module.HotStuffFollower
-	ExecutionDataRequester state_synchronization.ExecutionDataRequester
-	ExecutionIndexer       *indexer.Indexer
-	ExecutionIndexerCore   *indexer.IndexerCore
-	ScriptExecutor         *backend.ScriptExecutor
-	RegistersAsyncStore    *execution.RegistersAsyncStore
-	IndexerDependencies    *cmd.DependencyList
+	LibP2PNode                 p2p.LibP2PNode
+	FollowerState              stateprotocol.FollowerState
+	SyncCore                   *chainsync.Core
+	RpcEng                     *rpc.Engine
+	FollowerDistributor        *pubsub.FollowerDistributor
+	Committee                  hotstuff.DynamicCommittee
+	CollectionsToMarkFinalized *stdmap.Times
+	CollectionsToMarkExecuted  *stdmap.Times
+	BlocksToMarkExecuted       *stdmap.Times
+	Finalized                  *flow.Header
+	Pending                    []*flow.Header
+	FollowerCore               module.HotStuffFollower
+	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
+	ExecutionIndexer           *indexer.Indexer
+	ExecutionIndexerCore       *indexer.IndexerCore
+	ScriptExecutor             *backend.ScriptExecutor
+	RegistersAsyncStore        *execution.RegistersAsyncStore
+	IndexerDependencies        *cmd.DependencyList
 
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
@@ -230,6 +235,7 @@ type ObserverServiceBuilder struct {
 
 	// engines
 	IngestEng   *ingestion.Engine
+	RequestEng  *requester.Engine
 	FollowerEng *follower.ComplianceEngine
 	SyncEng     *synceng.Engine
 
@@ -508,6 +514,7 @@ func NewFlowObserverServiceBuilder(opts ...Option) *ObserverServiceBuilder {
 		ObserverServiceConfig: config,
 		FlowNodeBuilder:       cmd.FlowNode("observer"),
 		FollowerDistributor:   pubsub.NewFollowerDistributor(),
+		IndexerDependencies:   cmd.NewDependencyList(),
 	}
 	anb.FollowerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(anb.Logger))
 	// the observer gets a version of the root snapshot file that does not contain any node addresses
@@ -922,6 +929,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 	// setup dependency chain to ensure indexer starts after the requester
 	requesterDependable := module.NewProxiedReadyDoneAware()
+	builder.IndexerDependencies.Add(requesterDependable)
 
 	builder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
@@ -977,6 +985,17 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			}
 
 			execDataCacheBackend = herocache.NewBlockExecutionData(builder.executionDataCacheSize, builder.Logger, heroCacheCollector)
+
+			// Execution Data cache that uses a blobstore as the backend (instead of a downloader)
+			// This ensures that it simply returns a not found error if the blob doesn't exist
+			// instead of attempting to download it from the network.
+			executionDataStoreCache = execdatacache.NewExecutionDataCache(
+				builder.ExecutionDataStore,
+				builder.Storage.Headers,
+				builder.Storage.Seals,
+				builder.Storage.Results,
+				execDataCacheBackend,
+			)
 
 			return nil
 		}).
@@ -1089,7 +1108,10 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
 				indexedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
 				return nil
-			}).DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			}).Module("transaction results storage", func(node *cmd.NodeConfig) error {
+			builder.Storage.LightTransactionResults = bstorage.NewLightTransactionResults(node.Metrics.Cache, node.DB, bstorage.DefaultCacheSize)
+			return nil
+		}).DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// Note: using a DependableComponent here to ensure that the indexer does not block
 			// other components from starting while bootstrapping the register db since it may
 			// take hours to complete.
@@ -1295,6 +1317,35 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 }
 
 func (builder *ObserverServiceBuilder) enqueueRPCServer() {
+	ingestionDependable := module.NewProxiedReadyDoneAware()
+	builder.IndexerDependencies.Add(ingestionDependable)
+
+	builder.Module("transaction timing mempools", func(node *cmd.NodeConfig) error {
+		var err error
+
+		builder.CollectionsToMarkFinalized, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
+		if err != nil {
+			return err
+		}
+
+		builder.CollectionsToMarkExecuted, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
+		if err != nil {
+			return err
+		}
+
+		builder.BlocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
+		return err
+	})
+	builder.Module("server certificate", func(node *cmd.NodeConfig) error {
+		// generate the server certificate that will be served by the GRPC server
+		x509Certificate, err := grpcutils.X509Certificate(node.NetworkKey)
+		if err != nil {
+			return err
+		}
+		tlsConfig := grpcutils.DefaultServerTLSConfig(x509Certificate)
+		builder.rpcConf.TransportCredentials = credentials.NewTLS(tlsConfig)
+		return nil
+	})
 	builder.Module("creating grpc servers", func(node *cmd.NodeConfig) error {
 		builder.secureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
 			builder.rpcConf.SecureGRPCListenAddr,
@@ -1457,6 +1508,50 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
 		return builder.RpcEng, nil
+	})
+
+	builder.Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		var err error
+
+		builder.RequestEng, err = requester.New(
+			node.Logger,
+			node.Metrics.Engine,
+			node.EngineRegistry,
+			node.Me,
+			node.State,
+			channels.RequestCollections,
+			filter.HasRole(flow.RoleCollection),
+			func() flow.Entity { return &flow.Collection{} },
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not create requester engine: %w", err)
+		}
+
+		builder.IngestEng, err = ingestion.New(
+			node.Logger,
+			node.EngineRegistry,
+			node.State,
+			node.Me,
+			builder.RequestEng,
+			node.Storage.Blocks,
+			node.Storage.Headers,
+			node.Storage.Collections,
+			node.Storage.Transactions,
+			node.Storage.Results,
+			node.Storage.Receipts,
+			builder.AccessMetrics,
+			builder.CollectionsToMarkFinalized,
+			builder.CollectionsToMarkExecuted,
+			builder.BlocksToMarkExecuted,
+		)
+		if err != nil {
+			return nil, err
+		}
+		ingestionDependable.Init(builder.IngestEng)
+		builder.RequestEng.WithHandle(builder.IngestEng.OnCollection)
+		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.IngestEng.OnFinalizedBlock)
+
+		return builder.IngestEng, nil
 	})
 
 	// build secure grpc server
