@@ -4,7 +4,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-func NewUnknownFailure(err error) CodedError {
+func NewUnknownFailure(err error) CodedFailure {
 	return WrapCodedFailure(
 		FailureCodeUnknownFailure,
 		err,
@@ -16,7 +16,7 @@ func NewEncodingFailuref(
 	err error,
 	msg string,
 	args ...interface{},
-) CodedError {
+) CodedFailure {
 	return WrapCodedFailure(
 		FailureCodeEncodingFailure,
 		err,
@@ -26,7 +26,7 @@ func NewEncodingFailuref(
 
 // NewLedgerFailure constructs a new CodedError which captures a fatal error
 // cause by ledger failures.
-func NewLedgerFailure(err error) CodedError {
+func NewLedgerFailure(err error) CodedFailure {
 	return WrapCodedFailure(
 		FailureCodeLedgerFailure,
 		err,
@@ -36,12 +36,12 @@ func NewLedgerFailure(err error) CodedError {
 // IsLedgerFailure returns true if the error or any of the wrapped errors is
 // a ledger failure
 func IsLedgerFailure(err error) bool {
-	return HasErrorCode(err, FailureCodeLedgerFailure)
+	return HasFailureCode(err, FailureCodeLedgerFailure)
 }
 
 // NewStateMergeFailure constructs a new CodedError which captures a fatal
 // caused by state merge.
-func NewStateMergeFailure(err error) CodedError {
+func NewStateMergeFailure(err error) CodedFailure {
 	return WrapCodedFailure(
 		FailureCodeStateMergeFailure,
 		err,
@@ -50,7 +50,7 @@ func NewStateMergeFailure(err error) CodedError {
 
 // NewBlockFinderFailure constructs a new CodedError which captures a fatal
 // caused by block finder.
-func NewBlockFinderFailure(err error) CodedError {
+func NewBlockFinderFailure(err error) CodedFailure {
 	return WrapCodedFailure(
 		FailureCodeBlockFinderFailure,
 		err,
@@ -62,7 +62,7 @@ func NewBlockFinderFailure(err error) CodedError {
 // operation while it is parsing programs.
 func NewParseRestrictedModeInvalidAccessFailure(
 	spanName trace.SpanName,
-) CodedError {
+) CodedFailure {
 	return NewCodedFailure(
 		FailureCodeParseRestrictedModeInvalidAccessFailure,
 		"cannot access %s while cadence is in parse restricted mode",

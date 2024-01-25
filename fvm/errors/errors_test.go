@@ -69,24 +69,24 @@ func TestErrorHandling(t *testing.T) {
 func TestHandleRuntimeError(t *testing.T) {
 	baseErr := fmt.Errorf("base error")
 	tests := []struct {
-		name string
-		err  error
-		code ErrorCode
+		name        string
+		err         error
+		errorCode   ErrorCode
+		failureCode FailureCode
 	}{
 		{
 			name: "nil error",
 			err:  nil,
-			code: 0,
 		},
 		{
-			name: "unknown error",
-			err:  baseErr,
-			code: FailureCodeUnknownFailure,
+			name:        "unknown error",
+			err:         baseErr,
+			failureCode: FailureCodeUnknownFailure,
 		},
 		{
-			name: "runtime error",
-			err:  runtime.Error{Err: baseErr},
-			code: ErrCodeCadenceRunTimeError,
+			name:      "runtime error",
+			err:       runtime.Error{Err: baseErr},
+			errorCode: ErrCodeCadenceRunTimeError,
 		},
 		{
 			name: "coded error in Unwrappable error",
@@ -95,7 +95,7 @@ func TestHandleRuntimeError(t *testing.T) {
 					Recovered: NewScriptExecutionCancelledError(baseErr),
 				},
 			},
-			code: ErrCodeScriptExecutionCancelledError,
+			errorCode: ErrCodeScriptExecutionCancelledError,
 		},
 		{
 			name: "coded error in ParentError error",
@@ -109,7 +109,7 @@ func TestHandleRuntimeError(t *testing.T) {
 					},
 				},
 			},
-			code: ErrCodeScriptExecutionTimedOutError,
+			errorCode: ErrCodeScriptExecutionTimedOutError,
 		},
 		{
 			name: "first coded error returned",
@@ -124,7 +124,7 @@ func TestHandleRuntimeError(t *testing.T) {
 					},
 				},
 			},
-			code: ErrCodeScriptExecutionTimedOutError,
+			errorCode: ErrCodeScriptExecutionTimedOutError,
 		},
 		{
 			name: "failure returned",
@@ -138,7 +138,7 @@ func TestHandleRuntimeError(t *testing.T) {
 					},
 				},
 			},
-			code: FailureCodeLedgerFailure,
+			failureCode: FailureCodeLedgerFailure,
 		},
 		{
 			name: "error before failure returns failure",
@@ -153,7 +153,7 @@ func TestHandleRuntimeError(t *testing.T) {
 					},
 				},
 			},
-			code: FailureCodeLedgerFailure,
+			failureCode: FailureCodeLedgerFailure,
 		},
 		{
 			name: "embedded coded errors return deepest error",
@@ -169,7 +169,7 @@ func TestHandleRuntimeError(t *testing.T) {
 					},
 				},
 			},
-			code: ErrCodeScriptExecutionTimedOutError,
+			errorCode: ErrCodeScriptExecutionTimedOutError,
 		},
 		{
 			name: "failure with embedded error returns failure",
@@ -185,7 +185,7 @@ func TestHandleRuntimeError(t *testing.T) {
 					},
 				},
 			},
-			code: FailureCodeLedgerFailure,
+			failureCode: FailureCodeLedgerFailure,
 		},
 		{
 			name: "coded error with embedded failure returns failure",
@@ -201,36 +201,179 @@ func TestHandleRuntimeError(t *testing.T) {
 					},
 				},
 			},
-			code: FailureCodeLedgerFailure,
+			failureCode: FailureCodeLedgerFailure,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			actual := HandleRuntimeError(tc.err)
-			if tc.code == 0 {
+			if tc.err == nil {
 				assert.NoError(t, actual)
 				return
 			}
 
-			coded, ok := actual.(CodedError)
-			require.True(t, ok, "error is not a CodedError")
+			var actualCoded CodedError
+			var failureCoded CodedFailure
+			switch coded := actual.(type) {
+			case CodedError:
+				actualCoded, failureCoded = SplitErrorTypes(coded)
 
-			if tc.code == FailureCodeUnknownFailure {
-				assert.Equalf(t, tc.code, coded.Code(), "error code mismatch: expected %d, got %d", tc.code, coded.Code())
+			case CodedFailure:
+				if tc.failureCode == FailureCodeUnknownFailure {
+
+					return
+				}
+
+				actualCoded, failureCoded = SplitErrorTypes(coded)
+
+			default:
+				t.Fatalf("unexpected error type: %T", actual)
+			}
+
+			if tc.failureCode != 0 {
+				assert.NoError(t, actualCoded)
+				assert.Equalf(t, tc.failureCode, failureCoded.Code(), "error code mismatch: expected %d, got %d", tc.failureCode, failureCoded.Code())
+			} else {
+				assert.NoError(t, failureCoded)
+				assert.Equalf(t, tc.errorCode, actualCoded.Code(), "error code mismatch: expected %d, got %d", tc.errorCode, actualCoded.Code())
+			}
+		})
+	}
+}
+
+func TestFind(t *testing.T) {
+	targetCode := ErrCodeScriptExecutionCancelledError
+	baseErr := fmt.Errorf("base error")
+	tests := []struct {
+		name  string
+		err   error
+		found bool
+	}{
+		{
+			name:  "nil error",
+			err:   nil,
+			found: false,
+		},
+		{
+			name:  "plain error",
+			err:   baseErr,
+			found: false,
+		},
+		{
+			name:  "wrapped plain error",
+			err:   fmt.Errorf("wrapped: %w", baseErr),
+			found: false,
+		},
+		{
+			name:  "coded failure",
+			err:   NewLedgerFailure(baseErr),
+			found: false,
+		},
+		{
+			name:  "incorrect coded error",
+			err:   NewScriptExecutionTimedOutError(),
+			found: false,
+		},
+		{
+			name:  "found",
+			err:   NewScriptExecutionCancelledError(baseErr),
+			found: true,
+		},
+		{
+			name:  "found with embedded errors",
+			err:   NewScriptExecutionCancelledError(NewLedgerFailure(NewScriptExecutionTimedOutError())),
+			found: true,
+		},
+		{
+			name:  "found embedded in error",
+			err:   NewDerivedDataCacheImplementationFailure(NewScriptExecutionCancelledError(baseErr)),
+			found: true,
+		},
+		{
+			name:  "found embedded in failure",
+			err:   NewLedgerFailure(NewScriptExecutionCancelledError(baseErr)),
+			found: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := Find(tc.err, targetCode)
+			if !tc.found {
+				assert.NoError(t, actual)
 				return
 			}
 
-			// split the error to ensure that the wrapped error is available
-			actualCoded, failureCoded := SplitErrorTypes(coded)
+			assert.Equalf(t, targetCode, actual.Code(), "error code mismatch: expected %d, got %d", targetCode, actual.Code())
+		})
+	}
+}
 
-			if tc.code.IsFailure() {
-				assert.NoError(t, actualCoded)
-				assert.Equalf(t, tc.code, failureCoded.Code(), "error code mismatch: expected %d, got %d", tc.code, failureCoded.Code())
-			} else {
-				assert.NoError(t, failureCoded)
-				assert.Equalf(t, tc.code, actualCoded.Code(), "error code mismatch: expected %d, got %d", tc.code, actualCoded.Code())
+func TestFindFailure(t *testing.T) {
+	targetCode := FailureCodeLedgerFailure
+	baseErr := fmt.Errorf("base error")
+	tests := []struct {
+		name  string
+		err   error
+		found bool
+	}{
+		{
+			name:  "nil error",
+			err:   nil,
+			found: false,
+		},
+		{
+			name:  "plain error",
+			err:   baseErr,
+			found: false,
+		},
+		{
+			name:  "wrapped plain error",
+			err:   fmt.Errorf("wrapped: %w", baseErr),
+			found: false,
+		},
+		{
+			name:  "coded error",
+			err:   NewScriptExecutionTimedOutError(),
+			found: false,
+		},
+		{
+			name:  "incorrect coded failure",
+			err:   NewStateMergeFailure(baseErr),
+			found: false,
+		},
+		{
+			name:  "found",
+			err:   NewLedgerFailure(baseErr),
+			found: true,
+		},
+		{
+			name:  "found with embedded errors",
+			err:   NewLedgerFailure(NewScriptExecutionCancelledError(NewScriptExecutionTimedOutError())),
+			found: true,
+		},
+		{
+			name:  "found embedded in error",
+			err:   NewDerivedDataCacheImplementationFailure(NewLedgerFailure(baseErr)),
+			found: true,
+		},
+		{
+			name:  "found embedded in failure",
+			err:   NewStateMergeFailure(NewLedgerFailure(baseErr)),
+			found: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := FindFailure(tc.err, targetCode)
+			if !tc.found {
+				assert.NoError(t, actual)
+				return
 			}
+
+			assert.Equalf(t, targetCode, actual.Code(), "error code mismatch: expected %d, got %d", targetCode, actual.Code())
 		})
 	}
 }

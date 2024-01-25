@@ -10,7 +10,13 @@ import (
 )
 
 type Unwrappable interface {
+	error
 	Unwrap() error
+}
+
+type UnwrappableErrors interface {
+	error
+	Unwrap() []error
 }
 
 type CodedError interface {
@@ -23,8 +29,10 @@ type CodedError interface {
 // CodedFailure is a subtype of CodedError specifically for failures
 // This is used to make type checking with `errors.As` and `errors.Is` easier and more accurate
 type CodedFailure interface {
-	CodedError
-	IsFailure()
+	Code() FailureCode
+
+	Unwrappable
+	error
 }
 
 // WrappedParentError is a wrapper for errors.ParentError to make it conform to the unwrappable
@@ -51,29 +59,26 @@ func As(err error, target interface{}) bool {
 	return stdErrors.As(err, target)
 }
 
-// findImportantCodedError recursively unwraps the error to search for important
-// coded error:
+// findRootCodedError recursively unwraps the error to search for the root (deepest) coded error:
 //  1. If err is nil, this returns (nil, false),
 //  2. If err has no error code, this returns (nil, true),
-//  3. If err has a failure error code, this returns
-//     (<the shallowest failure coded error>, false),
-//  4. If err has a non-failure error code, this returns
-//     (<the deepest, aka root cause, non-failure coded error>, false)
-func findImportantCodedError(err error) (CodedError, bool) {
+//  3. If err has an error code, this returns
+//     (<the deepest, aka root cause, coded error>, false)
+//
+// Note: This assumes the caller has already checked if the error contains a CodedFailure.
+func findRootCodedError(err error) (CodedError, bool) {
 	if err == nil {
 		return nil, false
 	}
 
+	// If there are no coded errors, return immediately
 	var coded CodedError
 	if !As(err, &coded) {
 		return nil, true
 	}
 
+	// find the deepest coded error
 	for {
-		if coded.Code().IsFailure() {
-			return coded, false
-		}
-
 		var nextCoded CodedError
 		if !As(coded.Unwrap(), &nextCoded) {
 			return coded, false
@@ -86,30 +91,43 @@ func findImportantCodedError(err error) (CodedError, bool) {
 // IsFailure returns true if the error is un-coded, or if the error contains
 // a failure code.
 func IsFailure(err error) bool {
+	return AsFailure(err) != nil
+}
+
+func AsFailure(err error) CodedFailure {
 	if err == nil {
-		return false
+		return nil
 	}
 
-	coded, isUnknown := findImportantCodedError(err)
-	return isUnknown || coded.Code().IsFailure()
+	var failure CodedFailure
+	if As(err, &failure) {
+		return failure
+	}
+
+	var coded CodedError
+	if !As(err, &coded) {
+		return NewUnknownFailure(err)
+	}
+
+	return nil
 }
 
 // SplitErrorTypes splits the error into fatal (failures) and non-fatal errors
-func SplitErrorTypes(inp error) (err CodedError, failure CodedError) {
+func SplitErrorTypes(inp error) (err CodedError, failure CodedFailure) {
 	if inp == nil {
 		return nil, nil
 	}
 
-	coded, isUnknown := findImportantCodedError(inp)
-	if isUnknown {
-		return nil, NewUnknownFailure(inp)
-	}
-
-	if coded.Code().IsFailure() {
+	if failure = AsFailure(inp); failure != nil {
 		return nil, WrapCodedFailure(
-			coded.Code(),
+			failure.Code(),
 			inp,
 			"failure caused by")
+	}
+
+	coded, isUnknown := findRootCodedError(inp)
+	if isUnknown {
+		return nil, NewUnknownFailure(inp)
 	}
 
 	return WrapCodedError(
@@ -142,19 +160,23 @@ func HandleRuntimeError(inp error) (err error) {
 	}()
 
 	// cadence ParentError types contain a list of errors encountered during execution
-	// these need to be handled carefully because the std errors lib and the logic in this file
+	// this special case can be removed once these errors are updated to conform to the
+	// unwrappable interface used by the std errors lib. See
+	var parentErr errors.ParentError
+	if As(inp, &parentErr) {
+		err = WrappedParentError{parentErr}
+	}
+
+	// Error lists need to be handled carefully because the std errors lib and the logic in this file
 	// behave subtly different wrt which errors are returned. specifically:
 	// - std errors methods will recursively unwrap single errors and error lists until they finds
 	//   the first match using a depth-first search.
-	// - findImportantCodedError will also recursively unwrap single errors and error lists, but it
+	// - findRootCodedError will also recursively unwrap single errors and error lists, but it
 	//   will continue to search until it finds the deepest coded error in the first branch containing
 	//   any coded error. This means it will fail to find CodedFailures if there are any CodedErrors
 	//   earlier in the unwrapped error list.
-	var parentErr errors.ParentError
-	if As(inp, &parentErr) {
-		// wrap ParentErrors so they conform to unwrappable interface
-		wrapped := WrappedParentError{parentErr}
-
+	var wrapped UnwrappableErrors
+	if As(err, &wrapped) {
 		// first search through all of the errors for a coded failure. this ensures that a failure
 		// is returned if there were any failures anywhere in the error tree.
 		// Note: failure usually means unexpected fatal exceptions, and best to be treated
@@ -177,7 +199,7 @@ func HandleRuntimeError(inp error) (err error) {
 		var coded CodedError
 		if As(wrapped, &coded) {
 			// find the deepest coded error
-			coded, _ = findImportantCodedError(coded)
+			coded, _ = findRootCodedError(coded)
 			// we've already check that the error is a CodedError, so ignoring the return value
 			err = WrapCodedError(
 				coded.Code(),
@@ -193,13 +215,19 @@ func HandleRuntimeError(inp error) (err error) {
 	return
 }
 
-// This returns true if the error or one of its nested errors matches the
+// HasErrorCode returns true if the error or one of its nested errors matches the
 // specified error code.
 func HasErrorCode(err error, code ErrorCode) bool {
 	return Find(err, code) != nil
 }
 
-// This recursively unwraps the error and returns first CodedError that matches
+// HasFailureCode returns true if the error or one of its nested errors matches the
+// specified failure code.
+func HasFailureCode(err error, code FailureCode) bool {
+	return FindFailure(err, code) != nil
+}
+
+// Find recursively unwraps the error and returns first CodedError that matches
 // the specified error code.
 func Find(originalErr error, code ErrorCode) CodedError {
 	if originalErr == nil {
@@ -233,13 +261,47 @@ func Find(originalErr error, code ErrorCode) CodedError {
 	return nil
 }
 
+// FindFailure recursively unwraps the error and returns first CodedFailure that matches
+// the specified error code.
+func FindFailure(originalErr error, code FailureCode) CodedFailure {
+	if originalErr == nil {
+		return nil
+	}
+
+	var unwrappable Unwrappable
+	if !As(originalErr, &unwrappable) {
+		return nil
+	}
+
+	coded, ok := unwrappable.(CodedFailure)
+	if ok && coded.Code() == code {
+		return coded
+	}
+
+	// NOTE: we need to special case multierror.Error since As() will only
+	// inspect the first error within multierror.Error.
+	errors, ok := unwrappable.(*multierror.Error)
+	if !ok {
+		return FindFailure(unwrappable.Unwrap(), code)
+	}
+
+	for _, innerErr := range errors.Errors {
+		coded = FindFailure(innerErr, code)
+		if coded != nil {
+			return coded
+		}
+	}
+
+	return nil
+}
+
+var _ CodedError = (*codedError)(nil)
+
 type codedError struct {
 	code ErrorCode
 
 	err error
 }
-
-var _ CodedError = (*codedError)(nil)
 
 func newError(
 	code ErrorCode,
@@ -257,9 +319,6 @@ func WrapCodedError(
 	prefixMsgFormat string,
 	formatArguments ...interface{},
 ) codedError {
-	if code.IsFailure() {
-		panic(fmt.Sprintf("cannot wrap failure (%s) as CodedError", code))
-	}
 	if prefixMsgFormat != "" {
 		msg := fmt.Sprintf(prefixMsgFormat, formatArguments...)
 		err = fmt.Errorf("%s: %w", msg, err)
@@ -272,9 +331,6 @@ func NewCodedError(
 	format string,
 	formatArguments ...interface{},
 ) codedError {
-	if code.IsFailure() {
-		panic(fmt.Sprintf("cannot wrap failure (%s) as CodedError", code))
-	}
 	return newError(code, fmt.Errorf(format, formatArguments...))
 }
 
@@ -290,31 +346,29 @@ func (err codedError) Code() ErrorCode {
 	return err.code
 }
 
-// codedFailure is a subtype of CodedError specifically for failures
-type codedFailure struct {
-	CodedError
-}
-
 var _ CodedFailure = (*codedFailure)(nil)
 
+type codedFailure struct {
+	code FailureCode
+	err  error
+}
+
 func newFailure(
-	code ErrorCode,
+	code FailureCode,
 	rootCause error,
 ) codedFailure {
 	return codedFailure{
-		CodedError: newError(code, rootCause),
+		code: code,
+		err:  rootCause,
 	}
 }
 
 func WrapCodedFailure(
-	code ErrorCode,
+	code FailureCode,
 	err error,
 	prefixMsgFormat string,
 	formatArguments ...interface{},
 ) codedFailure {
-	if !code.IsFailure() {
-		panic(fmt.Sprintf("cannot wrap non-failure (%s) as CodedFailure", code))
-	}
 	if prefixMsgFormat != "" {
 		msg := fmt.Sprintf(prefixMsgFormat, formatArguments...)
 		err = fmt.Errorf("%s: %w", msg, err)
@@ -323,17 +377,24 @@ func WrapCodedFailure(
 }
 
 func NewCodedFailure(
-	code ErrorCode,
+	code FailureCode,
 	format string,
 	formatArguments ...interface{},
 ) codedFailure {
-	if !code.IsFailure() {
-		panic(fmt.Sprintf("cannot wrap non-failure (%s) as CodedFailure", code))
-	}
 	return newFailure(code, fmt.Errorf(format, formatArguments...))
 }
 
-func (err codedFailure) IsFailure() {}
+func (err codedFailure) Unwrap() error {
+	return err.err
+}
+
+func (err codedFailure) Error() string {
+	return fmt.Sprintf("%v %v", err.code, err.err)
+}
+
+func (err codedFailure) Code() FailureCode {
+	return err.code
+}
 
 // NewEventEncodingError construct a new CodedError which indicates
 // that encoding event has failed
