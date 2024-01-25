@@ -10,9 +10,11 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/cadence"
+
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	emulator "github.com/onflow/flow-emulator/emulator"
 
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
@@ -21,7 +23,6 @@ import (
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/dkg"
@@ -230,7 +231,7 @@ func (s *ClientSuite) setUpAdmin() {
 	// set up admin resource
 	setUpAdminTx := sdk.NewTransaction().
 		SetScript(templates.GeneratePublishDKGParticipantScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index,
 			s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address).
@@ -258,7 +259,7 @@ func (s *ClientSuite) startDKGWithParticipants(nodeIDs []flow.Identifier) {
 	// start DKG using admin resource
 	startDKGTx := sdk.NewTransaction().
 		SetScript(templates.GenerateStartDKGScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index,
 			s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address).
@@ -289,7 +290,7 @@ func (s *ClientSuite) createParticipant(nodeID flow.Identifier, authoriser sdk.A
 	// create DKG partcipant
 	createParticipantTx := sdk.NewTransaction().
 		SetScript(templates.GenerateCreateDKGParticipantScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index,
 			s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address).

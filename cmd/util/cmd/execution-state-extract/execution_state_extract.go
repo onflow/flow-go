@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
+	migrators "github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
@@ -27,11 +28,12 @@ func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flo
 }
 
 func extractExecutionState(
+	log zerolog.Logger,
 	dir string,
 	targetHash flow.StateCommitment,
 	outputDir string,
-	log zerolog.Logger,
 	nWorker int, // number of concurrent worker to migation payloads
+	runMigrations bool,
 ) error {
 
 	log.Info().Msg("init WAL")
@@ -83,6 +85,30 @@ func extractExecutionState(
 	}()
 
 	var migrations []ledger.Migration
+
+	if runMigrations {
+		rwf := reporters.NewReportFileWriterFactory(dir, log)
+
+		migrations = []ledger.Migration{
+			migrators.CreateAccountBasedMigration(
+				log,
+				nWorker,
+				[]migrators.AccountBasedMigration{
+					migrators.NewAtreeRegisterMigrator(
+						rwf,
+						flagValidateMigration,
+						flagLogVerboseValidationError,
+					),
+
+					&migrators.DeduplicateContractNamesMigration{},
+
+					// This will fix storage used discrepancies caused by the
+					// DeduplicateContractNamesMigration.
+					&migrators.AccountUsageMigrator{},
+				}),
+		}
+	}
+
 	newState := ledger.State(targetHash)
 
 	// migrate the trie if there are migrations
