@@ -53,8 +53,8 @@ require (
 	github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f
 	github.com/onflow/cadence v1.0.0-preview.2.0.20240122125204-5ce1f36f95bb
 	github.com/onflow/flow v0.3.4
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20240122220432-a5993d06ce1b
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20240122220432-a5993d06ce1b
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20240125001520-7204ba8f720f
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20240125001520-7204ba8f720f
 	github.com/onflow/flow-go-sdk v0.44.1-0.20240124213231-78d9f08eeae1
 	github.com/onflow/flow-go/crypto v0.25.0
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231213135419-ae911cc351a2
@@ -321,6 +321,6 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-replace github.com/onflow/flow-core-contracts/lib/go/contracts => ../flow-core-contracts/lib/go/contracts
+// replace github.com/onflow/flow-core-contracts/lib/go/contracts => ../flow-core-contracts/lib/go/contracts
 
-replace github.com/onflow/flow-core-contracts/lib/go/templates => ../flow-core-contracts/lib/go/templates
+// replace github.com/onflow/flow-core-contracts/lib/go/templates => ../flow-core-contracts/lib/go/templates
