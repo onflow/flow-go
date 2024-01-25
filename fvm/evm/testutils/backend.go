@@ -9,11 +9,13 @@ import (
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -33,6 +35,7 @@ func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
 		TestValueStore:   GetSimpleValueStore(),
 		testEventEmitter: getSimpleEventEmitter(),
 		testMeter:        getSimpleMeter(),
+		TestBlockInfo:    &TestBlockInfo{},
 	}
 	f(tb)
 }
@@ -153,7 +156,10 @@ type TestBackend struct {
 	*TestValueStore
 	*testMeter
 	*testEventEmitter
+	*TestBlockInfo
 }
+
+var _ types.Backend = &TestBackend{}
 
 func (tb *TestBackend) TotalStorageSize() int {
 	if tb.TotalStorageSizeFunc == nil {
@@ -375,4 +381,27 @@ func (vs *testEventEmitter) Reset() {
 		panic("method not set")
 	}
 	vs.reset()
+}
+
+type TestBlockInfo struct {
+	GetCurrentBlockHeightFunc func() (uint64, error)
+	GetBlockAtHeightFunc      func(height uint64) (runtime.Block, bool, error)
+}
+
+var _ environment.BlockInfo = &TestBlockInfo{}
+
+// GetCurrentBlockHeight returns the current block height.
+func (tb *TestBlockInfo) GetCurrentBlockHeight() (uint64, error) {
+	if tb.GetCurrentBlockHeightFunc == nil {
+		panic("GetCurrentBlockHeight method is not set")
+	}
+	return tb.GetCurrentBlockHeightFunc()
+}
+
+// GetBlockAtHeight returns the block at the given height.
+func (tb *TestBlockInfo) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
+	if tb.GetBlockAtHeightFunc == nil {
+		panic("GetBlockAtHeight method is not set")
+	}
+	return tb.GetBlockAtHeightFunc(height)
 }

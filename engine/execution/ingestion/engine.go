@@ -45,7 +45,6 @@ type Engine struct {
 	mempool             *Mempool
 	execState           state.ExecutionState
 	metrics             module.ExecutionMetrics
-	maxCollectionHeight uint64
 	tracer              module.Tracer
 	extensiveLogging    bool
 	executionDataPruner *pruner.Pruner
@@ -89,7 +88,6 @@ func New(
 		mempool:             mempool,
 		execState:           execState,
 		metrics:             metrics,
-		maxCollectionHeight: 0,
 		tracer:              tracer,
 		extensiveLogging:    extLog,
 		executionDataPruner: pruner,
@@ -682,12 +680,7 @@ func (e *Engine) addCollectionToMempool(
 				blockID)
 		}
 
-		// record collection max height metrics
-		blockHeight := executableBlock.Block.Header.Height
-		if blockHeight > e.maxCollectionHeight {
-			e.metrics.UpdateCollectionMaxHeight(blockHeight)
-			e.maxCollectionHeight = blockHeight
-		}
+		e.metrics.UpdateCollectionMaxHeight(executableBlock.Block.Header.Height)
 
 		if completeCollection.IsCompleted() {
 			// already received transactions for this collection
