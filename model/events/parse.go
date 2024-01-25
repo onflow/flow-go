@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -24,15 +23,16 @@ type ParsedEvent struct {
 	Name         string
 }
 
-// ParseEvent parses an event type into its parts. There are 2 valid EventType formats:
+// ParseEvent parses an event type into its parts. There are 3 valid EventType formats:
 // - flow.[EventName]
+// - evm.[EventName]
 // - A.[Address].[Contract].[EventName]
 // Any other format results in an error.
 func ParseEvent(eventType flow.EventType) (*ParsedEvent, error) {
 	parts := strings.Split(string(eventType), ".")
 
 	switch parts[0] {
-	case "flow", types.EVMLocationPrefix:
+	case "flow", flow.EVMLocationPrefix:
 		if len(parts) == 2 {
 			return &ParsedEvent{
 				Type:         ProtocolEventType,
