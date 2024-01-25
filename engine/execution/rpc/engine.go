@@ -197,12 +197,15 @@ func (h *handler) ExecuteScriptAtBlockID(
 		return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", blockID)
 	}
 
-	value, err := h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
+	value, compUsage, err := h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
 	if err != nil {
 		// todo check the error code instead
 		// return code 3 as this passes the litmus test in our context
 		return nil, status.Errorf(codes.InvalidArgument, "failed to execute script: %v", err)
 	}
+
+	// TODO: add compUsage to the ExecuteScriptAtBlockIDResponse when its updated
+	_ = compUsage
 
 	res := &execution.ExecuteScriptAtBlockIDResponse{
 		Value: value,
