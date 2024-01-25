@@ -6,9 +6,9 @@ import (
 	mrand "math/rand"
 	"testing"
 
+	"github.com/onflow/crypto/random"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto/random"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/tracing"

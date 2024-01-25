@@ -237,7 +237,7 @@ func TestBackend_AdjustWithInit_Concurrent_HeroCache(t *testing.T) {
 		adjustDone.Add(1)
 		e := e // capture range variable
 		go func() {
-			adjustDone.Done()
+			defer adjustDone.Done()
 
 			backend.AdjustWithInit(e.ID(), func(entity flow.Entity) flow.Entity {
 				// increment nonce of the entity
@@ -274,7 +274,7 @@ func TestBackend_GetWithInit_Concurrent_HeroCache(t *testing.T) {
 		adjustDone.Add(1)
 		e := e // capture range variable
 		go func() {
-			adjustDone.Done()
+			defer adjustDone.Done()
 
 			entity, ok := backend.GetWithInit(e.ID(), func() flow.Entity {
 				return e
@@ -299,12 +299,13 @@ func TestBackend_AdjustWithInit_Concurrent_MapBased(t *testing.T) {
 	sizeLimit := uint(100)
 	backend := stdmap.NewBackend(stdmap.WithLimit(sizeLimit))
 	entities := unittest.EntityListFixture(sizeLimit)
+
 	adjustDone := sync.WaitGroup{}
 	for _, e := range entities {
 		adjustDone.Add(1)
 		e := e // capture range variable
 		go func() {
-			adjustDone.Done()
+			defer adjustDone.Done()
 
 			backend.AdjustWithInit(e.ID(), func(entity flow.Entity) flow.Entity {
 				// increment nonce of the entity
@@ -339,7 +340,7 @@ func TestBackend_GetWithInit_Concurrent_MapBased(t *testing.T) {
 		adjustDone.Add(1)
 		e := e // capture range variable
 		go func() {
-			adjustDone.Done()
+			defer adjustDone.Done()
 
 			entity, ok := backend.GetWithInit(e.ID(), func() flow.Entity {
 				return e
@@ -364,8 +365,8 @@ func addRandomEntities(t *testing.T, backend *stdmap.Backend, num int) {
 	wg.Add(num)
 	for ; num > 0; num-- {
 		go func() {
+			defer wg.Done()
 			backend.Add(unittest.MockEntityFixture()) // creates and adds a fake item to the mempool
-			wg.Done()
 		}()
 	}
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "failed to add elements in time")
