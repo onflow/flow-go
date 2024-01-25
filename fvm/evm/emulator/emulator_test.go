@@ -292,16 +292,16 @@ func TestContractInteraction(t *testing.T) {
 
 // Self destruct test deploys a contract with a selfdestruct function
 // this function is called and we make sure the balance the contract had
-// is returned to the address provided, and the contract address no longer
-// contains data.
+// is returned to the address provided, and the contract data stays according to the
+// EIP 6780 https://eips.ethereum.org/EIPS/eip-6780 in case where the selfdestruct
+// is not caleld in the same transaction as deployment.
 func TestSelfdestruct(t *testing.T) {
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			testutils.RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *testutils.EOATestAccount) {
+
 				testContract := testutils.GetSelfDestructTestContract(t)
-
 				testAddress := types.NewAddressFromString("testaddr")
-
 				startBalance := big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(gethParams.Ether))
 				deployBalance := big.NewInt(0).Mul(big.NewInt(10), big.NewInt(gethParams.Ether))
 				var contractAddr types.Address
@@ -323,6 +323,16 @@ func TestSelfdestruct(t *testing.T) {
 						)
 						require.NoError(t, err)
 						contractAddr = res.DeployedContractAddress
+					})
+
+					RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
+						bal, err := blk.BalanceOf(testAddress)
+						require.NoError(t, err)
+						require.Equal(t, big.NewInt(0).Sub(startBalance, deployBalance), bal)
+
+						bal, err = blk.BalanceOf(contractAddr)
+						require.NoError(t, err)
+						require.Equal(t, deployBalance, bal)
 					})
 
 					// call the destroy method which executes selfdestruct call.
@@ -352,11 +362,11 @@ func TestSelfdestruct(t *testing.T) {
 
 						nonce, err := blk.NonceOf(contractAddr)
 						require.NoError(t, err)
-						require.Zero(t, nonce)
+						require.Equal(t, uint64(1), nonce)
 
 						code, err := blk.CodeOf(contractAddr)
 						require.NoError(t, err)
-						require.Len(t, code, 0)
+						require.True(t, len(code) > 0)
 					})
 				})
 			})
