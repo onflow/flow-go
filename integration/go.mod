@@ -19,12 +19,12 @@ require (
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v1.3.0
-	github.com/onflow/cadence v1.0.0-preview.2.0.20240120000236-f3397a0efdad
+	github.com/onflow/cadence v1.0.0-M3
 	github.com/onflow/crypto v0.25.0
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20240125013952-df76aaf4136f
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20240125013952-df76aaf4136f
-	github.com/onflow/flow-emulator v0.59.1-0.20240122200325-58ef35ed4aed
-	github.com/onflow/flow-go v0.33.2-0.20240122190738-254af677b873
+	github.com/onflow/flow-emulator v0.59.1-0.20240125162502-f1971b5d4630
+	github.com/onflow/flow-go v0.33.2-0.20240125033624-f3bd7a6004cf
 	github.com/onflow/flow-go-sdk v1.0.0-M1
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231213135419-ae911cc351a2
@@ -52,6 +52,7 @@ require (
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20221026131551-cf6655e29de4 // indirect
+	github.com/SaveTheRbtz/mph v0.1.1-0.20240117162131-4166ec7869bc // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
 	github.com/acomagu/bufpipe v1.0.3 // indirect
@@ -192,7 +193,7 @@ require (
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/jbenet/goprocess v0.1.4 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/k0kubun/pp/v3 v3.2.0 // indirect
+	github.com/k0kubun/pp v3.0.1+incompatible // indirect
 	github.com/kevinburke/go-bindata v3.24.0+incompatible // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/asmfmt v1.3.2 // indirect
@@ -252,7 +253,6 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20240125000944-01706d1b6a69 // indirect
-	github.com/onflow/flow-go/crypto v0.25.0 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20240125012012-2118663ca817 // indirect
 	github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d // indirect
 	github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba // indirect
@@ -362,15 +362,3 @@ require (
 replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/insecure => ../insecure
-
-// the replaces below should not be needed once flow-go and all the repos are updated
-// to use Cadence 1.0
-replace github.com/onflow/cadence => github.com/onflow/cadence v0.42.7
-
-replace github.com/onflow/flow-ft/lib/go/contracts => github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230711213910-baad011d2b13
-
-replace github.com/onflow/flow-nft/lib/go/contracts => github.com/onflow/flow-nft/lib/go/contracts v1.1.0
-
-replace github.com/onflow/sdks => github.com/onflow/sdks v0.5.0
-
-replace github.com/onflow/flow-core-contracts/lib/go/contracts => github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20231219201108-fbdb10b0a2da
