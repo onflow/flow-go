@@ -124,7 +124,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 
 							transaction(amount: UFix64) {
 								prepare(signer: auth(Storage) &Account) {
-									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
+									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
 
 									let sentVault <- vaultRef.withdraw(amount: amount)

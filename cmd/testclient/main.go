@@ -80,7 +80,7 @@ func main() {
             		    prepare(signer: &Account) { log(signer.address) }
             		}
         		`)).
-				SetGasLimit(100).
+				SetComputeLimit(100).
 				SetProposalKey(addr, accountKey.Index, nonce).
 				SetReferenceBlockID(latest.ID).
 				SetPayer(addr).

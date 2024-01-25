@@ -12,7 +12,7 @@ transaction() {
     ) {
         // take all the funds from the service account
         let tokenVault = service.storage
-            .borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
+            .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Unable to borrow reference to the default token vault")
 
         let storageReservation <- tokenVault.withdraw(amount: FlowStorageFees.minimumStorageReservation) as! @FlowToken.Vault

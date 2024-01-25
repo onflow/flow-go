@@ -17,10 +17,10 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/util"

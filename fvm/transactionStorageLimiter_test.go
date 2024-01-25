@@ -183,7 +183,7 @@ func TestTransactionStorageLimiter(t *testing.T) {
 	)
 	t.Run("special account is skipped", func(t *testing.T) {
 		sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
-		evm := sc.EVM.Address
+		evm := sc.EVMStorage.Address
 
 		executionSnapshot := &snapshot.ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
@@ -208,7 +208,14 @@ func TestTransactionStorageLimiter(t *testing.T) {
 			)
 
 		d := &fvm.TransactionStorageLimiter{}
+
+		// if EVM is disabled don't skip the storage check
 		err := d.CheckStorageLimits(ctx, env, executionSnapshot, flow.EmptyAddress, 0)
+		require.Error(t, err)
+
+		// if EVM is enabled skip the storage check
+		ctx := fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true))
+		err = d.CheckStorageLimits(ctx, env, executionSnapshot, flow.EmptyAddress, 0)
 		require.NoError(t, err)
 	})
 }

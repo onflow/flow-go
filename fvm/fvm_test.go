@@ -15,11 +15,11 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	cadenceErrors "github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/tests/utils"
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
@@ -1010,9 +1010,9 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			txBody.SetPayer(address)
 
 			if tc.gasLimit == 0 {
-				txBody.SetGasLimit(fvm.DefaultComputationLimit)
+				txBody.SetComputeLimit(fvm.DefaultComputationLimit)
 			} else {
-				txBody.SetGasLimit(tc.gasLimit)
+				txBody.SetComputeLimit(tc.gasLimit)
 			}
 
 			err = testutil.SignEnvelope(
@@ -1422,7 +1422,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
 				SetPayer(chain.ServiceAddress()).
-				SetGasLimit(maxExecutionEffort)
+				SetComputeLimit(maxExecutionEffort)
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
@@ -1448,7 +1448,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				SetProposalKey(chain.ServiceAddress(), 0, 1).
 				AddAuthorizer(chain.ServiceAddress()).
 				SetPayer(chain.ServiceAddress()).
-				SetGasLimit(maxExecutionEffort)
+				SetComputeLimit(maxExecutionEffort)
 
 			err = testutil.SignTransactionAsServiceAccount(txBody, 1, chain)
 			require.NoError(t, err)
@@ -1635,11 +1635,11 @@ func TestEnforcingComputationLimit(t *testing.T) {
 
 			txBody := flow.NewTransactionBody().
 				SetScript(script).
-				SetGasLimit(computationLimit)
+				SetComputeLimit(computationLimit)
 
 			if test.payerIsServAcc {
 				txBody.SetPayer(chain.ServiceAddress()).
-					SetGasLimit(0)
+					SetComputeLimit(0)
 			}
 			tx := fvm.Transaction(txBody, 0)
 
@@ -1738,7 +1738,7 @@ func TestStorageCapacity(t *testing.T) {
 								?? panic("Could not borrow receiver reference to the recipient''s Vault")
 
 							let vaultRef = signer.storage
-								.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
+								.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 								?? panic("Could not borrow reference to the owner''s Vault!")
 
 							var cap0: UInt64 = signer.storage.capacity
@@ -2755,6 +2755,8 @@ func TestEVM(t *testing.T) {
 			encodedArg, err := jsoncdc.Encode(addrBytes)
 			require.NoError(t, err)
 
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(fmt.Sprintf(`
 						import EVM from %s
@@ -2765,7 +2767,7 @@ func TestEVM(t *testing.T) {
 								log(addr)
 							}
 						}
-					`, chain.ServiceAddress().HexWithPrefix()))).
+					`, sc.EVMContract.Address.HexWithPrefix()))).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				SetPayer(chain.ServiceAddress()).
 				AddArgument(encodedArg)
@@ -2783,7 +2785,7 @@ func TestEVM(t *testing.T) {
 			require.Len(t, output.Logs, 1)
 			require.Equal(t, output.Logs[0], fmt.Sprintf(
 				"A.%s.EVM.EVMAddress(bytes: %s)",
-				chain.ServiceAddress(),
+				sc.EVMContract.Address,
 				addrBytes.String(),
 			))
 		}),
@@ -2853,6 +2855,7 @@ func TestEVM(t *testing.T) {
 			ctx fvm.Context,
 			snapshotTree snapshot.SnapshotTree,
 		) {
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 			script := fvm.Script([]byte(fmt.Sprintf(`
 				import EVM from %s
 				
@@ -2863,7 +2866,7 @@ func TestEVM(t *testing.T) {
 					destroy acc.withdraw(balance: bal);
 					destroy acc;
 				}
-			`, chain.ServiceAddress().HexWithPrefix())))
+			`, sc.EVMContract.Address.HexWithPrefix())))
 
 			_, output, err := vm.Run(ctx, script, snapshotTree)
 
@@ -2889,6 +2892,7 @@ func TestEVM(t *testing.T) {
 			ctx fvm.Context,
 			snapshotTree snapshot.SnapshotTree,
 		) {
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 			tests := []struct {
 				err        error
@@ -2920,7 +2924,7 @@ func TestEVM(t *testing.T) {
 					access(all) fun main() {
 						destroy <- EVM.createBridgedAccount();
 					}
-				`, chain.ServiceAddress().HexWithPrefix())))
+				`, sc.EVMContract.Address.HexWithPrefix())))
 
 				_, output, err := vm.Run(ctx, script, errStorage)
 
@@ -2929,6 +2933,77 @@ func TestEVM(t *testing.T) {
 				// make sure error it's the right type of error
 				require.True(t, e.errChecker(err), "error is not of the right type")
 			}
+		}),
+	)
+
+	t.Run("deploy contract code", newVMTest().
+		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(fmt.Sprintf(`
+					import FungibleToken from %s
+					import FlowToken from %s						
+					import EVM from %s
+
+					transaction() {
+						prepare(acc: auth(Storage) &Account) {
+							let vaultRef = acc.storage
+                                .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+							    ?? panic("Could not borrow reference to the owner's Vault!")
+
+							let acc <- EVM.createBridgedAccount()
+							let amount <- vaultRef.withdraw(amount: 0.0000001) as! @FlowToken.Vault
+							acc.deposit(from: <- amount)
+							destroy acc
+						}
+					}`,
+					sc.FungibleToken.Address.HexWithPrefix(),
+					sc.FlowToken.Address.HexWithPrefix(),
+					sc.FlowServiceAccount.Address.HexWithPrefix(), // TODO this should be sc.EVM.Address not found there???
+				))).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress())
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			ctx = fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true))
+			_, output, err := vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			evmLocation := types.EVMLocation{}
+
+			// convert events to type ids
+			eventTypeIDs := make([]common.TypeID, 0, len(output.Events))
+
+			for _, event := range output.Events {
+				eventTypeIDs = append(eventTypeIDs, common.TypeID(event.Type))
+			}
+
+			assert.ElementsMatch(
+				t,
+				[]common.TypeID{
+					evmLocation.TypeID(nil, string(types.EventTypeTransactionExecuted)),
+					evmLocation.TypeID(nil, string(types.EventTypeBlockExecuted)),
+					"A.7e60df042a9c0868.FlowToken.TokensWithdrawn",
+					"A.9a0766d93b6608b7.FungibleToken.Withdrawn",
+				},
+				eventTypeIDs,
+			)
 		}),
 	)
 }
