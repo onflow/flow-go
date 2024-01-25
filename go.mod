@@ -320,7 +320,3 @@ require (
 	nhooyr.io/websocket v1.8.7 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
-
-// replace github.com/onflow/flow-core-contracts/lib/go/contracts => ../flow-core-contracts/lib/go/contracts
-
-// replace github.com/onflow/flow-core-contracts/lib/go/templates => ../flow-core-contracts/lib/go/templates
