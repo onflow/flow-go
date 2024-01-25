@@ -2954,9 +2954,10 @@ func TestEVM(t *testing.T) {
 					import EVM from %s
 
 					transaction() {
-						prepare(acc: AuthAccount) {
-							let vaultRef = acc.borrow<&{FungibleToken.Provider}>(from: /storage/flowTokenVault)
-							?? panic("Could not borrow reference to the owner's Vault!")
+						prepare(acc: auth(Storage) &Account) {
+							let vaultRef = acc.storage
+                                .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+							    ?? panic("Could not borrow reference to the owner's Vault!")
 
 							let acc <- EVM.createBridgedAccount()
 							let amount <- vaultRef.withdraw(amount: 0.0000001) as! @FlowToken.Vault
@@ -2983,12 +2984,26 @@ func TestEVM(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
-			require.Len(t, output.Events, 3)
 
 			evmLocation := types.EVMLocation{}
-			txExe, blockExe := output.Events[1], output.Events[2]
-			assert.Equal(t, evmLocation.TypeID(nil, string(types.EventTypeTransactionExecuted)), common.TypeID(txExe.Type))
-			assert.Equal(t, evmLocation.TypeID(nil, string(types.EventTypeBlockExecuted)), common.TypeID(blockExe.Type))
+
+			// convert events to type ids
+			eventTypeIDs := make([]common.TypeID, 0, len(output.Events))
+
+			for _, event := range output.Events {
+				eventTypeIDs = append(eventTypeIDs, common.TypeID(event.Type))
+			}
+
+			assert.ElementsMatch(
+				t,
+				[]common.TypeID{
+					evmLocation.TypeID(nil, string(types.EventTypeTransactionExecuted)),
+					evmLocation.TypeID(nil, string(types.EventTypeBlockExecuted)),
+					"A.7e60df042a9c0868.FlowToken.TokensWithdrawn",
+					"A.9a0766d93b6608b7.FungibleToken.Withdrawn",
+				},
+				eventTypeIDs,
+			)
 		}),
 	)
 }
