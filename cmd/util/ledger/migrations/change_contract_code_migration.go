@@ -200,6 +200,7 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 				systemContracts.FungibleToken.Address.HexWithPrefix(),
 				systemContracts.FlowToken.Address.HexWithPrefix(),
 				systemContracts.FlowFees.Address.HexWithPrefix(),
+				systemContracts.FlowServiceAccount.Address.HexWithPrefix(),
 				true,
 			),
 		),
@@ -291,6 +292,7 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 			systemContracts.FungibleToken,
 			ftContracts.FungibleToken(
 				systemContracts.ViewResolver.Address.HexWithPrefix(),
+				systemContracts.FlowServiceAccount.Address.HexWithPrefix(),
 			),
 		),
 		{

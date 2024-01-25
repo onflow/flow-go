@@ -151,6 +151,7 @@ func deployContracts(
 			name: "FungibleToken",
 			code: coreContracts.FungibleToken(
 				contractsAddressHex,
+				contractsAddressHex,
 			),
 		},
 		{
