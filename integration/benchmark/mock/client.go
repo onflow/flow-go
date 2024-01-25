@@ -369,6 +369,32 @@ func (_m *Client) GetEventsForHeightRange(ctx context.Context, eventType string,
 	return r0, r1
 }
 
+// GetExecutionDataByBlockID provides a mock function with given fields: ctx, blockID
+func (_m *Client) GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier) (*flow.ExecutionData, error) {
+	ret := _m.Called(ctx, blockID)
+
+	var r0 *flow.ExecutionData
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) (*flow.ExecutionData, error)); ok {
+		return rf(ctx, blockID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) *flow.ExecutionData); ok {
+		r0 = rf(ctx, blockID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.ExecutionData)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
+		r1 = rf(ctx, blockID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetExecutionResultForBlockID provides a mock function with given fields: ctx, blockID
 func (_m *Client) GetExecutionResultForBlockID(ctx context.Context, blockID flow.Identifier) (*flow.ExecutionResult, error) {
 	ret := _m.Called(ctx, blockID)
@@ -461,6 +487,32 @@ func (_m *Client) GetLatestProtocolStateSnapshot(ctx context.Context) ([]byte, e
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetNetworkParameters provides a mock function with given fields: ctx
+func (_m *Client) GetNetworkParameters(ctx context.Context) (*flow.NetworkParameters, error) {
+	ret := _m.Called(ctx)
+
+	var r0 *flow.NetworkParameters
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (*flow.NetworkParameters, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) *flow.NetworkParameters); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.NetworkParameters)
 		}
 	}
 
@@ -603,6 +655,146 @@ func (_m *Client) SendTransaction(ctx context.Context, tx flow.Transaction) erro
 	}
 
 	return r0
+}
+
+// SubscribeEventsByBlockHeight provides a mock function with given fields: ctx, startHeight, filter
+func (_m *Client) SubscribeEventsByBlockHeight(ctx context.Context, startHeight uint64, filter flow.EventFilter) (<-chan flow.BlockEvents, <-chan error, error) {
+	ret := _m.Called(ctx, startHeight, filter)
+
+	var r0 <-chan flow.BlockEvents
+	var r1 <-chan error
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, flow.EventFilter) (<-chan flow.BlockEvents, <-chan error, error)); ok {
+		return rf(ctx, startHeight, filter)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, flow.EventFilter) <-chan flow.BlockEvents); ok {
+		r0 = rf(ctx, startHeight, filter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan flow.BlockEvents)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uint64, flow.EventFilter) <-chan error); ok {
+		r1 = rf(ctx, startHeight, filter)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(<-chan error)
+		}
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, uint64, flow.EventFilter) error); ok {
+		r2 = rf(ctx, startHeight, filter)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// SubscribeEventsByBlockID provides a mock function with given fields: ctx, startBlockID, filter
+func (_m *Client) SubscribeEventsByBlockID(ctx context.Context, startBlockID flow.Identifier, filter flow.EventFilter) (<-chan flow.BlockEvents, <-chan error, error) {
+	ret := _m.Called(ctx, startBlockID, filter)
+
+	var r0 <-chan flow.BlockEvents
+	var r1 <-chan error
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.EventFilter) (<-chan flow.BlockEvents, <-chan error, error)); ok {
+		return rf(ctx, startBlockID, filter)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.EventFilter) <-chan flow.BlockEvents); ok {
+		r0 = rf(ctx, startBlockID, filter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan flow.BlockEvents)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, flow.EventFilter) <-chan error); ok {
+		r1 = rf(ctx, startBlockID, filter)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(<-chan error)
+		}
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Identifier, flow.EventFilter) error); ok {
+		r2 = rf(ctx, startBlockID, filter)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// SubscribeExecutionDataByBlockHeight provides a mock function with given fields: ctx, startHeight
+func (_m *Client) SubscribeExecutionDataByBlockHeight(ctx context.Context, startHeight uint64) (<-chan flow.ExecutionDataStreamResponse, <-chan error, error) {
+	ret := _m.Called(ctx, startHeight)
+
+	var r0 <-chan flow.ExecutionDataStreamResponse
+	var r1 <-chan error
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint64) (<-chan flow.ExecutionDataStreamResponse, <-chan error, error)); ok {
+		return rf(ctx, startHeight)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uint64) <-chan flow.ExecutionDataStreamResponse); ok {
+		r0 = rf(ctx, startHeight)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan flow.ExecutionDataStreamResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uint64) <-chan error); ok {
+		r1 = rf(ctx, startHeight)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(<-chan error)
+		}
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, uint64) error); ok {
+		r2 = rf(ctx, startHeight)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// SubscribeExecutionDataByBlockID provides a mock function with given fields: ctx, startBlockID
+func (_m *Client) SubscribeExecutionDataByBlockID(ctx context.Context, startBlockID flow.Identifier) (<-chan flow.ExecutionDataStreamResponse, <-chan error, error) {
+	ret := _m.Called(ctx, startBlockID)
+
+	var r0 <-chan flow.ExecutionDataStreamResponse
+	var r1 <-chan error
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) (<-chan flow.ExecutionDataStreamResponse, <-chan error, error)); ok {
+		return rf(ctx, startBlockID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) <-chan flow.ExecutionDataStreamResponse); ok {
+		r0 = rf(ctx, startBlockID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan flow.ExecutionDataStreamResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) <-chan error); ok {
+		r1 = rf(ctx, startBlockID)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(<-chan error)
+		}
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Identifier) error); ok {
+		r2 = rf(ctx, startBlockID)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 type mockConstructorTestingTNewClient interface {

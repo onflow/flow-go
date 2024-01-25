@@ -17,8 +17,8 @@ transaction() {
         let authAccounts:[auth(SaveValue, Capabilities) &Account] = [service, fungibleToken, flowToken, feeContract]
 
         // Take all the funds from the service account.
-        let tokenVault: auth(FungibleToken.Withdrawable) &FlowToken.Vault = service.storage
-            .borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
+        let tokenVault: auth(FungibleToken.Withdraw) &FlowToken.Vault = service.storage
+            .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Unable to borrow reference to the default token vault")
 
         for account in authAccounts {

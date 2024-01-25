@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethVM "github.com/ethereum/go-ethereum/core/vm"
 )
 
 var (
@@ -14,12 +15,20 @@ var (
 	BlockNumberForEVMRules = big.NewInt(1)
 )
 
+type Precompile interface {
+	gethVM.PrecompiledContract
+	Address() Address
+}
+
 // BlockContext holds the context needed for the emulator operations
 type BlockContext struct {
 	BlockNumber            uint64
 	DirectCallBaseGasUsage uint64
 	DirectCallGasPrice     uint64
 	GasFeeCollector        Address
+
+	// a set of extra precompiles to be injected
+	ExtraPrecompiles []Precompile
 }
 
 // NewDefaultBlockContext returns a new default block context

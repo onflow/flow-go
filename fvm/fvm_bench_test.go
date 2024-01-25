@@ -424,7 +424,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 	}
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-	testContractAddress, err := chain.AddressAtIndex(systemcontracts.EVMAccountIndex + 1)
+	testContractAddress, err := chain.AddressAtIndex(systemcontracts.EVMStorageAccountIndex + 1)
 	require.NoError(b, err)
 
 	benchTransaction := func(
@@ -449,7 +449,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		for _, account := range accounts {
 			addrs = append(addrs, account.Address)
 		}
-		evmAddress, err := chain.AddressAtIndex(systemcontracts.EVMAccountIndex)
+		evmAddress, err := chain.AddressAtIndex(systemcontracts.EVMStorageAccountIndex)
 		require.NoError(b, err)
 		addrs = append(addrs, evmAddress)
 
@@ -543,7 +543,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			sc.FungibleToken.Address.Hex(),
 			sc.FlowToken.Address.Hex(),
 			testContractAddress,
-			sc.FlowServiceAccount.Address.Hex(),
+			sc.EVMContract.Address.Hex(),
 			rep,
 			prepare,
 		)
@@ -639,7 +639,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 					let receiverRef =  getAccount(signer.address)
 						.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!
 
-					let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)!
+					let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)!
 
 					receiverRef.deposit(from: <-vaultRef.withdraw(amount: 0.00001))
 				`)
@@ -953,7 +953,7 @@ func mintNFTs(b *testing.B, be TestBenchBlockExecutor, batchNFTAccount *TestBenc
 	mintScript := []byte(fmt.Sprintf(mintScriptTemplate, batchNFTAccount.Address.Hex(), size))
 
 	txBody := flow.NewTransactionBody().
-		SetGasLimit(999999).
+		SetComputeLimit(999999).
 		SetScript(mintScript).
 		SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).
 		AddAuthorizer(batchNFTAccount.Address).

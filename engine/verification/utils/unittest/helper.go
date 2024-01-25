@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -14,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/testutil"
 	enginemock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"

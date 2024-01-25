@@ -158,7 +158,7 @@ func (s *EmulatorSuite) deployDKGContract() {
 func (s *EmulatorSuite) setupDKGAdmin() {
 	setUpAdminTx := sdk.NewTransaction().
 		SetScript(templates.GeneratePublishDKGParticipantScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(
 			s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index,
@@ -212,7 +212,7 @@ func (s *EmulatorSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount 
 				transaction(amount: UFix64, recipient: Address) {
 				  let sentVault: @{FungibleToken.Vault}
 				  prepare(signer: auth(BorrowValue) &Account) {
-					let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
+					let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 					  ?? panic("failed to borrow reference to sender vault")
 					self.sentVault <- vaultRef.withdraw(amount: amount)
 				  }
@@ -302,7 +302,7 @@ func (s *EmulatorSuite) startDKGWithParticipants(accounts []*nodeAccount) {
 	// start DKG using admin resource
 	startDKGTx := sdk.NewTransaction().
 		SetScript(templates.GenerateStartDKGScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(
 			s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index,
@@ -329,7 +329,7 @@ func (s *EmulatorSuite) startDKGWithParticipants(accounts []*nodeAccount) {
 func (s *EmulatorSuite) claimDKGParticipant(node *node) {
 	createParticipantTx := sdk.NewTransaction().
 		SetScript(templates.GenerateCreateDKGParticipantScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(
 			s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index,

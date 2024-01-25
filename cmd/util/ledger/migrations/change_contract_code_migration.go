@@ -200,6 +200,7 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 				systemContracts.FungibleToken.Address.HexWithPrefix(),
 				systemContracts.FlowToken.Address.HexWithPrefix(),
 				systemContracts.FlowFees.Address.HexWithPrefix(),
+				systemContracts.FlowServiceAccount.Address.HexWithPrefix(),
 				true,
 			),
 		),
@@ -289,7 +290,10 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 		),
 		NewSystemContractChange(
 			systemContracts.FungibleToken,
-			ftContracts.FungibleToken(),
+			ftContracts.FungibleToken(
+				systemContracts.ViewResolver.Address.HexWithPrefix(),
+				systemContracts.FlowServiceAccount.Address.HexWithPrefix(),
+			),
 		),
 		{
 			Address:      fungibleTokenMetadataViewsAddress,
@@ -325,12 +329,12 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 		),
 		NewSystemContractChange(
 			systemContracts.ViewResolver,
-			nftContracts.Resolver(),
+			nftContracts.ViewResolver(),
 		),
 
 		// EVM related contracts
 		NewSystemContractChange(
-			systemContracts.EVM,
+			systemContracts.EVMContract,
 			evm.ContractCode(
 				systemContracts.FlowToken.Address,
 				true,

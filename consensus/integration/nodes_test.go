@@ -10,6 +10,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/gammazero/workerpool"
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -28,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
-	"github.com/onflow/flow-go/crypto"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/consensus/compliance"
 	"github.com/onflow/flow-go/engine/consensus/message_hub"
