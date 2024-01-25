@@ -4,7 +4,6 @@ import (
 	stdErrors "errors"
 	"fmt"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/errors"
 )
@@ -244,21 +243,7 @@ func Find(originalErr error, code ErrorCode) CodedError {
 		return coded
 	}
 
-	// NOTE: we need to special case multierror.Error since As() will only
-	// inspect the first error within multierror.Error.
-	errors, ok := unwrappable.(*multierror.Error)
-	if !ok {
-		return Find(unwrappable.Unwrap(), code)
-	}
-
-	for _, innerErr := range errors.Errors {
-		coded = Find(innerErr, code)
-		if coded != nil {
-			return coded
-		}
-	}
-
-	return nil
+	return Find(unwrappable.Unwrap(), code)
 }
 
 // FindFailure recursively unwraps the error and returns first CodedFailure that matches
@@ -278,21 +263,7 @@ func FindFailure(originalErr error, code FailureCode) CodedFailure {
 		return coded
 	}
 
-	// NOTE: we need to special case multierror.Error since As() will only
-	// inspect the first error within multierror.Error.
-	errors, ok := unwrappable.(*multierror.Error)
-	if !ok {
-		return FindFailure(unwrappable.Unwrap(), code)
-	}
-
-	for _, innerErr := range errors.Errors {
-		coded = FindFailure(innerErr, code)
-		if coded != nil {
-			return coded
-		}
-	}
-
-	return nil
+	return FindFailure(unwrappable.Unwrap(), code)
 }
 
 var _ CodedError = (*codedError)(nil)

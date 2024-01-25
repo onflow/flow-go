@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/cadence/runtime"
 	cadenceErr "github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/sema"
@@ -245,6 +246,7 @@ func TestHandleRuntimeError(t *testing.T) {
 func TestFind(t *testing.T) {
 	targetCode := ErrCodeScriptExecutionCancelledError
 	baseErr := fmt.Errorf("base error")
+
 	tests := []struct {
 		name  string
 		err   error
@@ -293,6 +295,17 @@ func TestFind(t *testing.T) {
 		{
 			name:  "found embedded in failure",
 			err:   NewLedgerFailure(NewScriptExecutionCancelledError(baseErr)),
+			found: true,
+		},
+		{
+			name: "found embedded with multierror",
+			err: &multierror.Error{
+				Errors: []error{
+					baseErr,
+					NewScriptExecutionTimedOutError(),
+					NewLedgerFailure(NewScriptExecutionCancelledError(baseErr)),
+				},
+			},
 			found: true,
 		},
 	}
@@ -361,6 +374,17 @@ func TestFindFailure(t *testing.T) {
 		{
 			name:  "found embedded in failure",
 			err:   NewStateMergeFailure(NewLedgerFailure(baseErr)),
+			found: true,
+		},
+		{
+			name: "found embedded with multierror",
+			err: &multierror.Error{
+				Errors: []error{
+					baseErr,
+					NewScriptExecutionTimedOutError(),
+					NewScriptExecutionCancelledError(NewLedgerFailure(baseErr)),
+				},
+			},
 			found: true,
 		},
 	}
