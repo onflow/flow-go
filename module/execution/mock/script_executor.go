@@ -16,13 +16,12 @@ type ScriptExecutor struct {
 }
 
 // ExecuteAtBlockHeight provides a mock function with given fields: ctx, script, arguments, height
-func (_m *ScriptExecutor) ExecuteAtBlockHeight(ctx context.Context, script []byte, arguments [][]byte, height uint64) ([]byte, uint64, error) {
+func (_m *ScriptExecutor) ExecuteAtBlockHeight(ctx context.Context, script []byte, arguments [][]byte, height uint64) ([]byte, error) {
 	ret := _m.Called(ctx, script, arguments, height)
 
 	var r0 []byte
-	var r1 uint64
-	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte, uint64) ([]byte, uint64, error)); ok {
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte, uint64) ([]byte, error)); ok {
 		return rf(ctx, script, arguments, height)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte, uint64) []byte); ok {
@@ -33,19 +32,13 @@ func (_m *ScriptExecutor) ExecuteAtBlockHeight(ctx context.Context, script []byt
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte, uint64) uint64); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte, uint64) error); ok {
 		r1 = rf(ctx, script, arguments, height)
 	} else {
-		r1 = ret.Get(1).(uint64)
+		r1 = ret.Error(1)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, []byte, [][]byte, uint64) error); ok {
-		r2 = rf(ctx, script, arguments, height)
-	} else {
-		r2 = ret.Error(2)
-	}
-
-	return r0, r1, r2
+	return r0, r1
 }
 
 // GetAccountAtBlockHeight provides a mock function with given fields: ctx, address, height
