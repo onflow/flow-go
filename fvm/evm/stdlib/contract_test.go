@@ -148,6 +148,10 @@ func deployContracts(
 			code: coreContracts.ViewResolver(),
 		},
 		{
+			name: "Burner",
+			code: coreContracts.Burner(),
+		},
+		{
 			name: "FungibleToken",
 			code: coreContracts.FungibleToken(
 				contractsAddressHex,
