@@ -53,7 +53,7 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 								prepare(signer: auth(BorrowValue) &Account) {
 
 									// Get a reference to the signer's stored vault
-									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
+									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
 
 									// Withdraw tokens from the signer's stored vault
@@ -1034,7 +1034,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 						prepare(signer: auth(AddContract) &Account, service: auth(BorrowValue) &Account) {
 							signer.contracts.add(name: "%s", code: "%s".decodeHex())
 
-							let vaultRef = service.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)!
+							let vaultRef = service.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)!
 							// deposit additional flow
 							let payment <- vaultRef.withdraw(amount: 10.0) as! @FlowToken.Vault
 

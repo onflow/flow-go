@@ -597,7 +597,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 								prepare(signer: auth(BorrowValue) &Account) {
 							
 									// Get a reference to the signer's stored vault
-									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
+									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
 							
 									// Withdraw tokens from the signer's stored vault

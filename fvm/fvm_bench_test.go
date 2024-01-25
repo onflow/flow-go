@@ -639,7 +639,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 					let receiverRef =  getAccount(signer.address)
 						.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!
 
-					let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)!
+					let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)!
 
 					receiverRef.deposit(from: <-vaultRef.withdraw(amount: 0.00001))
 				`)

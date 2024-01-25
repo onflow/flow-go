@@ -289,7 +289,9 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 		),
 		NewSystemContractChange(
 			systemContracts.FungibleToken,
-			ftContracts.FungibleToken(),
+			ftContracts.FungibleToken(
+				systemContracts.ViewResolver.Address.HexWithPrefix(),
+			),
 		),
 		{
 			Address:      fungibleTokenMetadataViewsAddress,
@@ -325,7 +327,7 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 		),
 		NewSystemContractChange(
 			systemContracts.ViewResolver,
-			nftContracts.Resolver(),
+			nftContracts.ViewResolver(),
 		),
 
 		// EVM related contracts

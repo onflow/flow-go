@@ -11,7 +11,7 @@ transaction {
 
         if signer.storage.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault) == nil {
             // Create a new flowToken Vault and put it in storage
-            signer.storage.save(<-FlowToken.createEmptyVault(), to: /storage/flowTokenVault)
+            signer.storage.save(<-FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>()), to: /storage/flowTokenVault)
 
             // Create a public capability to the Vault that only exposes
             // the deposit function through the Receiver interface

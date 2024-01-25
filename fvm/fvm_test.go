@@ -1738,7 +1738,7 @@ func TestStorageCapacity(t *testing.T) {
 								?? panic("Could not borrow receiver reference to the recipient''s Vault")
 
 							let vaultRef = signer.storage
-								.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
+								.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 								?? panic("Could not borrow reference to the owner''s Vault!")
 
 							var cap0: UInt64 = signer.storage.capacity

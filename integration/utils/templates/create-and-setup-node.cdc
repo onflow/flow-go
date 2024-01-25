@@ -25,13 +25,13 @@ transaction(
         let stakeDst = stakingAccount.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
             ?? panic("Could not borrow receiver reference to the recipient's Vault")
         // withdraw stake from service account
-        let stakeSrc = service.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
+        let stakeSrc = service.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
         stakeDst.deposit(from: <-stakeSrc.withdraw(amount: stake))
 
         // 3 - set up the staking collection
         //
-        let vaultCap = stakingAccount.capabilities.storage.issue<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(/storage/flowTokenVault)
+        let vaultCap = stakingAccount.capabilities.storage.issue<auth(FungibleToken.Withdraw) &FlowToken.Vault>(/storage/flowTokenVault)
 
         // Create a new Staking Collection and put it in storage
         let stakingCollection <-FlowStakingCollection.createStakingCollection(unlockedVault: vaultCap, tokenHolder: nil)
