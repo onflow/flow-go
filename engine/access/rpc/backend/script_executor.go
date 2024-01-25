@@ -48,9 +48,9 @@ func (s *ScriptExecutor) InitReporter(indexReporter state_synchronization.IndexR
 //   - storage.ErrNotFound if the register or block height is not found
 //   - execution.ErrDataNotAvailable if the data for the block height is not available. this could be because
 //     the height is not within the index block range, or the index is not ready.
-func (s *ScriptExecutor) ExecuteAtBlockHeight(ctx context.Context, script []byte, arguments [][]byte, height uint64) ([]byte, error) {
+func (s *ScriptExecutor) ExecuteAtBlockHeight(ctx context.Context, script []byte, arguments [][]byte, height uint64) ([]byte, uint64, error) {
 	if !s.isDataAvailable(height) {
-		return nil, execution.ErrDataNotAvailable
+		return nil, 0, execution.ErrDataNotAvailable
 	}
 
 	return s.scriptExecutor.ExecuteAtBlockHeight(ctx, script, arguments, height)

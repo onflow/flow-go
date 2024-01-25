@@ -43,7 +43,7 @@ type ScriptExecutor interface {
 		script []byte,
 		arguments [][]byte,
 		height uint64,
-	) ([]byte, error)
+	) ([]byte, uint64, error)
 
 	// GetAccountAtBlockHeight returns a Flow account by the provided address and block height.
 	// Expected errors:
@@ -108,11 +108,11 @@ func (s *Scripts) ExecuteAtBlockHeight(
 	script []byte,
 	arguments [][]byte,
 	height uint64,
-) ([]byte, error) {
+) ([]byte, uint64, error) {
 
 	snap, header, err := s.snapshotWithBlock(height)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	return s.executor.ExecuteScript(ctx, script, arguments, header, snap)
