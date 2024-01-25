@@ -15,15 +15,17 @@ import (
 )
 
 var (
-	flagExecutionStateDir string
-	flagOutputDir         string
-	flagBlockHash         string
-	flagStateCommitment   string
-	flagDatadir           string
-	flagChain             string
-	flagNoMigration       bool
-	flagNoReport          bool
-	flagNWorker           int
+	flagExecutionStateDir         string
+	flagOutputDir                 string
+	flagBlockHash                 string
+	flagStateCommitment           string
+	flagDatadir                   string
+	flagChain                     string
+	flagNWorker                   int
+	flagNoMigration               bool
+	flagNoReport                  bool
+	flagValidateMigration         bool
+	flagLogVerboseValidationError bool
 )
 
 var Cmd = &cobra.Command{
@@ -59,6 +61,13 @@ func init() {
 		"don't report the state")
 
 	Cmd.Flags().IntVar(&flagNWorker, "n-migrate-worker", 10, "number of workers to migrate payload concurrently")
+
+	Cmd.Flags().BoolVar(&flagValidateMigration, "validate", false,
+		"validate migrated Cadence values (atree migration)")
+
+	Cmd.Flags().BoolVar(&flagLogVerboseValidationError, "log-verbose-validation-error", false,
+		"log entire Cadence values on validation error (atree migration)")
+
 }
 
 func run(*cobra.Command, []string) {
@@ -131,16 +140,21 @@ func run(*cobra.Command, []string) {
 		log.Warn().Msgf("--no-report flag is deprecated")
 	}
 
-	if flagNoMigration {
-		log.Warn().Msgf("--no-migration flag is deprecated")
+	if flagValidateMigration {
+		log.Warn().Msgf("atree migration validation flag is enabled and will increase duration of migration")
+	}
+
+	if flagLogVerboseValidationError {
+		log.Warn().Msgf("atree migration has verbose validation error logging enabled which may increase size of log")
 	}
 
 	err := extractExecutionState(
+		log.Logger,
 		flagExecutionStateDir,
 		stateCommitment,
 		flagOutputDir,
-		log.Logger,
 		flagNWorker,
+		!flagNoMigration,
 	)
 
 	if err != nil {

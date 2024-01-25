@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
@@ -263,7 +263,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			}`),
 		}
 
-		spamTx.SetGasLimit(800000)
+		spamTx.SetComputeLimit(800000)
 		err = testutil.SignTransaction(spamTx, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 
@@ -597,7 +597,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 								prepare(signer: auth(BorrowValue) &Account) {
 							
 									// Get a reference to the signer's stored vault
-									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
+									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
 							
 									// Withdraw tokens from the signer's stored vault

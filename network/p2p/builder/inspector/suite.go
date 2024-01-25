@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/inspector"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 )
 
@@ -21,6 +20,7 @@ type GossipSubInspectorSuite struct {
 	ctrlMsgInspectDistributor p2p.GossipSubInspectorNotifDistributor
 }
 
+// TODO: this can be simplified as there is no more need for the aggregated inspector.
 var _ p2p.GossipSubInspectorSuite = (*GossipSubInspectorSuite)(nil)
 
 // NewGossipSubInspectorSuite creates a new GossipSubInspectorSuite.
@@ -36,10 +36,10 @@ var _ p2p.GossipSubInspectorSuite = (*GossipSubInspectorSuite)(nil)
 // regarding gossipsub control messages is detected.
 // Returns:
 //   - the new GossipSubInspectorSuite.
-func NewGossipSubInspectorSuite(metricsInspector *inspector.ControlMsgMetricsInspector,
+func NewGossipSubInspectorSuite(
 	validationInspector *validation.ControlMsgValidationInspector,
 	ctrlMsgInspectDistributor p2p.GossipSubInspectorNotifDistributor) *GossipSubInspectorSuite {
-	inspectors := []p2p.GossipSubRPCInspector{metricsInspector, validationInspector}
+	inspectors := []p2p.GossipSubRPCInspector{validationInspector}
 	s := &GossipSubInspectorSuite{
 		ctrlMsgInspectDistributor: ctrlMsgInspectDistributor,
 		validationInspector:       validationInspector,

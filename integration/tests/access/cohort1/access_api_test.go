@@ -72,7 +72,7 @@ func (s *AccessAPISuite) SetupTest() {
 		flow.RoleAccess,
 		testnet.WithLogLevel(zerolog.FatalLevel),
 		// make sure test continues to test as expected if the default config changes
-		testnet.WithAdditionalFlagf("--script-execution-mode=%s", backend.ScriptExecutionModeExecutionNodesOnly),
+		testnet.WithAdditionalFlagf("--script-execution-mode=%s", backend.IndexQueryModeExecutionNodesOnly),
 	)
 
 	indexingAccessConfig := testnet.NewNodeConfig(
@@ -83,7 +83,7 @@ func (s *AccessAPISuite) SetupTest() {
 		testnet.WithAdditionalFlag("--execution-data-retry-delay=1s"),
 		testnet.WithAdditionalFlag("--execution-data-indexing-enabled=true"),
 		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
-		testnet.WithAdditionalFlagf("--script-execution-mode=%s", backend.ScriptExecutionModeLocalOnly),
+		testnet.WithAdditionalFlagf("--script-execution-mode=%s", backend.IndexQueryModeLocalOnly),
 	)
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
@@ -324,7 +324,7 @@ func (s *AccessAPISuite) deployContract() *sdk.TransactionResult {
 		SetProposalKey(serviceAddress, 0, s.serviceClient.GetSeqNumber()).
 		SetPayer(serviceAddress).
 		AddAuthorizer(serviceAddress).
-		SetGasLimit(9999)
+		SetComputeLimit(9999)
 
 	err = s.serviceClient.SignAndSendTransaction(s.ctx, createCounterTx)
 	s.Require().NoError(err)

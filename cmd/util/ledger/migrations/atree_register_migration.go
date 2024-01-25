@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
@@ -35,6 +36,9 @@ type AtreeRegisterMigrator struct {
 	rwf     reporters.ReportWriterFactory
 
 	nWorkers int
+
+	validateMigratedValues    bool
+	logVerboseValidationError bool
 }
 
 var _ AccountBasedMigration = (*AtreeRegisterMigrator)(nil)
@@ -42,15 +46,18 @@ var _ io.Closer = (*AtreeRegisterMigrator)(nil)
 
 func NewAtreeRegisterMigrator(
 	rwf reporters.ReportWriterFactory,
+	validateMigratedValues bool,
+	logVerboseValidationError bool,
 ) *AtreeRegisterMigrator {
 
 	sampler := util2.NewTimedSampler(30 * time.Second)
 
 	migrator := &AtreeRegisterMigrator{
-		sampler: sampler,
-
-		rwf: rwf,
-		rw:  rwf.ReportWriter("atree-register-migrator"),
+		sampler:                   sampler,
+		rwf:                       rwf,
+		rw:                        rwf.ReportWriter("atree-register-migrator"),
+		validateMigratedValues:    validateMigratedValues,
+		logVerboseValidationError: logVerboseValidationError,
 	}
 
 	return migrator
@@ -108,6 +115,13 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 		return nil, err
 	}
 
+	if m.validateMigratedValues {
+		err = validateCadenceValues(address, oldPayloads, newPayloads, m.log, m.logVerboseValidationError)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	newLen := len(newPayloads)
 
 	if newLen > originalLen {
@@ -119,15 +133,6 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 			Kind:    "more_registers_after_migration",
 			Msg:     fmt.Sprintf("original: %d, new: %d", originalLen, newLen),
 		})
-	}
-
-	if address == cricketMomentsAddress {
-		// extra logging for cricket moments
-		m.log.Info().
-			Str("address", address.Hex()).
-			Int("originalLen", originalLen).
-			Int("newLen", newLen).
-			Msgf("done migrating cricketMomentsAddress")
 	}
 
 	return newPayloads, nil
@@ -146,30 +151,15 @@ func (m *AtreeRegisterMigrator) migrateAccountStorage(
 		}
 	}
 
-	if mr.Address == cricketMomentsAddress {
-		m.log.Info().Msg("Committing storage domain changes")
-	}
-
-	// commit the storage changes
-	// TODO: for cricket moments `commitNewStorageMaps` already happened potentially
-	// try switching directly to s.PersistentSlabStorage.FastCommit(runtime.NumCPU())
 	err := mr.Storage.Commit(mr.Interpreter, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to commit storage: %w", err)
-	}
-
-	if mr.Address == cricketMomentsAddress {
-		m.log.Info().Msg("Finalizing storage domain changes transaction")
 	}
 
 	// finalize the transaction
 	result, err := mr.TransactionState.FinalizeMainTransaction()
 	if err != nil {
 		return nil, fmt.Errorf("failed to finalize main transaction: %w", err)
-	}
-
-	if mr.Address == cricketMomentsAddress {
-		m.log.Info().Msg("Storage domain changes transaction finalized")
 	}
 
 	return result.WriteSet, nil
@@ -189,7 +179,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 	storageMapIds[string(atree.SlabIndexToLedgerKey(storageMap.StorageID().Index))] = struct{}{}
 
 	iterator := storageMap.Iterator(util.NopMemoryGauge{})
-	keys := make([]interpreter.StringStorageMapKey, 0)
+	keys := make([]interpreter.StringStorageMapKey, 0, storageMap.Count())
 	// to be safe avoid modifying the map while iterating
 	for {
 		key := iterator.NextKey()
@@ -216,7 +206,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 				return fmt.Errorf("failed to read value for key %s: %w", key, err)
 			}
 
-			value, err = m.cloneValue(mr, domain, key, value)
+			value, err = m.cloneValue(mr, value)
 
 			if err != nil {
 				return fmt.Errorf("failed to clone value for key %s: %w", key, err)
@@ -262,14 +252,6 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 	var statePayload *ledger.Payload
 	progressLog := func(int) {}
 
-	if mr.Address == cricketMomentsAddress {
-		progressLog = util2.LogProgress(m.log,
-			util2.DefaultLogProgressConfig(
-				"applying changes",
-				len(changes),
-			))
-	}
-
 	for id, value := range changes {
 		progressLog(1)
 		// delete all values that were changed from the original payloads so that we can
@@ -286,7 +268,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 			return nil, fmt.Errorf("failed to convert owner address: %w", err)
 		}
 
-		if ownerAddress.Hex() != mr.Address.Hex() {
+		if ownerAddress != mr.Address {
 			// something was changed that does not belong to this account. Log it.
 			m.log.Error().
 				Str("key", id.String()).
@@ -310,13 +292,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 
 	// add all values that were not changed
 	if len(originalPayloads) > 0 {
-		if mr.Address == cricketMomentsAddress {
-			progressLog = util2.LogProgress(m.log,
-				util2.DefaultLogProgressConfig(
-					"checking unchanged registers",
-					len(originalPayloads)),
-			)
-		}
+
 		for id, value := range originalPayloads {
 			progressLog(1)
 
@@ -339,29 +315,16 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 				continue
 			}
 
-			isADomainKey := false
-			for _, domain := range domains {
-				if id.Key == domain {
-					isADomainKey = true
-					break
-				}
-			}
-			if isADomainKey {
-				// TODO: check if this is really expected
+			if _, isADomainKey := domainsLookupMap[id.Key]; isADomainKey {
 				// this is expected. Move it to the new payloads
 				newPayloads = append(newPayloads, value)
 				continue
 			}
 
 			if _, ok := storageMapIds[id.Key]; ok {
+				// This is needed because storage map can be empty.
+				// Empty storage map only exists in old payloads because there isn't any element to migrate.
 				newPayloads = append(newPayloads, value)
-				continue
-			}
-
-			if mr.Address == cricketMomentsAddress {
-				// to be sure, copy all cricket moments keys
-				newPayloads = append(newPayloads, value)
-				m.log.Info().Msgf("copying cricket moments key %s", id)
 				continue
 			}
 
@@ -370,7 +333,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 				Key:     id.String(),
 				Size:    len(mr.Snapshot.Payloads),
 				Kind:    "not_migrated",
-				Msg:     fmt.Sprintf("%x", value),
+				Msg:     fmt.Sprintf("%x", value.Value()),
 			})
 
 			size, err := payloadSize(key, value)
@@ -386,9 +349,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 	}
 
 	if statePayload == nil {
-		m.log.Error().Msg("state payload was not found")
-		return newPayloads, nil
-		//return nil, fmt.Errorf("state payload was not found")
+		return nil, fmt.Errorf("state payload was not found")
 	}
 
 	// since some registers were removed, we need to update the storage used
@@ -415,30 +376,8 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 
 func (m *AtreeRegisterMigrator) cloneValue(
 	mr *migratorRuntime,
-	domain string,
-	key interpreter.StorageMapKey,
 	value interpreter.Value,
 ) (interpreter.Value, error) {
-
-	if isCricketMomentsShardedCollection(mr, value) {
-		m.log.Info().Msg("migrating CricketMomentsShardedCollection")
-		value, err := cloneCricketMomentsShardedCollection(
-			m.log,
-			m.nWorkers,
-			mr,
-			domain,
-			key,
-			value,
-		)
-
-		if err != nil {
-			m.log.Info().Err(err).Msg("failed to clone value")
-			return nil, err
-		}
-
-		m.log.Info().Msg("done migrating CricketMomentsShardedCollection")
-		return value, nil
-	}
 
 	err := capturePanic(func() {
 		// force the value to be read entirely
@@ -480,6 +419,17 @@ var domains = []string{
 	common.PathDomainPrivate.Identifier(),
 	common.PathDomainPublic.Identifier(),
 	runtime.StorageDomainContract,
+	stdlib.InboxStorageDomain,
+	stdlib.CapabilityControllerStorageDomain,
+}
+
+var domainsLookupMap = map[string]struct{}{
+	common.PathDomainStorage.Identifier():    {},
+	common.PathDomainPrivate.Identifier():    {},
+	common.PathDomainPublic.Identifier():     {},
+	runtime.StorageDomainContract:            {},
+	stdlib.InboxStorageDomain:                {},
+	stdlib.CapabilityControllerStorageDomain: {},
 }
 
 // migrationProblem is a struct for reporting errors

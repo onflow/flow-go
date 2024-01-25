@@ -18,11 +18,12 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/protobuf/testing/protocmp"
 
+	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
 	hsmock "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
@@ -984,7 +985,7 @@ func (suite *Suite) TestExecuteScript() {
 			Log:                      suite.log,
 			SnapshotHistoryLimit:     backend.DefaultSnapshotHistoryLimit,
 			Communicator:             backend.NewNodeCommunicator(false),
-			ScriptExecutionMode:      backend.ScriptExecutionModeExecutionNodesOnly,
+			ScriptExecutionMode:      backend.IndexQueryModeExecutionNodesOnly,
 			TxErrorMessagesCacheSize: 1000,
 		})
 		require.NoError(suite.T(), err)

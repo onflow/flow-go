@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/gammazero/workerpool"
+	"github.com/onflow/crypto/hash"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/engine/consensus/approvals"
@@ -257,11 +257,11 @@ func (c *Core) processIncorporatedResult(incRes *flow.IncorporatedResult) error 
 	// For incorporating blocks at heights that are already finalized, we check that the incorporating block
 	// is on the finalized fork. Otherwise, the incorporating block is orphaned, and we can drop the result.
 	if incorporatedAtHeight <= c.counterLastFinalizedHeight.Value() {
-		finalized, err := c.headers.ByHeight(incorporatedAtHeight)
+		finalizedID, err := c.headers.BlockIDByHeight(incorporatedAtHeight)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized block at height %d: %w", incorporatedAtHeight, err)
 		}
-		if finalized.ID() != incRes.IncorporatedBlockID {
+		if finalizedID != incRes.IncorporatedBlockID {
 			// it means that we got incorporated incRes for a block which doesn't extend our chain
 			// and should be discarded from future processing
 			return engine.NewOutdatedInputErrorf("won't process incorporated incRes from orphan block %s", incRes.IncorporatedBlockID)

@@ -4,12 +4,12 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"golang.org/x/crypto/sha3"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/sha3"
 
-	cryhash "github.com/onflow/flow-go/crypto/hash"
+	cryhash "github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 )

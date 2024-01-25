@@ -10,6 +10,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/cadence/runtime/common"
+
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -38,7 +40,22 @@ func TestGroupPayloadsByAccountCompareResults(t *testing.T) {
 	groups1 := util.GroupPayloadsByAccount(log, tmp1, 0)
 	groups2 := util.GroupPayloadsByAccount(log, tmp2, runtime.NumCPU())
 
+	groups3 := map[common.Address][]*ledger.Payload{}
+	for _, payload := range payloads {
+		key, err := payload.Key()
+		require.NoError(t, err)
+		registerID, err := convert.LedgerKeyToRegisterID(key)
+		require.NoError(t, err)
+		address, err := common.BytesToAddress([]byte(registerID.Owner))
+		require.NoError(t, err)
+		if _, ok := groups3[address]; !ok {
+			groups3[address] = []*ledger.Payload{}
+		}
+		groups3[address] = append(groups3[address], payload)
+	}
+
 	require.Equal(t, groups1.Len(), groups2.Len())
+	require.Equal(t, groups1.Len(), len(groups3))
 	for {
 		group1, err1 := groups1.Next()
 		group2, err2 := groups2.Next()
@@ -53,6 +70,9 @@ func TestGroupPayloadsByAccountCompareResults(t *testing.T) {
 
 		require.Equal(t, group1.Address, group2.Address)
 		require.Equal(t, len(group1.Payloads), len(group2.Payloads))
+		require.ElementsMatch(t, group1.Payloads, group2.Payloads)
+		require.Equal(t, len(group1.Payloads), len(groups3[group1.Address]))
+		require.ElementsMatch(t, group1.Payloads, groups3[group1.Address])
 	}
 }
 

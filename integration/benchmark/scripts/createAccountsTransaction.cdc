@@ -3,7 +3,7 @@ import FlowToken from 0x%s
 
 transaction(publicKey: [UInt8], count: Int, initialTokenAmount: UFix64) {
   prepare(signer: auth(AddContract, BorrowValue) &Account) {
-	let vault = signer.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
+	let vault = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
       ?? panic("Could not borrow reference to the owner's Vault")
 
     var i = 0

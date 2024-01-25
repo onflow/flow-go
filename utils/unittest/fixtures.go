@@ -14,12 +14,12 @@ import (
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/onflow/cadence"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -33,7 +33,6 @@ import (
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
@@ -1714,6 +1713,11 @@ func EventsFixture(
 	return events
 }
 
+func EventTypeFixture(chainID flow.ChainID) flow.EventType {
+	eventType := fmt.Sprintf("A.%s.TestContract.TestEvent1", RandomAddressFixtureForChain(chainID))
+	return flow.EventType(eventType)
+}
+
 // EventFixture returns an event
 func EventFixture(
 	eType flow.EventType,
@@ -1971,7 +1975,7 @@ func VoteWithBeaconSig() func(*hotstuff.Vote) {
 
 func WithParticipants(participants flow.IdentityList) func(*flow.EpochSetup) {
 	return func(setup *flow.EpochSetup) {
-		setup.Participants = participants.Sort(order.Canonical)
+		setup.Participants = participants.Sort(flow.Canonical)
 		setup.Assignments = ClusterAssignment(1, participants)
 	}
 }
@@ -2003,7 +2007,7 @@ func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 		Counter:            uint64(rand.Uint32()),
 		FirstView:          uint64(0),
 		FinalView:          uint64(rand.Uint32() + 1000),
-		Participants:       participants.Sort(order.Canonical),
+		Participants:       participants.Sort(flow.Canonical),
 		RandomSource:       SeedFixture(flow.EpochSetupRandomSourceLength),
 		DKGPhase1FinalView: 100,
 		DKGPhase2FinalView: 200,
@@ -2181,7 +2185,7 @@ func RootSnapshotFixtureWithChainID(
 	chainID flow.ChainID,
 	opts ...func(*flow.Block),
 ) *inmem.Snapshot {
-	block, result, seal := BootstrapFixtureWithChainID(participants.Sort(order.Canonical), chainID, opts...)
+	block, result, seal := BootstrapFixtureWithChainID(participants.Sort(flow.Canonical), chainID, opts...)
 	qc := QuorumCertificateFixture(QCWithRootBlockID(block.ID()))
 	root, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
 	if err != nil {

@@ -150,6 +150,12 @@ func NewPayloadsReadonlyLedger(snapshot *PayloadSnapshot) *PayloadsReadonlyLedge
 	return &PayloadsReadonlyLedger{Snapshot: snapshot}
 }
 
+// IsServiceLevelAddress returns true if the given address is the service level address.
+// Which means it's not an actual account but instead holds service lever registers.
+func IsServiceLevelAddress(address common.Address) bool {
+	return address == common.ZeroAddress
+}
+
 var _ atree.Ledger = &PayloadsReadonlyLedger{}
 
 func PayloadsFromEmulatorSnapshot(snapshotPath string) ([]*ledger.Payload, error) {

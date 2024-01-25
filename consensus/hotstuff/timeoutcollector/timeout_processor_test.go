@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -20,9 +21,7 @@ import (
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/local"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -55,7 +54,7 @@ func (s *TimeoutProcessorTestSuite) SetupTest() {
 	s.validator = mocks.NewValidator(s.T())
 	s.sigAggregator = mocks.NewTimeoutSignatureAggregator(s.T())
 	s.notifier = mocks.NewTimeoutCollectorConsumer(s.T())
-	s.participants = unittest.IdentityListFixture(11, unittest.WithWeight(s.sigWeight)).Sort(order.Canonical)
+	s.participants = unittest.IdentityListFixture(11, unittest.WithWeight(s.sigWeight)).Sort(flow.Canonical)
 	s.signer = s.participants[0]
 	s.view = (uint64)(rand.Uint32() + 100)
 	s.totalWeight = *atomic.NewUint64(0)
@@ -472,7 +471,7 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 		signers[identity.NodeID] = verification.NewStakingSigner(me)
 	})
 	// identities must be in canonical order
-	stakingSigners = stakingSigners.Sort(order.Canonical)
+	stakingSigners = stakingSigners.Sort(flow.Canonical)
 
 	// utility function which generates a valid timeout for every signer
 	createTimeouts := func(participants flow.IdentityList, view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) []*model.TimeoutObject {

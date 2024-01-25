@@ -11,15 +11,11 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
-	sdk "github.com/onflow/flow-go-sdk"
-
-	nftContracts "github.com/onflow/flow-nft/lib/go/contracts"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func DeployFungibleTokenContractTransaction(fungibleToken, viewResolver flow.Address) *flow.TransactionBody {
-	contract := contracts.FungibleToken(viewResolver.Hex())
+func DeployFungibleTokenContractTransaction(fungibleToken, viewResolver, burner flow.Address) *flow.TransactionBody {
+	contract := contracts.FungibleToken(viewResolver.Hex(), burner.Hex())
 	contractName := "FungibleToken"
 	return DeployContractTransaction(
 		fungibleToken,
@@ -58,11 +54,11 @@ func DeployViewResolverContractTransaction(nonFungibleToken flow.Address) *flow.
 	)
 }
 
-func DeployMultipleNFTContractTransaction(deployTo, nonFungibleToken flow.Address) *flow.TransactionBody {
-	contract := nftContracts.MultipleNFT(sdk.Address(nonFungibleToken))
-	contractName := "MultipleNFT"
+func DeployBurnerContractTransaction(fungibleToken flow.Address) *flow.TransactionBody {
+	contract := contracts.Burner()
+	contractName := "Burner"
 	return DeployContractTransaction(
-		deployTo,
+		fungibleToken,
 		contract,
 		contractName,
 	)

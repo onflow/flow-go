@@ -7,9 +7,10 @@ VERIFICATION = 1
 ACCESS = 1
 OBSERVER = 0
 NCLUSTERS=1
-EPOCHLEN=10000   # 0 means use default
-STAKINGLEN=2000 # 0 means use default
-DKGLEN=2000     # 0 means use default
+EPOCHLEN=10000                  # 0 means use default
+STAKINGLEN=2000                 # 0 means use default
+DKGLEN=2000                     # 0 means use default
+EPOCHCOMMITSAFETYTHRESHOLD=1000 # 0 means use default
 CONSENSUS_DELAY=800ms
 COLLECTION_DELAY=950ms
 
@@ -62,6 +63,7 @@ else
 		-epoch-length=$(EPOCHLEN) \
 		-epoch-staking-phase-length=$(STAKINGLEN) \
 		-epoch-dkg-phase-length=$(DKGLEN) \
+		-epoch-commit-safety-threshold=$(EPOCHCOMMITSAFETYTHRESHOLD) \
 		-profiler=$(PROFILER) \
 		-profile-uploader=$(PROFILE_UPLOADER) \
 		-tracing=$(TRACING) \
@@ -85,7 +87,7 @@ bootstrap-ci:
 # Creates a version of localnet configured with short epochs
 .PHONY: bootstrap-short-epochs
 bootstrap-short-epochs:
-	$(MAKE) -e EPOCHLEN=200 STAKINGLEN=10 DKGLEN=50 bootstrap
+	$(MAKE) -e EPOCHLEN=200 STAKINGLEN=5 DKGLEN=50 EPOCHCOMMITSAFETYTHRESHOLD=20 bootstrap
 
 # Starts the network - must have been bootstrapped first. Builds fresh images.
 .PHONY: start

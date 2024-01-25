@@ -16,11 +16,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/cadence/migrations"
-	"github.com/onflow/cadence/migrations/account_type"
 	"github.com/onflow/cadence/migrations/capcons"
 	"github.com/onflow/cadence/migrations/entitlements"
+	"github.com/onflow/cadence/migrations/statictypes"
 	"github.com/onflow/cadence/migrations/string_normalization"
-	"github.com/onflow/cadence/migrations/type_value"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 )
@@ -157,8 +156,7 @@ func NewCadenceValueMigrator(
 				},
 				entitlements.NewEntitlementsMigration(inter),
 				string_normalization.NewStringNormalizingMigration(),
-				account_type.NewAccountTypeMigration(),
-				type_value.NewTypeValueMigration(),
+				statictypes.NewStaticTypeMigration(),
 			}
 		},
 	}
@@ -200,6 +198,7 @@ type cadenceValueMigrationReporter struct {
 
 var _ capcons.LinkMigrationReporter = &cadenceValueMigrationReporter{}
 var _ capcons.CapabilityMigrationReporter = &cadenceValueMigrationReporter{}
+var _ migrations.Reporter = &cadenceValueMigrationReporter{}
 
 func newValueMigrationReporter(rw reporters.ReportWriter, log zerolog.Logger) *cadenceValueMigrationReporter {
 	return &cadenceValueMigrationReporter{
@@ -209,24 +208,29 @@ func newValueMigrationReporter(rw reporters.ReportWriter, log zerolog.Logger) *c
 }
 
 func (t *cadenceValueMigrationReporter) Migrated(
-	addressPath interpreter.AddressPath,
+	storageKey interpreter.StorageKey,
+	storageMapKey interpreter.StorageMapKey,
 	migration string,
 ) {
 	t.rw.Write(cadenceValueMigrationReportEntry{
-		Address:   addressPath,
-		Migration: migration,
+		StorageKey:    storageKey,
+		StorageMapKey: storageMapKey,
+		Migration:     migration,
 	})
 }
 
 func (t *cadenceValueMigrationReporter) Error(
-	addressPath interpreter.AddressPath,
+	storageKey interpreter.StorageKey,
+	storageMapKey interpreter.StorageMapKey,
 	migration string,
 	err error,
 ) {
 	t.log.Error().Msgf(
-		"failed to run %s for path %s: %s",
+		"failed to run %s for path /%s/%s in account %s: %s",
 		migration,
-		addressPath,
+		storageKey.Key,
+		storageMapKey,
+		storageKey.Address,
 		err,
 	)
 }
@@ -274,8 +278,9 @@ func (t *cadenceValueMigrationReporter) MissingTarget(accountAddressPath interpr
 }
 
 type cadenceValueMigrationReportEntry struct {
-	Address   interpreter.AddressPath `json:"address"`
-	Migration string                  `json:"migration"`
+	StorageKey    interpreter.StorageKey    `json:"storageKey"`
+	StorageMapKey interpreter.StorageMapKey `json:"storageMapKey"`
+	Migration     string                    `json:"migration"`
 }
 
 type capConsLinkMigration struct {

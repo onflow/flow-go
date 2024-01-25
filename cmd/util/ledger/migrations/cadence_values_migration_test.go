@@ -3,11 +3,11 @@ package migrations
 import (
 	"fmt"
 	"github.com/onflow/cadence/migrations"
-	"github.com/onflow/cadence/migrations/account_type"
 	"github.com/onflow/cadence/migrations/capcons"
 	"github.com/onflow/cadence/migrations/entitlements"
+	"github.com/onflow/cadence/migrations/statictypes"
 	"github.com/onflow/cadence/migrations/string_normalization"
-	"github.com/onflow/cadence/migrations/type_value"
+	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/onflow/flow-go/fvm/environment"
 	"io"
 	"os"
@@ -134,8 +134,7 @@ func TestCadenceValuesMigrationWithSwappedOrder(t *testing.T) {
 					Reporter:      reporter,
 				},
 				string_normalization.NewStringNormalizingMigration(),
-				account_type.NewAccountTypeMigration(),
-				type_value.NewTypeValueMigration(),
+				statictypes.NewStaticTypeMigration(),
 
 				// Run this at the end
 				entitlements.NewEntitlementsMigration(inter),
@@ -463,19 +462,18 @@ func checkReporters(
 
 	reportEntry := func(migration, key string, domain common.PathDomain) cadenceValueMigrationReportEntry {
 		return cadenceValueMigrationReportEntry{
-			Address: interpreter.AddressPath{
-				Address: address,
-				Path: interpreter.PathValue{
-					Identifier: key,
-					Domain:     domain,
-				},
-			},
+			StorageMapKey: interpreter.StringStorageMapKey(key),
+			StorageKey: interpreter.NewStorageKey(
+				nil,
+				address,
+				domain.Identifier(),
+			),
 			Migration: migration,
 		}
 	}
 
 	acctTypedDictKeyMigrationReportEntry := reportEntry(
-		"AccountTypeMigration",
+		"StaticTypeMigration",
 		"dictionary_with_account_type_keys",
 		common.PathDomainStorage)
 
@@ -486,28 +484,26 @@ func checkReporters(
 		[]any{
 			reportEntry("StringNormalizingMigration", "string_value_1", common.PathDomainStorage),
 			reportEntry("StringNormalizingMigration", "string_value_2", common.PathDomainStorage),
-			reportEntry("AccountTypeMigration", "type_value", common.PathDomainStorage),
+			reportEntry("StaticTypeMigration", "type_value", common.PathDomainStorage),
 
 			// String keys in dictionary
 			reportEntry("StringNormalizingMigration", "dictionary_with_string_keys", common.PathDomainStorage),
 			reportEntry("StringNormalizingMigration", "dictionary_with_string_keys", common.PathDomainStorage),
 
 			// Restricted typed keys in dictionary
-			reportEntry("TypeValueMigration", "dictionary_with_restricted_typed_keys", common.PathDomainStorage),
-			reportEntry("TypeValueMigration", "dictionary_with_restricted_typed_keys", common.PathDomainStorage),
+			reportEntry("StaticTypeMigration", "dictionary_with_restricted_typed_keys", common.PathDomainStorage),
+			reportEntry("StaticTypeMigration", "dictionary_with_restricted_typed_keys", common.PathDomainStorage),
 
 			// Capabilities and links
 			cadenceValueMigrationReportEntry{
-				Address: interpreter.AddressPath{
-					Address: address,
-					Path: interpreter.PathValue{
-						Identifier: "capability",
-						Domain:     common.PathDomainStorage,
-					},
-				},
+				StorageMapKey: interpreter.StringStorageMapKey("capability"),
+				StorageKey: interpreter.NewStorageKey(
+					nil,
+					address,
+					common.PathDomainStorage.Identifier(),
+				),
 				Migration: "CapabilityValueMigration",
 			},
-			reportEntry("EntitlementsMigration", "capability", common.PathDomainStorage),
 			capConsPathCapabilityMigration{
 				AccountAddress: address,
 				AddressPath: interpreter.AddressPath{
@@ -516,6 +512,16 @@ func checkReporters(
 				},
 				BorrowType: interpreter.NewReferenceStaticType(nil, interpreter.UnauthorizedAccess, rResourceType),
 			},
+			cadenceValueMigrationReportEntry{
+				StorageMapKey: interpreter.Uint64StorageMapKey(1),
+				StorageKey: interpreter.NewStorageKey(
+					nil,
+					address,
+					stdlib.CapabilityControllerStorageDomain,
+				),
+				Migration: "EntitlementsMigration",
+			},
+			reportEntry("EntitlementsMigration", "capability", common.PathDomainStorage),
 			reportEntry("EntitlementsMigration", "linkR", common.PathDomainPublic),
 
 			// Account-typed keys in dictionary
@@ -603,13 +609,12 @@ func runLinkMigration(
 				CapabilityID: 1,
 			},
 			cadenceValueMigrationReportEntry{
-				Address: interpreter.AddressPath{
-					Address: address,
-					Path: interpreter.PathValue{
-						Identifier: "linkR",
-						Domain:     common.PathDomainPublic,
-					},
-				},
+				StorageMapKey: interpreter.StringStorageMapKey("linkR"),
+				StorageKey: interpreter.NewStorageKey(
+					nil,
+					address,
+					common.PathDomainPublic.Identifier(),
+				),
 				Migration: "LinkValueMigration",
 			},
 		},
@@ -622,7 +627,7 @@ func runLinkMigration(
 		t,
 		logWriter.logs[0],
 		fmt.Sprintf(
-			"failed to run LinkValueMigration for path {%s /public/flowTokenReceiver}",
+			"failed to run LinkValueMigration for path /public/flowTokenReceiver in account %s",
 			testAccountAddress,
 		),
 	)
@@ -631,7 +636,7 @@ func runLinkMigration(
 		t,
 		logWriter.logs[1],
 		fmt.Sprintf(
-			"failed to run LinkValueMigration for path {%s /public/flowTokenBalance}",
+			"failed to run LinkValueMigration for path /public/flowTokenBalance in account %s",
 			testAccountAddress,
 		),
 	)

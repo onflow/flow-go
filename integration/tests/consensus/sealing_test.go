@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/crypto"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/engine/ghost/client"
 	verUtils "github.com/onflow/flow-go/engine/verification/utils"

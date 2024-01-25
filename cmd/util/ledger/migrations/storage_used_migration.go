@@ -34,6 +34,10 @@ func (m *AccountUsageMigrator) InitMigration(
 
 const oldAccountStatusSize = 25
 
+func (m *AccountUsageMigrator) Close() error {
+	return nil
+}
+
 func (m *AccountUsageMigrator) MigrateAccount(
 	_ context.Context,
 	address common.Address,
@@ -109,7 +113,7 @@ func (m *AccountUsageMigrator) compareUsage(
 	}
 
 	if oldSize != actualSize {
-		m.log.Info().
+		m.log.Warn().
 			Uint64("old_size", oldSize).
 			Uint64("new_size", actualSize).
 			Msg("account storage used usage mismatch")

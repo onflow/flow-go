@@ -3,6 +3,7 @@ package rpc_inspector
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"testing"
 	"time"
@@ -28,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
-	"github.com/onflow/flow-go/network/p2p/scoring"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -47,7 +47,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 
 	messageCount := 100
-	inspectorConfig.NumberOfWorkers = 1
+	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 	controlMessageCount := int64(1)
 
 	count := atomic.NewUint64(0)
@@ -180,9 +180,11 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 	require.NoError(t, err)
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 
-	inspectorConfig.NumberOfWorkers = 1
+	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 
-	messageCount := 10
+	// sets the message count to the max of the duplicate topic id threshold for graft and prune control messages to ensure
+	// a successful attack
+	messageCount := int(math.Max(float64(inspectorConfig.IHave.DuplicateTopicIdThreshold), float64(inspectorConfig.GraftPrune.DuplicateTopicIdThreshold))) + 2
 	controlMessageCount := int64(1)
 
 	count := atomic.NewInt64(0)
@@ -290,7 +292,7 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 	require.NoError(t, err)
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 
-	inspectorConfig.NumberOfWorkers = 1
+	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 
 	count := atomic.NewInt64(0)
 	done := make(chan struct{})
@@ -302,7 +304,7 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
-			require.True(t, validation.IsDuplicateTopicErr(notification.Error))
+			require.True(t, validation.IsDuplicateMessageIDErr(notification.Error))
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t,
 				notification.MsgType == p2pmsg.CtrlMsgIHave,
@@ -362,21 +364,25 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 	validationInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
+	// to suppress peers provider not set
+	p2ptest.RegisterPeerProviders(t, nodes)
 	spammer.Start(t)
 	defer stopComponents(t, cancel, nodes, validationInspector)
 
 	// generate 2 control messages with iHaves for different topics
-	ihaveCtlMsgs1 := spammer.GenerateCtlMessages(1, p2ptest.WithIHave(1, 1, pushBlocks.String()))
-	ihaveCtlMsgs2 := spammer.GenerateCtlMessages(1, p2ptest.WithIHave(1, 1, reqChunks.String()))
-
-	// duplicate message ids for a single topic is invalid and will cause an error
-	ihaveCtlMsgs1[0].Ihave[0].MessageIDs = append(ihaveCtlMsgs1[0].Ihave[0].MessageIDs, ihaveCtlMsgs1[0].Ihave[0].MessageIDs[0])
-	// duplicate message ids across different topics is valid
-	ihaveCtlMsgs2[0].Ihave[0].MessageIDs[0] = ihaveCtlMsgs1[0].Ihave[0].MessageIDs[0]
+	messageIdCount := inspectorConfig.IHave.DuplicateMessageIdThreshold + 2
+	messageIds := unittest.IdentifierListFixture(1)
+	for i := 0; i < messageIdCount; i++ {
+		messageIds = append(messageIds, messageIds[0])
+	}
+	// prepares 2 control messages with iHave messages for different topics with duplicate message IDs
+	ihaveCtlMsgs1 := spammer.GenerateCtlMessages(
+		1,
+		p2ptest.WithIHaveMessageIDs(messageIds.Strings(), pushBlocks.String()),
+		p2ptest.WithIHaveMessageIDs(messageIds.Strings(), reqChunks.String()))
 
 	// start spamming the victim peer
 	spammer.SpamControlMessage(t, victimNode, ihaveCtlMsgs1)
-	spammer.SpamControlMessage(t, victimNode, ihaveCtlMsgs2)
 
 	unittest.RequireCloseBefore(t, done, 5*time.Second, "failed to inspect RPC messages on time")
 	// ensure we receive the expected number of invalid control message notifications
@@ -394,7 +400,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	// set hard threshold to 0 so that in the case of invalid cluster ID
 	// we force the inspector to return an error
 	inspectorConfig.ClusterPrefixedMessage.HardThreshold = 0
-	inspectorConfig.NumberOfWorkers = 1
+	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 
 	// SafetyThreshold < messageCount < HardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
 	// restricting the message count to 1 allows us to only aggregate a single error when the error is logged in the inspector.
@@ -503,7 +509,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 	require.NoError(t, err)
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 	inspectorConfig.ClusterPrefixedMessage.HardThreshold = 5
-	inspectorConfig.NumberOfWorkers = 1
+	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 	controlMessageCount := int64(10)
 
 	count := atomic.NewInt64(0)
@@ -591,7 +597,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 	require.NoError(t, err)
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 	inspectorConfig.ClusterPrefixedMessage.HardThreshold = 5
-	inspectorConfig.NumberOfWorkers = 1
+	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 	controlMessageCount := int64(10)
 
 	count := atomic.NewInt64(0)
@@ -677,7 +683,7 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	// set hard threshold to 0 so that in the case of invalid cluster ID
 	// we force the inspector to return an error
 	inspectorConfig.ClusterPrefixedMessage.HardThreshold = 0
-	inspectorConfig.NumberOfWorkers = 1
+	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 
 	// SafetyThreshold < messageCount < HardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
 	// restricting the message count to 1 allows us to only aggregate a single error when the error is logged in the inspector.
@@ -772,11 +778,9 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
-	// force all cache miss checks
-	inspectorConfig.IWant.CacheMissCheckSize = 1
-	inspectorConfig.NumberOfWorkers = 1
-	inspectorConfig.IWant.CacheMissThreshold = .5 // set cache miss threshold to 50%
-	messageCount := 1
+	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
+	inspectorConfig.IWant.CacheMissThreshold = 10
+	messageCount := 10
 	controlMessageCount := int64(1)
 	cacheMissThresholdNotifCount := atomic.NewUint64(0)
 	done := make(chan struct{})
@@ -876,7 +880,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
-	inspectorConfig.NumberOfWorkers = 1
+	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 
 	idProvider := mock.NewIdentityProvider(t)
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, idProvider)
@@ -969,7 +973,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	topicProvider.UpdateTopics(topics)
 
 	// after 7 errors encountered disseminate a notification
-	inspectorConfig.MessageErrorThreshold = 6
+	inspectorConfig.PublishMessages.ErrorThreshold = 6
 
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
@@ -1024,7 +1028,7 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 	require.NoError(t, err)
 	// set the scoring parameters to be more aggressive to speed up the test
 	cfg.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 100 * time.Millisecond
-	cfg.NetworkConfig.GossipSub.ScoringParameters.AppSpecificScore.ScoreTTL = 100 * time.Millisecond
+	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 100 * time.Millisecond
 	victimNode, victimId := p2ptest.NodeFixture(t,
 		sporkID,
 		t.Name(),
@@ -1088,12 +1092,14 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 	graftCtlMsgsWithUnknownTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithGraft(spamRpcCount, unknownTopic.String()))
 	graftCtlMsgsWithMalformedTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithGraft(spamRpcCount, malformedTopic.String()))
 	graftCtlMsgsInvalidSporkIDTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithGraft(spamRpcCount, invalidSporkIDTopic.String()))
-	graftCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithGraft(3, duplicateTopic.String()))
+	graftCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), // sets duplicate to +2 above the threshold to ensure that the victim node will penalize the spammer node
+		p2ptest.WithGraft(cfg.NetworkConfig.GossipSub.RpcInspector.Validation.GraftPrune.DuplicateTopicIdThreshold+2, duplicateTopic.String()))
 
 	pruneCtlMsgsWithUnknownTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithPrune(spamRpcCount, unknownTopic.String()))
 	pruneCtlMsgsWithMalformedTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithPrune(spamRpcCount, malformedTopic.String()))
 	pruneCtlMsgsInvalidSporkIDTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithGraft(spamRpcCount, invalidSporkIDTopic.String()))
-	pruneCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithPrune(3, duplicateTopic.String()))
+	pruneCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), // sets duplicate to +2 above the threshold to ensure that the victim node will penalize the spammer node
+		p2ptest.WithPrune(cfg.NetworkConfig.GossipSub.RpcInspector.Validation.GraftPrune.DuplicateTopicIdThreshold+2, duplicateTopic.String()))
 
 	// start spamming the victim peer
 	spammer.SpamControlMessage(t, victimNode, graftCtlMsgsWithUnknownTopic)
@@ -1105,11 +1111,11 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsWithMalformedTopic)
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsInvalidSporkIDTopic)
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsDuplicateTopic)
-
+	scoreOptParameters := cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Thresholds
 	// wait for three GossipSub heartbeat intervals to ensure that the victim node has penalized the spammer node.
 	require.Eventually(t, func() bool {
 		score, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
-		return ok && score < 2*scoring.DefaultGraylistThreshold
+		return ok && score < 2*scoreOptParameters.Graylist
 	}, 5*time.Second, 100*time.Millisecond, "expected victim node to penalize spammer node")
 
 	// now we expect the detection and mitigation to kick in and the victim node to disconnect from the spammer node.

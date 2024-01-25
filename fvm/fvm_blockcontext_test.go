@@ -13,11 +13,10 @@ import (
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
@@ -53,7 +52,7 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 								prepare(signer: auth(BorrowValue) &Account) {
 
 									// Get a reference to the signer's stored vault
-									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
+									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
 
 									// Withdraw tokens from the signer's stored vault
@@ -913,7 +912,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 		t.Run(tt.label, func(t *testing.T) {
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(tt.script)).
-				SetGasLimit(tt.gasLimit)
+				SetComputeLimit(tt.gasLimit)
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
@@ -952,6 +951,9 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		// The evm account has a storage exception, and if we don't bootstrap with evm,
+		// the first created account will have that address.
+		fvm.WithSetupEVMEnabled(true),
 	}
 
 	t.Run("Storing too much data fails", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
@@ -1031,7 +1033,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 						prepare(signer: auth(AddContract) &Account, service: auth(BorrowValue) &Account) {
 							signer.contracts.add(name: "%s", code: "%s".decodeHex())
 
-							let vaultRef = service.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)!
+							let vaultRef = service.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)!
 							// deposit additional flow
 							let payment <- vaultRef.withdraw(amount: 10.0) as! @FlowToken.Vault
 
@@ -1862,6 +1864,9 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionMemoryLimit(math.MaxUint64),
+		// The evm account has a storage exception, and if we don't bootstrap with evm,
+		// the first created account will have that address.
+		fvm.WithSetupEVMEnabled(true),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced

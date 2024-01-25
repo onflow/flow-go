@@ -21,11 +21,6 @@ func TestAtreeRegisterMigration(t *testing.T) {
 	log := zerolog.New(zerolog.NewTestWriter(t))
 	dir := t.TempDir()
 
-	validation := migrations.NewCadenceDataValidationMigrations(
-		reporters.NewReportFileWriterFactory(dir, log),
-		2,
-	)
-
 	// Localnet v0.31 was used to produce an execution state that can be used for the tests.
 	t.Run(
 		"test v0.31 state",
@@ -35,9 +30,7 @@ func TestAtreeRegisterMigration(t *testing.T) {
 			"test-data/bootstrapped_v0.31",
 			migrations.CreateAccountBasedMigration(log, 2,
 				[]migrations.AccountBasedMigration{
-					validation.PreMigration(),
-					migrations.NewAtreeRegisterMigrator(reporters.NewReportFileWriterFactory(dir, log)),
-					validation.PostMigration(),
+					migrations.NewAtreeRegisterMigrator(reporters.NewReportFileWriterFactory(dir, log), true, false),
 				},
 			),
 			func(t *testing.T, oldPayloads []*ledger.Payload, newPayloads []*ledger.Payload) {

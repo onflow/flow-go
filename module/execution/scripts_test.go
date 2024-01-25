@@ -156,7 +156,7 @@ func (s *scriptTestSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.registerIndex = pebbleRegisters
 
-	index, err := indexer.New(logger, metrics.NewNoopCollector(), nil, s.registerIndex, headers, nil, nil)
+	index, err := indexer.New(logger, metrics.NewNoopCollector(), nil, s.registerIndex, headers, nil, nil, func(originID flow.Identifier, entity flow.Entity) {})
 	s.Require().NoError(err)
 
 	scripts, err := NewScripts(
