@@ -282,7 +282,6 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 			b.metrics.ScriptExecutionErrorOnExecutionNode()
 			b.log.Error().Err(errToReturn).Msg("script execution failed for execution node internal reasons")
 		}
-		// TODO:
 		return nil, execDuration, rpc.ConvertError(errToReturn, "failed to execute script on execution nodes", codes.Internal)
 	}
 
@@ -310,7 +309,6 @@ func (b *backendScripts) tryExecuteScriptOnExecutionNode(
 	if err != nil {
 		return nil, status.Errorf(status.Code(err), "failed to execute the script on the execution node %s: %v", executorAddress, err)
 	}
-
 	return execResp.GetValue(), nil
 }
 
