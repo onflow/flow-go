@@ -16,15 +16,6 @@ contract EVM {
             self.bytes = bytes
         }
 
-        /// Deposits the given vault into the EVM account with the given address
-        access(all)
-        fun deposit(from: @FlowToken.Vault) {
-            InternalEVM.deposit(
-                from: <-from,
-                to: self.bytes
-            )
-        }
-
         /// Balance of the address
         access(all)
         fun balance(): Balance {
@@ -81,7 +72,10 @@ contract EVM {
         /// Deposits the given vault into the bridged account's balance
         access(all)
         fun deposit(from: @FlowToken.Vault) {
-            self.address().deposit(from: <-from)
+            InternalEVM.deposit(
+                from: <-from,
+                to: self.addressBytes
+            )
         }
 
         /// Withdraws the balance from the bridged account's balance

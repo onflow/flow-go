@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/go-bitswap"
 	"github.com/rs/zerolog"
@@ -34,7 +36,6 @@ import (
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
@@ -147,6 +148,8 @@ type AccessNodeConfig struct {
 	registersDBPath              string
 	checkpointFile               string
 	scriptExecutorConfig         query.QueryConfig
+	scriptExecMinBlock           uint64
+	scriptExecMaxBlock           uint64
 }
 
 type PublicNetworkConfig struct {
@@ -238,6 +241,8 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registersDBPath:              filepath.Join(homedir, ".flow", "execution_state"),
 		checkpointFile:               cmd.NotSet,
 		scriptExecutorConfig:         query.NewDefaultConfig(),
+		scriptExecMinBlock:           0,
+		scriptExecMaxBlock:           math.MaxUint64,
 	}
 }
 
@@ -1113,6 +1118,14 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"script-execution-timeout",
 			defaultConfig.scriptExecutorConfig.ExecutionTimeLimit,
 			"timeout value for locally executed scripts. default: 10s")
+		flags.Uint64Var(&builder.scriptExecMinBlock,
+			"script-execution-min-height",
+			defaultConfig.scriptExecMinBlock,
+			"lowest block height to allow for script execution. default: no limit")
+		flags.Uint64Var(&builder.scriptExecMaxBlock,
+			"script-execution-max-height",
+			defaultConfig.scriptExecMaxBlock,
+			"highest block height to allow for script execution. default: no limit")
 
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
@@ -1427,7 +1440,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("backend script executor", func(node *cmd.NodeConfig) error {
-			builder.ScriptExecutor = backend.NewScriptExecutor()
+			builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
 			return nil
 		}).
 		Module("async register store", func(node *cmd.NodeConfig) error {

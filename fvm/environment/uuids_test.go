@@ -115,8 +115,9 @@ func testUUIDGenerator(t *testing.T, blockHeader *flow.Header, txnIndex uint32) 
 	generator.maybeInitializePartition()
 
 	partition := generator.partition
-	partitionMinValue := uint64(partition) << 56
-	maxUint56 := uint64(72057594037927935) // (1 << 56) - 1
+	partitionMinValue := uint64(partition) << 40
+	maxUint56 := uint64(0xFFFFFFFFFFFFFF)
+	maxUint56Split := uint64(0xFFFF00FFFFFFFFFF)
 
 	t.Run(
 		fmt.Sprintf("basic get and set uint (partition: %d)", partition),
@@ -131,11 +132,11 @@ func testUUIDGenerator(t *testing.T, blockHeader *flow.Header, txnIndex uint32) 
 				txnIndex)
 			uuidsA.maybeInitializePartition()
 
-			uuid, err := uuidsA.getUint64() // start from zero
+			uuid, err := uuidsA.getCounter() // start from zero
 			require.NoError(t, err)
 			require.Equal(t, uint64(0), uuid)
 
-			err = uuidsA.setUint56(5)
+			err = uuidsA.setCounter(5)
 			require.NoError(t, err)
 
 			// create new UUIDs instance
@@ -148,7 +149,7 @@ func testUUIDGenerator(t *testing.T, blockHeader *flow.Header, txnIndex uint32) 
 				txnIndex)
 			uuidsB.maybeInitializePartition()
 
-			uuid, err = uuidsB.getUint64() // should read saved value
+			uuid, err = uuidsB.getCounter() // should read saved value
 			require.NoError(t, err)
 
 			require.Equal(t, uint64(5), uuid)
@@ -204,7 +205,7 @@ func testUUIDGenerator(t *testing.T, blockHeader *flow.Header, txnIndex uint32) 
 		})
 
 	t.Run(
-		fmt.Sprintf("setUint56 overflows (partition: %d)", partition),
+		fmt.Sprintf("setCounter overflows (partition: %d)", partition),
 		func(t *testing.T) {
 			txnState := state.NewTransactionState(nil, state.DefaultParameters())
 			uuids := NewUUIDGenerator(
@@ -216,17 +217,17 @@ func testUUIDGenerator(t *testing.T, blockHeader *flow.Header, txnIndex uint32) 
 				txnIndex)
 			uuids.maybeInitializePartition()
 
-			err := uuids.setUint56(maxUint56)
+			err := uuids.setCounter(maxUint56)
 			require.NoError(t, err)
 
-			value, err := uuids.getUint64()
+			value, err := uuids.getCounter()
 			require.NoError(t, err)
 			require.Equal(t, value, maxUint56)
 
-			err = uuids.setUint56(maxUint56 + 1)
+			err = uuids.setCounter(maxUint56 + 1)
 			require.ErrorContains(t, err, "overflowed")
 
-			value, err = uuids.getUint64()
+			value, err = uuids.getCounter()
 			require.NoError(t, err)
 			require.Equal(t, value, maxUint56)
 		})
@@ -244,22 +245,22 @@ func testUUIDGenerator(t *testing.T, blockHeader *flow.Header, txnIndex uint32) 
 				txnIndex)
 			uuids.maybeInitializePartition()
 
-			err := uuids.setUint56(maxUint56 - 1)
+			err := uuids.setCounter(maxUint56 - 1)
 			require.NoError(t, err)
 
 			value, err := uuids.GenerateUUID()
 			require.NoError(t, err)
-			require.Equal(t, value, partitionMinValue+maxUint56-1)
-			require.Equal(t, value, partitionMinValue|(maxUint56-1))
+			require.Equal(t, value, partitionMinValue+maxUint56Split-1)
+			require.Equal(t, value, partitionMinValue|(maxUint56Split-1))
 
-			value, err = uuids.getUint64()
+			value, err = uuids.getCounter()
 			require.NoError(t, err)
 			require.Equal(t, value, maxUint56)
 
 			_, err = uuids.GenerateUUID()
 			require.ErrorContains(t, err, "overflowed")
 
-			value, err = uuids.getUint64()
+			value, err = uuids.getCounter()
 			require.NoError(t, err)
 			require.Equal(t, value, maxUint56)
 		})
@@ -282,33 +283,33 @@ func TestUUIDGeneratorHardcodedPartitionIdGeneration(t *testing.T) {
 
 	value, err := uuids.GenerateUUID()
 	require.NoError(t, err)
-	require.Equal(t, value, uint64(0xde00000000000000))
+	require.Equal(t, value, uint64(0x0000de0000000000))
 
-	value, err = uuids.getUint64()
+	value, err = uuids.getCounter()
 	require.NoError(t, err)
 	require.Equal(t, value, uint64(1))
 
 	value, err = uuids.GenerateUUID()
 	require.NoError(t, err)
-	require.Equal(t, value, uint64(0xde00000000000001))
+	require.Equal(t, value, uint64(0x0000de0000000001))
 
-	value, err = uuids.getUint64()
+	value, err = uuids.getCounter()
 	require.NoError(t, err)
 	require.Equal(t, value, uint64(2))
 
 	value, err = uuids.GenerateUUID()
 	require.NoError(t, err)
-	require.Equal(t, value, uint64(0xde00000000000002))
+	require.Equal(t, value, uint64(0x0000de0000000002))
 
-	value, err = uuids.getUint64()
+	value, err = uuids.getCounter()
 	require.NoError(t, err)
 	require.Equal(t, value, uint64(3))
 
 	// pretend we increamented the counter up to cafBad
 	cafBad := uint64(0x1c2a3f4b5a6d70)
-	decafBad := uint64(0xde1c2a3f4b5a6d70)
+	decafBad := uint64(0x1c2ade3f4b5a6d70)
 
-	err = uuids.setUint56(cafBad)
+	err = uuids.setCounter(cafBad)
 	require.NoError(t, err)
 
 	for i := 0; i < 5; i++ {
@@ -317,35 +318,71 @@ func TestUUIDGeneratorHardcodedPartitionIdGeneration(t *testing.T) {
 		require.Equal(t, value, decafBad+uint64(i))
 	}
 
-	value, err = uuids.getUint64()
+	value, err = uuids.getCounter()
 	require.NoError(t, err)
 	require.Equal(t, value, cafBad+uint64(5))
 
 	// pretend we increamented the counter up to overflow - 2
 	maxUint56Minus2 := uint64(0xfffffffffffffd)
-	err = uuids.setUint56(maxUint56Minus2)
+	err = uuids.setCounter(maxUint56Minus2)
 	require.NoError(t, err)
 
 	value, err = uuids.GenerateUUID()
 	require.NoError(t, err)
-	require.Equal(t, value, uint64(0xdefffffffffffffd))
+	require.Equal(t, value, uint64(0xffffdefffffffffd))
 
-	value, err = uuids.getUint64()
+	value, err = uuids.getCounter()
 	require.NoError(t, err)
 	require.Equal(t, value, maxUint56Minus2+1)
 
 	value, err = uuids.GenerateUUID()
 	require.NoError(t, err)
-	require.Equal(t, value, uint64(0xdefffffffffffffe))
+	require.Equal(t, value, uint64(0xffffdefffffffffe))
 
-	value, err = uuids.getUint64()
+	value, err = uuids.getCounter()
 	require.NoError(t, err)
 	require.Equal(t, value, maxUint56Minus2+2)
 
 	_, err = uuids.GenerateUUID()
 	require.ErrorContains(t, err, "overflowed")
 
-	value, err = uuids.getUint64()
+	value, err = uuids.getCounter()
 	require.NoError(t, err)
 	require.Equal(t, value, maxUint56Minus2+2)
+}
+
+func TestContinuati(t *testing.T) {
+	txnState := state.NewTransactionState(nil, state.DefaultParameters())
+	uuids := NewUUIDGenerator(
+		tracing.NewTracerSpan(),
+		zerolog.Nop(),
+		NewMeter(txnState),
+		txnState,
+		nil,
+		0)
+
+	// Hardcoded the partition to check for exact bytes
+	uuids.initialized = true
+	uuids.partition = 0x01
+	uuids.registerId = flow.UUIDRegisterID(0x01)
+
+	value, err := uuids.GenerateUUID()
+	require.NoError(t, err)
+	require.Equal(t, value, uint64(0x0000010000000000))
+
+	err = uuids.setCounter(0xFFFFFFFFFF)
+	require.NoError(t, err)
+
+	value, err = uuids.GenerateUUID()
+	require.NoError(t, err)
+	require.Equal(t, value, uint64(0x000001FFFFFFFFFF))
+
+	value, err = uuids.GenerateUUID()
+	require.NoError(t, err)
+	require.Equal(t, value, uint64(0x0001010000000000))
+
+	value, err = uuids.GenerateUUID()
+	require.NoError(t, err)
+	require.Equal(t, value, uint64(0x0001010000000001))
+
 }

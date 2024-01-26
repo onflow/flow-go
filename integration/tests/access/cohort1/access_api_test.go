@@ -325,7 +325,7 @@ func (s *AccessAPISuite) deployContract() *sdk.TransactionResult {
 		SetProposalKey(serviceAddress, 0, s.serviceClient.GetSeqNumber()).
 		SetPayer(serviceAddress).
 		AddAuthorizer(serviceAddress).
-		SetGasLimit(9999)
+		SetComputeLimit(9999)
 
 	err = s.serviceClient.SignAndSendTransaction(s.ctx, createCounterTx)
 	s.Require().NoError(err)
