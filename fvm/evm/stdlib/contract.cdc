@@ -30,7 +30,7 @@ contract EVM {
     struct Balance {
 
         /// The balance in atto-FLOW
-        /// Atto-FLOW is the smallest denomination of FLOW (1e10^-18 FLOW)
+        /// Atto-FLOW is the smallest denomination of FLOW (1e18 FLOW)
         /// that is used to store account balances inside EVM 
         /// similar to the way WEI is used to store ETH divisible to 18 decimal places.
         access(all)
