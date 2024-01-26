@@ -80,6 +80,7 @@ func TestNativeTokenBridging(t *testing.T) {
 }
 
 func TestContractInteraction(t *testing.T) {
+	t.Parallel()
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 
@@ -184,6 +185,29 @@ func TestContractInteraction(t *testing.T) {
 						require.Equal(t, blockNumber, ret)
 					})
 				})
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					pastBlkNumber := uint64(41)
+					expectedHash := testutils.RandomCommonHash(t)
+					ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
+					ctx.GetHashFunc = func(n uint64) gethCommon.Hash {
+						require.Equal(t, n, pastBlkNumber)
+						return expectedHash
+					}
+					ctx.BlockNumber = pastBlkNumber + 1
+					blk, err := env.NewBlockView(ctx)
+					require.NoError(t, err)
+					res, err := blk.DirectCall(
+						types.NewContractCall(
+							testAccount,
+							contractAddr,
+							testContract.MakeCallData(t, "blockHash", new(big.Int).SetUint64(pastBlkNumber)),
+							1_000_000,
+							big.NewInt(0),
+						),
+					)
+					require.NoError(t, err)
+					require.Equal(t, expectedHash, gethCommon.BytesToHash(res.ReturnedValue))
+				})
 
 			})
 
@@ -285,7 +309,6 @@ func TestContractInteraction(t *testing.T) {
 					require.True(t, types.IsEVMValidationError(err))
 				})
 			})
-
 		})
 	})
 }

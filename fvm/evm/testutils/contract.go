@@ -56,9 +56,9 @@ func GetStorageTestContract(tb testing.TB) *TestContract {
 					return block.number;
 				}
 				function blockTime() public view returns (uint) {
-					return  block.timestamp;
+					return block.timestamp;
 				}
-				function blockHash(uint num)  public view returns (bytes32) {
+				function blockHash(uint num) public view returns (bytes32) {
 					return blockhash(num);
 				}
 			}
