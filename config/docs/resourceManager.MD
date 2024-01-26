@@ -199,3 +199,7 @@ One easy way is to increase all limits by a certain factor across all scopes. Fo
 
 ### Notes
 - Replace `<1.5 * current value>` with the actual calculated value from `default-config.yaml`. For example, if the current system streams inbound limit is 10,000, the new value would be `--libp2p-resource-manager-system-streams-inbound=15000`.
+
+
+# References
+- https://github.com/libp2p/go-libp2p/blob/master/p2p/host/resource-manager/README.md
