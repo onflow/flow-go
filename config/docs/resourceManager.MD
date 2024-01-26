@@ -1,4 +1,28 @@
 # libp2p Resource Manager Configuration in Flow Go
+## Table of Contents
+1. [Overview](#overview)
+2. [What are These Limits?](#what-are-these-limits)
+3. [How to Set Limits](#how-to-set-limits)
+    1. [In Configuration File (`default-config.yaml`)](#in-configuration-file-default-configyaml)
+    2. [Via Runtime Flags](#via-runtime-flags)
+4. [Importance of Each Resource Scope](#importance-of-each-resource-scope)
+    1. [What does each scope mean?](#what-does-each-scope-mean)
+    2. [Scope Hierarchy](#scope-hierarchy)
+    3. [On Transient Scope](#on-transient-scope)
+5. [Case Study: what does scopes mean in terms of one resource?](#case-study-what-does-scopes-mean-in-terms-of-one-resource)
+    1. [System Scope](#system-scope)
+    2. [Transient Scope](#transient-scope)
+    3. [Protocol Scope](#protocol-scope)
+    4. [Peer Scope](#peer-scope)
+    5. [Peer-Protocol Scope](#peer-protocol-scope)
+6. [Troubleshooting (For Flow Node Operators)](#troubleshooting-for-flow-node-operators)
+    1. [Observation](#observation)
+    2. [Excessive Streams Across All Protocols and Peers](#excessive-streams-across-all-protocols-and-peers)
+    3. [Excessive Streams in a Specific Protocol](#excessive-streams-in-a-specific-protocol)
+    4. [Excessive Streams from Individual Peers](#excessive-streams-from-individual-peers)
+    5. [Excessive Streams from a Specific Peer on a Specific Protocol](#excessive-streams-from-a-specific-peer-on-a-specific-protocol)
+    6. [Wildcard: Increasing all limit overrides at scale](#wildcard-increasing-all-limit-overrides-at-scale)
+7. [References](#references)
 
 ## Overview
 In Flow Go, the libp2p Resource Manager plays a crucial role in managing network resources effectively. This document provides guidance on setting various limits through configuration files and runtime flags, helping you optimize resource usage based on specific network conditions or protocol behaviors.
