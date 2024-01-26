@@ -89,3 +89,32 @@ The `transient` scope is critical for managing resources during the negotiation 
 In this example, the system-wide connections limit acts as the global cap for all connections in the libp2p network, regardless of their state (established, transient, etc.).
 If this limit is lower than the transient-wide limit, it essentially restricts the total number of connections (including transient ones) to this lower system-wide limit.
 The transient-wide limit is intended to manage connections that are in the process of being fully established. 
+
+### Case Study: what does scopes mean in terms of one resource?
+As an example, we study the default limits for "Streams Inbound/Outbound" at different scopes in the libp2p Resource Manager. The limtis on other resources follow a similar pattern.
+Here's an explanation of what these default limits mean at each scope:
+
+### System Scope
+- **Streams Inbound/Outbound (e.g., 15,000)**:
+    - **Meaning**: This limit defines the maximum number of inbound and outbound streams that can be active across the entire system, regardless of the specific protocols or peers involved.
+    - **Implication**: It is a global cap ensuring that the total number of streams at any time does not exceed this limit, thus preventing system-wide resource exhaustion due to too many streams.
+
+### Transient Scope
+- **Streams Inbound/Outbound (e.g., 15,000)**:
+    - **Meaning**: This limit controls the number of streams in the transient state, i.e., streams that are being set up but not yet fully established or associated with a peer/protocol.
+    - **Implication**: It provides a buffer for handling stream negotiations, ensuring the system can manage a high volume of initiating connections without overwhelming the resources during the setup phase.
+
+### Protocol Scope
+- **Streams Inbound/Outbound (e.g., 5,000)**:
+    - **Meaning**: This limit specifies the maximum number of inbound and outbound streams for each protocol. It applies to each protocol independently.
+    - **Implication**: It ensures that no single protocol can dominate the network's resources, maintaining a balance in resource allocation among various protocols.
+
+### Peer Scope
+- **Streams Inbound/Outbound (e.g., 1,000)**:
+    - **Meaning**: This sets the maximum number of inbound and outbound streams allowed per (remote) peer on the local peer.
+    - **Implication**: It restricts the resource usage by individual peers, ensuring no single (remote) peer can exhaust network resources with too many streams.
+
+### Peer-Protocol Scope
+- **Streams Inbound/Outbound (e.g., 500)**:
+    - **Meaning**: This limit is the most granular, applying to streams from each (remote) peer for each protocol on the local peer.
+    - **Implication**: It offers fine-grained control, preventing any (remote) peer from using excessive resources in a specific protocol on the local peer, thus ensuring balanced resource use.
