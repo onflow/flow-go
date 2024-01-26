@@ -312,8 +312,9 @@ func (b *backendTransactions) GetTransactionResult(
 		blockHeight = block.Header.Height
 	}
 
+	// If there is still no transaction result, provide one based on available information.
 	if txResult == nil {
-		// derive status of the transaction
+		// Derive the status of the transaction.
 		txStatus, err := b.deriveTransactionStatus(tx, false, block)
 		if err != nil {
 			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
@@ -323,10 +324,10 @@ func (b *backendTransactions) GetTransactionResult(
 		}
 
 		txResult = &access.TransactionResult{
-			Status:        txStatus,
 			BlockID:       blockID,
 			BlockHeight:   blockHeight,
 			TransactionID: txID,
+			Status:        txStatus,
 			CollectionID:  collectionID,
 		}
 	} else {
@@ -387,8 +388,11 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			return results, nil
 		}
 
-		if err != nil && !errors.Is(err, storage.ErrNotFound) {
-			return nil, err
+		if err != nil {
+			// Skip error type NotFound, to request transaction result from EN
+			if !errors.Is(err, storage.ErrNotFound) {
+				return nil, err
+			}
 		}
 
 		results, err = b.getTransactionResultsByBlockIDFromExecutionNode(ctx, block, requiredEventEncodingVersion)
@@ -554,8 +558,11 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 			return result, nil
 		}
 
-		if err != nil && !errors.Is(err, storage.ErrNotFound) {
-			return nil, err
+		if err != nil {
+			// Skip error type NotFound, to request transaction result from EN
+			if !errors.Is(err, storage.ErrNotFound) {
+				return nil, err
+			}
 		}
 
 		result, err = b.getTransactionResultByIndexFromExecutionNode(ctx, block, index, requiredEventEncodingVersion)
@@ -731,9 +738,11 @@ func (b *backendTransactions) lookupTransactionResult(
 			return txResult, nil
 		}
 
-		if err != nil && !errors.Is(err, storage.ErrNotFound) {
-			// Other Error trying to retrieve the result, return with err
-			return nil, err
+		if err != nil {
+			// Skip error type NotFound, to request transaction result from EN
+			if !errors.Is(err, storage.ErrNotFound) {
+				return nil, err
+			}
 		}
 
 		txResult, err = b.getTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
