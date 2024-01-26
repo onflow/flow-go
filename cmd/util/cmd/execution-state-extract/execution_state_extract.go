@@ -124,10 +124,6 @@ func extractExecutionState(
 						migrators.NewStaticTypeMigrator[*interpreter.CompositeStaticType](compositeTypeRules),
 						migrators.NewStaticTypeMigrator[*interpreter.InterfaceStaticType](interfaceTypeRules),
 					),
-
-					// This will fix storage used discrepancies caused by the
-					// DeduplicateContractNamesMigration.
-					&migrators.AccountUsageMigrator{},
 				},
 			),
 		}
