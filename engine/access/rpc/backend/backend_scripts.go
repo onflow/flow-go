@@ -332,7 +332,8 @@ func convertScriptExecutionError(err error, height uint64) error {
 		return nil
 	}
 
-	if fvmerrors.IsFailure(err) {
+	var failure fvmerrors.CodedFailure
+	if fvmerrors.As(err, &failure) {
 		return rpc.ConvertError(err, "failed to execute script", codes.Internal)
 	}
 
