@@ -281,6 +281,7 @@ func (b *backendTransactions) GetTransactionResult(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
+	var blockHeight uint64
 	var txResult *access.TransactionResult
 	// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
 	if block != nil {
@@ -307,8 +308,11 @@ func (b *backendTransactions) GetTransactionResult(
 			return nil, status.Error(codes.InvalidArgument, "transaction not found in provided collection")
 		}
 
-		txResult.CollectionID = collectionID
-	} else {
+		blockID = block.ID()
+		blockHeight = block.Header.Height
+	}
+
+	if txResult == nil {
 		// derive status of the transaction
 		txStatus, err := b.deriveTransactionStatus(tx, false, block)
 		if err != nil {
@@ -321,9 +325,12 @@ func (b *backendTransactions) GetTransactionResult(
 		txResult = &access.TransactionResult{
 			Status:        txStatus,
 			BlockID:       blockID,
+			BlockHeight:   blockHeight,
 			TransactionID: txID,
 			CollectionID:  collectionID,
 		}
+	} else {
+		txResult.CollectionID = collectionID
 	}
 
 	b.transactionMetrics.TransactionResultFetched(time.Since(start), len(tx.Script))
