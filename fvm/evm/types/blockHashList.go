@@ -155,6 +155,9 @@ func NewBlockHashListFromEncoded(encoded []byte) (*BlockHashList, error) {
 	pos += heightEncodingSize
 
 	// decode hashes
+	if len(encoded[pos:]) < bhl.count*hashEncodingSize {
+		return nil, fmt.Errorf("encoded input too short: %d < %d", len(encoded), minEncodedByteSize)
+	}
 	for i := 0; i < bhl.count; i++ {
 		bhl.blocks[i] = gethCommon.BytesToHash(encoded[pos : pos+hashEncodingSize])
 		pos += hashEncodingSize
