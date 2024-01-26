@@ -25,6 +25,8 @@ func TestBlockHashList(t *testing.T) {
 	for i := 0; i < capacity; i++ {
 		err := bhl.Push(i, gethCommon.Hash{byte(i)})
 		require.NoError(t, err)
+		require.Equal(t, 0, bhl.MinAvailableHeight())
+		require.Equal(t, i, bhl.MaxAvailableHeight())
 	}
 	for i := 0; i < capacity; i++ {
 		found, h := bhl.BlockHashByHeight(i)
@@ -35,7 +37,10 @@ func TestBlockHashList(t *testing.T) {
 
 	// over border range
 	for i := capacity; i < capacity+3; i++ {
-		bhl.Push(i, gethCommon.Hash{byte(i)})
+		err := bhl.Push(i, gethCommon.Hash{byte(i)})
+		require.NoError(t, err)
+		require.Equal(t, i-capacity+1, bhl.MinAvailableHeight())
+		require.Equal(t, i, bhl.MaxAvailableHeight())
 	}
 	for i := 0; i < capacity-2; i++ {
 		found, _ := bhl.BlockHashByHeight(i)

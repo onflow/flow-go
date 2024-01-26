@@ -76,17 +76,24 @@ func (bhl *BlockHashList) LastAddedBlockHash() gethCommon.Hash {
 	return bhl.blocks[indx]
 }
 
+// MinAvailableHeight returns the min available height in the list
+func (bhl *BlockHashList) MinAvailableHeight() int {
+	return bhl.height - (bhl.count - 1)
+}
+
+// MaxAvailableHeight returns the max available height in the list
+func (bhl *BlockHashList) MaxAvailableHeight() int {
+	return bhl.height
+}
+
 // BlockHashByIndex returns the block hash by block height
 func (bhl *BlockHashList) BlockHashByHeight(height int) (found bool, bh gethCommon.Hash) {
-	if bhl.count == 0 {
+	if bhl.count == 0 || // empty
+		height > bhl.height || // height too high
+		height < bhl.MinAvailableHeight() { // height too low
 		return false, gethCommon.Hash{}
 	}
-	if height > bhl.height {
-		return false, gethCommon.Hash{}
-	}
-	if height < bhl.height-(bhl.count-1) {
-		return false, gethCommon.Hash{}
-	}
+
 	diff := bhl.height - height
 	indx := bhl.tail - int(diff) - 1
 	if indx < 0 {
