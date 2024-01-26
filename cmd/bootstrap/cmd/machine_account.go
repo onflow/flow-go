@@ -5,10 +5,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/onflow/crypto"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd"
-	"github.com/onflow/flow-go/crypto"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	ioutils "github.com/onflow/flow-go/utils/io"

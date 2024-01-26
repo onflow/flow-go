@@ -1,7 +1,7 @@
 package hash
 
 import (
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto/hash"
 )
 
 // DefaultComputeHash is the default hasher used by Flow.

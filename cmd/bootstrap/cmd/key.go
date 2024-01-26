@@ -5,17 +5,15 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/onflow/flow-go/cmd"
-	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-	p2putils "github.com/onflow/flow-go/network/p2p/utils"
-
 	"github.com/multiformats/go-multiaddr"
+	"github.com/onflow/crypto"
 	"github.com/spf13/cobra"
 
-	"github.com/onflow/flow-go/crypto"
-
+	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	p2putils "github.com/onflow/flow-go/network/p2p/utils"
 )
 
 var (
