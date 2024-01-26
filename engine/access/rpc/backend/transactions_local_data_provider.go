@@ -20,10 +20,16 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// TransactionErrorMessageGetter is a function type for getting transaction error messages.
 type TransactionErrorMessageGetter func(ctx context.Context, blockID flow.Identifier, transactionID flow.Identifier) (string, error)
+
+// TransactionErrorMessageByIndexGetter is a function type for getting transaction error messages by index.
 type TransactionErrorMessageByIndexGetter func(ctx context.Context, blockID flow.Identifier, index uint32) (string, error)
+
+// TransactionErrorMessagesByBlockIDGetter is a function type for getting transaction error messages by block ID.
 type TransactionErrorMessagesByBlockIDGetter func(ctx context.Context, blockID flow.Identifier) (map[flow.Identifier]string, error)
 
+// TransactionsLocalDataProvider provides functionality for retrieving transaction results and error messages from local storages
 type TransactionsLocalDataProvider struct {
 	state       protocol.State
 	results     storage.LightTransactionResults
@@ -32,6 +38,12 @@ type TransactionsLocalDataProvider struct {
 	blocks      storage.Blocks
 }
 
+// GetTransactionResultFromStorage retrieves a transaction result from storage by block ID and transaction ID.
+// Expected errors during normal operation:
+//   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
+//   - codes.Internal: Event payload conversion failed.
+//   - All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
+//     getter or when deriving transaction status.
 func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 	ctx context.Context,
 	block *flow.Block,
@@ -94,6 +106,12 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 	}, nil
 }
 
+// GetTransactionResultsByBlockIDFromStorage retrieves transaction results by block ID from storage
+// Expected errors during normal operation:
+//   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
+//   - codes.Internal: Event payload conversion failed.
+//   - All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
+//     getter or when deriving transaction status.
 func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorage(
 	ctx context.Context,
 	block *flow.Block,
@@ -172,6 +190,12 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 	return results, nil
 }
 
+// GetTransactionResultByIndexFromStorage retrieves a transaction result by index from storage.
+// Expected errors during normal operation:
+//   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
+//   - codes.Internal: Event payload conversion failed.
+//   - All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
+//     getter or when deriving transaction status.
 func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 	ctx context.Context,
 	block *flow.Block,

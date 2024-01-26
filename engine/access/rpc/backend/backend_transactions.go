@@ -1339,10 +1339,10 @@ func (b *backendTransactions) getTransactionErrorMessagesFromAnyEN(
 
 // Expected errors during normal operation:
 //   - status.Error - GRPC call failed, some of possible codes are:
-//      - codes.NotFound - request cannot be served by EN because of absence of data.
-//      - codes.Unavailable - remote node is not unavailable.
+//   - codes.NotFound - request cannot be served by EN because of absence of data.
+//   - codes.Unavailable - remote node is not unavailable.
+//
 // tryGetTransactionErrorMessageFromEN performs a grpc call to the specified execution node and returns response.
-
 func (b *backendTransactions) tryGetTransactionErrorMessageFromEN(
 	ctx context.Context,
 	execNode *flow.Identity,
