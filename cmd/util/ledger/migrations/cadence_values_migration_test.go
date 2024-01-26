@@ -1,14 +1,8 @@
 package migrations
 
 import (
+	"context"
 	"fmt"
-	"github.com/onflow/cadence/migrations"
-	"github.com/onflow/cadence/migrations/capcons"
-	"github.com/onflow/cadence/migrations/entitlements"
-	"github.com/onflow/cadence/migrations/statictypes"
-	"github.com/onflow/cadence/migrations/string_normalization"
-	"github.com/onflow/cadence/runtime/stdlib"
-	"github.com/onflow/flow-go/fvm/environment"
 	"io"
 	"os"
 	"testing"
@@ -20,12 +14,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/cadence/migrations"
+	"github.com/onflow/cadence/migrations/capcons"
+	"github.com/onflow/cadence/migrations/entitlements"
+	"github.com/onflow/cadence/migrations/statictypes"
+	"github.com/onflow/cadence/migrations/string_normalization"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -79,14 +80,15 @@ func TestCadenceValuesMigration(t *testing.T) {
 	err = valueMigration.InitMigration(logger, nil, 0)
 	require.NoError(t, err)
 
-	newPayloads, err := valueMigration.MigrateAccount(nil, address, payloads)
+	ctx := context.Background()
+	newPayloads, err := valueMigration.MigrateAccount(ctx, address, payloads)
 	require.NoError(t, err)
 
 	err = valueMigration.Close()
 	require.NoError(t, err)
 
 	// Assert the migrated payloads
-	rResourceType := checkMigratedPayloads(t, err, address, newPayloads)
+	rResourceType := checkMigratedPayloads(t, address, newPayloads)
 
 	// Check reporters
 	checkReporters(t, valueMigration, address, rResourceType)
@@ -155,14 +157,15 @@ func TestCadenceValuesMigrationWithSwappedOrder(t *testing.T) {
 	err = valueMigration.InitMigration(logger, nil, 0)
 	require.NoError(t, err)
 
-	newPayloads, err := valueMigration.MigrateAccount(nil, address, payloads)
+	ctx := context.Background()
+	newPayloads, err := valueMigration.MigrateAccount(ctx, address, payloads)
 	require.NoError(t, err)
 
 	err = valueMigration.Close()
 	require.NoError(t, err)
 
 	// Assert the migrated payloads
-	rResourceType := checkMigratedPayloads(t, err, address, newPayloads)
+	rResourceType := checkMigratedPayloads(t, address, newPayloads)
 
 	// Check reporters
 	checkReporters(t, valueMigration, address, rResourceType)
@@ -175,7 +178,6 @@ func TestCadenceValuesMigrationWithSwappedOrder(t *testing.T) {
 
 func checkMigratedPayloads(
 	t *testing.T,
-	err error,
 	address common.Address,
 	newPayloads []*ledger.Payload,
 ) *interpreter.CompositeStaticType {
@@ -578,7 +580,8 @@ func runLinkMigration(
 	err := linkValueMigration.InitMigration(logger, nil, 0)
 	require.NoError(t, err)
 
-	payloads, err = linkValueMigration.MigrateAccount(nil, address, payloads)
+	ctx := context.Background()
+	payloads, err = linkValueMigration.MigrateAccount(ctx, address, payloads)
 	require.NoError(t, err)
 
 	linkMigrationReportWriter := linkValueMigration.reporter.(*testReportWriter)
