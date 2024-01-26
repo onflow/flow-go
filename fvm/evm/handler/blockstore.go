@@ -8,7 +8,11 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-var FlexLatestBlockKey = "LatestBlock"
+const (
+	BlockHashListCapacity    = 256
+	FlexLatestBlockKey       = "LatestBlock"
+	FlexLatestBlockHashesKey = "LatestBlockHashes"
+)
 
 type BlockStore struct {
 	led           atree.Ledger
@@ -68,8 +72,31 @@ func (bs *BlockStore) CommitBlockProposal() error {
 		return types.NewFatalError(err)
 	}
 
-	bs.blockProposal = nil
+	// update block hashes
+	bhl, err := bs.getBlockHashList()
+	if err != nil {
+		return err
+	}
+	if bhl == nil {
+		bhl = types.NewBlockHashList(BlockHashListCapacity)
+	}
+	if bhl.IsEmpty() {
+		err = bhl.Push(int(types.GenesisBlock.Height), types.GenesisBlockHash)
+		if err != nil {
+			return err
+		}
+	}
+	hash, err := bs.blockProposal.Hash()
+	if err != nil {
+		return err
+	}
+	bhl.Push(int(bs.blockProposal.Height), hash)
+	if err != nil {
+		return err
+	}
+	bs.setBlockHashList(bhl)
 
+	bs.blockProposal = nil
 	return nil
 }
 
@@ -92,9 +119,32 @@ func (bs *BlockStore) LatestBlock() (*types.Block, error) {
 }
 
 // BlockHash returns the block hash for the last x blocks
-//
-// TODO: implement this properly to keep the last 256 block hashes
-// and connect use it inside the handler to pass as a config to the emulator
 func (bs *BlockStore) BlockHash(height int) (gethCommon.Hash, error) {
-	return gethCommon.Hash{}, nil
+	bhl, err := bs.getBlockHashList()
+	if err != nil {
+		return gethCommon.Hash{}, err
+	}
+	if bhl == nil {
+		if height == 0 {
+			return types.GenesisBlockHash, nil
+		}
+		return gethCommon.Hash{}, nil
+	}
+	_, hash := bhl.BlockHashByHeight(height)
+	return hash, nil
+}
+
+func (bs *BlockStore) getBlockHashList() (*types.BlockHashList, error) {
+	data, err := bs.led.GetValue(bs.flexAddress[:], []byte(FlexLatestBlockHashesKey))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) == 0 {
+		return nil, err
+	}
+	return types.NewBlockHashListFromEncoded(data)
+}
+
+func (bs *BlockStore) setBlockHashList(bhl *types.BlockHashList) error {
+	return bs.led.SetValue(bs.flexAddress[:], []byte(FlexLatestBlockHashesKey), bhl.Encode())
 }
