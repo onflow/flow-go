@@ -1843,7 +1843,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 						let vaultRef = acct.capabilities.borrow<&FlowToken.Vault>(/public/flowTokenBalance)
 							?? panic("Could not borrow Balance reference to the Vault")
 
-						return vaultRef.getBalance()
+						return vaultRef.balance
 					}
 				`,
 			sc.FungibleToken.Address.Hex(),
