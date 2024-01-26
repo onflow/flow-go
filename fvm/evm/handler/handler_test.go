@@ -548,18 +548,18 @@ func TestHandler_BridgedAccount(t *testing.T) {
 				foa := handler.AccountByAddress(handler.AllocateAddress(), true)
 				require.NotNil(t, foa)
 
-				vault := types.NewFlowTokenVault(testutils.MakeABalanceInFlow(100))
+				vault := types.NewFlowTokenVault(types.MakeABalanceInFlow(100))
 				foa.Deposit(vault)
 
 				testContract := testutils.GetStorageTestContract(t)
-				addr := foa.Deploy(testContract.ByteCode, math.MaxUint64, types.Balance(0))
+				addr := foa.Deploy(testContract.ByteCode, math.MaxUint64, types.EmptyBalance)
 				require.NotNil(t, addr)
 
 				ret := foa.Call(
 					addr,
 					testContract.MakeCallData(t, "random"),
 					math.MaxUint64,
-					types.Balance(0))
+					types.EmptyBalance)
 
 				require.Equal(t, random.Bytes(), []byte(ret))
 			})
