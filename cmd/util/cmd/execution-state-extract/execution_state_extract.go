@@ -21,6 +21,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+
+	"github.com/onflow/cadence/runtime/interpreter"
 )
 
 func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flow.StateCommitment, error) {
@@ -89,18 +91,15 @@ func extractExecutionState(
 	if runMigrations {
 		rwf := reporters.NewReportFileWriterFactory(dir, log)
 
+		capabilityIDs := map[interpreter.AddressPath]interpreter.UInt64Value{}
+
 		migrations = []ledger.Migration{
 			migrators.CreateAccountBasedMigration(
 				log,
 				nWorker,
 				[]migrators.AccountBasedMigration{
-					migrators.NewAtreeRegisterMigrator(
-						rwf,
-						flagValidateMigration,
-						flagLogVerboseValidationError,
-					),
-
-					&migrators.DeduplicateContractNamesMigration{},
+					migrators.NewCadenceLinkValueMigrator(rwf, capabilityIDs),
+					migrators.NewCadenceValueMigrator(rwf, capabilityIDs),
 
 					// This will fix storage used discrepancies caused by the
 					// DeduplicateContractNamesMigration.
