@@ -38,8 +38,9 @@ For example:
 
   
 ### Importance of Each Resource Scope
-In the libp2p Resource Manager, scopes are organized hierarchically; `system`, `transient`, `protocol`, `peer`, and `peer-protocol` scopes are arranged in a _descending order of priority_.
-This means that the `system` scope has the highest priority, followed by the `transient` scope, `protocol` scope, `peer` scope, and `peer-protocol` scope.
+In the libp2p Resource Manager, scopes are organized hierarchically; `system`, `protocol`, `peer`, and `peer-protocol` scopes are arranged in a _descending order of priority_.
+This means that the `system` scope has the highest priority `protocol` scope, `peer` scope, and `peer-protocol` scope.
+As we explain later in this documentation, the `transient` scope is a special case and is not strictly fit in the hierarchy of scopes.
 
 #### What does each scope mean?
    - **System Scope**: sets the global limits for the entire system and ensures overall stability and prevents resource hogging by any single component.
@@ -64,14 +65,27 @@ The higher scopes **"override"** limits on lower scopes:
     - The protocol scope sets limits for specific protocols, while the peer scope sets limits for individual peers. These are independent of each other but both are under the overarching system scope.
     - A peer can't exceed the limits set by the protocol scope, and vice versa. They operate within their own contexts but under the maximum limits imposed by the system scope.
 
-3. **Practical Implications**:
-    - It's essential to understand that the lowest limit in the hierarchy of applicable scopes will effectively be the operational limit.
-    - If the system inbound stream limit is lower than the protocol inbound stream limit, the system limit will effectively cap the maximum number of inbound streams, regardless of the higher limit set at the protocol level.
+It's essential to understand that the lowest limit in the hierarchy of applicable scopes will effectively be the operational limit. 
+If the system inbound stream limit is lower than the protocol inbound stream limit, the system limit will effectively cap the maximum number of inbound streams, regardless of the higher limit set at the protocol level.
+Also, the higher scopes limits must be configured in a way that they don't override the limits of lower scopes; rather, they add another layer of constraint. 
+Each scope must independently satisfy its own limits without violating the limits of the scopes above it.
+When configuring limits, it's crucial to consider the hierarchical nature of these scopes. 
+Ensure that the limits at lower scopes (like protocol or peer) are set within the bounds of higher scopes (like system) to maintain a coherent and effective resource management strategy.
 
-4. **No Override, but Cumulative Constraints**:
-    - Higher scopes limits must be configured in a way that they don't override the limits of lower scopes; rather, they add another layer of constraint.
-    - Each scope must independently satisfy its own limits without violating the limits of the scopes above it.
+#### On Transient Scope
+The `transient` scope in the libp2p Resource Manager hierarchy has a specific and unique role. 
+It is placed **alongside** other scopes like `system`, `protocol`, `peer`, and `peer-protocol`, but it serves a distinct purpose. Here's how the `transient` scope fits into the hierarchy:
+The `transient` scope is designed to manage resources for connections and streams that are in the process of being established but haven't yet been fully negotiated or associated with a specific peer or protocol.
+This includes streams that are awaiting protocol negotiation or connections that are in the initial stages of establishment.
 
-5. **Configuration Strategy**:
-    - When configuring limits, it's crucial to consider the hierarchical nature of these scopes.
-    - Ensure that the limits at lower scopes (like protocol or peer) are set within the bounds of higher scopes (like system) to maintain a coherent and effective resource management strategy.
+In terms of hierarchy, the `transient` scope is below `system`, but is not strictly above or below other scopes like `protocol`. 
+Instead, it operates more as a parallel scope that specifically handles resources in a temporary, intermediate state.
+While the `system` scope sets the global limits, the `transient` scope sets limits on resources that are not yet fully categorized into other specific scopes (like `peer` or `protocol`).
+The limits set in the `transient` scope are independent of those in the `protocol`, `peer`, and `peer-protocol` scopes but still operate under the overarching constraints of the `system` scope. 
+Once a connection or stream transitions out of the `transient` state (i.e., when a protocol is negotiated, or a peer is identified), it then falls under the appropriate scope (such as `protocol` or `peer`) and adheres to the limits set within those scopes.
+The `transient` scope is critical for managing resources during the negotiation phase of connections and streams. It helps in protecting the system against resource exhaustion attacks that can occur at the initial stages of connection or stream establishment.
+
+**Example:** For example, when the limit for system-wide connections is set lower than the limit for transient-wide connections in the libp2p Resource Manager, the system-wide limit effectively becomes the constraining factor
+In this example, the system-wide connections limit acts as the global cap for all connections in the libp2p network, regardless of their state (established, transient, etc.).
+If this limit is lower than the transient-wide limit, it essentially restricts the total number of connections (including transient ones) to this lower system-wide limit.
+The transient-wide limit is intended to manage connections that are in the process of being fully established. 
