@@ -257,9 +257,7 @@ func (a *Account) Balance() types.Balance {
 	bl, err := blk.BalanceOf(a.address)
 	handleError(err)
 
-	balance, err := types.NewBalanceFromAttoFlow(bl)
-	handleError(err)
-	return balance
+	return types.NewBalance(bl)
 }
 
 // Code returns the code of this account
@@ -294,9 +292,9 @@ func (a *Account) Deposit(v *types.FLOWTokenVault) {
 
 	call := types.NewDepositCall(
 		a.address,
-		v.Balance().ToAttoFlow(),
+		v.Balance(),
 	)
-	a.fch.executeAndHandleCall(a.fch.getBlockContext(), call, v.Balance().ToAttoFlow(), false)
+	a.fch.executeAndHandleCall(a.fch.getBlockContext(), call, v.Balance(), false)
 }
 
 // Withdraw deducts the balance from the account and
@@ -311,15 +309,18 @@ func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 	bp, err := a.fch.blockstore.BlockProposal()
 	handleError(err)
 	// b > total supply
-	if b.ToAttoFlow().Cmp(bp.TotalSupply) == 1 {
+	if types.BalanceToBigInt(b).Cmp(bp.TotalSupply) == 1 {
 		handleError(types.ErrInsufficientTotalSupply)
 	}
-
+	// Don't allow withdraw for balances that has rounding error
+	if types.BalanceConvertionToUFix64ProneToRoundingError(b) {
+		handleError(types.ErrWithdrawBalanceRounding)
+	}
 	call := types.NewWithdrawCall(
 		a.address,
-		b.ToAttoFlow(),
+		b,
 	)
-	a.fch.executeAndHandleCall(a.fch.getBlockContext(), call, b.ToAttoFlow(), true)
+	a.fch.executeAndHandleCall(a.fch.getBlockContext(), call, b, true)
 
 	return types.NewFlowTokenVault(b)
 }
@@ -334,7 +335,7 @@ func (a *Account) Transfer(to types.Address, balance types.Balance) {
 	call := types.NewTransferCall(
 		a.address,
 		to,
-		balance.ToAttoFlow(),
+		balance,
 	)
 	a.fch.executeAndHandleCall(ctx, call, nil, false)
 }
@@ -350,7 +351,7 @@ func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types
 		a.address,
 		code,
 		uint64(gaslimit),
-		balance.ToAttoFlow(),
+		balance,
 	)
 	res := a.fch.executeAndHandleCall(a.fch.getBlockContext(), call, nil, false)
 	return types.Address(res.DeployedContractAddress)
@@ -368,7 +369,7 @@ func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimi
 		to,
 		data,
 		uint64(gaslimit),
-		balance.ToAttoFlow(),
+		balance,
 	)
 	res := a.fch.executeAndHandleCall(a.fch.getBlockContext(), call, nil, false)
 	return res.ReturnedValue

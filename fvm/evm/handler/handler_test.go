@@ -35,11 +35,6 @@ import (
 
 var flowTokenAddress = common.MustBytesToAddress(systemcontracts.SystemContractsForChain(flow.Emulator).FlowToken.Address.Bytes())
 
-// makeABalanceInFlow makes a balance with `count` Flow in it
-func makeABalanceInFlow(count uint64) types.Balance {
-	return types.Balance(uint64(100_000_000) * count)
-}
-
 func TestHandler_TransactionRun(t *testing.T) {
 	t.Parallel()
 
@@ -204,27 +199,26 @@ func TestHandler_TransactionRun(t *testing.T) {
 
 				// deposit 1 Flow to the foa account
 				addr := handler.DeployCOA()
-				orgBalance, err := types.NewBalanceFromAttoFlow(types.OneFlowInAttoFlow)
-				require.NoError(t, err)
+				orgBalance := types.NewBalanceFromUFix64(types.OneFlowInUFix64)
 				vault := types.NewFlowTokenVault(orgBalance)
 				foa := handler.AccountByAddress(addr, true)
 				foa.Deposit(vault)
 
 				// transfer 0.1 flow to the non-foa address
-				deduction, err := types.NewBalanceFromAttoFlow(big.NewInt(1e17))
-				require.NoError(t, err)
+				deduction := types.NewBalance(big.NewInt(1e17))
 				foa.Call(eoa.Address(), nil, 400000, deduction)
-				require.Equal(t, orgBalance.Sub(deduction), foa.Balance())
+				expected, err := types.SubBalance(orgBalance, deduction)
+				require.NoError(t, err)
+				require.Equal(t, expected, foa.Balance())
 
 				// transfer 0.01 flow back to the foa through
-				addition, err := types.NewBalanceFromAttoFlow(big.NewInt(1e16))
-				require.NoError(t, err)
+				addition := types.NewBalance(big.NewInt(1e16))
 
 				tx := eoa.PrepareSignAndEncodeTx(
 					t,
 					foa.Address().ToCommon(),
 					nil,
-					addition.ToAttoFlow(),
+					addition,
 					gethParams.TxGas*10,
 					big.NewInt(1e8), // high gas fee to test coinbase collection,
 				)
@@ -232,16 +226,17 @@ func TestHandler_TransactionRun(t *testing.T) {
 				// setup coinbase
 				foa2 := handler.DeployCOA()
 				account2 := handler.AccountByAddress(foa2, true)
-				require.Equal(t, types.Balance(0), account2.Balance())
+				require.Equal(t, types.NewBalanceFromUFix64(0), account2.Balance())
 
 				// no panic means success here
 				handler.Run(tx, account2.Address())
-				require.Equal(t, orgBalance.Sub(deduction).Add(addition), foa.Balance())
+				expected, err = types.SubBalance(orgBalance, deduction)
+				require.NoError(t, err)
+				expected, err = types.AddBalance(expected, addition)
+				require.NoError(t, err)
+				require.Equal(t, expected, foa.Balance())
 
-				// TODO: unlock me when balance changes are merged
-				// fees has been collected to the coinbase
-				// require.NotEqual(t, types.Balance(0), account2.Balance())
-
+				require.NotEqual(t, types.NewBalanceFromUFix64(0), account2.Balance())
 			})
 		})
 	})
@@ -264,8 +259,7 @@ func TestHandler_OpsWithoutEmulator(t *testing.T) {
 				// do some changes
 				address := testutils.RandomAddress(t)
 				account := handler.AccountByAddress(address, true)
-				bal, err := types.NewBalanceFromAttoFlow(types.OneFlowInAttoFlow)
-				require.NoError(t, err)
+				bal := types.OneFlowBalance
 				account.Deposit(types.NewFlowTokenVault(bal))
 
 				// check if block height has been incremented
@@ -287,23 +281,18 @@ func TestHandler_COA(t *testing.T) {
 				foa := handler.AccountByAddress(handler.DeployCOA(), true)
 				require.NotNil(t, foa)
 
-				zeroBalance, err := types.NewBalanceFromAttoFlow(big.NewInt(0))
-				require.NoError(t, err)
+				zeroBalance := types.NewBalance(big.NewInt(0))
 				require.Equal(t, zeroBalance, foa.Balance())
 
-				balance, err := types.NewBalanceFromAttoFlow(types.OneFlowInAttoFlow)
-				require.NoError(t, err)
+				balance := types.OneFlowBalance
 				vault := types.NewFlowTokenVault(balance)
 
 				foa.Deposit(vault)
-				require.NoError(t, err)
 				require.Equal(t, balance, foa.Balance())
 
 				v := foa.Withdraw(balance)
-				require.NoError(t, err)
 				require.Equal(t, balance, v.Balance())
 
-				require.NoError(t, err)
 				require.Equal(t, zeroBalance, foa.Balance())
 
 				events := backend.Events()
@@ -322,7 +311,7 @@ func TestHandler_COA(t *testing.T) {
 				// transaction event
 				event = events[4]
 				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
-				_, err = jsoncdc.Decode(nil, event.Payload)
+				_, err := jsoncdc.Decode(nil, event.Payload)
 				require.NoError(t, err)
 				// TODO: decode encoded tx and check for the amount and value
 				// assert.Equal(t, foa.Address(), ret.Address)
@@ -336,6 +325,14 @@ func TestHandler_COA(t *testing.T) {
 				computationUsed, err := backend.ComputationUsed()
 				require.NoError(t, err)
 				require.Greater(t, computationUsed, types.DefaultDirectCallBaseGasUsage*3)
+
+				// Withdraw with invalid balance
+				assertPanic(t, types.IsWithdrawBalanceRoundingError, func() {
+					// deposit some money
+					foa.Deposit(vault)
+					// then withdraw invalid balance
+					foa.Withdraw(types.NewBalance(big.NewInt(1)))
+				})
 			})
 		})
 	})
@@ -352,12 +349,12 @@ func TestHandler_COA(t *testing.T) {
 				// make a second account with some money
 				coa2 := h.DeployCOA()
 				acc2 := h.AccountByAddress(coa2, true)
-				acc2.Deposit(types.NewFlowTokenVault(makeABalanceInFlow(100)))
+				acc2.Deposit(types.NewFlowTokenVault(types.MakeABalanceInFlow(100)))
 
 				// transfer money to COA
 				acc2.Transfer(
 					coa,
-					makeABalanceInFlow(1),
+					types.MakeABalanceInFlow(1),
 				)
 
 				// make a call to the contract
@@ -372,7 +369,7 @@ func TestHandler_COA(t *testing.T) {
 						[]byte{'A'},
 					),
 					types.GasLimit(3_000_000),
-					types.Balance(0))
+					types.EmptyBalance)
 
 				// 0x150b7a02
 				expected := types.Data([]byte{
@@ -403,7 +400,7 @@ func TestHandler_COA(t *testing.T) {
 						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
 
 						account := handler.AccountByAddress(testutils.RandomAddress(t), false)
-						account.Withdraw(types.Balance(1))
+						account.Withdraw(types.NewBalanceFromUFix64(1))
 					})
 
 					// test insufficient total supply
@@ -417,7 +414,7 @@ func TestHandler_COA(t *testing.T) {
 						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
-						account.Withdraw(types.Balance(1))
+						account.Withdraw(types.NewBalanceFromUFix64(1))
 					})
 
 					// test non fatal error of emulator
@@ -431,7 +428,7 @@ func TestHandler_COA(t *testing.T) {
 						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
-						account.Withdraw(types.Balance(0))
+						account.Withdraw(types.NewBalanceFromUFix64(0))
 					})
 
 					// test fatal error of emulator
@@ -445,7 +442,7 @@ func TestHandler_COA(t *testing.T) {
 						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
-						account.Withdraw(types.Balance(0))
+						account.Withdraw(types.NewBalanceFromUFix64(0))
 					})
 				})
 			})
@@ -475,7 +472,7 @@ func TestHandler_COA(t *testing.T) {
 						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
-						account.Deposit(types.NewFlowTokenVault(1))
+						account.Deposit(types.NewFlowTokenVault(types.NewBalanceFromUFix64(1)))
 					})
 
 					// test fatal error of emulator
@@ -489,7 +486,7 @@ func TestHandler_COA(t *testing.T) {
 						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
-						account.Deposit(types.NewFlowTokenVault(1))
+						account.Deposit(types.NewFlowTokenVault(types.NewBalanceFromUFix64(1)))
 					})
 				})
 			})
@@ -508,26 +505,27 @@ func TestHandler_COA(t *testing.T) {
 				require.NotNil(t, foa)
 
 				// deposit 10000 flow
-				bal := testutils.MakeABalanceInFlow(10000)
+				bal := types.MakeABalanceInFlow(10000)
 				vault := types.NewFlowTokenVault(bal)
 				foa.Deposit(vault)
 				require.Equal(t, bal, foa.Balance())
 
 				testContract := testutils.GetStorageTestContract(t)
-				addr := foa.Deploy(testContract.ByteCode, math.MaxUint64, types.Balance(0))
+				addr := foa.Deploy(testContract.ByteCode, math.MaxUint64, types.NewBalanceFromUFix64(0))
+				require.NotNil(t, addr)
 
 				num := big.NewInt(22)
 				_ = foa.Call(
 					addr,
 					testContract.MakeCallData(t, "store", num),
 					math.MaxUint64,
-					types.Balance(0))
+					types.NewBalanceFromUFix64(0))
 
 				ret := foa.Call(
 					addr,
 					testContract.MakeCallData(t, "retrieve"),
 					math.MaxUint64,
-					types.Balance(0))
+					types.NewBalanceFromUFix64(0))
 
 				require.Equal(t, num, new(big.Int).SetBytes(ret))
 			})
@@ -548,12 +546,12 @@ func TestHandler_COA(t *testing.T) {
 				foa := h.AccountByAddress(h.DeployCOA(), true)
 				require.NotNil(t, foa)
 
-				vault := types.NewFlowTokenVault(testutils.MakeABalanceInFlow(10000))
+				vault := types.NewFlowTokenVault(types.MakeABalanceInFlow(10000))
 				foa.Deposit(vault)
 
 				arch := handler.MakePrecompileAddress(1)
 
-				ret := foa.Call(arch, precompiles.FlowBlockHeightFuncSig[:], math.MaxUint64, types.Balance(0))
+				ret := foa.Call(arch, precompiles.FlowBlockHeightFuncSig[:], math.MaxUint64, types.NewBalanceFromUFix64(0))
 				require.Equal(t, big.NewInt(int64(blockHeight)), new(big.Int).SetBytes(ret))
 			})
 		})

@@ -88,7 +88,7 @@ func (t *testFlowAccount) Address() types.Address {
 
 func (t *testFlowAccount) Balance() types.Balance {
 	if t.balance == nil {
-		return types.Balance(0)
+		return types.NewBalanceFromUFix64(0)
 	}
 	return t.balance()
 }
@@ -2981,7 +2981,7 @@ func TestBridgedAccountCall(t *testing.T) {
 					assert.Equal(t, types.Address{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, toAddress)
 					assert.Equal(t, types.Data{4, 5, 6}, data)
 					assert.Equal(t, types.GasLimit(9999), limit)
-					assert.Equal(t, types.Balance(expectedBalance), balance)
+					assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
 
 					return types.Data{3, 1, 4}
 				},
@@ -3100,7 +3100,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 					deposited = true
 					assert.Equal(
 						t,
-						types.Balance(expectedBalance),
+						types.NewBalanceFromUFix64(expectedBalance),
 						vault.Balance(),
 					)
 				},
@@ -3217,13 +3217,13 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 				deposit: func(vault *types.FLOWTokenVault) {
 					deposited = true
 					assert.Equal(t,
-						types.Balance(expectedDepositBalance),
+						types.NewBalanceFromUFix64(expectedDepositBalance),
 						vault.Balance(),
 					)
 				},
 				withdraw: func(balance types.Balance) *types.FLOWTokenVault {
 					assert.Equal(t,
-						types.Balance(expectedWithdrawBalance),
+						types.NewBalanceFromUFix64(expectedWithdrawBalance),
 						balance,
 					)
 					withdrew = true
@@ -3346,7 +3346,7 @@ func TestBridgedAccountDeploy(t *testing.T) {
 					deployed = true
 					assert.Equal(t, types.Code{4, 5, 6}, code)
 					assert.Equal(t, types.GasLimit(9999), limit)
-					assert.Equal(t, types.Balance(expectedBalance), balance)
+					assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
 
 					return handler.DeployCOA()
 				},
@@ -3474,7 +3474,7 @@ func TestEVMAccountBalance(t *testing.T) {
 			return &testFlowAccount{
 				address: fromAddress,
 				balance: func() types.Balance {
-					return types.Balance(expectedBalanceValue)
+					return types.NewBalanceFromUFix64(expectedBalanceValue)
 				},
 			}
 		},
@@ -3574,7 +3574,7 @@ func TestEVMAccountBalanceForABIOnlyContract(t *testing.T) {
 			return &testFlowAccount{
 				address: fromAddress,
 				balance: func() types.Balance {
-					return types.Balance(expectedBalanceValue)
+					return types.NewBalanceFromUFix64(expectedBalanceValue)
 				},
 			}
 		},
