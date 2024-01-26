@@ -20,6 +20,7 @@ import (
 
 	"github.com/onflow/flow-go/integration/benchmark"
 	pb "github.com/onflow/flow-go/integration/benchmark/proto"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -30,7 +31,7 @@ type BenchmarkInfo struct {
 
 // Hardcoded CI values
 const (
-	loadType                    = "token-transfer"
+	defaultLoadType             = "token-transfer"
 	metricport                  = uint(8080)
 	accessNodeAddress           = "127.0.0.1:4001"
 	pushgateway                 = "127.0.0.1:9091"
@@ -64,7 +65,10 @@ func main() {
 	bigQueryProjectFlag := flag.String("bigquery-project", "dapperlabs-data", "project name for the bigquery uploader")
 	bigQueryDatasetFlag := flag.String("bigquery-dataset", "dev_src_flow_tps_metrics", "dataset name for the bigquery uploader")
 	bigQueryRawTableFlag := flag.String("bigquery-raw-table", "rawResults", "table name for the bigquery raw results")
+	loadTypeFlag := flag.String("load-type", defaultLoadType, "load type (token-transfer / const-exec / evm)")
 	flag.Parse()
+
+	loadType := *loadTypeFlag
 
 	// parse log level and apply to logger
 	log := zerolog.New(os.Stderr).With().Timestamp().Logger().Output(zerolog.ConsoleWriter{Out: os.Stderr})
@@ -163,6 +167,7 @@ func main() {
 			ServiceAccountAddress: &serviceAccountAddress,
 			FungibleTokenAddress:  &fungibleTokenAddress,
 			FlowTokenAddress:      &flowTokenAddress,
+			ChainId:               flow.Emulator,
 		},
 		benchmark.LoadParams{
 			NumberOfAccounts: maxInflight,
@@ -227,7 +232,7 @@ func main() {
 	// only upload valid data
 	if *bigQueryUpload {
 		repoInfo := MustGetRepoInfo(log, *gitRepoURLFlag, *gitRepoPathFlag)
-		mustUploadData(ctx, log, recorder, repoInfo, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryRawTableFlag)
+		mustUploadData(ctx, log, recorder, repoInfo, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryRawTableFlag, loadType)
 	} else {
 		log.Info().Int("raw_tps_size", len(recorder.BenchmarkResults.RawTPS)).Msg("logging tps results locally")
 		// log results locally when not uploading to BigQuery
@@ -245,6 +250,7 @@ func mustUploadData(
 	bigQueryProject string,
 	bigQueryDataset string,
 	bigQueryRawTable string,
+	loadType string,
 ) {
 	log.Info().Msg("Initializing BigQuery")
 	db, err := NewDB(ctx, log, bigQueryProject)

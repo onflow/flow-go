@@ -1,13 +1,20 @@
 package benchmark
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"sync"
 
 	"time"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	gethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
@@ -18,6 +25,10 @@ import (
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/access"
 	"github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go/fvm/evm/emulator"
+	"github.com/onflow/flow-go/fvm/evm/stdlib"
+	evmTypes "github.com/onflow/flow-go/fvm/evm/types"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -31,6 +42,7 @@ const (
 	LedgerHeavyLoadType   LoadType = "ledger-heavy"
 	ConstExecCostLoadType LoadType = "const-exec" // for an empty transactions with various tx arguments
 	ExecDataHeavyLoadType LoadType = "exec-data-heavy"
+	EVMLoadType           LoadType = "evm"
 )
 
 const lostTransactionThreshold = 90 * time.Second
@@ -82,6 +94,7 @@ type NetworkParams struct {
 	ServiceAccountAddress *flowsdk.Address
 	FungibleTokenAddress  *flowsdk.Address
 	FlowTokenAddress      *flowsdk.Address
+	ChainId               flow.ChainID
 }
 
 type LoadParams struct {
@@ -182,6 +195,8 @@ func New(
 		lg.workFunc = lg.sendConstExecCostTx
 	case CompHeavyLoadType, EventHeavyLoadType, LedgerHeavyLoadType, ExecDataHeavyLoadType:
 		lg.workFunc = lg.sendFavContractTx
+	case EVMLoadType:
+		lg.workFunc = lg.sendEVMTx
 	default:
 		return nil, fmt.Errorf("unknown load type: %s", loadParams.LoadType)
 	}
@@ -325,6 +340,11 @@ func (lg *ContLoadGenerator) Init() error {
 			lg.log.Error().Err(err).Msg("failed to setup fav contract")
 			return err
 		}
+		err = lg.setupEVMAccount()
+		if err != nil {
+			lg.log.Error().Err(err).Msg("failed to setup evm account")
+			return err
+		}
 	} else {
 		lg.log.Info().Int("numberOfAccountsCreated", len(lg.accounts)).
 			Msg("new accounts created. Grabbing the first as the proposer/payer " +
@@ -337,6 +357,105 @@ func (lg *ContLoadGenerator) Init() error {
 		}
 	}
 
+	return nil
+}
+
+func (lg *ContLoadGenerator) setupEVMAccount() error {
+
+	chain := lg.networkParams.ChainId.Chain()
+
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+	// generate test address
+	addressBytes, err := hex.DecodeString("3da9cb19b06A645BA6F12F79D8d7fcdd8A00cfD4")
+	if err != nil {
+		return err
+	}
+	addressCadenceBytes := make([]cadence.Value, 20)
+	for i := range addressCadenceBytes {
+		addressCadenceBytes[i] = cadence.UInt8(addressBytes[i])
+	}
+	addressArg := cadence.NewArray(addressCadenceBytes).WithType(stdlib.EVMAddressBytesCadenceType)
+
+	amountArg, err := cadence.NewUFix64("10000.0")
+	if err != nil {
+		return err
+	}
+
+	// Fund evm address
+	txBody := flowsdk.NewTransaction().
+		SetScript([]byte(fmt.Sprintf(
+			`
+						import EVM from %s
+						import FungibleToken from %s
+						import FlowToken from %s
+
+						transaction(address: [UInt8; 20], amount: UFix64) {
+							let fundVault: @FlowToken.Vault
+
+							prepare(signer: AuthAccount) {
+								let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+									?? panic("Could not borrow reference to the owner's Vault!")
+						
+								// 1.0 Flow for the EVM gass fees
+								self.fundVault <- vaultRef.withdraw(amount: amount+1.0) as! @FlowToken.Vault
+							}
+
+							execute {
+								let acc <- EVM.createBridgedAccount()
+								acc.deposit(from: <-self.fundVault)
+								let fundAddress = EVM.EVMAddress(bytes: address)
+								acc.call(
+										to: fundAddress,
+										data: [],
+										gasLimit: 21000,
+										value: EVM.Balance(flow: amount))
+
+								destroy acc
+							}
+						}
+					`,
+			sc.FlowServiceAccount.Address.HexWithPrefix(),
+			sc.FungibleToken.Address.HexWithPrefix(),
+			sc.FlowToken.Address.HexWithPrefix(),
+		))).
+		SetReferenceBlockID(lg.follower.BlockID()).
+		SetComputeLimit(9999)
+
+	err = txBody.AddArgument(addressArg)
+	if err != nil {
+		return err
+	}
+	err = txBody.AddArgument(amountArg)
+	if err != nil {
+		return err
+	}
+
+	key, err := lg.serviceAccount.GetKey()
+	if err != nil {
+		lg.log.Error().Err(err).Msg("error getting key")
+		return err
+	}
+	defer key.Done()
+
+	err = key.SignTx(txBody)
+	if err != nil {
+		return err
+	}
+
+	// Do not wait for the transaction to be sealed.
+	ch, err := lg.sendTx(-1, txBody)
+	if err != nil {
+		return err
+	}
+	defer key.IncrementSequenceNumber()
+
+	res := <-ch
+	if res.Error != nil {
+		return res.Error
+	}
+
+	lg.workerStatsTracker.IncTxExecuted()
 	return nil
 }
 
@@ -870,6 +989,147 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 	defer key.IncrementSequenceNumber()
 
 	log = log.With().Hex("tx_id", transferTx.ID().Bytes()).Logger()
+	log.Trace().Msg("transaction sent")
+
+	t := time.NewTimer(lostTransactionThreshold)
+	defer t.Stop()
+
+	select {
+	case result := <-ch:
+		if result.Error != nil {
+			lg.workerStatsTracker.IncTxFailed()
+		}
+		log.Trace().
+			Dur("duration", time.Since(startTime)).
+			Err(result.Error).
+			Str("status", result.Status.String()).
+			Msg("transaction confirmed")
+	case <-t.C:
+		lg.loaderMetrics.TransactionLost()
+		log.Warn().
+			Dur("duration", time.Since(startTime)).
+			Int("availableAccounts", len(lg.availableAccounts)).
+			Msg("transaction lost")
+		lg.workerStatsTracker.IncTxTimedout()
+	case <-lg.Done():
+		return
+	}
+	lg.workerStatsTracker.IncTxExecuted()
+}
+
+func (lg *ContLoadGenerator) sendEVMTx(workerID int) {
+	log := lg.log.With().Int("workerID", workerID).Logger()
+
+	log.Trace().
+		Int("availableAccounts", len(lg.availableAccounts)).
+		Msg("getting next available account")
+
+	var acc *account.FlowAccount
+
+	select {
+	case acc = <-lg.availableAccounts:
+	default:
+		log.Error().Msg("next available account channel empty; skipping send")
+		return
+	}
+	defer func() { lg.availableAccounts <- acc }()
+	nextAcc := lg.accounts[(acc.ID+1)%len(lg.accounts)]
+
+	log.Trace().
+		Float64("tokens", tokensPerTransfer).
+		Hex("srcAddress", acc.Address.Bytes()).
+		Hex("dstAddress", nextAcc.Address.Bytes()).
+		Int("srcAccount", acc.ID).
+		Int("dstAccount", nextAcc.ID).
+		Msg("creating transfer script")
+
+	key, err := acc.GetKey()
+	if err != nil {
+		log.Error().Err(err).Msg("error getting key")
+		return
+	}
+	defer key.Done()
+
+	nonce := key.SequenceNumber
+	to := gethcommon.HexToAddress("")
+	gasPrice := big.NewInt(0)
+
+	amount := new(big.Int).Div(evmTypes.OneFlowBalance, big.NewInt(10000000))
+	evmTx := types.NewTx(&types.LegacyTx{Nonce: nonce, To: &to, Value: amount, Gas: params.TxGas, GasPrice: gasPrice, Data: nil})
+
+	privateKey, err := gethcrypto.HexToECDSA("e43eb57b2f3be8009ea545059e171dc4fdf543ae97220a76c0684706357f7f39")
+	if err != nil {
+		log.Error().Err(err).Msg("error getting key")
+		return
+	}
+
+	signed, err := types.SignTx(evmTx, emulator.GetDefaultSigner(), privateKey)
+	if err != nil {
+		log.Error().Err(err).Msg("error signing transaction")
+		return
+	}
+	var encoded bytes.Buffer
+	err = signed.EncodeRLP(&encoded)
+	if err != nil {
+		log.Error().Err(err).Msg("error encoding transaction")
+		return
+	}
+
+	encodedCadence := make([]cadence.Value, 0)
+	for _, b := range encoded.Bytes() {
+		encodedCadence = append(encodedCadence, cadence.UInt8(b))
+	}
+	transactionBytes := cadence.NewArray(encodedCadence).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+	sc := systemcontracts.SystemContractsForChain(lg.networkParams.ChainId)
+	txBody := flowsdk.NewTransaction().
+		SetScript([]byte(fmt.Sprintf(
+			`
+						import EVM from %s
+						import FungibleToken from %s
+						import FlowToken from %s
+						
+						transaction(encodedTx: [UInt8]) {
+							//let bridgeVault: @FlowToken.Vault
+						
+							prepare(signer: AuthAccount){}
+						
+							execute {
+								let feeAcc <- EVM.createBridgedAccount()
+								EVM.run(tx: encodedTx, coinbase: feeAcc.address())
+								destroy feeAcc
+							}
+						}
+					`,
+			sc.EVMContract.Address.HexWithPrefix(),
+			sc.FungibleToken.Address.HexWithPrefix(),
+			sc.FlowToken.Address.HexWithPrefix(),
+		))).
+		SetReferenceBlockID(lg.follower.BlockID()).
+		SetComputeLimit(9999)
+
+	err = txBody.AddArgument(transactionBytes)
+	if err != nil {
+		log.Error().Err(err).Msg("error adding argument")
+		return
+	}
+
+	log.Trace().Msg("signing transaction")
+
+	err = key.SignTx(txBody)
+	if err != nil {
+		log.Error().Err(err).Msg("error signing transaction")
+		return
+	}
+
+	startTime := time.Now()
+	ch, err := lg.sendTx(workerID, txBody)
+	if err != nil {
+		return
+	}
+	defer key.IncrementSequenceNumber()
+
+	log = log.With().Hex("tx_id", txBody.ID().Bytes()).Logger()
 	log.Trace().Msg("transaction sent")
 
 	t := time.NewTimer(lostTransactionThreshold)

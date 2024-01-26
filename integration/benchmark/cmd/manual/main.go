@@ -133,6 +133,7 @@ func main() {
 			ServiceAccountAddress: &serviceAccountAddress,
 			FungibleTokenAddress:  &fungibleTokenAddress,
 			FlowTokenAddress:      &flowTokenAddress,
+			ChainId:               flow.ChainID(chainID),
 		},
 		benchmark.LoadParams{
 			NumberOfAccounts: int(maxTPS) * *accountMultiplierFlag,
