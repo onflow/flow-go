@@ -23,9 +23,9 @@ const (
 type BlockHashList struct {
 	blocks   []gethCommon.Hash
 	capacity int
-	tail     int // element index to write to
-	count    int // number of elements (count <= capacity)
-	height   int // keeps the height of last added block
+	tail     int    // element index to write to
+	count    int    // number of elements (count <= capacity)
+	height   uint64 // keeps the height of last added block
 }
 
 // NewBlockHashList constructs a new block hash list of the given capacity
@@ -41,7 +41,7 @@ func NewBlockHashList(capacity int) *BlockHashList {
 
 // Push pushes a block hash for the next height to the list.
 // If the list is full, it overwrites the oldest element.
-func (bhl *BlockHashList) Push(height int, bh gethCommon.Hash) error {
+func (bhl *BlockHashList) Push(height uint64, bh gethCommon.Hash) error {
 	if bhl.IsEmpty() && height != 0 {
 		return fmt.Errorf("out of our block hash push expected: 0, got: %d", height)
 	}
@@ -77,17 +77,17 @@ func (bhl *BlockHashList) LastAddedBlockHash() gethCommon.Hash {
 }
 
 // MinAvailableHeight returns the min available height in the list
-func (bhl *BlockHashList) MinAvailableHeight() int {
-	return bhl.height - (bhl.count - 1)
+func (bhl *BlockHashList) MinAvailableHeight() uint64 {
+	return bhl.height - (uint64(bhl.count) - 1)
 }
 
 // MaxAvailableHeight returns the max available height in the list
-func (bhl *BlockHashList) MaxAvailableHeight() int {
+func (bhl *BlockHashList) MaxAvailableHeight() uint64 {
 	return bhl.height
 }
 
 // BlockHashByIndex returns the block hash by block height
-func (bhl *BlockHashList) BlockHashByHeight(height int) (found bool, bh gethCommon.Hash) {
+func (bhl *BlockHashList) BlockHashByHeight(height uint64) (found bool, bh gethCommon.Hash) {
 	if bhl.count == 0 || // empty
 		height > bhl.height || // height too high
 		height < bhl.MinAvailableHeight() { // height too low
@@ -158,7 +158,7 @@ func NewBlockHashListFromEncoded(encoded []byte) (*BlockHashList, error) {
 	pos += countEncodingSize
 
 	// decode height
-	bhl.height = int(binary.BigEndian.Uint64(encoded[pos:]))
+	bhl.height = binary.BigEndian.Uint64(encoded[pos:])
 	pos += heightEncodingSize
 
 	// decode hashes

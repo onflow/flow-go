@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"math/big"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence/runtime/common"
@@ -156,7 +157,12 @@ func (h *ContractHandler) getBlockContext() types.BlockContext {
 	return types.BlockContext{
 		BlockNumber:            bp.Height,
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
-		ExtraPrecompiles:       h.precompiles,
+		GetHashFunc: func(n uint64) gethCommon.Hash {
+			hash, err := h.blockstore.BlockHash(n)
+			handleError(err)
+			return hash
+		},
+		ExtraPrecompiles: h.precompiles,
 	}
 }
 

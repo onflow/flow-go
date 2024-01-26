@@ -65,7 +65,7 @@ type BlockStore interface {
 	LatestBlock() (*Block, error)
 
 	// BlockHash returns the hash of the block at the given height
-	BlockHash(height int) (gethCommon.Hash, error)
+	BlockHash(height uint64) (gethCommon.Hash, error)
 
 	// BlockProposal returns the block proposal
 	BlockProposal() (*Block, error)

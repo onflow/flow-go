@@ -81,7 +81,7 @@ func (bs *BlockStore) CommitBlockProposal() error {
 		bhl = types.NewBlockHashList(BlockHashListCapacity)
 	}
 	if bhl.IsEmpty() {
-		err = bhl.Push(int(types.GenesisBlock.Height), types.GenesisBlockHash)
+		err = bhl.Push(types.GenesisBlock.Height, types.GenesisBlockHash)
 		if err != nil {
 			return err
 		}
@@ -90,7 +90,7 @@ func (bs *BlockStore) CommitBlockProposal() error {
 	if err != nil {
 		return err
 	}
-	bhl.Push(int(bs.blockProposal.Height), hash)
+	bhl.Push(bs.blockProposal.Height, hash)
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func (bs *BlockStore) LatestBlock() (*types.Block, error) {
 }
 
 // BlockHash returns the block hash for the last x blocks
-func (bs *BlockStore) BlockHash(height int) (gethCommon.Hash, error) {
+func (bs *BlockStore) BlockHash(height uint64) (gethCommon.Hash, error) {
 	bhl, err := bs.getBlockHashList()
 	if err != nil {
 		return gethCommon.Hash{}, err
