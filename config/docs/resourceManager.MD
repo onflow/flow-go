@@ -73,9 +73,9 @@ As we explain later in this documentation, the `transient` scope is a special ca
        for guarding against resource drainage during the establishment phase.
    - **Protocol Scope**: sets limits for specific protocols (e.g., DHT, gossipsub) and prevents any single protocol from dominating resource usage. The protocol scope is essential for 
      protocol-specific resource tuning and preventing abuse by any single protocol.
-   - **Peer Scope**: manages resources used by individual peers and prevents a single peer from exhausting resources. The peer scope is critical for preventing abuse by any single peer.
-   - **Peer-Protocol Scope**: sets limits for specific peers on specific protocols and prevents any single peer from dominating resource usage on a specific protocol. It also prevents a single protocol 
-      to dominate resource usage on a specific peer among all the protocols the peer is participating in. 
+   - **Peer Scope**: manages resources used by individual (remote) peers on the local peer and prevents a single (remote) peer from exhausting resources of the local peer. The peer scope is critical for preventing abuse by any single (remote) peer.
+   - **Peer-Protocol Scope**: sets limits for specific (remote) peers on specific protocols at the local peer and prevents any single (remote) peer from dominating resource usage on a specific protocol at the local peer. It also prevents a single protocol 
+      to dominate resource usage of a specific (remote) peer on the local peer among all the protocols the (remote) peer is participating in with the local peer. 
 
 #### Scope Hierarchy
 The higher scopes **"override"** limits on lower scopes:
