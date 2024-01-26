@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"os"
 	"path"
 	"path/filepath"
@@ -37,16 +36,15 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
-	"github.com/onflow/flow-go/engine/access/ingestion"
 	"github.com/onflow/flow-go/engine/access/rest"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
+	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
-	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/protocol"
@@ -67,7 +65,6 @@ import (
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool/herocache"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
@@ -103,6 +100,7 @@ import (
 	pStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/io"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // ObserverBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
@@ -210,31 +208,26 @@ type ObserverServiceBuilder struct {
 	*ObserverServiceConfig
 
 	// components
-	LibP2PNode                 p2p.LibP2PNode
-	FollowerState              stateprotocol.FollowerState
-	SyncCore                   *chainsync.Core
-	RpcEng                     *rpc.Engine
-	FollowerDistributor        *pubsub.FollowerDistributor
-	Committee                  hotstuff.DynamicCommittee
-	CollectionsToMarkFinalized *stdmap.Times
-	CollectionsToMarkExecuted  *stdmap.Times
-	BlocksToMarkExecuted       *stdmap.Times
-	Finalized                  *flow.Header
-	Pending                    []*flow.Header
-	FollowerCore               module.HotStuffFollower
-	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
-	ExecutionIndexer           *indexer.Indexer
-	ExecutionIndexerCore       *indexer.IndexerCore
-	RegistersAsyncStore        *execution.RegistersAsyncStore
-	IndexerDependencies        *cmd.DependencyList
+	LibP2PNode             p2p.LibP2PNode
+	FollowerState          stateprotocol.FollowerState
+	SyncCore               *chainsync.Core
+	RpcEng                 *rpc.Engine
+	FollowerDistributor    *pubsub.FollowerDistributor
+	Committee              hotstuff.DynamicCommittee
+	Finalized              *flow.Header
+	Pending                []*flow.Header
+	FollowerCore           module.HotStuffFollower
+	ExecutionDataRequester state_synchronization.ExecutionDataRequester
+	ExecutionIndexer       *indexer.Indexer
+	ExecutionIndexerCore   *indexer.IndexerCore
+	RegistersAsyncStore    *execution.RegistersAsyncStore
+	IndexerDependencies    *cmd.DependencyList
 
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
 	SyncEngineParticipantsProviderFactory func() module.IdentifierProvider
 
 	// engines
-	IngestEng   *ingestion.Engine
-	RequestEng  *requester.Engine
 	FollowerEng *follower.ComplianceEngine
 	SyncEng     *synceng.Engine
 
@@ -1195,7 +1188,12 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Storage.Headers,
 				builder.Storage.Events,
 				builder.Storage.LightTransactionResults,
-				builder.IngestEng.OnCollection,
+				func(_ flow.Identifier, entity flow.Entity) {
+					collections := builder.Storage.Collections
+					transactions := builder.Storage.Transactions
+					logger := builder.Logger
+					indexerCollectionHandler(entity, collections, transactions, logger)
+				},
 			)
 			if err != nil {
 				return nil, err
@@ -1314,22 +1312,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	ingestionDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(ingestionDependable)
 
-	builder.Module("transaction timing mempools", func(node *cmd.NodeConfig) error {
-		var err error
-
-		builder.CollectionsToMarkFinalized, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
-		if err != nil {
-			return err
-		}
-
-		builder.CollectionsToMarkExecuted, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
-		if err != nil {
-			return err
-		}
-
-		builder.BlocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
-		return err
-	})
 	builder.Module("rest metrics", func(node *cmd.NodeConfig) error {
 		m, err := metrics.NewRestCollector(routes.URLToRoute, node.MetricsRegisterer)
 		if err != nil {
@@ -1503,50 +1485,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		return builder.RpcEng, nil
 	})
 
-	builder.Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		var err error
-
-		builder.RequestEng, err = requester.New(
-			node.Logger,
-			node.Metrics.Engine,
-			node.EngineRegistry,
-			node.Me,
-			node.State,
-			channels.RequestCollections,
-			filter.HasRole(flow.RoleAccess),
-			func() flow.Entity { return &flow.Collection{} },
-		)
-		if err != nil {
-			return nil, fmt.Errorf("could not create requester engine: %w", err)
-		}
-
-		builder.IngestEng, err = ingestion.New(
-			node.Logger,
-			node.EngineRegistry,
-			node.State,
-			node.Me,
-			nil,
-			node.Storage.Blocks,
-			node.Storage.Headers,
-			node.Storage.Collections,
-			node.Storage.Transactions,
-			node.Storage.Results,
-			node.Storage.Receipts,
-			builder.AccessMetrics,
-			builder.CollectionsToMarkFinalized,
-			builder.CollectionsToMarkExecuted,
-			builder.BlocksToMarkExecuted,
-		)
-		if err != nil {
-			return nil, err
-		}
-		ingestionDependable.Init(builder.IngestEng)
-		builder.RequestEng.WithHandle(builder.IngestEng.OnCollection)
-		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.IngestEng.OnFinalizedBlock)
-
-		return builder.IngestEng, nil
-	})
-
 	// build secure grpc server
 	builder.Component("secure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		return builder.secureGrpcServer, nil
@@ -1556,6 +1494,46 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	builder.Component("unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		return builder.unsecureGrpcServer, nil
 	})
+}
+
+func indexerCollectionHandler(entity flow.Entity, collections storage.Collections,
+	transactions storage.Transactions,
+	logger zerolog.Logger) {
+
+	// convert the entity to a strictly typed collection
+	collection, ok := entity.(*flow.Collection)
+	if !ok {
+		logger.Error().Msgf("invalid entity type (%T)", entity)
+		return
+	}
+
+	light := collection.Light()
+
+	// FIX: we can't index guarantees here, as we might have more than one block
+	// with the same collection as long as it is not finalized
+
+	// store the light collection (collection minus the transaction body - those are stored separately)
+	// and add transaction ids as index
+	err := collections.StoreLightAndIndexByTransaction(&light)
+	if err != nil {
+		// ignore collection if already seen
+		if errors.Is(err, storage.ErrAlreadyExists) {
+			logger.Error().
+				Hex("collection_id", logging.Entity(light)).
+				Msg("collection is already seen")
+			return
+		}
+		return
+	}
+
+	// now store each of the transaction body
+	for _, tx := range collection.Transactions {
+		err := transactions.Store(tx)
+		if err != nil {
+			logger.Error().Err(err).Msg(fmt.Sprintf("could not store transaction (%x)", tx.ID()))
+			return
+		}
+	}
 }
 
 func loadNetworkingKey(path string) (crypto.PrivateKey, error) {
