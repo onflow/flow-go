@@ -196,7 +196,9 @@ func TestBridgedAccountWithdraw(t *testing.T) {
                                    let bridgedAccount <- EVM.createBridgedAccount()
                                    bridgedAccount.deposit(from: <-vault)
 
-                                   let vault2 <- bridgedAccount.withdraw(balance: EVM.Balance(flow: 1.23))
+								   let bal = EVM.Balance(0)
+								   bal.setFLOW(flow: 1.23)
+                                   let vault2 <- bridgedAccount.withdraw(balance: bal)
                                    let balance = vault2.balance
                                    destroy bridgedAccount
                                    destroy vault2
@@ -258,7 +260,7 @@ func TestBridgedAccountDeploy(t *testing.T) {
                                    let address = bridgedAccount.deploy(
                                        code: [],
                                        gasLimit: 53000,
-                                       value: EVM.Balance(flow: 1.23)
+                                       value: EVM.Balance(attoflow: 1230000000000000000)
                                    )
                                    destroy bridgedAccount
                                    return address.bytes
