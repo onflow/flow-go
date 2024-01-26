@@ -667,3 +667,72 @@ func (r *testReportWriter) Write(entry any) {
 }
 
 func (r *testReportWriter) Close() {}
+
+func TestStaticTypesMigrationRules(t *testing.T) {
+
+	t.Parallel()
+
+	programs := analysis.Programs{}
+	config := analysis.NewSimpleConfig(
+		analysis.NeedTypes,
+		map[common.Location][]byte{
+			utils.TestLocation: []byte(`
+              access(all)
+              contract Test {
+                  access(all)
+                  resource R {}
+
+                  access(all)
+                  resource interface RI {}
+              }
+            `),
+		},
+		nil,
+		nil,
+	)
+	err := programs.Load(config, utils.TestLocation)
+	require.NoError(t, err)
+
+	csv := strings.NewReader(`"import ""test""",Test.R,{Test.RI}`)
+
+	rules, err := ReadCSVStaticTypeMigrationRules(programs, csv)
+	require.NoError(t, err)
+
+	type ruleEntry struct {
+		source, target interpreter.StaticType
+	}
+
+	var actual []ruleEntry
+
+	for source, target := range rules {
+		actual = append(
+			actual,
+			ruleEntry{
+				source: source,
+				target: target,
+			},
+		)
+	}
+
+	assert.ElementsMatch(t,
+		[]ruleEntry{
+			{
+				source: &interpreter.CompositeStaticType{
+					Location:            utils.TestLocation,
+					QualifiedIdentifier: "Test.R",
+					TypeID:              "S.test.Test.R",
+				},
+				target: &interpreter.IntersectionStaticType{
+					Types: []*interpreter.InterfaceStaticType{
+						{
+							Location:            utils.TestLocation,
+							QualifiedIdentifier: "Test.RI",
+							TypeID:              "S.test.Test.RI",
+						},
+					},
+				},
+			},
+		},
+		actual,
+	)
+}
