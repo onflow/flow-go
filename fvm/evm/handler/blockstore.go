@@ -69,32 +69,13 @@ func (bs *BlockStore) CommitBlockProposal() error {
 
 	err = bs.led.SetValue(bs.flexAddress[:], []byte(FlexLatestBlockKey), blockBytes)
 	if err != nil {
-		return types.NewFatalError(err)
+		return err
 	}
 
-	// update block hashes
-	bhl, err := bs.getBlockHashList()
+	err = bs.updateBlockHashList(bs.blockProposal)
 	if err != nil {
 		return err
 	}
-	if bhl == nil {
-		bhl = types.NewBlockHashList(BlockHashListCapacity)
-	}
-	if bhl.IsEmpty() {
-		err = bhl.Push(types.GenesisBlock.Height, types.GenesisBlockHash)
-		if err != nil {
-			return err
-		}
-	}
-	hash, err := bs.blockProposal.Hash()
-	if err != nil {
-		return err
-	}
-	bhl.Push(bs.blockProposal.Height, hash)
-	if err != nil {
-		return err
-	}
-	bs.setBlockHashList(bhl)
 
 	bs.blockProposal = nil
 	return nil
@@ -145,6 +126,30 @@ func (bs *BlockStore) getBlockHashList() (*types.BlockHashList, error) {
 	return types.NewBlockHashListFromEncoded(data)
 }
 
-func (bs *BlockStore) setBlockHashList(bhl *types.BlockHashList) error {
-	return bs.led.SetValue(bs.flexAddress[:], []byte(FlexLatestBlockHashesKey), bhl.Encode())
+func (bs *BlockStore) updateBlockHashList(block *types.Block) error {
+	bhl, err := bs.getBlockHashList()
+	if err != nil {
+		return err
+	}
+	if bhl == nil {
+		bhl = types.NewBlockHashList(BlockHashListCapacity)
+	}
+	if bhl.IsEmpty() {
+		err = bhl.Push(types.GenesisBlock.Height, types.GenesisBlockHash)
+		if err != nil {
+			return err
+		}
+	}
+	hash, err := block.Hash()
+	if err != nil {
+		return err
+	}
+	err = bhl.Push(block.Height, hash)
+	if err != nil {
+		return err
+	}
+	return bs.led.SetValue(
+		bs.flexAddress[:],
+		[]byte(FlexLatestBlockHashesKey),
+		bhl.Encode())
 }
