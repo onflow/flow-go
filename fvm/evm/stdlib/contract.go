@@ -1019,7 +1019,7 @@ var internalEVMTypeCallFunctionType = &sema.FunctionType{
 		},
 		{
 			Label:          "value",
-			TypeAnnotation: sema.NewTypeAnnotation(sema.IntType),
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
 		},
 	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
@@ -1120,7 +1120,7 @@ func newInternalEVMTypeCallFunction(
 
 			// Get balance
 
-			balanceValue, ok := invocation.Arguments[4].(interpreter.IntValue)
+			balanceValue, ok := invocation.Arguments[4].(interpreter.UIntValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
@@ -1242,7 +1242,7 @@ var internalEVMTypeBalanceFunctionType = &sema.FunctionType{
 			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
 		},
 	},
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.IntType),
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
 }
 
 // newInternalEVMTypeBalanceFunction returns the Flow balance of the account
@@ -1270,7 +1270,7 @@ func newInternalEVMTypeBalanceFunction(
 			const isAuthorized = false
 			account := handler.AccountByAddress(address, isAuthorized)
 
-			return interpreter.IntValue{BigInt: account.Balance()}
+			return interpreter.UIntValue{BigInt: account.Balance()}
 		},
 	)
 }
@@ -1285,7 +1285,7 @@ var internalEVMTypeWithdrawFunctionType = &sema.FunctionType{
 		},
 		{
 			Label:          "amount",
-			TypeAnnotation: sema.NewTypeAnnotation(sema.IntType),
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
 		},
 	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyResourceType),
@@ -1316,7 +1316,7 @@ func newInternalEVMTypeWithdrawFunction(
 
 			// Get amount
 
-			amountValue, ok := invocation.Arguments[1].(interpreter.IntValue)
+			amountValue, ok := invocation.Arguments[1].(interpreter.UIntValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
@@ -1376,7 +1376,7 @@ var internalEVMTypeDeployFunctionType = &sema.FunctionType{
 		},
 		{
 			Label:          "value",
-			TypeAnnotation: sema.NewTypeAnnotation(sema.IntType),
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
 		},
 	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
@@ -1428,7 +1428,7 @@ func newInternalEVMTypeDeployFunction(
 
 			// Get value
 
-			amountValue, ok := invocation.Arguments[3].(interpreter.IntValue)
+			amountValue, ok := invocation.Arguments[3].(interpreter.UIntValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
@@ -1455,7 +1455,7 @@ var internalEVMTypeCastToAttoFLOWFunctionType = &sema.FunctionType{
 			TypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
 		},
 	},
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.IntType),
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
 }
 
 func newInternalEVMTypeCastToAttoFLOWFunction(
@@ -1471,7 +1471,7 @@ func newInternalEVMTypeCastToAttoFLOWFunction(
 				panic(errors.NewUnreachableError())
 			}
 			balance := types.NewBalanceFromUFix64(cadence.UFix64(balanceValue))
-			return interpreter.IntValue{BigInt: balance}
+			return interpreter.UIntValue{BigInt: balance}
 		},
 	)
 }
@@ -1482,7 +1482,7 @@ var internalEVMTypeCastToFLOWFunctionType = &sema.FunctionType{
 	Parameters: []sema.Parameter{
 		{
 			Label:          "balance",
-			TypeAnnotation: sema.NewTypeAnnotation(sema.IntType),
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
 		},
 	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
@@ -1496,7 +1496,7 @@ func newInternalEVMTypeCastToFLOWFunction(
 		gauge,
 		internalEVMTypeCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
-			balanceValue, ok := invocation.Arguments[0].(interpreter.IntValue)
+			balanceValue, ok := invocation.Arguments[0].(interpreter.UIntValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
@@ -1677,7 +1677,7 @@ func NewBalanceCadenceType(address common.Address) *cadence.StructType {
 		[]cadence.Field{
 			{
 				Identifier: "attoflow",
-				Type:       cadence.IntType{},
+				Type:       cadence.UIntType{},
 			},
 		},
 		nil,

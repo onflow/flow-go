@@ -1581,9 +1581,9 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
           access(all) struct Token {
             access(all) let id: Int
-            access(all) var balance: Int
+            access(all) var balance: UInt
 
-            init(id: Int, balance: Int) {
+            init(id: Int, balance: UInt) {
               self.id = id
               self.balance = balance
             }
@@ -2113,9 +2113,9 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
           access(all) struct Token {
             access(all) let id: Int
-            access(all) var balance: Int
+            access(all) var balance: UInt
 
-            init(id: Int, balance: Int) {
+            init(id: Int, balance: UInt) {
               self.id = id
               self.balance = balance
             }
@@ -2644,7 +2644,7 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
       import EVM from 0x1
 
       access(all)
-      fun main(_ attoflow: Int): EVM.Balance {
+      fun main(_ attoflow: UInt): EVM.Balance {
           return EVM.Balance(attoflow: attoflow)
       }
     `)
@@ -2692,7 +2692,7 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 
 	// Run script
 
-	flowValue := cadence.NewInt(1230000000000000000)
+	flowValue := cadence.NewUInt(1230000000000000000)
 
 	result, err := rt.ExecuteScript(
 		runtime.Script{
@@ -3443,7 +3443,7 @@ func TestEVMAccountBalance(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	expectedBalanceValue := cadence.NewInt(1013370000000000000)
+	expectedBalanceValue := cadence.NewUInt(1013370000000000000)
 	expectedBalance := cadence.
 		NewStruct([]cadence.Value{expectedBalanceValue}).
 		WithType(stdlib.NewBalanceCadenceType(common.Address(contractsAddress)))

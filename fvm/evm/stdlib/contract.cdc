@@ -34,11 +34,11 @@ contract EVM {
         /// that is used to store account balances inside EVM 
         /// similar to the way WEI is used to store ETH divisible to 18 decimal places.
         access(all)
-        var attoflow: Int
+        var attoflow: UInt
 
         /// Constructs a new balance
         access(all)
-        init(attoflow: Int) {
+        init(attoflow: UInt) {
             self.attoflow = attoflow
         }
 
@@ -60,7 +60,7 @@ contract EVM {
 
         /// Returns the balance in Atto-FLOW
         access(all)
-        fun inAttoFLOW(): Int {
+        fun inAttoFLOW(): UInt {
             return self.attoflow
         }
     }
