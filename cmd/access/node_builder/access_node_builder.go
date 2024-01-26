@@ -182,8 +182,9 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 					MaxFailures:    5,
 					MaxRequests:    1,
 				},
-				ScriptExecutionMode: backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
-				EventQueryMode:      backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				ScriptExecutionMode: backend.IndexQueryModeExecutionNodesOnly.String(),             // default to ENs only for now
+				EventQueryMode:      backend.IndexQueryModeExecutionNodesOnly.String(),             // default to ENs only for now
+				TxResultQueryMode:   backend.TransactionResultQueryModeExecutionNodesOnly.String(), // default to ENs only for now
 			},
 			RestConfig: rest.Config{
 				ListenAddress: "",
@@ -1086,6 +1087,11 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			defaultConfig.rpcConf.BackendConfig.EventQueryMode,
 			"mode to use when querying events. one of [local-only, execution-nodes-only(default), failover]")
 
+		flags.StringVar(&builder.rpcConf.BackendConfig.TxResultQueryMode,
+			"tx-result-query-mode",
+			defaultConfig.rpcConf.BackendConfig.TxResultQueryMode,
+			"mode to use when querying transaction results. one of [local-only, execution-nodes-only(default), failover]")
+
 		// Script Execution
 		flags.StringVar(&builder.rpcConf.BackendConfig.ScriptExecutionMode,
 			"script-execution-mode",
@@ -1471,10 +1477,15 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			eventQueryMode, err := backend.ParseIndexQueryMode(config.BackendConfig.EventQueryMode)
 			if err != nil {
-				return nil, fmt.Errorf("could not parse script execution mode: %w", err)
+				return nil, fmt.Errorf("could not parse event query mode: %w", err)
 			}
 			if eventQueryMode == backend.IndexQueryModeCompare {
 				return nil, fmt.Errorf("event query mode 'compare' is not supported")
+			}
+
+			txResultQueryMode, err := backend.ParseTransactionResultQueryMode(config.BackendConfig.TxResultQueryMode)
+			if err != nil {
+				return nil, fmt.Errorf("could not parse transaction result query mode: %w", err)
 			}
 
 			nodeBackend, err := backend.New(backend.Params{
@@ -1504,6 +1515,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ScriptExecutor:            builder.ScriptExecutor,
 				ScriptExecutionMode:       scriptExecMode,
 				EventQueryMode:            eventQueryMode,
+				TxResultQueryMode:         txResultQueryMode,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)

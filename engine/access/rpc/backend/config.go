@@ -18,6 +18,7 @@ type Config struct {
 	CircuitBreakerConfig      connection.CircuitBreakerConfig // the configuration for circuit breaker
 	ScriptExecutionMode       string                          // the mode in which scripts are executed
 	EventQueryMode            string                          // the mode in which events are queried
+	TxResultQueryMode         string                          // the mode in which events are queried
 }
 
 type IndexQueryMode int
@@ -65,6 +66,46 @@ func (m IndexQueryMode) String() string {
 		return "failover"
 	case IndexQueryModeCompare:
 		return "compare"
+	default:
+		return ""
+	}
+}
+
+type TransactionResultQueryMode int
+
+const (
+	// TransactionResultQueryModeLocalOnly gets transaction results using only local storage
+	TransactionResultQueryModeLocalOnly TransactionResultQueryMode = iota + 1
+
+	// TransactionResultQueryModeExecutionNodesOnly gets transaction results using only execution nodes
+	TransactionResultQueryModeExecutionNodesOnly
+
+	// TransactionResultQueryModeFailover gets transaction results using local storage first, then falls back to execution
+	// nodes if data is not available.
+	TransactionResultQueryModeFailover
+)
+
+func ParseTransactionResultQueryMode(s string) (TransactionResultQueryMode, error) {
+	switch s {
+	case TransactionResultQueryModeLocalOnly.String():
+		return TransactionResultQueryModeLocalOnly, nil
+	case TransactionResultQueryModeExecutionNodesOnly.String():
+		return TransactionResultQueryModeExecutionNodesOnly, nil
+	case TransactionResultQueryModeFailover.String():
+		return TransactionResultQueryModeFailover, nil
+	default:
+		return 0, errors.New("invalid transaction result query mode")
+	}
+}
+
+func (m TransactionResultQueryMode) String() string {
+	switch m {
+	case TransactionResultQueryModeLocalOnly:
+		return "local-only"
+	case TransactionResultQueryModeExecutionNodesOnly:
+		return "nodes-only"
+	case TransactionResultQueryModeFailover:
+		return "failover"
 	default:
 		return ""
 	}

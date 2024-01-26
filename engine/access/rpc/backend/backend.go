@@ -104,6 +104,7 @@ type Params struct {
 	ScriptExecutor            execution.ScriptExecutor
 	ScriptExecutionMode       IndexQueryMode
 	EventQueryMode            IndexQueryMode
+	TxResultQueryMode         TransactionResultQueryMode
 }
 
 // New creates backend instance
@@ -160,15 +161,17 @@ func New(params Params) (*Backend, error) {
 			scriptExecMode:    params.ScriptExecutionMode,
 		},
 		backendTransactions: backendTransactions{
+			TransactionsLocalDataProvider: TransactionsLocalDataProvider{
+				state:       params.State,
+				collections: params.Collections,
+				blocks:      params.Blocks,
+				results:     params.LightTransactionResults,
+				events:      params.Events,
+			},
 			log:                  params.Log,
 			staticCollectionRPC:  params.CollectionRPC,
-			state:                params.State,
 			chainID:              params.ChainID,
-			collections:          params.Collections,
-			blocks:               params.Blocks,
 			transactions:         params.Transactions,
-			results:              params.LightTransactionResults,
-			events:               params.Events,
 			executionReceipts:    params.ExecutionReceipts,
 			transactionValidator: configureTransactionValidator(params.State, params.ChainID),
 			transactionMetrics:   params.AccessMetrics,
@@ -178,6 +181,7 @@ func New(params Params) (*Backend, error) {
 			nodeCommunicator:     params.Communicator,
 			txResultCache:        txResCache,
 			txErrorMessagesCache: txErrorMessagesCache,
+			txResultQueryMode:    params.TxResultQueryMode,
 		},
 		backendEvents: backendEvents{
 			log:               params.Log,
