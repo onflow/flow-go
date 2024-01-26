@@ -36,6 +36,8 @@ func extractExecutionState(
 	outputDir string,
 	nWorker int, // number of concurrent worker to migation payloads
 	runMigrations bool,
+	compositeTypeRules migrators.StaticTypeMigrationRules,
+	interfaceTypeRules migrators.StaticTypeMigrationRules,
 ) error {
 
 	log.Info().Msg("init WAL")
@@ -72,7 +74,15 @@ func extractExecutionState(
 
 	log.Info().Msg("init compactor")
 
-	compactor, err := complete.NewCompactor(led, diskWal, log, complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	compactor, err := complete.NewCompactor(
+		led,
+		diskWal,
+		log,
+		complete.DefaultCacheSize,
+		checkpointDistance,
+		checkpointsToKeep,
+		atomic.NewBool(false),
+	)
 	if err != nil {
 		return fmt.Errorf("cannot create compactor: %w", err)
 	}
@@ -108,7 +118,12 @@ func extractExecutionState(
 				nWorker,
 				[]migrators.AccountBasedMigration{
 					migrators.NewCadenceLinkValueMigrator(rwf, capabilityIDs),
-					migrators.NewCadenceValueMigrator(rwf, capabilityIDs),
+					migrators.NewCadenceValueMigrator(
+						rwf,
+						capabilityIDs,
+						migrators.NewStaticTypeMigrator[*interpreter.CompositeStaticType](compositeTypeRules),
+						migrators.NewStaticTypeMigrator[*interpreter.InterfaceStaticType](interfaceTypeRules),
+					),
 
 					// This will fix storage used discrepancies caused by the
 					// DeduplicateContractNamesMigration.
@@ -168,9 +183,9 @@ func createCheckpoint(
 	outputDir,
 	outputFile string,
 ) (ledger.State, error) {
-	statecommitment := ledger.State(newTrie.RootHash())
+	stateCommitment := ledger.State(newTrie.RootHash())
 
-	log.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", statecommitment.String())
+	log.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", stateCommitment.String())
 
 	err := os.MkdirAll(outputDir, os.ModePerm)
 	if err != nil {
@@ -191,7 +206,7 @@ func createCheckpoint(
 	}
 
 	log.Info().Msgf("checkpoint file successfully stored at: %v %v", outputDir, outputFile)
-	return statecommitment, nil
+	return stateCommitment, nil
 }
 
 func writeStatusFile(fileName string, e error) error {

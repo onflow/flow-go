@@ -5,7 +5,18 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"testing"
+
+	"github.com/onflow/cadence/migrations"
+	"github.com/onflow/cadence/migrations/capcons"
+	"github.com/onflow/cadence/migrations/entitlements"
+	"github.com/onflow/cadence/migrations/statictypes"
+	"github.com/onflow/cadence/migrations/string_normalization"
+	"github.com/onflow/cadence/runtime/tests/utils"
+	"github.com/onflow/cadence/tools/analysis"
+
+	"github.com/onflow/flow-go/fvm/environment"
 
 	"github.com/rs/zerolog"
 
@@ -14,11 +25,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence/migrations"
-	"github.com/onflow/cadence/migrations/capcons"
-	"github.com/onflow/cadence/migrations/entitlements"
-	"github.com/onflow/cadence/migrations/statictypes"
-	"github.com/onflow/cadence/migrations/string_normalization"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
@@ -26,7 +32,6 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
-	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -73,7 +78,16 @@ func TestCadenceValuesMigration(t *testing.T) {
 	payloads = runLinkMigration(t, address, payloads, capabilityIDs, rwf)
 
 	// Run remaining migrations
-	valueMigration := NewCadenceValueMigrator(rwf, capabilityIDs)
+	valueMigration := NewCadenceValueMigrator(
+		rwf,
+		capabilityIDs,
+		func(staticType *interpreter.CompositeStaticType) interpreter.StaticType {
+			return nil
+		},
+		func(staticType *interpreter.InterfaceStaticType) interpreter.StaticType {
+			return nil
+		},
+	)
 
 	logWriter := &writer{}
 	logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
@@ -620,7 +634,7 @@ func runLinkMigration(
 		t,
 		logWriter.logs[0],
 		fmt.Sprintf(
-			"failed to run LinkValueMigration for path /public/flowTokenReceiver in account %s",
+			"failed to run LinkValueMigration in account %s, domain public, key flowTokenReceiver",
 			testAccountAddress,
 		),
 	)
@@ -629,7 +643,7 @@ func runLinkMigration(
 		t,
 		logWriter.logs[1],
 		fmt.Sprintf(
-			"failed to run LinkValueMigration for path /public/flowTokenBalance in account %s",
+			"failed to run LinkValueMigration in account %s, domain public, key flowTokenBalance:",
 			testAccountAddress,
 		),
 	)
@@ -653,3 +667,72 @@ func (r *testReportWriter) Write(entry any) {
 }
 
 func (r *testReportWriter) Close() {}
+
+func TestStaticTypesMigrationRules(t *testing.T) {
+
+	t.Parallel()
+
+	programs := analysis.Programs{}
+	config := analysis.NewSimpleConfig(
+		analysis.NeedTypes,
+		map[common.Location][]byte{
+			utils.TestLocation: []byte(`
+              access(all)
+              contract Test {
+                  access(all)
+                  resource R {}
+
+                  access(all)
+                  resource interface RI {}
+              }
+            `),
+		},
+		nil,
+		nil,
+	)
+	err := programs.Load(config, utils.TestLocation)
+	require.NoError(t, err)
+
+	csv := strings.NewReader(`"import ""test""",Test.R,{Test.RI}`)
+
+	rules, err := ReadCSVStaticTypeMigrationRules(programs, csv)
+	require.NoError(t, err)
+
+	type ruleEntry struct {
+		source, target interpreter.StaticType
+	}
+
+	var actual []ruleEntry
+
+	for source, target := range rules {
+		actual = append(
+			actual,
+			ruleEntry{
+				source: source,
+				target: target,
+			},
+		)
+	}
+
+	assert.ElementsMatch(t,
+		[]ruleEntry{
+			{
+				source: &interpreter.CompositeStaticType{
+					Location:            utils.TestLocation,
+					QualifiedIdentifier: "Test.R",
+					TypeID:              "S.test.Test.R",
+				},
+				target: &interpreter.IntersectionStaticType{
+					Types: []*interpreter.InterfaceStaticType{
+						{
+							Location:            utils.TestLocation,
+							QualifiedIdentifier: "Test.RI",
+							TypeID:              "S.test.Test.RI",
+						},
+					},
+				},
+			},
+		},
+		actual,
+	)
+}
