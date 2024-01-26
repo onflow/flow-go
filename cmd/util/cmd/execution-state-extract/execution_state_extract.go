@@ -104,6 +104,15 @@ func extractExecutionState(
 		capabilityIDs := map[interpreter.AddressPath]interpreter.UInt64Value{}
 
 		migrations = []ledger.Migration{
+			// Contracts must be migrated first
+			migrators.CreateAccountBasedMigration(
+				log,
+				nWorker,
+				[]migrators.AccountBasedMigration{
+					migrators.NewStagedContractsMigration(migrators.GetStagedContracts),
+				},
+			),
+
 			migrators.CreateAccountBasedMigration(
 				log,
 				nWorker,
