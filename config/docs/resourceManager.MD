@@ -118,3 +118,84 @@ Here's an explanation of what these default limits mean at each scope:
 - **Streams Inbound/Outbound (e.g., 500)**:
     - **Meaning**: This limit is the most granular, applying to streams from each (remote) peer for each protocol on the local peer.
     - **Implication**: It offers fine-grained control, preventing any (remote) peer from using excessive resources in a specific protocol on the local peer, thus ensuring balanced resource use.
+
+## Troubleshooting (For Flow Node Operators)
+This troubleshooting guide works based on the case of excessive streams in the network. Similar guidelines can be applied to other resources as well.
+
+### Observation
+If you observe an excessive number of open streams (or open `goroutines` affiliated with a libp2p protocol) in your network, 
+the appropriate action would be to adjust the stream limits within specific scopes, depending on the nature of the issue.
+
+### 1. Excessive Streams Across All Protocols and Peers
+- **Scope**: System Scope
+- **Limits to Adjust**:
+    - `streams-inbound`
+    - `streams-outbound`
+- **Reason**: The system scope applies globally across all peers and protocols. Adjusting these limits helps manage the overall number of streams in the network.
+
+### 2. Excessive Streams in a Specific Protocol
+- **Scope**: Protocol Scope
+- **Limits to Adjust**:
+    - `streams-inbound`
+    - `streams-outbound`
+- **Reason**: If a particular protocol (e.g., DHT, gossipsub) is opening too many streams, tightening limits in the protocol scope can restrict the resource usage by that specific protocol.
+
+### 3. Excessive Streams from Individual Peers
+- **Scope**: Peer Scope
+- **Limits to Adjust**:
+    - `streams-inbound`
+    - `streams-outbound`
+- **Reason**: When specific peers are opening too many streams, adjusting these limits can prevent any single peer from using an excessive number of streams.
+
+### 4. Excessive Streams from a Specific Peer on a Specific Protocol
+- **Scope**: Peer-Protocol Scope
+- **Limits to Adjust**:
+    - `streams-inbound`
+    - `streams-outbound`
+- **Reason**: This is the most granular level of control, where you can restrict stream usage for a specific protocol used by a specific peer.
+
+### Wildcard: Increasing all limit overrides at scale
+In order to preserve the hierarchy of scopes, you need to adjust the limits in each scope in a way that they don't override the limits of higher scopes.
+One easy way is to increase all limits by a certain factor across all scopes. For example, if you want to increase all limits by 1.5 times, you can do so by adjusting the flags for each limit within each scope.
+
+### System Scope
+1. **Streams Inbound/Outbound**
+    - `--libp2p-resource-manager-system-streams-inbound=<1.5 * current value>`
+    - `--libp2p-resource-manager-system-streams-outbound=<1.5 * current value>`
+2. **Connections Inbound/Outbound**
+    - `--libp2p-resource-manager-system-connections-inbound=<1.5 * current value>`
+    - `--libp2p-resource-manager-system-connections-outbound=<1.5 * current value>`
+3. **File Descriptors**
+    - `--libp2p-resource-manager-system-fd=<1.5 * current value>`
+4. **Memory Bytes**
+    - `--libp2p-resource-manager-system-memory-bytes=<1.5 * current value>`
+
+### Transient Scope
+1. **Streams Inbound/Outbound**
+    - `--libp2p-resource-manager-transient-streams-inbound=<1.5 * current value>`
+    - `--libp2p-resource-manager-transient-streams-outbound=<1.5 * current value>`
+2. **Connections Inbound/Outbound**
+    - `--libp2p-resource-manager-transient-connections-inbound=<1.5 * current value>`
+    - `--libp2p-resource-manager-transient-connections-outbound=<1.5 * current value>`
+3. **File Descriptors**
+    - `--libp2p-resource-manager-transient-fd=<1.5 * current value>`
+4. **Memory Bytes**
+    - `--libp2p-resource-manager-transient-memory-bytes=<1.5 * current value>`
+
+### Protocol Scope
+1. **Streams Inbound/Outbound**
+    - `--libp2p-resource-manager-protocol-streams-inbound=<1.5 * current value>`
+    - `--libp2p-resource-manager-protocol-streams-outbound=<1.5 * current value>`
+
+### Peer Scope
+1. **Streams Inbound/Outbound**
+    - `--libp2p-resource-manager-peer-streams-inbound=<1.5 * current value>`
+    - `--libp2p-resource-manager-peer-streams-outbound=<1.5 * current value>`
+
+### Peer-Protocol Scope
+1. **Streams Inbound/Outbound**
+    - `--libp2p-resource-manager-peer-protocol-streams-inbound=<1.5 * current value>`
+    - `--libp2p-resource-manager-peer-protocol-streams-outbound=<1.5 * current value>`
+
+### Notes
+- Replace `<1.5 * current value>` with the actual calculated value from `default-config.yaml`. For example, if the current system streams inbound limit is 10,000, the new value would be `--libp2p-resource-manager-system-streams-inbound=15000`.
