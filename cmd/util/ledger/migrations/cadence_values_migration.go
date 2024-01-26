@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/onflow/cadence/migrations/statictypes"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
@@ -18,7 +19,6 @@ import (
 	"github.com/onflow/cadence/migrations"
 	"github.com/onflow/cadence/migrations/capcons"
 	"github.com/onflow/cadence/migrations/entitlements"
-	"github.com/onflow/cadence/migrations/statictypes"
 	"github.com/onflow/cadence/migrations/string_normalization"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -139,6 +139,8 @@ func (m *CadenceBaseMigrator) mergeRegisterChanges(
 func NewCadenceValueMigrator(
 	rwf reporters.ReportWriterFactory,
 	capabilityIDs map[interpreter.AddressPath]interpreter.UInt64Value,
+	compositeTypeConverter statictypes.CompositeTypeConverterFunc,
+	interfaceTypeConverter statictypes.InterfaceTypeConverterFunc,
 ) *CadenceBaseMigrator {
 	return &CadenceBaseMigrator{
 		name:     "cadence-value-migration",
@@ -157,14 +159,8 @@ func NewCadenceValueMigrator(
 				entitlements.NewEntitlementsMigration(inter),
 				string_normalization.NewStringNormalizingMigration(),
 				statictypes.NewStaticTypeMigration().
-					WithCompositeTypeConverter(func(staticType *interpreter.CompositeStaticType) interpreter.StaticType {
-						// Returning `nil` indicates the type wasn't converted.
-						return nil
-					}).
-					WithInterfaceTypeConverter(func(staticType *interpreter.InterfaceStaticType) interpreter.StaticType {
-						// Returning `nil` indicates the type wasn't converted.
-						return nil
-					}),
+					WithCompositeTypeConverter(compositeTypeConverter).
+					WithInterfaceTypeConverter(interfaceTypeConverter),
 			}
 		},
 	}
@@ -234,11 +230,11 @@ func (t *cadenceValueMigrationReporter) Error(
 	err error,
 ) {
 	t.log.Error().Msgf(
-		"failed to run %s for path /%s/%s in account %s: %s",
+		"failed to run %s in account %s, domain %s, key %s: %s",
 		migration,
+		storageKey.Address,
 		storageKey.Key,
 		storageMapKey,
-		storageKey.Address,
 		err,
 	)
 }
