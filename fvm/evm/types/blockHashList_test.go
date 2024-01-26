@@ -25,8 +25,8 @@ func TestBlockHashList(t *testing.T) {
 	for i := 0; i < capacity; i++ {
 		err := bhl.Push(uint64(i), gethCommon.Hash{byte(i)})
 		require.NoError(t, err)
-		require.Equal(t, 0, bhl.MinAvailableHeight())
-		require.Equal(t, i, bhl.MaxAvailableHeight())
+		require.Equal(t, uint64(0), bhl.MinAvailableHeight())
+		require.Equal(t, uint64(i), bhl.MaxAvailableHeight())
 	}
 	for i := 0; i < capacity; i++ {
 		found, h := bhl.BlockHashByHeight(uint64(i))
@@ -39,8 +39,8 @@ func TestBlockHashList(t *testing.T) {
 	for i := capacity; i < capacity+3; i++ {
 		err := bhl.Push(uint64(i), gethCommon.Hash{byte(i)})
 		require.NoError(t, err)
-		require.Equal(t, i-capacity+1, bhl.MinAvailableHeight())
-		require.Equal(t, i, bhl.MaxAvailableHeight())
+		require.Equal(t, uint64(i-capacity+1), bhl.MinAvailableHeight())
+		require.Equal(t, uint64(i), bhl.MaxAvailableHeight())
 	}
 	for i := 0; i < capacity-2; i++ {
 		found, _ := bhl.BlockHashByHeight(uint64(i))
