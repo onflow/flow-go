@@ -27,7 +27,7 @@ func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount int) {
 					// note that trie growth is the function of number of accounts
 					for i := 0; i < accountCount; i++ {
 						account := handler.AccountByAddress(handler.AllocateAddress(), true)
-						account.Deposit(types.NewFlowTokenVault(types.Balance(100)))
+						account.Deposit(types.NewFlowTokenVault(types.NewBalanceFromUFix64(100)))
 						accounts[i] = account
 					}
 					backend.DropEvents()
@@ -49,7 +49,7 @@ func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount int) {
 								genes,
 							),
 							300_000_000,
-							types.Balance(0),
+							types.NewBalanceFromUFix64(0),
 						)
 						require.Equal(b, 2, len(backend.Events()))
 						backend.DropEvents() // this would make things lighter
@@ -66,7 +66,7 @@ func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount int) {
 							testutils.RandomBigInt(1000),
 						),
 						300_000_000,
-						types.Balance(0),
+						types.NewBalanceFromUFix64(0),
 					)
 
 					b.ReportMetric(float64(backend.TotalBytesRead()), "bytes_read")
