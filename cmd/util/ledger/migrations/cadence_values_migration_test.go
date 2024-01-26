@@ -450,8 +450,8 @@ func checkErrorLogs(t *testing.T, logWriter *writer) {
 			t,
 			line,
 			fmt.Sprintf(
-				"failed to run EntitlementsMigration for path /storage/dictionary_with_account_type_keys"+
-					" in account %s: internal error: cannot convert deprecated type",
+				"failed to run EntitlementsMigration in account %s, domain storage, key "+
+					"dictionary_with_account_type_keys: internal error: cannot convert deprecated type",
 				testAccountAddress,
 			),
 		)
