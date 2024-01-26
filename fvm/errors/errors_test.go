@@ -100,108 +100,82 @@ func TestHandleRuntimeError(t *testing.T) {
 		},
 		{
 			name: "coded error in ParentError error",
-			err: runtime.Error{
-				Err: cadenceErr.ExternalError{
-					Recovered: sema.CheckerError{
-						Errors: []error{
-							fmt.Errorf("first error"),
-							NewScriptExecutionTimedOutError(),
-						},
-					},
-				},
-			},
+			err: createCheckerErr([]error{
+				fmt.Errorf("first error"),
+				NewScriptExecutionTimedOutError(),
+			}),
 			errorCode: ErrCodeScriptExecutionTimedOutError,
 		},
 		{
 			name: "first coded error returned",
-			err: runtime.Error{
-				Err: cadenceErr.ExternalError{
-					Recovered: sema.CheckerError{
-						Errors: []error{
-							fmt.Errorf("first error"),
-							NewScriptExecutionTimedOutError(),
-							NewScriptExecutionCancelledError(baseErr),
-						},
-					},
-				},
-			},
+			err: createCheckerErr([]error{
+				fmt.Errorf("first error"),
+				NewScriptExecutionTimedOutError(),
+				NewScriptExecutionCancelledError(baseErr),
+			}),
 			errorCode: ErrCodeScriptExecutionTimedOutError,
 		},
 		{
 			name: "failure returned",
-			err: runtime.Error{
-				Err: cadenceErr.ExternalError{
-					Recovered: sema.CheckerError{
-						Errors: []error{
-							fmt.Errorf("first error"),
-							NewLedgerFailure(baseErr),
-						},
-					},
-				},
-			},
+			err: createCheckerErr([]error{
+				fmt.Errorf("first error"),
+				NewLedgerFailure(baseErr),
+			}),
 			failureCode: FailureCodeLedgerFailure,
 		},
 		{
 			name: "error before failure returns failure",
-			err: runtime.Error{
-				Err: cadenceErr.ExternalError{
-					Recovered: sema.CheckerError{
-						Errors: []error{
-							fmt.Errorf("first error"),
-							NewScriptExecutionTimedOutError(),
-							NewLedgerFailure(baseErr),
-						},
-					},
-				},
-			},
+			err: createCheckerErr([]error{
+				fmt.Errorf("first error"),
+				NewScriptExecutionTimedOutError(),
+				NewLedgerFailure(baseErr),
+			}),
 			failureCode: FailureCodeLedgerFailure,
 		},
 		{
 			name: "embedded coded errors return deepest error",
-			err: runtime.Error{
-				Err: cadenceErr.ExternalError{
-					Recovered: sema.CheckerError{
-						Errors: []error{
-							fmt.Errorf("first error"),
-							NewScriptExecutionCancelledError(
-								NewScriptExecutionTimedOutError(),
-							),
-						},
-					},
-				},
-			},
+			err: createCheckerErr([]error{
+				fmt.Errorf("first error"),
+				NewScriptExecutionCancelledError(
+					NewScriptExecutionTimedOutError(),
+				),
+			}),
 			errorCode: ErrCodeScriptExecutionTimedOutError,
 		},
 		{
 			name: "failure with embedded error returns failure",
-			err: runtime.Error{
-				Err: cadenceErr.ExternalError{
-					Recovered: sema.CheckerError{
-						Errors: []error{
-							fmt.Errorf("first error"),
-							NewLedgerFailure(
-								NewScriptExecutionTimedOutError(),
-							),
-						},
-					},
-				},
-			},
+			err: createCheckerErr([]error{
+				fmt.Errorf("first error"),
+				NewLedgerFailure(
+					NewScriptExecutionTimedOutError(),
+				),
+			}),
 			failureCode: FailureCodeLedgerFailure,
 		},
 		{
 			name: "coded error with embedded failure returns failure",
-			err: runtime.Error{
-				Err: cadenceErr.ExternalError{
-					Recovered: sema.CheckerError{
-						Errors: []error{
-							fmt.Errorf("first error"),
-							NewScriptExecutionCancelledError(
-								NewLedgerFailure(baseErr),
-							),
-						},
-					},
-				},
-			},
+			err: createCheckerErr([]error{
+				fmt.Errorf("first error"),
+				NewScriptExecutionCancelledError(
+					NewLedgerFailure(baseErr),
+				),
+			}),
+			failureCode: FailureCodeLedgerFailure,
+		},
+		{
+			// Note: this currently does not work for embedded ParentErrors, but will once they
+			// are updated to implement `Unwrap() []error`
+			name: "error tree with failure returns failure",
+			err: createCheckerErr([]error{
+				fmt.Errorf("first error"),
+				NewScriptExecutionCancelledError(baseErr),
+				wrappedErrors{[]error{
+					fmt.Errorf("first error"),
+					NewScriptExecutionCancelledError(
+						NewLedgerFailure(baseErr),
+					),
+				}},
+			}),
 			failureCode: FailureCodeLedgerFailure,
 		},
 	}
@@ -214,18 +188,7 @@ func TestHandleRuntimeError(t *testing.T) {
 				return
 			}
 
-			var actualCoded CodedError
-			var failureCoded CodedFailure
-			switch coded := actual.(type) {
-			case CodedError:
-				actualCoded, failureCoded = SplitErrorTypes(coded)
-
-			case CodedFailure:
-				actualCoded, failureCoded = SplitErrorTypes(coded)
-
-			default:
-				t.Fatalf("unexpected error type: %T", actual)
-			}
+			actualCoded, failureCoded := SplitErrorTypes(actual)
 
 			if tc.failureCode != 0 {
 				assert.NoError(t, actualCoded)
@@ -303,6 +266,20 @@ func TestFind(t *testing.T) {
 			},
 			found: true,
 		},
+		{
+			name: "found within embedded error tree",
+			err: createCheckerErr([]error{
+				fmt.Errorf("first error"),
+				NewLedgerFailure(baseErr),
+				createCheckerErr([]error{
+					fmt.Errorf("first error"),
+					NewLedgerFailure(
+						NewScriptExecutionCancelledError(baseErr),
+					),
+				}),
+			}),
+			found: true,
+		},
 	}
 
 	for _, tc := range tests {
@@ -313,6 +290,7 @@ func TestFind(t *testing.T) {
 				return
 			}
 
+			require.Error(t, actual, "expected error but none found")
 			assert.Equalf(t, targetCode, actual.Code(), "error code mismatch: expected %d, got %d", targetCode, actual.Code())
 		})
 	}
@@ -382,6 +360,20 @@ func TestFindFailure(t *testing.T) {
 			},
 			found: true,
 		},
+		{
+			name: "found within embedded error tree",
+			err: createCheckerErr([]error{
+				fmt.Errorf("first error"),
+				NewScriptExecutionCancelledError(baseErr),
+				createCheckerErr([]error{
+					fmt.Errorf("first error"),
+					NewScriptExecutionCancelledError(
+						NewLedgerFailure(baseErr),
+					),
+				}),
+			}),
+			found: true,
+		},
 	}
 
 	for _, tc := range tests {
@@ -392,7 +384,38 @@ func TestFindFailure(t *testing.T) {
 				return
 			}
 
+			require.Error(t, actual, "expected error but none found")
 			assert.Equalf(t, targetCode, actual.Code(), "error code mismatch: expected %d, got %d", targetCode, actual.Code())
 		})
 	}
+}
+
+func createCheckerErr(errs []error) error {
+	return runtime.Error{
+		Err: cadenceErr.ExternalError{
+			Recovered: sema.CheckerError{
+				Errors: errs,
+			},
+		},
+	}
+}
+
+type wrappedErrors struct {
+	errors []error
+}
+
+func (w wrappedErrors) Error() string {
+	if len(w.errors) == 0 {
+		return ""
+	}
+
+	msg := "wrapped errors:"
+	for _, err := range w.errors {
+		msg += fmt.Sprintf("\n  - %s", err.Error())
+	}
+	return msg
+}
+
+func (w wrappedErrors) Unwrap() []error {
+	return w.errors
 }

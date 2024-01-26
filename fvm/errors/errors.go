@@ -4,6 +4,7 @@ import (
 	stdErrors "errors"
 	"fmt"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/errors"
 )
@@ -226,44 +227,84 @@ func HasFailureCode(err error, code FailureCode) bool {
 	return FindFailure(err, code) != nil
 }
 
-// Find recursively unwraps the error and returns first CodedError that matches
+// Find recursively unwraps the error and returns the first CodedError that matches
 // the specified error code.
 func Find(originalErr error, code ErrorCode) CodedError {
 	if originalErr == nil {
 		return nil
 	}
 
-	var unwrappable Unwrappable
-	if !As(originalErr, &unwrappable) {
+	// Handle non-chained errors
+	var unwrappedErrs []error
+	switch err := originalErr.(type) {
+	case *multierror.Error:
+		unwrappedErrs = err.WrappedErrors()
+	case errors.ParentError:
+		unwrappedErrs = err.ChildErrors()
+	case UnwrappableErrors:
+		unwrappedErrs = err.Unwrap()
+
+	// IMPORTANT: this check needs to run after *multierror.Error because multierror does implement
+	// the Unwrappable interface, but its implementation causes child errors of those contained in
+	// its error list to be skipped.
+	case Unwrappable:
+		coded, ok := err.(CodedError)
+		if ok && coded.Code() == code {
+			return coded
+		}
+		return Find(err.Unwrap(), code)
+	default:
 		return nil
 	}
 
-	coded, ok := unwrappable.(CodedError)
-	if ok && coded.Code() == code {
-		return coded
+	for _, innerErr := range unwrappedErrs {
+		coded := Find(innerErr, code)
+		if coded != nil {
+			return coded
+		}
 	}
 
-	return Find(unwrappable.Unwrap(), code)
+	return nil
 }
 
-// FindFailure recursively unwraps the error and returns first CodedFailure that matches
+// FindFailure recursively unwraps the error and returns the first CodedFailure that matches
 // the specified error code.
 func FindFailure(originalErr error, code FailureCode) CodedFailure {
 	if originalErr == nil {
 		return nil
 	}
 
-	var unwrappable Unwrappable
-	if !As(originalErr, &unwrappable) {
+	// Handle non-chained errors
+	var unwrappedErrs []error
+	switch err := originalErr.(type) {
+	case *multierror.Error:
+		unwrappedErrs = err.WrappedErrors()
+	case errors.ParentError:
+		unwrappedErrs = err.ChildErrors()
+	case UnwrappableErrors:
+		unwrappedErrs = err.Unwrap()
+
+	// IMPORTANT: this check needs to run after *multierror.Error because multierror does implement
+	// the Unwrappable interface, but its implementation causes child errors of those contained in
+	// its error list to be skipped.
+	case Unwrappable:
+		coded, ok := err.(CodedFailure)
+		if ok && coded.Code() == code {
+			return coded
+		}
+		return FindFailure(err.Unwrap(), code)
+	default:
 		return nil
 	}
 
-	coded, ok := unwrappable.(CodedFailure)
-	if ok && coded.Code() == code {
-		return coded
+	for _, innerErr := range unwrappedErrs {
+		coded := FindFailure(innerErr, code)
+		if coded != nil {
+			return coded
+		}
 	}
 
-	return FindFailure(unwrappable.Unwrap(), code)
+	return nil
 }
 
 var _ CodedError = (*codedError)(nil)
