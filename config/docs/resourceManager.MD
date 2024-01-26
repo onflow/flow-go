@@ -21,8 +21,8 @@
     3. [Excessive Streams in a Specific Protocol](#excessive-streams-in-a-specific-protocol)
     4. [Excessive Streams from Individual Peers](#excessive-streams-from-individual-peers)
     5. [Excessive Streams from a Specific Peer on a Specific Protocol](#excessive-streams-from-a-specific-peer-on-a-specific-protocol)
-    6. [Wildcard: Increasing all limit overrides at scale](#wildcard-increasing-all-limit-overrides-at-scale)
-7. [References](#references)
+7. [Wildcard: Increasing all limit overrides at scale](#wildcard-increasing-all-limit-overrides-at-scale)
+8. [References](#references)
 
 ## Overview
 In Flow Go, the libp2p Resource Manager plays a crucial role in managing network resources effectively. This document provides guidance on setting various limits through configuration files and runtime flags, helping you optimize resource usage based on specific network conditions or protocol behaviors.
@@ -178,7 +178,7 @@ the appropriate action would be to adjust the stream limits within specific scop
     - `streams-outbound`
 - **Reason**: This is the most granular level of control, where you can restrict stream usage for a specific protocol used by a specific peer.
 
-### Wildcard: Increasing all limit overrides at scale
+## Wildcard: Increasing all limit overrides at scale
 In order to preserve the hierarchy of scopes, you need to adjust the limits in each scope in a way that they don't override the limits of higher scopes.
 One easy way is to increase all limits by a certain factor across all scopes. For example, if you want to increase all limits by 1.5 times, you can do so by adjusting the flags for each limit within each scope.
 
