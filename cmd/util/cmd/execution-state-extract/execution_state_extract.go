@@ -94,6 +94,15 @@ func extractExecutionState(
 		capabilityIDs := map[interpreter.AddressPath]interpreter.UInt64Value{}
 
 		migrations = []ledger.Migration{
+			// Contracts must be migrated first
+			migrators.CreateAccountBasedMigration(
+				log,
+				nWorker,
+				[]migrators.AccountBasedMigration{
+					migrators.NewStagedContractsMigration(migrators.GetStagedContracts),
+				},
+			),
+
 			migrators.CreateAccountBasedMigration(
 				log,
 				nWorker,
@@ -101,12 +110,11 @@ func extractExecutionState(
 					migrators.NewCadenceLinkValueMigrator(rwf, capabilityIDs),
 					migrators.NewCadenceValueMigrator(rwf, capabilityIDs),
 
-					migrators.NewStagedContractsMigration(migrators.GetStagedContracts),
-
 					// This will fix storage used discrepancies caused by the
 					// DeduplicateContractNamesMigration.
 					&migrators.AccountUsageMigrator{},
-				}),
+				},
+			),
 		}
 	}
 

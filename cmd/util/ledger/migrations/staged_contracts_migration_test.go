@@ -53,8 +53,7 @@ func TestStagedContractsMigration(t *testing.T) {
 		oldCode := "contract A {}"
 		newCode := "contract A { struct B {} }"
 
-		migration := StagedContractsMigration{}
-		migration.stagedContractsGetter = func() []StagedContract {
+		stagedContractsGetter := func() []StagedContract {
 			return []StagedContract{
 				{
 					Contract: Contract{
@@ -65,6 +64,8 @@ func TestStagedContractsMigration(t *testing.T) {
 				},
 			}
 		}
+
+		migration := NewStagedContractsMigration(stagedContractsGetter)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -93,8 +94,7 @@ func TestStagedContractsMigration(t *testing.T) {
 		oldCode := "contract A {}"
 		newCode := "contract A { struct B () }"
 
-		migration := StagedContractsMigration{}
-		migration.stagedContractsGetter = func() []StagedContract {
+		stagedContractsGetter := func() []StagedContract {
 			return []StagedContract{
 				{
 					Contract: Contract{
@@ -105,6 +105,8 @@ func TestStagedContractsMigration(t *testing.T) {
 				},
 			}
 		}
+
+		migration := NewStagedContractsMigration(stagedContractsGetter)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -181,8 +183,7 @@ func TestStagedContractsMigration(t *testing.T) {
 		newCode1 := "contract A { struct C () }" // broken
 		newCode2 := "contract B { struct C {} }" // all good
 
-		migration := StagedContractsMigration{}
-		migration.stagedContractsGetter = func() []StagedContract {
+		stagedContractsGetter := func() []StagedContract {
 			return []StagedContract{
 				{
 					Contract: Contract{
@@ -200,6 +201,8 @@ func TestStagedContractsMigration(t *testing.T) {
 				},
 			}
 		}
+
+		migration := NewStagedContractsMigration(stagedContractsGetter)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -233,8 +236,7 @@ func TestStagedContractsMigration(t *testing.T) {
 		oldCode := "contract A {}"
 		newCode := "contract A { struct B {} }"
 
-		migration := StagedContractsMigration{}
-		migration.stagedContractsGetter = func() []StagedContract {
+		stagedContractsGetter := func() []StagedContract {
 			return []StagedContract{
 				{
 					Contract: Contract{
@@ -245,6 +247,8 @@ func TestStagedContractsMigration(t *testing.T) {
 				},
 			}
 		}
+
+		migration := NewStagedContractsMigration(stagedContractsGetter)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -288,8 +292,7 @@ func TestStagedContractsMigration(t *testing.T) {
 		update1 := "contract A { struct B {} }"
 		update2 := "contract A { struct B {} struct C {} }"
 
-		migration := StagedContractsMigration{}
-		migration.stagedContractsGetter = func() []StagedContract {
+		stagedContractsGetter := func() []StagedContract {
 			return []StagedContract{
 				{
 					Contract: Contract{
@@ -307,6 +310,8 @@ func TestStagedContractsMigration(t *testing.T) {
 				},
 			}
 		}
+
+		migration := NewStagedContractsMigration(stagedContractsGetter)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)

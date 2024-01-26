@@ -34,7 +34,7 @@ type Contract struct {
 	code string
 }
 
-var _ AccountBasedMigration = (*StagedContractsMigration)(nil)
+var _ AccountBasedMigration = &StagedContractsMigration{}
 
 func NewStagedContractsMigration(stagedContractsGetter func() []StagedContract) *StagedContractsMigration {
 	return &StagedContractsMigration{
