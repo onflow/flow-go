@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/onflow/cadence/migrations"
@@ -12,6 +13,8 @@ import (
 	"github.com/onflow/cadence/migrations/entitlements"
 	"github.com/onflow/cadence/migrations/statictypes"
 	"github.com/onflow/cadence/migrations/string_normalization"
+	"github.com/onflow/cadence/runtime/tests/utils"
+	"github.com/onflow/cadence/tools/analysis"
 
 	"github.com/onflow/flow-go/fvm/environment"
 
@@ -79,10 +82,10 @@ func TestCadenceValuesMigration(t *testing.T) {
 		rwf,
 		capabilityIDs,
 		func(staticType *interpreter.CompositeStaticType) interpreter.StaticType {
-			return staticType
+			return nil
 		},
 		func(staticType *interpreter.InterfaceStaticType) interpreter.StaticType {
-			return staticType
+			return nil
 		},
 	)
 
@@ -631,7 +634,7 @@ func runLinkMigration(
 		t,
 		logWriter.logs[0],
 		fmt.Sprintf(
-			"failed to run LinkValueMigration for path /public/flowTokenReceiver in account %s",
+			"failed to run LinkValueMigration in account %s, domain public, key flowTokenReceiver",
 			testAccountAddress,
 		),
 	)
@@ -640,7 +643,7 @@ func runLinkMigration(
 		t,
 		logWriter.logs[1],
 		fmt.Sprintf(
-			"failed to run LinkValueMigration for path /public/flowTokenBalance in account %s",
+			"failed to run LinkValueMigration in account %s, domain public, key flowTokenBalance:",
 			testAccountAddress,
 		),
 	)
