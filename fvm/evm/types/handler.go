@@ -48,6 +48,7 @@ type Backend interface {
 	environment.Meter
 	environment.EventEmitter
 	environment.BlockInfo
+	environment.RandomGenerator
 }
 
 // AddressAllocator allocates addresses, used by the handler

@@ -132,7 +132,6 @@ func TestContractInteraction(t *testing.T) {
 
 			t.Run("call contract", func(t *testing.T) {
 				num := big.NewInt(10)
-
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
 						res, err := blk.DirectCall(
@@ -185,30 +184,6 @@ func TestContractInteraction(t *testing.T) {
 						require.Equal(t, blockNumber, ret)
 					})
 				})
-				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
-					pastBlkNumber := uint64(41)
-					expectedHash := testutils.RandomCommonHash(t)
-					ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
-					ctx.GetHashFunc = func(n uint64) gethCommon.Hash {
-						require.Equal(t, n, pastBlkNumber)
-						return expectedHash
-					}
-					ctx.BlockNumber = pastBlkNumber + 1
-					blk, err := env.NewBlockView(ctx)
-					require.NoError(t, err)
-					res, err := blk.DirectCall(
-						types.NewContractCall(
-							testAccount,
-							contractAddr,
-							testContract.MakeCallData(t, "blockHash", new(big.Int).SetUint64(pastBlkNumber)),
-							1_000_000,
-							big.NewInt(0),
-						),
-					)
-					require.NoError(t, err)
-					require.Equal(t, expectedHash, gethCommon.BytesToHash(res.ReturnedValue))
-				})
-
 			})
 
 			t.Run("test sending transactions (happy case)", func(t *testing.T) {

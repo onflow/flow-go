@@ -154,6 +154,9 @@ func (h *ContractHandler) emitEvent(event *types.Event) {
 func (h *ContractHandler) getBlockContext() types.BlockContext {
 	bp, err := h.blockstore.BlockProposal()
 	handleError(err)
+	rand := gethCommon.Hash{}
+	err = h.backend.ReadRandom(rand[:])
+	handleError(err)
 	return types.BlockContext{
 		BlockNumber:            bp.Height,
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
@@ -163,6 +166,7 @@ func (h *ContractHandler) getBlockContext() types.BlockContext {
 			return hash
 		},
 		ExtraPrecompiles: h.precompiles,
+		Random:           rand,
 	}
 }
 

@@ -29,6 +29,8 @@ type BlockContext struct {
 	DirectCallGasPrice     uint64
 	GasFeeCollector        Address
 	GetHashFunc            func(n uint64) gethCommon.Hash
+	Random                 gethCommon.Hash
+
 	// a set of extra precompiles to be injected
 	ExtraPrecompiles []Precompile
 }
