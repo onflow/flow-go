@@ -78,6 +78,7 @@ func (vmt vmTest) run(
 		baseOpts := []fvm.Option{
 			// default chain is Testnet
 			fvm.WithChain(flow.Testnet.Chain()),
+			fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
 		}
 
 		opts := append(baseOpts, vmt.contextOptions...)
