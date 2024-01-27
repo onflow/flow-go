@@ -533,6 +533,39 @@ func TestHandler_BridgedAccount(t *testing.T) {
 		})
 	})
 
+	t.Run("test block.random call (with integrated emulator)", func(t *testing.T) {
+		t.Parallel()
+
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			random := testutils.RandomCommonHash(t)
+			backend.ReadRandomFunc = func(buffer []byte) error {
+				copy(buffer, random.Bytes())
+				return nil
+			}
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				handler := SetupHandler(t, backend, rootAddr)
+
+				foa := handler.AccountByAddress(handler.AllocateAddress(), true)
+				require.NotNil(t, foa)
+
+				vault := types.NewFlowTokenVault(types.MakeABalanceInFlow(100))
+				foa.Deposit(vault)
+
+				testContract := testutils.GetStorageTestContract(t)
+				addr := foa.Deploy(testContract.ByteCode, math.MaxUint64, types.EmptyBalance)
+				require.NotNil(t, addr)
+
+				ret := foa.Call(
+					addr,
+					testContract.MakeCallData(t, "random"),
+					math.MaxUint64,
+					types.EmptyBalance)
+
+				require.Equal(t, random.Bytes(), []byte(ret))
+			})
+		})
+	})
+
 	// TODO add test with test emulator for unhappy cases (emulator)
 }
 
