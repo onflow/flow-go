@@ -1,4 +1,4 @@
-package execution
+package proxies
 
 import (
 	"testing"
@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestInitDataAvailable(t *testing.T) {
+func TestInitialize(t *testing.T) {
 	rootBlockHeight := uint64(1)
 	// test data available on init
 	registerID := unittest.RegisterIDFixture()
@@ -27,60 +27,60 @@ func TestInitDataAvailable(t *testing.T) {
 	t.Parallel()
 
 	t.Run("registersDB bootstrapped correct values returned", func(t *testing.T) {
-		registersAsync := NewRegistersAsyncStore()
+		registerStore := NewRegistersStore()
 		registers := storagemock.NewRegisterIndex(t)
 		registers.On("Get", registerID, firstHeight).Return(registerValue1, nil)
 		registers.On("Get", registerID, latestHeight).Return(registerValue2, nil)
 		registers.On("FirstHeight").Return(firstHeight)
 		registers.On("LatestHeight").Return(latestHeight)
 
-		require.NoError(t, registersAsync.InitDataAvailable(registers))
-		val1, err := registersAsync.RegisterValues([]flow.RegisterID{registerID}, firstHeight)
+		require.NoError(t, registerStore.Initialize(registers))
+		val1, err := registerStore.RegisterValues([]flow.RegisterID{registerID}, firstHeight)
 		require.NoError(t, err)
 		require.Equal(t, val1[0], registerValue1)
 
-		val2, err := registersAsync.RegisterValues([]flow.RegisterID{registerID}, latestHeight)
+		val2, err := registerStore.RegisterValues([]flow.RegisterID{registerID}, latestHeight)
 		require.NoError(t, err)
 		require.Equal(t, val2[0], registerValue2)
 	})
 
 	t.Run("out of bounds height correct error returned", func(t *testing.T) {
-		registersAsync := NewRegistersAsyncStore()
+		registerStore := NewRegistersStore()
 		registers := storagemock.NewRegisterIndex(t)
 		registers.On("LatestHeight").Return(latestHeight)
 
-		require.NoError(t, registersAsync.InitDataAvailable(registers))
-		_, err := registersAsync.RegisterValues([]flow.RegisterID{registerID}, latestHeight+1)
+		require.NoError(t, registerStore.Initialize(registers))
+		_, err := registerStore.RegisterValues([]flow.RegisterID{registerID}, latestHeight+1)
 		require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 	})
 
 	t.Run("no register value available correct error returned", func(t *testing.T) {
-		registersAsync := NewRegistersAsyncStore()
+		registerStore := NewRegistersStore()
 		registers := storagemock.NewRegisterIndex(t)
 		registers.On("Get", invalidRegisterID, latestHeight).Return(nil, storage.ErrNotFound)
 		registers.On("FirstHeight").Return(firstHeight)
 		registers.On("LatestHeight").Return(latestHeight)
 
-		require.NoError(t, registersAsync.InitDataAvailable(registers))
-		_, err := registersAsync.RegisterValues([]flow.RegisterID{invalidRegisterID}, latestHeight)
+		require.NoError(t, registerStore.Initialize(registers))
+		_, err := registerStore.RegisterValues([]flow.RegisterID{invalidRegisterID}, latestHeight)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
 
 func TestRegisterValuesDataUnAvailable(t *testing.T) {
 	rootBlockHeight := uint64(1)
-	registersAsync := NewRegistersAsyncStore()
+	registerStore := NewRegistersStore()
 	// registerDB not bootstrapped, correct error returned
 	registerID := unittest.RegisterIDFixture()
-	_, err := registersAsync.RegisterValues([]flow.RegisterID{registerID}, rootBlockHeight)
+	_, err := registerStore.RegisterValues([]flow.RegisterID{registerID}, rootBlockHeight)
 	require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 }
 
 func TestInitDataRepeatedCalls(t *testing.T) {
-	registersAsync := NewRegistersAsyncStore()
+	registerStore := NewRegistersStore()
 	registers1 := storagemock.NewRegisterIndex(t)
 	registers2 := storagemock.NewRegisterIndex(t)
 
-	require.NoError(t, registersAsync.InitDataAvailable(registers1))
-	require.Error(t, registersAsync.InitDataAvailable(registers2))
+	require.NoError(t, registerStore.Initialize(registers1))
+	require.Error(t, registerStore.Initialize(registers2))
 }

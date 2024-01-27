@@ -19,11 +19,11 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
-	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/state_synchronization/proxies"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -49,7 +49,8 @@ type BackendExecutionDataSuite struct {
 	seals          *storagemock.Seals
 	results        *storagemock.ExecutionResults
 	registers      *storagemock.RegisterIndex
-	registersAsync *execution.RegistersAsyncStore
+	registersAsync *proxies.RegistersStore
+	indexReporter  *proxies.IndexReporter
 
 	bs                blobs.Blobstore
 	eds               execution_data.ExecutionDataStore
@@ -156,9 +157,10 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 	s.registerID = unittest.RegisterIDFixture()
 
-	s.registersAsync = execution.NewRegistersAsyncStore()
+	s.indexReporter = proxies.NewIndexReporter()
+	s.registersAsync = proxies.NewRegistersStore()
 	s.registers = storagemock.NewRegisterIndex(s.T())
-	err = s.registersAsync.InitDataAvailable(s.registers)
+	err = s.registersAsync.Initialize(s.registers)
 	require.NoError(s.T(), err)
 	s.registers.On("LatestHeight").Return(rootBlock.Header.Height).Maybe()
 	s.registers.On("FirstHeight").Return(rootBlock.Header.Height).Maybe()
@@ -220,6 +222,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		rootBlock.Header.Height,
 		rootBlock.Header.Height, // initialize with no downloaded data
 		s.registersAsync,
+		s.indexReporter,
 		false,
 	)
 	require.NoError(s.T(), err)

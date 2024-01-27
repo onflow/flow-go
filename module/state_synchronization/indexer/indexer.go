@@ -96,19 +96,26 @@ func (i *Indexer) Start(ctx irrecoverable.SignalerContext) {
 }
 
 // LowestIndexedHeight returns the lowest height indexed by the execution indexer.
-func (i *Indexer) LowestIndexedHeight() uint64 {
+func (i *Indexer) LowestIndexedHeight() (uint64, error) {
 	// TODO: use a separate value to track the lowest indexed height. We're using the registers db's
 	// value here to start because it's convenient. When pruning support is added, this will need to
 	// be updated.
-	return i.registers.FirstHeight()
+	return i.registers.FirstHeight(), nil
 }
 
 // HighestIndexedHeight returns the highest height indexed by the execution indexer.
-func (i *Indexer) HighestIndexedHeight() uint64 {
+func (i *Indexer) HighestIndexedHeight() (uint64, error) {
+	select {
+	case <-i.jobConsumer.Ready():
+	default:
+		// LastProcessedIndex is not meaningful until the component has completed startup
+		return 0, fmt.Errorf("HighestIndexedHeight must not be called before the component is ready")
+	}
+
 	// The jobqueue maintains its own highest indexed height value, separate from the register db.
 	// Since jobs are only marked complete when ALL data is indexed, the lastProcessedIndex must
 	// be strictly less than or equal to the register db's LatestHeight.
-	return i.jobConsumer.LastProcessedIndex()
+	return i.jobConsumer.LastProcessedIndex(), nil
 }
 
 // OnExecutionData is used to notify when new execution data is downloaded by the execution data requester jobqueue.

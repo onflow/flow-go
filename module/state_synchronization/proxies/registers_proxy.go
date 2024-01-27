@@ -1,4 +1,4 @@
-package execution
+package proxies
 
 import (
 	"fmt"
@@ -9,20 +9,20 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// RegistersAsyncStore has the same basic structure as access/backend.ScriptExecutor
+// RegistersStore has the same basic structure as access/backend.ScriptExecutor
 // TODO: use this implementation in the `scripts.ScriptExecutor` passed into the AccessAPI
-type RegistersAsyncStore struct {
+type RegistersStore struct {
 	registerIndex atomic.Pointer[storage.RegisterIndex]
 }
 
-func NewRegistersAsyncStore() *RegistersAsyncStore {
-	return &RegistersAsyncStore{atomic.Pointer[storage.RegisterIndex]{}}
+func NewRegistersStore() *RegistersStore {
+	return &RegistersStore{atomic.Pointer[storage.RegisterIndex]{}}
 }
 
-// InitDataAvailable initializes the underlying storage.RegisterIndex
-// This method can be called at any time after the RegistersAsyncStore object is created and before RegisterValues is called
+// Initialize initializes the underlying storage.RegisterIndex
+// This method can be called at any time after the RegistersStore object is created and before RegisterValues is called
 // since we can't disambiguate between the underlying store before bootstrapping or just simply being behind sync
-func (r *RegistersAsyncStore) InitDataAvailable(registers storage.RegisterIndex) error {
+func (r *RegistersStore) Initialize(registers storage.RegisterIndex) error {
 	if r.registerIndex.CompareAndSwap(nil, &registers) {
 		return nil
 	}
@@ -33,7 +33,7 @@ func (r *RegistersAsyncStore) InitDataAvailable(registers storage.RegisterIndex)
 // Expected errors:
 //   - storage.ErrHeightNotIndexed if the store is still bootstrapping or if the values at the height is not indexed yet
 //   - storage.ErrNotFound if the register does not exist at the height
-func (r *RegistersAsyncStore) RegisterValues(ids flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+func (r *RegistersStore) RegisterValues(ids flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
 	registerStore, isAvailable := r.isDataAvailable(height)
 	if !isAvailable {
 		return nil, storage.ErrHeightNotIndexed
@@ -49,7 +49,7 @@ func (r *RegistersAsyncStore) RegisterValues(ids flow.RegisterIDs, height uint64
 	return result, nil
 }
 
-func (r *RegistersAsyncStore) isDataAvailable(height uint64) (storage.RegisterIndex, bool) {
+func (r *RegistersStore) isDataAvailable(height uint64) (storage.RegisterIndex, bool) {
 	str := r.registerIndex.Load()
 	if str != nil {
 		registerStore := *str

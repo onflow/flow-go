@@ -104,11 +104,21 @@ func (s *ScriptExecutor) checkDataAvailable(height uint64) error {
 		return fmt.Errorf("%w: script executor not initialized", execution.ErrDataNotAvailable)
 	}
 
-	if height > s.indexReporter.HighestIndexedHeight() {
+	highestHeight, err := s.indexReporter.HighestIndexedHeight()
+	if err != nil {
+		// index not ready yet
+		return fmt.Errorf("%w: could not get highest indexed height: %v", execution.ErrDataNotAvailable, err)
+	}
+	if height > highestHeight {
 		return fmt.Errorf("%w: block not indexed yet", execution.ErrDataNotAvailable)
 	}
 
-	if height < s.indexReporter.LowestIndexedHeight() {
+	lowestHeight, err := s.indexReporter.LowestIndexedHeight()
+	if err != nil {
+		// index not ready yet
+		return fmt.Errorf("%w: could not get lowest indexed height: %v", execution.ErrDataNotAvailable, err)
+	}
+	if height < lowestHeight {
 		return fmt.Errorf("%w: block is before lowest indexed height", execution.ErrDataNotAvailable)
 	}
 

@@ -21,6 +21,8 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
+	"github.com/onflow/flow-go/module/state_synchronization/proxies"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -49,6 +51,8 @@ type BackendEventsSuite struct {
 	receipts          *storagemock.ExecutionReceipts
 	connectionFactory *connectionmock.ConnectionFactory
 	chainID           flow.ChainID
+
+	indexReporter *proxies.IndexReporter
 
 	executionNodes flow.IdentityList
 	execClient     *access.ExecutionAPIClient
@@ -79,6 +83,7 @@ func (s *BackendEventsSuite) SetupTest() {
 
 	s.execClient = access.NewExecutionAPIClient(s.T())
 	s.executionNodes = unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+	s.indexReporter = proxies.NewIndexReporter()
 
 	blockCount := 5
 	s.blocks = make([]*flow.Block, blockCount)
@@ -170,6 +175,7 @@ func (s *BackendEventsSuite) defaultBackend() *backendEvents {
 		nodeCommunicator:  NewNodeCommunicator(false),
 		maxHeightRange:    DefaultMaxHeightRange,
 		queryMode:         IndexQueryModeExecutionNodesOnly,
+		indexReporter:     s.indexReporter,
 	}
 }
 
@@ -249,6 +255,11 @@ func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
 
 	startHeight := s.blocks[0].Header.Height
 	endHeight := s.sealedHead.Height
+
+	reporter := syncmock.NewIndexReporter(s.T())
+	reporter.On("LowestIndexedHeight").Return(startHeight, nil)
+	reporter.On("HighestIndexedHeight").Return(endHeight+10, nil)
+	s.indexReporter.Initialize(reporter)
 
 	s.state.On("Sealed").Return(s.snapshot)
 	s.snapshot.On("Head").Return(s.sealedHead, nil)

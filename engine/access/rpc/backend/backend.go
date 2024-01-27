@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -104,6 +105,7 @@ type Params struct {
 	ScriptExecutor            execution.ScriptExecutor
 	ScriptExecutionMode       IndexQueryMode
 	EventQueryMode            IndexQueryMode
+	IndexReporter             state_synchronization.IndexReporter
 }
 
 // New creates backend instance
@@ -189,6 +191,7 @@ func New(params Params) (*Backend, error) {
 			maxHeightRange:    params.MaxHeightRange,
 			nodeCommunicator:  params.Communicator,
 			queryMode:         params.EventQueryMode,
+			indexReporter:     params.IndexReporter,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: params.Headers,
