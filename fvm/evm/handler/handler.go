@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"math/big"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence/runtime/common"
@@ -153,10 +154,14 @@ func (h *ContractHandler) emitEvent(event *types.Event) {
 func (h *ContractHandler) getBlockContext() types.BlockContext {
 	bp, err := h.blockstore.BlockProposal()
 	handleError(err)
+	rand := gethCommon.Hash{}
+	err = h.backend.ReadRandom(rand[:])
+	handleError(err)
 	return types.BlockContext{
 		BlockNumber:            bp.Height,
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
 		ExtraPrecompiles:       h.precompiles,
+		Random:                 rand,
 	}
 }
 

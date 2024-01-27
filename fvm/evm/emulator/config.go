@@ -200,3 +200,11 @@ func WithExtraPrecompiles(precompiles []types.Precompile) Option {
 		return c
 	}
 }
+
+// WithRandom sets the block context random field
+func WithRandom(rand *gethCommon.Hash) Option {
+	return func(c *Config) *Config {
+		c.BlockContext.Random = rand
+		return c
+	}
+}
