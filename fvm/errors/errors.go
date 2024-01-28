@@ -135,6 +135,7 @@ func HandleRuntimeError(err error) error {
 		return NewUnknownFailure(err)
 	}
 
+	// All other errors are non-fatal Cadence errors.
 	return NewCadenceRuntimeError(runErr)
 }
 

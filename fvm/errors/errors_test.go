@@ -163,18 +163,16 @@ func TestHandleRuntimeError(t *testing.T) {
 			failureCode: FailureCodeLedgerFailure,
 		},
 		{
-			// Note: this currently does not work for embedded ParentErrors, but will once they
-			// are updated to implement `Unwrap() []error`
 			name: "error tree with failure returns failure",
 			err: createCheckerErr([]error{
 				fmt.Errorf("first error"),
 				NewScriptExecutionCancelledError(baseErr),
-				wrappedErrors{[]error{
+				createCheckerErr([]error{
 					fmt.Errorf("first error"),
 					NewScriptExecutionCancelledError(
 						NewLedgerFailure(baseErr),
 					),
-				}},
+				}),
 			}),
 			failureCode: FailureCodeLedgerFailure,
 		},
@@ -398,24 +396,4 @@ func createCheckerErr(errs []error) error {
 			},
 		},
 	}
-}
-
-type wrappedErrors struct {
-	errors []error
-}
-
-func (w wrappedErrors) Error() string {
-	if len(w.errors) == 0 {
-		return ""
-	}
-
-	msg := "wrapped errors:"
-	for _, err := range w.errors {
-		msg += fmt.Sprintf("\n  - %s", err.Error())
-	}
-	return msg
-}
-
-func (w wrappedErrors) Unwrap() []error {
-	return w.errors
 }
