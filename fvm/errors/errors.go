@@ -35,17 +35,6 @@ type CodedFailure interface {
 	error
 }
 
-// WrappedParentError is a wrapper for errors.ParentError to make it conform to the unwrappable
-// interface used by the std errors lib. Once these error types are updated, this can be removed.
-// See https://github.com/onflow/cadence/issues/3035
-type WrappedParentError struct {
-	errors.ParentError
-}
-
-func (err WrappedParentError) Unwrap() []error {
-	return err.ParentError.ChildErrors()
-}
-
 // Is is a utility function to call std error lib `Is` function for instance equality checks.
 func Is(err error, target error) bool {
 	return stdErrors.Is(err, target)
@@ -150,69 +139,7 @@ func HandleRuntimeError(inp error) (err error) {
 		return NewUnknownFailure(err)
 	}
 
-	// wrap all runtime errors as CadenceRuntimeError
-	defer func() {
-		err = WrapCodedError(
-			ErrCodeCadenceRunTimeError,
-			err,
-			"cadence runtime error",
-		)
-	}()
-
-	// cadence ParentError types contain a list of errors encountered during execution
-	// this special case can be removed once these errors are updated to conform to the
-	// unwrappable interface used by the std errors lib. See
-	var parentErr errors.ParentError
-	if As(inp, &parentErr) {
-		err = WrappedParentError{parentErr}
-	}
-
-	// Error lists need to be handled carefully because the std errors lib and the logic in this file
-	// behave subtly different wrt which errors are returned. specifically:
-	// - std errors methods will recursively unwrap single errors and error lists until they finds
-	//   the first match using a depth-first search.
-	// - findRootCodedError will also recursively unwrap single errors and error lists, but it
-	//   will continue to search until it finds the deepest coded error in the first branch containing
-	//   any coded error. This means it will fail to find CodedFailures if there are any CodedErrors
-	//   earlier in the unwrapped error list.
-	var wrapped UnwrappableErrors
-	if As(err, &wrapped) {
-		// first search through all of the errors for a coded failure. this ensures that a failure
-		// is returned if there were any failures anywhere in the error tree.
-		// Note: failure usually means unexpected fatal exceptions, and best to be treated
-		// as high priority to look into before any other errors. That's why as soon as we can
-		// find them, they should be returned.
-		var failure CodedFailure
-		if As(wrapped, &failure) {
-			err = WrapCodedFailure(
-				failure.Code(),
-				inp,
-				"cadence runtime failure caused by",
-			)
-			return
-		}
-
-		// next, do a depth-first search for the first coded error. this ensures that the deepest
-		// coded error in the chain is returned.
-		// Note, the coded error are for known non-fatal error cases, if we can find any of them, we
-		// will highlight its code
-		var coded CodedError
-		if As(wrapped, &coded) {
-			// find the deepest coded error
-			coded, _ = findRootCodedError(coded)
-			// we've already check that the error is a CodedError, so ignoring the return value
-			err = WrapCodedError(
-				coded.Code(),
-				inp,
-				"cadence runtime error caused by",
-			)
-			return
-		}
-	}
-
-	// All other errors are non-fatal Cadence errors.
-	err = runErr
-	return
+	return NewCadenceRuntimeError(runErr)
 }
 
 // HasErrorCode returns true if the error or one of its nested errors matches the
@@ -239,8 +166,6 @@ func Find(originalErr error, code ErrorCode) CodedError {
 	switch err := originalErr.(type) {
 	case *multierror.Error:
 		unwrappedErrs = err.WrappedErrors()
-	case errors.ParentError:
-		unwrappedErrs = err.ChildErrors()
 	case UnwrappableErrors:
 		unwrappedErrs = err.Unwrap()
 
@@ -279,8 +204,6 @@ func FindFailure(originalErr error, code FailureCode) CodedFailure {
 	switch err := originalErr.(type) {
 	case *multierror.Error:
 		unwrappedErrs = err.WrappedErrors()
-	case errors.ParentError:
-		unwrappedErrs = err.ChildErrors()
 	case UnwrappableErrors:
 		unwrappedErrs = err.Unwrap()
 
