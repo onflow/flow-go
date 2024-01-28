@@ -7,10 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/crypto"
 )
 
 func getPRG(t *testing.T) *mrand.Rand {

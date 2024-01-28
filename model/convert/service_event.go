@@ -5,10 +5,11 @@ import (
 	"fmt"
 
 	"github.com/coreos/go-semver/semver"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
+	"github.com/onflow/crypto"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/assignment"
@@ -198,19 +199,22 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 		DKGPhase3FinalView: uint64(dkgPhase3FinalView),
 	}
 
-	// Cadence's unsafeRandom().toString() produces a string of variable length.
-	// Here we pad it with enough 0s to meet the required length.
-	paddedRandomSrcHex := fmt.Sprintf(
-		"%0*s",
-		2*flow.EpochSetupRandomSourceLength,
-		string(randomSrcHex),
-	)
-	setup.RandomSource, err = hex.DecodeString(paddedRandomSrcHex)
+	// random source from the event must be a hex string
+	// containing exactly 128 bits (equivalent to 16 bytes or 32 hex characters)
+	setup.RandomSource, err = hex.DecodeString(string(randomSrcHex))
 	if err != nil {
 		return nil, fmt.Errorf(
 			"could not decode random source hex (%v): %w",
-			paddedRandomSrcHex,
+			randomSrcHex,
 			err,
+		)
+	}
+
+	if len(setup.RandomSource) != flow.EpochSetupRandomSourceLength {
+		return nil, fmt.Errorf(
+			"random source in epoch setup event must be of (%d) bytes, got (%d)",
+			flow.EpochSetupRandomSourceLength,
+			len(setup.RandomSource),
 		)
 	}
 
