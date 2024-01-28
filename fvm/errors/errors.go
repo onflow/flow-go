@@ -26,8 +26,6 @@ type CodedError interface {
 	error
 }
 
-// CodedFailure is a subtype of CodedError specifically for failures
-// This is used to make type checking with `errors.As` and `errors.Is` easier and more accurate
 type CodedFailure interface {
 	Code() FailureCode
 
@@ -60,13 +58,11 @@ func findRootCodedError(err error) (CodedError, bool) {
 		return nil, false
 	}
 
-	// If there are no coded errors, return immediately
 	var coded CodedError
 	if !As(err, &coded) {
 		return nil, true
 	}
 
-	// find the deepest coded error
 	for {
 		var nextCoded CodedError
 		if !As(coded.Unwrap(), &nextCoded) {
@@ -170,8 +166,8 @@ func Find(originalErr error, code ErrorCode) CodedError {
 		unwrappedErrs = err.Unwrap()
 
 	// IMPORTANT: this check needs to run after *multierror.Error because multierror does implement
-	// the Unwrappable interface, but its implementation causes child errors of those contained in
-	// its error list to be skipped.
+	// the Unwrappable interface, however its implementation only visits the base errors in the list,
+	// and ignores their descendants.
 	case Unwrappable:
 		coded, ok := err.(CodedError)
 		if ok && coded.Code() == code {
@@ -208,8 +204,8 @@ func FindFailure(originalErr error, code FailureCode) CodedFailure {
 		unwrappedErrs = err.Unwrap()
 
 	// IMPORTANT: this check needs to run after *multierror.Error because multierror does implement
-	// the Unwrappable interface, but its implementation causes child errors of those contained in
-	// its error list to be skipped.
+	// the Unwrappable interface, however its implementation only visits the base errors in the list,
+	// and ignores their descendants.
 	case Unwrappable:
 		coded, ok := err.(CodedFailure)
 		if ok && coded.Code() == code {
