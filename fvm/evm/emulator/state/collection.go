@@ -3,7 +3,6 @@ package state
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"math"
 	"runtime"
@@ -47,14 +46,14 @@ func NewCollectionProvider(
 // calling twice for the same collection might result in odd-behaviours
 // currently collection provider doesn't do any internal caching to protect aginast these cases
 func (cp *CollectionProvider) CollectionByID(collectionID []byte) (*Collection, error) {
-	storageID, err := atree.NewStorageIDFromRawBytes(collectionID)
+	storageID, err := atree.NewSlabIDFromRawBytes(collectionID)
 	if err != nil {
 		return nil, err
 	}
 	// sanity check the storage ID address
-	if storageID.Address != cp.rootAddr {
-		return nil, fmt.Errorf("root address mismatch %x != %x", storageID.Address, cp.rootAddr)
-	}
+	//if storageID != cp.rootAddr {
+	//	return nil, fmt.Errorf("root address mismatch %x != %x", storageID.Address, cp.rootAddr)
+	//}
 
 	omap, err := atree.NewMapWithRootID(cp.storage, storageID, atree.NewDefaultDigesterBuilder())
 	if err != nil {
@@ -69,20 +68,21 @@ func (cp *CollectionProvider) CollectionByID(collectionID []byte) (*Collection, 
 
 // NewCollection constructs a new collection
 func (cp *CollectionProvider) NewCollection() (*Collection, error) {
-	omap, err := atree.NewMap(cp.storage, cp.rootAddr, atree.NewDefaultDigesterBuilder(), emptyTypeInfo{})
-	if err != nil {
-		return nil, err
-	}
-	storageIDBytes := make([]byte, storageIDSize)
-	_, err = omap.StorageID().ToRawBytes(storageIDBytes)
-	if err != nil {
-		return nil, err
-	}
-	return &Collection{
-		storage:      cp.storage,
-		omap:         omap,
-		collectionID: storageIDBytes, // we reuse the storageID bytes as collectionID
-	}, nil
+	panic("")
+	//omap, err := atree.NewMap(cp.storage, cp.rootAddr, atree.NewDefaultDigesterBuilder(), emptyTypeInfo{})
+	//if err != nil {
+	//	return nil, err
+	//}
+	//storageIDBytes := make([]byte, storageIDSize)
+	//_, err = omap.StorageID().ToRawBytes(storageIDBytes)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//return &Collection{
+	//	storage:      cp.storage,
+	//	omap:         omap,
+	//	collectionID: storageIDBytes, // we reuse the storageID bytes as collectionID
+	//}, nil
 }
 
 // Commit commits all changes to the collections with changes
@@ -110,91 +110,94 @@ func (c *Collection) CollectionID() []byte {
 //
 // if key doesn't exist it returns nil (no error)
 func (c *Collection) Get(key []byte) ([]byte, error) {
-	data, err := c.omap.Get(compare, hashInputProvider, NewByteStringValue(key))
-	if err != nil {
-		var keyNotFoundError *atree.KeyNotFoundError
-		if errors.As(err, &keyNotFoundError) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	value, err := data.StoredValue(c.omap.Storage)
-	if err != nil {
-		return nil, err
-	}
-
-	return value.(ByteStringValue).Bytes(), nil
+	panic("")
+	//data, err := c.omap.Get(compare, hashInputProvider, NewByteStringValue(key))
+	//if err != nil {
+	//	var keyNotFoundError *atree.KeyNotFoundError
+	//	if errors.As(err, &keyNotFoundError) {
+	//		return nil, nil
+	//	}
+	//	return nil, err
+	//}
+	//
+	//value, err := data.StoredValue(c.omap.Storage)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//return value.(ByteStringValue).Bytes(), nil
 }
 
 // Set sets the value for the given key
 //
 // if a value already stored at the given key it replaces the value
 func (c *Collection) Set(key, value []byte) error {
-	existingValueStorable, err := c.omap.Set(compare, hashInputProvider, NewByteStringValue(key), NewByteStringValue(value))
-	if err != nil {
-		return err
-	}
-
-	if id, ok := existingValueStorable.(atree.StorageIDStorable); ok {
-		// NOTE: deep remove isn't necessary because value is ByteStringValue (not container)
-		err := c.storage.Remove(atree.StorageID(id))
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	panic("")
+	//existingValueStorable, err := c.omap.Set(compare, hashInputProvider, NewByteStringValue(key), NewByteStringValue(value))
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//if id, ok := existingValueStorable.(atree.StorageIDStorable); ok {
+	//	// NOTE: deep remove isn't necessary because value is ByteStringValue (not container)
+	//	err := c.storage.Remove(atree.StorageID(id))
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
+	//return nil
 }
 
 // Remove removes a key from the collection
 //
 // if the key doesn't exist it return no error
 func (c *Collection) Remove(key []byte) error {
-	_, existingValueStorable, err := c.omap.Remove(compare, hashInputProvider, NewByteStringValue(key))
-	if err != nil {
-		var keyNotFoundError *atree.KeyNotFoundError
-		if errors.As(err, &keyNotFoundError) {
-			return nil
-		}
-		return err
-	}
-
-	if id, ok := existingValueStorable.(atree.StorageIDStorable); ok {
-		// NOTE: deep remove isn't necessary because value is ByteStringValue (not container)
-		err := c.storage.Remove(atree.StorageID(id))
-		if err != nil {
-			return err
-		}
-	}
+	//_, existingValueStorable, err := c.omap.Remove(compare, hashInputProvider, NewByteStringValue(key))
+	//if err != nil {
+	//	var keyNotFoundError *atree.KeyNotFoundError
+	//	if errors.As(err, &keyNotFoundError) {
+	//		return nil
+	//	}
+	//	return err
+	//}
+	//
+	//if id, ok := existingValueStorable.(atree.StorageIDStorable); ok {
+	//	// NOTE: deep remove isn't necessary because value is ByteStringValue (not container)
+	//	err := c.storage.Remove(atree.StorageID(id))
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
 	return nil
 }
 
 // Destroy destroys the whole collection
 func (c *Collection) Destroy() ([][]byte, error) {
-	var cachedErr error
-	keys := make([][]byte, c.omap.Count())
-	i := 0
-	err := c.omap.PopIterate(func(keyStorable atree.Storable, valueStorable atree.Storable) {
-		if id, ok := valueStorable.(atree.StorageIDStorable); ok {
-			err := c.storage.Remove(atree.StorageID(id))
-			if err != nil && cachedErr == nil {
-				cachedErr = err
-			}
-		}
-		key, err := keyStorable.StoredValue(c.omap.Storage)
-		if err != nil && cachedErr == nil {
-			cachedErr = err
-		}
-		keys[i] = key.(ByteStringValue).Bytes()
-		i++
-	})
-	if cachedErr != nil {
-		return keys, cachedErr
-	}
-	if err != nil {
-		return keys, err
-	}
-	return keys, c.storage.Remove(c.omap.StorageID())
+	//var cachedErr error
+	//keys := make([][]byte, c.omap.Count())
+	//i := 0
+	//err := c.omap.PopIterate(func(keyStorable atree.Storable, valueStorable atree.Storable) {
+	//	if id, ok := valueStorable.(atree.StorageIDStorable); ok {
+	//		err := c.storage.Remove(atree.StorageID(id))
+	//		if err != nil && cachedErr == nil {
+	//			cachedErr = err
+	//		}
+	//	}
+	//	key, err := keyStorable.StoredValue(c.omap.Storage)
+	//	if err != nil && cachedErr == nil {
+	//		cachedErr = err
+	//	}
+	//	keys[i] = key.(ByteStringValue).Bytes()
+	//	i++
+	//})
+	//if cachedErr != nil {
+	//	return keys, cachedErr
+	//}
+	//if err != nil {
+	//	return keys, err
+	//}
+	//return keys, c.storage.Remove(c.omap.StorageID())
+	panic("")
 }
 
 // Size returns the number of items in the collection
@@ -224,29 +227,30 @@ func (v ByteStringValue) StoredValue(_ atree.SlabStorage) (atree.Value, error) {
 }
 
 func (v ByteStringValue) Storable(storage atree.SlabStorage, address atree.Address, maxInlineSize uint64) (atree.Storable, error) {
-	if uint64(v.ByteSize()) <= maxInlineSize {
-		return v, nil
-	}
-
-	// Create StorableSlab
-	id, err := storage.GenerateStorageID(address)
-	if err != nil {
-		return nil, err
-	}
-
-	slab := &atree.StorableSlab{
-		StorageID: id,
-		Storable:  v,
-	}
-
-	// Store StorableSlab in storage
-	err = storage.Store(id, slab)
-	if err != nil {
-		return nil, err
-	}
-
-	// Return storage id as storable
-	return atree.StorageIDStorable(id), nil
+	//if uint64(v.ByteSize()) <= maxInlineSize {
+	//	return v, nil
+	//}
+	//
+	//// Create StorableSlab
+	//id, err := storage.GenerateStorageID(address)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//slab := &atree.StorableSlab{
+	//	StorageID: id,
+	//	Storable:  v,
+	//}
+	//
+	//// Store StorableSlab in storage
+	//err = storage.Store(id, slab)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//// Return storage id as storable
+	//return atree.StorageIDStorable(id), nil
+	panic("")
 }
 
 func (v ByteStringValue) Encode(enc *atree.Encoder) error {
@@ -311,7 +315,7 @@ func (v ByteStringValue) Bytes() []byte {
 	return v.data
 }
 
-func decodeStorable(dec *cbor.StreamDecoder, _ atree.StorageID) (atree.Storable, error) {
+func decodeStorable(dec *cbor.StreamDecoder, _ atree.SlabIndex) (atree.Storable, error) {
 	t, err := dec.NextType()
 	if err != nil {
 		return nil, err
@@ -333,8 +337,8 @@ func decodeStorable(dec *cbor.StreamDecoder, _ atree.StorageID) (atree.Storable,
 
 		switch tagNumber {
 
-		case atree.CBORTagStorageID:
-			return atree.DecodeStorageIDStorable(dec)
+		//case atree.CBORTagStorageID:
+		//	return atree.DecodeStorageIDStorable(dec)
 
 		default:
 			return nil, fmt.Errorf("invalid tag number %d", tagNumber)
@@ -394,12 +398,27 @@ func NewPersistentSlabStorage(baseStorage atree.BaseStorage) (*atree.PersistentS
 		baseStorage,
 		encMode,
 		decMode,
-		decodeStorable,
+		nil,
 		decodeTypeInfo,
 	), nil
 }
 
 type emptyTypeInfo struct{}
+
+func (i emptyTypeInfo) IsComposite() bool {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (i emptyTypeInfo) Identifier() string {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (i emptyTypeInfo) Copy() atree.TypeInfo {
+	//TODO implement me
+	panic("implement me")
+}
 
 var _ atree.TypeInfo = emptyTypeInfo{}
 

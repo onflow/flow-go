@@ -10,14 +10,12 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -171,70 +169,70 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 	domain string,
 ) error {
 
-	storageMap := mr.Storage.GetStorageMap(mr.Address, domain, false)
-	if storageMap == nil {
-		// no storage for this domain
-		return nil
-	}
-	storageMapIds[string(atree.SlabIndexToLedgerKey(storageMap.StorageID().Index))] = struct{}{}
-
-	iterator := storageMap.Iterator(util.NopMemoryGauge{})
-	keys := make([]interpreter.StringStorageMapKey, 0, storageMap.Count())
-	// to be safe avoid modifying the map while iterating
-	for {
-		key := iterator.NextKey()
-		if key == nil {
-			break
-		}
-
-		stringKey, ok := key.(interpreter.StringAtreeValue)
-		if !ok {
-			return fmt.Errorf("invalid key type %T, expected interpreter.StringAtreeValue", key)
-		}
-
-		keys = append(keys, interpreter.StringStorageMapKey(stringKey))
-	}
-
-	for _, key := range keys {
-		err := func() error {
-			var value interpreter.Value
-
-			err := capturePanic(func() {
-				value = storageMap.ReadValue(util.NopMemoryGauge{}, key)
-			})
-			if err != nil {
-				return fmt.Errorf("failed to read value for key %s: %w", key, err)
-			}
-
-			value, err = m.cloneValue(mr, value)
-
-			if err != nil {
-				return fmt.Errorf("failed to clone value for key %s: %w", key, err)
-			}
-
-			err = capturePanic(func() {
-				// set value will first purge the old value
-				storageMap.SetValue(mr.Interpreter, key, value)
-			})
-
-			if err != nil {
-				return fmt.Errorf("failed to set value for key %s: %w", key, err)
-			}
-
-			return nil
-		}()
-		if err != nil {
-
-			m.rw.Write(migrationProblem{
-				Address: mr.Address.Hex(),
-				Size:    len(mr.Snapshot.Payloads),
-				Key:     string(key),
-				Kind:    "migration_failure",
-				Msg:     err.Error(),
-			})
-			return skippableAccountError
-		}
-	}
+	//storageMap := mr.Storage.GetStorageMap(mr.Address, domain, false)
+	//if storageMap == nil {
+	//	// no storage for this domain
+	//	return nil
+	//}
+	//storageMapIds[string(atree.SlabIndexToLedgerKey(storageMap.StorageID().Index))] = struct{}{}
+	//
+	//iterator := storageMap.Iterator(util.NopMemoryGauge{})
+	//keys := make([]interpreter.StringStorageMapKey, 0, storageMap.Count())
+	//// to be safe avoid modifying the map while iterating
+	//for {
+	//	key := iterator.NextKey()
+	//	if key == nil {
+	//		break
+	//	}
+	//
+	//	stringKey, ok := key.(interpreter.StringAtreeValue)
+	//	if !ok {
+	//		return fmt.Errorf("invalid key type %T, expected interpreter.StringAtreeValue", key)
+	//	}
+	//
+	//	keys = append(keys, interpreter.StringStorageMapKey(stringKey))
+	//}
+	//
+	//for _, key := range keys {
+	//	err := func() error {
+	//		var value interpreter.Value
+	//
+	//		err := capturePanic(func() {
+	//			value = storageMap.ReadValue(util.NopMemoryGauge{}, key)
+	//		})
+	//		if err != nil {
+	//			return fmt.Errorf("failed to read value for key %s: %w", key, err)
+	//		}
+	//
+	//		value, err = m.cloneValue(mr, value)
+	//
+	//		if err != nil {
+	//			return fmt.Errorf("failed to clone value for key %s: %w", key, err)
+	//		}
+	//
+	//		err = capturePanic(func() {
+	//			// set value will first purge the old value
+	//			storageMap.SetValue(mr.Interpreter, key, value)
+	//		})
+	//
+	//		if err != nil {
+	//			return fmt.Errorf("failed to set value for key %s: %w", key, err)
+	//		}
+	//
+	//		return nil
+	//	}()
+	//	if err != nil {
+	//
+	//		m.rw.Write(migrationProblem{
+	//			Address: mr.Address.Hex(),
+	//			Size:    len(mr.Snapshot.Payloads),
+	//			Key:     string(key),
+	//			Kind:    "migration_failure",
+	//			Msg:     err.Error(),
+	//		})
+	//		return skippableAccountError
+	//	}
+	//}
 
 	return nil
 }

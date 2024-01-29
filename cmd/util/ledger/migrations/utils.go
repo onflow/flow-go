@@ -51,11 +51,11 @@ func (a *AccountsAtreeLedger) ValueExists(owner, key []byte) (exists bool, err e
 	return len(v) > 0, nil
 }
 
-// AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
-func (a *AccountsAtreeLedger) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	v, err := a.Accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
+// AllocateSlabIndex allocates new storage index under the owner accounts to store a new register
+func (a *AccountsAtreeLedger) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
+	v, err := a.Accounts.AllocateSlabIndex(flow.BytesToAddress(owner))
 	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
+		return atree.SlabIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
 	}
 	return v, nil
 }
