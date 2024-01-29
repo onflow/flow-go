@@ -15,7 +15,7 @@ func TestAccountStatus(t *testing.T) {
 	s := environment.NewAccountStatus()
 
 	t.Run("test setting values", func(t *testing.T) {
-		index := atree.StorageIndex{1, 2, 3, 4, 5, 6, 7, 8}
+		index := atree.SlabIndex{1, 2, 3, 4, 5, 6, 7, 8}
 		s.SetStorageIndex(index)
 		s.SetPublicKeyCount(34)
 		s.SetStorageUsed(56)
@@ -58,7 +58,7 @@ func TestAccountStatus(t *testing.T) {
 
 		migrated, err := environment.AccountStatusFromBytes(oldBytes)
 		require.NoError(t, err)
-		require.Equal(t, atree.StorageIndex{0, 0, 0, 0, 0, 0, 0, 6}, migrated.StorageIndex())
+		require.Equal(t, atree.SlabIndex{0, 0, 0, 0, 0, 0, 0, 6}, migrated.StorageIndex())
 		require.Equal(t, uint64(5), migrated.PublicKeyCount())
 		require.Equal(t, uint64(7)+increaseInSize, migrated.StorageUsed())
 		require.Equal(t, uint64(0), migrated.AccountIdCounter())
