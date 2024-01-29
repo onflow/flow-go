@@ -24,8 +24,8 @@ import (
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
-	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -91,7 +91,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		irrecoverable.SignalerContext,
 		zerolog.Logger,
 		flow.Identifier,
-		*p2pconf.RpcInspectorParameters,
+		*p2pconfig.RpcInspectorParameters,
 		module.GossipSubMetrics,
 		metrics.HeroCacheMetricsFactory,
 		flownet.NetworkingType,
@@ -104,7 +104,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 
-	cfg.NetworkConfig.GossipSub.ScoringParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond // speed up the test
+	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond // speed up the test
 
 	node1, id1 := p2ptest.NodeFixture(
 		t,

@@ -12,49 +12,49 @@ import (
 
 const (
 	// [2_000, 3_000) reserved for the FVM
-	ComputationKindHash                       = 2001
-	ComputationKindVerifySignature            = 2002
-	ComputationKindAddAccountKey              = 2003
-	ComputationKindAddEncodedAccountKey       = 2004
-	ComputationKindAllocateStorageIndex       = 2005
-	ComputationKindCreateAccount              = 2006
-	ComputationKindEmitEvent                  = 2007
-	ComputationKindGenerateUUID               = 2008
-	ComputationKindGetAccountAvailableBalance = 2009
-	ComputationKindGetAccountBalance          = 2010
-	ComputationKindGetAccountContractCode     = 2011
-	ComputationKindGetAccountContractNames    = 2012
-	ComputationKindGetAccountKey              = 2013
-	ComputationKindGetBlockAtHeight           = 2014
-	ComputationKindGetCode                    = 2015
-	ComputationKindGetCurrentBlockHeight      = 2016
-	_                                         = 2017
-	ComputationKindGetStorageCapacity         = 2018
-	ComputationKindGetStorageUsed             = 2019
-	ComputationKindGetValue                   = 2020
-	ComputationKindRemoveAccountContractCode  = 2021
-	ComputationKindResolveLocation            = 2022
-	ComputationKindRevokeAccountKey           = 2023
-	ComputationKindRevokeEncodedAccountKey    = 2024
-	_                                         = 2025
-	ComputationKindSetValue                   = 2026
-	ComputationKindUpdateAccountContractCode  = 2027
-	ComputationKindValidatePublicKey          = 2028
-	ComputationKindValueExists                = 2029
-	ComputationKindAccountKeysCount           = 2030
-	ComputationKindBLSVerifyPOP               = 2031
-	ComputationKindBLSAggregateSignatures     = 2032
-	ComputationKindBLSAggregatePublicKeys     = 2033
-	ComputationKindGetOrLoadProgram           = 2034
-	ComputationKindGenerateAccountLocalID     = 2035
-	ComputationKindGetRandomSourceHistory     = 2036
-	ComputationKindEVMGasUsage                = 2037
-	ComputationKindRLPEncoding                = 2038
-	ComputationKindRLPDecoding                = 2039
-	ComputationKindEncodeEvent                = 2040
-	_                                         = 2041
-	ComputationKindEVMEncodeABI               = 2042
-	ComputationKindEVMDecodeABI               = 2042
+	ComputationKindHash = 2001 + iota
+	ComputationKindVerifySignature
+	ComputationKindAddAccountKey
+	ComputationKindAddEncodedAccountKey
+	ComputationKindAllocateStorageIndex
+	ComputationKindCreateAccount
+	ComputationKindEmitEvent
+	ComputationKindGenerateUUID
+	ComputationKindGetAccountAvailableBalance
+	ComputationKindGetAccountBalance
+	ComputationKindGetAccountContractCode
+	ComputationKindGetAccountContractNames
+	ComputationKindGetAccountKey
+	ComputationKindGetBlockAtHeight
+	ComputationKindGetCode
+	ComputationKindGetCurrentBlockHeight
+	_
+	ComputationKindGetStorageCapacity
+	ComputationKindGetStorageUsed
+	ComputationKindGetValue
+	ComputationKindRemoveAccountContractCode
+	ComputationKindResolveLocation
+	ComputationKindRevokeAccountKey
+	ComputationKindRevokeEncodedAccountKey
+	_
+	ComputationKindSetValue
+	ComputationKindUpdateAccountContractCode
+	ComputationKindValidatePublicKey
+	ComputationKindValueExists
+	ComputationKindAccountKeysCount
+	ComputationKindBLSVerifyPOP
+	ComputationKindBLSAggregateSignatures
+	ComputationKindBLSAggregatePublicKeys
+	ComputationKindGetOrLoadProgram
+	ComputationKindGenerateAccountLocalID
+	ComputationKindGetRandomSourceHistory
+	ComputationKindEVMGasUsage
+	ComputationKindRLPEncoding
+	ComputationKindRLPDecoding
+	ComputationKindEncodeEvent
+	_
+	ComputationKindEVMEncodeABI
+	ComputationKindEVMDecodeABI
 )
 
 type Meter interface {
