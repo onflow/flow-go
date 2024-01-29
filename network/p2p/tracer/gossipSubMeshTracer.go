@@ -67,8 +67,8 @@ type RpcSentTrackerConfig struct {
 }
 
 type DuplicateMessageTrackerCacheConfig struct {
-	CacheSize uint32  `validate:"required"`
-	Decay     float64 `validate:"required"`
+	CacheSize uint32  `validate:"gt=0"`
+	Decay     float64 `validate:"gt=0"`
 }
 
 type GossipSubMeshTracerConfig struct {
