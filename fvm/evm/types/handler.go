@@ -25,7 +25,7 @@ import (
 // ContractHandler handles operations on the evm environment
 type ContractHandler interface {
 	// DeployCOA deploys a Cadence owned account and return the address
-	DeployCOA() Address
+	DeployCOA(uuid uint64) Address
 
 	// AccountByAddress returns an account by address
 	// if isAuthorized is set, it allows for functionality like `call`, `deploy`
@@ -55,7 +55,7 @@ type Backend interface {
 // AddressAllocator allocates addresses, used by the handler
 type AddressAllocator interface {
 	// AllocateAddress allocates an address to be used by a COA resource
-	AllocateCOAAddress() (Address, error)
+	AllocateCOAAddress(uuid uint64) Address
 
 	// COAFactoryAddress returns the address for the COA factory
 	COAFactoryAddress() Address

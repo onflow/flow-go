@@ -37,28 +37,8 @@ func (aa *AddressAllocator) COAFactoryAddress() types.Address {
 }
 
 // AllocateCOAAddress allocates an address for COA
-func (aa *AddressAllocator) AllocateCOAAddress() (types.Address, error) {
-	data, err := aa.led.GetValue(aa.flexAddress[:], []byte(ledgerAddressAllocatorKey))
-	if err != nil {
-		return types.Address{}, err
-	}
-	// default value for uuid is 1, zero is not good for shuffling
-	uuid := uint64(1)
-	if len(data) > 0 {
-		uuid = binary.BigEndian.Uint64(data)
-	}
-
-	target := MakeCOAAddress(uuid)
-
-	// store new uuid
-	newData := make([]byte, 8)
-	binary.BigEndian.PutUint64(newData, uuid+1)
-	err = aa.led.SetValue(aa.flexAddress[:], []byte(ledgerAddressAllocatorKey), newData)
-	if err != nil {
-		return types.Address{}, err
-	}
-
-	return target, nil
+func (aa *AddressAllocator) AllocateCOAAddress(uuid uint64) types.Address {
+	return MakeCOAAddress(uuid)
 }
 
 func MakeCOAAddress(index uint64) types.Address {

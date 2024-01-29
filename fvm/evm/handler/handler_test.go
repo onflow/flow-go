@@ -198,7 +198,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 				eoa := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
 
 				// deposit 1 Flow to the foa account
-				addr := handler.DeployCOA()
+				addr := handler.DeployCOA(1)
 				orgBalance := types.NewBalanceFromUFix64(types.OneFlowInUFix64)
 				vault := types.NewFlowTokenVault(orgBalance)
 				foa := handler.AccountByAddress(addr, true)
@@ -224,7 +224,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 				)
 
 				// setup coinbase
-				foa2 := handler.DeployCOA()
+				foa2 := handler.DeployCOA(2)
 				account2 := handler.AccountByAddress(foa2, true)
 				require.Equal(t, types.NewBalanceFromUFix64(0), account2.Balance())
 
@@ -278,7 +278,7 @@ func TestHandler_COA(t *testing.T) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				handler := SetupHandler(t, backend, rootAddr)
 
-				foa := handler.AccountByAddress(handler.DeployCOA(), true)
+				foa := handler.AccountByAddress(handler.DeployCOA(1), true)
 				require.NotNil(t, foa)
 
 				zeroBalance := types.NewBalance(big.NewInt(0))
@@ -342,12 +342,12 @@ func TestHandler_COA(t *testing.T) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				h := SetupHandler(t, backend, rootAddr)
 
-				coa := h.DeployCOA()
+				coa := h.DeployCOA(1)
 				acc := h.AccountByAddress(coa, true)
 				require.NotEmpty(t, acc.Code())
 
 				// make a second account with some money
-				coa2 := h.DeployCOA()
+				coa2 := h.DeployCOA(2)
 				acc2 := h.AccountByAddress(coa2, true)
 				acc2.Deposit(types.NewFlowTokenVault(types.MakeABalanceInFlow(100)))
 
@@ -501,7 +501,7 @@ func TestHandler_COA(t *testing.T) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				handler := SetupHandler(t, backend, rootAddr)
 
-				foa := handler.AccountByAddress(handler.DeployCOA(), true)
+				foa := handler.AccountByAddress(handler.DeployCOA(1), true)
 				require.NotNil(t, foa)
 
 				// deposit 10000 flow
@@ -543,7 +543,7 @@ func TestHandler_COA(t *testing.T) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				h := SetupHandler(t, backend, rootAddr)
 
-				foa := h.AccountByAddress(h.DeployCOA(), true)
+				foa := h.AccountByAddress(h.DeployCOA(1), true)
 				require.NotNil(t, foa)
 
 				vault := types.NewFlowTokenVault(types.MakeABalanceInFlow(10000))
@@ -569,7 +569,7 @@ func TestHandler_COA(t *testing.T) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				handler := SetupHandler(t, backend, rootAddr)
 
-				foa := handler.AccountByAddress(handler.DeployCOA(), true)
+				foa := handler.AccountByAddress(handler.DeployCOA(1), true)
 				require.NotNil(t, foa)
 
 				vault := types.NewFlowTokenVault(types.MakeABalanceInFlow(100))

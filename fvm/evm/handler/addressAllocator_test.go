@@ -25,16 +25,14 @@ func TestAddressAllocator(t *testing.T) {
 			require.False(t, types.IsACOAAddress(adr))
 
 			// test default value fall back
-			adr, err = aa.AllocateCOAAddress()
-			require.NoError(t, err)
+			adr = aa.AllocateCOAAddress(1)
 			expectedAddress = types.NewAddress(gethCommon.HexToAddress("0x000000000000000000000002ffeeddccbbaa9987"))
 			require.Equal(t, expectedAddress, adr)
 			// check conforming to types
 			require.True(t, types.IsACOAAddress(adr))
 
 			// continous allocation logic
-			adr, err = aa.AllocateCOAAddress()
-			require.NoError(t, err)
+			adr = aa.AllocateCOAAddress(2)
 			expectedAddress = types.NewAddress(gethCommon.HexToAddress("0x000000000000000000000002ffddbb997755330e"))
 			require.Equal(t, expectedAddress, adr)
 			// check conforming to types

@@ -1140,6 +1140,12 @@ func newInternalEVMTypeCallFunction(
 const internalEVMTypeCreateBridgedAccountFunctionName = "createBridgedAccount"
 
 var internalEVMTypeCreateBridgedAccountFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "uuid",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
+		},
+	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
 }
 
@@ -1152,7 +1158,11 @@ func newInternalEVMTypeCreateBridgedAccountFunction(
 		internalEVMTypeCreateBridgedAccountFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			inter := invocation.Interpreter
-			address := handler.DeployCOA()
+			uuid, ok := invocation.Arguments[0].(interpreter.UInt64Value)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+			address := handler.DeployCOA(uint64(uuid))
 			return EVMAddressToAddressBytesArrayValue(inter, address)
 		},
 	)
