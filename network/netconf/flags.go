@@ -241,7 +241,7 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		"decay rate for the peer duplicate message counters.")
 	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.RpcTracerKey, p2pconfig.DuplicateMessageCacheTrackerKey, p2pconfig.SkipDecayThresholdKey),
 		config.GossipSub.RpcTracer.DuplicateMessageTrackerConfig.SkipDecayThreshold,
-		"the threshold for which when the counter is below this value, the decay function will not be called")
+		"the duplicate message count threshold below which the penalty will not be decayed")
 
 	flags.Int(BuildFlagName(gossipsubKey, p2pconfig.RpcTracerKey, p2pconfig.RPCSentTrackerNumOfWorkersKey), config.GossipSub.RpcTracer.RpcSentTrackerNumOfWorkers,
 		"number of workers for the rpc sent tracker worker pool.")
