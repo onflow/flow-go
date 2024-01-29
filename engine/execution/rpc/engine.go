@@ -204,11 +204,9 @@ func (h *handler) ExecuteScriptAtBlockID(
 		return nil, status.Errorf(codes.InvalidArgument, "failed to execute script: %v", err)
 	}
 
-	// TODO: add compUsage to the ExecuteScriptAtBlockIDResponse when its updated
-	_ = compUsage
-
 	res := &execution.ExecuteScriptAtBlockIDResponse{
-		Value: value,
+		Value:            value,
+		ComputationUsage: compUsage,
 	}
 
 	return res, nil
