@@ -483,13 +483,19 @@ func (t *GossipSubMeshTracer) LastHighestIHaveRPCSize() int64 {
 func (t *GossipSubMeshTracer) DuplicateMessageCount(peerID peer.ID) float64 {
 	count, found, err := t.duplicateMessageTrackerCache.GetWithInit(peerID)
 	if err != nil {
-		t.logger.Err(err).
+		t.logger.Fatal().
+			Err(err).
 			Bool(logging.KeyNetworkingSecurity, true).
 			Str("peer_id", peerID.String()).
 			Msg("failed to get duplicate message count for peer")
 		return 0
 	}
 	if !found {
+		t.logger.Fatal().
+			Err(err).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Str("peer_id", peerID.String()).
+			Msg("failed to initialize duplicate message count for peer during get with init")
 		return 0
 	}
 	return count
