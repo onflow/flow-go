@@ -70,7 +70,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics/unstaked"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
-	"github.com/onflow/flow-go/module/state_synchronization/proxies"
 	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/network"
 	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
@@ -279,8 +278,8 @@ type FlowAccessNodeBuilder struct {
 	ExecutionIndexer           *indexer.Indexer
 	ExecutionIndexerCore       *indexer.IndexerCore
 	ScriptExecutor             *backend.ScriptExecutor
-	RegistersStoreProxy        *proxies.RegistersStore
-	IndexReporterProxy         *proxies.IndexReporter
+	RegistersAsyncStore        *execution.RegistersAsyncStore
+	EventsIndex                *backend.EventsIndex
 	IndexerDependencies        *cmd.DependencyList
 
 	// The sync engine participants provider is the libp2p peer store for the access node
@@ -775,16 +774,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, err
 				}
 
-				err = builder.IndexReporterProxy.Initialize(builder.ExecutionIndexer)
-				if err != nil {
-					return nil, err
-				}
-
-				err = builder.RegistersStoreProxy.Initialize(registers)
-				if err != nil {
-					return nil, err
-				}
-
 				// setup requester to notify indexer when new execution data is received
 				execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
 
@@ -803,7 +792,20 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, err
 				}
 
-				builder.ScriptExecutor.InitReporter(builder.ExecutionIndexer, scripts)
+				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts)
+				if err != nil {
+					return nil, err
+				}
+
+				err = builder.EventsIndex.Initialize(builder.ExecutionIndexer)
+				if err != nil {
+					return nil, err
+				}
+
+				err = builder.RegistersAsyncStore.Initialize(registers)
+				if err != nil {
+					return nil, err
+				}
 
 				return builder.ExecutionIndexer, nil
 			}, builder.IndexerDependencies)
@@ -844,7 +846,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.stateStreamConf,
 				node.State,
 				node.Storage.Headers,
-				node.Storage.Events,
 				node.Storage.Seals,
 				node.Storage.Results,
 				builder.ExecutionDataStore,
@@ -852,8 +853,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				broadcaster,
 				builder.executionDataConfig.InitialBlockHeight,
 				highestAvailableHeight,
-				builder.RegistersStoreProxy,
-				builder.IndexReporterProxy,
+				builder.RegistersAsyncStore,
+				builder.EventsIndex,
 				useIndex,
 			)
 			if err != nil {
@@ -1445,16 +1446,16 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
 			return nil
 		}).
-		Module("register store proxy", func(node *cmd.NodeConfig) error {
-			builder.RegistersStoreProxy = proxies.NewRegistersStore()
-			return nil
-		}).
-		Module("index reporter proxy", func(node *cmd.NodeConfig) error {
-			builder.IndexReporterProxy = proxies.NewIndexReporter()
+		Module("async register store", func(node *cmd.NodeConfig) error {
+			builder.RegistersAsyncStore = execution.NewRegistersAsyncStore()
 			return nil
 		}).
 		Module("events storage", func(node *cmd.NodeConfig) error {
 			builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
+			return nil
+		}).
+		Module("events index", func(node *cmd.NodeConfig) error {
+			builder.EventsIndex = backend.NewEventsIndex(builder.Storage.Events)
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -1508,7 +1509,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				HistoricalAccessNodes:     builder.HistoricalAccessRPCs,
 				Blocks:                    node.Storage.Blocks,
 				Headers:                   node.Storage.Headers,
-				Events:                    node.Storage.Events,
 				Collections:               node.Storage.Collections,
 				Transactions:              node.Storage.Transactions,
 				ExecutionReceipts:         node.Storage.Receipts,
@@ -1528,7 +1528,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ScriptExecutor:            builder.ScriptExecutor,
 				ScriptExecutionMode:       scriptExecMode,
 				EventQueryMode:            eventQueryMode,
-				IndexReporter:             builder.IndexReporterProxy,
+				EventsIndex:               builder.EventsIndex,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)

@@ -20,16 +20,14 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
 type backendEvents struct {
 	headers           storage.Headers
-	events            storage.Events
 	executionReceipts storage.ExecutionReceipts
 	state             protocol.State
 	chain             flow.Chain
@@ -38,7 +36,7 @@ type backendEvents struct {
 	maxHeightRange    uint
 	nodeCommunicator  Communicator
 	queryMode         IndexQueryMode
-	indexReporter     state_synchronization.IndexReporter
+	eventsIndex       *EventsIndex
 }
 
 // blockMetadata is used to capture information about requested blocks to avoid repeated blockID
@@ -230,25 +228,16 @@ func (b *backendEvents) getBlockEventsFromStorage(
 	missing := make([]blockMetadata, 0)
 	resp := make([]flow.BlockEvents, 0)
 
-	lowestHeight, highestHeight, err := b.getIndexerHeights()
-	if err != nil {
-		return nil, nil, err
-	}
-
 	for _, blockInfo := range blockInfos {
 		if ctx.Err() != nil {
 			return nil, nil, rpc.ConvertError(ctx.Err(), "failed to get events from storage", codes.Canceled)
 		}
 
-		if blockInfo.Height < lowestHeight || blockInfo.Height > highestHeight {
-			missing = append(missing, blockInfo)
-			continue
-		}
-
-		events, err := b.events.ByBlockID(blockInfo.ID)
+		events, err := b.eventsIndex.GetEvents(blockInfo.ID, blockInfo.Height)
 		if err != nil {
-			// Note: if there are no events for a block, an empty slice is returned
-			if errors.Is(err, storage.ErrNotFound) {
+			if errors.Is(err, storage.ErrNotFound) ||
+				errors.Is(err, storage.ErrHeightNotIndexed) ||
+				errors.Is(err, indexer.ErrIndexNotInitialized) {
 				missing = append(missing, blockInfo)
 				continue
 			}
@@ -442,30 +431,4 @@ func (b *backendEvents) tryGetEvents(ctx context.Context,
 	defer closer.Close()
 
 	return execRPCClient.GetEventsForBlockIDs(ctx, req)
-}
-
-// getIndexerHeights returns the lowest and highest indexed block heights
-// Expected errors during normal operation:
-// - codes.FailedPrecondition: if the index reporter is not ready yet.
-// - codes.Internal: if there was any other error getting the heights.
-func (b *backendEvents) getIndexerHeights() (uint64, uint64, error) {
-	lowestHeight, err := b.indexReporter.LowestIndexedHeight()
-	if err != nil {
-		if errors.Is(err, execution.ErrDataNotAvailable) {
-			// if the index is not ready yet, but likely will be eventually
-			return 0, 0, status.Errorf(codes.FailedPrecondition, "failed to get lowest indexed height: %v", err)
-		}
-		return 0, 0, rpc.ConvertError(err, "failed to get lowest indexed height", codes.Internal)
-	}
-
-	highestHeight, err := b.indexReporter.HighestIndexedHeight()
-	if err != nil {
-		if errors.Is(err, execution.ErrDataNotAvailable) {
-			// if the index is not ready yet, but likely will be eventually
-			return 0, 0, status.Errorf(codes.FailedPrecondition, "failed to get highest indexed height: %v", err)
-		}
-		return 0, 0, rpc.ConvertError(err, "failed to get highest indexed height", codes.Internal)
-	}
-
-	return lowestHeight, highestHeight, nil
 }

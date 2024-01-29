@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/storage"
 )
 
 type ScriptExecutor struct {
@@ -60,22 +61,24 @@ func (s *ScriptExecutor) SetMaxCompatibleHeight(height uint64) {
 	s.log.Info().Uint64("height", height).Msg("maximum compatible height set")
 }
 
-// InitReporter initializes the indexReporter and script executor
+// Initialize initializes the indexReporter and script executor
 // This method can be called at any time after the ScriptExecutor object is created. Any requests
-// made to the other methods will return execution.ErrDataNotAvailable until this method is called.
-func (s *ScriptExecutor) InitReporter(indexReporter state_synchronization.IndexReporter, scriptExecutor *execution.Scripts) {
+// made to the other methods will return storage.ErrHeightNotIndexed until this method is called.
+func (s *ScriptExecutor) Initialize(indexReporter state_synchronization.IndexReporter, scriptExecutor *execution.Scripts) error {
 	if s.initialized.CompareAndSwap(false, true) {
 		s.log.Info().Msg("script executor initialized")
 		s.indexReporter = indexReporter
 		s.scriptExecutor = scriptExecutor
+		return nil
 	}
+	return fmt.Errorf("script executor already initialized")
 }
 
 // ExecuteAtBlockHeight executes provided script at the provided block height against a local execution state.
 //
 // Expected errors:
 //   - storage.ErrNotFound if the register or block height is not found
-//   - execution.ErrDataNotAvailable if the data for the block height is not available. this could be because
+//   - storage.ErrHeightNotIndexed if the data for the block height is not available. this could be because
 //     the height is not within the index block range, or the index is not ready.
 func (s *ScriptExecutor) ExecuteAtBlockHeight(ctx context.Context, script []byte, arguments [][]byte, height uint64) ([]byte, error) {
 	if err := s.checkDataAvailable(height); err != nil {
@@ -89,7 +92,7 @@ func (s *ScriptExecutor) ExecuteAtBlockHeight(ctx context.Context, script []byte
 //
 // Expected errors:
 //   - storage.ErrNotFound if the account or block height is not found
-//   - execution.ErrDataNotAvailable if the data for the block height is not available. this could be because
+//   - storage.ErrHeightNotIndexed if the data for the block height is not available. this could be because
 //     the height is not within the index block range, or the index is not ready.
 func (s *ScriptExecutor) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
 	if err := s.checkDataAvailable(height); err != nil {
@@ -101,29 +104,27 @@ func (s *ScriptExecutor) GetAccountAtBlockHeight(ctx context.Context, address fl
 
 func (s *ScriptExecutor) checkDataAvailable(height uint64) error {
 	if !s.initialized.Load() {
-		return fmt.Errorf("%w: script executor not initialized", execution.ErrDataNotAvailable)
+		return fmt.Errorf("%w: script executor not initialized", storage.ErrHeightNotIndexed)
 	}
 
 	highestHeight, err := s.indexReporter.HighestIndexedHeight()
 	if err != nil {
-		// index not ready yet
-		return fmt.Errorf("%w: could not get highest indexed height: %v", execution.ErrDataNotAvailable, err)
+		return fmt.Errorf("could not get highest indexed height: %w", err)
 	}
 	if height > highestHeight {
-		return fmt.Errorf("%w: block not indexed yet", execution.ErrDataNotAvailable)
+		return fmt.Errorf("%w: block not indexed yet", storage.ErrHeightNotIndexed)
 	}
 
 	lowestHeight, err := s.indexReporter.LowestIndexedHeight()
 	if err != nil {
-		// index not ready yet
-		return fmt.Errorf("%w: could not get lowest indexed height: %v", execution.ErrDataNotAvailable, err)
+		return fmt.Errorf("could not get lowest indexed height: %w", err)
 	}
 	if height < lowestHeight {
-		return fmt.Errorf("%w: block is before lowest indexed height", execution.ErrDataNotAvailable)
+		return fmt.Errorf("%w: block is before lowest indexed height", storage.ErrHeightNotIndexed)
 	}
 
 	if height > s.maxCompatibleHeight.Load() || height < s.minCompatibleHeight.Load() {
-		return fmt.Errorf("%w: node software is not compatible with version required to executed block", execution.ErrDataNotAvailable)
+		return fmt.Errorf("%w: node software is not compatible with version required to executed block", storage.ErrHeightNotIndexed)
 	}
 
 	return nil

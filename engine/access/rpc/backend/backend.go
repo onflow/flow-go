@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
-	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -84,7 +83,6 @@ type Params struct {
 	HistoricalAccessNodes     []accessproto.AccessAPIClient
 	Blocks                    storage.Blocks
 	Headers                   storage.Headers
-	Events                    storage.Events
 	Collections               storage.Collections
 	Transactions              storage.Transactions
 	ExecutionReceipts         storage.ExecutionReceipts
@@ -105,7 +103,7 @@ type Params struct {
 	ScriptExecutor            execution.ScriptExecutor
 	ScriptExecutionMode       IndexQueryMode
 	EventQueryMode            IndexQueryMode
-	IndexReporter             state_synchronization.IndexReporter
+	EventsIndex               *EventsIndex
 }
 
 // New creates backend instance
@@ -185,13 +183,12 @@ func New(params Params) (*Backend, error) {
 			chain:             params.ChainID.Chain(),
 			state:             params.State,
 			headers:           params.Headers,
-			events:            params.Events,
 			executionReceipts: params.ExecutionReceipts,
 			connFactory:       params.ConnFactory,
 			maxHeightRange:    params.MaxHeightRange,
 			nodeCommunicator:  params.Communicator,
 			queryMode:         params.EventQueryMode,
-			indexReporter:     params.IndexReporter,
+			eventsIndex:       params.EventsIndex,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: params.Headers,

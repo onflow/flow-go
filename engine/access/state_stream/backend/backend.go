@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -19,7 +20,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/state_synchronization"
-	"github.com/onflow/flow-go/module/state_synchronization/proxies"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -79,7 +80,8 @@ type StateStreamBackend struct {
 	broadcaster          *engine.Broadcaster
 	rootBlockHeight      uint64
 	rootBlockID          flow.Identifier
-	registers            *proxies.RegistersStore
+	registers            *execution.RegistersAsyncStore
+	indexReporter        state_synchronization.IndexReporter
 	registerRequestLimit int
 
 	// highestHeight contains the highest consecutive block height for which we have received a
@@ -92,7 +94,6 @@ func New(
 	config Config,
 	state protocol.State,
 	headers storage.Headers,
-	events storage.Events,
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	execDataStore execution_data.ExecutionDataStore,
@@ -100,8 +101,8 @@ func New(
 	broadcaster *engine.Broadcaster,
 	rootHeight uint64,
 	highestAvailableHeight uint64,
-	registers *proxies.RegistersStore,
-	indexReporter state_synchronization.IndexReporter,
+	registers *execution.RegistersAsyncStore,
+	eventsIndex *backend.EventsIndex,
 	useEventsIndex bool,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
@@ -124,6 +125,7 @@ func New(
 		rootBlockHeight:      rootHeight,
 		rootBlockID:          rootBlockID,
 		registers:            registers,
+		indexReporter:        eventsIndex,
 		registerRequestLimit: int(config.RegisterIDsRequestLimit),
 		highestHeight:        counters.NewMonotonousCounter(highestAvailableHeight),
 	}
@@ -141,7 +143,6 @@ func New(
 
 	b.EventsBackend = EventsBackend{
 		log:              logger,
-		events:           events,
 		headers:          headers,
 		broadcaster:      broadcaster,
 		sendTimeout:      config.ClientSendTimeout,
@@ -150,7 +151,7 @@ func New(
 		getExecutionData: b.getExecutionData,
 		getStartHeight:   b.getStartHeight,
 		useIndex:         useEventsIndex,
-		indexReporter:    indexReporter,
+		eventsIndex:      eventsIndex,
 	}
 
 	return b, nil
@@ -185,14 +186,12 @@ func (b *StateStreamBackend) getStartHeight(startBlockID flow.Identifier, startH
 		return 0, status.Errorf(codes.InvalidArgument, "only one of start block ID and start height may be provided")
 	}
 
-	if b.useIndex {
-		// ensure that the resolved start height is available
-		defer func() {
-			if err == nil {
-				height, err = b.checkStartHeight(height)
-			}
-		}()
-	}
+	// ensure that the resolved start height is available
+	defer func() {
+		if err == nil {
+			height, err = b.checkStartHeight(height)
+		}
+	}()
 
 	if startBlockID != flow.ZeroID {
 		return b.startHeightFromBlockID(startBlockID)
@@ -237,6 +236,10 @@ func (b *StateStreamBackend) checkStartHeight(height uint64) (uint64, error) {
 		height = b.rootBlockHeight + 1
 	}
 
+	if !b.useIndex {
+		return height, nil
+	}
+
 	lowestHeight, highestHeight, err := b.getIndexerHeights()
 	if err != nil {
 		return 0, err
@@ -260,8 +263,8 @@ func (b *StateStreamBackend) checkStartHeight(height uint64) (uint64, error) {
 func (b *StateStreamBackend) getIndexerHeights() (uint64, uint64, error) {
 	lowestHeight, err := b.indexReporter.LowestIndexedHeight()
 	if err != nil {
-		if errors.Is(err, execution.ErrDataNotAvailable) {
-			// if the index is not ready yet, but likely will be eventually
+		if errors.Is(err, storage.ErrHeightNotIndexed) || errors.Is(err, indexer.ErrIndexNotInitialized) {
+			// the index is not ready yet, but likely will be eventually
 			return 0, 0, status.Errorf(codes.FailedPrecondition, "failed to get lowest indexed height: %v", err)
 		}
 		return 0, 0, rpc.ConvertError(err, "failed to get lowest indexed height", codes.Internal)
@@ -269,8 +272,8 @@ func (b *StateStreamBackend) getIndexerHeights() (uint64, uint64, error) {
 
 	highestHeight, err := b.indexReporter.HighestIndexedHeight()
 	if err != nil {
-		if errors.Is(err, execution.ErrDataNotAvailable) {
-			// if the index is not ready yet, but likely will be eventually
+		if errors.Is(err, storage.ErrHeightNotIndexed) || errors.Is(err, indexer.ErrIndexNotInitialized) {
+			// the index is not ready yet, but likely will be eventually
 			return 0, 0, status.Errorf(codes.FailedPrecondition, "failed to get highest indexed height: %v", err)
 		}
 		return 0, 0, rpc.ConvertError(err, "failed to get highest indexed height", codes.Internal)

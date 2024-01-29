@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -361,7 +362,11 @@ func convertIndexError(err error, height uint64, defaultMsg string) error {
 		return nil
 	}
 
-	if errors.Is(err, execution.ErrDataNotAvailable) {
+	if errors.Is(err, indexer.ErrIndexNotInitialized) {
+		return status.Errorf(codes.FailedPrecondition, "data for block is not available: %v", err)
+	}
+
+	if errors.Is(err, storage.ErrHeightNotIndexed) {
 		return status.Errorf(codes.OutOfRange, "data for block height %d is not available", height)
 	}
 

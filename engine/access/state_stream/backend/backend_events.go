@@ -8,9 +8,9 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	rpcbackend "github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -23,7 +23,6 @@ type EventsResponse struct {
 
 type EventsBackend struct {
 	log            zerolog.Logger
-	events         storage.Events
 	headers        storage.Headers
 	broadcaster    *engine.Broadcaster
 	sendTimeout    time.Duration
@@ -33,8 +32,8 @@ type EventsBackend struct {
 	getExecutionData GetExecutionDataFunc
 	getStartHeight   GetStartHeightFunc
 
-	indexReporter state_synchronization.IndexReporter
-	useIndex      bool
+	useIndex    bool
+	eventsIndex *rpcbackend.EventsIndex
 }
 
 func (b *EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) state_stream.Subscription {
@@ -97,21 +96,12 @@ func (b *EventsBackend) getEventsFromStorage(height uint64, filter state_stream.
 		return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
 	}
 
-	indexedHeight, err := b.indexReporter.HighestIndexedHeight()
-	if err != nil {
-		return nil, fmt.Errorf("could not get highest indexed height: %w", err)
-	}
-
-	if height > indexedHeight {
-		return nil, fmt.Errorf("could not get events for block %d: %w", height, storage.ErrHeightNotIndexed)
-	}
-
-	events, err := b.events.ByBlockID(blockID)
+	events, err := b.eventsIndex.GetEvents(blockID, height)
 	if err != nil {
 		return nil, fmt.Errorf("could not get events for block %d: %w", height, err)
 	}
 
-	b.log.Debug().
+	b.log.Trace().
 		Uint64("height", height).
 		Hex("block_id", logging.ID(blockID)).
 		Int("events", len(events)).

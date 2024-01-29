@@ -15,6 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
+	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
@@ -44,6 +45,11 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromLocalStorage() {
 	s.events.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
 		mocks.StorageMapGetter(s.blockEvents),
 	)
+
+	reporter := syncmock.NewIndexReporter(s.T())
+	reporter.On("LowestIndexedHeight").Return(s.blocks[0].Header.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(s.blocks[len(s.blocks)-1].Header.Height, nil)
+	s.eventsIndex.Initialize(reporter)
 
 	s.runTestSubscribeEvents()
 }
@@ -218,5 +224,37 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 
 		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Header.Height+10, state_stream.EventFilter{})
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+	})
+
+	s.backend.useIndex = true
+
+	s.Run("returns error for uninitialized index", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		// Note: eventIndex.Initialize() is not called in this test
+		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, 0, state_stream.EventFilter{})
+		assert.Equal(s.T(), codes.FailedPrecondition, status.Code(sub.Err()), "expected FailedPrecondition, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+	})
+
+	reporter := syncmock.NewIndexReporter(s.T())
+	reporter.On("LowestIndexedHeight").Return(s.blocks[1].Header.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(s.blocks[len(s.blocks)-2].Header.Height, nil)
+	s.eventsIndex.Initialize(reporter)
+
+	s.Run("returns error for start below lowest indexed", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.blocks[0].Header.Height, state_stream.EventFilter{})
+		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+	})
+
+	s.Run("returns error for start above highest indexed", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Header.Height, state_stream.EventFilter{})
+		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 }
