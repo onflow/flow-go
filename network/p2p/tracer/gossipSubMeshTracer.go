@@ -61,9 +61,9 @@ type GossipSubMeshTracer struct {
 var _ p2p.PubSubTracer = (*GossipSubMeshTracer)(nil)
 
 type RpcSentTrackerConfig struct {
-	CacheSize            uint32 `validate:"required"`
-	WorkerQueueCacheSize uint32 `validate:"required"`
-	WorkerQueueNumber    int    `validate:"required"`
+	CacheSize            uint32 `validate:"gt=0"`
+	WorkerQueueCacheSize uint32 `validate:"gt=0"`
+	WorkerQueueNumber    int    `validate:"gt=0"`
 }
 
 type DuplicateMessageTrackerCacheConfig struct {
