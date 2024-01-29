@@ -18,7 +18,7 @@ type duplicateMessagesCounterEntity struct {
 	lastUpdated time.Time
 }
 
-func NewDuplicateMessagesCounter(id flow.Identifier) duplicateMessagesCounterEntity {
+func newDuplicateMessagesCounter(id flow.Identifier) duplicateMessagesCounterEntity {
 	return duplicateMessagesCounterEntity{
 		Id:          id,
 		Value:       0.0,

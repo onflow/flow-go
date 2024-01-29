@@ -66,7 +66,7 @@ func (d *DuplicateMessageTrackerCache) DuplicateMessageReceived(peerID peer.ID) 
 
 	entityId := makeId(peerID)
 	adjustedEntity, adjusted := d.c.AdjustWithInit(entityId, adjustFunc, func() flow.Entity {
-		return NewDuplicateMessagesCounter(entityId)
+		return newDuplicateMessagesCounter(entityId)
 	})
 
 	if err != nil {
