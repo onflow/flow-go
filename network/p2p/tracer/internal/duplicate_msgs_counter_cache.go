@@ -103,7 +103,7 @@ func (d *DuplicateMessageTrackerCache) GetWithInit(peerID peer.ID) (float64, boo
 
 	entityId := makeId(peerID)
 	adjustedEntity, adjusted := d.c.AdjustWithInit(entityId, adjustLogic, func() flow.Entity {
-		return NewDuplicateMessagesCounter(entityId)
+		return newDuplicateMessagesCounter(entityId)
 	})
 	if err != nil {
 		return 0, false, fmt.Errorf("unexpected error while applying decay adjustment for peer %s: %w", peerID, err)
