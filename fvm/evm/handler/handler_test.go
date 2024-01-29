@@ -569,7 +569,7 @@ func TestHandler_COA(t *testing.T) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				handler := SetupHandler(t, backend, rootAddr)
 
-				foa := handler.AccountByAddress(handler.AllocateAddress(), true)
+				foa := handler.AccountByAddress(handler.DeployCOA(), true)
 				require.NotNil(t, foa)
 
 				vault := types.NewFlowTokenVault(types.MakeABalanceInFlow(100))
