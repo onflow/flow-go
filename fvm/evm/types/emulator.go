@@ -3,6 +3,7 @@ package types
 import (
 	"math/big"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
 )
@@ -26,6 +27,7 @@ type BlockContext struct {
 	DirectCallBaseGasUsage uint64
 	DirectCallGasPrice     uint64
 	GasFeeCollector        Address
+	Random                 gethCommon.Hash
 
 	// a set of extra precompiles to be injected
 	ExtraPrecompiles []Precompile
