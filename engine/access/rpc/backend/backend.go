@@ -257,6 +257,7 @@ func New(params Params) (*Backend, error) {
 			log:            params.Log,
 			state:          params.State,
 			blocks:         params.Blocks,
+			results:        params.LightTransactionResults,
 			Broadcaster:    params.SubscriptionParams.Broadcaster,
 			sendTimeout:    params.SubscriptionParams.SendTimeout,
 			responseLimit:  params.SubscriptionParams.ResponseLimit,
@@ -270,6 +271,8 @@ func New(params Params) (*Backend, error) {
 	}
 	b.backendSubscribeBlocks.getStartHeight = b.GetStartHeight
 	b.backendSubscribeBlocks.getHighestHeight = b.GetHighestHeight
+	b.backendSubscribeTransactions.getStartHeight = b.GetStartHeight
+	b.backendSubscribeTransactions.getHighestHeight = b.GetHighestHeight
 
 	retry.SetBackend(b)
 

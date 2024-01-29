@@ -1457,6 +1457,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				Transactions:              node.Storage.Transactions,
 				ExecutionReceipts:         node.Storage.Receipts,
 				ExecutionResults:          node.Storage.Results,
+				LightTransactionResults:   node.Storage.LightTransactionResults,
 				ChainID:                   node.RootChainID,
 				AccessMetrics:             builder.AccessMetrics,
 				ConnFactory:               connFactory,

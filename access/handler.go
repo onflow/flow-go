@@ -780,9 +780,7 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 	h.StreamCount.Add(1)
 	defer h.StreamCount.Add(-1)
 
-	txMsg := request.GetTransaction()
-
-	tx, err := convert.MessageToTransaction(txMsg, h.chain)
+	tx, err := convert.MessageToTransaction(request.GetTransaction(), h.chain)
 	if err != nil {
 		return status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -793,7 +791,6 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 	}
 
 	sub := h.api.SendAndSubscribeTransactionStatuses(stream.Context(), &tx)
-	txId := tx.ID()
 
 	for {
 		v, ok := <-sub.Channel()
@@ -804,17 +801,19 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 			return nil
 		}
 
-		resp, ok := v.(*flow.TransactionStatus)
+		txSubInfo, ok := v.(*convert.TransactionSubscribeInfo)
 		if !ok {
 			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
 		}
 
-		err = stream.Send(&access.SendAndSubscribeTransactionStatusesResponse{
-			Id:     txId[:],
-			Status: entities.TransactionStatus(*resp),
-		})
+		err = stream.Send(convert.ConvertTransactionSubscribeInfoToSubscribtionResponce(txSubInfo))
+
 		if err != nil {
 			return rpc.ConvertError(err, "could not send response", codes.Internal)
+		}
+
+		if txSubInfo.Status == flow.TransactionStatusSealed || txSubInfo.Status == flow.TransactionStatusExpired {
+			return nil
 		}
 	}
 }

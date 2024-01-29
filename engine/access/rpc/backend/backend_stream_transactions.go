@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -19,31 +21,29 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type TransactionSubscribeResponse struct {
-	ID     flow.Identifier
-	Status flow.TransactionStatus
-}
-
 type backendSubscribeTransactions struct {
 	log            zerolog.Logger
 	state          protocol.State
 	blocks         storage.Blocks
+	results        storage.LightTransactionResults
 	Broadcaster    *engine.Broadcaster
 	sendTimeout    time.Duration
 	responseLimit  float64
 	sendBufferSize int
+
+	messageIndex uint64
 
 	getStartHeight   subscription.GetStartHeightFunc
 	getHighestHeight subscription.GetHighestHeight
 }
 
 func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody) subscription.Subscription {
-	startBlockID := tx.ReferenceBlockID
-	nextHeight, err := b.getStartHeight(startBlockID, 0, flow.BlockStatusFinalized)
+	nextHeight, err := b.getStartHeight(tx.ReferenceBlockID, 0, flow.BlockStatusFinalized)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")
 	}
 
+	b.messageIndex = 0
 	sub := subscription.NewHeightBasedSubscription(
 		b.sendBufferSize,
 		nextHeight,
@@ -56,6 +56,7 @@ func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(ctx c
 
 	return sub
 }
+
 func (b *backendSubscribeTransactions) backendSubscribeTransactions(ctx context.Context, tx *flow.TransactionBody, height uint64) (interface{}, error) {
 	highestHeight, err := b.getHighestHeight(flow.BlockStatusFinalized)
 	if err != nil {
@@ -75,16 +76,37 @@ func (b *backendSubscribeTransactions) backendSubscribeTransactions(ctx context.
 		return nil, status.Errorf(codes.Internal, "could not get block by height: %v", err)
 	}
 
-	// derive status of the transaction
-	txStatus, err := b.deriveSubscribeTransactionStatus(tx, true, block)
+	result, err := b.results.ByBlockIDTransactionID(block.ID(), tx.ID())
+	if err != nil {
+		err = rpc.ConvertStorageError(err)
+		if status.Code(err) != codes.NotFound {
+			return nil, err
+		}
+	}
+
+	var txStatus flow.TransactionStatus
+	if result == nil {
+		txStatus, err = b.deriveSubscribeTransactionStatus(tx, false, nil)
+	} else {
+		txStatus, err = b.deriveSubscribeTransactionStatus(tx, true, block)
+	}
+
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	return &txStatus, nil
+	response := &convert.TransactionSubscribeInfo{
+		ID:           tx.ID(),
+		Status:       txStatus,
+		MessageIndex: b.messageIndex,
+	}
+
+	b.messageIndex++
+
+	return response, nil
 }
 
-// deriveTransactionStatus derives the transaction status based on current protocol state
+// deriveSubscribeTransactionStatus derives the transaction status based on current protocol state
 // Error returns:
 //   - state.ErrUnknownSnapshotReference - block referenced by transaction has not been found.
 //   - all other errors are unexpected and potentially symptoms of internal implementation bugs or state corruption (fatal).

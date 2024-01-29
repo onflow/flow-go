@@ -1,10 +1,28 @@
 package convert
 
 import (
+	"strconv"
+
+	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/model/flow"
 )
+
+type TransactionSubscribeInfo struct {
+	ID           flow.Identifier
+	Status       flow.TransactionStatus
+	MessageIndex uint64
+}
+
+func ConvertTransactionSubscribeInfoToSubscribtionResponce(data *TransactionSubscribeInfo) *access.SendAndSubscribeTransactionStatusesResponse {
+	return &access.SendAndSubscribeTransactionStatusesResponse{
+		Id:     data.ID[:],
+		Status: entities.TransactionStatus(data.Status),
+		//TODO: rename ErrorMessage to MessageIndex and change type
+		ErrorMessage: strconv.FormatUint(data.MessageIndex, 10),
+	}
+}
 
 // TransactionToMessage converts a flow.TransactionBody to a protobuf message
 func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
