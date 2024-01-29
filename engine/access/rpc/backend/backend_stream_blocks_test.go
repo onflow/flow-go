@@ -7,11 +7,12 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/mock"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
 	access "github.com/onflow/flow-go/engine/access/mock"
@@ -26,6 +27,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// BackendBlocksSuite is a test suite for the backendBlocks functionality related to blocks subscription.
+// It utilizes the suite to organize and structure test code.
 type BackendBlocksSuite struct {
 	suite.Suite
 
@@ -65,6 +68,7 @@ func TestBackendBlocksSuite(t *testing.T) {
 	suite.Run(t, new(BackendBlocksSuite))
 }
 
+// SetupTest initializes the test suite with required dependencies.
 func (s *BackendBlocksSuite) SetupTest() {
 	s.log = zerolog.New(zerolog.NewConsoleWriter())
 	s.state = new(protocol.State)
@@ -107,8 +111,6 @@ func (s *BackendBlocksSuite) SetupTest() {
 	s.rootBlock = unittest.BlockFixture()
 	parent := s.rootBlock.Header
 	s.blockMap[s.rootBlock.Header.Height] = &s.rootBlock
-
-	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Header.Height, s.rootBlock.ID())
 
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
@@ -200,7 +202,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 		},
 	).Maybe()
 
-	s.snapshot.On("Head").Return(s.rootBlock.Header, nil).Maybe()
+	s.snapshot.On("Head").Return(s.rootBlock.Header, nil).Once()
 	s.state.On("Final").Return(s.snapshot, nil).Maybe()
 	s.state.On("Sealed").Return(s.snapshot, nil).Maybe()
 
@@ -209,6 +211,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 	require.NoError(s.T(), err)
 }
 
+// backendParams returns the Params configuration for the backend.
 func (s *BackendBlocksSuite) backendParams() Params {
 	return Params{
 		State:                    s.state,
@@ -239,16 +242,48 @@ func (s *BackendBlocksSuite) backendParams() Params {
 	}
 }
 
+// TestSubscribeBlocks tests the functionality of the SubscribeBlocks method in the Backend.
+// It covers various scenarios for subscribing to blocks, handling backfill, and receiving block updates.
+// The test cases include scenarios for both finalized and sealed blocks.
+//
+// Test Cases:
+//
+// 1. Happy path - all new blocks:
+//   - No backfill is performed, and the subscription starts from the current root block.
+//
+// 2. Happy path - partial backfill:
+//   - A partial backfill is performed, simulating an ongoing subscription to the blockchain.
+//
+// 3. Happy path - complete backfill:
+//   - A complete backfill is performed, simulating the subscription starting from a specific block.
+//
+// 4. Happy path - start from root block by height:
+//   - The subscription starts from the root block, specified by height.
+//
+// 5. Happy path - start from root block by ID:
+//   - The subscription starts from the root block, specified by block ID.
+//
+// Each test case simulates the reception of new blocks during the subscription, ensuring that the SubscribeBlocks
+// method correctly handles updates and delivers the expected block information to the subscriber.
+//
+// Test Steps:
+// - Initialize the test environment, including the Backend instance, mock components, and test data.
+// - For each test case, set up the backfill, if applicable.
+// - Subscribe to blocks using the SubscribeBlocks method.
+// - Simulate the reception of new blocks during the subscription.
+// - Validate that the received block information matches the expected data.
+// - Ensure the subscription shuts down gracefully when canceled.
 func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	type testType struct {
-		name            string
-		highestBackfill int
-		startBlockID    flow.Identifier
-		startHeight     uint64
-		blockStatus     flow.BlockStatus
+		name              string
+		highestBackfill   int
+		startBlockID      flow.Identifier
+		startHeight       uint64
+		blockStatus       flow.BlockStatus
+		fullBlockResponse bool
 	}
 
 	baseTests := []testType{
@@ -292,15 +327,10 @@ func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 		t1.blockStatus = flow.BlockStatusFinalized
 		tests = append(tests, t1)
 
-		//t2 := test
-		//t2.name = fmt.Sprintf("%s - sealed blocks", test.name)
-		//t2.blockStatus = flow.BlockStatusSealed
-		//tests = append(tests, t2)
-
-		//t3 := test
-		//t3.name = fmt.Sprintf("%s - all types", test.name)
-		//t2.blockStatus = flow.BlockStatusUnknown
-		//tests = append(tests, t3)
+		t2 := test
+		t2.name = fmt.Sprintf("%s - sealed blocks", test.name)
+		t2.blockStatus = flow.BlockStatusSealed
+		tests = append(tests, t2)
 	}
 
 	for _, test := range tests {
@@ -308,10 +338,11 @@ func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 			// add "backfill" block - blocks that are already in the database before the test starts
 			// this simulates a subscription on a past block
 			if test.highestBackfill > 0 {
-				s.backend.SetFinalizedHighestHeight(s.blocksArray[test.highestBackfill].Header.Height)
-				// simulates last sealed block
-				if test.blockStatus == flow.BlockStatusSealed {
+				if test.blockStatus == flow.BlockStatusFinalized {
+					s.backend.SetFinalizedHighestHeight(s.blocksArray[test.highestBackfill].Header.Height)
+				} else {
 					s.snapshot.On("Head").Return(s.blocksArray[test.highestBackfill].Header, nil)
+					s.backend.SetSealedHighestHeight(s.blocksArray[test.highestBackfill].Header.Height)
 				}
 			}
 
@@ -325,8 +356,10 @@ func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 				// simulate new block received.
 				// all blocks with index <= highestBackfill were already received
 				if int(i) > test.highestBackfill {
-					s.backend.SetFinalizedHighestHeight(b.Header.Height)
-					if test.blockStatus == flow.BlockStatusSealed {
+					if test.blockStatus == flow.BlockStatusFinalized {
+						s.backend.SetFinalizedHighestHeight(b.Header.Height)
+					} else {
+						s.backend.SetSealedHighestHeight(b.Header.Height)
 						s.snapshot.On("Head").Return(b.Header, nil)
 					}
 					s.broadcaster.Publish()
@@ -364,4 +397,70 @@ func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 			}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
 		})
 	}
+}
+
+// TestSubscribeBlocksHandlesErrors tests error handling scenarios for the SubscribeBlocks method in the Backend.
+// It ensures that the method correctly returns errors for various invalid input cases.
+//
+// Test Cases:
+//
+// 1. Returns error for unknown block status:
+//   - Verifies that attempting to subscribe to blocks with an unknown block status results in an InvalidArgument error.
+//
+// 2. Returns error if both start blockID and start height are provided:
+//   - Ensures that providing both start block ID and start height results in an InvalidArgument error.
+//
+// 3. Returns error for start height before root height:
+//   - Validates that attempting to subscribe to blocks with a start height before the root height results in an InvalidArgument error.
+//
+// 4. Returns error for unindexed start blockID:
+//   - Tests that subscribing to blocks with an unindexed start block ID results in a NotFound error.
+//
+// 5. Returns error for unindexed start height:
+//   - Tests that subscribing to blocks with an unindexed start height results in a NotFound error.
+//
+// Each test case checks for specific error conditions and ensures that the SubscribeBlocks method responds appropriately.
+func (s *BackendBlocksSuite) TestSubscribeBlocksHandlesErrors() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s.Run("returns error for unknown block status", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		sub := s.backend.SubscribeBlocks(subCtx, s.backend.BlocksWatcher.RootBlockID, 0, flow.BlockStatusUnknown)
+		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+	})
+
+	s.Run("returns error if both start blockID and start height are provided", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		sub := s.backend.SubscribeBlocks(subCtx, unittest.IdentifierFixture(), 1, flow.BlockStatusFinalized)
+		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()))
+	})
+
+	s.Run("returns error for start height before root height", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		sub := s.backend.SubscribeBlocks(subCtx, flow.ZeroID, s.backend.BlocksWatcher.RootHeight-1, flow.BlockStatusFinalized)
+		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+	})
+
+	s.Run("returns error for unindexed start blockID", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		sub := s.backend.SubscribeBlocks(subCtx, unittest.IdentifierFixture(), 0, flow.BlockStatusFinalized)
+		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+	})
+
+	s.Run("returns error for unindexed start height", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		sub := s.backend.SubscribeBlocks(subCtx, flow.ZeroID, s.blocksArray[len(s.blocksArray)-1].Header.Height+10, flow.BlockStatusFinalized)
+		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+	})
 }

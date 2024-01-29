@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// Streamer
+// Streamer represents a streaming subscription that delivers data to clients.
 type Streamer struct {
 	log         zerolog.Logger
 	sub         Streamable
@@ -23,6 +23,7 @@ type Streamer struct {
 	limiter     *rate.Limiter
 }
 
+// NewStreamer creates a new Streamer instance.
 func NewStreamer(
 	log zerolog.Logger,
 	broadcaster *engine.Broadcaster,

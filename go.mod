@@ -311,4 +311,4 @@ require (
 )
 
 //TODO: Remove when onflow/flow branch will be merged
-replace github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231213135419-ae911cc351a2 => github.com/UlyanaAndrukhiv/flow/protobuf/go/flow v0.0.0-20240129114200-fd0ec8b05dfd
+replace github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231213135419-ae911cc351a2 => github.com/UlyanaAndrukhiv/flow/protobuf/go/flow v0.0.0-20240129131255-43effb46fc28

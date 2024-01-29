@@ -154,19 +154,6 @@ func PayloadFromMessage(m *entities.Block) (*flow.Payload, error) {
 	}, nil
 }
 
-//// BlockStatusToMessage converts a flow.BlockStatus to a protobuf BlockStatus message.
-//func BlockStatusToMessage(status flow.BlockStatus) entities.BlockStatus {
-//	switch status {
-//	case flow.BlockStatusUnknown:
-//		return entities.BlockStatus_BLOCK_UNKNOWN
-//	case flow.BlockStatusFinalized:
-//		return entities.BlockStatus_BLOCK_FINALIZED
-//	case flow.BlockStatusSealed:
-//		return entities.BlockStatus_BLOCK_SEALED
-//	}
-//	return entities.BlockStatus_BLOCK_UNKNOWN
-//}
-
 // MessageToBlockStatus converts a protobuf BlockStatus message to a flow.BlockStatus.
 func MessageToBlockStatus(status entities.BlockStatus) flow.BlockStatus {
 	switch status {

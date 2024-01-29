@@ -12,12 +12,12 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// backendSubscribeBlocks is a struct representing a backend implementation for subscribing to blocks.
 type backendSubscribeBlocks struct {
 	log            zerolog.Logger
 	state          protocol.State
@@ -31,6 +31,7 @@ type backendSubscribeBlocks struct {
 	getHighestHeight subscription.GetHighestHeight
 }
 
+// SubscribeBlocks subscribes to blocks starting from a specified block ID or height and with a given block status.
 func (b *backendSubscribeBlocks) SubscribeBlocks(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
 	nextHeight, err := b.getStartHeight(startBlockID, startHeight, blockStatus)
 	if err != nil {
@@ -43,9 +44,10 @@ func (b *backendSubscribeBlocks) SubscribeBlocks(ctx context.Context, startBlock
 	return sub
 }
 
+// getResponse returns a GetDataByHeightFunc that retrieves block information for the specified height.
 func (b *backendSubscribeBlocks) getResponse(blockStatus flow.BlockStatus) subscription.GetDataByHeightFunc {
-	return func(ctx context.Context, height uint64) (interface{}, error) {
-		block, err := b.getBlock(ctx, height, blockStatus)
+	return func(_ context.Context, height uint64) (interface{}, error) {
+		block, err := b.getBlock(height, blockStatus)
 		if err != nil {
 			return nil, fmt.Errorf("could not get block by height %d: %w", height, err)
 		}
@@ -62,7 +64,7 @@ func (b *backendSubscribeBlocks) getResponse(blockStatus flow.BlockStatus) subsc
 // getBlock returns the block for the given block height.
 // Expected errors during normal operation:
 // - storage.ErrNotFound or execution_data.BlobNotFoundError: block for the given block height is not available.
-func (b *backendSubscribeBlocks) getBlock(ctx context.Context, height uint64, expectedBlockStatus flow.BlockStatus) (*flow.Block, error) {
+func (b *backendSubscribeBlocks) getBlock(height uint64, expectedBlockStatus flow.BlockStatus) (*flow.Block, error) {
 	highestHeight, err := b.getHighestHeight(expectedBlockStatus)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not get block by height: %v", err)
@@ -81,29 +83,5 @@ func (b *backendSubscribeBlocks) getBlock(ctx context.Context, height uint64, ex
 		return nil, status.Errorf(codes.Internal, "could not get block by height: %v", err)
 	}
 
-	sealed, err := b.state.Sealed().Head()
-	if err != nil {
-		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
-		// we should halt processing requests, but do throw an exception which might cause a crash:
-		// - It is unsafe to process requests if we have an internally bad state.
-		// - We would like to avoid throwing an exception as a result of an Access API request by policy
-		//   because this can cause DOS potential
-		// - Since the protocol state is widely shared, we assume that in practice another component will
-		//   observe the protocol state error and throw an exception.
-		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-		irrecoverable.Throw(ctx, err)
-		return nil, status.Errorf(codes.Internal, "could not get latest sealed block: %v", err)
-	}
-
-	var blockStatus flow.BlockStatus
-	if block.Header.Height > sealed.Height {
-		blockStatus = flow.BlockStatusFinalized
-	} else {
-		blockStatus = flow.BlockStatusSealed
-	}
-
-	if blockStatus != expectedBlockStatus {
-		return &flow.Block{}, nil
-	}
 	return block, nil
 }

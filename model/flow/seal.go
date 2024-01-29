@@ -12,7 +12,7 @@ import "encoding/json"
 // seals for the same result (or in edge cases, even for different results).
 //
 // NOTES
-// (1) As seals are (currently) included in the payload, they are not strictly
+// (1) As Seals are (currently) included in the payload, they are not strictly
 // entities. (Entities can be sent between nodes as self-contained messages
 // whose integrity is protected by a signature). By itself, a seal does
 // _not_ contain enough information to determine its validity (verifier
