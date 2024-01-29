@@ -377,7 +377,7 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		"the threshold when the median peer penalty in the mesh drops below this value, the peer may select more peers with penalty above the median to opportunistically graft on the mesh")
 	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PeerScoringKey, p2pconfig.InternalKey, p2pconfig.ThresholdsKey, p2pconfig.DuplicateMessageKey),
 		config.GossipSub.ScoringParameters.PeerScoring.Internal.Thresholds.DuplicateMessage,
-		"the threshold at which the duplicate message count for a peer will result in the peer being penalized")
+		"the peer's duplicate message count threshold above which the peer will be penalized")
 
 	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PeerScoringKey, p2pconfig.InternalKey, p2pconfig.BehaviourKey, p2pconfig.BehaviourPenaltyThresholdKey),
 		config.GossipSub.ScoringParameters.PeerScoring.Internal.Behaviour.PenaltyThreshold,
