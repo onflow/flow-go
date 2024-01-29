@@ -63,6 +63,7 @@ type GossipSubAppSpecificScoreRegistry struct {
 
 	appSpecificScoreParams    p2pconfig.ApplicationSpecificScoreParameters
 	duplicateMessageThreshold float64
+	collector                 module.GossipSubScoringRegistryMetrics
 }
 
 // GossipSubAppSpecificScoreRegistryConfig is the configuration for the GossipSubAppSpecificScoreRegistry.
@@ -101,6 +102,8 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	AppSpecificScoreParams p2pconfig.ApplicationSpecificScoreParameters `validate:"required"`
 
 	DuplicateMessageThreshold float64 `validate:"required"`
+
+	Collector module.GossipSubScoringRegistryMetrics `validate:"required"`
 }
 
 // NewGossipSubAppSpecificScoreRegistry returns a new GossipSubAppSpecificScoreRegistry.
@@ -134,6 +137,7 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		scoreTTL:                  config.Parameters.ScoreTTL,
 		appSpecificScoreParams:    config.AppSpecificScoreParams,
 		duplicateMessageThreshold: config.DuplicateMessageThreshold,
+		collector:                 config.Collector,
 	}
 
 	reg.appScoreUpdateWorkerPool = worker.NewWorkerPoolBuilder[peer.ID](lg.With().Str("component", "app_specific_score_update_worker_pool").Logger(),
@@ -352,15 +356,20 @@ func (r *GossipSubAppSpecificScoreRegistry) subscriptionPenalty(pid peer.ID, flo
 // message count for a peer exceeds the DefaultDuplicateMessageThreshold. A penalty is applied for the amount of duplicate
 // messages above the DefaultDuplicateMessageThreshold.
 func (r *GossipSubAppSpecificScoreRegistry) duplicateMessagesPenalty(pid peer.ID) float64 {
-	duplicateMessageCount := r.getDuplicateMessageCount(pid)
+	duplicateMessageCount, duplicateMessagePenalty := 0.0, 0.0
+	defer func() {
+		r.collector.DuplicateMessagesCounts(duplicateMessageCount)
+		r.collector.DuplicateMessagePenalties(duplicateMessagePenalty)
+	}()
+
+	duplicateMessageCount = r.getDuplicateMessageCount(pid)
 	if duplicateMessageCount > r.duplicateMessageThreshold {
-		duplicateMessagePenalty := (duplicateMessageCount - r.duplicateMessageThreshold) * r.appSpecificScoreParams.DuplicateMessagePenalty
+		duplicateMessagePenalty = (duplicateMessageCount - r.duplicateMessageThreshold) * r.appSpecificScoreParams.DuplicateMessagePenalty
 		if duplicateMessagePenalty < r.appSpecificScoreParams.MaxAppSpecificPenalty {
 			return r.appSpecificScoreParams.MaxAppSpecificPenalty
 		}
-		return duplicateMessagePenalty
 	}
-	return 0
+	return duplicateMessagePenalty
 }
 
 // OnInvalidControlMessageNotification is called when a new invalid control message notification is distributed.

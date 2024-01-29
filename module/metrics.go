@@ -84,6 +84,17 @@ type GossipSubRpcInspectorMetrics interface {
 	OnIncomingRpcReceived(iHaveCount, iWantCount, graftCount, pruneCount, msgCount int)
 }
 
+// GossipSubScoringRegistryMetrics encapsulates the metrics collectors for collecting metrics related to the Gossipsub scoring registry.
+// GossipSubScoringRegistryMetrics encapsulates various metrics collectors offering insights into penalties and
+// other factors used by the scoring registry to compute the application-specific score. It focuses on tracking internal
+// aspects of the application-specific score, distinguishing itself from GossipSubScoringMetrics.
+type GossipSubScoringRegistryMetrics interface {
+	// DuplicateMessagePenalties tracks the duplicate message penalty for a node.
+	DuplicateMessagePenalties(penalty float64)
+	// DuplicateMessagesCounts tracks the duplicate message count for a node.
+	DuplicateMessagesCounts(count float64)
+}
+
 // LocalGossipSubRouterMetrics encapsulates the metrics collectors for GossipSub router of the local node.
 // It gives a lens into the local GossipSub node's view of the GossipSub protocol.
 // LocalGossipSubRouterMetrics differs from GossipSubRpcInspectorMetrics in that the former tracks the local node's view
@@ -218,6 +229,7 @@ type LibP2PMetrics interface {
 	rcmgr.MetricsReporter
 	LibP2PConnectionMetrics
 	UnicastManagerMetrics
+	GossipSubScoringRegistryMetrics
 }
 
 // GossipSubScoringMetrics encapsulates the metrics collectors for the peer scoring module of GossipSub protocol.

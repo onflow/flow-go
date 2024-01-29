@@ -1228,6 +1228,7 @@ func newGossipSubAppSpecificScoreRegistry(t *testing.T,
 		NetworkingType:            network.PrivateNetwork,
 		AppSpecificScoreParams:    params.PeerScoring.Protocol.AppSpecificScore,
 		DuplicateMessageThreshold: params.PeerScoring.Internal.Thresholds.DuplicateMessage,
+		Collector:                 metrics.NewNoopCollector(),
 	}
 	for _, opt := range opts {
 		opt(cfg)

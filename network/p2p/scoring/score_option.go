@@ -44,6 +44,7 @@ type ScoreOptionConfig struct {
 	topicParams                      []func(map[string]*pubsub.TopicScoreParams)
 	registerNotificationConsumerFunc func(p2p.GossipSubInvCtrlMsgNotifConsumer)
 	getDuplicateMessageCount         func(id peer.ID) float64
+	scoringRegistryMetricsCollector  module.GossipSubScoringRegistryMetrics
 	networkingType                   network.NetworkingType
 }
 
@@ -58,17 +59,19 @@ type ScoreOptionConfig struct {
 func NewScoreOptionConfig(logger zerolog.Logger,
 	params p2pconfig.ScoringParameters,
 	hcMetricsFactory metrics.HeroCacheMetricsFactory,
+	scoringRegistryMetricsCollector module.GossipSubScoringRegistryMetrics,
 	idProvider module.IdentityProvider,
 	getDuplicateMessageCount func(id peer.ID) float64,
 	networkingType network.NetworkingType) *ScoreOptionConfig {
 	return &ScoreOptionConfig{
-		logger:                   logger.With().Str("module", "pubsub_score_option").Logger(),
-		provider:                 idProvider,
-		params:                   params,
-		heroCacheMetricsFactory:  hcMetricsFactory,
-		topicParams:              make([]func(map[string]*pubsub.TopicScoreParams), 0),
-		networkingType:           networkingType,
-		getDuplicateMessageCount: getDuplicateMessageCount,
+		logger:                          logger.With().Str("module", "pubsub_score_option").Logger(),
+		provider:                        idProvider,
+		params:                          params,
+		heroCacheMetricsFactory:         hcMetricsFactory,
+		topicParams:                     make([]func(map[string]*pubsub.TopicScoreParams), 0),
+		networkingType:                  networkingType,
+		getDuplicateMessageCount:        getDuplicateMessageCount,
+		scoringRegistryMetricsCollector: scoringRegistryMetricsCollector,
 	}
 }
 
@@ -132,6 +135,7 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 		NetworkingType:            cfg.networkingType,
 		AppSpecificScoreParams:    cfg.params.PeerScoring.Protocol.AppSpecificScore,
 		DuplicateMessageThreshold: cfg.params.PeerScoring.Internal.Thresholds.DuplicateMessage,
+		Collector:                 cfg.scoringRegistryMetricsCollector,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossipsub app specific score registry: %w", err)
