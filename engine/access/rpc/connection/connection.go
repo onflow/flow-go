@@ -6,13 +6,12 @@ import (
 	"net"
 	"time"
 
-	"github.com/rs/zerolog"
-
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/module"
-
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/module"
 )
 
 // ConnectionFactory is an interface for creating access and execution API clients.
