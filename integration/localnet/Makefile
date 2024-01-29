@@ -125,7 +125,7 @@ stop:
 
 .PHONY: load
 load:
-	go run ../benchmark/cmd/manual -log-level info -tps 1,1 -tps-durations 30s
+	go run ../benchmark/cmd/manual -log-level info -tps 1,10,100 -tps-durations 30s,30s
 
 .PHONY: tps-ci-smoke
 tps-ci-smoke:
