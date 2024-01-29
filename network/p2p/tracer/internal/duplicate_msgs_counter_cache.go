@@ -40,8 +40,6 @@ type DuplicateMessageTrackerCache struct {
 func NewDuplicateMessageTrackerCache(sizeLimit uint32, decay, skipDecayThreshold float64, logger zerolog.Logger, collector module.HeroCacheMetrics) *DuplicateMessageTrackerCache {
 	backData := herocache.NewCache(sizeLimit,
 		herocache.DefaultOversizeFactor,
-		// we should not evict any record from the cache,
-		// eviction will open the node to spam attacks by malicious peers to erase their duplicate message counters reducing the overall penalty applied application specific score.
 		heropool.LRUEjection,
 		logger.With().Str("mempool", "gossipsub=duplicate-message-counter-cache").Logger(),
 		collector)
