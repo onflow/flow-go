@@ -90,7 +90,7 @@ func (d *DuplicateMessageTrackerCache) DuplicateMessageReceived(peerID peer.ID) 
 // - peerID: peerID of the remote peer.
 // Returns:
 // - The duplicate messages counter value after the decay and true if the record exists, 0 and false otherwise.
-// No errors are expected during normal operation.
+// No errors are expected during normal operation, all errors returned are considered irrecoverable.
 func (d *DuplicateMessageTrackerCache) GetWithInit(peerID peer.ID) (float64, bool, error) {
 	var err error
 	adjustLogic := func(entity flow.Entity) flow.Entity {
