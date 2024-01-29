@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/flow-go/module/counters"
+
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 
 	"google.golang.org/grpc/codes"
@@ -31,7 +33,8 @@ type backendSubscribeTransactions struct {
 	responseLimit  float64
 	sendBufferSize int
 
-	messageIndex uint64
+	messageIndex counters.StrictMonotonousCounter
+	blockWithTx  *flow.Block
 
 	getStartHeight   subscription.GetStartHeightFunc
 	getHighestHeight subscription.GetHighestHeight
@@ -43,7 +46,8 @@ func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(ctx c
 		return subscription.NewFailedSubscription(err, "could not get start height")
 	}
 
-	b.messageIndex = 0
+	b.messageIndex = counters.NewMonotonousCounter(0)
+
 	sub := subscription.NewHeightBasedSubscription(
 		b.sendBufferSize,
 		nextHeight,
@@ -70,27 +74,28 @@ func (b *backendSubscribeTransactions) backendSubscribeTransactions(ctx context.
 		return nil, fmt.Errorf("block %d is not available yet: %w", height, storage.ErrNotFound)
 	}
 
-	// since we are querying a finalized or sealed block, we can use the height index and save an ID computation
-	block, err := b.blocks.ByHeight(height)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not get block by height: %v", err)
-	}
+	executed := b.blockWithTx != nil
+	if !executed {
+		// since we are querying a finalized or sealed block, we can use the height index and save an ID computation
+		block, err := b.blocks.ByHeight(height)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "could not get block by height: %v", err)
+		}
 
-	result, err := b.results.ByBlockIDTransactionID(block.ID(), tx.ID())
-	if err != nil {
-		err = rpc.ConvertStorageError(err)
-		if status.Code(err) != codes.NotFound {
-			return nil, err
+		result, err := b.results.ByBlockIDTransactionID(block.ID(), tx.ID())
+		if err != nil {
+			err = rpc.ConvertStorageError(err)
+			if status.Code(err) != codes.NotFound {
+				return nil, err
+			}
+		}
+
+		if result != nil {
+			b.blockWithTx = block
 		}
 	}
 
-	var txStatus flow.TransactionStatus
-	if result == nil {
-		txStatus, err = b.deriveSubscribeTransactionStatus(tx, false, nil)
-	} else {
-		txStatus, err = b.deriveSubscribeTransactionStatus(tx, true, block)
-	}
-
+	txStatus, err := b.deriveSubscribeTransactionStatus(tx, executed, b.blockWithTx)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
@@ -98,10 +103,12 @@ func (b *backendSubscribeTransactions) backendSubscribeTransactions(ctx context.
 	response := &convert.TransactionSubscribeInfo{
 		ID:           tx.ID(),
 		Status:       txStatus,
-		MessageIndex: b.messageIndex,
+		MessageIndex: b.messageIndex.Value(),
 	}
 
-	b.messageIndex++
+	if ok := b.messageIndex.Set(b.messageIndex.Value() + 1); !ok {
+		b.log.Debug().Msg("message index already incremented")
+	}
 
 	return response, nil
 }

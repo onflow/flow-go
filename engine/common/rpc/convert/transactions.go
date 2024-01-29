@@ -1,8 +1,6 @@
 package convert
 
 import (
-	"strconv"
-
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
@@ -15,12 +13,11 @@ type TransactionSubscribeInfo struct {
 	MessageIndex uint64
 }
 
-func ConvertTransactionSubscribeInfoToSubscribtionResponce(data *TransactionSubscribeInfo) *access.SendAndSubscribeTransactionStatusesResponse {
+func TransactionSubscribeInfoToSubscriptionResponse(data *TransactionSubscribeInfo) *access.SendAndSubscribeTransactionStatusesResponse {
 	return &access.SendAndSubscribeTransactionStatusesResponse{
-		Id:     data.ID[:],
-		Status: entities.TransactionStatus(data.Status),
-		//TODO: rename ErrorMessage to MessageIndex and change type
-		ErrorMessage: strconv.FormatUint(data.MessageIndex, 10),
+		Id:           data.ID[:],
+		Status:       entities.TransactionStatus(data.Status),
+		MessageIndex: data.MessageIndex,
 	}
 }
 

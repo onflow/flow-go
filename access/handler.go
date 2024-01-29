@@ -806,7 +806,7 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
 		}
 
-		err = stream.Send(convert.ConvertTransactionSubscribeInfoToSubscribtionResponce(txSubInfo))
+		err = stream.Send(convert.TransactionSubscribeInfoToSubscriptionResponse(txSubInfo))
 
 		if err != nil {
 			return rpc.ConvertError(err, "could not send response", codes.Internal)
