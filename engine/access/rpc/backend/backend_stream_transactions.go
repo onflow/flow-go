@@ -64,7 +64,7 @@ func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(ctx c
 func (b *backendSubscribeTransactions) backendSubscribeTransactions(ctx context.Context, tx *flow.TransactionBody, height uint64) (interface{}, error) {
 	highestHeight, err := b.getHighestHeight(flow.BlockStatusFinalized)
 	if err != nil {
-		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
+		return nil, fmt.Errorf("could not get highest height for block %d: %w", height, err)
 	}
 
 	// fail early if no notification has been received for the given block height.
