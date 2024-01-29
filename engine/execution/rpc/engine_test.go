@@ -96,7 +96,7 @@ func (suite *Suite) TestExecuteScriptAtBlockID() {
 	suite.Run("valid request with script execution failure", func() {
 		suite.commits.On("ByBlockID", mockIdentifier).Return(nil, nil).Once()
 		mockEngine.On("ExecuteScriptAtBlockID", ctx, script, arguments, mockIdentifier).
-			Return(nil, 0, status.Error(codes.InvalidArgument, "")).Once()
+			Return(nil, uint64(0), status.Error(codes.InvalidArgument, "")).Once()
 		_, err := handler.ExecuteScriptAtBlockID(ctx, &executionReq)
 		suite.Require().Error(err)
 		errors.Is(err, status.Error(codes.InvalidArgument, ""))
