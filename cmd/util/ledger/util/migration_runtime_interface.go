@@ -242,8 +242,8 @@ func (m MigrationRuntimeInterface) GetAccountContractNames(_ runtime.Address) ([
 	panic("unexpected GetAccountContractNames call")
 }
 
-func (m MigrationRuntimeInterface) AllocateStorageIndex(_ []byte) (atree.StorageIndex, error) {
-	panic("unexpected AllocateStorageIndex call")
+func (m MigrationRuntimeInterface) AllocateSlabIndex(_ []byte) (atree.SlabIndex, error) {
+	panic("unexpected AllocateSlabIndex call")
 }
 
 func (m MigrationRuntimeInterface) ComputationUsed() (uint64, error) {

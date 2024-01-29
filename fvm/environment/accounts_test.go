@@ -422,17 +422,17 @@ func TestAccounts_AllocateStorageIndex(t *testing.T) {
 	require.NoError(t, err)
 
 	// no register set case
-	i, err := accounts.AllocateStorageIndex(address)
+	i, err := accounts.AllocateSlabIndex(address)
 	require.NoError(t, err)
-	require.Equal(t, i, atree.StorageIndex([8]byte{0, 0, 0, 0, 0, 0, 0, 1}))
+	require.Equal(t, i, atree.SlabIndex([8]byte{0, 0, 0, 0, 0, 0, 0, 1}))
 
 	// register already set case
-	i, err = accounts.AllocateStorageIndex(address)
+	i, err = accounts.AllocateSlabIndex(address)
 	require.NoError(t, err)
-	require.Equal(t, i, atree.StorageIndex([8]byte{0, 0, 0, 0, 0, 0, 0, 2}))
+	require.Equal(t, i, atree.SlabIndex([8]byte{0, 0, 0, 0, 0, 0, 0, 2}))
 
 	// register update successful
-	i, err = accounts.AllocateStorageIndex(address)
+	i, err = accounts.AllocateSlabIndex(address)
 	require.NoError(t, err)
-	require.Equal(t, i, atree.StorageIndex([8]byte{0, 0, 0, 0, 0, 0, 0, 3}))
+	require.Equal(t, i, atree.SlabIndex([8]byte{0, 0, 0, 0, 0, 0, 0, 3}))
 }
