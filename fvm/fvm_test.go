@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	cadenceErrors "github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/tests/utils"
+	"github.com/stretchr/testify/assert"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -2979,6 +2980,8 @@ func TestEVM(t *testing.T) {
 			encodedArg, err := jsoncdc.Encode(addrBytes)
 			require.NoError(t, err)
 
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(fmt.Sprintf(`
 						import EVM from %s
@@ -2989,7 +2992,7 @@ func TestEVM(t *testing.T) {
 								log(addr)
 							}
 						}
-					`, chain.ServiceAddress().HexWithPrefix()))).
+					`, sc.EVMContract.Address.HexWithPrefix()))).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				SetPayer(chain.ServiceAddress()).
 				AddArgument(encodedArg)
@@ -3007,9 +3010,62 @@ func TestEVM(t *testing.T) {
 			require.Len(t, output.Logs, 1)
 			require.Equal(t, output.Logs[0], fmt.Sprintf(
 				"A.%s.EVM.EVMAddress(bytes: %s)",
-				chain.ServiceAddress(),
+				sc.EVMContract.Address,
 				addrBytes.String(),
 			))
+		}),
+	)
+
+	// this test makes sure that only ABI encoding/decoding functionality is
+	// available through the EVM contract, when bootstraped with `WithEVMABIOnly`
+	t.Run("with ABI only EVM", newVMTest().
+		withBootstrapProcedureOptions(
+			fvm.WithSetupEVMEnabled(true),
+			fvm.WithEVMABIOnly(true),
+		).
+		withContextOptions(
+			fvm.WithEVMEnabled(true),
+		).
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(fmt.Sprintf(`
+						import EVM from %s
+
+						transaction {
+							execute {
+								let data = EVM.encodeABI(["John Doe", UInt64(33), false])
+								log(data.length)
+								assert(data.length == 160)
+
+								let acc <- EVM.createBridgedAccount()
+								destroy acc
+							}
+						}
+					`, chain.ServiceAddress().HexWithPrefix()))).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				SetPayer(chain.ServiceAddress())
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			_, output, err := vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.Error(t, output.Err)
+			assert.ErrorContains(
+				t,
+				output.Err,
+				"value of type `EVM` has no member `createBridgedAccount`",
+			)
 		}),
 	)
 
@@ -3024,6 +3080,7 @@ func TestEVM(t *testing.T) {
 			ctx fvm.Context,
 			snapshotTree snapshot.SnapshotTree,
 		) {
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 			script := fvm.Script([]byte(fmt.Sprintf(`
 				import EVM from %s
 				
@@ -3034,7 +3091,7 @@ func TestEVM(t *testing.T) {
 					destroy acc.withdraw(balance: bal);
 					destroy acc;
 				}
-			`, chain.ServiceAddress().HexWithPrefix())))
+			`, sc.EVMContract.Address.HexWithPrefix())))
 
 			_, output, err := vm.Run(ctx, script, snapshotTree)
 
@@ -3060,6 +3117,7 @@ func TestEVM(t *testing.T) {
 			ctx fvm.Context,
 			snapshotTree snapshot.SnapshotTree,
 		) {
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 			tests := []struct {
 				err        error
@@ -3091,7 +3149,7 @@ func TestEVM(t *testing.T) {
 					pub fun main() {
 						destroy <- EVM.createBridgedAccount();
 					}
-				`, chain.ServiceAddress().HexWithPrefix())))
+				`, sc.EVMContract.Address.HexWithPrefix())))
 
 				_, output, err := vm.Run(ctx, script, errStorage)
 
