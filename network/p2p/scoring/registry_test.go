@@ -615,7 +615,7 @@ func testScoreRegistrySpamRecordWithoutDuplicateMessagesPenalty(t *testing.T, me
 	score, updated, exists = appScoreCache.Get(peerID) // get the score from the cache.
 	require.True(t, exists)
 	require.True(t, updated.After(queryTime))
-	require.True(t, math.Abs(expectedPenalty-score)/math.Max(expectedPenalty, score) < 0.001)
+	unittest.RequireNumericallyClose(t, expectedPenalty, score, 10e-3)
 
 	// stop the registry.
 	cancel()
