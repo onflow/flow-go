@@ -502,7 +502,7 @@ func testScoreRegistrySpamRecordWithDuplicateMessagesPenalty(t *testing.T, messa
 	require.Eventually(t, func() bool {
 		// calling the app specific score function when there is no app specific score in the cache should eventually update the cache.
 		score := reg.AppSpecificScoreFunc()(peerID)
-		return math.Abs(expectedPenalty-score)/math.Max(expectedPenalty, score) < 0.001
+		return unittest.AreNumericallyClose(expectedPenalty, score, 10e-3)
 	}, 5*time.Second, 100*time.Millisecond)
 
 	// the app specific score should now be updated in the cache.
