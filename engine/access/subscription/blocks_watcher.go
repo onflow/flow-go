@@ -185,7 +185,6 @@ func (h *BlocksWatcher) SetSealedHighestHeight(height uint64) bool {
 func (h *BlocksWatcher) ProcessSubscriptionOnFinalizedBlock(finalizedHeader *flow.Header) error {
 	if ok := h.SetFinalizedHighestHeight(finalizedHeader.Height); !ok {
 		h.log.Debug().Msg("finalized block already received")
-		return nil
 	}
 
 	// retrieve latest _finalized_ seal in the fork with head finalizedBlock and update last
