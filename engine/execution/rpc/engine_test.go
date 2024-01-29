@@ -70,14 +70,16 @@ func (suite *Suite) TestExecuteScriptAtBlockID() {
 		Script:  script,
 	}
 	scriptExecValue := []byte{9, 10, 11}
+	computationUsage := uint64(11)
 	executionResp := execution.ExecuteScriptAtBlockIDResponse{
-		Value: scriptExecValue,
+		Value:            scriptExecValue,
+		ComputationUsage: computationUsage,
 	}
 
 	suite.Run("happy path with successful script execution", func() {
 		suite.commits.On("ByBlockID", mockIdentifier).Return(nil, nil).Once()
 		mockEngine.On("ExecuteScriptAtBlockID", ctx, script, arguments, mockIdentifier).
-			Return(scriptExecValue, nil).Once()
+			Return(scriptExecValue, computationUsage, nil).Once()
 		response, err := handler.ExecuteScriptAtBlockID(ctx, &executionReq)
 		suite.Require().NoError(err)
 		suite.Require().Equal(&executionResp, response)
@@ -94,7 +96,7 @@ func (suite *Suite) TestExecuteScriptAtBlockID() {
 	suite.Run("valid request with script execution failure", func() {
 		suite.commits.On("ByBlockID", mockIdentifier).Return(nil, nil).Once()
 		mockEngine.On("ExecuteScriptAtBlockID", ctx, script, arguments, mockIdentifier).
-			Return(nil, status.Error(codes.InvalidArgument, "")).Once()
+			Return(nil, 0, status.Error(codes.InvalidArgument, "")).Once()
 		_, err := handler.ExecuteScriptAtBlockID(ctx, &executionReq)
 		suite.Require().Error(err)
 		errors.Is(err, status.Error(codes.InvalidArgument, ""))
