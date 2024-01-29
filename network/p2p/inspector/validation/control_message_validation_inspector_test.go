@@ -346,7 +346,7 @@ func TestControlMessageInspection_ValidRpc(t *testing.T) {
 // TestGraftInspection_InvalidTopic ensures inspector disseminates an invalid control message notification for
 // graft messages when the topic is invalid.
 func TestGraftInspection_InvalidTopic(t *testing.T) {
-	inspector, signalerCtx, cancel, distributor, _, sporkID, _, topicProviderOracle := inspectorFixture(t)
+	inspector, signalerCtx, cancel, distributor, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t)
 	// create unknown topic
 	unknownTopic, malformedTopic, invalidSporkIDTopic := invalidTopics(t, sporkID)
 	// avoid unknown topics errors
@@ -361,6 +361,7 @@ func TestGraftInspection_InvalidTopic(t *testing.T) {
 
 	from := unittest.PeerIdFixture(t)
 	checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgGraft, channels.IsInvalidTopicErr, p2p.CtrlMsgNonClusterTopicType)
+	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 	distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(checkNotification)
 
 	inspector.Start(signalerCtx)
