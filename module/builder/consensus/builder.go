@@ -337,7 +337,7 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 	return guarantees, nil
 }
 
-// getInsertableSeals returns the list of seals from the mempool that should be
+// getInsertableSeals returns the list of Seals from the mempool that should be
 // inserted in the next payload.
 // Per protocol definition, a specific result is only incorporated _once_ in each fork.
 // Specifically, the result is incorporated in the block that contains a receipt committing
@@ -383,7 +383,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	// Furthermore, condition (2) imposes a limit on how far we have to walk back:
 	//  * A result can only be incorporated in a child of the block that it computes.
 	//    Therefore, we only have to inspect the results incorporated in unsealed blocks.
-	sealsSuperset := make(map[uint64][]*flow.IncorporatedResultSeal) // map: executedBlock.Height -> candidate seals
+	sealsSuperset := make(map[uint64][]*flow.IncorporatedResultSeal) // map: executedBlock.Height -> candidate Seals
 	sealCollector := func(header *flow.Header) error {
 		blockID := header.ID()
 		if blockID == parentID {
