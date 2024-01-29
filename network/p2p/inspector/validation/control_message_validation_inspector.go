@@ -696,7 +696,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 func (c *ControlMsgValidationInspector) truncateRPC(from peer.ID, rpc *pubsub.RPC) {
 	if c.config.InspectionProcess.Truncate.Disabled {
 		c.logger.
-			Warn().
+			Trace().
 			Str("peer_id", p2plogging.PeerId(from)).
 			Bool(logging.KeyNetworkingSecurity, true).
 			Msg(RPCTruncationDisabledWarning)
