@@ -318,4 +318,4 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.42.7-patch.1
+replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.42.8-patch.1
