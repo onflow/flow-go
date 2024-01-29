@@ -3163,7 +3163,15 @@ func TestEVM(t *testing.T) {
 	)
 
 	t.Run("deploy contract code", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
+		withBootstrapProcedureOptions(
+			fvm.WithSetupEVMEnabled(true),
+		).
+		withContextOptions(
+			// default is testnet, but testnet has a special EVM storage contract location
+			// so we have to use emulator here so that the EVM storage contract is deployed
+			// to the 5th address
+			fvm.WithChain(flow.Emulator.Chain()),
+		).
 		run(func(
 			t *testing.T,
 			vm fvm.VM,
