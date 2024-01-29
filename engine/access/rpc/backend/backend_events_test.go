@@ -256,7 +256,8 @@ func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
 	reporter := syncmock.NewIndexReporter(s.T())
 	reporter.On("LowestIndexedHeight").Return(startHeight, nil)
 	reporter.On("HighestIndexedHeight").Return(endHeight+10, nil)
-	s.eventsIndex.Initialize(reporter)
+	err := s.eventsIndex.Initialize(reporter)
+	s.Require().NoError(err)
 
 	s.state.On("Sealed").Return(s.snapshot)
 	s.snapshot.On("Head").Return(s.sealedHead, nil)
@@ -347,7 +348,8 @@ func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
 			events.On("ByBlockID", s.blockIDs[2]).Return(s.blockEvents, nil)
 			events.On("ByBlockID", s.blockIDs[3]).Return(s.blockEvents, nil)
 
-			eventsIndex.Initialize(reporter)
+			err := eventsIndex.Initialize(reporter)
+			s.Require().NoError(err)
 
 			backend := s.defaultBackend()
 			backend.queryMode = tt.queryMode
