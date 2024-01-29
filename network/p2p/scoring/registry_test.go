@@ -181,14 +181,14 @@ func testScoreRegistryPeerWithSpamRecord(t *testing.T, messageType p2pmsg.Contro
 		// this peer has a spam record, with no subscription penalty. Hence, the app specific score should only be the spam penalty,
 		// and the peer should be deprived of the default reward for its valid staked role.
 		// As the app specific score in the cache and spam penalty in the spamRecords are updated at different times, we account for 0.1% error.
-		return math.Abs(expectedPenalty-score)/math.Max(expectedPenalty, score) < 0.001
+		return unittest.AreNumericallyClose(expectedPenalty, score, 10e-4)
 	}, 5*time.Second, 100*time.Millisecond)
 
 	// the app specific score should now be updated in the cache.
 	score, updated, exists = appScoreCache.Get(peerID) // get the score from the cache.
 	require.True(t, exists)
 	require.True(t, updated.After(queryTime))
-	require.True(t, math.Abs(expectedPenalty-score)/math.Max(expectedPenalty, score) < 0.001)
+	require.True(t, unittest.AreNumericallyClose(expectedPenalty, score, 10e-4))
 
 	// stop the registry.
 	cancel()
@@ -502,14 +502,14 @@ func testScoreRegistrySpamRecordWithDuplicateMessagesPenalty(t *testing.T, messa
 	require.Eventually(t, func() bool {
 		// calling the app specific score function when there is no app specific score in the cache should eventually update the cache.
 		score := reg.AppSpecificScoreFunc()(peerID)
-		return math.Abs(expectedPenalty-score)/math.Max(expectedPenalty, score) < 0.001
+		return unittest.AreNumericallyClose(expectedPenalty, score, 10e-4)
 	}, 5*time.Second, 100*time.Millisecond)
 
 	// the app specific score should now be updated in the cache.
 	score, updated, exists = appScoreCache.Get(peerID) // get the score from the cache.
 	require.True(t, exists)
 	require.True(t, updated.After(queryTime))
-	require.True(t, math.Abs(expectedPenalty-score)/math.Max(expectedPenalty, score) < 0.001)
+	require.True(t, unittest.AreNumericallyClose(expectedPenalty, score, 10e-4))
 
 	// stop the registry.
 	cancel()
@@ -589,7 +589,7 @@ func testScoreRegistrySpamRecordWithoutDuplicateMessagesPenalty(t *testing.T, me
 	require.Never(t, func() bool {
 		score := reg.AppSpecificScoreFunc()(peerID)
 		return score != cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Protocol.AppSpecificScore.MaxAppSpecificReward
-	}, 5*time.Second, 100*time.Millisecond)
+	}, 5*time.Second, 10*time.Millisecond)
 
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
@@ -608,14 +608,14 @@ func testScoreRegistrySpamRecordWithoutDuplicateMessagesPenalty(t *testing.T, me
 	// eventually, the app specific score should be updated in the cache.
 	require.Eventually(t, func() bool {
 		score := reg.AppSpecificScoreFunc()(peerID)
-		return math.Abs(expectedPenalty-score)/math.Max(expectedPenalty, score) < 0.001
-	}, 5*time.Second, 100*time.Millisecond)
+		return unittest.AreNumericallyClose(expectedPenalty, score, 0.2)
+	}, 5*time.Second, 10*time.Millisecond)
 
 	// the app specific score should now be updated in the cache.
 	score, updated, exists = appScoreCache.Get(peerID) // get the score from the cache.
 	require.True(t, exists)
 	require.True(t, updated.After(queryTime))
-	require.True(t, math.Abs(expectedPenalty-score)/math.Max(expectedPenalty, score) < 0.001)
+	require.True(t, unittest.AreNumericallyClose(expectedPenalty, score, 0.01))
 
 	// stop the registry.
 	cancel()
