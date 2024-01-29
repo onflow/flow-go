@@ -26,7 +26,7 @@ func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount int) {
 					// setup several of accounts
 					// note that trie growth is the function of number of accounts
 					for i := 0; i < accountCount; i++ {
-						account := handler.AccountByAddress(handler.AllocateAddress(), true)
+						account := handler.AccountByAddress(handler.DeployCOA(), true)
 						account.Deposit(types.NewFlowTokenVault(types.NewBalanceFromUFix64(100)))
 						accounts[i] = account
 					}

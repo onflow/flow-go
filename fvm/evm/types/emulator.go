@@ -3,6 +3,7 @@ package types
 import (
 	"math/big"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
 )
@@ -26,6 +27,7 @@ type BlockContext struct {
 	DirectCallBaseGasUsage uint64
 	DirectCallGasPrice     uint64
 	GasFeeCollector        Address
+	Random                 gethCommon.Hash
 
 	// a set of extra precompiles to be injected
 	ExtraPrecompiles []Precompile
@@ -46,8 +48,10 @@ type ReadOnlyBlockView interface {
 	BalanceOf(address Address) (*big.Int, error)
 	// NonceOf returns the nonce of this address
 	NonceOf(address Address) (uint64, error)
-	// CodeOf returns the code for this address (if smart contract is deployed at this address)
+	// CodeOf returns the code for this address
 	CodeOf(address Address) (Code, error)
+	// CodeHashOf returns the code hash for this address
+	CodeHashOf(address Address) ([]byte, error)
 }
 
 // BlockView facilitates execution of a transaction or a direct evm  call in the context of a block

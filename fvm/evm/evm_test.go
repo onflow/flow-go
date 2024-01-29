@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/cadence/encoding/json"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
@@ -85,10 +86,12 @@ func TestEVMRun(t *testing.T) {
 }
 
 func RunWithNewTestVM(t *testing.T, chain flow.Chain, f func(fvm.Context, fvm.VM, snapshot.SnapshotTree)) {
+
 	opts := []fvm.Option{
 		fvm.WithChain(chain),
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+		fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
 	}
 	ctx := fvm.NewContext(opts...)
 
@@ -166,7 +169,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 	})
 }
 
-func TestBridgedAccountWithdraw(t *testing.T) {
+func TestCOAWithdraw(t *testing.T) {
 
 	t.Parallel()
 

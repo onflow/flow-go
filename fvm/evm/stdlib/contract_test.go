@@ -37,7 +37,7 @@ func (t *testContractHandler) FlowTokenAddress() common.Address {
 
 var _ types.ContractHandler = &testContractHandler{}
 
-func (t *testContractHandler) AllocateAddress() types.Address {
+func (t *testContractHandler) DeployCOA() types.Address {
 	if t.allocateAddress == nil {
 		t.addressIndex++
 		var address types.Address
@@ -71,6 +71,8 @@ func (t *testContractHandler) Run(tx []byte, coinbase types.Address) {
 type testFlowAccount struct {
 	address  types.Address
 	balance  func() types.Balance
+	code     func() types.Code
+	codeHash func() []byte
 	transfer func(address types.Address, balance types.Balance)
 	deposit  func(vault *types.FLOWTokenVault)
 	withdraw func(balance types.Balance) *types.FLOWTokenVault
@@ -89,6 +91,20 @@ func (t *testFlowAccount) Balance() types.Balance {
 		return types.NewBalanceFromUFix64(0)
 	}
 	return t.balance()
+}
+
+func (t *testFlowAccount) Code() types.Code {
+	if t.balance == nil {
+		return types.Code{}
+	}
+	return t.code()
+}
+
+func (t *testFlowAccount) CodeHash() []byte {
+	if t.codeHash == nil {
+		return nil
+	}
+	return t.codeHash()
 }
 
 func (t *testFlowAccount) Transfer(address types.Address, balance types.Balance) {
@@ -3332,7 +3348,7 @@ func TestBridgedAccountDeploy(t *testing.T) {
 					assert.Equal(t, types.GasLimit(9999), limit)
 					assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
 
-					return handler.AllocateAddress()
+					return handler.DeployCOA()
 				},
 			}
 		},

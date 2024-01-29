@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"math/big"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence/runtime/common"
@@ -60,15 +61,27 @@ func getPrecompiles(
 	return []types.Precompile{archContract}
 }
 
-// AllocateAddress allocates an address to be used by the bridged accounts
-func (h *ContractHandler) AllocateAddress() types.Address {
+// DeployCOA deploys a cadence-owned-account and returns the address
+func (h *ContractHandler) DeployCOA() types.Address {
 	target, err := h.addressAllocator.AllocateCOAAddress()
+	gaslimit := types.GasLimit(COAContractDeploymentRequiredGas)
 	handleError(err)
-	return target
+	h.checkGasLimit(gaslimit)
+
+	factory := h.addressAllocator.COAFactoryAddress()
+	call := types.NewDeployCallWithTargetAddress(
+		factory,
+		target,
+		COAContractBytes,
+		uint64(gaslimit),
+		new(big.Int),
+	)
+	res := h.executeAndHandleCall(h.getBlockContext(), call, nil, false)
+	return res.DeployedContractAddress
 }
 
 // AccountByAddress returns the account for the given address,
-// if isAuthorized is set, account is controlled by the FVM (bridged accounts)
+// if isAuthorized is set, account is controlled by the FVM (COAs)
 func (h *ContractHandler) AccountByAddress(addr types.Address, isAuthorized bool) types.Account {
 	return newAccount(h, addr, isAuthorized)
 }
@@ -153,11 +166,67 @@ func (h *ContractHandler) emitEvent(event *types.Event) {
 func (h *ContractHandler) getBlockContext() types.BlockContext {
 	bp, err := h.blockstore.BlockProposal()
 	handleError(err)
+	rand := gethCommon.Hash{}
+	err = h.backend.ReadRandom(rand[:])
+	handleError(err)
 	return types.BlockContext{
 		BlockNumber:            bp.Height,
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
 		ExtraPrecompiles:       h.precompiles,
+		Random:                 rand,
 	}
+}
+
+func (h *ContractHandler) executeAndHandleCall(
+	ctx types.BlockContext,
+	call *types.DirectCall,
+	totalSupplyDiff *big.Int,
+	deductSupplyDiff bool,
+) *types.Result {
+	// execute the call
+	blk, err := h.emulator.NewBlockView(ctx)
+	handleError(err)
+
+	res, err := blk.DirectCall(call)
+	h.meterGasUsage(res)
+	handleError(err)
+
+	// update block proposal
+	callHash, err := call.Hash()
+	if err != nil {
+		err = types.NewFatalError(err)
+		handleError(err)
+	}
+
+	bp, err := h.blockstore.BlockProposal()
+	handleError(err)
+	bp.AppendTxHash(callHash)
+	if totalSupplyDiff != nil {
+		if deductSupplyDiff {
+			bp.TotalSupply = new(big.Int).Sub(bp.TotalSupply, totalSupplyDiff)
+		} else {
+			bp.TotalSupply = new(big.Int).Add(bp.TotalSupply, totalSupplyDiff)
+		}
+	}
+	// emit events
+	encoded, err := call.Encode()
+	handleError(err)
+
+	h.emitEvent(
+		types.NewTransactionExecutedEvent(
+			bp.Height,
+			encoded,
+			callHash,
+			res,
+		),
+	)
+	h.emitEvent(types.NewBlockExecutedEvent(bp))
+
+	// commit block proposal
+	err = h.blockstore.CommitBlockProposal()
+	handleError(err)
+
+	return res
 }
 
 type Account struct {
@@ -175,12 +244,12 @@ func newAccount(fch *ContractHandler, addr types.Address, isAuthorized bool) *Ac
 	}
 }
 
-// Address returns the address associated with the bridged account
+// Address returns the address associated with the account
 func (a *Account) Address() types.Address {
 	return a.address
 }
 
-// Balance returns the balance of this bridged account
+// Balance returns the balance of this account
 //
 // TODO: we might need to meter computation for read only operations as well
 // currently the storage limits is enforced
@@ -196,6 +265,30 @@ func (a *Account) Balance() types.Balance {
 	return types.NewBalance(bl)
 }
 
+// Code returns the code of this account
+func (a *Account) Code() types.Code {
+	ctx := a.fch.getBlockContext()
+
+	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
+	handleError(err)
+
+	code, err := blk.CodeOf(a.address)
+	handleError(err)
+	return code
+}
+
+// CodeHash returns the code hash of this account
+func (a *Account) CodeHash() []byte {
+	ctx := a.fch.getBlockContext()
+
+	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
+	handleError(err)
+
+	code, err := blk.CodeHashOf(a.address)
+	handleError(err)
+	return code
+}
+
 // Deposit deposits the token from the given vault into the flow evm main vault
 // and update the account balance with the new amount
 func (a *Account) Deposit(v *types.FLOWTokenVault) {
@@ -206,7 +299,7 @@ func (a *Account) Deposit(v *types.FLOWTokenVault) {
 		a.address,
 		v.Balance(),
 	)
-	a.executeAndHandleCall(a.fch.getBlockContext(), call, v.Balance(), false)
+	a.fch.executeAndHandleCall(a.fch.getBlockContext(), call, v.Balance(), false)
 }
 
 // Withdraw deducts the balance from the account and
@@ -232,7 +325,7 @@ func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 		a.address,
 		b,
 	)
-	a.executeAndHandleCall(a.fch.getBlockContext(), call, b, true)
+	a.fch.executeAndHandleCall(a.fch.getBlockContext(), call, b, true)
 
 	return types.NewFlowTokenVault(b)
 }
@@ -249,7 +342,7 @@ func (a *Account) Transfer(to types.Address, balance types.Balance) {
 		to,
 		balance,
 	)
-	a.executeAndHandleCall(ctx, call, nil, false)
+	a.fch.executeAndHandleCall(ctx, call, nil, false)
 }
 
 // Deploy deploys a contract to the EVM environment
@@ -265,7 +358,7 @@ func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types
 		uint64(gaslimit),
 		balance,
 	)
-	res := a.executeAndHandleCall(a.fch.getBlockContext(), call, nil, false)
+	res := a.fch.executeAndHandleCall(a.fch.getBlockContext(), call, nil, false)
 	return types.Address(res.DeployedContractAddress)
 }
 
@@ -283,66 +376,12 @@ func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimi
 		uint64(gaslimit),
 		balance,
 	)
-	res := a.executeAndHandleCall(a.fch.getBlockContext(), call, nil, false)
+	res := a.fch.executeAndHandleCall(a.fch.getBlockContext(), call, nil, false)
 	return res.ReturnedValue
 }
 
-func (a *Account) executeAndHandleCall(
-	ctx types.BlockContext,
-	call *types.DirectCall,
-	totalSupplyDiff *big.Int,
-	deductSupplyDiff bool,
-) *types.Result {
-	// execute the call
-	blk, err := a.fch.emulator.NewBlockView(ctx)
-	handleError(err)
-
-	res, err := blk.DirectCall(call)
-	a.fch.meterGasUsage(res)
-	handleError(err)
-
-	// update block proposal
-	callHash, err := call.Hash()
-	if err != nil {
-		err = types.NewFatalError(err)
-		handleError(err)
-	}
-
-	bp, err := a.fch.blockstore.BlockProposal()
-	handleError(err)
-	bp.AppendTxHash(callHash)
-	if totalSupplyDiff != nil {
-		if deductSupplyDiff {
-			bp.TotalSupply = new(big.Int).Sub(bp.TotalSupply, totalSupplyDiff)
-		} else {
-			bp.TotalSupply = new(big.Int).Add(bp.TotalSupply, totalSupplyDiff)
-		}
-
-	}
-
-	// emit events
-	encoded, err := call.Encode()
-	handleError(err)
-
-	a.fch.emitEvent(
-		types.NewTransactionExecutedEvent(
-			bp.Height,
-			encoded,
-			callHash,
-			res,
-		),
-	)
-	a.fch.emitEvent(types.NewBlockExecutedEvent(bp))
-
-	// commit block proposal
-	err = a.fch.blockstore.CommitBlockProposal()
-	handleError(err)
-
-	return res
-}
-
 func (a *Account) checkAuthorized() {
-	// check if account is authorized (i.e. is a bridged account)
+	// check if account is authorized (i.e. is a COA)
 	if !a.isAuthorized {
 		handleError(types.ErrUnAuthroizedMethodCall)
 	}

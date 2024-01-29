@@ -78,6 +78,7 @@ func (vmt vmTest) run(
 		baseOpts := []fvm.Option{
 			// default chain is Testnet
 			fvm.WithChain(flow.Testnet.Chain()),
+			fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
 		}
 
 		opts := append(baseOpts, vmt.contextOptions...)
@@ -3162,7 +3163,15 @@ func TestEVM(t *testing.T) {
 	)
 
 	t.Run("deploy contract code", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
+		withBootstrapProcedureOptions(
+			fvm.WithSetupEVMEnabled(true),
+		).
+		withContextOptions(
+			// default is testnet, but testnet has a special EVM storage contract location
+			// so we have to use emulator here so that the EVM storage contract is deployed
+			// to the 5th address
+			fvm.WithChain(flow.Emulator.Chain()),
+		).
 		run(func(
 			t *testing.T,
 			vm fvm.VM,
@@ -3208,10 +3217,10 @@ func TestEVM(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
-			require.Len(t, output.Events, 3)
+			require.Len(t, output.Events, 5)
 
 			evmLocation := types.EVMLocation{}
-			txExe, blockExe := output.Events[1], output.Events[2]
+			txExe, blockExe := output.Events[3], output.Events[4]
 			assert.Equal(t, evmLocation.TypeID(nil, string(types.EventTypeTransactionExecuted)), common.TypeID(txExe.Type))
 			assert.Equal(t, evmLocation.TypeID(nil, string(types.EventTypeBlockExecuted)), common.TypeID(blockExe.Type))
 		}),

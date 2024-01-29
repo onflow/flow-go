@@ -12,6 +12,7 @@ type TestEmulator struct {
 	BalanceOfFunc      func(address types.Address) (*big.Int, error)
 	NonceOfFunc        func(address types.Address) (uint64, error)
 	CodeOfFunc         func(address types.Address) (types.Code, error)
+	CodeHashOfFunc     func(address types.Address) ([]byte, error)
 	DirectCallFunc     func(call *types.DirectCall) (*types.Result, error)
 	RunTransactionFunc func(tx *gethTypes.Transaction) (*types.Result, error)
 }
@@ -44,12 +45,20 @@ func (em *TestEmulator) NonceOf(address types.Address) (uint64, error) {
 	return em.NonceOfFunc(address)
 }
 
-// CodeOf returns the code for this address (if smart contract is deployed at this address)
+// CodeOf returns the code for this address
 func (em *TestEmulator) CodeOf(address types.Address) (types.Code, error) {
 	if em.CodeOfFunc == nil {
 		panic("method not set")
 	}
 	return em.CodeOfFunc(address)
+}
+
+// CodeHashOf returns the code hash for this address
+func (em *TestEmulator) CodeHashOf(address types.Address) ([]byte, error) {
+	if em.CodeHashOfFunc == nil {
+		panic("method not set")
+	}
+	return em.CodeHashOfFunc(address)
 }
 
 // DirectCall executes a direct call

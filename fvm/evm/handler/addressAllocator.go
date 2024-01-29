@@ -32,6 +32,10 @@ func NewAddressAllocator(led atree.Ledger, flexAddress flow.Address) (*AddressAl
 	}, nil
 }
 
+func (aa *AddressAllocator) COAFactoryAddress() types.Address {
+	return MakeCOAAddress(0)
+}
+
 // AllocateCOAAddress allocates an address for COA
 func (aa *AddressAllocator) AllocateCOAAddress() (types.Address, error) {
 	data, err := aa.led.GetValue(aa.flexAddress[:], []byte(ledgerAddressAllocatorKey))
