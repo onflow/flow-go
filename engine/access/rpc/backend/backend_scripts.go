@@ -128,7 +128,10 @@ func (b *backendScripts) executeScript(
 
 	case IndexQueryModeFailover:
 		localResult, localDuration, localErr := b.executeScriptLocally(ctx, scriptRequest)
-		if localErr == nil || isInvalidArgumentError(localErr) || status.Code(localErr) == codes.Canceled {
+		// Note: temporarily ignoring error types and falling back to ENs for ALL errors
+		// This should only fallback for non-cadence errors, but on v0.32, some errors are hidden
+		// within a cadence runtime error, resulting in the incorrect error type being returned.
+		if localErr == nil || status.Code(localErr) == codes.Canceled {
 			return localResult, localErr
 		}
 		// Note: scripts that timeout are retried on the execution nodes since ANs may have performance
