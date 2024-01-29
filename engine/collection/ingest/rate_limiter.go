@@ -97,6 +97,8 @@ func (r *AddressRateLimiter) GetAddresses() []flow.Address {
 
 // GetLimitConfig get the limit config
 func (r *AddressRateLimiter) GetLimitConfig() (rate.Limit, int) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	return r.limit, r.burst
 }
 
