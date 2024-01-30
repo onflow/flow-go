@@ -338,10 +338,11 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCod
 		err        error
 		statusCode codes.Code
 	}{
-		{
-			err:        cadenceErr,
-			statusCode: codes.InvalidArgument,
-		},
+		// Skipping failover for InvalidArgument temporarily disabled
+		// {
+		// 	err:        cadenceErr,
+		// 	statusCode: codes.InvalidArgument,
+		// },
 		{
 			err:        ctxCancelErr,
 			statusCode: codes.Canceled,
