@@ -1,4 +1,8 @@
 config-file: "./default-config.yml"
+# WARNING: Only modify the network configurations below if you fully understand their implications.
+# Incorrect settings may lead to system instability, security vulnerabilities, or degraded performance.
+# Make changes with caution and refer to the documentation for guidance.
+# Network configuration.
 network-config:
   # Network Configuration
   # Connection pruning determines whether connections to nodes
@@ -136,38 +140,66 @@ network-config:
       # The size of the queue for notifications about invalid RPC messages
       notification-cache-size: 10_000
       validation: # RPC control message validation inspector configs
-        # Rpc validation inspector number of pool workers
-        workers: 5
-        # The size of the queue used by worker pool for the control message validation inspector
-        queue-size: 100
-        # The max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated
-        message-max-sample-size: 1000
-        # Max number of control messages in a sample to be inspected when inspecting GRAFT and PRUNE message types. If the total number of control messages (GRAFT or PRUNE)
-        # exceeds this max sample size then the respective message will be truncated before being processed.
-        graft-and-prune-message-max-sample-size: 1000
-        # The threshold at which an error will be returned if the number of invalid RPC messages exceeds this value
-        error-threshold: 500
-        ihave: # Max number of ihave messages in a sample to be inspected. If the number of ihave messages exceeds this configured value
-          # the control message ihaves will be truncated to the max sample size. This sample is randomly selected.
+        inspection-queue:
+          # Rpc validation inspector number of pool workers
+          workers: 5
+          # The size of the queue used by worker pool for the control message validation inspector
+          queue-size: 100
+        publish-messages:
+          # The maximum number of messages in a single RPC message that are randomly sampled for async inspection.
+          #	When the size of a single RPC message exceeds this threshold, a random sample is taken for inspection, but the RPC message is not truncated.
           max-sample-size: 1000
-          # Max number of ihave message ids in a sample to be inspected per ihave. Each ihave message includes a list of message ids
-          # each. If the size of the message ids list for a single ihave message exceeds the configured max message id sample size the list of message ids will be truncated.
-          max-message-id-sample-size: 1000
+          # The threshold at which an error will be returned if the number of invalid RPC messages exceeds this value
+          error-threshold: 500
+        graft-and-prune:
+          # The maximum number of GRAFT or PRUNE messages in a single RPC message.
+          # When the total number of GRAFT or PRUNE messages in a single RPC message exceeds this threshold,
+          #	a random sample of GRAFT or PRUNE messages will be taken and the RPC message will be truncated to this sample size.
+          message-count-threshold: 1000
+          # Maximum number of total duplicate topic ids in a single GRAFT or PRUNE message, ideally this should be 0 but we allow for some tolerance
+          # to avoid penalizing peers that are not malicious but are misbehaving due to bugs or other issues.
+          # A topic id is considered duplicate if it appears more than once in a single GRAFT or PRUNE message.
+          duplicate-topic-id-threshold: 50
+        ihave:
+          # The maximum allowed number of iHave messages in a single RPC message.
+          #	Each iHave message represents the list of message ids. When the total number of iHave messages
+          #	in a single RPC message exceeds this threshold, a random sample of iHave messages will be taken and the RPC message will be truncated to this sample size.
+          #	The sample size is equal to the configured message-count-threshold.
+          message-count-threshold: 1000
+          # The maximum allowed number of message ids in a single iHave message.
+          #	Each iHave message represents the list of message ids for a specific topic, and this parameter controls the maximum number of message ids
+          #	that can be included in a single iHave message. When the total number of message ids in a single iHave message exceeds this threshold,
+          #	a random sample of message ids will be taken and the iHave message will be truncated to this sample size.
+          #	The sample size is equal to the configured message-id-count-threshold.
+          message-id-count-threshold: 1000
+          # The tolerance threshold for having duplicate topics in an iHave message under inspection.
+          #	When the total number of duplicate topic ids in a single iHave message exceeds this threshold, the inspection of message will fail.
+          #	Note that a topic ID is counted as a duplicate only if it is repeated more than once.
+          duplicate-topic-id-threshold: 50
+          # Threshold of tolerance for having duplicate message IDs in a single iHave message under inspection.
+          # When the total number of duplicate message ids in a single iHave message exceeds this threshold, the inspection of message will fail.
+          # Ideally, an iHave message should not have any duplicate message IDs, hence a message id is considered duplicate when it is repeated more than once
+          # within the same iHave message. When the total number of duplicate message ids in a single iHave message exceeds this threshold, the inspection of message will fail.
+          duplicate-message-id-threshold: 100
         iwant:
-          # Max number of iwant messages in a sample to be inspected. If the total number of iWant control messages
-          # exceeds this max sample size then the respective message will be truncated before being processed.
-          max-sample-size: 1000
-          # Max number of iwant message ids in a sample to be inspected per iwant. Each iwant message includes a list of message ids
-          # each, if the size of this list exceeds the configured max message id sample size the list of message ids will be truncated.
-          max-message-id-sample-size: 1000
-          # The allowed threshold of iWant messages received without a corresponding tracked iHave message that was sent. If the cache miss threshold is exceeded an
-          # invalid control message notification is disseminated and the sender will be penalized.
-          cache-miss-threshold: .5
-          # The iWants size at which message id cache misses will be checked.
-          cache-miss-check-size: 1000
-          # The max allowed duplicate message IDs in a single iWant control message. If the duplicate message threshold is exceeded an invalid control message
-          # notification is disseminated and the sender will be penalized.
-          duplicate-message-id-threshold: .15
+          # The maximum allowed number of iWant messages in a single RPC message.
+          #	Each iWant message represents the list of message ids. When the total number of iWant messages
+          #	in a single RPC message exceeds this threshold, a random sample of iWant messages will be taken and the RPC message will be truncated to this sample size.
+          #	The sample size is equal to the configured message-count-threshold.
+          message-count-threshold: 1000
+          # The maximum allowed number of message ids in a single iWant message.
+          #	Each iWant message represents the list of message ids for a specific topic, and this parameter controls the maximum number of message ids
+          #	that can be included in a single iWant message. When the total number of message ids in a single iWant message exceeds this threshold,
+          #	a random sample of message ids will be taken and the iWant message will be truncated to this sample size.
+          #	The sample size is equal to the configured message-id-count-threshold.
+          message-id-count-threshold: 1000
+          # The allowed threshold of iWant messages received without a corresponding tracked iHave message that was sent.
+          # If the cache miss threshold is exceeded an invalid control message notification is disseminated and the sender will be penalized.
+          cache-miss-threshold: 500
+          # The max allowed number of duplicate message ids in a single iwant message.
+          # Note that ideally there should be no duplicate message ids in a single iwant message but
+          # we allow for some tolerance to avoid penalizing peers that are not malicious
+          duplicate-message-id-threshold: 100
         cluster-prefixed-messages:
           # Cluster prefixed control message validation configs
           # The size of the cache used to track the amount of cluster prefixed topics received by peers
@@ -195,38 +227,338 @@ network-config:
       # Peer scoring is the default value for enabling peer scoring
     peer-scoring-enabled: true
     scoring-parameters:
-      app-specific-score:
-        # number of workers that asynchronously update the app specific score requests when they are expired.
-        score-update-worker-num: 5
-        # size of the queue used by the worker pool for the app specific score update requests. The queue is used to buffer the app specific score update requests
-        # before they are processed by the worker pool. The queue size must be larger than total number of peers in the network.
-        # The queue is deduplicated based on the peer ids ensuring that there is only one app specific score update request per peer in the queue.
-        score-update-request-queue-size: 10_000
-        # score ttl is the time to live for the app specific score. Once the score is expired; a new request will be sent to the app specific score provider to update the score.
-        # until the score is updated, the previous score will be used.
-        score-ttl: 1m
-      spam-record-cache:
-        # size of cache used to track spam records at gossipsub. Each peer id is mapped to a spam record that keeps track of the spam score for that peer.
-        # cache should be big enough to keep track of the entire network's size. Otherwise, the local node's view of the network will be incomplete due to cache eviction.
-        cache-size: 10_000
-        # Threshold level for spam record penalty.
-        # At each evaluation period, when a node's penalty is below this value, the decay rate slows down, ensuring longer decay periods for malicious nodes and quicker decay for honest ones.
-        penalty-decay-slowdown-threshold: -99
-        # This setting adjusts the decay rate when a node's penalty falls below the threshold.
-        # The decay rate, ranging between 0 and 1, dictates how quickly penalties decrease: a higher rate results in slower decay.
-        # The decay calculation is multiplicative (newPenalty = decayRate * oldPenalty).
-        # The reduction factor increases the decay rate, thus decelerating the penalty reduction. For instance, with a 0.01 reduction factor,
-        # the decay rate increases by 0.01 at each evaluation interval when the penalty is below the threshold.
-        # Consequently, a decay rate of `x` diminishes the penalty to zero more rapidly than a rate of `x+0.01`.
-        penalty-decay-rate-reduction-factor: 0.01
-        # Defines the frequency for evaluating and potentially adjusting the decay process of a spam record.
-        # At each interval, the system assesses the current penalty of a node.
-        # If this penalty is below the defined threshold, the decay rate is modified according to the reduction factor, slowing down the penalty reduction process.
-        # This reassessment at regular intervals ensures that the decay rate is dynamically adjusted to reflect the node's ongoing behavior,
-        # maintaining a balance between penalizing malicious activity and allowing recovery for honest nodes.
-        penalty-decay-evaluation-period: 10m
-      # the intervals at which counters associated with a peer behavior in gossipsub system are decayed.
-      decay-interval: 1m
+      peer-scoring:
+        internal:
+          # The weight for app-specific scores.
+          # It is used to scale the app-specific scores to the same range as the other scores.
+          # At the current version, we don't distinguish between the app-specific scores
+          # and the other scores, so we set it to 1.
+          app-specific-score-weight: 1
+          # The default decay interval for the overall score of a peer at the GossipSub scoring
+          # system. We set it to 1 minute so that it is not too short so that a malicious node can recover from a penalty
+          # and is not too long so that a well-behaved node can't recover from a penalty.
+          decay-interval: 1m
+          # The default decay to zero for the overall score of a peer at the GossipSub scoring system.
+          # It defines the maximum value below which a peer scoring counter is reset to zero.
+          # This is to prevent the counter from decaying to a very small value.
+          # The default value is 0.01, which means that a counter will be reset to zero if it decays to 0.01.
+          # When a counter hits the DecayToZero threshold, it means that the peer did not exhibit the behavior
+          # for a long time, and we can reset the counter.
+          decay-to-zero: 0.01
+          topic:
+            # This is the default value for the skip atomic validation flag for topics.
+            # We set it to true, which means gossipsub parameter validation will not fail if we leave some of the
+            # topic parameters at their default values, i.e., zero. This is because we are not setting all
+            # topic parameters at the current implementation.
+            skip-atomic-validation: true
+            # This value is applied to the square of the number of invalid message deliveries on a topic.
+            # It is used to penalize peers that send invalid messages. By an invalid message, we mean a message that is not signed by the
+            # publisher, or a message that is not signed by the peer that sent it.
+            # An invalid message also can be a self-origin message, i.e., the peer sees its own message bounced back to it.
+            # GossipSub has an edge-case that a peer may inadvertently request a self-origin message from a peer that it is connected to, through iHave-iWant messages, which is a
+            # false-positive edge-case.
+            # We set it to -10e-4, which means that with around 1414 invalid
+            # message deliveries within a gossipsub heartbeat interval, the peer will be disconnected.
+            # Note that we intentionally set this threshold high to avoid false-positively penalizing nodes due to self-origin message requests by iHave-iWants (a known issue in gossipsub).
+            # The supporting math is as follows:
+            # - each staked (i.e., authorized) peer is rewarded by the fixed reward of 100 (i.e., DefaultStakedIdentityReward).
+            # - x invalid message deliveries will result in a penalty of x^2 * DefaultTopicInvalidMessageDeliveriesWeight, i.e., -x^2 * 10-e4.
+            # - the peer will be disconnected when its penalty reaches -100 (i.e., MaxAppSpecificPenalty).
+            # - so, the maximum number of invalid message deliveries that a peer can have before being disconnected is sqrt(200/10-e4) ~ 1414.
+            invalid-message-deliveries-weight: -10e-4
+            # The decay factor used to decay the number of invalid message deliveries.
+            # The total number of invalid message deliveries is multiplied by this factor at each heartbeat interval to
+            # decay the number of invalid message deliveries, and prevent the peer from being disconnected if it stops
+            # sending invalid messages. We set it to 0.5, which means that the number of invalid message deliveries will
+            # decay by 50% at each heartbeat interval.
+            # The decay heartbeats are defined by the heartbeat interval of the gossipsub scoring system, which is 1 Minute (defaultDecayInterval).
+            # Note that we set the decay factor low so that the invalid message deliveries will be decayed fast enough to prevent the peer from being disconnected on mediocre loads.
+            # This is to address the false-positive disconnections that we observed in the network due to the self-origin message requests by iHave-iWants (a known issue in gossipsub).
+            invalid-message-deliveries-decay: 0.5
+            # The default time in mesh quantum for the GossipSub scoring system. It is used to gauge
+            # a discrete time interval for the time in mesh counter. We set it to 1 hour, which means that every one complete hour a peer is
+            # in a topic mesh, the time in mesh counter will be incremented by 1 and is counted towards the availability score of the peer in that topic mesh.
+            # The reason for setting it to 1 hour is that we want to reward peers that are in a topic mesh for a long time, and we want to avoid rewarding peers that
+            # are churners, i.e., peers that join and leave a topic mesh frequently.
+            time-in-mesh-quantum: 1h
+            # The default weight of a topic in the GossipSub scoring system.
+            # The overall score of a peer in a topic mesh is multiplied by the weight of the topic when calculating the overall score of the peer.
+            # We set it to 1.0, which means that the overall score of a peer in a topic mesh is not affected by the weight of the topic.
+            topic-weight: 1.0
+            # This is applied to the number of actual message deliveries in a topic mesh
+            # at each decay interval (i.e., defaultDecayInterval).
+            # It is used to decay the number of actual message deliveries, and prevents past message
+            # deliveries from affecting the current score of the peer.
+            # As the decay interval is 1 minute, we set it to 0.5, which means that the number of actual message
+            # deliveries will decay by 50% at each decay interval.
+            mesh-message-deliveries-decay: 0.5
+            # The maximum number of actual message deliveries in a topic
+            # mesh that is used to calculate the score of a peer in that topic mesh.
+            # We set it to 1000, which means that the maximum number of actual message deliveries in a
+            # topic mesh that is used to calculate the score of a peer in that topic mesh is 1000.
+            # This is to prevent the score of a peer in a topic mesh from being affected by a large number of actual
+            # message deliveries and also affect the score of the peer in other topic meshes.
+            # When the total delivered messages in a topic mesh exceeds this value, the score of the peer in that topic
+            # mesh will not be affected by the actual message deliveries in that topic mesh.
+            # Moreover, this does not allow the peer to accumulate a large number of actual message deliveries in a topic mesh
+            # and then start under-performing in that topic mesh without being penalized.
+            mesh-message-deliveries-cap: 1000
+            # The threshold for the number of actual message deliveries in a
+            # topic mesh that is used to calculate the score of a peer in that topic mesh.
+            # If the number of actual message deliveries in a topic mesh is less than this value,
+            # the peer will be penalized by square of the difference between the actual message deliveries and the threshold,
+            # i.e., -w * (actual - threshold)^2 where `actual` and `threshold` are the actual message deliveries and the
+            # threshold, respectively, and `w` is the weight (i.e., defaultTopicMeshMessageDeliveriesWeight).
+            # We set it to 0.1 * defaultTopicMeshMessageDeliveriesCap, which means that if a peer delivers less tha 10% of the
+            # maximum number of actual message deliveries in a topic mesh, it will be considered as an under-performing peer
+            # in that topic mesh.
+            mesh-message-deliveries-threshold: 100
+            # The weight for applying penalty when a peer is under-performing in a topic mesh.
+            # Upon every decay interval, if the number of actual message deliveries is less than the topic mesh message deliveries threshold
+            # (i.e., defaultTopicMeshMessageDeliveriesThreshold), the peer will be penalized by square of the difference between the actual
+            # message deliveries and the threshold, multiplied by this weight, i.e., -w * (actual - threshold)^2 where w is the weight, and
+            # `actual` and `threshold` are the actual message deliveries and the threshold, respectively.
+            # We set this value to be - 0.05 MaxAppSpecificReward / (defaultTopicMeshMessageDeliveriesThreshold^2). This guarantees that even if a peer
+            # is not delivering any message in a topic mesh, it will not be disconnected.
+            # Rather, looses part of the MaxAppSpecificReward that is awarded by our app-specific scoring function to all staked
+            # nodes by default will be withdrawn, and the peer will be slightly penalized. In other words, under-performing in a topic mesh
+            # will drop the overall score of a peer by 5% of the MaxAppSpecificReward that is awarded by our app-specific scoring function.
+            # It means that under-performing in a topic mesh will not cause a peer to be disconnected, but it will cause the peer to lose
+            # its MaxAppSpecificReward that is awarded by our app-specific scoring function.
+            # At this point, we do not want to disconnect a peer only because it is under-performing in a topic mesh as it might be
+            # causing a false positive network partition.
+            mesh-deliveries-weight: -0.0005
+            # The window size is time interval that we count a delivery of an already
+            # seen message towards the score of a peer in a topic mesh. The delivery is counted
+            # by GossipSub only if the previous sender of the message is different from the current sender.
+            # We set it to the decay interval of the GossipSub scoring system, which is 1 minute.
+            # It means that if a peer delivers a message that it has already seen less than one minute ago,
+            # the delivery will be counted towards the score of the peer in a topic mesh only if the previous sender of the message.
+            # This also prevents replay attacks of messages that are older than one minute. As replayed messages will not
+            # be counted towards the actual message deliveries of a peer in a topic mesh.
+            mesh-message-deliveries-window: 1m
+            # The time interval that we wait for a new peer that joins a topic mesh
+            # till start counting the number of actual message deliveries of that peer in that topic mesh.
+            # We set it to 2 * defaultDecayInterval, which means that we wait for 2 decay intervals before start counting
+            # the number of actual message deliveries of a peer in a topic mesh.
+            # With a default decay interval of 1 minute, it means that we wait for 2 minutes before start counting the
+            # number of actual message deliveries of a peer in a topic mesh. This is to account for
+            # the time that it takes for a peer to start up and receive messages from other peers in the topic mesh.
+            mesh-message-delivery-activation: 2m
+          thresholds:
+            # This is the threshold when a peer's penalty drops below this threshold, no gossip
+            # is emitted towards that peer and gossip from that peer is ignored.
+            # Validation Constraint: GossipThreshold >= PublishThreshold && GossipThreshold < 0
+            # How we use it: As the current max penalty is -100, we set the threshold to -99
+            # so that all gossips to and from peers with penalty -100 are ignored.
+            gossip: -99
+            # This is the threshold when a peer's penalty drops below this threshold,
+            # self-published messages are not propagated towards this peer.
+            # Validation Constraint:
+            # PublishThreshold >= GraylistThreshold && PublishThreshold <= GossipThreshold && PublishThreshold < 0.
+            # How we use it: As the current max penalty is -100, we set the threshold to -99
+            # so that all penalized peers are deprived of receiving any published messages.
+            publish: -99
+            # This is the threshold when a peer's penalty drops below this threshold,
+            # the peer is graylisted, i.e., incoming RPCs from the peer are ignored.
+            # Validation Constraint:
+            # GraylistThreshold =< PublishThreshold && GraylistThreshold =< GossipThreshold && GraylistThreshold < 0
+            # How we use it: As the current max penalty is -100, we set the threshold to -99
+            # so that all penalized peers are graylisted.
+            graylist: -99
+            # This is the threshold when a peer sends us PX information with a prune,
+            # we only accept it and connect to the supplied peers if the originating peer's
+            # penalty exceeds this threshold.
+            # Validation Constraint: must be non-negative.
+            # How we use it: As the current max reward is 100, we set the threshold to 99
+            # so that we only receive supplied peers from well-behaved peers.
+            accept-px: 99
+            # This is the threshold when the median peer penalty in the mesh drops
+            # below this value, the peer may select more peers with penalty above the median
+            # to opportunistically graft on the mesh.
+            # Validation Constraint: must be non-negative.
+            # How we use it: We set it to the -100 + 1 so that we only
+            # opportunistically graft peers that are not access nodes (i.e., with -1),
+            # or penalized peers (i.e., with -100).
+            opportunistic-graft: 101
+          behaviour:
+            # The threshold when the behavior of a peer is considered as bad by GossipSub.
+            # Currently, the misbehavior is defined as advertising an iHave without responding to the iWants (iHave broken promises), as well as attempting
+            # on GRAFT when the peer is considered for a PRUNE backoff, i.e., the local peer does not allow the peer to join the local topic mesh
+            # for a while, and the remote peer keep attempting on GRAFT (aka GRAFT flood).
+            # When the misbehavior counter of a peer goes beyond this threshold, the peer is penalized by defaultBehaviorPenaltyWeight (see below) for the excess misbehavior.
+            #
+            # An iHave broken promise means that a peer advertises an iHave for a message, but does not respond to the iWant requests for that message.
+            # For iHave broken promises, the gossipsub scoring works as follows:
+            # It samples ONLY A SINGLE iHave out of the entire RPC.
+            # If that iHave is not followed by an actual message within the next 3 seconds, the peer misbehavior counter is incremented by 1.
+            #
+            # We set it to 10, meaning that we at most tolerate 10 of such RPCs containing iHave broken promises. After that, the peer is penalized for every
+            # excess RPC containing iHave broken promises.
+            # The counter is also decayed by (0.99) every decay interval (defaultDecayInterval) i.e., every minute.
+            # Note that misbehaviors are counted by GossipSub across all topics (and is different from the Application Layer Misbehaviors that we count through
+            # the ALSP system).
+            penalty-threshold: 1000
+            # The weight for applying penalty when a peer misbehavior goes beyond the threshold.
+            # Misbehavior of a peer at gossipsub layer is defined as advertising an iHave without responding to the iWants (broken promises), as well as attempting
+            # on GRAFT when the peer is considered for a PRUNE backoff, i.e., the local peer does not allow the peer to join the local topic mesh
+            # This is detected by the GossipSub scoring system, and the peer is penalized by defaultBehaviorPenaltyWeight.
+            #
+            # An iHave broken promise means that a peer advertises an iHave for a message, but does not respond to the iWant requests for that message.
+            # For iHave broken promises, the gossipsub scoring works as follows:
+            # It samples ONLY A SINGLE iHave out of the entire RPC.
+            # If that iHave is not followed by an actual message within the next 3 seconds, the peer misbehavior counter is incremented by 1.
+            #
+            # The penalty is applied to the square of the difference between the misbehavior counter and the threshold, i.e., -|w| * (misbehavior counter - threshold)^2.
+            # We set it to 0.01 * MaxAppSpecificPenalty, which means that misbehaving 10 times more than the threshold (i.e., 10 + 10) will cause the peer to lose
+            # its entire AppSpecificReward that is awarded by our app-specific scoring function to all staked (i.e., authorized) nodes by default.
+            # Moreover, as the MaxAppSpecificPenalty is -MaxAppSpecificReward, misbehaving sqrt(2) * 10 times more than the threshold will cause the peer score
+            # to be dropped below the MaxAppSpecificPenalty, which is also below the GraylistThreshold, and the peer will be graylisted (i.e., disconnected).
+            #
+            # The math is as follows: -|w| * (misbehavior - threshold)^2 = 0.01 * MaxAppSpecificPenalty * (misbehavior - threshold)^2 < 2 * MaxAppSpecificPenalty
+            # if misbehavior > threshold + sqrt(2) * 10.
+            # As shown above, with this choice of defaultBehaviorPenaltyWeight, misbehaving sqrt(2) * 10 times more than the threshold will cause the peer score
+            # to be dropped below the MaxAppSpecificPenalty, which is also below the GraylistThreshold, and the peer will be graylisted (i.e., disconnected). This weight
+            # is chosen in a way that with almost a few misbehaviors more than the threshold, the peer will be graylisted. The rationale relies on the fact that
+            # the misbehavior counter is incremented by 1 for each RPC containing one or more broken promises. Hence, it is per RPC, and not per broken promise.
+            # Having sqrt(2) * 10 broken promises RPC is a blatant misbehavior, and the peer should be graylisted. With decay interval of 1 minute, and decay value of
+            # 0.99 we expect a graylisted node due to borken promises to get back in about 527 minutes, i.e., (0.99)^x * (sqrt(2) * 10)^2 * MaxAppSpecificPenalty > GraylistThreshold
+            # where x is the number of decay intervals that the peer is graylisted. As MaxAppSpecificPenalty and GraylistThresholds are close, we can simplify the inequality
+            # to (0.99)^x * (sqrt(2) * 10)^2 > 1 --> (0.99)^x * 200 > 1 --> (0.99)^x > 1/200 --> x > log(1/200) / log(0.99) --> x > 527.17 decay intervals, i.e., 527 minutes.
+            # Note that misbehaviors are counted by GossipSub across all topics (and is different from the Application Layer Misbehaviors that we count through
+            # the ALSP system that are reported by the engines).
+            penalty-weight: -0.01
+            # The decay interval for the misbehavior counter of a peer. The misbehavior counter is
+            # incremented by GossipSub for iHave broken promises or the GRAFT flooding attacks (i.e., each GRAFT received from a remote peer while that peer is on a PRUNE backoff).
+            #
+            # An iHave broken promise means that a peer advertises an iHave for a message, but does not respond to the iWant requests for that message.
+            # For iHave broken promises, the gossipsub scoring works as follows:
+            # It samples ONLY A SINGLE iHave out of the entire RPC.
+            # If that iHave is not followed by an actual message within the next 3 seconds, the peer misbehavior counter is incremented by 1.
+            # This means that regardless of how many iHave broken promises an RPC contains, the misbehavior counter is incremented by 1.
+            # That is why we decay the misbehavior counter very slow, as this counter indicates a severe misbehavior.
+            #
+            # The misbehavior counter is decayed per decay interval (i.e., defaultDecayInterval = 1 minute) by GossipSub.
+            # We set it to 0.99, which means that the misbehavior counter is decayed by 1% per decay interval.
+            # With the generous threshold that we set (i.e., defaultBehaviourPenaltyThreshold = 10), we take the peers going beyond the threshold as persistent misbehaviors,
+            # We expect honest peers never to go beyond the threshold, and if they do, we expect them to go back below the threshold quickly.
+            #
+            # Note that misbehaviors are counted by GossipSub across all topics (and is different from the Application Layer Misbehaviors that we count through
+            # the ALSP system that is based on the engines report).
+            penalty-decay: 0.5
+        protocol:
+          # The max number of debug/trace log events per second.
+          # Logs emitted above this threshold are dropped.
+          max-debug-logs: 50
+          application-specific:
+            # This is the maximum penalty for severe offenses that we apply
+            # to a remote node score. The score mechanism of GossipSub in Flow is designed
+            # in a way that all other infractions are penalized with a fraction of this value.
+            # We have also set the other parameters such as GraylistThreshold,
+            # GossipThreshold, and PublishThreshold to be a bit higher than this,
+            # i.e., -100 + 1. This ensures that a node with a score of
+            # -100 will be graylisted (i.e., all incoming and outgoing RPCs
+            # are rejected) and will not be able to publish or gossip any messages.
+            max-app-specific-penalty: -100
+            min-app-specific-penalty: -1
+            # This is the penalty for unknown identity. It is
+            # applied to the peer's score when the peer is not in the identity list.
+            unknown-identity-penalty: -100
+            # This is the penalty for invalid subscription.
+            # It is applied to the peer's score when the peer subscribes to a topic that it is
+            # not authorized to subscribe to.
+            invalid-subscription-penalty: -100
+            # This is the reward for well-behaving staked peers.
+            # If a peer does not have any misbehavior record, e.g., invalid subscription,
+            # invalid message, etc., it will be rewarded with this score.
+            max-app-specific-reward: 100
+            # This is the reward for staking peers. It is applied
+            # to the peer's score when the peer does not have any misbehavior record, e.g.,
+            # invalid subscription, invalid message, etc. The purpose is to reward the staking
+            # peers for their contribution to the network and prioritize them in neighbor selection.
+            staked-identity-reward: 100
+      scoring-registry:
+        # Defines the duration of time, after the node startup,
+        # during which the scoring registry remains inactive before penalizing nodes.
+        # Throughout this startup silence period, the application-specific penalty
+        # returned for all nodes will be 0, and any invalid control message notifications
+        # will be ignored. This configuration allows nodes to stabilize and initialize before
+        # applying penalties or processing invalid control message notifications.
+        startup-silence-duration: 1h
+        app-specific-score:
+          # number of workers that asynchronously update the app specific score requests when they are expired.
+          score-update-worker-num: 5
+          # size of the queue used by the worker pool for the app specific score update requests. The queue is used to buffer the app specific score update requests
+          # before they are processed by the worker pool. The queue size must be larger than total number of peers in the network.
+          # The queue is deduplicated based on the peer ids ensuring that there is only one app specific score update request per peer in the queue.
+          score-update-request-queue-size: 10_000
+          # score ttl is the time to live for the app specific score. Once the score is expired; a new request will be sent to the app specific score provider to update the score.
+          # until the score is updated, the previous score will be used.
+          score-ttl: 1m
+        spam-record-cache:
+          # size of cache used to track spam records at gossipsub. Each peer id is mapped to a spam record that keeps track of the spam score for that peer.
+          # cache should be big enough to keep track of the entire network's size. Otherwise, the local node's view of the network will be incomplete due to cache eviction.
+          cache-size: 10_000
+          decay:
+            # Threshold level for spam record penalty.
+            # At each evaluation period, when a node's penalty is below this value, the decay rate slows down, ensuring longer decay periods for malicious nodes and quicker decay for honest ones.
+            penalty-decay-slowdown-threshold: -99
+            # This setting adjusts the decay rate when a node's penalty falls below the threshold.
+            # The decay rate, ranging between 0 and 1, dictates how quickly penalties decrease: a higher rate results in slower decay.
+            # The decay calculation is multiplicative (newPenalty = decayRate * oldPenalty).
+            # The reduction factor increases the decay rate, thus decelerating the penalty reduction. For instance, with a 0.01 reduction factor,
+            # the decay rate increases by 0.01 at each evaluation interval when the penalty is below the threshold.
+            # Consequently, a decay rate of `x` diminishes the penalty to zero more rapidly than a rate of `x+0.01`.
+            penalty-decay-rate-reduction-factor: 0.01
+            # Defines the frequency for evaluating and potentially adjusting the decay process of a spam record.
+            # At each interval, the system assesses the current penalty of a node.
+            # If this penalty is below the defined threshold, the decay rate is modified according to the reduction factor, slowing down the penalty reduction process.
+            # This reassessment at regular intervals ensures that the decay rate is dynamically adjusted to reflect the node's ongoing behavior,
+            # maintaining a balance between penalizing malicious activity and allowing recovery for honest nodes.
+            penalty-decay-evaluation-period: 10m
+            # The minimum speed at which the spam penalty value of a peer is decayed.
+            # Spam record will be initialized with a decay value between .5 , .7 and this value will then be decayed up to .99 on consecutive misbehavior's,
+            # The maximum decay value decays the penalty by 1% every second. The decay is applied geometrically, i.e., `newPenalty = oldPenalty * decay`, hence, the higher decay value
+            # indicates a lower decay speed, i.e., it takes more heartbeat intervals to decay a penalty back to zero when the decay value is high.
+            # assume:
+            #     penalty = -100 (the maximum application specific penalty is -100)
+            #     skipDecayThreshold = -0.1
+            # it takes around 459 seconds for the penalty to decay to reach greater than -0.1 and turn into 0.
+            #     x * 0.99 ^ n > -0.1 (assuming negative x).
+            #     0.99 ^ n > -0.1 / x
+            # Now we can take the logarithm of both sides (with any base, but let's use base 10 for simplicity).
+            #     log( 0.99 ^ n ) < log( 0.1 / x )
+            # Using the properties of logarithms, we can bring down the exponent:
+            #     n * log( 0.99 ) < log( -0.1 / x )
+            # And finally, we can solve for n:
+            #     n > log( -0.1 / x ) / log( 0.99 )
+            # We can plug in x = -100:
+            #     n > log( -0.1 / -100 ) / log( 0.99 )
+            #     n > log( 0.001 ) / log( 0.99 )
+            #     n > -3 / log( 0.99 )
+            #     n >  458.22
+            minimum-spam-penalty-decay-factor: 0.99
+            # The maximum rate at which the spam penalty value of a peer decays. Decay speeds increase
+            # during sustained malicious activity, leading to a slower recovery of the app-specific score for the penalized node. Conversely,
+            # decay speeds decrease, allowing faster recoveries, when nodes exhibit fleeting misbehavior.
+            maximum-spam-penalty-decay-factor: 0.8
+            # The threshold for which when the negative penalty is above this value, the decay function will not be called.
+            # instead, the penalty will be set to 0. This is to prevent the penalty from keeping a small negative value for a long time.
+            skip-decay-threshold: -0.1
+        misbehaviour-penalties:
+          # The penalty applied to the application specific penalty when a peer conducts a graft misbehaviour.
+          graft: -10
+          # The penalty applied to the application specific penalty when a peer conducts a prune misbehaviour.
+          prune: -10
+          # The penalty applied to the application specific penalty when a peer conducts a iHave misbehaviour.
+          ihave: -10
+          # The penalty applied to the application specific penalty when a peer conducts a iWant misbehaviour.
+          iwant: -10
+          # The penalty applied to the application specific penalty when a peer conducts a rpc publish message misbehaviour.
+          publish: -10
+          # The factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics. This allows a more lenient punishment for nodes
+          # that fall behind and may need to request old data.
+          cluster-prefixed-reduction-factor: 0.2
     subscription-provider:
       # The interval for updating the list of subscribed peers to all topics in gossipsub. This is used to keep track of subscriptions
       # violations and penalize peers accordingly. Recommended value is in the order of a few minutes to avoid contentions; as the operation

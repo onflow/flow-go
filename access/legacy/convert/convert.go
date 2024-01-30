@@ -4,13 +4,13 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/legacy/entities"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -69,7 +69,7 @@ func MessageToTransaction(m *entitiesproto.Transaction, chain flow.Chain) (flow.
 	t.SetScript(m.GetScript())
 	t.SetArguments(m.GetArguments())
 	t.SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId()))
-	t.SetGasLimit(m.GetGasLimit())
+	t.SetComputeLimit(m.GetGasLimit())
 
 	return *t, nil
 }

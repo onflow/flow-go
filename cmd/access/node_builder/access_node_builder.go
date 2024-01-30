@@ -13,6 +13,7 @@ import (
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/go-bitswap"
 	"github.com/rs/zerolog"
@@ -34,7 +35,6 @@ import (
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
@@ -119,34 +119,35 @@ import (
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type AccessNodeConfig struct {
-	supportsObserver             bool // True if this is an Access node that supports observers and consensus follower engines
-	collectionGRPCPort           uint
-	executionGRPCPort            uint
-	pingEnabled                  bool
-	nodeInfoFile                 string
-	apiRatelimits                map[string]int
-	apiBurstlimits               map[string]int
-	rpcConf                      rpc.Config
-	stateStreamConf              statestreambackend.Config
-	stateStreamFilterConf        map[string]int
-	ExecutionNodeAddress         string // deprecated
-	HistoricalAccessRPCs         []access.AccessAPIClient
-	logTxTimeToFinalized         bool
-	logTxTimeToExecuted          bool
-	logTxTimeToFinalizedExecuted bool
-	retryEnabled                 bool
-	rpcMetricsEnabled            bool
-	executionDataSyncEnabled     bool
-	executionDataDir             string
-	executionDataStartHeight     uint64
-	executionDataConfig          edrequester.ExecutionDataConfig
-	PublicNetworkConfig          PublicNetworkConfig
-	TxResultCacheSize            uint
-	TxErrorMessagesCacheSize     uint
-	executionDataIndexingEnabled bool
-	registersDBPath              string
-	checkpointFile               string
-	scriptExecutorConfig         query.QueryConfig
+	supportsObserver                  bool // True if this is an Access node that supports observers and consensus follower engines
+	collectionGRPCPort                uint
+	executionGRPCPort                 uint
+	pingEnabled                       bool
+	nodeInfoFile                      string
+	apiRatelimits                     map[string]int
+	apiBurstlimits                    map[string]int
+	rpcConf                           rpc.Config
+	stateStreamConf                   statestreambackend.Config
+	stateStreamFilterConf             map[string]int
+	ExecutionNodeAddress              string // deprecated
+	HistoricalAccessRPCs              []access.AccessAPIClient
+	logTxTimeToFinalized              bool
+	logTxTimeToExecuted               bool
+	logTxTimeToFinalizedExecuted      bool
+	retryEnabled                      bool
+	rpcMetricsEnabled                 bool
+	executionDataSyncEnabled          bool
+	publicNetworkExecutionDataEnabled bool
+	executionDataDir                  string
+	executionDataStartHeight          uint64
+	executionDataConfig               edrequester.ExecutionDataConfig
+	PublicNetworkConfig               PublicNetworkConfig
+	TxResultCacheSize                 uint
+	TxErrorMessagesCacheSize          uint
+	executionDataIndexingEnabled      bool
+	registersDBPath                   string
+	checkpointFile                    string
+	scriptExecutorConfig              query.QueryConfig
 }
 
 type PublicNetworkConfig struct {
@@ -222,9 +223,10 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			BindAddress: cmd.NotSet,
 			Metrics:     metrics.NewNoopCollector(),
 		},
-		executionDataSyncEnabled: true,
-		executionDataDir:         filepath.Join(homedir, ".flow", "execution_data"),
-		executionDataStartHeight: 0,
+		executionDataSyncEnabled:          true,
+		publicNetworkExecutionDataEnabled: false,
+		executionDataDir:                  filepath.Join(homedir, ".flow", "execution_data"),
+		executionDataStartHeight:          0,
 		executionDataConfig: edrequester.ExecutionDataConfig{
 			InitialBlockHeight: 0,
 			MaxSearchAhead:     edrequester.DefaultMaxSearchAhead,
@@ -248,33 +250,34 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
-	FollowerState              protocol.FollowerState
-	SyncCore                   *chainsync.Core
-	RpcEng                     *rpc.Engine
-	FollowerDistributor        *consensuspubsub.FollowerDistributor
-	CollectionRPC              access.AccessAPIClient
-	TransactionTimings         *stdmap.TransactionTimings
-	CollectionsToMarkFinalized *stdmap.Times
-	CollectionsToMarkExecuted  *stdmap.Times
-	BlocksToMarkExecuted       *stdmap.Times
-	TransactionMetrics         *metrics.TransactionCollector
-	RestMetrics                *metrics.RestCollector
-	AccessMetrics              module.AccessMetrics
-	PingMetrics                module.PingMetrics
-	Committee                  hotstuff.DynamicCommittee
-	Finalized                  *flow.Header // latest finalized block that the node knows of at startup time
-	Pending                    []*flow.Header
-	FollowerCore               module.HotStuffFollower
-	Validator                  hotstuff.Validator
-	ExecutionDataDownloader    execution_data.Downloader
-	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
-	ExecutionDataStore         execution_data.ExecutionDataStore
-	ExecutionDataCache         *execdatacache.ExecutionDataCache
-	ExecutionIndexer           *indexer.Indexer
-	ExecutionIndexerCore       *indexer.IndexerCore
-	ScriptExecutor             *backend.ScriptExecutor
-	RegistersAsyncStore        *execution.RegistersAsyncStore
-	IndexerDependencies        *cmd.DependencyList
+	FollowerState                 protocol.FollowerState
+	SyncCore                      *chainsync.Core
+	RpcEng                        *rpc.Engine
+	FollowerDistributor           *consensuspubsub.FollowerDistributor
+	CollectionRPC                 access.AccessAPIClient
+	TransactionTimings            *stdmap.TransactionTimings
+	CollectionsToMarkFinalized    *stdmap.Times
+	CollectionsToMarkExecuted     *stdmap.Times
+	BlocksToMarkExecuted          *stdmap.Times
+	TransactionMetrics            *metrics.TransactionCollector
+	RestMetrics                   *metrics.RestCollector
+	AccessMetrics                 module.AccessMetrics
+	PingMetrics                   module.PingMetrics
+	Committee                     hotstuff.DynamicCommittee
+	Finalized                     *flow.Header // latest finalized block that the node knows of at startup time
+	Pending                       []*flow.Header
+	FollowerCore                  module.HotStuffFollower
+	Validator                     hotstuff.Validator
+	ExecutionDataDownloader       execution_data.Downloader
+	PublicExecutionDataDownloader execution_data.Downloader
+	ExecutionDataRequester        state_synchronization.ExecutionDataRequester
+	ExecutionDataStore            execution_data.ExecutionDataStore
+	ExecutionDataCache            *execdatacache.ExecutionDataCache
+	ExecutionIndexer              *indexer.Indexer
+	ExecutionIndexerCore          *indexer.IndexerCore
+	ScriptExecutor                *backend.ScriptExecutor
+	RegistersAsyncStore           *execution.RegistersAsyncStore
+	IndexerDependencies           *cmd.DependencyList
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -484,6 +487,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
 	var bsDependable *module.ProxiedReadyDoneAware
+	var publicBsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
 	var executionDataStoreCache *execdatacache.ExecutionDataCache
@@ -657,6 +661,37 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 			return builder.ExecutionDataRequester, nil
 		})
+
+	if builder.publicNetworkExecutionDataEnabled {
+		builder.Module("public blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {
+			publicBsDependable = module.NewProxiedReadyDoneAware()
+			builder.PeerManagerDependencies.Add(publicBsDependable)
+			return nil
+		})
+
+		builder.Component("public network execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			opts := []network.BlobServiceOption{
+				blob.WithBitswapOptions(
+					bitswap.WithTracer(
+						blob.NewTracer(node.Logger.With().Str("public_blob_service", channels.PublicExecutionDataService.String()).Logger()),
+					),
+				),
+			}
+
+			net := builder.AccessNodeConfig.PublicNetworkConfig.Network
+
+			var err error
+			bs, err = net.RegisterBlobService(channels.PublicExecutionDataService, ds, opts...)
+			if err != nil {
+				return nil, fmt.Errorf("could not register blob service: %w", err)
+			}
+
+			publicBsDependable.Init(bs)
+			builder.PublicExecutionDataDownloader = execution_data.NewDownloader(bs)
+
+			return builder.PublicExecutionDataDownloader, nil
+		})
+	}
 
 	if builder.executionDataIndexingEnabled {
 		var indexedBlockHeight storage.ConsumerProgress
@@ -1015,6 +1050,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"execution-data-sync-enabled",
 			defaultConfig.executionDataSyncEnabled,
 			"whether to enable the execution data sync protocol")
+		flags.BoolVar(&builder.publicNetworkExecutionDataEnabled,
+			"public-network-execution-data-sync-enabled",
+			defaultConfig.publicNetworkExecutionDataEnabled,
+			"whether to enable the execution data sync protocol on public network")
 		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
 		flags.Uint64Var(&builder.executionDataStartHeight,
 			"execution-data-start-height",

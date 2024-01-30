@@ -7,15 +7,16 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/onflow/cadence"
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/cadence"
+	"github.com/onflow/crypto"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go/model/flow"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/flow"
 	model "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/epochs"
@@ -126,7 +127,7 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 	// construct transaction to send dkg whiteboard message to contract
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateSendDKGWhiteboardMessageScript(c.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlock.ID).
 		SetProposalKey(account.Address, int(c.AccountKeyIndex), account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
 		SetPayer(account.Address).
@@ -192,7 +193,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateSendDKGFinalSubmissionScript(c.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlock.ID).
 		SetProposalKey(account.Address, int(c.AccountKeyIndex), account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
 		SetPayer(account.Address).
