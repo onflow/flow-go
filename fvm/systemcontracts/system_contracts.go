@@ -82,6 +82,11 @@ var (
 	nftTokenAddressMainnet = flow.HexToAddress("1d7e57aa55817448")
 	// nftTokenAddressTestnet is the address of the NonFungibleToken contract on Testnet
 	nftTokenAddressTestnet = flow.HexToAddress("631e88ae7f1d7c20")
+
+	// evmStorageAddressTestnet is the address of the EVM state storage contract on Testnet
+	evmStorageAddressTestnet = flow.HexToAddress("1a54ed2be7552821")
+	// evmStorageAddressMainnet is the address of the EVM state storage contract on Mainnet
+	evmStorageAddressMainnet = flow.HexToAddress("d421a63faae318f9")
 )
 
 // SystemContract represents a system contract on a particular chain.
@@ -284,6 +289,17 @@ func init() {
 		}
 	}
 
+	evmStorageEVMFunc := func(chain flow.ChainID) flow.Address {
+		switch chain {
+		case flow.Mainnet:
+			return evmStorageAddressMainnet
+		case flow.Testnet:
+			return evmStorageAddressTestnet
+		default:
+			return nthAddressFunc(EVMStorageAccountIndex)(chain)
+		}
+	}
+
 	contractAddressFunc = map[string]func(id flow.ChainID) flow.Address{
 		ContractNameIDTableStaking: epochAddressFunc,
 		ContractNameEpoch:          epochAddressFunc,
@@ -304,7 +320,7 @@ func init() {
 		ContractNameViewResolver:     nftTokenAddressFunc,
 
 		ContractNameEVM:       serviceAddressFunc,
-		AccountNameEVMStorage: nthAddressFunc(EVMStorageAccountIndex),
+		AccountNameEVMStorage: evmStorageEVMFunc,
 	}
 
 	getSystemContractsForChain := func(chainID flow.ChainID) *SystemContracts {

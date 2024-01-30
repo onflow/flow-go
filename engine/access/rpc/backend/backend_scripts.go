@@ -332,13 +332,14 @@ func convertScriptExecutionError(err error, height uint64) error {
 		return nil
 	}
 
+	var failure fvmerrors.CodedFailure
+	if fvmerrors.As(err, &failure) {
+		return rpc.ConvertError(err, "failed to execute script", codes.Internal)
+	}
+
+	// general FVM/ledger errors
 	var coded fvmerrors.CodedError
 	if fvmerrors.As(err, &coded) {
-		// general FVM/ledger errors
-		if coded.Code().IsFailure() {
-			return rpc.ConvertError(err, "failed to execute script", codes.Internal)
-		}
-
 		switch coded.Code() {
 		case fvmerrors.ErrCodeScriptExecutionCancelledError:
 			return status.Errorf(codes.Canceled, "script execution canceled: %v", err)
