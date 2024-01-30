@@ -64,7 +64,7 @@ For example:
 ### Importance of Each Resource Scope
 In the libp2p Resource Manager, scopes are organized hierarchically; `system`, `protocol`, `peer`, and `peer-protocol` scopes are arranged in a _descending order of priority_.
 This means that the `system` scope has the highest priority, then `protocol` scope, `peer` scope, and `peer-protocol` scope.
-As we explain later in this documentation, the `transient` scope is a special case and is not strictly fit in the hierarchy of scopes.
+As we explain later in this documentation, the `transient` scope is a special case and does not strictly fit in the hierarchy of scopes.
 
 #### What does each scope mean?
    - **System Scope**: sets the global limits for the entire system and ensures overall stability and prevents resource hogging by any single component.
