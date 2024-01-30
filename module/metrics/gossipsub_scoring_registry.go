@@ -28,7 +28,7 @@ func NewGossipSubScoringRegistryMetrics(prefix string) *GossipSubScoringRegistry
 			Subsystem: subsystemGossip,
 			Name:      gc.prefix + "gossipsub_scoring_registry_duplicate_message_penalties",
 			Help:      "duplicate message penalty applied to the overall application specific score of a node",
-			Buckets:   []float64{-0.001, -0.01, -1},
+			Buckets:   []float64{-1, -0.01, -0.001},
 		},
 	)
 	gc.duplicateMessageCounts = promauto.NewHistogram(
