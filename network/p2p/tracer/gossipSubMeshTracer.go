@@ -485,7 +485,7 @@ func (t *GossipSubMeshTracer) DuplicateMessageCount(peerID peer.ID) float64 {
 	if err != nil {
 		t.logger.Err(err).
 			Bool(logging.KeyNetworkingSecurity, true).
-			Str("peer_id", peerID.String()).
+			Str("peer_id", p2plogging.PeerId(peerID)).
 			Msg("failed to get duplicate message count for peer")
 		return 0
 	}
