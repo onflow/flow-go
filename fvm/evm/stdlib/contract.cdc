@@ -50,9 +50,14 @@ contract EVM {
     resource BridgedAccount {
 
         access(self)
-        let addressBytes: [UInt8; 20]
+        var addressBytes: [UInt8; 20]
 
-        init(addressBytes: [UInt8; 20]) {
+        init() {
+            self.addressBytes = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        }
+
+        access(contract)
+        fun setAddress(addressBytes: [UInt8; 20]) {
            self.addressBytes = addressBytes
         }
 
@@ -127,9 +132,10 @@ contract EVM {
     /// Creates a new bridged account
     access(all)
     fun createBridgedAccount(): @BridgedAccount {
-        return <-create BridgedAccount(
-            addressBytes: InternalEVM.createBridgedAccount()
-        )
+        let acc <-create BridgedAccount()
+        let addr = InternalEVM.createBridgedAccount(uuid: acc.uuid)
+        acc.setAddress(addressBytes: addr)
+        return <-acc
     }
 
     /// Runs an a RLP-encoded EVM transaction, deducts the gas fees,

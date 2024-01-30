@@ -62,10 +62,9 @@ func getPrecompiles(
 }
 
 // DeployCOA deploys a cadence-owned-account and returns the address
-func (h *ContractHandler) DeployCOA() types.Address {
-	target, err := h.addressAllocator.AllocateCOAAddress()
+func (h *ContractHandler) DeployCOA(uuid uint64) types.Address {
+	target := h.addressAllocator.AllocateCOAAddress(uuid)
 	gaslimit := types.GasLimit(COAContractDeploymentRequiredGas)
-	handleError(err)
 	h.checkGasLimit(gaslimit)
 
 	factory := h.addressAllocator.COAFactoryAddress()
