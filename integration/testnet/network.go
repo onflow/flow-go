@@ -109,9 +109,10 @@ const (
 	// PrimaryAN is the container name for the primary access node to use for API requests
 	PrimaryAN = "access_1"
 
-	DefaultViewsInStakingAuction uint64 = 5
-	DefaultViewsInDKGPhase       uint64 = 50
-	DefaultViewsInEpoch          uint64 = 180
+	DefaultViewsInStakingAuction      uint64 = 5
+	DefaultViewsInDKGPhase            uint64 = 50
+	DefaultViewsInEpoch               uint64 = 200
+	DefaultEpochCommitSafetyThreshold uint64 = 20
 
 	// DefaultMinimumNumOfAccessNodeIDS at-least 1 AN ID must be configured for LN & SN
 	DefaultMinimumNumOfAccessNodeIDS = 1
@@ -428,12 +429,13 @@ type NetworkConfigOpt func(*NetworkConfig)
 
 func NewNetworkConfig(name string, nodes NodeConfigs, opts ...NetworkConfigOpt) NetworkConfig {
 	c := NetworkConfig{
-		Nodes:                 nodes,
-		Name:                  name,
-		NClusters:             1, // default to 1 cluster
-		ViewsInStakingAuction: DefaultViewsInStakingAuction,
-		ViewsInDKGPhase:       DefaultViewsInDKGPhase,
-		ViewsInEpoch:          DefaultViewsInEpoch,
+		Nodes:                      nodes,
+		Name:                       name,
+		NClusters:                  1, // default to 1 cluster
+		ViewsInStakingAuction:      DefaultViewsInStakingAuction,
+		ViewsInDKGPhase:            DefaultViewsInDKGPhase,
+		ViewsInEpoch:               DefaultViewsInEpoch,
+		EpochCommitSafetyThreshold: DefaultEpochCommitSafetyThreshold,
 	}
 
 	for _, apply := range opts {

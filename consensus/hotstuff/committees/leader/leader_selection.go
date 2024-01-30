@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/onflow/flow-go/crypto/random"
+	"github.com/onflow/crypto/random"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 

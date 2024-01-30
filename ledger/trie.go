@@ -9,7 +9,8 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 
-	cryptoHash "github.com/onflow/flow-go/crypto/hash"
+	cryptoHash "github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/ledger/common/hash"
 )
@@ -317,6 +318,16 @@ func (p *Payload) Key() (Key, error) {
 		return Key{}, err
 	}
 	return *k, nil
+}
+
+// EncodedKey returns payload key.
+// CAUTION: do not modify returned encoded key
+// because it shares underlying data with payload key.
+func (p *Payload) EncodedKey() []byte {
+	if p == nil {
+		return nil
+	}
+	return p.encKey
 }
 
 // Value returns payload value.

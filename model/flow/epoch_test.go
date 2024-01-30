@@ -3,11 +3,11 @@ package flow_test
 import (
 	"testing"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestClusterQCVoteData_Equality(t *testing.T) {

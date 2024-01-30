@@ -5,7 +5,6 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	evm "github.com/onflow/flow-go/fvm/evm/emulator"
-	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -13,9 +12,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func RootAccountAddress(chainID flow.ChainID) (flow.Address, error) {
+func ContractAccountAddress(chainID flow.ChainID) (flow.Address, error) {
 	sc := systemcontracts.SystemContractsForChain(chainID)
-	return sc.EVM.Address, nil
+	return sc.EVMContract.Address, nil
+}
+
+func StorageAccountAddress(chainID flow.ChainID) (flow.Address, error) {
+	sc := systemcontracts.SystemContractsForChain(chainID)
+	return sc.EVMStorage.Address, nil
 }
 
 func SetupEnvironment(
@@ -25,32 +29,31 @@ func SetupEnvironment(
 	service flow.Address,
 	flowToken flow.Address,
 ) error {
-	// TODO: setup proper root address based on chainID
-	evmRootAddress, err := RootAccountAddress(chainID)
+	evmStorageAccountAddress, err := StorageAccountAddress(chainID)
 	if err != nil {
 		return err
 	}
 
-	db, err := database.NewDatabase(backend, evmRootAddress)
+	evmContractAccountAddress, err := ContractAccountAddress(chainID)
 	if err != nil {
 		return err
 	}
 
-	em := evm.NewEmulator(db)
+	em := evm.NewEmulator(backend, evmStorageAccountAddress)
 
-	bs, err := handler.NewBlockStore(backend, evmRootAddress)
+	bs, err := handler.NewBlockStore(backend, evmStorageAccountAddress)
 	if err != nil {
 		return err
 	}
 
-	aa, err := handler.NewAddressAllocator(backend, evmRootAddress)
+	aa, err := handler.NewAddressAllocator(backend, evmStorageAccountAddress)
 	if err != nil {
 		return err
 	}
 
 	contractHandler := handler.NewContractHandler(common.Address(flowToken), bs, aa, backend, em)
 
-	stdlib.SetupEnvironment(env, contractHandler, service)
+	stdlib.SetupEnvironment(env, contractHandler, evmContractAccountAddress)
 
 	return nil
 }

@@ -3,10 +3,10 @@
 package mock
 
 import (
-	crypto "github.com/onflow/flow-go/crypto"
+	crypto "github.com/onflow/crypto"
 	flow "github.com/onflow/flow-go/model/flow"
 
-	hash "github.com/onflow/flow-go/crypto/hash"
+	hash "github.com/onflow/crypto/hash"
 
 	mock "github.com/stretchr/testify/mock"
 )
