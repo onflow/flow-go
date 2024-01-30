@@ -3,7 +3,7 @@
 package mock
 
 import (
-	crypto "github.com/onflow/flow-go/crypto"
+	crypto "github.com/onflow/crypto"
 	flow "github.com/onflow/flow-go/model/flow"
 
 	messages "github.com/onflow/flow-go/model/messages"

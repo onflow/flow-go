@@ -16,15 +16,6 @@ contract EVM {
             self.bytes = bytes
         }
 
-        /// Deposits the given vault into the EVM account with the given address
-        access(all)
-        fun deposit(from: @FlowToken.Vault) {
-            InternalEVM.deposit(
-                from: <-from,
-                to: self.bytes
-            )
-        }
-
         /// Balance of the address
         access(all)
         fun balance(): Balance {
@@ -81,7 +72,10 @@ contract EVM {
         /// Deposits the given vault into the bridged account's balance
         access(all)
         fun deposit(from: @FlowToken.Vault) {
-            self.address().deposit(from: <-from)
+            InternalEVM.deposit(
+                from: <-from,
+                to: self.addressBytes
+            )
         }
 
         /// Withdraws the balance from the bridged account's balance
@@ -155,6 +149,38 @@ contract EVM {
 
     access(all)
     fun decodeABI(types: [Type], data: [UInt8]): [AnyStruct] {
+        return InternalEVM.decodeABI(types: types, data: data)
+    }
+
+    access(all)
+    fun encodeABIWithSignature(
+        _ signature: String,
+        _ values: [AnyStruct]
+    ): [UInt8] {
+        let methodID = HashAlgorithm.KECCAK_256.hash(
+            signature.utf8
+        ).slice(from: 0, upTo: 4)
+        let arguments = InternalEVM.encodeABI(values)
+
+        return methodID.concat(arguments)
+    }
+
+    access(all)
+    fun decodeABIWithSignature(
+        _ signature: String,
+        types: [Type],
+        data: [UInt8]
+    ): [AnyStruct] {
+        let methodID = HashAlgorithm.KECCAK_256.hash(
+            signature.utf8
+        ).slice(from: 0, upTo: 4)
+
+        for byte in methodID {
+            if byte != data.removeFirst() {
+                panic("signature mismatch")
+            }
+        }
+
         return InternalEVM.decodeABI(types: types, data: data)
     }
 }

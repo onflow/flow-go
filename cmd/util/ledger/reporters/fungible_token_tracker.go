@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -147,7 +147,7 @@ func (r *FungibleTokenTracker) worker(
 			state.DefaultParameters())
 		accounts := environment.NewAccounts(txnState)
 		storage := cadenceRuntime.NewStorage(
-			&migrations.AccountsAtreeLedger{Accounts: accounts},
+			&util.AccountsAtreeLedger{Accounts: accounts},
 			nil,
 		)
 

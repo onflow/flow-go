@@ -158,7 +158,7 @@ func (s *EmulatorSuite) deployDKGContract() {
 func (s *EmulatorSuite) setupDKGAdmin() {
 	setUpAdminTx := sdk.NewTransaction().
 		SetScript(templates.GeneratePublishDKGParticipantScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(
 			s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index,
@@ -303,7 +303,7 @@ func (s *EmulatorSuite) startDKGWithParticipants(accounts []*nodeAccount) {
 	// start DKG using admin resource
 	startDKGTx := sdk.NewTransaction().
 		SetScript(templates.GenerateStartDKGScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(
 			s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index,
@@ -330,7 +330,7 @@ func (s *EmulatorSuite) startDKGWithParticipants(accounts []*nodeAccount) {
 func (s *EmulatorSuite) claimDKGParticipant(node *node) {
 	createParticipantTx := sdk.NewTransaction().
 		SetScript(templates.GenerateCreateDKGParticipantScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(
 			s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index,
@@ -461,12 +461,6 @@ func (s *EmulatorSuite) initEngines(node *node, ids flow.IdentityList) {
 		controllerFactoryLogger = zerolog.New(os.Stdout).Hook(hook)
 	}
 
-	// create a config with no delays for tests
-	config := dkg.ControllerConfig{
-		BaseStartDelay:                0,
-		BaseHandleFirstBroadcastDelay: 0,
-	}
-
 	// the reactor engine reacts to new views being finalized and drives the
 	// DKG protocol
 	reactorEngine := dkgeng.NewReactorEngine(
@@ -479,7 +473,6 @@ func (s *EmulatorSuite) initEngines(node *node, ids flow.IdentityList) {
 			core.Me,
 			[]module.DKGContractClient{node.dkgContractClient},
 			brokerTunnel,
-			config,
 		),
 		viewsObserver,
 	)
