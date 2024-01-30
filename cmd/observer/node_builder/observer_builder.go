@@ -1309,9 +1309,6 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 }
 
 func (builder *ObserverServiceBuilder) enqueueRPCServer() {
-	ingestionDependable := module.NewProxiedReadyDoneAware()
-	builder.IndexerDependencies.Add(ingestionDependable)
-
 	builder.Module("rest metrics", func(node *cmd.NodeConfig) error {
 		m, err := metrics.NewRestCollector(routes.URLToRoute, node.MetricsRegisterer)
 		if err != nil {
