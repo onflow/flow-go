@@ -8,28 +8,30 @@ import (
 )
 
 // ExecuteScript handler sends the script from the request to be executed.
-func ExecuteScript(r *request.Request, backend access.API, _ models.LinkGenerator) (interface{}, uint64, error) {
+func ExecuteScript(r *request.Request, backend access.API, _ models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetScriptRequest()
 	if err != nil {
-		return nil, 0, models.NewBadRequestError(err)
+		return nil, models.NewBadRequestError(err)
 	}
 
 	if req.BlockID != flow.ZeroID {
-		return backend.ExecuteScriptAtBlockID(r.Context(), req.BlockID, req.Script.Source, req.Script.Args)
+		data, _, err := backend.ExecuteScriptAtBlockID(r.Context(), req.BlockID, req.Script.Source, req.Script.Args)
+		return data, err
 	}
 
 	// default to sealed height
 	if req.BlockHeight == request.SealedHeight || req.BlockHeight == request.EmptyHeight {
-		return backend.ExecuteScriptAtLatestBlock(r.Context(), req.Script.Source, req.Script.Args)
+		data, _, err := backend.ExecuteScriptAtLatestBlock(r.Context(), req.Script.Source, req.Script.Args)
+		return data, err
 	}
 
 	if req.BlockHeight == request.FinalHeight {
 		finalBlock, _, err := backend.GetLatestBlockHeader(r.Context(), false)
 		if err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 		req.BlockHeight = finalBlock.Height
 	}
-
-	return backend.ExecuteScriptAtBlockHeight(r.Context(), req.BlockHeight, req.Script.Source, req.Script.Args)
+	data, _, err := backend.ExecuteScriptAtBlockHeight(r.Context(), req.BlockHeight, req.Script.Source, req.Script.Args)
+	return data, err
 }
