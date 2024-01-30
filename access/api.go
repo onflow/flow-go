@@ -54,8 +54,13 @@ type API interface {
 	GetExecutionResultForBlockID(ctx context.Context, blockID flow.Identifier) (*flow.ExecutionResult, error)
 	GetExecutionResultByID(ctx context.Context, id flow.Identifier) (*flow.ExecutionResult, error)
 
-	// SubscribeBlocks subscribes to the blocks starting from a specific block ID and block height, with an optional block status.
-	// By default, returns sealed blocks.
+	// SubscribeBlocks subscribes to the finalized or sealed blocks starting at the requested
+	// start block, up until the latest available block. Once the latest is
+	// reached, the stream will remain open and responses are sent for each new
+	// block as it becomes available.
+	//
+	// Each block is filtered by the provided block status, and only
+	// those blocks that match the status are returned.
 	SubscribeBlocks(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription
 }
 

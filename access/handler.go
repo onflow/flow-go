@@ -850,7 +850,7 @@ func WithBlockSignerDecoder(signerIndicesDecoder hotstuff.BlockSignerDecoder) fu
 
 func checkBlockStatus(blockStatus flow.BlockStatus) error {
 	if blockStatus == flow.BlockStatusUnknown {
-		return fmt.Errorf("block status is unlnown. Possible variants: BLOCK_FINALIZED, BLOCK_SEALED")
+		return fmt.Errorf("block status is unknown. Possible variants: BLOCK_FINALIZED, BLOCK_SEALED")
 	}
 	return nil
 }
