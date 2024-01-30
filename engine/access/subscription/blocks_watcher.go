@@ -81,6 +81,20 @@ func NewBlocksWatcher(
 // Only one of startBlockID and startHeight may be set. Otherwise, an InvalidArgument error is returned.
 // If a block is provided and does not exist, a NotFound error is returned.
 // If neither startBlockID nor startHeight is provided, the latest sealed block is used.
+//
+// Parameters:
+// - startBlockID: The identifier of the starting block. If provided, startHeight should be 0.
+// - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
+// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
+//
+// Returns:
+// - uint64: The start height for searching.
+// - error: An error indicating the result of the operation, if any.
+//
+// Errors:
+// - codes.InvalidArgument: If blockStatus is flow.BlockStatusUnknown, or both startBlockID and startHeight are provided.
+// - storage.ErrNotFound`: If a block is provided and does not exist.
+// - codes.Internal: If there is an internal error.
 func (h *BlocksWatcher) GetStartHeight(startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error) {
 	// block status could be only sealed and finalized
 	if blockStatus == flow.BlockStatusUnknown {
