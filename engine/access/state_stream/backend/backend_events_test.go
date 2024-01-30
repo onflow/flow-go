@@ -49,7 +49,8 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromLocalStorage() {
 	reporter := syncmock.NewIndexReporter(s.T())
 	reporter.On("LowestIndexedHeight").Return(s.blocks[0].Header.Height, nil)
 	reporter.On("HighestIndexedHeight").Return(s.blocks[len(s.blocks)-1].Header.Height, nil)
-	s.eventsIndex.Initialize(reporter)
+	err := s.eventsIndex.Initialize(reporter)
+	s.Require().NoError(err)
 
 	s.runTestSubscribeEvents()
 }
@@ -240,7 +241,8 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 	reporter := syncmock.NewIndexReporter(s.T())
 	reporter.On("LowestIndexedHeight").Return(s.blocks[1].Header.Height, nil)
 	reporter.On("HighestIndexedHeight").Return(s.blocks[len(s.blocks)-2].Header.Height, nil)
-	s.eventsIndex.Initialize(reporter)
+	err := s.eventsIndex.Initialize(reporter)
+	s.Require().NoError(err)
 
 	s.Run("returns error for start below lowest indexed", func() {
 		subCtx, subCancel := context.WithCancel(ctx)
