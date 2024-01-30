@@ -48,11 +48,11 @@ libp2p-resource-manager:
 
 #### Via Runtime Flags
 Each limit can also be dynamically set using runtime flags in the format:
-`--libp2p-resource-manager-<scope>-<limit>`
+`--libp2p-resource-manager-limits-override-<scope>-<limit>`
 
 For example:
-- To set inbound stream limits for the system scope: `--libp2p-resource-manager-system-streams-inbound=<value>`
-- For outbound streams in the protocol scope: `--libp2p-resource-manager-protocol-streams-outbound=<value>`
+- To set inbound stream limits for the system scope: `--libp2p-resource-manager-limits-override-system-streams-inbound=<value>`
+- For outbound streams in the protocol scope: `--libp2p-resource-manager-limits-override-protocol-streams-outbound=<value>`
 
 **Exceptions:** The `memory-limit-ratio` and `file-descriptors-ratio` limits are set as the following flags and both must be **between 0 and 1**:
 - `--libp2p-resource-manager-memory-limit-ratio=<value>`
@@ -184,45 +184,45 @@ One easy way is to increase all limits by a certain factor across all scopes. Fo
 
 ### System Scope
 1. **Streams Inbound/Outbound**
-    - `--libp2p-resource-manager-system-streams-inbound=<1.5 * current value>`
-    - `--libp2p-resource-manager-system-streams-outbound=<1.5 * current value>`
+    - `--libp2p-resource-manager-limits-override-system-streams-inbound=<1.5 * current value>`
+    - `--libp2p-resource-manager-limits-override-system-streams-outbound=<1.5 * current value>`
 2. **Connections Inbound/Outbound**
-    - `--libp2p-resource-manager-system-connections-inbound=<1.5 * current value>`
-    - `--libp2p-resource-manager-system-connections-outbound=<1.5 * current value>`
+    - `--libp2p-resource-manager-limits-override-system-connections-inbound=<1.5 * current value>`
+    - `--libp2p-resource-manager-limits-override-system-connections-outbound=<1.5 * current value>`
 3. **File Descriptors**
-    - `--libp2p-resource-manager-system-fd=<1.5 * current value>`
+    - `--libp2p-resource-manager-limits-override-system-fd=<1.5 * current value>`
 4. **Memory Bytes**
-    - `--libp2p-resource-manager-system-memory-bytes=<1.5 * current value>`
+    - `--libp2p-resource-manager-limits-override-system-memory-bytes=<1.5 * current value>`
 
 ### Transient Scope
 1. **Streams Inbound/Outbound**
-    - `--libp2p-resource-manager-transient-streams-inbound=<1.5 * current value>`
-    - `--libp2p-resource-manager-transient-streams-outbound=<1.5 * current value>`
+    - `--libp2p-resource-manager-limits-override-transient-streams-inbound=<1.5 * current value>`
+    - `--libp2p-resource-manager-limits-override-transient-streams-outbound=<1.5 * current value>`
 2. **Connections Inbound/Outbound**
-    - `--libp2p-resource-manager-transient-connections-inbound=<1.5 * current value>`
-    - `--libp2p-resource-manager-transient-connections-outbound=<1.5 * current value>`
+    - `--libp2p-resource-manager-limits-override-transient-connections-inbound=<1.5 * current value>`
+    - `--libp2p-resource-manager-limits-override-transient-connections-outbound=<1.5 * current value>`
 3. **File Descriptors**
-    - `--libp2p-resource-manager-transient-fd=<1.5 * current value>`
+    - `--libp2p-resource-manager-limits-override-transient-fd=<1.5 * current value>`
 4. **Memory Bytes**
-    - `--libp2p-resource-manager-transient-memory-bytes=<1.5 * current value>`
+    - `--libp2p-resource-manager-limits-override-transient-memory-bytes=<1.5 * current value>`
 
 ### Protocol Scope
 1. **Streams Inbound/Outbound**
-    - `--libp2p-resource-manager-protocol-streams-inbound=<1.5 * current value>`
-    - `--libp2p-resource-manager-protocol-streams-outbound=<1.5 * current value>`
+    - `--libp2p-resource-manager-limits-override-protocol-streams-inbound=<1.5 * current value>`
+    - `--libp2p-resource-manager-limits-override-protocol-streams-outbound=<1.5 * current value>`
 
 ### Peer Scope
 1. **Streams Inbound/Outbound**
-    - `--libp2p-resource-manager-peer-streams-inbound=<1.5 * current value>`
-    - `--libp2p-resource-manager-peer-streams-outbound=<1.5 * current value>`
+    - `--libp2p-resource-manager-limits-override-peer-streams-inbound=<1.5 * current value>`
+    - `--libp2p-resource-manager-limits-override-peer-streams-outbound=<1.5 * current value>`
 
 ### Peer-Protocol Scope
 1. **Streams Inbound/Outbound**
-    - `--libp2p-resource-manager-peer-protocol-streams-inbound=<1.5 * current value>`
-    - `--libp2p-resource-manager-peer-protocol-streams-outbound=<1.5 * current value>`
+    - `--libp2p-resource-manager-limits-override-peer-protocol-streams-inbound=<1.5 * current value>`
+    - `--libp2p-resource-manager-limits-override-peer-protocol-streams-outbound=<1.5 * current value>`
 
 ### Notes
-- Replace `<1.5 * current value>` with the actual calculated value from `default-config.yaml`. For example, if the current system streams inbound limit is 10,000, the new value would be `--libp2p-resource-manager-system-streams-inbound=15000`.
+- Replace `<1.5 * current value>` with the actual calculated value from `default-config.yaml`. For example, if the current system streams inbound limit is 10,000, the new value would be `--libp2p-resource-manager-limits-override-system-streams-inbound=15000`.
 
 
 # References
