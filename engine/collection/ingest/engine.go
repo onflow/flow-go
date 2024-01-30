@@ -55,11 +55,12 @@ func New(
 	chain flow.Chain,
 	pools *epochs.TransactionPools,
 	config Config,
+	limiter *AddressRateLimiter,
 ) (*Engine, error) {
 
 	logger := log.With().Str("engine", "ingest").Logger()
 
-	transactionValidator := access.NewTransactionValidator(
+	transactionValidator := access.NewTransactionValidatorWithLimiter(
 		access.NewProtocolStateBlocks(state),
 		chain,
 		access.TransactionValidationOptions{
@@ -70,6 +71,7 @@ func New(
 			MaxTransactionByteSize: config.MaxTransactionByteSize,
 			MaxCollectionByteSize:  config.MaxCollectionByteSize,
 		},
+		limiter,
 	)
 
 	// FIFO queue for transactions
