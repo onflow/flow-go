@@ -78,7 +78,7 @@ As we explain later in this documentation, the `transient` scope is a special ca
       to dominate resource usage of a specific (remote) peer on the local peer among all the protocols the (remote) peer is participating in with the local peer. 
 
 #### Scope Hierarchy
-The higher scopes **"override"** limits on lower scopes:
+The higher order scopes **"override"** limits on lower scopes:
 1. **System Scope vs. Protocol/Peer Scopes**:
     - The system scope sets global limits. If the system scope has a lower limit than a protocol or peer scope, the system limit will be the effective constraint 
       because it's the upper bound for the entire system.
