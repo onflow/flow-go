@@ -445,7 +445,7 @@ func testScoreRegistrySpamRecordWithDuplicateMessagesPenalty(t *testing.T, messa
 	require.NoError(t, err)
 	// refresh cached app-specific score every 100 milliseconds to speed up the test.
 	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond
-	duplicateMessageThreshold := cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Thresholds.DuplicateMessage
+	duplicateMessageThreshold := cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Protocol.AppSpecificScore.DuplicateMessageThreshold
 	duplicateMessagePenalty := cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Protocol.AppSpecificScore.DuplicateMessagePenalty
 	maximumSpamPenaltyDecayFactor := cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.SpamRecordCache.Decay.MaximumSpamPenaltyDecayFactor
 	duplicateMessagesCount := 10000.0
@@ -554,7 +554,7 @@ func testScoreRegistrySpamRecordWithoutDuplicateMessagesPenalty(t *testing.T, me
 	require.NoError(t, err)
 	// refresh cached app-specific score every 100 milliseconds to speed up the test.
 	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond
-	duplicateMessageThreshold := cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Thresholds.DuplicateMessage
+	duplicateMessageThreshold := cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Protocol.AppSpecificScore.DuplicateMessagePenalty
 	maximumSpamPenaltyDecayFactor := cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.SpamRecordCache.Decay.MaximumSpamPenaltyDecayFactor
 	reg, spamRecords, appScoreCache := newGossipSubAppSpecificScoreRegistry(t, cfg.NetworkConfig.GossipSub.ScoringParameters,
 		scoring.InitAppScoreRecordStateFunc(maximumSpamPenaltyDecayFactor),
@@ -1227,7 +1227,7 @@ func newGossipSubAppSpecificScoreRegistry(t *testing.T,
 		HeroCacheMetricsFactory:   metrics.NewNoopHeroCacheMetricsFactory(),
 		NetworkingType:            network.PrivateNetwork,
 		AppSpecificScoreParams:    params.PeerScoring.Protocol.AppSpecificScore,
-		DuplicateMessageThreshold: params.PeerScoring.Internal.Thresholds.DuplicateMessage,
+		DuplicateMessageThreshold: params.PeerScoring.Protocol.AppSpecificScore.DuplicateMessageThreshold,
 		Collector:                 metrics.NewNoopCollector(),
 	}
 	for _, opt := range opts {

@@ -134,7 +134,7 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 		Parameters:                cfg.params.ScoringRegistryParameters.AppSpecificScore,
 		NetworkingType:            cfg.networkingType,
 		AppSpecificScoreParams:    cfg.params.PeerScoring.Protocol.AppSpecificScore,
-		DuplicateMessageThreshold: cfg.params.PeerScoring.Internal.Thresholds.DuplicateMessage,
+		DuplicateMessageThreshold: cfg.params.PeerScoring.Protocol.AppSpecificScore.DuplicateMessageThreshold,
 		Collector:                 cfg.scoringRegistryMetricsCollector,
 	})
 	if err != nil {

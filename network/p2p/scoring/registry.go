@@ -101,7 +101,7 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 
 	AppSpecificScoreParams p2pconfig.ApplicationSpecificScoreParameters `validate:"required"`
 
-	DuplicateMessageThreshold float64 `validate:"required"`
+	DuplicateMessageThreshold float64 `validate:"gt=0"`
 
 	Collector module.GossipSubScoringRegistryMetrics `validate:"required"`
 }

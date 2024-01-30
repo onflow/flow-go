@@ -353,8 +353,6 @@ network-config:
             # opportunistically graft peers that are not access nodes (i.e., with -1),
             # or penalized peers (i.e., with -100).
             opportunistic-graft: 101
-            # The threshold at which the duplicate message count for a peer will result in the peer being penalized
-            duplicate-message: 10e+4
           behaviour:
             # The threshold when the behavior of a peer is considered as bad by GossipSub.
             # Currently, the misbehavior is defined as advertising an iHave without responding to the iWants (iHave broken promises), as well as attempting
@@ -445,6 +443,8 @@ network-config:
             # The penalty for duplicate messages detected by the gossipsub tracer for a peer.
             # The penalty is multiplied by the current duplicate message count for a peer before it is applied to the application specific score.
             duplicate-message-penalty: -10e-4
+            # The threshold at which the duplicate message count for a peer will result in the peer being penalized
+            duplicate-message-threshold: 10e+4
             # This is the reward for well-behaving staked peers.
             # If a peer does not have any misbehavior record, e.g., invalid subscription,
             # invalid message, etc., it will be rewarded with this score.

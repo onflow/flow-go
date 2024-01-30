@@ -21,9 +21,10 @@ type PeerScoringParameters struct {
 const (
 	AppSpecificScoreWeightKey = "app-specific-score-weight"
 	DecayToZeroKey            = "decay-to-zero"
-	ThresholdsKey             = "thresholds"
 	BehaviourKey              = "behaviour"
 	TopicKey                  = "topic"
+	ThresholdsKey             = "thresholds"
+	ThresholdKey              = "threshold"
 )
 
 type InternalGossipSubScoreParams struct {
@@ -86,6 +87,8 @@ type ApplicationSpecificScoreParameters struct {
 	// DuplicateMessagePenalty is the penalty for duplicate messages detected by the gossipsub tracer for a peer.
 	// The penalty is multiplied by the current duplicate message count for a peer before it is applied to the application specific score.
 	DuplicateMessagePenalty float64 `validate:"lt=0" mapstructure:"duplicate-message-penalty"`
+	// DuplicateMessageThreshold the threshold at which the duplicate message count for a peer will result in the peer being penalized.
+	DuplicateMessageThreshold float64 `validate:"gt=0" mapstructure:"duplicate-message-threshold"`
 	// MaxAppSpecificReward is the  reward for well-behaving staked peers. If a peer does not have
 	// any misbehavior record, e.g., invalid subscription, invalid message, etc., it will be rewarded with this score.
 	MaxAppSpecificReward float64 `validate:"gt=0" mapstructure:"max-app-specific-reward"`
@@ -120,8 +123,6 @@ type InternalScoringThresholds struct {
 	// OpportunisticGraft when the median peer penalty in the mesh drops below this value,
 	// the peer may select more peers with penalty above the median to opportunistically graft on the mesh.
 	OpportunisticGraft float64 `validate:"gt=0" mapstructure:"opportunistic-graft"`
-	// DuplicateMessage the threshold at which the duplicate message count for a peer will result in the peer being penalized.
-	DuplicateMessage float64 `validate:"gt=0" mapstructure:"duplicate-message"`
 }
 
 const (
