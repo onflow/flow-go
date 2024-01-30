@@ -1048,7 +1048,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.BoolVar(&builder.publicNetworkExecutionDataEnabled,
 			"public-network-execution-data-sync-enabled",
 			defaultConfig.publicNetworkExecutionDataEnabled,
-			"whether to enable the execution data sync protocol on public network")
+			"[experimental] whether to enable the execution data sync protocol on public network")
 		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
 		flags.Uint64Var(&builder.executionDataStartHeight,
 			"execution-data-start-height",
@@ -1311,8 +1311,7 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 			builder.AccessNodeConfig.PublicNetworkConfig.Network,
 			node.Logger,
 			map[channels.Channel]channels.Channel{
-				channels.ReceiveBlocks:        channels.PublicReceiveBlocks,
-				channels.ExecutionDataService: channels.PublicExecutionDataService,
+				channels.ReceiveBlocks: channels.PublicReceiveBlocks,
 			},
 		)
 		node.EngineRegistry = relayNet

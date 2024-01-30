@@ -573,9 +573,18 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
 
 		// ExecutionDataRequester config
-		flags.BoolVar(&builder.executionDataSyncEnabled, "execution-data-sync-enabled", defaultConfig.executionDataSyncEnabled, "whether to enable the execution data sync protocol")
-		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
-		flags.Uint64Var(&builder.executionDataStartHeight, "execution-data-start-height", defaultConfig.executionDataStartHeight, "height of first block to sync execution data from when starting with an empty Execution Data database")
+		flags.BoolVar(&builder.executionDataSyncEnabled,
+			"execution-data-sync-enabled",
+			defaultConfig.executionDataSyncEnabled,
+			"whether to enable the execution data sync protocol")
+		flags.StringVar(&builder.executionDataDir,
+			"execution-data-dir",
+			defaultConfig.executionDataDir,
+			"directory to use for Execution Data database")
+		flags.Uint64Var(&builder.executionDataStartHeight,
+			"execution-data-start-height",
+			defaultConfig.executionDataStartHeight,
+			"height of first block to sync execution data from when starting with an empty Execution Data database")
 		flags.Uint64Var(&builder.executionDataConfig.MaxSearchAhead,
 			"execution-data-max-search-ahead",
 			defaultConfig.executionDataConfig.MaxSearchAhead,
@@ -596,7 +605,10 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"execution-data-max-retry-delay",
 			defaultConfig.executionDataConfig.MaxRetryDelay,
 			"maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
-		flags.Uint32Var(&builder.executionDataCacheSize, "execution-data-cache-size", defaultConfig.executionDataCacheSize, "block execution data cache size")
+		flags.Uint32Var(&builder.executionDataCacheSize,
+			"execution-data-cache-size",
+			defaultConfig.executionDataCacheSize,
+			"block execution data cache size")
 	}).ValidateFlags(func() error {
 		if builder.executionDataSyncEnabled {
 			if builder.executionDataConfig.FetchTimeout <= 0 {
