@@ -237,7 +237,6 @@ func (s *BackendBlocksSuite) backendParams() Params {
 			Broadcaster:            s.broadcaster,
 			RootHeight:             s.rootBlock.Header.Height,
 			HighestAvailableHeight: s.rootBlock.Header.Height,
-			Seals:                  s.seals,
 		},
 	}
 }

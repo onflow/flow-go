@@ -118,7 +118,6 @@ type SubscriptionParams struct {
 
 	RootHeight             uint64
 	HighestAvailableHeight uint64
-	Seals                  storage.Seals
 }
 
 // New creates backend instance
@@ -165,7 +164,6 @@ func New(params Params) (*Backend, error) {
 		params.SubscriptionParams.RootHeight,
 		params.Headers,
 		params.SubscriptionParams.HighestAvailableHeight,
-		params.SubscriptionParams.Seals,
 		params.SubscriptionParams.Broadcaster,
 	)
 	if err != nil {

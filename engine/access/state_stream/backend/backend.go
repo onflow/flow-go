@@ -101,7 +101,6 @@ func New(
 		rootHeight,
 		headers,
 		highestAvailableHeight,
-		seals,
 		broadcaster,
 	)
 	if err != nil {

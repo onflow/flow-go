@@ -182,7 +182,7 @@ func (e *Engine) processOnFinalizedBlock(_ *model.Block) error {
 	finalizedHeader := e.finalizedHeaderCache.Get()
 
 	var errs *multierror.Error
-	err := e.backend.ProcessSubscriptionOnFinalizedBlock(finalizedHeader)
+	err := e.backend.ProcessOnFinalizedBlock()
 	if err != nil {
 		errs = multierror.Append(errs, err)
 	}

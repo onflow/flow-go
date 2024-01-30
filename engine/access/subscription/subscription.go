@@ -56,10 +56,19 @@ type Subscription interface {
 
 // Streamable represents a subscription that can be streamed.
 type Streamable interface {
+	// ID returns the subscription ID
+	// Note: this is not a cryptographic hash
 	ID() string
+	// Close is called when a subscription ends gracefully, and closes the subscription channel
 	Close()
+	// Fail registers an error and closes the subscription channel
 	Fail(error)
+	// Send sends a value to the subscription channel or returns an error
+	// Expected errors:
+	// - context.DeadlineExceeded if send timed out
+	// - context.Canceled if the client disconnected
 	Send(context.Context, interface{}, time.Duration) error
+	// Next returns the value for the next height from the subscription
 	Next(context.Context) (interface{}, error)
 }
 

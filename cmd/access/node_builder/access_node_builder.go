@@ -1478,7 +1478,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					SendBufferSize:         int(builder.stateStreamConf.ClientSendBufferSize),
 					RootHeight:             builder.executionDataConfig.InitialBlockHeight,
 					HighestAvailableHeight: highestAvailableHeight,
-					Seals:                  node.Storage.Seals,
 				},
 			})
 			if err != nil {
