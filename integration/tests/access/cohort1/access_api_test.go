@@ -73,6 +73,7 @@ func (s *AccessAPISuite) SetupTest() {
 		testnet.WithLogLevel(zerolog.FatalLevel),
 		// make sure test continues to test as expected if the default config changes
 		testnet.WithAdditionalFlagf("--script-execution-mode=%s", backend.IndexQueryModeExecutionNodesOnly),
+		testnet.WithAdditionalFlagf("--tx-result-query-mode=%s", backend.TransactionResultQueryModeExecutionNodesOnly),
 	)
 
 	indexingAccessConfig := testnet.NewNodeConfig(
