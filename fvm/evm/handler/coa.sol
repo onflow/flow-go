@@ -91,7 +91,7 @@ contract COA is ERC1155TokenReceiver, ERC777TokensRecipient, ERC721TokenReceiver
     bytes32 _hash,
     bytes memory _sig
     ) external view virtual returns (bytes4){
-        (bool ok, bytes memory data) = cadenceArch.staticcall(abi.encodeWithSignature("verifyCOAOwnershipProof(address, bytes32, bytes)", address(this), _hash, _sig));
+        (bool ok, bytes memory data) = cadenceArch.staticcall(abi.encodeWithSignature("verifyCOAOwnershipProof(address,bytes32,bytes)", address(this), _hash, _sig));
         require(ok);
         bool output = abi.decode(data, (bool));
         if (output) {
