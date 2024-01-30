@@ -309,7 +309,7 @@ func (h *handler) GetTransactionResult(
 
 	var statusCode uint32 = 0
 	errMsg := ""
-
+	var compUsage uint64
 	// lookup any transaction error that might have occurred
 	txResult, err := h.transactionResults.ByBlockIDTransactionID(blockID, txID)
 	if err != nil {
@@ -319,7 +319,9 @@ func (h *handler) GetTransactionResult(
 
 		return nil, status.Errorf(codes.Internal, "failed to get transaction result: %v", err)
 	}
-
+	if txResult != nil {
+		compUsage = txResult.ComputationUsed
+	}
 	if txResult.ErrorMessage != "" {
 		cadenceErrMessage := txResult.ErrorMessage
 		if !utf8.ValidString(cadenceErrMessage) {
@@ -350,6 +352,7 @@ func (h *handler) GetTransactionResult(
 		ErrorMessage:         errMsg,
 		Events:               events,
 		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+		ComputationUsage:     compUsage,
 	}, nil
 }
 
@@ -367,6 +370,7 @@ func (h *handler) GetTransactionResultByIndex(
 	index := req.GetIndex()
 
 	var statusCode uint32 = 0
+	var compUsage uint64
 	errMsg := ""
 
 	// lookup any transaction error that might have occurred
@@ -378,7 +382,9 @@ func (h *handler) GetTransactionResultByIndex(
 
 		return nil, status.Errorf(codes.Internal, "failed to get transaction result: %v", err)
 	}
-
+	if txResult != nil {
+		compUsage = txResult.ComputationUsed
+	}
 	if txResult.ErrorMessage != "" {
 		cadenceErrMessage := txResult.ErrorMessage
 		if !utf8.ValidString(cadenceErrMessage) {
@@ -409,6 +415,7 @@ func (h *handler) GetTransactionResultByIndex(
 		ErrorMessage:         errMsg,
 		Events:               events,
 		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+		ComputationUsage:     compUsage,
 	}, nil
 }
 
@@ -485,9 +492,10 @@ func (h *handler) GetTransactionResultsByBlockID(
 		events := convert.EventsToMessages(eventsByTxIndex[txIndex])
 
 		responseTxResults[index] = &execution.GetTransactionResultResponse{
-			StatusCode:   statusCode,
-			ErrorMessage: errMsg,
-			Events:       events,
+			StatusCode:       statusCode,
+			ErrorMessage:     errMsg,
+			Events:           events,
+			ComputationUsage: txResult.ComputationUsed,
 		}
 	}
 

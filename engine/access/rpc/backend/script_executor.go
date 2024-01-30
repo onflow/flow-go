@@ -82,7 +82,8 @@ func (s *ScriptExecutor) ExecuteAtBlockHeight(ctx context.Context, script []byte
 		return nil, err
 	}
 
-	return s.scriptExecutor.ExecuteAtBlockHeight(ctx, script, arguments, height)
+	data, _, err := s.scriptExecutor.ExecuteAtBlockHeight(ctx, script, arguments, height)
+	return data, err
 }
 
 // GetAccountAtBlockHeight returns the account at the provided block height from a local execution state.

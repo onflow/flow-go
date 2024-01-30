@@ -50,11 +50,12 @@ func (s *scriptTestSuite) TestScriptExecution() {
 		number := int64(42)
 		code := []byte(fmt.Sprintf("pub fun main(): Int { return %d; }", number))
 
-		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height)
+		result, compUsed, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height)
 		s.Require().NoError(err)
 		val, err := jsoncdc.Decode(nil, result)
 		s.Require().NoError(err)
 		s.Assert().Equal(number, val.(cadence.Int).Value.Int64())
+		s.Require().NotZero(compUsed)
 	})
 
 	s.Run("Get Block", func() {
@@ -63,21 +64,23 @@ func (s *scriptTestSuite) TestScriptExecution() {
 			return getCurrentBlock().height 
 		}`, s.height))
 
-		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height)
+		result, compUsed, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height)
 		s.Require().NoError(err)
 		val, err := jsoncdc.Decode(nil, result)
 		s.Require().NoError(err)
 		// make sure that the returned block height matches the current one set
 		s.Assert().Equal(s.height, val.(cadence.UInt64).ToGoValue())
+		s.Require().NotZero(compUsed)
 	})
 
 	s.Run("Handle not found Register", func() {
 		// use a non-existing address to trigger register get function
 		code := []byte("import Foo from 0x01; pub fun main() { }")
 
-		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height)
+		result, compUsed, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height)
 		s.Assert().Error(err)
 		s.Assert().Nil(result)
+		s.Require().Zero(compUsed)
 	})
 
 	s.Run("Valid Argument", func() {
@@ -86,7 +89,7 @@ func (s *scriptTestSuite) TestScriptExecution() {
 		encoded, err := jsoncdc.Encode(arg)
 		s.Require().NoError(err)
 
-		result, err := s.scripts.ExecuteAtBlockHeight(
+		result, compUsed, err := s.scripts.ExecuteAtBlockHeight(
 			context.Background(),
 			code,
 			[][]byte{encoded},
@@ -94,18 +97,20 @@ func (s *scriptTestSuite) TestScriptExecution() {
 		)
 		s.Require().NoError(err)
 		s.Assert().Equal(encoded, result)
+		s.Require().NotZero(compUsed)
 	})
 
 	s.Run("Invalid Argument", func() {
 		code := []byte("pub fun main(foo: Int): Int { return foo }")
 		invalid := [][]byte{[]byte("i")}
 
-		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, invalid, s.height)
+		result, compUsed, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, invalid, s.height)
 		s.Assert().Nil(result)
 		var coded errors.CodedError
 		s.Require().True(errors.As(err, &coded))
 		fmt.Println(coded.Code(), coded.Error())
 		s.Assert().Equal(errors.ErrCodeInvalidArgumentError, coded.Code())
+		s.Require().Zero(compUsed)
 	})
 }
 

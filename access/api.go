@@ -39,9 +39,9 @@ type API interface {
 	GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error)
 	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
 
-	ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error)
-	ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error)
-	ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error)
+	ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, uint64, error)
+	ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, uint64, error)
+	ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, uint64, error)
 
 	GetEventsForHeightRange(ctx context.Context, eventType string, startHeight, endHeight uint64, requiredEventEncodingVersion entities.EventEncodingVersion) ([]flow.BlockEvents, error)
 	GetEventsForBlockIDs(ctx context.Context, eventType string, blockIDs []flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) ([]flow.BlockEvents, error)
@@ -56,26 +56,28 @@ type API interface {
 
 // TODO: Combine this with flow.TransactionResult?
 type TransactionResult struct {
-	Status        flow.TransactionStatus
-	StatusCode    uint
-	Events        []flow.Event
-	ErrorMessage  string
-	BlockID       flow.Identifier
-	TransactionID flow.Identifier
-	CollectionID  flow.Identifier
-	BlockHeight   uint64
+	Status           flow.TransactionStatus
+	StatusCode       uint
+	Events           []flow.Event
+	ErrorMessage     string
+	BlockID          flow.Identifier
+	TransactionID    flow.Identifier
+	CollectionID     flow.Identifier
+	BlockHeight      uint64
+	ComputationUsage uint64
 }
 
 func TransactionResultToMessage(result *TransactionResult) *access.TransactionResultResponse {
 	return &access.TransactionResultResponse{
-		Status:        entities.TransactionStatus(result.Status),
-		StatusCode:    uint32(result.StatusCode),
-		ErrorMessage:  result.ErrorMessage,
-		Events:        convert.EventsToMessages(result.Events),
-		BlockId:       result.BlockID[:],
-		TransactionId: result.TransactionID[:],
-		CollectionId:  result.CollectionID[:],
-		BlockHeight:   result.BlockHeight,
+		Status:           entities.TransactionStatus(result.Status),
+		StatusCode:       uint32(result.StatusCode),
+		ErrorMessage:     result.ErrorMessage,
+		Events:           convert.EventsToMessages(result.Events),
+		BlockId:          result.BlockID[:],
+		TransactionId:    result.TransactionID[:],
+		CollectionId:     result.CollectionID[:],
+		BlockHeight:      result.BlockHeight,
+		ComputationUsage: result.ComputationUsage,
 	}
 }
 
@@ -93,14 +95,15 @@ func TransactionResultsToMessage(results []*TransactionResult) *access.Transacti
 func MessageToTransactionResult(message *access.TransactionResultResponse) *TransactionResult {
 
 	return &TransactionResult{
-		Status:        flow.TransactionStatus(message.Status),
-		StatusCode:    uint(message.StatusCode),
-		ErrorMessage:  message.ErrorMessage,
-		Events:        convert.MessagesToEvents(message.Events),
-		BlockID:       flow.HashToID(message.BlockId),
-		TransactionID: flow.HashToID(message.TransactionId),
-		CollectionID:  flow.HashToID(message.CollectionId),
-		BlockHeight:   message.BlockHeight,
+		Status:           flow.TransactionStatus(message.Status),
+		StatusCode:       uint(message.StatusCode),
+		ErrorMessage:     message.ErrorMessage,
+		Events:           convert.MessagesToEvents(message.Events),
+		BlockID:          flow.HashToID(message.BlockId),
+		TransactionID:    flow.HashToID(message.TransactionId),
+		CollectionID:     flow.HashToID(message.CollectionId),
+		BlockHeight:      message.BlockHeight,
+		ComputationUsage: message.ComputationUsage,
 	}
 }
 

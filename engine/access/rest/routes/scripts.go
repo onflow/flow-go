@@ -8,10 +8,10 @@ import (
 )
 
 // ExecuteScript handler sends the script from the request to be executed.
-func ExecuteScript(r *request.Request, backend access.API, _ models.LinkGenerator) (interface{}, error) {
+func ExecuteScript(r *request.Request, backend access.API, _ models.LinkGenerator) (interface{}, uint64, error) {
 	req, err := r.GetScriptRequest()
 	if err != nil {
-		return nil, models.NewBadRequestError(err)
+		return nil, 0, models.NewBadRequestError(err)
 	}
 
 	if req.BlockID != flow.ZeroID {
@@ -26,7 +26,7 @@ func ExecuteScript(r *request.Request, backend access.API, _ models.LinkGenerato
 	if req.BlockHeight == request.FinalHeight {
 		finalBlock, _, err := backend.GetLatestBlockHeader(r.Context(), false)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		req.BlockHeight = finalBlock.Height
 	}

@@ -495,14 +495,15 @@ func (h *Handler) ExecuteScriptAtLatestBlock(
 	script := req.GetScript()
 	arguments := req.GetArguments()
 
-	value, err := h.api.ExecuteScriptAtLatestBlock(ctx, script, arguments)
+	value, compUsage, err := h.api.ExecuteScriptAtLatestBlock(ctx, script, arguments)
 	if err != nil {
 		return nil, err
 	}
 
 	return &access.ExecuteScriptResponse{
-		Value:    value,
-		Metadata: metadata,
+		Value:            value,
+		Metadata:         metadata,
+		ComputationUsage: compUsage,
 	}, nil
 }
 
@@ -517,14 +518,15 @@ func (h *Handler) ExecuteScriptAtBlockHeight(
 	arguments := req.GetArguments()
 	blockHeight := req.GetBlockHeight()
 
-	value, err := h.api.ExecuteScriptAtBlockHeight(ctx, blockHeight, script, arguments)
+	value, compUsage, err := h.api.ExecuteScriptAtBlockHeight(ctx, blockHeight, script, arguments)
 	if err != nil {
 		return nil, err
 	}
 
 	return &access.ExecuteScriptResponse{
-		Value:    value,
-		Metadata: metadata,
+		Value:            value,
+		Metadata:         metadata,
+		ComputationUsage: compUsage,
 	}, nil
 }
 
@@ -539,14 +541,15 @@ func (h *Handler) ExecuteScriptAtBlockID(
 	arguments := req.GetArguments()
 	blockID := convert.MessageToIdentifier(req.GetBlockId())
 
-	value, err := h.api.ExecuteScriptAtBlockID(ctx, blockID, script, arguments)
+	value, compUsage, err := h.api.ExecuteScriptAtBlockID(ctx, blockID, script, arguments)
 	if err != nil {
 		return nil, err
 	}
 
 	return &access.ExecuteScriptResponse{
-		Value:    value,
-		Metadata: metadata,
+		Value:            value,
+		Metadata:         metadata,
+		ComputationUsage: compUsage,
 	}, nil
 }
 

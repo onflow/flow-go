@@ -204,10 +204,10 @@ func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address 
 }
 
 // ExecuteScriptAtLatestBlock executes script at latest block.
-func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error) {
+func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, uint64, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer closer.Close()
 
@@ -219,17 +219,17 @@ func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, scrip
 	r.log("upstream", "ExecuteScriptAtLatestBlock", err)
 
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return executeScriptAtLatestBlockResponse.Value, nil
+	return executeScriptAtLatestBlockResponse.Value, executeScriptAtLatestBlockResponse.ComputationUsage, nil
 }
 
 // ExecuteScriptAtBlockHeight executes script at the given block height .
-func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error) {
+func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, uint64, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer closer.Close()
 
@@ -242,17 +242,17 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(ctx context.Context, block
 	r.log("upstream", "ExecuteScriptAtBlockHeight", err)
 
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return executeScriptAtBlockHeightResponse.Value, nil
+	return executeScriptAtBlockHeightResponse.Value, executeScriptAtBlockHeightResponse.ComputationUsage, nil
 }
 
 // ExecuteScriptAtBlockID executes script at the given block id .
-func (r *RestProxyHandler) ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error) {
+func (r *RestProxyHandler) ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, uint64, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer closer.Close()
 
@@ -265,10 +265,10 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockID(ctx context.Context, blockID f
 	r.log("upstream", "ExecuteScriptAtBlockID", err)
 
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return executeScriptAtBlockIDResponse.Value, nil
+	return executeScriptAtBlockIDResponse.Value, executeScriptAtBlockIDResponse.ComputationUsage, nil
 }
 
 // GetEventsForHeightRange returns events by their name in the specified blocks heights.

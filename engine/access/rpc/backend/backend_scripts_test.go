@@ -421,9 +421,10 @@ func (s *BackendScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_Inconsis
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
 			irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), signCtxErr))
 
-		actual, err := backend.ExecuteScriptAtLatestBlock(signalerCtx, s.script, s.arguments)
+		actual, compUsed, err := backend.ExecuteScriptAtLatestBlock(signalerCtx, s.script, s.arguments)
 		s.Require().Error(err)
 		s.Require().Nil(actual)
+		s.Require().Zero(compUsed)
 	})
 }
 
@@ -432,14 +433,16 @@ func (s *BackendScriptsSuite) testExecuteScriptAtLatestBlock(ctx context.Context
 	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
 
 	if statusCode == codes.OK {
-		actual, err := backend.ExecuteScriptAtLatestBlock(ctx, s.script, s.arguments)
+		actual, compUsed, err := backend.ExecuteScriptAtLatestBlock(ctx, s.script, s.arguments)
 		s.Require().NoError(err)
 		s.Require().Equal(expectedResponse, actual)
+		s.Require().NotZero(compUsed)
 	} else {
-		actual, err := backend.ExecuteScriptAtLatestBlock(ctx, s.failingScript, s.arguments)
+		actual, compUsed, err := backend.ExecuteScriptAtLatestBlock(ctx, s.failingScript, s.arguments)
 		s.Require().Error(err)
 		s.Require().Equal(statusCode, status.Code(err), "error code mismatch: expected %d, got %d: %s", statusCode, status.Code(err), err)
 		s.Require().Nil(actual)
+		s.Require().Zero(compUsed)
 	}
 }
 
@@ -448,14 +451,16 @@ func (s *BackendScriptsSuite) testExecuteScriptAtBlockID(ctx context.Context, ba
 	s.headers.On("ByBlockID", blockID).Return(s.block.Header, nil).Once()
 
 	if statusCode == codes.OK {
-		actual, err := backend.ExecuteScriptAtBlockID(ctx, blockID, s.script, s.arguments)
+		actual, compUsed, err := backend.ExecuteScriptAtBlockID(ctx, blockID, s.script, s.arguments)
 		s.Require().NoError(err)
 		s.Require().Equal(expectedResponse, actual)
+		s.Require().NotZero(compUsed)
 	} else {
-		actual, err := backend.ExecuteScriptAtBlockID(ctx, blockID, s.failingScript, s.arguments)
+		actual, compUsed, err := backend.ExecuteScriptAtBlockID(ctx, blockID, s.failingScript, s.arguments)
 		s.Require().Error(err)
 		s.Require().Equal(statusCode, status.Code(err), "error code mismatch: expected %d, got %d: %s", statusCode, status.Code(err), err)
 		s.Require().Nil(actual)
+		s.Require().Zero(compUsed)
 	}
 }
 
@@ -464,13 +469,15 @@ func (s *BackendScriptsSuite) testExecuteScriptAtBlockHeight(ctx context.Context
 	s.headers.On("ByHeight", height).Return(s.block.Header, nil).Once()
 
 	if statusCode == codes.OK {
-		actual, err := backend.ExecuteScriptAtBlockHeight(ctx, height, s.script, s.arguments)
+		actual, compUsed, err := backend.ExecuteScriptAtBlockHeight(ctx, height, s.script, s.arguments)
 		s.Require().NoError(err)
 		s.Require().Equal(expectedResponse, actual)
+		s.Require().NotZero(compUsed)
 	} else {
-		actual, err := backend.ExecuteScriptAtBlockHeight(ctx, height, s.failingScript, s.arguments)
+		actual, compUsed, err := backend.ExecuteScriptAtBlockHeight(ctx, height, s.failingScript, s.arguments)
 		s.Require().Error(err)
 		s.Require().Equalf(statusCode, status.Code(err), "error code mismatch: expected %d, got %d: %s", statusCode, status.Code(err), err)
 		s.Require().Nil(actual)
+		s.Require().Zero(compUsed)
 	}
 }

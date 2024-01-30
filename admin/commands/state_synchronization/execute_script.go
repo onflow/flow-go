@@ -25,7 +25,7 @@ type ExecuteScriptCommand struct {
 func (e *ExecuteScriptCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	d := req.ValidatorData.(*scriptData)
 
-	result, err := e.scriptExecutor.ExecuteAtBlockHeight(context.Background(), d.script, d.arguments, d.height)
+	result, _, err := e.scriptExecutor.ExecuteAtBlockHeight(context.Background(), d.script, d.arguments, d.height)
 	if err != nil {
 		return nil, err
 	}

@@ -263,7 +263,8 @@ func (h *Handler) ExecuteScriptAtLatestBlock(
 	script := req.GetScript()
 	arguments := req.GetArguments()
 
-	value, err := h.api.ExecuteScriptAtLatestBlock(ctx, script, arguments)
+	// ignoring the computation usage here as its not supported by the legacy api
+	value, _, err := h.api.ExecuteScriptAtLatestBlock(ctx, script, arguments)
 	if err != nil {
 		return nil, err
 	}
@@ -282,7 +283,8 @@ func (h *Handler) ExecuteScriptAtBlockHeight(
 	arguments := req.GetArguments()
 	blockHeight := req.GetBlockHeight()
 
-	value, err := h.api.ExecuteScriptAtBlockHeight(ctx, blockHeight, script, arguments)
+	// ignoring the computation usage here as its not supported by the legacy api
+	value, _, err := h.api.ExecuteScriptAtBlockHeight(ctx, blockHeight, script, arguments)
 	if err != nil {
 		return nil, err
 	}
@@ -301,7 +303,8 @@ func (h *Handler) ExecuteScriptAtBlockID(
 	arguments := req.GetArguments()
 	blockID := convert.MessageToIdentifier(req.GetBlockId())
 
-	value, err := h.api.ExecuteScriptAtBlockID(ctx, blockID, script, arguments)
+	// ignoring the computation usage here as its not supported by the legacy api
+	value, _, err := h.api.ExecuteScriptAtBlockID(ctx, blockID, script, arguments)
 	if err != nil {
 		return nil, err
 	}
