@@ -17,6 +17,8 @@ const (
 	EventAccountUpdated EventType = "flow.AccountUpdated"
 )
 
+const EVMLocationPrefix = "evm"
+
 type EventType string
 
 type Event struct {

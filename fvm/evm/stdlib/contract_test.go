@@ -86,7 +86,7 @@ func (t *testFlowAccount) Address() types.Address {
 
 func (t *testFlowAccount) Balance() types.Balance {
 	if t.balance == nil {
-		return types.Balance(0)
+		return types.NewBalanceFromUFix64(0)
 	}
 	return t.balance()
 }
@@ -133,6 +133,7 @@ func deployContracts(
 	runtimeInterface *TestRuntimeInterface,
 	transactionEnvironment runtime.Environment,
 	nextTransactionLocation func() common.TransactionLocation,
+	evmAbiOnly bool,
 ) {
 
 	contractsAddressHex := contractsAddress.Hex()
@@ -185,7 +186,7 @@ func deployContracts(
 		},
 		{
 			name: stdlib.ContractName,
-			code: stdlib.ContractCode(contractsAddress),
+			code: stdlib.ContractCode(contractsAddress, evmAbiOnly),
 		},
 	}
 
@@ -306,6 +307,7 @@ func TestEVMEncodeABI(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -434,6 +436,7 @@ func TestEVMEncodeABIComputation(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -529,6 +532,7 @@ func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -633,6 +637,7 @@ func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -731,6 +736,7 @@ func TestEVMDecodeABI(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -865,6 +871,7 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -1138,6 +1145,7 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -1216,6 +1224,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -1302,6 +1311,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -1387,6 +1397,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -1473,6 +1484,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -1559,6 +1571,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -1655,6 +1668,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -1741,6 +1755,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -1827,6 +1842,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -1913,6 +1929,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -1999,6 +2016,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -2085,6 +2103,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -2216,6 +2235,7 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -2349,6 +2369,7 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -2463,6 +2484,7 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -2572,6 +2594,7 @@ func TestEVMAddressConstructionAndReturn(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -2664,6 +2687,7 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		false,
 	)
 
 	// Run script
@@ -2794,6 +2818,7 @@ func TestEVMRun(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		false,
 	)
 
 	// Run script
@@ -2881,6 +2906,7 @@ func TestEVMCreateBridgedAccount(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		false,
 	)
 
 	// Run script
@@ -2939,7 +2965,7 @@ func TestBridgedAccountCall(t *testing.T) {
 					assert.Equal(t, types.Address{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, toAddress)
 					assert.Equal(t, types.Data{4, 5, 6}, data)
 					assert.Equal(t, types.GasLimit(9999), limit)
-					assert.Equal(t, types.Balance(expectedBalance), balance)
+					assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
 
 					return types.Data{3, 1, 4}
 				},
@@ -3011,6 +3037,7 @@ func TestBridgedAccountCall(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		false,
 	)
 
 	// Run script
@@ -3048,7 +3075,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 	handler := &testContractHandler{
 
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.False(t, isAuthorized)
 
 			return &testFlowAccount{
@@ -3057,7 +3084,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 					deposited = true
 					assert.Equal(
 						t,
-						types.Balance(expectedBalance),
+						types.NewBalanceFromUFix64(expectedBalance),
 						vault.Balance(),
 					)
 				},
@@ -3084,10 +3111,9 @@ func TestEVMAddressDeposit(t *testing.T) {
           let vault <- minter.mintTokens(amount: 1.23)
           destroy minter
 
-          let address = EVM.EVMAddress(
-              bytes: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-          )
-          address.deposit(from: <-vault)
+          let bridgedAccount <- EVM.createBridgedAccount()
+          bridgedAccount.deposit(from: <-vault)
+		  destroy bridgedAccount
       }
    `)
 
@@ -3129,6 +3155,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		false,
 	)
 
 	// Run script
@@ -3174,13 +3201,13 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 				deposit: func(vault *types.FLOWTokenVault) {
 					deposited = true
 					assert.Equal(t,
-						types.Balance(expectedDepositBalance),
+						types.NewBalanceFromUFix64(expectedDepositBalance),
 						vault.Balance(),
 					)
 				},
 				withdraw: func(balance types.Balance) *types.FLOWTokenVault {
 					assert.Equal(t,
-						types.Balance(expectedWithdrawBalance),
+						types.NewBalanceFromUFix64(expectedWithdrawBalance),
 						balance,
 					)
 					withdrew = true
@@ -3208,7 +3235,7 @@ func TestBridgedAccountWithdraw(t *testing.T) {
           destroy minter
 
           let bridgedAccount <- EVM.createBridgedAccount()
-          bridgedAccount.address().deposit(from: <-vault)
+          bridgedAccount.deposit(from: <-vault)
 
           let vault2 <- bridgedAccount.withdraw(balance: EVM.Balance(flow: 1.23))
           let balance = vault2.balance
@@ -3257,6 +3284,7 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		false,
 	)
 
 	// Run script
@@ -3302,7 +3330,7 @@ func TestBridgedAccountDeploy(t *testing.T) {
 					deployed = true
 					assert.Equal(t, types.Code{4, 5, 6}, code)
 					assert.Equal(t, types.GasLimit(9999), limit)
-					assert.Equal(t, types.Balance(expectedBalance), balance)
+					assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
 
 					return handler.AllocateAddress()
 				},
@@ -3370,6 +3398,7 @@ func TestBridgedAccountDeploy(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		false,
 	)
 
 	// Run script
@@ -3429,7 +3458,7 @@ func TestEVMAccountBalance(t *testing.T) {
 			return &testFlowAccount{
 				address: fromAddress,
 				balance: func() types.Balance {
-					return types.Balance(expectedBalanceValue)
+					return types.NewBalanceFromUFix64(expectedBalanceValue)
 				},
 			}
 		},
@@ -3490,6 +3519,7 @@ func TestEVMAccountBalance(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		false,
 	)
 
 	// Run script
@@ -3508,4 +3538,112 @@ func TestEVMAccountBalance(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, expectedBalance, actual)
+}
+
+func TestEVMAccountBalanceForABIOnlyContract(t *testing.T) {
+
+	t.Parallel()
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	expectedBalanceValue, err := cadence.NewUFix64FromParts(1, 1337000)
+	require.NoError(t, err)
+
+	handler := &testContractHandler{
+		flowTokenAddress: common.Address(contractsAddress),
+		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
+			assert.Equal(t, types.Address{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.False(t, isAuthorized)
+
+			return &testFlowAccount{
+				address: fromAddress,
+				balance: func() types.Balance {
+					return types.NewBalanceFromUFix64(expectedBalanceValue)
+				},
+			}
+		},
+	}
+
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.Balance {
+          let bridgedAccount <- EVM.createBridgedAccount()
+          let balance = bridgedAccount.balance()
+          destroy bridgedAccount
+          return balance
+      }
+    `)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+		true,
+	)
+
+	// Run script
+
+	_, err = rt.ExecuteScript(
+		runtime.Script{
+			Source: script,
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.Error(t, err)
+
+	assert.ErrorContains(
+		t,
+		err,
+		"error: cannot find type in this scope: `EVM.Balance`",
+	)
+	assert.ErrorContains(
+		t,
+		err,
+		"error: value of type `EVM` has no member `createBridgedAccount`",
+	)
 }
