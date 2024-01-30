@@ -145,6 +145,55 @@ func TestDuplicateMessageTrackerCache_DuplicateMessageReceived(t *testing.T) {
 	require.Greater(t, gauge3, 1.9)
 }
 
+// TestDuplicateMessageTrackerCache_ConcurrentDuplicateMessageReceived tests the concurrent adjustments and reads of records for different
+// node IDs. The test covers the following scenarios:
+// 1. Multiple goroutines adjusting records for different peer IDs concurrently.
+// 2. Multiple goroutines getting records for different peer IDs concurrently.
+// 3. The adjusted records are correctly updated in the cache.
+// 4. Ensure records are decayed as expected.
+func TestDuplicateMessageTrackerCache_ConcurrentDuplicateMessageReceived(t *testing.T) {
+	cache := duplicateMessageTrackerCacheFixture(t, 100, defaultDecay, defaultSkipDecayThreshold, zerolog.Nop(), metrics.NewNoopCollector())
+
+	peerIDs := unittest.PeerIdFixtures(t, 10)
+	for _, peerID := range peerIDs {
+		_, ok, err := cache.GetWithInit(peerID)
+		require.NoError(t, err)
+		require.True(t, ok)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(peerIDs) * 2)
+
+	for _, peerID := range peerIDs {
+		// adjust spam records concurrently
+		go func(id peer.ID) {
+			defer wg.Done()
+			_, err := cache.DuplicateMessageReceived(id)
+			require.NoError(t, err)
+		}(peerID)
+
+		// get spam records concurrently
+		go func(id peer.ID) {
+			defer wg.Done()
+			_, found, err := cache.GetWithInit(id)
+			require.NoError(t, err)
+			require.True(t, found)
+		}(peerID)
+	}
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
+
+	// ensure that the records are correctly updated in the cache
+	for _, nodeID := range peerIDs {
+		gauge, found, err := cache.GetWithInit(nodeID)
+		require.NoError(t, err)
+		require.True(t, found)
+		// slight decay will result in 0.9 < gauge < 1
+		require.LessOrEqual(t, gauge, 1.0)
+		require.Greater(t, gauge, 0.9)
+	}
+}
+
 // TestDuplicateMessageTrackerCache_UpdateDecay ensures that a counter value in the record cache is eventually decayed back to 0 after some time.
 func TestDuplicateMessageTrackerCache_Decay(t *testing.T) {
 	cache := duplicateMessageTrackerCacheFixture(t, 100, 0.09, defaultSkipDecayThreshold, zerolog.Nop(), metrics.NewNoopCollector())
