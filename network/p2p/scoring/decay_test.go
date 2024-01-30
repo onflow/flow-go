@@ -287,7 +287,7 @@ func TestDefaultDecayFunction(t *testing.T) {
 				record: p2p.GossipSubSpamRecord{
 					Penalty:             -100,
 					Decay:               0.8,
-					LastDecayAdjustment: time.Now().Add(-flowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig.PenaltyDecayEvaluationPeriod),
+					LastDecayAdjustment: time.Now().Add(-flowConfig.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.SpamRecordCache.Decay.PenaltyDecayEvaluationPeriod),
 				},
 				lastUpdated: time.Now(),
 			},
@@ -299,8 +299,9 @@ func TestDefaultDecayFunction(t *testing.T) {
 			},
 		},
 	}
-	scoringRegistryConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig
-	decayFunc := scoring.DefaultDecayFunction(scoringRegistryConfig.PenaltyDecaySlowdownThreshold, scoringRegistryConfig.DecayRateReductionFactor, scoringRegistryConfig.PenaltyDecayEvaluationPeriod)
+	scoringRegistryConfig := flowConfig.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters
+	decayFunc := scoring.DefaultDecayFunction(scoringRegistryConfig.SpamRecordCache.Decay)
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := decayFunc(tt.args.record, tt.args.lastUpdated)

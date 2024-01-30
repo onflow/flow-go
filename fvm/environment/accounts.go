@@ -8,9 +8,9 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/atree"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -75,7 +75,7 @@ func (a *StatefulAccounts) AllocateStorageIndex(
 	key := atree.SlabIndexToLedgerKey(index)
 	a.txnState.RunWithAllLimitsDisabled(func() {
 		err = a.txnState.Set(
-			flow.NewRegisterID(string(address.Bytes()), string(key)),
+			flow.NewRegisterID(address, string(key)),
 			[]byte{})
 	})
 	if err != nil {

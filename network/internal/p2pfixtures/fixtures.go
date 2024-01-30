@@ -17,11 +17,11 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/config"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/metrics"
@@ -30,10 +30,9 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
+	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
+	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -100,21 +99,10 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 	defaultFlowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 
-	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                             logger,
-		Metrics:                            metrics.NewNoopCollector(),
-		IDProvider:                         idProvider,
-		LoggerInterval:                     defaultFlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval,
-		RpcSentTrackerCacheSize:            defaultFlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
-		RpcSentTrackerWorkerQueueCacheSize: defaultFlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
-		RpcSentTrackerNumOfWorkers:         defaultFlowConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
-		HeroCacheMetricsFactory:            metrics.NewNoopHeroCacheMetricsFactory(),
-		NetworkingType:                     flownet.PublicNetwork,
-	}
-	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
-
-	builder := p2pbuilder.NewNodeBuilder(logger,
-		&p2pconfig.MetricsConfig{
+	builder := p2pbuilder.NewNodeBuilder(
+		logger,
+		&defaultFlowConfig.NetworkConfig.GossipSub,
+		&p2pbuilderconfig.MetricsConfig{
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 			Metrics:          metrics.NewNoopCollector(),
 		},
@@ -123,24 +111,19 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		networkKey,
 		sporkID,
 		idProvider,
-		defaultFlowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig,
 		&defaultFlowConfig.NetworkConfig.ResourceManager,
-		&defaultFlowConfig.NetworkConfig.GossipSubConfig,
-		p2pconfig.PeerManagerDisableConfig(),
+		p2pbuilderconfig.PeerManagerDisableConfig(),
 		&p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
 		},
-		meshTracer,
-		&p2pconfig.UnicastConfig{
-			UnicastConfig: defaultFlowConfig.NetworkConfig.UnicastConfig,
+		&p2pbuilderconfig.UnicastConfig{
+			Unicast: defaultFlowConfig.NetworkConfig.Unicast,
 		}).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, protocols.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
-		SetResourceManager(&network.NullResourceManager{}).
-		SetGossipSubTracer(meshTracer).
-		SetGossipSubScoreTracerInterval(defaultFlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval)
+		SetResourceManager(&network.NullResourceManager{})
 
 	for _, opt := range opts {
 		opt(builder)
@@ -246,7 +229,7 @@ func EnsureMessageExchangeOverUnicast(t *testing.T, ctx context.Context, nodes [
 			if this == other {
 				continue
 			}
-			err := this.OpenProtectedStream(ctx, other.ID(), t.Name(), func(stream network.Stream) error {
+			err := this.OpenAndWriteOnStream(ctx, other.ID(), t.Name(), func(stream network.Stream) error {
 				rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
 				_, err := rw.WriteString(msg)
 				require.NoError(t, err)
@@ -305,7 +288,7 @@ func EnsureNoStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2P
 			}
 			require.Empty(t, other.Host().Network().ConnsToPeer(thisId))
 
-			err := this.OpenProtectedStream(ctx, otherId, t.Name(), func(stream network.Stream) error {
+			err := this.OpenAndWriteOnStream(ctx, otherId, t.Name(), func(stream network.Stream) error {
 				// no-op as the stream is never created.
 				return nil
 			})
@@ -330,7 +313,7 @@ func EnsureStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2PNo
 				require.Fail(t, "node is in both from and to lists")
 			}
 			// stream creation should pass without error
-			err := this.OpenProtectedStream(ctx, other.ID(), t.Name(), func(stream network.Stream) error {
+			err := this.OpenAndWriteOnStream(ctx, other.ID(), t.Name(), func(stream network.Stream) error {
 				require.NotNil(t, stream)
 				return nil
 			})

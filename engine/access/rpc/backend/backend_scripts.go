@@ -37,7 +37,7 @@ type backendScripts struct {
 	loggedScripts     *lru.Cache[[md5.Size]byte, time.Time]
 	nodeCommunicator  Communicator
 	scriptExecutor    execution.ScriptExecutor
-	scriptExecMode    ScriptExecutionMode
+	scriptExecMode    IndexQueryMode
 }
 
 // scriptExecutionRequest encapsulates the data needed to execute a script to make it easier
@@ -118,15 +118,15 @@ func (b *backendScripts) executeScript(
 	scriptRequest *scriptExecutionRequest,
 ) ([]byte, error) {
 	switch b.scriptExecMode {
-	case ScriptExecutionModeExecutionNodesOnly:
+	case IndexQueryModeExecutionNodesOnly:
 		result, _, err := b.executeScriptOnAvailableExecutionNodes(ctx, scriptRequest)
 		return result, err
 
-	case ScriptExecutionModeLocalOnly:
+	case IndexQueryModeLocalOnly:
 		result, _, err := b.executeScriptLocally(ctx, scriptRequest)
 		return result, err
 
-	case ScriptExecutionModeFailover:
+	case IndexQueryModeFailover:
 		localResult, localDuration, localErr := b.executeScriptLocally(ctx, scriptRequest)
 		if localErr == nil || isInvalidArgumentError(localErr) || status.Code(localErr) == codes.Canceled {
 			return localResult, localErr
@@ -143,7 +143,7 @@ func (b *backendScripts) executeScript(
 
 		return execResult, execErr
 
-	case ScriptExecutionModeCompare:
+	case IndexQueryModeCompare:
 		execResult, execDuration, execErr := b.executeScriptOnAvailableExecutionNodes(ctx, scriptRequest)
 		// we can only compare the results if there were either no errors or a cadence error
 		// since we cannot distinguish the EN error as caused by the block being pruned or some other reason,
@@ -332,13 +332,14 @@ func convertScriptExecutionError(err error, height uint64) error {
 		return nil
 	}
 
+	var failure fvmerrors.CodedFailure
+	if fvmerrors.As(err, &failure) {
+		return rpc.ConvertError(err, "failed to execute script", codes.Internal)
+	}
+
+	// general FVM/ledger errors
 	var coded fvmerrors.CodedError
 	if fvmerrors.As(err, &coded) {
-		// general FVM/ledger errors
-		if coded.Code().IsFailure() {
-			return rpc.ConvertError(err, "failed to execute script", codes.Internal)
-		}
-
 		switch coded.Code() {
 		case fvmerrors.ErrCodeScriptExecutionCancelledError:
 			return status.Errorf(codes.Canceled, "script execution canceled: %v", err)

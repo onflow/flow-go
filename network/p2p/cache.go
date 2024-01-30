@@ -36,15 +36,6 @@ type UpdateFunction func(record GossipSubSpamRecord) GossipSubSpamRecord
 //
 // Implementation must be thread-safe.
 type GossipSubSpamRecordCache interface {
-	// Add adds the GossipSubSpamRecord of a peer to the cache.
-	// Args:
-	// - peerID: the peer ID of the peer in the GossipSub protocol.
-	// - record: the GossipSubSpamRecord of the peer.
-	//
-	// Returns:
-	// - bool: true if the record was added successfully, false otherwise.
-	Add(peerId peer.ID, record GossipSubSpamRecord) bool
-
 	// Get returns the GossipSubSpamRecord of a peer from the cache.
 	// Args:
 	// - peerID: the peer ID of the peer in the GossipSub protocol.
@@ -54,14 +45,16 @@ type GossipSubSpamRecordCache interface {
 	// - bool: true if the record was retrieved successfully, false otherwise.
 	Get(peerID peer.ID) (*GossipSubSpamRecord, error, bool)
 
-	// Update updates the GossipSub spam penalty of a peer in the cache using the given adjust function.
+	// Adjust updates the GossipSub spam penalty of a peer in the cache. If the peer does not have a record in the cache, a new record is created.
+	// The order of the pre-processing functions is the same as the order in which they were added to the cache.
 	// Args:
 	// - peerID: the peer ID of the peer in the GossipSub protocol.
-	// - adjustFn: the adjust function to be applied to the record.
+	// - updateFn: the update function to be applied to the record.
 	// Returns:
 	// - *GossipSubSpamRecord: the updated record.
 	// - error on failure to update the record. The returned error is irrecoverable and indicates an exception.
-	Update(peerID peer.ID, updateFunc UpdateFunction) (*GossipSubSpamRecord, error)
+	// Note that if any of the pre-processing functions returns an error, the record is reverted to its original state (prior to applying the update function).
+	Adjust(peerID peer.ID, updateFunc UpdateFunction) (*GossipSubSpamRecord, error)
 
 	// Has returns true if the cache contains the GossipSubSpamRecord of the given peer.
 	// Args:
@@ -69,6 +62,33 @@ type GossipSubSpamRecordCache interface {
 	// Returns:
 	// - bool: true if the cache contains the GossipSubSpamRecord of the given peer, false otherwise.
 	Has(peerID peer.ID) bool
+}
+
+// GossipSubApplicationSpecificScoreCache is a cache for storing the application specific score of peers.
+// The application specific score of a peer is used to calculate the GossipSub score of the peer; it contains the spam penalty of the peer, staking score, and subscription penalty.
+// Note that none of the application specific scores, spam penalties, staking scores, and subscription penalties are shared publicly with other peers.
+// Rather they are solely used by the current peer to select the peers to which it will connect on a topic mesh.
+// The cache is expected to have an eject policy to remove the least recently used record when the cache is full.
+// Implementation must be thread-safe, but can be blocking.
+type GossipSubApplicationSpecificScoreCache interface {
+	// Get returns the application specific score of a peer from the cache.
+	// Args:
+	// - peerID: the peer ID of the peer in the GossipSub protocol.
+	// Returns:
+	// - float64: the application specific score of the peer.
+	// - time.Time: the time at which the score was last updated.
+	// - bool: true if the score was retrieved successfully, false otherwise.
+	Get(peerID peer.ID) (float64, time.Time, bool)
+
+	// AdjustWithInit  adds the application specific score of a peer to the cache.
+	// If the peer already has a score in the cache, the score is updated.
+	// Args:
+	// - peerID: the peer ID of the peer in the GossipSub protocol.
+	// - score: the application specific score of the peer.
+	// - time: the time at which the score was last updated.
+	// Returns:
+	// - error on failure to add the score. The returned error is irrecoverable and indicates an exception.
+	AdjustWithInit(peerID peer.ID, score float64, time time.Time) error
 }
 
 // GossipSubSpamRecord represents spam record of a peer in the GossipSub protocol.

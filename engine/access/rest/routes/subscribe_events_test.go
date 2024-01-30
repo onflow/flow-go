@@ -43,10 +43,11 @@ type testType struct {
 	headers http.Header
 }
 
+var chainID = flow.Testnet
 var testEventTypes = []flow.EventType{
-	"A.0123456789abcdef.flow.event",
-	"B.0123456789abcdef.flow.event",
-	"C.0123456789abcdef.flow.event",
+	unittest.EventTypeFixture(chainID),
+	unittest.EventTypeFixture(chainID),
+	unittest.EventTypeFixture(chainID),
 }
 
 type SubscribeEventsSuite struct {
@@ -83,6 +84,8 @@ func (s *SubscribeEventsSuite) SetupTest() {
 		// update payloads with valid CCF encoded data
 		for i := range blockEvents.Events {
 			blockEvents.Events[i].Payload = eventsGenerator.New().Payload
+
+			s.T().Logf("block events %d %v => %v", block.Header.Height, block.ID(), blockEvents.Events[i].Type)
 		}
 
 		s.blocks = append(s.blocks, block)
@@ -143,7 +146,6 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 			},
 		},
 	}
-	chain := flow.MonotonicEmulator.Chain()
 
 	// create variations for each of the base test
 	tests := make([]testType, 0, len(testVectors)*2)
@@ -159,7 +161,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 
 		t3 := test
 		t3.name = fmt.Sprintf("%s - non existing events", test.name)
-		t3.eventTypes = []string{"A.0123456789abcdff.flow.event"}
+		t3.eventTypes = []string{fmt.Sprintf("%s_new", testEventTypes[0])}
 		tests = append(tests, t3)
 	}
 
@@ -170,7 +172,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 
 			filter, err := state_stream.NewEventFilter(
 				state_stream.DefaultEventFilterConfig,
-				chain,
+				chainID.Chain(),
 				test.eventTypes,
 				test.addresses,
 				test.contracts)
@@ -245,9 +247,9 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 			// closing the connection after 1 second
 			go func() {
 				time.Sleep(1 * time.Second)
-				close(respRecorder.closed)
+				respRecorder.Close()
 			}()
-			executeWsRequest(req, stateStreamBackend, respRecorder)
+			executeWsRequest(req, stateStreamBackend, respRecorder, chainID.Chain())
 			requireResponse(s.T(), respRecorder, expectedEventsResponses)
 		})
 	}
@@ -259,7 +261,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), s.blocks[0].Header.Height, nil, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := newTestHijackResponseRecorder()
-		executeWsRequest(req, stateStreamBackend, respRecorder)
+		executeWsRequest(req, stateStreamBackend, respRecorder, chainID.Chain())
 		requireError(s.T(), respRecorder, "can only provide either block ID or start height")
 	})
 
@@ -284,7 +286,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		req, err := getSubscribeEventsRequest(s.T(), invalidBlock.ID(), request.EmptyHeight, nil, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := newTestHijackResponseRecorder()
-		executeWsRequest(req, stateStreamBackend, respRecorder)
+		executeWsRequest(req, stateStreamBackend, respRecorder, chainID.Chain())
 		requireError(s.T(), respRecorder, "stream encountered an error: subscription error")
 	})
 
@@ -293,7 +295,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, []string{"foo"}, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := newTestHijackResponseRecorder()
-		executeWsRequest(req, stateStreamBackend, respRecorder)
+		executeWsRequest(req, stateStreamBackend, respRecorder, chainID.Chain())
 		requireError(s.T(), respRecorder, "invalid event type format")
 	})
 
@@ -318,7 +320,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := newTestHijackResponseRecorder()
-		executeWsRequest(req, stateStreamBackend, respRecorder)
+		executeWsRequest(req, stateStreamBackend, respRecorder, chainID.Chain())
 		requireError(s.T(), respRecorder, "subscription channel closed")
 	})
 }

@@ -65,6 +65,7 @@ type ExecutionConfig struct {
 	// file descriptors causing connection failures.
 	onflowOnlyLNs    bool
 	enableStorehouse bool
+	enableChecker    bool
 }
 
 func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
@@ -118,6 +119,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 
 	flags.BoolVar(&exeConf.onflowOnlyLNs, "temp-onflow-only-lns", false, "do not use unless required. forces node to only request collections from onflow collection nodes")
 	flags.BoolVar(&exeConf.enableStorehouse, "enable-storehouse", false, "enable storehouse to store registers on disk, default is false")
+	flags.BoolVar(&exeConf.enableChecker, "enable-checker", true, "enable checker to check the correctness of the execution result, default is true")
 
 }
 
