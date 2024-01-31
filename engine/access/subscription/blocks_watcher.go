@@ -29,12 +29,18 @@ type StreamingData struct {
 	StreamCount atomic.Int32
 }
 
+func NewStreamingData(maxStreams uint32) StreamingData {
+	return StreamingData{
+		MaxStreams:  int32(maxStreams),
+		StreamCount: atomic.Int32{},
+	}
+}
+
 // BlocksWatcher watches for new blocks and handles block-related operations.
 type BlocksWatcher struct {
 	log         zerolog.Logger
 	state       protocol.State
 	headers     storage.Headers
-	seals       storage.Seals
 	broadcaster *engine.Broadcaster
 	RootHeight  uint64
 	RootBlockID flow.Identifier
@@ -52,7 +58,6 @@ func NewBlocksWatcher(
 	rootHeight uint64,
 	headers storage.Headers,
 	highestAvailableFinalizedHeight uint64,
-	seals storage.Seals,
 	broadcaster *engine.Broadcaster,
 ) (*BlocksWatcher, error) {
 	lastSealed, err := state.Sealed().Head()
@@ -68,7 +73,6 @@ func NewBlocksWatcher(
 		headers:                headers,
 		finalizedHighestHeight: counters.NewMonotonousCounter(highestAvailableFinalizedHeight),
 		sealedHighestHeight:    counters.NewMonotonousCounter(lastSealed.Height),
-		seals:                  seals,
 		broadcaster:            broadcaster,
 	}, nil
 }
@@ -77,6 +81,20 @@ func NewBlocksWatcher(
 // Only one of startBlockID and startHeight may be set. Otherwise, an InvalidArgument error is returned.
 // If a block is provided and does not exist, a NotFound error is returned.
 // If neither startBlockID nor startHeight is provided, the latest sealed block is used.
+//
+// Parameters:
+// - startBlockID: The identifier of the starting block. If provided, startHeight should be 0.
+// - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
+// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
+//
+// Returns:
+// - uint64: The start height for searching.
+// - error: An error indicating the result of the operation, if any.
+//
+// Errors:
+// - codes.InvalidArgument: If blockStatus is flow.BlockStatusUnknown, or both startBlockID and startHeight are provided.
+// - storage.ErrNotFound`: If a block is provided and does not exist.
+// - codes.Internal: If there is an internal error.
 func (h *BlocksWatcher) GetStartHeight(startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error) {
 	// block status could be only sealed and finalized
 	if blockStatus == flow.BlockStatusUnknown {
@@ -181,26 +199,35 @@ func (h *BlocksWatcher) SetSealedHighestHeight(height uint64) bool {
 	return h.sealedHighestHeight.Set(height)
 }
 
-// ProcessSubscriptionOnFinalizedBlock processes the subscription logic when a block is finalized.
-func (h *BlocksWatcher) ProcessSubscriptionOnFinalizedBlock(finalizedHeader *flow.Header) error {
+// ProcessOnFinalizedBlock drives the subscription logic when a block is finalized.
+// The input to this callback is treated as trusted. This method should be executed on
+// `OnFinalizedBlock` notifications from the node-internal consensus instance.
+// No errors expected during normal operations.
+func (h *BlocksWatcher) ProcessOnFinalizedBlock() error {
+	// get the finalized header from state
+	finalizedHeader, err := h.state.Final().Head()
+	if err != nil {
+		// this header MUST exist in the db, otherwise the node likely has inconsistent state.
+		// Don't crash as a result of an external API request, but other components will likely panic.
+		h.log.Err(err).Msg("failed to get latest block header. potentially inconsistent protocol state.")
+		return status.Errorf(codes.Internal, "unable to get latest finalized header: %v", err)
+	}
+
 	if ok := h.SetFinalizedHighestHeight(finalizedHeader.Height); !ok {
-		h.log.Debug().Msg("finalized block already received")
+		return nil
 	}
 
-	// retrieve latest _finalized_ seal in the fork with head finalizedBlock and update last
-	// sealed height; we do _not_ bail, because we want to re-request approvals
-	// especially, when sealing is stuck, i.e. last sealed height does not increase
-	finalizedSeal, err := h.seals.HighestInFork(finalizedHeader.ID())
+	// get the latest seal header from storage
+	sealedHeader, err := h.state.Sealed().Head()
 	if err != nil {
-		return fmt.Errorf("could not retrieve finalizedSeal for finalized block %s", finalizedHeader.ID())
-	}
-	lastBlockWithFinalizedSeal, err := h.headers.ByBlockID(finalizedSeal.BlockID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve last sealed block %v: %w", finalizedSeal.BlockID, err)
+		// this header MUST exist in the db, otherwise the node likely has inconsistent state.
+		// Don't crash as a result of an external API request, but other components will likely panic.
+		h.log.Err(err).Msg("failed to get latest block header. potentially inconsistent protocol state.")
+		return status.Errorf(codes.Internal, "unable to get latest sealed header: %v", err)
 	}
 
-	if ok := h.SetSealedHighestHeight(lastBlockWithFinalizedSeal.Height); !ok {
-		h.log.Debug().Msg("sealed block already received")
+	if ok := h.SetSealedHighestHeight(sealedHeader.Height); !ok {
+		return nil
 	}
 
 	h.broadcaster.Publish()

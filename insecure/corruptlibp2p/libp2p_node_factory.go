@@ -10,8 +10,9 @@ import (
 	"github.com/rs/zerolog"
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
+	fcrypto "github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/cmd"
-	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -19,9 +20,9 @@ import (
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
+	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
+	p2pnode "github.com/onflow/flow-go/network/p2p/node"
 )
 
 // InitCorruptLibp2pNode initializes and returns a corrupt libp2p node that should only be used for BFT testing in
@@ -58,9 +59,9 @@ func InitCorruptLibp2pNode(
 	metricsCfg module.NetworkMetrics,
 	resolver madns.BasicResolver,
 	role string,
-	connGaterCfg *p2pconfig.ConnectionGaterConfig,
-	peerManagerCfg *p2pconfig.PeerManagerConfig,
-	uniCfg *p2pconfig.UnicastConfig,
+	connGaterCfg *p2pbuilderconfig.ConnectionGaterConfig,
+	peerManagerCfg *p2pbuilderconfig.PeerManagerConfig,
+	uniCfg *p2pbuilderconfig.UnicastConfig,
 	netConfig *netconf.Config,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig,
 	topicValidatorDisabled,
@@ -71,7 +72,7 @@ func InitCorruptLibp2pNode(
 		panic("illegal chain id for using corrupt libp2p node")
 	}
 
-	metCfg := &p2pconfig.MetricsConfig{
+	metCfg := &p2pbuilderconfig.MetricsConfig{
 		HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		Metrics:          metricsCfg,
 	}

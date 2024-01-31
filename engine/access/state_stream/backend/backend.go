@@ -84,6 +84,7 @@ func New(
 	config Config,
 	state protocol.State,
 	headers storage.Headers,
+	events storage.Events,
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	execDataStore execution_data.ExecutionDataStore,
@@ -92,6 +93,7 @@ func New(
 	rootHeight uint64,
 	highestAvailableHeight uint64,
 	registers *execution.RegistersAsyncStore,
+	useEventsIndex bool,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
@@ -101,7 +103,6 @@ func New(
 		rootHeight,
 		headers,
 		highestAvailableHeight,
-		seals,
 		broadcaster,
 	)
 	if err != nil {
@@ -135,12 +136,15 @@ func New(
 
 	b.EventsBackend = EventsBackend{
 		log:              logger,
+		events:           events,
+		headers:          headers,
 		broadcaster:      broadcaster,
 		sendTimeout:      config.ClientSendTimeout,
 		responseLimit:    config.ResponseLimit,
 		sendBufferSize:   int(config.ClientSendBufferSize),
 		getExecutionData: b.getExecutionData,
 		getStartHeight:   b.BlocksWatcher.GetStartHeight,
+		useIndex:         useEventsIndex,
 	}
 
 	return b, nil

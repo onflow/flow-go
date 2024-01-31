@@ -160,11 +160,10 @@ func (t *AssignmentCollectorTree) selectCollectorsForFinalizedFork(startHeight, 
 	var fork []*assignmentCollectorVertex
 	for height := startHeight; height <= finalizedHeight; height++ {
 		iter := t.forest.GetVerticesAtLevel(height)
-		finalizedBlock, err := t.headers.ByHeight(height)
+		finalizedBlockID, err := t.headers.BlockIDByHeight(height)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve finalized block at height %d: %w", height, err)
 		}
-		finalizedBlockID := finalizedBlock.ID()
 		for iter.HasNext() {
 			vertex := iter.NextVertex().(*assignmentCollectorVertex)
 			if finalizedBlockID == vertex.collector.BlockID() {

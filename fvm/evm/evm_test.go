@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/cadence/encoding/json"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
@@ -33,6 +34,7 @@ func TestEVMRun(t *testing.T) {
 						chain := flow.Emulator.Chain()
 
 						RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
+							sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 							code := []byte(fmt.Sprintf(
 								`
                           import EVM from %s
@@ -43,7 +45,7 @@ func TestEVMRun(t *testing.T) {
                               EVM.run(tx: tx, coinbase: coinbase)
                           }
                         `,
-								chain.ServiceAddress().HexWithPrefix(),
+								sc.EVMContract.Address.HexWithPrefix(),
 							))
 
 							gasLimit := uint64(100_000)
@@ -84,10 +86,12 @@ func TestEVMRun(t *testing.T) {
 }
 
 func RunWithNewTestVM(t *testing.T, chain flow.Chain, f func(fvm.Context, fvm.VM, snapshot.SnapshotTree)) {
+
 	opts := []fvm.Option{
 		fvm.WithChain(chain),
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+		fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
 	}
 	ctx := fvm.NewContext(opts...)
 
@@ -126,25 +130,25 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 						code := []byte(fmt.Sprintf(
 							`
-                               import EVM from %[1]s
-                               import FlowToken from %[2]s
+                               import EVM from %s
+                               import FlowToken from %s
 
                                access(all)
                                fun main() {
-                                   let admin = getAuthAccount(%[1]s)
+                                   let admin = getAuthAccount(%s)
                                        .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
                                    let minter <- admin.createNewMinter(allowedAmount: 1.23)
                                    let vault <- minter.mintTokens(amount: 1.23)
                                    destroy minter
 
-                                   let address = EVM.EVMAddress(
-                                       bytes: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-                                   )
-                                   address.deposit(from: <-vault)
+								   let bridgedAccount <- EVM.createBridgedAccount()
+								   bridgedAccount.deposit(from: <-vault)
+								   destroy bridgedAccount
                                }
                             `,
-							sc.FlowServiceAccount.Address.HexWithPrefix(),
+							sc.EVMContract.Address.HexWithPrefix(),
 							sc.FlowToken.Address.HexWithPrefix(),
+							sc.FlowServiceAccount.Address.HexWithPrefix(),
 						))
 
 						script := fvm.Script(code)
@@ -181,19 +185,19 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 
 						code := []byte(fmt.Sprintf(
 							`
-                               import EVM from %[1]s
-                               import FlowToken from %[2]s
+                               import EVM from %s
+                               import FlowToken from %s
 
                                access(all)
                                fun main(): UFix64 {
-                                   let admin = getAuthAccount(%[1]s)
+                                   let admin = getAuthAccount(%s)
                                        .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
                                    let minter <- admin.createNewMinter(allowedAmount: 2.34)
                                    let vault <- minter.mintTokens(amount: 2.34)
                                    destroy minter
 
                                    let bridgedAccount <- EVM.createBridgedAccount()
-                                   bridgedAccount.address().deposit(from: <-vault)
+                                   bridgedAccount.deposit(from: <-vault)
 
                                    let vault2 <- bridgedAccount.withdraw(balance: EVM.Balance(flow: 1.23))
                                    let balance = vault2.balance
@@ -203,8 +207,9 @@ func TestBridgedAccountWithdraw(t *testing.T) {
                                    return balance
                                }
                             `,
-							sc.FlowServiceAccount.Address.HexWithPrefix(),
+							sc.EVMContract.Address.HexWithPrefix(),
 							sc.FlowToken.Address.HexWithPrefix(),
+							sc.FlowServiceAccount.Address.HexWithPrefix(),
 						))
 
 						script := fvm.Script(code)
@@ -225,11 +230,8 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 	})
 }
 
-// TODO: provide proper contract code
 func TestBridgedAccountDeploy(t *testing.T) {
-
 	t.Parallel()
-
 	RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			tc := GetStorageTestContract(t)
@@ -242,19 +244,19 @@ func TestBridgedAccountDeploy(t *testing.T) {
 
 						code := []byte(fmt.Sprintf(
 							`
-                               import EVM from %[1]s
-                               import FlowToken from %[2]s
+                               import EVM from %s
+                               import FlowToken from %s
 
                                 access(all)
                                 fun main(): [UInt8; 20] {
-                                   let admin = getAuthAccount(%[1]s)
+                                   let admin = getAuthAccount(%s)
                                        .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
                                    let minter <- admin.createNewMinter(allowedAmount: 2.34)
                                    let vault <- minter.mintTokens(amount: 2.34)
                                    destroy minter
 
                                    let bridgedAccount <- EVM.createBridgedAccount()
-                                   bridgedAccount.address().deposit(from: <-vault)
+                                   bridgedAccount.deposit(from: <-vault)
 
                                    let address = bridgedAccount.deploy(
                                        code: [],
@@ -265,8 +267,9 @@ func TestBridgedAccountDeploy(t *testing.T) {
                                    return address.bytes
                                 }
                             `,
-							sc.FlowServiceAccount.Address.HexWithPrefix(),
+							sc.EVMContract.Address.HexWithPrefix(),
 							sc.FlowToken.Address.HexWithPrefix(),
+							sc.FlowServiceAccount.Address.HexWithPrefix(),
 						))
 
 						script := fvm.Script(code)

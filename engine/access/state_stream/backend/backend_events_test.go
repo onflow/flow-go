@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
@@ -15,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 type BackendEventsSuite struct {
@@ -29,8 +31,24 @@ func (s *BackendEventsSuite) SetupTest() {
 	s.BackendExecutionDataSuite.SetupTest()
 }
 
-// TestSubscribeEvents tests the SubscribeEvents method happy path
-func (s *BackendEventsSuite) TestSubscribeEvents() {
+// TestSubscribeEventsFromExecutionData tests the SubscribeEvents method happy path for events
+// extracted from ExecutionData
+func (s *BackendEventsSuite) TestSubscribeEventsFromExecutionData() {
+	s.runTestSubscribeEvents()
+}
+
+// TestSubscribeEventsFromLocalStorage tests the SubscribeEvents method happy path for events
+// extracted from local storage
+func (s *BackendEventsSuite) TestSubscribeEventsFromLocalStorage() {
+	s.backend.useIndex = true
+	s.events.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
+		mocks.StorageMapGetter(s.blockEvents),
+	)
+
+	s.runTestSubscribeEvents()
+}
+
+func (s *BackendEventsSuite) runTestSubscribeEvents() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -77,9 +95,6 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 		},
 	}
 
-	// supports simple address comparisions for testing
-	chain := flow.MonotonicEmulator.Chain()
-
 	// create variations for each of the base test
 	tests := make([]testType, 0, len(baseTests)*3)
 	for _, test := range baseTests {
@@ -90,13 +105,13 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 
 		t2 := test
 		t2.name = fmt.Sprintf("%s - some events", test.name)
-		t2.filters, err = state_stream.NewEventFilter(state_stream.DefaultEventFilterConfig, chain, []string{string(testEventTypes[0])}, nil, nil)
+		t2.filters, err = state_stream.NewEventFilter(state_stream.DefaultEventFilterConfig, chainID.Chain(), []string{string(testEventTypes[0])}, nil, nil)
 		require.NoError(s.T(), err)
 		tests = append(tests, t2)
 
 		t3 := test
 		t3.name = fmt.Sprintf("%s - no events", test.name)
-		t3.filters, err = state_stream.NewEventFilter(state_stream.DefaultEventFilterConfig, chain, []string{"A.0x1.NonExistent.Event"}, nil, nil)
+		t3.filters, err = state_stream.NewEventFilter(state_stream.DefaultEventFilterConfig, chainID.Chain(), []string{"A.0x1.NonExistent.Event"}, nil, nil)
 		require.NoError(s.T(), err)
 		tests = append(tests, t3)
 	}
@@ -126,7 +141,7 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 					s.broadcaster.Publish()
 				}
 
-				expectedEvents := flow.EventsList{}
+				var expectedEvents flow.EventsList
 				for _, event := range s.blockEvents[b.ID()] {
 					if test.filters.Match(event) {
 						expectedEvents = append(expectedEvents, event)

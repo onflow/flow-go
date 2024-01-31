@@ -199,8 +199,7 @@ func TestGetExecutionDataByBlockID(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ccfEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_CCF_V0)
-	jsonEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_JSON_CDC_V0)
+	ccfEvents, jsonEvents := generateEvents(t, 3)
 
 	tests := []struct {
 		eventVersion entities.EventEncodingVersion
@@ -346,8 +345,7 @@ func TestExecutionDataStream(t *testing.T) {
 		}
 	}
 
-	ccfEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_CCF_V0)
-	jsonEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_JSON_CDC_V0)
+	ccfEvents, jsonEvents := generateEvents(t, 3)
 
 	tests := []struct {
 		eventVersion entities.EventEncodingVersion
@@ -473,9 +471,7 @@ func TestEventStream(t *testing.T) {
 	}
 
 	// generate events with a payload to include
-	// generators will produce identical event payloads (before encoding)
-	ccfEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_CCF_V0)
-	jsonEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_JSON_CDC_V0)
+	ccfEvents, jsonEvents := generateEvents(t, 3)
 
 	tests := []struct {
 		eventVersion entities.EventEncodingVersion
@@ -604,6 +600,17 @@ func TestGetRegisterValues(t *testing.T) {
 		_, err := h.GetRegisterValues(ctx, req)
 		require.Equal(t, codes.OutOfRange, status.Code(err))
 	})
+}
+
+func generateEvents(t *testing.T, n int) ([]flow.Event, []flow.Event) {
+	ccfEvents := generator.GetEventsWithEncoding(n, entities.EventEncodingVersion_CCF_V0)
+	jsonEvents := make([]flow.Event, len(ccfEvents))
+	for i, e := range ccfEvents {
+		jsonEvent, err := convert.CcfEventToJsonEvent(e)
+		require.NoError(t, err)
+		jsonEvents[i] = *jsonEvent
+	}
+	return ccfEvents, jsonEvents
 }
 
 func makeConfig(maxGlobalStreams uint32) Config {

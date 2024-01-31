@@ -3,7 +3,6 @@ package access
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -41,10 +40,7 @@ func NewHandler(api API,
 	maxStreams uint32,
 	options ...HandlerOption) *Handler {
 	h := &Handler{
-		StreamingData: subscription.StreamingData{
-			MaxStreams:  int32(maxStreams),
-			StreamCount: atomic.Int32{},
-		},
+		StreamingData:        subscription.NewStreamingData(maxStreams),
 		api:                  api,
 		chain:                chain,
 		finalizedHeaderCache: finalizedHeader,
@@ -899,7 +895,7 @@ func WithBlockSignerDecoder(signerIndicesDecoder hotstuff.BlockSignerDecoder) fu
 
 func checkBlockStatus(blockStatus flow.BlockStatus) error {
 	if blockStatus == flow.BlockStatusUnknown {
-		return fmt.Errorf("block status is unlnown. Possible variants: BLOCK_FINALIZED, BLOCK_SEALED")
+		return fmt.Errorf("block status is unknown. Possible variants: BLOCK_FINALIZED, BLOCK_SEALED")
 	}
 	return nil
 }

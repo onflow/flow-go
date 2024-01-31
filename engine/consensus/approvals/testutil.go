@@ -2,10 +2,10 @@ package approvals
 
 import (
 	"github.com/gammazero/workerpool"
+	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
@@ -134,20 +134,22 @@ func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
 			return realstorage.ErrNotFound
 		}
 	})
-	s.Headers.On("ByHeight", mock.Anything).Return(
-		func(height uint64) *flow.Header {
+	s.Headers.On("BlockIDByHeight", mock.Anything).Return(
+		func(height uint64) (flow.Identifier, error) {
 			if block, found := s.FinalizedAtHeight[height]; found {
-				return block
+				return block.ID(), nil
 			} else {
-				return nil
+				return flow.ZeroID, realstorage.ErrNotFound
 			}
 		},
-		func(height uint64) error {
-			_, found := s.FinalizedAtHeight[height]
-			if !found {
-				return realstorage.ErrNotFound
+	)
+	s.Headers.On("ByHeight", mock.Anything).Return(
+		func(height uint64) (*flow.Header, error) {
+			if block, found := s.FinalizedAtHeight[height]; found {
+				return block, nil
+			} else {
+				return nil, realstorage.ErrNotFound
 			}
-			return nil
 		},
 	)
 

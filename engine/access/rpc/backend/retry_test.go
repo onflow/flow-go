@@ -18,6 +18,12 @@ import (
 
 // TestTransactionRetry tests that the retry mechanism will send retries at specific times
 func (suite *Suite) TestTransactionRetry() {
+	params := suite.defaultBackendParams()
+
+	// Setup Handler + Retry
+	backend, err := New(params)
+	suite.Require().NoError(err)
+
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
 	block := unittest.BlockFixture()
@@ -35,12 +41,6 @@ func (suite *Suite) TestTransactionRetry() {
 
 	// collection storage returns a not found error
 	suite.collections.On("LightByTransactionID", transactionBody.ID()).Return(nil, realstorage.ErrNotFound)
-
-	params := suite.defaultBackendParams()
-
-	// Setup Handler + Retry
-	backend, err := New(params)
-	suite.Require().NoError(err)
 
 	retry := newRetry(suite.log).SetBackend(backend).Activate()
 	backend.retry = retry

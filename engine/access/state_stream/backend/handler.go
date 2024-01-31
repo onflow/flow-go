@@ -2,7 +2,6 @@ package backend
 
 import (
 	"context"
-	"sync/atomic"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -29,10 +28,7 @@ type Handler struct {
 
 func NewHandler(api state_stream.API, chain flow.Chain, config Config) *Handler {
 	h := &Handler{
-		StreamingData: subscription.StreamingData{
-			MaxStreams:  int32(config.MaxGlobalStreams),
-			StreamCount: atomic.Int32{},
-		},
+		StreamingData:            subscription.NewStreamingData(config.MaxGlobalStreams),
 		api:                      api,
 		chain:                    chain,
 		eventFilterConfig:        config.EventFilterConfig,

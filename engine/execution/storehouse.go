@@ -57,6 +57,11 @@ type RegisterStore interface {
 	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
 }
 
+// RegisterStoreNotifier is the interface for register store to notify when a block is finalized and executed
+type RegisterStoreNotifier interface {
+	OnFinalizedAndExecutedHeightUpdated(height uint64)
+}
+
 type FinalizedReader interface {
 	// FinalizedBlockIDAtHeight returns the block ID of the finalized block at the given height.
 	// It return storage.NotFound if the given height has not been finalized yet

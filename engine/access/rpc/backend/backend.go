@@ -89,6 +89,7 @@ type Params struct {
 	HistoricalAccessNodes     []accessproto.AccessAPIClient
 	Blocks                    storage.Blocks
 	Headers                   storage.Headers
+	Events                    storage.Events
 	Collections               storage.Collections
 	Transactions              storage.Transactions
 	ExecutionReceipts         storage.ExecutionReceipts
@@ -107,7 +108,8 @@ type Params struct {
 	TxResultCacheSize         uint
 	TxErrorMessagesCacheSize  uint
 	ScriptExecutor            execution.ScriptExecutor
-	ScriptExecutionMode       ScriptExecutionMode
+	ScriptExecutionMode       IndexQueryMode
+	EventQueryMode            IndexQueryMode
 	SubscriptionParams        SubscriptionParams
 }
 
@@ -119,7 +121,6 @@ type SubscriptionParams struct {
 
 	RootHeight             uint64
 	HighestAvailableHeight uint64
-	Seals                  storage.Seals
 }
 
 // New creates backend instance
@@ -166,7 +167,6 @@ func New(params Params) (*Backend, error) {
 		params.SubscriptionParams.RootHeight,
 		params.Headers,
 		params.SubscriptionParams.HighestAvailableHeight,
-		params.SubscriptionParams.Seals,
 		params.SubscriptionParams.Broadcaster,
 	)
 	if err != nil {
@@ -178,11 +178,11 @@ func New(params Params) (*Backend, error) {
 		BlocksWatcher: subscriptionHandler,
 		// create the sub-backends
 		backendScripts: backendScripts{
+			log:               params.Log,
 			headers:           params.Headers,
 			executionReceipts: params.ExecutionReceipts,
 			connFactory:       params.ConnFactory,
 			state:             params.State,
-			log:               params.Log,
 			metrics:           params.AccessMetrics,
 			loggedScripts:     loggedScripts,
 			nodeCommunicator:  params.Communicator,
@@ -190,6 +190,7 @@ func New(params Params) (*Backend, error) {
 			scriptExecMode:    params.ScriptExecutionMode,
 		},
 		backendTransactions: backendTransactions{
+			log:                  params.Log,
 			staticCollectionRPC:  params.CollectionRPC,
 			state:                params.State,
 			chainID:              params.ChainID,
@@ -203,19 +204,21 @@ func New(params Params) (*Backend, error) {
 			retry:                retry,
 			connFactory:          params.ConnFactory,
 			previousAccessNodes:  params.HistoricalAccessNodes,
-			log:                  params.Log,
 			nodeCommunicator:     params.Communicator,
 			txResultCache:        txResCache,
 			txErrorMessagesCache: txErrorMessagesCache,
 		},
 		backendEvents: backendEvents{
+			log:               params.Log,
+			chain:             params.ChainID.Chain(),
 			state:             params.State,
 			headers:           params.Headers,
+			events:            params.Events,
 			executionReceipts: params.ExecutionReceipts,
 			connFactory:       params.ConnFactory,
-			log:               params.Log,
 			maxHeightRange:    params.MaxHeightRange,
 			nodeCommunicator:  params.Communicator,
+			queryMode:         params.EventQueryMode,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: params.Headers,
@@ -226,11 +229,11 @@ func New(params Params) (*Backend, error) {
 			state:  params.State,
 		},
 		backendAccounts: backendAccounts{
+			log:               params.Log,
 			state:             params.State,
 			headers:           params.Headers,
 			executionReceipts: params.ExecutionReceipts,
 			connFactory:       params.ConnFactory,
-			log:               params.Log,
 			nodeCommunicator:  params.Communicator,
 			scriptExecutor:    params.ScriptExecutor,
 			scriptExecMode:    params.ScriptExecutionMode,

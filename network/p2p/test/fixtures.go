@@ -17,13 +17,13 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	discoveryBackoff "github.com/libp2p/go-libp2p/p2p/discovery/backoff"
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
 
 	"github.com/onflow/flow-go/config"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -33,11 +33,11 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
+	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
+	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
@@ -98,7 +98,7 @@ func NodeFixture(t *testing.T,
 		Logger:         unittest.Logger().Level(zerolog.WarnLevel),
 		Role:           flow.RoleCollection,
 		IdProvider:     idProvider,
-		MetricsCfg: &p2pconfig.MetricsConfig{
+		MetricsCfg: &p2pbuilderconfig.MetricsConfig{
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 			Metrics:          metrics.NewNoopCollector(),
 		},
@@ -136,7 +136,7 @@ func NodeFixture(t *testing.T,
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
 		},
-		&p2pconfig.UnicastConfig{
+		&p2pbuilderconfig.UnicastConfig{
 			Unicast:                parameters.FlowConfig.NetworkConfig.Unicast,
 			RateLimiterDistributor: parameters.UnicastRateLimiterDistributor,
 		}).
@@ -239,13 +239,13 @@ type NodeFixtureParameters struct {
 	PeerScoringEnabled                bool
 	IdProvider                        module.IdentityProvider
 	PeerScoringConfigOverride         *p2p.PeerScoringConfigOverride
-	PeerManagerConfig                 *p2pconfig.PeerManagerConfig
+	PeerManagerConfig                 *p2pbuilderconfig.PeerManagerConfig
 	PeerProvider                      p2p.PeersProvider // peer manager parameter
 	ConnGater                         p2p.ConnectionGater
 	ConnManager                       connmgr.ConnManager
 	GossipSubFactory                  p2p.GossipSubFactoryFunc
 	GossipSubConfig                   p2p.GossipSubAdapterConfigFunc
-	MetricsCfg                        *p2pconfig.MetricsConfig
+	MetricsCfg                        *p2pbuilderconfig.MetricsConfig
 	ResourceManager                   network.ResourceManager
 	GossipSubRpcInspectorSuiteFactory p2p.GossipSubRpcInspectorSuiteFactoryFunc
 	FlowConfig                        *config.FlowConfig
@@ -294,7 +294,7 @@ func WithDefaultStreamHandler(handler network.StreamHandler) NodeFixtureParamete
 	}
 }
 
-func WithPeerManagerEnabled(cfg *p2pconfig.PeerManagerConfig, peerProvider p2p.PeersProvider) NodeFixtureParameterOption {
+func WithPeerManagerEnabled(cfg *p2pbuilderconfig.PeerManagerConfig, peerProvider p2p.PeersProvider) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.PeerManagerConfig = cfg
 		p.PeerProvider = peerProvider
@@ -384,8 +384,8 @@ func WithUnicastHandlerFunc(handler network.StreamHandler) NodeFixtureParameterO
 }
 
 // PeerManagerConfigFixture is a test fixture that sets the default config for the peer manager.
-func PeerManagerConfigFixture(opts ...func(*p2pconfig.PeerManagerConfig)) *p2pconfig.PeerManagerConfig {
-	cfg := &p2pconfig.PeerManagerConfig{
+func PeerManagerConfigFixture(opts ...func(*p2pbuilderconfig.PeerManagerConfig)) *p2pbuilderconfig.PeerManagerConfig {
+	cfg := &p2pbuilderconfig.PeerManagerConfig{
 		ConnectionPruning: true,
 		UpdateInterval:    1 * time.Second,
 		ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
@@ -398,8 +398,8 @@ func PeerManagerConfigFixture(opts ...func(*p2pconfig.PeerManagerConfig)) *p2pco
 
 // WithZeroJitterAndZeroBackoff is a test fixture that sets the default config for the peer manager.
 // It uses a backoff connector with zero jitter and zero backoff.
-func WithZeroJitterAndZeroBackoff(t *testing.T) func(*p2pconfig.PeerManagerConfig) {
-	return func(cfg *p2pconfig.PeerManagerConfig) {
+func WithZeroJitterAndZeroBackoff(t *testing.T) func(*p2pbuilderconfig.PeerManagerConfig) {
+	return func(cfg *p2pbuilderconfig.PeerManagerConfig) {
 		cfg.ConnectorFactory = func(host host.Host) (p2p.Connector, error) {
 			cacheSize := 100
 			dialTimeout := time.Minute * 2
@@ -825,6 +825,22 @@ func MockInspectorNotificationDistributorReadyDoneAware(d *mockp2p.GossipSubInsp
 	}()).Maybe()
 }
 
+// MockScoringRegistrySubscriptionValidatorReadyDoneAware mocks the Ready and Done methods of the subscription validator to return a channel that is already closed,
+// so that the distributor is considered ready and done when the test needs.
+func MockScoringRegistrySubscriptionValidatorReadyDoneAware(s *mockp2p.SubscriptionValidator) {
+	s.On("Start", mockery.Anything).Return().Maybe()
+	s.On("Ready").Return(func() <-chan struct{} {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}()).Maybe()
+	s.On("Done").Return(func() <-chan struct{} {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}()).Maybe()
+}
+
 // GossipSubRpcFixtures returns a slice of random message IDs for testing.
 // Args:
 // - t: *testing.T instance
@@ -914,6 +930,18 @@ func WithIHave(msgCount, msgIDCount int, topicId string) GossipSubCtrlOption {
 			}
 		}
 		msg.Ihave = iHaves
+	}
+}
+
+// WithIHaveMessageIDs adds iHave control messages with the given message IDs to the control message.
+func WithIHaveMessageIDs(msgIDs []string, topicId string) GossipSubCtrlOption {
+	return func(msg *pb.ControlMessage) {
+		msg.Ihave = []*pb.ControlIHave{
+			{
+				TopicID:    &topicId,
+				MessageIDs: msgIDs,
+			},
+		}
 	}
 }
 

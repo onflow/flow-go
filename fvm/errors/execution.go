@@ -76,8 +76,8 @@ func IsInsufficientPayerBalanceError(err error) bool {
 func NewPayerBalanceCheckFailure(
 	payer flow.Address,
 	err error,
-) CodedError {
-	return WrapCodedError(
+) CodedFailure {
+	return WrapCodedFailure(
 		FailureCodePayerBalanceCheckFailure,
 		err,
 		"failed to check if the payer %s has sufficient balance",
@@ -88,8 +88,8 @@ func NewPayerBalanceCheckFailure(
 // the derived data cache.
 func NewDerivedDataCacheImplementationFailure(
 	err error,
-) CodedError {
-	return WrapCodedError(
+) CodedFailure {
+	return WrapCodedFailure(
 		FailureCodeDerivedDataCacheImplementationFailure,
 		err,
 		"implementation error in derived data cache")
@@ -99,8 +99,8 @@ func NewDerivedDataCacheImplementationFailure(
 // the random source provider.
 func NewRandomSourceFailure(
 	err error,
-) CodedError {
-	return WrapCodedError(
+) CodedFailure {
+	return WrapCodedFailure(
 		FailureCodeRandomSourceFailure,
 		err,
 		"implementation error in random source provider")
@@ -288,18 +288,4 @@ func NewInvalidInternalStateAccessError(
 		"could not directly %s flow internal state (%s)",
 		opType,
 		id)
-}
-
-// NewEVMError constructs a new CodedError which captures a
-// collection of errors provided by (non-fatal) evm runtime.
-func NewEVMError(err error) CodedError {
-	return WrapCodedError(
-		ErrEVMExecutionError,
-		err,
-		"evm runtime error")
-}
-
-// IsEVMError returns true if error is an EVM error
-func IsEVMError(err error) bool {
-	return HasErrorCode(err, ErrEVMExecutionError)
 }

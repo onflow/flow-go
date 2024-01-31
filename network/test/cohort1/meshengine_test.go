@@ -29,9 +29,9 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2pnet"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	p2pnode "github.com/onflow/flow-go/network/p2p/node"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
+	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -39,11 +39,11 @@ import (
 // of engines over a complete graph
 type MeshEngineTestSuite struct {
 	suite.Suite
-	testutils.ConduitWrapper                   // used as a wrapper around conduit methods
-	networks                 []*p2pnet.Network // used to keep track of the networks
-	libp2pNodes              []p2p.LibP2PNode  // used to keep track of the libp2p nodes
-	ids                      flow.IdentityList // used to keep track of the identifiers associated with networks
-	obs                      chan string       // used to keep track of Protect events tagged by pubsub messages
+	testutils.ConduitWrapper                     // used as a wrapper around conduit methods
+	networks                 []*underlay.Network // used to keep track of the networks
+	libp2pNodes              []p2p.LibP2PNode    // used to keep track of the libp2p nodes
+	ids                      flow.IdentityList   // used to keep track of the identifiers associated with networks
+	obs                      chan string         // used to keep track of Protect events tagged by pubsub messages
 	cancel                   context.CancelFunc
 }
 
@@ -175,7 +175,7 @@ func (suite *MeshEngineTestSuite) TestTargetedValidators_Publish() {
 // TestMaxMessageSize_Unicast evaluates the messageSizeScenario scenario using
 // the Unicast method of conduits.
 func (suite *MeshEngineTestSuite) TestMaxMessageSize_Unicast() {
-	suite.messageSizeScenario(suite.Unicast, p2pnet.DefaultMaxUnicastMsgSize)
+	suite.messageSizeScenario(suite.Unicast, underlay.DefaultMaxUnicastMsgSize)
 }
 
 // TestMaxMessageSize_Multicast evaluates the messageSizeScenario scenario using

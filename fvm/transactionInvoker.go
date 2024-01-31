@@ -406,6 +406,7 @@ func (executor *transactionExecutor) normalExecution() (
 	// actual balance, for the purpose of calculating storage capacity, because the payer will have to pay for this tx.
 	executor.txnState.RunWithAllLimitsDisabled(func() {
 		err = executor.CheckStorageLimits(
+			executor.ctx,
 			executor.env,
 			bodySnapshot,
 			executor.proc.Transaction.Payer,

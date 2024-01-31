@@ -15,8 +15,8 @@ type GossipSubApplicationSpecificScoreCache struct {
 	mock.Mock
 }
 
-// Add provides a mock function with given fields: peerID, score, _a2
-func (_m *GossipSubApplicationSpecificScoreCache) Add(peerID peer.ID, score float64, _a2 time.Time) error {
+// AdjustWithInit provides a mock function with given fields: peerID, score, _a2
+func (_m *GossipSubApplicationSpecificScoreCache) AdjustWithInit(peerID peer.ID, score float64, _a2 time.Time) error {
 	ret := _m.Called(peerID, score, _a2)
 
 	var r0 error
