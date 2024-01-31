@@ -357,18 +357,15 @@ func TestStagedContractsWithImports(t *testing.T) {
 
 		oldCodeA := fmt.Sprintf(`
             import B from %s
-
             access(all) contract A {}
         `,
 			address2.HexWithPrefix(),
 		)
-		oldCodeB := `
-            access(all) contract B {}
-        `
+
+		oldCodeB := `access(all) contract B {}`
 
 		newCodeA := fmt.Sprintf(`
             import B from %s
-
             access(all) contract A {
                 access(all) fun foo(a: B.C) {}
             }
@@ -434,18 +431,15 @@ func TestStagedContractsWithImports(t *testing.T) {
 
 		oldCodeA := fmt.Sprintf(`
             import B from %s
-
             access(all) contract A {}
         `,
 			address2.HexWithPrefix(),
 		)
-		oldCodeB := `
-            pub contract B {}  // not compatible
-        `
+
+		oldCodeB := `pub contract B {}  // not compatible`
 
 		newCodeA := fmt.Sprintf(`
             import B from %s
-
             access(all) contract A {
                 access(all) fun foo(a: B.C) {}
             }
@@ -493,9 +487,92 @@ func TestStagedContractsWithImports(t *testing.T) {
 			"`pub` is no longer a valid access keyword",
 		)
 
-		// Payloads should be old ones
+		// Payloads should be the old ones
 		require.Len(t, payloads, 2)
 		require.Equal(t, oldCodeA, string(payloads[0].Value()))
 		require.Equal(t, oldCodeB, string(payloads[1].Value()))
+	})
+
+	t.Run("broken import in one, valid third contract", func(t *testing.T) {
+		t.Parallel()
+
+		oldCodeA := fmt.Sprintf(`
+            import B from %s
+            access(all) contract A {}
+        `,
+			address2.HexWithPrefix(),
+		)
+
+		oldCodeB := `pub contract B {}  // not compatible`
+
+		oldCodeC := `pub contract C {}`
+
+		newCodeA := fmt.Sprintf(`
+            import B from %s
+            access(all) contract A {
+                access(all) fun foo(a: B.X) {}
+            }
+        `,
+			address2.HexWithPrefix(),
+		)
+
+		newCodeC := `access(all) contract C {}`
+
+		stagedContractsGetter := func() []StagedContract {
+			return []StagedContract{
+				{
+					Contract: Contract{
+						name: "A",
+						code: []byte(newCodeA),
+					},
+					address: address1,
+				},
+				{
+					Contract: Contract{
+						name: "C",
+						code: []byte(newCodeC),
+					},
+					address: address1,
+				},
+			}
+		}
+
+		migration := NewStagedContractsMigration(stagedContractsGetter)
+
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+		err := migration.InitMigration(log, nil, 0)
+		require.NoError(t, err)
+
+		payloads := []*ledger.Payload{
+			newContractPayload(address1, "A", []byte(oldCodeA)),
+			newContractPayload(address2, "B", []byte(oldCodeB)),
+			newContractPayload(address1, "C", []byte(oldCodeC)),
+		}
+
+		payloads, err = migration.MigrateAccount(ctx, address1, payloads)
+		require.NoError(t, err)
+
+		payloads, err = migration.MigrateAccount(ctx, address2, payloads)
+		require.NoError(t, err)
+
+		err = migration.Close()
+		require.NoError(t, err)
+
+		require.Len(t, logWriter.logs, 1)
+		require.Contains(
+			t,
+			logWriter.logs[0],
+			"`pub` is no longer a valid access keyword",
+		)
+
+		// A and B should be the old ones.
+		// C should be updated.
+		// Type checking failures in unrelated contracts should not
+		// stop other contracts from being migrated.
+		require.Len(t, payloads, 3)
+		require.Equal(t, oldCodeA, string(payloads[0].Value()))
+		require.Equal(t, oldCodeB, string(payloads[1].Value()))
+		require.Equal(t, newCodeC, string(payloads[2].Value()))
 	})
 }
