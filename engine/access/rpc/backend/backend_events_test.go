@@ -158,8 +158,8 @@ func (s *BackendEventsSuite) SetupTest() {
 	}
 }
 
-func (s *BackendEventsSuite) defaultBackend() *backendEvents {
-	return &backendEvents{
+func (s *BackendEventsSuite) defaultBackend() *BackendEvents {
+	return &BackendEvents{
 		log:               s.log,
 		chain:             s.chainID.Chain(),
 		state:             s.state,

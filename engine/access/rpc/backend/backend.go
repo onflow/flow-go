@@ -53,14 +53,14 @@ var fixedENIdentifiers flow.IdentifierList
 // Transaction related calls are handled by backendTransactions.
 // Block Header related calls are handled by backendBlockHeaders.
 // Block details related calls are handled by backendBlockDetails.
-// Event related calls are handled by backendEvents.
+// Event related calls are handled by BackendEvents.
 // Account related calls are handled by backendAccounts.
 //
 // All remaining calls are handled by the base Backend in this file.
 type Backend struct {
 	backendScripts
 	backendTransactions
-	backendEvents
+	BackendEvents
 	backendBlockHeaders
 	backendBlockDetails
 	backendAccounts
@@ -183,7 +183,7 @@ func New(params Params) (*Backend, error) {
 			txErrorMessagesCache: txErrorMessagesCache,
 			txResultQueryMode:    params.TxResultQueryMode,
 		},
-		backendEvents: backendEvents{
+		BackendEvents: BackendEvents{
 			log:               params.Log,
 			chain:             params.ChainID.Chain(),
 			state:             params.State,

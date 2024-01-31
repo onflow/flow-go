@@ -2,14 +2,6 @@ package apiproxy
 
 import (
 	"context"
-	"errors"
-	"fmt"
-
-	"github.com/onflow/flow-go/engine/common/rpc"
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-	"google.golang.org/grpc/codes"
 
 	"google.golang.org/grpc/status"
 
@@ -17,8 +9,12 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
+
+	"github.com/onflow/flow-go/access/legacy/convert"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/grpc/forwarder"
+	rpcConvert "github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/engine/protocol"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -31,7 +27,7 @@ type FlowAccessAPIRouter struct {
 	Metrics   *metrics.ObserverCollector
 	Upstream  *FlowAccessAPIForwarder
 	Observer  *protocol.Handler
-	LocalData *ObserverLocalDataService
+	LocalData *backend.ObserverLocalDataService
 }
 
 func (h *FlowAccessAPIRouter) log(handler, rpc string, err error) {
@@ -198,6 +194,26 @@ func (h *FlowAccessAPIRouter) GetEventsForHeightRange(context context.Context, r
 }
 
 func (h *FlowAccessAPIRouter) GetEventsForBlockIDs(context context.Context, req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
+
+	if h.LocalData != nil {
+		eventType := req.GetType()
+		blockIDs := convert.MessagesToIdentifiers(req.GetBlockIds())
+		requiredEventEncodingVersion := req.GetEventEncodingVersion()
+
+		events, err := h.LocalData.GetEventsForBlockIDsFromStorage(context, blockIDs, eventType, requiredEventEncodingVersion)
+
+		resultEvents, err := rpcConvert.BlockEventsToMessages(events)
+		if err != nil {
+			return nil, err
+		}
+
+		return &access.EventsResponse{
+			Results:  resultEvents,
+			Metadata: metadata,
+		}, nil
+
+	}
+
 	res, err := h.Upstream.GetEventsForBlockIDs(context, req)
 	h.log("upstream", "GetEventsForBlockIDs", err)
 	return res, err

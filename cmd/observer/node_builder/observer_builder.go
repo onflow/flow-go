@@ -1453,14 +1453,23 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
-		// check for flag
-		var localData *apiproxy.ObserverLocalDataService
-
+		var localData *backend.ObserverLocalDataService
 		if builder.executionDataIndexingEnabled {
-			localData = apiproxy.NewObserverLocalDataService(
-				builder.Storage.Headers,
-				builder.Storage.Events,
-				builder.Storage.LightTransactionResults)
+			localData = backend.NewObserverLocalDataService(
+				node.State,
+				node.Storage.Collections,
+				node.Storage.Blocks,
+				node.Storage.LightTransactionResults,
+				node.Storage.Events,
+				node.Storage.Headers,
+				node.Storage.Receipts,
+				node.RootChainID.Chain(),
+				connFactory,
+				builder.Logger,
+				backendConfig.MaxHeightRange,
+				backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+				backend.IndexQueryModeLocalOnly,
+			)
 		}
 
 		rpcHandler := &apiproxy.FlowAccessAPIRouter{
