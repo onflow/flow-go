@@ -142,7 +142,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 		nil).Build()
 
 	blockHeader := unittest.BlockHeaderFixture()
-	suite.snapshot.On("Head").Return(blockHeader, nil).Once()
+	suite.snapshot.On("Head").Return(blockHeader, nil).Twice()
 
 	bnd, err := backend.New(backend.Params{
 		State:                suite.state,
