@@ -29,6 +29,11 @@ import (
 // TODO document error returns
 type Snapshot interface {
 
+	// BlockID returns the block ID of the snapshot
+	// It returns state.ErrUnknownSnapshotReference if the height is not finalized
+	// or the block does not exist
+	BlockID() (flow.Identifier, error)
+
 	// Head returns the latest block at the selected point of the protocol state
 	// history. It can represent either a finalized or ambiguous block,
 	// depending on our selection criteria. Either way, it's the block on which

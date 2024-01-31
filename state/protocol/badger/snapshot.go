@@ -72,6 +72,10 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 	return head, err
 }
 
+func (s *Snapshot) BlockID() (flow.Identifier, error) {
+	return s.blockID, nil
+}
+
 // QuorumCertificate (QC) returns a valid quorum certificate pointing to the
 // header at this snapshot.
 // The sentinel error storage.ErrNotFound is returned if the QC is unknown.

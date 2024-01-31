@@ -201,7 +201,7 @@ func (e *Engine) reloadBlock(
 // have passed consensus validation) received from the consensus nodes
 // NOTE: BlockProcessable might be called multiple times for the same block.
 // NOTE: Ready calls reloadUnexecutedBlocks during initialization, which handles dropped protocol events.
-func (e *Engine) BlockProcessable(b *flow.Header, _ *flow.QuorumCertificate) {
+func (e *Engine) BlockProcessable(b *flow.Header, qc *flow.QuorumCertificate) {
 
 	// TODO: this should not be blocking: https://github.com/onflow/flow-go/issues/4400
 
@@ -210,7 +210,7 @@ func (e *Engine) BlockProcessable(b *flow.Header, _ *flow.QuorumCertificate) {
 		return
 	}
 
-	blockID := b.ID()
+	blockID := qc.BlockID
 	newBlock, err := e.blocks.ByID(blockID)
 	if err != nil {
 		e.log.Fatal().Err(err).Msgf("could not get incorporated block(%v): %v", blockID, err)

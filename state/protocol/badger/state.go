@@ -698,8 +698,7 @@ func (state *State) Final() protocol.Snapshot {
 //   - exception for critical unexpected storage errors
 func (state *State) AtHeight(height uint64) protocol.Snapshot {
 	// retrieve the block ID for the finalized height
-	var blockID flow.Identifier
-	err := state.db.View(operation.LookupBlockHeight(height, &blockID))
+	blockID, err := state.headers.BlockIDByHeight(height)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return invalid.NewSnapshotf("unknown finalized height %d: %w", height, statepkg.ErrUnknownSnapshotReference)
