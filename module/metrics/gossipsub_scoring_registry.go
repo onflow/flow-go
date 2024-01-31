@@ -7,8 +7,7 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// GossipSubScoringRegistryMetrics encapsulates the metrics collectors for collecting metrics related to the Gossipsub scoring registry.
-// GossipSubScoringRegistryMetrics encapsulates various metrics collectors offering insights into penalties and
+// GossipSubScoringRegistryMetrics encapsulates the metrics collectors for collecting metrics related to the Gossipsub scoring registry, offering insights into penalties and
 // other factors used by the scoring registry to compute the application-specific score. It focuses on tracking internal
 // aspects of the application-specific score, distinguishing itself from GossipSubScoringMetrics.
 type GossipSubScoringRegistryMetrics struct {
