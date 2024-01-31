@@ -271,8 +271,10 @@ func New(params Params) (*Backend, error) {
 	}
 	b.backendSubscribeBlocks.getStartHeight = b.GetStartHeight
 	b.backendSubscribeBlocks.getHighestHeight = b.GetHighestHeight
+
 	b.backendSubscribeTransactions.getStartHeight = b.GetStartHeight
 	b.backendSubscribeTransactions.getHighestHeight = b.GetHighestHeight
+	b.backendSubscribeTransactions.deriveTransactionStatus = b.DeriveTransactionStatus
 
 	retry.SetBackend(b)
 

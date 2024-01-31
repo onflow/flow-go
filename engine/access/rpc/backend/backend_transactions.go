@@ -319,7 +319,7 @@ func (b *backendTransactions) GetTransactionResult(
 	}
 
 	// derive status of the transaction
-	txStatus, err := b.deriveTransactionStatus(tx, transactionWasExecuted, block)
+	txStatus, err := b.DeriveTransactionStatus(tx, transactionWasExecuted, block)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
@@ -438,7 +438,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			txResult := resp.TransactionResults[i]
 
 			// tx body is irrelevant to status if it's in an executed block
-			txStatus, err := b.deriveTransactionStatus(nil, true, block)
+			txStatus, err := b.DeriveTransactionStatus(nil, true, block)
 			if err != nil {
 				if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 					irrecoverable.Throw(ctx, err)
@@ -495,7 +495,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			return nil, status.Errorf(codes.Internal, "could not get system chunk transaction: %v", err)
 		}
 		systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
-		systemTxStatus, err := b.deriveTransactionStatus(systemTx, true, block)
+		systemTxStatus, err := b.DeriveTransactionStatus(systemTx, true, block)
 		if err != nil {
 			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 				irrecoverable.Throw(ctx, err)
@@ -556,7 +556,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	}
 
 	// tx body is irrelevant to status if it's in an executed block
-	txStatus, err := b.deriveTransactionStatus(nil, true, block)
+	txStatus, err := b.DeriveTransactionStatus(nil, true, block)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
@@ -619,7 +619,7 @@ func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, bl
 	}
 
 	systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
-	systemTxStatus, err := b.deriveTransactionStatus(systemTx, true, block)
+	systemTxStatus, err := b.DeriveTransactionStatus(systemTx, true, block)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
@@ -640,11 +640,11 @@ func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, bl
 	}, nil
 }
 
-// deriveTransactionStatus derives the transaction status based on current protocol state
+// DeriveTransactionStatus derives the transaction status based on current protocol state
 // Error returns:
 //   - state.ErrUnknownSnapshotReference - block referenced by transaction has not been found.
 //   - all other errors are unexpected and potentially symptoms of internal implementation bugs or state corruption (fatal).
-func (b *backendTransactions) deriveTransactionStatus(
+func (b *backendTransactions) DeriveTransactionStatus(
 	tx *flow.TransactionBody,
 	executed bool,
 	block *flow.Block,
