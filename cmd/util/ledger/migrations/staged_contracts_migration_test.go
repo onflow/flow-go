@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"testing"
 
@@ -50,15 +51,15 @@ func TestStagedContractsMigration(t *testing.T) {
 	t.Run("one contract", func(t *testing.T) {
 		t.Parallel()
 
-		oldCode := "contract A {}"
-		newCode := "contract A { struct B {} }"
+		oldCode := "access(all) contract A {}"
+		newCode := "access(all) contract A { access(all) struct B {} }"
 
 		stagedContractsGetter := func() []StagedContract {
 			return []StagedContract{
 				{
 					Contract: Contract{
 						name: "A",
-						code: newCode,
+						code: []byte(newCode),
 					},
 					address: address1,
 				},
@@ -91,15 +92,15 @@ func TestStagedContractsMigration(t *testing.T) {
 	t.Run("syntax error in new code", func(t *testing.T) {
 		t.Parallel()
 
-		oldCode := "contract A {}"
-		newCode := "contract A { struct B () }"
+		oldCode := "access(all) contract A {}"
+		newCode := "access(all) contract A { access(all) struct B () }"
 
 		stagedContractsGetter := func() []StagedContract {
 			return []StagedContract{
 				{
 					Contract: Contract{
 						name: "A",
-						code: newCode,
+						code: []byte(newCode),
 					},
 					address: address1,
 				},
@@ -134,15 +135,15 @@ func TestStagedContractsMigration(t *testing.T) {
 	t.Run("syntax error in old code", func(t *testing.T) {
 		t.Parallel()
 
-		oldCode := "contract A {"
-		newCode := "contract A { struct B {} }"
+		oldCode := "access(all) contract A {"
+		newCode := "access(all) contract A { access(all) struct B {} }"
 
 		stagedContractsGetter := func() []StagedContract {
 			return []StagedContract{
 				{
 					Contract: Contract{
 						name: "A",
-						code: newCode,
+						code: []byte(newCode),
 					},
 					address: address1,
 				},
@@ -177,25 +178,25 @@ func TestStagedContractsMigration(t *testing.T) {
 	t.Run("one fail, one success", func(t *testing.T) {
 		t.Parallel()
 
-		oldCode1 := "contract A {}"
-		oldCode2 := "contract B {}"
+		oldCode1 := "access(all) contract A {}"
+		oldCode2 := "access(all) contract B {}"
 
-		newCode1 := "contract A { struct C () }" // broken
-		newCode2 := "contract B { struct C {} }" // all good
+		newCode1 := "access(all) contract A { access(all) struct C () }" // broken
+		newCode2 := "access(all) contract B { access(all) struct C {} }" // all good
 
 		stagedContractsGetter := func() []StagedContract {
 			return []StagedContract{
 				{
 					Contract: Contract{
 						name: "A",
-						code: newCode1,
+						code: []byte(newCode1),
 					},
 					address: address1,
 				},
 				{
 					Contract: Contract{
 						name: "B",
-						code: newCode2,
+						code: []byte(newCode2),
 					},
 					address: address1,
 				},
@@ -233,15 +234,15 @@ func TestStagedContractsMigration(t *testing.T) {
 	t.Run("different accounts", func(t *testing.T) {
 		t.Parallel()
 
-		oldCode := "contract A {}"
-		newCode := "contract A { struct B {} }"
+		oldCode := "access(all) contract A {}"
+		newCode := "access(all) contract A { access(all) struct B {} }"
 
 		stagedContractsGetter := func() []StagedContract {
 			return []StagedContract{
 				{
 					Contract: Contract{
 						name: "A",
-						code: newCode,
+						code: []byte(newCode),
 					},
 					address: address2,
 				},
@@ -288,23 +289,23 @@ func TestStagedContractsMigration(t *testing.T) {
 	t.Run("multiple updates for same contract", func(t *testing.T) {
 		t.Parallel()
 
-		oldCode := "contract A {}"
-		update1 := "contract A { struct B {} }"
-		update2 := "contract A { struct B {} struct C {} }"
+		oldCode := "access(all) contract A {}"
+		update1 := "access(all) contract A { access(all) struct B {} }"
+		update2 := "access(all) contract A { access(all) struct B {} access(all) struct C {} }"
 
 		stagedContractsGetter := func() []StagedContract {
 			return []StagedContract{
 				{
 					Contract: Contract{
 						name: "A",
-						code: update1,
+						code: []byte(update1),
 					},
 					address: address1,
 				},
 				{
 					Contract: Contract{
 						name: "A",
-						code: update2,
+						code: []byte(update2),
 					},
 					address: address1,
 				},
@@ -338,5 +339,163 @@ func TestStagedContractsMigration(t *testing.T) {
 		require.Len(t, payloads, 1)
 		require.Equal(t, update2, string(payloads[0].Value()))
 	})
+}
 
+func TestStagedContractsWithImports(t *testing.T) {
+	t.Parallel()
+
+	address1, err := common.HexToAddress("0x1")
+	require.NoError(t, err)
+
+	address2, err := common.HexToAddress("0x2")
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	t.Run("valid import", func(t *testing.T) {
+		t.Parallel()
+
+		oldCodeA := fmt.Sprintf(`
+            import B from %s
+
+            access(all) contract A {}
+        `,
+			address2.HexWithPrefix(),
+		)
+		oldCodeB := `
+            access(all) contract B {}
+        `
+
+		newCodeA := fmt.Sprintf(`
+            import B from %s
+
+            access(all) contract A {
+                access(all) fun foo(a: B.C) {}
+            }
+        `,
+			address2.HexWithPrefix(),
+		)
+
+		newCodeB := `
+            access(all) contract B {
+                access(all) struct C {}
+            }
+        `
+
+		stagedContractsGetter := func() []StagedContract {
+			return []StagedContract{
+				{
+					Contract: Contract{
+						name: "A",
+						code: []byte(newCodeA),
+					},
+					address: address1,
+				},
+				{
+					Contract: Contract{
+						name: "B",
+						code: []byte(newCodeB),
+					},
+					address: address2,
+				},
+			}
+		}
+
+		migration := NewStagedContractsMigration(stagedContractsGetter)
+
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+		err := migration.InitMigration(log, nil, 0)
+		require.NoError(t, err)
+
+		payloads := []*ledger.Payload{
+			newContractPayload(address1, "A", []byte(oldCodeA)),
+			newContractPayload(address2, "B", []byte(oldCodeB)),
+		}
+
+		payloads, err = migration.MigrateAccount(ctx, address1, payloads)
+		require.NoError(t, err)
+
+		payloads, err = migration.MigrateAccount(ctx, address2, payloads)
+		require.NoError(t, err)
+
+		err = migration.Close()
+		require.NoError(t, err)
+
+		require.Empty(t, logWriter.logs)
+
+		require.Len(t, payloads, 2)
+		require.Equal(t, newCodeA, string(payloads[0].Value()))
+		require.Equal(t, newCodeB, string(payloads[1].Value()))
+	})
+
+	t.Run("broken import", func(t *testing.T) {
+		t.Parallel()
+
+		oldCodeA := fmt.Sprintf(`
+            import B from %s
+
+            access(all) contract A {}
+        `,
+			address2.HexWithPrefix(),
+		)
+		oldCodeB := `
+            pub contract B {}  // not compatible
+        `
+
+		newCodeA := fmt.Sprintf(`
+            import B from %s
+
+            access(all) contract A {
+                access(all) fun foo(a: B.C) {}
+            }
+        `,
+			address2.HexWithPrefix(),
+		)
+
+		stagedContractsGetter := func() []StagedContract {
+			return []StagedContract{
+				{
+					Contract: Contract{
+						name: "A",
+						code: []byte(newCodeA),
+					},
+					address: address1,
+				},
+			}
+		}
+
+		migration := NewStagedContractsMigration(stagedContractsGetter)
+
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+		err := migration.InitMigration(log, nil, 0)
+		require.NoError(t, err)
+
+		payloads := []*ledger.Payload{
+			newContractPayload(address1, "A", []byte(oldCodeA)),
+			newContractPayload(address2, "B", []byte(oldCodeB)),
+		}
+
+		payloads, err = migration.MigrateAccount(ctx, address1, payloads)
+		require.NoError(t, err)
+
+		payloads, err = migration.MigrateAccount(ctx, address2, payloads)
+		require.NoError(t, err)
+
+		err = migration.Close()
+		require.NoError(t, err)
+
+		require.Len(t, logWriter.logs, 1)
+		require.Contains(
+			t,
+			logWriter.logs[0],
+			"`pub` is no longer a valid access keyword",
+		)
+
+		// Payloads should be old ones
+		require.Len(t, payloads, 2)
+		require.Equal(t, oldCodeA, string(payloads[0].Value()))
+		require.Equal(t, oldCodeB, string(payloads[1].Value()))
+	})
 }

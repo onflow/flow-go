@@ -7,11 +7,12 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/old_parser"
-	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/cadence/runtime/stdlib"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -21,6 +22,7 @@ type StagedContractsMigration struct {
 	log                   zerolog.Logger
 	mutex                 sync.RWMutex
 	contracts             map[common.Address]map[flow.RegisterID]Contract
+	contractsByLocation   map[common.Location][]byte
 	stagedContractsGetter func() []StagedContract
 }
 
@@ -31,7 +33,7 @@ type StagedContract struct {
 
 type Contract struct {
 	name string
-	code string
+	code []byte
 }
 
 var _ AccountBasedMigration = &StagedContractsMigration{}
@@ -39,6 +41,8 @@ var _ AccountBasedMigration = &StagedContractsMigration{}
 func NewStagedContractsMigration(stagedContractsGetter func() []StagedContract) *StagedContractsMigration {
 	return &StagedContractsMigration{
 		stagedContractsGetter: stagedContractsGetter,
+		contracts:             map[common.Address]map[flow.RegisterID]Contract{},
+		contractsByLocation:   map[common.Location][]byte{},
 	}
 }
 
@@ -77,10 +81,6 @@ func (m *StagedContractsMigration) registerContractUpdates() {
 }
 
 func (m *StagedContractsMigration) registerContractChange(change StagedContract) {
-	if m.contracts == nil {
-		m.contracts = map[common.Address]map[flow.RegisterID]Contract{}
-	}
-
 	address := change.address
 	if _, ok := m.contracts[address]; !ok {
 		m.contracts[address] = map[flow.RegisterID]Contract{}
@@ -100,6 +100,12 @@ func (m *StagedContractsMigration) registerContractChange(change StagedContract)
 	}
 
 	m.contracts[address][registerID] = change.Contract
+
+	location := common.AddressLocation{
+		Name:    change.name,
+		Address: address,
+	}
+	m.contractsByLocation[location] = change.Contract.code
 }
 
 func (m *StagedContractsMigration) contractUpdatesForAccount(
@@ -129,6 +135,17 @@ func (m *StagedContractsMigration) MigrateAccount(
 		return payloads, nil
 	}
 
+	config := util.RuntimeInterfaceConfig{
+		GetContractCodeFunc: func(location runtime.Location) ([]byte, error) {
+			return m.contractsByLocation[location], nil
+		},
+	}
+
+	mr, err := newMigratorRuntime(address, payloads, config)
+	if err != nil {
+		return nil, err
+	}
+
 	for payloadIndex, payload := range payloads {
 		key, err := payload.Key()
 		if err != nil {
@@ -151,7 +168,7 @@ func (m *StagedContractsMigration) MigrateAccount(
 		newCode := updatedContract.code
 		oldCode := payload.Value()
 
-		err = m.checkUpdateValidity(name, newCode, oldCode)
+		err = m.checkUpdateValidity(mr, address, name, newCode, oldCode)
 		if err != nil {
 			m.log.Error().Err(err).
 				Msgf(
@@ -163,7 +180,7 @@ func (m *StagedContractsMigration) MigrateAccount(
 			// change contract code
 			payloads[payloadIndex] = ledger.NewPayload(
 				key,
-				[]byte(newCode),
+				newCode,
 			)
 		}
 
@@ -179,8 +196,25 @@ func (m *StagedContractsMigration) MigrateAccount(
 	return payloads, nil
 }
 
-func (m *StagedContractsMigration) checkUpdateValidity(contractName, newCode string, oldCode ledger.Value) error {
-	newProgram, err := parser.ParseProgram(nil, []byte(newCode), parser.Config{})
+func (m *StagedContractsMigration) checkUpdateValidity(
+	mr *migratorRuntime,
+	address common.Address,
+	contractName string,
+	newCode []byte,
+	oldCode ledger.Value,
+) error {
+	location := common.AddressLocation{
+		Name:    contractName,
+		Address: address,
+	}
+
+	// NOTE: do NOT use the program obtained from the host environment, as the current program.
+	// Always re-parse and re-check the new program.
+	// NOTE: *DO NOT* store the program – the new or updated program
+	// should not be effective during the execution
+	const getAndSetProgram = false
+
+	newProgram, err := mr.ContractAdditionHandler.ParseAndCheckProgram(newCode, location, getAndSetProgram)
 	if err != nil {
 		return err
 	}
@@ -194,7 +228,7 @@ func (m *StagedContractsMigration) checkUpdateValidity(contractName, newCode str
 		nil,
 		contractName,
 		oldProgram,
-		newProgram,
+		newProgram.Program,
 	)
 
 	return validator.Validate()
