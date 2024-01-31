@@ -36,18 +36,18 @@ const (
 	codeSealedRootHeight        = 27 // the height of the highest sealed block contained in the root snapshot
 
 	// codes for single entity storage
-	// 31 was used for identities before epochs
 	codeHeader               = 30
+	_                        = 31 // DEPRECATED: 31 was used for identities before epochs
 	codeGuarantee            = 32
 	codeSeal                 = 33
 	codeTransaction          = 34
 	codeCollection           = 35
 	codeExecutionResult      = 36
-	codeExecutionReceiptMeta = 36
 	codeResultApproval       = 37
 	codeChunk                = 38
+	codeExecutionReceiptMeta = 39 // NOTE: prior to Mainnet25, this erroneously had the same value as codeExecutionResult (36)
 
-	// codes for indexing single identifier by identifier/integeter
+	// codes for indexing single identifier by identifier/integer
 	codeHeightToBlock              = 40 // index mapping height to block ID
 	codeBlockIDToLatestSealID      = 41 // index mapping a block its last payload seal
 	codeClusterBlockToRefBlock     = 42 // index cluster block ID to reference block ID
@@ -56,8 +56,8 @@ const (
 	codeBlockIDToQuorumCertificate = 45 // index of quorum certificates by block ID
 
 	// codes for indexing multiple identifiers by identifier
-	// NOTE: 51 was used for identity indexes before epochs
 	codeBlockChildren     = 50 // index mapping block ID to children blocks
+	_                     = 51 // DEPRECATED: 51 was used for identity indexes before epochs
 	codePayloadGuarantees = 52 // index mapping block ID to payload guarantees
 	codePayloadSeals      = 53 // index mapping block ID to payload seals
 	codeCollectionBlock   = 54 // index mapping collection ID to block ID
