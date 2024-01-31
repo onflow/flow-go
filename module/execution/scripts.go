@@ -115,7 +115,10 @@ func (s *Scripts) ExecuteAtBlockHeight(
 		return nil, err
 	}
 
-	return s.executor.ExecuteScript(ctx, script, arguments, header, snap)
+	value, compUsage, err := s.executor.ExecuteScript(ctx, script, arguments, header, snap)
+	// TODO: return compUsage when upstream can handle it
+	_ = compUsage
+	return value, err
 }
 
 // GetAccountAtBlockHeight returns a Flow account by the provided address and block height.
