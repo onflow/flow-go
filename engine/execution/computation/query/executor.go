@@ -37,6 +37,7 @@ type Executor interface {
 		snapshot snapshot.StorageSnapshot,
 	) (
 		[]byte,
+		uint64,
 		error,
 	)
 
@@ -112,6 +113,7 @@ func (e *QueryExecutor) ExecuteScript(
 	snapshot snapshot.StorageSnapshot,
 ) (
 	encodedValue []byte,
+	computationUsed uint64,
 	err error,
 ) {
 
@@ -126,7 +128,7 @@ func (e *QueryExecutor) ExecuteScript(
 		defer e.rngLock.Unlock()
 		trackerID, err := rand.Uint32()
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate trackerID: %w", err)
+			return nil, 0, fmt.Errorf("failed to generate trackerID: %w", err)
 		}
 
 		trackedLogger := e.logger.With().Hex("script_hex", script).Uint32("trackerID", trackerID).Logger()
@@ -178,11 +180,11 @@ func (e *QueryExecutor) ExecuteScript(
 		fvm.NewScriptWithContextAndArgs(script, requestCtx, arguments...),
 		snapshot)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
+		return nil, 0, fmt.Errorf("failed to execute script (internal error): %w", err)
 	}
 
 	if output.Err != nil {
-		return nil, errors.NewCodedError(
+		return nil, 0, errors.NewCodedError(
 			output.Err.Code(),
 			"failed to execute script at block (%s): %s", blockHeader.ID(),
 			summarizeLog(output.Err.Error(), e.config.MaxErrorMessageSize),
@@ -191,7 +193,7 @@ func (e *QueryExecutor) ExecuteScript(
 
 	encodedValue, err = jsoncdc.Encode(output.Value)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode runtime value: %w", err)
+		return nil, 0, fmt.Errorf("failed to encode runtime value: %w", err)
 	}
 
 	memAllocAfter := debug.GetHeapAllocsBytes()
@@ -201,7 +203,7 @@ func (e *QueryExecutor) ExecuteScript(
 		memAllocAfter-memAllocBefore,
 		output.MemoryEstimate)
 
-	return encodedValue, nil
+	return encodedValue, output.ComputationUsed, nil
 }
 
 func summarizeLog(log string, limit int) string {
