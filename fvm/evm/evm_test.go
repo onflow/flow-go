@@ -34,7 +34,6 @@ func TestEVMRun(t *testing.T) {
 			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
 				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
 					num := int64(12)
-
 					RunWithNewTestVM(t, chain, backend, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
 						sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 						code := []byte(fmt.Sprintf(
@@ -94,6 +93,7 @@ func RunWithNewTestVM(t *testing.T, chain flow.Chain, backend *TestBackend, f fu
 
 	opts := []fvm.Option{
 		fvm.WithChain(chain),
+		fvm.WithBlockHeader(block1.Header),
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
@@ -292,6 +292,65 @@ func TestBridgedAccountDeploy(t *testing.T) {
 
 					// TODO:
 					_ = executionSnapshot
+				})
+			})
+		})
+	})
+}
+
+func TestCadenceArch(t *testing.T) {
+	t.Parallel()
+	t.Run("testing calling Cadence arch - flow block height (happy case)", func(t *testing.T) {
+		RunWithTestBackend(t, func(backend *TestBackend) {
+			chain := flow.Emulator.Chain()
+			rootAddr, err := evm.StorageAccountAddress(chain.ChainID())
+			require.NoError(t, err)
+			tc := GetStorageTestContract(t)
+			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
+				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
+					RunWithNewTestVM(t, chain, backend, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
+						sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+						code := []byte(fmt.Sprintf(
+							`
+							import EVM from %s
+
+							access(all)
+							fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
+								let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+								EVM.run(tx: tx, coinbase: coinbase)
+							}
+                       		`,
+							sc.EVMContract.Address.HexWithPrefix(),
+						))
+
+						gasLimit := uint64(10_000_000)
+						txBytes := testAccount.PrepareSignAndEncodeTx(t,
+							testContract.DeployedAt.ToCommon(),
+							tc.MakeCallData(t, "verifyArchCallToFlowBlockHeight", uint64(ctx.BlockHeader.Height)),
+							big.NewInt(0),
+							gasLimit,
+							big.NewInt(0),
+						)
+						tx := cadence.NewArray(
+							ConvertToCadence(txBytes),
+						).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+						coinbase := cadence.NewArray(
+							ConvertToCadence(testAccount.Address().Bytes()),
+						).WithType(stdlib.EVMAddressBytesCadenceType)
+
+						script := fvm.Script(code).WithArguments(
+							json.MustEncode(tx),
+							json.MustEncode(coinbase),
+						)
+
+						_, output, err := vm.Run(
+							ctx,
+							script,
+							snapshot)
+						require.NoError(t, err)
+						require.NoError(t, output.Err)
+					})
 				})
 			})
 		})
