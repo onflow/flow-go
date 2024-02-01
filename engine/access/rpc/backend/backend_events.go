@@ -21,13 +21,13 @@ import (
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
 type backendEvents struct {
 	headers           storage.Headers
-	events            storage.Events
 	executionReceipts storage.ExecutionReceipts
 	state             protocol.State
 	chain             flow.Chain
@@ -36,6 +36,15 @@ type backendEvents struct {
 	maxHeightRange    uint
 	nodeCommunicator  Communicator
 	queryMode         IndexQueryMode
+	eventsIndex       *EventsIndex
+}
+
+// blockMetadata is used to capture information about requested blocks to avoid repeated blockID
+// calculations and passing around full block headers.
+type blockMetadata struct {
+	ID        flow.Identifier
+	Height    uint64
+	Timestamp time.Time
 }
 
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and
@@ -87,15 +96,25 @@ func (b *backendEvents) GetEventsForHeightRange(
 	}
 
 	// find the block headers for all the blocks between min and max height (inclusive)
-	blockHeaders := make([]*flow.Header, 0)
+	blockHeaders := make([]blockMetadata, 0, endHeight-startHeight+1)
 
 	for i := startHeight; i <= endHeight; i++ {
-		header, err := b.headers.ByHeight(i)
+		// this looks inefficient, but is actually what's done under the covers by `headers.ByHeight`
+		// and avoids calculating header.ID() for each block.
+		blockID, err := b.headers.BlockIDByHeight(i)
 		if err != nil {
-			return nil, rpc.ConvertStorageError(fmt.Errorf("failed to get events: %w", err))
+			return nil, rpc.ConvertStorageError(fmt.Errorf("failed to get blockID for %d: %w", i, err))
+		}
+		header, err := b.headers.ByBlockID(blockID)
+		if err != nil {
+			return nil, rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %d: %w", i, err))
 		}
 
-		blockHeaders = append(blockHeaders, header)
+		blockHeaders = append(blockHeaders, blockMetadata{
+			ID:        blockID,
+			Height:    header.Height,
+			Timestamp: header.Timestamp,
+		})
 	}
 
 	return b.getBlockEvents(ctx, blockHeaders, eventType, requiredEventEncodingVersion)
@@ -114,14 +133,18 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	}
 
 	// find the block headers for all the block IDs
-	blockHeaders := make([]*flow.Header, 0)
+	blockHeaders := make([]blockMetadata, 0, len(blockIDs))
 	for _, blockID := range blockIDs {
 		header, err := b.headers.ByBlockID(blockID)
 		if err != nil {
-			return nil, rpc.ConvertStorageError(fmt.Errorf("failed to get events: %w", err))
+			return nil, rpc.ConvertStorageError(fmt.Errorf("failed to get block header for %s: %w", blockID, err))
 		}
 
-		blockHeaders = append(blockHeaders, header)
+		blockHeaders = append(blockHeaders, blockMetadata{
+			ID:        blockID,
+			Height:    header.Height,
+			Timestamp: header.Timestamp,
+		})
 	}
 
 	return b.getBlockEvents(ctx, blockHeaders, eventType, requiredEventEncodingVersion)
@@ -131,7 +154,7 @@ func (b *backendEvents) GetEventsForBlockIDs(
 // It gets all events available in storage, and requests the rest from an execution node.
 func (b *backendEvents) getBlockEvents(
 	ctx context.Context,
-	blockHeaders []*flow.Header,
+	blockInfos []blockMetadata,
 	eventType string,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
@@ -143,36 +166,36 @@ func (b *backendEvents) getBlockEvents(
 
 	switch b.queryMode {
 	case IndexQueryModeExecutionNodesOnly:
-		return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType, requiredEventEncodingVersion)
+		return b.getBlockEventsFromExecutionNode(ctx, blockInfos, eventType, requiredEventEncodingVersion)
 
 	case IndexQueryModeLocalOnly:
-		localResponse, missingHeaders, err := b.getBlockEventsFromStorage(ctx, blockHeaders, target, requiredEventEncodingVersion)
+		localResponse, missingBlocks, err := b.getBlockEventsFromStorage(ctx, blockInfos, target, requiredEventEncodingVersion)
 		if err != nil {
 			return nil, err
 		}
 		// all blocks should be available.
-		if len(missingHeaders) > 0 {
-			return nil, status.Errorf(codes.NotFound, "events not found in local storage for %d blocks", len(missingHeaders))
+		if len(missingBlocks) > 0 {
+			return nil, status.Errorf(codes.NotFound, "events not found in local storage for %d blocks", len(missingBlocks))
 		}
 		return localResponse, nil
 
 	case IndexQueryModeFailover:
-		localResponse, missingHeaders, err := b.getBlockEventsFromStorage(ctx, blockHeaders, target, requiredEventEncodingVersion)
+		localResponse, missingBlocks, err := b.getBlockEventsFromStorage(ctx, blockInfos, target, requiredEventEncodingVersion)
 		if err != nil {
 			// if there was an error, request all blocks from execution nodes
-			missingHeaders = blockHeaders
+			missingBlocks = blockInfos
 			b.log.Debug().Err(err).Msg("failed to get events from local storage")
 		}
 
-		if len(missingHeaders) == 0 {
+		if len(missingBlocks) == 0 {
 			return localResponse, nil
 		}
 
 		b.log.Debug().
-			Int("missing_blocks", len(missingHeaders)).
+			Int("missing_blocks", len(missingBlocks)).
 			Msg("querying execution nodes for events from missing blocks")
 
-		enResponse, err := b.getBlockEventsFromExecutionNode(ctx, missingHeaders, eventType, requiredEventEncodingVersion)
+		enResponse, err := b.getBlockEventsFromExecutionNode(ctx, missingBlocks, eventType, requiredEventEncodingVersion)
 		if err != nil {
 			return nil, err
 		}
@@ -198,25 +221,27 @@ func (b *backendEvents) getBlockEvents(
 // from the local storage
 func (b *backendEvents) getBlockEventsFromStorage(
 	ctx context.Context,
-	blockHeaders []*flow.Header,
+	blockInfos []blockMetadata,
 	eventType flow.EventType,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) ([]flow.BlockEvents, []*flow.Header, error) {
-	missing := make([]*flow.Header, 0)
+) ([]flow.BlockEvents, []blockMetadata, error) {
+	missing := make([]blockMetadata, 0)
 	resp := make([]flow.BlockEvents, 0)
-	for _, header := range blockHeaders {
+
+	for _, blockInfo := range blockInfos {
 		if ctx.Err() != nil {
 			return nil, nil, rpc.ConvertError(ctx.Err(), "failed to get events from storage", codes.Canceled)
 		}
 
-		events, err := b.events.ByBlockID(header.ID())
+		events, err := b.eventsIndex.GetEvents(blockInfo.ID, blockInfo.Height)
 		if err != nil {
-			// Note: if there are no events for a block, an empty slice is returned
-			if errors.Is(err, storage.ErrNotFound) {
-				missing = append(missing, header)
+			if errors.Is(err, storage.ErrNotFound) ||
+				errors.Is(err, storage.ErrHeightNotIndexed) ||
+				errors.Is(err, indexer.ErrIndexNotInitialized) {
+				missing = append(missing, blockInfo)
 				continue
 			}
-			err = fmt.Errorf("failed to get events for block %s: %w", header.ID(), err)
+			err = fmt.Errorf("failed to get events for block %s: %w", blockInfo.ID, err)
 			return nil, nil, rpc.ConvertError(err, "failed to get events from storage", codes.Internal)
 		}
 
@@ -230,7 +255,7 @@ func (b *backendEvents) getBlockEventsFromStorage(
 			if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
 				payload, err := convert.CcfPayloadToJsonPayload(e.Payload)
 				if err != nil {
-					err = fmt.Errorf("failed to convert event payload for block %s: %w", header.ID(), err)
+					err = fmt.Errorf("failed to convert event payload for block %s: %w", blockInfo.ID, err)
 					return nil, nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
 				}
 				e.Payload = payload
@@ -240,9 +265,9 @@ func (b *backendEvents) getBlockEventsFromStorage(
 		}
 
 		resp = append(resp, flow.BlockEvents{
-			BlockID:        header.ID(),
-			BlockHeight:    header.Height,
-			BlockTimestamp: header.Timestamp,
+			BlockID:        blockInfo.ID,
+			BlockHeight:    blockInfo.Height,
+			BlockTimestamp: blockInfo.Timestamp,
 			Events:         filteredEvents,
 		})
 	}
@@ -254,15 +279,15 @@ func (b *backendEvents) getBlockEventsFromStorage(
 // from an execution node
 func (b *backendEvents) getBlockEventsFromExecutionNode(
 	ctx context.Context,
-	blockHeaders []*flow.Header,
+	blockInfos []blockMetadata,
 	eventType string,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
 
 	// create an execution API request for events at block ID
-	blockIDs := make([]flow.Identifier, len(blockHeaders))
-	for i := range blockIDs {
-		blockIDs[i] = blockHeaders[i].ID()
+	blockIDs := make([]flow.Identifier, len(blockInfos))
+	for i := range blockInfos {
+		blockIDs[i] = blockInfos[i].ID
 	}
 
 	if len(blockIDs) == 0 {
@@ -296,7 +321,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	// convert execution node api result to access node api result
 	results, err := verifyAndConvertToAccessEvents(
 		resp.GetResults(),
-		blockHeaders,
+		blockInfos,
 		resp.GetEventEncodingVersion(),
 		requiredEventEncodingVersion,
 	)
@@ -307,31 +332,31 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	return results, nil
 }
 
-// verifyAndConvertToAccessEvents converts execution node api result to access node api result, and verifies that the results contains
-// results from each block that was requested
+// verifyAndConvertToAccessEvents converts execution node api result to access node api result,
+// and verifies that the results contains results from each block that was requested
 func verifyAndConvertToAccessEvents(
 	execEvents []*execproto.GetEventsForBlockIDsResponse_Result,
-	requestedBlockHeaders []*flow.Header,
+	requestedBlockInfos []blockMetadata,
 	from entities.EventEncodingVersion,
 	to entities.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
-	if len(execEvents) != len(requestedBlockHeaders) {
+	if len(execEvents) != len(requestedBlockInfos) {
 		return nil, errors.New("number of results does not match number of blocks requested")
 	}
 
-	requestedBlockHeaderSet := map[string]*flow.Header{}
-	for _, header := range requestedBlockHeaders {
-		requestedBlockHeaderSet[header.ID().String()] = header
+	requestedBlockInfoSet := map[string]blockMetadata{}
+	for _, header := range requestedBlockInfos {
+		requestedBlockInfoSet[header.ID.String()] = header
 	}
 
 	results := make([]flow.BlockEvents, len(execEvents))
 
 	for i, result := range execEvents {
-		header, expected := requestedBlockHeaderSet[hex.EncodeToString(result.GetBlockId())]
+		blockInfo, expected := requestedBlockInfoSet[hex.EncodeToString(result.GetBlockId())]
 		if !expected {
 			return nil, fmt.Errorf("unexpected blockID from exe node %x", result.GetBlockId())
 		}
-		if result.GetBlockHeight() != header.Height {
+		if result.GetBlockHeight() != blockInfo.Height {
 			return nil, fmt.Errorf("unexpected block height %d for block %x from exe node",
 				result.GetBlockHeight(),
 				result.GetBlockId())
@@ -344,9 +369,9 @@ func verifyAndConvertToAccessEvents(
 		}
 
 		results[i] = flow.BlockEvents{
-			BlockID:        header.ID(),
-			BlockHeight:    header.Height,
-			BlockTimestamp: header.Timestamp,
+			BlockID:        blockInfo.ID,
+			BlockHeight:    blockInfo.Height,
+			BlockTimestamp: blockInfo.Timestamp,
 			Events:         events,
 		}
 	}

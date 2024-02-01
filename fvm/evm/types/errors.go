@@ -16,18 +16,18 @@ var (
 	// left in the context of flow transaction to execute the evm operation.
 	ErrInsufficientComputation = errors.New("insufficient computation")
 
-	// unauthorized method call, usually emited when calls are called on EOA accounts
+	// ErrUnAuthroizedMethodCall method call, usually emited when calls are called on EOA accounts
 	ErrUnAuthroizedMethodCall = errors.New("unauthroized method call")
+
 	// ErrInsufficientTotalSupply is returned when flow token
 	// is withdraw request is there but not enough balance is on EVM vault
 	// this should never happen but its a saftey measure to protect Flow against EVM issues.
 	// TODO: we might consider this fatal
 	ErrInsufficientTotalSupply = errors.New("insufficient total supply")
 
-	// ErrBalanceConversion is returned conversion of balance has failed, usually
-	// is returned when the balance presented in attoflow has values that could
-	// be marginally lost on the conversion.
-	ErrBalanceConversion = errors.New("balance converion error")
+	// ErrWithdrawBalanceRounding is returned when withdraw call has a balance that could
+	// yeild to rounding error, i.e. the balance contains fractions smaller than 10^8 Flow (smallest unit allowed to transfer).
+	ErrWithdrawBalanceRounding = errors.New("withdraw failed! balance is susceptible to the rounding error")
 
 	// ErrNotImplemented is a fatal error when something is called that is not implemented
 	ErrNotImplemented = NewFatalError(errors.New("a functionality is called that is not implemented"))
@@ -89,35 +89,35 @@ func IsEVMValidationError(err error) bool {
 	return errors.As(err, &EVMValidationError{})
 }
 
-// DatabaseError is a non-fatal error, returned when a database operation
+// StateError is a non-fatal error, returned when a state operation
 // has failed (e.g. reaching storage interaction limit)
-type DatabaseError struct {
+type StateError struct {
 	err error
 }
 
-// NewDatabaseError returns a new DatabaseError
-func NewDatabaseError(rootCause error) DatabaseError {
-	return DatabaseError{
+// NewStateError returns a new StateError
+func NewStateError(rootCause error) StateError {
+	return StateError{
 		err: rootCause,
 	}
 }
 
 // Unwrap unwraps the underlying evm error
-func (err DatabaseError) Unwrap() error {
+func (err StateError) Unwrap() error {
 	return err.err
 }
 
-func (err DatabaseError) Error() string {
-	return fmt.Sprintf("database error: %v", err.err)
+func (err StateError) Error() string {
+	return fmt.Sprintf("state error: %v", err.err)
 }
 
-// IsADatabaseError returns true if the error or any underlying errors
+// IsAStateError returns true if the error or any underlying errors
 // is of the type EVM validation error
-func IsADatabaseError(err error) bool {
-	return errors.As(err, &DatabaseError{})
+func IsAStateError(err error) bool {
+	return errors.As(err, &StateError{})
 }
 
-// FatalError is user for any error that is not user related and something
+// FatalError is used for any error that is not user related and something
 // unusual has happend. Usually we stop the node when this happens
 // given it might have a non-deterministic root.
 type FatalError struct {
@@ -150,6 +150,12 @@ func IsAFatalError(err error) bool {
 // error type is InsufficientTotalSupplyError
 func IsAInsufficientTotalSupplyError(err error) bool {
 	return errors.Is(err, ErrInsufficientTotalSupply)
+}
+
+// IsWithdrawBalanceRoundingError returns true if the error type is
+// ErrWithdrawBalanceRounding
+func IsWithdrawBalanceRoundingError(err error) bool {
+	return errors.Is(err, ErrWithdrawBalanceRounding)
 }
 
 // IsAUnAuthroizedMethodCallError returns true if the error type is

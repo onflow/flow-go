@@ -7,9 +7,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/fxamacker/cbor/v2"
+	"github.com/onflow/crypto"
 	"github.com/vmihailenco/msgpack"
-
-	"github.com/onflow/flow-go/crypto"
 )
 
 // DefaultInitialWeight is the default initial weight for a node identity.

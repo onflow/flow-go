@@ -27,9 +27,16 @@ import (
 //go:embed contract.cdc
 var contractCode string
 
+//go:embed abiOnlyContract.cdc
+var abiOnlyContractCode string
+
 var flowTokenImportPattern = regexp.MustCompile(`^import "FlowToken"\n`)
 
-func ContractCode(flowTokenAddress flow.Address) []byte {
+func ContractCode(flowTokenAddress flow.Address, evmAbiOnly bool) []byte {
+	if evmAbiOnly {
+		return []byte(abiOnlyContractCode)
+	}
+
 	return []byte(flowTokenImportPattern.ReplaceAllString(
 		contractCode,
 		fmt.Sprintf("import FlowToken from %s", flowTokenAddress.HexWithPrefix()),
@@ -1118,8 +1125,7 @@ func newInternalEVMTypeCallFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			balance := types.Balance(balanceValue)
-
+			balance := types.NewBalanceFromUFix64(cadence.UFix64(balanceValue))
 			// Call
 
 			const isAuthorized = true
@@ -1197,7 +1203,7 @@ func newInternalEVMTypeDepositFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			amount := types.Balance(amountValue)
+			amount := types.NewBalanceFromUFix64(cadence.UFix64(amountValue))
 
 			// Get to address
 
@@ -1264,7 +1270,12 @@ func newInternalEVMTypeBalanceFunction(
 			const isAuthorized = false
 			account := handler.AccountByAddress(address, isAuthorized)
 
-			return interpreter.UFix64Value(account.Balance())
+			// TODO: return roundoff flag or handle it
+			ufix, _, err := types.ConvertBalanceToUFix64(account.Balance())
+			if err != nil {
+				panic(err)
+			}
+			return interpreter.UFix64Value(ufix)
 		},
 	)
 }
@@ -1315,13 +1326,19 @@ func newInternalEVMTypeWithdrawFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			amount := types.Balance(amountValue)
+			amount := types.NewBalanceFromUFix64(cadence.UFix64(amountValue))
 
 			// Withdraw
 
 			const isAuthorized = true
 			account := handler.AccountByAddress(fromAddress, isAuthorized)
 			vault := account.Withdraw(amount)
+
+			// TODO: return rounded off flag or handle it ?
+			ufix, _, err := types.ConvertBalanceToUFix64(vault.Balance())
+			if err != nil {
+				panic(err)
+			}
 
 			// TODO: improve: maybe call actual constructor
 			return interpreter.NewCompositeValue(
@@ -1334,7 +1351,7 @@ func newInternalEVMTypeWithdrawFunction(
 					{
 						Name: "balance",
 						Value: interpreter.NewUFix64Value(gauge, func() uint64 {
-							return uint64(vault.Balance())
+							return uint64(ufix)
 						}),
 					},
 				},
@@ -1419,7 +1436,7 @@ func newInternalEVMTypeDeployFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			amount := types.Balance(amountValue)
+			amount := types.NewBalanceFromUFix64(cadence.UFix64(amountValue))
 
 			// Deploy
 

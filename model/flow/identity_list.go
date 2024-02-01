@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/onflow/crypto"
 	"golang.org/x/exp/slices"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/utils/rand"
 )
 
