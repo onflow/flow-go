@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -32,7 +33,7 @@ func TestEVMRun(t *testing.T) {
 						num := int64(12)
 						chain := flow.Emulator.Chain()
 
-						RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
+						RunWithNewTestVM(t, chain, backend, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
 							sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 							code := []byte(fmt.Sprintf(
 								`
@@ -84,7 +85,11 @@ func TestEVMRun(t *testing.T) {
 	})
 }
 
-func RunWithNewTestVM(t *testing.T, chain flow.Chain, f func(fvm.Context, fvm.VM, snapshot.SnapshotTree)) {
+func RunWithNewTestVM(t *testing.T, chain flow.Chain, backend *TestBackend, f func(fvm.Context, fvm.VM, snapshot.SnapshotTree)) {
+
+	blocks := new(envMock.Blocks)
+	block1 := unittest.BlockFixture()
+	blocks.On("ByHeightFrom", block1.Header.Height, block1.Header).Return(block1.Header, nil)
 
 	opts := []fvm.Option{
 		fvm.WithChain(chain),
@@ -95,7 +100,7 @@ func RunWithNewTestVM(t *testing.T, chain flow.Chain, f func(fvm.Context, fvm.VM
 	ctx := fvm.NewContext(opts...)
 
 	vm := fvm.NewVirtualMachine()
-	snapshotTree := snapshot.NewSnapshotTree(nil)
+	snapshotTree := snapshot.NewSnapshotTree(backend)
 
 	baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
@@ -125,7 +130,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 					chain := flow.Emulator.Chain()
 					sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-					RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
+					RunWithNewTestVM(t, chain, backend, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
 
 						code := []byte(fmt.Sprintf(
 							`
@@ -180,7 +185,7 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 					chain := flow.Emulator.Chain()
 					sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-					RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
+					RunWithNewTestVM(t, chain, backend, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
 
 						code := []byte(fmt.Sprintf(
 							`
@@ -241,7 +246,7 @@ func TestBridgedAccountDeploy(t *testing.T) {
 					chain := flow.Emulator.Chain()
 					sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-					RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
+					RunWithNewTestVM(t, chain, backend, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
 
 						code := []byte(fmt.Sprintf(
 							`
