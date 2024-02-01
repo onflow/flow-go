@@ -198,8 +198,8 @@ func TestBridgedAccountWithdraw(t *testing.T) {
                                    let bridgedAccount <- EVM.createBridgedAccount()
                                    bridgedAccount.deposit(from: <-vault)
 
-								   let bal = EVM.Balance(0)
-								   bal.setFLOW(flow: 1.23)
+                                   let bal = EVM.Balance(0)
+                                   bal.setFLOW(flow: 1.23)
                                    let vault2 <- bridgedAccount.withdraw(balance: bal)
                                    let balance = vault2.balance
                                    destroy bridgedAccount
