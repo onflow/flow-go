@@ -64,9 +64,10 @@ func (s *EmulatorSuite) SetupTest() {
 	s.deployDKGContract()
 	s.setupDKGAdmin()
 
-	s.netIDs = unittest.IdentityListFixture(numberOfNodes, unittest.WithRole(flow.RoleConsensus))
-	for _, id := range s.netIDs {
+	boostrapNodesInfo := unittest.PrivateNodeInfosFixture(numberOfNodes, unittest.WithRole(flow.RoleConsensus))
+	for _, id := range boostrapNodesInfo {
 		s.nodeAccounts = append(s.nodeAccounts, s.createAndFundAccount(id))
+		s.netIDs = append(s.netIDs, id.Identity())
 	}
 
 	for _, acc := range s.nodeAccounts {
@@ -88,6 +89,7 @@ func (s *EmulatorSuite) BeforeTest(_, testName string) {
 	}
 	// We need to initialise the nodes with a list of identities that contain
 	// all roles, otherwise there would be an error initialising the first epoch
+
 	identities := unittest.CompleteIdentitySet(s.netIDs...)
 	for _, node := range s.nodes {
 		s.initEngines(node, identities)
@@ -158,7 +160,7 @@ func (s *EmulatorSuite) deployDKGContract() {
 func (s *EmulatorSuite) setupDKGAdmin() {
 	setUpAdminTx := sdk.NewTransaction().
 		SetScript(templates.GeneratePublishDKGParticipantScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(
 			s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index,
@@ -175,7 +177,7 @@ func (s *EmulatorSuite) setupDKGAdmin() {
 }
 
 // createAndFundAccount creates a nodeAccount and funds it in the emulator
-func (s *EmulatorSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
+func (s *EmulatorSuite) createAndFundAccount(netID bootstrap.NodeInfo) *nodeAccount {
 	accountPrivateKey := lib.RandomPrivateKey()
 	accountKey := sdk.NewAccountKey().
 		FromPrivateKey(accountPrivateKey).
@@ -303,7 +305,7 @@ func (s *EmulatorSuite) startDKGWithParticipants(accounts []*nodeAccount) {
 	// start DKG using admin resource
 	startDKGTx := sdk.NewTransaction().
 		SetScript(templates.GenerateStartDKGScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(
 			s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index,
@@ -330,7 +332,7 @@ func (s *EmulatorSuite) startDKGWithParticipants(accounts []*nodeAccount) {
 func (s *EmulatorSuite) claimDKGParticipant(node *node) {
 	createParticipantTx := sdk.NewTransaction().
 		SetScript(templates.GenerateCreateDKGParticipantScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(
 			s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index,
@@ -461,12 +463,6 @@ func (s *EmulatorSuite) initEngines(node *node, ids flow.IdentityList) {
 		controllerFactoryLogger = zerolog.New(os.Stdout).Hook(hook)
 	}
 
-	// create a config with no delays for tests
-	config := dkg.ControllerConfig{
-		BaseStartDelay:                0,
-		BaseHandleFirstBroadcastDelay: 0,
-	}
-
 	// the reactor engine reacts to new views being finalized and drives the
 	// DKG protocol
 	reactorEngine := dkgeng.NewReactorEngine(
@@ -479,7 +475,6 @@ func (s *EmulatorSuite) initEngines(node *node, ids flow.IdentityList) {
 			core.Me,
 			[]module.DKGContractClient{node.dkgContractClient},
 			brokerTunnel,
-			config,
 		),
 		viewsObserver,
 	)

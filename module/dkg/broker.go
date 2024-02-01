@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/model/flow"
@@ -59,7 +59,7 @@ type Broker struct {
 	log                       zerolog.Logger
 	unit                      *engine.Unit
 	dkgInstanceID             string                            // unique identifier of the current dkg run (prevent replay attacks)
-	committee                 flow.IdentityList                 // identities of DKG members
+	committee                 flow.IdentitySkeletonList         // identities of DKG members
 	me                        module.Local                      // used for signing broadcast messages
 	myIndex                   int                               // index of this instance in the committee
 	dkgContractClients        []module.DKGContractClient        // array of clients to communicate with the DKG smart contract in priority order for fallbacks during retries
@@ -84,7 +84,7 @@ var _ module.DKGBroker = (*Broker)(nil)
 func NewBroker(
 	log zerolog.Logger,
 	dkgInstanceID string,
-	committee flow.IdentityList,
+	committee flow.IdentitySkeletonList,
 	me module.Local,
 	myIndex int,
 	dkgContractClients []module.DKGContractClient,
@@ -345,7 +345,7 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 			continue
 		}
 		if !ok {
-			b.log.Error().Msg("invalid signature on broadcast dkg message")
+			b.log.Error().Err(err).Msg("invalid signature on broadcast dkg message")
 			continue
 		}
 		b.log.Debug().Msgf("forwarding broadcast message to controller")
@@ -470,7 +470,7 @@ func (b *Broker) prepareBroadcastMessage(data []byte) (messages.BroadcastDKGMess
 func (b *Broker) verifyBroadcastMessage(bcastMsg messages.BroadcastDKGMessage) (bool, error) {
 	err := b.hasValidDKGInstanceID(bcastMsg.DKGMessage)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("invalid dkg instance: %w", err)
 	}
 	origin := b.committee[bcastMsg.CommitteeMemberIndex]
 	signData := fingerprint.Fingerprint(bcastMsg.DKGMessage)

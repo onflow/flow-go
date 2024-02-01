@@ -68,24 +68,28 @@ type GenericNode struct {
 	Cancel context.CancelFunc
 	Errs   <-chan error
 
-	Log                zerolog.Logger
-	Metrics            *metrics.NoopCollector
-	Tracer             module.Tracer
-	PublicDB           *badger.DB
-	SecretsDB          *badger.DB
-	Headers            storage.Headers
-	Guarantees         storage.Guarantees
-	Seals              storage.Seals
-	Payloads           storage.Payloads
-	Blocks             storage.Blocks
-	QuorumCertificates storage.QuorumCertificates
-	State              protocol.ParticipantState
-	Index              storage.Index
-	Me                 module.Local
-	Net                *stub.Network
-	DBDir              string
-	ChainID            flow.ChainID
-	ProtocolEvents     *events.Distributor
+	Log                    zerolog.Logger
+	Metrics                *metrics.NoopCollector
+	Tracer                 module.Tracer
+	PublicDB               *badger.DB
+	SecretsDB              *badger.DB
+	Headers                storage.Headers
+	Guarantees             storage.Guarantees
+	Seals                  storage.Seals
+	Payloads               storage.Payloads
+	Blocks                 storage.Blocks
+	QuorumCertificates     storage.QuorumCertificates
+	Results                storage.ExecutionResults
+	Setups                 storage.EpochSetups
+	EpochCommits           storage.EpochCommits
+	ProtocolStateSnapshots storage.ProtocolState
+	State                  protocol.ParticipantState
+	Index                  storage.Index
+	Me                     module.Local
+	Net                    *stub.Network
+	DBDir                  string
+	ChainID                flow.ChainID
+	ProtocolEvents         *events.Distributor
 }
 
 func (g *GenericNode) Done() {
@@ -203,6 +207,7 @@ type ExecutionNode struct {
 	Collections         storage.Collections
 	Finalizer           *consensus.Finalizer
 	MyExecutionReceipts storage.MyExecutionReceipts
+	StorehouseEnabled   bool
 }
 
 func (en ExecutionNode) Ready(ctx context.Context) {
@@ -247,12 +252,23 @@ func (en ExecutionNode) Done(cancelFunc context.CancelFunc) {
 }
 
 func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.Header) {
-
 	height, blockID, err := en.ExecutionState.GetHighestExecutedBlockID(context.Background())
 	require.NoError(t, err)
 
 	require.Equal(t, header.ID(), blockID)
 	require.Equal(t, header.Height, height)
+}
+
+func (en ExecutionNode) AssertBlockIsExecuted(t *testing.T, header *flow.Header) {
+	executed, err := en.ExecutionState.IsBlockExecuted(header.Height, header.ID())
+	require.NoError(t, err)
+	require.True(t, executed)
+}
+
+func (en ExecutionNode) AssertBlockNotExecuted(t *testing.T, header *flow.Header) {
+	executed, err := en.ExecutionState.IsBlockExecuted(header.Height, header.ID())
+	require.NoError(t, err)
+	require.False(t, executed)
 }
 
 // VerificationNode implements an in-process verification node for tests.

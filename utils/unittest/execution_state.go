@@ -4,10 +4,9 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
-
 	"github.com/onflow/cadence"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -24,6 +23,7 @@ const ServiceAccountPrivateKeySignAlgo = crypto.ECDSAP256
 const ServiceAccountPrivateKeyHashAlgo = hash.SHA2_256
 
 // Pre-calculated state commitment with root account with the above private key
+// ====MERGE: may need to change below
 const GenesisStateCommitmentHex = "c433591f3d737e2fa01eda78ab98a286868041c412f679ec3fb3f71b15c76ac7"
 
 var GenesisStateCommitment flow.StateCommitment
@@ -88,7 +88,16 @@ func genesisCommitHexByChainID(chainID flow.ChainID) string {
 		return GenesisStateCommitmentHex
 	}
 	if chainID == flow.Testnet {
+<<<<<<< HEAD
 		return "5d2dfefa5c41dc1fd7ec517c88291a6a3c337b95da19590da33135ea51cd8ee5"
 	}
 	return "68a21698fa76177c5747cba5c5c2d5d27140beea918119167d878dfc16f1cc6f"
+=======
+		return "b048e9114f816d26f71aeb6aa425161b281ebeddbcd323a5f30e571ac911dfa3"
+	}
+	if chainID == flow.Sandboxnet {
+		return "e1c08b17f9e5896f03fe28dd37ca396c19b26628161506924fbf785834646ea1"
+	}
+	return "ef65504ae38f3666acdd1a3cc260620464827082a7c554751527a82bdee4dc89"
+>>>>>>> master
 }

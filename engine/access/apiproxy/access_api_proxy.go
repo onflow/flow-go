@@ -43,16 +43,6 @@ func (h *FlowAccessAPIRouter) log(handler, rpc string, err error) {
 	logger.Info().Msg("request succeeded")
 }
 
-// TODO: this is implemented in https://github.com/onflow/flow-go/pull/4957, remove when merged
-func (h *FlowAccessAPIRouter) GetProtocolStateSnapshotByBlockID(ctx context.Context, request *access.GetProtocolStateSnapshotByBlockIDRequest) (*access.ProtocolStateSnapshotResponse, error) {
-	panic("implement me")
-}
-
-// TODO: this is implemented in https://github.com/onflow/flow-go/pull/4957, remove when merged
-func (h *FlowAccessAPIRouter) GetProtocolStateSnapshotByHeight(ctx context.Context, request *access.GetProtocolStateSnapshotByHeightRequest) (*access.ProtocolStateSnapshotResponse, error) {
-	panic("implement me")
-}
-
 // Ping pings the service. It is special in the sense that it responds successful,
 // only if all underlying services are ready.
 func (h *FlowAccessAPIRouter) Ping(context context.Context, req *access.PingRequest) (*access.PingResponse, error) {
@@ -216,6 +206,18 @@ func (h *FlowAccessAPIRouter) GetLatestProtocolStateSnapshot(context context.Con
 	return res, err
 }
 
+func (h *FlowAccessAPIRouter) GetProtocolStateSnapshotByBlockID(context context.Context, req *access.GetProtocolStateSnapshotByBlockIDRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	res, err := h.Observer.GetProtocolStateSnapshotByBlockID(context, req)
+	h.log("observer", "GetProtocolStateSnapshotByBlockID", err)
+	return res, err
+}
+
+func (h *FlowAccessAPIRouter) GetProtocolStateSnapshotByHeight(context context.Context, req *access.GetProtocolStateSnapshotByHeightRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	res, err := h.Observer.GetProtocolStateSnapshotByHeight(context, req)
+	h.log("observer", "GetProtocolStateSnapshotByHeight", err)
+	return res, err
+}
+
 func (h *FlowAccessAPIRouter) GetExecutionResultForBlockID(context context.Context, req *access.GetExecutionResultForBlockIDRequest) (*access.ExecutionResultForBlockIDResponse, error) {
 	res, err := h.Upstream.GetExecutionResultForBlockID(context, req)
 	h.log("upstream", "GetExecutionResultForBlockID", err)
@@ -233,7 +235,7 @@ type FlowAccessAPIForwarder struct {
 	*forwarder.Forwarder
 }
 
-func NewFlowAccessAPIForwarder(identities flow.IdentityList, connectionFactory connection.ConnectionFactory) (*FlowAccessAPIForwarder, error) {
+func NewFlowAccessAPIForwarder(identities flow.IdentitySkeletonList, connectionFactory connection.ConnectionFactory) (*FlowAccessAPIForwarder, error) {
 	forwarder, err := forwarder.NewForwarder(identities, connectionFactory)
 	if err != nil {
 		return nil, err

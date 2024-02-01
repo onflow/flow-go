@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 
-	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
@@ -601,7 +600,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 			serviceEvents := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
 
-			payload, err := ccf.Decode(nil, unittest.EpochSetupFixtureCCF)
+			randomSource := unittest.EpochSetupRandomSourceFixture()
+			payload, err := ccf.Decode(nil, unittest.EpochSetupFixtureCCF(randomSource))
 			require.NoError(t, err)
 
 			serviceEventA, ok := payload.(cadence.Event)
@@ -1255,7 +1255,8 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	noopCollector := metrics.NewNoopCollector()
 
 	expectedNumberOfEvents := 3
-	expectedEventSize := 1478
+	// MERGE: may need to adjust
+	expectedEventSize := 1493
 	// bootstrapping does not cache programs
 	expectedCachedPrograms := 0
 

@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/state"
 	realproto "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
@@ -393,13 +394,13 @@ func (bc *BaseChainSuite) SetupChain() {
 func StateSnapshotForUnknownBlock() *protocol.Snapshot {
 	snapshot := &protocol.Snapshot{}
 	snapshot.On("Identity", mock.Anything).Return(
-		nil, storerr.ErrNotFound,
+		nil, state.ErrUnknownSnapshotReference,
 	)
 	snapshot.On("Identities", mock.Anything).Return(
-		nil, storerr.ErrNotFound,
+		nil, state.ErrUnknownSnapshotReference,
 	)
 	snapshot.On("Head", mock.Anything).Return(
-		nil, storerr.ErrNotFound,
+		nil, state.ErrUnknownSnapshotReference,
 	)
 	return snapshot
 }
@@ -419,7 +420,7 @@ func StateSnapshotForKnownBlock(block *flow.Header, identities map[flow.Identifi
 		},
 	)
 	snapshot.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			var idts flow.IdentityList
 			for _, i := range identities {
 				if selector(i) {
@@ -428,7 +429,7 @@ func StateSnapshotForKnownBlock(block *flow.Header, identities map[flow.Identifi
 			}
 			return idts
 		},
-		func(selector flow.IdentityFilter) error {
+		func(selector flow.IdentityFilter[flow.Identity]) error {
 			return nil
 		},
 	)

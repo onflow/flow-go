@@ -47,19 +47,19 @@ import (
 	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/p2p"
+	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
+	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dns"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
+	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -309,21 +309,21 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 	// setup default rate limiter options
 	unicastRateLimiterOpts := []ratelimit.RateLimitersOption{
-		ratelimit.WithDisabledRateLimiting(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.DryRun),
+		ratelimit.WithDisabledRateLimiting(fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.DryRun),
 		ratelimit.WithNotifier(fnb.UnicastRateLimiterDistributor),
 	}
 
 	// override noop unicast message rate limiter
-	if fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.MessageRateLimit > 0 {
+	if fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.MessageRateLimit > 0 {
 		unicastMessageRateLimiter := ratelimiter.NewRateLimiter(
-			rate.Limit(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.MessageRateLimit),
-			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.MessageRateLimit,
-			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.LockoutDuration,
+			rate.Limit(fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.MessageRateLimit),
+			fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.MessageRateLimit,
+			fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.LockoutDuration,
 		)
 		unicastRateLimiterOpts = append(unicastRateLimiterOpts, ratelimit.WithMessageRateLimiter(unicastMessageRateLimiter))
 
 		// avoid connection gating and pruning during dry run
-		if !fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.DryRun {
+		if !fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.DryRun {
 			f := rateLimiterPeerFilter(unicastMessageRateLimiter)
 			// add IsRateLimited peerFilters to conn gater intercept secure peer and peer manager filters list
 			// don't allow rate limited peers to establishing incoming connections
@@ -334,16 +334,16 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	}
 
 	// override noop unicast bandwidth rate limiter
-	if fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.BandwidthRateLimit > 0 && fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.BandwidthBurstLimit > 0 {
+	if fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.BandwidthRateLimit > 0 && fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.BandwidthBurstLimit > 0 {
 		unicastBandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(
-			rate.Limit(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.BandwidthRateLimit),
-			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.BandwidthBurstLimit,
-			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.LockoutDuration,
+			rate.Limit(fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.BandwidthRateLimit),
+			fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.BandwidthBurstLimit,
+			fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.LockoutDuration,
 		)
 		unicastRateLimiterOpts = append(unicastRateLimiterOpts, ratelimit.WithBandwidthRateLimiter(unicastBandwidthRateLimiter))
 
 		// avoid connection gating and pruning during dry run
-		if !fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.DryRun {
+		if !fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.DryRun {
 			f := rateLimiterPeerFilter(unicastBandwidthRateLimiter)
 			// add IsRateLimited peerFilters to conn gater intercept secure peer and peer manager filters list
 			connGaterInterceptSecureFilters = append(connGaterInterceptSecureFilters, f)
@@ -354,17 +354,17 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	// setup unicast rate limiters
 	unicastRateLimiters := ratelimit.NewRateLimiters(unicastRateLimiterOpts...)
 
-	uniCfg := &p2pconfig.UnicastConfig{
-		UnicastConfig:          fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig,
+	uniCfg := &p2pbuilderconfig.UnicastConfig{
+		Unicast:                fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast,
 		RateLimiterDistributor: fnb.UnicastRateLimiterDistributor,
 	}
 
-	connGaterCfg := &p2pconfig.ConnectionGaterConfig{
+	connGaterCfg := &p2pbuilderconfig.ConnectionGaterConfig{
 		InterceptPeerDialFilters: connGaterPeerDialFilters,
 		InterceptSecuredFilters:  connGaterInterceptSecureFilters,
 	}
 
-	peerManagerCfg := &p2pconfig.PeerManagerConfig{
+	peerManagerCfg := &p2pbuilderconfig.PeerManagerConfig{
 		ConnectionPruning: fnb.FlowConfig.NetworkConfig.NetworkConnectionPruning,
 		UpdateInterval:    fnb.FlowConfig.NetworkConfig.PeerUpdateInterval,
 		ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
@@ -386,7 +386,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.NetworkKey,
 			fnb.SporkID,
 			fnb.IdentityProvider,
-			&p2pconfig.MetricsConfig{
+			&p2pbuilderconfig.MetricsConfig{
 				Metrics:          fnb.Metrics.Network,
 				HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
 			},
@@ -394,10 +394,10 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.BaseConfig.NodeRole,
 			connGaterCfg,
 			peerManagerCfg,
-			&fnb.FlowConfig.NetworkConfig.GossipSubConfig,
+			&fnb.FlowConfig.NetworkConfig.GossipSub,
 			&fnb.FlowConfig.NetworkConfig.ResourceManager,
 			uniCfg,
-			&fnb.FlowConfig.NetworkConfig.ConnectionManagerConfig,
+			&fnb.FlowConfig.NetworkConfig.ConnectionManager,
 			&p2p.DisallowListCacheConfig{
 				MaxSize: fnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 				Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
@@ -452,22 +452,22 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 	unicastRateLimiters *ratelimit.RateLimiters,
 	peerManagerFilters []p2p.PeerFilter) (network.EngineRegistry, error) {
 
-	var networkOptions []p2pnet.NetworkOption
+	var networkOptions []underlay.NetworkOption
 	if len(fnb.MsgValidators) > 0 {
-		networkOptions = append(networkOptions, p2pnet.WithMessageValidators(fnb.MsgValidators...))
+		networkOptions = append(networkOptions, underlay.WithMessageValidators(fnb.MsgValidators...))
 	}
 
 	// by default if no rate limiter configuration was provided in the CLI args the default
 	// noop rate limiter will be used.
-	networkOptions = append(networkOptions, p2pnet.WithUnicastRateLimiters(unicastRateLimiters))
+	networkOptions = append(networkOptions, underlay.WithUnicastRateLimiters(unicastRateLimiters))
 
 	networkOptions = append(networkOptions,
-		p2pnet.WithPreferredUnicastProtocols(protocols.ToProtocolNames(fnb.FlowConfig.NetworkConfig.PreferredUnicastProtocols)...),
+		underlay.WithPreferredUnicastProtocols(protocols.ToProtocolNames(fnb.FlowConfig.NetworkConfig.PreferredUnicastProtocols)...),
 	)
 
 	// peerManagerFilters are used by the peerManager via the network to filter peers from the topology.
 	if len(peerManagerFilters) > 0 {
-		networkOptions = append(networkOptions, p2pnet.WithPeerManagerFilters(peerManagerFilters...))
+		networkOptions = append(networkOptions, underlay.WithPeerManagerFilters(peerManagerFilters...))
 	}
 
 	receiveCache := netcache.NewHeroReceiveCache(fnb.FlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
@@ -480,7 +480,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 	}
 
 	// creates network instance
-	net, err := p2pnet.NewNetwork(&p2pnet.NetworkConfig{
+	net, err := underlay.NewNetwork(&underlay.NetworkConfig{
 		Logger:                fnb.Logger,
 		Libp2pNode:            fnb.LibP2PNode,
 		Codec:                 fnb.CodecFactory(),
@@ -492,7 +492,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 		IdentityProvider:      fnb.IdentityProvider,
 		ReceiveCache:          receiveCache,
 		ConduitFactory:        cf,
-		UnicastMessageTimeout: fnb.FlowConfig.NetworkConfig.UnicastMessageTimeout,
+		UnicastMessageTimeout: fnb.FlowConfig.NetworkConfig.Unicast.MessageTimeout,
 		IdentityTranslator:    fnb.IDTranslator,
 		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
 			Logger:                  fnb.Logger,
@@ -755,10 +755,7 @@ func (fnb *FlowNodeBuilder) initMetrics() error {
 		// metrics enabled, report node info metrics as post init event
 		fnb.PostInit(func(nodeConfig *NodeConfig) error {
 			nodeInfoMetrics := metrics.NewNodeInfoCollector()
-			protocolVersion, err := fnb.RootSnapshot.Params().ProtocolVersion()
-			if err != nil {
-				return fmt.Errorf("could not query root snapshoot protocol version: %w", err)
-			}
+			protocolVersion := fnb.RootSnapshot.Params().ProtocolVersion()
 			nodeInfoMetrics.NodeInfo(build.Version(), build.Commit(), nodeConfig.SporkID.String(), protocolVersion)
 			return nil
 		})
@@ -1006,8 +1003,9 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	collections := bstorage.NewCollections(fnb.DB, transactions)
 	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
 	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
-	statuses := bstorage.NewEpochStatuses(fnb.Metrics.Cache, fnb.DB)
 	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
+	protocolState := bstorage.NewProtocolState(fnb.Metrics.Cache, setups, epochCommits, fnb.DB,
+		bstorage.DefaultProtocolStateCacheSize, bstorage.DefaultProtocolStateByBlockIDCacheSize)
 	versionBeacons := bstorage.NewVersionBeacons(fnb.DB)
 
 	fnb.Storage = Storage{
@@ -1025,7 +1023,7 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		Setups:             setups,
 		EpochCommits:       epochCommits,
 		VersionBeacons:     versionBeacons,
-		Statuses:           statuses,
+		ProtocolState:      protocolState,
 		Commits:            commits,
 	}
 
@@ -1059,9 +1057,9 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(
 			filter.And(
-				filter.HasRole(flow.RoleConsensus),
-				filter.Not(filter.HasNodeID(node.Me.NodeID())),
-				p2pnet.NotEjectedFilter,
+				filter.HasRole[flow.Identity](flow.RoleConsensus),
+				filter.Not(filter.HasNodeID[flow.Identity](node.Me.NodeID())),
+				underlay.NotEjectedFilter,
 			),
 			node.IdentityProvider,
 		)
@@ -1089,7 +1087,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.QuorumCertificates,
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
-			fnb.Storage.Statuses,
+			fnb.Storage.ProtocolState,
 			fnb.Storage.VersionBeacons,
 		)
 		if err != nil {
@@ -1098,11 +1096,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 		fnb.State = state
 
 		// set root snapshot field
-		rootBlock, err := state.Params().FinalizedRoot()
-		if err != nil {
-			return fmt.Errorf("could not get root block from protocol state: %w", err)
-		}
-
+		rootBlock := state.Params().FinalizedRoot()
 		rootSnapshot := state.AtBlockID(rootBlock.ID())
 		if err := fnb.setRootSnapshot(rootSnapshot); err != nil {
 			return err
@@ -1141,7 +1135,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.QuorumCertificates,
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
-			fnb.Storage.Statuses,
+			fnb.Storage.ProtocolState,
 			fnb.Storage.VersionBeacons,
 			fnb.RootSnapshot,
 			options...,
@@ -1230,10 +1224,7 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 	}
 
 	fnb.RootChainID = fnb.FinalizedRootBlock.Header.ChainID
-	fnb.SporkID, err = fnb.RootSnapshot.Params().SporkID()
-	if err != nil {
-		return fmt.Errorf("failed to read spork ID: %w", err)
-	}
+	fnb.SporkID = fnb.RootSnapshot.Params().SporkID()
 
 	return nil
 }
@@ -1257,11 +1248,7 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 	// We enforce this strictly for MainNet. For other networks (e.g. TestNet or BenchNet), we
 	// are lenient, to allow ghost node to run as any role.
 	if self.Role.String() != fnb.BaseConfig.NodeRole {
-		rootBlockHeader, err := fnb.State.Params().FinalizedRoot()
-		if err != nil {
-			return fmt.Errorf("could not get root block from protocol state: %w", err)
-		}
-
+		rootBlockHeader := fnb.State.Params().FinalizedRoot()
 		if rootBlockHeader.ChainID == flow.Mainnet {
 			return fmt.Errorf("running as incorrect role, expected: %v, actual: %v, exiting",
 				self.Role.String(),
@@ -1282,7 +1269,7 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 		return fmt.Errorf("configured staking key does not match protocol state")
 	}
 
-	fnb.Me, err = local.New(self, fnb.StakingKey)
+	fnb.Me, err = local.New(self.IdentitySkeleton, fnb.StakingKey)
 	if err != nil {
 		return fmt.Errorf("could not initialize local: %w", err)
 	}

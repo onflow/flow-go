@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/network/codec"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 )
 
 var (
@@ -122,7 +122,7 @@ func (av *AuthorizedSenderValidator) Validate(from peer.ID, payload []byte, chan
 //   - message.ErrUnauthorizedMessageOnChannel if msg is not authorized to be sent on channel
 //   - message.ErrUnauthorizedRole if sender role is not authorized to send msg
 func (av *AuthorizedSenderValidator) isAuthorizedSender(identity *flow.Identity, channel channels.Channel, msgCode codec.MessageCode, protocol message.ProtocolType) (string, error) {
-	if identity.Ejected {
+	if identity.IsEjected() {
 		return "", ErrSenderEjected
 	}
 

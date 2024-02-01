@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
@@ -14,7 +15,9 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
+	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 type BackendEventsSuite struct {
@@ -29,8 +32,30 @@ func (s *BackendEventsSuite) SetupTest() {
 	s.BackendExecutionDataSuite.SetupTest()
 }
 
-// TestSubscribeEvents tests the SubscribeEvents method happy path
-func (s *BackendEventsSuite) TestSubscribeEvents() {
+// TestSubscribeEventsFromExecutionData tests the SubscribeEvents method happy path for events
+// extracted from ExecutionData
+func (s *BackendEventsSuite) TestSubscribeEventsFromExecutionData() {
+	s.runTestSubscribeEvents()
+}
+
+// TestSubscribeEventsFromLocalStorage tests the SubscribeEvents method happy path for events
+// extracted from local storage
+func (s *BackendEventsSuite) TestSubscribeEventsFromLocalStorage() {
+	s.backend.useIndex = true
+	s.events.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
+		mocks.StorageMapGetter(s.blockEvents),
+	)
+
+	reporter := syncmock.NewIndexReporter(s.T())
+	reporter.On("LowestIndexedHeight").Return(s.blocks[0].Header.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(s.blocks[len(s.blocks)-1].Header.Height, nil)
+	err := s.eventsIndex.Initialize(reporter)
+	s.Require().NoError(err)
+
+	s.runTestSubscribeEvents()
+}
+
+func (s *BackendEventsSuite) runTestSubscribeEvents() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -77,9 +102,6 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 		},
 	}
 
-	// supports simple address comparisions for testing
-	chain := flow.MonotonicEmulator.Chain()
-
 	// create variations for each of the base test
 	tests := make([]testType, 0, len(baseTests)*3)
 	for _, test := range baseTests {
@@ -90,13 +112,13 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 
 		t2 := test
 		t2.name = fmt.Sprintf("%s - some events", test.name)
-		t2.filters, err = state_stream.NewEventFilter(state_stream.DefaultEventFilterConfig, chain, []string{string(testEventTypes[0])}, nil, nil)
+		t2.filters, err = state_stream.NewEventFilter(state_stream.DefaultEventFilterConfig, chainID.Chain(), []string{string(testEventTypes[0])}, nil, nil)
 		require.NoError(s.T(), err)
 		tests = append(tests, t2)
 
 		t3 := test
 		t3.name = fmt.Sprintf("%s - no events", test.name)
-		t3.filters, err = state_stream.NewEventFilter(state_stream.DefaultEventFilterConfig, chain, []string{"A.0x1.NonExistent.Event"}, nil, nil)
+		t3.filters, err = state_stream.NewEventFilter(state_stream.DefaultEventFilterConfig, chainID.Chain(), []string{"A.0x1.NonExistent.Event"}, nil, nil)
 		require.NoError(s.T(), err)
 		tests = append(tests, t3)
 	}
@@ -126,7 +148,7 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 					s.broadcaster.Publish()
 				}
 
-				expectedEvents := flow.EventsList{}
+				var expectedEvents flow.EventsList
 				for _, event := range s.blockEvents[b.ID()] {
 					if test.filters.Match(event) {
 						expectedEvents = append(expectedEvents, event)
@@ -203,5 +225,38 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 
 		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Header.Height+10, state_stream.EventFilter{})
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+	})
+
+	s.backend.useIndex = true
+
+	s.Run("returns error for uninitialized index", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		// Note: eventIndex.Initialize() is not called in this test
+		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, 0, state_stream.EventFilter{})
+		assert.Equal(s.T(), codes.FailedPrecondition, status.Code(sub.Err()), "expected FailedPrecondition, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+	})
+
+	reporter := syncmock.NewIndexReporter(s.T())
+	reporter.On("LowestIndexedHeight").Return(s.blocks[1].Header.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(s.blocks[len(s.blocks)-2].Header.Height, nil)
+	err := s.eventsIndex.Initialize(reporter)
+	s.Require().NoError(err)
+
+	s.Run("returns error for start below lowest indexed", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.blocks[0].Header.Height, state_stream.EventFilter{})
+		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+	})
+
+	s.Run("returns error for start above highest indexed", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Header.Height, state_stream.EventFilter{})
+		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 }

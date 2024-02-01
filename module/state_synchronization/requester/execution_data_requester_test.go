@@ -789,18 +789,19 @@ func (m *mockSnapshot) Head() (*flow.Header, error) {
 
 // none of these are used in this test
 func (m *mockSnapshot) QuorumCertificate() (*flow.QuorumCertificate, error) { return nil, nil }
-func (m *mockSnapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (m *mockSnapshot) Identities(selector flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
 	return nil, nil
 }
 func (m *mockSnapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) { return nil, nil }
 func (m *mockSnapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 	return nil, nil, nil
 }
-func (m *mockSnapshot) Commit() (flow.StateCommitment, error)             { return flow.DummyStateCommitment, nil }
-func (m *mockSnapshot) SealingSegment() (*flow.SealingSegment, error)     { return nil, nil }
-func (m *mockSnapshot) Descendants() ([]flow.Identifier, error)           { return nil, nil }
-func (m *mockSnapshot) RandomSource() ([]byte, error)                     { return nil, nil }
-func (m *mockSnapshot) Phase() (flow.EpochPhase, error)                   { return flow.EpochPhaseUndefined, nil }
-func (m *mockSnapshot) Epochs() protocol.EpochQuery                       { return nil }
-func (m *mockSnapshot) Params() protocol.GlobalParams                     { return nil }
-func (m *mockSnapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) { return nil, nil }
+func (m *mockSnapshot) Commit() (flow.StateCommitment, error)                 { return flow.DummyStateCommitment, nil }
+func (m *mockSnapshot) SealingSegment() (*flow.SealingSegment, error)         { return nil, nil }
+func (m *mockSnapshot) Descendants() ([]flow.Identifier, error)               { return nil, nil }
+func (m *mockSnapshot) RandomSource() ([]byte, error)                         { return nil, nil }
+func (m *mockSnapshot) Phase() (flow.EpochPhase, error)                       { return flow.EpochPhaseUndefined, nil }
+func (m *mockSnapshot) Epochs() protocol.EpochQuery                           { return nil }
+func (m *mockSnapshot) Params() protocol.GlobalParams                         { return nil }
+func (m *mockSnapshot) ProtocolState() (protocol.DynamicProtocolState, error) { return nil, nil }
+func (m *mockSnapshot) VersionBeacon() (*flow.SealedVersionBeacon, error)     { return nil, nil }

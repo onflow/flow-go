@@ -31,10 +31,8 @@ const finalizeHappyPathLogs = "using default epoch timing config with root epoch
 	`reading root block votes` +
 	`read vote .*` +
 	`reading dkg data` +
+	`reading intermediary bootstrapping data` +
 	`constructing root QC` +
-	`computing collection node clusters` +
-	`constructing root blocks for collection node clusters` +
-	`constructing root QCs for collection node clusters` +
 	`constructing root execution result and block seal` +
 	`constructing root protocol snapshot` +
 	`wrote file \S+/root-protocol-state-snapshot.json` +
@@ -70,10 +68,6 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagRootChain = chainName
 		flagRootParent = hex.EncodeToString(rootParent[:])
 		flagRootHeight = rootHeight
-
-		// rootBlock will generate DKG and place it into bootDir/public-root-information
-		rootBlock(nil, nil)
-
 		flagRootCommit = hex.EncodeToString(rootCommit[:])
 		flagEpochCounter = epochCounter
 		flagNumViewsInEpoch = 100_000
@@ -81,7 +75,12 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagNumViewsInDKGPhase = 2_000
 		flagUseDefaultEpochTargetEndTime = true
 		flagEpochCommitSafetyThreshold = 1_000
-		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
+
+		// rootBlock will generate DKG and place it into bootDir/public-root-information
+		rootBlock(nil, nil)
+
+		flagRootBlockPath = filepath.Join(bootDir, model.PathRootBlockData)
+		flagIntermediaryBootstrappingDataPath = filepath.Join(bootDir, model.PathIntermediaryBootstrappingData)
 		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
 		flagRootBlockVotesDir = filepath.Join(bootDir, model.DirnameRootBlockVotes)
 

@@ -14,7 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
 
@@ -167,7 +167,7 @@ func FilterStream(host host.Host, targetID peer.ID, options ...FilterOption) []n
 }
 
 // NetworkingInfo returns ip, port, libp2p public key of the identity.
-func NetworkingInfo(identity flow.Identity) (string, string, crypto.PubKey, error) {
+func NetworkingInfo(identity flow.IdentitySkeleton) (string, string, crypto.PubKey, error) {
 	// split the node address into ip and port
 	ip, port, err := net.SplitHostPort(identity.Address)
 	if err != nil {

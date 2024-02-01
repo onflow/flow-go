@@ -138,6 +138,20 @@ func (_m *ExecutionState) GetHighestExecutedBlockID(_a0 context.Context) (uint64
 	return r0, r1, r2
 }
 
+// GetHighestFinalizedExecuted provides a mock function with given fields:
+func (_m *ExecutionState) GetHighestFinalizedExecuted() uint64 {
+	ret := _m.Called()
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	return r0
+}
+
 // IsBlockExecuted provides a mock function with given fields: height, blockID
 func (_m *ExecutionState) IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error) {
 	ret := _m.Called(height, blockID)

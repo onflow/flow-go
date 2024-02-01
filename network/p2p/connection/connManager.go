@@ -31,7 +31,7 @@ var _ connmgr.ConnManager = (*ConnManager)(nil)
 // It errors if creating the basic connection manager of libp2p fails.
 // The error is not benign, and we should crash the node if it happens.
 // It is a malpractice to start the node without connection manager.
-func NewConnManager(logger zerolog.Logger, metric module.LibP2PConnectionMetrics, cfg *netconf.ConnectionManagerConfig) (*ConnManager, error) {
+func NewConnManager(logger zerolog.Logger, metric module.LibP2PConnectionMetrics, cfg *netconf.ConnectionManager) (*ConnManager, error) {
 	basic, err := libp2pconnmgr.NewConnManager(
 		cfg.LowWatermark,
 		cfg.HighWatermark,

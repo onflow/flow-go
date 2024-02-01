@@ -25,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/channels"
 	psEvents "github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -37,7 +36,6 @@ type Engine struct {
 
 	unit                *engine.Unit
 	log                 zerolog.Logger
-	me                  module.Local
 	collectionFetcher   CollectionFetcher
 	headers             storage.Headers // see comments on getHeaderByHeight for why we need it
 	blocks              storage.Blocks
@@ -47,7 +45,6 @@ type Engine struct {
 	mempool             *Mempool
 	execState           state.ExecutionState
 	metrics             module.ExecutionMetrics
-	maxCollectionHeight uint64
 	tracer              module.Tracer
 	extensiveLogging    bool
 	executionDataPruner *pruner.Pruner
@@ -60,7 +57,6 @@ func New(
 	unit *engine.Unit,
 	logger zerolog.Logger,
 	net network.EngineRegistry,
-	me module.Local,
 	collectionFetcher CollectionFetcher,
 	headers storage.Headers,
 	blocks storage.Blocks,
@@ -83,7 +79,6 @@ func New(
 	eng := Engine{
 		unit:                unit,
 		log:                 log,
-		me:                  me,
 		collectionFetcher:   collectionFetcher,
 		headers:             headers,
 		blocks:              blocks,
@@ -93,7 +88,6 @@ func New(
 		mempool:             mempool,
 		execState:           execState,
 		metrics:             metrics,
-		maxCollectionHeight: 0,
 		tracer:              tracer,
 		extensiveLogging:    extLog,
 		executionDataPruner: pruner,
@@ -130,49 +124,9 @@ func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
 
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	e.unit.Launch(func() {
-		err := e.process(e.me.NodeID(), event)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
-}
-
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(
-	channel channels.Channel,
-	originID flow.Identifier,
-	event interface{},
-) {
-	e.unit.Launch(func() {
-		err := e.process(originID, event)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
-}
-
 // ProcessLocal processes an event originating on the local node.
 func (e *Engine) ProcessLocal(event interface{}) error {
 	return fmt.Errorf("ingestion error does not process local events")
-}
-
-func (e *Engine) Process(
-	channel channels.Channel,
-	originID flow.Identifier,
-	event interface{},
-) error {
-	return e.unit.Do(func() error {
-		return e.process(originID, event)
-	})
-}
-
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	return nil
 }
 
 // on nodes startup, we need to load all the unexecuted blocks to the execution queues.
@@ -202,7 +156,7 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 			e.log.Debug().Hex("block_id", blockID[:]).Msg("reloaded block")
 		}
 
-		log.Info().Msg("all unexecuted have been successfully reloaded")
+		e.log.Info().Int("count", len(unexecuted)).Msg("all unexecuted have been successfully reloaded")
 
 		return nil
 	})
@@ -251,7 +205,8 @@ func (e *Engine) BlockProcessable(b *flow.Header, _ *flow.QuorumCertificate) {
 
 	// TODO: this should not be blocking: https://github.com/onflow/flow-go/issues/4400
 
-	// skip if stopControl tells to skip
+	// skip if stopControl tells to skip, so that we can avoid fetching collections
+	// for this block
 	if !e.stopControl.ShouldExecuteBlock(b) {
 		return
 	}
@@ -396,6 +351,8 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 		Uint64("first_unexecuted_in_queue", firstUnexecutedHeight).
 		Bool("complete", complete).
 		Bool("head_of_queue", head).
+		Int("cols", len(executableBlock.Block.Payload.Guarantees)).
+		Int("missing_cols", len(missingCollections)).
 		Msg("block is enqueued")
 
 	return missingCollections, nil
@@ -407,6 +364,12 @@ func (e *Engine) executeBlock(
 	ctx context.Context,
 	executableBlock *entity.ExecutableBlock,
 ) {
+
+	// don't execute the block if the stop control says no
+	if !e.stopControl.ShouldExecuteBlock(executableBlock.Block.Header) {
+		return
+	}
+
 	lg := e.log.With().
 		Hex("block_id", logging.Entity(executableBlock)).
 		Uint64("height", executableBlock.Block.Header.Height).
@@ -489,6 +452,8 @@ func (e *Engine) executeBlock(
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("block executed")
 
+	e.stopControl.OnBlockExecuted(executableBlock.Block.Header)
+
 	err = e.onBlockExecuted(executableBlock, finalEndState)
 	if err != nil {
 		lg.Err(err).Msg("failed in process block's children")
@@ -497,8 +462,6 @@ func (e *Engine) executeBlock(
 	if e.executionDataPruner != nil {
 		e.executionDataPruner.NotifyFulfilledHeight(executableBlock.Height())
 	}
-
-	e.stopControl.OnBlockExecuted(executableBlock.Block.Header)
 
 	e.unit.Ctx()
 
@@ -724,12 +687,7 @@ func (e *Engine) addCollectionToMempool(
 				blockID)
 		}
 
-		// record collection max height metrics
-		blockHeight := executableBlock.Block.Header.Height
-		if blockHeight > e.maxCollectionHeight {
-			e.metrics.UpdateCollectionMaxHeight(blockHeight)
-			e.maxCollectionHeight = blockHeight
-		}
+		e.metrics.UpdateCollectionMaxHeight(executableBlock.Block.Header.Height)
 
 		if completeCollection.IsCompleted() {
 			// already received transactions for this collection

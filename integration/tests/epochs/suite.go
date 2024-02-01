@@ -14,26 +14,26 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onflow/cadence"
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/cadence"
+	"github.com/onflow/crypto"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
-	"github.com/onflow/flow-go/fvm/blueprints"
-	"github.com/onflow/flow-go/state/protocol"
-
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/ghost/client"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -343,7 +343,7 @@ func (s *Suite) SubmitSetApprovedListTx(ctx context.Context, env templates.Envir
 	idTableAddress := sdk.HexToAddress(env.IDTableAddress)
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateSetApprovedNodesScript(env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
 		SetProposalKey(s.Client.SDKServiceAddress(), 0, s.Client.Account().Keys[0].SequenceNumber).
 		SetPayer(s.Client.SDKServiceAddress()).

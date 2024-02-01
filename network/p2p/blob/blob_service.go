@@ -30,7 +30,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/utils/logging"
 
 	ipld "github.com/ipfs/go-ipld-format"
@@ -281,7 +281,7 @@ func AuthorizedRequester(
 			Logger()
 
 		// TODO: when execution data verification is enabled, add verification nodes here
-		if (id.Role != flow.RoleExecution && id.Role != flow.RoleAccess) || id.Ejected {
+		if (id.Role != flow.RoleExecution && id.Role != flow.RoleAccess) || id.IsEjected() {
 			lg.Warn().
 				Bool(logging.KeySuspicious, true).
 				Msg("rejecting request from peer: unauthorized")

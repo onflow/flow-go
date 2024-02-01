@@ -144,10 +144,10 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(
 	return nil
 }
 
-func ImportRegistersFromCheckpoint(logger zerolog.Logger, checkpointFile string, checkpointHeight uint64, pdb *pebble.DB, workerCount int) error {
-	logger.Info().Msgf("importing registers from checkpoint file %s at height %d", checkpointFile, checkpointHeight)
+func ImportRegistersFromCheckpoint(logger zerolog.Logger, checkpointFile string, checkpointHeight uint64, checkpointRootHash ledger.RootHash, pdb *pebble.DB, workerCount int) error {
+	logger.Info().Msgf("importing registers from checkpoint file %s at height %d with root hash: %v", checkpointFile, checkpointHeight, checkpointRootHash)
 
-	bootstrap, err := pStorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, logger)
+	bootstrap, err := pStorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, checkpointRootHash, logger)
 	if err != nil {
 		return fmt.Errorf("could not create registers bootstrapper: %w", err)
 	}

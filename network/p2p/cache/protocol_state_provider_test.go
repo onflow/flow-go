@@ -73,7 +73,7 @@ func (suite *ProtocolStateProviderTestSuite) triggerUpdate() {
 	// set up protocol snapshot mock
 	snapshot := &mockprotocol.Snapshot{}
 	snapshot.On("Identities", mock.Anything).Return(
-		func(filter flow.IdentityFilter) flow.IdentityList {
+		func(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return suite.participants.Filter(filter)
 		},
 		nil,

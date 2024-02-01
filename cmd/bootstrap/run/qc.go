@@ -3,6 +3,7 @@ package run
 import (
 	"fmt"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -12,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
@@ -120,7 +120,7 @@ func GenerateRootBlockVotes(block *flow.Block, participantData *ParticipantData)
 		if err != nil {
 			return nil, fmt.Errorf("could not get private keys for participant: %w", err)
 		}
-		me, err := local.New(p.Identity(), keys.StakingKey)
+		me, err := local.New(p.Identity().IdentitySkeleton, keys.StakingKey)
 		if err != nil {
 			return nil, err
 		}

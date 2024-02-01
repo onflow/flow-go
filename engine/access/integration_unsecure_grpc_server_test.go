@@ -63,6 +63,7 @@ type SameGRPCPortTestSuite struct {
 	// storage
 	blocks       *storagemock.Blocks
 	headers      *storagemock.Headers
+	events       *storagemock.Events
 	collections  *storagemock.Collections
 	transactions *storagemock.Transactions
 	receipts     *storagemock.ExecutionReceipts
@@ -101,6 +102,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	suite.snapshot.On("Epochs").Return(suite.epochQuery).Maybe()
 	suite.blocks = new(storagemock.Blocks)
 	suite.headers = new(storagemock.Headers)
+	suite.events = new(storagemock.Events)
 	suite.transactions = new(storagemock.Transactions)
 	suite.collections = new(storagemock.Collections)
 	suite.receipts = new(storagemock.ExecutionReceipts)
@@ -249,6 +251,8 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		rootBlock.Header.Height,
 		rootBlock.Header.Height,
 		suite.registers,
+		backend.NewEventsIndex(suite.events),
+		false,
 	)
 	assert.NoError(suite.T(), err)
 

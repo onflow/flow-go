@@ -20,7 +20,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2pnet"
+	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -29,10 +29,10 @@ import (
 // single message from one engine to the other one through different scenarios.
 type EchoEngineTestSuite struct {
 	suite.Suite
-	testutils.ConduitWrapper                   // used as a wrapper around conduit methods
-	networks                 []*p2pnet.Network // used to keep track of the networks
-	libp2pNodes              []p2p.LibP2PNode  // used to keep track of the libp2p nodes
-	ids                      flow.IdentityList // used to keep track of the identifiers associated with networks
+	testutils.ConduitWrapper                     // used as a wrapper around conduit methods
+	networks                 []*underlay.Network // used to keep track of the networks
+	libp2pNodes              []p2p.LibP2PNode    // used to keep track of the libp2p nodes
+	ids                      flow.IdentityList   // used to keep track of the identifiers associated with networks
 	cancel                   context.CancelFunc
 }
 

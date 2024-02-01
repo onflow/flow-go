@@ -30,21 +30,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dir: [./, ./integration/, ./crypto/, ./insecure/]
+        dir: [./, ./integration/, ./insecure/]
     name: Lint
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
     - name: Setup Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
+      timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-    - name: Install C formatter
-      run: sudo apt-get install -y clang-format
-    - name: Run C formatter and sanitizer for ./crypto
-      run: make -C crypto c-format && make -C crypto c-sanitize
     - name: Run go generate
       run: go generate
       working-directory: ${{ matrix.dir }}
@@ -66,7 +63,8 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
+        timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -84,13 +82,14 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
+        timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
       - name: Set Test Matrix
         id: set-test-matrix
-        run: go run utils/test_matrix/test_matrix.go admin cmd consensus engine/access engine/collection engine/common engine/consensus engine/execution/ingestion:buildjet-8vcpu-ubuntu-2204 engine/execution/computation engine/execution engine/verification engine:buildjet-4vcpu-ubuntu-2204 fvm ledger module/dkg module:buildjet-4vcpu-ubuntu-2204 network/alsp network/test/cohort1:buildjet-16vcpu-ubuntu-2204 network/test/cohort2:buildjet-4vcpu-ubuntu-2204 network/p2p/connection network/p2p/p2pnode:buildjet-4vcpu-ubuntu-2204 network/p2p/scoring network/p2p network state storage utils
+        run: go run utils/test_matrix/test_matrix.go admin cmd consensus engine/access engine/collection engine/common engine/consensus engine/execution/ingestion:buildjet-8vcpu-ubuntu-2204 engine/execution/computation engine/execution engine/verification engine:buildjet-4vcpu-ubuntu-2204 fvm ledger module/dkg module:buildjet-4vcpu-ubuntu-2204 network/alsp network/test/cohort1:buildjet-16vcpu-ubuntu-2204 network/test/cohort2:buildjet-4vcpu-ubuntu-2204 network/p2p/connection network/p2p/node:buildjet-4vcpu-ubuntu-2204 network/p2p/scoring network/p2p network state storage utils
 
   unit-test:
     name: Unit Tests (${{ matrix.targets.name }})
@@ -105,7 +104,8 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v3
     - name: Setup Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
+      timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
@@ -117,7 +117,6 @@ jobs:
         timeout_minutes: 35
         max_attempts: 5
         command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
-
       # TODO(rbtz): re-enable when we fix exisiting races.
       #env:
       #  RACE_DETECTOR: 1
@@ -134,11 +133,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: crypto
-            setup: noop
-            retries: 1
-            race: 1
-            runner: ubuntu-latest
           - name: insecure
             setup: install-tools
             retries: 5
@@ -154,7 +148,8 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
+        timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -179,6 +174,8 @@ jobs:
   docker-build:
     name: Docker Build
     runs-on: buildjet-16vcpu-ubuntu-2204
+    env:
+      CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -186,12 +183,15 @@ jobs:
           # all tags are needed for integration tests
           fetch-depth: 0
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
+        timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
       - name: Docker build
-        run: make docker-build-flow docker-build-flow-corrupt
+        env:
+          CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
+        run: make docker-native-build-flow docker-native-build-flow-corrupt
       - name: Save Docker images
         run: |
           docker save \
@@ -276,7 +276,8 @@ jobs:
           # all tags are needed for integration tests
           fetch-depth: 0
     - name: Setup Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
+      timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true

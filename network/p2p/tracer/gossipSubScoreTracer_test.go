@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -72,6 +73,14 @@ func TestGossipSubScoreTracer(t *testing.T) {
 	topic1 := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 
 	// 3. Creates three nodes with different roles and sets their roles as consensus, access, and tracer, respectively.
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+	// tracer will update the score and local mesh every 1 second (for testing purposes)
+	cfg.NetworkConfig.GossipSub.RpcTracer.LocalMeshLogInterval = 1 * time.Second
+	cfg.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
+	// the libp2p node updates the subscription list as well as the app-specific score every 10 milliseconds (for testing purposes)
+	cfg.NetworkConfig.GossipSub.SubscriptionProvider.UpdateInterval = 10 * time.Millisecond
+	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond
 	tracerNode, tracerId := p2ptest.NodeFixture(
 		t,
 		sporkId,
@@ -82,7 +91,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 			c:             scoreMetrics,
 		}),
 		p2ptest.WithLogger(logger),
-		p2ptest.WithPeerScoreTracerInterval(1*time.Second), // set the peer score log interval to 1 second for sake of testing.
+		p2ptest.OverrideFlowConfig(cfg),
 		p2ptest.EnablePeerScoringWithOverride(&p2p.PeerScoringConfigOverride{
 			AppSpecificScoreParams: func(pid peer.ID) float64 {
 				id, ok := idProvider.ByPeerID(pid)
@@ -163,7 +172,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 	scoreMetrics.On("SetWarningStateCount", uint(0)).Return()
 
 	// 6. Subscribes the nodes to a common topic.
-	_, err := tracerNode.Subscribe(
+	_, err = tracerNode.Subscribe(
 		topic1,
 		validator.TopicValidator(
 			unittest.Logger(),
@@ -186,7 +195,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 
 	// 7. Expects the tracer node to have the correct app scores, a non-zero score, an existing behaviour score, an existing
 	// IP score, and an existing mesh score.
-	assert.Eventually(t, func() bool {
+	require.Eventually(t, func() bool {
 		// we expect the tracerNode to have the consensusNodes and accessNodes with the correct app scores.
 		exposer := tracerNode.PeerScoreExposer()
 		score, ok := exposer.GetAppScore(consensusNode.ID())

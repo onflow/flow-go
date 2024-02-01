@@ -13,9 +13,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
-
 	"google.golang.org/grpc/credentials"
 
 	"github.com/onflow/flow-go/cmd"
@@ -28,7 +28,6 @@ import (
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rest"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
@@ -57,20 +56,19 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
+	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
+	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
-	"github.com/onflow/flow-go/network/p2p/p2pnet"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/network/p2p/subscription"
-	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/slashing"
+	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/network/validator"
 	stateprotocol "github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -103,7 +101,7 @@ type ObserverServiceConfig struct {
 	bootstrapNodeAddresses    []string
 	bootstrapNodePublicKeys   []string
 	observerNetworkingKeyPath string
-	bootstrapIdentities       flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
+	bootstrapIdentities       flow.IdentitySkeletonList // the identity list of bootstrap peers the node uses to discover other nodes
 	apiRatelimits             map[string]int
 	apiBurstlimits            map[string]int
 	rpcConf                   rpc.Config
@@ -111,7 +109,7 @@ type ObserverServiceConfig struct {
 	apiTimeout                time.Duration
 	upstreamNodeAddresses     []string
 	upstreamNodePublicKeys    []string
-	upstreamIdentities        flow.IdentityList // the identity list of upstream peers the node uses to forward API requests to
+	upstreamIdentities        flow.IdentitySkeletonList // the identity list of upstream peers the node uses to forward API requests to
 }
 
 // DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
@@ -224,7 +222,7 @@ func (builder *ObserverServiceBuilder) deriveUpstreamIdentities() error {
 		return fmt.Errorf("number of addresses and keys provided for the boostrap nodes don't match")
 	}
 
-	ids := make([]*flow.Identity, len(addresses))
+	ids := make(flow.IdentitySkeletonList, len(addresses))
 	for i, address := range addresses {
 		key := keys[i]
 
@@ -236,7 +234,7 @@ func (builder *ObserverServiceBuilder) deriveUpstreamIdentities() error {
 		}
 
 		// create the identity of the peer by setting only the relevant fields
-		ids[i] = &flow.Identity{
+		ids[i] = &flow.IdentitySkeleton{
 			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the public network it does not apply
 			Address:       address,
 			Role:          flow.RoleAccess, // the upstream node has to be an access node
@@ -470,24 +468,70 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 	builder.ExtraFlags(func(flags *pflag.FlagSet) {
 		defaultConfig := DefaultObserverServiceConfig()
 
-		flags.StringVarP(&builder.rpcConf.UnsecureGRPCListenAddr, "rpc-addr", "r", defaultConfig.rpcConf.UnsecureGRPCListenAddr, "the address the unsecured gRPC server listens on")
-		flags.StringVar(&builder.rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", defaultConfig.rpcConf.SecureGRPCListenAddr, "the address the secure gRPC server listens on")
+		flags.StringVarP(&builder.rpcConf.UnsecureGRPCListenAddr,
+			"rpc-addr",
+			"r",
+			defaultConfig.rpcConf.UnsecureGRPCListenAddr,
+			"the address the unsecured gRPC server listens on")
+		flags.StringVar(&builder.rpcConf.SecureGRPCListenAddr,
+			"secure-rpc-addr",
+			defaultConfig.rpcConf.SecureGRPCListenAddr,
+			"the address the secure gRPC server listens on")
 		flags.StringVarP(&builder.rpcConf.HTTPListenAddr, "http-addr", "h", defaultConfig.rpcConf.HTTPListenAddr, "the address the http proxy server listens on")
-		flags.StringVar(&builder.rpcConf.RestConfig.ListenAddress, "rest-addr", defaultConfig.rpcConf.RestConfig.ListenAddress, "the address the REST server listens on (if empty the REST server will not be started)")
-		flags.DurationVar(&builder.rpcConf.RestConfig.WriteTimeout, "rest-write-timeout", defaultConfig.rpcConf.RestConfig.WriteTimeout, "timeout to use when writing REST response")
-		flags.DurationVar(&builder.rpcConf.RestConfig.ReadTimeout, "rest-read-timeout", defaultConfig.rpcConf.RestConfig.ReadTimeout, "timeout to use when reading REST request headers")
+		flags.StringVar(&builder.rpcConf.RestConfig.ListenAddress,
+			"rest-addr",
+			defaultConfig.rpcConf.RestConfig.ListenAddress,
+			"the address the REST server listens on (if empty the REST server will not be started)")
+		flags.DurationVar(&builder.rpcConf.RestConfig.WriteTimeout,
+			"rest-write-timeout",
+			defaultConfig.rpcConf.RestConfig.WriteTimeout,
+			"timeout to use when writing REST response")
+		flags.DurationVar(&builder.rpcConf.RestConfig.ReadTimeout,
+			"rest-read-timeout",
+			defaultConfig.rpcConf.RestConfig.ReadTimeout,
+			"timeout to use when reading REST request headers")
 		flags.DurationVar(&builder.rpcConf.RestConfig.IdleTimeout, "rest-idle-timeout", defaultConfig.rpcConf.RestConfig.IdleTimeout, "idle timeout for REST connections")
-		flags.UintVar(&builder.rpcConf.MaxMsgSize, "rpc-max-message-size", defaultConfig.rpcConf.MaxMsgSize, "the maximum message size in bytes for messages sent or received over grpc")
-		flags.UintVar(&builder.rpcConf.BackendConfig.ConnectionPoolSize, "connection-pool-size", defaultConfig.rpcConf.BackendConfig.ConnectionPoolSize, "maximum number of connections allowed in the connection pool, size of 0 disables the connection pooling, and anything less than the default size will be overridden to use the default size")
-		flags.UintVar(&builder.rpcConf.BackendConfig.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.BackendConfig.MaxHeightRange, "maximum size for height range requests")
-		flags.StringToIntVar(&builder.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
-		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
-		flags.StringVar(&builder.observerNetworkingKeyPath, "observer-networking-key-path", defaultConfig.observerNetworkingKeyPath, "path to the networking key for observer")
-		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
-		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an observer (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
+		flags.UintVar(&builder.rpcConf.MaxMsgSize,
+			"rpc-max-message-size",
+			defaultConfig.rpcConf.MaxMsgSize,
+			"the maximum message size in bytes for messages sent or received over grpc")
+		flags.UintVar(&builder.rpcConf.BackendConfig.ConnectionPoolSize,
+			"connection-pool-size",
+			defaultConfig.rpcConf.BackendConfig.ConnectionPoolSize,
+			"maximum number of connections allowed in the connection pool, size of 0 disables the connection pooling, and anything less than the default size will be overridden to use the default size")
+		flags.UintVar(&builder.rpcConf.BackendConfig.MaxHeightRange,
+			"rpc-max-height-range",
+			defaultConfig.rpcConf.BackendConfig.MaxHeightRange,
+			"maximum size for height range requests")
+		flags.StringToIntVar(&builder.apiRatelimits,
+			"api-rate-limits",
+			defaultConfig.apiRatelimits,
+			"per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
+		flags.StringToIntVar(&builder.apiBurstlimits,
+			"api-burst-limits",
+			defaultConfig.apiBurstlimits,
+			"burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
+		flags.StringVar(&builder.observerNetworkingKeyPath,
+			"observer-networking-key-path",
+			defaultConfig.observerNetworkingKeyPath,
+			"path to the networking key for observer")
+		flags.StringSliceVar(&builder.bootstrapNodeAddresses,
+			"bootstrap-node-addresses",
+			defaultConfig.bootstrapNodeAddresses,
+			"the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
+		flags.StringSliceVar(&builder.bootstrapNodePublicKeys,
+			"bootstrap-node-public-keys",
+			defaultConfig.bootstrapNodePublicKeys,
+			"the networking public key of the bootstrap access node if this is an observer (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 		flags.DurationVar(&builder.apiTimeout, "upstream-api-timeout", defaultConfig.apiTimeout, "tcp timeout for Flow API gRPC sockets to upstrem nodes")
-		flags.StringSliceVar(&builder.upstreamNodeAddresses, "upstream-node-addresses", defaultConfig.upstreamNodeAddresses, "the gRPC network addresses of the upstream access node. e.g. access-001.mainnet.flow.org:9000,access-002.mainnet.flow.org:9000")
-		flags.StringSliceVar(&builder.upstreamNodePublicKeys, "upstream-node-public-keys", defaultConfig.upstreamNodePublicKeys, "the networking public key of the upstream access node (in the same order as the upstream node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
+		flags.StringSliceVar(&builder.upstreamNodeAddresses,
+			"upstream-node-addresses",
+			defaultConfig.upstreamNodeAddresses,
+			"the gRPC network addresses of the upstream access node. e.g. access-001.mainnet.flow.org:9000,access-002.mainnet.flow.org:9000")
+		flags.StringSliceVar(&builder.upstreamNodePublicKeys,
+			"upstream-node-public-keys",
+			defaultConfig.upstreamNodePublicKeys,
+			"the networking public key of the upstream access node (in the same order as the upstream node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
 	})
 }
@@ -510,12 +554,12 @@ func publicNetworkMsgValidators(log zerolog.Logger, idProvider module.IdentityPr
 // BootstrapIdentities converts the bootstrap node addresses and keys to a Flow Identity list where
 // each Flow Identity is initialized with the passed address, the networking key
 // and the Node ID set to ZeroID, role set to Access, 0 stake and no staking key.
-func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, error) {
+func BootstrapIdentities(addresses []string, keys []string) (flow.IdentitySkeletonList, error) {
 	if len(addresses) != len(keys) {
 		return nil, fmt.Errorf("number of addresses and keys provided for the boostrap nodes don't match")
 	}
 
-	ids := make([]*flow.Identity, len(addresses))
+	ids := make(flow.IdentitySkeletonList, len(addresses))
 	for i, address := range addresses {
 		bytes, err := hex.DecodeString(keys[i])
 		if err != nil {
@@ -528,7 +572,7 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 		}
 
 		// create the identity of the peer by setting only the relevant fields
-		ids[i] = &flow.Identity{
+		ids[i] = &flow.IdentitySkeleton{
 			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the public network it does not apply
 			Address:       address,
 			Role:          flow.RoleAccess, // the upstream node has to be an access node
@@ -697,21 +741,10 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		pis = append(pis, pi)
 	}
 
-	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                             builder.Logger,
-		Metrics:                            builder.Metrics.Network,
-		IDProvider:                         builder.IdentityProvider,
-		LoggerInterval:                     builder.FlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval,
-		RpcSentTrackerCacheSize:            builder.FlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
-		RpcSentTrackerWorkerQueueCacheSize: builder.FlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
-		RpcSentTrackerNumOfWorkers:         builder.FlowConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
-		HeroCacheMetricsFactory:            builder.HeroCacheMetricsFactory(),
-		NetworkingType:                     network.PublicNetwork,
-	}
-	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
-
-	node, err := p2pbuilder.NewNodeBuilder(builder.Logger,
-		&p2pconfig.MetricsConfig{
+	node, err := p2pbuilder.NewNodeBuilder(
+		builder.Logger,
+		&builder.FlowConfig.NetworkConfig.GossipSub,
+		&p2pbuilderconfig.MetricsConfig{
 			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
 			Metrics:          builder.Metrics.Network,
 		},
@@ -720,17 +753,14 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		networkKey,
 		builder.SporkID,
 		builder.IdentityProvider,
-		builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig,
 		&builder.FlowConfig.NetworkConfig.ResourceManager,
-		&builder.FlowConfig.NetworkConfig.GossipSubConfig,
-		p2pconfig.PeerManagerDisableConfig(), // disable peer manager for observer node.
+		p2pbuilderconfig.PeerManagerDisableConfig(), // disable peer manager for observer node.
 		&p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		},
-		meshTracer,
-		&p2pconfig.UnicastConfig{
-			UnicastConfig: builder.FlowConfig.NetworkConfig.UnicastConfig,
+		&p2pbuilderconfig.UnicastConfig{
+			Unicast: builder.FlowConfig.NetworkConfig.Unicast,
 		}).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
@@ -745,8 +775,6 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 				dht.BootstrapPeers(pis...),
 			)
 		}).
-		SetGossipSubTracer(meshTracer).
-		SetGossipSubScoreTracerInterval(builder.FlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval).
 		Build()
 
 	if err != nil {
@@ -764,7 +792,7 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 func (builder *ObserverServiceBuilder) initObserverLocal() func(node *cmd.NodeConfig) error {
 	return func(node *cmd.NodeConfig) error {
 		// for an observer, set the identity here explicitly since it will not be found in the protocol state
-		self := &flow.Identity{
+		self := flow.IdentitySkeleton{
 			NodeID:        node.NodeID,
 			NetworkPubKey: node.NetworkKey.PublicKey(),
 			StakingPubKey: nil,             // no staking key needed for the observer
@@ -811,7 +839,7 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 				return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
 			}
 
-			net, err := p2pnet.NewNetwork(&p2pnet.NetworkConfig{
+			net, err := underlay.NewNetwork(&underlay.NetworkConfig{
 				Logger:                builder.Logger.With().Str("component", "public-network").Logger(),
 				Codec:                 builder.CodecFactory(),
 				Me:                    builder.Me,
@@ -823,7 +851,7 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 				ReceiveCache:          receiveCache,
 				ConduitFactory:        conduit.NewDefaultConduitFactory(),
 				SporkId:               builder.SporkID,
-				UnicastMessageTimeout: p2pnet.DefaultUnicastTimeout,
+				UnicastMessageTimeout: underlay.DefaultUnicastTimeout,
 				IdentityTranslator:    builder.IDTranslator,
 				AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
 					Logger:                  builder.Logger,
@@ -838,7 +866,7 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 				SlashingViolationConsumerFactory: func(adapter network.ConduitAdapter) network.ViolationsConsumer {
 					return slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network, adapter)
 				},
-			}, p2pnet.WithMessageValidators(publicNetworkMsgValidators(node.Logger, node.IdentityProvider, node.NodeID)...))
+			}, underlay.WithMessageValidators(publicNetworkMsgValidators(node.Logger, node.IdentityProvider, node.NodeID)...))
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize network: %w", err)
 			}
@@ -1011,7 +1039,12 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				node.State,
 				node.Storage.Blocks,
 				node.Storage.Headers,
-				backend.NewNetworkAPI(node.State, node.RootChainID, backend.DefaultSnapshotHistoryLimit),
+				backend.NewNetworkAPI(
+					node.State,
+					node.RootChainID,
+					node.Storage.Headers,
+					backend.DefaultSnapshotHistoryLimit,
+				),
 			)),
 		}
 

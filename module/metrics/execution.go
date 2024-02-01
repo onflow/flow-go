@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/counters"
 )
 
 type ExecutionCollector struct {
@@ -18,6 +19,7 @@ type ExecutionCollector struct {
 	totalExecutedScriptsCounter             prometheus.Counter
 	totalFailedTransactionsCounter          prometheus.Counter
 	lastExecutedBlockHeightGauge            prometheus.Gauge
+	lastFinalizedExecutedBlockHeightGauge   prometheus.Gauge
 	stateStorageDiskTotal                   prometheus.Gauge
 	storageStateCommitment                  prometheus.Gauge
 	forestApproxMemorySize                  prometheus.Gauge
@@ -80,6 +82,7 @@ type ExecutionCollector struct {
 	stateSyncActive                         prometheus.Gauge
 	blockDataUploadsInProgress              prometheus.Gauge
 	blockDataUploadsDuration                prometheus.Histogram
+	maxCollectionHeightData                 counters.StrictMonotonousCounter
 	maxCollectionHeight                     prometheus.Gauge
 	computationResultUploadedCount          prometheus.Counter
 	computationResultUploadRetriedCount     prometheus.Counter
@@ -633,6 +636,13 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the last height that was executed",
 		}),
 
+		lastFinalizedExecutedBlockHeightGauge: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "last_finalized_executed_block_height",
+			Help:      "the last height that was finalized and executed",
+		}),
+
 		stateStorageDiskTotal: promauto.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemStateStorage,
@@ -675,6 +685,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the number of times a program was found in the cache",
 		}),
 
+		maxCollectionHeightData: counters.NewMonotonousCounter(0),
 		maxCollectionHeight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name:      "max_collection_height",
 			Namespace: namespaceExecution,
@@ -791,6 +802,11 @@ func (ec *ExecutionCollector) ExecutionStorageStateCommitment(bytes int64) {
 // ExecutionLastExecutedBlockHeight reports last executed block height
 func (ec *ExecutionCollector) ExecutionLastExecutedBlockHeight(height uint64) {
 	ec.lastExecutedBlockHeightGauge.Set(float64(height))
+}
+
+// ExecutionLastFinalizedExecutedBlockHeight reports last finalized executed block height
+func (ec *ExecutionCollector) ExecutionLastFinalizedExecutedBlockHeight(height uint64) {
+	ec.lastFinalizedExecutedBlockHeightGauge.Set(float64(height))
 }
 
 // ForestApproxMemorySize records approximate memory usage of forest (all in-memory trees)
@@ -937,7 +953,10 @@ func (ec *ExecutionCollector) RuntimeTransactionProgramsCacheHit() {
 }
 
 func (ec *ExecutionCollector) UpdateCollectionMaxHeight(height uint64) {
-	ec.maxCollectionHeight.Set(float64(height))
+	updated := ec.maxCollectionHeightData.Set(height)
+	if updated {
+		ec.maxCollectionHeight.Set(float64(height))
+	}
 }
 
 func (ec *ExecutionCollector) ExecutionComputationResultUploaded() {

@@ -23,8 +23,8 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
-	"github.com/onflow/flow-go/network/p2p/p2pnet"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
+	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -54,7 +54,7 @@ type UnicastAuthorizationTestSuite struct {
 	cancel  context.CancelFunc
 	sporkId flow.Identifier
 	// waitCh is the channel used to wait for the networks to perform authorization and invoke the slashing
-	//violation's consumer before making mock assertions and cleaning up resources
+	// violation's consumer before making mock assertions and cleaning up resources
 	waitCh chan struct{}
 }
 
@@ -84,8 +84,8 @@ func (u *UnicastAuthorizationTestSuite) setupNetworks(slashingViolationsConsumer
 		u.sporkId,
 		ids,
 		libP2PNodes,
-		p2pnet.WithCodec(u.codec),
-		p2pnet.WithSlashingViolationConsumerFactory(func(_ network.ConduitAdapter) network.ViolationsConsumer {
+		underlay.WithCodec(u.codec),
+		underlay.WithSlashingViolationConsumerFactory(func(_ network.ConduitAdapter) network.ViolationsConsumer {
 			return slashingViolationsConsumer
 		}))
 	require.Len(u.T(), ids, 2)
@@ -169,7 +169,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
 	u.setupNetworks(slashingViolationsConsumer)
 	//NOTE: setup ejected identity
-	u.senderID.Ejected = true
+	u.senderID.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 
 	// overriding the identity provide of the receiver node to return the ejected identity so that the
 	// sender node looks ejected to its networking layer and hence it sends a SenderEjectedError upon receiving a message
@@ -446,7 +446,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 		MsgType:  "*message.TestMessage",
 		Channel:  channels.TestNetworkChannel,
 		Protocol: message.ProtocolTypeUnicast,
-		Err:      p2pnet.ErrUnicastMsgWithoutSub,
+		Err:      underlay.ErrUnicastMsgWithoutSub,
 	}
 
 	slashingViolationsConsumer.On("OnUnauthorizedUnicastOnChannel", expectedViolation).
