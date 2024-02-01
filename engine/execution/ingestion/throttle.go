@@ -20,9 +20,8 @@ import (
 const CatchUpThreshold = 500
 
 func NewThrottleEngine(
-	blocks storage.Blocks,
-	handler BlockHandler,
 	log zerolog.Logger,
+	handler BlockHandler,
 	state protocol.State,
 	execState state.ExecutionState,
 	headers storage.Headers,
@@ -35,10 +34,19 @@ func NewThrottleEngine(
 
 	e := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			processables := make(chan flow.Identifier, 1)
+			// TODO: config the buffer size
+			// since the handler.OnBlock method could be blocking, we need to make sure
+			// the channel has enough buffer space to hold the unprocessed blocks.
+			// if the channel is full, then it will block the follower engine from
+			// delivering new blocks until the channel is not full, which could be
+			// useful because we probably don't want to process too many blocks if
+			// the execution is not fast enough or even stopped.
+			// TODO: wrap the channel so that we can report acurate metrics about the
+			// buffer size
+			processables := make(chan flow.Identifier, 10000)
 
 			go func() {
-				err := forwardProcessableToHandler(ctx, blocks, handler, processables)
+				err := forwardProcessableToHandler(ctx, headers, handler, processables)
 				if err != nil {
 					ctx.Throw(err)
 				}
@@ -61,7 +69,7 @@ func NewThrottleEngine(
 
 func forwardProcessableToHandler(
 	ctx context.Context,
-	blocks storage.Blocks,
+	headers storage.Headers,
 	handler BlockHandler,
 	processables <-chan flow.Identifier,
 ) error {
@@ -70,7 +78,7 @@ func forwardProcessableToHandler(
 		case <-ctx.Done():
 			return nil
 		case blockID := <-processables:
-			block, err := blocks.ByID(blockID)
+			block, err := headers.ByBlockID(blockID)
 			if err != nil {
 				return fmt.Errorf("could not get block: %w", err)
 			}
@@ -109,7 +117,7 @@ type Throttle struct {
 }
 
 type BlockHandler interface {
-	OnBlock(block *flow.Block) error
+	OnBlock(block *flow.Header) error
 }
 
 func NewThrottle(
