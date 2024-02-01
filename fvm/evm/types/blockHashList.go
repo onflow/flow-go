@@ -43,10 +43,10 @@ func NewBlockHashList(capacity int) *BlockHashList {
 // If the list is full, it overwrites the oldest element.
 func (bhl *BlockHashList) Push(height uint64, bh gethCommon.Hash) error {
 	if bhl.IsEmpty() && height != 0 {
-		return fmt.Errorf("out of our block hash push expected: 0, got: %d", height)
+		return fmt.Errorf("out of the order block hash, expected: 0, got: %d", height)
 	}
 	if !bhl.IsEmpty() && height != bhl.height+1 {
-		return fmt.Errorf("out of our block hash push expected: %d, got: %d", bhl.height+1, height)
+		return fmt.Errorf("out of the order block hash, expected: %d, got: %d", bhl.height+1, height)
 	}
 	bhl.blocks[bhl.tail] = bh
 	bhl.tail = (bhl.tail + 1) % bhl.capacity

@@ -10,23 +10,23 @@ import (
 
 const (
 	BlockHashListCapacity    = 256
-	FlexLatestBlockKey       = "LatestBlock"
-	FlexLatestBlockHashesKey = "LatestBlockHashes"
+	BlockStoreLatestBlockKey = "LatestBlock"
+	BlockStoreBlockHashesKey = "LatestBlockHashes"
 )
 
 type BlockStore struct {
 	led           atree.Ledger
-	flexAddress   flow.Address
+	rootAddress   flow.Address
 	blockProposal *types.Block
 }
 
 var _ types.BlockStore = &BlockStore{}
 
 // NewBlockStore constructs a new block store
-func NewBlockStore(led atree.Ledger, flexAddress flow.Address) (*BlockStore, error) {
+func NewBlockStore(led atree.Ledger, rootAddress flow.Address) (*BlockStore, error) {
 	return &BlockStore{
 		led:         led,
-		flexAddress: flexAddress,
+		rootAddress: rootAddress,
 	}, nil
 }
 
@@ -67,7 +67,7 @@ func (bs *BlockStore) CommitBlockProposal() error {
 		return types.NewFatalError(err)
 	}
 
-	err = bs.led.SetValue(bs.flexAddress[:], []byte(FlexLatestBlockKey), blockBytes)
+	err = bs.led.SetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockKey), blockBytes)
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func (bs *BlockStore) ResetBlockProposal() error {
 
 // LatestBlock returns the latest executed block
 func (bs *BlockStore) LatestBlock() (*types.Block, error) {
-	data, err := bs.led.GetValue(bs.flexAddress[:], []byte(FlexLatestBlockKey))
+	data, err := bs.led.GetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockKey))
 	if len(data) == 0 {
 		return types.GenesisBlock, err
 	}
@@ -105,23 +105,19 @@ func (bs *BlockStore) BlockHash(height uint64) (gethCommon.Hash, error) {
 	if err != nil {
 		return gethCommon.Hash{}, err
 	}
-	if bhl == nil {
-		if height == 0 {
-			return types.GenesisBlockHash, nil
-		}
-		return gethCommon.Hash{}, nil
-	}
 	_, hash := bhl.BlockHashByHeight(height)
 	return hash, nil
 }
 
 func (bs *BlockStore) getBlockHashList() (*types.BlockHashList, error) {
-	data, err := bs.led.GetValue(bs.flexAddress[:], []byte(FlexLatestBlockHashesKey))
+	data, err := bs.led.GetValue(bs.rootAddress[:], []byte(BlockStoreBlockHashesKey))
 	if err != nil {
 		return nil, err
 	}
 	if len(data) == 0 {
-		return nil, err
+		bhl := types.NewBlockHashList(BlockHashListCapacity)
+		err = bhl.Push(types.GenesisBlock.Height, types.GenesisBlockHash)
+		return bhl, err
 	}
 	return types.NewBlockHashListFromEncoded(data)
 }
@@ -130,15 +126,6 @@ func (bs *BlockStore) updateBlockHashList(block *types.Block) error {
 	bhl, err := bs.getBlockHashList()
 	if err != nil {
 		return err
-	}
-	if bhl == nil {
-		bhl = types.NewBlockHashList(BlockHashListCapacity)
-	}
-	if bhl.IsEmpty() {
-		err = bhl.Push(types.GenesisBlock.Height, types.GenesisBlockHash)
-		if err != nil {
-			return err
-		}
 	}
 	hash, err := block.Hash()
 	if err != nil {
@@ -149,7 +136,7 @@ func (bs *BlockStore) updateBlockHashList(block *types.Block) error {
 		return err
 	}
 	return bs.led.SetValue(
-		bs.flexAddress[:],
-		[]byte(FlexLatestBlockHashesKey),
+		bs.rootAddress[:],
+		[]byte(BlockStoreBlockHashesKey),
 		bhl.Encode())
 }
