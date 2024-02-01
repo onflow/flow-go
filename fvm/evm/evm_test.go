@@ -11,10 +11,13 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/crypto"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/evm"
+	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
+	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
@@ -347,6 +350,127 @@ func TestCadenceArch(t *testing.T) {
 						_, output, err := vm.Run(
 							ctx,
 							script,
+							snapshot)
+						require.NoError(t, err)
+						require.NoError(t, output.Err)
+					})
+				})
+			})
+		})
+	})
+
+	t.Run("testing calling Cadence arch - COA ownership proof (happy case)", func(t *testing.T) {
+		RunWithTestBackend(t, func(backend *TestBackend) {
+			chain := flow.Emulator.Chain()
+			rootAddr, err := evm.StorageAccountAddress(chain.ChainID())
+			require.NoError(t, err)
+			tc := GetStorageTestContract(t)
+			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
+				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
+					RunWithNewTestVM(t, chain, backend, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
+						sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+						// create account
+						privateKey, err := testutil.GenerateAccountPrivateKey()
+						require.NoError(t, err)
+
+						snapshot, accounts, err := testutil.CreateAccounts(
+							vm,
+							snapshot,
+							[]flow.AccountPrivateKey{privateKey},
+							chain)
+						require.NoError(t, err)
+						account := accounts[0]
+
+						// setup account with a COA
+						script := []byte(fmt.Sprintf(
+							`
+							import EVM from %s
+
+							transaction {
+								prepare(account: AuthAccount) {
+									let bridgedAccount1 <- EVM.createBridgedAccount()
+									account.save<@EVM.BridgedAccount>(<-bridgedAccount1,
+																	  to: /storage/bridgedAccount)
+									account.link<&EVM.BridgedAccount{EVM.Addressable}>(/public/bridgedAccount,
+																					   target: /storage/bridgedAccount)
+								}
+							}
+                       		`,
+							sc.EVMContract.Address.HexWithPrefix(),
+						))
+
+						txBody := flow.NewTransactionBody().
+							SetScript(script).
+							AddAuthorizer(account)
+
+						tx := fvm.Transaction(txBody, 0)
+						es, output, err := vm.Run(ctx, tx, snapshot)
+						require.NoError(t, err)
+						require.NoError(t, output.Err)
+						snapshot = snapshot.Append(es)
+
+						// create a proof
+						expectedCOAAddress := handler.MakeCOAAddress(1)
+						sdHash := RandomCommonHash(t)
+						sd := types.SignedData(sdHash.Bytes())
+
+						hasher, err := crypto.NewPrefixedHashing(privateKey.HashAlgo, "")
+						require.NoError(t, err)
+
+						sig, err := privateKey.PrivateKey.Sign(sd, hasher)
+						require.NoError(t, err)
+
+						proof := types.COAOwnershipProof{
+							KeyIndices:     []uint64{0},
+							Address:        types.FlowAddress(account),
+							CapabilityPath: "/public/bridgedAccount",
+							Signatures:     []types.Signature{types.Signature(sig)},
+						}
+						encodedProof, err := proof.Encode()
+						require.NoError(t, err)
+						types.NewCOAOwnershipProofInContext(sd,
+							expectedCOAAddress,
+							encodedProof,
+						)
+						code := []byte(fmt.Sprintf(
+							`
+							import EVM from %s
+
+							access(all)
+							fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
+								let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+								EVM.run(tx: tx, coinbase: coinbase)
+							}
+                       		`,
+							sc.EVMContract.Address.HexWithPrefix(),
+						))
+
+						gasLimit := uint64(10_000_000)
+						txBytes := testAccount.PrepareSignAndEncodeTx(t,
+							testContract.DeployedAt.ToCommon(),
+							tc.MakeCallData(t, "verifyArchCallToVerifyCOAOwnershipProof",
+								true,
+								expectedCOAAddress.ToCommon(),
+								sdHash,
+								encodedProof),
+							big.NewInt(0),
+							gasLimit,
+							big.NewInt(0),
+						)
+
+						verifyScript := fvm.Script(code).WithArguments(
+							json.MustEncode(cadence.NewArray(
+								ConvertToCadence(txBytes),
+							).WithType(stdlib.EVMTransactionBytesCadenceType)),
+							json.MustEncode(cadence.NewArray(
+								ConvertToCadence(testAccount.Address().Bytes()),
+							).WithType(stdlib.EVMAddressBytesCadenceType)),
+						)
+
+						_, output, err = vm.Run(
+							ctx,
+							verifyScript,
 							snapshot)
 						require.NoError(t, err)
 						require.NoError(t, output.Err)
