@@ -1,15 +1,17 @@
 package ingestion
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/rs/zerolog"
 )
 
 // CatchUpThreshold is the number of blocks that if the execution is far behind
@@ -18,6 +20,71 @@ import (
 const CatchUpThreshold = 500
 
 // BlockThrottle is a helper struct that throttles the unexecuted blocks to be sent
+func NewThrottleEngine(
+	blocks storage.Blocks,
+	handler BlockHandler,
+	log zerolog.Logger,
+	state protocol.State,
+	execState state.ExecutionState,
+	headers storage.Headers,
+	catchupThreshold int,
+) (*component.ComponentManager, error) {
+	throttle, err := NewBlockThrottle(log, state, execState, headers, catchupThreshold)
+	if err != nil {
+		return nil, fmt.Errorf("could not create throttle: %w", err)
+	}
+
+	e := component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			processables := make(chan flow.Identifier, 1)
+
+			go func() {
+				err := forwardProcessableToHandler(ctx, blocks, handler, processables)
+				if err != nil {
+					ctx.Throw(err)
+				}
+			}()
+
+			log.Info().Msg("initializing throttle engine")
+
+			err = throttle.Init(processables)
+			if err != nil {
+				ctx.Throw(err)
+			}
+
+			log.Info().Msgf("throttle engine initialized")
+
+			ready()
+		}).
+		Build()
+	return e, nil
+}
+
+func forwardProcessableToHandler(
+	ctx context.Context,
+	blocks storage.Blocks,
+	handler BlockHandler,
+	processables <-chan flow.Identifier,
+) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case blockID := <-processables:
+			block, err := blocks.ByID(blockID)
+			if err != nil {
+				return fmt.Errorf("could not get block: %w", err)
+			}
+
+			err = handler.OnBlock(block)
+			if err != nil {
+				return fmt.Errorf("could not process block: %w", err)
+			}
+		}
+	}
+}
+
+// Throttle is a helper struct that helps throttle the unexecuted blocks to be sent
 // to the block queue for execution.
 // It is useful for case when execution is falling far behind the finalization, in which case
 // we want to throttle the blocks to be sent to the block queue for fetching data to execute
@@ -43,7 +110,7 @@ type BlockThrottle struct {
 }
 
 type BlockHandler interface {
-	OnBlock(block *flow.Header) error
+	OnBlock(block *flow.Block) error
 }
 
 func NewBlockThrottle(
