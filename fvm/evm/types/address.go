@@ -17,6 +17,8 @@ const (
 	// Since EVM addresses are 160-bits long, EVM addresses offer only 80 bits of security (collision resistance 
 	// offers the lowest level).
 	// A preimage resistance of 80 bits requires the prefix to be at least 80-bits long (i.e 10 bytes)
+	//
+	// When used as a prefix in EVM addresses (20-bytes long), it leaves a variable part of 8 bytes (64 bits).
 	FlowEVMSpecialAddressPrefixLen = 12
 )
 
@@ -65,7 +67,7 @@ func NewAddressFromString(str string) Address {
 
 // IsACOAAddress returns true if the address is a COA address
 //
-// This test insure `addr` has been generated as a COA address with high probability.
+// This test insures `addr` has been generated as a COA address with high probability.
 // Brute forcing an EVM address `addr` to pass the `IsACOAAddress` test is as hard as the bit-length
 // of `FlowEVMCOAAddressPrefix` (here 96 bits).
 // Although this is lower than the protocol-wide security level in Flow (128 bits), it remains

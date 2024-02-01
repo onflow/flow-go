@@ -11,7 +11,6 @@ import (
 
 const (
 	ledgerAddressAllocatorKey = "AddressAllocator"
-	uint64ByteSize            = 8
 	// addressIndexShuffleSeed is used for shuffling address index
 	// shuffling index is used to make address postfixes look random
 	addressIndexShuffleSeed = uint64(0xFFEEDDCCBBAA9987)
@@ -59,9 +58,9 @@ func makePrefixedAddress(
 	prefix [types.FlowEVMSpecialAddressPrefixLen]byte,
 ) types.Address {
 	var addr types.Address
-	prefixIndex := types.AddressLength - uint64ByteSize
-	copy(addr[:prefixIndex], prefix[:])
-	binary.BigEndian.PutUint64(addr[prefixIndex:], index)
+	copy(addr[:], prefix[:])
+	// only works if `len(addr) - len(prefix)` is exactly 8 bytes
+	binary.BigEndian.PutUint64(addr[len(prefix):], index)
 	return addr
 }
 
