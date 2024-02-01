@@ -83,7 +83,6 @@ type Params struct {
 	HistoricalAccessNodes     []accessproto.AccessAPIClient
 	Blocks                    storage.Blocks
 	Headers                   storage.Headers
-	Events                    storage.Events
 	Collections               storage.Collections
 	Transactions              storage.Transactions
 	ExecutionReceipts         storage.ExecutionReceipts
@@ -104,6 +103,7 @@ type Params struct {
 	ScriptExecutor            execution.ScriptExecutor
 	ScriptExecutionMode       IndexQueryMode
 	EventQueryMode            IndexQueryMode
+	EventsIndex               *EventsIndex
 }
 
 // New creates backend instance
@@ -180,12 +180,12 @@ func New(params Params) (*Backend, error) {
 			chain:             params.ChainID.Chain(),
 			state:             params.State,
 			headers:           params.Headers,
-			events:            params.Events,
 			executionReceipts: params.ExecutionReceipts,
 			connFactory:       params.ConnFactory,
 			maxHeightRange:    params.MaxHeightRange,
 			nodeCommunicator:  params.Communicator,
 			queryMode:         params.EventQueryMode,
+			eventsIndex:       params.EventsIndex,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: params.Headers,

@@ -21,13 +21,13 @@ import (
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
 type backendEvents struct {
 	headers           storage.Headers
-	events            storage.Events
 	executionReceipts storage.ExecutionReceipts
 	state             protocol.State
 	chain             flow.Chain
@@ -36,6 +36,7 @@ type backendEvents struct {
 	maxHeightRange    uint
 	nodeCommunicator  Communicator
 	queryMode         IndexQueryMode
+	eventsIndex       *EventsIndex
 }
 
 // blockMetadata is used to capture information about requested blocks to avoid repeated blockID
@@ -226,15 +227,17 @@ func (b *backendEvents) getBlockEventsFromStorage(
 ) ([]flow.BlockEvents, []blockMetadata, error) {
 	missing := make([]blockMetadata, 0)
 	resp := make([]flow.BlockEvents, 0)
+
 	for _, blockInfo := range blockInfos {
 		if ctx.Err() != nil {
 			return nil, nil, rpc.ConvertError(ctx.Err(), "failed to get events from storage", codes.Canceled)
 		}
 
-		events, err := b.events.ByBlockID(blockInfo.ID)
+		events, err := b.eventsIndex.GetEvents(blockInfo.ID, blockInfo.Height)
 		if err != nil {
-			// Note: if there are no events for a block, an empty slice is returned
-			if errors.Is(err, storage.ErrNotFound) {
+			if errors.Is(err, storage.ErrNotFound) ||
+				errors.Is(err, storage.ErrHeightNotIndexed) ||
+				errors.Is(err, indexer.ErrIndexNotInitialized) {
 				missing = append(missing, blockInfo)
 				continue
 			}
