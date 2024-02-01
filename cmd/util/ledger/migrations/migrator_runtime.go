@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -28,6 +29,7 @@ var _ storage.TransactionPreparer = migrationTransactionPreparer{}
 func newMigratorRuntime(
 	address common.Address,
 	payloads []*ledger.Payload,
+	config util.RuntimeInterfaceConfig,
 ) (
 	*migratorRuntime,
 	error,
@@ -65,6 +67,7 @@ func newMigratorRuntime(
 			},
 			accounts,
 		),
+		RuntimeInterfaceConfig: config,
 	}
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{
@@ -89,26 +92,28 @@ func newMigratorRuntime(
 	}
 
 	return &migratorRuntime{
-		Address:          address,
-		Payloads:         payloads,
-		Snapshot:         snapshot,
-		TransactionState: transactionState,
-		Interpreter:      inter,
-		Storage:          runtimeStorage,
-		AccountsLedger:   accountsAtreeLedger,
-		Accounts:         accounts,
+		Address:                 address,
+		Payloads:                payloads,
+		Snapshot:                snapshot,
+		TransactionState:        transactionState,
+		Interpreter:             inter,
+		Storage:                 runtimeStorage,
+		AccountsLedger:          accountsAtreeLedger,
+		Accounts:                accounts,
+		ContractAdditionHandler: env,
 	}, nil
 }
 
 type migratorRuntime struct {
-	Snapshot         *util.PayloadSnapshot
-	TransactionState state.NestedTransactionPreparer
-	Interpreter      *interpreter.Interpreter
-	Storage          *runtime.Storage
-	Payloads         []*ledger.Payload
-	Address          common.Address
-	AccountsLedger   *util.AccountsAtreeLedger
-	Accounts         environment.Accounts
+	Snapshot                *util.PayloadSnapshot
+	TransactionState        state.NestedTransactionPreparer
+	Interpreter             *interpreter.Interpreter
+	Storage                 *runtime.Storage
+	Payloads                []*ledger.Payload
+	Address                 common.Address
+	AccountsLedger          *util.AccountsAtreeLedger
+	Accounts                environment.Accounts
+	ContractAdditionHandler stdlib.AccountContractAdditionHandler
 }
 
 func (mr *migratorRuntime) GetReadOnlyStorage() *runtime.Storage {

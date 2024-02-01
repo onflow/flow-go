@@ -195,7 +195,11 @@ func checkMigratedPayloads(
 	address common.Address,
 	newPayloads []*ledger.Payload,
 ) *interpreter.CompositeStaticType {
-	mr, err := newMigratorRuntime(address, newPayloads)
+	mr, err := newMigratorRuntime(
+		address,
+		newPayloads,
+		util.RuntimeInterfaceConfig{},
+	)
 	require.NoError(t, err)
 
 	storageMap := mr.Storage.GetStorageMap(address, common.PathDomainStorage.Identifier(), false)
