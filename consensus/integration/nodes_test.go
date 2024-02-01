@@ -55,6 +55,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/util"
 	storage "github.com/onflow/flow-go/storage/badger"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -187,7 +188,7 @@ func buildEpochLookupList(epochs ...protocol.Epoch) []epochInfo {
 // The list of created nodes, the common network hub, and a function which starts
 // all the nodes together, is returned.
 func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot protocol.Snapshot, stopper *Stopper) (nodes []*Node, hub *Hub, runFor func(time.Duration)) {
-	consensus, err := rootSnapshot.Identities(filter.HasRole(flow.RoleConsensus))
+	consensus, err := rootSnapshot.Identities(filter.HasRole[flow.Identity](flow.RoleConsensus))
 	require.NoError(t, err)
 
 	epochViewLookup := buildEpochLookupList(rootSnapshot.Epochs().Current(),
@@ -256,16 +257,16 @@ func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *fl
 
 	// add other roles to create a complete identity list
 	participants := unittest.CompleteIdentitySet(consensusParticipants...)
-	participants.Sort(flow.Canonical)
+	participants.Sort(flow.Canonical[flow.Identity])
 
 	dkgParticipantsKeys := make([]crypto.PublicKey, 0, len(consensusParticipants))
-	for _, participant := range participants.Filter(filter.HasRole(flow.RoleConsensus)) {
+	for _, participant := range participants.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus)) {
 		dkgParticipantsKeys = append(dkgParticipantsKeys, participantData.Lookup[participant.NodeID].KeyShare)
 	}
 
 	counter := uint64(1)
 	setup := unittest.EpochSetupFixture(
-		unittest.WithParticipants(participants),
+		unittest.WithParticipants(participants.ToSkeleton()),
 		unittest.SetupWithCounter(counter),
 		unittest.WithFirstView(root.Header.View),
 		unittest.WithFinalView(root.Header.View+1000),
@@ -279,6 +280,7 @@ func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *fl
 		},
 	)
 
+	root.SetPayload(flow.Payload{ProtocolStateID: inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()})
 	result := unittest.BootstrapExecutionResultFixture(root, unittest.GenesisStateCommitment)
 	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()}
 
@@ -288,7 +290,7 @@ func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *fl
 }
 
 func createPrivateNodeIdentities(n int) []bootstrap.NodeInfo {
-	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical)
+	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical[flow.Identity])
 	infos := make([]bootstrap.NodeInfo, 0, n)
 	for _, node := range consensus {
 		networkPrivKey := unittest.NetworkingPrivKeyFixture()
@@ -297,7 +299,7 @@ func createPrivateNodeIdentities(n int) []bootstrap.NodeInfo {
 			node.NodeID,
 			node.Role,
 			node.Address,
-			node.Weight,
+			node.InitialWeight,
 			networkPrivKey,
 			stakingPrivKey,
 		)
@@ -374,7 +376,8 @@ func createNode(
 	qcsDB := storage.NewQuorumCertificates(metricsCollector, db, storage.DefaultCacheSize)
 	setupsDB := storage.NewEpochSetups(metricsCollector, db)
 	commitsDB := storage.NewEpochCommits(metricsCollector, db)
-	statusesDB := storage.NewEpochStatuses(metricsCollector, db)
+	protocolStateDB := storage.NewProtocolState(metricsCollector, setupsDB, commitsDB, db,
+		storage.DefaultProtocolStateCacheSize, storage.DefaultProtocolStateByBlockIDCacheSize)
 	versionBeaconDB := storage.NewVersionBeacons(db)
 	protocolStateEvents := events.NewDistributor()
 
@@ -395,7 +398,7 @@ func createNode(
 		qcsDB,
 		setupsDB,
 		commitsDB,
-		statusesDB,
+		protocolStateDB,
 		versionBeaconDB,
 		rootSnapshot,
 	)
@@ -443,7 +446,7 @@ func createNode(
 	require.NoError(t, err)
 
 	// make local
-	me, err := local.New(identity, privateKeys.StakingKey)
+	me, err := local.New(identity.IdentitySkeleton, privateKeys.StakingKey)
 	require.NoError(t, err)
 
 	// add a network for this node to the hub
@@ -457,9 +460,32 @@ func createNode(
 
 	seals := stdmap.NewIncorporatedResultSeals(sealLimit)
 
+	mutableProtocolState := protocol_state.NewMutableProtocolState(
+		protocolStateDB,
+		state.Params(),
+		headersDB,
+		resultsDB,
+		setupsDB,
+		commitsDB,
+	)
+
 	// initialize the block builder
-	build, err := builder.NewBuilder(metricsCollector, db, fullState, headersDB, sealsDB, indexDB, blocksDB, resultsDB, receiptsDB,
-		guarantees, consensusMempools.NewIncorporatedResultSeals(seals, receiptsDB), receipts, tracer)
+	build, err := builder.NewBuilder(
+		metricsCollector,
+		db,
+		fullState,
+		headersDB,
+		sealsDB,
+		indexDB,
+		blocksDB,
+		resultsDB,
+		receiptsDB,
+		mutableProtocolState,
+		guarantees,
+		consensusMempools.NewIncorporatedResultSeals(seals, receiptsDB),
+		receipts,
+		tracer,
+	)
 	require.NoError(t, err)
 
 	// initialize the pending blocks cache
@@ -471,7 +497,6 @@ func createNode(
 	rootQC, err := rootSnapshot.QuorumCertificate()
 	require.NoError(t, err)
 
-	// selector := filter.HasRole(flow.RoleConsensus)
 	committee, err := committees.NewConsensusCommittee(state, localID)
 	require.NoError(t, err)
 	protocolStateEvents.AddConsumer(committee)
@@ -620,8 +645,8 @@ func createNode(
 	require.NoError(t, err)
 
 	identities, err := state.Final().Identities(filter.And(
-		filter.HasRole(flow.RoleConsensus),
-		filter.Not(filter.HasNodeID(me.NodeID())),
+		filter.HasRole[flow.Identity](flow.RoleConsensus),
+		filter.Not(filter.HasNodeID[flow.Identity](me.NodeID())),
 	))
 	require.NoError(t, err)
 	idProvider := id.NewFixedIdentifierProvider(identities.NodeIDs())
