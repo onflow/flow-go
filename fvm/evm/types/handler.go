@@ -49,6 +49,7 @@ type Backend interface {
 	environment.EventEmitter
 	environment.BlockInfo
 	environment.RandomGenerator
+	environment.ContractFunctionInvoker
 }
 
 // AddressAllocator allocates addresses, used by the handler
