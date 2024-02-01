@@ -2,7 +2,9 @@ package connection
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
+	"math/big"
 	"net"
 	"sync"
 	"testing"
@@ -558,7 +560,7 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 		ctx := context.Background()
 
 		// Generate random number of requests
-		nofRequests := rapid.IntRange(10, 100).Draw(tt, "nofRequests").(int)
+		nofRequests := rapid.IntRange(10, 100).Draw(tt, "nofRequests")
 		reqCompleted := atomic.NewUint64(0)
 
 		var waitGroup sync.WaitGroup
@@ -710,6 +712,103 @@ func TestEvictingCacheClients(t *testing.T) {
 	assert.Equal(t, 0, connectionCache.Len())
 
 	wg.Wait() // wait until the move test routine is done
+}
+
+func TestConcurrentConnections(t *testing.T) {
+	logger := unittest.Logger()
+	metrics := metrics.NewNoopCollector()
+
+	// Add createExecNode function to recreate it each time for rapid test
+	createExecNode := func() (*executionNode, func()) {
+		en := new(executionNode)
+		en.start(t)
+		return en, func() {
+			en.stop(t)
+		}
+	}
+
+	// setup the handler mock
+	req := &execution.PingRequest{}
+	resp := &execution.PingResponse{}
+
+	// Note: rapid will randomly fail with an error: "group did not use any data from bitstream"
+	// See https://github.com/flyingmutant/rapid/issues/65
+	rapid.Check(t, func(tt *rapid.T) {
+		en, closer := createExecNode()
+		defer closer()
+
+		responsesSent := atomic.NewInt32(0)
+		en.handler.
+			On("Ping", testifymock.Anything, req).
+			Return(func(_ context.Context, _ *execution.PingRequest) (*execution.PingResponse, error) {
+				sleepMicro := rapid.UintRange(100, 10_000).Draw(tt, "s")
+				time.Sleep(time.Duration(sleepMicro) * time.Microsecond)
+
+				// randomly fail ~25% of the time to test that client connection and reuse logic
+				// handles concurrent connect/disconnects
+				fail, err := rand.Int(rand.Reader, big.NewInt(4))
+				require.NoError(tt, err)
+
+				if fail.Uint64()%4 == 0 {
+					err = status.Errorf(codes.Unavailable, "random error")
+				}
+
+				responsesSent.Inc()
+				return resp, err
+			})
+
+		connectionCache, err := NewCache(logger, metrics, 1)
+		require.NoError(tt, err)
+
+		connectionFactory := &ConnectionFactoryImpl{
+			ExecutionGRPCPort:        en.port,
+			ExecutionNodeGRPCTimeout: time.Second,
+			AccessMetrics:            metrics,
+			Manager: NewManager(
+				logger,
+				metrics,
+				connectionCache,
+				0,
+				CircuitBreakerConfig{},
+				grpcutils.NoCompressor,
+			),
+		}
+
+		clientAddress := en.listener.Addr().String()
+
+		ctx := context.Background()
+
+		// Generate random number of requests
+		requestCount := rapid.IntRange(50, 1000).Draw(tt, "r")
+
+		var wg sync.WaitGroup
+		wg.Add(requestCount)
+
+		for i := 0; i < requestCount; i++ {
+			go func() {
+				defer wg.Done()
+
+				client, _, err := connectionFactory.GetExecutionAPIClient(clientAddress)
+				require.NoError(tt, err)
+
+				_, err = client.Ping(ctx, req)
+
+				if err != nil {
+					// Note: for some reason, when Unavailable is returned, the error message is
+					// changed to "the connection to 127.0.0.1:57753 was closed". Other error codes
+					// preserve the message.
+					require.Equalf(tt, codes.Unavailable, status.Code(err), "unexpected error: %v", err)
+				}
+			}()
+		}
+		wg.Wait()
+
+		// the grpc client seems to throttle requests to servers that return Unavailable, so not
+		// all of the requests make it through to the backend every test. Requiring that at least 1
+		// request is handled for these cases, but all should be handled in most runs.
+		assert.LessOrEqual(tt, responsesSent.Load(), int32(requestCount))
+		assert.Greater(tt, responsesSent.Load(), int32(0))
+	})
 }
 
 var successCodes = []codes.Code{
