@@ -49,7 +49,7 @@ func TestScripts(t *testing.T) {
 		backend := &mock.API{}
 		backend.Mock.
 			On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}).
-			Return([]byte("hello world"), nil)
+			Return([]byte("hello world"), uint64(10), nil)
 
 		req := scriptReq("", sealedHeightQueryParam, validBody)
 		assertOKResponse(t, req, fmt.Sprintf(
@@ -64,7 +64,7 @@ func TestScripts(t *testing.T) {
 
 		backend.Mock.
 			On("ExecuteScriptAtBlockHeight", mocks.Anything, height, validCode, [][]byte{validArgs}).
-			Return([]byte("hello world"), nil)
+			Return([]byte("hello world"), uint64(10), nil)
 
 		req := scriptReq("", fmt.Sprintf("%d", height), validBody)
 		assertOKResponse(t, req, fmt.Sprintf(
@@ -79,7 +79,7 @@ func TestScripts(t *testing.T) {
 
 		backend.Mock.
 			On("ExecuteScriptAtBlockID", mocks.Anything, id, validCode, [][]byte{validArgs}).
-			Return([]byte("hello world"), nil)
+			Return([]byte("hello world"), uint64(0), nil)
 
 		req := scriptReq(id.String(), "", validBody)
 		assertOKResponse(t, req, fmt.Sprintf(
@@ -92,7 +92,7 @@ func TestScripts(t *testing.T) {
 		backend := &mock.API{}
 		backend.Mock.
 			On("ExecuteScriptAtBlockHeight", mocks.Anything, uint64(1337), validCode, [][]byte{validArgs}).
-			Return(nil, status.Error(codes.Internal, "internal server error"))
+			Return(nil, uint64(0), status.Error(codes.Internal, "internal server error"))
 
 		req := scriptReq("", "1337", validBody)
 		assertResponse(
@@ -108,7 +108,7 @@ func TestScripts(t *testing.T) {
 		backend := &mock.API{}
 		backend.Mock.
 			On("ExecuteScriptAtBlockHeight", mocks.Anything, mocks.Anything, mocks.Anything, mocks.Anything).
-			Return(nil, nil)
+			Return(nil, uint64(0), nil)
 
 		tests := []struct {
 			id     string

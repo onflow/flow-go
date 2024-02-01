@@ -1056,7 +1056,7 @@ func (suite *Suite) TestExecuteScript() {
 				Value: []byte{9, 10, 11},
 			}
 
-			suite.execClient.On("ExecuteScriptAtBlockID", ctx, &executionReq).Return(&executionResp, nil).Once()
+			suite.execClient.On("ExecuteScriptAtBlockID", ctx, &executionReq).Return(&executionResp, uint64(0), nil).Once()
 
 			finalizedHeader := suite.finalizedHeaderCache.Get()
 			finalizedHeaderId := finalizedHeader.ID()

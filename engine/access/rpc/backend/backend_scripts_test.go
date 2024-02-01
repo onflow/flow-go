@@ -133,7 +133,8 @@ func (s *BackendScriptsSuite) setupENSuccessResponse(blockID flow.Identifier) {
 
 	s.execClient.On("ExecuteScriptAtBlockID", mock.Anything, expectedExecRequest).
 		Return(&execproto.ExecuteScriptAtBlockIDResponse{
-			Value: expectedResponse,
+			Value:            expectedResponse,
+			ComputationUsage: uint64(10),
 		}, nil)
 }
 
@@ -208,7 +209,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_HappyPath() {
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Header.Height).
-		Return(expectedResponse, nil)
+		Return(expectedResponse, uint64(10), nil)
 
 	backend := s.defaultBackend()
 	backend.scriptExecMode = IndexQueryModeLocalOnly
@@ -266,7 +267,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 
 	for _, tt := range testCases {
 		scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Header.Height).
-			Return(nil, tt.err).Times(3)
+			Return(nil, uint64(0), tt.err).Times(3)
 
 		s.Run(fmt.Sprintf("GetAccount - fails with %v", tt.err), func() {
 			s.testExecuteScriptAtLatestBlock(ctx, backend, tt.statusCode)
@@ -306,7 +307,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 	for _, errToReturn := range errors {
 		// configure local script executor to fail
 		scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Header.Height).
-			Return(nil, errToReturn).Times(3)
+			Return(nil, uint64(0), errToReturn).Times(3)
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtLatestBlock - recovers %v", errToReturn), func() {
 			s.testExecuteScriptAtLatestBlock(ctx, backend, codes.OK)
@@ -350,7 +351,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCod
 
 	for _, tt := range testCases {
 		scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Header.Height).
-			Return(nil, tt.err).
+			Return(nil, uint64(0), tt.err).
 			Times(3)
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtLatestBlock - %s", tt.statusCode), func() {
@@ -383,7 +384,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 	// configure local script executor to fail
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, mock.Anything, mock.Anything, s.block.Header.Height).
-		Return(nil, execution.ErrDataNotAvailable)
+		Return(nil, uint64(0), execution.ErrDataNotAvailable)
 
 	backend := s.defaultBackend()
 	backend.scriptExecMode = IndexQueryModeFailover
