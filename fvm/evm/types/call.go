@@ -6,6 +6,7 @@ import (
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethCore "github.com/ethereum/go-ethereum/core"
 	gethCrypto "github.com/ethereum/go-ethereum/crypto"
+	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -20,8 +21,8 @@ const (
 	DeployCallSubType   = byte(4)
 	ContractCallSubType = byte(5)
 
-	DepositCallGasLimit  = 21_000
-	WithdrawCallGasLimit = 21_000
+	DepositCallGasLimit  = gethParams.TxGas
+	WithdrawCallGasLimit = gethParams.TxGas
 
 	// 21_000 is the minimum for a transaction + max gas allowed for receive/fallback methods
 	DefaultGasLimitForTokenTransfer = 21_000 + 2_300

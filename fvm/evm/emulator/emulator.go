@@ -1,6 +1,7 @@
 package emulator
 
 import (
+	"errors"
 	"math/big"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -15,6 +16,8 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+var ErrInvalidBalance = errors.New("invalid balance for transfer")
 
 // Emulator handles operations against evm runtime
 type Emulator struct {
@@ -279,15 +282,20 @@ func (proc *procedure) deployAt(
 	// increment the nonce for the caller
 	proc.state.SetNonce(callerCommon, proc.state.GetNonce(callerCommon)+1)
 
+	if value.Sign() < 0 {
+		return res, ErrInvalidBalance
+	}
 	// setup account
 	proc.state.CreateAccount(addr)
 	proc.state.SetNonce(addr, 1) // (EIP-158)
-	proc.evm.Context.Transfer(   // transfer value
-		proc.state,
-		caller.ToCommon(),
-		addr,
-		value,
-	)
+	if value.Sign() > 0 {
+		proc.evm.Context.Transfer( // transfer value
+			proc.state,
+			caller.ToCommon(),
+			addr,
+			value,
+		)
+	}
 
 	// run code through interpreter
 	// this would check for errors and computes the final bytes to be stored under account
@@ -298,9 +306,8 @@ func (proc *procedure) deployAt(
 		gethVM.AccountRef(addr),
 		value,
 		gasLimit)
-	contract.Code = data
-	contract.CodeHash = gethCrypto.Keccak256Hash(data)
-	contract.CodeAddr = &addr
+
+	contract.SetCallCode(&addr, gethCrypto.Keccak256Hash(data), data)
 	// update access list (Berlin)
 	proc.state.AddAddressToAccessList(addr)
 
