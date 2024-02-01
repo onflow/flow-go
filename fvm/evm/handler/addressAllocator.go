@@ -74,7 +74,7 @@ func makePrefixedAddress(
 // 
 // The current implementation uses a simple modular multiplication by a constant modulo 2^64.
 // The multiplier constant can be any odd number. Since odd numbers are co-prime with 2^64, they
-// have an multiplicative inverse modulo 2^64. 
+// have a multiplicative inverse modulo 2^64. 
 // This makes multiplying by an odd number an injective function (and therefore bijective).
 //
 // Multiplying modulo 2^64 is implicitly implemented as a uint64 multiplication with a uin64 result.

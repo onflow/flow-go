@@ -7,22 +7,24 @@ import (
 )
 
 const (
-	// number of prefix bytes with constant values for special accounts (extended precompiles and COAs)
-	// using leading zeros for prefix helps with the storage compactness.
+	// number of prefix bytes with constant values for special accounts (extended precompiles and COAs).
 	//
 	// The prefix length should insure a high-enough level of security against finding a preimage using the hash
 	// function used for EVM addresses generation (Keccak256). This is required to avoid finding an EVM address
-	// that can also be a valid FlowEVM address. 
+	// that is also a valid FlowEVM address. 
 	// The target (minimal) security in this case is the security level provided by EVM addresses.
-	// Since EVM addresses are 160-bits long, EVM addresses offer only 80 bits of security (collision resistance 
+	// Since EVM addresses are 160-bits long, they offer only 80 bits of security (collision resistance 
 	// offers the lowest level).
-	// A preimage resistance of 80 bits requires the prefix to be at least 80-bits long (i.e 10 bytes)
+	// A preimage resistance of 80 bits requires the prefix to be at least 80-bits long (i.e 10 bytes).
 	//
-	// When used as a prefix in EVM addresses (20-bytes long), it leaves a variable part of 8 bytes (64 bits).
+	// When used as a prefix in EVM addresses (20-bytes long), a prefix length of 12 bytes
+	// leaves a variable part of 8 bytes (64 bits).
 	FlowEVMSpecialAddressPrefixLen = 12
 )
 
 var (
+	// Using leading zeros for prefix helps with the storage compactness.
+	//
 	// Prefix for the built-in EVM precompiles
 	FlowEVMNativePrecompileAddressPrefix = [FlowEVMSpecialAddressPrefixLen]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 	// Prefix for the extended precompiles
