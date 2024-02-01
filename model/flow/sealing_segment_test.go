@@ -2,6 +2,7 @@ package flow_test
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -407,6 +408,8 @@ func TestAddBlock_StorageError(t *testing.T) {
 		))
 
 		err := builder.AddBlock(&block1)
+		assert.NoError(t, err)
+		_, err = builder.SealingSegment()
 		require.ErrorIs(t, err, flow.ErrSegmentResultLookup)
 	})
 
