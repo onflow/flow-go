@@ -2,7 +2,6 @@ package handler
 
 import (
 	"bytes"
-	"fmt"
 	"math/big"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -14,17 +13,19 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/types"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // ContractHandler is responsible for triggering calls to emulator, metering,
 // event emission and updating the block
 type ContractHandler struct {
-	flowTokenAddress common.Address
-	blockstore       types.BlockStore
-	addressAllocator types.AddressAllocator
-	backend          types.Backend
-	emulator         types.Emulator
-	precompiles      []types.Precompile
+	evmContractAddress flow.Address
+	flowTokenAddress   common.Address
+	blockstore         types.BlockStore
+	addressAllocator   types.AddressAllocator
+	backend            types.Backend
+	emulator           types.Emulator
+	precompiles        []types.Precompile
 }
 
 func (h *ContractHandler) FlowTokenAddress() common.Address {
@@ -34,6 +35,7 @@ func (h *ContractHandler) FlowTokenAddress() common.Address {
 var _ types.ContractHandler = &ContractHandler{}
 
 func NewContractHandler(
+	evmContractAddress flow.Address,
 	flowTokenAddress common.Address,
 	blockstore types.BlockStore,
 	addressAllocator types.AddressAllocator,
@@ -41,16 +43,18 @@ func NewContractHandler(
 	emulator types.Emulator,
 ) *ContractHandler {
 	return &ContractHandler{
-		flowTokenAddress: flowTokenAddress,
-		blockstore:       blockstore,
-		addressAllocator: addressAllocator,
-		backend:          backend,
-		emulator:         emulator,
-		precompiles:      getPrecompiles(addressAllocator, backend),
+		evmContractAddress: evmContractAddress,
+		flowTokenAddress:   flowTokenAddress,
+		blockstore:         blockstore,
+		addressAllocator:   addressAllocator,
+		backend:            backend,
+		emulator:           emulator,
+		precompiles:        getPrecompiles(evmContractAddress, addressAllocator, backend),
 	}
 }
 
 func getPrecompiles(
+	evmContractAddress flow.Address,
 	addressAllocator types.AddressAllocator,
 	backend types.Backend,
 ) []types.Precompile {
@@ -58,9 +62,7 @@ func getPrecompiles(
 	archContract := precompiles.ArchContract(
 		archAddress,
 		backend.GetCurrentBlockHeight,
-		func(cpic *types.COAOwnershipProofInContext) (bool, error) {
-			return false, fmt.Errorf("not implemented")
-		},
+		COAOwnershipProofValidator(evmContractAddress, backend),
 	)
 	return []types.Precompile{archContract}
 }
