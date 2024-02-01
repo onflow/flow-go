@@ -1,4 +1,4 @@
-package blocks
+package block_queue
 
 import (
 	"errors"
