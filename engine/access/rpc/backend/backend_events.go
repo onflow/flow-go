@@ -308,7 +308,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	}
 
 	var resp *execproto.GetEventsForBlockIDsResponse
-	var successfulNode *flow.Identity
+	var successfulNode *flow.IdentitySkeleton
 	resp, successfulNode, err = b.getEventsFromAnyExeNode(ctx, execNodes, req)
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to retrieve events from execution nodes", codes.Internal)
@@ -384,14 +384,13 @@ func verifyAndConvertToAccessEvents(
 // other ENs are logged and swallowed. If all ENs fail to return a valid response, then an
 // error aggregating all failures is returned.
 func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context,
-	execNodes flow.IdentityList,
-	req *execproto.GetEventsForBlockIDsRequest,
-) (*execproto.GetEventsForBlockIDsResponse, *flow.Identity, error) {
+	execNodes flow.IdentitySkeletonList,
+	req *execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, *flow.IdentitySkeleton, error) {
 	var resp *execproto.GetEventsForBlockIDsResponse
-	var execNode *flow.Identity
+	var execNode *flow.IdentitySkeleton
 	errToReturn := b.nodeCommunicator.CallAvailableNode(
 		execNodes,
-		func(node *flow.Identity) error {
+		func(node *flow.IdentitySkeleton) error {
 			var err error
 			start := time.Now()
 			resp, err = b.tryGetEvents(ctx, node, req)
@@ -421,9 +420,8 @@ func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context,
 }
 
 func (b *backendEvents) tryGetEvents(ctx context.Context,
-	execNode *flow.Identity,
-	req *execproto.GetEventsForBlockIDsRequest,
-) (*execproto.GetEventsForBlockIDsResponse, error) {
+	execNode *flow.IdentitySkeleton,
+	req *execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err

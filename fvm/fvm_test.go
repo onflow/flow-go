@@ -3086,7 +3086,7 @@ func TestEVM(t *testing.T) {
 				import EVM from %s
 				
 				pub fun main() {
-					let bal = EVM.Balance(flow: 1.0);
+					let bal = EVM.Balance(attoflow: 1000000000000000000);
 					let acc <- EVM.createBridgedAccount();
 					// withdraw insufficient balance
 					destroy acc.withdraw(balance: bal);
