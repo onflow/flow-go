@@ -30,7 +30,7 @@ var contractCode string
 //go:embed abiOnlyContract.cdc
 var abiOnlyContractCode string
 
-var flowTokenImportPattern = regexp.MustCompile(`^import "FlowToken"\n`)
+var flowTokenImportPattern = regexp.MustCompile(`(?m)^import "FlowToken"\n`)
 
 func ContractCode(flowTokenAddress flow.Address, evmAbiOnly bool) []byte {
 	if evmAbiOnly {

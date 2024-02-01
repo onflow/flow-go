@@ -9,6 +9,8 @@ import (
 	"github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/sema"
+	cadenceStdlib "github.com/onflow/cadence/runtime/stdlib"
 	"github.com/onflow/cadence/runtime/tests/utils"
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/stretchr/testify/assert"
@@ -271,7 +273,7 @@ func TestEVMEncodeABI(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnResolveLocation: LocationResolver,
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -400,7 +402,7 @@ func TestEVMEncodeABIComputation(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnResolveLocation: LocationResolver,
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -496,7 +498,7 @@ func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnResolveLocation: LocationResolver,
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -601,7 +603,7 @@ func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnResolveLocation: LocationResolver,
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -700,7 +702,7 @@ func TestEVMDecodeABI(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnResolveLocation: LocationResolver,
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -835,7 +837,7 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnResolveLocation: LocationResolver,
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -1115,7 +1117,7 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnResolveLocation: LocationResolver,
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -1194,7 +1196,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnResolveLocation: LocationResolver,
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -1281,7 +1283,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnResolveLocation: LocationResolver,
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -1367,7 +1369,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnResolveLocation: LocationResolver,
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -1454,7 +1456,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnResolveLocation: LocationResolver,
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -1541,7 +1543,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnResolveLocation: LocationResolver,
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -1638,7 +1640,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnResolveLocation: LocationResolver,
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -1725,7 +1727,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnResolveLocation: LocationResolver,
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -1812,7 +1814,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnResolveLocation: LocationResolver,
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -1899,7 +1901,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnResolveLocation: LocationResolver,
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -1986,7 +1988,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnResolveLocation: LocationResolver,
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -2073,7 +2075,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			OnGetSigningAccounts: func() ([]runtime.Address, error) {
 				return []runtime.Address{runtime.Address(contractsAddress)}, nil
 			},
-			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnResolveLocation: LocationResolver,
 			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 				accountCodes[location] = code
 				return nil
@@ -2192,7 +2194,7 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnResolveLocation: LocationResolver,
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -2326,7 +2328,7 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnResolveLocation: LocationResolver,
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -2447,7 +2449,7 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnResolveLocation: LocationResolver,
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -2551,7 +2553,7 @@ func TestEVMAddressConstructionAndReturn(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnResolveLocation: LocationResolver,
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -2657,7 +2659,7 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnResolveLocation: LocationResolver,
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -2787,7 +2789,7 @@ func TestEVMRun(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnResolveLocation: LocationResolver,
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -2875,7 +2877,7 @@ func TestEVMCreateBridgedAccount(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnResolveLocation: LocationResolver,
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -3008,7 +3010,7 @@ func TestBridgedAccountCall(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnResolveLocation: LocationResolver,
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -3126,7 +3128,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnResolveLocation: LocationResolver,
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -3255,7 +3257,7 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnResolveLocation: LocationResolver,
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -3369,7 +3371,7 @@ func TestBridgedAccountDeploy(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnResolveLocation: LocationResolver,
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -3488,7 +3490,7 @@ func TestEVMAccountBalance(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnResolveLocation: LocationResolver,
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -3588,7 +3590,7 @@ func TestEVMAccountBalanceForABIOnlyContract(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnResolveLocation: LocationResolver,
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -3645,4 +3647,156 @@ func TestEVMAccountBalanceForABIOnlyContract(t *testing.T) {
 		err,
 		"error: value of type `EVM` has no member `createBridgedAccount`",
 	)
+}
+
+func TestEVMValidateCOAOwnershipProof(t *testing.T) {
+
+	t.Parallel()
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	proof := &types.COAOwnershipProofInContext{
+		COAOwnershipProof: types.COAOwnershipProof{
+			Address:        types.FlowAddress(contractsAddress),
+			CapabilityPath: "bridgedAccount",
+			Signatures:     []types.Signature{[]byte("signature")},
+			KeyIndices:     []uint64{0},
+		},
+		SignedData: []byte("signedData"),
+		EVMAddress: RandomAddress(t),
+	}
+
+	handler := &testContractHandler{
+		allocateAddress: func() types.Address {
+			return proof.EVMAddress
+		},
+	}
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: LocationResolver,
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+		OnGetAccountKey: func(addr runtime.Address, index int) (*cadenceStdlib.AccountKey, error) {
+			require.Equal(t, proof.Address[:], addr[:])
+			return &cadenceStdlib.AccountKey{
+				PublicKey: &cadenceStdlib.PublicKey{},
+				KeyIndex:  index,
+				Weight:    100,
+				HashAlgo:  sema.HashAlgorithmKECCAK_256,
+				IsRevoked: false,
+			}, nil
+		},
+		OnVerifySignature: func(
+			signature []byte,
+			tag string,
+			sd,
+			publicKey []byte,
+			signatureAlgorithm runtime.SignatureAlgorithm,
+			hashAlgorithm runtime.HashAlgorithm) (bool, error) {
+			// require.Equal(t, []byte(signedData.ToGoValue()), st)
+			return true, nil
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+		false,
+	)
+
+	setupTx := []byte(`
+		import EVM from 0x1
+
+		transaction {
+			prepare(account: AuthAccount) {
+				let bridgedAccount1 <- EVM.createBridgedAccount()
+				account.save<@EVM.BridgedAccount>(<-bridgedAccount1,
+					                              to: /storage/bridgedAccount)
+				account.link<&EVM.BridgedAccount{EVM.Addressable}>(/public/bridgedAccount,
+					                                               target: /storage/bridgedAccount)
+			}
+		}`)
+
+	err := rt.ExecuteTransaction(
+		runtime.Script{
+			Source: setupTx,
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: transactionEnvironment,
+			Location:    nextTransactionLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(
+		  address: Address,
+		  path: PublicPath,
+		  signedData: [UInt8],
+		  keyIndices: [UInt64],
+		  signatures: [[UInt8]],
+		  evmAddress: [UInt8; 20]
+
+		) {
+          EVM.validateCOAOwnershipProof(
+			address: address,
+			path: path,
+			signedData: signedData,
+			keyIndices: keyIndices,
+			signatures: signatures, 
+			evmAddress: evmAddress
+		  )
+      }
+    `)
+
+	// Run script
+	_, err = rt.ExecuteScript(
+		runtime.Script{
+			Source:    script,
+			Arguments: EncodeArgs(proof.ToCadenceValues()),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
 }
