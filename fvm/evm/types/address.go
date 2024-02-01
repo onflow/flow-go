@@ -7,8 +7,16 @@ import (
 )
 
 const (
-	// number of prefix bytes with specific values for special accounts (extended precompiles and COAs)
-	// using leading zeros for prefix helps with the storage compactness
+	// number of prefix bytes with constant values for special accounts (extended precompiles and COAs)
+	// using leading zeros for prefix helps with the storage compactness.
+	//
+	// The prefix length should insure a high-enough level of security against finding a preimage using the hash
+	// function used for EVM addresses generation (Keccak256). This is required to avoid finding an EVM address
+	// that can also be a valid FlowEVM address. 
+	// The target (minimal) security in this case is the security level provided by EVM addresses.
+	// Since EVM addresses are 160-bits long, EVM addresses offer only 80 bits of security (collision resistance 
+	// offers the lowest level).
+	// A preimage resistance of 80 bits requires the prefix to be at least 80-bits long (i.e 10 bytes)
 	FlowEVMSpecialAddressPrefixLen = 12
 )
 
@@ -56,6 +64,12 @@ func NewAddressFromString(str string) Address {
 }
 
 // IsACOAAddress returns true if the address is a COA address
+//
+// This test insure `addr` has been generated as a COA address with high probability.
+// Brute forcing an EVM address `addr` to pass the `IsACOAAddress` test is as hard as the bit-length
+// of `FlowEVMCOAAddressPrefix` (here 96 bits).
+// Although this is lower than the protocol-wide security level in Flow (128 bits), it remains
+// higher than the EVM addresses security (80 bits when considering collision attacks)
 func IsACOAAddress(addr Address) bool {
 	return bytes.HasPrefix(addr[:], FlowEVMCOAAddressPrefix[:])
 }
