@@ -2,20 +2,23 @@ package backend
 
 import (
 	"context"
-
+	"fmt"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
-
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 type ObserverLocalDataService struct {
 	TransactionsLocalDataProvider
 	backendEvents BackendEvents
+	me            module.Local
 }
 
 func NewObserverLocalDataService(state protocol.State,
@@ -30,7 +33,7 @@ func NewObserverLocalDataService(state protocol.State,
 	log zerolog.Logger,
 	maxHeightRange uint,
 	nodeCommunicator Communicator,
-	queryMode IndexQueryMode,
+	me module.Local,
 ) *ObserverLocalDataService {
 
 	return &ObserverLocalDataService{
@@ -51,81 +54,201 @@ func NewObserverLocalDataService(state protocol.State,
 			log:               log,
 			maxHeightRange:    maxHeightRange,
 			nodeCommunicator:  nodeCommunicator,
-			queryMode:         queryMode,
+			queryMode:         IndexQueryModeLocalOnly,
 		},
+		me: me,
 	}
 }
 
 func (o *ObserverLocalDataService) GetEventsForBlockIDsFromStorage(ctx context.Context,
 	blockIDs []flow.Identifier,
 	eventType string,
-	requiredEventEncodingVersion entities.EventEncodingVersion) ([]flow.BlockEvents, error) {
-	return o.backendEvents.GetEventsForBlockIDs(ctx, eventType, blockIDs, requiredEventEncodingVersion)
+	requiredEventEncodingVersion entities.EventEncodingVersion) (*access.EventsResponse, error) {
+	events, err := o.backendEvents.GetEventsForBlockIDs(ctx, eventType, blockIDs, requiredEventEncodingVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	resultEvents, err := convert.BlockEventsToMessages(events)
+	if err != nil {
+		return nil, err
+	}
+
+	lastFinalizedHeader, err := o.state.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get finalized, %w", err)
+	}
+	blockId := lastFinalizedHeader.ID()
+	nodeId := o.me.NodeID()
+
+	metadata := &entities.Metadata{
+		LatestFinalizedBlockId: blockId[:],
+		LatestFinalizedHeight:  lastFinalizedHeader.Height,
+		NodeId:                 nodeId[:],
+	}
+
+	return &access.EventsResponse{
+		Results:  resultEvents,
+		Metadata: metadata,
+	}, nil
 }
 
-func (o *ObserverLocalDataService) GetEventsForHeightRangeFromStorage(
+func (o *ObserverLocalDataService) GetEventsForHeightRangeFromStorageData(
 	ctx context.Context,
 	eventType string,
 	startHeight, endHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) ([]flow.BlockEvents, error) {
-	return o.backendEvents.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion)
+) (*access.EventsResponse, error) {
+	events, err := o.backendEvents.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	resultEvents, err := convert.BlockEventsToMessages(events)
+	if err != nil {
+		return nil, err
+	}
+
+	lastFinalizedHeader, err := o.state.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get finalized, %w", err)
+	}
+	blockId := lastFinalizedHeader.ID()
+	nodeId := o.me.NodeID()
+
+	metadata := &entities.Metadata{
+		LatestFinalizedBlockId: blockId[:],
+		LatestFinalizedHeight:  lastFinalizedHeader.Height,
+		NodeId:                 nodeId[:],
+	}
+
+	return &access.EventsResponse{
+		Results:  resultEvents,
+		Metadata: metadata,
+	}, nil
 }
 
-//func (s *ObserverLocalDataService) GetEventsForBlockIDsFromStorage(_ context.Context, eventType string, blockIDs []flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) ([]flow.BlockEvents, error) {
-//	// find the block headers for all the block IDs
-//	blockHeaders := make([]*flow.Header, 0)
-//	for _, blockID := range blockIDs {
-//		header, err := s.backendEvents.headers.ByBlockID(blockID)
-//		if err != nil {
-//			return nil, rpc.ConvertStorageError(fmt.Errorf("failed to get events: %w", err))
-//		}
-//
-//		blockHeaders = append(blockHeaders, header)
-//	}
-//
-//	missing := make([]*flow.Header, 0)
-//	resp := make([]flow.BlockEvents, 0)
-//	for _, header := range blockHeaders {
-//
-//		events, err := s.events.ByBlockID(header.ID())
-//		if err != nil {
-//			// Note: if there are no events for a block, an empty slice is returned
-//			if errors.Is(err, storage.ErrNotFound) {
-//				missing = append(missing, header)
-//				continue
-//			}
-//			err = fmt.Errorf("failed to get events for block %s: %w", header.ID(), err)
-//			return nil, rpc.ConvertError(err, "failed to get events from storage", codes.Internal)
-//		}
-//
-//		filteredEvents := make([]flow.Event, 0)
-//		for _, e := range events {
-//			if e.Type != flow.EventType(eventType) {
-//				continue
-//			}
-//
-//			// events are encoded in CCF format in storage. convert to JSON-CDC if requested
-//			if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
-//				payload, err := convert.CcfPayloadToJsonPayload(e.Payload)
-//				if err != nil {
-//					err = fmt.Errorf("failed to convert event payload for block %s: %w", header.ID(), err)
-//					return nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
-//				}
-//				e.Payload = payload
-//			}
-//
-//			filteredEvents = append(filteredEvents, e)
-//		}
-//
-//		resp = append(resp, flow.BlockEvents{
-//			BlockID:        header.ID(),
-//			BlockHeight:    header.Height,
-//			BlockTimestamp: header.Timestamp,
-//			Events:         filteredEvents,
-//		})
-//
-//	}
-//
-//	return resp, nil
-//}
+func (o *ObserverLocalDataService) GetTransactionResultFromStorageData(
+	ctx context.Context,
+	txID flow.Identifier,
+	blockID flow.Identifier,
+	collectionID flow.Identifier,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+	errorMessageGetter TransactionErrorMessageGetter,
+) (*access.TransactionResultResponse, error) {
+
+	result, err := o.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion, errorMessageGetter)
+	if err != nil {
+		return nil, err
+	}
+
+	lastFinalizedHeader, err := o.state.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get finalized, %w", err)
+	}
+	blockId := lastFinalizedHeader.ID()
+	nodeId := o.me.NodeID()
+
+	metadata := &entities.Metadata{
+		LatestFinalizedBlockId: blockId[:],
+		LatestFinalizedHeight:  lastFinalizedHeader.Height,
+		NodeId:                 nodeId[:],
+	}
+
+	return &access.TransactionResultResponse{
+		Status:        entities.TransactionStatus(result.Status),
+		StatusCode:    uint32(result.StatusCode),
+		ErrorMessage:  result.ErrorMessage,
+		Events:        convert.EventsToMessages(result.Events),
+		BlockId:       result.BlockID[:],
+		TransactionId: result.TransactionID[:],
+		CollectionId:  result.CollectionID[:],
+		BlockHeight:   result.BlockHeight,
+		Metadata:      metadata,
+	}, nil
+}
+
+func (o *ObserverLocalDataService) GetTransactionResultsByBlockIDFromStorageData(
+	ctx context.Context,
+	block *flow.Block,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+	errorMessageByBlockIDGetter TransactionErrorMessagesByBlockIDGetter,
+) (*access.TransactionResultsResponse, error) {
+	results, err := o.GetTransactionResultsByBlockIDFromStorage(ctx, block, requiredEventEncodingVersion, errorMessageByBlockIDGetter)
+	if err != nil {
+		return nil, err
+	}
+
+	lastFinalizedHeader, err := o.state.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get finalized, %w", err)
+	}
+	blockId := lastFinalizedHeader.ID()
+	nodeId := o.me.NodeID()
+
+	metadata := &entities.Metadata{
+		LatestFinalizedBlockId: blockId[:],
+		LatestFinalizedHeight:  lastFinalizedHeader.Height,
+		NodeId:                 nodeId[:],
+	}
+
+	var txResultsResponse []*access.TransactionResultResponse
+	for _, result := range results {
+		resultResponse := &access.TransactionResultResponse{
+			Status:        entities.TransactionStatus(result.Status),
+			StatusCode:    uint32(result.StatusCode),
+			ErrorMessage:  result.ErrorMessage,
+			Events:        convert.EventsToMessages(result.Events),
+			BlockId:       result.BlockID[:],
+			TransactionId: result.TransactionID[:],
+			CollectionId:  result.CollectionID[:],
+			BlockHeight:   result.BlockHeight,
+			Metadata:      metadata,
+		}
+
+		txResultsResponse = append(txResultsResponse, resultResponse)
+	}
+
+	return &access.TransactionResultsResponse{
+		TransactionResults: txResultsResponse,
+		Metadata:           metadata,
+	}, nil
+}
+
+func (o *ObserverLocalDataService) GetTransactionResultByIndexFromStorageData(
+	ctx context.Context,
+	block *flow.Block,
+	index uint32,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+	errorMessageByIndexGetter TransactionErrorMessageByIndexGetter,
+) (*access.TransactionResultResponse, error) {
+	result, err := o.GetTransactionResultByIndexFromStorage(ctx, block, index, requiredEventEncodingVersion, errorMessageByIndexGetter)
+	if err != nil {
+		return nil, err
+	}
+
+	lastFinalizedHeader, err := o.state.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get finalized, %w", err)
+	}
+	blockId := lastFinalizedHeader.ID()
+	nodeId := o.me.NodeID()
+
+	metadata := &entities.Metadata{
+		LatestFinalizedBlockId: blockId[:],
+		LatestFinalizedHeight:  lastFinalizedHeader.Height,
+		NodeId:                 nodeId[:],
+	}
+
+	return &access.TransactionResultResponse{
+		Status:        entities.TransactionStatus(result.Status),
+		StatusCode:    uint32(result.StatusCode),
+		ErrorMessage:  result.ErrorMessage,
+		Events:        convert.EventsToMessages(result.Events),
+		BlockId:       result.BlockID[:],
+		TransactionId: result.TransactionID[:],
+		CollectionId:  result.CollectionID[:],
+		BlockHeight:   result.BlockHeight,
+		Metadata:      metadata,
+	}, nil
+}

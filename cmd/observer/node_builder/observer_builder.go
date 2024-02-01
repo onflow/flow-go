@@ -1468,7 +1468,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				builder.Logger,
 				backendConfig.MaxHeightRange,
 				backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-				backend.IndexQueryModeLocalOnly,
+				builder.Me,
 			)
 		}
 

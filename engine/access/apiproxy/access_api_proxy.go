@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/access/legacy/convert"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/grpc/forwarder"
-	rpcConvert "github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/engine/protocol"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -116,6 +115,17 @@ func (h *FlowAccessAPIRouter) GetTransaction(context context.Context, req *acces
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResult(context context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
+	if h.LocalData != nil {
+		txId := req.GetId()
+		blockId := req.GetBlockId()
+		collectionID := req.GetCollectionId()
+		requiredEventEncodingVersion := req.GetEventEncodingVersion()
+
+		res, err := h.LocalData.GetTransactionResultFromStorageData(context, block, txId, requiredEventEncodingVersion, nil)
+		h.log("observerStorage", "GetTransactionResult", err)
+		return res, err
+	}
+
 	res, err := h.Upstream.GetTransactionResult(context, req)
 	h.log("upstream", "GetTransactionResult", err)
 	return res, err
@@ -188,30 +198,31 @@ func (h *FlowAccessAPIRouter) ExecuteScriptAtBlockHeight(context context.Context
 }
 
 func (h *FlowAccessAPIRouter) GetEventsForHeightRange(context context.Context, req *access.GetEventsForHeightRangeRequest) (*access.EventsResponse, error) {
+	if h.LocalData != nil {
+		eventType := req.GetType()
+		startHeight := req.GetStartHeight()
+		endHeight := req.GetEndHeight()
+		requiredEventEncodingVersion := req.GetEventEncodingVersion()
+
+		res, err := h.LocalData.GetEventsForHeightRangeFromStorageData(context, eventType, startHeight, endHeight, requiredEventEncodingVersion)
+		h.log("observerStorage", "GetEventsForHeightRange", err)
+		return res, err
+	}
+
 	res, err := h.Upstream.GetEventsForHeightRange(context, req)
 	h.log("upstream", "GetEventsForHeightRange", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetEventsForBlockIDs(context context.Context, req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
-
 	if h.LocalData != nil {
 		eventType := req.GetType()
 		blockIDs := convert.MessagesToIdentifiers(req.GetBlockIds())
 		requiredEventEncodingVersion := req.GetEventEncodingVersion()
 
-		events, err := h.LocalData.GetEventsForBlockIDsFromStorage(context, blockIDs, eventType, requiredEventEncodingVersion)
-
-		resultEvents, err := rpcConvert.BlockEventsToMessages(events)
-		if err != nil {
-			return nil, err
-		}
-
-		return &access.EventsResponse{
-			Results:  resultEvents,
-			Metadata: metadata,
-		}, nil
-
+		res, err := h.LocalData.GetEventsForBlockIDsFromStorage(context, blockIDs, eventType, requiredEventEncodingVersion)
+		h.log("observerStorage", "GetEventsForBlockIDs", err)
+		return res, err
 	}
 
 	res, err := h.Upstream.GetEventsForBlockIDs(context, req)
