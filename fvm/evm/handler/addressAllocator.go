@@ -11,9 +11,10 @@ import (
 
 const (
 	ledgerAddressAllocatorKey = "AddressAllocator"
-	// addressIndexMultiplierConstant is used for mapping address indices
-	// into a deterministic random-looking address postfixes. 
-	// look at `mapAddressIndex` for more details.
+	// `addressIndexMultiplierConstant` is used for mapping address indices
+	// into deterministic random-looking address postfixes. 
+	// The constant must be an ODD number. It is a "nothing-up-my-sleeves" constant.
+	// Look at `mapAddressIndex` for more details.
 	addressIndexMultiplierConstant = uint64(0xFFEEDDCCBBAA9977)
 )
 
