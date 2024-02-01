@@ -78,8 +78,7 @@ type Replicas interface {
 	// Returns the following expected errors for invalid inputs:
 	//   - model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 	//
-	// TODO: should return identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
-	IdentitiesByEpoch(view uint64) (flow.IdentityList, error)
+	IdentitiesByEpoch(view uint64) (flow.IdentitySkeletonList, error)
 
 	// IdentityByEpoch returns the full Identity for specified HotStuff participant.
 	// The node must be a legitimate HotStuff participant with NON-ZERO WEIGHT at the specified block.
@@ -92,8 +91,7 @@ type Replicas interface {
 	// Returns the following expected errors for invalid inputs:
 	//   - model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 	//
-	// TODO: should return identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
-	IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.Identity, error)
+	IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.IdentitySkeleton, error)
 }
 
 // DynamicCommittee extends Replicas to provide the consensus committee for the purposes
