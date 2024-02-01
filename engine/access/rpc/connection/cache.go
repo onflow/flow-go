@@ -1,22 +1,60 @@
 package connection
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/onflow/crypto"
+	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
+
+	"github.com/onflow/flow-go/module"
 )
 
 // CachedClient represents a gRPC client connection that is cached for reuse.
 type CachedClient struct {
-	ClientConn     *grpc.ClientConn
-	Address        string
-	timeout        time.Duration
+	conn    *grpc.ClientConn
+	address string
+	timeout time.Duration
+
+	cache          *Cache
 	closeRequested *atomic.Bool
 	wg             sync.WaitGroup
 	mu             sync.Mutex
+}
+
+// ClientConn returns the underlying gRPC client connection.
+func (cc *CachedClient) ClientConn() *grpc.ClientConn {
+	return cc.conn
+}
+
+// Address returns the address of the remote server.
+func (cc *CachedClient) Address() string {
+	return cc.address
+}
+
+// CloseRequested returns true if the CachedClient has been marked for closure.
+func (cc *CachedClient) CloseRequested() bool {
+	return cc.closeRequested.Load()
+}
+
+// AddRequest increments the in-flight request counter for the CachedClient.
+// It returns a function that should be called when the request completes to decrement the counter
+func (cc *CachedClient) AddRequest() func() {
+	cc.wg.Add(1)
+	return cc.wg.Done
+}
+
+// Invalidate removes the CachedClient from the cache and closes the connection.
+func (cc *CachedClient) Invalidate() {
+	cc.cache.invalidate(cc.address)
+
+	// Close the connection asynchronously to avoid blocking requests
+	go cc.Close()
 }
 
 // Close closes the CachedClient connection. It marks the connection for closure and waits asynchronously for ongoing
@@ -29,15 +67,16 @@ func (cc *CachedClient) Close() {
 
 	// Obtain the lock to ensure that any connection attempts have completed
 	cc.mu.Lock()
-	conn := cc.ClientConn
+	conn := cc.conn
 	cc.mu.Unlock()
 
-	// If the initial connection attempt failed, ClientConn will be nil
+	// If the initial connection attempt failed, conn will be nil
 	if conn == nil {
 		return
 	}
 
 	// If there are ongoing requests, wait for them to complete asynchronously
+	// this avoids tearing down the connection while requests are in-flight resulting in errors
 	cc.wg.Wait()
 
 	// Close the connection
@@ -46,59 +85,97 @@ func (cc *CachedClient) Close() {
 
 // Cache represents a cache of CachedClient instances with a given maximum size.
 type Cache struct {
-	cache *lru.Cache[string, *CachedClient]
-	size  int
+	cache   *lru.Cache[string, *CachedClient]
+	maxSize int
+
+	logger  zerolog.Logger
+	metrics module.GRPCConnectionPoolMetrics
 }
 
 // NewCache creates a new Cache with the specified maximum size and the underlying LRU cache.
-func NewCache(cache *lru.Cache[string, *CachedClient], size int) *Cache {
+func NewCache(
+	log zerolog.Logger,
+	metrics module.GRPCConnectionPoolMetrics,
+	maxSize int,
+) (*Cache, error) {
+	cache, err := lru.NewWithEvict(maxSize, func(_ string, client *CachedClient) {
+		go client.Close() // close is blocking, so run in a goroutine
+
+		log.Debug().Str("grpc_conn_evicted", client.address).Msg("closing grpc connection evicted from pool")
+		metrics.ConnectionFromPoolEvicted()
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
+	}
+
 	return &Cache{
-		cache: cache,
-		size:  size,
-	}
+		cache:   cache,
+		maxSize: maxSize,
+		logger:  log,
+		metrics: metrics,
+	}, nil
 }
 
-// Get retrieves the CachedClient for the given address from the cache.
-// It returns the CachedClient and a boolean indicating whether the entry exists in the cache.
-func (c *Cache) Get(address string) (*CachedClient, bool) {
-	val, ok := c.cache.Get(address)
-	if !ok {
-		return nil, false
+// GetConnected returns a CachedClient for the given address that has an active connection.
+// If the address is not in the cache, it creates a new entry and connects.
+func (c *Cache) GetConnected(
+	address string,
+	timeout time.Duration,
+	networkPubKey crypto.PublicKey,
+	connectFn func(string, time.Duration, crypto.PublicKey, *CachedClient) (*grpc.ClientConn, error),
+) (*CachedClient, error) {
+	client := &CachedClient{
+		address:        address,
+		timeout:        timeout,
+		closeRequested: atomic.NewBool(false),
+		cache:          c,
 	}
-	return val, true
-}
 
-// GetOrAdd atomically gets the CachedClient for the given address from the cache, or adds a new one
-// if none existed.
-// New entries are added to the cache with their mutex locked. This ensures that the caller gets
-// priority when working with the new client, allowing it to create the underlying connection.
-// Clients retrieved from the cache are returned without modifying their lock.
-func (c *Cache) GetOrAdd(address string, timeout time.Duration) (*CachedClient, bool) {
-	client := &CachedClient{}
+	// capture the lock before inserting into the cache. we are guaranteed to continue if an entry
+	// doesn't exist yet
 	client.mu.Lock()
 
 	val, existed, _ := c.cache.PeekOrAdd(address, client)
 	if existed {
-		return val, true
+		client = val
+
+		// wait for the lock before continuing. this ensures only one goroutine is creating a new
+		// connection to a given address at a time
+		client.mu.Lock()
+		c.metrics.ConnectionFromPoolReused()
+	} else {
+		c.metrics.ConnectionAddedToPool()
+	}
+	defer client.mu.Unlock()
+
+	// after getting the lock, check if the connection is still active
+	if client.conn != nil && client.conn.GetState() != connectivity.Shutdown {
+		return client, nil
 	}
 
-	client.Address = address
-	client.timeout = timeout
-	client.closeRequested = atomic.NewBool(false)
+	// if the connection is not setup yet or closed, create a new connection and cache it
+	conn, err := connectFn(client.address, client.timeout, networkPubKey, client)
+	if err != nil {
+		return nil, err
+	}
 
-	return client, false
+	c.metrics.NewConnectionEstablished()
+	c.metrics.TotalConnectionsInPool(uint(c.Len()), uint(c.MaxSize()))
+
+	client.conn = conn
+	return client, nil
 }
 
-// Add adds a CachedClient to the cache with the given address.
-// It returns a boolean indicating whether an existing entry was evicted.
-func (c *Cache) Add(address string, client *CachedClient) (evicted bool) {
-	return c.cache.Add(address, client)
-}
+// invalidate removes the CachedClient entry from the cache with the given address, and shuts
+// down the connection.
+func (c *Cache) invalidate(address string) {
+	if !c.cache.Remove(address) {
+		return
+	}
 
-// Remove removes the CachedClient entry from the cache with the given address.
-// It returns a boolean indicating whether the entry was present and removed.
-func (c *Cache) Remove(address string) (present bool) {
-	return c.cache.Remove(address)
+	c.logger.Debug().Str("cached_client_invalidated", address).Msg("invalidating cached client")
+	c.metrics.ConnectionFromPoolInvalidated()
 }
 
 // Len returns the number of CachedClient entries in the cache.
@@ -108,11 +185,5 @@ func (c *Cache) Len() int {
 
 // MaxSize returns the maximum size of the cache.
 func (c *Cache) MaxSize() int {
-	return c.size
-}
-
-// Contains checks if the cache contains an entry with the given address.
-// It returns a boolean indicating whether the address is present in the cache.
-func (c *Cache) Contains(address string) (containKey bool) {
-	return c.cache.Contains(address)
+	return c.maxSize
 }
