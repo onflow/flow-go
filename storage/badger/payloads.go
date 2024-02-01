@@ -144,10 +144,11 @@ func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (*fl
 			results = append(results, result)
 		}
 		payload := &flow.Payload{
-			Seals:      seals,
-			Guarantees: guarantees,
-			Receipts:   receipts,
-			Results:    results,
+			Seals:           seals,
+			Guarantees:      guarantees,
+			Receipts:        receipts,
+			Results:         results,
+			ProtocolStateID: idx.ProtocolStateID,
 		}
 
 		return payload, nil

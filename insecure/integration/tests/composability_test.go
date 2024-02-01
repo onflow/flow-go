@@ -13,13 +13,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/insecure/corruptnet"
 	"github.com/onflow/flow-go/insecure/orchestrator"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -122,7 +122,7 @@ func TestCorruptNetworkFrameworkHappyPath(t *testing.T) {
 // withCorruptNetwork creates a real corrupt network, starts it, runs the "run" function, and then stops it.
 func withCorruptNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corruptnet.Network, *stub.Hub)) {
 	codec := unittest.NetworkCodec()
-	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
+	corruptedIdentity := unittest.PrivateNodeInfoFixture(unittest.WithAddress(insecure.DefaultAddress))
 
 	// life-cycle management of orchestratorNetwork.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -138,11 +138,16 @@ func withCorruptNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corru
 	hub := stub.NewNetworkHub()
 	ccf := corruptnet.NewCorruptConduitFactory(unittest.Logger(), flow.BftTestnet)
 	flowNetwork := stub.NewNetwork(t, corruptedIdentity.NodeID, hub, stub.WithConduitFactory(ccf))
+
+	privateKeys, err := corruptedIdentity.PrivateKeys()
+	require.NoError(t, err)
+	me, err := local.New(corruptedIdentity.Identity().IdentitySkeleton, privateKeys.StakingKey)
+	require.NoError(t, err)
 	corruptNetwork, err := corruptnet.NewCorruptNetwork(
 		unittest.Logger(),
 		flow.BftTestnet,
 		insecure.DefaultAddress,
-		testutil.LocalFixture(t, corruptedIdentity),
+		me,
 		codec,
 		flowNetwork,
 		ccf)
@@ -161,7 +166,7 @@ func withCorruptNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corru
 		flowNetwork.StartConDev(100*time.Millisecond, true)
 	}, 100*time.Millisecond, "failed to start corrupted node network")
 
-	run(t, *corruptedIdentity, corruptNetwork, hub)
+	run(t, *corruptedIdentity.Identity(), corruptNetwork, hub)
 
 	// terminates orchestratorNetwork
 	cancel()

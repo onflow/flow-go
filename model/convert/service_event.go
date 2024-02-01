@@ -12,7 +12,6 @@ import (
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/assignment"
 )
 
 // ServiceEvent converts a service event encoded as the generic flow.Event
@@ -37,8 +36,10 @@ func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, e
 
 // convertServiceEventEpochSetup converts a service event encoded as the generic
 // flow.Event type to a ServiceEvent type for an EpochSetup event
+// CONVENTION: in the returned `EpochSetup` event,
+//   - Node identities listed in `EpochSetup.Participants` are in CANONICAL ORDER
+//   - for each cluster assignment (i.e. element in `EpochSetup.Assignments`), the nodeIDs are listed in CANONICAL ORDER
 func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error) {
-
 	// decode bytes using ccf
 	payload, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
@@ -218,13 +219,13 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 		)
 	}
 
-	// parse cluster assignments
+	// parse cluster assignments; returned assignments are in canonical order
 	setup.Assignments, err = convertClusterAssignments(cdcClusters.Values)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert cluster assignments: %w", err)
 	}
 
-	// parse epoch participants
+	// parse epoch participants; returned node identities are in canonical order
 	setup.Participants, err = convertParticipants(cdcParticipants.Values)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert participants: %w", err)
@@ -242,7 +243,6 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 // convertServiceEventEpochCommit converts a service event encoded as the generic
 // flow.Event type to a ServiceEvent type for an EpochCommit event
 func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error) {
-
 	// decode bytes using ccf
 	payload, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
@@ -352,15 +352,14 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 // convertClusterAssignments converts the Cadence representation of cluster
 // assignments included in the EpochSetup into the protocol AssignmentList
 // representation.
+// CONVENTION: for each cluster assignment (i.e. element in `AssignmentList`), the nodeIDs are listed in CANONICAL ORDER
 func convertClusterAssignments(cdcClusters []cadence.Value) (flow.AssignmentList, error) {
-
 	// ensure we don't have duplicate cluster indices
 	indices := make(map[uint]struct{})
 
 	// parse cluster assignments to Go types
-	identifierLists := make([]flow.IdentifierList, len(cdcClusters))
+	clusterAssignments := make([]flow.IdentifierList, len(cdcClusters))
 	for _, value := range cdcClusters {
-
 		cdcCluster, ok := value.(cadence.Struct)
 		if !ok {
 			return nil, invalidCadenceTypeError("cluster", cdcCluster, cadence.Struct{})
@@ -434,8 +433,8 @@ func convertClusterAssignments(cdcClusters []cadence.Value) (flow.AssignmentList
 		}
 
 		// read weights to retrieve node IDs of cdcCluster members
+		clusterMembers := make(flow.IdentifierList, 0, len(weightsByNodeID.Pairs))
 		for _, pair := range weightsByNodeID.Pairs {
-
 			nodeIDString, ok := pair.Key.(cadence.String)
 			if !ok {
 				return nil, invalidCadenceTypeError(
@@ -451,26 +450,25 @@ func convertClusterAssignments(cdcClusters []cadence.Value) (flow.AssignmentList
 					err,
 				)
 			}
-
-			identifierLists[clusterIndex] = append(identifierLists[clusterIndex], nodeID)
+			clusterMembers = append(clusterMembers, nodeID)
 		}
+
+		// IMPORTANT: for each cluster, node IDs must be in *canonical order*
+		clusterAssignments[clusterIndex] = clusterMembers.Sort(flow.IdentifierCanonical)
 	}
 
-	// sort identifier lists in Canonical order
-	assignments := assignment.FromIdentifierLists(identifierLists)
-
-	return assignments, nil
+	return clusterAssignments, nil
 }
 
 // convertParticipants converts the network participants specified in the
 // EpochSetup event into an IdentityList.
-func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, error) {
-
-	participants := make(flow.IdentityList, 0, len(cdcParticipants))
+// CONVENTION: returned IdentityList is in CANONICAL ORDER
+func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentitySkeletonList, error) {
+	participants := make(flow.IdentitySkeletonList, 0, len(cdcParticipants))
 	var err error
 
 	for _, value := range cdcParticipants {
-
+		// checking compliance with expected format
 		cdcNodeInfoStruct, ok := value.(cadence.Struct)
 		if !ok {
 			return nil, invalidCadenceTypeError(
@@ -479,7 +477,6 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, er
 				cadence.Struct{},
 			)
 		}
-
 		const expectedFieldCount = 14
 		if len(cdcNodeInfoStruct.Fields) < expectedFieldCount {
 			return nil, fmt.Errorf(
@@ -488,7 +485,6 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, er
 				expectedFieldCount,
 			)
 		}
-
 		if cdcNodeInfoStruct.Type() == nil {
 			return nil, fmt.Errorf("nodeInfo struct doesn't have type")
 		}
@@ -587,10 +583,10 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, er
 			return nil, fmt.Errorf("invalid role %d", role)
 		}
 
-		identity := &flow.Identity{
-			Address: string(address),
-			Weight:  uint64(initialWeight),
-			Role:    flow.Role(role),
+		identity := &flow.IdentitySkeleton{
+			InitialWeight: uint64(initialWeight),
+			Address:       string(address),
+			Role:          flow.Role(role),
 		}
 
 		// convert nodeID string into identifier
@@ -634,7 +630,8 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, er
 		participants = append(participants, identity)
 	}
 
-	participants = participants.Sort(flow.Canonical)
+	// IMPORTANT: returned identities must be in *canonical order*
+	participants = participants.Sort(flow.Canonical[flow.IdentitySkeleton])
 	return participants, nil
 }
 
