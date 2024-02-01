@@ -12,15 +12,9 @@ import (
 const (
 	ledgerAddressAllocatorKey = "AddressAllocator"
 	uint64ByteSize            = 8
-	addressPrefixLen          = 12
-)
-
-var (
-	// prefixes:
-	// the first 12 bytes of addresses allocation
-	// leading zeros helps with storage and all zero is reserved for the EVM precompiles
-	FlowEVMPrecompileAddressPrefix = [addressPrefixLen]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
-	FlowEVMCOAAddressPrefix        = [addressPrefixLen]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2}
+	// addressIndexShuffleSeed is used for shuffling address index
+	// shuffling index is used to make address postfixes look random
+	addressIndexShuffleSeed = uint64(0xFFEEDDCCBBAA9987)
 )
 
 type AddressAllocator struct {
@@ -38,33 +32,17 @@ func NewAddressAllocator(led atree.Ledger, flexAddress flow.Address) (*AddressAl
 	}, nil
 }
 
+func (aa *AddressAllocator) COAFactoryAddress() types.Address {
+	return MakeCOAAddress(0)
+}
+
 // AllocateCOAAddress allocates an address for COA
-func (aa *AddressAllocator) AllocateCOAAddress() (types.Address, error) {
-	data, err := aa.led.GetValue(aa.flexAddress[:], []byte(ledgerAddressAllocatorKey))
-	if err != nil {
-		return types.Address{}, err
-	}
-	// default value for uuid is 1
-	uuid := uint64(1)
-	if len(data) > 0 {
-		uuid = binary.BigEndian.Uint64(data)
-	}
-
-	target := MakeCOAAddress(uuid)
-
-	// store new uuid
-	newData := make([]byte, 8)
-	binary.BigEndian.PutUint64(newData, uuid+1)
-	err = aa.led.SetValue(aa.flexAddress[:], []byte(ledgerAddressAllocatorKey), newData)
-	if err != nil {
-		return types.Address{}, err
-	}
-
-	return target, nil
+func (aa *AddressAllocator) AllocateCOAAddress(uuid uint64) types.Address {
+	return MakeCOAAddress(uuid)
 }
 
 func MakeCOAAddress(index uint64) types.Address {
-	return makePrefixedAddress(index, FlowEVMCOAAddressPrefix)
+	return makePrefixedAddress(shuffleAddressIndex(index), types.FlowEVMCOAAddressPrefix)
 }
 
 func (aa *AddressAllocator) AllocatePrecompileAddress(index uint64) types.Address {
@@ -73,13 +51,20 @@ func (aa *AddressAllocator) AllocatePrecompileAddress(index uint64) types.Addres
 }
 
 func MakePrecompileAddress(index uint64) types.Address {
-	return makePrefixedAddress(index, FlowEVMPrecompileAddressPrefix)
+	return makePrefixedAddress(index, types.FlowEVMExtendedPrecompileAddressPrefix)
 }
 
-func makePrefixedAddress(index uint64, prefix [addressPrefixLen]byte) types.Address {
+func makePrefixedAddress(
+	index uint64,
+	prefix [types.FlowEVMSpecialAddressPrefixLen]byte,
+) types.Address {
 	var addr types.Address
 	prefixIndex := types.AddressLength - uint64ByteSize
 	copy(addr[:prefixIndex], prefix[:])
 	binary.BigEndian.PutUint64(addr[prefixIndex:], index)
 	return addr
+}
+
+func shuffleAddressIndex(preShuffleIndex uint64) uint64 {
+	return uint64(preShuffleIndex * addressIndexShuffleSeed)
 }

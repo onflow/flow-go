@@ -13,7 +13,6 @@ import (
 )
 
 func TestAddressAllocator(t *testing.T) {
-
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(root flow.Address) {
 			aa, err := handler.NewAddressAllocator(backend, root)
@@ -22,20 +21,27 @@ func TestAddressAllocator(t *testing.T) {
 			adr := aa.AllocatePrecompileAddress(3)
 			expectedAddress := types.NewAddress(gethCommon.HexToAddress("0x0000000000000000000000010000000000000003"))
 			require.Equal(t, expectedAddress, adr)
+			// check conforming to types
+			require.False(t, types.IsACOAAddress(adr))
 
 			// test default value fall back
-			adr, err = aa.AllocateCOAAddress()
-			require.NoError(t, err)
-			expectedAddress = types.NewAddress(gethCommon.HexToAddress("0x0000000000000000000000020000000000000001"))
+			adr = aa.AllocateCOAAddress(1)
+			expectedAddress = types.NewAddress(gethCommon.HexToAddress("0x000000000000000000000002ffeeddccbbaa9987"))
 			require.Equal(t, expectedAddress, adr)
+			// check conforming to types
+			require.True(t, types.IsACOAAddress(adr))
 
 			// continous allocation logic
-			adr, err = aa.AllocateCOAAddress()
-			require.NoError(t, err)
-			expectedAddress = types.NewAddress(gethCommon.HexToAddress("0x0000000000000000000000020000000000000002"))
+			adr = aa.AllocateCOAAddress(2)
+			expectedAddress = types.NewAddress(gethCommon.HexToAddress("0x000000000000000000000002ffddbb997755330e"))
 			require.Equal(t, expectedAddress, adr)
+			// check conforming to types
+			require.True(t, types.IsACOAAddress(adr))
+
+			// factory
+			factory := aa.COAFactoryAddress()
+			expectedAddress = types.NewAddress(gethCommon.HexToAddress("0x0000000000000000000000020000000000000000"))
+			require.Equal(t, expectedAddress, factory)
 		})
-
 	})
-
 }

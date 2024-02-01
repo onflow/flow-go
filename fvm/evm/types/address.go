@@ -1,9 +1,24 @@
 package types
 
 import (
-	"math/big"
+	"bytes"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
+)
+
+const (
+	// number of prefix bytes with specific values for special accounts (extended precompiles and COAs)
+	// using leading zeros for prefix helps with the storage compactness
+	FlowEVMSpecialAddressPrefixLen = 12
+)
+
+var (
+	// Prefix for the built-in EVM precompiles
+	FlowEVMNativePrecompileAddressPrefix = [FlowEVMSpecialAddressPrefixLen]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	// Prefix for the extended precompiles
+	FlowEVMExtendedPrecompileAddressPrefix = [FlowEVMSpecialAddressPrefixLen]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
+	// Prefix for the COA addresses
+	FlowEVMCOAAddressPrefix = [FlowEVMSpecialAddressPrefixLen]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2}
 )
 
 // Address is an EVM-compatible address
@@ -40,13 +55,12 @@ func NewAddressFromString(str string) Address {
 	return NewAddressFromBytes([]byte(str))
 }
 
-type GasLimit uint64
+// IsACOAAddress returns true if the address is a COA address
+func IsACOAAddress(addr Address) bool {
+	return bytes.HasPrefix(addr[:], FlowEVMCOAAddressPrefix[:])
+}
 
-type Code []byte
-
-type Data []byte
-
-// AsBigInt process the data and return it as a big integer
-func (d Data) AsBigInt() *big.Int {
-	return new(big.Int).SetBytes(d)
+// IsAnExtendedPrecompileAddress returns true if the address is a extended precompile address
+func IsAnExtendedPrecompileAddress(addr Address) bool {
+	return bytes.HasPrefix(addr[:], FlowEVMExtendedPrecompileAddressPrefix[:])
 }

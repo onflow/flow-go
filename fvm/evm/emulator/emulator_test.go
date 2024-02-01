@@ -1,12 +1,14 @@
 package emulator_test
 
 import (
+	"fmt"
 	"math"
 	"math/big"
 	"testing"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethVM "github.com/ethereum/go-ethereum/core/vm"
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/stretchr/testify/require"
 
@@ -283,7 +285,81 @@ func TestContractInteraction(t *testing.T) {
 					require.True(t, types.IsEVMValidationError(err))
 				})
 			})
+		})
+	})
+}
 
+func TestDeployAtFunctionality(t *testing.T) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			testContract := testutils.GetStorageTestContract(t)
+			testAccount := types.NewAddressFromString("test")
+			amount := big.NewInt(0).Mul(big.NewInt(1337), big.NewInt(gethParams.Ether))
+			amountToBeTransfered := big.NewInt(0).Mul(big.NewInt(100), big.NewInt(gethParams.Ether))
+
+			// fund test account
+			RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+				RunWithNewBlockView(t, env, func(blk types.BlockView) {
+					_, err := blk.DirectCall(types.NewDepositCall(testAccount, amount))
+					require.NoError(t, err)
+				})
+			})
+
+			t.Run("deploy contract at target address", func(t *testing.T) {
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					target := types.Address{1, 2, 3}
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						res, err := blk.DirectCall(
+							types.NewDeployCallWithTargetAddress(
+								testAccount,
+								target,
+								testContract.ByteCode,
+								math.MaxUint64,
+								amountToBeTransfered),
+						)
+						require.NoError(t, err)
+						require.Equal(t, target, res.DeployedContractAddress)
+					})
+					RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
+						require.NotNil(t, target)
+						retCode, err := blk.CodeOf(target)
+						require.NoError(t, err)
+						require.NotEmpty(t, retCode)
+
+						retBalance, err := blk.BalanceOf(target)
+						require.NoError(t, err)
+						require.Equal(t, amountToBeTransfered, retBalance)
+
+						retBalance, err = blk.BalanceOf(testAccount)
+						require.NoError(t, err)
+						require.Equal(t, amount.Sub(amount, amountToBeTransfered), retBalance)
+					})
+					// test deployment to an address that is already exist
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						_, err := blk.DirectCall(
+							types.NewDeployCallWithTargetAddress(
+								testAccount,
+								target,
+								testContract.ByteCode,
+								math.MaxUint64,
+								amountToBeTransfered),
+						)
+						require.Equal(t, gethVM.ErrContractAddressCollision, err)
+					})
+					// test deployment with not enough gas
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						_, err := blk.DirectCall(
+							types.NewDeployCallWithTargetAddress(
+								testAccount,
+								types.Address{3, 4, 5},
+								testContract.ByteCode,
+								100,
+								new(big.Int)),
+						)
+						require.Equal(t, fmt.Errorf("out of gas"), err)
+					})
+				})
+			})
 		})
 	})
 }

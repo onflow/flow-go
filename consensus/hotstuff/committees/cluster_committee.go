@@ -20,18 +20,18 @@ import (
 // implementation reference blocks on the cluster chain, which in turn reference
 // blocks on the main chain - this implementation manages that translation.
 type Cluster struct {
-	state    protocol.State
-	payloads storage.ClusterPayloads
-	me       flow.Identifier
-	// pre-computed leader selection for the full lifecycle of the cluster
-	selection *leader.LeaderSelection
-	// a filter that returns all members of the cluster committee allowed to vote
-	clusterMemberFilter flow.IdentityFilter
-	// initial set of cluster members, WITHOUT dynamic weight changes
-	// TODO: should use identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
-	initialClusterMembers flow.IdentityList
-	weightThresholdForQC  uint64 // computed based on initial cluster committee weights
-	weightThresholdForTO  uint64 // computed based on initial cluster committee weights
+	state     protocol.State
+	payloads  storage.ClusterPayloads
+	me        flow.Identifier
+	selection *leader.LeaderSelection // pre-computed leader selection for the full lifecycle of the cluster
+
+	clusterMembers       flow.IdentitySkeletonList          // cluster members in canonical order as specified by the epoch smart contract
+	clusterMemberFilter  flow.IdentityFilter[flow.Identity] // filter that returns true for all members of the cluster committee allowed to vote
+	weightThresholdForQC uint64                             // computed based on initial cluster committee weights
+	weightThresholdForTO uint64                             // computed based on initial cluster committee weights
+
+	// initialClusterIdentities lists full Identities for cluster members (in canonical order) at time of cluster initialization by Epoch smart contract
+	initialClusterIdentities flow.IdentityList
 }
 
 var _ hotstuff.Replicas = (*Cluster)(nil)
@@ -44,26 +44,28 @@ func NewClusterCommittee(
 	epoch protocol.Epoch,
 	me flow.Identifier,
 ) (*Cluster, error) {
-
 	selection, err := leader.SelectionForCluster(cluster, epoch)
 	if err != nil {
 		return nil, fmt.Errorf("could not compute leader selection for cluster: %w", err)
 	}
 
-	totalWeight := cluster.Members().TotalWeight()
+	initialClusterIdentities := votingClusterParticipants(cluster.Members()) // drops nodes with `InitialWeight=0`
+	initialClusterMembersSelector := initialClusterIdentities.Selector()     // hence, any node accepted by this selector has `InitialWeight>0`
+	totalWeight := initialClusterIdentities.TotalWeight()
+
 	com := &Cluster{
 		state:     state,
 		payloads:  payloads,
 		me:        me,
 		selection: selection,
-		clusterMemberFilter: filter.And(
-			cluster.Members().Selector(),
-			filter.Not(filter.Ejected),
-			filter.HasWeight(true),
+		clusterMemberFilter: filter.And[flow.Identity](
+			initialClusterMembersSelector,
+			filter.IsValidCurrentEpochParticipant,
 		),
-		initialClusterMembers: cluster.Members(),
-		weightThresholdForQC:  WeightThresholdToBuildQC(totalWeight),
-		weightThresholdForTO:  WeightThresholdToTimeout(totalWeight),
+		clusterMembers:           initialClusterIdentities.ToSkeleton(),
+		initialClusterIdentities: initialClusterIdentities,
+		weightThresholdForQC:     WeightThresholdToBuildQC(totalWeight),
+		weightThresholdForTO:     WeightThresholdToTimeout(totalWeight),
 	}
 	return com, nil
 }
@@ -74,18 +76,15 @@ func (c *Cluster) IdentitiesByBlock(blockID flow.Identifier) (flow.IdentityList,
 	// blockID is a collection block not a block produced by consensus,
 	// to query the identities from protocol state, we need to use the reference block id from the payload
 	//
-	// first retrieve the cluster block payload
+	// first retrieve the cluster block's payload
 	payload, err := c.payloads.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get cluster payload: %w", err)
 	}
 
-	// an empty reference block ID indicates a root block
-	isRootBlock := payload.ReferenceBlockID == flow.ZeroID
-
-	// use the initial cluster members for root block
-	if isRootBlock {
-		return c.initialClusterMembers, nil
+	// An empty reference block ID indicates a root block. In this case, use the initial cluster members for root block
+	if isRootBlock := payload.ReferenceBlockID == flow.ZeroID; isRootBlock {
+		return c.initialClusterIdentities, nil
 	}
 
 	// otherwise use the snapshot given by the reference block
@@ -94,19 +93,15 @@ func (c *Cluster) IdentitiesByBlock(blockID flow.Identifier) (flow.IdentityList,
 }
 
 func (c *Cluster) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
-
-	// first retrieve the cluster block payload
+	// first retrieve the cluster block's payload
 	payload, err := c.payloads.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get cluster payload: %w", err)
 	}
 
-	// an empty reference block ID indicates a root block
-	isRootBlock := payload.ReferenceBlockID == flow.ZeroID
-
-	// use the initial cluster members for root block
-	if isRootBlock {
-		identity, ok := c.initialClusterMembers.ByNodeID(nodeID)
+	// An empty reference block ID indicates a root block. In this case, use the initial cluster members for root block
+	if isRootBlock := payload.ReferenceBlockID == flow.ZeroID; isRootBlock {
+		identity, ok := c.initialClusterIdentities.ByNodeID(nodeID)
 		if !ok {
 			return nil, model.NewInvalidSignerErrorf("node %v is not an authorized hotstuff participant", nodeID)
 		}
@@ -127,11 +122,12 @@ func (c *Cluster) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identifie
 	return identity, nil
 }
 
-// IdentitiesByEpoch returns the initial cluster members for this epoch. The view
-// parameter is the view in the cluster consensus. Since clusters only exist for
-// one epoch, we don't need to check the view.
-func (c *Cluster) IdentitiesByEpoch(_ uint64) (flow.IdentityList, error) {
-	return c.initialClusterMembers, nil
+// IdentitiesByEpoch returns the IdentitySkeletons of the cluster members in canonical order.
+// This represents the cluster composition at the time the cluster was specified by the epoch smart
+// contract (hence, we return IdentitySkeletons as opposed to full identities). Since clusters only
+// exist for one epoch, we don't need to check the view.
+func (c *Cluster) IdentitiesByEpoch(_ uint64) (flow.IdentitySkeletonList, error) {
+	return c.clusterMembers, nil
 }
 
 // IdentityByEpoch returns the node from the initial cluster members for this epoch.
@@ -141,10 +137,10 @@ func (c *Cluster) IdentitiesByEpoch(_ uint64) (flow.IdentityList, error) {
 // Returns:
 //   - model.InvalidSignerError if nodeID was not listed by the Epoch Setup event as an
 //     authorized participant in this cluster
-func (c *Cluster) IdentityByEpoch(_ uint64, nodeID flow.Identifier) (*flow.Identity, error) {
-	identity, ok := c.initialClusterMembers.ByNodeID(nodeID)
+func (c *Cluster) IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.IdentitySkeleton, error) {
+	identity, ok := c.clusterMembers.ByNodeID(participantID)
 	if !ok {
-		return nil, model.NewInvalidSignerErrorf("node %v is not an authorized hotstuff participant", nodeID)
+		return nil, model.NewInvalidSignerErrorf("node %v is not an authorized hotstuff participant", participantID)
 	}
 	return identity, nil
 }
@@ -179,4 +175,39 @@ func (c *Cluster) Self() flow.Identifier {
 
 func (c *Cluster) DKG(_ uint64) (hotstuff.DKG, error) {
 	panic("queried DKG of cluster committee")
+}
+
+// votingClusterParticipants extends the IdentitySkeletons of the cluster members to their full Identities
+// at the time of cluster initialization by EpochSetup event.
+// IMPORTANT CONVENTIONS:
+//  1. clusterMembers with zero `InitialWeight` are _not included_ as "contributing" cluster participants.
+//     In accordance with their zero weight, they cannot contribute to advancing the cluster consensus.
+//     For example, the consensus leader selection allows zero-weighted nodes among the weighted participants,
+//     but these nodes have zero probability to be selected as leader. Similarly, they cannot meaningfully contribute
+//     votes or Timeouts to QCs or TC, due to their zero weight. Therefore, we do not consider them a valid signer.
+//  2. This operation maintains the relative order. In other words, if `clusterMembers` is in canonical order,
+//     then the output `IdentityList` is also canonically ordered.
+//
+// CONTEXT: The EpochSetup event contains the IdentitySkeletons for each cluster, thereby specifying cluster membership.
+// While ejection status is not part of the EpochSetup event, we can supplement this information as follows:
+//   - Per convention, service events are delivered (asynchronously) in an *order-preserving* manner. Furthermore,
+//     node ejection is also mediated by system smart contracts and delivered via service events.
+//   - Therefore, the EpochSetup event contains the up-to-date snapshot of the cluster members. Any node ejection
+//     that happened before should be reflected in the EpochSetup event. Specifically, ejected nodes
+//     should be no longer listed in the EpochSetup event. Hence, when the EpochSetup event is emitted / processed,
+//     the participation status of all cluster members equals flow.EpochParticipationStatusActive.
+func votingClusterParticipants(clusterMembers flow.IdentitySkeletonList) flow.IdentityList {
+	initialClusterIdentities := make(flow.IdentityList, 0, len(clusterMembers))
+	for _, skeleton := range clusterMembers {
+		if skeleton.InitialWeight == 0 {
+			continue
+		}
+		initialClusterIdentities = append(initialClusterIdentities, &flow.Identity{
+			IdentitySkeleton: *skeleton,
+			DynamicIdentity: flow.DynamicIdentity{
+				EpochParticipationStatus: flow.EpochParticipationStatusActive,
+			},
+		})
+	}
+	return initialClusterIdentities
 }

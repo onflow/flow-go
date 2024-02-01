@@ -1240,8 +1240,8 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
 			return id.NewIdentityFilterIdentifierProvider(
 				filter.And(
-					filter.HasRole(flow.RoleConsensus),
-					filter.Not(filter.HasNodeID(node.Me.NodeID())),
+					filter.HasRole[flow.Identity](flow.RoleConsensus),
+					filter.Not(filter.HasNodeID[flow.Identity](node.Me.NodeID())),
 					underlay.NotEjectedFilter,
 				),
 				builder.IdentityProvider,
@@ -1574,7 +1574,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Me,
 				node.State,
 				channels.RequestCollections,
-				filter.HasRole(flow.RoleCollection),
+				filter.HasRole[flow.Identity](flow.RoleCollection),
 				func() flow.Entity { return &flow.Collection{} },
 			)
 			if err != nil {
