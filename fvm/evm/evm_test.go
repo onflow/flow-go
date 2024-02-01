@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
+	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -26,17 +27,18 @@ func TestEVMRun(t *testing.T) {
 
 	t.Run("testing EVM.run (happy case)", func(t *testing.T) {
 		RunWithTestBackend(t, func(backend *TestBackend) {
-			RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				tc := GetStorageTestContract(t)
-				RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
-					RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
-						num := int64(12)
-						chain := flow.Emulator.Chain()
+			chain := flow.Emulator.Chain()
+			rootAddr, err := evm.StorageAccountAddress(chain.ChainID())
+			require.NoError(t, err)
+			tc := GetStorageTestContract(t)
+			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
+				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
+					num := int64(12)
 
-						RunWithNewTestVM(t, chain, backend, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
-							sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-							code := []byte(fmt.Sprintf(
-								`
+					RunWithNewTestVM(t, chain, backend, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
+						sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+						code := []byte(fmt.Sprintf(
+							`
                           import EVM from %s
 
                           access(all)
@@ -45,39 +47,38 @@ func TestEVMRun(t *testing.T) {
                               EVM.run(tx: tx, coinbase: coinbase)
                           }
                         `,
-								sc.EVMContract.Address.HexWithPrefix(),
-							))
+							sc.EVMContract.Address.HexWithPrefix(),
+						))
 
-							gasLimit := uint64(100_000)
+						gasLimit := uint64(100_000)
 
-							txBytes := testAccount.PrepareSignAndEncodeTx(t,
-								testContract.DeployedAt.ToCommon(),
-								testContract.MakeCallData(t, "store", big.NewInt(num)),
-								big.NewInt(0),
-								gasLimit,
-								big.NewInt(0),
-							)
+						txBytes := testAccount.PrepareSignAndEncodeTx(t,
+							testContract.DeployedAt.ToCommon(),
+							testContract.MakeCallData(t, "store", big.NewInt(num)),
+							big.NewInt(0),
+							gasLimit,
+							big.NewInt(0),
+						)
 
-							tx := cadence.NewArray(
-								ConvertToCadence(txBytes),
-							).WithType(stdlib.EVMTransactionBytesCadenceType)
+						tx := cadence.NewArray(
+							ConvertToCadence(txBytes),
+						).WithType(stdlib.EVMTransactionBytesCadenceType)
 
-							coinbase := cadence.NewArray(
-								ConvertToCadence(testAccount.Address().Bytes()),
-							).WithType(stdlib.EVMAddressBytesCadenceType)
+						coinbase := cadence.NewArray(
+							ConvertToCadence(testAccount.Address().Bytes()),
+						).WithType(stdlib.EVMAddressBytesCadenceType)
 
-							script := fvm.Script(code).WithArguments(
-								json.MustEncode(tx),
-								json.MustEncode(coinbase),
-							)
+						script := fvm.Script(code).WithArguments(
+							json.MustEncode(tx),
+							json.MustEncode(coinbase),
+						)
 
-							_, output, err := vm.Run(
-								ctx,
-								script,
-								snapshot)
-							require.NoError(t, err)
-							require.NoError(t, output.Err)
-						})
+						_, output, err := vm.Run(
+							ctx,
+							script,
+							snapshot)
+						require.NoError(t, err)
+						require.NoError(t, output.Err)
 					})
 				})
 			})
@@ -123,17 +124,19 @@ func TestEVMAddressDeposit(t *testing.T) {
 	t.Parallel()
 
 	RunWithTestBackend(t, func(backend *TestBackend) {
-		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-			tc := GetStorageTestContract(t)
-			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
-				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
-					chain := flow.Emulator.Chain()
-					sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		chain := flow.Emulator.Chain()
+		rootAddr, err := evm.StorageAccountAddress(chain.ChainID())
+		require.NoError(t, err)
+		tc := GetStorageTestContract(t)
+		RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
+			RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
+				chain := flow.Emulator.Chain()
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-					RunWithNewTestVM(t, chain, backend, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
+				RunWithNewTestVM(t, chain, backend, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
 
-						code := []byte(fmt.Sprintf(
-							`
+					code := []byte(fmt.Sprintf(
+						`
                                import EVM from %s
                                import FlowToken from %s
 
@@ -150,23 +153,22 @@ func TestEVMAddressDeposit(t *testing.T) {
 								   destroy bridgedAccount
                                }
                             `,
-							sc.EVMContract.Address.HexWithPrefix(),
-							sc.FlowToken.Address.HexWithPrefix(),
-							sc.FlowServiceAccount.Address.HexWithPrefix(),
-						))
+						sc.EVMContract.Address.HexWithPrefix(),
+						sc.FlowToken.Address.HexWithPrefix(),
+						sc.FlowServiceAccount.Address.HexWithPrefix(),
+					))
 
-						script := fvm.Script(code)
+					script := fvm.Script(code)
 
-						executionSnapshot, output, err := vm.Run(
-							ctx,
-							script,
-							snapshot)
-						require.NoError(t, err)
-						require.NoError(t, output.Err)
+					executionSnapshot, output, err := vm.Run(
+						ctx,
+						script,
+						snapshot)
+					require.NoError(t, err)
+					require.NoError(t, output.Err)
 
-						// TODO:
-						_ = executionSnapshot
-					})
+					// TODO:
+					_ = executionSnapshot
 				})
 			})
 		})
@@ -178,17 +180,19 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 	t.Parallel()
 
 	RunWithTestBackend(t, func(backend *TestBackend) {
-		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-			tc := GetStorageTestContract(t)
-			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
-				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
-					chain := flow.Emulator.Chain()
-					sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		chain := flow.Emulator.Chain()
+		rootAddr, err := evm.StorageAccountAddress(chain.ChainID())
+		require.NoError(t, err)
+		tc := GetStorageTestContract(t)
+		RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
+			RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
+				chain := flow.Emulator.Chain()
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-					RunWithNewTestVM(t, chain, backend, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
+				RunWithNewTestVM(t, chain, backend, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
 
-						code := []byte(fmt.Sprintf(
-							`
+					code := []byte(fmt.Sprintf(
+						`
                                import EVM from %s
                                import FlowToken from %s
 
@@ -213,23 +217,22 @@ func TestBridgedAccountWithdraw(t *testing.T) {
                                    return balance
                                }
                             `,
-							sc.EVMContract.Address.HexWithPrefix(),
-							sc.FlowToken.Address.HexWithPrefix(),
-							sc.FlowServiceAccount.Address.HexWithPrefix(),
-						))
+						sc.EVMContract.Address.HexWithPrefix(),
+						sc.FlowToken.Address.HexWithPrefix(),
+						sc.FlowServiceAccount.Address.HexWithPrefix(),
+					))
 
-						script := fvm.Script(code)
+					script := fvm.Script(code)
 
-						executionSnapshot, output, err := vm.Run(
-							ctx,
-							script,
-							snapshot)
-						require.NoError(t, err)
-						require.NoError(t, output.Err)
+					executionSnapshot, output, err := vm.Run(
+						ctx,
+						script,
+						snapshot)
+					require.NoError(t, err)
+					require.NoError(t, output.Err)
 
-						// TODO:
-						_ = executionSnapshot
-					})
+					// TODO:
+					_ = executionSnapshot
 				})
 			})
 		})
@@ -239,17 +242,17 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 func TestBridgedAccountDeploy(t *testing.T) {
 	t.Parallel()
 	RunWithTestBackend(t, func(backend *TestBackend) {
-		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-			tc := GetStorageTestContract(t)
-			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
-				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
-					chain := flow.Emulator.Chain()
-					sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		chain := flow.Emulator.Chain()
+		rootAddr, err := evm.StorageAccountAddress(chain.ChainID())
+		require.NoError(t, err)
+		tc := GetStorageTestContract(t)
+		RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
+			RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				RunWithNewTestVM(t, chain, backend, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
 
-					RunWithNewTestVM(t, chain, backend, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
-
-						code := []byte(fmt.Sprintf(
-							`
+					code := []byte(fmt.Sprintf(
+						`
                                import EVM from %s
                                import FlowToken from %s
 
@@ -273,23 +276,22 @@ func TestBridgedAccountDeploy(t *testing.T) {
                                    return address.bytes
                                 }
                             `,
-							sc.EVMContract.Address.HexWithPrefix(),
-							sc.FlowToken.Address.HexWithPrefix(),
-							sc.FlowServiceAccount.Address.HexWithPrefix(),
-						))
+						sc.EVMContract.Address.HexWithPrefix(),
+						sc.FlowToken.Address.HexWithPrefix(),
+						sc.FlowServiceAccount.Address.HexWithPrefix(),
+					))
 
-						script := fvm.Script(code)
+					script := fvm.Script(code)
 
-						executionSnapshot, output, err := vm.Run(
-							ctx,
-							script,
-							snapshot)
-						require.NoError(t, err)
-						require.NoError(t, output.Err)
+					executionSnapshot, output, err := vm.Run(
+						ctx,
+						script,
+						snapshot)
+					require.NoError(t, err)
+					require.NoError(t, output.Err)
 
-						// TODO:
-						_ = executionSnapshot
-					})
+					// TODO:
+					_ = executionSnapshot
 				})
 			})
 		})
