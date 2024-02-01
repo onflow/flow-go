@@ -24,11 +24,13 @@ type CachedClient struct {
 	cache          *Cache
 	closeRequested *atomic.Bool
 	wg             sync.WaitGroup
-	mu             sync.Mutex
+	mu             sync.RWMutex
 }
 
 // ClientConn returns the underlying gRPC client connection.
 func (cc *CachedClient) ClientConn() *grpc.ClientConn {
+	cc.mu.RLock()
+	defer cc.mu.RUnlock()
 	return cc.conn
 }
 
@@ -66,9 +68,9 @@ func (cc *CachedClient) Close() {
 	}
 
 	// Obtain the lock to ensure that any connection attempts have completed
-	cc.mu.Lock()
+	cc.mu.RLock()
 	conn := cc.conn
-	cc.mu.Unlock()
+	cc.mu.RUnlock()
 
 	// If the initial connection attempt failed, conn will be nil
 	if conn == nil {
@@ -132,21 +134,19 @@ func (c *Cache) GetConnected(
 		cache:          c,
 	}
 
-	// capture the lock before inserting into the cache. we are guaranteed to continue if an entry
-	// doesn't exist yet
-	client.mu.Lock()
-
+	// Note: PeekOrAdd does not "visit" the existing entry, so we need to call Get explicitly
+	// to mark the entry as "visited" and update the LRU order. Unfortunately, the lru library
+	// doesn't have a GetOrAdd method, so this is the simplest way to achieve atomic get-or-add
 	val, existed, _ := c.cache.PeekOrAdd(address, client)
 	if existed {
 		client = val
-
-		// wait for the lock before continuing. this ensures only one goroutine is creating a new
-		// connection to a given address at a time
-		client.mu.Lock()
+		_, _ = c.cache.Get(address)
 		c.metrics.ConnectionFromPoolReused()
 	} else {
 		c.metrics.ConnectionAddedToPool()
 	}
+
+	client.mu.Lock()
 	defer client.mu.Unlock()
 
 	// after getting the lock, check if the connection is still active

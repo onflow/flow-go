@@ -393,34 +393,33 @@ func TestConnectionPoolFull(t *testing.T) {
 	assert.Equal(t, connectionCache.Len(), 2)
 	assert.NoError(t, err)
 
-	// Peek first client from cache. "recently used"-ness will not be updated, so it will be wiped out first.
+	// Get the first client from cache.
 	_, _, err = connectionFactory.GetAccessAPIClient(cn1Address, nil)
 	assert.Equal(t, connectionCache.Len(), 2)
 	assert.NoError(t, err)
 
-	// Create and add third client to cache, firs client will be removed from cache
+	// Create and add third client to cache, second client will be removed from cache
 	_, _, err = connectionFactory.GetAccessAPIClient(cn3Address, nil)
 	assert.Equal(t, connectionCache.Len(), 2)
 	assert.NoError(t, err)
 
 	var hostnameOrIP string
+
 	hostnameOrIP, _, err = net.SplitHostPort(cn1Address)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	grpcAddress1 := fmt.Sprintf("%s:%d", hostnameOrIP, connectionFactory.CollectionGRPCPort)
+
 	hostnameOrIP, _, err = net.SplitHostPort(cn2Address)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	grpcAddress2 := fmt.Sprintf("%s:%d", hostnameOrIP, connectionFactory.CollectionGRPCPort)
+
 	hostnameOrIP, _, err = net.SplitHostPort(cn3Address)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	grpcAddress3 := fmt.Sprintf("%s:%d", hostnameOrIP, connectionFactory.CollectionGRPCPort)
 
-	contains1 := connectionCache.cache.Contains(grpcAddress1)
-	contains2 := connectionCache.cache.Contains(grpcAddress2)
-	contains3 := connectionCache.cache.Contains(grpcAddress3)
-
-	assert.False(t, contains1)
-	assert.True(t, contains2)
-	assert.True(t, contains3)
+	assert.True(t, connectionCache.cache.Contains(grpcAddress1))
+	assert.False(t, connectionCache.cache.Contains(grpcAddress2))
+	assert.True(t, connectionCache.cache.Contains(grpcAddress3))
 }
 
 // TestConnectionPoolStale tests that a new connection will be established if the old one cached is stale
