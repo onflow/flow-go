@@ -4,6 +4,8 @@ import (
 	"math/big"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/runtime/sema"
 )
 
 // Address is an EVM-compatible address
@@ -38,6 +40,17 @@ func NewAddressFromBytes(inp []byte) Address {
 // NewAddressFromString constructs a new address from an string
 func NewAddressFromString(str string) Address {
 	return NewAddressFromBytes([]byte(str))
+}
+
+var AddressBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.TheUInt8Type)
+var AddressBytesSemaType = sema.ByteArrayType
+
+func (a Address) ToCadenceValue() cadence.Array {
+	values := make([]cadence.Value, len(a))
+	for i, v := range a {
+		values[i] = cadence.NewUInt8(v)
+	}
+	return cadence.NewArray(values).WithType(AddressBytesCadenceType)
 }
 
 type GasLimit uint64
