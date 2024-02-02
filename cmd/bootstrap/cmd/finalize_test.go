@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/hex"
+	"fmt"
 	"math/rand"
 	"path/filepath"
 	"regexp"
@@ -17,15 +18,14 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const finalizeHappyPathLogs = "using default epoch timing config with root epoch target end time.*" +
-	"collecting partner network and staking keys" +
+const finalizeHappyPathLogs = "collecting partner network and staking keys" +
 	`read \d+ partner node configuration files` +
 	`read \d+ weights for partner nodes` +
 	"generating internal private networking and staking keys" +
 	`read \d+ internal private node-info files` +
 	`read internal node configurations` +
 	`read \d+ weights for internal nodes` +
-	`checking constraints on consensus/cluster nodes` +
+	`checking constraints on consensus nodes` +
 	`assembling network and staking keys` +
 	`reading root block data` +
 	`reading root block votes` +
@@ -73,8 +73,11 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagNumViewsInEpoch = 100_000
 		flagNumViewsInStakingAuction = 50_000
 		flagNumViewsInDKGPhase = 2_000
-		flagUseDefaultEpochTargetEndTime = true
 		flagEpochCommitSafetyThreshold = 1_000
+		flagUseDefaultEpochTargetEndTime = true
+		flagEpochTimingRefCounter = 0
+		flagEpochTimingRefTimestamp = 0
+		flagEpochTimingDuration = 0
 
 		// rootBlock will generate DKG and place it into bootDir/public-root-information
 		rootBlock(nil, nil)
@@ -88,6 +91,7 @@ func TestFinalize_HappyPath(t *testing.T) {
 		log = log.Hook(hook)
 
 		finalize(nil, nil)
+		fmt.Println(hook.logs.String())
 		assert.Regexp(t, finalizeHappyPathRegex, hook.logs.String())
 		hook.logs.Reset()
 
