@@ -118,10 +118,6 @@ type BlockThrottle struct {
 	headers storage.Headers
 }
 
-type BlockHandler interface {
-	OnBlock(block *flow.Header) error
-}
-
 func NewBlockThrottle(
 	log zerolog.Logger,
 	state protocol.State,
@@ -184,7 +180,7 @@ func (c *BlockThrottle) Init(processables chan<- flow.Identifier) error {
 	return nil
 }
 
-func (c *BlockThrottle) OnBlockExecuted(executed uint64, _ flow.Identifier) error {
+func (c *BlockThrottle) OnBlockExecuted(_ flow.Identifier, executed uint64) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -224,21 +220,22 @@ func (c *BlockThrottle) OnBlockExecuted(executed uint64, _ flow.Identifier) erro
 	return nil
 }
 
-func (c *BlockThrottle) BlockProcessable(block *flow.Header, qc *flow.QuorumCertificate) {
+func (c *BlockThrottle) OnBlock(blockID flow.Identifier) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if !c.inited {
-		return
+		return fmt.Errorf("throttle not inited")
 	}
 
 	// ignore the block if has not caught up.
 	if !c.caughtUp() {
-		return
+		return nil
 	}
 
 	// if has caught up, then process the block
-	c.processables <- qc.BlockID
+	c.processables <- blockID
+	return nil
 }
 
 func (c *BlockThrottle) OnBlockFinalized(lastFinalized *flow.Header) {
