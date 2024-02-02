@@ -160,8 +160,13 @@ func (h *ContractHandler) getBlockContext() types.BlockContext {
 	return types.BlockContext{
 		BlockNumber:            bp.Height,
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
-		ExtraPrecompiles:       h.precompiles,
-		Random:                 rand,
+		GetHashFunc: func(n uint64) gethCommon.Hash {
+			hash, err := h.blockstore.BlockHash(n)
+			handleError(err)
+			return hash
+		},
+		ExtraPrecompiles: h.precompiles,
+		Random:           rand,
 	}
 }
 
