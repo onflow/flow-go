@@ -127,6 +127,7 @@ func (e *Core) launchWorkerToConsumeThrottledBlocks() {
 	// processables blocks which are throttled,
 	// and forward them to the block queue for processing
 	e.unit.Launch(func() {
+		e.log.Info().Msgf("starting worker to consume throttled blocks")
 		err := e.forwardProcessableToHandler(processables)
 		if err != nil {
 			e.log.Fatal().Err(err).Msg("fail to process block")
