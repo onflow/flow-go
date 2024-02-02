@@ -1,8 +1,10 @@
 package ingestion
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -41,7 +43,7 @@ type Core struct {
 	// computation, data fetching, events
 	executor          BlockExecutor
 	collectionFetcher CollectionFetcher
-	eventConsumer     ExecutionEventConsumer
+	eventConsumer     EventConsumer
 }
 
 type Throttle interface {
@@ -51,11 +53,12 @@ type Throttle interface {
 }
 
 type BlockExecutor interface {
-	ExecuteBlock(block *entity.ExecutableBlock) (*execution.ComputationResult, error)
+	ExecuteBlock(ctx context.Context, block *entity.ExecutableBlock) (*execution.ComputationResult, error)
 }
 
-type ExecutionEventConsumer interface {
-	OnComputationResultSaved(blockID flow.Identifier, result *execution.ComputationResult)
+type EventConsumer interface {
+	BeforeComputationResultSaved(ctx context.Context, result *execution.ComputationResult)
+	OnComputationResultSaved(ctx context.Context, result *execution.ComputationResult) string
 }
 
 func NewCore(
@@ -68,7 +71,7 @@ func NewCore(
 	collections storage.Collections,
 	executor BlockExecutor,
 	collectionFetcher CollectionFetcher,
-	eventConsumer ExecutionEventConsumer,
+	eventConsumer EventConsumer,
 ) *Core {
 	return &Core{
 		log:               logger.With().Str("engine", "ingestion_core").Logger(),
@@ -99,12 +102,18 @@ func (e *Core) Done() <-chan struct{} {
 	return e.unit.Done()
 }
 
-func (e *Core) OnBlock(header *flow.Header) error {
-	return e.onBlock(header)
+func (e *Core) OnBlock(header *flow.Header) {
+	err := e.onBlock(header)
+	if err != nil {
+		e.log.Fatal().Err(err).Msgf("error processing block %v (%v)", header.Height, header.ID())
+	}
 }
 
-func (e *Core) OnCollection(col *flow.Collection) error {
-	return e.onCollection(col)
+func (e *Core) OnCollection(col *flow.Collection) {
+	err := e.onCollection(col)
+	if err != nil {
+		e.log.Fatal().Err(err).Msgf("error processing collection: %v", col.ID())
+	}
 }
 
 func (e *Core) launchWorkerToConsumeThrottledBlocks() {
@@ -266,9 +275,6 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 }
 
 func (e *Core) onBlockExecuted(block *entity.ExecutableBlock, computationResult *execution.ComputationResult) error {
-	// TODO add more feilds to log
-	e.log.Info().Msgf("block executed")
-
 	commit := computationResult.CurrentEndState()
 
 	// block queue decides when a block becomes executed, it doesn't care if the execution
@@ -279,6 +285,15 @@ func (e *Core) onBlockExecuted(block *entity.ExecutableBlock, computationResult 
 		return fmt.Errorf("unexpected error while marking block as executed: %w", err)
 	}
 
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	defer wg.Wait()
+
+	go func() {
+		defer wg.Done()
+		e.eventConsumer.BeforeComputationResultSaved(e.unit.Ctx(), computationResult)
+	}()
+
 	err = e.execState.SaveExecutionResults(e.unit.Ctx(), computationResult)
 	if err != nil {
 		return fmt.Errorf("cannot persist execution state: %w", err)
@@ -288,7 +303,10 @@ func (e *Core) onBlockExecuted(block *entity.ExecutableBlock, computationResult 
 
 	// notify event consumer so that the event consumer can do tasks
 	// such as broadcasting or uploading the result
-	e.eventConsumer.OnComputationResultSaved(block.ID(), computationResult)
+	logs := e.eventConsumer.OnComputationResultSaved(e.unit.Ctx(), computationResult)
+
+	// TODO add more feilds to log
+	e.log.Info().Str("logs", logs).Msgf("block executed")
 
 	// we ensures that the child blocks are only executed after the execution result of
 	// its parent block has been successfully saved to storage.
@@ -362,7 +380,7 @@ func (e *Core) execute(executable *entity.ExecutableBlock) error {
 	// TODO: add fields
 	e.log.Info().Msgf("executing block")
 
-	result, err := e.executor.ExecuteBlock(executable)
+	result, err := e.executor.ExecuteBlock(e.unit.Ctx(), executable)
 	if err != nil {
 		return fmt.Errorf("failed to execute block %v: %w", executable.Block.ID(), err)
 	}
