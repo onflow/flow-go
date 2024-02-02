@@ -19,13 +19,13 @@ require (
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v1.3.0
-	github.com/onflow/cadence v1.0.0-M4
+	github.com/onflow/cadence v1.0.0-M5
 	github.com/onflow/crypto v0.25.0
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20240125214229-b7a95136dd0d
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20240125214229-b7a95136dd0d
 	github.com/onflow/flow-emulator v0.59.1-0.20240125162502-f1971b5d4630
 	github.com/onflow/flow-go v0.33.2-0.20240125033624-f3bd7a6004cf
-	github.com/onflow/flow-go-sdk v1.0.0-M1
+	github.com/onflow/flow-go-sdk v1.0.0-M2
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231213135419-ae911cc351a2
 	github.com/plus3it/gorecurcopy v0.0.1
@@ -226,7 +226,7 @@ require (
 	github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-runewidth v0.0.14 // indirect
+	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/miekg/dns v1.1.54 // indirect
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b // indirect
