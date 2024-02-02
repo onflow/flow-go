@@ -50,7 +50,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	"github.com/onflow/flow-go/engine/execution/ingestion/fetcher"
-	"github.com/onflow/flow-go/engine/execution/ingestion/loader"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
@@ -124,26 +123,27 @@ type ExecutionNode struct {
 
 	ingestionUnit *engine.Unit
 
-	collector              module.ExecutionMetrics
-	executionState         state.ExecutionState
-	followerState          protocol.FollowerState
-	committee              hotstuff.DynamicCommittee
-	ledgerStorage          *ledger.Ledger
-	registerStore          *storehouse.RegisterStore
-	events                 *storage.Events
-	serviceEvents          *storage.ServiceEvents
-	txResults              *storage.TransactionResults
-	results                *storage.ExecutionResults
-	myReceipts             *storage.MyExecutionReceipts
-	providerEngine         *exeprovider.Engine
-	checkerEng             *checker.Engine
-	syncCore               *chainsync.Core
-	syncEngine             *synchronization.Engine
-	followerCore           *hotstuff.FollowerLoop        // follower hotstuff logic
-	followerEng            *followereng.ComplianceEngine // to sync blocks from consensus nodes
-	computationManager     *computation.Manager
-	collectionRequester    *requester.Engine
-	ingestionEng           *ingestion.Engine
+	collector           module.ExecutionMetrics
+	executionState      state.ExecutionState
+	followerState       protocol.FollowerState
+	committee           hotstuff.DynamicCommittee
+	ledgerStorage       *ledger.Ledger
+	registerStore       *storehouse.RegisterStore
+	events              *storage.Events
+	serviceEvents       *storage.ServiceEvents
+	txResults           *storage.TransactionResults
+	results             *storage.ExecutionResults
+	myReceipts          *storage.MyExecutionReceipts
+	providerEngine      *exeprovider.Engine
+	checkerEng          *checker.Engine
+	syncCore            *chainsync.Core
+	syncEngine          *synchronization.Engine
+	followerCore        *hotstuff.FollowerLoop        // follower hotstuff logic
+	followerEng         *followereng.ComplianceEngine // to sync blocks from consensus nodes
+	computationManager  *computation.Manager
+	collectionRequester *requester.Engine
+	// ingestionEng           *ingestion.Engine // deprecated
+	ingestionMachine       *ingestion.Machine
 	scriptsEng             *scripts.Engine
 	followerDistributor    *pubsub.FollowerDistributor
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
@@ -982,40 +982,59 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 	}
 
 	fetcher := fetcher.NewCollectionFetcher(node.Logger, exeNode.collectionRequester, node.State, exeNode.exeConf.onflowOnlyLNs)
-	var blockLoader ingestion.BlockLoader
-	if exeNode.exeConf.enableStorehouse {
-		blockLoader = loader.NewUnfinalizedLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
-	} else {
-		blockLoader = loader.NewUnexecutedLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
-	}
+	// var blockLoader ingestion.BlockLoader
+	// if exeNode.exeConf.enableStorehouse {
+	// 	blockLoader = loader.NewUnfinalizedLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
+	// } else {
+	// 	blockLoader = loader.NewUnexecutedLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
+	// }
 
-	exeNode.ingestionEng, err = ingestion.New(
-		exeNode.ingestionUnit,
+	exeNode.ingestionMachine, err = ingestion.NewMachine(
 		node.Logger,
-		node.EngineRegistry,
+		node.ProtocolEvents,
+		exeNode.collectionRequester,
 		fetcher,
 		node.Storage.Headers,
 		node.Storage.Blocks,
 		node.Storage.Collections,
+		exeNode.executionState,
+		node.State,
+		exeNode.collector,
 		exeNode.computationManager,
 		exeNode.providerEngine,
-		exeNode.executionState,
-		exeNode.collector,
-		node.Tracer,
-		exeNode.exeConf.extensiveLog,
-		exeNode.executionDataPruner,
 		exeNode.blockDataUploader,
 		exeNode.stopControl,
-		blockLoader,
 	)
+
+	return exeNode.ingestionMachine, err
+
+	// exeNode.ingestionEng, err = ingestion.New(
+	// 	exeNode.ingestionUnit,
+	// 	node.Logger,
+	// 	node.EngineRegistry,
+	// 	fetcher,
+	// 	node.Storage.Headers,
+	// 	node.Storage.Blocks,
+	// 	node.Storage.Collections,
+	// 	exeNode.computationManager,
+	// 	exeNode.providerEngine,
+	// 	exeNode.executionState,
+	// 	exeNode.collector,
+	// 	node.Tracer,
+	// 	exeNode.exeConf.extensiveLog,
+	// 	exeNode.executionDataPruner,
+	// 	exeNode.blockDataUploader,
+	// 	exeNode.stopControl,
+	// 	blockLoader,
+	// )
 
 	// TODO: we should solve these mutual dependencies better
 	// => https://github.com/dapperlabs/flow-go/issues/4360
-	exeNode.collectionRequester = exeNode.collectionRequester.WithHandle(exeNode.ingestionEng.OnCollection)
+	// exeNode.collectionRequester = exeNode.collectionRequester.WithHandle(exeNode.ingestionEng.OnCollection)
+	//
+	// node.ProtocolEvents.AddConsumer(exeNode.ingestionEng)
 
-	node.ProtocolEvents.AddConsumer(exeNode.ingestionEng)
-
-	return exeNode.ingestionEng, err
+	// return exeNode.ingestionEng, err
 }
 
 // create scripts engine for handling script execution

@@ -33,7 +33,7 @@ type Machine struct {
 }
 
 type CollectionRequester interface {
-	WithHandler(requester.HandleFunc)
+	WithHandle(requester.HandleFunc)
 }
 
 func NewMachine(
@@ -88,7 +88,7 @@ func NewMachine(
 	e.core = core
 
 	protocolEvents.AddConsumer(e)
-	collectionRequester.WithHandler(func(originID flow.Identifier, entity flow.Entity) {
+	collectionRequester.WithHandle(func(originID flow.Identifier, entity flow.Entity) {
 		collection, ok := entity.(*flow.Collection)
 		if !ok {
 			e.log.Error().Msgf("invalid entity type (%T)", entity)
