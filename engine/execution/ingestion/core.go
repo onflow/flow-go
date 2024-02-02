@@ -48,7 +48,7 @@ type Core struct {
 
 type Throttle interface {
 	Init(processables <-chan flow.Identifier) error
-	OnBlock(block *flow.Header) error
+	OnBlock(blockID flow.Identifier) error
 	OnBlockExecuted(blockID flow.Identifier, height uint64) error
 }
 
@@ -102,8 +102,9 @@ func (e *Core) Done() <-chan struct{} {
 	return e.unit.Done()
 }
 
-func (e *Core) OnBlock(header *flow.Header) {
-	err := e.onBlock(header)
+func (e *Core) OnBlock(header *flow.Header, qc *flow.QuorumCertificate) {
+	// qc.Block == header.ID()
+	err := e.throttle.OnBlock(qc.BlockID)
 	if err != nil {
 		e.log.Fatal().Err(err).Msgf("error processing block %v (%v)", header.Height, header.ID())
 	}
@@ -154,10 +155,6 @@ func (e *Core) forwardProcessableToHandler(
 			}
 		}
 	}
-}
-
-func (e *Core) onBlock(header *flow.Header) error {
-	return e.throttle.OnBlock(header)
 }
 
 func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
