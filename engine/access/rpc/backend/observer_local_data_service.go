@@ -3,16 +3,20 @@ package backend
 import (
 	"context"
 	"fmt"
+
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 type ObserverLocalDataService struct {
@@ -130,14 +134,45 @@ func (o *ObserverLocalDataService) GetEventsForHeightRangeFromStorageData(
 
 func (o *ObserverLocalDataService) GetTransactionResultFromStorageData(
 	ctx context.Context,
-	txID flow.Identifier,
-	blockID flow.Identifier,
-	collectionID flow.Identifier,
+	txID []byte,
+	blockID []byte,
+	collectionID []byte,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	errorMessageGetter TransactionErrorMessageGetter,
 ) (*access.TransactionResultResponse, error) {
 
-	result, err := o.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion, errorMessageGetter)
+	transactionID, err := convert.TransactionID(txID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid transaction id: %v", err)
+	}
+
+	blockId := flow.ZeroID
+	requestBlockId := blockID
+	if requestBlockId != nil {
+		blockId, err = convert.BlockID(requestBlockId)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
+		}
+	}
+
+	collectionId := flow.ZeroID
+	requestCollectionId := collectionID
+	if requestCollectionId != nil {
+		collectionId, err = convert.CollectionID(requestCollectionId)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid collection id: %v", err)
+		}
+	}
+
+	block, err := o.retrieveBlock(blockId, collectionId, transactionID)
+	// an error occurred looking up the block or the requested block or collection was not found.
+	// If looking up the block based solely on the txID returns not found, then no error is
+	// returned since the block may not be finalized yet.
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
+	result, err := o.GetTransactionResultFromStorage(ctx, block, transactionID, requiredEventEncodingVersion, errorMessageGetter)
 	if err != nil {
 		return nil, err
 	}
@@ -146,11 +181,11 @@ func (o *ObserverLocalDataService) GetTransactionResultFromStorageData(
 	if err != nil {
 		return nil, fmt.Errorf("could not get finalized, %w", err)
 	}
-	blockId := lastFinalizedHeader.ID()
+	finalizedBlockId := lastFinalizedHeader.ID()
 	nodeId := o.me.NodeID()
 
 	metadata := &entities.Metadata{
-		LatestFinalizedBlockId: blockId[:],
+		LatestFinalizedBlockId: finalizedBlockId[:],
 		LatestFinalizedHeight:  lastFinalizedHeader.Height,
 		NodeId:                 nodeId[:],
 	}
@@ -170,10 +205,21 @@ func (o *ObserverLocalDataService) GetTransactionResultFromStorageData(
 
 func (o *ObserverLocalDataService) GetTransactionResultsByBlockIDFromStorageData(
 	ctx context.Context,
-	block *flow.Block,
+	blockID []byte,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	errorMessageByBlockIDGetter TransactionErrorMessagesByBlockIDGetter,
 ) (*access.TransactionResultsResponse, error) {
+
+	blockId, err := convert.BlockID(blockID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
+	}
+
+	block, err := o.blocks.ByID(blockId)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
 	results, err := o.GetTransactionResultsByBlockIDFromStorage(ctx, block, requiredEventEncodingVersion, errorMessageByBlockIDGetter)
 	if err != nil {
 		return nil, err
@@ -183,11 +229,11 @@ func (o *ObserverLocalDataService) GetTransactionResultsByBlockIDFromStorageData
 	if err != nil {
 		return nil, fmt.Errorf("could not get finalized, %w", err)
 	}
-	blockId := lastFinalizedHeader.ID()
+	finalizedBlockId := lastFinalizedHeader.ID()
 	nodeId := o.me.NodeID()
 
 	metadata := &entities.Metadata{
-		LatestFinalizedBlockId: blockId[:],
+		LatestFinalizedBlockId: finalizedBlockId[:],
 		LatestFinalizedHeight:  lastFinalizedHeader.Height,
 		NodeId:                 nodeId[:],
 	}
@@ -203,7 +249,6 @@ func (o *ObserverLocalDataService) GetTransactionResultsByBlockIDFromStorageData
 			TransactionId: result.TransactionID[:],
 			CollectionId:  result.CollectionID[:],
 			BlockHeight:   result.BlockHeight,
-			Metadata:      metadata,
 		}
 
 		txResultsResponse = append(txResultsResponse, resultResponse)
@@ -217,11 +262,21 @@ func (o *ObserverLocalDataService) GetTransactionResultsByBlockIDFromStorageData
 
 func (o *ObserverLocalDataService) GetTransactionResultByIndexFromStorageData(
 	ctx context.Context,
-	block *flow.Block,
+	blockID []byte,
 	index uint32,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	errorMessageByIndexGetter TransactionErrorMessageByIndexGetter,
 ) (*access.TransactionResultResponse, error) {
+	blockId, err := convert.BlockID(blockID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
+	}
+
+	block, err := o.blocks.ByID(blockId)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
 	result, err := o.GetTransactionResultByIndexFromStorage(ctx, block, index, requiredEventEncodingVersion, errorMessageByIndexGetter)
 	if err != nil {
 		return nil, err
@@ -231,11 +286,11 @@ func (o *ObserverLocalDataService) GetTransactionResultByIndexFromStorageData(
 	if err != nil {
 		return nil, fmt.Errorf("could not get finalized, %w", err)
 	}
-	blockId := lastFinalizedHeader.ID()
+	finalizedBlockId := lastFinalizedHeader.ID()
 	nodeId := o.me.NodeID()
 
 	metadata := &entities.Metadata{
-		LatestFinalizedBlockId: blockId[:],
+		LatestFinalizedBlockId: finalizedBlockId[:],
 		LatestFinalizedHeight:  lastFinalizedHeader.Height,
 		NodeId:                 nodeId[:],
 	}

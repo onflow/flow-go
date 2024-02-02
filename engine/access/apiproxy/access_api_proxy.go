@@ -3,15 +3,12 @@ package apiproxy
 import (
 	"context"
 
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc/status"
 
-	"github.com/rs/zerolog"
-
-	"github.com/onflow/flow/protobuf/go/flow/access"
-
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
-
 	"github.com/onflow/flow-go/access/legacy/convert"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/grpc/forwarder"
 	"github.com/onflow/flow-go/engine/protocol"
@@ -121,7 +118,7 @@ func (h *FlowAccessAPIRouter) GetTransactionResult(context context.Context, req 
 		collectionID := req.GetCollectionId()
 		requiredEventEncodingVersion := req.GetEventEncodingVersion()
 
-		res, err := h.LocalData.GetTransactionResultFromStorageData(context, block, txId, requiredEventEncodingVersion, nil)
+		res, err := h.LocalData.GetTransactionResultFromStorageData(context, txId, blockId, collectionID, requiredEventEncodingVersion, nil)
 		h.log("observerStorage", "GetTransactionResult", err)
 		return res, err
 	}
@@ -132,6 +129,15 @@ func (h *FlowAccessAPIRouter) GetTransactionResult(context context.Context, req 
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResultsByBlockID(context context.Context, req *access.GetTransactionsByBlockIDRequest) (*access.TransactionResultsResponse, error) {
+	if h.LocalData != nil {
+		blockId := req.GetBlockId()
+		requiredEventEncodingVersion := req.GetEventEncodingVersion()
+
+		res, err := h.LocalData.GetTransactionResultsByBlockIDFromStorageData(context, blockId, requiredEventEncodingVersion, nil)
+		h.log("observerStorage", "GetTransactionResultsByBlockID", err)
+		return res, err
+	}
+
 	res, err := h.Upstream.GetTransactionResultsByBlockID(context, req)
 	h.log("upstream", "GetTransactionResultsByBlockID", err)
 	return res, err
@@ -144,6 +150,16 @@ func (h *FlowAccessAPIRouter) GetTransactionsByBlockID(context context.Context, 
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResultByIndex(context context.Context, req *access.GetTransactionByIndexRequest) (*access.TransactionResultResponse, error) {
+	if h.LocalData != nil {
+		blockId := req.GetBlockId()
+		index := req.GetIndex()
+		requiredEventEncodingVersion := req.GetEventEncodingVersion()
+
+		res, err := h.LocalData.GetTransactionResultByIndexFromStorageData(context, blockId, index, requiredEventEncodingVersion, nil)
+		h.log("observerStorage", "GetTransactionResultByIndex", err)
+		return res, err
+	}
+
 	res, err := h.Upstream.GetTransactionResultByIndex(context, req)
 	h.log("upstream", "GetTransactionResultByIndex", err)
 	return res, err
