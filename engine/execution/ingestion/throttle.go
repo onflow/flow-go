@@ -234,7 +234,10 @@ func (c *BlockThrottle) OnBlock(blockID flow.Identifier) error {
 	}
 
 	// if has caught up, then process the block
+	c.log.Info().Str("blockID", blockID.String()).Msgf("forwarding block for processing")
 	c.processables <- blockID
+	c.log.Info().Str("blockID", blockID.String()).Msgf("block has been processed")
+
 	return nil
 }
 
