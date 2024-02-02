@@ -83,7 +83,7 @@ func GetSimpleValueStore() *TestValueStore {
 			index := allocator[string(owner)]
 			// TODO: figure out why it result in a collision
 			if index == 0 {
-				index = 4
+				index = 1
 			}
 			var data [8]byte
 			allocator[string(owner)] = index + 1
