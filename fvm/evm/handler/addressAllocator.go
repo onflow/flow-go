@@ -11,10 +11,15 @@ import (
 
 const (
 	ledgerAddressAllocatorKey = "AddressAllocator"
-	uint64ByteSize            = 8
-	// addressIndexShuffleSeed is used for shuffling address index
-	// shuffling index is used to make address postfixes look random
-	addressIndexShuffleSeed = uint64(0xFFEEDDCCBBAA9987)
+	// `addressIndexMultiplierConstant` is used for mapping address indices
+	// into deterministic random-looking address postfixes. 
+	// The constant must be an ODD number.
+	// It is a "nothing-up-my-sleeves" constant, chosen to be big enough so that
+	// the index and its corresponding address look less "related". 
+	// Note that the least significant byte was set to "77" instead of "88" to force
+	// the odd parity.
+	// Look at `mapAddressIndex` for more details.
+	addressIndexMultiplierConstant = uint64(0xFFEEDDCCBBAA9977)
 )
 
 type AddressAllocator struct {
@@ -42,7 +47,7 @@ func (aa *AddressAllocator) AllocateCOAAddress(uuid uint64) types.Address {
 }
 
 func MakeCOAAddress(index uint64) types.Address {
-	return makePrefixedAddress(shuffleAddressIndex(index), types.FlowEVMCOAAddressPrefix)
+	return makePrefixedAddress(mapAddressIndex(index), types.FlowEVMCOAAddressPrefix)
 }
 
 func (aa *AddressAllocator) AllocatePrecompileAddress(index uint64) types.Address {
@@ -59,12 +64,24 @@ func makePrefixedAddress(
 	prefix [types.FlowEVMSpecialAddressPrefixLen]byte,
 ) types.Address {
 	var addr types.Address
-	prefixIndex := types.AddressLength - uint64ByteSize
-	copy(addr[:prefixIndex], prefix[:])
-	binary.BigEndian.PutUint64(addr[prefixIndex:], index)
+	copy(addr[:], prefix[:])
+	// only works if `len(addr) - len(prefix)` is exactly 8 bytes
+	binary.BigEndian.PutUint64(addr[len(prefix):], index)
 	return addr
 }
 
-func shuffleAddressIndex(preShuffleIndex uint64) uint64 {
-	return uint64(preShuffleIndex * addressIndexShuffleSeed)
+// `mapAddressIndex` maps an index of 64 bits to a deterministic random-looking 64 bits.
+//
+// The mapping function must be an injective mapping (in this case bijective) 
+// where every two indices always map to two different results. Multiple injective 
+// mappings are possible.
+// 
+// The current implementation uses a simple modular multiplication by a constant modulo 2^64.
+// The multiplier constant can be any odd number. Since odd numbers are co-prime with 2^64, they
+// have a multiplicative inverse modulo 2^64. 
+// This makes multiplying by an odd number an injective function (and therefore bijective).
+//
+// Multiplying modulo 2^64 is implicitly implemented as a uint64 multiplication with a uin64 result.
+func mapAddressIndex(index uint64) uint64 {
+	return uint64(index * addressIndexMultiplierConstant)
 }
