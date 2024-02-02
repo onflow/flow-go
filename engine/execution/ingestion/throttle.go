@@ -177,6 +177,8 @@ func (c *BlockThrottle) Init(processables chan<- flow.Identifier) error {
 		c.processables <- id
 	}
 
+	c.log.Info().Msgf("throttle initialized with %d unexecuted blocks", len(unexecuted))
+
 	return nil
 }
 

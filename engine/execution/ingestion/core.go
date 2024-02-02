@@ -147,10 +147,20 @@ func (e *Core) launchWorkerToConsumeThrottledBlocks() {
 func (e *Core) forwardProcessableToHandler(
 	processables <-chan flow.Identifier,
 ) error {
+<<<<<<< HEAD
 	for blockID := range processables {
 		err := e.onProcessableBlock(blockID)
 		if err != nil {
 			return fmt.Errorf("could not process block: %w", err)
+=======
+	for {
+		select {
+		case blockID := <-processables:
+			err := e.onProcessableBlock(blockID)
+			if err != nil {
+				return fmt.Errorf("could not process block: %w", err)
+			}
+>>>>>>> 8dfd90180e (log)
 		}
 	}
 
