@@ -115,6 +115,7 @@ func (e *Machine) Done() <-chan struct{} {
 func (e *Machine) BlockProcessable(b *flow.Header, qc *flow.QuorumCertificate) {
 	e.log.Info().Msgf("block processable: %v", b.Height)
 	e.core.OnBlock(b, qc)
+	e.log.Info().Msgf("block processed: %v", b.Height)
 }
 
 // EventConsumer implementation

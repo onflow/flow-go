@@ -158,6 +158,7 @@ func (e *Core) forwardProcessableToHandler(
 }
 
 func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
+	e.log.Info().Msgf("processing block %v", blockID)
 	header, err := e.headers.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not get block: %w", err)
