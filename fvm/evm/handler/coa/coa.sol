@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
+
 pragma solidity >=0.7.0 <0.9.0;
+
 interface IERC165 {
     function supportsInterface(bytes4 interfaceId) external view returns (bool);
 }
+
 interface ERC721TokenReceiver {
     function onERC721Received(
         address _operator,
@@ -11,6 +14,7 @@ interface ERC721TokenReceiver {
         bytes calldata _data
         ) external returns (bytes4);
 }
+
 interface ERC777TokensRecipient {
     function tokensReceived(
             address operator,
@@ -21,6 +25,7 @@ interface ERC777TokensRecipient {
             bytes calldata operatorData
         ) external;
 }
+
 interface ERC1155TokenReceiver {
 
     function onERC1155Received(
@@ -40,6 +45,7 @@ interface ERC1155TokenReceiver {
         ) external returns (bytes4);
 
 }
+
 contract COA is ERC1155TokenReceiver, ERC777TokensRecipient, ERC721TokenReceiver, IERC165 {
     address constant public cadenceArch = 0x0000000000000000000000010000000000000001;
 
