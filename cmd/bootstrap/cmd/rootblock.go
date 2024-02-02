@@ -109,15 +109,15 @@ func addRootBlockCmdFlags() {
 	//
 	// Use Option 1 for Benchnet, Localnet, etc.
 	// Use Option 2 for Mainnet, Testnet, Canary.
-	finalizeCmd.Flags().BoolVar(&flagUseDefaultEpochTargetEndTime, "use-default-epoch-timing", false, "whether to use the default target end time")
-	finalizeCmd.Flags().Uint64Var(&flagEpochTimingRefCounter, "epoch-timing-ref-counter", 0, "the reference epoch for computing the root epoch's target end time")
-	finalizeCmd.Flags().Uint64Var(&flagEpochTimingRefTimestamp, "epoch-timing-ref-timestamp", 0, "the end time of the reference epoch, specified in second-precision Unix time, to use to compute the root epoch's target end time")
-	finalizeCmd.Flags().Uint64Var(&flagEpochTimingDuration, "epoch-timing-duration", 0, "the duration of each epoch in seconds, used to compute the root epoch's target end time")
+	rootBlockCmd.Flags().BoolVar(&flagUseDefaultEpochTargetEndTime, "use-default-epoch-timing", false, "whether to use the default target end time")
+	rootBlockCmd.Flags().Uint64Var(&flagEpochTimingRefCounter, "epoch-timing-ref-counter", 0, "the reference epoch for computing the root epoch's target end time")
+	rootBlockCmd.Flags().Uint64Var(&flagEpochTimingRefTimestamp, "epoch-timing-ref-timestamp", 0, "the end time of the reference epoch, specified in second-precision Unix time, to use to compute the root epoch's target end time")
+	rootBlockCmd.Flags().Uint64Var(&flagEpochTimingDuration, "epoch-timing-duration", 0, "the duration of each epoch in seconds, used to compute the root epoch's target end time")
 
-	finalizeCmd.MarkFlagsOneRequired("use-default-epoch-timing", "epoch-timing-ref-counter", "epoch-timing-ref-timestamp", "epoch-timing-duration")
-	finalizeCmd.MarkFlagsRequiredTogether("epoch-timing-ref-counter", "epoch-timing-ref-timestamp", "epoch-timing-duration")
+	rootBlockCmd.MarkFlagsOneRequired("use-default-epoch-timing", "epoch-timing-ref-counter", "epoch-timing-ref-timestamp", "epoch-timing-duration")
+	rootBlockCmd.MarkFlagsRequiredTogether("epoch-timing-ref-counter", "epoch-timing-ref-timestamp", "epoch-timing-duration")
 	for _, flag := range []string{"epoch-timing-ref-counter", "epoch-timing-ref-timestamp", "epoch-timing-duration"} {
-		finalizeCmd.MarkFlagsMutuallyExclusive("use-default-epoch-timing", flag)
+		rootBlockCmd.MarkFlagsMutuallyExclusive("use-default-epoch-timing", flag)
 	}
 }
 
