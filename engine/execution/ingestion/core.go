@@ -47,7 +47,7 @@ type Core struct {
 }
 
 type Throttle interface {
-	Init(processables <-chan flow.Identifier) error
+	Init(processables chan<- flow.Identifier) error
 	OnBlock(blockID flow.Identifier) error
 	OnBlockExecuted(blockID flow.Identifier, height uint64) error
 }
