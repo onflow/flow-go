@@ -3110,7 +3110,10 @@ func TestEVM(t *testing.T) {
 	// we have implemented a snapshot wrapper to return an error from the EVM
 	t.Run("internal evm error handling", newVMTest().
 		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
-		withContextOptions(fvm.WithEVMEnabled(true)).
+		withContextOptions(
+			fvm.WithChain(flow.Emulator.Chain()),
+			fvm.WithEVMEnabled(true),
+		).
 		run(func(
 			t *testing.T,
 			vm fvm.VM,
@@ -3138,7 +3141,7 @@ func TestEVM(t *testing.T) {
 				errStorage.
 					On("Get", mockery.AnythingOfType("flow.RegisterID")).
 					Return(func(id flow.RegisterID) (flow.RegisterValue, error) {
-						if id.Key == "AddressAllocator" {
+						if id.Key == "LatestBlock" {
 							return nil, e.err
 						}
 						return snapshotTree.Get(id)
