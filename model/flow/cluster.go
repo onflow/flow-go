@@ -11,7 +11,7 @@ type AssignmentList []IdentifierList
 
 // ClusterList is a list of identity lists. Each `IdentityList` represents the
 // nodes assigned to a specific cluster.
-type ClusterList []IdentityList
+type ClusterList []IdentitySkeletonList
 
 func (al AssignmentList) EqualTo(other AssignmentList) bool {
 	if len(al) != len(other) {
@@ -45,10 +45,10 @@ func (cl ClusterList) Assignments() AssignmentList {
 
 // NewClusterList creates a new cluster list based on the given cluster assignment
 // and the provided list of identities.
-func NewClusterList(assignments AssignmentList, collectors IdentityList) (ClusterList, error) {
+func NewClusterList(assignments AssignmentList, collectors IdentitySkeletonList) (ClusterList, error) {
 
 	// build a lookup for all the identities by node identifier
-	lookup := make(map[Identifier]*Identity)
+	lookup := make(map[Identifier]*IdentitySkeleton)
 	for _, collector := range collectors {
 		_, ok := lookup[collector.NodeID]
 		if ok {
@@ -60,7 +60,7 @@ func NewClusterList(assignments AssignmentList, collectors IdentityList) (Cluste
 	// replicate the identifier list but use identities instead
 	clusters := make(ClusterList, 0, len(assignments))
 	for _, participants := range assignments {
-		cluster := make(IdentityList, 0, len(participants))
+		cluster := make(IdentitySkeletonList, 0, len(participants))
 		for _, participantID := range participants {
 			participant, found := lookup[participantID]
 			if !found {
@@ -81,7 +81,7 @@ func NewClusterList(assignments AssignmentList, collectors IdentityList) (Cluste
 }
 
 // ByIndex retrieves the list of identities that are part of the given cluster.
-func (cl ClusterList) ByIndex(index uint) (IdentityList, bool) {
+func (cl ClusterList) ByIndex(index uint) (IdentitySkeletonList, bool) {
 	if index >= uint(len(cl)) {
 		return nil, false
 	}
@@ -93,7 +93,7 @@ func (cl ClusterList) ByIndex(index uint) (IdentityList, bool) {
 //
 // For evenly distributed transaction IDs, this will evenly distribute
 // transactions between clusters.
-func (cl ClusterList) ByTxID(txID Identifier) (IdentityList, bool) {
+func (cl ClusterList) ByTxID(txID Identifier) (IdentitySkeletonList, bool) {
 	bigTxID := new(big.Int).SetBytes(txID[:])
 	bigIndex := new(big.Int).Mod(bigTxID, big.NewInt(int64(len(cl))))
 	return cl.ByIndex(uint(bigIndex.Uint64()))
@@ -103,7 +103,7 @@ func (cl ClusterList) ByTxID(txID Identifier) (IdentityList, bool) {
 //
 // Nodes will be divided into equally sized clusters as far as possible.
 // The last return value will indicate if the look up was successful
-func (cl ClusterList) ByNodeID(nodeID Identifier) (IdentityList, uint, bool) {
+func (cl ClusterList) ByNodeID(nodeID Identifier) (IdentitySkeletonList, uint, bool) {
 	for index, cluster := range cl {
 		for _, participant := range cluster {
 			if participant.NodeID == nodeID {
@@ -115,7 +115,7 @@ func (cl ClusterList) ByNodeID(nodeID Identifier) (IdentityList, uint, bool) {
 }
 
 // IndexOf returns the index of the given cluster.
-func (cl ClusterList) IndexOf(cluster IdentityList) (uint, bool) {
+func (cl ClusterList) IndexOf(cluster IdentitySkeletonList) (uint, bool) {
 	clusterFingerprint := cluster.ID()
 	for index, other := range cl {
 		if other.ID() == clusterFingerprint {

@@ -430,6 +430,10 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		"--execution-data-sync-enabled=true",
 		"--execution-data-dir=/data/execution-data",
 		"--public-network-execution-data-sync-enabled=true",
+		"--execution-data-indexing-enabled=true",
+		"--execution-state-dir=/data/execution-state",
+		"--script-execution-mode=execution-nodes-only",
+		"--event-query-mode=execution-nodes-only",
 		fmt.Sprintf("--state-stream-addr=%s:%s", container.ContainerName, testnet.ExecutionStatePort),
 	)
 

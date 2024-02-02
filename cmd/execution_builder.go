@@ -322,8 +322,11 @@ func (exeNode *ExecutionNode) LoadBlobService(
 				return nil, fmt.Errorf("allowed node ID %s is not an access node", id.NodeID.String())
 			}
 
-			if id.Ejected {
-				return nil, fmt.Errorf("allowed node ID %s is ejected", id.NodeID.String())
+			if id.IsEjected() {
+				exeNode.builder.Logger.Warn().
+					Str("node_id", idHex).
+					Msg("removing Access Node from the set of nodes authorized to request Execution Data, because it is ejected")
+				continue
 			}
 
 			allowedANs[anID] = true
@@ -801,15 +804,9 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 
 	if !bootstrapped {
 		checkpointFile := path.Join(exeNode.exeConf.triedir, modelbootstrap.FilenameWALRootCheckpoint)
-		sealedRoot, err := node.State.Params().SealedRoot()
-		if err != nil {
-			return fmt.Errorf("could not get sealed root: %w", err)
-		}
+		sealedRoot := node.State.Params().SealedRoot()
 
-		rootSeal, err := node.State.Params().Seal()
-		if err != nil {
-			return fmt.Errorf("could not get root seal: %w", err)
-		}
+		rootSeal := node.State.Params().Seal()
 
 		if sealedRoot.ID() != rootSeal.BlockID {
 			return fmt.Errorf("mismatching root seal and sealed root: %v != %v", sealedRoot.ID(), rootSeal.BlockID)
@@ -1169,8 +1166,8 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 		exeNode.exeConf.receiptRequestWorkers,
 		channels.ProvideReceiptsByBlockID,
 		filter.And(
-			filter.HasWeight(true),
-			filter.HasRole(flow.RoleConsensus),
+			filter.IsValidCurrentEpochParticipantOrJoining,
+			filter.HasRole[flow.Identity](flow.RoleConsensus),
 		),
 		retrieve,
 	)

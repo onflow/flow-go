@@ -21,23 +21,24 @@ import (
 func TestSaveBlockAsReplica(t *testing.T) {
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	protocolState, err := rootSnapshot.ProtocolState()
+	require.NoError(t, err)
+	rootProtocolStateID := protocolState.Entry().ID()
 	b0, err := rootSnapshot.Head()
 	require.NoError(t, err)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		b1 := unittest.BlockWithParentFixture(b0)
-		b1.SetPayload(flow.Payload{})
+		b1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 
 		err = state.Extend(context.Background(), b1)
 		require.NoError(t, err)
 
-		b2 := unittest.BlockWithParentFixture(b1.Header)
-		b2.SetPayload(flow.Payload{})
+		b2 := unittest.BlockWithParentProtocolState(b1)
 
 		err = state.Extend(context.Background(), b2)
 		require.NoError(t, err)
 
-		b3 := unittest.BlockWithParentFixture(b2.Header)
-		b3.SetPayload(flow.Payload{})
+		b3 := unittest.BlockWithParentProtocolState(b2)
 
 		err = state.Extend(context.Background(), b3)
 		require.NoError(t, err)

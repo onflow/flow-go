@@ -180,10 +180,10 @@ func (suite *MutableIdentityTableSuite) setupStateMock() {
 	suite.snapshot.On("Phase").Return(flow.EpochPhaseCommitted, nil)
 	// return all the current list of ids for the state.Final.Identities call made by the network
 	suite.snapshot.On("Identities", mock.Anything).Return(
-		func(flow.IdentityFilter) flow.IdentityList {
+		func(flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return suite.testNodes.ids()
 		},
-		func(flow.IdentityFilter) error { return nil })
+		func(flow.IdentityFilter[flow.Identity]) error { return nil })
 	suite.state.On("Final").Return(suite.snapshot, nil)
 }
 
@@ -397,7 +397,7 @@ func (suite *MutableIdentityTableSuite) exchangeMessages(
 	for i, allowedEng := range allowedEngs {
 
 		fromID := allowedIDs[i].NodeID
-		targetIDs := allowedIDs.Filter(filter.Not(filter.HasNodeID(allowedIDs[i].NodeID)))
+		targetIDs := allowedIDs.Filter(filter.Not(filter.HasNodeID[flow.Identity](allowedIDs[i].NodeID)))
 
 		err := suite.sendMessage(fromID, allowedEng, targetIDs, send)
 		require.NoError(suite.T(), err)

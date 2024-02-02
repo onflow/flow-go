@@ -204,13 +204,8 @@ func (e *Engine) Start(parent irrecoverable.SignalerContext) {
 // If the index has already been initialized, this is a no-op.
 // No errors are expected during normal operation.
 func (e *Engine) initLastFullBlockHeightIndex() error {
-	rootBlock, err := e.state.Params().FinalizedRoot()
-	if err != nil {
-		return fmt.Errorf("failed to get root block: %w", err)
-	}
-
-	// insert is a noop if the index has already been initialized and no error is returned
-	err = e.blocks.InsertLastFullBlockHeightIfNotExists(rootBlock.Height)
+	rootBlock := e.state.Params().FinalizedRoot()
+	err := e.blocks.InsertLastFullBlockHeightIfNotExists(rootBlock.Height)
 	if err != nil {
 		return fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err)
 	}
@@ -862,6 +857,6 @@ func (e *Engine) requestCollectionsInFinalizedBlock(missingColls []*flow.Collect
 			// failed to find guarantors for guarantees contained in a finalized block is fatal error
 			e.log.Fatal().Err(err).Msgf("could not find guarantors for guarantee %v", cg.ID())
 		}
-		e.request.EntityByID(cg.ID(), filter.HasNodeID(guarantors...))
+		e.request.EntityByID(cg.ID(), filter.HasNodeID[flow.Identity](guarantors...))
 	}
 }
