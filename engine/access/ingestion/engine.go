@@ -549,8 +549,16 @@ func (e *Engine) trackExecutedMetricForCollection(light *flow.LightCollection) {
 	}
 }
 
-// handleCollection handles the response of the a collection request made earlier when a block was received
-func (e *Engine) handleCollection(_ flow.Identifier, entity flow.Entity) error {
+type ExecutionMetricForCollection func(light *flow.LightCollection)
+
+// HandleCollection handles the response of the a collection request made earlier when a block was received
+func HandleCollection(
+	entity flow.Entity,
+	collections storage.Collections,
+	transactions storage.Transactions,
+	logger zerolog.Logger,
+	metricForCollection ExecutionMetricForCollection,
+) error {
 
 	// convert the entity to a strictly typed collection
 	collection, ok := entity.(*flow.Collection)
@@ -560,18 +568,20 @@ func (e *Engine) handleCollection(_ flow.Identifier, entity flow.Entity) error {
 
 	light := collection.Light()
 
-	e.trackExecutedMetricForCollection(&light)
+	if metricForCollection != nil {
+		metricForCollection(&light)
+	}
 
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized
 
 	// store the light collection (collection minus the transaction body - those are stored separately)
 	// and add transaction ids as index
-	err := e.collections.StoreLightAndIndexByTransaction(&light)
+	err := collections.StoreLightAndIndexByTransaction(&light)
 	if err != nil {
 		// ignore collection if already seen
 		if errors.Is(err, storage.ErrAlreadyExists) {
-			e.log.Debug().
+			logger.Debug().
 				Hex("collection_id", logging.Entity(light)).
 				Msg("collection is already seen")
 			return nil
@@ -581,7 +591,7 @@ func (e *Engine) handleCollection(_ flow.Identifier, entity flow.Entity) error {
 
 	// now store each of the transaction body
 	for _, tx := range collection.Transactions {
-		err := e.transactions.Store(tx)
+		err := transactions.Store(tx)
 		if err != nil {
 			return fmt.Errorf("could not store transaction (%x): %w", tx.ID(), err)
 		}
@@ -590,8 +600,8 @@ func (e *Engine) handleCollection(_ flow.Identifier, entity flow.Entity) error {
 	return nil
 }
 
-func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
-	err := e.handleCollection(originID, entity)
+func (e *Engine) OnCollection(_ flow.Identifier, entity flow.Entity) {
+	err := HandleCollection(entity, e.collections, e.transactions, e.log, e.trackExecutedMetricForCollection)
 	if err != nil {
 		e.log.Error().Err(err).Msg("could not handle collection")
 		return

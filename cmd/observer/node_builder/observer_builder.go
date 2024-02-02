@@ -36,6 +36,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
+	"github.com/onflow/flow-go/engine/access/ingestion"
 	"github.com/onflow/flow-go/engine/access/rest"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
@@ -99,7 +100,6 @@ import (
 	pStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/io"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 // ObserverBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
@@ -1198,12 +1198,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Storage.Headers,
 				builder.Storage.Events,
 				builder.Storage.LightTransactionResults,
-				func(_ flow.Identifier, entity flow.Entity) {
-					collections := builder.Storage.Collections
-					transactions := builder.Storage.Transactions
-					logger := builder.Logger
-					indexerCollectionHandler(entity, collections, transactions, logger)
-				},
+				builder.onCollection,
 			)
 			if err != nil {
 				return nil, err
@@ -1232,6 +1227,19 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	}
 
 	return builder
+}
+
+func (builder *ObserverServiceBuilder) onCollection(_ flow.Identifier, entity flow.Entity) {
+	collections := builder.Storage.Collections
+	transactions := builder.Storage.Transactions
+	logger := builder.Logger
+
+	err := ingestion.HandleCollection(entity, collections, transactions, logger, nil)
+
+	if err != nil {
+		logger.Error().Err(err).Msg("could not handle collection")
+		return
+	}
 }
 
 // enqueuePublicNetworkInit enqueues the observer network component initialized for the observer
@@ -1492,46 +1500,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	builder.Component("unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		return builder.unsecureGrpcServer, nil
 	})
-}
-
-func indexerCollectionHandler(entity flow.Entity, collections storage.Collections,
-	transactions storage.Transactions,
-	logger zerolog.Logger) {
-
-	// convert the entity to a strictly typed collection
-	collection, ok := entity.(*flow.Collection)
-	if !ok {
-		logger.Error().Msgf("invalid entity type (%T)", entity)
-		return
-	}
-
-	light := collection.Light()
-
-	// FIX: we can't index guarantees here, as we might have more than one block
-	// with the same collection as long as it is not finalized
-
-	// store the light collection (collection minus the transaction body - those are stored separately)
-	// and add transaction ids as index
-	err := collections.StoreLightAndIndexByTransaction(&light)
-	if err != nil {
-		// ignore collection if already seen
-		if errors.Is(err, storage.ErrAlreadyExists) {
-			logger.Error().
-				Hex("collection_id", logging.Entity(light)).
-				Msg("collection is already seen")
-			return
-		}
-		return
-	}
-
-	// now store each of the transaction body
-	for _, tx := range collection.Transactions {
-		err := transactions.Store(tx)
-		if err != nil {
-			logger.Error().Err(err).Msg(fmt.Sprintf("could not store transaction (%x)", tx.ID()))
-			return
-		}
-	}
 }
 
 func loadNetworkingKey(path string) (crypto.PrivateKey, error) {
