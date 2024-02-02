@@ -44,6 +44,7 @@ func newConfig(ctx types.BlockContext) *Config {
 		WithCoinbase(ctx.GasFeeCollector.ToCommon()),
 		WithDirectCallBaseGasUsage(ctx.DirectCallBaseGasUsage),
 		WithExtraPrecompiles(ctx.ExtraPrecompiles),
+		WithGetBlockHashFunction(ctx.GetHashFunc),
 		WithRandom(&ctx.Random),
 	)
 }
