@@ -174,8 +174,7 @@ func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.Versio
 	return event, expected
 }
 
-func createEpochSetupEvent(randomSource []byte) cadence.Event {
-	randomSourceHex := hex.EncodeToString(randomSource)
+func createEpochSetupEvent(randomSourceHex string) cadence.Event {
 
 	return cadence.NewEvent([]cadence.Value{
 		// counter
@@ -1044,7 +1043,8 @@ func ufix64FromString(s string) cadence.UFix64 {
 }
 
 func EpochSetupFixtureCCF(randomSource []byte) []byte {
-	b, err := ccf.Encode(createEpochSetupEvent(randomSource))
+	randomSourceHex := hex.EncodeToString(randomSource)
+	b, err := ccf.Encode(createEpochSetupEvent(randomSourceHex))
 	if err != nil {
 		panic(err)
 	}
@@ -1062,34 +1062,7 @@ func EpochSetupCCFWithNonHexRandomSource() []byte {
 		randomSource = randomSource + "aa"
 	}
 
-	event := cadence.NewEvent([]cadence.Value{
-		// counter
-		cadence.NewUInt64(1),
-
-		// nodeInfo
-		createEpochNodes(),
-
-		// firstView
-		cadence.NewUInt64(100),
-
-		// finalView
-		cadence.NewUInt64(200),
-
-		// collectorClusters
-		createEpochCollectors(),
-
-		// randomSource
-		cadence.String(randomSource),
-
-		// DKGPhase1FinalView
-		cadence.UInt64(150),
-
-		// DKGPhase2FinalView
-		cadence.UInt64(160),
-
-		// DKGPhase3FinalView
-		cadence.UInt64(170),
-	}).WithType(newFlowEpochEpochSetupEventType())
+	event := createEpochSetupEvent(randomSource)
 
 	b, err := ccf.Encode(event)
 	if err != nil {
