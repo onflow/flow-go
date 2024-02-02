@@ -164,49 +164,72 @@ func PayloadsFromEmulatorSnapshot(snapshotPath string) ([]*ledger.Payload, error
 		return nil, err
 	}
 
-	rows, err := db.Query("SELECT key, value FROM ledger")
+	payloads, _, _, err := PayloadsAndAccountsFromEmulatorSnapshot(db)
+	return payloads, err
+}
+
+func PayloadsAndAccountsFromEmulatorSnapshot(db *sql.DB) (
+	[]*ledger.Payload,
+	map[flow.RegisterID]PayloadMetaInfo,
+	[]common.Address,
+	error,
+) {
+	rows, err := db.Query("SELECT key, value, version, height FROM ledger")
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 
 	var payloads []*ledger.Payload
+	var accounts []common.Address
+	accountsSet := make(map[common.Address]struct{})
+
+	payloadSet := make(map[flow.RegisterID]PayloadMetaInfo)
 
 	for rows.Next() {
 		var hexKey, hexValue string
+		var height, version uint64
 
-		err := rows.Scan(&hexKey, &hexValue)
+		err := rows.Scan(&hexKey, &hexValue, &height, &version)
 		if err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
 
 		key, err := hex.DecodeString(hexKey)
 		if err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
 
 		value, err := hex.DecodeString(hexValue)
 		if err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
 
-		registerId := registerIDKeyFromString(string(key))
+		registerId, address := registerIDKeyFromString(string(key))
+
+		if _, contains := accountsSet[address]; !contains {
+			accountsSet[address] = struct{}{}
+			accounts = append(accounts, address)
+		}
 
 		ledgerKey := convert.RegisterIDToLedgerKey(registerId)
 
-		payloads = append(
-			payloads,
-			ledger.NewPayload(
-				ledgerKey,
-				value,
-			),
+		payload := ledger.NewPayload(
+			ledgerKey,
+			value,
 		)
+
+		payloads = append(payloads, payload)
+		payloadSet[registerId] = PayloadMetaInfo{
+			Height:  height,
+			Version: version,
+		}
 	}
 
-	return payloads, nil
+	return payloads, payloadSet, accounts, nil
 }
 
 // registerIDKeyFromString is the inverse of `flow.RegisterID.String()` method.
-func registerIDKeyFromString(s string) flow.RegisterID {
+func registerIDKeyFromString(s string) (flow.RegisterID, common.Address) {
 	parts := strings.SplitN(s, "/", 2)
 
 	owner := parts[0]
@@ -243,7 +266,12 @@ func registerIDKeyFromString(s string) flow.RegisterID {
 	}
 
 	return flow.RegisterID{
-		Owner: string(address.Bytes()),
-		Key:   decodedKey,
-	}
+			Owner: string(address.Bytes()),
+			Key:   decodedKey,
+		},
+		address
+}
+
+type PayloadMetaInfo struct {
+	Height, Version uint64
 }
