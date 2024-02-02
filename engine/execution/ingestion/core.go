@@ -148,7 +148,7 @@ func (e *Core) forwardProcessableToHandler(
 }
 
 func (e *Core) onBlock(header *flow.Header) error {
-	return nil
+	return e.throttle.OnBlock(header)
 }
 
 func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
