@@ -10,12 +10,11 @@ import (
 )
 
 const (
-	ledgerAddressAllocatorKey = "AddressAllocator"
 	// `addressIndexMultiplierConstant` is used for mapping address indices
-	// into deterministic random-looking address postfixes. 
+	// into deterministic random-looking address postfixes.
 	// The constant must be an ODD number.
 	// It is a "nothing-up-my-sleeves" constant, chosen to be big enough so that
-	// the index and its corresponding address look less "related". 
+	// the index and its corresponding address look less "related".
 	// Note that the least significant byte was set to "77" instead of "88" to force
 	// the odd parity.
 	// Look at `mapAddressIndex` for more details.
@@ -72,13 +71,13 @@ func makePrefixedAddress(
 
 // `mapAddressIndex` maps an index of 64 bits to a deterministic random-looking 64 bits.
 //
-// The mapping function must be an injective mapping (in this case bijective) 
-// where every two indices always map to two different results. Multiple injective 
+// The mapping function must be an injective mapping (in this case bijective)
+// where every two indices always map to two different results. Multiple injective
 // mappings are possible.
-// 
+//
 // The current implementation uses a simple modular multiplication by a constant modulo 2^64.
 // The multiplier constant can be any odd number. Since odd numbers are co-prime with 2^64, they
-// have a multiplicative inverse modulo 2^64. 
+// have a multiplicative inverse modulo 2^64.
 // This makes multiplying by an odd number an injective function (and therefore bijective).
 //
 // Multiplying modulo 2^64 is implicitly implemented as a uint64 multiplication with a uin64 result.

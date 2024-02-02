@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm/handler/coa"
 	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
@@ -64,14 +65,14 @@ func getPrecompiles(
 // DeployCOA deploys a cadence-owned-account and returns the address
 func (h *ContractHandler) DeployCOA(uuid uint64) types.Address {
 	target := h.addressAllocator.AllocateCOAAddress(uuid)
-	gaslimit := types.GasLimit(COAContractDeploymentRequiredGas)
+	gaslimit := types.GasLimit(coa.ContractDeploymentRequiredGas)
 	h.checkGasLimit(gaslimit)
 
 	factory := h.addressAllocator.COAFactoryAddress()
 	call := types.NewDeployCallWithTargetAddress(
 		factory,
 		target,
-		COAContractBytes,
+		coa.ContractBytes,
 		uint64(gaslimit),
 		new(big.Int),
 	)

@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/handler"
+	"github.com/onflow/flow-go/fvm/evm/handler/coa"
 	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -342,8 +343,8 @@ func TestHandler_COA(t *testing.T) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				h := SetupHandler(t, backend, rootAddr)
 
-				coa := h.DeployCOA(1)
-				acc := h.AccountByAddress(coa, true)
+				coa1 := h.DeployCOA(1)
+				acc := h.AccountByAddress(coa1, true)
 				require.NotEmpty(t, acc.Code())
 
 				// make a second account with some money
@@ -353,15 +354,15 @@ func TestHandler_COA(t *testing.T) {
 
 				// transfer money to COA
 				acc2.Transfer(
-					coa,
+					coa1,
 					types.MakeABalanceInFlow(1),
 				)
 
 				// make a call to the contract
 				ret := acc2.Call(
-					coa,
+					coa1,
 					testutils.MakeCallData(t,
-						handler.COAContractABIJSON,
+						coa.ContractABIJSON,
 						"onERC721Received",
 						gethCommon.Address{1},
 						gethCommon.Address{1},
