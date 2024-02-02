@@ -363,3 +363,20 @@ func mustHexAddress(hexAddress string) common.Address {
 	}
 	return address
 }
+
+// NewlyAddedSystemContracts returns the list of newly added system contracts.
+// These needs to be added to the existing payloads.
+func NewlyAddedSystemContracts(chainID flow.ChainID) []*ledger.Payload {
+	systemContracts := systemcontracts.SystemContractsForChain(chainID)
+	serviceAccount := systemContracts.FlowServiceAccount.Address
+
+	return []*ledger.Payload{
+		// `Burner` contract
+		ledger.NewPayload(
+			convert.RegisterIDToLedgerKey(
+				flow.ContractRegisterID(serviceAccount, "Burner"),
+			),
+			ftContracts.Burner(),
+		),
+	}
+}
