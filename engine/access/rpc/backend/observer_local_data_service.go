@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -22,7 +21,7 @@ import (
 type ObserverLocalDataService struct {
 	TransactionsLocalDataProvider
 	backendEvents BackendEvents
-	me            module.Local
+	nodeId        flow.Identifier
 }
 
 func NewObserverLocalDataService(state protocol.State,
@@ -37,7 +36,7 @@ func NewObserverLocalDataService(state protocol.State,
 	log zerolog.Logger,
 	maxHeightRange uint,
 	nodeCommunicator Communicator,
-	me module.Local,
+	nodeId flow.Identifier,
 ) *ObserverLocalDataService {
 
 	return &ObserverLocalDataService{
@@ -60,7 +59,7 @@ func NewObserverLocalDataService(state protocol.State,
 			nodeCommunicator:  nodeCommunicator,
 			queryMode:         IndexQueryModeLocalOnly,
 		},
-		me: me,
+		nodeId: nodeId,
 	}
 }
 
@@ -78,17 +77,9 @@ func (o *ObserverLocalDataService) GetEventsForBlockIDsFromStorage(ctx context.C
 		return nil, err
 	}
 
-	lastFinalizedHeader, err := o.state.Final().Head()
+	metadata, err := o.buildMetadataResponse()
 	if err != nil {
-		return nil, fmt.Errorf("could not get finalized, %w", err)
-	}
-	blockId := lastFinalizedHeader.ID()
-	nodeId := o.me.NodeID()
-
-	metadata := &entities.Metadata{
-		LatestFinalizedBlockId: blockId[:],
-		LatestFinalizedHeight:  lastFinalizedHeader.Height,
-		NodeId:                 nodeId[:],
+		return nil, err
 	}
 
 	return &access.EventsResponse{
@@ -113,17 +104,9 @@ func (o *ObserverLocalDataService) GetEventsForHeightRangeFromStorageData(
 		return nil, err
 	}
 
-	lastFinalizedHeader, err := o.state.Final().Head()
+	metadata, err := o.buildMetadataResponse()
 	if err != nil {
-		return nil, fmt.Errorf("could not get finalized, %w", err)
-	}
-	blockId := lastFinalizedHeader.ID()
-	nodeId := o.me.NodeID()
-
-	metadata := &entities.Metadata{
-		LatestFinalizedBlockId: blockId[:],
-		LatestFinalizedHeight:  lastFinalizedHeader.Height,
-		NodeId:                 nodeId[:],
+		return nil, err
 	}
 
 	return &access.EventsResponse{
@@ -177,17 +160,9 @@ func (o *ObserverLocalDataService) GetTransactionResultFromStorageData(
 		return nil, err
 	}
 
-	lastFinalizedHeader, err := o.state.Final().Head()
+	metadata, err := o.buildMetadataResponse()
 	if err != nil {
-		return nil, fmt.Errorf("could not get finalized, %w", err)
-	}
-	finalizedBlockId := lastFinalizedHeader.ID()
-	nodeId := o.me.NodeID()
-
-	metadata := &entities.Metadata{
-		LatestFinalizedBlockId: finalizedBlockId[:],
-		LatestFinalizedHeight:  lastFinalizedHeader.Height,
-		NodeId:                 nodeId[:],
+		return nil, err
 	}
 
 	return &access.TransactionResultResponse{
@@ -225,17 +200,9 @@ func (o *ObserverLocalDataService) GetTransactionResultsByBlockIDFromStorageData
 		return nil, err
 	}
 
-	lastFinalizedHeader, err := o.state.Final().Head()
+	metadata, err := o.buildMetadataResponse()
 	if err != nil {
-		return nil, fmt.Errorf("could not get finalized, %w", err)
-	}
-	finalizedBlockId := lastFinalizedHeader.ID()
-	nodeId := o.me.NodeID()
-
-	metadata := &entities.Metadata{
-		LatestFinalizedBlockId: finalizedBlockId[:],
-		LatestFinalizedHeight:  lastFinalizedHeader.Height,
-		NodeId:                 nodeId[:],
+		return nil, err
 	}
 
 	var txResultsResponse []*access.TransactionResultResponse
@@ -282,17 +249,9 @@ func (o *ObserverLocalDataService) GetTransactionResultByIndexFromStorageData(
 		return nil, err
 	}
 
-	lastFinalizedHeader, err := o.state.Final().Head()
+	metadata, err := o.buildMetadataResponse()
 	if err != nil {
-		return nil, fmt.Errorf("could not get finalized, %w", err)
-	}
-	finalizedBlockId := lastFinalizedHeader.ID()
-	nodeId := o.me.NodeID()
-
-	metadata := &entities.Metadata{
-		LatestFinalizedBlockId: finalizedBlockId[:],
-		LatestFinalizedHeight:  lastFinalizedHeader.Height,
-		NodeId:                 nodeId[:],
+		return nil, err
 	}
 
 	return &access.TransactionResultResponse{
@@ -305,5 +264,21 @@ func (o *ObserverLocalDataService) GetTransactionResultByIndexFromStorageData(
 		CollectionId:  result.CollectionID[:],
 		BlockHeight:   result.BlockHeight,
 		Metadata:      metadata,
+	}, nil
+}
+
+// buildMetadataResponse builds and returns the metadata response object.
+func (o *ObserverLocalDataService) buildMetadataResponse() (*entities.Metadata, error) {
+	lastFinalizedHeader, err := o.state.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get finalized, %w", err)
+	}
+	finalizedBlockId := lastFinalizedHeader.ID()
+	nodeId := o.nodeId
+
+	return &entities.Metadata{
+		LatestFinalizedBlockId: finalizedBlockId[:],
+		LatestFinalizedHeight:  lastFinalizedHeader.Height,
+		NodeId:                 nodeId[:],
 	}, nil
 }
