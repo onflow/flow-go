@@ -57,7 +57,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
-	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -220,7 +219,6 @@ type ObserverServiceBuilder struct {
 	ExecutionDataRequester state_synchronization.ExecutionDataRequester
 	ExecutionIndexer       *indexer.Indexer
 	ExecutionIndexerCore   *indexer.IndexerCore
-	RegistersAsyncStore    *execution.RegistersAsyncStore
 	IndexerDependencies    *cmd.DependencyList
 
 	// available until after the network has started. Hence, a factory function that needs to be called just before
@@ -1226,11 +1224,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil, err
 			}
 
-			err = builder.RegistersAsyncStore.InitDataAvailable(registers)
-			if err != nil {
-				return nil, err
-			}
-
 			// setup requester to notify indexer when new execution data is received
 			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
 
@@ -1364,10 +1357,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		return nil
 	})
 
-	builder.Module("async register store", func(node *cmd.NodeConfig) error {
-		builder.RegistersAsyncStore = execution.NewRegistersAsyncStore()
-		return nil
-	})
 	builder.Module("events storage", func(node *cmd.NodeConfig) error {
 		builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
 		return nil
