@@ -97,6 +97,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/pebble"
 	pStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
@@ -150,6 +151,8 @@ type AccessNodeConfig struct {
 	scriptExecutorConfig         query.QueryConfig
 	scriptExecMinBlock           uint64
 	scriptExecMaxBlock           uint64
+	registerCacheType            string
+	registerCacheSize            uint
 }
 
 type PublicNetworkConfig struct {
@@ -242,6 +245,8 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		scriptExecutorConfig:         query.NewDefaultConfig(),
 		scriptExecMinBlock:           0,
 		scriptExecMaxBlock:           math.MaxUint64,
+		registerCacheType:            pebble.CacheTypeLRU.String(),
+		registerCacheSize:            0,
 	}
 }
 
@@ -738,7 +743,16 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					}
 				}
 
-				registers, err := pStorage.NewRegisters(pdb)
+				opts := []pStorage.RegistersOption{}
+				cacheType, err := pebble.ParseCacheType(builder.registerCacheType)
+				if err != nil {
+					return nil, fmt.Errorf("could not parse register cache type: %w", err)
+				}
+				if builder.registerCacheSize > 0 {
+					opts = append(opts, pStorage.WithReadCache(cacheType, builder.registerCacheSize, builder.Metrics.Cache))
+				}
+
+				registers, err := pStorage.NewRegisters(pdb, opts...)
 				if err != nil {
 					return nil, fmt.Errorf("could not create registers storage: %w", err)
 				}
@@ -1129,6 +1143,15 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"script-execution-max-height",
 			defaultConfig.scriptExecMaxBlock,
 			"highest block height to allow for script execution. default: no limit")
+
+		flags.StringVar(&builder.registerCacheType,
+			"register-cache-type",
+			defaultConfig.registerCacheType,
+			"type of backend cache to use for registers (lru, arc, 2q)")
+		flags.UintVar(&builder.registerCacheSize,
+			"register-cache-size",
+			defaultConfig.registerCacheSize,
+			"number of registers to cache for script execution. default: 0 (no cache)")
 
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {

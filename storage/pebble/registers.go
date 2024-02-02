@@ -9,6 +9,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -18,26 +19,63 @@ type Registers struct {
 	db           *pebble.DB
 	firstHeight  uint64
 	latestHeight *atomic.Uint64
+
+	cache *ReadCache
 }
 
 var _ storage.RegisterIndex = (*Registers)(nil)
 
+type RegistersOption func(*Registers) error
+
+func WithReadCache(cacheType CacheType, size uint, metrics module.CacheMetrics) RegistersOption {
+	return func(r *Registers) error {
+		if size == 0 {
+			return errors.New("cache size cannot be 0")
+		}
+
+		cache, err := newReadCache(
+			metrics,
+			"registers",
+			cacheType,
+			size,
+			func(key string) (flow.RegisterValue, error) {
+				return r.lookupRegister([]byte(key))
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("could not create cache: %w", err)
+		}
+
+		r.cache = cache
+		return nil
+	}
+}
+
 // NewRegisters takes a populated pebble instance with LatestHeight and FirstHeight set.
 // return storage.ErrNotBootstrapped if they those two keys are unavailable as it implies a uninitialized state
 // return other error if database is in a corrupted state
-func NewRegisters(db *pebble.DB) (*Registers, error) {
+func NewRegisters(db *pebble.DB, opts ...RegistersOption) (*Registers, error) {
 	// check height keys and populate cache. These two variables will have been set
 	firstHeight, latestHeight, err := ReadHeightsFromBootstrappedDB(db)
 	if err != nil {
 		// first height is found, but latest height is not found, this means that the DB is in a corrupted state
 		return nil, fmt.Errorf("unable to initialize register storage, latest height unavailable in db: %w", err)
 	}
+
 	/// All registers between firstHeight and lastHeight have been indexed
-	return &Registers{
+	r := &Registers{
 		db:           db,
 		firstHeight:  firstHeight,
 		latestHeight: atomic.NewUint64(latestHeight),
-	}, nil
+	}
+
+	for _, opt := range opts {
+		if err := opt(r); err != nil {
+			return nil, fmt.Errorf("failed to apply option: %w", err)
+		}
+	}
+
+	return r, nil
 }
 
 // Get returns the most recent updated payload for the given RegisterID.
@@ -59,6 +97,15 @@ func (s *Registers) Get(
 			fmt.Sprintf("height %d not indexed, indexed range is [%d-%d]", height, s.firstHeight, latestHeight),
 		)
 	}
+	key := newLookupKey(height, reg)
+
+	if s.cache != nil {
+		return s.cache.Get(key.String())
+	}
+	return s.lookupRegister(key.Bytes())
+}
+
+func (s *Registers) lookupRegister(key []byte) (flow.RegisterValue, error) {
 	iter, err := s.db.NewIter(&pebble.IterOptions{
 		UseL6Filters: true,
 	})
@@ -68,8 +115,7 @@ func (s *Registers) Get(
 
 	defer iter.Close()
 
-	encoded := newLookupKey(height, reg).Bytes()
-	ok := iter.SeekPrefixGE(encoded)
+	ok := iter.SeekPrefixGE(key)
 	if !ok {
 		// no such register found
 		return nil, storage.ErrNotFound
