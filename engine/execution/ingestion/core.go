@@ -1,12 +1,13 @@
 package ingestion
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/ingestion/block_queue"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
@@ -16,11 +17,19 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// Core connects the execution components
+// when it receives blocks and collections, it forwards them to the block queue.
+// when the block queue decides to execute blocks, it forwards to the executor for execution
+// when the block queue decides to fetch missing collections, it forwards to the collection fetcher
+// when a block is executed, it notifies the block queue and forwards to execution state to save them.
 type Core struct {
+	unit *engine.Unit // for async block execution
+
 	log zerolog.Logger
 
 	// state machine
 	blockQueue  *block_queue.BlockQueue
+	throttle    Throttle // for throttling blocks to be added to the block queue
 	execState   state.ExecutionState
 	stopControl *stop.StopControl // decide whether to execute a block or not
 
@@ -29,21 +38,29 @@ type Core struct {
 	blocks      storage.Blocks
 	collections storage.Collections
 
-	// computation and data fetching
+	// computation, data fetching, events
 	executor          BlockExecutor
 	collectionFetcher CollectionFetcher
+	eventConsumer     ExecutionEventConsumer
+}
+
+type Throttle interface {
+	Init(processables <-chan flow.Identifier) error
+	OnBlock(block *flow.Header) error
+	OnBlockExecuted(blockID flow.Identifier, height uint64) error
 }
 
 type BlockExecutor interface {
-	ExecuteBlock(handler ComputationResultHandler, block *entity.ExecutableBlock) error
+	ExecuteBlock(block *entity.ExecutableBlock) (*execution.ComputationResult, error)
 }
 
-type ComputationResultHandler interface {
-	OnBlockExecuted(block *entity.ExecutableBlock, computationResult *execution.ComputationResult)
+type ExecutionEventConsumer interface {
+	OnComputationResultSaved(blockID flow.Identifier, result *execution.ComputationResult)
 }
 
 func NewCore(
 	logger zerolog.Logger,
+	throttle Throttle,
 	execState state.ExecutionState,
 	stopControl *stop.StopControl,
 	headers storage.Headers,
@@ -51,9 +68,11 @@ func NewCore(
 	collections storage.Collections,
 	executor BlockExecutor,
 	collectionFetcher CollectionFetcher,
+	eventConsumer ExecutionEventConsumer,
 ) *Core {
 	return &Core{
-		log:               logger,
+		log:               logger.With().Str("engine", "ingestion_core").Logger(),
+		throttle:          throttle,
 		execState:         execState,
 		blockQueue:        block_queue.NewBlockQueue(logger),
 		stopControl:       stopControl,
@@ -62,16 +81,86 @@ func NewCore(
 		collections:       collections,
 		executor:          executor,
 		collectionFetcher: collectionFetcher,
+		eventConsumer:     eventConsumer,
 	}
 }
 
+func (e *Core) Ready() <-chan struct{} {
+	if e.stopControl.IsExecutionStopped() {
+		return e.unit.Ready()
+	}
+
+	e.launchWorkerToConsumeThrottledBlocks()
+
+	return e.unit.Ready()
+}
+
+func (e *Core) Done() <-chan struct{} {
+	return e.unit.Done()
+}
+
 func (e *Core) OnBlock(header *flow.Header) error {
+	return e.onBlock(header)
+}
+
+func (e *Core) OnCollection(col *flow.Collection) error {
+	return e.onCollection(col)
+}
+
+func (e *Core) launchWorkerToConsumeThrottledBlocks() {
+	// processables are throttled blocks
+	processables := make(chan flow.Identifier, 10000)
+
+	// running worker in the background to consume
+	// processables blocks which are throttled,
+	// and forward them to the block queue for processing
+	e.unit.Launch(func() {
+		err := e.forwardProcessableToHandler(processables)
+		if err != nil {
+			e.log.Fatal().Err(err).Msg("fail to process block")
+		}
+	})
+
+	log.Info().Msg("initializing throttle engine")
+
+	err := e.throttle.Init(processables)
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("fail to initialize throttle engine")
+	}
+
+	log.Info().Msgf("throttle engine initialized")
+}
+
+func (e *Core) forwardProcessableToHandler(
+	processables <-chan flow.Identifier,
+) error {
+	for {
+		select {
+		case <-e.unit.Quit():
+			return nil
+		case blockID := <-processables:
+			err := e.onProcessableBlock(blockID)
+			if err != nil {
+				return fmt.Errorf("could not process block: %w", err)
+			}
+		}
+	}
+}
+
+func (e *Core) onBlock(header *flow.Header) error {
+	return nil
+}
+
+func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
+	header, err := e.headers.ByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not get block: %w", err)
+	}
+
 	// skip if stopControl tells to skip
 	if !e.stopControl.ShouldExecuteBlock(header) {
 		return nil
 	}
-
-	blockID := header.ID()
 
 	executed, err := e.execState.IsBlockExecuted(header.Height, blockID)
 	if err != nil {
@@ -97,10 +186,7 @@ func (e *Core) OnBlock(header *flow.Header) error {
 		return fmt.Errorf("failed to enqueue block %v: %w", blockID, err)
 	}
 
-	err = e.execute(executables)
-	if err != nil {
-		return fmt.Errorf("failed to execute block: %w", err)
-	}
+	e.executeConcurrently(executables)
 
 	err = e.fetch(missingColls)
 	if err != nil {
@@ -179,46 +265,41 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 	return missingColls, executables, nil
 }
 
-func (e *Core) OnBlockExecuted(block *entity.ExecutableBlock, computationResult *execution.ComputationResult) {
-	err := e.onBlockExecuted(block, computationResult)
-	if err != nil {
-		// TODO: use irrecoverable error
-		e.log.Fatal().Err(err).Msg("unexpected error while handling block execution")
-	}
-}
-
 func (e *Core) onBlockExecuted(block *entity.ExecutableBlock, computationResult *execution.ComputationResult) error {
+	// TODO add more feilds to log
+	e.log.Info().Msgf("block executed")
+
 	commit := computationResult.CurrentEndState()
 
-	// we notify the block queue before saving the results to database,
-	// so that it reduce the chance of race condition when OnBlock is called with
-	// parent commit which might get outdated.
+	// block queue decides when a block becomes executed, it doesn't care if the execution
+	// result has been saved to database, so we can notify block queue
+	// as soon as a block has been executed.
 	executables, err := e.blockQueue.OnBlockExecuted(block.ID(), commit)
 	if err != nil {
 		return fmt.Errorf("unexpected error while marking block as executed: %w", err)
 	}
 
-	// TODO: use app level context
-	err = e.execState.SaveExecutionResults(context.Background(), computationResult)
+	err = e.execState.SaveExecutionResults(e.unit.Ctx(), computationResult)
 	if err != nil {
 		return fmt.Errorf("cannot persist execution state: %w", err)
 	}
 
 	e.stopControl.OnBlockExecuted(block.Block.Header)
 
+	// notify event consumer so that the event consumer can do tasks
+	// such as broadcasting or uploading the result
+	e.eventConsumer.OnComputationResultSaved(block.ID(), computationResult)
+
 	// we ensures that the child blocks are only executed after the execution result of
 	// its parent block has been successfully saved to storage.
 	// this ensures OnBlockExecuted would not be called with blocks in a wrong order, such as
 	// OnBlockExecuted(childBlock) being called before OnBlockExecuted(parentBlock).
-	err = e.execute(executables)
-	if err != nil {
-		return fmt.Errorf("failed to execute block when receiving %v: %w", block.ID(), err)
-	}
+	e.executeConcurrently(executables)
 
 	return nil
 }
 
-func (e *Core) OnCollection(col *flow.Collection) error {
+func (e *Core) onCollection(col *flow.Collection) error {
 	// EN might request a collection from multiple collection nodes,
 	// therefore might receive multiple copies of the same collection.
 	// we only need to store it once.
@@ -238,10 +319,7 @@ func (e *Core) OnCollection(col *flow.Collection) error {
 		return fmt.Errorf("unexpected error while adding collection to block queue")
 	}
 
-	err = e.execute(executables)
-	if err != nil {
-		return fmt.Errorf("failed to execute block when receiving collection %v: %w", col.ID(), err)
-	}
+	e.executeConcurrently(executables)
 
 	return nil
 }
@@ -262,18 +340,36 @@ func storeCollectionIfMissing(collections storage.Collections, col *flow.Collect
 	return nil
 }
 
-func (e *Core) execute(executables []*entity.ExecutableBlock) error {
+// execute block concurrently
+func (e *Core) executeConcurrently(executables []*entity.ExecutableBlock) {
 	for _, executable := range executables {
-		if !e.stopControl.ShouldExecuteBlock(executable.Block.Header) {
-			continue
-		}
+		func(executable *entity.ExecutableBlock) {
+			e.unit.Launch(func() {
+				err := e.execute(executable)
+				if err != nil {
+					e.log.Error().Err(err).Msgf("failed to execute block %v", executable.Block.ID())
+				}
+			})
+		}(executable)
+	}
+}
 
-		// passing the block and itself to the executor so that when the executor
-		// finish executing the block, it can call OnBlockExecuted to notify the ingester
-		err := e.executor.ExecuteBlock(e, executable)
-		if err != nil {
-			return fmt.Errorf("failed to execute block %v: %w", executable.Block.ID(), err)
-		}
+func (e *Core) execute(executable *entity.ExecutableBlock) error {
+	if !e.stopControl.ShouldExecuteBlock(executable.Block.Header) {
+		return nil
+	}
+
+	// TODO: add fields
+	e.log.Info().Msgf("executing block")
+
+	result, err := e.executor.ExecuteBlock(executable)
+	if err != nil {
+		return fmt.Errorf("failed to execute block %v: %w", executable.Block.ID(), err)
+	}
+
+	err = e.onBlockExecuted(executable, result)
+	if err != nil {
+		return fmt.Errorf("failed to handle execution result of block %v: %w", executable.Block.ID(), err)
 	}
 
 	return nil
