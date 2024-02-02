@@ -70,3 +70,5 @@ var GenesisBlock = &Block{
 	TotalSupply:     new(big.Int),
 	ReceiptRoot:     gethTypes.EmptyRootHash,
 }
+
+var GenesisBlockHash, _ = GenesisBlock.Hash()
