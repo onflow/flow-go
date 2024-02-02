@@ -72,11 +72,20 @@ contract EVM {
         var addressBytes: [UInt8; 20]
 
         init() {
-            self.addressBytes = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            // address is initially set to zero
+            // but updated through initAddress later
+            // we have to do this since we need resource id (uuid)
+            // to calculate the EVM address for this bridge account
+            self.addressBytes = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] 
         }
 
         access(contract)
-        fun setAddress(addressBytes: [UInt8; 20]) {
+        fun initAddress(addressBytes: [UInt8; 20]) {
+           // only allow set address for the first time
+           // check address is empty
+            for item in self.addressBytes {
+                assert(item == 0, message: "address byte is not empty")
+            }
            self.addressBytes = addressBytes
         }
 
@@ -157,7 +166,7 @@ contract EVM {
     fun createBridgedAccount(): @BridgedAccount {
         let acc <-create BridgedAccount()
         let addr = InternalEVM.createBridgedAccount(uuid: acc.uuid)
-        acc.setAddress(addressBytes: addr)
+        acc.initAddress(addressBytes: addr)
         return <-acc
     }
 
