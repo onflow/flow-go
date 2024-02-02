@@ -13,7 +13,11 @@ const (
 	ledgerAddressAllocatorKey = "AddressAllocator"
 	// `addressIndexMultiplierConstant` is used for mapping address indices
 	// into deterministic random-looking address postfixes. 
-	// The constant must be an ODD number. It is a "nothing-up-my-sleeves" constant.
+	// The constant must be an ODD number.
+	// It is a "nothing-up-my-sleeves" constant, chosen to be big enough so that
+	// the index and its corresponding address look less "related". 
+	// Note that the least significant byte was set to "77" instead of "88" to force
+	// the odd parity.
 	// Look at `mapAddressIndex` for more details.
 	addressIndexMultiplierConstant = uint64(0xFFEEDDCCBBAA9977)
 )
