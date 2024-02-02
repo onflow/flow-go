@@ -295,7 +295,7 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 		NewSystemContractChange(
 			systemContracts.FungibleToken,
 			ftContracts.FungibleToken(
-				// Use `Hex()`, since  this method adds the prefix.
+				// Use `Hex()`, since this method adds the prefix.
 				systemContracts.ViewResolver.Address.Hex(),
 				systemContracts.FlowServiceAccount.Address.Hex(),
 			),
@@ -304,7 +304,7 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 			Address:      fungibleTokenMetadataViewsAddress,
 			ContractName: "FungibleTokenMetadataViews",
 			NewContractCode: string(ftContracts.FungibleTokenMetadataViews(
-				// Use `Hex()`, since  this method adds the prefix.
+				// Use `Hex()`, since this method adds the prefix.
 				systemContracts.FungibleToken.Address.Hex(),
 				systemContracts.MetadataViews.Address.Hex(),
 				systemContracts.ViewResolver.Address.Hex(),
@@ -330,6 +330,15 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 			systemContracts.ViewResolver,
 			nftContracts.ViewResolver(),
 		),
+
+		// EVM related contracts
+		NewSystemContractChange(
+			systemContracts.EVMContract,
+			evm.ContractCode(
+				systemContracts.FlowToken.Address,
+				true,
+			),
+		),
 	}
 
 	if chainID != flow.Emulator {
@@ -341,15 +350,6 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 					systemContracts.FungibleToken.Address.HexWithPrefix(),
 				)),
 			},
-
-			// EVM related contracts
-			NewSystemContractChange(
-				systemContracts.EVMContract,
-				evm.ContractCode(
-					systemContracts.FlowToken.Address,
-					true,
-				),
-			),
 		)
 	}
 
