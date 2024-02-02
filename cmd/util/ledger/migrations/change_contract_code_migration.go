@@ -173,6 +173,10 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 		stakingCollectionAddress = mustHexAddress("0x95e019a17d0e23d7")
 		stakingProxyAddress = mustHexAddress("0x7aad92e5a0715d21")
 
+	case flow.Emulator:
+		stakingCollectionAddress = common.Address(systemContracts.FlowServiceAccount.Address)
+		stakingProxyAddress = common.Address(systemContracts.FlowServiceAccount.Address)
+
 	default:
 		panic(fmt.Errorf("unsupported chain ID: %s", chainID))
 	}
@@ -181,7 +185,7 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 	fungibleTokenMetadataViewsAddress := common.Address(systemContracts.FungibleToken.Address)
 	fungibleTokenSwitchboardAddress := common.Address(systemContracts.FungibleToken.Address)
 
-	return []SystemContractChange{
+	contractChanges := []SystemContractChange{
 		// epoch related contracts
 		NewSystemContractChange(
 			systemContracts.Epoch,
@@ -291,24 +295,19 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 		NewSystemContractChange(
 			systemContracts.FungibleToken,
 			ftContracts.FungibleToken(
-				systemContracts.ViewResolver.Address.HexWithPrefix(),
-				systemContracts.FlowServiceAccount.Address.HexWithPrefix(),
+				// Use `Hex()`, since  this method adds the prefix.
+				systemContracts.ViewResolver.Address.Hex(),
+				systemContracts.FlowServiceAccount.Address.Hex(),
 			),
 		),
 		{
 			Address:      fungibleTokenMetadataViewsAddress,
 			ContractName: "FungibleTokenMetadataViews",
 			NewContractCode: string(ftContracts.FungibleTokenMetadataViews(
-				systemContracts.FungibleToken.Address.HexWithPrefix(),
-				systemContracts.MetadataViews.Address.HexWithPrefix(),
-				systemContracts.ViewResolver.Address.HexWithPrefix(),
-			)),
-		},
-		{
-			Address:      fungibleTokenSwitchboardAddress,
-			ContractName: "FungibleTokenSwitchboard",
-			NewContractCode: string(ftContracts.FungibleTokenSwitchboard(
-				systemContracts.FungibleToken.Address.HexWithPrefix(),
+				// Use `Hex()`, since  this method adds the prefix.
+				systemContracts.FungibleToken.Address.Hex(),
+				systemContracts.MetadataViews.Address.Hex(),
+				systemContracts.ViewResolver.Address.Hex(),
 			)),
 		},
 
@@ -331,16 +330,30 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 			systemContracts.ViewResolver,
 			nftContracts.ViewResolver(),
 		),
-
-		// EVM related contracts
-		NewSystemContractChange(
-			systemContracts.EVMContract,
-			evm.ContractCode(
-				systemContracts.FlowToken.Address,
-				true,
-			),
-		),
 	}
+
+	if chainID != flow.Emulator {
+		contractChanges = append(contractChanges,
+			SystemContractChange{
+				Address:      fungibleTokenSwitchboardAddress,
+				ContractName: "FungibleTokenSwitchboard",
+				NewContractCode: string(ftContracts.FungibleTokenSwitchboard(
+					systemContracts.FungibleToken.Address.HexWithPrefix(),
+				)),
+			},
+
+			// EVM related contracts
+			NewSystemContractChange(
+				systemContracts.EVMContract,
+				evm.ContractCode(
+					systemContracts.FlowToken.Address,
+					true,
+				),
+			),
+		)
+	}
+
+	return contractChanges
 }
 
 func mustHexAddress(hexAddress string) common.Address {
