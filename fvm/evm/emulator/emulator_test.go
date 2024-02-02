@@ -80,6 +80,7 @@ func TestNativeTokenBridging(t *testing.T) {
 }
 
 func TestContractInteraction(t *testing.T) {
+	t.Parallel()
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 
@@ -131,7 +132,6 @@ func TestContractInteraction(t *testing.T) {
 
 			t.Run("call contract", func(t *testing.T) {
 				num := big.NewInt(10)
-
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
 						res, err := blk.DirectCall(
@@ -184,7 +184,6 @@ func TestContractInteraction(t *testing.T) {
 						require.Equal(t, blockNumber, ret)
 					})
 				})
-
 			})
 
 			t.Run("test sending transactions (happy case)", func(t *testing.T) {
@@ -285,7 +284,6 @@ func TestContractInteraction(t *testing.T) {
 					require.True(t, types.IsEVMValidationError(err))
 				})
 			})
-
 		})
 	})
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"math/big"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence/runtime/common"
@@ -153,10 +154,19 @@ func (h *ContractHandler) emitEvent(event *types.Event) {
 func (h *ContractHandler) getBlockContext() types.BlockContext {
 	bp, err := h.blockstore.BlockProposal()
 	handleError(err)
+	rand := gethCommon.Hash{}
+	err = h.backend.ReadRandom(rand[:])
+	handleError(err)
 	return types.BlockContext{
 		BlockNumber:            bp.Height,
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
-		ExtraPrecompiles:       h.precompiles,
+		GetHashFunc: func(n uint64) gethCommon.Hash {
+			hash, err := h.blockstore.BlockHash(n)
+			handleError(err)
+			return hash
+		},
+		ExtraPrecompiles: h.precompiles,
+		Random:           rand,
 	}
 }
 
@@ -193,9 +203,7 @@ func (a *Account) Balance() types.Balance {
 	bl, err := blk.BalanceOf(a.address)
 	handleError(err)
 
-	balance, err := types.NewBalanceFromAttoFlow(bl)
-	handleError(err)
-	return balance
+	return types.NewBalance(bl)
 }
 
 // Deposit deposits the token from the given vault into the flow evm main vault
@@ -206,9 +214,9 @@ func (a *Account) Deposit(v *types.FLOWTokenVault) {
 
 	call := types.NewDepositCall(
 		a.address,
-		v.Balance().ToAttoFlow(),
+		v.Balance(),
 	)
-	a.executeAndHandleCall(a.fch.getBlockContext(), call, v.Balance().ToAttoFlow(), false)
+	a.executeAndHandleCall(a.fch.getBlockContext(), call, v.Balance(), false)
 }
 
 // Withdraw deducts the balance from the account and
@@ -223,15 +231,18 @@ func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 	bp, err := a.fch.blockstore.BlockProposal()
 	handleError(err)
 	// b > total supply
-	if b.ToAttoFlow().Cmp(bp.TotalSupply) == 1 {
+	if types.BalanceToBigInt(b).Cmp(bp.TotalSupply) == 1 {
 		handleError(types.ErrInsufficientTotalSupply)
 	}
-
+	// Don't allow withdraw for balances that has rounding error
+	if types.BalanceConvertionToUFix64ProneToRoundingError(b) {
+		handleError(types.ErrWithdrawBalanceRounding)
+	}
 	call := types.NewWithdrawCall(
 		a.address,
-		b.ToAttoFlow(),
+		b,
 	)
-	a.executeAndHandleCall(a.fch.getBlockContext(), call, b.ToAttoFlow(), true)
+	a.executeAndHandleCall(a.fch.getBlockContext(), call, b, true)
 
 	return types.NewFlowTokenVault(b)
 }
@@ -246,7 +257,7 @@ func (a *Account) Transfer(to types.Address, balance types.Balance) {
 	call := types.NewTransferCall(
 		a.address,
 		to,
-		balance.ToAttoFlow(),
+		balance,
 	)
 	a.executeAndHandleCall(ctx, call, nil, false)
 }
@@ -262,7 +273,7 @@ func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types
 		a.address,
 		code,
 		uint64(gaslimit),
-		balance.ToAttoFlow(),
+		balance,
 	)
 	res := a.executeAndHandleCall(a.fch.getBlockContext(), call, nil, false)
 	return types.Address(res.DeployedContractAddress)
@@ -280,7 +291,7 @@ func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimi
 		to,
 		data,
 		uint64(gaslimit),
-		balance.ToAttoFlow(),
+		balance,
 	)
 	res := a.executeAndHandleCall(a.fch.getBlockContext(), call, nil, false)
 	return res.ReturnedValue

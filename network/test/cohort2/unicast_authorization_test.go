@@ -168,8 +168,8 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
 	u.setupNetworks(slashingViolationsConsumer)
-	// NOTE: setup ejected identity
-	u.senderID.Ejected = true
+	//NOTE: setup ejected identity
+	u.senderID.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 
 	// overriding the identity provide of the receiver node to return the ejected identity so that the
 	// sender node looks ejected to its networking layer and hence it sends a SenderEjectedError upon receiving a message

@@ -208,6 +208,43 @@ network-config:
           tracker-cache-decay: 0.99
           # The upper bound on the amount of cluster prefixed control messages that will be processed
           hard-threshold: 100
+        process:
+          inspection:
+            # Serves as a fail-safe mechanism to globally deactivate inspection logic. When this fail-safe is activated it disables all
+            # aspects of the inspection logic, irrespective of individual configurations like inspection.enable-graft, inspection.enable-prune, etc.
+            # Consequently, all metrics collection and logging related to the rpc and inspection will also be disabled.
+            # It is important to note that activating this fail-safe results in a comprehensive deactivation inspection features.
+            # Please use this setting judiciously, considering its broad impact on the behavior of control message handling.
+            disabled: false
+            # Enables graft control message inspection.
+            enable-graft: true
+            # Enables prune control message inspection.
+            enable-prune: true
+            # Enables ihave control message inspection.
+            enable-ihave: true
+            # Enables iwant control message inspection.
+            enable-iwant: true
+            # Enables publish message inspection.
+            enable-publish: true
+          truncation:
+            # Serves as a fail-safe mechanism to globally deactivate truncation logic. When this fail-safe is activated it disables all
+            # aspects of the truncation logic, irrespective of individual configurations like truncation.enable-graft, truncation.enable-prune, etc.
+            # Consequently, all metrics collection and logging related to the rpc and inspection will also be disabled.
+            # It is important to note that activating this fail-safe results in a comprehensive deactivation truncation features.
+            # Please use this setting judiciously, considering its broad impact on the behavior of control message handling.
+            disabled: false
+            # Enables graft control message truncation.
+            enable-graft: true
+            # Enables prune control message truncation.
+            enable-prune: true
+            # Enables ihave control message truncation.
+            enable-ihave: true
+            # Enables ihave message id truncation.
+            enable-ihave-message-id: true
+            # Enables iwant control message truncation.
+            enable-iwant: true
+            # Enables iwant message id truncation.
+            enable-iwant-message-id: true
     rpc-tracer:
       # The default interval at which the mesh tracer logs the mesh topology. This is used for debugging and forensics purposes.
       #	Note that we purposefully choose this logging interval high enough to avoid spamming the logs. Moreover, the

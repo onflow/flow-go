@@ -86,7 +86,7 @@ func (t *testFlowAccount) Address() types.Address {
 
 func (t *testFlowAccount) Balance() types.Balance {
 	if t.balance == nil {
-		return types.Balance(0)
+		return types.NewBalanceFromUFix64(0)
 	}
 	return t.balance()
 }
@@ -1593,9 +1593,9 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
           access(all) struct Token {
             access(all) let id: Int
-            access(all) var balance: Int
+            access(all) var balance: UInt
 
-            init(id: Int, balance: Int) {
+            init(id: Int, balance: UInt) {
               self.id = id
               self.balance = balance
             }
@@ -2125,9 +2125,9 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
           access(all) struct Token {
             access(all) let id: Int
-            access(all) var balance: Int
+            access(all) var balance: UInt
 
-            init(id: Int, balance: Int) {
+            init(id: Int, balance: UInt) {
               self.id = id
               self.balance = balance
             }
@@ -2656,8 +2656,8 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
       import EVM from 0x1
 
       access(all)
-      fun main(_ flow: UFix64): EVM.Balance {
-          return EVM.Balance(flow: flow)
+      fun main(_ attoflow: UInt): EVM.Balance {
+          return EVM.Balance(attoflow: attoflow)
       }
     `)
 
@@ -2704,8 +2704,7 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 
 	// Run script
 
-	flowValue, err := cadence.NewUFix64FromParts(1, 23000000)
-	require.NoError(t, err)
+	flowValue := cadence.NewUInt(1230000000000000000)
 
 	result, err := rt.ExecuteScript(
 		runtime.Script{
@@ -2977,7 +2976,7 @@ func TestBridgedAccountCall(t *testing.T) {
 					assert.Equal(t, types.Address{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, toAddress)
 					assert.Equal(t, types.Data{4, 5, 6}, data)
 					assert.Equal(t, types.GasLimit(9999), limit)
-					assert.Equal(t, types.Balance(expectedBalance), balance)
+					assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
 
 					return types.Data{3, 1, 4}
 				},
@@ -2998,13 +2997,15 @@ func TestBridgedAccountCall(t *testing.T) {
       access(all)
       fun main(): [UInt8] {
           let bridgedAccount <- EVM.createBridgedAccount()
+		  let bal = EVM.Balance(0)
+		  bal.setFLOW(flow: 1.23)
           let response = bridgedAccount.call(
               to: EVM.EVMAddress(
                   bytes: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
               ),
               data: [4, 5, 6],
               gasLimit: 9999,
-              value: EVM.Balance(flow: 1.23)
+              value: bal
           )
           destroy bridgedAccount
           return response
@@ -3096,7 +3097,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 					deposited = true
 					assert.Equal(
 						t,
-						types.Balance(expectedBalance),
+						types.NewBalanceFromUFix64(expectedBalance),
 						vault.Balance(),
 					)
 				},
@@ -3213,13 +3214,13 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 				deposit: func(vault *types.FLOWTokenVault) {
 					deposited = true
 					assert.Equal(t,
-						types.Balance(expectedDepositBalance),
+						types.NewBalanceFromUFix64(expectedDepositBalance),
 						vault.Balance(),
 					)
 				},
 				withdraw: func(balance types.Balance) *types.FLOWTokenVault {
 					assert.Equal(t,
-						types.Balance(expectedWithdrawBalance),
+						types.NewBalanceFromUFix64(expectedWithdrawBalance),
 						balance,
 					)
 					withdrew = true
@@ -3249,7 +3250,7 @@ func TestBridgedAccountWithdraw(t *testing.T) {
           let bridgedAccount <- EVM.createBridgedAccount()
           bridgedAccount.deposit(from: <-vault)
 
-          let vault2 <- bridgedAccount.withdraw(balance: EVM.Balance(flow: 1.23))
+          let vault2 <- bridgedAccount.withdraw(balance: EVM.Balance(attoflow: 1230000000000000000))
           let balance = vault2.balance
           destroy bridgedAccount
           destroy vault2
@@ -3342,7 +3343,7 @@ func TestBridgedAccountDeploy(t *testing.T) {
 					deployed = true
 					assert.Equal(t, types.Code{4, 5, 6}, code)
 					assert.Equal(t, types.GasLimit(9999), limit)
-					assert.Equal(t, types.Balance(expectedBalance), balance)
+					assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
 
 					return handler.AllocateAddress()
 				},
@@ -3365,7 +3366,7 @@ func TestBridgedAccountDeploy(t *testing.T) {
           let address = bridgedAccount.deploy(
               code: [4, 5, 6],
               gasLimit: 9999,
-              value: EVM.Balance(flow: 1.23)
+              value: EVM.Balance(flow: 1230000000000000000)
           )
           destroy bridgedAccount
           return address.bytes
@@ -3454,12 +3455,10 @@ func TestEVMAccountBalance(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	expectedBalanceValue, err := cadence.NewUFix64FromParts(1, 1337000)
+	expectedBalanceValue := cadence.NewUInt(1013370000000000000)
 	expectedBalance := cadence.
 		NewStruct([]cadence.Value{expectedBalanceValue}).
 		WithType(stdlib.NewBalanceCadenceType(common.Address(contractsAddress)))
-
-	require.NoError(t, err)
 
 	handler := &testContractHandler{
 		flowTokenAddress: common.Address(contractsAddress),
@@ -3470,7 +3469,7 @@ func TestEVMAccountBalance(t *testing.T) {
 			return &testFlowAccount{
 				address: fromAddress,
 				balance: func() types.Balance {
-					return types.Balance(expectedBalanceValue)
+					return types.NewBalance(expectedBalanceValue.Value)
 				},
 			}
 		},
@@ -3549,7 +3548,7 @@ func TestEVMAccountBalance(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, err)
-	require.Equal(t, expectedBalance, actual)
+	require.Equal(t, expectedBalance.ToGoValue(), actual.ToGoValue())
 }
 
 func TestEVMAccountBalanceForABIOnlyContract(t *testing.T) {
@@ -3570,7 +3569,7 @@ func TestEVMAccountBalanceForABIOnlyContract(t *testing.T) {
 			return &testFlowAccount{
 				address: fromAddress,
 				balance: func() types.Balance {
-					return types.Balance(expectedBalanceValue)
+					return types.NewBalanceFromUFix64(expectedBalanceValue)
 				},
 			}
 		},

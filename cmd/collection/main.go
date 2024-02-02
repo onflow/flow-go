@@ -5,10 +5,12 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+	"golang.org/x/time/rate"
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/admin/commands"
+	collectionCommands "github.com/onflow/flow-go/admin/commands/collection"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
@@ -83,6 +85,7 @@ func main() {
 
 		pools               *epochpool.TransactionPools // epoch-scoped transaction pools
 		followerDistributor *pubsub.FollowerDistributor
+		addressRateLimiter  *ingest.AddressRateLimiter
 
 		push              *pusher.Engine
 		ing               *ingest.Engine
@@ -99,6 +102,9 @@ func main() {
 		accessNodeIDS      []string
 		apiRatelimits      map[string]int
 		apiBurstlimits     map[string]int
+		txRatelimits       float64
+		txBurstlimits      int
+		txRatelimitPayers  string
 	)
 	var deprecatedFlagBlockRateDelay time.Duration
 
@@ -159,6 +165,17 @@ func main() {
 		flags.StringToIntVar(&apiRatelimits, "api-rate-limits", map[string]int{}, "per second rate limits for GRPC API methods e.g. Ping=300,SendTransaction=500 etc. note limits apply globally to all clients.")
 		flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", map[string]int{}, "burst limits for gRPC API methods e.g. Ping=100,SendTransaction=100 etc. note limits apply globally to all clients.")
 
+		// rate limiting for accounts, default is 2 transactions every 2.5 seconds
+		// Note: The rate limit configured for each node may differ from the effective network-wide rate limit
+		// for a given payer. In particular, the number of clusters and the message propagation factor will
+		// influence how the individual rate limit translates to a network-wide rate limit.
+		// For example, suppose we have 5 collection clusters and configure each Collection Node with a rate
+		// limit of 1 message per second. Then, the effective network-wide rate limit for a payer address would
+		// be *at least* 5 messages per second.
+		flags.Float64Var(&txRatelimits, "ingest-tx-rate-limits", 2.5, "per second rate limits for processing transactions for limited account")
+		flags.IntVar(&txBurstlimits, "ingest-tx-burst-limits", 2, "burst limits for processing transactions for limited account")
+		flags.StringVar(&txRatelimitPayers, "ingest-tx-rate-limit-payers", "", "comma separated list of accounts to apply rate limiting to")
+
 		// deprecated flags
 		flags.DurationVar(&deprecatedFlagBlockRateDelay, "block-rate-delay", 0, "the delay to broadcast block proposal in order to control block production rate")
 	}).ValidateFlags(func() error {
@@ -181,6 +198,21 @@ func main() {
 
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
+		Module("transaction rate limiter", func(node *cmd.NodeConfig) error {
+			// To be managed by admin tool, and used by ingestion engine
+			addressRateLimiter = ingest.NewAddressRateLimiter(rate.Limit(txRatelimits), txBurstlimits)
+			// read the rate limit addresses from flag and add to the rate limiter
+			addrs, err := ingest.ParseAddresses(txRatelimitPayers)
+			if err != nil {
+				return fmt.Errorf("could not parse rate limit addresses: %w", err)
+			}
+			ingest.AddAddresses(addressRateLimiter, addrs)
+
+			return nil
+		}).
+		AdminCommand("ingest-tx-rate-limit", func(node *cmd.NodeConfig) commands.AdminCommand {
+			return collectionCommands.NewTxRateLimitCommand(addressRateLimiter)
+		}).
 		AdminCommand("read-range-cluster-blocks", func(conf *cmd.NodeConfig) commands.AdminCommand {
 			clusterPayloads := badger.NewClusterPayloads(&metrics.NoopCollector{}, conf.DB)
 			headers, ok := conf.Storage.Headers.(*badger.Headers)
@@ -391,6 +423,7 @@ func main() {
 				node.RootChainID.Chain(),
 				pools,
 				ingestConf,
+				addressRateLimiter,
 			)
 			return ing, err
 		}).
@@ -427,8 +460,8 @@ func main() {
 				collectionProviderWorkers,
 				channels.ProvideCollections,
 				filter.And(
-					filter.HasWeight(true),
-					filter.HasRole(flow.RoleAccess, flow.RoleExecution),
+					filter.IsValidCurrentEpochParticipantOrJoining,
+					filter.HasRole[flow.Identity](flow.RoleAccess, flow.RoleExecution),
 				),
 				retrieve,
 			)

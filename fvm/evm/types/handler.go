@@ -48,6 +48,7 @@ type Backend interface {
 	environment.Meter
 	environment.EventEmitter
 	environment.BlockInfo
+	environment.RandomGenerator
 }
 
 // AddressAllocator allocates addresses, used by the handler
@@ -65,7 +66,7 @@ type BlockStore interface {
 	LatestBlock() (*Block, error)
 
 	// BlockHash returns the hash of the block at the given height
-	BlockHash(height int) (gethCommon.Hash, error)
+	BlockHash(height uint64) (gethCommon.Hash, error)
 
 	// BlockProposal returns the block proposal
 	BlockProposal() (*Block, error)
