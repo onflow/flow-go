@@ -55,9 +55,11 @@ func NewMachine(
 ) (*Machine, error) {
 
 	e := &Machine{
-		log:         logger.With().Str("engine", "ingestion_machine").Logger(),
-		broadcaster: broadcaster,
-		uploader:    uploader,
+		log:                logger.With().Str("engine", "ingestion_machine").Logger(),
+		broadcaster:        broadcaster,
+		uploader:           uploader,
+		execState:          execState,
+		computationManager: computationManager,
 	}
 
 	throttle, err := NewBlockThrottle(
@@ -74,7 +76,7 @@ func NewMachine(
 
 	core := NewCore(
 		logger,
-		throttle, // TODO: create throttle
+		throttle,
 		execState,
 		stopControl,
 		headers,
@@ -113,9 +115,7 @@ func (e *Machine) Done() <-chan struct{} {
 
 // Protocol Events implementation
 func (e *Machine) BlockProcessable(b *flow.Header, qc *flow.QuorumCertificate) {
-	e.log.Info().Msgf("block processable: %v", b.Height)
 	e.core.OnBlock(b, qc)
-	e.log.Info().Msgf("block processed: %v", b.Height)
 }
 
 // EventConsumer implementation

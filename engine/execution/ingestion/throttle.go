@@ -144,7 +144,7 @@ func NewBlockThrottle(
 		executed:  executed,
 		finalized: finalized,
 
-		log:     log.With().Str("component", "throttle").Logger(),
+		log:     log.With().Str("component", "block_throttle").Logger(),
 		state:   state,
 		headers: headers,
 	}, nil
@@ -158,6 +158,7 @@ func (c *BlockThrottle) Init(processables chan<- flow.Identifier) error {
 	}
 
 	c.inited = true
+	c.processables = processables
 
 	var unexecuted []flow.Identifier
 	var err error
@@ -236,9 +237,7 @@ func (c *BlockThrottle) OnBlock(blockID flow.Identifier) error {
 	}
 
 	// if has caught up, then process the block
-	c.log.Info().Str("blockID", blockID.String()).Msgf("forwarding block for processing")
 	c.processables <- blockID
-	c.log.Info().Str("blockID", blockID.String()).Msgf("block has been processed")
 
 	return nil
 }
