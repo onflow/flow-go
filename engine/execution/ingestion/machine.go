@@ -113,6 +113,7 @@ func (e *Machine) Done() <-chan struct{} {
 
 // Protocol Events implementation
 func (e *Machine) BlockProcessable(b *flow.Header, qc *flow.QuorumCertificate) {
+	e.log.Info().Msgf("block processable: %v", b.Height)
 	e.core.OnBlock(b, qc)
 }
 
