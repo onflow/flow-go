@@ -92,3 +92,25 @@ In the context of the Flow blockchain, RPC inspection is necessary for the follo
 3. **Metrics and Monitoring**: The inspection process provides valuable insights into the network's health and performance. 
    By monitoring the incoming RPC messages, the system can collect metrics and statistics about message propagation, topic membership, and other relevant network attributes.
 
+## RPC Truncation
+The Control Message Validation Inspector is responsible for truncating the size of incoming RPC messages to prevent excessive resource consumption. This is done by sampling the messages and reducing their size to a configurable threshold. 
+The truncation process is entirely done in a blocking manner, i.e., it is performed at the entry point of the GossipSub through an injected interceptor, and the incoming RPC messages are modified before they are further processed by the GossipSub protocol.
+The truncation process is applied to different components of the RPC message, specifically the control message types (`GRAFT`, `PRUNE`, `IHAVE`, `IWANT`) and their respective message IDs.
+Truncation is triggered if the count of messages or message IDs exceeds certain configured thresholds, ensuring that the system resources are not overwhelmed.
+When the number of messages or message IDs exceeds the threshold, a random sample of messages or message IDs is selected, and the rest are discarded.
+
+### Message vs Message ID Truncation
+In the context of GossipSub RPC inspection, there is a subtle distinction between the count of messages and the count of message IDs:
+
+1. **Count of Messages:**
+    - This refers to the number of control messages (like `GRAFT`, `PRUNE`, `IHAVE`, `IWANT`) that are part of the `ControlMessage` structure within an RPC message, i.e., size of the `Graft`, `Prune`, `Ihave`, and `Iwant` slice fields.
+    - Each control message type serves a different purpose in the GossipSub protocol (e.g., `GRAFT` for joining a mesh for a topic, `PRUNE` for leaving a mesh).
+    - When we talk about the "count of messages," we're referring to how many individual control messages of each type are included in the RPC.
+    - Truncation based on the count of messages ensures that the number of control messages of each type doesn't exceed a configured threshold, preventing overwhelming the receiving peer with too many control instructions at once.
+
+2. **Count of Message IDs:**
+    - This refers to the number of unique identifiers for actual published messages that are being referenced within control messages like `IHAVE` and `IWANT`.
+    - `IHAVE` messages contain IDs of messages that the sender has and is announcing to peers. `IWANT` messages contain IDs of messages that the sender wants from peers.
+    - Each _individual_ `IHAVE` or `IWANT` control message can reference multiple message IDs. The "count of message IDs" is the total number of such IDs contained within each `IHAVE` or `IWANT` control message.
+    - Truncation based on the count of message IDs ensures that each `IHAVE` or `IWANT` control message doesn't reference an excessively large number of messages. This prevents a scenario where a peer might be asked to process an overwhelming number of message requests at once, which could lead to resource exhaustion.
+
