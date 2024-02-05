@@ -61,10 +61,8 @@ func testLoad(l load.Load) func(t *testing.T) {
 			vm:       vm,
 			snapshot: testSnapshotTree,
 		}
-		serviceSigner, err := crypto.NewInMemorySigner(unittest.ServiceAccountPrivateKey.PrivateKey, unittest.ServiceAccountPrivateKey.HashAlgo)
-		require.NoError(t, err)
 
-		serviceAccount, err := accountLoader.Load(sdk.ServiceAddress(sdk.ChainID(chain.ChainID())), serviceSigner)
+		serviceAccount, err := accountLoader.Load(sdk.ServiceAddress(sdk.ChainID(chain.ChainID())), unittest.ServiceAccountPrivateKey.PrivateKey, unittest.ServiceAccountPrivateKey.HashAlgo)
 
 		err = account.EnsureAccountHasKeys(log, serviceAccount, 50, blockProvider, transactionSender)
 		require.NoError(t, err)
@@ -73,6 +71,7 @@ func testLoad(l load.Load) func(t *testing.T) {
 		require.NoError(t, err)
 
 		accountProvider, err := account.SetupProvider(
+			log,
 			100,
 			10_000_000_000,
 			blockProvider,
@@ -231,7 +230,10 @@ type TestAccountLoader struct {
 
 var _ account.Loader = (*TestAccountLoader)(nil)
 
-func (t *TestAccountLoader) Load(address sdk.Address, signer crypto.Signer) (*account.FlowAccount, error) {
+func (t *TestAccountLoader) Load(
+	address sdk.Address,
+	privateKey crypto.PrivateKey,
+	hashAlgo crypto.HashAlgorithm) (*account.FlowAccount, error) {
 	wrapErr := func(err error) error {
 		return fmt.Errorf("error while loading account: %w", err)
 	}
@@ -254,7 +256,7 @@ func (t *TestAccountLoader) Load(address sdk.Address, signer crypto.Signer) (*ac
 		})
 	}
 
-	return account.New(address, signer, keys)
+	return account.New(address, privateKey, hashAlgo, keys)
 }
 
 type testSnapshotTree struct {

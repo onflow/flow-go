@@ -11,7 +11,8 @@ import (
 type Loader interface {
 	Load(
 		address flowsdk.Address,
-		signer crypto.Signer,
+		privateKey crypto.PrivateKey,
+		hashAlgo crypto.HashAlgorithm,
 	) (*FlowAccount, error)
 }
 
@@ -20,8 +21,22 @@ type ClientAccountLoader struct {
 	flowClient access.Client
 }
 
-func (c *ClientAccountLoader) Load(address flowsdk.Address, signer crypto.Signer) (*FlowAccount, error) {
-	return LoadAccount(c.ctx, c.flowClient, address, signer)
+func NewClientAccountLoader(
+	ctx context.Context,
+	flowClient access.Client,
+) *ClientAccountLoader {
+	return &ClientAccountLoader{
+		ctx:        ctx,
+		flowClient: flowClient,
+	}
+}
+
+func (c *ClientAccountLoader) Load(
+	address flowsdk.Address,
+	privateKey crypto.PrivateKey,
+	hashAlgo crypto.HashAlgorithm,
+) (*FlowAccount, error) {
+	return LoadAccount(c.ctx, c.flowClient, address, privateKey, hashAlgo)
 }
 
 func ReloadAccount(c Loader, acc *FlowAccount) error {
@@ -31,7 +46,7 @@ func ReloadAccount(c Loader, acc *FlowAccount) error {
 	}
 	key.Done()
 
-	newAcc, err := c.Load(acc.Address, key.Signer)
+	newAcc, err := c.Load(acc.Address, acc.PrivateKey, acc.HashAlgo)
 	if err != nil {
 		return err
 	}

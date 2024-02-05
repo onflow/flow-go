@@ -93,9 +93,8 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("error while decoding serice account private key hex: %w", err)
 	}
-	serviceSigner, err := crypto.NewInMemorySigner(privateKey, unittest.ServiceAccountPrivateKey.HashAlgo)
 
-	servAcc, err := account.LoadAccount(ctx, flowClient, flowsdk.BytesToAddress(sc.FlowServiceAccount.Address.Bytes()), serviceSigner)
+	servAcc, err := account.LoadAccount(ctx, flowClient, flowsdk.BytesToAddress(sc.FlowServiceAccount.Address.Bytes()), privateKey, unittest.ServiceAccountPrivateKey.HashAlgo)
 	if err != nil {
 		return nil, fmt.Errorf("error loading service account %w", err)
 	}
@@ -138,7 +137,20 @@ func New(
 		lostTransactionThreshold: lostTransactionThreshold,
 	}
 
+	accountLoader := account.NewClientAccountLoader(ctx, flowClient)
+
+	err = account.EnsureAccountHasKeys(log, servAcc, 50, lg.follower, ts)
+	if err != nil {
+		return nil, fmt.Errorf("error ensuring service account has keys: %w", err)
+	}
+
+	err = account.ReloadAccount(accountLoader, servAcc)
+	if err != nil {
+		return nil, fmt.Errorf("error reloading service account: %w", err)
+	}
+
 	ap, err := account.SetupProvider(
+		lg.log,
 		loadParams.NumberOfAccounts,
 		100_000_000_000,
 		lg.follower,

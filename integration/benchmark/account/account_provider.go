@@ -3,9 +3,10 @@ package account
 import (
 	"errors"
 	"fmt"
-
 	"github.com/onflow/cadence"
 	flowsdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go/module/util"
+	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go-sdk/crypto"
@@ -28,6 +29,7 @@ type AccountProvider interface {
 }
 
 type provider struct {
+	log                      zerolog.Logger
 	availableAccounts        chan *FlowAccount
 	numberOfAccounts         int
 	accountCreationBatchSize int
@@ -52,6 +54,7 @@ func (p *provider) ReturnAvailableAccount(account *FlowAccount) {
 }
 
 func SetupProvider(
+	log zerolog.Logger,
 	numberOfAccounts int,
 	fundAmount uint64,
 	rb common.ReferenceBlockProvider,
@@ -60,6 +63,7 @@ func SetupProvider(
 	chain flow.Chain,
 ) (AccountProvider, error) {
 	p := &provider{
+		log:                      log.With().Str("component", "AccountProvider").Logger(),
 		availableAccounts:        make(chan *FlowAccount, numberOfAccounts),
 		numberOfAccounts:         numberOfAccounts,
 		accountCreationBatchSize: 750,
@@ -83,15 +87,21 @@ func (p *provider) init(
 	g := errgroup.Group{}
 	g.SetLimit(creator.NumKeys())
 
+	progress := util.LogProgress(p.log,
+		util.DefaultLogProgressConfig(
+			"creating accounts",
+			p.numberOfAccounts,
+		))
+
 	for i := 0; i < p.numberOfAccounts; i += p.accountCreationBatchSize {
 		i := i
 		g.Go(func() error {
-
 			num := p.accountCreationBatchSize
-
 			if i+p.accountCreationBatchSize > p.numberOfAccounts {
 				num = p.numberOfAccounts - i
 			}
+
+			defer func() { progress(num) }()
 
 			return p.createAccountBatch(num, fundAmount, rb, creator, sender, chain)
 		})
@@ -117,11 +127,6 @@ func (p *provider) createAccountBatch(
 	}
 
 	privKey := RandomPrivateKey()
-	signer, err := crypto.NewInMemorySigner(privKey, crypto.SHA3_256)
-	if err != nil {
-		return wrapErr(err)
-	}
-
 	accountKey := flowsdk.NewAccountKey().
 		FromPrivateKey(privKey).
 		SetHashAlgo(crypto.SHA3_256).
@@ -142,7 +147,7 @@ func (p *provider) createAccountBatch(
 
 	initialTokenAmount := cadence.UFix64(fundAmount)
 
-	err = createAccountTx.AddArgument(publicKey)
+	err := createAccountTx.AddArgument(publicKey)
 	if err != nil {
 		return wrapErr(err)
 	}
@@ -185,7 +190,7 @@ func (p *provider) createAccountBatch(
 		accountCreatedEvent := flowsdk.AccountCreatedEvent(event)
 		accountAddress := accountCreatedEvent.Address()
 
-		newAcc, err := New(accountAddress, signer, []*flowsdk.AccountKey{accountKey})
+		newAcc, err := New(accountAddress, privKey, crypto.SHA3_256, []*flowsdk.AccountKey{accountKey})
 		if err != nil {
 			return fmt.Errorf("failed to create account: %w", err)
 		}

@@ -12,11 +12,23 @@ import (
 )
 
 type FlowAccount struct {
-	Address flowsdk.Address
-	keys    *keystore
+	Address    flowsdk.Address
+	keys       *keystore
+	PrivateKey crypto.PrivateKey
+	HashAlgo   crypto.HashAlgorithm
 }
 
-func New(address flowsdk.Address, signer crypto.Signer, accountKeys []*flowsdk.AccountKey) (*FlowAccount, error) {
+func New(
+	address flowsdk.Address,
+	privateKey crypto.PrivateKey,
+	hashAlgo crypto.HashAlgorithm,
+	accountKeys []*flowsdk.AccountKey,
+) (*FlowAccount, error) {
+	signer, err := crypto.NewInMemorySigner(privateKey, hashAlgo)
+	if err != nil {
+		return nil, fmt.Errorf("error while creating in-memory signer: %w", err)
+	}
+
 	keys := make([]*AccountKey, 0, len(accountKeys))
 	for _, key := range accountKeys {
 		keys = append(keys, &AccountKey{
@@ -27,8 +39,10 @@ func New(address flowsdk.Address, signer crypto.Signer, accountKeys []*flowsdk.A
 	}
 
 	return &FlowAccount{
-		Address: address,
-		keys:    newKeystore(keys),
+		Address:    address,
+		keys:       newKeystore(keys),
+		PrivateKey: privateKey,
+		HashAlgo:   hashAlgo,
 	}, nil
 }
 
@@ -36,14 +50,15 @@ func LoadAccount(
 	ctx context.Context,
 	flowClient access.Client,
 	address flowsdk.Address,
-	signer crypto.Signer,
+	privateKey crypto.PrivateKey,
+	hashAlgo crypto.HashAlgorithm,
 ) (*FlowAccount, error) {
 	acc, err := flowClient.GetAccount(ctx, address)
 	if err != nil {
 		return nil, fmt.Errorf("error while calling get account for account %s: %w", address, err)
 	}
 
-	return New(address, signer, acc.Keys)
+	return New(address, privateKey, hashAlgo, acc.Keys)
 }
 
 func (acc *FlowAccount) NumKeys() int {
