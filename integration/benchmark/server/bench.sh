@@ -45,4 +45,5 @@ while read -r input; do
 
     docker system prune -a -f
     make clean-data
-done </Users/janezpodhostnik/Programming/flow-go/integration/benchmark/server/commits.recent
+done </opt/commits.recent
+
