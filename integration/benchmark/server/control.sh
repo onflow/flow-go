@@ -8,7 +8,7 @@
 
 git fetch
 
-commits_file="/opt/commits.recent"
+commits_file="/Users/janezpodhostnik/Programming/flow-go/integration/benchmark/server/commits.recent"
 # the commits_file stores a list of git merge commit hashes of any branches that will each be tested via benchmarking
 # and the load they will be tested with
 # Sample:

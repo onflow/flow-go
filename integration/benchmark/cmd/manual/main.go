@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"github.com/onflow/flow-go/integration/benchmark/load"
 	"net"
 	"os"
 	"strconv"
@@ -118,7 +119,7 @@ func main() {
 	workerStatsTracker := benchmark.NewWorkerStatsTracker(ctx)
 	defer workerStatsTracker.Stop()
 
-	statsLogger := benchmark.NewPeriodicStatsLogger(workerStatsTracker, log)
+	statsLogger := benchmark.NewPeriodicStatsLogger(nil, workerStatsTracker, log)
 	statsLogger.Start()
 	defer statsLogger.Stop()
 
@@ -129,15 +130,12 @@ func main() {
 		loaderMetrics,
 		clients,
 		benchmark.NetworkParams{
-			ServAccPrivKeyHex:     *serviceAccountPrivateKeyHex,
-			ServiceAccountAddress: &serviceAccountAddress,
-			FungibleTokenAddress:  &fungibleTokenAddress,
-			FlowTokenAddress:      &flowTokenAddress,
-			ChainId:               flow.ChainID(chainID),
+			ServAccPrivKeyHex: *serviceAccountPrivateKeyHex,
+			ChainId:           flow.ChainID(chainID),
 		},
 		benchmark.LoadParams{
 			NumberOfAccounts: int(maxTPS) * *accountMultiplierFlag,
-			LoadType:         benchmark.LoadType(*loadTypeFlag),
+			LoadType:         load.LoadType(*loadTypeFlag),
 			FeedbackEnabled:  *feedbackEnabled,
 		},
 		benchmark.ConstExecParams{
@@ -151,11 +149,6 @@ func main() {
 		log.Fatal().Err(err).Msg("unable to create new cont load generator")
 	}
 	defer lg.Stop()
-
-	err = lg.Init()
-	if err != nil {
-		log.Fatal().Err(err).Msg("unable to init loader")
-	}
 
 	for i, c := range loadCases {
 		log.Info().

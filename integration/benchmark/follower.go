@@ -3,6 +3,7 @@ package benchmark
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/integration/benchmark/common"
 	"sync"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 )
 
 type TxFollower interface {
+	common.ReferenceBlockProvider
 	// Follow returns a channel that is closed when the transaction is complete.
 	Follow(ID flowsdk.Identifier) <-chan flowsdk.TransactionResult
 
@@ -280,6 +282,10 @@ func (f *txFollowerImpl) Stop() {
 		close(v.C)
 	}
 	f.txToChan = make(map[flowsdk.Identifier]txInfo)
+}
+
+func (f *txFollowerImpl) ReferenceBlockID() flowsdk.Identifier {
+	return f.BlockID()
 }
 
 type nopTxFollower struct {

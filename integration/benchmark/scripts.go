@@ -12,43 +12,6 @@ import (
 	flowsdk "github.com/onflow/flow-go-sdk"
 )
 
-//go:embed scripts/tokenTransferTransaction.cdc
-var tokenTransferTransactionTemplate string
-
-// TokenTransferTransaction returns a transaction script for transferring `amount` flow tokens to `toAddr` address
-func TokenTransferTransaction(ftAddr, flowToken, toAddr *flowsdk.Address, amount float64) (*flowsdk.Transaction, error) {
-
-	withFTAddr := strings.Replace(tokenTransferTransactionTemplate, "0xFUNGIBLETOKENADDRESS", "0x"+ftAddr.Hex(), 1)
-	withFlowTokenAddr := strings.Replace(withFTAddr, "0xTOKENADDRESS", "0x"+flowToken.Hex(), 1)
-
-	tx := flowsdk.NewTransaction().
-		SetScript([]byte(withFlowTokenAddr))
-
-	cadAmount, err := cadence.NewUFix64(fmt.Sprintf("%f", amount))
-	if err != nil {
-		return nil, err
-	}
-
-	err = tx.AddArgument(cadAmount)
-	if err != nil {
-		return nil, err
-	}
-	err = tx.AddArgument(cadence.BytesToAddress(toAddr.Bytes()))
-	if err != nil {
-		return nil, err
-	}
-
-	return tx, nil
-}
-
-//go:embed scripts/addKeyToAccountTransaction.cdc
-var addKeyToAccountTransactionTemplate string
-
-// AddKeyToAccountScript returns a transaction script to add keys to an account
-func AddKeyToAccountScript() ([]byte, error) {
-	return []byte(addKeyToAccountTransactionTemplate), nil
-}
-
 //go:embed scripts/createAccountsTransaction.cdc
 var createAccountsScriptTemplate string
 

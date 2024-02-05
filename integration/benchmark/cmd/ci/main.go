@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"github.com/onflow/flow-go/integration/benchmark/load"
 	"net"
 	"os"
 	"strings"
@@ -70,13 +71,7 @@ func main() {
 
 	loadType := *loadTypeFlag
 
-	// parse log level and apply to logger
-	log := zerolog.New(os.Stderr).With().Timestamp().Logger().Output(zerolog.ConsoleWriter{Out: os.Stderr})
-	lvl, err := zerolog.ParseLevel(strings.ToLower(*logLvl))
-	if err != nil {
-		log.Fatal().Err(err).Str("strLevel", *logLvl).Msg("invalid log level")
-	}
-	log = log.Level(lvl)
+	log := setupLogger(logLvl)
 
 	if *gitRepoPathFlag == "" {
 		flag.PrintDefaults()
@@ -152,7 +147,7 @@ func main() {
 	workerStatsTracker := benchmark.NewWorkerStatsTracker(bCtx)
 	defer workerStatsTracker.Stop()
 
-	statsLogger := benchmark.NewPeriodicStatsLogger(workerStatsTracker, log)
+	statsLogger := benchmark.NewPeriodicStatsLogger(ctx, workerStatsTracker, log)
 	statsLogger.Start()
 	defer statsLogger.Stop()
 
@@ -163,27 +158,18 @@ func main() {
 		loaderMetrics,
 		[]access.Client{flowClient},
 		benchmark.NetworkParams{
-			ServAccPrivKeyHex:     serviceAccountPrivateKeyHex,
-			ServiceAccountAddress: &serviceAccountAddress,
-			FungibleTokenAddress:  &fungibleTokenAddress,
-			FlowTokenAddress:      &flowTokenAddress,
-			ChainId:               flow.Emulator,
+			ServAccPrivKeyHex: serviceAccountPrivateKeyHex,
+			ChainId:           flow.Emulator,
 		},
 		benchmark.LoadParams{
 			NumberOfAccounts: maxInflight,
-			LoadType:         benchmark.LoadType(loadType),
+			LoadType:         load.LoadType(loadType),
 			FeedbackEnabled:  feedbackEnabled,
 		},
-		// We do support only one load type for now.
 		benchmark.ConstExecParams{},
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to create new cont load generator")
-	}
-
-	err = lg.Init()
-	if err != nil {
-		log.Fatal().Err(err).Msg("unable to init loader")
 	}
 
 	// run load
@@ -240,6 +226,22 @@ func main() {
 			log.Info().Int("tps_record_index", i).Interface("tpsRecord", tpsRecord).Msg("tps_record")
 		}
 	}
+}
+
+// setupLogger parses log level and apply to logger
+func setupLogger(logLvl *string) zerolog.Logger {
+	log := zerolog.New(os.Stderr).
+		With().
+		Timestamp().
+		Logger().
+		Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
+	lvl, err := zerolog.ParseLevel(strings.ToLower(*logLvl))
+	if err != nil {
+		log.Fatal().Err(err).Str("strLevel", *logLvl).Msg("invalid log level")
+	}
+	log = log.Level(lvl)
+	return log
 }
 
 func mustUploadData(
