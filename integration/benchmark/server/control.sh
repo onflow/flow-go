@@ -21,7 +21,7 @@ commits_file="/Users/janezpodhostnik/Programming/flow-go/integration/benchmark/s
 #git log  --merges --first-parent  --format="%S:%H:token-transfer" origin/master --since '1 week' | sort -R  | tee -a $commits_file
 
 # example for all commits on a single branch since master since 1 week ago with the load set to evm
-git log   --first-parent  --format="%S:%H:evm" origin/master..janez/tps-benchmark-evm-load --since '1 week' | sort -R  | tee -a $commits_file
+# git log   --first-parent  --format="%S:%H:evm" origin/master..janez/tps-benchmark-evm-load --since '1 week' | sort -R  | tee -a $commits_file
 
-
+echo "janez/tps-benchmark-evm-load:$(git rev-parse head):evm" | tee -a $commits_file
 
