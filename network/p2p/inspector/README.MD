@@ -81,3 +81,14 @@ type ControlMessage struct {
 	XXX_sizecache        int32           `json:"-"`
 }
 ```
+
+## Why is RPC Inspection Necessary?
+In the context of the Flow blockchain, RPC inspection is necessary for the following reasons:
+1. **Security**: The inspection process mitigates potential security risks such as spamming, message replay attacks, or malicious content dissemination, and provides complementing feedbacks for the internal GossipSub scoring system.
+
+2. **Resource Management**: By validating and potentially truncating incoming RPC messages, the system manages its computational and memory resources more effectively. 
+   This prevents resource exhaustion attacks where an adversary might attempt to overwhelm the system by sending a large volume of non-compliant or oversized messages.
+
+3. **Metrics and Monitoring**: The inspection process provides valuable insights into the network's health and performance. 
+   By monitoring the incoming RPC messages, the system can collect metrics and statistics about message propagation, topic membership, and other relevant network attributes.
+
