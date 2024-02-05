@@ -57,10 +57,11 @@ func sendSimpleTransaction(log zerolog.Logger, lc LoadContext, txFN transactionF
 	}
 
 	_, err = lc.Send(tx)
-	if !errors.Is(err, common.TransactionError{}) {
+	if err == nil || !errors.Is(err, common.TransactionError{}) {
 		key.IncrementSequenceNumber()
 	}
 	if err != nil {
+
 		return wrapErr(err)
 	}
 
