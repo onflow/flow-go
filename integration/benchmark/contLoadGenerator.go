@@ -156,7 +156,7 @@ func New(
 			WorkerID: -1,
 		},
 		AccountProvider:        ap,
-		TransactionSender:      nil,
+		TransactionSender:      ts,
 		ReferenceBlockProvider: lg.follower,
 	}
 
