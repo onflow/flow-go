@@ -44,7 +44,6 @@ func sendSimpleTransaction(log zerolog.Logger, lc LoadContext, txFN transactionF
 	}
 
 	tx.SetReferenceBlockID(lc.ReferenceBlockID())
-	tx.SetComputeLimit(9999 * 100)
 
 	key, err := acc.GetKey()
 	if err != nil {
