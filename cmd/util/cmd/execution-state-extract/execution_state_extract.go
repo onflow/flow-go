@@ -21,8 +21,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-
-	"github.com/onflow/cadence/runtime/interpreter"
 )
 
 func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flow.StateCommitment, error) {
@@ -34,10 +32,8 @@ func extractExecutionState(
 	dir string,
 	targetHash flow.StateCommitment,
 	outputDir string,
-	nWorker int, // number of concurrent worker to migation payloads
+	nWorker int, // number of concurrent worker to migration payloads
 	runMigrations bool,
-	compositeTypeRules migrators.StaticTypeMigrationRules,
-	interfaceTypeRules migrators.StaticTypeMigrationRules,
 ) error {
 
 	log.Info().Msg("init WAL")
@@ -101,8 +97,6 @@ func extractExecutionState(
 	if runMigrations {
 		rwf := reporters.NewReportFileWriterFactory(dir, log)
 
-		capabilityIDs := map[interpreter.AddressPath]interpreter.UInt64Value{}
-
 		migrations = []ledger.Migration{
 			// Contracts must be migrated first
 			migrators.CreateAccountBasedMigration(
@@ -116,15 +110,7 @@ func extractExecutionState(
 			migrators.CreateAccountBasedMigration(
 				log,
 				nWorker,
-				[]migrators.AccountBasedMigration{
-					migrators.NewCadenceLinkValueMigrator(rwf, capabilityIDs),
-					migrators.NewCadenceValueMigrator(
-						rwf,
-						capabilityIDs,
-						migrators.NewStaticTypeMigrator[*interpreter.CompositeStaticType](compositeTypeRules),
-						migrators.NewStaticTypeMigrator[*interpreter.InterfaceStaticType](interfaceTypeRules),
-					),
-				},
+				migrators.NewCadenceMigrations(rwf),
 			),
 		}
 	}

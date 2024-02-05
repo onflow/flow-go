@@ -3,6 +3,7 @@ package migrations
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -51,7 +52,16 @@ func (m *StagedContractsMigration) Close() error {
 	defer m.mutex.RUnlock()
 
 	if len(m.contracts) > 0 {
-		return fmt.Errorf("failed to find all contract registers that need to be changed")
+		var sb strings.Builder
+		sb.WriteString("failed to find all contract registers that need to be changed:\n")
+		for address, contracts := range m.contracts {
+			_, _ = fmt.Fprintf(&sb, "- address: %s\n", address)
+			for registerID := range contracts {
+				_, _ = fmt.Fprintf(&sb, "  - %s\n", flow.RegisterIDContractName(registerID))
+			}
+		}
+		return fmt.Errorf(sb.String())
+
 	}
 
 	return nil
@@ -190,7 +200,12 @@ func (m *StagedContractsMigration) MigrateAccount(
 	}
 
 	if len(contractUpdates) > 0 {
-		return nil, fmt.Errorf("failed to find all contract registers that need to be changed")
+		var sb strings.Builder
+		_, _ = fmt.Fprintf(&sb, "failed to find all contract registers that need to be changed for address %s:\n", address)
+		for registerID := range contractUpdates {
+			_, _ = fmt.Fprintf(&sb, "  - %s\n", flow.RegisterIDContractName(registerID))
+		}
+		return nil, fmt.Errorf(sb.String())
 	}
 
 	return payloads, nil

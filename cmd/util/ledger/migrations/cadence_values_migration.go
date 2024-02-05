@@ -8,20 +8,18 @@ import (
 	"github.com/onflow/cadence/migrations/statictypes"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
-	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/tracing"
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
-	"github.com/onflow/flow-go/model/flow"
-
 	"github.com/onflow/cadence/migrations"
 	"github.com/onflow/cadence/migrations/capcons"
 	"github.com/onflow/cadence/migrations/entitlements"
 	"github.com/onflow/cadence/migrations/string_normalization"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/tracing"
+	"github.com/onflow/flow-go/ledger"
 )
 
 type CadenceBaseMigrator struct {
@@ -103,41 +101,11 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 	}
 
 	// Merge the changes to the original payloads.
-	return m.mergeRegisterChanges(migrationRuntime, result.WriteSet)
-}
-
-func (m *CadenceBaseMigrator) mergeRegisterChanges(
-	mr *migratorRuntime,
-	changes map[flow.RegisterID]flow.RegisterValue,
-) ([]*ledger.Payload, error) {
-
-	originalPayloads := mr.Snapshot.Payloads
-	newPayloads := make([]*ledger.Payload, 0, len(originalPayloads))
-
-	// Add all new payloads.
-	for id, value := range changes {
-		key := convert.RegisterIDToLedgerKey(id)
-		newPayloads = append(newPayloads, ledger.NewPayload(key, value))
-	}
-
-	// Add any old payload that wasn't updated.
-	for id, value := range originalPayloads {
-		if len(value.Value()) == 0 {
-			// This is strange, but we don't want to add empty values. Log it.
-			m.log.Warn().Msgf("empty value for key %s", id)
-			continue
-		}
-
-		// If the payload had changed, then it has been added earlier.
-		// So skip old payload.
-		if _, contains := changes[id]; contains {
-			continue
-		}
-
-		newPayloads = append(newPayloads, value)
-	}
-
-	return newPayloads, nil
+	return MergeRegisterChanges(
+		migrationRuntime.Snapshot.Payloads,
+		result.WriteSet,
+		m.log,
+	)
 }
 
 func NewCadenceValueMigrator(

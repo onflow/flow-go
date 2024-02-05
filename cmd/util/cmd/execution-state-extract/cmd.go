@@ -155,8 +155,6 @@ func run(*cobra.Command, []string) {
 		flagOutputDir,
 		flagNWorker,
 		!flagNoMigration,
-		nil,
-		nil,
 	)
 
 	if err != nil {

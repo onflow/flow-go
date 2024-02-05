@@ -3,6 +3,7 @@ package migrations
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
@@ -34,7 +35,15 @@ func (d *ChangeContractCodeMigration) Close() error {
 	defer d.mutex.RUnlock()
 
 	if len(d.contracts) > 0 {
-		return fmt.Errorf("failed to find all contract registers that need to be changed")
+		var sb strings.Builder
+		sb.WriteString("failed to find all contract registers that need to be changed:\n")
+		for address, contracts := range d.contracts {
+			_, _ = fmt.Fprintf(&sb, "- address: %s\n", address)
+			for registerID := range contracts {
+				_, _ = fmt.Fprintf(&sb, "  - %s\n", flow.RegisterIDContractName(registerID))
+			}
+		}
+		return fmt.Errorf(sb.String())
 	}
 
 	return nil
@@ -109,7 +118,12 @@ func (d *ChangeContractCodeMigration) MigrateAccount(
 	}
 
 	if len(contracts) > 0 {
-		return nil, fmt.Errorf("failed to find all contract registers that need to be changed")
+		var sb strings.Builder
+		_, _ = fmt.Fprintf(&sb, "failed to find all contract registers that need to be changed for address %s:\n", address)
+		for registerID := range contracts {
+			_, _ = fmt.Fprintf(&sb, "- %s\n", flow.RegisterIDContractName(registerID))
+		}
+		return nil, fmt.Errorf(sb.String())
 	}
 
 	return payloads, nil
@@ -159,7 +173,19 @@ func NewSystemContractChange(
 	}
 }
 
-func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
+type EVMContractChange uint8
+
+const (
+	EVMContractChangeNone EVMContractChange = iota
+	EVMContractChangeABIOnly
+	EVMContractChangeFull
+)
+
+type SystemContractChangesOptions struct {
+	EVM EVMContractChange
+}
+
+func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOptions) []SystemContractChange {
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
 	var stakingCollectionAddress, stakingProxyAddress common.Address
@@ -330,19 +356,11 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 			systemContracts.ViewResolver,
 			nftContracts.ViewResolver(),
 		),
-
-		// EVM related contracts
-		NewSystemContractChange(
-			systemContracts.EVMContract,
-			evm.ContractCode(
-				systemContracts.FlowToken.Address,
-				true,
-			),
-		),
 	}
 
 	if chainID != flow.Emulator {
-		contractChanges = append(contractChanges,
+		contractChanges = append(
+			contractChanges,
 			SystemContractChange{
 				Address:      fungibleTokenSwitchboardAddress,
 				ContractName: "FungibleTokenSwitchboard",
@@ -351,6 +369,26 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 				)),
 			},
 		)
+	}
+
+	// EVM related contracts
+	switch options.EVM {
+	case EVMContractChangeNone:
+		// do nothing
+	case EVMContractChangeABIOnly, EVMContractChangeFull:
+		abiOnly := options.EVM == EVMContractChangeABIOnly
+		contractChanges = append(
+			contractChanges,
+			NewSystemContractChange(
+				systemContracts.EVMContract,
+				evm.ContractCode(
+					systemContracts.FlowToken.Address,
+					abiOnly,
+				),
+			),
+		)
+	default:
+		panic(fmt.Errorf("unsupported EVM contract change option: %d", options.EVM))
 	}
 
 	return contractChanges
