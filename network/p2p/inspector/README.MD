@@ -92,7 +92,7 @@ In the context of the Flow blockchain, RPC inspection is necessary for the follo
 3. **Metrics and Monitoring**: The inspection process provides valuable insights into the network's health and performance. 
    By monitoring the incoming RPC messages, the system can collect metrics and statistics about message propagation, topic membership, and other relevant network attributes.
 
-## RPC Truncation
+## RPC Truncation (Blocking)
 The Control Message Validation Inspector is responsible for truncating the size of incoming RPC messages to prevent excessive resource consumption. This is done by sampling the messages and reducing their size to a configurable threshold. 
 The truncation process is entirely done in a blocking manner, i.e., it is performed at the entry point of the GossipSub through an injected interceptor, and the incoming RPC messages are modified before they are further processed by the GossipSub protocol.
 The truncation process is applied to different components of the RPC message, specifically the control message types (`GRAFT`, `PRUNE`, `IHAVE`, `IWANT`) and their respective message IDs.
@@ -114,3 +114,42 @@ In the context of GossipSub RPC inspection, there is a subtle distinction betwee
     - Each _individual_ `IHAVE` or `IWANT` control message can reference multiple message IDs. The "count of message IDs" is the total number of such IDs contained within each `IHAVE` or `IWANT` control message.
     - Truncation based on the count of message IDs ensures that each `IHAVE` or `IWANT` control message doesn't reference an excessively large number of messages. This prevents a scenario where a peer might be asked to process an overwhelming number of message requests at once, which could lead to resource exhaustion.
 
+## RPC Validation (Non-Blocking)
+The Control Message Validation Inspector is also responsible for inspecting the truncated or original RPC messages for compliance with the Flow protocol semantics. 
+The inspection process is done post truncation and is entirely non-blocking, i.e., it does not prevent the further processing of the RPC messages by the GossipSub protocol. 
+In other words, the RPC messages are passed through after truncation for further processing by the GossipSub protocol, regardless of whether they pass the inspection or not.
+At the same time, each incoming RPC message is queued for asynchronous inspection, and the results of the inspection are used for internal metrics, logging, and feedback to the GossipSub scoring system.
+This means that even a non-compliant RPC message is allowed to proceed through the GossipSub protocol to the Flow node. However, based on the result of the asynchronous inspection, 
+the message may be scored negatively, and the sender may be penalized in the peer scoring system. Hence, its future messages may be de-prioritized or ignored by the GossipSub protocol.
+This follows the principle that post truncation, as far as the RPC size is within the configured limits, a single (or few) non-compliant RPCs do not drastically affect the system's health,
+hence, the RPCs are allowed to proceed for further processing. However, the sender's reputation and future message propagation are affected based on the inspection results.
+
+The queued RPCs are picked by a pool of worker threads, and the inspection is performed in parallel to the GossipSub protocol's processing of the RPC messages.
+Each RPC message is inspected for the following attributes sequentially, and once a non-compliance is detected, the inspection process is terminated with a failure result. A failure result
+will cause an _invalid control message notification_ (`p2p.InvCtrlMsgNotif`) to be sent to the `GossipSubAppSpecificScoreRegistry`, which will then be used for penalizing the sender in the peer scoring system.
+The `GossipSubAppSpecificScoreRegistry` is a Flow-level component that decides on part of the individual peer's scoring based on their Flow-specific behavior. 
+It directly provides feedback to the GossipSub protocol for scoring the peers.
+
+The [order of inspections for a single RPC](https://github.com/onflow/flow-go/blob/master/network/p2p/inspector/validation/control_message_validation_inspector.go#L270-L323) is as follows:
+1. `GRAFT`s validation: Each RPC contains one or more `GRAFT` messages. Each `GRAFT` message contains a topic ID indicating the mesh the peer wants to join. 
+    The validation process involves iterating through each `GRAFT` message received in the (potentially truncated) RPC.
+    For each `GRAFT` message, the topic ID is validated to ensure it corresponds to a valid and recognized topic within the Flow-network.
+    Topic validation might involve checking if the topic is known, if it's within the scope of the peer's interests or subscriptions, and if it aligns with the network's current configuration (e.g., checking against the active spork ID).
+    If the topic is cluster-prefixed, additional validations ensure that the topic is part of the active cluster IDs. 
+    If (even one) topic ID is invalid or unrecognized, the `GRAFT` message is flagged as invalid, and the inspection process is terminated with a failure result. 
+    In future we may relax this condition to allow for a certain number of invalid topics, but for now, a single invalid topic results in a failure.
+    The inspection process also system keeps track of the topics seen in the `GRAFT` messages of the same RPC. 
+    If a topic is repeated (i.e., if there are duplicate topics in the `GRAFT` messages), this is usually a sign of a protocol violation or misbehavior.
+    The validation process counts these duplicates and, if the number exceeds a certain threshold, it flags RPC message as invalid and terminates the inspection process with a failure result, i.e.,
+    an invalid control message notification is sent to the `GossipSubAppSpecificScoreRegistry`.
+2. `PRUNE`s validation: Similar to `GRAFT`s, each RPC contains one or more `PRUNE` messages. Each `PRUNE` message contains a topic ID indicating the mesh the peer wants to leave. 
+    The validation process involves iterating through each `PRUNE` message received in the (potentially truncated) RPC.
+    For each `PRUNE` message, the topic ID is validated to ensure it corresponds to a valid and recognized topic within the Flow-network.
+    Topic validation might involve checking if the topic is known, if it's within the scope of the peer's interests or subscriptions, and if it aligns with the network's current configuration (e.g., checking against the active spork ID).
+    If the topic is cluster-prefixed, additional validations ensure that the topic is part of the active cluster IDs.
+    If (even one) topic ID is invalid or unrecognized, the `PRUNE` message is flagged as invalid, and the inspection process is terminated with a failure result. 
+    In future we may relax this condition to allow for a certain number of invalid topics, but for now, a single invalid topic results in a failure.
+    The inspection process also system keeps track of the topics seen in the `PRUNE` messages of the same RPC. 
+    If a topic is repeated (i.e., if there are duplicate topics in the `PRUNE` messages), this is usually a sign of a protocol violation or misbehavior.
+    The validation process counts these duplicates and, if the number exceeds a certain threshold, it flags RPC message as invalid and terminates the inspection process with a failure result, i.e.,
+    an invalid control message notification is sent to the `GossipSubAppSpecificScoreRegistry`.
