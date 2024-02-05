@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
-	"github.com/rs/zerolog"
 )
 
 var ErrMissingParent = fmt.Errorf("missing parent block")
