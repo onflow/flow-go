@@ -1,0 +1,101 @@
+package migrations
+
+import (
+	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
+)
+
+func NewTransactionBasedMigration(
+	tx *flow.TransactionBody,
+	chain flow.Chain,
+	logger zerolog.Logger,
+) ledger.Migration {
+	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
+
+		options := computation.DefaultFVMOptions(chain.ChainID(), false, false)
+		options = append(options,
+			fvm.WithContractDeploymentRestricted(false),
+			fvm.WithContractRemovalRestricted(false),
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+			fvm.WithTransactionFeesEnabled(false))
+		// more options might be needed for the context
+		ctx := fvm.NewContext(options...)
+
+		snapshot, err := util.NewPayloadSnapshot(payloads)
+		if err != nil {
+			return nil, err
+		}
+
+		vm := fvm.NewVirtualMachine()
+
+		executionSnapshot, res, err := vm.Run(
+			ctx,
+			fvm.Transaction(tx, 0),
+			snapshot,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		if res.Err != nil {
+			return nil, res.Err
+		}
+
+		return MergeRegisterChanges(
+			snapshot.Payloads,
+			executionSnapshot.WriteSet,
+			logger,
+		)
+	}
+}
+
+func NewDeploymentMigration(
+	chain flow.Chain,
+	contract Contract,
+	authorizer flow.Address,
+	logger zerolog.Logger,
+) ledger.Migration {
+
+	script := []byte(`
+      transaction(name: String, code: String) {
+          prepare(signer: auth(AddContract) &Account) {
+              signer.contracts.add(name: name, code: code.utf8)
+          }
+      }
+    `)
+
+	tx := flow.NewTransactionBody().
+		SetScript(script).
+		AddArgument(jsoncdc.MustEncode(cadence.String(contract.name))).
+		AddArgument(jsoncdc.MustEncode(cadence.String(contract.code))).
+		AddAuthorizer(authorizer)
+
+	return NewTransactionBasedMigration(tx, chain, logger)
+}
+
+func NewBurnerDeploymentMigration(
+	chain flow.Chain,
+	authorizer flow.Address,
+	logger zerolog.Logger,
+) ledger.Migration {
+
+	return NewDeploymentMigration(
+		chain,
+		Contract{
+			name: "Burner",
+			code: coreContracts.Burner(),
+		},
+		authorizer,
+		logger,
+	)
+}
