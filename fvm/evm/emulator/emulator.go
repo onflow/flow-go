@@ -265,7 +265,7 @@ func (proc *procedure) deployAt(
 		return res, nil
 	}
 
-	// precheck 2 - ensure there's no existing contract is deployed at the address
+	// precheck 2 - ensure there's no existing eoa or contract is deployed at the address
 	contractHash := proc.state.GetCodeHash(addr)
 	if proc.state.GetNonce(addr) != 0 ||
 		(contractHash != (gethCommon.Hash{}) && contractHash != gethTypes.EmptyCodeHash) {
@@ -375,7 +375,7 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 	if err != nil {
 		// if the error is a fatal error or a non-fatal state error return it
 		// this condition should never happen
-		// given all StateDB errors are captured for the commit time.
+		// given all StateDB errors are withheld for the commit time.
 		if types.IsAFatalError(err) || types.IsAStateError(err) {
 			return &res, err
 		}
