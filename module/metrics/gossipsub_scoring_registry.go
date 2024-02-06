@@ -7,8 +7,7 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// GossipSubScoringRegistryMetrics encapsulates the metrics collectors for collecting metrics related to the Gossipsub scoring registry.
-// GossipSubScoringRegistryMetrics encapsulates various metrics collectors offering insights into penalties and
+// GossipSubScoringRegistryMetrics encapsulates the metrics collectors for collecting metrics related to the Gossipsub scoring registry, offering insights into penalties and
 // other factors used by the scoring registry to compute the application-specific score. It focuses on tracking internal
 // aspects of the application-specific score, distinguishing itself from GossipSubScoringMetrics.
 type GossipSubScoringRegistryMetrics struct {
@@ -28,7 +27,7 @@ func NewGossipSubScoringRegistryMetrics(prefix string) *GossipSubScoringRegistry
 			Subsystem: subsystemGossip,
 			Name:      gc.prefix + "gossipsub_scoring_registry_duplicate_message_penalties",
 			Help:      "duplicate message penalty applied to the overall application specific score of a node",
-			Buckets:   []float64{-0.001, -0.01, -1},
+			Buckets:   []float64{-1, -0.01, -0.001},
 		},
 	)
 	gc.duplicateMessageCounts = promauto.NewHistogram(

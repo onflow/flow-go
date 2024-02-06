@@ -88,8 +88,6 @@ func AllFlagNames() []string {
 		BuildFlagName(gossipsubKey, p2pconfig.RpcTracerKey, p2pconfig.DuplicateMessageCacheTrackerKey, p2pconfig.DuplicateMessageCacheTrackerSizeKey),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcTracerKey, p2pconfig.DuplicateMessageCacheTrackerKey, p2pconfig.DuplicateMessageCacheTrackerDecayKey),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcTracerKey, p2pconfig.DuplicateMessageCacheTrackerKey, p2pconfig.SkipDecayThresholdKey),
-		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.NumberOfWorkersKey),
-		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.QueueSizeKey),
 
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.InspectionQueueConfigKey, p2pconfig.NumberOfWorkersKey),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.InspectionQueueConfigKey, p2pconfig.QueueSizeKey),

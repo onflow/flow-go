@@ -14,7 +14,7 @@ func HasValidFlowIdentity(idProvider module.IdentityProvider, pid peer.ID) (*flo
 		return nil, NewInvalidPeerIDError(pid, PeerIdStatusUnknown)
 	}
 
-	if flowId.Ejected {
+	if flowId.IsEjected() {
 		return nil, NewInvalidPeerIDError(pid, PeerIdStatusEjected)
 	}
 

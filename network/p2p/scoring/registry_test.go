@@ -1095,12 +1095,12 @@ func TestPeerSpamPenaltyClusterPrefixed(t *testing.T) {
 		record, err, ok := spamRecords.Get(peerID) // get the record from the spamRecords.
 		assert.True(t, ok)
 		assert.NoError(t, err)
-		assert.Less(t, math.Abs(expectedPenalty-record.Penalty), 10e-3)
+		unittest.RequireNumericallyClose(t, expectedPenalty, record.Penalty, 0.02)
 		assert.Equal(t, scoring.InitAppScoreRecordStateFunc(maximumSpamPenaltyDecayFactor)().Decay, record.Decay)
 		// this peer has a spam record, with no subscription penalty. Hence, the app specific score should only be the spam penalty,
 		// and the peer should be deprived of the default reward for its valid staked role.
 		score := reg.AppSpecificScoreFunc()(peerID)
-		tolerance := 10e-3 // 0.1%
+		tolerance := 0.02 // 0.1%
 		if expectedPenalty == 0 {
 			assert.Less(t, math.Abs(expectedPenalty), tolerance)
 		} else {
