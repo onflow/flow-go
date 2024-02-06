@@ -1,6 +1,7 @@
 package main
 
 import (
+	crand "crypto/rand"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -22,53 +23,56 @@ import (
 )
 
 const (
-	BootstrapDir             = "./bootstrap"
-	ProfilerDir              = "./profiler"
-	DataDir                  = "./data"
-	TrieDir                  = "./trie"
-	DockerComposeFile        = "./docker-compose.nodes.yml"
-	DockerComposeFileVersion = "3.7"
-	PrometheusTargetsFile    = "./targets.nodes.json"
-	PortMapFile              = "./ports.nodes.json"
-	DefaultObserverRole      = "observer"
-	DefaultLogLevel          = "DEBUG"
-	DefaultGOMAXPROCS        = 8
-	DefaultMaxObservers      = 100
-	DefaultCollectionCount   = 3
-	DefaultConsensusCount    = 3
-	DefaultExecutionCount    = 1
-	DefaultVerificationCount = 1
-	DefaultAccessCount       = 1
-	DefaultObserverCount     = 0
-	DefaultNClusters         = 1
-	DefaultProfiler          = false
-	DefaultProfileUploader   = false
-	DefaultTracing           = true
-	DefaultCadenceTracing    = false
-	DefaultExtensiveTracing  = false
-	DefaultConsensusDelay    = 800 * time.Millisecond
-	DefaultCollectionDelay   = 950 * time.Millisecond
+	BootstrapDir              = "./bootstrap"
+	ProfilerDir               = "./profiler"
+	DataDir                   = "./data"
+	TrieDir                   = "./trie"
+	DockerComposeFile         = "./docker-compose.nodes.yml"
+	DockerComposeFileVersion  = "3.7"
+	PrometheusTargetsFile     = "./targets.nodes.json"
+	PortMapFile               = "./ports.nodes.json"
+	DefaultObserverRole       = "observer"
+	DefaultLogLevel           = "DEBUG"
+	DefaultGOMAXPROCS         = 8
+	DefaultMaxObservers       = 100
+	DefaultCollectionCount    = 3
+	DefaultConsensusCount     = 3
+	DefaultExecutionCount     = 1
+	DefaultVerificationCount  = 1
+	DefaultAccessCount        = 1
+	DefaultObserverCount      = 0
+	DefaultTestExecutionCount = 0
+	DefaultNClusters          = 1
+	DefaultProfiler           = false
+	DefaultProfileUploader    = false
+	DefaultTracing            = true
+	DefaultCadenceTracing     = false
+	DefaultExtensiveTracing   = false
+	DefaultConsensusDelay     = 800 * time.Millisecond
+	DefaultCollectionDelay    = 950 * time.Millisecond
 )
 
 var (
-	collectionCount        int
-	consensusCount         int
-	executionCount         int
-	verificationCount      int
-	accessCount            int
-	observerCount          int
-	nClusters              uint
-	numViewsInStakingPhase uint64
-	numViewsInDKGPhase     uint64
-	numViewsEpoch          uint64
-	profiler               bool
-	profileUploader        bool
-	tracing                bool
-	cadenceTracing         bool
-	extesiveTracing        bool
-	consensusDelay         time.Duration
-	collectionDelay        time.Duration
-	logLevel               string
+	collectionCount            int
+	consensusCount             int
+	executionCount             int
+	verificationCount          int
+	accessCount                int
+	observerCount              int
+	testExecutionCount         int
+	nClusters                  uint
+	numViewsInStakingPhase     uint64
+	numViewsInDKGPhase         uint64
+	numViewsEpoch              uint64
+	epochCommitSafetyThreshold uint64
+	profiler                   bool
+	profileUploader            bool
+	tracing                    bool
+	cadenceTracing             bool
+	extesiveTracing            bool
+	consensusDelay             time.Duration
+	collectionDelay            time.Duration
+	logLevel                   string
 
 	ports *PortAllocator
 )
@@ -80,6 +84,7 @@ func init() {
 	flag.IntVar(&verificationCount, "verification", DefaultVerificationCount, "number of verification nodes")
 	flag.IntVar(&accessCount, "access", DefaultAccessCount, "number of staked access nodes")
 	flag.IntVar(&observerCount, "observer", DefaultObserverCount, "number of observers")
+	flag.IntVar(&testExecutionCount, "test-execution", DefaultTestExecutionCount, "number of test execution")
 	flag.UintVar(&nClusters, "nclusters", DefaultNClusters, "number of collector clusters")
 	flag.Uint64Var(&numViewsEpoch, "epoch-length", 10000, "number of views in epoch")
 	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 2000, "number of views in epoch staking phase")
@@ -145,6 +150,7 @@ func main() {
 	}
 
 	dockerServices = prepareObserverServices(dockerServices, flowNodeContainerConfigs)
+	dockerServices = prepareTestExecutionService(dockerServices, flowNodeContainerConfigs)
 
 	err = writeDockerComposeConfig(dockerServices)
 	if err != nil {
@@ -643,6 +649,15 @@ func getAccessGatewayPublicKey(flowNodeContainerConfigs []testnet.ContainerConfi
 	return "", fmt.Errorf("Unable to find public key for Access Gateway expected in container '%s'", testnet.PrimaryAN)
 }
 
+func getExecutionNodeConfig(flowNodeContainerConfigs []testnet.ContainerConfig) (testnet.ContainerConfig, error) {
+	for _, container := range flowNodeContainerConfigs {
+		if container.Role == flow.RoleExecution {
+			return container, nil
+		}
+	}
+	return testnet.ContainerConfig{}, fmt.Errorf("Unable to find execution node")
+}
+
 func prepareObserverServices(dockerServices Services, flowNodeContainerConfigs []testnet.ContainerConfig) Services {
 	if observerCount == 0 {
 		return dockerServices
@@ -670,13 +685,56 @@ func prepareObserverServices(dockerServices Services, flowNodeContainerConfigs [
 		dockerServices[observerName] = observerService
 
 		// Generate observer private key (localnet only, not for production)
-		err := testnet.WriteObserverPrivateKey(observerName, BootstrapDir)
+		_, err := testnet.WriteObserverPrivateKey(observerName, BootstrapDir)
 		if err != nil {
 			panic(err)
 		}
 	}
+
 	fmt.Println()
 	fmt.Println("Observer services bootstrapping data generated...")
+	fmt.Printf("Access Gateway (%s) public network libp2p key: %s\n\n", testnet.PrimaryAN, agPublicKey)
+
+	return dockerServices
+}
+
+func prepareTestExecutionService(dockerServices Services, flowNodeContainerConfigs []testnet.ContainerConfig) Services {
+	if testExecutionCount == 0 {
+		return dockerServices
+	}
+
+	agPublicKey, err := getAccessGatewayPublicKey(flowNodeContainerConfigs)
+	if err != nil {
+		panic(err)
+	}
+
+	containerConfig, err := getExecutionNodeConfig(flowNodeContainerConfigs)
+	if err != nil {
+		panic(err)
+	}
+
+	var nodeid flow.Identifier
+	_, _ = crand.Read(nodeid[:])
+	address := "test_execution_1:2137"
+
+	observerName := fmt.Sprintf("%s_%d", "test_execution", 1)
+	// Generate observer private key (localnet only, not for production)
+	nodeinfo, err := testnet.WriteTestExecutionService(nodeid, address, observerName, BootstrapDir)
+	if err != nil {
+		panic(err)
+	}
+
+	containerConfig.NodeInfo = nodeinfo
+	containerConfig.ContainerName = observerName
+	fmt.Println("NodeID: ", containerConfig)
+
+	observerService := prepareExecutionService(containerConfig, 1, 1)
+
+	// Add a docker container for this named Observer
+	dockerServices[observerName] = observerService
+
+	fmt.Println()
+	fmt.Println("Test execution services bootstrapping data generated...")
 	fmt.Printf("Access Gateway (%s) public network libp2p key: %s\n\n", testnet.PrimaryAN, agPublicKey)
 
 	return dockerServices
