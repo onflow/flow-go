@@ -12,8 +12,7 @@ import (
 // but we take a different apporach here and include more data so that
 // it requires less work for anyone who tracks and consume results.
 type Result struct {
-	// a boolean that is set to false if the execution has failed (non-fatal)
-	Failed bool
+	Error error
 	// type of transaction defined by the evm package
 	// see DirectCallTxType as extra type we added type for direct calls.
 	TxType uint8
@@ -27,6 +26,10 @@ type Result struct {
 	Logs []*gethTypes.Log
 }
 
+func (res *Result) Failed() bool {
+	return res.Error != nil
+}
+
 // Receipt constructs an EVM-style receipt
 // can be used by json-rpc and other integration to be returned.
 func (res *Result) Receipt() *gethTypes.ReceiptForStorage {
@@ -36,7 +39,7 @@ func (res *Result) Receipt() *gethTypes.ReceiptForStorage {
 		Logs:              res.Logs,
 		ContractAddress:   res.DeployedContractAddress.ToCommon(),
 	}
-	if res.Failed {
+	if res.Failed() {
 		receipt.Status = gethTypes.ReceiptStatusFailed
 	} else {
 		receipt.Status = gethTypes.ReceiptStatusSuccessful

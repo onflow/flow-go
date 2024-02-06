@@ -6,11 +6,9 @@ import (
 )
 
 var (
-	// ErrAccountDoesNotExist is returned when evm account doesn't exist
-	ErrAccountDoesNotExist = errors.New("account does not exist")
 
-	// ErrInsufficientBalance is returned when evm account doesn't have enough balance
-	ErrInsufficientBalance = errors.New("insufficient balance")
+	// ErrInvalidBalance is returned when an invalid balance is provided for transfer (e.g. negative)
+	ErrInvalidBalance = errors.New("invalid balance for transfer")
 
 	// ErrInsufficientComputation is returned when not enough computation is
 	// left in the context of flow transaction to execute the evm operation.

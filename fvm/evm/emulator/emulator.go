@@ -1,7 +1,6 @@
 package emulator
 
 import (
-	"errors"
 	"math/big"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -16,8 +15,6 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-var ErrInvalidBalance = errors.New("invalid balance for transfer")
 
 // Emulator handles operations against evm runtime
 type Emulator struct {
@@ -129,22 +126,21 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 func (bl *BlockView) RunTransaction(
 	tx *gethTypes.Transaction,
 ) (*types.Result, error) {
+	var res *types.Result
 	var err error
 	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
 	}
-
 	msg, err := gethCore.TransactionToMessage(tx, GetSigner(bl.config), proc.config.BlockContext.BaseFee)
 	if err != nil {
-		// note that this is not a fatal error (e.g. due to bad signature)
-		// not a valid transaction
-		return nil, types.NewEVMValidationError(err)
+		res.Error = types.NewEVMValidationError(err)
+		return res, nil
 	}
 
 	// update tx context origin
 	proc.evm.TxContext.Origin = msg.From
-	res, err := proc.run(msg, tx.Type())
+	res, err = proc.run(msg, tx.Type())
 	return res, err
 }
 
@@ -229,7 +225,8 @@ func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*ty
 	// check the source account balance
 	// if balance is lower than amount needed for withdrawal, error out
 	if proc.state.GetBalance(addr).Cmp(amount) < 0 {
-		return res, types.ErrInsufficientBalance
+		res.Error = types.NewEVMExecutionError(gethVM.ErrInsufficientBalance)
+		return res, nil
 	}
 
 	// sub balance
@@ -265,14 +262,16 @@ func (proc *procedure) deployAt(
 	// precheck 1 - check balance of the source
 	if value.Sign() != 0 &&
 		!proc.evm.Context.CanTransfer(proc.state, caller.ToCommon(), value) {
-		return res, gethVM.ErrInsufficientBalance
+		res.Error = types.NewEVMExecutionError(gethVM.ErrInsufficientBalance)
+		return res, nil
 	}
 
 	// precheck 2 - ensure there's no existing contract is deployed at the address
 	contractHash := proc.state.GetCodeHash(addr)
 	if proc.state.GetNonce(addr) != 0 ||
 		(contractHash != (gethCommon.Hash{}) && contractHash != gethTypes.EmptyCodeHash) {
-		return res, gethVM.ErrContractAddressCollision
+		res.Error = types.NewEVMExecutionError(gethVM.ErrContractAddressCollision)
+		return res, nil
 	}
 
 	callerCommon := caller.ToCommon()
@@ -284,7 +283,8 @@ func (proc *procedure) deployAt(
 	proc.state.SetNonce(callerCommon, proc.state.GetNonce(callerCommon)+1)
 
 	if value.Sign() < 0 {
-		return res, ErrInvalidBalance
+		res.Error = types.NewEVMExecutionError(types.ErrInvalidBalance)
+		return res, nil
 	}
 	// setup account
 	proc.state.CreateAccount(addr)
@@ -322,32 +322,32 @@ func (proc *procedure) deployAt(
 		if err != gethVM.ErrExecutionReverted {
 			res.GasConsumed = gasLimit
 		}
-		res.Failed = true
-		return res, err
+		res.Error = types.NewEVMExecutionError(err)
+		return res, nil
 	}
 
 	// update gas usage
 	if gasCost > gasLimit {
 		// consume all the remaining gas (Homestead)
 		res.GasConsumed = gasLimit
-		res.Failed = true
-		return res, gethVM.ErrCodeStoreOutOfGas
+		res.Error = types.NewEVMExecutionError(gethVM.ErrCodeStoreOutOfGas)
+		return res, nil
 	}
 
 	// check max code size (EIP-158)
 	if len(ret) > gethParams.MaxCodeSize {
 		// consume all the remaining gas (Homestead)
 		res.GasConsumed = gasLimit
-		res.Failed = true
-		return res, gethVM.ErrMaxCodeSizeExceeded
+		res.Error = types.NewEVMExecutionError(gethVM.ErrMaxCodeSizeExceeded)
+		return res, nil
 	}
 
 	// reject code starting with 0xEF (EIP-3541)
 	if len(ret) >= 1 && ret[0] == 0xEF {
 		// consume all the remaining gas (Homestead)
 		res.GasConsumed = gasLimit
-		res.Failed = true
-		return res, gethVM.ErrInvalidCode
+		res.Error = types.NewEVMExecutionError(gethVM.ErrInvalidCode)
+		return res, nil
 	}
 
 	proc.state.SetCode(addr, ret)
@@ -374,14 +374,16 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 		gasPool,
 	).TransitionDb()
 	if err != nil {
-		res.Failed = true
 		// if the error is a fatal error or a non-fatal state error return it
+		// this condition should never happen
+		// given all StateDB errors are captured for the commit time.
 		if types.IsAFatalError(err) || types.IsAStateError(err) {
 			return &res, err
 		}
 		// otherwise is a validation error (pre-check failure)
 		// no state change, wrap the error and return
-		return &res, types.NewEVMValidationError(err)
+		res.Error = types.NewEVMValidationError(err)
+		return &res, nil
 	}
 
 	// if prechecks are passed, the exec result won't be nil
@@ -401,15 +403,13 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 				0,
 			)
 		} else {
-			res.Failed = true
-			err = types.NewEVMExecutionError(execResult.Err)
+			// execResult.Err is VM errors
+			res.Error = types.NewEVMExecutionError(execResult.Err)
 		}
 	}
-	commitErr := proc.commit()
-	if commitErr != nil {
-		return &res, commitErr
-	}
-	return &res, err
+	// all commmit errors (StateDB errors) has to be returned
+	// TODO: maybe handle them (if there are happy errors)
+	return &res, proc.commit()
 }
 
 func SetupPrecompile(cfg *Config) {
