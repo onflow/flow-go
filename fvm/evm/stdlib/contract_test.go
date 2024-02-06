@@ -24,8 +24,7 @@ import (
 
 type testContractHandler struct {
 	flowTokenAddress  common.Address
-	allocateAddress   func() types.Address
-	addressIndex      uint64
+	deployCOA         func(uint64) types.Address
 	accountByAddress  func(types.Address, bool) types.Account
 	lastExecutedBlock func() *types.Block
 	run               func(tx []byte, coinbase types.Address)
@@ -37,14 +36,13 @@ func (t *testContractHandler) FlowTokenAddress() common.Address {
 
 var _ types.ContractHandler = &testContractHandler{}
 
-func (t *testContractHandler) AllocateAddress() types.Address {
-	if t.allocateAddress == nil {
-		t.addressIndex++
+func (t *testContractHandler) DeployCOA(uuid uint64) types.Address {
+	if t.deployCOA == nil {
 		var address types.Address
-		binary.LittleEndian.PutUint64(address[:], t.addressIndex)
+		binary.LittleEndian.PutUint64(address[:], uuid)
 		return address
 	}
-	return t.allocateAddress()
+	return t.deployCOA(uuid)
 }
 
 func (t *testContractHandler) AccountByAddress(addr types.Address, isAuthorized bool) types.Account {
@@ -71,6 +69,8 @@ func (t *testContractHandler) Run(tx []byte, coinbase types.Address) {
 type testFlowAccount struct {
 	address  types.Address
 	balance  func() types.Balance
+	code     func() types.Code
+	codeHash func() []byte
 	transfer func(address types.Address, balance types.Balance)
 	deposit  func(vault *types.FLOWTokenVault)
 	withdraw func(balance types.Balance) *types.FLOWTokenVault
@@ -89,6 +89,20 @@ func (t *testFlowAccount) Balance() types.Balance {
 		return types.NewBalanceFromUFix64(0)
 	}
 	return t.balance()
+}
+
+func (t *testFlowAccount) Code() types.Code {
+	if t.balance == nil {
+		return types.Code{}
+	}
+	return t.code()
+}
+
+func (t *testFlowAccount) CodeHash() []byte {
+	if t.codeHash == nil {
+		return nil
+	}
+	return t.codeHash()
 }
 
 func (t *testFlowAccount) Transfer(address types.Address, balance types.Balance) {
@@ -2842,13 +2856,18 @@ func TestEVMCreateBridgedAccount(t *testing.T) {
 
 	t.Parallel()
 
-	handler := &testContractHandler{}
+	uuidCounter := uint64(0)
+	handler := &testContractHandler{
+		deployCOA: func(uuid uint64) types.Address {
+			require.Equal(t, uuidCounter, uuid)
+			return types.Address{uint8(uuidCounter)}
+		},
+	}
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
-
 	rt := runtime.NewInterpreterRuntime(runtime.Config{})
 
 	script := []byte(`
@@ -2891,6 +2910,10 @@ func TestEVMCreateBridgedAccount(t *testing.T) {
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
+		OnGenerateUUID: func() (uint64, error) {
+			uuidCounter++
+			return uuidCounter, nil
+		},
 	}
 
 	nextTransactionLocation := NewTransactionLocationGenerator()
@@ -2923,7 +2946,7 @@ func TestEVMCreateBridgedAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := cadence.NewArray([]cadence.Value{
-		cadence.UInt8(2), cadence.UInt8(0),
+		cadence.UInt8(4), cadence.UInt8(0),
 		cadence.UInt8(0), cadence.UInt8(0),
 		cadence.UInt8(0), cadence.UInt8(0),
 		cadence.UInt8(0), cadence.UInt8(0),
@@ -2950,7 +2973,7 @@ func TestBridgedAccountCall(t *testing.T) {
 
 	handler := &testContractHandler{
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.True(t, isAuthorized)
 
 			return &testFlowAccount{
@@ -3076,7 +3099,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 	handler := &testContractHandler{
 
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.False(t, isAuthorized)
 
 			return &testFlowAccount{
@@ -3194,7 +3217,7 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 	handler := &testContractHandler{
 		flowTokenAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.Equal(t, deposited, isAuthorized)
 
 			return &testFlowAccount{
@@ -3318,11 +3341,10 @@ func TestBridgedAccountDeploy(t *testing.T) {
 	expectedBalance, err := cadence.NewUFix64FromParts(1, 23000000)
 	require.NoError(t, err)
 
-	var handler *testContractHandler
-	handler = &testContractHandler{
+	handler := &testContractHandler{
 		flowTokenAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.True(t, isAuthorized)
 
 			return &testFlowAccount{
@@ -3333,7 +3355,7 @@ func TestBridgedAccountDeploy(t *testing.T) {
 					assert.Equal(t, types.GasLimit(9999), limit)
 					assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
 
-					return handler.AllocateAddress()
+					return types.Address{4}
 				},
 			}
 		},
@@ -3417,7 +3439,7 @@ func TestBridgedAccountDeploy(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := cadence.NewArray([]cadence.Value{
-		cadence.UInt8(2), cadence.UInt8(0),
+		cadence.UInt8(4), cadence.UInt8(0),
 		cadence.UInt8(0), cadence.UInt8(0),
 		cadence.UInt8(0), cadence.UInt8(0),
 		cadence.UInt8(0), cadence.UInt8(0),
@@ -3451,7 +3473,7 @@ func TestEVMAccountBalance(t *testing.T) {
 	handler := &testContractHandler{
 		flowTokenAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.False(t, isAuthorized)
 
 			return &testFlowAccount{
@@ -3551,7 +3573,7 @@ func TestEVMAccountBalanceForABIOnlyContract(t *testing.T) {
 	handler := &testContractHandler{
 		flowTokenAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.False(t, isAuthorized)
 
 			return &testFlowAccount{
