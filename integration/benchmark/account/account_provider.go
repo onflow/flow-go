@@ -106,9 +106,8 @@ func (p *provider) init(
 			return p.createAccountBatch(num, fundAmount, rb, creator, sender, chain)
 		})
 	}
-
-	if err := g.Wait(); err != nil {
-
+	err := g.Wait()
+	if err != nil {
 		return fmt.Errorf("error creating accounts: %w", err)
 	}
 	return nil
@@ -174,7 +173,7 @@ func (p *provider) createAccountBatch(
 	}
 
 	result, err := sender.Send(createAccountTx)
-	if !errors.Is(err, common.TransactionError{}) {
+	if err == nil || !errors.Is(err, common.TransactionError{}) {
 		key.IncrementSequenceNumber()
 	}
 	if err != nil {
