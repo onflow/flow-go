@@ -130,6 +130,11 @@ func AddKeysToAccount(
 	referenceBlockProvider common.ReferenceBlockProvider,
 	sender common.TransactionSender,
 ) error {
+	log.Debug().
+		Int("number_of_keys_to_add", numberOfKeysToAdd).
+		Str("account", account.Address.String()).
+		Msg("adding keys to account")
+
 	key, err := account.GetKey()
 	if err != nil {
 		return err
@@ -155,7 +160,6 @@ func AddKeysToAccount(
 
 	addKeysTx := flowsdk.NewTransaction().
 		SetScript(scripts.AddKeysToAccountTransaction).
-		AddAuthorizer(account.Address).
 		SetReferenceBlockID(referenceBlockProvider.ReferenceBlockID())
 
 	err = addKeysTx.AddArgument(cadenceKeysArray)

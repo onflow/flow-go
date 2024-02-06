@@ -142,6 +142,8 @@ func New(
 		return nil, fmt.Errorf("error ensuring service account has keys: %w", err)
 	}
 
+	time.Sleep(10 * time.Second) // wait for the service account to be ready
+
 	err = account.ReloadAccount(accountLoader, servAcc)
 	if err != nil {
 		return nil, fmt.Errorf("error reloading service account: %w", err)
