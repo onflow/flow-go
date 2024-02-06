@@ -608,7 +608,7 @@ func validateOrPopulateEpochTimingConfig() error {
 			return fmt.Errorf("invalid epoch timing config: cannot specify ANY of --epoch-timing-ref-counter, --epoch-timing-ref-timestamp, or --epoch-timing-duration if using default timing config")
 		}
 		flagEpochTimingRefCounter = flagEpochCounter
-		flagEpochTimingDuration = flagNumViewsInEpoch // default to 1 view/s
+		flagEpochTimingDuration = flagNumViewsInEpoch
 		flagEpochTimingRefTimestamp = uint64(time.Now().Unix()) + flagNumViewsInEpoch
 
 		// compute target end time for initial (root) epoch from flags: `TargetEndTime = RefTimestamp + (RootEpochCounter - RefEpochCounter) * Duration`
