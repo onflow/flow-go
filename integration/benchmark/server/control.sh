@@ -21,4 +21,4 @@ commits_file="/opt/commits.recent"
 #git log  --merges --first-parent  --format="%S:%H:token-transfer" origin/master --since '1 week' | sort -R  | tee -a $commits_file
 
 # example for all commits on a single branch since master since 1 week ago with the load set to evm
-git log   --first-parent  --format="%S:%H:evm" origin/master..janez/tps-benchmark-evm-load --since '1 week' | sort -R | head -n 1 | tee -a $commits_file
+git log   --first-parent  --format="%S:%H:evm" origin/master..janez/tps-benchmark-evm-load --since '1 week' --author-date-order | head -n 1 | tee -a $commits_file
