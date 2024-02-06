@@ -168,7 +168,7 @@ func AddKeysToAccount(log zerolog.Logger,
 	}
 
 	_, err = sender.Send(addKeysTx)
-	if err == nil || !errors.Is(err, common.TransactionError{}) {
+	if err == nil || errors.Is(err, common.TransactionError{}) {
 		key.IncrementSequenceNumber()
 	}
 	if err != nil {

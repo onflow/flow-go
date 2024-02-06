@@ -8,6 +8,7 @@ import (
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go-sdk/crypto"
@@ -96,9 +97,21 @@ func (p *provider) init(
 			p.numberOfAccounts,
 		))
 
+	log.Info().
+		Int("number_of_accounts", p.numberOfAccounts).
+		Int("account_creation_batch_size", p.accountCreationBatchSize).
+		Int("number_of_keys", creator.NumKeys()).
+		Msg("creating accounts")
+
 	for i := 0; i < p.numberOfAccounts; i += p.accountCreationBatchSize {
 		i := i
 		g.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return nil
+			default:
+			}
+			
 			num := p.accountCreationBatchSize
 			if i+p.accountCreationBatchSize > p.numberOfAccounts {
 				num = p.numberOfAccounts - i
@@ -186,7 +199,7 @@ func (p *provider) createAccountBatch(
 	}
 
 	result, err := sender.Send(createAccountTx)
-	if err == nil || !errors.Is(err, common.TransactionError{}) {
+	if err == nil || errors.Is(err, common.TransactionError{}) {
 		key.IncrementSequenceNumber()
 	}
 	if err != nil {
