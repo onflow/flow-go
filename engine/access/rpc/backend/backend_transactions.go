@@ -42,7 +42,7 @@ type backendTransactions struct {
 	nodeCommunicator     Communicator
 	txResultCache        *lru.Cache[flow.Identifier, *access.TransactionResult]
 	txErrorMessagesCache *lru.Cache[flow.Identifier, string] // cache for transactions error messages, indexed by hash(block_id, tx_id).
-	txResultQueryMode    TransactionResultQueryMode
+	txResultQueryMode    IndexQueryMode
 }
 
 // SendTransaction forwards the transaction to the collection node
@@ -378,11 +378,11 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	}
 
 	switch b.txResultQueryMode {
-	case TransactionResultQueryModeExecutionNodesOnly:
+	case IndexQueryModeExecutionNodesOnly:
 		return b.getTransactionResultsByBlockIDFromExecutionNode(ctx, block, requiredEventEncodingVersion)
-	case TransactionResultQueryModeLocalOnly:
+	case IndexQueryModeLocalOnly:
 		return b.GetTransactionResultsByBlockIDFromStorage(ctx, block, requiredEventEncodingVersion, b.lookupTransactionErrorMessagesByBlockID)
-	case TransactionResultQueryModeFailover:
+	case IndexQueryModeFailover:
 		results, err := b.GetTransactionResultsByBlockIDFromStorage(ctx, block, requiredEventEncodingVersion, b.lookupTransactionErrorMessagesByBlockID)
 		if err == nil {
 			return results, nil
@@ -543,11 +543,11 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	}
 
 	switch b.txResultQueryMode {
-	case TransactionResultQueryModeExecutionNodesOnly:
+	case IndexQueryModeExecutionNodesOnly:
 		return b.getTransactionResultByIndexFromExecutionNode(ctx, block, index, requiredEventEncodingVersion)
-	case TransactionResultQueryModeLocalOnly:
+	case IndexQueryModeLocalOnly:
 		return b.GetTransactionResultByIndexFromStorage(ctx, block, index, requiredEventEncodingVersion, b.lookupTransactionErrorMessageByIndex)
-	case TransactionResultQueryModeFailover:
+	case IndexQueryModeFailover:
 		result, err := b.GetTransactionResultByIndexFromStorage(ctx, block, index, requiredEventEncodingVersion, b.lookupTransactionErrorMessageByIndex)
 		if err == nil {
 			return result, nil
@@ -706,7 +706,7 @@ func (b *backendTransactions) lookupTransactionResult(
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*access.TransactionResult, error) {
 	switch b.txResultQueryMode {
-	case TransactionResultQueryModeExecutionNodesOnly:
+	case IndexQueryModeExecutionNodesOnly:
 		txResult, err := b.getTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
 		if err != nil {
 			// if either the execution node reported no results or there were not enough execution results
@@ -720,9 +720,9 @@ func (b *backendTransactions) lookupTransactionResult(
 
 		// considered executed as long as some result is returned, even if it's an error message
 		return txResult, nil
-	case TransactionResultQueryModeLocalOnly:
+	case IndexQueryModeLocalOnly:
 		return b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion, b.lookupTransactionErrorMessage)
-	case TransactionResultQueryModeFailover:
+	case IndexQueryModeFailover:
 		txResult, err := b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion, b.lookupTransactionErrorMessage)
 		if err == nil {
 			return txResult, nil

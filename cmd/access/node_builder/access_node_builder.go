@@ -185,9 +185,9 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 					MaxFailures:    5,
 					MaxRequests:    1,
 				},
-				ScriptExecutionMode: backend.IndexQueryModeExecutionNodesOnly.String(),             // default to ENs only for now
-				EventQueryMode:      backend.IndexQueryModeExecutionNodesOnly.String(),             // default to ENs only for now
-				TxResultQueryMode:   backend.TransactionResultQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				ScriptExecutionMode: backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				EventQueryMode:      backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				TxResultQueryMode:   backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
 			},
 			RestConfig: rest.Config{
 				ListenAddress: "",
@@ -1496,9 +1496,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("event query mode 'compare' is not supported")
 			}
 
-			txResultQueryMode, err := backend.ParseTransactionResultQueryMode(config.BackendConfig.TxResultQueryMode)
+			txResultQueryMode, err := backend.ParseIndexQueryMode(config.BackendConfig.TxResultQueryMode)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse transaction result query mode: %w", err)
+			}
+			if eventQueryMode == backend.IndexQueryModeCompare {
+				return nil, fmt.Errorf("event query mode 'compare' is not supported")
 			}
 
 			nodeBackend, err := backend.New(backend.Params{

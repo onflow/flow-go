@@ -1019,7 +1019,7 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 	params.ConnFactory = connFactory
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 	params.Events = suite.events
-	params.TxResultQueryMode = TransactionResultQueryModeLocalOnly
+	params.TxResultQueryMode = IndexQueryModeLocalOnly
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
@@ -1110,7 +1110,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	params.ConnFactory = connFactory
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 	params.Events = suite.events
-	params.TxResultQueryMode = TransactionResultQueryModeLocalOnly
+	params.TxResultQueryMode = IndexQueryModeLocalOnly
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
@@ -1201,7 +1201,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	params.ConnFactory = connFactory
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 	params.Events = suite.events
-	params.TxResultQueryMode = TransactionResultQueryModeLocalOnly
+	params.TxResultQueryMode = IndexQueryModeLocalOnly
 
 	backend, err := New(params)
 	suite.Require().NoError(err)

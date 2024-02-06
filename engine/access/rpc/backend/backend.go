@@ -42,8 +42,10 @@ const DefaultLoggedScriptsCacheSize = 1_000_000
 // DefaultConnectionPoolSize is the default size for the connection pool to collection and execution nodes
 const DefaultConnectionPoolSize = 250
 
-var preferredENIdentifiers flow.IdentifierList
-var fixedENIdentifiers flow.IdentifierList
+var (
+	preferredENIdentifiers flow.IdentifierList
+	fixedENIdentifiers     flow.IdentifierList
+)
 
 // Backend implements the Access API.
 //
@@ -104,7 +106,7 @@ type Params struct {
 	ScriptExecutor            execution.ScriptExecutor
 	ScriptExecutionMode       IndexQueryMode
 	EventQueryMode            IndexQueryMode
-	TxResultQueryMode         TransactionResultQueryMode
+	TxResultQueryMode         IndexQueryMode
 }
 
 // New creates backend instance
