@@ -1,6 +1,6 @@
+name: Build Node Docker Images
 # This workflow is used to build and push one-off images for specific node types. This is useful
 # when deploying hotfixes or any time a change is not needed for all node roles.
-name: Build Node Docker Images
 
 on:
   workflow_dispatch:
@@ -38,9 +38,10 @@ on:
         type: boolean
         description: 'Observer'
         required: false
-      include_without_netgo:
+      # GHA allows only up to 10 inputs - regroup two entries in one
+      include_alternative_builds:
         type: boolean
-        description: 'Build `without_netgo` images'
+        description: 'Build amd64 `without_adx` and `without_netgo_without_adx` images, and arm64 images'
         required: false
 
 jobs:
@@ -111,17 +112,22 @@ jobs:
       run: |
         gcloud auth configure-docker
 
-    - name: Build/Push ${{ matrix.role }} images
+    - name: Build/Push ${{ matrix.role }} amd64 images with adx (default)
       env:
         IMAGE_TAG: ${{ inputs.docker_tag }}
         CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
       run: |
-        make docker-build-${{ matrix.role }} docker-push-${{ matrix.role }}
+        make docker-build-${{ matrix.role }}-with-adx docker-push-${{ matrix.role }}-with-adx
 
-    - name: Build/Push ${{ matrix.role }} without_netgo images
-      if: ${{ inputs.include_without_netgo }}
+    - name: Build/Push ${{ matrix.role }} amd64 images without netgo and without adx, arm64 images
+      if: ${{ inputs.include_alternative_builds }}
       env:
         IMAGE_TAG: ${{ inputs.docker_tag }}
         CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
       run: |
-        make docker-build-${{ matrix.role }}-without-netgo docker-push-${{ matrix.role }}-without-netgo
+        make docker-build-${{ matrix.role }}-without-adx docker-push-${{ matrix.role }}-without-adx \
+          docker-build-${{ matrix.role }}-without-netgo-without-adx docker-push-${{ matrix.role }}-without-netgo-without-adx \
+          docker-cross-build-${{ matrix.role }}-arm docker-push-${{ matrix.role }}-arm
+
+
+        

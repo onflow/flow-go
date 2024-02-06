@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package badger
 
 import (
@@ -11,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/mapfunc"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -84,102 +81,27 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 }
 
 func (s *Snapshot) Phase() (flow.EpochPhase, error) {
-	status, err := s.state.epoch.statuses.ByBlockID(s.blockID)
+	psSnapshot, err := s.state.protocolState.AtBlockID(s.blockID)
 	if err != nil {
-		return flow.EpochPhaseUndefined, fmt.Errorf("could not retrieve epoch status: %w", err)
+		return flow.EpochPhaseUndefined, fmt.Errorf("could not retrieve protocol state snapshot: %w", err)
 	}
-	phase, err := status.Phase()
-	return phase, err
+	return psSnapshot.EpochPhase(), nil
 }
 
-func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
-
-	// TODO: CAUTION SHORTCUT
-	// we retrieve identities based on the initial identity table from the EpochSetup
-	// event here -- this will need revision to support mid-epoch identity changes
-	// once slashing is implemented
-
-	status, err := s.state.epoch.statuses.ByBlockID(s.blockID)
+func (s *Snapshot) Identities(selector flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
+	psSnapshot, err := s.state.protocolState.AtBlockID(s.blockID)
 	if err != nil {
 		return nil, err
 	}
-
-	setup, err := s.state.epoch.setups.ByID(status.CurrentEpoch.SetupID)
-	if err != nil {
-		return nil, err
-	}
-
-	// sort the identities so the 'IsCached' binary search works
-	identities := setup.Participants.Sort(flow.Canonical)
-
-	// get identities that are in either last/next epoch but NOT in the current epoch
-	var otherEpochIdentities flow.IdentityList
-	phase, err := status.Phase()
-	if err != nil {
-		return nil, fmt.Errorf("could not get phase: %w", err)
-	}
-	switch phase {
-	// during staking phase (the beginning of the epoch) we include identities
-	// from the previous epoch that are now un-staking
-	case flow.EpochPhaseStaking:
-
-		if !status.HasPrevious() {
-			break
-		}
-
-		previousSetup, err := s.state.epoch.setups.ByID(status.PreviousEpoch.SetupID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get previous epoch setup event: %w", err)
-		}
-
-		for _, identity := range previousSetup.Participants {
-			exists := identities.Exists(identity)
-			// add identity from previous epoch that is not in current epoch
-			if !exists {
-				otherEpochIdentities = append(otherEpochIdentities, identity)
-			}
-		}
-
-	// during setup and committed phases (the end of the epoch) we include
-	// identities that will join in the next epoch
-	case flow.EpochPhaseSetup, flow.EpochPhaseCommitted:
-
-		nextSetup, err := s.state.epoch.setups.ByID(status.NextEpoch.SetupID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get next epoch setup: %w", err)
-		}
-
-		for _, identity := range nextSetup.Participants {
-			exists := identities.Exists(identity)
-
-			// add identity from next epoch that is not in current epoch
-			if !exists {
-				otherEpochIdentities = append(otherEpochIdentities, identity)
-			}
-		}
-
-	default:
-		return nil, fmt.Errorf("invalid epoch phase: %s", phase)
-	}
-
-	// add the identities from next/last epoch, with weight set to 0
-	identities = append(
-		identities,
-		otherEpochIdentities.Map(mapfunc.WithWeight(0))...,
-	)
 
 	// apply the filter to the participants
-	identities = identities.Filter(selector)
-
-	// apply a deterministic sort to the participants
-	identities = identities.Sort(flow.Canonical)
-
+	identities := psSnapshot.Identities().Filter(selector)
 	return identities, nil
 }
 
 func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 	// filter identities at snapshot for node ID
-	identities, err := s.Identities(filter.HasNodeID(nodeID))
+	identities, err := s.Identities(filter.HasNodeID[flow.Identity](nodeID))
 	if err != nil {
 		return nil, fmt.Errorf("could not get identities: %w", err)
 	}
@@ -401,6 +323,13 @@ func (s *Snapshot) Params() protocol.GlobalParams {
 	return s.state.Params()
 }
 
+// ProtocolState returns the dynamic protocol state that the Head block commits to. The
+// compliance layer guarantees that only valid blocks are appended to the protocol state.
+// For each block stored there should be a protocol state stored.
+func (s *Snapshot) ProtocolState() (protocol.DynamicProtocolState, error) {
+	return s.state.protocolState.AtBlockID(s.blockID)
+}
+
 func (s *Snapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) {
 	head, err := s.state.headers.ByBlockID(s.blockID)
 	if err != nil {
@@ -419,19 +348,13 @@ type EpochQuery struct {
 func (q *EpochQuery) Current() protocol.Epoch {
 	// all errors returned from storage reads here are unexpected, because all
 	// snapshots reside within a current epoch, which must be queryable
-	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
+	psSnapshot, err := q.snap.state.protocolState.AtBlockID(q.snap.blockID)
 	if err != nil {
-		return invalid.NewEpochf("could not get epoch status for block %x: %w", q.snap.blockID, err)
-	}
-	setup, err := q.snap.state.epoch.setups.ByID(status.CurrentEpoch.SetupID)
-	if err != nil {
-		return invalid.NewEpochf("could not get current EpochSetup (id=%x) for block %x: %w", status.CurrentEpoch.SetupID, q.snap.blockID, err)
-	}
-	commit, err := q.snap.state.epoch.commits.ByID(status.CurrentEpoch.CommitID)
-	if err != nil {
-		return invalid.NewEpochf("could not get current EpochCommit (id=%x) for block %x: %w", status.CurrentEpoch.CommitID, q.snap.blockID, err)
+		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
 
+	setup := psSnapshot.EpochSetup()
+	commit := psSnapshot.EpochCommit()
 	firstHeight, _, epochStarted, _, err := q.retrieveEpochHeightBounds(setup.Counter)
 	if err != nil {
 		return invalid.NewEpochf("could not get current epoch height bounds: %s", err.Error())
@@ -445,37 +368,28 @@ func (q *EpochQuery) Current() protocol.Epoch {
 // Next returns the next epoch, if it is available.
 func (q *EpochQuery) Next() protocol.Epoch {
 
-	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
+	psSnapshot, err := q.snap.state.protocolState.AtBlockID(q.snap.blockID)
 	if err != nil {
-		return invalid.NewEpochf("could not get epoch status for block %x: %w", q.snap.blockID, err)
+		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
-	phase, err := status.Phase()
-	if err != nil {
-		// critical error: malformed EpochStatus in storage
-		return invalid.NewEpochf("read malformed EpochStatus from storage: %w", err)
-	}
+	phase := psSnapshot.EpochPhase()
+	entry := psSnapshot.Entry()
+
 	// if we are in the staking phase, the next epoch is not setup yet
 	if phase == flow.EpochPhaseStaking {
 		return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
 	}
-
 	// if we are in setup phase, return a SetupEpoch
-	nextSetup, err := q.snap.state.epoch.setups.ByID(status.NextEpoch.SetupID)
-	if err != nil {
-		// all errors are critical, because we must be able to retrieve EpochSetup when in setup phase
-		return invalid.NewEpochf("could not get next EpochSetup (id=%x) for block %x: %w", status.NextEpoch.SetupID, q.snap.blockID, err)
-	}
+	nextSetup := entry.NextEpochSetup
 	if phase == flow.EpochPhaseSetup {
 		return inmem.NewSetupEpoch(nextSetup)
 	}
-
 	// if we are in committed phase, return a CommittedEpoch
-	nextCommit, err := q.snap.state.epoch.commits.ByID(status.NextEpoch.CommitID)
-	if err != nil {
-		// all errors are critical, because we must be able to retrieve EpochCommit when in committed phase
-		return invalid.NewEpochf("could not get next EpochCommit (id=%x) for block %x: %w", status.NextEpoch.CommitID, q.snap.blockID, err)
+	nextCommit := entry.NextEpochCommit
+	if phase == flow.EpochPhaseCommitted {
+		return inmem.NewCommittedEpoch(nextSetup, nextCommit)
 	}
-	return inmem.NewCommittedEpoch(nextSetup, nextCommit)
+	return invalid.NewEpochf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
 }
 
 // Previous returns the previous epoch. During the first epoch after the root
@@ -483,29 +397,22 @@ func (q *EpochQuery) Next() protocol.Epoch {
 // For all other epochs, returns the previous epoch.
 func (q *EpochQuery) Previous() protocol.Epoch {
 
-	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
+	psSnapshot, err := q.snap.state.protocolState.AtBlockID(q.snap.blockID)
 	if err != nil {
-		return invalid.NewEpochf("could not get epoch status for block %x: %w", q.snap.blockID, err)
+		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
+	entry := psSnapshot.Entry()
 
 	// CASE 1: there is no previous epoch - this indicates we are in the first
 	// epoch after a spork root or genesis block
-	if !status.HasPrevious() {
+	if !psSnapshot.PreviousEpochExists() {
 		return invalid.NewEpoch(protocol.ErrNoPreviousEpoch)
 	}
 
 	// CASE 2: we are in any other epoch - retrieve the setup and commit events
 	// for the previous epoch
-	setup, err := q.snap.state.epoch.setups.ByID(status.PreviousEpoch.SetupID)
-	if err != nil {
-		// all errors are critical, because we must be able to retrieve EpochSetup for previous epoch
-		return invalid.NewEpochf("could not get previous EpochSetup (id=%x) for block %x: %w", status.PreviousEpoch.SetupID, q.snap.blockID, err)
-	}
-	commit, err := q.snap.state.epoch.commits.ByID(status.PreviousEpoch.CommitID)
-	if err != nil {
-		// all errors are critical, because we must be able to retrieve EpochCommit for previous epoch
-		return invalid.NewEpochf("could not get current EpochCommit (id=%x) for block %x: %w", status.PreviousEpoch.CommitID, q.snap.blockID, err)
-	}
+	setup := entry.PreviousEpochSetup
+	commit := entry.PreviousEpochCommit
 
 	firstHeight, finalHeight, _, epochEnded, err := q.retrieveEpochHeightBounds(setup.Counter)
 	if err != nil {
