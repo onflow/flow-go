@@ -68,7 +68,7 @@ func SetupProvider(
 		log:                      log.With().Str("component", "AccountProvider").Logger(),
 		availableAccounts:        make(chan *FlowAccount, numberOfAccounts),
 		numberOfAccounts:         numberOfAccounts,
-		accountCreationBatchSize: 750,
+		accountCreationBatchSize: 50,
 	}
 
 	err := p.init(ctx, fundAmount, rb, creator, sender, chain)
@@ -163,8 +163,7 @@ func (p *provider) createAccountBatch(
 		SetScript(scripts.CreateAccountsTransaction(
 			flowsdk.BytesToAddress(sc.FungibleToken.Address.Bytes()),
 			flowsdk.BytesToAddress(sc.FlowToken.Address.Bytes()))).
-		SetReferenceBlockID(rb.ReferenceBlockID()).
-		SetComputeLimit(999999)
+		SetReferenceBlockID(rb.ReferenceBlockID())
 
 	publicKey := blueprints.BytesToCadenceArray(accountKey.PublicKey.Encode())
 	count := cadence.NewInt(num)
