@@ -72,7 +72,7 @@ func moveMachineAcctRun(cmd *cobra.Command, args []string) {
 	}
 
 	// identities with machine accounts
-	machineAcctIdentities := identities.Filter(filter.HasRole(flow.RoleCollection, flow.RoleConsensus))
+	machineAcctIdentities := identities.Filter(filter.HasRole[flow.Identity](flow.RoleCollection, flow.RoleConsensus))
 
 	machineAcctFiles, err := os.ReadDir(flagMachineAccountsSrcDir)
 	if err != nil {

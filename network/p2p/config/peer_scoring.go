@@ -93,7 +93,6 @@ type ApplicationSpecificScoreParameters struct {
 
 const (
 	GossipThresholdKey             = "gossip"
-	PublishThresholdKey            = "publish"
 	GraylistThresholdKey           = "graylist"
 	AcceptPXThresholdKey           = "accept-px"
 	OpportunisticGraftThresholdKey = "opportunistic-graft"
