@@ -13,7 +13,7 @@ transaction(amount: UFix64, recipient: Address) {
 
 	execute {
 	    let receiverRef =  getAccount(recipient)
-		    .capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+		    .capabilities.borrow<&FlowToken.Vault>(/public/flowTokenReceiver)
 		    ?? panic("failed to borrow reference to recipient vault")
 	    receiverRef.deposit(from: <-self.sentVault)
 	}
