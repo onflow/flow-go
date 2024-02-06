@@ -337,28 +337,29 @@ func (b *bootstrapExecutor) Execute() error {
 		b.ctx.Chain,
 		environment.NewAccounts(b.txnState))
 
-	service := b.createServiceAccount()
+	serviceAccount := b.createServiceAccount()
 
-	b.deployViewResolver(service)
-	b.deployBurner(service)
+	tokenStandardAccount := b.deployViewResolver()
+	b.deployBurner(tokenStandardAccount)
 
-	fungibleToken := b.deployFungibleToken(service, service)
-	nonFungibleToken := b.deployNonFungibleToken(service, service)
+	b.deployFungibleToken(tokenStandardAccount)
+	b.deployNonFungibleToken(tokenStandardAccount)
 
-	b.deployMetadataViews(fungibleToken, nonFungibleToken, service)
+	b.deployMetadataViews(tokenStandardAccount)
+	b.deployFungibleTokenSwitchboard(tokenStandardAccount)
 
-	flowToken := b.deployFlowToken(service, fungibleToken, nonFungibleToken)
-	storageFees := b.deployStorageFees(service, fungibleToken, flowToken)
-	feeContract := b.deployFlowFees(service, fungibleToken, flowToken, storageFees)
+	flowToken := b.deployFlowToken(serviceAccount, tokenStandardAccount)
+	b.deployStorageFees(serviceAccount, tokenStandardAccount, flowToken)
+	b.deployFlowFees(serviceAccount, tokenStandardAccount, flowToken)
 
 	if b.initialTokenSupply > 0 {
-		b.mintInitialTokens(service, fungibleToken, flowToken, b.initialTokenSupply)
+		b.mintInitialTokens(serviceAccount, tokenStandardAccount, flowToken, b.initialTokenSupply)
 	}
 
-	b.deployServiceAccount(service, fungibleToken, flowToken, feeContract)
+	b.deployServiceAccount(serviceAccount, tokenStandardAccount, flowToken)
 
 	b.setupParameters(
-		service,
+		serviceAccount,
 		b.accountCreationFee,
 		b.minimumStorageReservation,
 		b.storagePerFlow,
@@ -366,49 +367,49 @@ func (b *bootstrapExecutor) Execute() error {
 	)
 
 	b.setupFees(
-		service,
-		feeContract,
+		serviceAccount,
+		serviceAccount,
 		b.transactionFees.SurgeFactor,
 		b.transactionFees.InclusionEffortCost,
 		b.transactionFees.ExecutionEffortCost,
 	)
 
-	b.setContractDeploymentRestrictions(service, b.restrictedContractDeployment)
+	b.setContractDeploymentRestrictions(serviceAccount, b.restrictedContractDeployment)
 
-	b.setupExecutionWeights(service)
+	b.setupExecutionWeights(serviceAccount)
 
-	b.setupStorageForServiceAccounts(service, fungibleToken, flowToken, feeContract)
+	b.setupStorageForServiceAccounts(serviceAccount, tokenStandardAccount, flowToken, serviceAccount)
 
-	b.createMinter(service, flowToken)
+	b.createMinter(serviceAccount, flowToken)
 
-	b.deployDKG(service)
+	b.deployDKG(serviceAccount)
 
-	b.deployQC(service)
+	b.deployQC(serviceAccount)
 
-	b.deployIDTableStaking(service, fungibleToken, flowToken, feeContract, service)
+	b.deployIDTableStaking(serviceAccount, tokenStandardAccount, flowToken, serviceAccount, tokenStandardAccount)
 
-	b.deployEpoch(service, fungibleToken, flowToken, feeContract)
+	b.deployEpoch(serviceAccount, tokenStandardAccount, flowToken, serviceAccount)
 
-	b.deployVersionBeacon(service, b.versionFreezePeriod)
+	b.deployVersionBeacon(serviceAccount, b.versionFreezePeriod)
 
-	b.deployRandomBeaconHistory(service)
+	b.deployRandomBeaconHistory(serviceAccount)
 
 	// deploy staking proxy contract to the service account
-	b.deployStakingProxyContract(service)
+	b.deployStakingProxyContract(serviceAccount)
 
 	// deploy locked tokens contract to the service account
-	b.deployLockedTokensContract(service, fungibleToken, flowToken)
+	b.deployLockedTokensContract(serviceAccount, tokenStandardAccount, flowToken)
 
 	// deploy staking collection contract to the service account
-	b.deployStakingCollection(service, fungibleToken, flowToken)
+	b.deployStakingCollection(serviceAccount, tokenStandardAccount, flowToken)
 
-	b.registerNodes(service, fungibleToken, flowToken)
+	b.registerNodes(serviceAccount, tokenStandardAccount, flowToken)
 
 	// set the list of nodes which are allowed to stake in this network
-	b.setStakingAllowlist(service, b.identities.NodeIDs())
+	b.setStakingAllowlist(serviceAccount, b.identities.NodeIDs())
 
 	// sets up the EVM environment
-	b.setupEVM(service, fungibleToken, flowToken)
+	b.setupEVM(serviceAccount, tokenStandardAccount, flowToken)
 
 	return nil
 }
@@ -432,40 +433,39 @@ func (b *bootstrapExecutor) createServiceAccount() flow.Address {
 	return address
 }
 
-func (b *bootstrapExecutor) deployFungibleToken(viewResolver, burner flow.Address) flow.Address {
-	fungibleToken := b.createAccount(b.accountKeys.FungibleTokenAccountPublicKeys)
+func (b *bootstrapExecutor) deployFungibleToken(tokenStandardAccount flow.Address) {
 
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployFungibleTokenContractTransaction(fungibleToken, viewResolver, burner),
+			blueprints.DeployFungibleTokenContractTransaction(tokenStandardAccount, tokenStandardAccount, tokenStandardAccount),
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy fungible token contract: %s", txError, err)
-	return fungibleToken
 }
 
-func (b *bootstrapExecutor) deployNonFungibleToken(deployTo, viewResolver flow.Address) flow.Address {
+func (b *bootstrapExecutor) deployNonFungibleToken(tokenStandardAccount flow.Address) {
 
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployNonFungibleTokenContractTransaction(deployTo, viewResolver),
+			blueprints.DeployNonFungibleTokenContractTransaction(tokenStandardAccount, tokenStandardAccount),
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy non-fungible token contract: %s", txError, err)
-	return deployTo
 }
 
-func (b *bootstrapExecutor) deployViewResolver(deployTo flow.Address) {
+func (b *bootstrapExecutor) deployViewResolver() flow.Address {
+	viewResolver := b.createAccount(b.accountKeys.FlowTokenAccountPublicKeys)
 
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployViewResolverContractTransaction(deployTo),
+			blueprints.DeployViewResolverContractTransaction(viewResolver),
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy view resolver contract: %s", txError, err)
+	return viewResolver
 }
 
 func (b *bootstrapExecutor) deployBurner(deployTo flow.Address) {
@@ -479,12 +479,12 @@ func (b *bootstrapExecutor) deployBurner(deployTo flow.Address) {
 	panicOnMetaInvokeErrf("failed to deploy burner contract: %s", txError, err)
 }
 
-func (b *bootstrapExecutor) deployMetadataViews(fungibleToken, nonFungibleToken, viewResolver flow.Address) {
+func (b *bootstrapExecutor) deployMetadataViews(tokenStandardAccount flow.Address) {
 
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployMetadataViewsContractTransaction(fungibleToken, nonFungibleToken, viewResolver),
+			blueprints.DeployMetadataViewsContractTransaction(tokenStandardAccount, tokenStandardAccount, tokenStandardAccount),
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy metadata views contract: %s", txError, err)
@@ -492,21 +492,32 @@ func (b *bootstrapExecutor) deployMetadataViews(fungibleToken, nonFungibleToken,
 	txError, err = b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken, nonFungibleToken, viewResolver),
+			blueprints.DeployFungibleTokenMetadataViewsContractTransaction(tokenStandardAccount, tokenStandardAccount, tokenStandardAccount),
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy fungible token metadata views contract: %s", txError, err)
 }
 
-func (b *bootstrapExecutor) deployFlowToken(service, fungibleToken, metadataViews flow.Address) flow.Address {
+func (b *bootstrapExecutor) deployFungibleTokenSwitchboard(tokenStandardAccount flow.Address) {
+
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployFungibleTokenSwitchboardContractTransaction(tokenStandardAccount),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy fungible token switchboard contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployFlowToken(service, tokenStandardAccount flow.Address) flow.Address {
 	flowToken := b.createAccount(b.accountKeys.FlowTokenAccountPublicKeys)
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
 			blueprints.DeployFlowTokenContractTransaction(
 				service,
-				fungibleToken,
-				metadataViews,
+				tokenStandardAccount,
+				tokenStandardAccount,
 				flowToken),
 			0),
 	)
@@ -514,8 +525,7 @@ func (b *bootstrapExecutor) deployFlowToken(service, fungibleToken, metadataView
 	return flowToken
 }
 
-func (b *bootstrapExecutor) deployFlowFees(service, fungibleToken, flowToken, storageFees flow.Address) flow.Address {
-	flowFees := b.createAccount(b.accountKeys.FlowFeesAccountPublicKeys)
+func (b *bootstrapExecutor) deployFlowFees(service, fungibleToken, flowToken flow.Address) {
 
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
@@ -524,16 +534,15 @@ func (b *bootstrapExecutor) deployFlowFees(service, fungibleToken, flowToken, st
 				service,
 				fungibleToken,
 				flowToken,
-				storageFees,
-				flowFees,
+				service,
+				service,
 			),
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy fees contract: %s", txError, err)
-	return flowFees
 }
 
-func (b *bootstrapExecutor) deployStorageFees(service, fungibleToken, flowToken flow.Address) flow.Address {
+func (b *bootstrapExecutor) deployStorageFees(service, fungibleToken, flowToken flow.Address) {
 	contract := contracts.FlowStorageFees(
 		fungibleToken.HexWithPrefix(),
 		flowToken.HexWithPrefix(),
@@ -549,7 +558,6 @@ func (b *bootstrapExecutor) deployStorageFees(service, fungibleToken, flowToken 
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy storage fees contract: %s", txError, err)
-	return service
 }
 
 func (b *bootstrapExecutor) createMinter(service, flowToken flow.Address) {
@@ -636,11 +644,11 @@ func (b *bootstrapExecutor) deployEpoch(service, fungibleToken, flowToken, flowF
 	panicOnMetaInvokeErrf("failed to deploy Epoch contract: %s", txError, err)
 }
 
-func (b *bootstrapExecutor) deployServiceAccount(service, fungibleToken, flowToken, feeContract flow.Address) {
+func (b *bootstrapExecutor) deployServiceAccount(service, fungibleToken, flowToken flow.Address) {
 	contract := contracts.FlowServiceAccount(
 		fungibleToken.HexWithPrefix(),
 		flowToken.HexWithPrefix(),
-		feeContract.HexWithPrefix(),
+		service.HexWithPrefix(),
 		service.HexWithPrefix(),
 	)
 

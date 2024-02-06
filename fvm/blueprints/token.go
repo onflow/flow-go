@@ -74,6 +74,16 @@ func DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken, nonFungi
 	)
 }
 
+func DeployFungibleTokenSwitchboardContractTransaction(fungibleToken flow.Address) *flow.TransactionBody {
+	contract := contracts.FungibleTokenSwitchboard(fungibleToken.Hex())
+	contractName := "FungibleTokenSwitchboard"
+	return DeployContractTransaction(
+		fungibleToken,
+		contract,
+		contractName,
+	)
+}
+
 //go:embed scripts/deployFlowTokenTransactionTemplate.cdc
 var deployFlowTokenTransactionTemplate string
 
