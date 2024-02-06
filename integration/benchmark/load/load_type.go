@@ -68,3 +68,24 @@ var ExecDataHeavyLoad = NewSimpleLoadType(
 	"DataHeavy",
 	scripts.DataHeavyContractTemplate,
 	scripts.DataHeavyScriptTemplate)
+
+func CreateLoadType(t LoadType) Load {
+	switch t {
+	case CompHeavyLoadType:
+		return CompHeavyLoad
+	case EventHeavyLoadType:
+		return EventHeavyLoad
+	case LedgerHeavyLoadType:
+		return LedgerHeavyLoad
+	case ExecDataHeavyLoadType:
+		return ExecDataHeavyLoad
+	case TokenTransferLoadType:
+		return NewTokenTransferLoad()
+	case AddKeysLoadType:
+		return NewAddKeysLoad()
+	case EVMTransferLoadType:
+		return NewEVMTransferLoad()
+	default:
+		panic("unknown load type")
+	}
+}

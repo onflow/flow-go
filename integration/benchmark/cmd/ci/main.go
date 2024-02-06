@@ -166,7 +166,6 @@ func main() {
 			LoadType:         load.LoadType(loadType),
 			FeedbackEnabled:  feedbackEnabled,
 		},
-		benchmark.ConstExecParams{},
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to create new cont load generator")

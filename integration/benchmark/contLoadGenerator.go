@@ -23,14 +23,6 @@ import (
 
 const lostTransactionThreshold = 90 * time.Second
 
-// ConstExecParams hosts all parameters for const-exec load type
-type ConstExecParams struct {
-	MaxTxSizeInByte uint
-	AuthAccountNum  uint
-	ArgSizeInByte   uint
-	PayerKeyCount   uint
-}
-
 // ContLoadGenerator creates a continuous load of transactions to the network
 // by creating many accounts and transfer flow tokens between them
 type ContLoadGenerator struct {
@@ -39,11 +31,7 @@ type ContLoadGenerator struct {
 	log                zerolog.Logger
 	loaderMetrics      *metrics.LoaderCollector
 	loadParams         LoadParams
-	networkParams      NetworkParams
-	constExecParams    ConstExecParams
 	flowClient         access.Client
-	favContractAddress flowsdk.Address
-	availableAccounts  chan *account.FlowAccount // queue with accounts available for workers
 	workerStatsTracker *WorkerStatsTracker
 	stoppedChannel     chan struct{}
 	follower           TxFollower
@@ -51,9 +39,6 @@ type ContLoadGenerator struct {
 
 	workersMutex sync.Mutex
 	workers      []*Worker
-
-	accountsMutex sync.Mutex
-	accounts      []*account.FlowAccount
 }
 
 type NetworkParams struct {
@@ -78,7 +63,6 @@ func New(
 	flowClients []access.Client,
 	networkParams NetworkParams,
 	loadParams LoadParams,
-	constExecParams ConstExecParams,
 ) (*ContLoadGenerator, error) {
 	if len(flowClients) == 0 {
 		return nil, errors.New("no flow clients available")
@@ -113,11 +97,7 @@ func New(
 		log:                log,
 		loaderMetrics:      loaderMetrics,
 		loadParams:         loadParams,
-		networkParams:      networkParams,
-		constExecParams:    constExecParams,
 		flowClient:         flowClient,
-		accounts:           make([]*account.FlowAccount, 0),
-		availableAccounts:  make(chan *account.FlowAccount, loadParams.NumberOfAccounts),
 		workerStatsTracker: workerStatsTracker,
 		follower:           follower,
 		stoppedChannel:     make(chan struct{}),
@@ -142,7 +122,10 @@ func New(
 		return nil, fmt.Errorf("error ensuring service account has keys: %w", err)
 	}
 
-	time.Sleep(10 * time.Second) // wait for the service account to be ready
+	// we need to wait for the tx adding keys to be sealed otherwise the client won't
+	// pickup the changes
+	// TODO: add a better way to wait for txs to be sealed
+	time.Sleep(10 * time.Second)
 
 	err = account.ReloadAccount(accountLoader, servAcc)
 	if err != nil {
@@ -173,7 +156,7 @@ func New(
 		ReferenceBlockProvider: lg.follower,
 	}
 
-	l := load.NewTokenTransferLoad()
+	l := load.CreateLoadType(loadParams.LoadType)
 
 	err = l.Setup(log, lc)
 	if err != nil {
@@ -187,7 +170,7 @@ func New(
 
 		log := lg.log.With().Int("workerID", workerID).Logger()
 		err := l.Load(log, wlc)
-		if err != nil {
+		if err != nil && !errors.Is(err, context.Canceled) {
 			log.Error().Err(err).Msg("error running load")
 		}
 	}
