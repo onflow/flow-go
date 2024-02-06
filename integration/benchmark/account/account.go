@@ -24,13 +24,14 @@ func New(
 	hashAlgo crypto.HashAlgorithm,
 	accountKeys []*flowsdk.AccountKey,
 ) (*FlowAccount, error) {
-	signer, err := crypto.NewInMemorySigner(privateKey, hashAlgo)
-	if err != nil {
-		return nil, fmt.Errorf("error while creating in-memory signer: %w", err)
-	}
-
 	keys := make([]*AccountKey, 0, len(accountKeys))
 	for _, key := range accountKeys {
+		// signer are not thread safe, so we need to create a new signer for each key
+		signer, err := crypto.NewInMemorySigner(privateKey, hashAlgo)
+		if err != nil {
+			return nil, fmt.Errorf("error while creating in-memory signer: %w", err)
+		}
+
 		keys = append(keys, &AccountKey{
 			AccountKey: *key,
 			Address:    address,
