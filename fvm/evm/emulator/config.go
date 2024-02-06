@@ -7,7 +7,6 @@ import (
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethCore "github.com/ethereum/go-ethereum/core"
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
-	gethCrypto "github.com/ethereum/go-ethereum/crypto"
 	gethParams "github.com/ethereum/go-ethereum/params"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -87,10 +86,10 @@ func defaultConfig() *Config {
 		BlockContext: &gethVM.BlockContext{
 			CanTransfer: gethCore.CanTransfer,
 			Transfer:    gethCore.Transfer,
-			GasLimit:    BlockLevelGasLimit, // block gas limit
+			GasLimit:    BlockLevelGasLimit,
 			BaseFee:     big.NewInt(0),
-			GetHash: func(n uint64) gethCommon.Hash { // default returns some random hash values
-				return gethCommon.BytesToHash(gethCrypto.Keccak256([]byte(new(big.Int).SetUint64(n).String())))
+			GetHash: func(n uint64) gethCommon.Hash {
+				return gethCommon.Hash{}
 			},
 		},
 	}
@@ -197,6 +196,14 @@ func WithExtraPrecompiles(precompiles []types.Precompile) Option {
 			}
 			c.ExtraPrecompiles[pc.Address().ToCommon()] = pc
 		}
+		return c
+	}
+}
+
+// WithRandom sets the block context random field
+func WithRandom(rand *gethCommon.Hash) Option {
+	return func(c *Config) *Config {
+		c.BlockContext.Random = rand
 		return c
 	}
 }

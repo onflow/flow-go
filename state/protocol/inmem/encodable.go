@@ -9,14 +9,13 @@ import (
 // EncodableSnapshot is the encoding format for protocol.Snapshot
 type EncodableSnapshot struct {
 	Head                *flow.Header
-	Identities          flow.IdentityList
 	LatestSeal          *flow.Seal
 	LatestResult        *flow.ExecutionResult
 	SealingSegment      *flow.SealingSegment
 	QuorumCertificate   *flow.QuorumCertificate
-	Phase               flow.EpochPhase
 	Epochs              EncodableEpochs
 	Params              EncodableParams
+	ProtocolState       *flow.ProtocolStateEntry
 	SealedVersionBeacon *flow.SealedVersionBeacon
 }
 
@@ -36,7 +35,7 @@ type EncodableEpoch struct {
 	DKGPhase3FinalView uint64
 	FinalView          uint64
 	RandomSource       []byte
-	InitialIdentities  flow.IdentityList
+	InitialIdentities  flow.IdentitySkeletonList
 	Clustering         flow.ClusterList
 	Clusters           []EncodableCluster
 	DKG                *EncodableDKG
@@ -60,7 +59,7 @@ type EncodableFullDKG struct {
 type EncodableCluster struct {
 	Index     uint
 	Counter   uint64
-	Members   flow.IdentityList
+	Members   flow.IdentitySkeletonList
 	RootBlock *cluster.Block
 	RootQC    *flow.QuorumCertificate
 }

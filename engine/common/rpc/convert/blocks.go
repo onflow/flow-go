@@ -35,15 +35,16 @@ func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (
 	}
 
 	bh := entities.Block{
-		Id:                       id[:],
+		Id:                       IdentifierToMessage(id),
 		Height:                   h.Header.Height,
-		ParentId:                 parentID[:],
+		ParentId:                 IdentifierToMessage(parentID),
 		Timestamp:                t,
 		CollectionGuarantees:     cg,
 		BlockSeals:               seals,
 		Signatures:               [][]byte{h.Header.ParentVoterSigData},
 		ExecutionReceiptMetaList: ExecutionResultMetaListToMessages(h.Payload.Receipts),
 		ExecutionResultList:      execResults,
+		ProtocolStateId:          IdentifierToMessage(h.Payload.ProtocolStateID),
 		BlockHeader:              blockHeader,
 	}
 
@@ -147,9 +148,10 @@ func PayloadFromMessage(m *entities.Block) (*flow.Payload, error) {
 		return nil, err
 	}
 	return &flow.Payload{
-		Guarantees: cgs,
-		Seals:      seals,
-		Receipts:   receipts,
-		Results:    results,
+		Guarantees:      cgs,
+		Seals:           seals,
+		Receipts:        receipts,
+		Results:         results,
+		ProtocolStateID: MessageToIdentifier(m.ProtocolStateId),
 	}, nil
 }

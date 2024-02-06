@@ -78,6 +78,7 @@ func (vmt vmTest) run(
 		baseOpts := []fvm.Option{
 			// default chain is Testnet
 			fvm.WithChain(flow.Testnet.Chain()),
+			fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
 		}
 
 		opts := append(baseOpts, vmt.contextOptions...)
@@ -2860,7 +2861,7 @@ func TestEVM(t *testing.T) {
 				import EVM from %s
 				
 				access(all) fun main() {
-					let bal = EVM.Balance(flow: 1.0);
+					let bal = EVM.Balance(attoflow: 1000000000000000000);
 					let acc <- EVM.createBridgedAccount();
 					// withdraw insufficient balance
 					destroy acc.withdraw(balance: bal);
@@ -2884,7 +2885,10 @@ func TestEVM(t *testing.T) {
 	// we have implemented a snapshot wrapper to return an error from the EVM
 	t.Run("internal evm error handling", newVMTest().
 		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
-		withContextOptions(fvm.WithEVMEnabled(true)).
+		withContextOptions(
+			fvm.WithChain(flow.Emulator.Chain()),
+			fvm.WithEVMEnabled(true),
+		).
 		run(func(
 			t *testing.T,
 			vm fvm.VM,
@@ -2912,7 +2916,7 @@ func TestEVM(t *testing.T) {
 				errStorage.
 					On("Get", mockery.AnythingOfType("flow.RegisterID")).
 					Return(func(id flow.RegisterID) (flow.RegisterValue, error) {
-						if id.Key == "AddressAllocator" {
+						if id.Key == "LatestBlock" {
 							return nil, e.err
 						}
 						return snapshotTree.Get(id)
@@ -2937,7 +2941,15 @@ func TestEVM(t *testing.T) {
 	)
 
 	t.Run("deploy contract code", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
+		withBootstrapProcedureOptions(
+			fvm.WithSetupEVMEnabled(true),
+		).
+		withContextOptions(
+			// default is testnet, but testnet has a special EVM storage contract location
+			// so we have to use emulator here so that the EVM storage contract is deployed
+			// to the 5th address
+			fvm.WithChain(flow.Emulator.Chain()),
+		).
 		run(func(
 			t *testing.T,
 			vm fvm.VM,
@@ -2999,8 +3011,10 @@ func TestEVM(t *testing.T) {
 				[]common.TypeID{
 					evmLocation.TypeID(nil, string(types.EventTypeTransactionExecuted)),
 					evmLocation.TypeID(nil, string(types.EventTypeBlockExecuted)),
-					"A.7e60df042a9c0868.FlowToken.TokensWithdrawn",
-					"A.9a0766d93b6608b7.FungibleToken.Withdrawn",
+					"A.0ae53cb6e3f42a79.FlowToken.TokensWithdrawn",
+					"A.ee82856bf20e2aa6.FungibleToken.Withdrawn",
+					evmLocation.TypeID(nil, string(types.EventTypeTransactionExecuted)),
+					evmLocation.TypeID(nil, string(types.EventTypeBlockExecuted)),
 				},
 				eventTypeIDs,
 			)
