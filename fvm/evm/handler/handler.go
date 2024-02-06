@@ -96,6 +96,14 @@ func (h *ContractHandler) LastExecutedBlock() *types.Block {
 // Run runs an rlpencoded evm transaction and
 // collects the gas fees and pay it to the coinbase address provided.
 func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) {
+	h.run(rlpEncodedTx, coinbase, false)
+}
+
+func (h *ContractHandler) run(
+	rlpEncodedTx []byte,
+	coinbase types.Address,
+	try bool,
+) {
 	// step 1 - transaction decoding
 	encodedLen := uint(len(rlpEncodedTx))
 	err := h.backend.MeterComputation(environment.ComputationKindRLPDecoding, encodedLen)
@@ -119,6 +127,17 @@ func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) {
 	res, err := blk.RunTransaction(&tx)
 	h.meterGasUsage(res)
 	handleError(err)
+
+	// if validation error don't continue and return
+	if res.Failed() && types.IsEVMValidationError(res.Error) {
+		return
+	}
+
+	// Differntiat - validation and other errors
+	// from vm errors
+	//
+	// If validation - don't form block or receipt
+	// if only execution, commit and return ?
 
 	// step 3 - update block proposal
 	bp, err := h.blockstore.BlockProposal()

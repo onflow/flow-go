@@ -134,8 +134,7 @@ func (bl *BlockView) RunTransaction(
 	}
 	msg, err := gethCore.TransactionToMessage(tx, GetSigner(bl.config), proc.config.BlockContext.BaseFee)
 	if err != nil {
-		res.Error = types.NewEVMValidationError(err)
-		return res, nil
+		return res, types.NewEVMValidationError(err)
 	}
 
 	// update tx context origin
@@ -382,8 +381,7 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 		}
 		// otherwise is a validation error (pre-check failure)
 		// no state change, wrap the error and return
-		res.Error = types.NewEVMValidationError(err)
-		return &res, nil
+		return &res, types.NewEVMValidationError(err)
 	}
 
 	// if prechecks are passed, the exec result won't be nil
@@ -403,7 +401,7 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 				0,
 			)
 		} else {
-			// execResult.Err is VM errors
+			// execResult.Err is VM errors (we don't return it as error)
 			res.Error = types.NewEVMExecutionError(execResult.Err)
 		}
 	}
