@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const lostTransactionThreshold = 90 * time.Second
+const lostTransactionThreshold = 120 * time.Second
 
 // ContLoadGenerator creates a continuous load of transactions to the network
 // by creating many accounts and transfer flow tokens between them
