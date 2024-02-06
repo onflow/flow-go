@@ -168,7 +168,7 @@ var blockExecutedEventCadenceType = &cadence.EventType{
 	Fields: []cadence.Field{
 		cadence.NewField("height", cadence.UInt64Type),
 		cadence.NewField("hash", cadence.StringType),
-		cadence.NewField("totalSupply", cadence.UInt64Type),
+		cadence.NewField("totalSupply", cadence.IntType),
 		cadence.NewField("parentHash", cadence.StringType),
 		cadence.NewField("receiptRoot", cadence.StringType),
 		cadence.NewField(
