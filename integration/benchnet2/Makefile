@@ -77,7 +77,7 @@ gen-bootstrap: clone-flow
 		--root-block-votes-dir ../../../bootstrap/public-root-information/root-block-votes/
 
 gen-helm-l1:
-	go run automate/cmd/level1/bootstrap.go --data bootstrap/public-root-information/root-protocol-state-snapshot.json --dockerTag $(NETWORK_ID) --dockerRegistry $(DOCKER_REGISTRY)
+	go run automate/cmd/level1/bootstrap.go --data bootstrap/public-root-information/root-protocol-state-snapshot.json --dockerTag $(DOCKER_TAG) --dockerRegistry $(DOCKER_REGISTRY)
 
 gen-helm-l2:
 	go run automate/cmd/level2/template.go --data template-data.json --template automate/templates/helm-values-all-nodes.yml --outPath="./values.yml"
