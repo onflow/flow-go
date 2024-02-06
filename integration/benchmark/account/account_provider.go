@@ -1,6 +1,7 @@
 package account
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/onflow/cadence"
@@ -55,6 +56,7 @@ func (p *provider) ReturnAvailableAccount(account *FlowAccount) {
 
 func SetupProvider(
 	log zerolog.Logger,
+	ctx context.Context,
 	numberOfAccounts int,
 	fundAmount uint64,
 	rb common.ReferenceBlockProvider,
@@ -69,7 +71,7 @@ func SetupProvider(
 		accountCreationBatchSize: 750,
 	}
 
-	err := p.init(fundAmount, rb, creator, sender, chain)
+	err := p.init(ctx, fundAmount, rb, creator, sender, chain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize account provider: %w", err)
 	}
@@ -78,13 +80,14 @@ func SetupProvider(
 }
 
 func (p *provider) init(
+	ctx context.Context,
 	fundAmount uint64,
 	rb common.ReferenceBlockProvider,
 	creator *FlowAccount,
 	sender common.TransactionSender,
 	chain flow.Chain,
 ) error {
-	g := errgroup.Group{}
+	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(creator.NumKeys())
 
 	progress := util.LogProgress(p.log,
@@ -103,7 +106,17 @@ func (p *provider) init(
 
 			defer func() { progress(num) }()
 
-			return p.createAccountBatch(num, fundAmount, rb, creator, sender, chain)
+			err := p.createAccountBatch(num, fundAmount, rb, creator, sender, chain)
+			if err != nil {
+				p.log.
+					Err(err).
+					Int("batch_size", num).
+					Int("index", i).
+					Msg("error creating accounts")
+				return err
+			}
+
+			return nil
 		})
 	}
 	err := g.Wait()

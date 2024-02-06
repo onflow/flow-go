@@ -1,6 +1,7 @@
 package load_test
 
 import (
+	"context"
 	"fmt"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
@@ -72,6 +73,7 @@ func testLoad(l load.Load) func(t *testing.T) {
 
 		accountProvider, err := account.SetupProvider(
 			log,
+			context.Background(),
 			100,
 			10_000_000_000,
 			blockProvider,

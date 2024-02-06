@@ -42,7 +42,6 @@ type ContLoadGenerator struct {
 	networkParams      NetworkParams
 	constExecParams    ConstExecParams
 	flowClient         access.Client
-	serviceAccount     *account.FlowAccount
 	favContractAddress flowsdk.Address
 	availableAccounts  chan *account.FlowAccount // queue with accounts available for workers
 	workerStatsTracker *WorkerStatsTracker
@@ -117,7 +116,6 @@ func New(
 		networkParams:      networkParams,
 		constExecParams:    constExecParams,
 		flowClient:         flowClient,
-		serviceAccount:     servAcc,
 		accounts:           make([]*account.FlowAccount, 0),
 		availableAccounts:  make(chan *account.FlowAccount, loadParams.NumberOfAccounts),
 		workerStatsTracker: workerStatsTracker,
@@ -125,7 +123,7 @@ func New(
 		stoppedChannel:     make(chan struct{}),
 	}
 
-	lg.log.Info().Int("num_keys", lg.serviceAccount.NumKeys()).Msg("service account loaded")
+	lg.log.Info().Int("num_keys", servAcc.NumKeys()).Msg("service account loaded")
 
 	ts := &transactionSender{
 		ctx:                      ctx,
@@ -151,10 +149,11 @@ func New(
 
 	ap, err := account.SetupProvider(
 		lg.log,
+		ctx,
 		loadParams.NumberOfAccounts,
 		100_000_000_000,
 		lg.follower,
-		lg.serviceAccount,
+		servAcc,
 		ts,
 		networkParams.ChainId.Chain(),
 	)
