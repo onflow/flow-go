@@ -34,7 +34,7 @@ func NewFixedIdentityProvider(identities flow.IdentityList) *FixedIdentityProvid
 	return &FixedIdentityProvider{identities}
 }
 
-func (p *FixedIdentityProvider) Identities(filter flow.IdentityFilter) flow.IdentityList {
+func (p *FixedIdentityProvider) Identities(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 	return p.identities.Filter(filter)
 }
 

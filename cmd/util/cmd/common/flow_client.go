@@ -92,7 +92,7 @@ func insecureFlowClient(accessAddress string) (*client.Client, error) {
 func FlowClientConfigs(accessNodeIDS []flow.Identifier, insecureAccessAPI bool, snapshot protocol.Snapshot) ([]*FlowClientConfig, error) {
 	flowClientOpts := make([]*FlowClientConfig, 0)
 
-	identities, err := snapshot.Identities(filter.HasNodeID(accessNodeIDS...))
+	identities, err := snapshot.Identities(filter.HasNodeID[flow.Identity](accessNodeIDS...))
 	if err != nil {
 		return nil, fmt.Errorf("failed get identities access node identities (ids=%v) from snapshot: %w", accessNodeIDS, err)
 	}
@@ -138,7 +138,7 @@ func convertAccessAddrFromState(address string, insecureAccessAPI bool) string {
 
 // DefaultAccessNodeIDS will return all the access node IDS in the protocol state for staked access nodes
 func DefaultAccessNodeIDS(snapshot protocol.Snapshot) ([]flow.Identifier, error) {
-	identities, err := snapshot.Identities(filter.HasRole(flow.RoleAccess))
+	identities, err := snapshot.Identities(filter.HasRole[flow.Identity](flow.RoleAccess))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get staked access node IDs from protocol state %w", err)
 	}

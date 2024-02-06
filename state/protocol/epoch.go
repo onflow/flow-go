@@ -112,7 +112,7 @@ type Epoch interface {
 	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
 	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
 	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-	InitialIdentities() (flow.IdentityList, error)
+	InitialIdentities() (flow.IdentitySkeletonList, error)
 
 	// Clustering returns the cluster assignment for this epoch.
 	// Error returns:

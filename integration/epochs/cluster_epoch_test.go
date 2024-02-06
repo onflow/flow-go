@@ -81,10 +81,10 @@ func (s *Suite) deployEpochQCContract() {
 }
 
 // CreateClusterList creates a clustering with the nodes split evenly and returns the resulting `ClusterList`
-func (s *Suite) CreateClusterList(clusterCount, nodesPerCluster int) (flow.ClusterList, flow.IdentityList) {
+func (s *Suite) CreateClusterList(clusterCount, nodesPerCluster int) (flow.ClusterList, flow.IdentitySkeletonList) {
 
 	// create list of nodes to be used for the clustering
-	nodes := unittest.IdentityListFixture(clusterCount*nodesPerCluster, unittest.WithRole(flow.RoleCollection))
+	nodes := unittest.IdentityListFixture(clusterCount*nodesPerCluster, unittest.WithRole(flow.RoleCollection)).ToSkeleton()
 	// create cluster assignment
 	clusterAssignment := unittest.ClusterAssignment(uint(clusterCount), nodes)
 
@@ -145,7 +145,7 @@ func (s *Suite) StartVoting(clustering flow.ClusterList, clusterCount, nodesPerC
 			cdcNodeID, err := cadence.NewString(node.NodeID.String())
 			require.NoError(s.T(), err)
 			nodeIDs = append(nodeIDs, cdcNodeID)
-			nodeWeights = append(nodeWeights, cadence.NewUInt64(node.Weight))
+			nodeWeights = append(nodeWeights, cadence.NewUInt64(node.InitialWeight))
 		}
 
 		clusterNodeIDs[index] = cadence.NewArray(nodeIDs)
