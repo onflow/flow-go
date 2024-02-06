@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	subscriptionmock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/execution"
@@ -57,6 +58,7 @@ type BackendExecutionDataSuite struct {
 	broadcaster       *engine.Broadcaster
 	execDataCache     *cache.ExecutionDataCache
 	execDataHeroCache *herocache.BlockExecutionData
+	chainStateTracker *subscriptionmock.ChainStateTracker
 	backend           *StateStreamBackend
 
 	blocks      []*flow.Block
@@ -66,6 +68,8 @@ type BackendExecutionDataSuite struct {
 	sealMap     map[flow.Identifier]*flow.Seal
 	resultMap   map[flow.Identifier]*flow.ExecutionResult
 	registerID  flow.RegisterID
+
+	rootBlock flow.Block
 }
 
 func TestBackendExecutionDataSuite(t *testing.T) {
@@ -90,6 +94,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 	s.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metrics.NewNoopCollector())
 	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
+	s.chainStateTracker = subscriptionmock.NewChainStateTracker(s.T())
 
 	conf := Config{
 		ClientSendTimeout:       subscription.DefaultSendTimeout,
@@ -108,11 +113,11 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	s.blocks = make([]*flow.Block, 0, blockCount)
 
 	// generate blockCount consecutive blocks with associated seal, result and execution data
-	rootBlock := unittest.BlockFixture()
-	parent := rootBlock.Header
-	s.blockMap[rootBlock.Header.Height] = &rootBlock
+	s.rootBlock = unittest.BlockFixture()
+	parent := s.rootBlock.Header
+	s.blockMap[s.rootBlock.Header.Height] = &s.rootBlock
 
-	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, rootBlock.Header.Height, rootBlock.ID())
+	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Header.Height, s.rootBlock.ID())
 
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
@@ -161,8 +166,8 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	s.registers = storagemock.NewRegisterIndex(s.T())
 	err = s.registersAsync.InitDataAvailable(s.registers)
 	require.NoError(s.T(), err)
-	s.registers.On("LatestHeight").Return(rootBlock.Header.Height).Maybe()
-	s.registers.On("FirstHeight").Return(rootBlock.Header.Height).Maybe()
+	s.registers.On("LatestHeight").Return(s.rootBlock.Header.Height).Maybe()
+	s.registers.On("FirstHeight").Return(s.rootBlock.Header.Height).Maybe()
 	s.registers.On("Get", mock.AnythingOfType("RegisterID"), mock.AnythingOfType("uint64")).Return(
 		func(id flow.RegisterID, height uint64) (flow.RegisterValue, error) {
 			if id == s.registerID {
@@ -218,12 +223,13 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		s.eds,
 		s.execDataCache,
 		s.broadcaster,
-		rootBlock.Header.Height,
-		rootBlock.Header.Height, // initialize with no downloaded data
+		s.rootBlock.Header.Height,
+		s.rootBlock.Header.Height, // initialize with no downloaded data
 		s.registersAsync,
 		false,
 	)
 	require.NoError(s.T(), err)
+	s.backend.ChainStateTracker = s.chainStateTracker
 }
 
 func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
@@ -236,7 +242,8 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 	execData := s.execDataMap[block.ID()]
 
 	// notify backend block is available
-	s.backend.setHighestHeight(block.Header.Height)
+	s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).
+		Return(block.Header.Height, nil)
 
 	var err error
 	s.Run("happy path TestGetExecutionDataByBlockID success", func() {
@@ -291,12 +298,12 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 			name:            "happy path - start from root block by height",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
 			startBlockID:    flow.ZeroID,
-			startHeight:     s.backend.BlocksWatcher.RootHeight, // start from root block
+			startHeight:     s.rootBlock.Header.Height, // start from root block
 		},
 		{
 			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1,                   // backfill all blocks
-			startBlockID:    s.backend.BlocksWatcher.RootBlockID, // start from root block
+			highestBackfill: len(s.blocks) - 1,       // backfill all blocks
+			startBlockID:    s.rootBlock.Header.ID(), // start from root block
 			startHeight:     0,
 		},
 	}
@@ -312,21 +319,24 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 			// this simulates a subscription on a past block
 			for i := 0; i <= test.highestBackfill; i++ {
 				s.T().Logf("backfilling block %d", i)
-				s.backend.setHighestHeight(s.blocks[i].Header.Height)
+				s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).
+					Return(s.blocks[i].Header.Height, nil)
 			}
 
 			subCtx, subCancel := context.WithCancel(ctx)
 			sub := s.backend.SubscribeExecutionData(subCtx, test.startBlockID, test.startHeight)
 
-			// loop over all of the blocks
+			// loop over of the all blocks
 			for i, b := range s.blocks {
 				execData := s.execDataMap[b.ID()]
-				s.T().Logf("checking block %d %v", i, b.ID())
+				s.T().Logf("checking block %d %v %v", i, b.Header.Height, b.ID())
 
 				// simulate new exec data received.
 				// exec data for all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
-					s.backend.setHighestHeight(b.Header.Height)
+					s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).Unset()
+					s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).
+						Return(b.Header.Height, nil)
 					s.broadcaster.Publish()
 				}
 
@@ -378,7 +388,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeExecutionData(subCtx, flow.ZeroID, s.backend.BlocksWatcher.RootHeight-1)
+		sub := s.backend.SubscribeExecutionData(subCtx, flow.ZeroID, s.rootBlock.Header.Height-1)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()))
 	})
 
@@ -404,24 +414,24 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 
 func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 	s.Run("normal case", func() {
-		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.backend.BlocksWatcher.RootHeight)
+		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.rootBlock.Header.Height)
 		require.NoError(s.T(), err)
 		require.NotEmpty(s.T(), res)
 	})
 
 	s.Run("returns error if block height is out of range", func() {
-		_, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.backend.BlocksWatcher.RootHeight+1)
+		_, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.rootBlock.Header.Height+1)
 		require.Equal(s.T(), codes.OutOfRange, status.Code(err))
 	})
 
 	s.Run("returns error if register path is not indexed", func() {
 		falseID := flow.RegisterIDs{flow.RegisterID{Owner: "ha", Key: "ha"}}
-		_, err := s.backend.GetRegisterValues(falseID, s.backend.BlocksWatcher.RootHeight)
+		_, err := s.backend.GetRegisterValues(falseID, s.rootBlock.Header.Height)
 		require.Equal(s.T(), codes.NotFound, status.Code(err))
 	})
 
 	s.Run("returns error if too many registers are requested", func() {
-		_, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.registerRequestLimit+1), s.backend.BlocksWatcher.RootHeight)
+		_, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.registerRequestLimit+1), s.rootBlock.Header.Height)
 		require.Equal(s.T(), codes.InvalidArgument, status.Code(err))
 	})
 }

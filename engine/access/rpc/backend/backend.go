@@ -69,7 +69,7 @@ type Backend struct {
 	backendExecutionResults
 	backendNetwork
 
-	*subscription.BlocksWatcher
+	subscription.ChainStateTracker
 	backendSubscribeBlocks
 
 	state             protocol.State
@@ -160,7 +160,7 @@ func New(params Params) (*Backend, error) {
 		return nil, fmt.Errorf("failed to initialize node version info: %w", err)
 	}
 
-	subscriptionHandler, err := subscription.NewBlocksWatcher(
+	chainStateTracker, err := subscription.NewChainStateTracker(
 		params.Log,
 		params.State,
 		params.SubscriptionParams.RootHeight,
@@ -173,8 +173,8 @@ func New(params Params) (*Backend, error) {
 	}
 
 	b := &Backend{
-		state:         params.State,
-		BlocksWatcher: subscriptionHandler,
+		state:             params.State,
+		ChainStateTracker: chainStateTracker,
 		// create the sub-backends
 		backendScripts: backendScripts{
 			log:               params.Log,

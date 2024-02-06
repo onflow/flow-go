@@ -19,6 +19,7 @@ import (
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	subscriptionmock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -44,6 +45,7 @@ type BackendBlocksSuite struct {
 	results            *storagemock.ExecutionResults
 	transactionResults *storagemock.LightTransactionResults
 	seals              *storagemock.Seals
+	chainStateTracker  *subscriptionmock.ChainStateTracker
 
 	colClient              *access.AccessAPIClient
 	execClient             *access.ExecutionAPIClient
@@ -97,6 +99,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 	s.chainID = flow.Testnet
 	s.historicalAccessClient = new(access.AccessAPIClient)
 	s.connectionFactory = connectionmock.NewConnectionFactory(s.T())
+	s.chainStateTracker = subscriptionmock.NewChainStateTracker(s.T())
 
 	s.communicator = new(backendmock.Communicator)
 
@@ -209,6 +212,8 @@ func (s *BackendBlocksSuite) SetupTest() {
 	var err error
 	s.backend, err = New(s.backendParams())
 	require.NoError(s.T(), err)
+	s.backend.ChainStateTracker = s.chainStateTracker
+	s.backend.backendSubscribeBlocks.getHighestHeight = s.chainStateTracker.GetHighestHeight
 }
 
 // backendParams returns the Params configuration for the backend.
@@ -338,10 +343,14 @@ func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 			// this simulates a subscription on a past block
 			if test.highestBackfill > 0 {
 				if test.blockStatus == flow.BlockStatusFinalized {
-					s.backend.SetFinalizedHighestHeight(s.blocksArray[test.highestBackfill].Header.Height)
+					s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).Unset()
+					s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).
+						Return(s.blocksArray[test.highestBackfill].Header.Height, nil)
 				} else {
 					s.snapshot.On("Head").Return(s.blocksArray[test.highestBackfill].Header, nil)
-					s.backend.SetSealedHighestHeight(s.blocksArray[test.highestBackfill].Header.Height)
+					s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusSealed).Unset()
+					s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusSealed).
+						Return(s.blocksArray[test.highestBackfill].Header.Height, nil)
 				}
 			}
 
@@ -356,9 +365,13 @@ func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 				// all blocks with index <= highestBackfill were already received
 				if int(i) > test.highestBackfill {
 					if test.blockStatus == flow.BlockStatusFinalized {
-						s.backend.SetFinalizedHighestHeight(b.Header.Height)
+						s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).Unset()
+						s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).
+							Return(b.Header.Height, nil)
 					} else {
-						s.backend.SetSealedHighestHeight(b.Header.Height)
+						s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusSealed).Unset()
+						s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusSealed).
+							Return(b.Header.Height, nil)
 						s.snapshot.On("Head").Return(b.Header, nil)
 					}
 					s.broadcaster.Publish()
@@ -427,7 +440,7 @@ func (s *BackendBlocksSuite) TestSubscribeBlocksHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeBlocks(subCtx, s.backend.BlocksWatcher.RootBlockID, 0, flow.BlockStatusUnknown)
+		sub := s.backend.SubscribeBlocks(subCtx, s.rootBlock.Header.ID(), 0, flow.BlockStatusUnknown)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -443,7 +456,7 @@ func (s *BackendBlocksSuite) TestSubscribeBlocksHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeBlocks(subCtx, flow.ZeroID, s.backend.BlocksWatcher.RootHeight-1, flow.BlockStatusFinalized)
+		sub := s.backend.SubscribeBlocks(subCtx, flow.ZeroID, s.rootBlock.Header.Height-1, flow.BlockStatusFinalized)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
