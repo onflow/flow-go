@@ -3020,7 +3020,7 @@ func TestBridgedAccountCall(t *testing.T) {
       access(all)
       fun main(): [UInt8] {
           let bridgedAccount <- EVM.createBridgedAccount()
-		  let bal = EVM.Balance(0)
+		  let bal = EVM.Balance(attoflow: 0)
 		  bal.setFLOW(flow: 1.23)
           let response = bridgedAccount.call(
               to: EVM.EVMAddress(
@@ -3388,7 +3388,7 @@ func TestBridgedAccountDeploy(t *testing.T) {
           let address = bridgedAccount.deploy(
               code: [4, 5, 6],
               gasLimit: 9999,
-              value: EVM.Balance(flow: 1230000000000000000)
+              value: EVM.Balance(attoflow: 1230000000000000000)
           )
           destroy bridgedAccount
           return address.bytes

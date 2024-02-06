@@ -3011,8 +3011,10 @@ func TestEVM(t *testing.T) {
 				[]common.TypeID{
 					evmLocation.TypeID(nil, string(types.EventTypeTransactionExecuted)),
 					evmLocation.TypeID(nil, string(types.EventTypeBlockExecuted)),
-					"A.7e60df042a9c0868.FlowToken.TokensWithdrawn",
-					"A.9a0766d93b6608b7.FungibleToken.Withdrawn",
+					"A.0ae53cb6e3f42a79.FlowToken.TokensWithdrawn",
+					"A.ee82856bf20e2aa6.FungibleToken.Withdrawn",
+					evmLocation.TypeID(nil, string(types.EventTypeTransactionExecuted)),
+					evmLocation.TypeID(nil, string(types.EventTypeBlockExecuted)),
 				},
 				eventTypeIDs,
 			)
