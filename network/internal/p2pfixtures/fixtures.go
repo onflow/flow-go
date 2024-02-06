@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"testing"
@@ -135,6 +136,41 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 	return libp2pNode
 }
 
+// SubMustEventuallyStopReceivingAnyMessage checks that the subscription eventually stops receiving any messages within the given timeout by the context.
+// This func uses the send callback to continually publish messages to the subscription, this ensures that the subscription indeed stops receiving the messages.
+func SubMustEventuallyStopReceivingAnyMessage(t *testing.T, ctx context.Context, sub p2p.Subscription, publish func(t *testing.T)) {
+	done := make(chan struct{})
+	ticker := time.NewTicker(1 * time.Second)
+	defer func() {
+		close(done)
+		ticker.Stop()
+	}()
+
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				publish(t)
+			}
+		}
+	}()
+
+	// eventually we should stop receiving messages on the sub
+	require.Eventually(t, func() bool {
+		_, err := sub.Next(ctx)
+		return errors.Is(err, context.DeadlineExceeded)
+	}, 10*time.Second, 100*time.Millisecond)
+
+	// after we stop receiving messages on sub we should continue to not receiving messages
+	// despite messages continuing to be published
+	require.Never(t, func() bool {
+		_, err := sub.Next(ctx)
+		return !errors.Is(err, context.DeadlineExceeded)
+	}, 5*time.Second, 100*time.Millisecond)
+}
+
 // SubMustNeverReceiveAnyMessage checks that the subscription never receives any message within the given timeout by the context.
 func SubMustNeverReceiveAnyMessage(t *testing.T, ctx context.Context, sub p2p.Subscription) {
 	timeouted := make(chan struct{})
@@ -149,6 +185,12 @@ func SubMustNeverReceiveAnyMessage(t *testing.T, ctx context.Context, sub p2p.Su
 	// on a happy path the timeout never happens, and short enough to make sure that
 	// the test doesn't take too long in case of a failure.
 	unittest.RequireCloseBefore(t, timeouted, 10*time.Second, "timeout did not happen on receiving expected pubsub message")
+}
+
+func SubsMustEventuallyStopReceivingAnyMessage(t *testing.T, ctx context.Context, subs []p2p.Subscription, send func(t *testing.T)) {
+	for _, sub := range subs {
+		SubMustEventuallyStopReceivingAnyMessage(t, ctx, sub, send)
+	}
 }
 
 // HasSubReceivedMessage checks that the subscription have received the given message within the given timeout by the context.
