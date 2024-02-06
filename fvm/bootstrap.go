@@ -346,6 +346,7 @@ func (b *bootstrapExecutor) Execute() error {
 	nonFungibleToken := b.deployNonFungibleToken(service, service)
 
 	b.deployMetadataViews(fungibleToken, nonFungibleToken, service)
+	b.deployFungibleTokenSwitchboard(fungibleToken)
 
 	flowToken := b.deployFlowToken(service, fungibleToken, nonFungibleToken)
 	storageFees := b.deployStorageFees(service, fungibleToken, flowToken)
