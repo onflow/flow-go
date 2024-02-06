@@ -68,7 +68,7 @@ func SetupProvider(
 		log:                      log.With().Str("component", "AccountProvider").Logger(),
 		availableAccounts:        make(chan *FlowAccount, numberOfAccounts),
 		numberOfAccounts:         numberOfAccounts,
-		accountCreationBatchSize: 100,
+		accountCreationBatchSize: 50,
 	}
 
 	err := p.init(ctx, fundAmount, rb, creator, sender, chain)
