@@ -83,9 +83,9 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	for _, e := range events {
-		// events are encoded in CCF format in storage. convert to JSON-CDC if requested
-		if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
+	// events are encoded in CCF format in storage. convert to JSON-CDC if requested
+	if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
+		for _, e := range events {
 			payload, err := convert.CcfPayloadToJsonPayload(e.Payload)
 			if err != nil {
 				err = fmt.Errorf("failed to convert event payload for block %s: %w", blockID, err)
@@ -158,9 +158,10 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 			return nil, rpc.ConvertStorageError(err)
 		}
 
-		for _, e := range events {
-			// events are encoded in CCF format in storage. convert to JSON-CDC if requested
-			if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
+		// events are encoded in CCF format in storage. convert to JSON-CDC if requested
+		if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
+			for _, e := range events {
+			
 				payload, err := convert.CcfPayloadToJsonPayload(e.Payload)
 				if err != nil {
 					err = fmt.Errorf("failed to convert event payload for block %s: %w", blockID, err)
@@ -236,9 +237,9 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	for _, e := range events {
-		// events are encoded in CCF format in storage. convert to JSON-CDC if requested
-		if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
+	// events are encoded in CCF format in storage. convert to JSON-CDC if requested
+	if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
+		for _, e := range events {
 			payload, err := convert.CcfPayloadToJsonPayload(e.Payload)
 			if err != nil {
 				err = fmt.Errorf("failed to convert event payload for block %s: %w", blockID, err)

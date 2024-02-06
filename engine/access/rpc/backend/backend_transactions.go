@@ -395,12 +395,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			}
 		}
 
-		results, err = b.getTransactionResultsByBlockIDFromExecutionNode(ctx, block, requiredEventEncodingVersion)
-		if err != nil {
-			return nil, err
-		}
-
-		return results, nil
+		return b.getTransactionResultsByBlockIDFromExecutionNode(ctx, block, requiredEventEncodingVersion)
 	default:
 		return nil, status.Errorf(codes.Internal, "unknown transaction result query mode: %v", b.txResultQueryMode)
 	}
@@ -714,7 +709,7 @@ func (b *backendTransactions) lookupTransactionResult(
 	case TransactionResultQueryModeExecutionNodesOnly:
 		txResult, err := b.getTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
 		if err != nil {
-			// if either the execution node reported no results or the execution node could not be chosen
+			// if either the execution node reported no results or there were not enough execution results
 			if status.Code(err) == codes.NotFound {
 				// No result yet, indicate that it has not been executed
 				return nil, nil
@@ -726,12 +721,7 @@ func (b *backendTransactions) lookupTransactionResult(
 		// considered executed as long as some result is returned, even if it's an error message
 		return txResult, nil
 	case TransactionResultQueryModeLocalOnly:
-		txResult, err := b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion, b.lookupTransactionErrorMessage)
-		if err != nil {
-			return nil, err
-		}
-
-		return txResult, nil
+		return b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion, b.lookupTransactionErrorMessage)
 	case TransactionResultQueryModeFailover:
 		txResult, err := b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion, b.lookupTransactionErrorMessage)
 		if err == nil {
