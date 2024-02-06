@@ -34,7 +34,7 @@ func TestOnEntityRequestFull(t *testing.T) {
 	entities := make(map[flow.Identifier]flow.Entity)
 
 	identities := unittest.IdentityListFixture(8)
-	selector := filter.HasNodeID(identities.NodeIDs()...)
+	selector := filter.HasNodeID[flow.Identity](identities.NodeIDs()...)
 	originID := identities[0].NodeID
 
 	coll1 := unittest.CollectionFixture(1)
@@ -59,7 +59,7 @@ func TestOnEntityRequestFull(t *testing.T) {
 
 	final := protocol.NewSnapshot(t)
 	final.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return identities.Filter(selector)
 		},
 		nil,
@@ -128,7 +128,7 @@ func TestOnEntityRequestPartial(t *testing.T) {
 	entities := make(map[flow.Identifier]flow.Entity)
 
 	identities := unittest.IdentityListFixture(8)
-	selector := filter.HasNodeID(identities.NodeIDs()...)
+	selector := filter.HasNodeID[flow.Identity](identities.NodeIDs()...)
 	originID := identities[0].NodeID
 
 	coll1 := unittest.CollectionFixture(1)
@@ -153,7 +153,7 @@ func TestOnEntityRequestPartial(t *testing.T) {
 
 	final := protocol.NewSnapshot(t)
 	final.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return identities.Filter(selector)
 		},
 		nil,
@@ -220,7 +220,7 @@ func TestOnEntityRequestDuplicates(t *testing.T) {
 	entities := make(map[flow.Identifier]flow.Entity)
 
 	identities := unittest.IdentityListFixture(8)
-	selector := filter.HasNodeID(identities.NodeIDs()...)
+	selector := filter.HasNodeID[flow.Identity](identities.NodeIDs()...)
 	originID := identities[0].NodeID
 
 	coll1 := unittest.CollectionFixture(1)
@@ -241,7 +241,7 @@ func TestOnEntityRequestDuplicates(t *testing.T) {
 
 	final := protocol.NewSnapshot(t)
 	final.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return identities.Filter(selector)
 		},
 		nil,
@@ -307,7 +307,7 @@ func TestOnEntityRequestEmpty(t *testing.T) {
 
 	entities := make(map[flow.Identifier]flow.Entity)
 	identities := unittest.IdentityListFixture(8)
-	selector := filter.HasNodeID(identities.NodeIDs()...)
+	selector := filter.HasNodeID[flow.Identity](identities.NodeIDs()...)
 	originID := identities[0].NodeID
 
 	coll1 := unittest.CollectionFixture(1)
@@ -326,7 +326,7 @@ func TestOnEntityRequestEmpty(t *testing.T) {
 
 	final := protocol.NewSnapshot(t)
 	final.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return identities.Filter(selector)
 		},
 		nil,
@@ -385,7 +385,7 @@ func TestOnEntityRequestInvalidOrigin(t *testing.T) {
 
 	entities := make(map[flow.Identifier]flow.Entity)
 	identities := unittest.IdentityListFixture(8)
-	selector := filter.HasNodeID(identities.NodeIDs()...)
+	selector := filter.HasNodeID[flow.Identity](identities.NodeIDs()...)
 	originID := unittest.IdentifierFixture()
 
 	coll1 := unittest.CollectionFixture(1)
@@ -410,7 +410,7 @@ func TestOnEntityRequestInvalidOrigin(t *testing.T) {
 
 	final := protocol.NewSnapshot(t)
 	final.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			defer cancel()
 			return identities.Filter(selector)
 		},

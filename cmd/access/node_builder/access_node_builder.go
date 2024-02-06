@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -147,6 +148,8 @@ type AccessNodeConfig struct {
 	registersDBPath              string
 	checkpointFile               string
 	scriptExecutorConfig         query.QueryConfig
+	scriptExecMinBlock           uint64
+	scriptExecMaxBlock           uint64
 }
 
 type PublicNetworkConfig struct {
@@ -237,6 +240,8 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registersDBPath:              filepath.Join(homedir, ".flow", "execution_state"),
 		checkpointFile:               cmd.NotSet,
 		scriptExecutorConfig:         query.NewDefaultConfig(),
+		scriptExecMinBlock:           0,
+		scriptExecMaxBlock:           math.MaxUint64,
 	}
 }
 
@@ -274,6 +279,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionIndexerCore       *indexer.IndexerCore
 	ScriptExecutor             *backend.ScriptExecutor
 	RegistersAsyncStore        *execution.RegistersAsyncStore
+	EventsIndex                *backend.EventsIndex
 	IndexerDependencies        *cmd.DependencyList
 
 	// The sync engine participants provider is the libp2p peer store for the access node
@@ -768,11 +774,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, err
 				}
 
-				err = builder.RegistersAsyncStore.InitDataAvailable(registers)
-				if err != nil {
-					return nil, err
-				}
-
 				// setup requester to notify indexer when new execution data is received
 				execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
 
@@ -791,7 +792,20 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, err
 				}
 
-				builder.ScriptExecutor.InitReporter(builder.ExecutionIndexer, scripts)
+				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts)
+				if err != nil {
+					return nil, err
+				}
+
+				err = builder.EventsIndex.Initialize(builder.ExecutionIndexer)
+				if err != nil {
+					return nil, err
+				}
+
+				err = builder.RegistersAsyncStore.Initialize(registers)
+				if err != nil {
+					return nil, err
+				}
 
 				return builder.ExecutionIndexer, nil
 			}, builder.IndexerDependencies)
@@ -832,7 +846,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.stateStreamConf,
 				node.State,
 				node.Storage.Headers,
-				node.Storage.Events,
 				node.Storage.Seals,
 				node.Storage.Results,
 				builder.ExecutionDataStore,
@@ -841,6 +854,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.executionDataConfig.InitialBlockHeight,
 				highestAvailableHeight,
 				builder.RegistersAsyncStore,
+				builder.EventsIndex,
 				useIndex,
 			)
 			if err != nil {
@@ -1107,6 +1121,14 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"script-execution-timeout",
 			defaultConfig.scriptExecutorConfig.ExecutionTimeLimit,
 			"timeout value for locally executed scripts. default: 10s")
+		flags.Uint64Var(&builder.scriptExecMinBlock,
+			"script-execution-min-height",
+			defaultConfig.scriptExecMinBlock,
+			"lowest block height to allow for script execution. default: no limit")
+		flags.Uint64Var(&builder.scriptExecMaxBlock,
+			"script-execution-max-height",
+			defaultConfig.scriptExecMaxBlock,
+			"highest block height to allow for script execution. default: no limit")
 
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
@@ -1218,8 +1240,8 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
 			return id.NewIdentityFilterIdentifierProvider(
 				filter.And(
-					filter.HasRole(flow.RoleConsensus),
-					filter.Not(filter.HasNodeID(node.Me.NodeID())),
+					filter.HasRole[flow.Identity](flow.RoleConsensus),
+					filter.Not(filter.HasNodeID[flow.Identity](node.Me.NodeID())),
 					underlay.NotEjectedFilter,
 				),
 				builder.IdentityProvider,
@@ -1421,7 +1443,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("backend script executor", func(node *cmd.NodeConfig) error {
-			builder.ScriptExecutor = backend.NewScriptExecutor()
+			builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
 			return nil
 		}).
 		Module("async register store", func(node *cmd.NodeConfig) error {
@@ -1430,6 +1452,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		Module("events storage", func(node *cmd.NodeConfig) error {
 			builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
+			return nil
+		}).
+		Module("events index", func(node *cmd.NodeConfig) error {
+			builder.EventsIndex = backend.NewEventsIndex(builder.Storage.Events)
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -1483,7 +1509,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				HistoricalAccessNodes:     builder.HistoricalAccessRPCs,
 				Blocks:                    node.Storage.Blocks,
 				Headers:                   node.Storage.Headers,
-				Events:                    node.Storage.Events,
 				Collections:               node.Storage.Collections,
 				Transactions:              node.Storage.Transactions,
 				ExecutionReceipts:         node.Storage.Receipts,
@@ -1503,6 +1528,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ScriptExecutor:            builder.ScriptExecutor,
 				ScriptExecutionMode:       scriptExecMode,
 				EventQueryMode:            eventQueryMode,
+				EventsIndex:               builder.EventsIndex,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
@@ -1548,7 +1574,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Me,
 				node.State,
 				channels.RequestCollections,
-				filter.HasRole(flow.RoleCollection),
+				filter.HasRole[flow.Identity](flow.RoleCollection),
 				func() flow.Entity { return &flow.Collection{} },
 			)
 			if err != nil {
@@ -1740,7 +1766,6 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 	if err != nil {
 		return nil, fmt.Errorf("could not create connection manager: %w", err)
 	}
-
 	libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger, &builder.FlowConfig.NetworkConfig.GossipSub, &p2pbuilderconfig.MetricsConfig{
 		HeroCacheFactory: builder.HeroCacheMetricsFactory(),
 		Metrics:          networkMetrics,

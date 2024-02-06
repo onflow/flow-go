@@ -285,9 +285,9 @@ We might incorrectly compute high error in the target view rate, if local curren
 
 **Solution:** determine epoch locally based on view only, do not use `EpochTransition` event.
 
-### EECC
+### EFM
 
-We need to detect EECC and revert to a default block-rate-delay (stop adjusting).
+We need to detect EFM and revert to a default block-rate-delay (stop adjusting).
 
 ## Testing
 
