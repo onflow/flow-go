@@ -8,7 +8,6 @@ import (
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go-sdk/crypto"
@@ -97,7 +96,7 @@ func (p *provider) init(
 			p.numberOfAccounts,
 		))
 
-	log.Info().
+	p.log.Info().
 		Int("number_of_accounts", p.numberOfAccounts).
 		Int("account_creation_batch_size", p.accountCreationBatchSize).
 		Int("number_of_keys", creator.NumKeys()).
@@ -111,7 +110,7 @@ func (p *provider) init(
 				return nil
 			default:
 			}
-			
+
 			num := p.accountCreationBatchSize
 			if i+p.accountCreationBatchSize > p.numberOfAccounts {
 				num = p.numberOfAccounts - i

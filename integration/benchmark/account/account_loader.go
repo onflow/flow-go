@@ -2,6 +2,7 @@ package account
 
 import (
 	"context"
+	"github.com/rs/zerolog"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/access"
@@ -17,15 +18,18 @@ type Loader interface {
 }
 
 type ClientAccountLoader struct {
+	log        zerolog.Logger
 	ctx        context.Context
 	flowClient access.Client
 }
 
 func NewClientAccountLoader(
+	log zerolog.Logger,
 	ctx context.Context,
 	flowClient access.Client,
 ) *ClientAccountLoader {
 	return &ClientAccountLoader{
+		log:        log.With().Str("component", "account_loader").Logger(),
 		ctx:        ctx,
 		flowClient: flowClient,
 	}
@@ -36,7 +40,14 @@ func (c *ClientAccountLoader) Load(
 	privateKey crypto.PrivateKey,
 	hashAlgo crypto.HashAlgorithm,
 ) (*FlowAccount, error) {
-	return LoadAccount(c.ctx, c.flowClient, address, privateKey, hashAlgo)
+	acc, err := LoadAccount(c.ctx, c.flowClient, address, privateKey, hashAlgo)
+
+	c.log.Debug().
+		Str("address", address.String()).
+		Int("keys", acc.NumKeys()).
+		Msg("Loaded account")
+
+	return acc, err
 }
 
 func ReloadAccount(c Loader, acc *FlowAccount) error {
@@ -44,6 +55,7 @@ func ReloadAccount(c Loader, acc *FlowAccount) error {
 	if err != nil {
 		return err
 	}
+
 	acc.keys = newAcc.keys
 	return nil
 }

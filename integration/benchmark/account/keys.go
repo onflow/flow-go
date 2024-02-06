@@ -123,7 +123,8 @@ func EnsureAccountHasKeys(
 	return AddKeysToAccount(log, account, numberOfKeysToAdd, referenceBlockProvider, sender)
 }
 
-func AddKeysToAccount(log zerolog.Logger,
+func AddKeysToAccount(
+	log zerolog.Logger,
 	account *FlowAccount,
 	numberOfKeysToAdd int,
 	referenceBlockProvider common.ReferenceBlockProvider,
