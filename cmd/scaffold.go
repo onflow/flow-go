@@ -1239,9 +1239,12 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 		return fmt.Errorf("could not parse node identifier: %w", err)
 	}
 
+	fnb.Logger.Info().Msgf("bind addr %v", fnb.BaseConfig.BindAddr)
+
 	self, err := fnb.State.Final().Identity(myID)
 	if err != nil {
-		return fmt.Errorf("node identity not found in the identity list of the finalized state (id: %v): %w", myID, err)
+		return fmt.Errorf("node identity not found in the identity list of the finalized state (id: %v) %v: %w", myID,
+			fnb.BaseConfig.BindAddr, err)
 	}
 
 	// Verify that my role (as given in the configuration) is consistent with the protocol state.
