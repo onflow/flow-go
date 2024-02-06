@@ -40,12 +40,6 @@ func (c *ClientAccountLoader) Load(
 }
 
 func ReloadAccount(c Loader, acc *FlowAccount) error {
-	key, err := acc.GetKey()
-	if err != nil {
-		return err
-	}
-	key.Done()
-
 	newAcc, err := c.Load(acc.Address, acc.PrivateKey, acc.HashAlgo)
 	if err != nil {
 		return err

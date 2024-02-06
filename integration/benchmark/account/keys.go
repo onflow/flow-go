@@ -123,8 +123,7 @@ func EnsureAccountHasKeys(
 	return AddKeysToAccount(log, account, numberOfKeysToAdd, referenceBlockProvider, sender)
 }
 
-func AddKeysToAccount(
-	log zerolog.Logger,
+func AddKeysToAccount(log zerolog.Logger,
 	account *FlowAccount,
 	numberOfKeysToAdd int,
 	referenceBlockProvider common.ReferenceBlockProvider,
@@ -169,10 +168,7 @@ func AddKeysToAccount(
 	}
 
 	_, err = sender.Send(addKeysTx)
-	if err != nil {
-		return wrapErr(err)
-	}
-	if !errors.Is(err, common.TransactionError{}) {
+	if err == nil || !errors.Is(err, common.TransactionError{}) {
 		key.IncrementSequenceNumber()
 	}
 	if err != nil {
