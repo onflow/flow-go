@@ -59,7 +59,7 @@ func LoadAccount(
 		return nil, fmt.Errorf("error while calling get account for account %s: %w", address, err)
 	}
 
-	keys := make([]flowsdk.AccountKey, 0, len(acc.Keys))
+	keys := make([]flowsdk.AccountKey, len(acc.Keys))
 	for i, key := range acc.Keys {
 		keys[i] = *key
 	}
