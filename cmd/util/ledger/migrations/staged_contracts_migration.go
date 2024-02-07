@@ -20,11 +20,11 @@ import (
 )
 
 type StagedContractsMigration struct {
-	log                   zerolog.Logger
-	mutex                 sync.RWMutex
-	contracts             map[common.Address]map[flow.RegisterID]Contract
-	contractsByLocation   map[common.Location][]byte
-	stagedContractsGetter func() []StagedContract
+	log                 zerolog.Logger
+	mutex               sync.RWMutex
+	contracts           map[common.Address]map[flow.RegisterID]Contract
+	contractsByLocation map[common.Location][]byte
+	stagedContracts     []StagedContract
 }
 
 type StagedContract struct {
@@ -39,11 +39,11 @@ type Contract struct {
 
 var _ AccountBasedMigration = &StagedContractsMigration{}
 
-func NewStagedContractsMigration(stagedContractsGetter func() []StagedContract) *StagedContractsMigration {
+func NewStagedContractsMigration(stagedContracts []StagedContract) *StagedContractsMigration {
 	return &StagedContractsMigration{
-		stagedContractsGetter: stagedContractsGetter,
-		contracts:             map[common.Address]map[flow.RegisterID]Contract{},
-		contractsByLocation:   map[common.Location][]byte{},
+		stagedContracts:     stagedContracts,
+		contracts:           map[common.Address]map[flow.RegisterID]Contract{},
+		contractsByLocation: map[common.Location][]byte{},
 	}
 }
 
@@ -84,8 +84,7 @@ func (m *StagedContractsMigration) InitMigration(
 
 // registerContractUpdates prepares the contract updates as a map for easy lookup.
 func (m *StagedContractsMigration) registerContractUpdates() {
-	contractChanges := m.stagedContractsGetter()
-	for _, contractChange := range contractChanges {
+	for _, contractChange := range m.stagedContracts {
 		m.registerContractChange(contractChange)
 	}
 }
@@ -247,9 +246,4 @@ func (m *StagedContractsMigration) checkUpdateValidity(
 	)
 
 	return validator.Validate()
-}
-
-func GetStagedContracts() []StagedContract {
-	// TODO:
-	return nil
 }

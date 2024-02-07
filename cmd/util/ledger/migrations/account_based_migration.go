@@ -36,14 +36,14 @@ type AccountBasedMigration interface {
 	io.Closer
 }
 
-// CreateAccountBasedMigration creates a migration function that migrates the payloads
+// NewAccountBasedMigration creates a migration function that migrates the payloads
 // account by account using the given migrations
 // accounts are processed concurrently using the given number of workers
 // but each account is processed sequentially by the given migrations in order.
 // The migrations InitMigration function is called once before the migration starts
 // And the Close function is called once after the migration finishes if the migration
 // is a finisher.
-func CreateAccountBasedMigration(
+func NewAccountBasedMigration(
 	log zerolog.Logger,
 	nWorker int,
 	migrations []AccountBasedMigration,
@@ -282,8 +282,9 @@ func MigrateGroupConcurrently(
 		Array("top_longest_migrations", durations.Array()).
 		Msgf("Top longest migrations")
 
-	if ctx.Err() != nil {
-		return nil, fmt.Errorf("fail to migrate payload: %w", ctx.Err())
+	err := ctx.Err()
+	if err != nil {
+		return nil, fmt.Errorf("failed to migrate payload: %w", err)
 	}
 
 	return migrated, nil

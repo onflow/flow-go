@@ -401,3 +401,18 @@ func mustHexAddress(hexAddress string) common.Address {
 	}
 	return address
 }
+
+func NewSystemContactsMigration(
+	chainID flow.ChainID,
+	options SystemContractChangesOptions,
+) *ChangeContractCodeMigration {
+	migration := &ChangeContractCodeMigration{}
+	for _, change := range SystemContractChanges(chainID, options) {
+		migration.RegisterContractChange(
+			change.Address,
+			change.ContractName,
+			change.NewContractCode,
+		)
+	}
+	return migration
+}

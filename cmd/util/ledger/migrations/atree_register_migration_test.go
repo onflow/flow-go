@@ -28,7 +28,7 @@ func TestAtreeRegisterMigration(t *testing.T) {
 
 			log,
 			"test-data/bootstrapped_v0.31",
-			migrations.CreateAccountBasedMigration(log, 2,
+			migrations.NewAccountBasedMigration(log, 2,
 				[]migrations.AccountBasedMigration{
 					migrations.NewAtreeRegisterMigrator(reporters.NewReportFileWriterFactory(dir, log), true, false),
 				},

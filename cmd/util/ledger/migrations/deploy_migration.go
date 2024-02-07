@@ -15,12 +15,12 @@ import (
 
 func NewTransactionBasedMigration(
 	tx *flow.TransactionBody,
-	chain flow.Chain,
+	chainID flow.ChainID,
 	logger zerolog.Logger,
 ) ledger.Migration {
 	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
 
-		options := computation.DefaultFVMOptions(chain.ChainID(), false, false)
+		options := computation.DefaultFVMOptions(chainID, false, false)
 		options = append(options,
 			fvm.WithContractDeploymentRestricted(false),
 			fvm.WithContractRemovalRestricted(false),
@@ -60,7 +60,7 @@ func NewTransactionBasedMigration(
 }
 
 func NewDeploymentMigration(
-	chain flow.Chain,
+	chainID flow.ChainID,
 	contract Contract,
 	authorizer flow.Address,
 	logger zerolog.Logger,
@@ -80,22 +80,21 @@ func NewDeploymentMigration(
 		AddArgument(jsoncdc.MustEncode(cadence.String(contract.code))).
 		AddAuthorizer(authorizer)
 
-	return NewTransactionBasedMigration(tx, chain, logger)
+	return NewTransactionBasedMigration(tx, chainID, logger)
 }
 
 func NewBurnerDeploymentMigration(
-	chain flow.Chain,
-	authorizer flow.Address,
+	chainID flow.ChainID,
 	logger zerolog.Logger,
 ) ledger.Migration {
 
 	return NewDeploymentMigration(
-		chain,
+		chainID,
 		Contract{
 			name: "Burner",
 			code: coreContracts.Burner(),
 		},
-		authorizer,
+		chainID.Chain().ServiceAddress(),
 		logger,
 	)
 }

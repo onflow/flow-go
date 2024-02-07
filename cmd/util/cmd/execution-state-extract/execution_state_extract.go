@@ -34,6 +34,8 @@ func extractExecutionState(
 	outputDir string,
 	nWorker int, // number of concurrent worker to migration payloads
 	runMigrations bool,
+	chainID flow.ChainID,
+	evmContractChange migrators.EVMContractChange,
 ) error {
 
 	log.Info().Msg("init WAL")
@@ -94,25 +96,20 @@ func extractExecutionState(
 
 	var migrations []ledger.Migration
 
+	// TODO:
+	var stagedContracts []migrators.StagedContract
+
 	if runMigrations {
 		rwf := reporters.NewReportFileWriterFactory(dir, log)
 
-		migrations = []ledger.Migration{
-			// Contracts must be migrated first
-			migrators.CreateAccountBasedMigration(
-				log,
-				nWorker,
-				[]migrators.AccountBasedMigration{
-					migrators.NewStagedContractsMigration(migrators.GetStagedContracts),
-				},
-			),
-
-			migrators.CreateAccountBasedMigration(
-				log,
-				nWorker,
-				migrators.NewCadenceMigrations(rwf),
-			),
-		}
+		migrations = migrators.NewCadence1Migrations(
+			log,
+			rwf,
+			nWorker,
+			chainID,
+			evmContractChange,
+			stagedContracts,
+		)
 	}
 
 	newState := ledger.State(targetHash)
