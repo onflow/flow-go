@@ -1,10 +1,8 @@
 package migrations
 
 import (
-	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"testing"
 
@@ -28,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -523,89 +520,6 @@ func checkReporters(
 			reportEntry("StringNormalizingMigration", "dictionary_with_reference_typed_key", common.PathDomainStorage),
 		},
 	)
-}
-
-func updateContracts(payloads []*ledger.Payload, address common.Address) ([]*ledger.Payload, error) {
-	testContractRegisterId := flow.ContractRegisterID(flow.ConvertAddress(address), "Test")
-
-	updatedContractCode, err := os.ReadFile(updatedTestContract)
-	if err != nil {
-		return nil, err
-	}
-
-	for payloadIndex, payload := range payloads {
-		key, err := payload.Key()
-		if err != nil {
-			return nil, err
-		}
-
-		registerID, err := convert.LedgerKeyToRegisterID(key)
-		if err != nil {
-			return nil, err
-		}
-
-		if registerID == testContractRegisterId {
-			// change contract code
-			payloads[payloadIndex] = ledger.NewPayload(key, updatedContractCode)
-		}
-
-	}
-
-	return payloads, nil
-}
-
-func runLinkMigration(
-	t *testing.T,
-	address common.Address,
-	payloads []*ledger.Payload,
-	capabilityIDs map[interpreter.AddressPath]interpreter.UInt64Value,
-	rwf *testReportWriterFactory,
-) []*ledger.Payload {
-	linkValueMigration := NewCadence1LinkValueMigrator(rwf, capabilityIDs)
-
-	logWriter := &writer{}
-	logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
-
-	err := linkValueMigration.InitMigration(logger, nil, 0)
-	require.NoError(t, err)
-
-	ctx := context.Background()
-	payloads, err = linkValueMigration.MigrateAccount(ctx, address, payloads)
-	require.NoError(t, err)
-
-	linkMigrationReportWriter := linkValueMigration.reporter.(*testReportWriter)
-
-	// Order is non-deterministic, so use 'ElementsMatch'.
-	assert.ElementsMatch(
-		t,
-		linkMigrationReportWriter.entries,
-		[]any{
-			capConsLinkMigration{
-				AccountAddressPath: interpreter.AddressPath{
-					Address: address,
-					Path: interpreter.PathValue{
-						Identifier: "linkR",
-						Domain:     common.PathDomainPublic,
-					},
-				},
-				CapabilityID: 1,
-			},
-			cadenceValueMigrationReportEntry{
-				StorageMapKey: interpreter.StringStorageMapKey("linkR"),
-				StorageKey: interpreter.NewStorageKey(
-					nil,
-					address,
-					common.PathDomainPublic.Identifier(),
-				),
-				Migration: "LinkValueMigration",
-			},
-		},
-	)
-
-	// Check error logs.
-	require.Equal(t, []string{}, logWriter.logs)
-
-	return payloads
 }
 
 type testReportWriterFactory struct{}
