@@ -3,11 +3,7 @@ package migrations
 import (
 	"fmt"
 	"io"
-	"strings"
 	"testing"
-
-	"github.com/onflow/cadence/runtime/tests/utils"
-	"github.com/onflow/cadence/tools/analysis"
 
 	"github.com/onflow/flow-go/fvm/environment"
 
@@ -96,84 +92,8 @@ func TestCadenceValuesMigration(t *testing.T) {
 	require.Equal(t, []string{}, logWriter.logs)
 }
 
+// TODO:
 //func TestCadenceValuesMigrationWithSwappedOrder(t *testing.T) {
-//
-//	t.Parallel()
-//
-//	address, err := common.HexToAddress(testAccountAddress)
-//	require.NoError(t, err)
-//
-//	// Get the old payloads
-//	payloads, err := util.PayloadsFromEmulatorSnapshot(snapshotPath)
-//	require.NoError(t, err)
-//
-//	// Update contracts to stable cadence.
-//	payloads, err = updateContracts(payloads, address)
-//	require.NoError(t, err)
-//
-//	// Migrate
-//
-//	rwf := &testReportWriterFactory{}
-//	capabilityIDs := map[interpreter.AddressPath]interpreter.UInt64Value{}
-//
-//	// Run link values migration
-//	payloads = runLinkMigration(t, address, payloads, capabilityIDs, rwf)
-//
-//	// Run remaining migrations
-//	valueMigration := &CadenceBaseMigrator{
-//		name:     "cadence-value-migration",
-//		reporter: rwf.ReportWriter("cadence-value-migrator"),
-//		valueMigrations: func(
-//			inter *interpreter.Interpreter,
-//			_ environment.Accounts,
-//			reporter *cadenceValueMigrationReporter,
-//		) []migrations.ValueMigration {
-//			// All cadence migrations except the `capcons.LinkValueMigration`.
-//			return []migrations.ValueMigration{
-//				&capcons.CapabilityValueMigration{
-//					CapabilityIDs: capabilityIDs,
-//					Reporter:      reporter,
-//				},
-//				string_normalization.NewStringNormalizingMigration(),
-//				statictypes.NewStaticTypeMigration().
-//					WithCompositeTypeConverter(func(staticType *interpreter.CompositeStaticType) interpreter.StaticType {
-//						// Returning `nil` indicates the type wasn't converted.
-//						return nil
-//					}).
-//					WithInterfaceTypeConverter(func(staticType *interpreter.InterfaceStaticType) interpreter.StaticType {
-//						// Returning `nil` indicates the type wasn't converted.
-//						return nil
-//					}),
-//
-//				// Run this at the end
-//				entitlements.NewEntitlementsMigration(inter),
-//			}
-//		},
-//	}
-//
-//	logWriter := &writer{}
-//	logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
-//	err = valueMigration.InitMigration(logger, nil, 0)
-//	require.NoError(t, err)
-//
-//	ctx := context.Background()
-//	newPayloads, err := valueMigration.MigrateAccount(ctx, address, payloads)
-//	require.NoError(t, err)
-//
-//	err = valueMigration.Close()
-//	require.NoError(t, err)
-//
-//	// Assert the migrated payloads
-//	rResourceType := checkMigratedPayloads(t, address, newPayloads)
-//
-//	// Check reporters
-//	checkReporters(t, valueMigration, address, rResourceType)
-//
-//	// Check error logs.
-//	// Given entitlement migration was run at the end,
-//	// we shouldn't get the deprecated-type errors
-//	require.Empty(t, logWriter.logs)
-//}
 
 func checkMigratedPayloads(
 	t *testing.T,
@@ -539,72 +459,3 @@ func (r *testReportWriter) Write(entry any) {
 }
 
 func (r *testReportWriter) Close() {}
-
-func TestStaticTypesMigrationRules(t *testing.T) {
-
-	t.Parallel()
-
-	programs := analysis.Programs{}
-	config := analysis.NewSimpleConfig(
-		analysis.NeedTypes,
-		map[common.Location][]byte{
-			utils.TestLocation: []byte(`
-              access(all)
-              contract Test {
-                  access(all)
-                  resource R {}
-
-                  access(all)
-                  resource interface RI {}
-              }
-            `),
-		},
-		nil,
-		nil,
-	)
-	err := programs.Load(config, utils.TestLocation)
-	require.NoError(t, err)
-
-	csv := strings.NewReader(`"import ""test""",Test.R,{Test.RI}`)
-
-	rules, err := ReadCSVStaticTypeMigrationRules(programs, csv)
-	require.NoError(t, err)
-
-	type ruleEntry struct {
-		source, target interpreter.StaticType
-	}
-
-	var actual []ruleEntry
-
-	for source, target := range rules {
-		actual = append(
-			actual,
-			ruleEntry{
-				source: source,
-				target: target,
-			},
-		)
-	}
-
-	assert.ElementsMatch(t,
-		[]ruleEntry{
-			{
-				source: &interpreter.CompositeStaticType{
-					Location:            utils.TestLocation,
-					QualifiedIdentifier: "Test.R",
-					TypeID:              "S.test.Test.R",
-				},
-				target: &interpreter.IntersectionStaticType{
-					Types: []*interpreter.InterfaceStaticType{
-						{
-							Location:            utils.TestLocation,
-							QualifiedIdentifier: "Test.RI",
-							TypeID:              "S.test.Test.RI",
-						},
-					},
-				},
-			},
-		},
-		actual,
-	)
-}

@@ -1,62 +1,161 @@
 package migrations
 
 import (
-	"bytes"
 	_ "embed"
 
 	"github.com/onflow/cadence/migrations/statictypes"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/tools/analysis"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-//go:embed cadence_composite_type_rules.csv
-var cadenceCompositeTypeRulesCSV []byte
+func NewCadence1InterfaceStaticTypeConverter(chainID flow.ChainID) statictypes.InterfaceTypeConverterFunc {
+	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
-//go:embed cadence_interface_type_rules.csv
-var cadenceInterfaceTypeRulesCSV []byte
+	oldFungibleTokenResolverType, newFungibleTokenResolverType := fungibleTokenResolverRule(systemContracts)
 
-var cadenceCompositeTypeConverter statictypes.CompositeTypeConverterFunc
-var cadenceInterfaceTypeConverter statictypes.InterfaceTypeConverterFunc
-
-func init() {
-	programs := analysis.Programs{}
-
-	cadenceCompositeTypeRules, err := ReadCSVStaticTypeMigrationRules(
-		programs,
-		bytes.NewReader(cadenceCompositeTypeRulesCSV),
-	)
-	if err != nil {
-		panic(err)
+	rules := StaticTypeMigrationRules{
+		oldFungibleTokenResolverType.ID(): newFungibleTokenResolverType,
 	}
 
-	cadenceCompositeTypeConverter =
-		NewStaticTypeMigrator[*interpreter.CompositeStaticType](cadenceCompositeTypeRules)
+	return NewStaticTypeMigrator[*interpreter.InterfaceStaticType](rules)
+}
 
-	cadenceInterfaceTypeRules, err := ReadCSVStaticTypeMigrationRules(
-		programs,
-		bytes.NewReader(cadenceInterfaceTypeRulesCSV),
-	)
-	if err != nil {
-		panic(err)
+func NewCadence1CompositeStaticTypeConverter(chainID flow.ChainID) statictypes.CompositeTypeConverterFunc {
+
+	systemContracts := systemcontracts.SystemContractsForChain(chainID)
+
+	oldFungibleTokenVaultCompositeType, newFungibleTokenVaultType := fungibleTokenVaultRule(systemContracts)
+	oldNonFungibleTokenNFTCompositeType, newNonFungibleTokenNFTType := nonFungibleTokenNFTRule(systemContracts)
+
+	rules := StaticTypeMigrationRules{
+		oldFungibleTokenVaultCompositeType.ID():  newFungibleTokenVaultType,
+		oldNonFungibleTokenNFTCompositeType.ID(): newNonFungibleTokenNFTType,
 	}
 
-	cadenceInterfaceTypeConverter =
-		NewStaticTypeMigrator[*interpreter.InterfaceStaticType](cadenceInterfaceTypeRules)
+	return NewStaticTypeMigrator[*interpreter.CompositeStaticType](rules)
+}
+
+func nonFungibleTokenNFTRule(
+	systemContracts *systemcontracts.SystemContracts,
+) (
+	*interpreter.CompositeStaticType,
+	*interpreter.IntersectionStaticType,
+) {
+	contract := systemContracts.NonFungibleToken
+
+	qualifiedIdentifier := contract.Name + ".NFT"
+
+	location := common.AddressLocation{
+		Address: common.Address(contract.Address),
+		Name:    contract.Name,
+	}
+
+	nftTypeID := location.TypeID(nil, qualifiedIdentifier)
+
+	oldType := &interpreter.CompositeStaticType{
+		Location:            location,
+		QualifiedIdentifier: qualifiedIdentifier,
+		TypeID:              nftTypeID,
+	}
+
+	newType := &interpreter.IntersectionStaticType{
+		Types: []*interpreter.InterfaceStaticType{
+			{
+				Location:            location,
+				QualifiedIdentifier: qualifiedIdentifier,
+				TypeID:              nftTypeID,
+			},
+		},
+	}
+
+	return oldType, newType
+}
+
+func fungibleTokenVaultRule(
+	systemContracts *systemcontracts.SystemContracts,
+) (
+	*interpreter.CompositeStaticType,
+	*interpreter.IntersectionStaticType,
+) {
+	contract := systemContracts.FungibleToken
+
+	qualifiedIdentifier := contract.Name + ".Vault"
+
+	location := common.AddressLocation{
+		Address: common.Address(contract.Address),
+		Name:    contract.Name,
+	}
+
+	vaultTypeID := location.TypeID(nil, qualifiedIdentifier)
+
+	oldType := &interpreter.CompositeStaticType{
+		Location:            location,
+		QualifiedIdentifier: qualifiedIdentifier,
+		TypeID:              vaultTypeID,
+	}
+
+	newType := &interpreter.IntersectionStaticType{
+		Types: []*interpreter.InterfaceStaticType{
+			{
+				Location:            location,
+				QualifiedIdentifier: qualifiedIdentifier,
+				TypeID:              vaultTypeID,
+			},
+		},
+	}
+
+	return oldType, newType
+}
+
+func fungibleTokenResolverRule(
+	systemContracts *systemcontracts.SystemContracts,
+) (
+	*interpreter.InterfaceStaticType,
+	*interpreter.InterfaceStaticType,
+) {
+	oldContract := systemContracts.MetadataViews
+	newContract := systemContracts.ViewResolver
+
+	oldLocation := common.AddressLocation{
+		Address: common.Address(oldContract.Address),
+		Name:    oldContract.Name,
+	}
+
+	newLocation := common.AddressLocation{
+		Address: common.Address(newContract.Address),
+		Name:    newContract.Name,
+	}
+
+	oldQualifiedIdentifier := oldContract.Name + ".Resolver"
+	newQualifiedIdentifier := newContract.Name + ".Resolver"
+
+	oldType := &interpreter.InterfaceStaticType{
+		Location:            oldLocation,
+		QualifiedIdentifier: oldQualifiedIdentifier,
+		TypeID:              oldLocation.TypeID(nil, oldQualifiedIdentifier),
+	}
+
+	newType := &interpreter.InterfaceStaticType{
+		Location:            newLocation,
+		QualifiedIdentifier: newQualifiedIdentifier,
+		TypeID:              newLocation.TypeID(nil, newQualifiedIdentifier),
+	}
+
+	return oldType, newType
 }
 
 func NewCadence1ValueMigrations(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
 	nWorker int,
-) (
-	migrations []ledger.Migration,
-) {
+	chainID flow.ChainID,
+) (migrations []ledger.Migration) {
 
 	// Populated by CadenceLinkValueMigrator,
 	// used by CadenceCapabilityValueMigrator
@@ -65,8 +164,8 @@ func NewCadence1ValueMigrations(
 	for _, accountBasedMigration := range []AccountBasedMigration{
 		NewCadence1ValueMigrator(
 			rwf,
-			cadenceCompositeTypeConverter,
-			cadenceInterfaceTypeConverter,
+			NewCadence1CompositeStaticTypeConverter(chainID),
+			NewCadence1InterfaceStaticTypeConverter(chainID),
 		),
 		NewCadence1LinkValueMigrator(rwf, capabilityIDs),
 		NewCadence1CapabilityValueMigrator(rwf, capabilityIDs),
@@ -127,6 +226,6 @@ func NewCadence1Migrations(
 ) []ledger.Migration {
 	return common.Concat(
 		NewCadence1ContractsMigrations(log, nWorker, chainID, evmContractChange, stagedContracts),
-		NewCadence1ValueMigrations(log, rwf, nWorker),
+		NewCadence1ValueMigrations(log, rwf, nWorker, chainID),
 	)
 }
