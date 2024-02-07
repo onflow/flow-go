@@ -184,6 +184,9 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 		)
 	}
 
+	require.Equal(t.t, string(tx.PayloadMessage()), string(txBody.PayloadMessage()))
+	require.Equal(t.t, string(tx.EnvelopeMessage()), string(txBody.EnvelopeMessage()))
+
 	proc := fvm.Transaction(txBody, 0)
 
 	executionSnapshot, result, err := t.vm.Run(t.ctx, proc, t.snapshot)
@@ -246,9 +249,9 @@ func (t *TestAccountLoader) Load(
 		return nil, wrapErr(err)
 	}
 
-	keys := make([]*sdk.AccountKey, 0, len(acc.Keys))
+	keys := make([]sdk.AccountKey, 0, len(acc.Keys))
 	for _, key := range acc.Keys {
-		keys = append(keys, &sdk.AccountKey{
+		keys = append(keys, sdk.AccountKey{
 			Index:          key.Index,
 			PublicKey:      key.PublicKey,
 			SigAlgo:        key.SignAlgo,

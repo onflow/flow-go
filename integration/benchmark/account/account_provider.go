@@ -213,7 +213,7 @@ func (p *provider) createAccountBatch(
 		accountCreatedEvent := flowsdk.AccountCreatedEvent(event)
 		accountAddress := accountCreatedEvent.Address()
 
-		newAcc, err := New(accountAddress, privKey, crypto.SHA3_256, []*flowsdk.AccountKey{accountKey})
+		newAcc, err := New(accountAddress, privKey, crypto.SHA3_256, []flowsdk.AccountKey{*accountKey})
 		if err != nil {
 			return fmt.Errorf("failed to create account: %w", err)
 		}

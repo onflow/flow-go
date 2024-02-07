@@ -22,7 +22,7 @@ func New(
 	address flowsdk.Address,
 	privateKey crypto.PrivateKey,
 	hashAlgo crypto.HashAlgorithm,
-	accountKeys []*flowsdk.AccountKey,
+	accountKeys []flowsdk.AccountKey,
 ) (*FlowAccount, error) {
 	keys := make([]*AccountKey, 0, len(accountKeys))
 	for _, key := range accountKeys {
@@ -33,7 +33,7 @@ func New(
 		}
 
 		keys = append(keys, &AccountKey{
-			AccountKey: *key,
+			AccountKey: key,
 			Address:    address,
 			Signer:     signer,
 		})
@@ -59,7 +59,12 @@ func LoadAccount(
 		return nil, fmt.Errorf("error while calling get account for account %s: %w", address, err)
 	}
 
-	return New(address, privateKey, hashAlgo, acc.Keys)
+	keys := make([]flowsdk.AccountKey, 0, len(acc.Keys))
+	for i, key := range acc.Keys {
+		keys[i] = *key
+	}
+
+	return New(address, privateKey, hashAlgo, keys)
 }
 
 func (acc *FlowAccount) NumKeys() int {

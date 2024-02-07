@@ -90,7 +90,7 @@ func (l *EVMTransferLoad) Type() LoadType {
 
 func (l *EVMTransferLoad) Setup(log zerolog.Logger, lc LoadContext) error {
 	// create some EOA ahead of time to get a better result for the benchmark
-	const createEOA = 3000
+	const createEOA = 10000
 
 	g, ctx := errgroup.WithContext(context.Background())
 	g.SetLimit(lc.Proposer.NumKeys())
