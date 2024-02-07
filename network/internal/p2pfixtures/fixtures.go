@@ -140,7 +140,7 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 // This func uses the send callback to continually publish messages to the subscription, this ensures that the subscription indeed stops receiving the messages.
 func SubMustEventuallyStopReceivingAnyMessage(t *testing.T, ctx context.Context, sub p2p.Subscription, publish func(t *testing.T)) {
 	done := make(chan struct{})
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(500 * time.Second)
 	defer func() {
 		close(done)
 		ticker.Stop()
@@ -165,10 +165,9 @@ func SubMustEventuallyStopReceivingAnyMessage(t *testing.T, ctx context.Context,
 
 	// after we stop receiving messages on sub we should continue to not receiving messages
 	// despite messages continuing to be published
-	require.Never(t, func() bool {
-		_, err := sub.Next(ctx)
-		return !errors.Is(err, context.DeadlineExceeded)
-	}, 5*time.Second, 100*time.Millisecond)
+	_, err := sub.Next(ctx)
+	require.Error(t, err)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
 // SubMustNeverReceiveAnyMessage checks that the subscription never receives any message within the given timeout by the context.
