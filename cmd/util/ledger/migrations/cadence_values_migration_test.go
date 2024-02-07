@@ -5,6 +5,8 @@ import (
 	"io"
 	"testing"
 
+	"github.com/onflow/cadence/runtime/stdlib"
+
 	"github.com/onflow/flow-go/fvm/environment"
 
 	"github.com/rs/zerolog"
@@ -17,7 +19,6 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
-	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
@@ -26,8 +27,6 @@ import (
 )
 
 const snapshotPath = "test-data/cadence_values_migration/snapshot_cadence_v0.42.6"
-
-const updatedTestContract = "test-data/cadence_values_migration/test_contract_upgraded.cdc"
 
 const testAccountAddress = "01cf0e2f2f715450"
 
@@ -46,8 +45,8 @@ func TestCadenceValuesMigration(t *testing.T) {
 
 	t.Parallel()
 
-	//address, err := common.HexToAddress(testAccountAddress)
-	//require.NoError(t, err)
+	address, err := common.HexToAddress(testAccountAddress)
+	require.NoError(t, err)
 
 	// Get the old payloads
 	payloads, err := util.PayloadsFromEmulatorSnapshot(snapshotPath)
@@ -82,14 +81,14 @@ func TestCadenceValuesMigration(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	//	// Assert the migrated payloads
-	//	rResourceType := checkMigratedPayloads(t, address, newPayloads)
-	//
-	//	// Check reporters
-	//	checkReporters(t, valueMigration, address, rResourceType)
+	// Assert the migrated payloads
+	rResourceType := checkMigratedPayloads(t, address, payloads)
+
+	// Check reporters
+	checkReporters(t, rwf, address, rResourceType)
 
 	// Check error logs.
-	require.Equal(t, []string{}, logWriter.logs)
+	require.Nil(t, logWriter.logs)
 }
 
 // TODO:
@@ -352,12 +351,10 @@ func checkAccountID(t *testing.T, mr *migratorRuntime, address common.Address) {
 
 func checkReporters(
 	t *testing.T,
-	valueMigration *CadenceBaseMigrator,
+	rwf *testReportWriterFactory,
 	address common.Address,
 	rResourceType *interpreter.CompositeStaticType,
 ) {
-	reportWriter := valueMigration.reporter.(*testReportWriter)
-
 	reportEntry := func(migration, key string, domain common.PathDomain) cadenceValueMigrationReportEntry {
 		return cadenceValueMigrationReportEntry{
 			StorageMapKey: interpreter.StringStorageMapKey(key),
@@ -370,6 +367,14 @@ func checkReporters(
 		}
 	}
 
+	var entries []any
+	for _, reportWriter := range rwf.reportWriters {
+		entries = append(
+			entries,
+			reportWriter.entries...,
+		)
+	}
+
 	acctTypedDictKeyMigrationReportEntry := reportEntry(
 		"StaticTypeMigration",
 		"dictionary_with_account_type_keys",
@@ -378,7 +383,6 @@ func checkReporters(
 	// Order is non-deterministic, so use 'ElementsMatch'.
 	assert.ElementsMatch(
 		t,
-		reportWriter.entries,
 		[]any{
 			reportEntry("StringNormalizingMigration", "string_value_1", common.PathDomainStorage),
 			reportEntry("StringNormalizingMigration", "string_value_2", common.PathDomainStorage),
@@ -439,13 +443,24 @@ func checkReporters(
 			reportEntry("EntitlementsMigration", "dictionary_with_reference_typed_key", common.PathDomainStorage),
 			reportEntry("StringNormalizingMigration", "dictionary_with_reference_typed_key", common.PathDomainStorage),
 		},
+		entries,
 	)
 }
 
-type testReportWriterFactory struct{}
+type testReportWriterFactory struct {
+	reportWriters map[string]*testReportWriter
+}
 
-func (_m *testReportWriterFactory) ReportWriter(_ string) reporters.ReportWriter {
-	return &testReportWriter{}
+func (f *testReportWriterFactory) ReportWriter(dataNamespace string) reporters.ReportWriter {
+	if f.reportWriters == nil {
+		f.reportWriters = make(map[string]*testReportWriter)
+	}
+	reportWriter := &testReportWriter{}
+	if _, ok := f.reportWriters[dataNamespace]; ok {
+		panic(fmt.Sprintf("report writer already exists for namespace %s", dataNamespace))
+	}
+	f.reportWriters[dataNamespace] = reportWriter
+	return reportWriter
 }
 
 type testReportWriter struct {
