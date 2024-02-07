@@ -371,6 +371,19 @@ func checkReporters(
 		"Test.R",
 	)
 
+	entitlementAuthorization := func() interpreter.EntitlementSetAuthorization {
+		return interpreter.NewEntitlementSetAuthorization(
+			nil,
+			func() (entitlements []common.TypeID) {
+				return []common.TypeID{
+					testContractLocation.TypeID(nil, "Test.E"),
+				}
+			},
+			1,
+			sema.Conjunction,
+		)
+	}
+
 	reportEntry := func(migration, key string, domain common.PathDomain) cadenceValueMigrationReportEntry {
 		return cadenceValueMigrationReportEntry{
 			StorageMapKey: interpreter.StringStorageMapKey(key),
@@ -428,7 +441,11 @@ func checkReporters(
 					Address: address,
 					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainPublic, "linkR"),
 				},
-				BorrowType: interpreter.NewReferenceStaticType(nil, interpreter.UnauthorizedAccess, rResourceType),
+				BorrowType: interpreter.NewReferenceStaticType(
+					nil,
+					entitlementAuthorization(),
+					rResourceType,
+				),
 			},
 			reportEntry("EntitlementsMigration", "capability", common.PathDomainStorage),
 			reportEntry("EntitlementsMigration", "linkR", common.PathDomainPublic),
