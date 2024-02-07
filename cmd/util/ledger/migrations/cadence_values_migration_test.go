@@ -6,8 +6,6 @@ import (
 	"io"
 	"testing"
 
-	"github.com/onflow/cadence/runtime/stdlib"
-
 	"github.com/onflow/flow-go/fvm/environment"
 
 	"github.com/rs/zerolog"
@@ -250,7 +248,7 @@ func checkMigratedPayloads(
 
 		interpreter.NewUnmeteredSomeValueNonCopying(
 			interpreter.NewUnmeteredCapabilityValue(
-				interpreter.NewUnmeteredUInt64Value(1),
+				interpreter.NewUnmeteredUInt64Value(2),
 				interpreter.NewAddressValue(nil, address),
 				interpreter.NewReferenceStaticType(nil, entitlementAuthorization(), rResourceType),
 			),
@@ -431,15 +429,6 @@ func checkReporters(
 					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainPublic, "linkR"),
 				},
 				BorrowType: interpreter.NewReferenceStaticType(nil, interpreter.UnauthorizedAccess, rResourceType),
-			},
-			cadenceValueMigrationReportEntry{
-				StorageMapKey: interpreter.Uint64StorageMapKey(1),
-				StorageKey: interpreter.NewStorageKey(
-					nil,
-					address,
-					stdlib.CapabilityControllerStorageDomain,
-				),
-				Migration: "EntitlementsMigration",
 			},
 			reportEntry("EntitlementsMigration", "capability", common.PathDomainStorage),
 			reportEntry("EntitlementsMigration", "linkR", common.PathDomainPublic),
