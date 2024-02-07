@@ -82,10 +82,10 @@ func TestCadenceValuesMigration(t *testing.T) {
 	}
 
 	// Assert the migrated payloads
-	rResourceType := checkMigratedPayloads(t, address, payloads)
+	checkMigratedPayloads(t, address, payloads)
 
 	// Check reporters
-	checkReporters(t, rwf, address, rResourceType)
+	checkReporters(t, rwf, address)
 
 	// Check error logs.
 	require.Nil(t, logWriter.logs)
@@ -98,7 +98,7 @@ func checkMigratedPayloads(
 	t *testing.T,
 	address common.Address,
 	newPayloads []*ledger.Payload,
-) *interpreter.CompositeStaticType {
+) {
 	mr, err := newMigratorRuntime(
 		address,
 		newPayloads,
@@ -157,17 +157,13 @@ func checkMigratedPayloads(
 		"Test.R",
 	)
 
-	entitlementType := interpreter.NewCompositeStaticTypeComputeTypeID(
-		nil,
-		testContractLocation,
-		"Test.E",
-	)
-
 	entitlementAuthorization := func() interpreter.EntitlementSetAuthorization {
 		return interpreter.NewEntitlementSetAuthorization(
 			nil,
 			func() (entitlements []common.TypeID) {
-				return []common.TypeID{entitlementType.TypeID}
+				return []common.TypeID{
+					testContractLocation.TypeID(nil, "Test.E"),
+				}
 			},
 			1,
 			sema.Conjunction,
@@ -333,9 +329,8 @@ func checkMigratedPayloads(
 	}
 
 	if len(expectedValues) != 0 {
-		assert.Fail(t, fmt.Sprintf("%d extra item(s) in expected values", len(expectedValues)))
+		assert.Fail(t, fmt.Sprintf("%d extra item(s) in expected values: %s", len(expectedValues), expectedValues))
 	}
-	return rResourceType
 }
 
 func checkAccountID(t *testing.T, mr *migratorRuntime, address common.Address) {
@@ -346,15 +341,27 @@ func checkAccountID(t *testing.T, mr *migratorRuntime, address common.Address) {
 	accountStatus, err := environment.AccountStatusFromBytes(statusBytes)
 	require.NoError(t, err)
 
-	assert.Equal(t, uint64(1), accountStatus.AccountIdCounter())
+	assert.Equal(t, uint64(3), accountStatus.AccountIdCounter())
 }
 
 func checkReporters(
 	t *testing.T,
 	rwf *testReportWriterFactory,
 	address common.Address,
-	rResourceType *interpreter.CompositeStaticType,
 ) {
+
+	testContractLocation := common.NewAddressLocation(
+		nil,
+		address,
+		"Test",
+	)
+
+	rResourceType := interpreter.NewCompositeStaticTypeComputeTypeID(
+		nil,
+		testContractLocation,
+		"Test.R",
+	)
+
 	reportEntry := func(migration, key string, domain common.PathDomain) cadenceValueMigrationReportEntry {
 		return cadenceValueMigrationReportEntry{
 			StorageMapKey: interpreter.StringStorageMapKey(key),
