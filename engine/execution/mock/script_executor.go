@@ -16,12 +16,13 @@ type ScriptExecutor struct {
 }
 
 // ExecuteScriptAtBlockID provides a mock function with given fields: ctx, script, arguments, blockID
-func (_m *ScriptExecutor) ExecuteScriptAtBlockID(ctx context.Context, script []byte, arguments [][]byte, blockID flow.Identifier) ([]byte, error) {
+func (_m *ScriptExecutor) ExecuteScriptAtBlockID(ctx context.Context, script []byte, arguments [][]byte, blockID flow.Identifier) ([]byte, uint64, error) {
 	ret := _m.Called(ctx, script, arguments, blockID)
 
 	var r0 []byte
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte, flow.Identifier) ([]byte, error)); ok {
+	var r1 uint64
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte, flow.Identifier) ([]byte, uint64, error)); ok {
 		return rf(ctx, script, arguments, blockID)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte, flow.Identifier) []byte); ok {
@@ -32,13 +33,19 @@ func (_m *ScriptExecutor) ExecuteScriptAtBlockID(ctx context.Context, script []b
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte, flow.Identifier) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte, flow.Identifier) uint64); ok {
 		r1 = rf(ctx, script, arguments, blockID)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(uint64)
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, []byte, [][]byte, flow.Identifier) error); ok {
+		r2 = rf(ctx, script, arguments, blockID)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // GetAccount provides a mock function with given fields: ctx, address, blockID

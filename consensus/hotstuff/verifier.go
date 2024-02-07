@@ -38,7 +38,7 @@ type Verifier interface {
 	//    where querying of DKG might fail if no epoch containing the given view is known.
 	//  * unexpected errors should be treated as symptoms of bugs or uncovered
 	//    edge cases in the logic (i.e. as fatal)
-	VerifyVote(voter *flow.Identity, sigData []byte, view uint64, blockID flow.Identifier) error
+	VerifyVote(voter *flow.IdentitySkeleton, sigData []byte, view uint64, blockID flow.Identifier) error
 
 	// VerifyQC checks the cryptographic validity of a QC's `SigData` w.r.t. the
 	// given view and blockID. It is the responsibility of the calling code to ensure that
@@ -58,7 +58,7 @@ type Verifier interface {
 	//    where querying of DKG might fail if no epoch containing the given view is known.
 	//  * unexpected errors should be treated as symptoms of bugs or uncovered
 	//	  edge cases in the logic (i.e. as fatal)
-	VerifyQC(signers flow.IdentityList, sigData []byte, view uint64, blockID flow.Identifier) error
+	VerifyQC(signers flow.IdentitySkeletonList, sigData []byte, view uint64, blockID flow.Identifier) error
 
 	// VerifyTC checks cryptographic validity of the TC's `sigData` w.r.t. the
 	// given view. It is the responsibility of the calling code to ensure
@@ -69,5 +69,5 @@ type Verifier interface {
 	//  * model.ErrInvalidSignature if a signature is invalid
 	//  * unexpected errors should be treated as symptoms of bugs or uncovered
 	//	  edge cases in the logic (i.e. as fatal)
-	VerifyTC(signers flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64) error
+	VerifyTC(signers flow.IdentitySkeletonList, sigData []byte, view uint64, highQCViews []uint64) error
 }

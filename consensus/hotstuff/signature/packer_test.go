@@ -16,11 +16,11 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func newPacker(identities flow.IdentityList) *ConsensusSigDataPacker {
+func newPacker(identities flow.IdentitySkeletonList) *ConsensusSigDataPacker {
 	// mock consensus committee
 	committee := &mocks.DynamicCommittee{}
 	committee.On("IdentitiesByEpoch", mock.Anything).Return(
-		func(_ uint64) flow.IdentityList {
+		func(_ uint64) flow.IdentitySkeletonList {
 			return identities
 		},
 		nil,
@@ -29,7 +29,7 @@ func newPacker(identities flow.IdentityList) *ConsensusSigDataPacker {
 	return NewConsensusSigDataPacker(committee)
 }
 
-func makeBlockSigData(committee flow.IdentityList) *hotstuff.BlockSignatureData {
+func makeBlockSigData(committee flow.IdentitySkeletonList) *hotstuff.BlockSignatureData {
 	blockSigData := &hotstuff.BlockSignatureData{
 		StakingSigners: []flow.Identifier{
 			committee[0].NodeID, // A
@@ -54,7 +54,7 @@ func makeBlockSigData(committee flow.IdentityList) *hotstuff.BlockSignatureData 
 // aggregated random beacon sigs are from [D,F]
 func TestPackUnpack(t *testing.T) {
 	// prepare data for testing
-	committee := unittest.IdentityListFixture(6, unittest.WithRole(flow.RoleConsensus))
+	committee := unittest.IdentityListFixture(6, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 	view := rand.Uint64()
 	blockSigData := makeBlockSigData(committee)
 
@@ -100,9 +100,9 @@ func TestPackUnpack_EmptySigners(t *testing.T) {
 	require.NoError(t, err)
 
 	// create packer with a non-empty committee (honest node trying to decode the sig data)
-	committee := unittest.IdentityListFixture(6, unittest.WithRole(flow.RoleConsensus))
+	committee := unittest.IdentityListFixture(6, unittest.WithRole(flow.RoleConsensus)).ToSkeleton()
 	packer := newPacker(committee)
-	unpacked, err := packer.Unpack(make([]*flow.Identity, 0), sig)
+	unpacked, err := packer.Unpack(make(flow.IdentitySkeletonList, 0), sig)
 	require.NoError(t, err)
 
 	// check that the unpack data match with the original data
@@ -117,7 +117,7 @@ func TestPackUnpack_EmptySigners(t *testing.T) {
 // it's able to pack and unpack
 func TestPackUnpackManyNodes(t *testing.T) {
 	// prepare data for testing
-	committee := unittest.IdentityListFixture(200, unittest.WithRole(flow.RoleConsensus))
+	committee := unittest.IdentityListFixture(200, unittest.WithRole(flow.RoleConsensus)).ToSkeleton()
 	view := rand.Uint64()
 	blockSigData := makeBlockSigData(committee)
 	stakingSigners := make([]flow.Identifier, 0)
@@ -161,7 +161,7 @@ func TestPackUnpackManyNodes(t *testing.T) {
 // if the sig data can not be decoded, return model.InvalidFormatError
 func TestFailToDecode(t *testing.T) {
 	// prepare data for testing
-	committee := unittest.IdentityListFixture(6, unittest.WithRole(flow.RoleConsensus))
+	committee := unittest.IdentityListFixture(6, unittest.WithRole(flow.RoleConsensus)).ToSkeleton()
 	view := rand.Uint64()
 	blockSigData := makeBlockSigData(committee)
 
@@ -184,7 +184,7 @@ func TestFailToDecode(t *testing.T) {
 // if the signer IDs doesn't match, return InvalidFormatError
 func TestMismatchSignerIDs(t *testing.T) {
 	// prepare data for testing
-	committee := unittest.IdentityListFixture(9, unittest.WithRole(flow.RoleConsensus))
+	committee := unittest.IdentityListFixture(9, unittest.WithRole(flow.RoleConsensus)).ToSkeleton()
 	view := rand.Uint64()
 	blockSigData := makeBlockSigData(committee[:6])
 
@@ -216,7 +216,7 @@ func TestMismatchSignerIDs(t *testing.T) {
 // if sig type doesn't match, return InvalidFormatError
 func TestInvalidSigType(t *testing.T) {
 	// prepare data for testing
-	committee := unittest.IdentityListFixture(6, unittest.WithRole(flow.RoleConsensus))
+	committee := unittest.IdentityListFixture(6, unittest.WithRole(flow.RoleConsensus)).ToSkeleton()
 	view := rand.Uint64()
 	blockSigData := makeBlockSigData(committee)
 
@@ -250,7 +250,7 @@ func TestInvalidSigType(t *testing.T) {
 // no random beacon signers
 func TestPackUnpackWithoutRBAggregatedSig(t *testing.T) {
 	// prepare data for testing
-	committee := unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus))
+	committee := unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus)).ToSkeleton()
 	view := rand.Uint64()
 
 	blockSigData := &hotstuff.BlockSignatureData{
@@ -292,7 +292,7 @@ func TestPackUnpackWithoutRBAggregatedSig(t *testing.T) {
 // with different structure format, more specifically there is no difference between
 // nil and empty slices for RandomBeaconSigners and AggregatedRandomBeaconSig.
 func TestPackWithoutRBAggregatedSig(t *testing.T) {
-	identities := unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus))
+	identities := unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus)).ToSkeleton()
 	committee := identities.NodeIDs()
 
 	// prepare data for testing

@@ -36,6 +36,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
+	"github.com/onflow/flow-go/engine/access/ingestion"
 	"github.com/onflow/flow-go/engine/access/rest"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
@@ -57,7 +58,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
-	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -100,7 +100,6 @@ import (
 	pStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/io"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 // ObserverBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
@@ -126,7 +125,7 @@ type ObserverServiceConfig struct {
 	bootstrapNodeAddresses       []string
 	bootstrapNodePublicKeys      []string
 	observerNetworkingKeyPath    string
-	bootstrapIdentities          flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
+	bootstrapIdentities          flow.IdentitySkeletonList // the identity list of bootstrap peers the node uses to discover other nodes
 	apiRatelimits                map[string]int
 	apiBurstlimits               map[string]int
 	rpcConf                      rpc.Config
@@ -136,7 +135,7 @@ type ObserverServiceConfig struct {
 	apiTimeout                   time.Duration
 	upstreamNodeAddresses        []string
 	upstreamNodePublicKeys       []string
-	upstreamIdentities           flow.IdentityList // the identity list of upstream peers the node uses to forward API requests to
+	upstreamIdentities           flow.IdentitySkeletonList // the identity list of upstream peers the node uses to forward API requests to
 	scriptExecutorConfig         query.QueryConfig
 	executionDataSyncEnabled     bool
 	executionDataIndexingEnabled bool
@@ -220,7 +219,6 @@ type ObserverServiceBuilder struct {
 	ExecutionDataRequester state_synchronization.ExecutionDataRequester
 	ExecutionIndexer       *indexer.Indexer
 	ExecutionIndexerCore   *indexer.IndexerCore
-	RegistersAsyncStore    *execution.RegistersAsyncStore
 	IndexerDependencies    *cmd.DependencyList
 
 	// available until after the network has started. Hence, a factory function that needs to be called just before
@@ -281,7 +279,7 @@ func (builder *ObserverServiceBuilder) deriveUpstreamIdentities() error {
 		return fmt.Errorf("number of addresses and keys provided for the boostrap nodes don't match")
 	}
 
-	ids := make([]*flow.Identity, len(addresses))
+	ids := make(flow.IdentitySkeletonList, len(addresses))
 	for i, address := range addresses {
 		key := keys[i]
 
@@ -293,7 +291,7 @@ func (builder *ObserverServiceBuilder) deriveUpstreamIdentities() error {
 		}
 
 		// create the identity of the peer by setting only the relevant fields
-		ids[i] = &flow.Identity{
+		ids[i] = &flow.IdentitySkeleton{
 			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the public network it does not apply
 			Address:       address,
 			Role:          flow.RoleAccess, // the upstream node has to be an access node
@@ -599,9 +597,18 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"whether to enable the execution data indexing")
 
 		// ExecutionDataRequester config
-		flags.BoolVar(&builder.executionDataSyncEnabled, "execution-data-sync-enabled", defaultConfig.executionDataSyncEnabled, "whether to enable the execution data sync protocol")
-		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
-		flags.Uint64Var(&builder.executionDataStartHeight, "execution-data-start-height", defaultConfig.executionDataStartHeight, "height of first block to sync execution data from when starting with an empty Execution Data database")
+		flags.BoolVar(&builder.executionDataSyncEnabled,
+			"execution-data-sync-enabled",
+			defaultConfig.executionDataSyncEnabled,
+			"whether to enable the execution data sync protocol")
+		flags.StringVar(&builder.executionDataDir,
+			"execution-data-dir",
+			defaultConfig.executionDataDir,
+			"directory to use for Execution Data database")
+		flags.Uint64Var(&builder.executionDataStartHeight,
+			"execution-data-start-height",
+			defaultConfig.executionDataStartHeight,
+			"height of first block to sync execution data from when starting with an empty Execution Data database")
 		flags.Uint64Var(&builder.executionDataConfig.MaxSearchAhead,
 			"execution-data-max-search-ahead",
 			defaultConfig.executionDataConfig.MaxSearchAhead,
@@ -622,7 +629,10 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"execution-data-max-retry-delay",
 			defaultConfig.executionDataConfig.MaxRetryDelay,
 			"maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
-		flags.Uint32Var(&builder.executionDataCacheSize, "execution-data-cache-size", defaultConfig.executionDataCacheSize, "block execution data cache size")
+		flags.Uint32Var(&builder.executionDataCacheSize,
+			"execution-data-cache-size",
+			defaultConfig.executionDataCacheSize,
+			"block execution data cache size")
 	}).ValidateFlags(func() error {
 		if builder.executionDataSyncEnabled {
 			if builder.executionDataConfig.FetchTimeout <= 0 {
@@ -664,12 +674,12 @@ func publicNetworkMsgValidators(log zerolog.Logger, idProvider module.IdentityPr
 // BootstrapIdentities converts the bootstrap node addresses and keys to a Flow Identity list where
 // each Flow Identity is initialized with the passed address, the networking key
 // and the Node ID set to ZeroID, role set to Access, 0 stake and no staking key.
-func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, error) {
+func BootstrapIdentities(addresses []string, keys []string) (flow.IdentitySkeletonList, error) {
 	if len(addresses) != len(keys) {
 		return nil, fmt.Errorf("number of addresses and keys provided for the boostrap nodes don't match")
 	}
 
-	ids := make([]*flow.Identity, len(addresses))
+	ids := make(flow.IdentitySkeletonList, len(addresses))
 	for i, address := range addresses {
 		bytes, err := hex.DecodeString(keys[i])
 		if err != nil {
@@ -682,7 +692,7 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 		}
 
 		// create the identity of the peer by setting only the relevant fields
-		ids[i] = &flow.Identity{
+		ids[i] = &flow.IdentitySkeleton{
 			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the public network it does not apply
 			Address:       address,
 			Role:          flow.RoleAccess, // the upstream node has to be an access node
@@ -905,7 +915,7 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 func (builder *ObserverServiceBuilder) initObserverLocal() func(node *cmd.NodeConfig) error {
 	return func(node *cmd.NodeConfig) error {
 		// for an observer, set the identity here explicitly since it will not be found in the protocol state
-		self := &flow.Identity{
+		self := flow.IdentitySkeleton{
 			NodeID:        node.NodeID,
 			NetworkPubKey: node.NetworkKey.PublicKey(),
 			StakingPubKey: nil,             // no staking key needed for the observer
@@ -1188,12 +1198,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Storage.Headers,
 				builder.Storage.Events,
 				builder.Storage.LightTransactionResults,
-				func(_ flow.Identifier, entity flow.Entity) {
-					collections := builder.Storage.Collections
-					transactions := builder.Storage.Transactions
-					logger := builder.Logger
-					indexerCollectionHandler(entity, collections, transactions, logger)
-				},
+				builder.onCollection,
 			)
 			if err != nil {
 				return nil, err
@@ -1214,11 +1219,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil, err
 			}
 
-			err = builder.RegistersAsyncStore.InitDataAvailable(registers)
-			if err != nil {
-				return nil, err
-			}
-
 			// setup requester to notify indexer when new execution data is received
 			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
 
@@ -1227,6 +1227,19 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	}
 
 	return builder
+}
+
+func (builder *ObserverServiceBuilder) onCollection(_ flow.Identifier, entity flow.Entity) {
+	collections := builder.Storage.Collections
+	transactions := builder.Storage.Transactions
+	logger := builder.Logger
+
+	err := ingestion.HandleCollection(entity, collections, transactions, logger, nil)
+
+	if err != nil {
+		logger.Error().Err(err).Msg("could not handle collection")
+		return
+	}
 }
 
 // enqueuePublicNetworkInit enqueues the observer network component initialized for the observer
@@ -1352,10 +1365,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		return nil
 	})
 
-	builder.Module("async register store", func(node *cmd.NodeConfig) error {
-		builder.RegistersAsyncStore = execution.NewRegistersAsyncStore()
-		return nil
-	})
 	builder.Module("events storage", func(node *cmd.NodeConfig) error {
 		builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
 		return nil
@@ -1511,46 +1520,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	builder.Component("unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		return builder.unsecureGrpcServer, nil
 	})
-}
-
-func indexerCollectionHandler(entity flow.Entity, collections storage.Collections,
-	transactions storage.Transactions,
-	logger zerolog.Logger) {
-
-	// convert the entity to a strictly typed collection
-	collection, ok := entity.(*flow.Collection)
-	if !ok {
-		logger.Error().Msgf("invalid entity type (%T)", entity)
-		return
-	}
-
-	light := collection.Light()
-
-	// FIX: we can't index guarantees here, as we might have more than one block
-	// with the same collection as long as it is not finalized
-
-	// store the light collection (collection minus the transaction body - those are stored separately)
-	// and add transaction ids as index
-	err := collections.StoreLightAndIndexByTransaction(&light)
-	if err != nil {
-		// ignore collection if already seen
-		if errors.Is(err, storage.ErrAlreadyExists) {
-			logger.Error().
-				Hex("collection_id", logging.Entity(light)).
-				Msg("collection is already seen")
-			return
-		}
-		return
-	}
-
-	// now store each of the transaction body
-	for _, tx := range collection.Transactions {
-		err := transactions.Store(tx)
-		if err != nil {
-			logger.Error().Err(err).Msg(fmt.Sprintf("could not store transaction (%x)", tx.ID()))
-			return
-		}
-	}
 }
 
 func loadNetworkingKey(path string) (crypto.PrivateKey, error) {

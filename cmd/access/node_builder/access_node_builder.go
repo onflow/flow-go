@@ -256,34 +256,35 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
-	FollowerState                 protocol.FollowerState
-	SyncCore                      *chainsync.Core
-	RpcEng                        *rpc.Engine
-	FollowerDistributor           *consensuspubsub.FollowerDistributor
-	CollectionRPC                 access.AccessAPIClient
-	TransactionTimings            *stdmap.TransactionTimings
-	CollectionsToMarkFinalized    *stdmap.Times
-	CollectionsToMarkExecuted     *stdmap.Times
-	BlocksToMarkExecuted          *stdmap.Times
-	TransactionMetrics            *metrics.TransactionCollector
-	RestMetrics                   *metrics.RestCollector
-	AccessMetrics                 module.AccessMetrics
-	PingMetrics                   module.PingMetrics
-	Committee                     hotstuff.DynamicCommittee
-	Finalized                     *flow.Header // latest finalized block that the node knows of at startup time
-	Pending                       []*flow.Header
-	FollowerCore                  module.HotStuffFollower
-	Validator                     hotstuff.Validator
-	ExecutionDataDownloader       execution_data.Downloader
-	PublicExecutionDataDownloader execution_data.Downloader
-	ExecutionDataRequester        state_synchronization.ExecutionDataRequester
-	ExecutionDataStore            execution_data.ExecutionDataStore
-	ExecutionDataCache            *execdatacache.ExecutionDataCache
-	ExecutionIndexer              *indexer.Indexer
-	ExecutionIndexerCore          *indexer.IndexerCore
-	ScriptExecutor                *backend.ScriptExecutor
-	RegistersAsyncStore           *execution.RegistersAsyncStore
-	IndexerDependencies           *cmd.DependencyList
+	FollowerState              protocol.FollowerState
+	SyncCore                   *chainsync.Core
+	RpcEng                     *rpc.Engine
+	FollowerDistributor        *consensuspubsub.FollowerDistributor
+	CollectionRPC              access.AccessAPIClient
+	TransactionTimings         *stdmap.TransactionTimings
+	CollectionsToMarkFinalized *stdmap.Times
+	CollectionsToMarkExecuted  *stdmap.Times
+	BlocksToMarkExecuted       *stdmap.Times
+	TransactionMetrics         *metrics.TransactionCollector
+	RestMetrics                *metrics.RestCollector
+	AccessMetrics              module.AccessMetrics
+	PingMetrics                module.PingMetrics
+	Committee                  hotstuff.DynamicCommittee
+	Finalized                  *flow.Header // latest finalized block that the node knows of at startup time
+	Pending                    []*flow.Header
+	FollowerCore               module.HotStuffFollower
+	Validator                  hotstuff.Validator
+	ExecutionDataDownloader    execution_data.Downloader
+	PublicBlobService          network.BlobService
+	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
+	ExecutionDataStore         execution_data.ExecutionDataStore
+	ExecutionDataCache         *execdatacache.ExecutionDataCache
+	ExecutionIndexer           *indexer.Indexer
+	ExecutionIndexerCore       *indexer.IndexerCore
+	ScriptExecutor             *backend.ScriptExecutor
+	RegistersAsyncStore        *execution.RegistersAsyncStore
+	EventsIndex                *backend.EventsIndex
+	IndexerDependencies        *cmd.DependencyList
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -493,7 +494,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
 	var bsDependable *module.ProxiedReadyDoneAware
-	var publicBsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
 	var executionDataStoreCache *execdatacache.ExecutionDataCache
@@ -669,12 +669,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		})
 
 	if builder.publicNetworkExecutionDataEnabled {
-		builder.Module("public blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {
-			publicBsDependable = module.NewProxiedReadyDoneAware()
-			builder.PeerManagerDependencies.Add(publicBsDependable)
-			return nil
-		})
-
 		builder.Component("public network execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			opts := []network.BlobServiceOption{
 				blob.WithBitswapOptions(
@@ -687,15 +681,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			net := builder.AccessNodeConfig.PublicNetworkConfig.Network
 
 			var err error
-			bs, err = net.RegisterBlobService(channels.PublicExecutionDataService, ds, opts...)
+			builder.PublicBlobService, err = net.RegisterBlobService(channels.PublicExecutionDataService, ds, opts...)
 			if err != nil {
 				return nil, fmt.Errorf("could not register blob service: %w", err)
 			}
 
-			publicBsDependable.Init(bs)
-			builder.PublicExecutionDataDownloader = execution_data.NewDownloader(bs)
-
-			return builder.PublicExecutionDataDownloader, nil
+			return builder.PublicBlobService, nil
 		})
 	}
 
@@ -809,11 +800,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, err
 				}
 
-				err = builder.RegistersAsyncStore.InitDataAvailable(registers)
-				if err != nil {
-					return nil, err
-				}
-
 				// setup requester to notify indexer when new execution data is received
 				execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
 
@@ -832,7 +818,20 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, err
 				}
 
-				builder.ScriptExecutor.InitReporter(builder.ExecutionIndexer, scripts)
+				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts)
+				if err != nil {
+					return nil, err
+				}
+
+				err = builder.EventsIndex.Initialize(builder.ExecutionIndexer)
+				if err != nil {
+					return nil, err
+				}
+
+				err = builder.RegistersAsyncStore.Initialize(registers)
+				if err != nil {
+					return nil, err
+				}
 
 				return builder.ExecutionIndexer, nil
 			}, builder.IndexerDependencies)
@@ -873,7 +872,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.stateStreamConf,
 				node.State,
 				node.Storage.Headers,
-				node.Storage.Events,
 				node.Storage.Seals,
 				node.Storage.Results,
 				builder.ExecutionDataStore,
@@ -882,6 +880,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.executionDataConfig.InitialBlockHeight,
 				highestAvailableHeight,
 				builder.RegistersAsyncStore,
+				builder.EventsIndex,
 				useIndex,
 			)
 			if err != nil {
@@ -1059,7 +1058,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.BoolVar(&builder.publicNetworkExecutionDataEnabled,
 			"public-network-execution-data-sync-enabled",
 			defaultConfig.publicNetworkExecutionDataEnabled,
-			"whether to enable the execution data sync protocol on public network")
+			"[experimental] whether to enable the execution data sync protocol on public network")
 		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
 		flags.Uint64Var(&builder.executionDataStartHeight,
 			"execution-data-start-height",
@@ -1276,8 +1275,8 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
 			return id.NewIdentityFilterIdentifierProvider(
 				filter.And(
-					filter.HasRole(flow.RoleConsensus),
-					filter.Not(filter.HasNodeID(node.Me.NodeID())),
+					filter.HasRole[flow.Identity](flow.RoleConsensus),
+					filter.Not(filter.HasNodeID[flow.Identity](node.Me.NodeID())),
 					underlay.NotEjectedFilter,
 				),
 				builder.IdentityProvider,
@@ -1490,6 +1489,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
 			return nil
 		}).
+		Module("events index", func(node *cmd.NodeConfig) error {
+			builder.EventsIndex = backend.NewEventsIndex(builder.Storage.Events)
+			return nil
+		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			config := builder.rpcConf
 			backendConfig := config.BackendConfig
@@ -1546,7 +1549,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				HistoricalAccessNodes:     builder.HistoricalAccessRPCs,
 				Blocks:                    node.Storage.Blocks,
 				Headers:                   node.Storage.Headers,
-				Events:                    node.Storage.Events,
 				Collections:               node.Storage.Collections,
 				Transactions:              node.Storage.Transactions,
 				ExecutionReceipts:         node.Storage.Receipts,
@@ -1568,6 +1570,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ScriptExecutionMode:       scriptExecMode,
 				EventQueryMode:            eventQueryMode,
 				TxResultQueryMode:         txResultQueryMode,
+				EventsIndex:               builder.EventsIndex,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
@@ -1613,7 +1616,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Me,
 				node.State,
 				channels.RequestCollections,
-				filter.HasRole(flow.RoleCollection),
+				filter.HasRole[flow.Identity](flow.RoleCollection),
 				func() flow.Entity { return &flow.Collection{} },
 			)
 			if err != nil {

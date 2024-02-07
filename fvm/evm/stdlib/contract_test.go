@@ -1581,9 +1581,9 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
           access(all) struct Token {
             access(all) let id: Int
-            access(all) var balance: Int
+            access(all) var balance: UInt
 
-            init(id: Int, balance: Int) {
+            init(id: Int, balance: UInt) {
               self.id = id
               self.balance = balance
             }
@@ -2113,9 +2113,9 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 
           access(all) struct Token {
             access(all) let id: Int
-            access(all) var balance: Int
+            access(all) var balance: UInt
 
-            init(id: Int, balance: Int) {
+            init(id: Int, balance: UInt) {
               self.id = id
               self.balance = balance
             }
@@ -2644,8 +2644,8 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
       import EVM from 0x1
 
       access(all)
-      fun main(_ flow: UFix64): EVM.Balance {
-          return EVM.Balance(flow: flow)
+      fun main(_ attoflow: UInt): EVM.Balance {
+          return EVM.Balance(attoflow: attoflow)
       }
     `)
 
@@ -2692,8 +2692,7 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 
 	// Run script
 
-	flowValue, err := cadence.NewUFix64FromParts(1, 23000000)
-	require.NoError(t, err)
+	flowValue := cadence.NewUInt(1230000000000000000)
 
 	result, err := rt.ExecuteScript(
 		runtime.Script{
@@ -2986,13 +2985,15 @@ func TestBridgedAccountCall(t *testing.T) {
       access(all)
       fun main(): [UInt8] {
           let bridgedAccount <- EVM.createBridgedAccount()
+		  let bal = EVM.Balance(0)
+		  bal.setFLOW(flow: 1.23)
           let response = bridgedAccount.call(
               to: EVM.EVMAddress(
                   bytes: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
               ),
               data: [4, 5, 6],
               gasLimit: 9999,
-              value: EVM.Balance(flow: 1.23)
+              value: bal
           )
           destroy bridgedAccount
           return response
@@ -3237,7 +3238,7 @@ func TestBridgedAccountWithdraw(t *testing.T) {
           let bridgedAccount <- EVM.createBridgedAccount()
           bridgedAccount.deposit(from: <-vault)
 
-          let vault2 <- bridgedAccount.withdraw(balance: EVM.Balance(flow: 1.23))
+          let vault2 <- bridgedAccount.withdraw(balance: EVM.Balance(attoflow: 1230000000000000000))
           let balance = vault2.balance
           destroy bridgedAccount
           destroy vault2
@@ -3353,7 +3354,7 @@ func TestBridgedAccountDeploy(t *testing.T) {
           let address = bridgedAccount.deploy(
               code: [4, 5, 6],
               gasLimit: 9999,
-              value: EVM.Balance(flow: 1.23)
+              value: EVM.Balance(flow: 1230000000000000000)
           )
           destroy bridgedAccount
           return address.bytes
@@ -3442,12 +3443,10 @@ func TestEVMAccountBalance(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	expectedBalanceValue, err := cadence.NewUFix64FromParts(1, 1337000)
+	expectedBalanceValue := cadence.NewUInt(1013370000000000000)
 	expectedBalance := cadence.
 		NewStruct([]cadence.Value{expectedBalanceValue}).
 		WithType(stdlib.NewBalanceCadenceType(common.Address(contractsAddress)))
-
-	require.NoError(t, err)
 
 	handler := &testContractHandler{
 		flowTokenAddress: common.Address(contractsAddress),
@@ -3458,7 +3457,7 @@ func TestEVMAccountBalance(t *testing.T) {
 			return &testFlowAccount{
 				address: fromAddress,
 				balance: func() types.Balance {
-					return types.NewBalanceFromUFix64(expectedBalanceValue)
+					return types.NewBalance(expectedBalanceValue.Value)
 				},
 			}
 		},
@@ -3537,7 +3536,7 @@ func TestEVMAccountBalance(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, err)
-	require.Equal(t, expectedBalance, actual)
+	require.Equal(t, expectedBalance.ToGoValue(), actual.ToGoValue())
 }
 
 func TestEVMAccountBalanceForABIOnlyContract(t *testing.T) {

@@ -32,8 +32,8 @@ import (
 func (suite *Suite) withPreConfiguredState(f func(snap protocol.Snapshot)) {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state)
 
 		epochBuilder.
 			BuildEpoch().
@@ -1018,7 +1018,7 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = connFactory
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
-	params.Events = suite.events
+
 	params.TxResultQueryMode = TransactionResultQueryModeLocalOnly
 
 	backend, err := New(params)
@@ -1109,7 +1109,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = connFactory
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
-	params.Events = suite.events
+
 	params.TxResultQueryMode = TransactionResultQueryModeLocalOnly
 
 	backend, err := New(params)
@@ -1200,7 +1200,7 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = connFactory
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
-	params.Events = suite.events
+
 	params.TxResultQueryMode = TransactionResultQueryModeLocalOnly
 
 	backend, err := New(params)
