@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/onflow/cadence/migrations/statictypes"
+	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence/migrations"
@@ -20,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type CadenceBaseMigrator struct {
@@ -31,6 +33,7 @@ type CadenceBaseMigrator struct {
 		accounts environment.Accounts,
 		reporter *cadenceValueMigrationReporter,
 	) []migrations.ValueMigration
+	runtimeInterfaceConfig util.RuntimeInterfaceConfig
 }
 
 var _ AccountBasedMigration = (*CadenceBaseMigrator)(nil)
@@ -44,10 +47,38 @@ func (m *CadenceBaseMigrator) Close() error {
 
 func (m *CadenceBaseMigrator) InitMigration(
 	log zerolog.Logger,
-	_ []*ledger.Payload,
+	allPayloads []*ledger.Payload,
 	_ int,
 ) error {
 	m.log = log.With().Str("migration", m.name).Logger()
+
+	// The MigrateAccount function is only given the payloads for the account to be migrated.
+	// However, the migration needs to be able to get the code for contracts of any account.
+
+	fullPayloadSnapshot, err := util.NewPayloadSnapshot(allPayloads)
+	if err != nil {
+		return err
+	}
+
+	m.runtimeInterfaceConfig = util.RuntimeInterfaceConfig{
+
+		GetContractCodeFunc: func(location runtime.Location) ([]byte, error) {
+			addressLocation, ok := location.(common.AddressLocation)
+			if !ok {
+				return nil, nil
+			}
+			contractRegisterID := flow.ContractRegisterID(
+				flow.Address(addressLocation.Address),
+				addressLocation.Name,
+			)
+			contract, err := fullPayloadSnapshot.Get(contractRegisterID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get contract code: %w", err)
+			}
+			return contract, nil
+		},
+	}
+
 	return nil
 }
 
@@ -58,10 +89,11 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 ) ([]*ledger.Payload, error) {
 
 	// Create all the runtime components we need for the migration
+
 	migrationRuntime, err := newMigratorRuntime(
 		address,
 		oldPayloads,
-		util.RuntimeInterfaceConfig{},
+		m.runtimeInterfaceConfig,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
