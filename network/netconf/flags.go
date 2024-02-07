@@ -84,8 +84,14 @@ func AllFlagNames() []string {
 		BuildFlagName(gossipsubKey, p2pconfig.RpcTracerKey, p2pconfig.RPCSentTrackerCacheSizeKey),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcTracerKey, p2pconfig.RPCSentTrackerQueueCacheSizeKey),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcTracerKey, p2pconfig.RPCSentTrackerNumOfWorkersKey),
+
+		BuildFlagName(gossipsubKey, p2pconfig.RpcTracerKey, p2pconfig.DuplicateMessageCacheTrackerKey, p2pconfig.DuplicateMessageCacheTrackerSizeKey),
+		BuildFlagName(gossipsubKey, p2pconfig.RpcTracerKey, p2pconfig.DuplicateMessageCacheTrackerKey, p2pconfig.DuplicateMessageCacheTrackerDecayKey),
+		BuildFlagName(gossipsubKey, p2pconfig.RpcTracerKey, p2pconfig.DuplicateMessageCacheTrackerKey, p2pconfig.SkipDecayThresholdKey),
+
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.InspectionQueueConfigKey, p2pconfig.NumberOfWorkersKey),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.InspectionQueueConfigKey, p2pconfig.QueueSizeKey),
+
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ClusterPrefixedMessageConfigKey, p2pconfig.TrackerCacheSizeKey),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ClusterPrefixedMessageConfigKey, p2pconfig.TrackerCacheDecayKey),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ClusterPrefixedMessageConfigKey, p2pconfig.HardThresholdKey),
@@ -152,6 +158,8 @@ func AllFlagNames() []string {
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PeerScoringKey, p2pconfig.ProtocolKey, p2pconfig.AppSpecificKey, p2pconfig.MinAppSpecificKey, p2pconfig.PenaltyKey),
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PeerScoringKey, p2pconfig.ProtocolKey, p2pconfig.AppSpecificKey, p2pconfig.UnknownIdentityKey, p2pconfig.PenaltyKey),
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PeerScoringKey, p2pconfig.ProtocolKey, p2pconfig.AppSpecificKey, p2pconfig.InvalidSubscriptionKey, p2pconfig.PenaltyKey),
+		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PeerScoringKey, p2pconfig.ProtocolKey, p2pconfig.AppSpecificKey, p2pconfig.DuplicateMessageKey, p2pconfig.PenaltyKey),
+		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PeerScoringKey, p2pconfig.ProtocolKey, p2pconfig.AppSpecificKey, p2pconfig.DuplicateMessageKey, p2pconfig.ThresholdKey),
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PeerScoringKey, p2pconfig.ProtocolKey, p2pconfig.AppSpecificKey, p2pconfig.MaxAppSpecificKey, p2pconfig.RewardKey),
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PeerScoringKey, p2pconfig.ProtocolKey, p2pconfig.AppSpecificKey, p2pconfig.StakedIdentityKey, p2pconfig.RewardKey),
 
@@ -246,6 +254,17 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		"cache size of the rpc sent tracker used by the gossipsub mesh tracer.")
 	flags.Uint32(BuildFlagName(gossipsubKey, p2pconfig.RpcTracerKey, p2pconfig.RPCSentTrackerQueueCacheSizeKey), config.GossipSub.RpcTracer.RPCSentTrackerQueueCacheSize,
 		"cache size of the rpc sent tracker worker queue.")
+
+	flags.Uint32(BuildFlagName(gossipsubKey, p2pconfig.RpcTracerKey, p2pconfig.DuplicateMessageCacheTrackerKey, p2pconfig.DuplicateMessageCacheTrackerSizeKey),
+		config.GossipSub.RpcTracer.DuplicateMessageTrackerConfig.CacheSize,
+		"cache size of the gossipsub duplicate message tracker.")
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.RpcTracerKey, p2pconfig.DuplicateMessageCacheTrackerKey, p2pconfig.DuplicateMessageCacheTrackerDecayKey),
+		config.GossipSub.RpcTracer.DuplicateMessageTrackerConfig.Decay,
+		"decay rate for the peer duplicate message counters.")
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.RpcTracerKey, p2pconfig.DuplicateMessageCacheTrackerKey, p2pconfig.SkipDecayThresholdKey),
+		config.GossipSub.RpcTracer.DuplicateMessageTrackerConfig.SkipDecayThreshold,
+		"the duplicate message count threshold below which the penalty will not be decayed")
+
 	flags.Int(BuildFlagName(gossipsubKey, p2pconfig.RpcTracerKey, p2pconfig.RPCSentTrackerNumOfWorkersKey), config.GossipSub.RpcTracer.RpcSentTrackerNumOfWorkers,
 		"number of workers for the rpc sent tracker worker pool.")
 	// gossipsub RPC control message validation limits used for validation configuration and rate limiting
@@ -458,12 +477,18 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		p2pconfig.PenaltyKey),
 		config.GossipSub.ScoringParameters.PeerScoring.Protocol.AppSpecificScore.InvalidSubscriptionPenalty,
 		"the  penalty for invalid subscription. It is applied to the peer's score when the peer subscribes to a topic that it is not authorized to subscribe to")
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PeerScoringKey, p2pconfig.ProtocolKey, p2pconfig.AppSpecificKey, p2pconfig.DuplicateMessageKey, p2pconfig.PenaltyKey),
+		config.GossipSub.ScoringParameters.PeerScoring.Protocol.AppSpecificScore.DuplicateMessagePenalty,
+		"the penalty for duplicate messages detected by the gossipsub tracer for a peer")
 	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PeerScoringKey, p2pconfig.ProtocolKey, p2pconfig.AppSpecificKey, p2pconfig.MaxAppSpecificKey, p2pconfig.RewardKey),
 		config.GossipSub.ScoringParameters.PeerScoring.Protocol.AppSpecificScore.MaxAppSpecificReward,
 		"the reward for well-behaving staked peers")
 	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PeerScoringKey, p2pconfig.ProtocolKey, p2pconfig.AppSpecificKey, p2pconfig.StakedIdentityKey, p2pconfig.RewardKey),
 		config.GossipSub.ScoringParameters.PeerScoring.Protocol.AppSpecificScore.StakedIdentityReward,
 		"the reward for staking peers")
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PeerScoringKey, p2pconfig.ProtocolKey, p2pconfig.AppSpecificKey, p2pconfig.DuplicateMessageKey, p2pconfig.ThresholdKey),
+		config.GossipSub.ScoringParameters.PeerScoring.Protocol.AppSpecificScore.DuplicateMessageThreshold,
+		"the peer's duplicate message count threshold above which the peer will be penalized")
 
 	flags.Duration(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoringRegistryKey, p2pconfig.StartupSilenceDurationKey),
 		config.GossipSub.ScoringParameters.ScoringRegistryParameters.StartupSilenceDuration,
