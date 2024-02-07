@@ -25,12 +25,16 @@ type TestContract struct {
 	DeployedAt types.Address
 }
 
-func (tc *TestContract) MakeCallData(t testing.TB, name string, args ...interface{}) []byte {
-	abi, err := gethABI.JSON(strings.NewReader(tc.ABI))
+func MakeCallData(t testing.TB, abiString string, name string, args ...interface{}) []byte {
+	abi, err := gethABI.JSON(strings.NewReader(abiString))
 	require.NoError(t, err)
 	call, err := abi.Pack(name, args...)
 	require.NoError(t, err)
 	return call
+}
+
+func (tc *TestContract) MakeCallData(t testing.TB, name string, args ...interface{}) []byte {
+	return MakeCallData(t, tc.ABI, name, args...)
 }
 
 func (tc *TestContract) SetDeployedAt(deployedAt types.Address) {
@@ -60,7 +64,7 @@ func GetStorageTestContract(tb testing.TB) *TestContract {
 				function blockTime() public view returns (uint) {
 					return block.timestamp;
 				}
-				function blockHash(uint num)  public view returns (bytes32) {
+				function blockHash(uint num) public view returns (bytes32) {
 					return blockhash(num);
 				}
 			
