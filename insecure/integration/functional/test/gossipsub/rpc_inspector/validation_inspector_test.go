@@ -1025,6 +1025,9 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 	t.Run("gossipsub spam mitigation invalid prunes", func(t *testing.T) {
 		testGossipSubSpamMitigationIntegration(t, p2pmsg.CtrlMsgPrune)
 	})
+	t.Run("gossipsub spam mitigation invalid ihaves", func(t *testing.T) {
+		testGossipSubSpamMitigationIntegration(t, p2pmsg.CtrlMsgIHave)
+	})
 }
 
 // testGossipSubSpamMitigationIntegration tests that the spam mitigation feature of GossipSub is working as expected.
@@ -1122,6 +1125,12 @@ func testGossipSubSpamMitigationIntegration(t *testing.T, msgType p2pmsg.Control
 		invalidSporkIDTopicSpam = spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithGraft(spamRpcCount, invalidSporkIDTopic.String()))
 		duplicateTopicSpam = spammer.GenerateCtlMessages(int(spamCtrlMsgCount), // sets duplicate to +2 above the threshold to ensure that the victim node will penalize the spammer node
 			p2ptest.WithPrune(cfg.NetworkConfig.GossipSub.RpcInspector.Validation.GraftPrune.DuplicateTopicIdThreshold+2, duplicateTopic.String()))
+	case p2pmsg.CtrlMsgIHave:
+		unknownTopicSpam = spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithIHave(spamRpcCount, 100, unknownTopic.String()))
+		malformedTopicSpam = spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithIHave(spamRpcCount, 100, malformedTopic.String()))
+		invalidSporkIDTopicSpam = spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithIHave(spamRpcCount, 100, invalidSporkIDTopic.String()))
+		duplicateTopicSpam = spammer.GenerateCtlMessages(int(spamCtrlMsgCount), // sets duplicate to +2 above the threshold to ensure that the victim node will penalize the spammer node
+			p2ptest.WithIHave(cfg.NetworkConfig.GossipSub.RpcInspector.Validation.IHave.DuplicateTopicIdThreshold+spamRpcCount, 100, duplicateTopic.String()))
 	default:
 		t.Fatal("invalid control message type expected graft or prune")
 	}
