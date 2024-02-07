@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const lostTransactionThreshold = 120 * time.Second
+const lostTransactionThreshold = 180 * time.Second
 
 // ContLoadGenerator creates a continuous load of transactions to the network
 // by creating many accounts and transfer flow tokens between them
@@ -154,9 +154,10 @@ func New(
 		AccountProvider:        ap,
 		TransactionSender:      ts,
 		ReferenceBlockProvider: lg.follower,
+		Proposer:               servAcc,
 	}
 
-	l := load.CreateLoadType(loadParams.LoadType)
+	l := load.CreateLoadType(log, loadParams.LoadType)
 
 	err = l.Setup(log, lc)
 	if err != nil {

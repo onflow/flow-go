@@ -2,6 +2,7 @@ package load
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"fmt"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -15,8 +16,13 @@ import (
 	evmTypes "github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/integration/benchmark/account"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
+	"golang.org/x/sync/errgroup"
+	"io"
 	"math/big"
+	"time"
 )
 
 // eoa is a struct that represents an evm owned account.
@@ -28,37 +34,141 @@ type eoa struct {
 }
 
 type EVMTransferLoad struct {
+	log               zerolog.Logger
 	tokensPerTransfer cadence.UFix64
 
-	eoaChan chan *eoa
+	eoaChan  chan *eoa
+	doneChan chan struct{}
+
+	transfers atomic.Uint64
+	creations atomic.Uint64
 }
 
-func NewEVMTransferLoad() *EVMTransferLoad {
-	return &EVMTransferLoad{
+func NewEVMTransferLoad(log zerolog.Logger) *EVMTransferLoad {
+	load := &EVMTransferLoad{
+		log:               log.With().Str("component", "EVMTransferLoad").Logger(),
 		tokensPerTransfer: cadence.UFix64(100),
 		// really large channel,
 		// it's going to get filled as needed
-		eoaChan: make(chan *eoa, 1_000_000),
+		eoaChan:  make(chan *eoa, 1_000_000),
+		doneChan: make(chan struct{}),
 	}
+
+	go load.reportStatus()
+
+	return load
 }
 
 var _ Load = (*EVMTransferLoad)(nil)
+var _ io.Closer = (*EVMTransferLoad)(nil)
+
+func (l *EVMTransferLoad) Close() error {
+	close(l.eoaChan)
+	close(l.doneChan)
+	return nil
+}
+
+func (l *EVMTransferLoad) reportStatus() {
+	// report status every 10 seconds until done
+	for {
+		select {
+		case <-l.doneChan:
+			return
+		case <-time.After(10 * time.Second):
+			l.log.Info().
+				Uint64("transfers", l.transfers.Load()).
+				Uint64("creations", l.creations.Load()).
+				Msg("EVMTransferLoad status report")
+		}
+	}
+
+}
 
 func (l *EVMTransferLoad) Type() LoadType {
 	return EVMTransferLoadType
 }
 
 func (l *EVMTransferLoad) Setup(log zerolog.Logger, lc LoadContext) error {
+
+	// create some EOA ahead of time to get a better result for the benchmark
+	const createEOA = 3000
+
+	for i := 0; i < 2000; i++ {
+
+		eoa, err := l.setupTransaction(log, lc)
+		if err != nil {
+			return err
+		}
+		l.creations.Add(1)
+		l.eoaChan <- eoa
+	}
+
+	g, ctx := errgroup.WithContext(context.Background())
+	g.SetLimit(lc.Proposer.NumKeys())
+
+	progress := util.LogProgress(l.log,
+		util.DefaultLogProgressConfig(
+			"creating and funding EOC accounts",
+			createEOA,
+		))
+
+	l.log.Info().
+		Int("number_of_accounts", createEOA).
+		Int("number_of_keys", lc.Proposer.NumKeys()).
+		Msg("creating and funding EOC accounts")
+
+	for i := 0; i < createEOA; i += 1 {
+		i := i
+		g.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return nil
+			default:
+			}
+			defer func() { progress(1) }()
+
+			eoa, err := l.setupTransaction(log, lc)
+			if err != nil {
+				return err
+			}
+
+			if err != nil {
+				l.log.
+					Err(err).
+					Int("index", i).
+					Msg("error creating EOA accounts")
+				return err
+			}
+
+			l.creations.Add(1)
+
+			select {
+			case l.eoaChan <- eoa:
+			default:
+			}
+
+			return nil
+		})
+	}
+	err := g.Wait()
+	if err != nil {
+		return fmt.Errorf("error creating EOC accounts: %w", err)
+	}
 	return nil
 }
 
 func (l *EVMTransferLoad) Load(log zerolog.Logger, lc LoadContext) error {
 	select {
 	case eoa := <-l.eoaChan:
+		if eoa == nil {
+			return nil
+		}
 		err := l.transferTransaction(log, lc, eoa)
 		if err == nil {
 			eoa.nonce += 1
 		}
+
+		l.transfers.Add(1)
 
 		select {
 		case l.eoaChan <- eoa:
@@ -72,6 +182,7 @@ func (l *EVMTransferLoad) Load(log zerolog.Logger, lc LoadContext) error {
 		if err != nil {
 			return err
 		}
+		l.creations.Add(1)
 
 		select {
 		case l.eoaChan <- eoa:

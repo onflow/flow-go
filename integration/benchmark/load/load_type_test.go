@@ -24,26 +24,26 @@ import (
 
 func TestLoadTypes(t *testing.T) {
 
+	log := zerolog.New(zerolog.NewTestWriter(t))
+
 	loads := []load.Load{
 		load.CompHeavyLoad,
 		load.EventHeavyLoad,
 		load.LedgerHeavyLoad,
 		load.ExecDataHeavyLoad,
 		load.NewTokenTransferLoad(),
-		load.NewEVMTransferLoad(),
+		load.NewEVMTransferLoad(log),
 		load.NewAddKeysLoad(),
 	}
 
 	for _, l := range loads {
-		t.Run(string(l.Type()), testLoad(l))
+		t.Run(string(l.Type()), testLoad(log, l))
 	}
 }
 
-func testLoad(l load.Load) func(t *testing.T) {
+func testLoad(log zerolog.Logger, l load.Load) func(t *testing.T) {
 
 	return func(t *testing.T) {
-
-		log := zerolog.New(zerolog.NewTestWriter(t))
 
 		chain := flow.Benchnet.Chain()
 
@@ -91,6 +91,7 @@ func testLoad(l load.Load) func(t *testing.T) {
 			WorkerContext: load.WorkerContext{
 				WorkerID: 0,
 			},
+			Proposer: serviceAccount,
 		}
 
 		err = l.Setup(log, lc)

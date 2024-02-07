@@ -31,6 +31,7 @@ type LoadContext struct {
 	account.AccountProvider
 	common.TransactionSender
 	common.ReferenceBlockProvider
+	Proposer *account.FlowAccount
 }
 
 type WorkerContext struct {
@@ -69,7 +70,7 @@ var ExecDataHeavyLoad = NewSimpleLoadType(
 	scripts.DataHeavyContractTemplate,
 	scripts.DataHeavyScriptTemplate)
 
-func CreateLoadType(t LoadType) Load {
+func CreateLoadType(log zerolog.Logger, t LoadType) Load {
 	switch t {
 	case CompHeavyLoadType:
 		return CompHeavyLoad
@@ -84,7 +85,7 @@ func CreateLoadType(t LoadType) Load {
 	case AddKeysLoadType:
 		return NewAddKeysLoad()
 	case EVMTransferLoadType:
-		return NewEVMTransferLoad()
+		return NewEVMTransferLoad(log)
 	default:
 		panic("unknown load type")
 	}
