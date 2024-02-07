@@ -117,7 +117,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 				// ignore weight as comparing against expected weight is not thread safe
 				assert.NoError(t, err)
 			}(i, sig)
-			expectedWeight += ids[i+subSet].Weight
+			expectedWeight += ids[i+subSet].InitialWeight
 		}
 
 		wg.Wait()
@@ -137,7 +137,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		for i, sig := range sigs[:subSet] {
 			weight, err := aggregator.TrustedAdd(ids[i].NodeID, sig)
 			assert.NoError(t, err)
-			expectedWeight += ids[i].Weight
+			expectedWeight += ids[i].InitialWeight
 			assert.Equal(t, expectedWeight, weight)
 			// test TotalWeight
 			assert.Equal(t, expectedWeight, aggregator.TotalWeight())
@@ -181,7 +181,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		// add signatures
 		for i, sig := range sigs {
 			weight, err := aggregator.TrustedAdd(ids[i].NodeID, sig)
-			expectedWeight += ids[i].Weight
+			expectedWeight += ids[i].InitialWeight
 			assert.Equal(t, expectedWeight, weight)
 			require.NoError(t, err)
 		}
@@ -263,7 +263,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 			for i, sig := range sigs {
 				weight, err := aggregator.TrustedAdd(ids[i].NodeID, sig)
 				require.NoError(t, err)
-				expectedWeight += ids[i].Weight
+				expectedWeight += ids[i].InitialWeight
 				assert.Equal(t, expectedWeight, weight)
 			}
 

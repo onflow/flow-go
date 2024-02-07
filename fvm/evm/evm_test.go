@@ -9,9 +9,9 @@ import (
 	"github.com/onflow/cadence/encoding/json"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
-	"github.com/onflow/flow-go/fvm/evm/testutils"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -24,7 +24,7 @@ func TestEVMRun(t *testing.T) {
 	t.Parallel()
 
 	t.Run("testing EVM.run (happy case)", func(t *testing.T) {
-		RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		RunWithTestBackend(t, func(backend *TestBackend) {
 			RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				tc := GetStorageTestContract(t)
 				RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
@@ -85,10 +85,12 @@ func TestEVMRun(t *testing.T) {
 }
 
 func RunWithNewTestVM(t *testing.T, chain flow.Chain, f func(fvm.Context, fvm.VM, snapshot.SnapshotTree)) {
+
 	opts := []fvm.Option{
 		fvm.WithChain(chain),
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+		fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
 	}
 	ctx := fvm.NewContext(opts...)
 
@@ -115,7 +117,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 	t.Parallel()
 
-	RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	RunWithTestBackend(t, func(backend *TestBackend) {
 		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			tc := GetStorageTestContract(t)
 			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
@@ -166,11 +168,11 @@ func TestEVMAddressDeposit(t *testing.T) {
 	})
 }
 
-func TestBridgedAccountWithdraw(t *testing.T) {
+func TestCOAWithdraw(t *testing.T) {
 
 	t.Parallel()
 
-	RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	RunWithTestBackend(t, func(backend *TestBackend) {
 		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			tc := GetStorageTestContract(t)
 			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
@@ -196,7 +198,9 @@ func TestBridgedAccountWithdraw(t *testing.T) {
                                    let bridgedAccount <- EVM.createBridgedAccount()
                                    bridgedAccount.deposit(from: <-vault)
 
-                                   let vault2 <- bridgedAccount.withdraw(balance: EVM.Balance(flow: 1.23))
+                                   let bal = EVM.Balance(0)
+                                   bal.setFLOW(flow: 1.23)
+                                   let vault2 <- bridgedAccount.withdraw(balance: bal)
                                    let balance = vault2.balance
                                    destroy bridgedAccount
                                    destroy vault2
@@ -229,7 +233,7 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 
 func TestBridgedAccountDeploy(t *testing.T) {
 	t.Parallel()
-	RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	RunWithTestBackend(t, func(backend *TestBackend) {
 		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			tc := GetStorageTestContract(t)
 			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
@@ -258,7 +262,7 @@ func TestBridgedAccountDeploy(t *testing.T) {
                                    let address = bridgedAccount.deploy(
                                        code: [],
                                        gasLimit: 53000,
-                                       value: EVM.Balance(flow: 1.23)
+                                       value: EVM.Balance(attoflow: 1230000000000000000)
                                    )
                                    destroy bridgedAccount
                                    return address.bytes

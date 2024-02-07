@@ -8,21 +8,25 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-var FlexLatestBlockKey = "LatestBlock"
+const (
+	BlockHashListCapacity    = 256
+	BlockStoreLatestBlockKey = "LatestBlock"
+	BlockStoreBlockHashesKey = "LatestBlockHashes"
+)
 
 type BlockStore struct {
 	led           atree.Ledger
-	flexAddress   flow.Address
+	rootAddress   flow.Address
 	blockProposal *types.Block
 }
 
 var _ types.BlockStore = &BlockStore{}
 
 // NewBlockStore constructs a new block store
-func NewBlockStore(led atree.Ledger, flexAddress flow.Address) (*BlockStore, error) {
+func NewBlockStore(led atree.Ledger, rootAddress flow.Address) (*BlockStore, error) {
 	return &BlockStore{
 		led:         led,
-		flexAddress: flexAddress,
+		rootAddress: rootAddress,
 	}, nil
 }
 
@@ -63,13 +67,17 @@ func (bs *BlockStore) CommitBlockProposal() error {
 		return types.NewFatalError(err)
 	}
 
-	err = bs.led.SetValue(bs.flexAddress[:], []byte(FlexLatestBlockKey), blockBytes)
+	err = bs.led.SetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockKey), blockBytes)
 	if err != nil {
-		return types.NewFatalError(err)
+		return err
+	}
+
+	err = bs.updateBlockHashList(bs.blockProposal)
+	if err != nil {
+		return err
 	}
 
 	bs.blockProposal = nil
-
 	return nil
 }
 
@@ -81,7 +89,7 @@ func (bs *BlockStore) ResetBlockProposal() error {
 
 // LatestBlock returns the latest executed block
 func (bs *BlockStore) LatestBlock() (*types.Block, error) {
-	data, err := bs.led.GetValue(bs.flexAddress[:], []byte(FlexLatestBlockKey))
+	data, err := bs.led.GetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockKey))
 	if len(data) == 0 {
 		return types.GenesisBlock, err
 	}
@@ -92,9 +100,43 @@ func (bs *BlockStore) LatestBlock() (*types.Block, error) {
 }
 
 // BlockHash returns the block hash for the last x blocks
-//
-// TODO: implement this properly to keep the last 256 block hashes
-// and connect use it inside the handler to pass as a config to the emulator
-func (bs *BlockStore) BlockHash(height int) (gethCommon.Hash, error) {
-	return gethCommon.Hash{}, nil
+func (bs *BlockStore) BlockHash(height uint64) (gethCommon.Hash, error) {
+	bhl, err := bs.getBlockHashList()
+	if err != nil {
+		return gethCommon.Hash{}, err
+	}
+	_, hash := bhl.BlockHashByHeight(height)
+	return hash, nil
+}
+
+func (bs *BlockStore) getBlockHashList() (*types.BlockHashList, error) {
+	data, err := bs.led.GetValue(bs.rootAddress[:], []byte(BlockStoreBlockHashesKey))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) == 0 {
+		bhl := types.NewBlockHashList(BlockHashListCapacity)
+		err = bhl.Push(types.GenesisBlock.Height, types.GenesisBlockHash)
+		return bhl, err
+	}
+	return types.NewBlockHashListFromEncoded(data)
+}
+
+func (bs *BlockStore) updateBlockHashList(block *types.Block) error {
+	bhl, err := bs.getBlockHashList()
+	if err != nil {
+		return err
+	}
+	hash, err := block.Hash()
+	if err != nil {
+		return err
+	}
+	err = bhl.Push(block.Height, hash)
+	if err != nil {
+		return err
+	}
+	return bs.led.SetValue(
+		bs.rootAddress[:],
+		[]byte(BlockStoreBlockHashesKey),
+		bhl.Encode())
 }
