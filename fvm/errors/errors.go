@@ -361,3 +361,12 @@ func NewEVMError(err error) EVMError {
 func IsEVMError(err error) bool {
 	return HasErrorCode(err, ErrEVMExecutionError)
 }
+
+// IsAnFVMError returns true if error is a coded error or a failure
+func IsFVMError(err error) bool {
+	var coded CodedError
+	if As(err, &coded) {
+		return true
+	}
+	return IsFailure(err)
+}

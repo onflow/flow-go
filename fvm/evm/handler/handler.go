@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
+	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/handler/coa"
 	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -65,7 +66,7 @@ func getPrecompiles(
 // DeployCOA deploys a cadence-owned-account and returns the address
 func (h *ContractHandler) DeployCOA(uuid uint64) types.Address {
 	addr, err := h.deployCOA(uuid)
-	handleError(err)
+	panicOnAnyError(err)
 	return addr
 }
 
@@ -103,7 +104,7 @@ func (h *ContractHandler) AccountByAddress(addr types.Address, isAuthorized bool
 // LastExecutedBlock returns the last executed block
 func (h *ContractHandler) LastExecutedBlock() *types.Block {
 	block, err := h.blockstore.LatestBlock()
-	handleError(err)
+	panicOnAnyError(err)
 	return block
 }
 
@@ -111,7 +112,7 @@ func (h *ContractHandler) LastExecutedBlock() *types.Block {
 // collects the gas fees and pay it to the coinbase address provided.
 func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) {
 	err := h.run(rlpEncodedTx, coinbase)
-	handleError(err)
+	panicOnAnyError(err)
 }
 
 func (h *ContractHandler) run(
@@ -232,7 +233,7 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
 		GetHashFunc: func(n uint64) gethCommon.Hash {
 			hash, err := h.blockstore.BlockHash(n)
-			handleError(err) // we have to handle it here given we can't continue with it even in try case
+			panicOnAnyError(err) // we have to handle it here given we can't continue with it even in try case
 			return hash
 		},
 		ExtraPrecompiles: h.precompiles,
@@ -269,7 +270,9 @@ func (h *ContractHandler) executeAndHandleCall(
 	if err != nil {
 		return res, err
 	}
+
 	bp.AppendTxHash(callHash)
+
 	if totalSupplyDiff != nil {
 		if deductSupplyDiff {
 			bp.TotalSupply = new(big.Int).Sub(bp.TotalSupply, totalSupplyDiff)
@@ -277,6 +280,7 @@ func (h *ContractHandler) executeAndHandleCall(
 			bp.TotalSupply = new(big.Int).Add(bp.TotalSupply, totalSupplyDiff)
 		}
 	}
+
 	// emit events
 	encoded, err := call.Encode()
 	if err != nil {
@@ -330,7 +334,7 @@ func (a *Account) Address() types.Address {
 // currently the storage limits is enforced
 func (a *Account) Balance() types.Balance {
 	bal, err := a.balance()
-	handleError(err)
+	panicOnAnyError(err)
 	return bal
 }
 
@@ -352,7 +356,7 @@ func (a *Account) balance() (types.Balance, error) {
 // Code returns the code of this account
 func (a *Account) Code() types.Code {
 	code, err := a.code()
-	handleError(err)
+	panicOnAnyError(err)
 	return code
 }
 
@@ -372,7 +376,7 @@ func (a *Account) code() (types.Code, error) {
 // CodeHash returns the code hash of this account
 func (a *Account) CodeHash() []byte {
 	codeHash, err := a.codeHash()
-	handleError(err)
+	panicOnAnyError(err)
 	return codeHash
 }
 
@@ -394,7 +398,7 @@ func (a *Account) codeHash() ([]byte, error) {
 // and update the account balance with the new amount
 func (a *Account) Deposit(v *types.FLOWTokenVault) {
 	err := a.deposit(v)
-	handleError(err)
+	panicOnAnyError(err)
 }
 
 func (a *Account) deposit(v *types.FLOWTokenVault) error {
@@ -414,7 +418,7 @@ func (a *Account) deposit(v *types.FLOWTokenVault) error {
 // withdraw and return flow token from the Flex main vault.
 func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 	v, err := a.withdraw(b)
-	handleError(err)
+	panicOnAnyError(err)
 	return v
 }
 
@@ -455,7 +459,7 @@ func (a *Account) withdraw(b types.Balance) (*types.FLOWTokenVault, error) {
 // Transfer transfers tokens between accounts
 func (a *Account) Transfer(to types.Address, balance types.Balance) {
 	err := a.transfer(to, balance)
-	handleError(err)
+	panicOnAnyError(err)
 }
 
 func (a *Account) transfer(to types.Address, balance types.Balance) error {
@@ -477,7 +481,7 @@ func (a *Account) transfer(to types.Address, balance types.Balance) error {
 // the contract data is not controlled by the caller accounts
 func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types.Balance) types.Address {
 	addr, err := a.deploy(code, gaslimit, balance)
-	handleError(err)
+	panicOnAnyError(err)
 	return addr
 }
 
@@ -494,6 +498,9 @@ func (a *Account) deploy(code types.Code, gaslimit types.GasLimit, balance types
 		balance,
 	)
 	res, err := a.fch.executeAndHandleCall(ctx, call, nil, false)
+	if err != nil {
+		return types.Address{}, err
+	}
 	return types.Address(res.DeployedContractAddress), nil
 }
 
@@ -503,7 +510,7 @@ func (a *Account) deploy(code types.Code, gaslimit types.GasLimit, balance types
 // the balance would be deducted from the OFA account and would be transferred to the target address
 func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimit, balance types.Balance) types.Data {
 	data, err := a.call(to, data, gaslimit, balance)
-	handleError(err)
+	panicOnAnyError(err)
 	return data
 }
 
@@ -540,7 +547,18 @@ func (a *Account) precheck(authroized bool, gaslimit types.GasLimit) (types.Bloc
 	return a.fch.getBlockContext()
 }
 
-func handleError(err error) {
+func panicOnAnyError(err error) {
+	if err == nil {
+		return
+	}
+
+	panicOnFVMError(err)
+	// if not FVM wrap it and panic
+	panic(errors.NewEVMError(err))
+}
+
+// panicOnFVMError errors panic on fatal or external (FVM) errors
+func panicOnFVMError(err error) {
 	if err == nil {
 		return
 	}
@@ -549,5 +567,8 @@ func handleError(err error) {
 		// don't wrap it
 		panic(err)
 	}
-	panic(errors.NewEVMError(err))
+
+	if fvmErrors.IsFVMError(err) {
+		panic(err)
+	}
 }
