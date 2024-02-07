@@ -1808,7 +1808,6 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 	if err != nil {
 		return nil, fmt.Errorf("could not create connection manager: %w", err)
 	}
-
 	libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger, &builder.FlowConfig.NetworkConfig.GossipSub, &p2pbuilderconfig.MetricsConfig{
 		HeroCacheFactory: builder.HeroCacheMetricsFactory(),
 		Metrics:          networkMetrics,
