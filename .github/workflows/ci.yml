@@ -189,7 +189,7 @@ jobs:
       - name: Docker build
         env:
           CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
-        run: make docker-build-flow docker-build-flow-corrupt
+        run: make docker-native-build-flow docker-native-build-flow-corrupt
       - name: Save Docker images
         run: |
           docker save \
