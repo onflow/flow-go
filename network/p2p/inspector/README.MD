@@ -174,6 +174,8 @@ will then be used for penalizing the sender in the peer scoring system.
     The validation process counts these duplicates and, if the number exceeds a certain threshold, it flags RPC message as invalid and terminates the inspection process with a failure result.
 5. `Publish` messages validation: Each RPC contains a list of `Publish` messages that are intended to be gossiped to the network. 
     The validation process involves iterating through each `Publish` message received in the (potentially truncated) RPC.
+    To validate the `Publish` messages of an RPC, the inspector samples a subset of the `Publish` messages and validates them for compliance with the Flow protocol semantics.
+    This is done to avoid adding excessive computational overhead to the inspection process, as the number of `Publish` messages in an RPC can be large, and validating each message can be resource-intensive.
     The validation of each `Publish` message involves several steps: (1) whether the sender is a valid (staked) Flow node, 
     (2) whether the topic ID is a valid based on the Flow protocol semantics, and (3) whether the local peer has a valid subscription to the topic.
     Failure in any of these steps results in a validation error for the `Publish` message. 
