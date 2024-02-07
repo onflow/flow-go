@@ -1,6 +1,7 @@
 package migrations
 
 import (
+	_ "embed"
 	"fmt"
 	"io"
 	"testing"
@@ -41,6 +42,9 @@ func (w *writer) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
+//go:embed test-data/cadence_values_migration/test_contract_upgraded.cdc
+var testContractUpgraded []byte
+
 func TestCadenceValuesMigration(t *testing.T) {
 
 	t.Parallel()
@@ -64,8 +68,15 @@ func TestCadenceValuesMigration(t *testing.T) {
 	// TODO: EVM contract is not deployed in snapshot yet, so can't update it
 	const evmContractChange = EVMContractChangeNone
 
-	// TODO:
-	var stagedContracts []StagedContract
+	stagedContracts := []StagedContract{
+		{
+			Contract: Contract{
+				name: "Test",
+				code: testContractUpgraded,
+			},
+			address: address,
+		},
+	}
 
 	migrations := NewCadence1Migrations(
 		logger,
