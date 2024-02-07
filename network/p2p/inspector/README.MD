@@ -9,6 +9,18 @@ The inspector performs two primary functions:
 1. **RPC truncation (blocking)**: It truncates size of incoming RPC messages to prevent excessive resource consumption, if needed. This is done by sampling the messages and reducing their size to a configurable threshold.
 2. **RPC inspection (aka validation) (non-blocking)**: It inspects (aka validates) the truncated or original RPC messages for compliance with the Flow protocol semantics. This includes validation of message structure, topic, sender, and other relevant attributes.
 
+Figure below shows the high-level overview of the Control Message Validation Inspector and its interaction with the GossipSub protocol and the Flow node.
+The blue box represents the GossipSub protocol, which is responsible for handling the pub-sub messaging system and is an external dependency of the Flow node.
+The green boxes represent various components of the Flow node's networking layer that are involved in the inspection and processing of incoming RPC messages.
+The steps that are marked with an asterisk (*) are performed concurrently, while the rest are performed sequentially.
+As shown in this figure, an incoming RPC message is passed by GossipSub to the Control Message Validation Inspector, which then performs the blocking truncation process and queues the RPC for asynchronous non-blocking inspection processes.
+As soon as the RPC is queued for inspection, it is also passed to the GossipSub protocol for further processing. The results of the inspection are used for internal metrics, logging, and feedback to the GossipSub scoring system.
+Once the GossipSub processes the RPC it passes the message to the libp2p node component of the networking layer of the Flow node, which then processes the message and sends it to the rest of the Flow node for further processing.
+Note that the validation process is non-blocking, hence even a malformed RPC is allowed to proceed through the GossipSub protocol to the Flow node. 
+However, based on the result of the asynchronous inspection, the message may be scored negatively, and the sender may be penalized in the peer scoring system.
+The rationale behind this is that post truncation, as far as the RPC size is within the configured limits, a single (or few) non-compliant RPCs do not drastically affect the system's health, hence, the RPCs are allowed to proceed for further processing.
+What matters is the persistent behavior of the sender, and the sender's reputation and future message propagation are _eventually_ affected based on the inspection results.
+![rpc-inspection-process.png](rpc-inspection-process.png)
 ## What is an RPC?
 RPC stands for Remote Procedure Call. In the context of GossipSub, it is a message that is sent from one peer to another peer over the GossipSub protocol. 
 The message is sent in the form of a protobuf message and is used to communicate information about the state of the network, such as topic membership, message propagation, and other relevant information.
