@@ -133,7 +133,7 @@ It directly provides feedback to the GossipSub protocol for scoring the peers.
 The [order of inspections for a single RPC](https://github.com/onflow/flow-go/blob/master/network/p2p/inspector/validation/control_message_validation_inspector.go#L270-L323) is as follows. Note that in the
 descriptions below, when we say an RPC is flagged as invalid or the inspection process is terminated with a failure result, and an _invalid control message notification_ is sent to the `GossipSubAppSpecificScoreRegistry`, which
 will then be used for penalizing the sender in the peer scoring system.
-1. `GRAFT`s validation: Each RPC contains one or more `GRAFT` messages. Each `GRAFT` message contains a topic ID indicating the mesh the peer wants to join. 
+1. `GRAFT` messages validation: Each RPC contains one or more `GRAFT` messages. Each `GRAFT` message contains a topic ID indicating the mesh the peer wants to join. 
     The validation process involves iterating through each `GRAFT` message received in the (potentially truncated) RPC.
     For each `GRAFT` message, the topic ID is validated to ensure it corresponds to a valid and recognized topic within the Flow-network.
     Topic validation might involve checking if the topic is known, if it's within the scope of the peer's interests or subscriptions, and if it aligns with the network's current configuration (e.g., checking against the active spork ID).
@@ -143,7 +143,7 @@ will then be used for penalizing the sender in the peer scoring system.
     The inspection process also system keeps track of the topics seen in the `GRAFT` messages of the same RPC. 
     If a topic is repeated (i.e., if there are duplicate topics in the `GRAFT` messages of the same RPC), this is usually a sign of a protocol violation or misbehavior.
     The validation process counts these duplicates and, if the number exceeds a certain threshold, it flags RPC message as invalid and terminates the inspection process with a failure result.
-2. `PRUNE`s validation: Similar to `GRAFT`s, each RPC contains one or more `PRUNE` messages. Each `PRUNE` message contains a topic ID indicating the mesh the peer wants to leave. 
+2. `PRUNE` messages validation: Similar to `GRAFT`s, each RPC contains one or more `PRUNE` messages. Each `PRUNE` message contains a topic ID indicating the mesh the peer wants to leave. 
     The validation process involves iterating through each `PRUNE` message received in the (potentially truncated) RPC.
     For each `PRUNE` message, the topic ID is validated to ensure it corresponds to a valid and recognized topic within the Flow-network.
     Topic validation might involve checking if the topic is known, if it's within the scope of the peer's interests or subscriptions, and if it aligns with the network's current configuration (e.g., checking against the active spork ID).
@@ -153,7 +153,7 @@ will then be used for penalizing the sender in the peer scoring system.
     The inspection process also system keeps track of the topics seen in the `PRUNE` messages of the same RPC. 
     If a topic is repeated (i.e., if there are duplicate topics in the `PRUNE` messages of the same RPC), this is usually a sign of a protocol violation or misbehavior.
     The validation process counts these duplicates and, if the number exceeds a certain threshold, it flags RPC message as invalid and terminates the inspection process with a failure result.
-3. `IWANT`s validation: Each RPC contains one or more `IWANT` messages. Each `IWANT` message contains a list of message IDs that the sender wants from the receiver as the result of an `IHAVE` message.
+3. `IWANT` messages validation: Each RPC contains one or more `IWANT` messages. Each `IWANT` message contains a list of message IDs that the sender wants from the receiver as the result of an `IHAVE` message.
     The validation process involves iterating through each `IWANT` message received in the (potentially truncated) RPC.
     For each `IWANT` message, the message IDs are validated to ensure they correspond to a valid message ID that recently advertised by the sender in an `IHAVE` message.
     We define an `IWANT` cache miss as the event of an `IWANT` message ID does not correspond to a valid recently advertised `IHAVE` message ID.
@@ -161,7 +161,7 @@ will then be used for penalizing the sender in the peer scoring system.
     The inspection process also system keeps track of the message IDs seen in the `IWANT` messages of the same RPC. 
     If a message ID is repeated (i.e., if there are duplicate message IDs in the `IWANT` messages of the same RPC), this is usually a sign of a protocol violation or misbehavior.
     The validation process counts these duplicates and, if the number exceeds a certain threshold, it flags RPC message as invalid and terminates the inspection process with a failure result.
-4. `IHAVE`s validation: Each RPC contains one or more `IHAVE` messages. Each `IHAVE` message contains a list of message IDs that the sender has and is advertising to the receiver.
+4. `IHAVE` messages validation: Each RPC contains one or more `IHAVE` messages. Each `IHAVE` message contains a list of message IDs that the sender has and is advertising to the receiver.
     The validation process involves iterating through each `IHAVE` message received in the (potentially truncated) RPC.
     Each `IHAVE` message is composed of a topic ID as well as the list of message IDs advertised for that topic.
     Each topic ID is validated to ensure it corresponds to a valid and recognized topic within the Flow-network.
@@ -172,4 +172,15 @@ will then be used for penalizing the sender in the peer scoring system.
     The validation process counts these duplicates and, if the number exceeds a certain threshold, it flags RPC message as invalid and terminates the inspection process with a failure result.
     The message IDs advertised in the `IHAVE` messages are also validated ensure there are no duplicates. When a message ID is repeated (i.e., if there are duplicate message IDs in the `IHAVE` messages of the same RPC), this is usually a sign of a protocol violation or misbehavior.
     The validation process counts these duplicates and, if the number exceeds a certain threshold, it flags RPC message as invalid and terminates the inspection process with a failure result.
-   
+5. `Publish` messages validation: Each RPC contains a list of `Publish` messages that are intended to be gossiped to the network. 
+    The validation process involves iterating through each `Publish` message received in the (potentially truncated) RPC.
+    The validation of each `Publish` message involves several steps: (1) whether the sender is a valid (staked) Flow node, 
+    (2) whether the topic ID is a valid based on the Flow protocol semantics, and (3) whether the local peer has a valid subscription to the topic.
+    Failure in any of these steps results in a validation error for the `Publish` message. 
+    However, validation error for a single `Publish` message does not cause inspection process to terminate with a failure result for the entire RPC.
+    Rather the inspection process continues to validate the rest of the `Publish` messages in the sampled RPC.
+    Once the entire sampled RPC is validated, the inspection process is terminated with a success if the number of validation errors is within a certain threshold.
+    Otherwise, when the number of validation errors exceeds the threshold, the inspection process is terminated with a failure result, which 
+    will cause an _invalid control message notification_ to be sent to the `GossipSubAppSpecificScoreRegistry`, which will then be used for penalizing the sender in the peer scoring system.
+    As this is the last step in the inspection process, when an RPC reaches this step, it means that the RPC has passed all the previous inspections and is only being validated for the `Publish` messages.
+    Hence, result of this step is used to determine the final result of the inspection process.
