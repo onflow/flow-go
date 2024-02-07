@@ -140,7 +140,7 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 // This func uses the publish callback to continually publish messages to the subscription, this ensures that the subscription indeed stops receiving the messages.
 func SubMustEventuallyStopReceivingAnyMessage(t *testing.T, ctx context.Context, sub p2p.Subscription, publish func(t *testing.T)) {
 	done := make(chan struct{})
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(500 * time.Millisecond)
 	defer func() {
 		close(done)
 		ticker.Stop()
