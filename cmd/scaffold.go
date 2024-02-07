@@ -1240,12 +1240,31 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 		return fmt.Errorf("could not parse node identifier: %w", err)
 	}
 
-	fnb.Logger.Info().Msgf("bind addr %v", fnb.BaseConfig.BindAddr)
+	if fnb.BaseConfig.ObserverMode {
+		info, err := LoadPrivateNodeInfo(fnb.BaseConfig.BootstrapDir, myID)
+		if err != nil {
+			return fmt.Errorf("failed to load private node info: %w", err)
+		}
+
+		id := flow.IdentitySkeleton{
+			NodeID:        myID,
+			Address:       info.Address,
+			Role:          info.Role,
+			InitialWeight: 0,
+			NetworkPubKey: info.NetworkPrivKey.PublicKey(),
+			StakingPubKey: info.StakingPrivKey.PublicKey(),
+		}
+		fnb.Me, err = local.New(id, info.StakingPrivKey)
+		if err != nil {
+			return fmt.Errorf("could not initialize local: %w", err)
+		}
+		return nil
+	}
 
 	self, err := fnb.State.Final().Identity(myID)
 	if err != nil {
-		return fmt.Errorf("node identity not found in the identity list of the finalized state (id: %v) %v: %w", myID,
-			fnb.BaseConfig.BindAddr, err)
+		return fmt.Errorf("node identity not found in the identity list of the finalized state (id: %v) : %w", myID,
+			err)
 	}
 
 	// Verify that my role (as given in the configuration) is consistent with the protocol state.

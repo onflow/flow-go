@@ -141,18 +141,24 @@ func WriteTestExecutionService(nodeid flow.Identifier, address, observerName, bo
 		return bootstrap.NodeInfo{}, err
 	}
 
-	nodeInfo := bootstrap.NewPublicNodeInfo(
+	nodeInfo := bootstrap.NewPrivateNodeInfo(
 		nodeid,
 		flow.RoleExecution,
 		address,
 		0,
-		networkKey.PublicKey(),
-		networkKey.PublicKey(),
+		networkKey,
+		networkKey,
 	)
 
 	path := fmt.Sprintf("%s/private-root-information/private-node-info_%v/%vjson",
 		bootstrapDir, nodeid, bootstrap.PathPrivNodeInfoPrefix)
-	err = io.WriteJSON(path, nodeInfo)
+
+	private, err := nodeInfo.Private()
+	if err != nil {
+		return bootstrap.NodeInfo{}, err
+	}
+
+	err = io.WriteJSON(path, private)
 	if err != nil {
 		return bootstrap.NodeInfo{}, err
 	}

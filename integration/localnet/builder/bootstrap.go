@@ -735,6 +735,9 @@ func prepareTestExecutionService(dockerServices Services, flowNodeContainerConfi
 	fmt.Println("NodeID: ", containerConfig)
 
 	observerService := prepareExecutionService(containerConfig, 1, 1)
+	observerService.Command = append(observerService.Command,
+		"--observer-mode=true",
+	)
 
 	// Add a docker container for this named Observer
 	dockerServices[observerName] = observerService
