@@ -7,7 +7,7 @@ All incoming RPC messages are passed through this inspection to ensure their val
 
 The inspector performs two primary functions:
 1. **RPC truncation (blocking)**: It truncates size of incoming RPC messages to prevent excessive resource consumption, if needed. This is done by sampling the messages and reducing their size to a configurable threshold.
-2. **RPC inspection (non-blocking)**: It inspects the truncated or original RPC messages for compliance with the Flow protocol semantics. This includes validation of message structure, topic, sender, and other relevant attributes.
+2. **RPC inspection (aka validation) (non-blocking)**: It inspects (aka validates) the truncated or original RPC messages for compliance with the Flow protocol semantics. This includes validation of message structure, topic, sender, and other relevant attributes.
 
 ## What is an RPC?
 RPC stands for Remote Procedure Call. In the context of GossipSub, it is a message that is sent from one peer to another peer over the GossipSub protocol. 
