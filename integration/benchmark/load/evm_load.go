@@ -34,6 +34,8 @@ type eoa struct {
 }
 
 type EVMTransferLoad struct {
+	PreCreateEOAAccounts int
+
 	log               zerolog.Logger
 	tokensPerTransfer cadence.UFix64
 
@@ -50,8 +52,9 @@ func NewEVMTransferLoad(log zerolog.Logger) *EVMTransferLoad {
 		tokensPerTransfer: cadence.UFix64(100),
 		// really large channel,
 		// it's going to get filled as needed
-		eoaChan:  make(chan *eoa, 1_000_000),
-		doneChan: make(chan struct{}),
+		eoaChan:              make(chan *eoa, 1_000_000),
+		doneChan:             make(chan struct{}),
+		PreCreateEOAAccounts: 5000,
 	}
 
 	go load.reportStatus()
@@ -90,7 +93,7 @@ func (l *EVMTransferLoad) Type() LoadType {
 
 func (l *EVMTransferLoad) Setup(log zerolog.Logger, lc LoadContext) error {
 	// create some EOA ahead of time to get a better result for the benchmark
-	const createEOA = 10000
+	createEOA := l.PreCreateEOAAccounts
 
 	g, ctx := errgroup.WithContext(context.Background())
 	g.SetLimit(lc.Proposer.NumKeys())

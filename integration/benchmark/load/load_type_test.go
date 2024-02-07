@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+	"sync"
 	"testing"
 )
 
@@ -26,14 +27,18 @@ func TestLoadTypes(t *testing.T) {
 
 	log := zerolog.New(zerolog.NewTestWriter(t))
 
+	evmLoad := load.NewEVMTransferLoad(log)
+	// dont create that many accounts for the test
+	evmLoad.PreCreateEOAAccounts = 20
+
 	loads := []load.Load{
 		load.CompHeavyLoad,
 		load.EventHeavyLoad,
 		load.LedgerHeavyLoad,
 		load.ExecDataHeavyLoad,
 		load.NewTokenTransferLoad(),
-		load.NewEVMTransferLoad(log),
 		load.NewAddKeysLoad(),
+		evmLoad,
 	}
 
 	for _, l := range loads {
@@ -189,6 +194,9 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 
 	proc := fvm.Transaction(txBody, 0)
 
+	t.snapshot.Lock()
+	defer t.snapshot.Unlock()
+
 	executionSnapshot, result, err := t.vm.Run(t.ctx, proc, t.snapshot)
 	if err != nil {
 		return sdk.TransactionResult{}, err
@@ -244,6 +252,9 @@ func (t *TestAccountLoader) Load(
 		return fmt.Errorf("error while loading account: %w", err)
 	}
 
+	t.snapshot.Lock()
+	defer t.snapshot.Unlock()
+
 	acc, err := t.vm.GetAccount(t.ctx, flow.ConvertAddress(address), t.snapshot)
 	if err != nil {
 		return nil, wrapErr(err)
@@ -267,6 +278,7 @@ func (t *TestAccountLoader) Load(
 
 type testSnapshotTree struct {
 	snapshot snapshot.SnapshotTree
+	sync.Mutex
 }
 
 func (t *testSnapshotTree) Get(id flow.RegisterID) (flow.RegisterValue, error) {
