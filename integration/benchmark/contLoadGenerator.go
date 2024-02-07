@@ -117,7 +117,7 @@ func New(
 
 	accountLoader := account.NewClientAccountLoader(lg.log, ctx, flowClient)
 
-	err = account.EnsureAccountHasKeys(lg.log, servAcc, 200, lg.follower, ts)
+	err = account.EnsureAccountHasKeys(lg.log, servAcc, 100, lg.follower, ts)
 	if err != nil {
 		return nil, fmt.Errorf("error ensuring service account has keys: %w", err)
 	}

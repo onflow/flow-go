@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/integration/benchmark/account"
 	"github.com/onflow/flow-go/integration/benchmark/common"
@@ -58,6 +59,7 @@ func testLoad(log zerolog.Logger, l load.Load) func(t *testing.T) {
 		blockProvider := noopReferenceBlockProvider{}
 		transactionSender := &testTransactionSender{
 			t:        t,
+			log:      log.With().Str("component", "testTransactionSender").Logger(),
 			vm:       vm,
 			ctx:      ctx,
 			snapshot: testSnapshotTree,
@@ -148,6 +150,7 @@ var _ common.ReferenceBlockProvider = noopReferenceBlockProvider{}
 
 type testTransactionSender struct {
 	t        *testing.T
+	log      zerolog.Logger
 	vm       *fvm.VirtualMachine
 	ctx      fvm.Context
 	snapshot *testSnapshotTree
@@ -203,6 +206,9 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 	}
 	// Update the snapshot
 	t.snapshot.Append(executionSnapshot)
+
+	computationUsed := environment.MainnetExecutionEffortWeights.ComputationFromIntensities(result.ComputationIntensities)
+	t.log.Debug().Uint64("computation", computationUsed).Msg("Transaction applied")
 
 	sdkResult := sdk.TransactionResult{
 		Status:        sdk.TransactionStatusSealed,
