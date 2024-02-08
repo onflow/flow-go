@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
+	"sync"
 	"testing"
 
 	"github.com/onflow/flow-go/fvm/environment"

@@ -3,6 +3,7 @@ package migrations
 import (
 	_ "embed"
 
+	"github.com/onflow/cadence/migrations/capcons"
 	"github.com/onflow/cadence/migrations/statictypes"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -159,7 +160,7 @@ func NewCadence1ValueMigrations(
 
 	// Populated by CadenceLinkValueMigrator,
 	// used by CadenceCapabilityValueMigrator
-	capabilityIDs := map[interpreter.AddressPath]interpreter.UInt64Value{}
+	capabilityIDs := &capcons.CapabilityIDMapping{}
 
 	for _, accountBasedMigration := range []AccountBasedMigration{
 		NewCadence1ValueMigrator(
