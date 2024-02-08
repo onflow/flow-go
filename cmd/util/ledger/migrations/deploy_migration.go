@@ -76,8 +76,8 @@ func NewDeploymentMigration(
 
 	tx := flow.NewTransactionBody().
 		SetScript(script).
-		AddArgument(jsoncdc.MustEncode(cadence.String(contract.name))).
-		AddArgument(jsoncdc.MustEncode(cadence.String(contract.code))).
+		AddArgument(jsoncdc.MustEncode(cadence.String(contract.Name))).
+		AddArgument(jsoncdc.MustEncode(cadence.String(contract.Code))).
 		AddAuthorizer(authorizer)
 
 	return NewTransactionBasedMigration(tx, chainID, logger)
@@ -91,8 +91,8 @@ func NewBurnerDeploymentMigration(
 	return NewDeploymentMigration(
 		chainID,
 		Contract{
-			name: "Burner",
-			code: coreContracts.Burner(),
+			Name: "Burner",
+			Code: coreContracts.Burner(),
 		},
 		chainID.Chain().ServiceAddress(),
 		logger,

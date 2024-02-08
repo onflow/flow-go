@@ -29,12 +29,12 @@ type StagedContractsMigration struct {
 
 type StagedContract struct {
 	Contract
-	address common.Address
+	Address common.Address
 }
 
 type Contract struct {
-	name string
-	code []byte
+	Name string
+	Code []byte
 }
 
 var _ AccountBasedMigration = &StagedContractsMigration{}
@@ -90,12 +90,12 @@ func (m *StagedContractsMigration) registerContractUpdates() {
 }
 
 func (m *StagedContractsMigration) registerContractChange(change StagedContract) {
-	address := change.address
+	address := change.Address
 	if _, ok := m.contracts[address]; !ok {
 		m.contracts[address] = map[flow.RegisterID]Contract{}
 	}
 
-	registerID := flow.ContractRegisterID(flow.ConvertAddress(address), change.name)
+	registerID := flow.ContractRegisterID(flow.ConvertAddress(address), change.Name)
 
 	_, exist := m.contracts[address][registerID]
 	if exist {
@@ -104,17 +104,17 @@ func (m *StagedContractsMigration) registerContractChange(change StagedContract)
 		m.log.Warn().Msgf(
 			"existing staged update found for contract %s.%s. Previous update will be overwritten.",
 			address.HexWithPrefix(),
-			change.name,
+			change.Name,
 		)
 	}
 
 	m.contracts[address][registerID] = change.Contract
 
 	location := common.AddressLocation{
-		Name:    change.name,
+		Name:    change.Name,
 		Address: address,
 	}
-	m.contractsByLocation[location] = change.Contract.code
+	m.contractsByLocation[location] = change.Contract.Code
 }
 
 func (m *StagedContractsMigration) contractUpdatesForAccount(
@@ -173,8 +173,8 @@ func (m *StagedContractsMigration) MigrateAccount(
 			continue
 		}
 
-		name := updatedContract.name
-		newCode := updatedContract.code
+		name := updatedContract.Name
+		newCode := updatedContract.Code
 		oldCode := payload.Value()
 
 		err = m.checkUpdateValidity(mr, address, name, newCode, oldCode)

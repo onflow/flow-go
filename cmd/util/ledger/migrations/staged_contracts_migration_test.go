@@ -57,10 +57,10 @@ func TestStagedContractsMigration(t *testing.T) {
 		stagedContracts := []StagedContract{
 			{
 				Contract: Contract{
-					name: "A",
-					code: []byte(newCode),
+					Name: "A",
+					Code: []byte(newCode),
 				},
-				address: address1,
+				Address: address1,
 			},
 		}
 
@@ -96,10 +96,10 @@ func TestStagedContractsMigration(t *testing.T) {
 		stagedContracts := []StagedContract{
 			{
 				Contract: Contract{
-					name: "A",
-					code: []byte(newCode),
+					Name: "A",
+					Code: []byte(newCode),
 				},
-				address: address1,
+				Address: address1,
 			},
 		}
 
@@ -137,10 +137,10 @@ func TestStagedContractsMigration(t *testing.T) {
 		stagedContracts := []StagedContract{
 			{
 				Contract: Contract{
-					name: "A",
-					code: []byte(newCode),
+					Name: "A",
+					Code: []byte(newCode),
 				},
-				address: address1,
+				Address: address1,
 			},
 		}
 
@@ -181,17 +181,17 @@ func TestStagedContractsMigration(t *testing.T) {
 		stagedContracts := []StagedContract{
 			{
 				Contract: Contract{
-					name: "A",
-					code: []byte(newCode1),
+					Name: "A",
+					Code: []byte(newCode1),
 				},
-				address: address1,
+				Address: address1,
 			},
 			{
 				Contract: Contract{
-					name: "B",
-					code: []byte(newCode2),
+					Name: "B",
+					Code: []byte(newCode2),
 				},
-				address: address1,
+				Address: address1,
 			},
 		}
 
@@ -232,10 +232,10 @@ func TestStagedContractsMigration(t *testing.T) {
 		stagedContracts := []StagedContract{
 			{
 				Contract: Contract{
-					name: "A",
-					code: []byte(newCode),
+					Name: "A",
+					Code: []byte(newCode),
 				},
-				address: address2,
+				Address: address2,
 			},
 		}
 
@@ -286,17 +286,17 @@ func TestStagedContractsMigration(t *testing.T) {
 		stagedContracts := []StagedContract{
 			{
 				Contract: Contract{
-					name: "A",
-					code: []byte(update1),
+					Name: "A",
+					Code: []byte(update1),
 				},
-				address: address1,
+				Address: address1,
 			},
 			{
 				Contract: Contract{
-					name: "A",
-					code: []byte(update2),
+					Name: "A",
+					Code: []byte(update2),
 				},
-				address: address1,
+				Address: address1,
 			},
 		}
 
@@ -370,17 +370,17 @@ func TestStagedContractsWithImports(t *testing.T) {
 		stagedContracts := []StagedContract{
 			{
 				Contract: Contract{
-					name: "A",
-					code: []byte(newCodeA),
+					Name: "A",
+					Code: []byte(newCodeA),
 				},
-				address: address1,
+				Address: address1,
 			},
 			{
 				Contract: Contract{
-					name: "B",
-					code: []byte(newCodeB),
+					Name: "B",
+					Code: []byte(newCodeB),
 				},
-				address: address2,
+				Address: address2,
 			},
 		}
 
@@ -436,10 +436,10 @@ func TestStagedContractsWithImports(t *testing.T) {
 		stagedContracts := []StagedContract{
 			{
 				Contract: Contract{
-					name: "A",
-					code: []byte(newCodeA),
+					Name: "A",
+					Code: []byte(newCodeA),
 				},
-				address: address1,
+				Address: address1,
 			},
 		}
 
@@ -505,17 +505,17 @@ func TestStagedContractsWithImports(t *testing.T) {
 		stagedContracts := []StagedContract{
 			{
 				Contract: Contract{
-					name: "A",
-					code: []byte(newCodeA),
+					Name: "A",
+					Code: []byte(newCodeA),
 				},
-				address: address1,
+				Address: address1,
 			},
 			{
 				Contract: Contract{
-					name: "C",
-					code: []byte(newCodeC),
+					Name: "C",
+					Code: []byte(newCodeC),
 				},
-				address: address1,
+				Address: address1,
 			},
 		}
 

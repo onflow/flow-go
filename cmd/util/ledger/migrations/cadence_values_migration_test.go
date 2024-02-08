@@ -71,10 +71,10 @@ func TestCadenceValuesMigration(t *testing.T) {
 	stagedContracts := []StagedContract{
 		{
 			Contract: Contract{
-				name: "Test",
-				code: testContractUpgraded,
+				Name: "Test",
+				Code: testContractUpgraded,
 			},
-			address: address,
+			Address: address,
 		},
 	}
 
