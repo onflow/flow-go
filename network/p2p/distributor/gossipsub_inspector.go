@@ -6,12 +6,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
-	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 )
 
 const (
@@ -33,7 +31,6 @@ type GossipSubInspectorNotifDistributor struct {
 	cm     *component.ComponentManager
 	logger zerolog.Logger
 
-	workerPool   *worker.Pool[*p2p.InvCtrlMsgNotif]
 	consumerLock sync.RWMutex // protects the consumer field from concurrent updates
 	consumers    []p2p.GossipSubInvCtrlMsgNotifConsumer
 }
@@ -62,15 +59,6 @@ func NewGossipSubInspectorNotificationDistributor(log zerolog.Logger, store engi
 		logger: lg,
 	}
 
-	pool := worker.NewWorkerPoolBuilder[*p2p.InvCtrlMsgNotif](lg, store, d.distribute).Build()
-	d.workerPool = pool
-
-	cm := component.NewComponentManagerBuilder()
-
-	for i := 0; i < defaultGossipSubInspectorNotificationQueueWorkerCount; i++ {
-		cm.AddWorker(pool.WorkerLogic())
-	}
-
 	d.cm = cm.Build()
 	d.Component = d.cm
 
@@ -81,13 +69,7 @@ func NewGossipSubInspectorNotificationDistributor(log zerolog.Logger, store engi
 // The distribution is done asynchronously and non-blocking. The notification is added to a queue and processed by a worker pool.
 // DistributeEvent in this implementation does not return an error, but it logs a warning if the queue is full.
 func (g *GossipSubInspectorNotifDistributor) Distribute(notification *p2p.InvCtrlMsgNotif) error {
-	lg := g.logger.With().Str("peer_id", p2plogging.PeerId(notification.PeerID)).Logger()
-	if ok := g.workerPool.Submit(notification); !ok {
-		// we use a queue with a fixed size, so this can happen when queue is full or when the notification is duplicate.
-		lg.Warn().Msg("gossipsub rpc inspector notification queue is full or notification is duplicate, discarding notification")
-	}
-	lg.Trace().Msg("gossipsub rpc inspector notification submitted to the queue")
-	return nil
+
 }
 
 // AddConsumer adds a consumer to the distributor. The consumer will be called when distributor distributes a new event.
