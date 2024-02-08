@@ -85,7 +85,6 @@ type Params struct {
 	HistoricalAccessNodes     []accessproto.AccessAPIClient
 	Blocks                    storage.Blocks
 	Headers                   storage.Headers
-	Events                    storage.Events
 	Collections               storage.Collections
 	Transactions              storage.Transactions
 	ExecutionReceipts         storage.ExecutionReceipts
@@ -106,6 +105,7 @@ type Params struct {
 	ScriptExecutor            execution.ScriptExecutor
 	ScriptExecutionMode       IndexQueryMode
 	EventQueryMode            IndexQueryMode
+	EventsIndex               *EventsIndex
 	TxResultQueryMode         IndexQueryMode
 }
 
@@ -142,10 +142,7 @@ func New(params Params) (*Backend, error) {
 	}
 
 	// initialize node version info
-	nodeInfo, err := getNodeVersionInfo(params.State.Params())
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize node version info: %w", err)
-	}
+	nodeInfo := getNodeVersionInfo(params.State.Params())
 
 	b := &Backend{
 		state: params.State,
@@ -168,7 +165,7 @@ func New(params Params) (*Backend, error) {
 				collections: params.Collections,
 				blocks:      params.Blocks,
 				results:     params.LightTransactionResults,
-				events:      params.Events,
+				eventsIndex: params.EventsIndex,
 			},
 			log:                  params.Log,
 			staticCollectionRPC:  params.CollectionRPC,
@@ -190,12 +187,12 @@ func New(params Params) (*Backend, error) {
 			chain:             params.ChainID.Chain(),
 			state:             params.State,
 			headers:           params.Headers,
-			events:            params.Events,
 			executionReceipts: params.ExecutionReceipts,
 			connFactory:       params.ConnFactory,
 			maxHeightRange:    params.MaxHeightRange,
 			nodeCommunicator:  params.Communicator,
 			queryMode:         params.EventQueryMode,
+			eventsIndex:       params.EventsIndex,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: params.Headers,
@@ -259,7 +256,6 @@ func NewCache(
 		log.Debug().Str("grpc_conn_evicted", client.Address).Msg("closing grpc connection evicted from pool")
 		metrics.ConnectionFromPoolEvicted()
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
 	}
@@ -298,7 +294,6 @@ func configureTransactionValidator(state protocol.State, chainID flow.ChainID) *
 
 // Ping responds to requests when the server is up.
 func (b *Backend) Ping(ctx context.Context) error {
-
 	// staticCollectionRPC is only set if a collection node address was provided at startup
 	if b.staticCollectionRPC != nil {
 		_, err := b.staticCollectionRPC.Ping(ctx, &accessproto.PingRequest{})
@@ -317,26 +312,12 @@ func (b *Backend) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo
 
 // getNodeVersionInfo returns the NodeVersionInfo for the node.
 // Since these values are static while the node is running, it is safe to cache.
-func getNodeVersionInfo(stateParams protocol.Params) (*access.NodeVersionInfo, error) {
-	sporkID, err := stateParams.SporkID()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read spork ID: %v", err)
-	}
+func getNodeVersionInfo(stateParams protocol.Params) *access.NodeVersionInfo {
+	sporkID := stateParams.SporkID()
+	protocolVersion := stateParams.ProtocolVersion()
+	sporkRootBlockHeight := stateParams.SporkRootBlockHeight()
 
-	protocolVersion, err := stateParams.ProtocolVersion()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read protocol version: %v", err)
-	}
-
-	sporkRootBlockHeight, err := stateParams.SporkRootBlockHeight()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read spork root block height: %w", err)
-	}
-
-	nodeRootBlockHeader, err := stateParams.SealedRoot()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read node root block: %w", err)
-	}
+	nodeRootBlockHeader := stateParams.SealedRoot()
 
 	nodeInfo := &access.NodeVersionInfo{
 		Semver:               build.Version(),
@@ -347,7 +328,7 @@ func getNodeVersionInfo(stateParams protocol.Params) (*access.NodeVersionInfo, e
 		NodeRootBlockHeight:  nodeRootBlockHeader.Height,
 	}
 
-	return nodeInfo, nil
+	return nodeInfo
 }
 
 func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*flow.LightCollection, error) {
@@ -380,19 +361,18 @@ func executionNodesForBlockID(
 	executionReceipts storage.ExecutionReceipts,
 	state protocol.State,
 	log zerolog.Logger,
-) (flow.IdentityList, error) {
-
-	var executorIDs flow.IdentifierList
+) (flow.IdentitySkeletonList, error) {
+	var (
+		executorIDs flow.IdentifierList
+		err         error
+	)
 
 	// check if the block ID is of the root block. If it is then don't look for execution receipts since they
 	// will not be present for the root block.
-	rootBlock, err := state.Params().FinalizedRoot()
-	if err != nil {
-		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
-	}
+	rootBlock := state.Params().FinalizedRoot()
 
 	if rootBlock.ID() == blockID {
-		executorIdentities, err := state.Final().Identities(filter.HasRole(flow.RoleExecution))
+		executorIdentities, err := state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 		if err != nil {
 			return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 		}
@@ -422,14 +402,14 @@ func executionNodesForBlockID(
 			case <-ctx.Done():
 				return nil, ctx.Err()
 			case <-time.After(100 * time.Millisecond << time.Duration(attempt)):
-				//retry after an exponential backoff
+				// retry after an exponential backoff
 			}
 		}
 
 		receiptCnt := len(executorIDs)
 		// if less than minExecutionNodesCnt execution receipts have been received so far, then return random ENs
 		if receiptCnt < minExecutionNodesCnt {
-			newExecutorIDs, err := state.AtBlockID(blockID).Identities(filter.HasRole(flow.RoleExecution))
+			newExecutorIDs, err := state.AtBlockID(blockID).Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 			if err != nil {
 				return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 			}
@@ -457,7 +437,6 @@ func findAllExecutionNodes(
 	executionReceipts storage.ExecutionReceipts,
 	log zerolog.Logger,
 ) (flow.IdentifierList, error) {
-
 	// lookup the receipt's storage with the block ID
 	allReceipts, err := executionReceipts.ByBlockID(blockID)
 	if err != nil {
@@ -513,9 +492,8 @@ func findAllExecutionNodes(
 // If neither preferred nor fixed nodes are defined, then all execution node matching the executor IDs are returned.
 // e.g. If execution nodes in identity table are {1,2,3,4}, preferred ENs are defined as {2,3,4}
 // and the executor IDs is {1,2,3}, then {2, 3} is returned as the chosen subset of ENs
-func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList) (flow.IdentityList, error) {
-
-	allENs, err := state.Final().Identities(filter.HasRole(flow.RoleExecution))
+func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList) (flow.IdentitySkeletonList, error) {
+	allENs, err := state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive all execution IDs: %w", err)
 	}
@@ -524,25 +502,27 @@ func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList)
 	var chosenIDs flow.IdentityList
 	if len(preferredENIdentifiers) > 0 {
 		// find the preferred execution node IDs which have executed the transaction
-		chosenIDs = allENs.Filter(filter.And(filter.HasNodeID(preferredENIdentifiers...),
-			filter.HasNodeID(executorIDs...)))
+		chosenIDs = allENs.Filter(filter.And(filter.HasNodeID[flow.Identity](preferredENIdentifiers...),
+			filter.HasNodeID[flow.Identity](executorIDs...)))
 		if len(chosenIDs) > 0 {
-			return chosenIDs, nil
+			return chosenIDs.ToSkeleton(), nil
 		}
 	}
 
 	// if no preferred EN ID is found, then choose from the fixed EN IDs
 	if len(fixedENIdentifiers) > 0 {
 		// choose fixed ENs which have executed the transaction
-		chosenIDs = allENs.Filter(filter.And(filter.HasNodeID(fixedENIdentifiers...), filter.HasNodeID(executorIDs...)))
+		chosenIDs = allENs.Filter(filter.And(
+			filter.HasNodeID[flow.Identity](fixedENIdentifiers...),
+			filter.HasNodeID[flow.Identity](executorIDs...)))
 		if len(chosenIDs) > 0 {
-			return chosenIDs, nil
+			return chosenIDs.ToSkeleton(), nil
 		}
 		// if no such ENs are found then just choose all fixed ENs
-		chosenIDs = allENs.Filter(filter.HasNodeID(fixedENIdentifiers...))
-		return chosenIDs, nil
+		chosenIDs = allENs.Filter(filter.HasNodeID[flow.Identity](fixedENIdentifiers...))
+		return chosenIDs.ToSkeleton(), nil
 	}
 
 	// If no preferred or fixed ENs have been specified, then return all executor IDs i.e. no preference at all
-	return allENs.Filter(filter.HasNodeID(executorIDs...)), nil
+	return allENs.Filter(filter.HasNodeID[flow.Identity](executorIDs...)).ToSkeleton(), nil
 }

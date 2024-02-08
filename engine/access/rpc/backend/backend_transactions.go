@@ -105,7 +105,7 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 	// try sending the transaction to one of the chosen collection nodes
 	sendError = b.nodeCommunicator.CallAvailableNode(
 		collNodes,
-		func(node *flow.Identity) error {
+		func(node *flow.IdentitySkeleton) error {
 			err = b.sendTransactionToCollector(ctx, tx, node.Address)
 			if err != nil {
 				return err
@@ -120,7 +120,8 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 
 // chooseCollectionNodes finds a random subset of size sampleSize of collection node addresses from the
 // collection node cluster responsible for the given tx
-func (b *backendTransactions) chooseCollectionNodes(txID flow.Identifier) (flow.IdentityList, error) {
+func (b *backendTransactions) chooseCollectionNodes(txID flow.Identifier) (flow.IdentitySkeletonList, error) {
+
 	// retrieve the set of collector clusters
 	clusters, err := b.state.Final().Epochs().Current().Clustering()
 	if err != nil {
@@ -467,11 +468,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromExecutionNode(
 	// after iterating through all transactions  in each collection, i equals the total number of
 	// user transactions  in the block
 	txCount := i
-
-	sporkRootBlockHeight, err := b.state.Params().SporkRootBlockHeight()
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to retrieve root block: %v", err)
-	}
+	sporkRootBlockHeight := b.state.Params().SporkRootBlockHeight()
 
 	// root block has no system transaction result
 	if block.Header.Height > sporkRootBlockHeight {
@@ -854,7 +851,7 @@ func (b *backendTransactions) ProcessFinalizedBlockHeight(height uint64) error {
 
 func (b *backendTransactions) getTransactionResultFromAnyExeNode(
 	ctx context.Context,
-	execNodes flow.IdentityList,
+	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetTransactionResultRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
 	var errToReturn error
@@ -868,7 +865,7 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(
 	var resp *execproto.GetTransactionResultResponse
 	errToReturn = b.nodeCommunicator.CallAvailableNode(
 		execNodes,
-		func(node *flow.Identity) error {
+		func(node *flow.IdentitySkeleton) error {
 			var err error
 			resp, err = b.tryGetTransactionResult(ctx, node, req)
 			if err == nil {
@@ -889,7 +886,7 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(
 
 func (b *backendTransactions) tryGetTransactionResult(
 	ctx context.Context,
-	execNode *flow.Identity,
+	execNode *flow.IdentitySkeleton,
 	req *execproto.GetTransactionResultRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
@@ -908,7 +905,7 @@ func (b *backendTransactions) tryGetTransactionResult(
 
 func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 	ctx context.Context,
-	execNodes flow.IdentityList,
+	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetTransactionsByBlockIDRequest,
 ) (*execproto.GetTransactionResultsResponse, error) {
 	var errToReturn error
@@ -928,7 +925,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 	var resp *execproto.GetTransactionResultsResponse
 	errToReturn = b.nodeCommunicator.CallAvailableNode(
 		execNodes,
-		func(node *flow.Identity) error {
+		func(node *flow.IdentitySkeleton) error {
 			var err error
 			resp, err = b.tryGetTransactionResultsByBlockID(ctx, node, req)
 			if err == nil {
@@ -948,7 +945,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 
 func (b *backendTransactions) tryGetTransactionResultsByBlockID(
 	ctx context.Context,
-	execNode *flow.Identity,
+	execNode *flow.IdentitySkeleton,
 	req *execproto.GetTransactionsByBlockIDRequest,
 ) (*execproto.GetTransactionResultsResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
@@ -967,7 +964,7 @@ func (b *backendTransactions) tryGetTransactionResultsByBlockID(
 
 func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 	ctx context.Context,
-	execNodes flow.IdentityList,
+	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetTransactionByIndexRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
 	var errToReturn error
@@ -984,7 +981,7 @@ func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 	var resp *execproto.GetTransactionResultResponse
 	errToReturn = b.nodeCommunicator.CallAvailableNode(
 		execNodes,
-		func(node *flow.Identity) error {
+		func(node *flow.IdentitySkeleton) error {
 			var err error
 			resp, err = b.tryGetTransactionResultByIndex(ctx, node, req)
 			if err == nil {
@@ -1005,7 +1002,7 @@ func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 
 func (b *backendTransactions) tryGetTransactionResultByIndex(
 	ctx context.Context,
-	execNode *flow.Identity,
+	execNode *flow.IdentitySkeleton,
 	req *execproto.GetTransactionByIndexRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
@@ -1191,7 +1188,7 @@ func (b *backendTransactions) LookupErrorMessagesByBlockID(
 //   - codes.Unavailable - remote node is not unavailable.
 func (b *backendTransactions) getTransactionErrorMessageFromAnyEN(
 	ctx context.Context,
-	execNodes flow.IdentityList,
+	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetTransactionErrorMessageRequest,
 ) (*execproto.GetTransactionErrorMessageResponse, error) {
 	// if we were passed 0 execution nodes add a specific error
@@ -1202,7 +1199,7 @@ func (b *backendTransactions) getTransactionErrorMessageFromAnyEN(
 	var resp *execproto.GetTransactionErrorMessageResponse
 	errToReturn := b.nodeCommunicator.CallAvailableNode(
 		execNodes,
-		func(node *flow.Identity) error {
+		func(node *flow.IdentitySkeleton) error {
 			var err error
 			resp, err = b.tryGetTransactionErrorMessageFromEN(ctx, node, req)
 			if err == nil {
@@ -1234,7 +1231,7 @@ func (b *backendTransactions) getTransactionErrorMessageFromAnyEN(
 //   - codes.Unavailable - remote node is not unavailable.
 func (b *backendTransactions) getTransactionErrorMessageByIndexFromAnyEN(
 	ctx context.Context,
-	execNodes flow.IdentityList,
+	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetTransactionErrorMessageByIndexRequest,
 ) (*execproto.GetTransactionErrorMessageResponse, error) {
 	// if we were passed 0 execution nodes add a specific error
@@ -1245,7 +1242,7 @@ func (b *backendTransactions) getTransactionErrorMessageByIndexFromAnyEN(
 	var resp *execproto.GetTransactionErrorMessageResponse
 	errToReturn := b.nodeCommunicator.CallAvailableNode(
 		execNodes,
-		func(node *flow.Identity) error {
+		func(node *flow.IdentitySkeleton) error {
 			var err error
 			resp, err = b.tryGetTransactionErrorMessageByIndexFromEN(ctx, node, req)
 			if err == nil {
@@ -1275,7 +1272,7 @@ func (b *backendTransactions) getTransactionErrorMessageByIndexFromAnyEN(
 //   - codes.Unavailable - remote node is not unavailable.
 func (b *backendTransactions) getTransactionErrorMessagesFromAnyEN(
 	ctx context.Context,
-	execNodes flow.IdentityList,
+	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetTransactionErrorMessagesByBlockIDRequest,
 ) ([]*execproto.GetTransactionErrorMessagesResponse_Result, error) {
 	// if we were passed 0 execution nodes add a specific error
@@ -1286,7 +1283,7 @@ func (b *backendTransactions) getTransactionErrorMessagesFromAnyEN(
 	var resp *execproto.GetTransactionErrorMessagesResponse
 	errToReturn := b.nodeCommunicator.CallAvailableNode(
 		execNodes,
-		func(node *flow.Identity) error {
+		func(node *flow.IdentitySkeleton) error {
 			var err error
 			resp, err = b.tryGetTransactionErrorMessagesByBlockIDFromEN(ctx, node, req)
 			if err == nil {
@@ -1318,7 +1315,7 @@ func (b *backendTransactions) getTransactionErrorMessagesFromAnyEN(
 // tryGetTransactionErrorMessageFromEN performs a grpc call to the specified execution node and returns response.
 func (b *backendTransactions) tryGetTransactionErrorMessageFromEN(
 	ctx context.Context,
-	execNode *flow.Identity,
+	execNode *flow.IdentitySkeleton,
 	req *execproto.GetTransactionErrorMessageRequest,
 ) (*execproto.GetTransactionErrorMessageResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
@@ -1336,7 +1333,7 @@ func (b *backendTransactions) tryGetTransactionErrorMessageFromEN(
 //   - codes.Unavailable - remote node is not unavailable.
 func (b *backendTransactions) tryGetTransactionErrorMessageByIndexFromEN(
 	ctx context.Context,
-	execNode *flow.Identity,
+	execNode *flow.IdentitySkeleton,
 	req *execproto.GetTransactionErrorMessageByIndexRequest,
 ) (*execproto.GetTransactionErrorMessageResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
@@ -1354,7 +1351,7 @@ func (b *backendTransactions) tryGetTransactionErrorMessageByIndexFromEN(
 //   - codes.Unavailable - remote node is not unavailable.
 func (b *backendTransactions) tryGetTransactionErrorMessagesByBlockIDFromEN(
 	ctx context.Context,
-	execNode *flow.Identity,
+	execNode *flow.IdentitySkeleton,
 	req *execproto.GetTransactionErrorMessagesByBlockIDRequest,
 ) (*execproto.GetTransactionErrorMessagesResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)

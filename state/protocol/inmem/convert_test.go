@@ -23,9 +23,9 @@ func TestFromSnapshot(t *testing.T) {
 	identities := unittest.IdentityListFixture(10, unittest.WithAllRoles())
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 
-	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
-
-		epochBuilder := unittest.NewEpochBuilder(t, state)
+	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, fullState *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
+		state := fullState.FollowerState
+		epochBuilder := unittest.NewEpochBuilder(t, mutableState, state)
 		// build epoch 1 (prepare epoch 2)
 		epochBuilder.
 			BuildEpoch().
@@ -43,8 +43,7 @@ func TestFromSnapshot(t *testing.T) {
 
 		// test that we are able to retrieve an in-memory version of root snapshot
 		t.Run("root snapshot", func(t *testing.T) {
-			root, err := state.Params().FinalizedRoot()
-			require.NoError(t, err)
+			root := state.Params().FinalizedRoot()
 			expected := state.AtHeight(root.Height)
 			actual, err := inmem.FromSnapshot(expected)
 			require.NoError(t, err)

@@ -1008,7 +1008,7 @@ func TestPublishMessageInspection_Ejected_From(t *testing.T) {
 	})
 	from := unittest.PeerIdFixture(t)
 	id := unittest.IdentityFixture()
-	id.Ejected = true
+	id.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 	topic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
 	topicProviderOracle.UpdateTopics([]string{topic})
 	pubsubMsgs := unittest.GossipSubMessageFixtures(501, topic, unittest.WithFrom(from))

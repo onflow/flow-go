@@ -8,4 +8,5 @@ import "testing"
 // 4. can read after init
 // 5. can read after set
 func TestChunkConsumer(t *testing.T) {
+	// TODO
 }

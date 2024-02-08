@@ -34,12 +34,11 @@ type TransactionErrorMessage interface {
 // TransactionsLocalDataProvider provides functionality for retrieving transaction results and error messages from local storages
 type TransactionsLocalDataProvider struct {
 	TransactionErrorMessage
-
 	state       protocol.State
 	results     storage.LightTransactionResults
-	events      storage.Events
 	collections storage.Collections
 	blocks      storage.Blocks
+	eventsIndex *EventsIndex
 }
 
 // GetTransactionResultFromStorage retrieves a transaction result from storage by block ID and transaction ID.
@@ -79,7 +78,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	events, err := t.events.ByBlockIDTransactionID(blockID, transactionID)
+	events, err := t.eventsIndex.GetEventsByTransactionID(blockID, block.Header.Height, transactionID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
@@ -151,7 +150,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 			return nil, rpc.ConvertStorageError(err)
 		}
 
-		events, err := t.events.ByBlockIDTransactionID(blockID, txResult.TransactionID)
+		events, err := t.eventsIndex.GetEventsByTransactionID(blockID, block.Header.Height, txResult.TransactionID)
 		if err != nil {
 			return nil, rpc.ConvertStorageError(err)
 		}
@@ -227,7 +226,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	events, err := t.events.ByBlockIDTransactionIndex(blockID, index)
+	events, err := t.eventsIndex.GetEventsByTransactionIndex(blockID, block.Header.Height, index)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
