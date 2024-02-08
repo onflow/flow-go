@@ -599,10 +599,14 @@ func checkReporters(
 }
 
 type testReportWriterFactory struct {
+	lock          sync.Mutex
 	reportWriters map[string]*testReportWriter
 }
 
 func (f *testReportWriterFactory) ReportWriter(dataNamespace string) reporters.ReportWriter {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
 	if f.reportWriters == nil {
 		f.reportWriters = make(map[string]*testReportWriter)
 	}
@@ -615,12 +619,16 @@ func (f *testReportWriterFactory) ReportWriter(dataNamespace string) reporters.R
 }
 
 type testReportWriter struct {
+	lock    sync.Mutex
 	entries []any
 }
 
 var _ reporters.ReportWriter = &testReportWriter{}
 
 func (r *testReportWriter) Write(entry any) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	r.entries = append(r.entries, entry)
 }
 
