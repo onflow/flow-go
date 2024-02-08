@@ -71,7 +71,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 	}
 
 	// tx body is irrelevant to status if it's in an executed block
-	txStatus, err := t.deriveTransactionStatus(nil, true, block)
+	txStatus, err := t.deriveTransactionStatus(blockID, block.Header.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
@@ -143,7 +143,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 		}
 
 		// tx body is irrelevant to status if it's in an executed block
-		txStatus, err := t.deriveTransactionStatus(nil, true, block)
+		txStatus, err := t.deriveTransactionStatus(blockID, block.Header.Height, true)
 		if err != nil {
 			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 				irrecoverable.Throw(ctx, err)
@@ -219,7 +219,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 	}
 
 	// tx body is irrelevant to status if it's in an executed block
-	txStatus, err := t.deriveTransactionStatus(nil, true, block)
+	txStatus, err := t.deriveTransactionStatus(blockID, block.Header.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
@@ -261,59 +261,53 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 	}, nil
 }
 
-// deriveTransactionStatus derives the transaction status based on current protocol state
-// Error returns:
-//   - state.ErrUnknownSnapshotReference - block referenced by transaction has not been found.
-//   - all other errors are unexpected and potentially symptoms of internal implementation bugs or state corruption (fatal).
-func (t *TransactionsLocalDataProvider) deriveTransactionStatus(
-	tx *flow.TransactionBody,
-	executed bool,
-	block *flow.Block,
-) (flow.TransactionStatus, error) {
-	if block == nil {
-		// Not in a block, let's see if it's expired
-		referenceBlock, err := t.state.AtBlockID(tx.ReferenceBlockID).Head()
-		if err != nil {
-			return flow.TransactionStatusUnknown, err
-		}
-		refHeight := referenceBlock.Height
-		// get the latest finalized block from the state
-		finalized, err := t.state.Final().Head()
-		if err != nil {
-			return flow.TransactionStatusUnknown, irrecoverable.NewExceptionf("failed to lookup final header: %w", err)
-		}
-		finalizedHeight := finalized.Height
+// deriveUnknownTransactionStatus is used to determine the status of transaction
+// that are not in a block yet based on the provided reference block ID.
+func (t *TransactionsLocalDataProvider) deriveUnknownTransactionStatus(refBlockID flow.Identifier) (flow.TransactionStatus, error) {
+	referenceBlock, err := t.state.AtBlockID(refBlockID).Head()
+	if err != nil {
+		return flow.TransactionStatusUnknown, err
+	}
+	refHeight := referenceBlock.Height
+	// get the latest finalized block from the state
+	finalized, err := t.state.Final().Head()
+	if err != nil {
+		return flow.TransactionStatusUnknown, irrecoverable.NewExceptionf("failed to lookup final header: %w", err)
+	}
+	finalizedHeight := finalized.Height
 
-		// if we haven't seen the expiry block for this transaction, it's not expired
-		if !isExpired(refHeight, finalizedHeight) {
-			return flow.TransactionStatusPending, nil
-		}
-
-		// At this point, we have seen the expiry block for the transaction.
-		// This means that, if no collections  prior to the expiry block contain
-		// the transaction, it can never be included and is expired.
-		//
-		// To ensure this, we need to have received all collections  up to the
-		// expiry block to ensure the transaction did not appear in any.
-
-		// the last full height is the height where we have received all
-		// collections  for all blocks with a lower height
-		fullHeight, err := t.blocks.GetLastFullBlockHeight()
-		if err != nil {
-			return flow.TransactionStatusUnknown, err
-		}
-
-		// if we have received collections  for all blocks up to the expiry block, the transaction is expired
-		if isExpired(refHeight, fullHeight) {
-			return flow.TransactionStatusExpired, nil
-		}
-
-		// tx found in transaction storage and collection storage but not in block storage
-		// However, this will not happen as of now since the ingestion engine doesn't subscribe
-		// for collections
+	// if we haven't seen the expiry block for this transaction, it's not expired
+	if !isExpired(refHeight, finalizedHeight) {
 		return flow.TransactionStatusPending, nil
 	}
 
+	// At this point, we have seen the expiry block for the transaction.
+	// This means that, if no collections  prior to the expiry block contain
+	// the transaction, it can never be included and is expired.
+	//
+	// To ensure this, we need to have received all collections  up to the
+	// expiry block to ensure the transaction did not appear in any.
+
+	// the last full height is the height where we have received all
+	// collections  for all blocks with a lower height
+	fullHeight, err := t.blocks.GetLastFullBlockHeight()
+	if err != nil {
+		return flow.TransactionStatusUnknown, err
+	}
+
+	// if we have received collections  for all blocks up to the expiry block, the transaction is expired
+	if isExpired(refHeight, fullHeight) {
+		return flow.TransactionStatusExpired, nil
+	}
+
+	// tx found in transaction storage and collection storage but not in block storage
+	// However, this will not happen as of now since the ingestion engine doesn't subscribe
+	// for collections
+	return flow.TransactionStatusPending, nil
+}
+
+// deriveTransactionStatus is used to determine the status of a transaction based on the provided block ID, block height, and execution status.
+func (t *TransactionsLocalDataProvider) deriveTransactionStatus(blockID flow.Identifier, blockHeight uint64, executed bool) (flow.TransactionStatus, error) {
 	if !executed {
 		// If we've gotten here, but the block has not yet been executed, report it as only been finalized
 		return flow.TransactionStatusFinalized, nil
@@ -327,7 +321,7 @@ func (t *TransactionsLocalDataProvider) deriveTransactionStatus(
 		return flow.TransactionStatusUnknown, irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 	}
 
-	if block.Header.Height > sealed.Height {
+	if blockHeight > sealed.Height {
 		// The block is not yet sealed, so we'll report it as only executed
 		return flow.TransactionStatusExecuted, nil
 	}
