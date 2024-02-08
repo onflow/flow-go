@@ -384,7 +384,10 @@ func checkReporters(
 		)
 	}
 
-	reportEntry := func(migration, key string, domain common.PathDomain) cadenceValueMigrationReportEntry {
+	newCadenceValueMigrationReportEntry := func(
+		migration, key string,
+		domain common.PathDomain,
+	) cadenceValueMigrationReportEntry {
 		return cadenceValueMigrationReportEntry{
 			StorageMapKey: interpreter.StringStorageMapKey(key),
 			StorageKey: interpreter.NewStorageKey(
@@ -396,15 +399,21 @@ func checkReporters(
 		}
 	}
 
-	var entries []any
+	var accountReportEntries []reportEntry
+
 	for _, reportWriter := range rwf.reportWriters {
-		entries = append(
-			entries,
-			reportWriter.entries...,
-		)
+		for _, entry := range reportWriter.entries {
+
+			e := entry.(reportEntry)
+			if e.accountAddress() != address {
+				continue
+			}
+
+			accountReportEntries = append(accountReportEntries, e)
+		}
 	}
 
-	acctTypedDictKeyMigrationReportEntry := reportEntry(
+	acctTypedDictKeyMigrationReportEntry := newCadenceValueMigrationReportEntry(
 		"StaticTypeMigration",
 		"dictionary_with_account_type_keys",
 		common.PathDomainStorage)
@@ -412,18 +421,46 @@ func checkReporters(
 	// Order is non-deterministic, so use 'ElementsMatch'.
 	assert.ElementsMatch(
 		t,
-		[]any{
-			reportEntry("StringNormalizingMigration", "string_value_1", common.PathDomainStorage),
-			reportEntry("StringNormalizingMigration", "string_value_2", common.PathDomainStorage),
-			reportEntry("StaticTypeMigration", "type_value", common.PathDomainStorage),
+		[]reportEntry{
+			newCadenceValueMigrationReportEntry(
+				"StringNormalizingMigration",
+				"string_value_1",
+				common.PathDomainStorage,
+			),
+			newCadenceValueMigrationReportEntry(
+				"StringNormalizingMigration",
+				"string_value_2",
+				common.PathDomainStorage,
+			),
+			newCadenceValueMigrationReportEntry(
+				"StaticTypeMigration",
+				"type_value",
+				common.PathDomainStorage,
+			),
 
 			// String keys in dictionary
-			reportEntry("StringNormalizingMigration", "dictionary_with_string_keys", common.PathDomainStorage),
-			reportEntry("StringNormalizingMigration", "dictionary_with_string_keys", common.PathDomainStorage),
+			newCadenceValueMigrationReportEntry(
+				"StringNormalizingMigration",
+				"dictionary_with_string_keys",
+				common.PathDomainStorage,
+			),
+			newCadenceValueMigrationReportEntry(
+				"StringNormalizingMigration",
+				"dictionary_with_string_keys",
+				common.PathDomainStorage,
+			),
 
 			// Restricted typed keys in dictionary
-			reportEntry("StaticTypeMigration", "dictionary_with_restricted_typed_keys", common.PathDomainStorage),
-			reportEntry("StaticTypeMigration", "dictionary_with_restricted_typed_keys", common.PathDomainStorage),
+			newCadenceValueMigrationReportEntry(
+				"StaticTypeMigration",
+				"dictionary_with_restricted_typed_keys",
+				common.PathDomainStorage,
+			),
+			newCadenceValueMigrationReportEntry(
+				"StaticTypeMigration",
+				"dictionary_with_restricted_typed_keys",
+				common.PathDomainStorage,
+			),
 
 			// Capabilities and links
 			cadenceValueMigrationReportEntry{
@@ -435,11 +472,14 @@ func checkReporters(
 				),
 				Migration: "CapabilityValueMigration",
 			},
-			capConsPathCapabilityMigration{
+			capConsPathCapabilityMigrationEntry{
 				AccountAddress: address,
 				AddressPath: interpreter.AddressPath{
 					Address: address,
-					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainPublic, "linkR"),
+					Path: interpreter.NewUnmeteredPathValue(
+						common.PathDomainPublic,
+						"linkR",
+					),
 				},
 				BorrowType: interpreter.NewReferenceStaticType(
 					nil,
@@ -447,8 +487,16 @@ func checkReporters(
 					rResourceType,
 				),
 			},
-			reportEntry("EntitlementsMigration", "capability", common.PathDomainStorage),
-			reportEntry("EntitlementsMigration", "linkR", common.PathDomainPublic),
+			newCadenceValueMigrationReportEntry(
+				"EntitlementsMigration",
+				"capability",
+				common.PathDomainStorage,
+			),
+			newCadenceValueMigrationReportEntry(
+				"EntitlementsMigration",
+				"linkR",
+				common.PathDomainPublic,
+			),
 
 			// Account-typed keys in dictionary
 			acctTypedDictKeyMigrationReportEntry,
@@ -462,12 +510,90 @@ func checkReporters(
 			acctTypedDictKeyMigrationReportEntry,
 
 			// Entitled typed keys in dictionary
-			reportEntry("EntitlementsMigration", "dictionary_with_auth_reference_typed_key", common.PathDomainStorage),
-			reportEntry("StringNormalizingMigration", "dictionary_with_auth_reference_typed_key", common.PathDomainStorage),
-			reportEntry("EntitlementsMigration", "dictionary_with_reference_typed_key", common.PathDomainStorage),
-			reportEntry("StringNormalizingMigration", "dictionary_with_reference_typed_key", common.PathDomainStorage),
+			newCadenceValueMigrationReportEntry(
+				"EntitlementsMigration",
+				"dictionary_with_auth_reference_typed_key",
+				common.PathDomainStorage,
+			),
+			newCadenceValueMigrationReportEntry(
+				"StringNormalizingMigration",
+				"dictionary_with_auth_reference_typed_key",
+				common.PathDomainStorage,
+			),
+			newCadenceValueMigrationReportEntry(
+				"EntitlementsMigration",
+				"dictionary_with_reference_typed_key",
+				common.PathDomainStorage,
+			),
+			newCadenceValueMigrationReportEntry(
+				"StringNormalizingMigration",
+				"dictionary_with_reference_typed_key",
+				common.PathDomainStorage,
+			),
+
+			// Entitlements in links
+			newCadenceValueMigrationReportEntry(
+				"EntitlementsMigration",
+				"flowTokenReceiver",
+				common.PathDomainPublic,
+			),
+			newCadenceValueMigrationReportEntry(
+				"EntitlementsMigration",
+				"flowTokenBalance",
+				common.PathDomainPublic,
+			),
+
+			// Cap cons
+
+			capConsLinkMigrationEntry{
+				AccountAddressPath: interpreter.AddressPath{
+					Address: address,
+					Path: interpreter.PathValue{
+						Identifier: "flowTokenReceiver",
+						Domain:     common.PathDomainPublic,
+					},
+				},
+				CapabilityID: 1,
+			},
+			newCadenceValueMigrationReportEntry(
+				"LinkValueMigration",
+				"flowTokenReceiver",
+				common.PathDomainPublic,
+			),
+
+			capConsLinkMigrationEntry{
+				AccountAddressPath: interpreter.AddressPath{
+					Address: address,
+					Path: interpreter.PathValue{
+						Identifier: "linkR",
+						Domain:     common.PathDomainPublic,
+					},
+				},
+				CapabilityID: 2,
+			},
+			newCadenceValueMigrationReportEntry(
+				"LinkValueMigration",
+				"linkR",
+				common.PathDomainPublic,
+			),
+
+			capConsLinkMigrationEntry{
+				AccountAddressPath: interpreter.AddressPath{
+					Address: address,
+					Path: interpreter.PathValue{
+						Identifier: "flowTokenBalance",
+						Domain:     common.PathDomainPublic,
+					},
+				},
+				CapabilityID: 3,
+			},
+			newCadenceValueMigrationReportEntry(
+				"LinkValueMigration",
+				"flowTokenBalance",
+				common.PathDomainPublic,
+			),
 		},
-		entries,
+		accountReportEntries,
 	)
 }
 
