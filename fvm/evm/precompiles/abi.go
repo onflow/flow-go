@@ -181,11 +181,14 @@ func ReadBytes(buffer []byte, index int) ([]byte, error) {
 
 // SizeNeededForBytesEncoding computes the number of bytes needed for bytes encoding
 func SizeNeededForBytesEncoding(data []byte) int {
+	if len(data) == 0 {
+		return EncodedUint64Size + EncodedUint64Size + FixedSizeUnitDataReadSize
+	}
 	paddedSize := (len(data) / FixedSizeUnitDataReadSize)
 	if len(data)%FixedSizeUnitDataReadSize != 0 {
-		paddedSize += FixedSizeUnitDataReadSize
+		paddedSize += 1
 	}
-	return EncodedUint64Size + EncodedUint64Size + paddedSize
+	return EncodedUint64Size + EncodedUint64Size + paddedSize*FixedSizeUnitDataReadSize
 }
 
 // EncodeBytes encodes the data into the buffer at index and append payload to the
