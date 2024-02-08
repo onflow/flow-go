@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/onflow/flow-go/integration/benchmark/load"
 	"net"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/onflow/flow-go/integration/benchmark/load"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -246,7 +247,7 @@ func setupLogger(logLvl *string) zerolog.Logger {
 func mustUploadData(
 	ctx context.Context,
 	log zerolog.Logger,
-	recorder *tpsRecorder,
+	recorder *TPSRecorder,
 	repoInfo *RepoInfo,
 	bigQueryProject string,
 	bigQueryDataset string,
@@ -258,7 +259,12 @@ func mustUploadData(
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create bigquery client")
 	}
-	defer db.Close()
+	defer func(db *DB) {
+		err := db.Close()
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to close bigquery client")
+		}
+	}(db)
 
 	err = db.createTable(ctx, bigQueryDataset, bigQueryRawTable, RawRecord{})
 	if err != nil {
@@ -280,7 +286,7 @@ func mustUploadData(
 	}
 }
 
-func mustValidateData(log zerolog.Logger, recorder *tpsRecorder) {
+func mustValidateData(log zerolog.Logger, recorder *TPSRecorder) {
 	log.Info().Msg("Validating data")
 	var totalTPS float64
 	for _, record := range recorder.BenchmarkResults.RawTPS {

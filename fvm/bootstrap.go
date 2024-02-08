@@ -256,7 +256,6 @@ func Bootstrap(
 			transactionFees:     BootstrapProcedureFeeParameters{0, 0, 0},
 			epochConfig:         epochs.DefaultEpochConfig(),
 			versionFreezePeriod: DefaultVersionFreezePeriod,
-			setupEVMEnabled:     true,
 		},
 	}
 

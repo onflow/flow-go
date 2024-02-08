@@ -2,8 +2,10 @@ package load
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/integration/benchmark/account"
+
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/integration/benchmark/account"
 )
 
 type AddKeysLoad struct {

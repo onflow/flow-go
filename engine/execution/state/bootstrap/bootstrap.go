@@ -51,6 +51,7 @@ func (b *Bootstrapper) BootstrapLedger(
 		fvm.WithLogger(b.logger),
 		fvm.WithMaxStateInteractionSize(ledgerIntractionLimitNeededForBootstrapping),
 		fvm.WithChain(chain),
+		fvm.WithEVMEnabled(true),
 	)
 
 	bootstrap := fvm.Bootstrap(

@@ -3,9 +3,11 @@ package load
 import (
 	"errors"
 	"fmt"
+
+	"github.com/rs/zerolog"
+
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/integration/benchmark/common"
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/integration/benchmark/account"
 )

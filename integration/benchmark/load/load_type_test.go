@@ -3,9 +3,15 @@ package load_test
 import (
 	"context"
 	"fmt"
+	"sync"
+	"testing"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	convert2 "github.com/onflow/flow-emulator/convert"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/engine/execution/computation"
@@ -19,10 +25,6 @@ import (
 	"github.com/onflow/flow-go/integration/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-	"sync"
-	"testing"
 )
 
 func TestLoadTypes(t *testing.T) {
@@ -30,7 +32,7 @@ func TestLoadTypes(t *testing.T) {
 	log := zerolog.New(zerolog.NewTestWriter(t))
 
 	evmLoad := load.NewEVMTransferLoad(log)
-	// dont create that many accounts for the test
+	// don't create that many accounts for the test
 	evmLoad.PreCreateEOAAccounts = 20
 
 	loads := []load.Load{
@@ -72,6 +74,7 @@ func testLoad(log zerolog.Logger, l load.Load) func(t *testing.T) {
 		}
 
 		serviceAccount, err := accountLoader.Load(sdk.ServiceAddress(sdk.ChainID(chain.ChainID())), unittest.ServiceAccountPrivateKey.PrivateKey, unittest.ServiceAccountPrivateKey.HashAlgo)
+		require.NoError(t, err)
 
 		err = account.EnsureAccountHasKeys(log, serviceAccount, 50, blockProvider, transactionSender)
 		require.NoError(t, err)
@@ -132,6 +135,7 @@ func bootstrapVM(t *testing.T, chain flow.Chain) (*fvm.VirtualMachine, fvm.Conte
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithSetupEVMEnabled(true),
 	}
 
 	executionSnapshot, _, err := vm.Run(

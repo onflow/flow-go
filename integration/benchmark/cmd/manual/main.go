@@ -3,12 +3,13 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/onflow/flow-go/integration/benchmark/load"
 	"net"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/onflow/flow-go/integration/benchmark/load"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
@@ -50,7 +51,7 @@ func main() {
 	feedbackEnabled := flag.Bool("feedback-enabled", true, "wait for trannsaction execution before submitting new transaction")
 	flag.Parse()
 
-	chainID := flowsdk.ChainID([]byte(*chainIDStr))
+	chainID := flowsdk.ChainID(*chainIDStr)
 
 	// parse log level and apply to logger
 	log := zerolog.New(os.Stderr).With().Timestamp().Logger().Output(zerolog.ConsoleWriter{Out: os.Stderr})
@@ -115,7 +116,7 @@ func main() {
 	workerStatsTracker := benchmark.NewWorkerStatsTracker(ctx)
 	defer workerStatsTracker.Stop()
 
-	statsLogger := benchmark.NewPeriodicStatsLogger(nil, workerStatsTracker, log)
+	statsLogger := benchmark.NewPeriodicStatsLogger(context.TODO(), workerStatsTracker, log)
 	statsLogger.Start()
 	defer statsLogger.Stop()
 

@@ -2,11 +2,13 @@ package load
 
 import (
 	_ "embed"
+
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/integration/benchmark/account"
 	"github.com/onflow/flow-go/integration/benchmark/common"
 	"github.com/onflow/flow-go/integration/benchmark/scripts"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/rs/zerolog"
 )
 
 type LoadType string

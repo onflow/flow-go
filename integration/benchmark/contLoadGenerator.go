@@ -281,7 +281,6 @@ type transactionSender struct {
 	loaderMetrics            *metrics.LoaderCollector
 	workerStatsTracker       *WorkerStatsTracker
 	follower                 TxFollower
-	workerID                 int
 	lostTransactionThreshold time.Duration
 }
 

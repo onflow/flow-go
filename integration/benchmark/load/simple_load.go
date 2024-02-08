@@ -2,11 +2,13 @@ package load
 
 import (
 	"fmt"
+
 	"github.com/onflow/cadence"
+	"github.com/rs/zerolog"
+
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/integration/benchmark/account"
-	"github.com/rs/zerolog"
 )
 
 // SimpleLoad is a load that at setup deploys a contract,

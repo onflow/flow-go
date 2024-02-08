@@ -3,12 +3,14 @@ package account
 import (
 	"errors"
 	"fmt"
+	"sync"
+
 	"github.com/onflow/cadence"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/integration/benchmark/common"
 	"github.com/onflow/flow-go/integration/benchmark/scripts"
-	"github.com/rs/zerolog"
-	"sync"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 
