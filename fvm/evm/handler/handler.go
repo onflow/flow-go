@@ -111,19 +111,41 @@ func (h *ContractHandler) LastExecutedBlock() *types.Block {
 // Run runs an rlpencoded evm transaction and
 // collects the gas fees and pay it to the coinbase address provided.
 func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) {
-	err := h.run(rlpEncodedTx, coinbase)
+	_, err := h.run(rlpEncodedTx, coinbase)
 	panicOnAnyError(err)
+}
+
+// TryRun tries to run an rlpencoded evm transaction and
+// collects the gas fees and pay it to the coinbase address provided.
+func (h *ContractHandler) TryRun(rlpEncodedTx []byte, coinbase types.Address) *types.ResultSummary {
+	res, err := h.run(rlpEncodedTx, coinbase)
+	rs := &types.ResultSummary{
+		Status: types.StatusSuccessful,
+	}
+	if err != nil {
+		panicOnFVMError(err)
+		// remaining errors are validation errors
+		rs.ErrorCode = types.ValidationErrorCode(err)
+		rs.Status = types.StatusInvalid
+		return rs
+	}
+	if res.Error != nil {
+		rs.ErrorCode = types.ExecutionErrorCode(res.Error)
+		rs.GasConsumed = res.GasConsumed
+		rs.Status = types.StatusFailed
+	}
+	return rs
 }
 
 func (h *ContractHandler) run(
 	rlpEncodedTx []byte,
 	coinbase types.Address,
-) error {
+) (*types.Result, error) {
 	// step 1 - transaction decoding
 	encodedLen := uint(len(rlpEncodedTx))
 	err := h.backend.MeterComputation(environment.ComputationKindRLPDecoding, encodedLen)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	tx := gethTypes.Transaction{}
@@ -132,23 +154,23 @@ func (h *ContractHandler) run(
 			bytes.NewReader(rlpEncodedTx),
 			uint64(encodedLen)))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// step 2 - run transaction
 	err = h.checkGasLimit(types.GasLimit(tx.Gas()))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	ctx, err := h.getBlockContext()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	ctx.GasFeeCollector = coinbase
 	blk, err := h.emulator.NewBlockView(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	res, err := blk.RunTransaction(&tx)
@@ -156,20 +178,20 @@ func (h *ContractHandler) run(
 		// continue metering
 		err = h.meterGasUsage(res)
 		if err != nil {
-			return err
+			return res, err
 		}
-		return err
+		return res, err
 	}
 
 	err = h.meterGasUsage(res)
 	if err != nil {
-		return err
+		return res, err
 	}
 
 	// step 3 - update block proposal
 	bp, err := h.blockstore.BlockProposal()
 	if err != nil {
-		return err
+		return res, err
 	}
 
 	txHash := tx.Hash()
@@ -183,16 +205,16 @@ func (h *ContractHandler) run(
 		res,
 	))
 	if err != nil {
-		return err
+		return res, err
 	}
 
 	err = h.emitEvent(types.NewBlockExecutedEvent(bp))
 	if err != nil {
-		return err
+		return res, err
 	}
 
 	// step 5 - commit block proposal
-	return h.blockstore.CommitBlockProposal()
+	return res, h.blockstore.CommitBlockProposal()
 }
 
 func (h *ContractHandler) checkGasLimit(limit types.GasLimit) error {
@@ -553,7 +575,8 @@ func panicOnAnyError(err error) {
 	}
 
 	panicOnFVMError(err)
-	// if not FVM wrap it and panic
+
+	// if not FVM wrap it with EVM error and panic
 	panic(errors.NewEVMError(err))
 }
 

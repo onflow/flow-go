@@ -48,3 +48,28 @@ func (res *Result) Receipt() *gethTypes.ReceiptForStorage {
 	receipt.Bloom = gethTypes.CreateBloom(gethTypes.Receipts{receipt})
 	return (*gethTypes.ReceiptForStorage)(receipt)
 }
+
+// Status captures the status of an interaction to the emulator
+type Status uint8
+
+var (
+	StatusUnknown Status = 0
+	// StatusInvalid shows that the transaction was not a valid
+	// transaction and rejected to be executed and included in any block.
+	StatusInvalid Status = 1
+	// StatusFailed shows that the transaction has been executed,
+	// but the output of the execution was an error
+	// for this case a block is formed and receipts are available
+	StatusFailed Status = 2
+	// StatusFailed shows that the transaction has been executed and the execution has returned success
+	// for this case a block is formed and receipts are available
+	StatusSuccessful Status = 3
+)
+
+// ResultSummary summerizes the outcome of a EVM call or run
+// used to return to EVM contract
+type ResultSummary struct {
+	Status      Status
+	ErrorCode   ErrorCode
+	GasConsumed uint64
+}
