@@ -1,6 +1,7 @@
 package testutils
 
 import (
+	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -32,10 +33,11 @@ func RunWithTestFlowEVMRootAddress(t testing.TB, backend atree.Ledger, f func(fl
 
 func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
 	tb := &TestBackend{
-		TestValueStore:   GetSimpleValueStore(),
-		testEventEmitter: getSimpleEventEmitter(),
-		testMeter:        getSimpleMeter(),
-		TestBlockInfo:    &TestBlockInfo{},
+		TestValueStore:      GetSimpleValueStore(),
+		testEventEmitter:    getSimpleEventEmitter(),
+		testMeter:           getSimpleMeter(),
+		TestBlockInfo:       &TestBlockInfo{},
+		TestRandomGenerator: getSimpleRandomGenerator(),
 	}
 	f(tb)
 }
@@ -157,6 +159,7 @@ type TestBackend struct {
 	*testMeter
 	*testEventEmitter
 	*TestBlockInfo
+	*TestRandomGenerator
 }
 
 var _ types.Backend = &TestBackend{}
@@ -404,4 +407,26 @@ func (tb *TestBlockInfo) GetBlockAtHeight(height uint64) (runtime.Block, bool, e
 		panic("GetBlockAtHeight method is not set")
 	}
 	return tb.GetBlockAtHeightFunc(height)
+}
+
+type TestRandomGenerator struct {
+	ReadRandomFunc func([]byte) error
+}
+
+var _ environment.RandomGenerator = &TestRandomGenerator{}
+
+func (t *TestRandomGenerator) ReadRandom(buffer []byte) error {
+	if t.ReadRandomFunc == nil {
+		panic("ReadRandomFunc method is not set")
+	}
+	return t.ReadRandomFunc(buffer)
+}
+
+func getSimpleRandomGenerator() *TestRandomGenerator {
+	return &TestRandomGenerator{
+		ReadRandomFunc: func(buffer []byte) error {
+			_, err := rand.Read(buffer)
+			return err
+		},
+	}
 }

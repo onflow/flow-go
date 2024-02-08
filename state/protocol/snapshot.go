@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package protocol
 
 import (
@@ -50,12 +48,12 @@ type Snapshot interface {
 	// epoch. At the end of an epoch, this includes identities scheduled to join
 	// in the next epoch but are not active yet.
 	//
-	// Identities are guaranteed to be returned in canonical order (flow.Canonical).
+	// Identities are guaranteed to be returned in canonical order (flow.Canonical[flow.Identity]).
 	//
 	// It allows us to provide optional upfront filters which can be used by the
 	// implementation to speed up database lookups.
 	// TODO document error returns
-	Identities(selector flow.IdentityFilter) (flow.IdentityList, error)
+	Identities(selector flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error)
 
 	// Identity attempts to retrieve the node with the given identifier at the
 	// selected point of the protocol state history. It will error if it doesn't exist.
@@ -136,6 +134,12 @@ type Snapshot interface {
 	// Params returns global parameters of the state this snapshot is taken from.
 	// Returns invalid.Params with state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
 	Params() GlobalParams
+
+	// ProtocolState returns the dynamic protocol state that the Head block commits to. The
+	// compliance layer guarantees that only valid blocks are appended to the protocol state.
+	// Returns state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
+	// All other errors should be treated as exceptions.
+	ProtocolState() (DynamicProtocolState, error)
 
 	// VersionBeacon returns the latest sealed version beacon.
 	// If no version beacon has been sealed so far during the current spork, returns nil.
