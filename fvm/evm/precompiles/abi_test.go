@@ -2,6 +2,7 @@ package precompiles_test
 
 import (
 	"encoding/hex"
+	"math/big"
 	"testing"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -52,6 +53,16 @@ func TestABIEncodingDecodingFunctions(t *testing.T) {
 
 	})
 
+	t.Run("test read uint256", func(t *testing.T) {
+		encodedUint256, err := hex.DecodeString("1000000000000000000000000000000000000000000000000000000000000046")
+		require.NoError(t, err)
+		ret, err := precompiles.ReadUint256(encodedUint256, 0)
+		require.NoError(t, err)
+		expectedValue, success := new(big.Int).SetString("7237005577332262213973186563042994240829374041602535252466099000494570602566", 10)
+		require.True(t, success)
+		require.Equal(t, expectedValue, ret)
+	})
+
 	t.Run("test fixed size bytes", func(t *testing.T) {
 		encodedFixedSizeBytes, err := hex.DecodeString("abcdef1200000000000000000000000000000000000000000000000000000000")
 		require.NoError(t, err)
@@ -89,4 +100,32 @@ func TestABIEncodingDecodingFunctions(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, encodedData, buffer)
 	})
+
+	t.Run("test size needed for encoding bytes", func(t *testing.T) {
+		// len zero
+		data := []byte{}
+		ret := precompiles.SizeNeededForBytesEncoding(data)
+		offsetAndLenEncodingSize := precompiles.EncodedUint64Size + precompiles.EncodedUint64Size
+		expectedSize := offsetAndLenEncodingSize + precompiles.FixedSizeUnitDataReadSize
+		require.Equal(t, expectedSize, ret)
+
+		// data size 1
+		data = []byte{1}
+		ret = precompiles.SizeNeededForBytesEncoding(data)
+		expectedSize = offsetAndLenEncodingSize + precompiles.FixedSizeUnitDataReadSize
+		require.Equal(t, expectedSize, ret)
+
+		// data size 32
+		data = make([]byte, 32)
+		ret = precompiles.SizeNeededForBytesEncoding(data)
+		expectedSize = offsetAndLenEncodingSize + precompiles.FixedSizeUnitDataReadSize
+		require.Equal(t, expectedSize, ret)
+
+		// data size 33
+		data = make([]byte, 33)
+		ret = precompiles.SizeNeededForBytesEncoding(data)
+		expectedSize = offsetAndLenEncodingSize + precompiles.FixedSizeUnitDataReadSize*2
+		require.Equal(t, expectedSize, ret)
+	})
+
 }

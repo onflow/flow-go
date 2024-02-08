@@ -30,30 +30,32 @@ var (
 func ArchContract(
 	address types.Address,
 	heightProvider func() (uint64, error),
-	proofVerifier func(*types.COAOwnershipProofInContext) (bool, error),
+	proofVer func(*types.COAOwnershipProofInContext) (bool, error),
 ) types.Precompile {
 	return MultiFunctionPrecompileContract(
 		address,
 		[]Function{
-			&flowBlockHeightFunction{heightProvider},
-			&proofVerifierFunction{proofVerifier},
+			&flowBlockHeight{heightProvider},
+			&proofVerifier{proofVer},
 		},
 	)
 }
 
-type flowBlockHeightFunction struct {
+type flowBlockHeight struct {
 	flowBlockHeightLookUp func() (uint64, error)
 }
 
-func (c *flowBlockHeightFunction) FunctionSelector() FunctionSelector {
+var _ Function = &flowBlockHeight{}
+
+func (c *flowBlockHeight) FunctionSelector() FunctionSelector {
 	return FlowBlockHeightFuncSig
 }
 
-func (c *flowBlockHeightFunction) ComputeGas(input []byte) uint64 {
+func (c *flowBlockHeight) ComputeGas(input []byte) uint64 {
 	return FlowBlockHeightFixedGas
 }
 
-func (c *flowBlockHeightFunction) Run(input []byte) ([]byte, error) {
+func (c *flowBlockHeight) Run(input []byte) ([]byte, error) {
 	if len(input) > 0 {
 		return nil, fmt.Errorf("unexpected input is provided")
 	}
@@ -67,22 +69,33 @@ func (c *flowBlockHeightFunction) Run(input []byte) ([]byte, error) {
 	return buffer, EncodeUint64(bh, buffer, 0)
 }
 
-type proofVerifierFunction struct {
+type proofVerifier struct {
 	proofVerifier func(*types.COAOwnershipProofInContext) (bool, error)
 }
 
-func (f *proofVerifierFunction) FunctionSelector() FunctionSelector {
+var _ Function = &proofVerifier{}
+
+func (f *proofVerifier) FunctionSelector() FunctionSelector {
 	return ProofVerifierFuncSig
 }
 
-func (f *proofVerifierFunction) ComputeGas(input []byte) uint64 {
-	// skip first two parts
-	index := FixedSizeUnitDataReadSize + Bytes32DataReadSize
+func (f *proofVerifier) ComputeGas(input []byte) uint64 {
+	// we compute the gas using a fixed base fee and extra fees
+	// per signatures. Note that the input data is already trimmed from the function selector
+	// and the remaining is ABI encoded of the inputs
+
+	// skip to the encoded signature part of args (skip address and bytes32 data part)
+	index := EncodedAddressSize + Bytes32DataReadSize
+	// Reading the encoded signature bytes
 	encodedSignature, err := ReadBytes(input, index)
 	if err != nil {
 		// if any error run would anyway fail, so returning any non-zero value here is fine
 		return ProofVerifierBaseGas
 	}
+	// this method would return the number of signatures from the encoded signature data
+	// this saves the extra time needed for full decoding
+	// given ComputeGas function is called before charging the gas, we need to keep
+	// this function as light as possible
 	count, err := types.COAOwnershipProofSignatureCountFromEncoded(encodedSignature)
 	if err != nil {
 		// if any error run would anyway fail, so returning any non-zero value here is fine
@@ -91,7 +104,7 @@ func (f *proofVerifierFunction) ComputeGas(input []byte) uint64 {
 	return ProofVerifierBaseGas + uint64(count)*ProofVerifierGasMultiplerPerSignature
 }
 
-func (f *proofVerifierFunction) Run(input []byte) ([]byte, error) {
+func (f *proofVerifier) Run(input []byte) ([]byte, error) {
 	proof, err := DecodeABIEncodedProof(input)
 	if err != nil {
 		return nil, err

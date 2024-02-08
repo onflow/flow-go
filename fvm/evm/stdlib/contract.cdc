@@ -77,9 +77,23 @@ contract EVM {
     resource BridgedAccount: Addressable  {
 
         access(self)
-        let addressBytes: [UInt8; 20]
+        var addressBytes: [UInt8; 20]
 
-        init(addressBytes: [UInt8; 20]) {
+        init() {
+            // address is initially set to zero
+            // but updated through initAddress later
+            // we have to do this since we need resource id (uuid)
+            // to calculate the EVM address for this bridge account
+            self.addressBytes = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] 
+        }
+
+        access(contract)
+        fun initAddress(addressBytes: [UInt8; 20]) {
+           // only allow set address for the first time
+           // check address is empty
+            for item in self.addressBytes {
+                assert(item == 0, message: "address byte is not empty")
+            }
            self.addressBytes = addressBytes
         }
 
@@ -158,9 +172,10 @@ contract EVM {
     /// Creates a new bridged account
     access(all)
     fun createBridgedAccount(): @BridgedAccount {
-        return <-create BridgedAccount(
-            addressBytes: InternalEVM.createBridgedAccount()
-        )
+        let acc <-create BridgedAccount()
+        let addr = InternalEVM.createBridgedAccount(uuid: acc.uuid)
+        acc.initAddress(addressBytes: addr)
+        return <-acc
     }
 
     /// Runs an a RLP-encoded EVM transaction, deducts the gas fees,

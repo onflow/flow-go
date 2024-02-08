@@ -8,11 +8,11 @@ import (
 	gethCommon "github.com/ethereum/go-ethereum/common"
 )
 
-// This package provides fast and effient
+// This package provides fast and efficient
 // utilities needed for abi encoding and decoding
 // encodings are mostly used for testing purpose
 // if more complex encoding and decoding is needed please
-// use the abi package and pass teh ABIs, though
+// use the abi package and pass the ABIs, though
 // that has a performance overhead.
 const (
 	FixedSizeUnitDataReadSize = 32
@@ -46,7 +46,7 @@ func ReadAddress(buffer []byte, index int) (gethCommon.Address, error) {
 	return addr, nil
 }
 
-// EncodeBool encodes boolean into fixed size unit of encoded data
+// EncodeAddress encodes the address and add it to the buffer at the index
 func EncodeAddress(address gethCommon.Address, buffer []byte, index int) error {
 	if len(buffer) < index+EncodedAddressSize {
 		return ErrBufferTooSmall
@@ -71,16 +71,13 @@ func EncodeBool(bitSet bool, buffer []byte, index int) error {
 	if len(buffer) < index+EncodedBoolSize {
 		return ErrBufferTooSmall
 	}
-	var bitSetVar uint8
-	if bitSet {
-		bitSetVar = 1
+	// bit set with left padding
+	for i := 0; i < EncodedBoolSize; i++ {
+		buffer[index+i] = 0
 	}
-	copy(buffer[index:index+EncodedBoolSize],
-		gethCommon.LeftPadBytes(
-			[]byte{bitSetVar},
-			EncodedBoolSize,
-		),
-	)
+	if bitSet {
+		buffer[index+EncodedBoolSize-1] = 1
+	}
 	return nil
 }
 
@@ -118,7 +115,7 @@ func ReadUint256(buffer []byte, index int) (*big.Int, error) {
 
 // ReadBytes4 reads a 4 byte slice from the buffer at index
 func ReadBytes4(buffer []byte, index int) ([]byte, error) {
-	if len(buffer) < index+Bytes4DataReadSize {
+	if len(buffer) < index+EncodedBytes4Size {
 		return nil, ErrInputDataTooSmall
 	}
 	// fixed-size byte values are zero-padded on the right side.
@@ -127,7 +124,7 @@ func ReadBytes4(buffer []byte, index int) ([]byte, error) {
 
 // ReadBytes8 reads a 8 byte slice from the buffer at index
 func ReadBytes8(buffer []byte, index int) ([]byte, error) {
-	if len(buffer) < index+Bytes8DataReadSize {
+	if len(buffer) < index+EncodedBytes8Size {
 		return nil, ErrInputDataTooSmall
 	}
 	// fixed-size byte values are zero-padded on the right side.
@@ -184,8 +181,14 @@ func ReadBytes(buffer []byte, index int) ([]byte, error) {
 
 // SizeNeededForBytesEncoding computes the number of bytes needed for bytes encoding
 func SizeNeededForBytesEncoding(data []byte) int {
-	paddedSize := (len(data) / FixedSizeUnitDataReadSize) + FixedSizeUnitDataReadSize
-	return EncodedUint64Size + EncodedUint64Size + paddedSize
+	if len(data) == 0 {
+		return EncodedUint64Size + EncodedUint64Size + FixedSizeUnitDataReadSize
+	}
+	paddedSize := (len(data) / FixedSizeUnitDataReadSize)
+	if len(data)%FixedSizeUnitDataReadSize != 0 {
+		paddedSize += 1
+	}
+	return EncodedUint64Size + EncodedUint64Size + paddedSize*FixedSizeUnitDataReadSize
 }
 
 // EncodeBytes encodes the data into the buffer at index and append payload to the
@@ -195,6 +198,16 @@ func EncodeBytes(data []byte, buffer []byte, headerIndex, payloadIndex int) erro
 	if len(buffer) < headerIndex+EncodedUint64Size {
 		return ErrBufferTooSmall
 	}
+	dataSize := len(data)
+	// compute padded data size
+	paddedSize := (dataSize / FixedSizeUnitDataReadSize)
+	if dataSize%FixedSizeUnitDataReadSize != 0 {
+		paddedSize += FixedSizeUnitDataReadSize
+	}
+	if len(buffer) < payloadIndex+EncodedUint64Size+paddedSize {
+		return ErrBufferTooSmall
+	}
+
 	err := EncodeUint64(uint64(payloadIndex), buffer, headerIndex)
 	if err != nil {
 		return err
@@ -203,14 +216,10 @@ func EncodeBytes(data []byte, buffer []byte, headerIndex, payloadIndex int) erro
 
 	//// updating payload
 	// padding data
-	dataSize := len(data)
-	paddedSize := (dataSize / FixedSizeUnitDataReadSize) + FixedSizeUnitDataReadSize
 	if dataSize%FixedSizeUnitDataReadSize != 0 {
 		data = gethCommon.RightPadBytes(data, paddedSize)
 	}
-	if len(buffer) < payloadIndex+EncodedUint64Size+paddedSize {
-		return ErrBufferTooSmall
-	}
+
 	// adding length
 	err = EncodeUint64(uint64(dataSize), buffer, payloadIndex)
 	if err != nil {
