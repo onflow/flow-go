@@ -140,7 +140,7 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 	}
 
 	lg := config.Logger.With().Str("module", "app_score_registry").Logger()
-	store := queue.NewHeroStore(config.Parameters.ScoreUpdateRequestQueueSize,
+	appSpecificScoreHS := queue.NewHeroStore(config.Parameters.ScoreUpdateRequestQueueSize,
 		lg.With().Str("component", "app_specific_score_update").Logger(),
 		metrics.GossipSubAppSpecificScoreUpdateQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType))
 
@@ -161,10 +161,10 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 	}
 
 	reg.appScoreUpdateWorkerPool = worker.NewWorkerPoolBuilder[peer.ID](lg.With().Str("component", "app_specific_score_update_worker_pool").Logger(),
-		store,
+		appSpecificScoreHS,
 		reg.processAppSpecificScoreUpdateWork).Build()
 
-	pool := worker.NewWorkerPoolBuilder[*p2p.InvCtrlMsgNotif](lg, store, reg.handleMisbehaviourReport).Build()
+	pool := worker.NewWorkerPoolBuilder[*p2p.InvCtrlMsgNotif](lg, appSpecificScoreHS, reg.handleMisbehaviourReport).Build()
 	reg.workerPool = pool
 
 	builder := component.NewComponentManagerBuilder()
