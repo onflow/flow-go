@@ -92,6 +92,13 @@ func (ss Signatures) Count() int {
 	return len(ss)
 }
 
+// COAOwnershipProofInContext contains all the data
+// needed to verify a COAOwnership proof.
+// The proof is verified by checking the signatures over the
+// input signed data (SignedData), then loading the resource
+// capability from the provided path in the proof, and
+// at last checking if the EVMAddress of the resource matches
+// the provided one.
 type COAOwnershipProofInContext struct {
 	COAOwnershipProof
 	SignedData SignedData
@@ -121,6 +128,14 @@ func (proof *COAOwnershipProofInContext) ToCadenceValues() []cadence.Value {
 	}
 }
 
+// COAOwnershipProof is a proof that a flow account
+// controls a COA resource. To do so, the flow
+// account (Address is address of this account)
+// provides signatures (with proper total weights) over an arbitary data input
+// set by proof requester. KeyIndicies captures,
+// which account keys has been used for signatures.
+// Beside signatures, it provides the CapabilityPath
+// where the resource EVMAddress capability is stored.
 type COAOwnershipProof struct {
 	KeyIndices     KeyIndices
 	Address        FlowAddress

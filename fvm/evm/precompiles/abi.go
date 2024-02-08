@@ -71,16 +71,13 @@ func EncodeBool(bitSet bool, buffer []byte, index int) error {
 	if len(buffer) < index+EncodedBoolSize {
 		return ErrBufferTooSmall
 	}
-	var bitSetVar uint8
-	if bitSet {
-		bitSetVar = 1
+	// bit set with left padding
+	for i := 0; i < EncodedBoolSize; i++ {
+		buffer[index+i] = 0
 	}
-	copy(buffer[index:index+EncodedBoolSize],
-		gethCommon.LeftPadBytes(
-			[]byte{bitSetVar},
-			EncodedBoolSize,
-		),
-	)
+	if bitSet {
+		buffer[index+EncodedBoolSize-1] = 1
+	}
 	return nil
 }
 
@@ -184,7 +181,10 @@ func ReadBytes(buffer []byte, index int) ([]byte, error) {
 
 // SizeNeededForBytesEncoding computes the number of bytes needed for bytes encoding
 func SizeNeededForBytesEncoding(data []byte) int {
-	paddedSize := (len(data) / FixedSizeUnitDataReadSize) + FixedSizeUnitDataReadSize
+	paddedSize := (len(data) / FixedSizeUnitDataReadSize)
+	if len(data)%FixedSizeUnitDataReadSize != 0 {
+		paddedSize += FixedSizeUnitDataReadSize
+	}
 	return EncodedUint64Size + EncodedUint64Size + paddedSize
 }
 
@@ -195,6 +195,16 @@ func EncodeBytes(data []byte, buffer []byte, headerIndex, payloadIndex int) erro
 	if len(buffer) < headerIndex+EncodedUint64Size {
 		return ErrBufferTooSmall
 	}
+	dataSize := len(data)
+	// compute padded data size
+	paddedSize := (dataSize / FixedSizeUnitDataReadSize)
+	if dataSize%FixedSizeUnitDataReadSize != 0 {
+		paddedSize += FixedSizeUnitDataReadSize
+	}
+	if len(buffer) < payloadIndex+EncodedUint64Size+paddedSize {
+		return ErrBufferTooSmall
+	}
+
 	err := EncodeUint64(uint64(payloadIndex), buffer, headerIndex)
 	if err != nil {
 		return err
@@ -203,14 +213,10 @@ func EncodeBytes(data []byte, buffer []byte, headerIndex, payloadIndex int) erro
 
 	//// updating payload
 	// padding data
-	dataSize := len(data)
-	paddedSize := (dataSize / FixedSizeUnitDataReadSize) + FixedSizeUnitDataReadSize
 	if dataSize%FixedSizeUnitDataReadSize != 0 {
 		data = gethCommon.RightPadBytes(data, paddedSize)
 	}
-	if len(buffer) < payloadIndex+EncodedUint64Size+paddedSize {
-		return ErrBufferTooSmall
-	}
+
 	// adding length
 	err = EncodeUint64(uint64(dataSize), buffer, payloadIndex)
 	if err != nil {

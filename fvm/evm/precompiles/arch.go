@@ -76,13 +76,22 @@ func (f *proofVerifierFunction) FunctionSelector() FunctionSelector {
 }
 
 func (f *proofVerifierFunction) ComputeGas(input []byte) uint64 {
-	// skip first two parts
-	index := FixedSizeUnitDataReadSize + Bytes32DataReadSize
+	// we compute the gas using a fixed base fee and extra fees
+	// per signatures. Note that the input data is already trimmed from the function selector
+	// and the remaining is ABI encoded of the inputs
+
+	// skip to the encoded signature part of args (skip address and bytes32 data part)
+	index := EncodedAddressSize + Bytes32DataReadSize
+	// Reading the encoded signature bytes
 	encodedSignature, err := ReadBytes(input, index)
 	if err != nil {
 		// if any error run would anyway fail, so returning any non-zero value here is fine
 		return ProofVerifierBaseGas
 	}
+	// this method would return the number of signatures from the encoded signature data
+	// this saves the extra time needed for full decoding
+	// given ComputeGas function is called before charging the gas, we need to keep
+	// this function as light as possible
 	count, err := types.COAOwnershipProofSignatureCountFromEncoded(encodedSignature)
 	if err != nil {
 		// if any error run would anyway fail, so returning any non-zero value here is fine
