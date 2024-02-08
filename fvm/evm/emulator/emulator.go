@@ -1,6 +1,7 @@
 package emulator
 
 import (
+	"errors"
 	"math/big"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -8,12 +9,15 @@ import (
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
 	gethCrypto "github.com/ethereum/go-ethereum/crypto"
+	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+var ErrInvalidBalance = errors.New("invalid balance for transfer")
 
 // Emulator handles operations against evm runtime
 type Emulator struct {
@@ -40,6 +44,7 @@ func newConfig(ctx types.BlockContext) *Config {
 		WithCoinbase(ctx.GasFeeCollector.ToCommon()),
 		WithDirectCallBaseGasUsage(ctx.DirectCallBaseGasUsage),
 		WithExtraPrecompiles(ctx.ExtraPrecompiles),
+		WithGetBlockHashFunction(ctx.GetHashFunc),
 		WithRandom(&ctx.Random),
 	)
 }
@@ -74,14 +79,19 @@ func (bv *ReadOnlyBlockView) BalanceOf(address types.Address) (*big.Int, error) 
 	return bv.state.GetBalance(address.ToCommon()), nil
 }
 
+// NonceOf returns the nonce of the given address
+func (bv *ReadOnlyBlockView) NonceOf(address types.Address) (uint64, error) {
+	return bv.state.GetNonce(address.ToCommon()), nil
+}
+
 // CodeOf returns the code of the given address
 func (bv *ReadOnlyBlockView) CodeOf(address types.Address) (types.Code, error) {
 	return bv.state.GetCode(address.ToCommon()), nil
 }
 
-// NonceOf returns the nonce of the given address
-func (bv *ReadOnlyBlockView) NonceOf(address types.Address) (uint64, error) {
-	return bv.state.GetNonce(address.ToCommon()), nil
+// CodeHashOf returns the code hash of the given address
+func (bv *ReadOnlyBlockView) CodeHashOf(address types.Address) ([]byte, error) {
+	return bv.state.GetCodeHash(address.ToCommon()).Bytes(), nil
 }
 
 // BlockView allows mutation of the evm state as part of a block
@@ -100,16 +110,19 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	var res *types.Result
 	switch call.SubType {
 	case types.DepositCallSubType:
-		res, err = proc.mintTo(call.To, call.Value)
+		return proc.mintTo(call.To, call.Value)
 	case types.WithdrawCallSubType:
-		res, err = proc.withdrawFrom(call.From, call.Value)
+		return proc.withdrawFrom(call.From, call.Value)
+	case types.DeployCallSubType:
+		if !call.EmptyToField() {
+			return proc.deployAt(call.From, call.To, call.Data, call.GasLimit, call.Value)
+		}
+		fallthrough
 	default:
-		res, err = proc.run(call.Message(), types.DirectCallTxType)
+		return proc.runDirect(call.Message(), types.DirectCallTxType)
 	}
-	return res, err
 }
 
 // RunTransaction runs an evm transaction
@@ -206,12 +219,9 @@ func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*ty
 	}
 
 	// check if account exists
-	// while this method is only called from bridged accounts
-	// it might be the case that someone creates a bridged account
+	// while this method is only called for COAs
+	// it might be the case that someone creates a COA
 	// and never transfer tokens to and call for withdraw
-	// TODO: we might revisit this apporach and
-	// 		return res, types.ErrAccountDoesNotExist
-	// instead
 	if !proc.state.Exist(addr) {
 		proc.state.CreateAccount(addr)
 	}
@@ -231,6 +241,125 @@ func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*ty
 	proc.state.SetNonce(addr, nonce+1)
 
 	return res, proc.commit()
+}
+
+// deployAt deploys a contract at the given target address
+// behaviour should be similar to what evm.create internal method does with
+// a few differences, don't need to check for previous forks given this
+// functionality was not available to anyone, we don't need to
+// follow snapshoting, given we do commit/revert style in this code base.
+// in the future we might optimize this method accepting deploy-ready byte codes
+// and skip interpreter call, gas calculations and many checks.
+func (proc *procedure) deployAt(
+	caller types.Address,
+	to types.Address,
+	data types.Code,
+	gasLimit uint64,
+	value *big.Int,
+) (*types.Result, error) {
+	res := &types.Result{
+		TxType: types.DirectCallTxType,
+	}
+	addr := to.ToCommon()
+
+	// precheck 1 - check balance of the source
+	if value.Sign() != 0 &&
+		!proc.evm.Context.CanTransfer(proc.state, caller.ToCommon(), value) {
+		return res, gethVM.ErrInsufficientBalance
+	}
+
+	// precheck 2 - ensure there's no existing contract is deployed at the address
+	contractHash := proc.state.GetCodeHash(addr)
+	if proc.state.GetNonce(addr) != 0 ||
+		(contractHash != (gethCommon.Hash{}) && contractHash != gethTypes.EmptyCodeHash) {
+		return res, gethVM.ErrContractAddressCollision
+	}
+
+	callerCommon := caller.ToCommon()
+	// setup caller if doesn't exist
+	if !proc.state.Exist(callerCommon) {
+		proc.state.CreateAccount(callerCommon)
+	}
+	// increment the nonce for the caller
+	proc.state.SetNonce(callerCommon, proc.state.GetNonce(callerCommon)+1)
+
+	if value.Sign() < 0 {
+		return res, ErrInvalidBalance
+	}
+	// setup account
+	proc.state.CreateAccount(addr)
+	proc.state.SetNonce(addr, 1) // (EIP-158)
+	if value.Sign() > 0 {
+		proc.evm.Context.Transfer( // transfer value
+			proc.state,
+			caller.ToCommon(),
+			addr,
+			value,
+		)
+	}
+
+	// run code through interpreter
+	// this would check for errors and computes the final bytes to be stored under account
+	var err error
+	inter := gethVM.NewEVMInterpreter(proc.evm)
+	contract := gethVM.NewContract(
+		gethVM.AccountRef(caller.ToCommon()),
+		gethVM.AccountRef(addr),
+		value,
+		gasLimit)
+
+	contract.SetCallCode(&addr, gethCrypto.Keccak256Hash(data), data)
+	// update access list (Berlin)
+	proc.state.AddAddressToAccessList(addr)
+
+	ret, err := inter.Run(contract, nil, false)
+	gasCost := uint64(len(ret)) * gethParams.CreateDataGas
+	res.GasConsumed = gasCost
+
+	// handle errors
+	if err != nil {
+		// for all errors except this one consume all the remaining gas (Homestead)
+		if err != gethVM.ErrExecutionReverted {
+			res.GasConsumed = gasLimit
+		}
+		res.Failed = true
+		return res, err
+	}
+
+	// update gas usage
+	if gasCost > gasLimit {
+		// consume all the remaining gas (Homestead)
+		res.GasConsumed = gasLimit
+		res.Failed = true
+		return res, gethVM.ErrCodeStoreOutOfGas
+	}
+
+	// check max code size (EIP-158)
+	if len(ret) > gethParams.MaxCodeSize {
+		// consume all the remaining gas (Homestead)
+		res.GasConsumed = gasLimit
+		res.Failed = true
+		return res, gethVM.ErrMaxCodeSizeExceeded
+	}
+
+	// reject code starting with 0xEF (EIP-3541)
+	if len(ret) >= 1 && ret[0] == 0xEF {
+		// consume all the remaining gas (Homestead)
+		res.GasConsumed = gasLimit
+		res.Failed = true
+		return res, gethVM.ErrInvalidCode
+	}
+
+	proc.state.SetCode(addr, ret)
+	res.DeployedContractAddress = to
+	return res, proc.commit()
+}
+
+func (proc *procedure) runDirect(msg *gethCore.Message, txType uint8) (*types.Result, error) {
+	// set the nonce for the message (needed for some opeartions like deployment)
+	msg.Nonce = proc.state.GetNonce(msg.From)
+	proc.evm.TxContext.Origin = msg.From
+	return proc.run(msg, types.DirectCallTxType)
 }
 
 func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, error) {

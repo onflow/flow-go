@@ -104,6 +104,7 @@ const (
 	ResourceNetworkingRPCSentTrackerCache                    = "gossipsub_rpc_sent_tracker_cache"
 	ResourceNetworkingRPCSentTrackerQueue                    = "gossipsub_rpc_sent_tracker_queue"
 	ResourceNetworkingUnicastDialConfigCache                 = "unicast_dial_config_cache"
+	ResourceNetworkingGossipsubDuplicateMessagesTrackerCache = "gossipsub_duplicate_messages_tracker_cache"
 
 	ResourceFollowerPendingBlocksCache         = "follower_pending_block_cache"           // follower engine
 	ResourceFollowerLoopCertifiedBlocksChannel = "follower_loop_certified_blocks_channel" // follower loop, certified blocks buffered channel
