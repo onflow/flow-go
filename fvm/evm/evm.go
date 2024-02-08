@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	evm "github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
@@ -24,8 +25,8 @@ func StorageAccountAddress(chainID flow.ChainID) (flow.Address, error) {
 
 func SetupEnvironment(
 	chainID flow.ChainID,
-	backend types.Backend,
-	env runtime.Environment,
+	fvmEnv environment.Environment,
+	runtimeEnv runtime.Environment,
 	service flow.Address,
 	flowToken flow.Address,
 ) error {
@@ -39,11 +40,17 @@ func SetupEnvironment(
 		return err
 	}
 
+	backend := types.NewWrappedWrappedEnvironment(fvmEnv)
+
 	em := evm.NewEmulator(backend, evmStorageAccountAddress)
 
-	contractHandler := handler.NewContractHandler(common.Address(flowToken), evmStorageAccountAddress, backend, em)
+	bs := handler.NewBlockStore(backend, evmStorageAccountAddress)
 
-	stdlib.SetupEnvironment(env, contractHandler, evmContractAccountAddress)
+	aa := handler.NewAddressAllocator()
+
+	contractHandler := handler.NewContractHandler(common.Address(flowToken), bs, aa, backend, em)
+
+	stdlib.SetupEnvironment(runtimeEnv, contractHandler, evmContractAccountAddress)
 
 	return nil
 }

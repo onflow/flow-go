@@ -45,6 +45,11 @@ func TestHandler_TransactionRun(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+
+					bs := handler.NewBlockStore(backend, rootAddr)
+
+					aa := handler.NewAddressAllocator()
+
 					result := &types.Result{
 						DeployedContractAddress: types.Address(testutils.RandomAddress(t)),
 						ReturnedValue:           testutils.RandomData(t),
@@ -60,7 +65,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 							return result, nil
 						},
 					}
-					handler := handler.NewContractHandler(flowTokenAddress, rootAddr, backend, em)
+					handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
 
 					coinbase := types.NewAddress(gethCommon.Address{})
 
@@ -126,12 +131,17 @@ func TestHandler_TransactionRun(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+
+					bs := handler.NewBlockStore(backend, rootAddr)
+
+					aa := handler.NewAddressAllocator()
+
 					em := &testutils.TestEmulator{
 						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
 							return &types.Result{}, types.NewEVMValidationError(fmt.Errorf("some sort of validation error"))
 						},
 					}
-					handler := handler.NewContractHandler(flowTokenAddress, rootAddr, backend, em)
+					handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
 
 					coinbase := types.NewAddress(gethCommon.Address{})
 
@@ -374,12 +384,14 @@ func TestHandler_COA(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+					bs := handler.NewBlockStore(backend, rootAddr)
+					aa := handler.NewAddressAllocator()
 
 					// Withdraw calls are only possible within FOA accounts
 					assertPanic(t, types.IsAUnAuthroizedMethodCallError, func() {
 						em := &testutils.TestEmulator{}
 
-						handler := handler.NewContractHandler(flowTokenAddress, rootAddr, backend, em)
+						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
 
 						account := handler.AccountByAddress(testutils.RandomAddress(t), false)
 						account.Withdraw(types.NewBalanceFromUFix64(1))
@@ -393,7 +405,7 @@ func TestHandler_COA(t *testing.T) {
 							},
 						}
 
-						handler := handler.NewContractHandler(flowTokenAddress, rootAddr, backend, em)
+						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
 						account.Withdraw(types.NewBalanceFromUFix64(1))
@@ -407,7 +419,7 @@ func TestHandler_COA(t *testing.T) {
 							},
 						}
 
-						handler := handler.NewContractHandler(flowTokenAddress, rootAddr, backend, em)
+						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
 						account.Withdraw(types.NewBalanceFromUFix64(0))
@@ -421,7 +433,7 @@ func TestHandler_COA(t *testing.T) {
 							},
 						}
 
-						handler := handler.NewContractHandler(flowTokenAddress, rootAddr, backend, em)
+						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
 						account.Withdraw(types.NewBalanceFromUFix64(0))
@@ -437,6 +449,9 @@ func TestHandler_COA(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+					bs := handler.NewBlockStore(backend, rootAddr)
+					aa := handler.NewAddressAllocator()
+
 					// test non fatal error of emulator
 					assertPanic(t, isNotFatal, func() {
 						em := &testutils.TestEmulator{
@@ -445,7 +460,7 @@ func TestHandler_COA(t *testing.T) {
 							},
 						}
 
-						handler := handler.NewContractHandler(flowTokenAddress, rootAddr, backend, em)
+						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
 						account.Deposit(types.NewFlowTokenVault(types.NewBalanceFromUFix64(1)))
@@ -459,7 +474,7 @@ func TestHandler_COA(t *testing.T) {
 							},
 						}
 
-						handler := handler.NewContractHandler(flowTokenAddress, rootAddr, backend, em)
+						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
 						account.Deposit(types.NewFlowTokenVault(types.NewBalanceFromUFix64(1)))
@@ -593,8 +608,10 @@ func assertPanic(t *testing.T, check checkError, f func()) {
 }
 
 func SetupHandler(t testing.TB, backend types.Backend, rootAddr flow.Address) *handler.ContractHandler {
+	bs := handler.NewBlockStore(backend, rootAddr)
+	aa := handler.NewAddressAllocator()
 	emulator := emulator.NewEmulator(backend, rootAddr)
 
-	handler := handler.NewContractHandler(flowTokenAddress, rootAddr, backend, emulator)
+	handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, emulator)
 	return handler
 }

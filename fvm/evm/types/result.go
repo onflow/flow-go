@@ -30,6 +30,13 @@ func (res *Result) Failed() bool {
 	return res.VMError != nil
 }
 
+func (res *Result) VMErrorString() string {
+	if res.VMError != nil {
+		return res.VMError.Error()
+	}
+	return ""
+}
+
 // Receipt constructs an EVM-style receipt
 // can be used by json-rpc and other integration to be returned.
 func (res *Result) Receipt() *gethTypes.ReceiptForStorage {

@@ -14,15 +14,14 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/handler/coa"
 	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/types"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 // ContractHandler is responsible for triggering calls to emulator, metering,
 // event emission and updating the block
 type ContractHandler struct {
 	flowTokenAddress common.Address
-	blockstore       types.BlockStore
 	addressAllocator types.AddressAllocator
+	blockstore       types.BlockStore
 	backend          types.Backend
 	emulator         types.Emulator
 	precompiles      []types.Precompile
@@ -36,19 +35,18 @@ var _ types.ContractHandler = &ContractHandler{}
 
 func NewContractHandler(
 	flowTokenAddress common.Address,
-	storageRootAddr flow.Address,
+	blockStore types.BlockStore,
+	addressAllocator types.AddressAllocator,
 	backend types.Backend,
 	emulator types.Emulator,
 ) *ContractHandler {
-	addressAllocator := NewAddressAllocator()
-	wrappedBackend := &WrappedBackend{backend}
 	return &ContractHandler{
 		flowTokenAddress: flowTokenAddress,
-		blockstore:       NewBlockStore(wrappedBackend, storageRootAddr),
+		blockstore:       blockStore,
 		addressAllocator: addressAllocator,
-		backend:          wrappedBackend,
+		backend:          backend,
 		emulator:         emulator,
-		precompiles:      getPrecompiles(addressAllocator, wrappedBackend),
+		precompiles:      getPrecompiles(addressAllocator, backend),
 	}
 }
 
@@ -585,7 +583,7 @@ func panicOnFatalOrBackendError(err error) {
 		panic(err)
 	}
 
-	if IsABackendError(err) {
+	if types.IsABackendError(err) {
 		panic(err)
 	}
 }
