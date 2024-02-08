@@ -8,11 +8,11 @@ import (
 	gethCommon "github.com/ethereum/go-ethereum/common"
 )
 
-// This package provides fast and effient
+// This package provides fast and efficient
 // utilities needed for abi encoding and decoding
 // encodings are mostly used for testing purpose
 // if more complex encoding and decoding is needed please
-// use the abi package and pass teh ABIs, though
+// use the abi package and pass the ABIs, though
 // that has a performance overhead.
 const (
 	FixedSizeUnitDataReadSize = 32
@@ -46,7 +46,7 @@ func ReadAddress(buffer []byte, index int) (gethCommon.Address, error) {
 	return addr, nil
 }
 
-// EncodeBool encodes boolean into fixed size unit of encoded data
+// EncodeAddress encodes the address and add it to the buffer at the index
 func EncodeAddress(address gethCommon.Address, buffer []byte, index int) error {
 	if len(buffer) < index+EncodedAddressSize {
 		return ErrBufferTooSmall
@@ -118,7 +118,7 @@ func ReadUint256(buffer []byte, index int) (*big.Int, error) {
 
 // ReadBytes4 reads a 4 byte slice from the buffer at index
 func ReadBytes4(buffer []byte, index int) ([]byte, error) {
-	if len(buffer) < index+Bytes4DataReadSize {
+	if len(buffer) < index+EncodedBytes4Size {
 		return nil, ErrInputDataTooSmall
 	}
 	// fixed-size byte values are zero-padded on the right side.
@@ -127,7 +127,7 @@ func ReadBytes4(buffer []byte, index int) ([]byte, error) {
 
 // ReadBytes8 reads a 8 byte slice from the buffer at index
 func ReadBytes8(buffer []byte, index int) ([]byte, error) {
-	if len(buffer) < index+Bytes8DataReadSize {
+	if len(buffer) < index+EncodedBytes8Size {
 		return nil, ErrInputDataTooSmall
 	}
 	// fixed-size byte values are zero-padded on the right side.
