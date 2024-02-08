@@ -175,6 +175,12 @@ type PubSubTracer interface {
 	component.Component
 	pubsub.RawTracer
 	RpcControlTracking
+	// DuplicateMessageCount returns the current duplicate message count for the peer.
+	// Args:
+	// - peer.ID: the peer ID.
+	// Returns:
+	// - float64: duplicate message count.
+	DuplicateMessageCount(peer.ID) float64
 	// GetLocalMeshPeers returns the list of peers in the mesh for the given topic.
 	// Args:
 	// - topic: the topic.
