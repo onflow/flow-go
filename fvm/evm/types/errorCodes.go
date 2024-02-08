@@ -9,29 +9,29 @@ import (
 
 type ErrorCode uint64
 
-// TODO: move this to emulator
-// TODO: include other flow EVM errors
-
 // internal error codes
 const ( // code reserved for no error
 	ErrCodeNoError ErrorCode = 0
 
 	// covers all other validation codes that doesn't have an specific code
-	ValidationErrCodeMisc                    ErrorCode = 100
-	ValidationErrCodeInvalidBalance          ErrorCode = 101
+	ValidationErrCodeMisc ErrorCode = 100
+	// invalid balance is provided (e.g. negative value)
+	ValidationErrCodeInvalidBalance ErrorCode = 101
+	// insufficient computation is left in the flow transaction
 	ValidationErrCodeInsufficientComputation ErrorCode = 102
-	ValidationErrCodeUnAuthroizedMethodCall  ErrorCode = 103
+	// unauthroized method call
+	ValidationErrCodeUnAuthroizedMethodCall ErrorCode = 103
+	// withdraw balance is prone to rounding error
+	ValidationErrCodeWithdrawBalanceRounding ErrorCode = 104
 
 	// general execution error returned for cases that don't have an specific code
-	ExecutionErrCodeMisc                         ErrorCode = 150
-	ExecutionErrCodeInsufficientTotalSupply      ErrorCode = 151
-	ExecutionErrCodeWithdrawBalanceRoundingError ErrorCode = 152
+	ExecutionErrCodeMisc ErrorCode = 400
 )
 
-// geth evm core errors (reserved range: [200-300) )
+// geth evm core errors (reserved range: [201-300) )
 const (
 	// the nonce of the tx is lower than the expected
-	ValidationErrCodeNonceTooLow = iota + 200
+	ValidationErrCodeNonceTooLow = iota + 201
 	// the nonce of the tx is higher than the expected
 	ValidationErrCodeNonceTooHigh
 	// tx sender account has reached to the maximum nonce
@@ -64,10 +64,10 @@ const (
 	ValidationErrCodeBlobFeeCapTooLow
 )
 
-// evm execution errors (reserved range: [300-400) )
+// evm execution errors (reserved range: [301-400) )
 const (
 	// execution ran out of gas
-	ExecutionErrCodeOutOfGas ErrorCode = iota + 300
+	ExecutionErrCodeOutOfGas ErrorCode = iota + 301
 	// contract creation code storage out of gas
 	ExecutionErrCodeCodeStoreOutOfGas
 	// max call depth exceeded
@@ -97,6 +97,27 @@ const (
 )
 
 func ValidationErrorCode(err error) ErrorCode {
+	// internal validation errors
+	if IsEVMValidationError(err) {
+		nested := errors.Unwrap(err)
+		switch nested {
+		case ErrInvalidBalance:
+			return ValidationErrCodeInvalidBalance
+		case ErrInsufficientComputation:
+			return ValidationErrCodeInsufficientComputation
+		case ErrUnAuthroizedMethodCall:
+			return ValidationErrCodeUnAuthroizedMethodCall
+		case ErrWithdrawBalanceRounding:
+			return ValidationErrCodeWithdrawBalanceRounding
+		}
+	}
+	// direct errors that are returned by the evm
+	switch err {
+	case gethVM.ErrGasUintOverflow:
+		return ValidationErrCodeGasUintOverflow
+	}
+
+	// wrapped errors return from the evm
 	nested := errors.Unwrap(err)
 	switch nested {
 	case gethCore.ErrNonceTooLow:
@@ -113,8 +134,6 @@ func ValidationErrorCode(err error) ErrorCode {
 		return ValidationErrCodeMaxInitCodeSizeExceeded
 	case gethCore.ErrInsufficientFunds:
 		return ValidationErrCodeInsufficientFunds
-	case gethCore.ErrGasUintOverflow:
-		return ValidationErrCodeGasUintOverflow
 	case gethCore.ErrIntrinsicGas:
 		return ValidationErrCodeIntrinsicGas
 	case gethCore.ErrTxTypeNotSupported:

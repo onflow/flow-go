@@ -6,58 +6,28 @@ import (
 )
 
 var (
-
 	// ErrInvalidBalance is returned when an invalid balance is provided for transfer (e.g. negative)
-	ErrInvalidBalance = errors.New("invalid balance for transfer")
+	ErrInvalidBalance = NewEVMValidationError(errors.New("invalid balance for transfer"))
 
 	// ErrInsufficientComputation is returned when not enough computation is
 	// left in the context of flow transaction to execute the evm operation.
-	ErrInsufficientComputation = errors.New("insufficient computation")
+	ErrInsufficientComputation = NewEVMValidationError(errors.New("insufficient computation"))
 
 	// ErrUnAuthroizedMethodCall method call, usually emited when calls are called on EOA accounts
-	ErrUnAuthroizedMethodCall = errors.New("unauthroized method call")
+	ErrUnAuthroizedMethodCall = NewEVMValidationError(errors.New("unauthroized method call"))
+
+	// ErrWithdrawBalanceRounding is returned when withdraw call has a balance that could
+	// yeild to rounding error, i.e. the balance contains fractions smaller than 10^8 Flow (smallest unit allowed to transfer).
+	ErrWithdrawBalanceRounding = NewEVMValidationError(errors.New("withdraw failed! the balance is susceptible to the rounding error"))
 
 	// ErrInsufficientTotalSupply is returned when flow token
 	// is withdraw request is there but not enough balance is on EVM vault
 	// this should never happen but its a saftey measure to protect Flow against EVM issues.
-	// TODO: we might consider this fatal
-	ErrInsufficientTotalSupply = errors.New("insufficient total supply")
-
-	// ErrWithdrawBalanceRounding is returned when withdraw call has a balance that could
-	// yeild to rounding error, i.e. the balance contains fractions smaller than 10^8 Flow (smallest unit allowed to transfer).
-	ErrWithdrawBalanceRounding = errors.New("withdraw failed! balance is susceptible to the rounding error")
+	ErrInsufficientTotalSupply = NewFatalError(errors.New("insufficient total supply"))
 
 	// ErrNotImplemented is a fatal error when something is called that is not implemented
 	ErrNotImplemented = NewFatalError(errors.New("a functionality is called that is not implemented"))
 )
-
-// EVMExecutionError is a non-fatal error, returned when execution of
-// an evm transaction or direct call has failed.
-type EVMExecutionError struct {
-	err error
-}
-
-// NewEVMExecutionError returns a new EVMExecutionError
-func NewEVMExecutionError(rootCause error) EVMExecutionError {
-	return EVMExecutionError{
-		err: rootCause,
-	}
-}
-
-// Unwrap unwraps the underlying evm error
-func (err EVMExecutionError) Unwrap() error {
-	return err.err
-}
-
-func (err EVMExecutionError) Error() string {
-	return fmt.Sprintf("EVM execution error: %v", err.err)
-}
-
-// IsEVMValidationError returns true if the error or any underlying errors
-// is of the type EVM execution error
-func IsEVMExecutionError(err error) bool {
-	return errors.As(err, &EVMExecutionError{})
-}
 
 // EVMValidationError is a non-fatal error, returned when validation steps of an EVM transaction
 // or direct call has failed.

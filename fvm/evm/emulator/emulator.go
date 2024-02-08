@@ -134,7 +134,7 @@ func (bl *BlockView) RunTransaction(
 	}
 	msg, err := gethCore.TransactionToMessage(tx, GetSigner(bl.config), proc.config.BlockContext.BaseFee)
 	if err != nil {
-		return res, err
+		return res, types.NewEVMValidationError(err)
 	}
 
 	// update tx context origin
@@ -250,6 +250,10 @@ func (proc *procedure) deployAt(
 	gasLimit uint64,
 	value *big.Int,
 ) (*types.Result, error) {
+	if value.Sign() < 0 {
+		return nil, types.ErrInvalidBalance
+	}
+
 	res := &types.Result{
 		TxType: types.DirectCallTxType,
 	}
@@ -278,10 +282,6 @@ func (proc *procedure) deployAt(
 	// increment the nonce for the caller
 	proc.state.SetNonce(callerCommon, proc.state.GetNonce(callerCommon)+1)
 
-	if value.Sign() < 0 {
-		res.VMError = types.ErrInvalidBalance
-		return res, nil
-	}
 	// setup account
 	proc.state.CreateAccount(addr)
 	proc.state.SetNonce(addr, 1) // (EIP-158)
@@ -378,7 +378,7 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 		}
 		// otherwise is a validation error (pre-check failure)
 		// no state change, wrap the error and return
-		return &res, err
+		return &res, types.NewEVMValidationError(err)
 	}
 
 	// if prechecks are passed, the exec result won't be nil

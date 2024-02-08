@@ -298,6 +298,9 @@ func (h *ContractHandler) executeAndHandleCall(
 	if totalSupplyDiff != nil {
 		if deductSupplyDiff {
 			bp.TotalSupply = new(big.Int).Sub(bp.TotalSupply, totalSupplyDiff)
+			if bp.TotalSupply.Sign() < 0 {
+				return res, types.ErrInsufficientTotalSupply
+			}
 		} else {
 			bp.TotalSupply = new(big.Int).Add(bp.TotalSupply, totalSupplyDiff)
 		}
@@ -455,17 +458,6 @@ func (a *Account) withdraw(b types.Balance) (*types.FLOWTokenVault, error) {
 		return nil, err
 	}
 
-	// check balance of flex vault
-	bp, err := a.fch.blockstore.BlockProposal()
-	if err != nil {
-		return nil, err
-	}
-
-	// b > total supply
-	if types.BalanceToBigInt(b).Cmp(bp.TotalSupply) == 1 {
-		return nil, types.ErrInsufficientTotalSupply
-	}
-
 	// Don't allow withdraw for balances that has rounding error
 	if types.BalanceConvertionToUFix64ProneToRoundingError(b) {
 		return nil, types.ErrWithdrawBalanceRounding
@@ -475,6 +467,7 @@ func (a *Account) withdraw(b types.Balance) (*types.FLOWTokenVault, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return types.NewFlowTokenVault(b), nil
 }
 
