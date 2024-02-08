@@ -3689,7 +3689,7 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 	}
 
 	handler := &testContractHandler{
-		allocateAddress: func() types.Address {
+		deployCOA: func(_ uint64) types.Address {
 			return proof.EVMAddress
 		},
 	}

@@ -271,7 +271,6 @@ contract EVM {
            )
         }
 
-        // Question? I assume this checks for min weight as well ?
         let isValid = keyList.verify(
             signatureSet: signatureSet,
             signedData: signedData
