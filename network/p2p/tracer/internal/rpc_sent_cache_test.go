@@ -20,7 +20,7 @@ import (
 // It ensures that the method returns true when a new record is initialized
 // and false when an existing record is initialized.
 func TestCache_Add(t *testing.T) {
-	cache := cacheFixture(t, 100, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := rpcSentCacheFixture(t, 100, zerolog.Nop(), metrics.NewNoopCollector())
 	controlMsgType := p2pmsg.CtrlMsgIHave
 	messageID1 := unittest.IdentifierFixture().String()
 	messageID2 := unittest.IdentifierFixture().String()
@@ -46,7 +46,7 @@ func TestCache_Add(t *testing.T) {
 // 1. Multiple goroutines initializing records for different ids.
 // 2. Ensuring that all records are correctly initialized.
 func TestCache_ConcurrentAdd(t *testing.T) {
-	cache := cacheFixture(t, 100, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := rpcSentCacheFixture(t, 100, zerolog.Nop(), metrics.NewNoopCollector())
 	controlMsgType := p2pmsg.CtrlMsgIHave
 	messageIds := unittest.IdentifierListFixture(10)
 
@@ -74,7 +74,7 @@ func TestCache_ConcurrentAdd(t *testing.T) {
 // 2. Only one goroutine successfully initializes the record, and others receive false on initialization.
 // 3. The record is correctly initialized in the cache and can be retrieved using the Get method.
 func TestCache_ConcurrentSameRecordAdd(t *testing.T) {
-	cache := cacheFixture(t, 100, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := rpcSentCacheFixture(t, 100, zerolog.Nop(), metrics.NewNoopCollector())
 	controlMsgType := p2pmsg.CtrlMsgIHave
 	messageID := unittest.IdentifierFixture().String()
 	const concurrentAttempts = 10
@@ -103,8 +103,8 @@ func TestCache_ConcurrentSameRecordAdd(t *testing.T) {
 	require.True(t, cache.has(messageID, controlMsgType))
 }
 
-// cacheFixture returns a new *RecordCache.
-func cacheFixture(t *testing.T, sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *rpcSentCache {
+// rpcSentCacheFixture returns a new *RecordCache.
+func rpcSentCacheFixture(t *testing.T, sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *rpcSentCache {
 	config := &rpcCtrlMsgSentCacheConfig{
 		sizeLimit: sizeLimit,
 		logger:    logger,
