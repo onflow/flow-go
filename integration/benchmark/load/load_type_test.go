@@ -9,6 +9,7 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -111,11 +112,14 @@ func testLoad(log zerolog.Logger, l load.Load) func(t *testing.T) {
 }
 
 func bootstrapVM(t *testing.T, chain flow.Chain) (*fvm.VirtualMachine, fvm.Context, snapshot.SnapshotTree) {
+	source := testutil.EntropyProviderFixture(nil)
+
 	opts := computation.DefaultFVMOptions(chain.ChainID(), false, false)
 	opts = append(opts,
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithContractDeploymentRestricted(false),
+		fvm.WithEntropyProvider(source),
 	)
 
 	ctx := fvm.NewContext(opts...)

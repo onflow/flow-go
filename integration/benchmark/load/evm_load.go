@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/cadence"
 	flowsdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	evmTypes "github.com/onflow/flow-go/fvm/evm/types"
@@ -44,6 +45,8 @@ type EVMTransferLoad struct {
 
 	transfers atomic.Uint64
 	creations atomic.Uint64
+
+	bridgedAcountAddress flowsdk.Address
 }
 
 func NewEVMTransferLoad(log zerolog.Logger) *EVMTransferLoad {
@@ -92,6 +95,75 @@ func (l *EVMTransferLoad) Type() LoadType {
 }
 
 func (l *EVMTransferLoad) Setup(log zerolog.Logger, lc LoadContext) error {
+
+	// create a shared bridged account
+	err := sendSimpleTransaction(
+		log,
+		lc,
+		func(
+			log zerolog.Logger,
+			lc LoadContext,
+			acc *account.FlowAccount,
+		) (*flowsdk.Transaction, error) {
+			l.bridgedAcountAddress = acc.Address
+
+			sc := systemcontracts.SystemContractsForChain(lc.ChainID)
+
+			contractName := "BridgedAccountContract"
+
+			contract := fmt.Sprintf(`
+import EVM from %s
+import FlowToken from %s
+
+access(all) contract BridgedAccountContract {
+	access(self) var acc : @EVM.BridgedAccount
+
+    access(all)
+	fun address() : EVM.EVMAddress {
+		return self.acc.address()
+    }
+
+	access(all) 
+	fun call(
+			to: EVM.EVMAddress,
+            data: [UInt8],
+            gasLimit: UInt64,
+            value: EVM.Balance
+        ): [UInt8] { 
+		return self.acc.call(to: to, data: data, gasLimit: gasLimit, value: value)
+	}
+
+	access(all)
+	fun deposit(from: @FlowToken.Vault) {
+		self.acc.deposit(from: <-from)
+	}
+
+	init() {
+		self.acc <- EVM.createBridgedAccount()
+	}
+}
+			`,
+				sc.EVMContract.Address.HexWithPrefix(),
+				sc.FlowToken.Address.HexWithPrefix())
+
+			tx := flowsdk.NewTransaction().
+				SetScript(blueprints.DeployContractTransactionTemplate)
+
+			err := tx.AddArgument(cadence.String(contractName))
+			if err != nil {
+				return nil, err
+			}
+			err = tx.AddArgument(cadence.String(contract))
+			if err != nil {
+				return nil, err
+			}
+
+			return tx, nil
+		})
+	if err != nil {
+		return fmt.Errorf("error creating shared bridged account: %w", err)
+	}
+
 	// create some EOA ahead of time to get a better result for the benchmark
 	createEOA := l.PreCreateEOAAccounts
 
@@ -142,7 +214,7 @@ func (l *EVMTransferLoad) Setup(log zerolog.Logger, lc LoadContext) error {
 			return nil
 		})
 	}
-	err := g.Wait()
+	err = g.Wait()
 	if err != nil {
 		return fmt.Errorf("error creating EOC accounts: %w", err)
 	}
@@ -233,6 +305,7 @@ func (l *EVMTransferLoad) setupTransaction(
 						import EVM from %s
 						import FungibleToken from %s
 						import FlowToken from %s
+						import BridgedAccountContract from 0x%s
 
 						transaction(address: [UInt8; 20], amount: UFix64) {
 							let fundVault: @FlowToken.Vault
@@ -246,22 +319,22 @@ func (l *EVMTransferLoad) setupTransaction(
 							}
 
 							execute {
-								let acc <- EVM.createBridgedAccount()
-								acc.deposit(from: <-self.fundVault)
+								BridgedAccountContract.deposit(from: <-self.fundVault)
 								let fundAddress = EVM.EVMAddress(bytes: address)
-								acc.call(
+								var balance = EVM.Balance(attoflow: 0)
+								balance.setFLOW(flow: amount)
+								BridgedAccountContract.call(
 										to: fundAddress,
 										data: [],
 										gasLimit: 21000,
-										value: EVM.Balance(flow: amount))
-
-								destroy acc
+										value: balance)
 							}
 						}
 					`,
 					sc.FlowServiceAccount.Address.HexWithPrefix(),
 					sc.FungibleToken.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
+					l.bridgedAcountAddress.Hex(),
 				)))
 
 			err = txBody.AddArgument(eoa.addressArg)
@@ -322,21 +395,16 @@ func (l *EVMTransferLoad) transferTransaction(
 			txBody := flowsdk.NewTransaction().
 				SetScript([]byte(fmt.Sprintf(
 					`
-						import EVM from %s
-						import FungibleToken from %s
-						import FlowToken from %s
-						
-						transaction(encodedTx: [UInt8]) {
-							//let bridgeVault: @FlowToken.Vault
-						
-							prepare(signer: AuthAccount){}
-						
-							execute {
-								let feeAcc <- EVM.createBridgedAccount()
-								EVM.run(tx: encodedTx, coinbase: feeAcc.address())
-								destroy feeAcc
-							}
-						}
+import EVM from %s
+import FungibleToken from %s
+import FlowToken from %s
+
+transaction(encodedTx: [UInt8], address: [UInt8; 20]) {
+	prepare(signer: AuthAccount){}
+	execute {
+		EVM.run(tx: encodedTx, coinbase: EVM.EVMAddress(bytes: address))
+	}
+}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FungibleToken.Address.HexWithPrefix(),
@@ -344,6 +412,10 @@ func (l *EVMTransferLoad) transferTransaction(
 				)))
 
 			err = txBody.AddArgument(transactionBytes)
+			if err != nil {
+				return nil, fmt.Errorf("error adding argument to transaction: %w", err)
+			}
+			err = txBody.AddArgument(eoa.addressArg)
 			if err != nil {
 				return nil, fmt.Errorf("error adding argument to transaction: %w", err)
 			}
