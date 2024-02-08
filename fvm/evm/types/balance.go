@@ -5,8 +5,6 @@ import (
 	"math"
 	"math/big"
 
-	gethVM "github.com/ethereum/go-ethereum/core/vm"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/fixedpoint"
 )
@@ -78,7 +76,7 @@ func BalanceConvertionToUFix64ProneToRoundingError(bal Balance) bool {
 // Subtract balance 2 from balance 1 and returns the result as a new balance
 func SubBalance(bal1 Balance, bal2 Balance) (Balance, error) {
 	if (*big.Int)(bal1).Cmp(bal2) == -1 {
-		return nil, gethVM.ErrInsufficientBalance
+		return nil, ErrInvalidBalance
 	}
 	return new(big.Int).Sub(bal1, bal2), nil
 }

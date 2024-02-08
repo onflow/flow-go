@@ -134,6 +134,8 @@ func (bl *BlockView) RunTransaction(
 	}
 	msg, err := gethCore.TransactionToMessage(tx, GetSigner(bl.config), proc.config.BlockContext.BaseFee)
 	if err != nil {
+		// this is not a fatal error (e.g. due to bad signature)
+		// not a valid transaction
 		return res, types.NewEVMValidationError(err)
 	}
 
