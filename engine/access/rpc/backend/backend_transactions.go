@@ -81,7 +81,6 @@ func (b *backendTransactions) SendTransaction(
 
 // trySendTransaction tries to transaction to a collection node
 func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.TransactionBody) error {
-
 	// if a collection node rpc client was provided at startup, just use that
 	if b.staticCollectionRPC != nil {
 		return b.grpcTxSend(ctx, b.staticCollectionRPC, tx)
@@ -120,7 +119,6 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 // chooseCollectionNodes finds a random subset of size sampleSize of collection node addresses from the
 // collection node cluster responsible for the given tx
 func (b *backendTransactions) chooseCollectionNodes(txID flow.Identifier) (flow.IdentityList, error) {
-
 	// retrieve the set of collector clusters
 	clusters, err := b.state.Final().Epochs().Current().Clustering()
 	if err != nil {
@@ -142,7 +140,6 @@ func (b *backendTransactions) sendTransactionToCollector(
 	tx *flow.TransactionBody,
 	collectionNodeAddr string,
 ) error {
-
 	collectionRPC, closer, err := b.connFactory.GetAccessAPIClient(collectionNodeAddr, nil)
 	if err != nil {
 		return fmt.Errorf("failed to connect to collection node at %s: %w", collectionNodeAddr, err)
@@ -174,7 +171,6 @@ func (b *backendTransactions) SendRawTransaction(
 	ctx context.Context,
 	tx *flow.TransactionBody,
 ) error {
-
 	// send the transaction to the collection node
 	return b.trySendTransaction(ctx, tx)
 }
@@ -273,7 +269,6 @@ func (b *backendTransactions) GetTransactionResult(
 	}
 
 	block, err := b.retrieveBlock(blockID, collectionID, txID)
-
 	// an error occurred looking up the block or the requested block or collection was not found.
 	// If looking up the block based solely on the txID returns not found, then no error is
 	// returned since the block may not be finalized yet.
@@ -381,18 +376,15 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	case IndexQueryModeExecutionNodesOnly:
 		return b.getTransactionResultsByBlockIDFromExecutionNode(ctx, block, requiredEventEncodingVersion)
 	case IndexQueryModeLocalOnly:
-		return b.GetTransactionResultsByBlockIDFromStorage(ctx, block, requiredEventEncodingVersion, b.lookupTransactionErrorMessagesByBlockID)
+		return b.GetTransactionResultsByBlockIDFromStorage(ctx, block, requiredEventEncodingVersion)
 	case IndexQueryModeFailover:
-		results, err := b.GetTransactionResultsByBlockIDFromStorage(ctx, block, requiredEventEncodingVersion, b.lookupTransactionErrorMessagesByBlockID)
+		results, err := b.GetTransactionResultsByBlockIDFromStorage(ctx, block, requiredEventEncodingVersion)
 		if err == nil {
 			return results, nil
 		}
 
 		if err != nil {
-			// Skip error type NotFound, to request transaction result from EN
-			if !errors.Is(err, storage.ErrNotFound) {
-				return nil, err
-			}
+			return nil, err
 		}
 
 		return b.getTransactionResultsByBlockIDFromExecutionNode(ctx, block, requiredEventEncodingVersion)
@@ -546,9 +538,9 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	case IndexQueryModeExecutionNodesOnly:
 		return b.getTransactionResultByIndexFromExecutionNode(ctx, block, index, requiredEventEncodingVersion)
 	case IndexQueryModeLocalOnly:
-		return b.GetTransactionResultByIndexFromStorage(ctx, block, index, requiredEventEncodingVersion, b.lookupTransactionErrorMessageByIndex)
+		return b.GetTransactionResultByIndexFromStorage(ctx, block, index, requiredEventEncodingVersion)
 	case IndexQueryModeFailover:
-		result, err := b.GetTransactionResultByIndexFromStorage(ctx, block, index, requiredEventEncodingVersion, b.lookupTransactionErrorMessageByIndex)
+		result, err := b.GetTransactionResultByIndexFromStorage(ctx, block, index, requiredEventEncodingVersion)
 		if err == nil {
 			return result, nil
 		}
@@ -685,7 +677,6 @@ func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, bl
 //   - `storage.ErrNotFound` - collection referenced by transaction or block by a collection has not been found.
 //   - all other errors are unexpected and potentially symptoms of internal implementation bugs or state corruption (fatal).
 func (b *backendTransactions) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
-
 	collection, err := b.collections.LightByTransactionID(txID)
 	if err != nil {
 		return nil, err
@@ -721,9 +712,9 @@ func (b *backendTransactions) lookupTransactionResult(
 		// considered executed as long as some result is returned, even if it's an error message
 		return txResult, nil
 	case IndexQueryModeLocalOnly:
-		return b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion, b.lookupTransactionErrorMessage)
+		return b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion)
 	case IndexQueryModeFailover:
-		txResult, err := b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion, b.lookupTransactionErrorMessage)
+		txResult, err := b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion)
 		if err == nil {
 			return txResult, nil
 		}

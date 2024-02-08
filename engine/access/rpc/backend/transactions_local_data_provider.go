@@ -36,6 +36,10 @@ type TransactionsLocalDataProvider struct {
 	events      storage.Events
 	collections storage.Collections
 	blocks      storage.Blocks
+
+	errorMessageGetter          TransactionErrorMessageGetter
+	errorMessageByBlockIDGetter TransactionErrorMessagesByBlockIDGetter
+	errorMessageByIndexGetter   TransactionErrorMessageByIndexGetter
 }
 
 // GetTransactionResultFromStorage retrieves a transaction result from storage by block ID and transaction ID.
@@ -49,7 +53,6 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 	block *flow.Block,
 	transactionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-	errorMessageGetter TransactionErrorMessageGetter,
 ) (*access.TransactionResult, error) {
 	blockID := block.ID()
 	txResult, err := t.results.ByBlockIDTransactionID(blockID, transactionID)
@@ -60,8 +63,8 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 	var txErrorMessage string
 	var txStatusCode uint = 0
 	if txResult.Failed {
-		if errorMessageGetter != nil {
-			txErrorMessage, err = errorMessageGetter(ctx, blockID, transactionID)
+		if t.errorMessageGetter != nil {
+			txErrorMessage, err = t.errorMessageGetter(ctx, blockID, transactionID)
 			if err != nil {
 				return nil, err
 			}
@@ -116,7 +119,6 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 	ctx context.Context,
 	block *flow.Block,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-	errorMessageByBlockIDGetter TransactionErrorMessagesByBlockIDGetter,
 ) ([]*access.TransactionResult, error) {
 	blockID := block.ID()
 	txResults, err := t.results.ByBlockID(blockID)
@@ -125,8 +127,8 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 	}
 
 	txErrors := make(map[flow.Identifier]string)
-	if errorMessageByBlockIDGetter != nil {
-		txErrors, err = errorMessageByBlockIDGetter(ctx, blockID)
+	if t.errorMessageByBlockIDGetter != nil {
+		txErrors, err = t.errorMessageByBlockIDGetter(ctx, blockID)
 		if err != nil {
 			return nil, err
 		}
@@ -202,7 +204,6 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 	block *flow.Block,
 	index uint32,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-	errorMessageByIndexGetter TransactionErrorMessageByIndexGetter,
 ) (*access.TransactionResult, error) {
 	blockID := block.ID()
 	txResult, err := t.results.ByBlockIDTransactionIndex(blockID, index)
@@ -213,8 +214,8 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 	var txErrorMessage string
 	var txStatusCode uint = 0
 	if txResult.Failed {
-		if errorMessageByIndexGetter != nil {
-			txErrorMessage, err = errorMessageByIndexGetter(ctx, blockID, index)
+		if t.errorMessageByIndexGetter != nil {
+			txErrorMessage, err = t.errorMessageByIndexGetter(ctx, blockID, index)
 			if err != nil {
 				return nil, err
 			}
