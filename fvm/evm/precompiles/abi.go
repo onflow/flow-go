@@ -212,7 +212,6 @@ func EncodeBytes(data []byte, buffer []byte, headerIndex, payloadIndex int) erro
 	if err != nil {
 		return err
 	}
-	headerIndex += EncodedUint64Size
 
 	//// updating payload
 	// padding data
