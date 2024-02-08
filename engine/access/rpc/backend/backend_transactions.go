@@ -45,6 +45,8 @@ type backendTransactions struct {
 	txResultQueryMode    IndexQueryMode
 }
 
+var _ TransactionErrorMessage = (*backendTransactions)(nil)
+
 // SendTransaction forwards the transaction to the collection node
 func (b *backendTransactions) SendTransaction(
 	ctx context.Context,
@@ -1020,13 +1022,13 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 	return resp, nil
 }
 
-// lookupTransactionErrorMessage returns transaction error message for specified transaction.
+// LookupErrorMessageByTransactionId returns transaction error message for specified transaction.
 // If an error message for transaction can be found in the cache then it will be used to serve the request, otherwise
 // an RPC call will be made to the EN to fetch that error message, fetched value will be cached in the LRU cache.
 // Expected errors during normal operation:
 //   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 //   - status.Error - remote GRPC call to EN has failed.
-func (b *backendTransactions) lookupTransactionErrorMessage(
+func (b *backendTransactions) LookupErrorMessageByTransactionId(
 	ctx context.Context,
 	blockID flow.Identifier,
 	transactionID flow.Identifier,
@@ -1067,14 +1069,14 @@ func (b *backendTransactions) lookupTransactionErrorMessage(
 	return value, nil
 }
 
-// lookupTransactionErrorMessageByIndex returns transaction error message for specified transaction using its index.
+// LookupErrorMessageByIndex returns transaction error message for specified transaction using its index.
 // If an error message for transaction can be found in cache then it will be used to serve the request, otherwise
 // an RPC call will be made to the EN to fetch that error message, fetched value will be cached in the LRU cache.
 // Expected errors during normal operation:
 //   - status.Error[codes.NotFound] - transaction result for given block ID and tx index is not available.
 //   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 //   - status.Error - remote GRPC call to EN has failed.
-func (b *backendTransactions) lookupTransactionErrorMessageByIndex(
+func (b *backendTransactions) LookupErrorMessageByIndex(
 	ctx context.Context,
 	blockID flow.Identifier,
 	index uint32,
@@ -1120,13 +1122,13 @@ func (b *backendTransactions) lookupTransactionErrorMessageByIndex(
 	return value, nil
 }
 
-// lookupTransactionErrorMessagesByBlockID returns all error messages for failed transactions by blockID.
+// LookupErrorMessagesByBlockID returns all error messages for failed transactions by blockID.
 // An RPC call will be made to the EN to fetch missing errors messages, fetched value will be cached in the LRU cache.
 // Expected errors during normal operation:
 //   - status.Error[codes.NotFound] - transaction results for given block ID are not available.
 //   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 //   - status.Error - remote GRPC call to EN has failed.
-func (b *backendTransactions) lookupTransactionErrorMessagesByBlockID(
+func (b *backendTransactions) LookupErrorMessagesByBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
 ) (map[flow.Identifier]string, error) {

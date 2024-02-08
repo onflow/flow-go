@@ -20,26 +20,26 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// TransactionErrorMessageGetter is a function type for getting transaction error messages.
-type TransactionErrorMessageGetter func(ctx context.Context, blockID flow.Identifier, transactionID flow.Identifier) (string, error)
+type TransactionErrorMessage interface {
+	// LookupErrorMessageByTransactionId is a function type for getting transaction error message.
+	LookupErrorMessageByTransactionId(ctx context.Context, blockID flow.Identifier, transactionID flow.Identifier) (string, error)
 
-// TransactionErrorMessageByIndexGetter is a function type for getting transaction error messages by index.
-type TransactionErrorMessageByIndexGetter func(ctx context.Context, blockID flow.Identifier, index uint32) (string, error)
+	// LookupErrorMessageByIndex is a function type for getting transaction error message by index.
+	LookupErrorMessageByIndex(ctx context.Context, blockID flow.Identifier, index uint32) (string, error)
 
-// TransactionErrorMessagesByBlockIDGetter is a function type for getting transaction error messages by block ID.
-type TransactionErrorMessagesByBlockIDGetter func(ctx context.Context, blockID flow.Identifier) (map[flow.Identifier]string, error)
+	// LookupErrorMessagesByBlockID is a function type for getting transaction error messages by block ID.
+	LookupErrorMessagesByBlockID(ctx context.Context, blockID flow.Identifier) (map[flow.Identifier]string, error)
+}
 
 // TransactionsLocalDataProvider provides functionality for retrieving transaction results and error messages from local storages
 type TransactionsLocalDataProvider struct {
+	TransactionErrorMessage
+
 	state       protocol.State
 	results     storage.LightTransactionResults
 	events      storage.Events
 	collections storage.Collections
 	blocks      storage.Blocks
-
-	errorMessageGetter          TransactionErrorMessageGetter
-	errorMessageByBlockIDGetter TransactionErrorMessagesByBlockIDGetter
-	errorMessageByIndexGetter   TransactionErrorMessageByIndexGetter
 }
 
 // GetTransactionResultFromStorage retrieves a transaction result from storage by block ID and transaction ID.
@@ -63,11 +63,9 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 	var txErrorMessage string
 	var txStatusCode uint = 0
 	if txResult.Failed {
-		if t.errorMessageGetter != nil {
-			txErrorMessage, err = t.errorMessageGetter(ctx, blockID, transactionID)
-			if err != nil {
-				return nil, err
-			}
+		txErrorMessage, err = t.LookupErrorMessageByTransactionId(ctx, blockID, transactionID)
+		if err != nil {
+			return nil, err
 		}
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
@@ -126,13 +124,11 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	txErrors := make(map[flow.Identifier]string)
-	if t.errorMessageByBlockIDGetter != nil {
-		txErrors, err = t.errorMessageByBlockIDGetter(ctx, blockID)
-		if err != nil {
-			return nil, err
-		}
+	txErrors, err := t.LookupErrorMessagesByBlockID(ctx, blockID)
+	if err != nil {
+		return nil, err
 	}
+
 	numberOfTxResults := len(txResults)
 	results := make([]*access.TransactionResult, 0, numberOfTxResults)
 
@@ -214,11 +210,9 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 	var txErrorMessage string
 	var txStatusCode uint = 0
 	if txResult.Failed {
-		if t.errorMessageByIndexGetter != nil {
-			txErrorMessage, err = t.errorMessageByIndexGetter(ctx, blockID, index)
-			if err != nil {
-				return nil, err
-			}
+		txErrorMessage, err = t.LookupErrorMessageByIndex(ctx, blockID, index)
+		if err != nil {
+			return nil, err
 		}
 
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN

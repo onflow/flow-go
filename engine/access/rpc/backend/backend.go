@@ -231,10 +231,6 @@ func New(params Params) (*Backend, error) {
 		nodeInfo:          nodeInfo,
 	}
 
-	b.errorMessageGetter = b.backendTransactions.lookupTransactionErrorMessage
-	b.errorMessageByIndexGetter = b.backendTransactions.retry.backend.lookupTransactionErrorMessageByIndex
-	b.errorMessageByBlockIDGetter = b.backendTransactions.lookupTransactionErrorMessagesByBlockID
-
 	retry.SetBackend(b)
 
 	preferredENIdentifiers, err = identifierList(params.PreferredExecutionNodeIDs)
