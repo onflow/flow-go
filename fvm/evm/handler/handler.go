@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/errors"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/handler/coa"
 	"github.com/onflow/flow-go/fvm/evm/precompiles"
@@ -154,7 +153,7 @@ func (h *ContractHandler) run(
 			bytes.NewReader(rlpEncodedTx),
 			uint64(encodedLen)))
 	if err != nil {
-		return nil, err
+		return nil, types.NewEVMValidationError(err)
 	}
 
 	// step 2 - run transaction
@@ -570,7 +569,7 @@ func panicOnAnyError(err error) {
 	panicOnFVMError(err)
 
 	// if not FVM wrap it with EVM error and panic
-	panic(errors.NewEVMError(err))
+	panic(fvmErrors.NewEVMError(err))
 }
 
 // panicOnFVMError errors panic on fatal or external (FVM) errors

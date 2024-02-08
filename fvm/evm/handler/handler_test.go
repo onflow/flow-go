@@ -142,7 +142,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 
 					em := &testutils.TestEmulator{
 						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
-							return &types.Result{}, fmt.Errorf("some sort of error")
+							return &types.Result{}, types.NewEVMValidationError(fmt.Errorf("some sort of validation error"))
 						},
 					}
 					handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
@@ -181,9 +181,9 @@ func TestHandler_TransactionRun(t *testing.T) {
 						big.NewInt(1),
 					)
 
-					assertPanic(t, isNotFatal, func() {
-						handler.Run([]byte(tx), coinbase)
-					})
+					// should not panic given this is a VM error
+					handler.Run([]byte(tx), coinbase)
+					// TODO check the receipt from evetns
 				})
 			})
 		})
@@ -404,11 +404,11 @@ func TestHandler_COA(t *testing.T) {
 						account.Withdraw(types.NewBalanceFromUFix64(1))
 					})
 
-					// test insufficient total supply
+					// test insufficient total supply error
 					assertPanic(t, types.IsAInsufficientTotalSupplyError, func() {
 						em := &testutils.TestEmulator{
 							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
-								return &types.Result{}, fmt.Errorf("some sort of error")
+								return &types.Result{}, nil
 							},
 						}
 
@@ -422,7 +422,7 @@ func TestHandler_COA(t *testing.T) {
 					assertPanic(t, isNotFatal, func() {
 						em := &testutils.TestEmulator{
 							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
-								return &types.Result{}, fmt.Errorf("some sort of error")
+								return &types.Result{}, types.NewEVMValidationError(fmt.Errorf("some sort of error"))
 							},
 						}
 
@@ -611,6 +611,7 @@ func assertPanic(t *testing.T, check checkError, f func()) {
 		if !ok {
 			t.Fatal("panic is not with an error type")
 		}
+		fmt.Println(err)
 		require.True(t, check(err))
 	}()
 	f()
