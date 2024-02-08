@@ -189,6 +189,7 @@ func WithPruneCallback(callback PruneCallback) StorageOption {
 }
 
 func OpenStorage(dbPath string, startHeight uint64, logger zerolog.Logger, opts ...StorageOption) (*storage, error) {
+	lg := logger.With().Str("module", "tracker_storage").Logger()
 	db, err := badger.Open(badger.LSMOnlyOptions(dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("could not open tracker db: %w", err)
@@ -197,16 +198,20 @@ func OpenStorage(dbPath string, startHeight uint64, logger zerolog.Logger, opts 
 	storage := &storage{
 		db:            db,
 		pruneCallback: func(c cid.Cid) error { return nil },
-		logger:        logger.With().Str("module", "tracker_storage").Logger(),
+		logger:        lg,
 	}
 
 	for _, opt := range opts {
 		opt(storage)
 	}
 
+	lg.Info().Msgf("initialize storage with start ehgith: %d", startHeight)
+
 	if err := storage.init(startHeight); err != nil {
 		return nil, fmt.Errorf("failed to initialize storage: %w", err)
 	}
+
+	lg.Info().Msgf("storage initialized")
 
 	return storage, nil
 }
