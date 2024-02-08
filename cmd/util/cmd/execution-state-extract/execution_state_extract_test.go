@@ -10,6 +10,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -66,6 +67,9 @@ func TestExtractExecutionState(t *testing.T) {
 				outdir,
 				10,
 				false,
+				flow.Emulator,
+				// TODO:
+				migrations.EVMContractChangeNone,
 			)
 			require.Error(t, err)
 		})
