@@ -41,17 +41,7 @@ func SetupEnvironment(
 
 	em := evm.NewEmulator(backend, evmStorageAccountAddress)
 
-	bs, err := handler.NewBlockStore(backend, evmStorageAccountAddress)
-	if err != nil {
-		return err
-	}
-
-	aa, err := handler.NewAddressAllocator(backend, evmStorageAccountAddress)
-	if err != nil {
-		return err
-	}
-
-	contractHandler := handler.NewContractHandler(common.Address(flowToken), bs, aa, backend, em)
+	contractHandler := handler.NewContractHandler(common.Address(flowToken), evmStorageAccountAddress, backend, em)
 
 	stdlib.SetupEnvironment(env, contractHandler, evmContractAccountAddress)
 

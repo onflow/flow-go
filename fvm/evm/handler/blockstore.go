@@ -15,7 +15,7 @@ const (
 )
 
 type BlockStore struct {
-	led           atree.Ledger
+	backend       atree.Ledger
 	rootAddress   flow.Address
 	blockProposal *types.Block
 }
@@ -23,11 +23,11 @@ type BlockStore struct {
 var _ types.BlockStore = &BlockStore{}
 
 // NewBlockStore constructs a new block store
-func NewBlockStore(led atree.Ledger, rootAddress flow.Address) (*BlockStore, error) {
+func NewBlockStore(backend types.Backend, rootAddress flow.Address) *BlockStore {
 	return &BlockStore{
-		led:         led,
+		backend:     backend,
 		rootAddress: rootAddress,
-	}, nil
+	}
 }
 
 // BlockProposal returns the block proposal to be updated by the handler
@@ -67,7 +67,7 @@ func (bs *BlockStore) CommitBlockProposal() error {
 		return types.NewFatalError(err)
 	}
 
-	err = bs.led.SetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockKey), blockBytes)
+	err = bs.backend.SetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockKey), blockBytes)
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func (bs *BlockStore) ResetBlockProposal() error {
 
 // LatestBlock returns the latest executed block
 func (bs *BlockStore) LatestBlock() (*types.Block, error) {
-	data, err := bs.led.GetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockKey))
+	data, err := bs.backend.GetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockKey))
 	if len(data) == 0 {
 		return types.GenesisBlock, err
 	}
@@ -110,7 +110,7 @@ func (bs *BlockStore) BlockHash(height uint64) (gethCommon.Hash, error) {
 }
 
 func (bs *BlockStore) getBlockHashList() (*types.BlockHashList, error) {
-	data, err := bs.led.GetValue(bs.rootAddress[:], []byte(BlockStoreBlockHashesKey))
+	data, err := bs.backend.GetValue(bs.rootAddress[:], []byte(BlockStoreBlockHashesKey))
 	if err != nil {
 		return nil, err
 	}
@@ -135,8 +135,12 @@ func (bs *BlockStore) updateBlockHashList(block *types.Block) error {
 	if err != nil {
 		return err
 	}
-	return bs.led.SetValue(
+	err = bs.backend.SetValue(
 		bs.rootAddress[:],
 		[]byte(BlockStoreBlockHashesKey),
 		bhl.Encode())
+	if err != nil {
+		return err
+	}
+	return nil
 }

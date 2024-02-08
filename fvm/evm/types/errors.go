@@ -80,7 +80,7 @@ func (err StateError) Error() string {
 }
 
 // IsAStateError returns true if the error or any underlying errors
-// is of the type EVM validation error
+// is a state error
 func IsAStateError(err error) bool {
 	return errors.As(err, &StateError{})
 }

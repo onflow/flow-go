@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/handler/coa"
 	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/types"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // ContractHandler is responsible for triggering calls to emulator, metering,
@@ -35,18 +36,19 @@ var _ types.ContractHandler = &ContractHandler{}
 
 func NewContractHandler(
 	flowTokenAddress common.Address,
-	blockstore types.BlockStore,
-	addressAllocator types.AddressAllocator,
+	storageRootAddr flow.Address,
 	backend types.Backend,
 	emulator types.Emulator,
 ) *ContractHandler {
+	addressAllocator := NewAddressAllocator()
+	wrappedBackend := &WrappedBackend{backend}
 	return &ContractHandler{
 		flowTokenAddress: flowTokenAddress,
-		blockstore:       blockstore,
+		blockstore:       NewBlockStore(wrappedBackend, storageRootAddr),
 		addressAllocator: addressAllocator,
-		backend:          backend,
+		backend:          wrappedBackend,
 		emulator:         emulator,
-		precompiles:      getPrecompiles(addressAllocator, backend),
+		precompiles:      getPrecompiles(addressAllocator, wrappedBackend),
 	}
 }
 
@@ -122,7 +124,7 @@ func (h *ContractHandler) TryRun(rlpEncodedTx []byte, coinbase types.Address) *t
 		Status: types.StatusSuccessful,
 	}
 	if err != nil {
-		panicOnFVMError(err)
+		panicOnFatalOrBackendError(err)
 		// remaining errors are validation errors
 		rs.ErrorCode = types.ValidationErrorCode(err)
 		rs.Status = types.StatusInvalid
@@ -566,14 +568,14 @@ func panicOnAnyError(err error) {
 		return
 	}
 
-	panicOnFVMError(err)
+	panicOnFatalOrBackendError(err)
 
 	// if not FVM wrap it with EVM error and panic
 	panic(fvmErrors.NewEVMError(err))
 }
 
-// panicOnFVMError errors panic on fatal or external (FVM) errors
-func panicOnFVMError(err error) {
+// panicOnFatalOrBackendError errors panic on fatal or backend-related errors
+func panicOnFatalOrBackendError(err error) {
 	if err == nil {
 		return
 	}
@@ -583,7 +585,7 @@ func panicOnFVMError(err error) {
 		panic(err)
 	}
 
-	if fvmErrors.IsFVMError(err) {
+	if IsABackendError(err) {
 		panic(err)
 	}
 }
