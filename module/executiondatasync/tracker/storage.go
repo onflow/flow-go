@@ -224,10 +224,12 @@ func (s *storage) init(startHeight uint64) error {
 			)
 		}
 
+		s.logger.Info().Msgf("prune from height %v up to height %d", fulfilledHeight, prunedHeight)
 		// replay pruning in case it was interrupted during previous shutdown
 		if err := s.PruneUpToHeight(prunedHeight); err != nil {
 			return fmt.Errorf("failed to replay pruning: %w", err)
 		}
+		s.logger.Info().Msgf("finished pruning")
 	} else if errors.Is(fulfilledHeightErr, badger.ErrKeyNotFound) && errors.Is(prunedHeightErr, badger.ErrKeyNotFound) {
 		// db is empty, we need to bootstrap it
 		if err := s.bootstrap(startHeight); err != nil {

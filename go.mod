@@ -107,7 +107,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230711213910-baad011d2b13
 	github.com/onflow/flow-nft/lib/go/contracts v1.1.0
-	github.com/onflow/wal v0.0.0-20230529184820-bc9f8244608d
+	github.com/onflow/wal v0.0.0-20240208022732-d756cd497d3b
 	github.com/slok/go-http-metrics v0.10.0
 	github.com/sony/gobreaker v0.5.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20230711160842-782d3b101e98
