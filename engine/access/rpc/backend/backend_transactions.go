@@ -383,10 +383,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			return results, nil
 		}
 
-		if err != nil {
-			return nil, err
-		}
-
+		// If any error occurs with local storage - request transaction result from EN
 		return b.getTransactionResultsByBlockIDFromExecutionNode(ctx, block, requiredEventEncodingVersion)
 	default:
 		return nil, status.Errorf(codes.Internal, "unknown transaction result query mode: %v", b.txResultQueryMode)
@@ -545,18 +542,8 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 			return result, nil
 		}
 
-		if err != nil {
-			// Skip error type NotFound, to request transaction result from EN
-			if !errors.Is(err, storage.ErrNotFound) {
-				return nil, err
-			}
-		}
-
-		result, err = b.getTransactionResultByIndexFromExecutionNode(ctx, block, index, requiredEventEncodingVersion)
-		if err != nil {
-			return nil, err
-		}
-		return result, nil
+		// If any error occurs with local storage - request transaction result from EN
+		return b.getTransactionResultByIndexFromExecutionNode(ctx, block, index, requiredEventEncodingVersion)
 	default:
 		return nil, status.Errorf(codes.Internal, "unknown transaction result query mode: %v", b.txResultQueryMode)
 	}
@@ -719,13 +706,7 @@ func (b *backendTransactions) lookupTransactionResult(
 			return txResult, nil
 		}
 
-		if err != nil {
-			// Skip error type NotFound, to request transaction result from EN
-			if !errors.Is(err, storage.ErrNotFound) {
-				return nil, err
-			}
-		}
-
+		// If any error occurs with local storage - request transaction result from EN
 		txResult, err = b.getTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
 		if err != nil {
 			// if either the execution node reported no results or the execution node could not be chosen
