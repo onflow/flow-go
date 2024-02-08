@@ -142,7 +142,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 
 					em := &testutils.TestEmulator{
 						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
-							return &types.Result{}, types.NewEVMExecutionError(fmt.Errorf("some sort of error"))
+							return &types.Result{}, fmt.Errorf("some sort of error")
 						},
 					}
 					handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
@@ -408,7 +408,7 @@ func TestHandler_COA(t *testing.T) {
 					assertPanic(t, types.IsAInsufficientTotalSupplyError, func() {
 						em := &testutils.TestEmulator{
 							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
-								return &types.Result{}, types.NewEVMExecutionError(fmt.Errorf("some sort of error"))
+								return &types.Result{}, fmt.Errorf("some sort of error")
 							},
 						}
 
@@ -419,10 +419,10 @@ func TestHandler_COA(t *testing.T) {
 					})
 
 					// test non fatal error of emulator
-					assertPanic(t, types.IsEVMExecutionError, func() {
+					assertPanic(t, isNotFatal, func() {
 						em := &testutils.TestEmulator{
 							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
-								return &types.Result{}, types.NewEVMExecutionError(fmt.Errorf("some sort of error"))
+								return &types.Result{}, fmt.Errorf("some sort of error")
 							},
 						}
 
@@ -463,10 +463,10 @@ func TestHandler_COA(t *testing.T) {
 					require.NoError(t, err)
 
 					// test non fatal error of emulator
-					assertPanic(t, types.IsEVMExecutionError, func() {
+					assertPanic(t, isNotFatal, func() {
 						em := &testutils.TestEmulator{
 							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
-								return &types.Result{}, types.NewEVMExecutionError(fmt.Errorf("some sort of error"))
+								return &types.Result{}, fmt.Errorf("some sort of error")
 							},
 						}
 

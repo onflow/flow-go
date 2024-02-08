@@ -9,86 +9,96 @@ import (
 
 type ErrorCode uint64
 
-// TODO reorder to the org ones
+// TODO: move this to emulator
 // TODO: include other flow EVM errors
 
-const (
-	// code reserved for no error
+// internal error codes
+const ( // code reserved for no error
 	ErrCodeNoError ErrorCode = 0
+
 	// covers all other validation codes that doesn't have an specific code
-	ValidationErrCodeMisc ErrorCode = 100
-	// the transaction is not supported in the current network configuration.
-	ValidationErrCodeTxTypeNotSupported ErrorCode = 101
-	// the sender of a transaction is a contract
-	ValidationErrCodeSenderNoEOA ErrorCode = 102
-	// the nonce of the tx is lower than the expected
-	ValidationErrCodeNonceTooLow ErrorCode = 103
-	// the nonce of the tx is higher than the expected
-	ValidationErrCodeNonceTooHigh ErrorCode = 104
-	// tx sender account has reached to the maximum nonce
-	ValidationErrCodeNonceMax ErrorCode = 105
-	// not enough gas is available on the block to include this transaction
-	ValidationErrCodeGasLimitReached ErrorCode = 106
-	// the transaction is specified to use less gas than required to start the invocation.
-	ValidationErrCodeIntrinsicGas ErrorCode = 107
-	// overflow detected when calculating the gas usage
-	ValidationErrCodeGasUintOverflow ErrorCode = 108
-	// tip was set to higher than the total fee cap
-	ValidationErrCodeTipAboveFeeCap ErrorCode = 109
-	// an extremely big numbers is set for the tip field
-	ValidationErrCodeTipVeryHigh ErrorCode = 110
-	// the transaction fee cap is less than the base fee of the block
-	ValidationErrCodeFeeCapTooLow ErrorCode = 111
-	// an extremely big numbers is set for the fee cap field
-	ValidationErrCodeFeeCapVeryHigh ErrorCode = 112
-	// the transaction fee cap is less than the blob gas fee of the block.
-	ValidationErrCodeBlobFeeCapTooLow ErrorCode = 113
-	// the transaction sender doesn't have enough funds for transfer(topmost call only).
-	ValidationErrCodeInsufficientFundsForTransfer ErrorCode = 114
-	// the total cost of executing a transaction is higher than the balance of the user's account.
-	ValidationErrCodeInsufficientFunds ErrorCode = 115
-	// creation transaction provides the init code bigger than init code size limit.
-	ValidationErrCodeMaxInitCodeSizeExceeded ErrorCode = 116
+	ValidationErrCodeMisc                    ErrorCode = 100
+	ValidationErrCodeInvalidBalance          ErrorCode = 101
+	ValidationErrCodeInsufficientComputation ErrorCode = 102
+	ValidationErrCodeUnAuthroizedMethodCall  ErrorCode = 103
 
 	// general execution error returned for cases that don't have an specific code
-	ExecutionErrCodeMisc ErrorCode = 200
+	ExecutionErrCodeMisc                         ErrorCode = 150
+	ExecutionErrCodeInsufficientTotalSupply      ErrorCode = 151
+	ExecutionErrCodeWithdrawBalanceRoundingError ErrorCode = 152
+)
+
+// geth evm core errors (reserved range: [200-300) )
+const (
+	// the nonce of the tx is lower than the expected
+	ValidationErrCodeNonceTooLow = iota + 200
+	// the nonce of the tx is higher than the expected
+	ValidationErrCodeNonceTooHigh
+	// tx sender account has reached to the maximum nonce
+	ValidationErrCodeNonceMax
+	// not enough gas is available on the block to include this transaction
+	ValidationErrCodeGasLimitReached
+	// the transaction sender doesn't have enough funds for transfer(topmost call only).
+	ValidationErrCodeInsufficientFundsForTransfer
+	// creation transaction provides the init code bigger than init code size limit.
+	ValidationErrCodeMaxInitCodeSizeExceeded
+	// the total cost of executing a transaction is higher than the balance of the user's account.
+	ValidationErrCodeInsufficientFunds
+	// overflow detected when calculating the gas usage
+	ValidationErrCodeGasUintOverflow
+	// the transaction is specified to use less gas than required to start the invocation.
+	ValidationErrCodeIntrinsicGas
+	// the transaction is not supported in the current network configuration.
+	ValidationErrCodeTxTypeNotSupported
+	// tip was set to higher than the total fee cap
+	ValidationErrCodeTipAboveFeeCap
+	// an extremely big numbers is set for the tip field
+	ValidationErrCodeTipVeryHigh
+	// an extremely big numbers is set for the fee cap field
+	ValidationErrCodeFeeCapVeryHigh
+	// the transaction fee cap is less than the base fee of the block
+	ValidationErrCodeFeeCapTooLow
+	// the sender of a transaction is a contract
+	ValidationErrCodeSenderNoEOA
+	// the transaction fee cap is less than the blob gas fee of the block.
+	ValidationErrCodeBlobFeeCapTooLow
+)
+
+// evm execution errors (reserved range: [300-400) )
+const (
 	// execution ran out of gas
-	ExecutionErrCodeOutOfGas ErrorCode = 201
+	ExecutionErrCodeOutOfGas ErrorCode = iota + 300
 	// contract creation code storage out of gas
-	ExecutionErrCodeCodeStoreOutOfGas ErrorCode = 202
+	ExecutionErrCodeCodeStoreOutOfGas
 	// max call depth exceeded
-	ExecutionErrCodeDepth ErrorCode = 203
+	ExecutionErrCodeDepth
 	// insufficient balance for transfer
-	ExecutionErrCodeInsufficientBalance ErrorCode = 204
+	ExecutionErrCodeInsufficientBalance
 	// contract address collision"
-	ExecutionErrCodeContractAddressCollision ErrorCode = 205
+	ExecutionErrCodeContractAddressCollision
 	// execution reverted
-	ExecutionErrCodeExecutionReverted ErrorCode = 206
+	ExecutionErrCodeExecutionReverted
 	// max initcode size exceeded
-	ExecutionErrCodeMaxInitCodeSizeExceeded ErrorCode = 207
+	ExecutionErrCodeMaxInitCodeSizeExceeded
 	// max code size exceeded
-	ExecutionErrCodeMaxCodeSizeExceeded ErrorCode = 208
+	ExecutionErrCodeMaxCodeSizeExceeded
 	// invalid jump destination
-	ExecutionErrCodeInvalidJump ErrorCode = 209
+	ExecutionErrCodeInvalidJump
 	// write protection
-	ExecutionErrCodeWriteProtection ErrorCode = 210
+	ExecutionErrCodeWriteProtection
 	// return data out of bounds
-	ExecutionErrCodeReturnDataOutOfBounds ErrorCode = 211
+	ExecutionErrCodeReturnDataOutOfBounds
 	// gas uint64 overflow
-	ExecutionErrCodeGasUintOverflow ErrorCode = 212
+	ExecutionErrCodeGasUintOverflow
 	// invalid code: must not begin with 0xef
-	ExecutionErrCodeInvalidCode ErrorCode = 213
+	ExecutionErrCodeInvalidCode
 	// nonce uint64 overflow
-	ExecutionErrCodeNonceUintOverflow ErrorCode = 214
+	ExecutionErrCodeNonceUintOverflow
 )
 
 func ValidationErrorCode(err error) ErrorCode {
 	nested := errors.Unwrap(err)
 	switch nested {
-	case gethCore.ErrTxTypeNotSupported:
-		return ValidationErrCodeTxTypeNotSupported
-	case gethCore.ErrSenderNoEOA:
-		return ValidationErrCodeSenderNoEOA
 	case gethCore.ErrNonceTooLow:
 		return ValidationErrCodeNonceTooLow
 	case gethCore.ErrNonceTooHigh:
@@ -97,10 +107,18 @@ func ValidationErrorCode(err error) ErrorCode {
 		return ValidationErrCodeNonceMax
 	case gethCore.ErrGasLimitReached:
 		return ValidationErrCodeGasLimitReached
+	case gethCore.ErrInsufficientFundsForTransfer:
+		return ValidationErrCodeInsufficientFundsForTransfer
+	case gethCore.ErrMaxInitCodeSizeExceeded:
+		return ValidationErrCodeMaxInitCodeSizeExceeded
+	case gethCore.ErrInsufficientFunds:
+		return ValidationErrCodeInsufficientFunds
 	case gethCore.ErrGasUintOverflow:
 		return ValidationErrCodeGasUintOverflow
 	case gethCore.ErrIntrinsicGas:
 		return ValidationErrCodeIntrinsicGas
+	case gethCore.ErrTxTypeNotSupported:
+		return ValidationErrCodeTxTypeNotSupported
 	case gethCore.ErrTipAboveFeeCap:
 		return ValidationErrCodeTipAboveFeeCap
 	case gethCore.ErrTipVeryHigh:
@@ -109,14 +127,10 @@ func ValidationErrorCode(err error) ErrorCode {
 		return ValidationErrCodeFeeCapVeryHigh
 	case gethCore.ErrFeeCapTooLow:
 		return ValidationErrCodeFeeCapTooLow
+	case gethCore.ErrSenderNoEOA:
+		return ValidationErrCodeSenderNoEOA
 	case gethCore.ErrBlobFeeCapTooLow:
 		return ValidationErrCodeBlobFeeCapTooLow
-	case gethCore.ErrInsufficientFundsForTransfer:
-		return ValidationErrCodeInsufficientFundsForTransfer
-	case gethCore.ErrInsufficientFunds:
-		return ValidationErrCodeInsufficientFunds
-	case gethCore.ErrMaxInitCodeSizeExceeded:
-		return ValidationErrCodeMaxInitCodeSizeExceeded
 	default:
 		return ValidationErrCodeMisc
 	}

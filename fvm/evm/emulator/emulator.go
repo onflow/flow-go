@@ -134,7 +134,7 @@ func (bl *BlockView) RunTransaction(
 	}
 	msg, err := gethCore.TransactionToMessage(tx, GetSigner(bl.config), proc.config.BlockContext.BaseFee)
 	if err != nil {
-		return res, types.NewEVMValidationError(err)
+		return res, err
 	}
 
 	// update tx context origin
@@ -170,20 +170,17 @@ type procedure struct {
 
 // commit commits the changes to the state.
 func (proc *procedure) commit() error {
-	return handleCommitError(proc.state.Commit())
-}
+	err := proc.state.Commit()
+	if err != nil {
+		// if known types (state errors) don't do anything and return
+		if types.IsAFatalError(err) || types.IsAStateError(err) {
+			return err
+		}
 
-func handleCommitError(err error) error {
-	if err == nil {
-		return nil
+		// else is a new fatal error
+		return types.NewFatalError(err)
 	}
-	// if known types (state errors) don't do anything and return
-	if types.IsAFatalError(err) || types.IsAStateError(err) {
-		return err
-	}
-
-	// else is a new fatal error
-	return types.NewFatalError(err)
+	return nil
 }
 
 func (proc *procedure) mintTo(address types.Address, amount *big.Int) (*types.Result, error) {
@@ -224,7 +221,7 @@ func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*ty
 	// check the source account balance
 	// if balance is lower than amount needed for withdrawal, error out
 	if proc.state.GetBalance(addr).Cmp(amount) < 0 {
-		res.Error = types.NewEVMExecutionError(gethVM.ErrInsufficientBalance)
+		res.VMError = gethVM.ErrInsufficientBalance
 		return res, nil
 	}
 
@@ -261,7 +258,7 @@ func (proc *procedure) deployAt(
 	// precheck 1 - check balance of the source
 	if value.Sign() != 0 &&
 		!proc.evm.Context.CanTransfer(proc.state, caller.ToCommon(), value) {
-		res.Error = types.NewEVMExecutionError(gethVM.ErrInsufficientBalance)
+		res.VMError = gethVM.ErrInsufficientBalance
 		return res, nil
 	}
 
@@ -269,7 +266,7 @@ func (proc *procedure) deployAt(
 	contractHash := proc.state.GetCodeHash(addr)
 	if proc.state.GetNonce(addr) != 0 ||
 		(contractHash != (gethCommon.Hash{}) && contractHash != gethTypes.EmptyCodeHash) {
-		res.Error = types.NewEVMExecutionError(gethVM.ErrContractAddressCollision)
+		res.VMError = gethVM.ErrContractAddressCollision
 		return res, nil
 	}
 
@@ -282,7 +279,7 @@ func (proc *procedure) deployAt(
 	proc.state.SetNonce(callerCommon, proc.state.GetNonce(callerCommon)+1)
 
 	if value.Sign() < 0 {
-		res.Error = types.NewEVMExecutionError(types.ErrInvalidBalance)
+		res.VMError = types.ErrInvalidBalance
 		return res, nil
 	}
 	// setup account
@@ -321,7 +318,7 @@ func (proc *procedure) deployAt(
 		if err != gethVM.ErrExecutionReverted {
 			res.GasConsumed = gasLimit
 		}
-		res.Error = types.NewEVMExecutionError(err)
+		res.VMError = err
 		return res, nil
 	}
 
@@ -329,7 +326,7 @@ func (proc *procedure) deployAt(
 	if gasCost > gasLimit {
 		// consume all the remaining gas (Homestead)
 		res.GasConsumed = gasLimit
-		res.Error = types.NewEVMExecutionError(gethVM.ErrCodeStoreOutOfGas)
+		res.VMError = gethVM.ErrCodeStoreOutOfGas
 		return res, nil
 	}
 
@@ -337,7 +334,7 @@ func (proc *procedure) deployAt(
 	if len(ret) > gethParams.MaxCodeSize {
 		// consume all the remaining gas (Homestead)
 		res.GasConsumed = gasLimit
-		res.Error = types.NewEVMExecutionError(gethVM.ErrMaxCodeSizeExceeded)
+		res.VMError = gethVM.ErrMaxCodeSizeExceeded
 		return res, nil
 	}
 
@@ -345,7 +342,7 @@ func (proc *procedure) deployAt(
 	if len(ret) >= 1 && ret[0] == 0xEF {
 		// consume all the remaining gas (Homestead)
 		res.GasConsumed = gasLimit
-		res.Error = types.NewEVMExecutionError(gethVM.ErrInvalidCode)
+		res.VMError = gethVM.ErrInvalidCode
 		return res, nil
 	}
 
@@ -381,7 +378,7 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 		}
 		// otherwise is a validation error (pre-check failure)
 		// no state change, wrap the error and return
-		return &res, types.NewEVMValidationError(err)
+		return &res, err
 	}
 
 	// if prechecks are passed, the exec result won't be nil
@@ -402,7 +399,7 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 			)
 		} else {
 			// execResult.Err is VM errors (we don't return it as error)
-			res.Error = types.NewEVMExecutionError(execResult.Err)
+			res.VMError = execResult.Err
 		}
 	}
 	// all commmit errors (StateDB errors) has to be returned

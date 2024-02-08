@@ -12,7 +12,7 @@ import (
 // but we take a different apporach here and include more data so that
 // it requires less work for anyone who tracks and consume results.
 type Result struct {
-	Error error
+	VMError error
 	// type of transaction defined by the evm package
 	// see DirectCallTxType as extra type we added type for direct calls.
 	TxType uint8
@@ -27,7 +27,7 @@ type Result struct {
 }
 
 func (res *Result) Failed() bool {
-	return res.Error != nil
+	return res.VMError != nil
 }
 
 // Receipt constructs an EVM-style receipt
