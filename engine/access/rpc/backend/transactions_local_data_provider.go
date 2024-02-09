@@ -49,7 +49,7 @@ func NewTransactionsLocalDataProvider(
 	eventsIndex *EventsIndex,
 	txResultsIndex *TransactionResultsIndex,
 	txErrorMessages TransactionErrorMessage) *TransactionsLocalDataProvider {
-	t := &TransactionsLocalDataProvider{
+	return &TransactionsLocalDataProvider{
 		State:           state,
 		collections:     collections,
 		Blocks:          blocks,
@@ -57,8 +57,6 @@ func NewTransactionsLocalDataProvider(
 		txResultsIndex:  txResultsIndex,
 		TxErrorMessages: txErrorMessages,
 	}
-
-	return t
 }
 
 // GetTransactionResultFromStorage retrieves a transaction result from storage by block ID and transaction ID.

@@ -59,7 +59,7 @@ func NewBackendEvents(
 	nodeCommunicator Communicator,
 	queryMode IndexQueryMode,
 	eventsIndex *EventsIndex) *BackendEvents {
-	b := &BackendEvents{
+	return &BackendEvents{
 		headers:           headers,
 		executionReceipts: executionReceipts,
 		state:             state,
@@ -72,7 +72,6 @@ func NewBackendEvents(
 		eventsIndex:       eventsIndex,
 	}
 
-	return b
 }
 
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and

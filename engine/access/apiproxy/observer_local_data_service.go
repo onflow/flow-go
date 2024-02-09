@@ -19,8 +19,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// ObserverLocalDataService provides functionality for retrieving transaction results, events and error messages from local storages
 type ObserverLocalDataService struct {
 	*backend.TransactionsLocalDataProvider
+
 	backendEvents *backend.BackendEvents
 	nodeId        flow.Identifier
 }
@@ -44,6 +46,7 @@ type Params struct {
 
 var _ backend.TransactionErrorMessage = (*ObserverLocalDataService)(nil)
 
+// NewObserverLocalDataService creates ObserverLocalDataService instance
 func NewObserverLocalDataService(params Params) *ObserverLocalDataService {
 	o := &ObserverLocalDataService{
 		TransactionsLocalDataProvider: backend.NewTransactionsLocalDataProvider(
@@ -72,6 +75,7 @@ func NewObserverLocalDataService(params Params) *ObserverLocalDataService {
 	return o
 }
 
+// GetEventsForBlockIDsFromStorage retrieves events for all the specified block IDs that have the given type from storage.
 func (o *ObserverLocalDataService) GetEventsForBlockIDsFromStorage(ctx context.Context,
 	blockIDs []flow.Identifier,
 	eventType string,
@@ -98,6 +102,8 @@ func (o *ObserverLocalDataService) GetEventsForBlockIDsFromStorage(ctx context.C
 	}, nil
 }
 
+// GetEventsForHeightRangeFromStorageData retrieves events for all sealed blocks between the start block height and
+// the end block height (inclusive) that have the given type from storage.
 func (o *ObserverLocalDataService) GetEventsForHeightRangeFromStorageData(
 	ctx context.Context,
 	eventType string,
@@ -125,6 +131,7 @@ func (o *ObserverLocalDataService) GetEventsForHeightRangeFromStorageData(
 	}, nil
 }
 
+// GetTransactionResultFromStorageData retrieves a transaction result from storage by block ID and transaction ID.
 func (o *ObserverLocalDataService) GetTransactionResultFromStorageData(
 	ctx context.Context,
 	txID []byte,
@@ -272,21 +279,6 @@ func (o *ObserverLocalDataService) GetTransactionResultByIndexFromStorageData(
 	}, nil
 }
 
-// LookupErrorMessageByIndex implements TransactionErrorMessage.
-func (o *ObserverLocalDataService) LookupErrorMessageByIndex(ctx context.Context, blockID flow.Identifier, height uint64, index uint32) (string, error) {
-	return "", nil
-}
-
-// LookupErrorMessageByTransactionId implements TransactionErrorMessage.
-func (o *ObserverLocalDataService) LookupErrorMessageByTransactionId(ctx context.Context, blockID flow.Identifier, transactionID flow.Identifier) (string, error) {
-	return "", nil
-}
-
-// LookupErrorMessagesByBlockID implements TransactionErrorMessage.
-func (o *ObserverLocalDataService) LookupErrorMessagesByBlockID(ctx context.Context, blockID flow.Identifier, height uint64) (map[flow.Identifier]string, error) {
-	return map[flow.Identifier]string{}, nil
-}
-
 // buildMetadataResponse builds and returns the metadata response object.
 func (o *ObserverLocalDataService) buildMetadataResponse() (*entities.Metadata, error) {
 	lastFinalizedHeader, err := o.State.Final().Head()
@@ -301,4 +293,21 @@ func (o *ObserverLocalDataService) buildMetadataResponse() (*entities.Metadata, 
 		LatestFinalizedHeight:  lastFinalizedHeader.Height,
 		NodeId:                 nodeId[:],
 	}, nil
+}
+
+// TODO: implementation of those methods should be done as separate task as it's big scope of work
+
+// LookupErrorMessageByIndex implements TransactionErrorMessage.
+func (o *ObserverLocalDataService) LookupErrorMessageByIndex(ctx context.Context, blockID flow.Identifier, height uint64, index uint32) (string, error) {
+	return "", nil
+}
+
+// LookupErrorMessageByTransactionId implements TransactionErrorMessage.
+func (o *ObserverLocalDataService) LookupErrorMessageByTransactionId(ctx context.Context, blockID flow.Identifier, transactionID flow.Identifier) (string, error) {
+	return "", nil
+}
+
+// LookupErrorMessagesByBlockID implements TransactionErrorMessage.
+func (o *ObserverLocalDataService) LookupErrorMessagesByBlockID(ctx context.Context, blockID flow.Identifier, height uint64) (map[flow.Identifier]string, error) {
+	return map[flow.Identifier]string{}, nil
 }
