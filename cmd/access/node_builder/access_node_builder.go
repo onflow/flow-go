@@ -509,7 +509,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
 			datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
-			err := os.MkdirAll(datastoreDir, 0o700)
+			err := os.MkdirAll(datastoreDir, 0700)
 			if err != nil {
 				return err
 			}
