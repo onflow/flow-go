@@ -1,4 +1,5 @@
 // TODO copied this file directly from design doc (https://www.notion.so/dapperlabs/Protocol-state-key-value-storage-497326ff9cf44ff4a70610a0dad329b3).
+//  It should be replaced in the appropriate issue
 
 package kvstore
 
@@ -12,9 +13,8 @@ import (
 // each block that is being processed.
 type StateMachine interface {
 	// Build returns updated key-value store model, state ID and a flag indicating if there were any changes.
-	// TODO: in design doc updatedState is concrete struct.
-	//   I think it needs to be the interface/API type instead?
-	Build() (updatedState LatestKVInterface, stateID flow.Identifier, hasChanges bool)
+	// TODO: in design doc updatedState is concrete struct. I think it needs to be the interface/API type instead?
+	Build() (updatedState LatestKVApi, stateID flow.Identifier, hasChanges bool)
 
 	// ProcessUpdate updates current state of key-value store.
 	// Expected errors indicating that we have observed and invalid service event from protocol's point of view.
@@ -28,10 +28,12 @@ type StateMachine interface {
 	View() uint64
 
 	// ParentState returns parent state that is associated with this state machine.
-	ParentState() *LatestKVModel
+	// TODO: using API rather than concrete type here as well
+	ParentState() LatestKVApi
 }
 
 type KeyValueStoreStateMachine struct {
+	// TODO: package-internally we use the latest concrete type
 	currentKeyValueStore *LatestKVModel
 }
 
