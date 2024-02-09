@@ -167,19 +167,20 @@ func TestHandler_TransactionRun(t *testing.T) {
 						handler.Run([]byte(tx), coinbase)
 					})
 
-					// tx execution failure
-					tx := eoa.PrepareSignAndEncodeTx(
-						t,
-						gethCommon.Address{},
-						nil,
-						nil,
-						100_000,
-						big.NewInt(1),
-					)
+					// tx validation error
+					assertPanic(t, isNotFatal, func() {
+						// tx execution failure
+						tx := eoa.PrepareSignAndEncodeTx(
+							t,
+							gethCommon.Address{},
+							nil,
+							nil,
+							100_000,
+							big.NewInt(1),
+						)
 
-					// should not panic given this is a VM error
-					handler.Run([]byte(tx), coinbase)
-					// TODO check the receipt from evetns
+						handler.Run([]byte(tx), coinbase)
+					})
 				})
 			})
 		})

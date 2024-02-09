@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
-	"math"
 	"testing"
 
 	"github.com/onflow/atree"
@@ -22,7 +21,7 @@ import (
 )
 
 var TestFlowEVMRootAddress = flow.BytesToAddress([]byte("FlowEVM"))
-var TestComputationLimit = uint(math.MaxUint64 - 1)
+var TestComputationLimit = uint(100_000_000)
 
 func RunWithTestFlowEVMRootAddress(t testing.TB, backend atree.Ledger, f func(flow.Address)) {
 	as := environment.NewAccountStatus()
@@ -136,18 +135,17 @@ func getSimpleEventEmitter() *testEventEmitter {
 }
 
 func getSimpleMeter() *testMeter {
-	computationLimit := TestComputationLimit
 	compUsed := uint(0)
 	return &testMeter{
 		meterComputation: func(kind common.ComputationKind, intensity uint) error {
 			compUsed += intensity
-			if compUsed > computationLimit {
-				return fmt.Errorf("computation limit has hit %d", computationLimit)
+			if compUsed > TestComputationLimit {
+				return fmt.Errorf("computation limit has hit %d", TestComputationLimit)
 			}
 			return nil
 		},
 		hasComputationCapacity: func(kind common.ComputationKind, intensity uint) bool {
-			return compUsed+intensity < computationLimit
+			return compUsed+intensity < TestComputationLimit
 		},
 		computationUsed: func() (uint64, error) {
 			return uint64(compUsed), nil

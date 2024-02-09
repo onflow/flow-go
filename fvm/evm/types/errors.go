@@ -153,8 +153,8 @@ func (err BackendError) Error() string {
 	return fmt.Sprintf("backend error: %v", err.err)
 }
 
-// IsABackendError returns true if the error or any underlying errors
-// is a backend error
+// IsABackendError returns true if the error or
+// any underlying errors is a backend error
 func IsABackendError(err error) bool {
 	return errors.As(err, &BackendError{})
 }

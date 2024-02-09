@@ -175,9 +175,9 @@ func (h *ContractHandler) run(
 	res, err := blk.RunTransaction(&tx)
 	if err != nil {
 		// continue metering
-		err = h.meterGasUsage(res)
-		if err != nil {
-			return res, err
+		gasErr := h.meterGasUsage(res)
+		if gasErr != nil {
+			return res, gasErr
 		}
 		return res, err
 	}

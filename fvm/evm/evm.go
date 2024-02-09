@@ -5,10 +5,10 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm/backends"
 	evm "github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
-	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -40,7 +40,7 @@ func SetupEnvironment(
 		return err
 	}
 
-	backend := types.NewWrappedWrappedEnvironment(fvmEnv)
+	backend := backends.NewWrappedEnvironment(fvmEnv)
 
 	em := evm.NewEmulator(backend, evmStorageAccountAddress)
 
