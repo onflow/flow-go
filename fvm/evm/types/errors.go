@@ -29,7 +29,7 @@ const ( // code reserved for no error
 // geth evm core errors (reserved range: [201-300) )
 const (
 	// the nonce of the tx is lower than the expected
-	ValidationErrCodeNonceTooLow = iota + 201
+	ValidationErrCodeNonceTooLow ErrorCode = iota + 201
 	// the nonce of the tx is higher than the expected
 	ValidationErrCodeNonceTooHigh
 	// tx sender account has reached to the maximum nonce

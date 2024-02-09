@@ -13,7 +13,9 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethCore "github.com/ethereum/go-ethereum/core"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethVM "github.com/ethereum/go-ethereum/core/vm"
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
@@ -610,6 +612,151 @@ func TestHandler_COA(t *testing.T) {
 	})
 
 	// TODO add test with test emulator for unhappy cases (emulator)
+}
+
+func TestHandler_TransactionTryRun(t *testing.T) {
+	t.Parallel()
+
+	t.Run("test - transaction try run (success)", func(t *testing.T) {
+		t.Parallel()
+
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+
+					bs := handler.NewBlockStore(backend, rootAddr)
+					aa := handler.NewAddressAllocator()
+
+					result := &types.Result{
+						DeployedContractAddress: types.Address(testutils.RandomAddress(t)),
+						ReturnedValue:           testutils.RandomData(t),
+						GasConsumed:             testutils.RandomGas(1000),
+						Logs: []*gethTypes.Log{
+							testutils.GetRandomLogFixture(t),
+							testutils.GetRandomLogFixture(t),
+						},
+					}
+
+					em := &testutils.TestEmulator{
+						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
+							return result, nil
+						},
+					}
+					handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+					tx := eoa.PrepareSignAndEncodeTx(
+						t,
+						gethCommon.Address{},
+						nil,
+						nil,
+						100_000,
+						big.NewInt(1),
+					)
+
+					rs := handler.TryRun(tx, types.NewAddress(gethCommon.Address{}))
+					require.Equal(t, types.StatusSuccessful, rs.Status)
+					require.Equal(t, result.GasConsumed, rs.GasConsumed)
+					require.Equal(t, types.ErrCodeNoError, rs.ErrorCode)
+
+				})
+			})
+		})
+	})
+
+	t.Run("test - transaction try run (failed)", func(t *testing.T) {
+		t.Parallel()
+
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+
+					bs := handler.NewBlockStore(backend, rootAddr)
+					aa := handler.NewAddressAllocator()
+
+					result := &types.Result{
+						VMError:                 gethVM.ErrOutOfGas,
+						DeployedContractAddress: types.Address(testutils.RandomAddress(t)),
+						ReturnedValue:           testutils.RandomData(t),
+						GasConsumed:             testutils.RandomGas(1000),
+						Logs: []*gethTypes.Log{
+							testutils.GetRandomLogFixture(t),
+							testutils.GetRandomLogFixture(t),
+						},
+					}
+
+					em := &testutils.TestEmulator{
+						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
+							return result, nil
+						},
+					}
+					handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+
+					tx := eoa.PrepareSignAndEncodeTx(
+						t,
+						gethCommon.Address{},
+						nil,
+						nil,
+						100_000,
+						big.NewInt(1),
+					)
+
+					rs := handler.TryRun(tx, types.NewAddress(gethCommon.Address{}))
+					require.Equal(t, types.StatusFailed, rs.Status)
+					require.Equal(t, result.GasConsumed, rs.GasConsumed)
+					require.Equal(t, types.ExecutionErrCodeOutOfGas, rs.ErrorCode)
+
+				})
+			})
+		})
+	})
+
+	t.Run("test - transaction try run (unhappy cases)", func(t *testing.T) {
+		t.Parallel()
+
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+					bs := handler.NewBlockStore(backend, rootAddr)
+					aa := handler.NewAddressAllocator()
+					evmErr := fmt.Errorf("%w: next nonce %v, tx nonce %v", gethCore.ErrNonceTooLow, 1, 0)
+					em := &testutils.TestEmulator{
+						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
+							return &types.Result{}, types.NewEVMValidationError(evmErr)
+						},
+					}
+					handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+
+					coinbase := types.NewAddress(gethCommon.Address{})
+
+					gasLimit := uint64(testutils.TestComputationLimit + 1)
+					tx := eoa.PrepareSignAndEncodeTx(
+						t,
+						gethCommon.Address{},
+						nil,
+						nil,
+						gasLimit,
+						big.NewInt(1),
+					)
+
+					rs := handler.TryRun([]byte(tx), coinbase)
+					require.Equal(t, types.StatusInvalid, rs.Status)
+					require.Equal(t, types.ValidationErrCodeInsufficientComputation, rs.ErrorCode)
+
+					tx = eoa.PrepareSignAndEncodeTx(
+						t,
+						gethCommon.Address{},
+						nil,
+						nil,
+						100,
+						big.NewInt(1),
+					)
+
+					rs = handler.TryRun([]byte(tx), coinbase)
+					require.Equal(t, types.StatusInvalid, rs.Status)
+					require.Equal(t, types.ValidationErrCodeNonceTooLow, rs.ErrorCode)
+				})
+			})
+		})
+	})
 }
 
 // returns true if error passes the checks

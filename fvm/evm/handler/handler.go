@@ -130,9 +130,10 @@ func (h *ContractHandler) TryRun(rlpEncodedTx []byte, coinbase types.Address) *t
 	}
 	if res.VMError != nil {
 		rs.ErrorCode = ExecutionErrorCode(res.VMError)
-		rs.GasConsumed = res.GasConsumed
 		rs.Status = types.StatusFailed
+		rs.GasConsumed = res.GasConsumed
 	}
+	rs.GasConsumed = res.GasConsumed
 	return rs
 }
 

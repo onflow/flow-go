@@ -11,21 +11,24 @@ import (
 func ValidationErrorCode(err error) types.ErrorCode {
 	// if is a EVM validation error first unwrap one level
 	if types.IsEVMValidationError(err) {
+		// check local errors
+		switch err {
+		case types.ErrInvalidBalance:
+			return types.ValidationErrCodeInvalidBalance
+		case types.ErrInsufficientComputation:
+			return types.ValidationErrCodeInsufficientComputation
+		case types.ErrUnAuthroizedMethodCall:
+			return types.ValidationErrCodeUnAuthroizedMethodCall
+		case types.ErrWithdrawBalanceRounding:
+			return types.ValidationErrCodeWithdrawBalanceRounding
+		}
 		err = errors.Unwrap(err)
 	}
 
-	// direct errors that are returned by the evm and handler's errors
+	// direct errors that are returned by the evm
 	switch err {
 	case gethVM.ErrGasUintOverflow:
 		return types.ValidationErrCodeGasUintOverflow
-	case types.ErrInvalidBalance:
-		return types.ValidationErrCodeInvalidBalance
-	case types.ErrInsufficientComputation:
-		return types.ValidationErrCodeInsufficientComputation
-	case types.ErrUnAuthroizedMethodCall:
-		return types.ValidationErrCodeUnAuthroizedMethodCall
-	case types.ErrWithdrawBalanceRounding:
-		return types.ValidationErrCodeWithdrawBalanceRounding
 	}
 
 	// wrapped errors return from the evm
