@@ -121,7 +121,6 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 // chooseCollectionNodes finds a random subset of size sampleSize of collection node addresses from the
 // collection node cluster responsible for the given tx
 func (b *backendTransactions) chooseCollectionNodes(txID flow.Identifier) (flow.IdentitySkeletonList, error) {
-
 	// retrieve the set of collector clusters
 	clusters, err := b.state.Final().Epochs().Current().Clustering()
 	if err != nil {
@@ -312,8 +311,14 @@ func (b *backendTransactions) GetTransactionResult(
 
 	// If there is still no transaction result, provide one based on available information.
 	if txResult == nil {
+		var txStatus flow.TransactionStatus
 		// Derive the status of the transaction.
-		txStatus, err := b.deriveUnknownTransactionStatus(tx.ReferenceBlockID)
+		if block == nil {
+			txStatus, err = b.deriveUnknownTransactionStatus(tx.ReferenceBlockID)
+		} else {
+			txStatus, err = b.deriveTransactionStatus(blockID, blockHeight, false)
+		}
+
 		if err != nil {
 			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 				irrecoverable.Throw(ctx, err)
