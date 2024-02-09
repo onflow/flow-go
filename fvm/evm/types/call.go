@@ -63,7 +63,7 @@ func (dc *DirectCall) Message() *gethCore.Message {
 		Value:     dc.Value,
 		Data:      dc.Data,
 		GasLimit:  dc.GasLimit,
-		GasPrice:  big.NewInt(0), // price is set to zero fo direct calls
+		GasPrice:  big.NewInt(0), // price is set to zero for direct calls
 		GasTipCap: big.NewInt(1), // also known as maxPriorityFeePerGas
 		GasFeeCap: big.NewInt(2), // also known as maxFeePerGas
 		// AccessList:        tx.AccessList(), // TODO revisit this value, the cost matter but performance might
