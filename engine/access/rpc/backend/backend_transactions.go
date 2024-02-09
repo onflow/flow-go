@@ -319,7 +319,7 @@ func (b *backendTransactions) GetTransactionResult(
 		} else {
 			txStatus, err = b.deriveTransactionStatus(blockID, blockHeight, false)
 		}
-		
+
 		if err != nil {
 			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 				irrecoverable.Throw(ctx, err)
