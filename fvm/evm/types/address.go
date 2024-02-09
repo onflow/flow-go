@@ -67,10 +67,11 @@ func NewAddressFromBytes(inp []byte) Address {
 }
 
 func COAAddressFromFlowEvent(evmContractAddress flow.Address, event flow.Event) (Address, error) {
-	// check the type
+	// check the type first
 	if string(event.Type) != fmt.Sprintf(COAAddressTemplate, evmContractAddress.Hex()) {
 		return Address{}, fmt.Errorf("wrong event type is passed")
 	}
+	// then decode
 	eventData, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
 		return Address{}, err
