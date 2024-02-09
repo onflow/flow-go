@@ -1195,6 +1195,7 @@ func (exeNode *ExecutionNode) LoadSynchronizationEngine(
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize spam detection config: %w", err)
 	}
+
 	exeNode.syncEngine, err = synchronization.New(
 		node.Logger,
 		node.Metrics.Engine,
