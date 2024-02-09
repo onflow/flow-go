@@ -650,6 +650,10 @@ func (fnb *FlowNodeBuilder) initNodeInfo() error {
 		return fmt.Errorf("cannot start without node ID")
 	}
 
+	if fnb.BaseConfig.ObserverMode {
+		return nil
+	}
+
 	nodeID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
 	if err != nil {
 		return fmt.Errorf("could not parse node ID from string (id: %v): %w", fnb.BaseConfig.nodeIDHex, err)
@@ -1293,6 +1297,13 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 		if err != nil {
 			return fmt.Errorf("could not load networking public key: %w", err)
 		}
+
+		k, err := pubKey.Raw()
+		if err != nil {
+			return err
+		}
+
+		fnb.Logger.Info().Msgf("private key: %v, pub key: %x", info.NetworkPrivKey, k)
 
 		fnb.peerID, err = peer.IDFromPublicKey(pubKey)
 		if err != nil {

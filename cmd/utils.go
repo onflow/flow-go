@@ -43,6 +43,17 @@ func LoadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoP
 	return &info, err
 }
 
+func LoadNetworkPrivateKey(dir string, myID flow.Identifier) (*bootstrap.NodeInfoPriv, error) {
+	path := filepath.Join(dir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, myID))
+	data, err := io.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("could not read private node info (path=%s): %w", path, err)
+	}
+	var info bootstrap.NodeInfoPriv
+	err = json.Unmarshal(data, &info)
+	return &info, err
+}
+
 // loadSecretsEncryptionKey loads the encryption key for the secrets database.
 // If the file does not exist, returns os.ErrNotExist.
 func loadSecretsEncryptionKey(dir string, myID flow.Identifier) ([]byte, error) {
