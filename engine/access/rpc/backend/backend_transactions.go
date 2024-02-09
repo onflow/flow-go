@@ -122,7 +122,7 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 // collection node cluster responsible for the given tx
 func (b *backendTransactions) chooseCollectionNodes(txID flow.Identifier) (flow.IdentitySkeletonList, error) {
 	// retrieve the set of collector clusters
-	clusters, err := b.state.Final().Epochs().Current().Clustering()
+	clusters, err := b.State.Final().Epochs().Current().Clustering()
 	if err != nil {
 		return nil, fmt.Errorf("could not cluster collection nodes: %w", err)
 	}
@@ -200,7 +200,7 @@ func (b *backendTransactions) GetTransactionsByBlockID(
 	var transactions []*flow.TransactionBody
 
 	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
-	block, err := b.blocks.ByID(blockID)
+	block, err := b.Blocks.ByID(blockID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
@@ -270,7 +270,7 @@ func (b *backendTransactions) GetTransactionResult(
 		return historicalTxResult, nil
 	}
 
-	block, err := b.retrieveBlock(blockID, collectionID, txID)
+	block, err := b.RetrieveBlock(blockID, collectionID, txID)
 	// an error occurred looking up the block or the requested block or collection was not found.
 	// If looking up the block based solely on the txID returns not found, then no error is
 	// returned since the block may not be finalized yet.
@@ -348,7 +348,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]*access.TransactionResult, error) {
 	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
-	block, err := b.blocks.ByID(blockID)
+	block, err := b.Blocks.ByID(blockID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
@@ -381,7 +381,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromExecutionNode(
 		BlockId: blockID[:],
 	}
 
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.State, b.log)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
 			return nil, status.Errorf(codes.NotFound, err.Error())
@@ -446,7 +446,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromExecutionNode(
 	// after iterating through all transactions  in each collection, i equals the total number of
 	// user transactions  in the block
 	txCount := i
-	sporkRootBlockHeight := b.state.Params().SporkRootBlockHeight()
+	sporkRootBlockHeight := b.State.Params().SporkRootBlockHeight()
 
 	// root block has no system transaction result
 	if block.Header.Height > sporkRootBlockHeight {
@@ -503,7 +503,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*access.TransactionResult, error) {
 	// TODO: https://github.com/onflow/flow-go/issues/2175 so caching doesn't cause a circular dependency
-	block, err := b.blocks.ByID(blockID)
+	block, err := b.Blocks.ByID(blockID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
@@ -539,7 +539,7 @@ func (b *backendTransactions) getTransactionResultByIndexFromExecutionNode(
 		Index:   index,
 	}
 
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.State, b.log)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
 			return nil, status.Errorf(codes.NotFound, err.Error())
@@ -589,7 +589,7 @@ func (b *backendTransactions) GetSystemTransaction(ctx context.Context, _ flow.I
 
 // GetSystemTransactionResult returns system transaction result
 func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) (*access.TransactionResult, error) {
-	block, err := b.blocks.ByID(blockID)
+	block, err := b.Blocks.ByID(blockID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
@@ -597,7 +597,7 @@ func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, bl
 	req := &execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockID[:],
 	}
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.State, b.log)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
 			return nil, status.Errorf(codes.NotFound, err.Error())
@@ -741,7 +741,7 @@ func (b *backendTransactions) getHistoricalTransactionResult(
 }
 
 func (b *backendTransactions) registerTransactionForRetry(tx *flow.TransactionBody) {
-	referenceBlock, err := b.state.AtBlockID(tx.ReferenceBlockID).Head()
+	referenceBlock, err := b.State.AtBlockID(tx.ReferenceBlockID).Head()
 	if err != nil {
 		return
 	}
@@ -762,7 +762,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		TransactionId: transactionID[:],
 	}
 
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.State, b.log)
 	if err != nil {
 		// if no execution receipt were found, return a NotFound GRPC error
 		if IsInsufficientExecutionReceipts(err) {
@@ -1002,7 +1002,7 @@ func (b *backendTransactions) LookupErrorMessageByTransactionId(
 		}
 	}
 
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.State, b.log)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
 			return "", status.Errorf(codes.NotFound, err.Error())
@@ -1056,7 +1056,7 @@ func (b *backendTransactions) LookupErrorMessageByIndex(
 		}
 	}
 
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.State, b.log)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
 			return "", status.Errorf(codes.NotFound, err.Error())
@@ -1118,7 +1118,7 @@ func (b *backendTransactions) LookupErrorMessagesByBlockID(
 		}
 	}
 
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.State, b.log)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
 			return nil, status.Errorf(codes.NotFound, err.Error())

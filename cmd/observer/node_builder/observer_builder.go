@@ -1480,24 +1480,23 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
-		var localData *backend.ObserverLocalDataService
+		var localData *apiproxy.ObserverLocalDataService
 		if builder.executionDataIndexingEnabled {
-			localData = backend.NewObserverLocalDataService(
-				node.State,
-				node.Storage.Collections,
-				node.Storage.Blocks,
-				node.Storage.LightTransactionResults,
-				node.Storage.Events,
-				node.Storage.Headers,
-				node.Storage.Receipts,
-				node.RootChainID.Chain(),
-				connFactory,
-				builder.Logger,
-				backendConfig.MaxHeightRange,
-				backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-				builder.Me.NodeID(),
-				builder.EventsIndex,
-				builder.TxResultsIndex,
+			localData = apiproxy.NewObserverLocalDataService(apiproxy.Params{
+				State:             node.State,
+				Collections:       node.Storage.Collections,
+				Blocks:            node.Storage.Blocks,
+				Results:           node.Storage.LightTransactionResults,
+				Headers:           node.Storage.Headers,
+				ExecutionReceipts: node.Storage.Receipts,
+				Chain:             node.RootChainID.Chain(),
+				ConnFactory:       connFactory,
+				Log:               builder.Logger,
+				MaxHeightRange:    backendConfig.MaxHeightRange,
+				NodeCommunicator:  backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+				NodeId:            builder.Me.NodeID(),
+				EventsIndex:       builder.EventsIndex,
+				TxResultsIndex:    builder.TxResultsIndex},
 			)
 		}
 

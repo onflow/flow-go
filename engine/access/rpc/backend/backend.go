@@ -163,9 +163,9 @@ func New(params Params) (*Backend, error) {
 		},
 		backendTransactions: backendTransactions{
 			TransactionsLocalDataProvider: TransactionsLocalDataProvider{
-				state:          params.State,
+				State:          params.State,
 				collections:    params.Collections,
-				blocks:         params.Blocks,
+				Blocks:         params.Blocks,
 				eventsIndex:    params.EventsIndex,
 				txResultsIndex: params.TxResultsIndex,
 			},
@@ -230,7 +230,7 @@ func New(params Params) (*Backend, error) {
 		nodeInfo:          nodeInfo,
 	}
 
-	b.backendTransactions.txErrorMessages = b
+	b.backendTransactions.TxErrorMessages = b
 
 	retry.SetBackend(b)
 

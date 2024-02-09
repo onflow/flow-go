@@ -8,7 +8,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access/legacy/convert"
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/grpc/forwarder"
 	"github.com/onflow/flow-go/engine/protocol"
@@ -23,7 +22,7 @@ type FlowAccessAPIRouter struct {
 	Metrics   *metrics.ObserverCollector
 	Upstream  *FlowAccessAPIForwarder
 	Observer  *protocol.Handler
-	LocalData *backend.ObserverLocalDataService
+	LocalData *ObserverLocalDataService
 }
 
 func (h *FlowAccessAPIRouter) log(handler, rpc string, err error) {

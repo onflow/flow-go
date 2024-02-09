@@ -33,12 +33,32 @@ type TransactionErrorMessage interface {
 
 // TransactionsLocalDataProvider provides functionality for retrieving transaction results and error messages from local storages
 type TransactionsLocalDataProvider struct {
-	state           protocol.State
+	State           protocol.State
 	collections     storage.Collections
-	blocks          storage.Blocks
+	Blocks          storage.Blocks
 	eventsIndex     *EventsIndex
 	txResultsIndex  *TransactionResultsIndex
-	txErrorMessages TransactionErrorMessage
+	TxErrorMessages TransactionErrorMessage
+}
+
+// NewTransactionsLocalDataProvider creates TransactionsLocalDataProvider instance
+func NewTransactionsLocalDataProvider(
+	state protocol.State,
+	collections storage.Collections,
+	blocks storage.Blocks,
+	eventsIndex *EventsIndex,
+	txResultsIndex *TransactionResultsIndex,
+	txErrorMessages TransactionErrorMessage) *TransactionsLocalDataProvider {
+	t := &TransactionsLocalDataProvider{
+		State:           state,
+		collections:     collections,
+		Blocks:          blocks,
+		eventsIndex:     eventsIndex,
+		txResultsIndex:  txResultsIndex,
+		TxErrorMessages: txErrorMessages,
+	}
+
+	return t
 }
 
 // GetTransactionResultFromStorage retrieves a transaction result from storage by block ID and transaction ID.
@@ -62,7 +82,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 	var txErrorMessage string
 	var txStatusCode uint = 0
 	if txResult.Failed {
-		txErrorMessage, err = t.txErrorMessages.LookupErrorMessageByTransactionId(ctx, blockID, transactionID)
+		txErrorMessage, err = t.TxErrorMessages.LookupErrorMessageByTransactionId(ctx, blockID, transactionID)
 		if err != nil {
 			return nil, err
 		}
@@ -123,7 +143,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	txErrors, err := t.txErrorMessages.LookupErrorMessagesByBlockID(ctx, blockID, block.Header.Height)
+	txErrors, err := t.TxErrorMessages.LookupErrorMessagesByBlockID(ctx, blockID, block.Header.Height)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +229,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 	var txErrorMessage string
 	var txStatusCode uint = 0
 	if txResult.Failed {
-		txErrorMessage, err = t.txErrorMessages.LookupErrorMessageByIndex(ctx, blockID, block.Header.Height, index)
+		txErrorMessage, err = t.TxErrorMessages.LookupErrorMessageByIndex(ctx, blockID, block.Header.Height, index)
 		if err != nil {
 			return nil, err
 		}
@@ -263,13 +283,13 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 // deriveUnknownTransactionStatus is used to determine the status of transaction
 // that are not in a block yet based on the provided reference block ID.
 func (t *TransactionsLocalDataProvider) deriveUnknownTransactionStatus(refBlockID flow.Identifier) (flow.TransactionStatus, error) {
-	referenceBlock, err := t.state.AtBlockID(refBlockID).Head()
+	referenceBlock, err := t.State.AtBlockID(refBlockID).Head()
 	if err != nil {
 		return flow.TransactionStatusUnknown, err
 	}
 	refHeight := referenceBlock.Height
 	// get the latest finalized block from the state
-	finalized, err := t.state.Final().Head()
+	finalized, err := t.State.Final().Head()
 	if err != nil {
 		return flow.TransactionStatusUnknown, irrecoverable.NewExceptionf("failed to lookup final header: %w", err)
 	}
@@ -289,7 +309,7 @@ func (t *TransactionsLocalDataProvider) deriveUnknownTransactionStatus(refBlockI
 
 	// the last full height is the height where we have received all
 	// collections  for all blocks with a lower height
-	fullHeight, err := t.blocks.GetLastFullBlockHeight()
+	fullHeight, err := t.Blocks.GetLastFullBlockHeight()
 	if err != nil {
 		return flow.TransactionStatusUnknown, err
 	}
@@ -315,7 +335,7 @@ func (t *TransactionsLocalDataProvider) deriveTransactionStatus(blockID flow.Ide
 	// From this point on, we know for sure this transaction has at least been executed
 
 	// get the latest sealed block from the State
-	sealed, err := t.state.Sealed().Head()
+	sealed, err := t.State.Sealed().Head()
 	if err != nil {
 		return flow.TransactionStatusUnknown, irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 	}
@@ -359,20 +379,20 @@ func (t *TransactionsLocalDataProvider) lookupCollectionIDInBlock(
 	return flow.ZeroID, status.Error(codes.NotFound, "transaction not found in block")
 }
 
-// retrieveBlock function returns a block based on the input argument. The block ID lookup has the highest priority,
+// RetrieveBlock function returns a block based on the input argument. The block ID lookup has the highest priority,
 // followed by the collection ID lookup. If both are missing, the default lookup by transaction ID is performed.
-func (t *TransactionsLocalDataProvider) retrieveBlock(
+func (t *TransactionsLocalDataProvider) RetrieveBlock(
 	// the requested block or collection was not found. If looking up the block based solely on the txID returns
 	// not found, then no error is returned.
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
 	txID flow.Identifier) (*flow.Block, error) {
 	if blockID != flow.ZeroID {
-		return t.blocks.ByID(blockID)
+		return t.Blocks.ByID(blockID)
 	}
 
 	if collectionID != flow.ZeroID {
-		return t.blocks.ByCollectionID(collectionID)
+		return t.Blocks.ByCollectionID(collectionID)
 	}
 
 	// find the block for the transaction
@@ -387,7 +407,7 @@ func (t *TransactionsLocalDataProvider) retrieveBlock(
 
 // Error returns:
 //   - `storage.ErrNotFound` - collection referenced by transaction or block by a collection has not been found.
-//   - all other errors are unexpected and potentially symptoms of internal implementation bugs or state corruption (fatal).
+//   - all other errors are unexpected and potentially symptoms of internal implementation bugs or State corruption (fatal).
 func (t *TransactionsLocalDataProvider) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
 
 	collection, err := t.collections.LightByTransactionID(txID)
@@ -395,7 +415,7 @@ func (t *TransactionsLocalDataProvider) lookupBlock(txID flow.Identifier) (*flow
 		return nil, err
 	}
 
-	block, err := t.blocks.ByCollectionID(collection.ID())
+	block, err := t.Blocks.ByCollectionID(collection.ID())
 	if err != nil {
 		return nil, err
 	}

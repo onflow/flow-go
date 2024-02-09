@@ -1,4 +1,4 @@
-package backend
+package apiproxy
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -19,53 +20,54 @@ import (
 )
 
 type ObserverLocalDataService struct {
-	TransactionsLocalDataProvider
-	backendEvents BackendEvents
+	*backend.TransactionsLocalDataProvider
+	backendEvents *backend.BackendEvents
 	nodeId        flow.Identifier
 }
 
-var _ TransactionErrorMessage = (*ObserverLocalDataService)(nil)
+type Params struct {
+	State             protocol.State
+	Collections       storage.Collections
+	Blocks            storage.Blocks
+	Results           storage.LightTransactionResults
+	Headers           storage.Headers
+	ExecutionReceipts storage.ExecutionReceipts
+	Chain             flow.Chain
+	ConnFactory       connection.ConnectionFactory
+	Log               zerolog.Logger
+	MaxHeightRange    uint
+	NodeCommunicator  backend.Communicator
+	NodeId            flow.Identifier
+	EventsIndex       *backend.EventsIndex
+	TxResultsIndex    *backend.TransactionResultsIndex
+}
 
-func NewObserverLocalDataService(state protocol.State,
-	collections storage.Collections,
-	blocks storage.Blocks,
-	results storage.LightTransactionResults,
-	events storage.Events,
-	headers storage.Headers,
-	executionReceipts storage.ExecutionReceipts,
-	chain flow.Chain,
-	connFactory connection.ConnectionFactory,
-	log zerolog.Logger,
-	maxHeightRange uint,
-	nodeCommunicator Communicator,
-	nodeId flow.Identifier,
-	eventsIndex *EventsIndex,
-	txResultsIndex *TransactionResultsIndex,
-) *ObserverLocalDataService {
+var _ backend.TransactionErrorMessage = (*ObserverLocalDataService)(nil)
+
+func NewObserverLocalDataService(params Params) *ObserverLocalDataService {
 	o := &ObserverLocalDataService{
-		TransactionsLocalDataProvider: TransactionsLocalDataProvider{
-			state:          state,
-			collections:    collections,
-			blocks:         blocks,
-			eventsIndex:    eventsIndex,
-			txResultsIndex: txResultsIndex,
-		},
-		backendEvents: BackendEvents{
-			headers:           headers,
-			executionReceipts: executionReceipts,
-			state:             state,
-			chain:             chain,
-			connFactory:       connFactory,
-			log:               log,
-			maxHeightRange:    maxHeightRange,
-			nodeCommunicator:  nodeCommunicator,
-			queryMode:         IndexQueryModeLocalOnly,
-			eventsIndex:       eventsIndex,
-		},
-		nodeId: nodeId,
+		TransactionsLocalDataProvider: backend.NewTransactionsLocalDataProvider(
+			params.State,
+			params.Collections,
+			params.Blocks,
+			params.EventsIndex,
+			params.TxResultsIndex,
+			nil),
+		backendEvents: backend.NewBackendEvents(
+			params.Headers,
+			params.ExecutionReceipts,
+			params.State,
+			params.Chain,
+			params.ConnFactory,
+			params.Log,
+			params.MaxHeightRange,
+			params.NodeCommunicator,
+			backend.IndexQueryModeLocalOnly,
+			params.EventsIndex),
+		nodeId: params.NodeId,
 	}
 
-	o.TransactionsLocalDataProvider.txErrorMessages = o
+	o.TransactionsLocalDataProvider.TxErrorMessages = o
 
 	return o
 }
@@ -153,7 +155,7 @@ func (o *ObserverLocalDataService) GetTransactionResultFromStorageData(
 		}
 	}
 
-	block, err := o.retrieveBlock(blockId, collectionId, transactionID)
+	block, err := o.RetrieveBlock(blockId, collectionId, transactionID)
 	// an error occurred looking up the block or the requested block or collection was not found.
 	// If looking up the block based solely on the txID returns not found, then no error is
 	// returned since the block may not be finalized yet.
@@ -194,7 +196,7 @@ func (o *ObserverLocalDataService) GetTransactionResultsByBlockIDFromStorageData
 		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 
-	block, err := o.blocks.ByID(blockId)
+	block, err := o.Blocks.ByID(blockId)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
@@ -242,7 +244,7 @@ func (o *ObserverLocalDataService) GetTransactionResultByIndexFromStorageData(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 
-	block, err := o.blocks.ByID(blockId)
+	block, err := o.Blocks.ByID(blockId)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
@@ -287,7 +289,7 @@ func (o *ObserverLocalDataService) LookupErrorMessagesByBlockID(ctx context.Cont
 
 // buildMetadataResponse builds and returns the metadata response object.
 func (o *ObserverLocalDataService) buildMetadataResponse() (*entities.Metadata, error) {
-	lastFinalizedHeader, err := o.state.Final().Head()
+	lastFinalizedHeader, err := o.State.Final().Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not get finalized, %w", err)
 	}
