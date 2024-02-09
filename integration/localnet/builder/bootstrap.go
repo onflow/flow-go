@@ -434,7 +434,6 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		"--execution-state-dir=/data/execution-state",
 		"--script-execution-mode=execution-nodes-only",
 		"--event-query-mode=execution-nodes-only",
-		fmt.Sprintf("--state-stream-addr=%s:%s", container.ContainerName, testnet.ExecutionStatePort),
 	)
 
 	service.AddExposedPorts(
