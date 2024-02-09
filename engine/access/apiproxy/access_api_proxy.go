@@ -3,12 +3,12 @@ package apiproxy
 import (
 	"context"
 
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc/status"
 
-	"github.com/rs/zerolog"
-
-	"github.com/onflow/flow/protobuf/go/flow/access"
-
+	"github.com/onflow/flow-go/access/legacy/convert"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/grpc/forwarder"
 	"github.com/onflow/flow-go/engine/protocol"
@@ -19,10 +19,11 @@ import (
 // FlowAccessAPIRouter is a structure that represents the routing proxy algorithm.
 // It splits requests between a local and a remote API service.
 type FlowAccessAPIRouter struct {
-	Logger   zerolog.Logger
-	Metrics  *metrics.ObserverCollector
-	Upstream *FlowAccessAPIForwarder
-	Observer *protocol.Handler
+	Logger    zerolog.Logger
+	Metrics   *metrics.ObserverCollector
+	Upstream  *FlowAccessAPIForwarder
+	Observer  *protocol.Handler
+	LocalData *backend.ObserverLocalDataService
 }
 
 func (h *FlowAccessAPIRouter) log(handler, rpc string, err error) {
@@ -111,12 +112,32 @@ func (h *FlowAccessAPIRouter) GetTransaction(context context.Context, req *acces
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResult(context context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
+	if h.LocalData != nil {
+		txId := req.GetId()
+		blockId := req.GetBlockId()
+		collectionID := req.GetCollectionId()
+		requiredEventEncodingVersion := req.GetEventEncodingVersion()
+
+		res, err := h.LocalData.GetTransactionResultFromStorageData(context, txId, blockId, collectionID, requiredEventEncodingVersion)
+		h.log("observerStorage", "GetTransactionResult", err)
+		return res, err
+	}
+
 	res, err := h.Upstream.GetTransactionResult(context, req)
 	h.log("upstream", "GetTransactionResult", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResultsByBlockID(context context.Context, req *access.GetTransactionsByBlockIDRequest) (*access.TransactionResultsResponse, error) {
+	if h.LocalData != nil {
+		blockId := req.GetBlockId()
+		requiredEventEncodingVersion := req.GetEventEncodingVersion()
+
+		res, err := h.LocalData.GetTransactionResultsByBlockIDFromStorageData(context, blockId, requiredEventEncodingVersion)
+		h.log("observerStorage", "GetTransactionResultsByBlockID", err)
+		return res, err
+	}
+
 	res, err := h.Upstream.GetTransactionResultsByBlockID(context, req)
 	h.log("upstream", "GetTransactionResultsByBlockID", err)
 	return res, err
@@ -129,6 +150,16 @@ func (h *FlowAccessAPIRouter) GetTransactionsByBlockID(context context.Context, 
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResultByIndex(context context.Context, req *access.GetTransactionByIndexRequest) (*access.TransactionResultResponse, error) {
+	if h.LocalData != nil {
+		blockId := req.GetBlockId()
+		index := req.GetIndex()
+		requiredEventEncodingVersion := req.GetEventEncodingVersion()
+
+		res, err := h.LocalData.GetTransactionResultByIndexFromStorageData(context, blockId, index, requiredEventEncodingVersion)
+		h.log("observerStorage", "GetTransactionResultByIndex", err)
+		return res, err
+	}
+
 	res, err := h.Upstream.GetTransactionResultByIndex(context, req)
 	h.log("upstream", "GetTransactionResultByIndex", err)
 	return res, err
@@ -183,12 +214,33 @@ func (h *FlowAccessAPIRouter) ExecuteScriptAtBlockHeight(context context.Context
 }
 
 func (h *FlowAccessAPIRouter) GetEventsForHeightRange(context context.Context, req *access.GetEventsForHeightRangeRequest) (*access.EventsResponse, error) {
+	if h.LocalData != nil {
+		eventType := req.GetType()
+		startHeight := req.GetStartHeight()
+		endHeight := req.GetEndHeight()
+		requiredEventEncodingVersion := req.GetEventEncodingVersion()
+
+		res, err := h.LocalData.GetEventsForHeightRangeFromStorageData(context, eventType, startHeight, endHeight, requiredEventEncodingVersion)
+		h.log("observerStorage", "GetEventsForHeightRange", err)
+		return res, err
+	}
+
 	res, err := h.Upstream.GetEventsForHeightRange(context, req)
 	h.log("upstream", "GetEventsForHeightRange", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetEventsForBlockIDs(context context.Context, req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
+	if h.LocalData != nil {
+		eventType := req.GetType()
+		blockIDs := convert.MessagesToIdentifiers(req.GetBlockIds())
+		requiredEventEncodingVersion := req.GetEventEncodingVersion()
+
+		res, err := h.LocalData.GetEventsForBlockIDsFromStorage(context, blockIDs, eventType, requiredEventEncodingVersion)
+		h.log("observerStorage", "GetEventsForBlockIDs", err)
+		return res, err
+	}
+
 	res, err := h.Upstream.GetEventsForBlockIDs(context, req)
 	h.log("upstream", "GetEventsForBlockIDs", err)
 	return res, err

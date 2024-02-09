@@ -358,3 +358,47 @@ func (t *TransactionsLocalDataProvider) lookupCollectionIDInBlock(
 	}
 	return flow.ZeroID, status.Error(codes.NotFound, "transaction not found in block")
 }
+
+// retrieveBlock function returns a block based on the input argument. The block ID lookup has the highest priority,
+// followed by the collection ID lookup. If both are missing, the default lookup by transaction ID is performed.
+func (t *TransactionsLocalDataProvider) retrieveBlock(
+	// the requested block or collection was not found. If looking up the block based solely on the txID returns
+	// not found, then no error is returned.
+	blockID flow.Identifier,
+	collectionID flow.Identifier,
+	txID flow.Identifier) (*flow.Block, error) {
+	if blockID != flow.ZeroID {
+		return t.blocks.ByID(blockID)
+	}
+
+	if collectionID != flow.ZeroID {
+		return t.blocks.ByCollectionID(collectionID)
+	}
+
+	// find the block for the transaction
+	block, err := t.lookupBlock(txID)
+
+	if err != nil && !errors.Is(err, storage.ErrNotFound) {
+		return nil, err
+	}
+
+	return block, nil
+}
+
+// Error returns:
+//   - `storage.ErrNotFound` - collection referenced by transaction or block by a collection has not been found.
+//   - all other errors are unexpected and potentially symptoms of internal implementation bugs or state corruption (fatal).
+func (t *TransactionsLocalDataProvider) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
+
+	collection, err := t.collections.LightByTransactionID(txID)
+	if err != nil {
+		return nil, err
+	}
+
+	block, err := t.blocks.ByCollectionID(collection.ID())
+	if err != nil {
+		return nil, err
+	}
+
+	return block, nil
+}
