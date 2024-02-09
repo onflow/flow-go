@@ -5,6 +5,7 @@ import (
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethCore "github.com/ethereum/go-ethereum/core"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethCrypto "github.com/ethereum/go-ethereum/crypto"
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -56,14 +57,9 @@ func (dc *DirectCall) Hash() (gethCommon.Hash, error) {
 
 // Message constructs a core.Message from the direct call
 func (dc *DirectCall) Message() *gethCore.Message {
-	var to *gethCommon.Address
-	if !dc.EmptyToField() {
-		ct := dc.To.ToCommon()
-		to = &ct
-	}
 	return &gethCore.Message{
 		From:      dc.From.ToCommon(),
-		To:        to,
+		To:        dc.to(),
 		Value:     dc.Value,
 		Data:      dc.Data,
 		GasLimit:  dc.GasLimit,
@@ -75,9 +71,29 @@ func (dc *DirectCall) Message() *gethCore.Message {
 	}
 }
 
+// Transaction constructs a geth.Transaction from the direct call
+func (dc *DirectCall) Transaction() *gethTypes.Transaction {
+	return gethTypes.NewTx(&gethTypes.LegacyTx{
+		GasPrice: big.NewInt(0),
+		Gas:      dc.GasLimit,
+		To:       dc.to(),
+		Value:    dc.Value,
+		Data:     dc.Data,
+	})
+}
+
 // EmptyToField returns true if `to` field contains an empty address
 func (dc *DirectCall) EmptyToField() bool {
 	return dc.To == EmptyAddress
+}
+
+func (dc *DirectCall) to() *gethCommon.Address {
+	var to *gethCommon.Address
+	if !dc.EmptyToField() {
+		ct := dc.To.ToCommon()
+		to = &ct
+	}
+	return to
 }
 
 func NewDepositCall(address Address, amount *big.Int) *DirectCall {
