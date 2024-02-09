@@ -51,11 +51,6 @@ func (_m *GossipSubBuilder) EnableGossipSubScoringWithOverride(_a0 *p2p.PeerScor
 	_m.Called(_a0)
 }
 
-// OverrideDefaultRpcInspectorSuiteFactory provides a mock function with given fields: _a0
-func (_m *GossipSubBuilder) OverrideDefaultRpcInspectorSuiteFactory(_a0 p2p.GossipSubRpcInspectorSuiteFactoryFunc) {
-	_m.Called(_a0)
-}
-
 // SetGossipSubConfigFunc provides a mock function with given fields: _a0
 func (_m *GossipSubBuilder) SetGossipSubConfigFunc(_a0 p2p.GossipSubAdapterConfigFunc) {
 	_m.Called(_a0)
