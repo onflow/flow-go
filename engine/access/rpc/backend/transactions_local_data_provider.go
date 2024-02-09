@@ -25,20 +25,20 @@ type TransactionErrorMessage interface {
 	LookupErrorMessageByTransactionId(ctx context.Context, blockID flow.Identifier, transactionID flow.Identifier) (string, error)
 
 	// LookupErrorMessageByIndex is a function type for getting transaction error message by index.
-	LookupErrorMessageByIndex(ctx context.Context, blockID flow.Identifier, index uint32) (string, error)
+	LookupErrorMessageByIndex(ctx context.Context, blockID flow.Identifier, height uint64, index uint32) (string, error)
 
 	// LookupErrorMessagesByBlockID is a function type for getting transaction error messages by block ID.
-	LookupErrorMessagesByBlockID(ctx context.Context, blockID flow.Identifier) (map[flow.Identifier]string, error)
+	LookupErrorMessagesByBlockID(ctx context.Context, blockID flow.Identifier, height uint64) (map[flow.Identifier]string, error)
 }
 
 // TransactionsLocalDataProvider provides functionality for retrieving transaction results and error messages from local storages
 type TransactionsLocalDataProvider struct {
-	TransactionErrorMessage
-	state       protocol.State
-	results     storage.LightTransactionResults
-	collections storage.Collections
-	blocks      storage.Blocks
-	eventsIndex *EventsIndex
+	state           protocol.State
+	collections     storage.Collections
+	blocks          storage.Blocks
+	eventsIndex     *EventsIndex
+	txResultsIndex  *TransactionResultsIndex
+	txErrorMessages TransactionErrorMessage
 }
 
 // GetTransactionResultFromStorage retrieves a transaction result from storage by block ID and transaction ID.
@@ -54,7 +54,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*access.TransactionResult, error) {
 	blockID := block.ID()
-	txResult, err := t.results.ByBlockIDTransactionID(blockID, transactionID)
+	txResult, err := t.txResultsIndex.GetResultsByBlockIDTransactionID(blockID, block.Header.Height, transactionID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
@@ -62,7 +62,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 	var txErrorMessage string
 	var txStatusCode uint = 0
 	if txResult.Failed {
-		txErrorMessage, err = t.LookupErrorMessageByTransactionId(ctx, blockID, transactionID)
+		txErrorMessage, err = t.txErrorMessages.LookupErrorMessageByTransactionId(ctx, blockID, transactionID)
 		if err != nil {
 			return nil, err
 		}
@@ -118,12 +118,12 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]*access.TransactionResult, error) {
 	blockID := block.ID()
-	txResults, err := t.results.ByBlockID(blockID)
+	txResults, err := t.txResultsIndex.GetResultsByBlockID(blockID, block.Header.Height)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	txErrors, err := t.LookupErrorMessagesByBlockID(ctx, blockID)
+	txErrors, err := t.txErrorMessages.LookupErrorMessagesByBlockID(ctx, blockID, block.Header.Height)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +201,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*access.TransactionResult, error) {
 	blockID := block.ID()
-	txResult, err := t.results.ByBlockIDTransactionIndex(blockID, index)
+	txResult, err := t.txResultsIndex.GetResultsByBlockIDTransactionIndex(blockID, block.Header.Height, index)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
@@ -209,7 +209,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 	var txErrorMessage string
 	var txStatusCode uint = 0
 	if txResult.Failed {
-		txErrorMessage, err = t.LookupErrorMessageByIndex(ctx, blockID, index)
+		txErrorMessage, err = t.txErrorMessages.LookupErrorMessageByIndex(ctx, blockID, block.Header.Height, index)
 		if err != nil {
 			return nil, err
 		}

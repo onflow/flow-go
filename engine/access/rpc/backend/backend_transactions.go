@@ -1076,9 +1076,10 @@ func (b *backendTransactions) LookupErrorMessageByTransactionId(
 func (b *backendTransactions) LookupErrorMessageByIndex(
 	ctx context.Context,
 	blockID flow.Identifier,
+	height uint64,
 	index uint32,
 ) (string, error) {
-	txResult, err := b.results.ByBlockIDTransactionIndex(blockID, index)
+	txResult, err := b.txResultsIndex.GetResultsByBlockIDTransactionIndex(blockID, height, index)
 	if err != nil {
 		return "", rpc.ConvertStorageError(err)
 	}
@@ -1128,8 +1129,9 @@ func (b *backendTransactions) LookupErrorMessageByIndex(
 func (b *backendTransactions) LookupErrorMessagesByBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
+	height uint64,
 ) (map[flow.Identifier]string, error) {
-	txResults, err := b.results.ByBlockID(blockID)
+	txResults, err := b.txResultsIndex.GetResultsByBlockID(blockID, height)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}

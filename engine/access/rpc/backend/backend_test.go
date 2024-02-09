@@ -2140,7 +2140,6 @@ func (suite *Suite) defaultBackendParams() Params {
 		Transactions:             suite.transactions,
 		ExecutionReceipts:        suite.receipts,
 		ExecutionResults:         suite.results,
-		LightTransactionResults:  suite.transactionResults,
 		ChainID:                  suite.chainID,
 		CollectionRPC:            suite.colClient,
 		MaxHeightRange:           DefaultMaxHeightRange,

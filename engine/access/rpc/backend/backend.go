@@ -89,7 +89,6 @@ type Params struct {
 	Transactions              storage.Transactions
 	ExecutionReceipts         storage.ExecutionReceipts
 	ExecutionResults          storage.ExecutionResults
-	LightTransactionResults   storage.LightTransactionResults
 	ChainID                   flow.ChainID
 	AccessMetrics             module.AccessMetrics
 	ConnFactory               connection.ConnectionFactory
@@ -107,7 +106,10 @@ type Params struct {
 	EventQueryMode            IndexQueryMode
 	EventsIndex               *EventsIndex
 	TxResultQueryMode         IndexQueryMode
+	TxResultsIndex            *TransactionResultsIndex
 }
+
+var _ TransactionErrorMessage = (*Backend)(nil)
 
 // New creates backend instance
 func New(params Params) (*Backend, error) {
@@ -161,11 +163,11 @@ func New(params Params) (*Backend, error) {
 		},
 		backendTransactions: backendTransactions{
 			TransactionsLocalDataProvider: TransactionsLocalDataProvider{
-				state:       params.State,
-				collections: params.Collections,
-				blocks:      params.Blocks,
-				results:     params.LightTransactionResults,
-				eventsIndex: params.EventsIndex,
+				state:          params.State,
+				collections:    params.Collections,
+				blocks:         params.Blocks,
+				eventsIndex:    params.EventsIndex,
+				txResultsIndex: params.TxResultsIndex,
 			},
 			log:                  params.Log,
 			staticCollectionRPC:  params.CollectionRPC,
@@ -227,6 +229,8 @@ func New(params Params) (*Backend, error) {
 		chainID:           params.ChainID,
 		nodeInfo:          nodeInfo,
 	}
+
+	b.backendTransactions.txErrorMessages = b
 
 	retry.SetBackend(b)
 
