@@ -120,7 +120,7 @@ func GenerateRootBlockVotes(block *flow.Block, participantData *ParticipantData)
 		if err != nil {
 			return nil, fmt.Errorf("could not get private keys for participant: %w", err)
 		}
-		me, err := local.New(p.Identity(), keys.StakingKey)
+		me, err := local.New(p.Identity().IdentitySkeleton, keys.StakingKey)
 		if err != nil {
 			return nil, err
 		}

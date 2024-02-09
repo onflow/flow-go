@@ -14,6 +14,7 @@ import (
 
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
 	"github.com/onflow/flow-go/engine/testutil"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/dkg"
@@ -35,14 +36,19 @@ func createNodes(
 	hub *stub.Hub,
 	chainID flow.ChainID,
 	whiteboard *whiteboard,
-	conIdentities flow.IdentityList,
+	conIdentities []bootstrap.NodeInfo,
 	currentEpochSetup flow.EpochSetup,
 	nextEpochSetup flow.EpochSetup,
-	firstBlock *flow.Header) ([]*node, flow.IdentityList) {
+	firstBlock *flow.Header) []*node {
+
+	identities := make(flow.IdentityList, 0, len(conIdentities))
+	for _, identity := range conIdentities {
+		identities = append(identities, identity.Identity())
+	}
 
 	// We need to initialise the nodes with a list of identities that contain
 	// all roles, otherwise there would be an error initialising the first epoch
-	identities := unittest.CompleteIdentitySet(conIdentities...)
+	identities = unittest.CompleteIdentitySet(identities...)
 
 	nodes := []*node{}
 	for _, id := range conIdentities {
@@ -57,14 +63,14 @@ func createNodes(
 			firstBlock))
 	}
 
-	return nodes, conIdentities
+	return nodes
 }
 
 // createNode instantiates a node with a network hub, a whiteboard reference,
 // and a pre-set EpochSetup that will be used to trigger the next DKG run.
 func createNode(
 	t *testing.T,
-	id *flow.Identity,
+	id bootstrap.NodeInfo,
 	ids []*flow.Identity,
 	hub *stub.Hub,
 	chainID flow.ChainID,
@@ -187,7 +193,11 @@ func TestWithWhiteboard(t *testing.T) {
 
 	// we run the DKG protocol with N consensus nodes
 	N := 10
-	conIdentities := unittest.IdentityListFixture(N, unittest.WithRole(flow.RoleConsensus))
+	bootstrapNodesInfo := unittest.PrivateNodeInfosFixture(N, unittest.WithRole(flow.RoleConsensus))
+	conIdentities := make(flow.IdentitySkeletonList, 0, len(bootstrapNodesInfo))
+	for _, identity := range bootstrapNodesInfo {
+		conIdentities = append(conIdentities, &identity.Identity().IdentitySkeleton)
+	}
 
 	// The EpochSetup event is received at view 100. The phase transitions are
 	// at views 150, 200, and 250. In between phase transitions, the controller
@@ -220,7 +230,7 @@ func TestWithWhiteboard(t *testing.T) {
 		DKGPhase2FinalView: 200,
 		DKGPhase3FinalView: 250,
 		FinalView:          300,
-		Participants:       conIdentities,
+		Participants:       conIdentities.ToSkeleton(),
 		RandomSource:       unittest.EpochSetupRandomSourceFixture(),
 	}
 
@@ -228,16 +238,16 @@ func TestWithWhiteboard(t *testing.T) {
 	// desired parameters
 	nextEpochSetup := flow.EpochSetup{
 		Counter:      currentCounter + 1,
-		Participants: conIdentities,
+		Participants: conIdentities.ToSkeleton(),
 		RandomSource: unittest.EpochSetupRandomSourceFixture(),
 	}
 
-	nodes, _ := createNodes(
+	nodes := createNodes(
 		t,
 		hub,
 		chainID,
 		whiteboard,
-		conIdentities,
+		bootstrapNodesInfo,
 		currentEpochSetup,
 		nextEpochSetup,
 		firstBlock)

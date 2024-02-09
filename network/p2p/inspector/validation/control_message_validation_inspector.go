@@ -338,7 +338,7 @@ func (c *ControlMsgValidationInspector) checkPubsubMessageSender(message *pubsub
 	}
 	if id, ok := c.idProvider.ByPeerID(pid); !ok {
 		return fmt.Errorf("received rpc publish message from unstaked peer: %s", pid)
-	} else if id.Ejected {
+	} else if id.IsEjected() {
 		return fmt.Errorf("received rpc publish message from ejected peer: %s", pid)
 	}
 

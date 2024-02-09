@@ -128,6 +128,7 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 	idProvider := mock.NewIdentityProvider(t)
 	defaultConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
+
 	// override the default config to make the mesh tracer log more frequently
 	defaultConfig.NetworkConfig.GossipSub.RpcTracer.LocalMeshLogInterval = time.Second
 
