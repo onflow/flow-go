@@ -780,7 +780,6 @@ func assertPanic(t *testing.T, check checkError, f func()) {
 		if !ok {
 			t.Fatal("panic is not with an error type")
 		}
-		fmt.Println(err)
 		require.True(t, check(err))
 	}()
 	f()
