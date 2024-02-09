@@ -124,12 +124,12 @@ func (h *ContractHandler) TryRun(rlpEncodedTx []byte, coinbase types.Address) *t
 	if err != nil {
 		panicOnFatalOrBackendError(err)
 		// remaining errors are validation errors
-		rs.ErrorCode = types.ValidationErrorCode(err)
+		rs.ErrorCode = ValidationErrorCode(err)
 		rs.Status = types.StatusInvalid
 		return rs
 	}
 	if res.VMError != nil {
-		rs.ErrorCode = types.ExecutionErrorCode(res.VMError)
+		rs.ErrorCode = ExecutionErrorCode(res.VMError)
 		rs.GasConsumed = res.GasConsumed
 		rs.Status = types.StatusFailed
 	}
@@ -580,10 +580,11 @@ func panicOnFatalOrBackendError(err error) {
 
 	if types.IsAFatalError(err) {
 		// don't wrap it
-		panic(err)
+		panic(fvmErrors.NewEVMFailure(err))
 	}
 
 	if types.IsABackendError(err) {
+		// backend errors doesn't need wrapping
 		panic(err)
 	}
 }

@@ -5,6 +5,95 @@ import (
 	"fmt"
 )
 
+type ErrorCode uint64
+
+// internal error codes
+const ( // code reserved for no error
+	ErrCodeNoError ErrorCode = 0
+
+	// covers all other validation codes that doesn't have an specific code
+	ValidationErrCodeMisc ErrorCode = 100
+	// invalid balance is provided (e.g. negative value)
+	ValidationErrCodeInvalidBalance ErrorCode = 101
+	// insufficient computation is left in the flow transaction
+	ValidationErrCodeInsufficientComputation ErrorCode = 102
+	// unauthroized method call
+	ValidationErrCodeUnAuthroizedMethodCall ErrorCode = 103
+	// withdraw balance is prone to rounding error
+	ValidationErrCodeWithdrawBalanceRounding ErrorCode = 104
+
+	// general execution error returned for cases that don't have an specific code
+	ExecutionErrCodeMisc ErrorCode = 400
+)
+
+// geth evm core errors (reserved range: [201-300) )
+const (
+	// the nonce of the tx is lower than the expected
+	ValidationErrCodeNonceTooLow = iota + 201
+	// the nonce of the tx is higher than the expected
+	ValidationErrCodeNonceTooHigh
+	// tx sender account has reached to the maximum nonce
+	ValidationErrCodeNonceMax
+	// not enough gas is available on the block to include this transaction
+	ValidationErrCodeGasLimitReached
+	// the transaction sender doesn't have enough funds for transfer(topmost call only).
+	ValidationErrCodeInsufficientFundsForTransfer
+	// creation transaction provides the init code bigger than init code size limit.
+	ValidationErrCodeMaxInitCodeSizeExceeded
+	// the total cost of executing a transaction is higher than the balance of the user's account.
+	ValidationErrCodeInsufficientFunds
+	// overflow detected when calculating the gas usage
+	ValidationErrCodeGasUintOverflow
+	// the transaction is specified to use less gas than required to start the invocation.
+	ValidationErrCodeIntrinsicGas
+	// the transaction is not supported in the current network configuration.
+	ValidationErrCodeTxTypeNotSupported
+	// tip was set to higher than the total fee cap
+	ValidationErrCodeTipAboveFeeCap
+	// an extremely big numbers is set for the tip field
+	ValidationErrCodeTipVeryHigh
+	// an extremely big numbers is set for the fee cap field
+	ValidationErrCodeFeeCapVeryHigh
+	// the transaction fee cap is less than the base fee of the block
+	ValidationErrCodeFeeCapTooLow
+	// the sender of a transaction is a contract
+	ValidationErrCodeSenderNoEOA
+	// the transaction fee cap is less than the blob gas fee of the block.
+	ValidationErrCodeBlobFeeCapTooLow
+)
+
+// evm execution errors (reserved range: [301-400) )
+const (
+	// execution ran out of gas
+	ExecutionErrCodeOutOfGas ErrorCode = iota + 301
+	// contract creation code storage out of gas
+	ExecutionErrCodeCodeStoreOutOfGas
+	// max call depth exceeded
+	ExecutionErrCodeDepth
+	// insufficient balance for transfer
+	ExecutionErrCodeInsufficientBalance
+	// contract address collision"
+	ExecutionErrCodeContractAddressCollision
+	// execution reverted
+	ExecutionErrCodeExecutionReverted
+	// max initcode size exceeded
+	ExecutionErrCodeMaxInitCodeSizeExceeded
+	// max code size exceeded
+	ExecutionErrCodeMaxCodeSizeExceeded
+	// invalid jump destination
+	ExecutionErrCodeInvalidJump
+	// write protection
+	ExecutionErrCodeWriteProtection
+	// return data out of bounds
+	ExecutionErrCodeReturnDataOutOfBounds
+	// gas uint64 overflow
+	ExecutionErrCodeGasUintOverflow
+	// invalid code: must not begin with 0xef
+	ExecutionErrCodeInvalidCode
+	// nonce uint64 overflow
+	ExecutionErrCodeNonceUintOverflow
+)
+
 var (
 	// ErrInvalidBalance is returned when an invalid balance is provided for transfer (e.g. negative)
 	ErrInvalidBalance = NewEVMValidationError(errors.New("invalid balance for transfer"))
