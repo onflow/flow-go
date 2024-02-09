@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/encoding/json"
 	"github.com/stretchr/testify/require"
 
@@ -352,16 +351,10 @@ func TestCadenceArch(t *testing.T) {
 				require.NoError(t, output.Err)
 				snapshot = snapshot.Append(es)
 
-				eventData, err := ccf.Decode(nil, output.Events[2].Payload)
+				// 3rd event is the bridged account created event
+				coaAddress, err := types.COAAddressFromFlowEvent(sc.EVMContract.Address, output.Events[2])
 				require.NoError(t, err)
 
-				// create the proof
-				addressBytes := make([]byte, 20)
-				for i, v := range eventData.(cadence.Event).Fields[0].(cadence.Array).Values {
-					addressBytes[i] = v.ToGoValue().(byte)
-				}
-
-				coaAddress := types.NewAddressFromBytes(addressBytes)
 				data := RandomCommonHash(t)
 
 				hasher, err := crypto.NewPrefixedHashing(privateKey.HashAlgo, "FLOW-V0.0-user")
