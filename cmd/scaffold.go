@@ -13,6 +13,7 @@ import (
 	gcemd "cloud.google.com/go/compute/metadata"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/hashicorp/go-multierror"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -53,7 +54,10 @@ import (
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dns"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/network/p2p/ping"
+	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter"
@@ -124,6 +128,7 @@ type FlowNodeBuilder struct {
 	adminCommandBootstrapper *admin.CommandRunnerBootstrapper
 	adminCommands            map[string]func(config *NodeConfig) commands.AdminCommand
 	componentBuilder         component.ComponentManagerBuilder
+	peerID                   peer.ID
 }
 
 var _ NodeBuilder = (*FlowNodeBuilder)(nil)
@@ -1037,6 +1042,44 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		if err != nil {
 			return fmt.Errorf("could not initialize ProtocolStateIDCache: %w", err)
 		}
+
+		if node.ObserverMode {
+			fnb.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
+
+			// The following wrapper allows to black-list byzantine nodes via an admin command:
+			// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
+			fnb.IdentityProvider, err = cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
+				return fnb.NetworkUnderlay
+			})
+			if err != nil {
+				return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
+			}
+
+			// use the default identifier provider
+			fnb.SyncEngineIdentifierProvider = id.NewCustomIdentifierProvider(func() flow.IdentifierList {
+				pids := fnb.LibP2PNode.GetPeersForProtocol(protocols.FlowProtocolID(fnb.SporkID))
+				result := make(flow.IdentifierList, 0, len(pids))
+
+				for _, pid := range pids {
+					// exclude own Identifier
+					if pid == fnb.peerID {
+						continue
+					}
+
+					if flowID, err := fnb.IDTranslator.GetFlowID(pid); err != nil {
+						// TODO: this is an instance of "log error and continue with best effort" anti-pattern
+						fnb.Logger.Err(err).Str("peer", p2plogging.PeerId(pid)).Msg("failed to translate to Flow ID")
+					} else {
+						result = append(result, flowID)
+					}
+				}
+
+				return result
+			})
+
+			return nil
+		}
+
 		node.IDTranslator = idCache
 
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
@@ -1246,8 +1289,23 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 			return fmt.Errorf("failed to load private node info: %w", err)
 		}
 
+		pubKey, err := keyutils.LibP2PPublicKeyFromFlow(info.NetworkPrivKey.PublicKey())
+		if err != nil {
+			return fmt.Errorf("could not load networking public key: %w", err)
+		}
+
+		fnb.peerID, err = peer.IDFromPublicKey(pubKey)
+		if err != nil {
+			return fmt.Errorf("could not get peer ID from public key: %w", err)
+		}
+
+		nodeID, err := translator.NewPublicNetworkIDTranslator().GetFlowID(fnb.peerID)
+		if err != nil {
+			return fmt.Errorf("could not get flow node ID: %w", err)
+		}
+
 		id := flow.IdentitySkeleton{
-			NodeID:        myID,
+			NodeID:        nodeID,
 			Address:       info.Address,
 			Role:          info.Role,
 			InitialWeight: 0,
