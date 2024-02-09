@@ -767,7 +767,7 @@ var isFatal = func(err error) bool {
 }
 
 var isNotFatal = func(err error) bool {
-	return isFatal(err)
+	return !isFatal(err)
 }
 
 func assertPanic(t *testing.T, check checkError, f func()) {

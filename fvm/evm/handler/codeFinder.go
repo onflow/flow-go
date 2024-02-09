@@ -70,6 +70,7 @@ func ValidationErrorCode(err error) types.ErrorCode {
 }
 
 func ExecutionErrorCode(err error) types.ErrorCode {
+	// execution VM errors are never wrapped
 	switch err {
 	case gethVM.ErrOutOfGas:
 		return types.ExecutionErrCodeOutOfGas
