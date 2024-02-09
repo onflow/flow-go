@@ -1377,15 +1377,13 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	builder.Module("events storage", func(node *cmd.NodeConfig) error {
 		builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
 		return nil
-	}).
-		Module("events index", func(node *cmd.NodeConfig) error {
-			builder.EventsIndex = backend.NewEventsIndex(builder.Storage.Events)
-			return nil
-		}).
-		Module("transaction result index", func(node *cmd.NodeConfig) error {
-			builder.TxResultsIndex = backend.NewTransactionResultsIndex(builder.Storage.LightTransactionResults)
-			return nil
-		})
+	}).Module("events index", func(node *cmd.NodeConfig) error {
+		builder.EventsIndex = backend.NewEventsIndex(builder.Storage.Events)
+		return nil
+	}).Module("transaction result index", func(node *cmd.NodeConfig) error {
+		builder.TxResultsIndex = backend.NewTransactionResultsIndex(builder.Storage.LightTransactionResults)
+		return nil
+	})
 
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		accessMetrics := builder.AccessMetrics
