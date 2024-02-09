@@ -6,7 +6,6 @@ import (
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethCore "github.com/ethereum/go-ethereum/core"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	gethCrypto "github.com/ethereum/go-ethereum/crypto"
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -51,8 +50,9 @@ func (dc *DirectCall) Encode() ([]byte, error) {
 
 // Hash computes the hash of a direct call
 func (dc *DirectCall) Hash() (gethCommon.Hash, error) {
-	encoded, err := dc.Encode()
-	return gethCrypto.Keccak256Hash(encoded), err
+	// we use geth transaction hash calculation since direct call hash is included in the
+	// block transaction hashes, and thus observed as any other transaction
+	return dc.Transaction().Hash(), nil
 }
 
 // Message constructs a core.Message from the direct call
