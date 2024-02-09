@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/cmd"
@@ -18,6 +20,8 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
+	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -143,7 +147,7 @@ func WriteObserverPrivateKey(observerName, bootstrapDir string) (crypto.PrivateK
 	return networkKey, nil
 }
 
-func WriteTestExecutionService(nodeid flow.Identifier, address, observerName, bootstrapDir string) (bootstrap.NodeInfo, error) {
+func WriteTestExecutionService(_ flow.Identifier, address, observerName, bootstrapDir string) (bootstrap.NodeInfo, error) {
 	// make the observer private key for named observer
 	// only used for localnet, not for use with production
 	networkSeed := cmd.GenerateRandomSeed(crypto.KeyGenSeedMinLen)
@@ -162,8 +166,27 @@ func WriteTestExecutionService(nodeid flow.Identifier, address, observerName, bo
 		return bootstrap.NodeInfo{}, err
 	}
 
+	pubKey, err := keyutils.LibP2PPublicKeyFromFlow(networkKey.PublicKey())
+
+	peerID, err := peer.IDFromPublicKey(pubKey)
+	if err != nil {
+		return bootstrap.NodeInfo{}, fmt.Errorf("could not get peer ID from public key: %w", err)
+	}
+
+	nodeID, err := translator.NewPublicNetworkIDTranslator().GetFlowID(peerID)
+	if err != nil {
+		return bootstrap.NodeInfo{}, fmt.Errorf("could not get flow node ID: %w", err)
+	}
+
+	k, err := pubKey.Raw()
+	if err != nil {
+		return bootstrap.NodeInfo{}, err
+	}
+
+	log.Info().Msgf("test execution node private key: %v, public key: %x, peerID: %v, nodeID: %v", networkKey, k, peerID, nodeID)
+
 	nodeInfo := bootstrap.NewPrivateNodeInfo(
-		nodeid,
+		nodeID,
 		flow.RoleExecution,
 		address,
 		0,
@@ -172,7 +195,7 @@ func WriteTestExecutionService(nodeid flow.Identifier, address, observerName, bo
 	)
 
 	path := fmt.Sprintf("%s/private-root-information/private-node-info_%v/%vjson",
-		bootstrapDir, nodeid, bootstrap.PathPrivNodeInfoPrefix)
+		bootstrapDir, nodeID, bootstrap.PathPrivNodeInfoPrefix)
 
 	private, err := nodeInfo.Private()
 	if err != nil {
@@ -185,7 +208,7 @@ func WriteTestExecutionService(nodeid flow.Identifier, address, observerName, bo
 	}
 
 	path = fmt.Sprintf("%s/private-root-information/private-node-info_%v/%v",
-		bootstrapDir, nodeid, bootstrap.FilenameSecretsEncryptionKey)
+		bootstrapDir, nodeID, bootstrap.FilenameSecretsEncryptionKey)
 	err = os.WriteFile(path, encryptionKey, 0644)
 	if err != nil {
 		return bootstrap.NodeInfo{}, err
