@@ -83,7 +83,7 @@ type PubSubAdapterConfig interface {
 	// WithScoreTracer sets the tracer for the underlying pubsub score implementation.
 	// This is used to expose the local scoring table of the GossipSub node to its higher level components.
 	WithScoreTracer(tracer PeerScoreTracer)
-	WithInspectorSuite(GossipSubInspectorSuite)
+	WithRpcInspector(GossipSubMsgValidationRpcInspector)
 }
 
 // GossipSubRPCInspector app specific RPC inspector used to inspect and validate incoming RPC messages before they are processed by libp2p.

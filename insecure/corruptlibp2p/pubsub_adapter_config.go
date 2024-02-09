@@ -153,7 +153,7 @@ func (c *CorruptPubSubAdapterConfig) ScoreTracer() p2p.PeerScoreTracer {
 	return c.scoreTracer
 }
 
-func (c *CorruptPubSubAdapterConfig) WithInspectorSuite(_ p2p.GossipSubInspectorSuite) {
+func (c *CorruptPubSubAdapterConfig) WithRpcInspector(_ p2p.GossipSubInspectorSuite) {
 	// CorruptPubSub does not support inspector suite. This is a no-op.
 }
 

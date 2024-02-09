@@ -15,7 +15,7 @@ type PubSubAdapterConfig struct {
 }
 
 // WithInspectorSuite provides a mock function with given fields: _a0
-func (_m *PubSubAdapterConfig) WithInspectorSuite(_a0 p2p.GossipSubInspectorSuite) {
+func (_m *PubSubAdapterConfig) WithRpcInspector(_a0 p2p.GossipSubInspectorSuite) {
 	_m.Called(_a0)
 }
 
