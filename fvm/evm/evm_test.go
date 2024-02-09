@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/encoding/json"
 	"github.com/stretchr/testify/require"
 
@@ -14,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/fvm/crypto"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/evm"
-	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -352,11 +352,19 @@ func TestCadenceArch(t *testing.T) {
 				require.NoError(t, output.Err)
 				snapshot = snapshot.Append(es)
 
+				eventData, err := ccf.Decode(nil, output.Events[2].Payload)
+				require.NoError(t, err)
+
 				// create the proof
-				expectedCOAAddress := handler.MakeCOAAddress(1)
+				addressBytes := make([]byte, 20)
+				for i, v := range eventData.(cadence.Event).Fields[0].(cadence.Array).Values {
+					addressBytes[i] = v.ToGoValue().(byte)
+				}
+
+				coaAddress := types.NewAddressFromBytes(addressBytes)
 				data := RandomCommonHash(t)
 
-				hasher, err := crypto.NewPrefixedHashing(privateKey.HashAlgo, "")
+				hasher, err := crypto.NewPrefixedHashing(privateKey.HashAlgo, "FLOW-V0.0-user")
 				require.NoError(t, err)
 
 				sig, err := privateKey.PrivateKey.Sign(data.Bytes(), hasher)
@@ -365,7 +373,7 @@ func TestCadenceArch(t *testing.T) {
 				proof := types.COAOwnershipProof{
 					KeyIndices:     []uint64{0},
 					Address:        types.FlowAddress(account),
-					CapabilityPath: "/public/bridgedAccount",
+					CapabilityPath: "bridgedAccount",
 					Signatures:     []types.Signature{types.Signature(sig)},
 				}
 
@@ -389,7 +397,7 @@ func TestCadenceArch(t *testing.T) {
 					testContract.DeployedAt.ToCommon(),
 					testContract.MakeCallData(t, "verifyArchCallToVerifyCOAOwnershipProof",
 						true,
-						expectedCOAAddress.ToCommon(),
+						coaAddress.ToCommon(),
 						data,
 						encodedProof),
 					big.NewInt(0),

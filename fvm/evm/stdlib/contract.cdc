@@ -4,6 +4,8 @@ import "FlowToken"
 access(all)
 contract EVM {
 
+    pub event BridgedAccountCreated(addressBytes: [UInt8; 20])
+
     /// EVMAddress is an EVM-compatible address
     access(all)
     struct EVMAddress {
@@ -175,6 +177,7 @@ contract EVM {
         let acc <-create BridgedAccount()
         let addr = InternalEVM.createBridgedAccount(uuid: acc.uuid)
         acc.initAddress(addressBytes: addr)
+        emit BridgedAccountCreated(addressBytes: addr)
         return <-acc
     }
 
@@ -281,9 +284,12 @@ contract EVM {
             .borrow<&EVM.BridgedAccount{EVM.Addressable}>()
             ?? panic("could not borrow bridge account's address")
 
-        assert(
-            coaRef.address().bytes == evmAddress,
-            message: "evm address mismatch"
-        )
+        // verify evm address matching
+        var i = 0
+        for item in coaRef.address().bytes {
+            assert(item == evmAddress[i], message: "evm address mismatch")
+            i = i +1
+        }
+
     }
 }

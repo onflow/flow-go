@@ -27,8 +27,6 @@ func COAOwnershipProofValidator(contractAddress flow.Address, backend types.Back
 			},
 			proof.ToCadenceValues(),
 		)
-
-		// TODO fix me to only return error
-		return err != nil, nil
+		return err == nil, nil
 	}
 }
