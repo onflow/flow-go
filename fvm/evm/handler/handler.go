@@ -16,6 +16,8 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
+const InvalidTransactionComputationCost = 1_000
+
 // ContractHandler is responsible for triggering calls to emulator, metering,
 // event emission and updating the block
 type ContractHandler struct {
@@ -175,10 +177,11 @@ func (h *ContractHandler) run(
 
 	res, err := blk.RunTransaction(&tx)
 	if err != nil {
-		// continue metering
-		gasErr := h.meterGasUsage(res)
-		if gasErr != nil {
-			return res, gasErr
+		// if failed by validation errors
+		// charge the InvalidTransactionComputationCost
+		meterErr := h.chargeInvalidTxComputationCost()
+		if meterErr != nil {
+			return res, meterErr
 		}
 		return res, err
 	}
@@ -223,6 +226,10 @@ func (h *ContractHandler) checkGasLimit(limit types.GasLimit) error {
 		return types.ErrInsufficientComputation
 	}
 	return nil
+}
+
+func (h *ContractHandler) chargeInvalidTxComputationCost() error {
+	return h.backend.MeterComputation(environment.ComputationKindEVMGasUsage, InvalidTransactionComputationCost)
 }
 
 func (h *ContractHandler) meterGasUsage(res *types.Result) error {
@@ -277,7 +284,17 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	res, err = blk.DirectCall(call)
-	h.meterGasUsage(res)
+	if err != nil {
+		// if failed by validation errors
+		// charge the InvalidTransactionComputationCost
+		meterErr := h.chargeInvalidTxComputationCost()
+		if meterErr != nil {
+			return res, meterErr
+		}
+		return res, err
+	}
+
+	err = h.meterGasUsage(res)
 	if err != nil {
 		return res, err
 	}

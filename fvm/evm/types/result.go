@@ -73,8 +73,7 @@ var (
 	StatusSuccessful Status = 3
 )
 
-// ResultSummary summerizes the outcome of a EVM call or run
-// used to return to EVM contract
+// ResultSummary summerizes the outcome of a EVM call or tx run
 type ResultSummary struct {
 	Status      Status
 	ErrorCode   ErrorCode

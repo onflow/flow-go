@@ -2,7 +2,6 @@ package handler
 
 import (
 	gethCommon "github.com/ethereum/go-ethereum/common"
-	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
@@ -15,7 +14,7 @@ const (
 )
 
 type BlockStore struct {
-	backend       atree.Ledger
+	backend       types.Backend
 	rootAddress   flow.Address
 	blockProposal *types.Block
 }
