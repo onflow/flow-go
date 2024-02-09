@@ -312,8 +312,14 @@ func (b *backendTransactions) GetTransactionResult(
 
 	// If there is still no transaction result, provide one based on available information.
 	if txResult == nil {
+		var txStatus flow.TransactionStatus
 		// Derive the status of the transaction.
-		txStatus, err := b.deriveUnknownTransactionStatus(tx.ReferenceBlockID)
+		if block == nil {
+			txStatus, err = b.deriveUnknownTransactionStatus(tx.ReferenceBlockID)
+		} else {
+			txStatus, err = b.deriveTransactionStatus(blockID, blockHeight, false)
+		}
+		
 		if err != nil {
 			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 				irrecoverable.Throw(ctx, err)
