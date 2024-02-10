@@ -18,6 +18,9 @@ func MergeRegisterChanges(
 
 	// Add all new payloads.
 	for id, value := range changes {
+		if len(value) == 0 {
+			continue
+		}
 		key := convert.RegisterIDToLedgerKey(id)
 		newPayloads = append(newPayloads, ledger.NewPayload(key, value))
 	}
