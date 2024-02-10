@@ -40,6 +40,10 @@ func (aa *AddressAllocator) COAFactoryAddress() types.Address {
 	return MakeCOAAddress(0)
 }
 
+func (aa *AddressAllocator) NativeTokenBridgeAddress() types.Address {
+	return MakePrecompileAddress(0)
+}
+
 // AllocateCOAAddress allocates an address for COA
 func (aa *AddressAllocator) AllocateCOAAddress(uuid uint64) types.Address {
 	return MakeCOAAddress(uuid)

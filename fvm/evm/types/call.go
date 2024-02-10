@@ -39,6 +39,7 @@ type DirectCall struct {
 	Data     []byte
 	Value    *big.Int
 	GasLimit uint64
+	Nonce    uint64
 }
 
 // Encode encodes the direct call it also adds the type
@@ -62,6 +63,7 @@ func (dc *DirectCall) Message() *gethCore.Message {
 		To:        dc.to(),
 		Value:     dc.Value,
 		Data:      dc.Data,
+		Nonce:     dc.Nonce,
 		GasLimit:  dc.GasLimit,
 		GasPrice:  big.NewInt(0), // price is set to zero for direct calls
 		GasTipCap: big.NewInt(1), // also known as maxPriorityFeePerGas
@@ -79,6 +81,7 @@ func (dc *DirectCall) Transaction() *gethTypes.Transaction {
 		To:       dc.to(),
 		Value:    dc.Value,
 		Data:     dc.Data,
+		Nonce:    dc.Nonce,
 	})
 }
 
@@ -96,7 +99,11 @@ func (dc *DirectCall) to() *gethCommon.Address {
 	return to
 }
 
-func NewDepositCall(address Address, amount *big.Int) *DirectCall {
+func NewDepositCall(
+	address Address,
+	amount *big.Int,
+	nonce uint64,
+) *DirectCall {
 	return &DirectCall{
 		Type:     DirectCallTxType,
 		SubType:  DepositCallSubType,
@@ -105,10 +112,15 @@ func NewDepositCall(address Address, amount *big.Int) *DirectCall {
 		Data:     nil,
 		Value:    amount,
 		GasLimit: DepositCallGasLimit,
+		Nonce:    nonce,
 	}
 }
 
-func NewWithdrawCall(address Address, amount *big.Int) *DirectCall {
+func NewWithdrawCall(
+	address Address,
+	amount *big.Int,
+	nonce uint64,
+) *DirectCall {
 	return &DirectCall{
 		Type:     DirectCallTxType,
 		SubType:  WithdrawCallSubType,
@@ -117,10 +129,16 @@ func NewWithdrawCall(address Address, amount *big.Int) *DirectCall {
 		Data:     nil,
 		Value:    amount,
 		GasLimit: WithdrawCallGasLimit,
+		Nonce:    nonce,
 	}
 }
 
-func NewTransferCall(from Address, to Address, amount *big.Int) *DirectCall {
+func NewTransferCall(
+	from Address,
+	to Address,
+	amount *big.Int,
+	nonce uint64,
+) *DirectCall {
 	return &DirectCall{
 		Type:     DirectCallTxType,
 		SubType:  TransferCallSubType,
@@ -129,6 +147,7 @@ func NewTransferCall(from Address, to Address, amount *big.Int) *DirectCall {
 		Data:     nil,
 		Value:    amount,
 		GasLimit: DefaultGasLimitForTokenTransfer,
+		Nonce:    nonce,
 	}
 }
 
@@ -137,6 +156,7 @@ func NewDeployCall(
 	code Code,
 	gasLimit uint64,
 	value *big.Int,
+	nonce uint64,
 ) *DirectCall {
 	return &DirectCall{
 		Type:     DirectCallTxType,
@@ -146,6 +166,7 @@ func NewDeployCall(
 		Data:     code,
 		Value:    value,
 		GasLimit: gasLimit,
+		Nonce:    nonce,
 	}
 }
 
@@ -158,6 +179,7 @@ func NewDeployCallWithTargetAddress(
 	code Code,
 	gasLimit uint64,
 	value *big.Int,
+	nonce uint64,
 ) *DirectCall {
 	return &DirectCall{
 		Type:     DirectCallTxType,
@@ -167,6 +189,7 @@ func NewDeployCallWithTargetAddress(
 		Data:     code,
 		Value:    value,
 		GasLimit: gasLimit,
+		Nonce:    nonce,
 	}
 }
 
@@ -176,6 +199,7 @@ func NewContractCall(
 	data Data,
 	gasLimit uint64,
 	value *big.Int,
+	nonce uint64,
 ) *DirectCall {
 	return &DirectCall{
 		Type:     DirectCallTxType,
@@ -185,6 +209,7 @@ func NewContractCall(
 		Data:     data,
 		Value:    value,
 		GasLimit: gasLimit,
+		Nonce:    nonce,
 	}
 }
 
