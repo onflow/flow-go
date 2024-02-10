@@ -5,6 +5,7 @@ import (
 
 	gethCore "github.com/ethereum/go-ethereum/core"
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
+
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
