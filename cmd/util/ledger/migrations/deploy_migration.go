@@ -27,7 +27,6 @@ func NewTransactionBasedMigration(
 			fvm.WithAuthorizationChecksEnabled(false),
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithTransactionFeesEnabled(false))
-		// more options might be needed for the context
 		ctx := fvm.NewContext(options...)
 
 		snapshot, err := util.NewPayloadSnapshot(payloads)
