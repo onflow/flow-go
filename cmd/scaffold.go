@@ -1326,7 +1326,7 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 
 		id := flow.IdentitySkeleton{
 			NodeID:        nodeID,
-			Address:       "test_execution_1",
+			Address:       "test_execution_1:2137",
 			Role:          flow.RoleExecution,
 			InitialWeight: 0,
 			NetworkPubKey: networkingPrivateKey.PublicKey(),
@@ -1336,6 +1336,9 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 		if err != nil {
 			return fmt.Errorf("could not initialize local: %w", err)
 		}
+		fnb.NodeID = nodeID
+		fnb.NetworkKey = networkingPrivateKey
+		fnb.StakingKey = networkingPrivateKey
 		return nil
 	}
 
