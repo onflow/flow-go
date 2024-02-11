@@ -1288,12 +1288,12 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 	}
 
 	if fnb.BaseConfig.ObserverMode {
-		info, err := LoadPrivateNodeInfo(fnb.BaseConfig.BootstrapDir, myID)
+		networkingPrivateKey, err := LoadNetworkPrivateKey(fnb.BaseConfig.BootstrapDir, myID)
 		if err != nil {
 			return fmt.Errorf("failed to load private node info: %w", err)
 		}
 
-		pubKey, err := keyutils.LibP2PPublicKeyFromFlow(info.NetworkPrivKey.PublicKey())
+		pubKey, err := keyutils.LibP2PPublicKeyFromFlow(networkingPrivateKey.PublicKey())
 		if err != nil {
 			return fmt.Errorf("could not load networking public key: %w", err)
 		}
@@ -1303,7 +1303,7 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 			return err
 		}
 
-		fnb.Logger.Info().Msgf("private key: %v, pub key: %x", info.NetworkPrivKey, k)
+		fnb.Logger.Info().Msgf("private key: %v, pub key: %x", networkingPrivateKey, k)
 
 		fnb.peerID, err = peer.IDFromPublicKey(pubKey)
 		if err != nil {
@@ -1317,13 +1317,13 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 
 		id := flow.IdentitySkeleton{
 			NodeID:        nodeID,
-			Address:       info.Address,
-			Role:          info.Role,
+			Address:       "test_execution_1",
+			Role:          flow.RoleExecution,
 			InitialWeight: 0,
-			NetworkPubKey: info.NetworkPrivKey.PublicKey(),
-			StakingPubKey: info.StakingPrivKey.PublicKey(),
+			NetworkPubKey: networkingPrivateKey.PublicKey(),
+			StakingPubKey: networkingPrivateKey.PublicKey(),
 		}
-		fnb.Me, err = local.New(id, info.StakingPrivKey)
+		fnb.Me, err = local.New(id, networkingPrivateKey)
 		if err != nil {
 			return fmt.Errorf("could not initialize local: %w", err)
 		}
