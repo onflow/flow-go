@@ -18,18 +18,24 @@ type modelv0 struct{}
 var _ Reader = new(modelv0)
 var _ API = new(modelv0)
 
+// VersionedEncode encodes the key-value store, returning the version separately
+// from the encoded bytes.
+// No errors are expected during normal operation.
 func (model *modelv0) VersionedEncode() (uint64, []byte, error) {
-	return versionedEncode(0, model)
+	return versionedEncode(model.GetProtocolStateVersion(), model)
 }
 
-func (model *modelv0) GetProtocolStateVersion() (uint64, error) {
-	return 0, nil
+// GetProtocolStateVersion returns the Protocol State version.
+func (model *modelv0) GetProtocolStateVersion() uint64 {
+	return 0
 }
 
+// GetInvalidEpochTransitionAttempted returns ErrKeyNotSupported.
 func (model *modelv0) GetInvalidEpochTransitionAttempted() (bool, error) {
 	return false, ErrKeyNotSupported
 }
 
+// SetInvalidEpochTransitionAttempted returns ErrKeyNotSupported.
 func (model *modelv0) SetInvalidEpochTransitionAttempted(_ bool) error {
 	return ErrKeyNotSupported
 }
@@ -50,18 +56,27 @@ type modelv1 struct {
 var _ Reader = new(modelv1)
 var _ API = new(modelv1)
 
+// VersionedEncode encodes the key-value store, returning the version separately
+// from the encoded bytes.
+// No errors are expected during normal operation.
 func (model *modelv1) VersionedEncode() (uint64, []byte, error) {
-	return versionedEncode(1, model)
+	return versionedEncode(model.GetProtocolStateVersion(), model)
 }
 
-func (model *modelv1) GetProtocolStateVersion() (uint64, error) {
-	return 1, nil
+// GetProtocolStateVersion returns the Protocol State version.
+func (model *modelv1) GetProtocolStateVersion() uint64 {
+	return 1
 }
 
+// GetInvalidEpochTransitionAttempted returns the InvalidEpochTransitionAttempted flag.
+// This key must have a value set and will never return ErrKeyNotSet.
+// No errors are expected during normal operation.
 func (model *modelv1) GetInvalidEpochTransitionAttempted() (bool, error) {
 	return model.InvalidEpochTransitionAttempted, nil
 }
 
+// SetInvalidEpochTransitionAttempted sets the InvalidEpochTransitionAttempted flag.
+// No errors are expected during normal operation.
 func (model *modelv1) SetInvalidEpochTransitionAttempted(attempted bool) error {
 	model.InvalidEpochTransitionAttempted = attempted
 	return nil

@@ -22,8 +22,7 @@ type Reader interface {
 	// correspond to changes in the set of key-value pairs which are supported,
 	// and which model is used for serialization.
 	// It can be updated by an UpdateKVStoreVersion service event.
-	// No errors are expected under normal operation.
-	GetProtocolStateVersion() (uint64, error)
+	GetProtocolStateVersion() uint64
 
 	// v1
 

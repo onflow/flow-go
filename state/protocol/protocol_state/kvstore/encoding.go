@@ -27,7 +27,8 @@ func versionedEncode(version uint64, pairs any) (uint64, []byte, error) {
 }
 
 // VersionedDecode decodes a serialized key-value store instance with the given version.
-// No errors are expected during normal operation.
+// Errors:
+//   - ErrUnsupportedVersion if input version is not supported
 func VersionedDecode(version uint64, bz []byte) (API, error) {
 	var target API
 	switch version {
