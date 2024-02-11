@@ -214,5 +214,12 @@ func WriteTestExecutionService(_ flow.Identifier, address, observerName, bootstr
 		return bootstrap.NodeInfo{}, err
 	}
 
+	// write network private key
+	outputFile := fmt.Sprintf("%s/private-root-information/private-node-info_%v/network_private_key", bootstrapDir, nodeID)
+	err = os.WriteFile(outputFile, output, 0600)
+	if err != nil {
+		return bootstrap.NodeInfo{}, fmt.Errorf("could not write private key to file: %w", err)
+	}
+
 	return nodeInfo, nil
 }
