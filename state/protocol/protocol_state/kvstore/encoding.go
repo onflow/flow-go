@@ -2,7 +2,9 @@ package kvstore
 
 import (
 	"bytes"
+
 	"github.com/onflow/flow-go/module/irrecoverable"
+
 	"github.com/vmihailenco/msgpack/v4"
 )
 
