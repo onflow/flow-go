@@ -659,8 +659,13 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"state-stream-addr",
 			defaultConfig.stateStreamConf.ListenAddr,
 			"the address the state stream server listens on (if empty the server will not be started)")
-		flags.Uint32Var(&builder.stateStreamConf.ExecutionDataCacheSize, "execution-data-cache-size", defaultConfig.stateStreamConf.ExecutionDataCacheSize, "block execution data cache size")
-		flags.Uint32Var(&builder.stateStreamConf.MaxGlobalStreams, "state-stream-global-max-streams", defaultConfig.stateStreamConf.MaxGlobalStreams, "global maximum number of concurrent streams")
+		flags.Uint32Var(&builder.stateStreamConf.ExecutionDataCacheSize,
+			"execution-data-cache-size",
+			defaultConfig.stateStreamConf.ExecutionDataCacheSize,
+			"block execution data cache size")
+		flags.Uint32Var(&builder.stateStreamConf.MaxGlobalStreams,
+			"state-stream-global-max-streams", defaultConfig.stateStreamConf.MaxGlobalStreams,
+			"global maximum number of concurrent streams")
 		flags.UintVar(&builder.stateStreamConf.MaxExecutionDataMsgSize,
 			"state-stream-max-message-size",
 			defaultConfig.stateStreamConf.MaxExecutionDataMsgSize,
