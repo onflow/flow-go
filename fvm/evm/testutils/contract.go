@@ -411,14 +411,24 @@ func DeployContract(t testing.TB, tc *TestContract, led atree.Ledger, flowEVMRoo
 	// deploy contract
 	e := emulator.NewEmulator(led, flowEVMRootAddress)
 
-	blk, err := e.NewBlockView(types.NewDefaultBlockContext(2))
+	caller := types.NewAddress(gethCommon.Address{})
+
+	ctx := types.NewDefaultBlockContext(2)
+
+	bl, err := e.NewReadOnlyBlockView(ctx)
 	require.NoError(t, err)
 
-	caller := types.NewAddress(gethCommon.Address{})
+	nonce, err := bl.NonceOf(caller)
+	require.NoError(t, err)
+
+	blk, err := e.NewBlockView(ctx)
+	require.NoError(t, err)
+
 	_, err = blk.DirectCall(
 		types.NewDepositCall(
 			caller,
 			new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)),
+			nonce,
 		),
 	)
 	require.NoError(t, err)
@@ -432,6 +442,7 @@ func DeployContract(t testing.TB, tc *TestContract, led atree.Ledger, flowEVMRoo
 			tc.ByteCode,
 			math.MaxUint64,
 			big.NewInt(0),
+			nonce+1,
 		),
 	)
 	require.NoError(t, err)

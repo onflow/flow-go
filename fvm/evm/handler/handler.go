@@ -69,12 +69,14 @@ func (h *ContractHandler) DeployCOA(uuid uint64) types.Address {
 	h.checkGasLimit(gaslimit)
 
 	factory := h.addressAllocator.COAFactoryAddress()
+	factoryAccount := h.AccountByAddress(factory, false)
 	call := types.NewDeployCallWithTargetAddress(
 		factory,
 		target,
 		coa.ContractBytes,
 		uint64(gaslimit),
 		new(big.Int),
+		factoryAccount.Nonce(),
 	)
 	res := h.executeAndHandleCall(h.getBlockContext(), call, nil, false)
 	return res.DeployedContractAddress
@@ -254,6 +256,22 @@ func (a *Account) Address() types.Address {
 	return a.address
 }
 
+// Nonce returns the nonce of this account
+//
+// TODO: we might need to meter computation for read only operations as well
+// currently the storage limits is enforced
+func (a *Account) Nonce() uint64 {
+	ctx := a.fch.getBlockContext()
+
+	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
+	handleError(err)
+
+	nonce, err := blk.NonceOf(a.address)
+	handleError(err)
+
+	return nonce
+}
+
 // Balance returns the balance of this account
 //
 // TODO: we might need to meter computation for read only operations as well
@@ -300,9 +318,13 @@ func (a *Account) Deposit(v *types.FLOWTokenVault) {
 	cfg := a.fch.getBlockContext()
 	a.fch.checkGasLimit(types.GasLimit(cfg.DirectCallBaseGasUsage))
 
+	bridge := a.fch.addressAllocator.NativeTokenBridgeAddress()
+	bridgeAccount := a.fch.AccountByAddress(bridge, false)
+
 	call := types.NewDepositCall(
 		a.address,
 		v.Balance(),
+		bridgeAccount.Nonce(),
 	)
 	a.fch.executeAndHandleCall(a.fch.getBlockContext(), call, v.Balance(), false)
 }
@@ -329,6 +351,7 @@ func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 	call := types.NewWithdrawCall(
 		a.address,
 		b,
+		a.Nonce(),
 	)
 	a.fch.executeAndHandleCall(a.fch.getBlockContext(), call, b, true)
 
@@ -346,6 +369,7 @@ func (a *Account) Transfer(to types.Address, balance types.Balance) {
 		a.address,
 		to,
 		balance,
+		a.Nonce(),
 	)
 	a.fch.executeAndHandleCall(ctx, call, nil, false)
 }
@@ -362,6 +386,7 @@ func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types
 		code,
 		uint64(gaslimit),
 		balance,
+		a.Nonce(),
 	)
 	res := a.fch.executeAndHandleCall(a.fch.getBlockContext(), call, nil, false)
 	return types.Address(res.DeployedContractAddress)
@@ -380,6 +405,7 @@ func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimi
 		data,
 		uint64(gaslimit),
 		balance,
+		a.Nonce(),
 	)
 	res := a.fch.executeAndHandleCall(a.fch.getBlockContext(), call, nil, false)
 	return res.ReturnedValue
