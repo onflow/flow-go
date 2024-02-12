@@ -43,12 +43,12 @@ func TestGossipSubInvalidMessageDelivery_Integration(t *testing.T) {
 				return p2ptest.PubsubMessageFixture(t, p2ptest.WithTopic(topic.String()), p2ptest.WithoutSignature())
 			},
 		},
-		//{
-		//	name: "known peer, invalid signature",
-		//	spamMsgFactory: func(spammerId peer.ID, _ peer.ID, topic channels.Topic) *pubsub_pb.Message {
-		//		return p2ptest.PubsubMessageFixture(t, p2ptest.WithFrom(spammerId), p2ptest.WithTopic(topic.String()))
-		//	},
-		//},
+		{
+			name: "known peer, invalid signature",
+			spamMsgFactory: func(spammerId peer.ID, _ peer.ID, topic channels.Topic) *pubsub_pb.Message {
+				return p2ptest.PubsubMessageFixture(t, p2ptest.WithFrom(spammerId), p2ptest.WithTopic(topic.String()))
+			},
+		},
 		{
 			name: "known peer, missing signature",
 			spamMsgFactory: func(spammerId peer.ID, _ peer.ID, topic channels.Topic) *pubsub_pb.Message {
@@ -108,6 +108,7 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 	require.NoError(t, err)
 	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
 	cfg.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
+	cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.TopicParameters.InvalidMessageDeliveriesDecay = .01
 	victimNode, victimIdentity := p2ptest.NodeFixture(
 		t,
 		sporkId,
