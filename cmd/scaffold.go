@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -13,12 +15,17 @@ import (
 	gcemd "cloud.google.com/go/compute/metadata"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/hashicorp/go-multierror"
-	"github.com/libp2p/go-libp2p-core/peer"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"golang.org/x/time/rate"
 	"google.golang.org/api/option"
+
+	"github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
@@ -53,13 +60,16 @@ import (
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/connection"
+	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/network/p2p/ping"
+	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
@@ -129,6 +139,10 @@ type FlowNodeBuilder struct {
 	adminCommands            map[string]func(config *NodeConfig) commands.AdminCommand
 	componentBuilder         component.ComponentManagerBuilder
 	peerID                   peer.ID
+	bootstrapNodeAddresses   []string
+	bootstrapNodePublicKeys  []string
+
+	bootstrapIdentities flow.IdentitySkeletonList // the identity list of bootstrap peers the node uses to discover other nodes
 }
 
 var _ NodeBuilder = (*FlowNodeBuilder)(nil)
@@ -232,6 +246,15 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"compliance-skip-proposals-threshold",
 		defaultConfig.ComplianceConfig.SkipNewProposalsThreshold,
 		"threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
+
+	fnb.flags.StringSliceVar(&fnb.bootstrapNodePublicKeys,
+		"bootstrap-node-public-keys",
+		nil,
+		"the networking public key of the bootstrap access node if this is an observer (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
+	fnb.flags.StringSliceVar(&fnb.bootstrapNodeAddresses,
+		"bootstrap-node-addresses",
+		nil,
+		"the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -377,6 +400,75 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	}
 
 	fnb.Component(LibP2PNodeComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		if fnb.ObserverMode {
+			var pis []peer.AddrInfo
+
+			ids, err := BootstrapIdentities(fnb.bootstrapNodeAddresses, fnb.bootstrapNodePublicKeys)
+			if err != nil {
+				return nil, fmt.Errorf("could not create bootstrap identities: %w", err)
+			}
+
+			fnb.bootstrapIdentities = ids
+
+			for _, b := range fnb.bootstrapIdentities {
+				pi, err := utils.PeerAddressInfo(*b)
+				if err != nil {
+					return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
+				}
+
+				pis = append(pis, pi)
+			}
+
+			myAddr := fnb.NodeConfig.Me.Address()
+			if fnb.BaseConfig.BindAddr != NotSet {
+				myAddr = fnb.BaseConfig.BindAddr
+			}
+
+			node, err := p2pbuilder.NewNodeBuilder(
+				fnb.Logger,
+				&fnb.FlowConfig.NetworkConfig.GossipSub,
+				&p2pbuilderconfig.MetricsConfig{
+					HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
+					Metrics:          fnb.Metrics.Network,
+				},
+				network.PublicNetwork,
+				myAddr,
+				fnb.NetworkKey,
+				fnb.SporkID,
+				fnb.IdentityProvider,
+				&fnb.FlowConfig.NetworkConfig.ResourceManager,
+				p2pbuilderconfig.PeerManagerDisableConfig(), // disable peer manager for observer node.
+				&p2p.DisallowListCacheConfig{
+					MaxSize: fnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
+					Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PublicNetwork),
+				},
+				&p2pbuilderconfig.UnicastConfig{
+					Unicast: fnb.FlowConfig.NetworkConfig.Unicast,
+				}).
+				SetSubscriptionFilter(
+					subscription.NewRoleBasedFilter(
+						subscription.UnstakedRole, fnb.IdentityProvider,
+					),
+				).
+				SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
+					return p2pdht.NewDHT(ctx, h, protocols.FlowPublicDHTProtocolID(fnb.SporkID),
+						fnb.Logger,
+						fnb.Metrics.Network,
+						p2pdht.AsClient(),
+						dht.BootstrapPeers(pis...),
+					)
+				}).
+				Build()
+
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize libp2p node for observer: %w", err)
+			}
+
+			fnb.LibP2PNode = node
+
+			return node, nil
+		}
+
 		myAddr := fnb.NodeConfig.Me.Address()
 		if fnb.BaseConfig.BindAddr != NotSet {
 			myAddr = fnb.BaseConfig.BindAddr
@@ -437,9 +529,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	})
 
 	// peer manager won't be created until all PeerManagerDependencies are ready.
-	fnb.DependableComponent("peer manager", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		return fnb.LibP2PNode.PeerManagerComponent(), nil
-	}, fnb.PeerManagerDependencies)
+	if !fnb.ObserverMode {
+		fnb.DependableComponent("peer manager", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+			return fnb.LibP2PNode.PeerManagerComponent(), nil
+		}, fnb.PeerManagerDependencies)
+	}
 }
 
 // HeroCacheMetricsFactory returns a HeroCacheMetricsFactory based on the MetricsEnabled flag.
@@ -485,6 +579,11 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 		return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
 	}
 
+	networkType := network.PrivateNetwork
+	if fnb.ObserverMode {
+		networkType = network.PublicNetwork
+	}
+
 	// creates network instance
 	net, err := underlay.NewNetwork(&underlay.NetworkConfig{
 		Logger:                fnb.Logger,
@@ -508,7 +607,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 			HeartBeatInterval:       fnb.FlowConfig.NetworkConfig.AlspConfig.HearBeatInterval,
 			AlspMetrics:             fnb.Metrics.Network,
 			HeroCacheMetricsFactory: fnb.HeroCacheMetricsFactory(),
-			NetworkType:             network.PrivateNetwork,
+			NetworkType:             networkType,
 		},
 		SlashingViolationConsumerFactory: func(adapter network.ConduitAdapter) network.ViolationsConsumer {
 			return slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network, adapter)
@@ -1513,6 +1612,9 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, dependencies <
 		if err != nil {
 			ctx.Throw(fmt.Errorf("component %s initialization failed: %w", v.name, err))
 		}
+		if readyAware == nil {
+			ctx.Throw(fmt.Errorf("component %s initialization failed: nil component", v.name))
+		}
 		logger.Info().Msg("component initialization complete")
 
 		// if this is a Component, use the Startable interface to start the component, otherwise
@@ -1841,6 +1943,12 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 
 	fnb.EnqueueNetworkInit()
 
+	// if fnb.ObserverMode {
+	// 	fnb.Component("upstream connector", func(_ *NodeConfig) (module.ReadyDoneAware, error) {
+	// 		return consensus_follower.NewUpstreamConnector(fnb.bootstrapIdentities, fnb.LibP2PNode, fnb.Logger), nil
+	// 	})
+	// }
+
 	fnb.EnqueuePingService()
 
 	if fnb.MetricsEnabled {
@@ -2021,4 +2129,35 @@ func DhtSystemActivationStatus(roleStr string) (p2pbuilder.DhtSystemActivation, 
 	}
 
 	return p2pbuilder.DhtSystemDisabled, nil
+}
+
+// BootstrapIdentities converts the bootstrap node addresses and keys to a Flow Identity list where
+// each Flow Identity is initialized with the passed address, the networking key
+// and the Node ID set to ZeroID, role set to Access, 0 stake and no staking key.
+func BootstrapIdentities(addresses []string, keys []string) (flow.IdentitySkeletonList, error) {
+	if len(addresses) != len(keys) {
+		return nil, fmt.Errorf("number of addresses and keys provided for the boostrap nodes don't match")
+	}
+
+	ids := make(flow.IdentitySkeletonList, len(addresses))
+	for i, address := range addresses {
+		bytes, err := hex.DecodeString(keys[i])
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode secured GRPC server public key hex %w", err)
+		}
+
+		publicFlowNetworkingKey, err := crypto.DecodePublicKey(crypto.ECDSAP256, bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get public flow networking key could not decode public key bytes %w", err)
+		}
+
+		// create the identity of the peer by setting only the relevant fields
+		ids[i] = &flow.IdentitySkeleton{
+			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the public network it does not apply
+			Address:       address,
+			Role:          flow.RoleAccess, // the upstream node has to be an access node
+			NetworkPubKey: publicFlowNetworkingKey,
+		}
+	}
+	return ids, nil
 }

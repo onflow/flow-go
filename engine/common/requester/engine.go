@@ -133,7 +133,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.EngineReg
 // function. It is done in a separate call so that the requester can be injected
 // into engines upon construction, and then provide a handle function to the
 // requester from that engine itself.
-func (e *Engine) WithHandle(handle HandleFunc) *Engine {
+func (e *Engine) WithHandle(handle HandleFunc) module.Requester {
 	e.handle = handle
 	return e
 }

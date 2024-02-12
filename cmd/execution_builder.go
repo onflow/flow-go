@@ -135,14 +135,14 @@ type ExecutionNode struct {
 	txResults              *storage.TransactionResults
 	results                *storage.ExecutionResults
 	myReceipts             *storage.MyExecutionReceipts
-	providerEngine         *exeprovider.Engine
+	providerEngine         exeprovider.ProviderEngine
 	checkerEng             *checker.Engine
 	syncCore               *chainsync.Core
 	syncEngine             *synchronization.Engine
 	followerCore           *hotstuff.FollowerLoop        // follower hotstuff logic
 	followerEng            *followereng.ComplianceEngine // to sync blocks from consensus nodes
 	computationManager     *computation.Manager
-	collectionRequester    *requester.Engine
+	collectionRequester    module.Requester
 	ingestionEng           *ingestion.Engine
 	scriptsEng             *scripts.Engine
 	followerDistributor    *pubsub.FollowerDistributor
@@ -521,26 +521,30 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	}
 	exeNode.computationManager = manager
 
-	var chunkDataPackRequestQueueMetrics module.HeroCacheMetrics = metrics.NewNoopCollector()
-	if node.HeroCacheMetricsEnable {
-		chunkDataPackRequestQueueMetrics = metrics.ChunkDataPackRequestQueueMetricsFactory(node.MetricsRegisterer)
-	}
-	chdpReqQueue := queue.NewHeroStore(exeNode.exeConf.chunkDataPackRequestsCacheSize, node.Logger, chunkDataPackRequestQueueMetrics)
-	exeNode.providerEngine, err = exeprovider.New(
-		node.Logger,
-		node.Tracer,
-		node.EngineRegistry,
-		node.State,
-		exeNode.executionState,
-		exeNode.collector,
-		exeNode.checkAuthorizedAtBlock,
-		chdpReqQueue,
-		exeNode.exeConf.chunkDataPackRequestWorkers,
-		exeNode.exeConf.chunkDataPackQueryTimeout,
-		exeNode.exeConf.chunkDataPackDeliveryTimeout,
-	)
-	if err != nil {
-		return nil, err
+	if node.ObserverMode {
+		exeNode.providerEngine = &exeprovider.NoopEngine{}
+	} else {
+		var chunkDataPackRequestQueueMetrics module.HeroCacheMetrics = metrics.NewNoopCollector()
+		if node.HeroCacheMetricsEnable {
+			chunkDataPackRequestQueueMetrics = metrics.ChunkDataPackRequestQueueMetricsFactory(node.MetricsRegisterer)
+		}
+		chdpReqQueue := queue.NewHeroStore(exeNode.exeConf.chunkDataPackRequestsCacheSize, node.Logger, chunkDataPackRequestQueueMetrics)
+		exeNode.providerEngine, err = exeprovider.New(
+			node.Logger,
+			node.Tracer,
+			node.EngineRegistry,
+			node.State,
+			exeNode.executionState,
+			exeNode.collector,
+			exeNode.checkAuthorizedAtBlock,
+			chdpReqQueue,
+			exeNode.exeConf.chunkDataPackRequestWorkers,
+			exeNode.exeConf.chunkDataPackQueryTimeout,
+			exeNode.exeConf.chunkDataPackDeliveryTimeout,
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Get latest executed block and a view at that block
@@ -969,16 +973,20 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 	error,
 ) {
 	var err error
-	exeNode.collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.EngineRegistry, node.Me, node.State,
-		channels.RequestCollections,
-		filter.Any,
-		func() flow.Entity { return &flow.Collection{} },
-		// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
-		requester.WithBatchInterval(exeNode.exeConf.requestInterval),
-		// consistency of collection can be checked by checking hash, and hash comes from trusted source (blocks from consensus follower)
-		// hence we not need to check origin
-		requester.WithValidateStaking(false),
-	)
+	if node.ObserverMode {
+		exeNode.collectionRequester = &module.NoopRequester{}
+	} else {
+		exeNode.collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.EngineRegistry, node.Me, node.State,
+			channels.RequestCollections,
+			filter.Any,
+			func() flow.Entity { return &flow.Collection{} },
+			// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
+			requester.WithBatchInterval(exeNode.exeConf.requestInterval),
+			// consistency of collection can be checked by checking hash, and hash comes from trusted source (blocks from consensus follower)
+			// hence we not need to check origin
+			requester.WithValidateStaking(false),
+		)
+	}
 
 	if err != nil {
 		return nil, fmt.Errorf("could not create requester engine: %w", err)
