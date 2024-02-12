@@ -2,6 +2,7 @@ package handler
 
 import (
 	"github.com/onflow/cadence/runtime/sema"
+
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
