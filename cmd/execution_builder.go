@@ -142,7 +142,7 @@ type ExecutionNode struct {
 	followerCore           *hotstuff.FollowerLoop        // follower hotstuff logic
 	followerEng            *followereng.ComplianceEngine // to sync blocks from consensus nodes
 	computationManager     *computation.Manager
-	collectionRequester    module.Requester
+	collectionRequester    *requester.Engine
 	ingestionEng           *ingestion.Engine
 	scriptsEng             *scripts.Engine
 	followerDistributor    *pubsub.FollowerDistributor
@@ -969,21 +969,22 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 	module.ReadyDoneAware,
 	error,
 ) {
-	var err error
+	engineRegister := node.EngineRegistry
 	if node.ObserverMode {
-		exeNode.collectionRequester = &module.NoopRequester{}
-	} else {
-		exeNode.collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.EngineRegistry, node.Me, node.State,
-			channels.RequestCollections,
-			filter.Any,
-			func() flow.Entity { return &flow.Collection{} },
-			// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
-			requester.WithBatchInterval(exeNode.exeConf.requestInterval),
-			// consistency of collection can be checked by checking hash, and hash comes from trusted source (blocks from consensus follower)
-			// hence we not need to check origin
-			requester.WithValidateStaking(false),
-		)
+		engineRegister = &network.NoopEngineRegister{}
 	}
+
+	var err error
+	exeNode.collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, engineRegister, node.Me, node.State,
+		channels.RequestCollections,
+		filter.Any,
+		func() flow.Entity { return &flow.Collection{} },
+		// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
+		requester.WithBatchInterval(exeNode.exeConf.requestInterval),
+		// consistency of collection can be checked by checking hash, and hash comes from trusted source (blocks from consensus follower)
+		// hence we not need to check origin
+		requester.WithValidateStaking(false),
+	)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not create requester engine: %w", err)
@@ -1169,10 +1170,14 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 	}
 	receiptRequestQueue := queue.NewHeroStore(exeNode.exeConf.receiptRequestsCacheSize, node.Logger, receiptRequestQueueMetric)
 
+	engineRegister := node.EngineRegistry
+	if node.ObserverMode {
+		engineRegister = &network.NoopEngineRegister{}
+	}
 	eng, err := provider.New(
 		node.Logger.With().Str("engine", "receipt_provider").Logger(),
 		node.Metrics.Engine,
-		node.EngineRegistry,
+		engineRegister,
 		node.Me,
 		node.State,
 		receiptRequestQueue,

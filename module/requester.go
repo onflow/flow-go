@@ -25,8 +25,6 @@ type Requester interface {
 	// It can be used in cases where responsiveness is of utmost importance, at
 	// the cost of additional network messages.
 	Force()
-
-	WithHandle(func(flow.Identifier, flow.Entity)) Requester
 }
 
 type NoopRequester struct{}
