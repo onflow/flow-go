@@ -6,15 +6,8 @@ import (
 	"io"
 
 	"github.com/onflow/cadence/migrations/statictypes"
+	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
-
-	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
-	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/tracing"
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
-	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/cadence/migrations"
 	"github.com/onflow/cadence/migrations/capcons"
@@ -22,6 +15,13 @@ import (
 	"github.com/onflow/cadence/migrations/string_normalization"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/tracing"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type CadenceBaseMigrator struct {
@@ -33,6 +33,7 @@ type CadenceBaseMigrator struct {
 		accounts environment.Accounts,
 		reporter *cadenceValueMigrationReporter,
 	) []migrations.ValueMigration
+	runtimeInterfaceConfig util.RuntimeInterfaceConfig
 }
 
 var _ AccountBasedMigration = (*CadenceBaseMigrator)(nil)
@@ -46,10 +47,38 @@ func (m *CadenceBaseMigrator) Close() error {
 
 func (m *CadenceBaseMigrator) InitMigration(
 	log zerolog.Logger,
-	_ []*ledger.Payload,
+	allPayloads []*ledger.Payload,
 	_ int,
 ) error {
 	m.log = log.With().Str("migration", m.name).Logger()
+
+	// The MigrateAccount function is only given the payloads for the account to be migrated.
+	// However, the migration needs to be able to get the code for contracts of any account.
+
+	fullPayloadSnapshot, err := util.NewPayloadSnapshot(allPayloads)
+	if err != nil {
+		return err
+	}
+
+	m.runtimeInterfaceConfig = util.RuntimeInterfaceConfig{
+
+		GetContractCodeFunc: func(location runtime.Location) ([]byte, error) {
+			addressLocation, ok := location.(common.AddressLocation)
+			if !ok {
+				return nil, nil
+			}
+			contractRegisterID := flow.ContractRegisterID(
+				flow.Address(addressLocation.Address),
+				addressLocation.Name,
+			)
+			contract, err := fullPayloadSnapshot.Get(contractRegisterID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get contract code: %w", err)
+			}
+			return contract, nil
+		},
+	}
+
 	return nil
 }
 
@@ -60,10 +89,11 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 ) ([]*ledger.Payload, error) {
 
 	// Create all the runtime components we need for the migration
+
 	migrationRuntime, err := newMigratorRuntime(
 		address,
 		oldPayloads,
-		util.RuntimeInterfaceConfig{},
+		m.runtimeInterfaceConfig,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
@@ -103,46 +133,17 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 	}
 
 	// Merge the changes to the original payloads.
-	return m.mergeRegisterChanges(migrationRuntime, result.WriteSet)
+	return MergeRegisterChanges(
+		migrationRuntime.Snapshot.Payloads,
+		result.WriteSet,
+		m.log,
+	)
 }
 
-func (m *CadenceBaseMigrator) mergeRegisterChanges(
-	mr *migratorRuntime,
-	changes map[flow.RegisterID]flow.RegisterValue,
-) ([]*ledger.Payload, error) {
-
-	originalPayloads := mr.Snapshot.Payloads
-	newPayloads := make([]*ledger.Payload, 0, len(originalPayloads))
-
-	// Add all new payloads.
-	for id, value := range changes {
-		key := convert.RegisterIDToLedgerKey(id)
-		newPayloads = append(newPayloads, ledger.NewPayload(key, value))
-	}
-
-	// Add any old payload that wasn't updated.
-	for id, value := range originalPayloads {
-		if len(value.Value()) == 0 {
-			// This is strange, but we don't want to add empty values. Log it.
-			m.log.Warn().Msgf("empty value for key %s", id)
-			continue
-		}
-
-		// If the payload had changed, then it has been added earlier.
-		// So skip old payload.
-		if _, contains := changes[id]; contains {
-			continue
-		}
-
-		newPayloads = append(newPayloads, value)
-	}
-
-	return newPayloads, nil
-}
-
-func NewCadenceValueMigrator(
+// NewCadence1ValueMigrator creates a new CadenceBaseMigrator
+// which runs some of the Cadence value migrations (static types, entitlements, strings)
+func NewCadence1ValueMigrator(
 	rwf reporters.ReportWriterFactory,
-	capabilityIDs map[interpreter.AddressPath]interpreter.UInt64Value,
 	compositeTypeConverter statictypes.CompositeTypeConverterFunc,
 	interfaceTypeConverter statictypes.InterfaceTypeConverterFunc,
 ) *CadenceBaseMigrator {
@@ -154,25 +155,23 @@ func NewCadenceValueMigrator(
 			_ environment.Accounts,
 			reporter *cadenceValueMigrationReporter,
 		) []migrations.ValueMigration {
-			// All cadence migrations except the `capcons.LinkValueMigration`.
 			return []migrations.ValueMigration{
-				&capcons.CapabilityValueMigration{
-					CapabilityIDs: capabilityIDs,
-					Reporter:      reporter,
-				},
-				entitlements.NewEntitlementsMigration(inter),
-				string_normalization.NewStringNormalizingMigration(),
 				statictypes.NewStaticTypeMigration().
 					WithCompositeTypeConverter(compositeTypeConverter).
 					WithInterfaceTypeConverter(interfaceTypeConverter),
+				entitlements.NewEntitlementsMigration(inter),
+				string_normalization.NewStringNormalizingMigration(),
 			}
 		},
 	}
 }
 
-func NewCadenceLinkValueMigrator(
+// NewCadence1LinkValueMigrator creates a new CadenceBaseMigrator
+// which migrates links to capability controllers.
+// It populates the given map with the IDs of the capability controller it issues.
+func NewCadence1LinkValueMigrator(
 	rwf reporters.ReportWriterFactory,
-	capabilityIDs map[interpreter.AddressPath]interpreter.UInt64Value,
+	capabilityIDs *capcons.CapabilityIDMapping,
 ) *CadenceBaseMigrator {
 	return &CadenceBaseMigrator{
 		name:     "cadence-link-value-migration",
@@ -192,6 +191,32 @@ func NewCadenceLinkValueMigrator(
 					CapabilityIDs:      capabilityIDs,
 					AccountIDGenerator: idGenerator,
 					Reporter:           reporter,
+				},
+			}
+		},
+	}
+}
+
+// NewCadence1CapabilityValueMigrator creates a new CadenceBaseMigrator
+// which migrates path capability values to ID capability values.
+// It requires a map the IDs of the capability controllers,
+// generated by the link value migration.
+func NewCadence1CapabilityValueMigrator(
+	rwf reporters.ReportWriterFactory,
+	capabilityIDs *capcons.CapabilityIDMapping,
+) *CadenceBaseMigrator {
+	return &CadenceBaseMigrator{
+		name:     "cadence-capability-value-migration",
+		reporter: rwf.ReportWriter("cadence-capability-value-migrator"),
+		valueMigrations: func(
+			_ *interpreter.Interpreter,
+			_ environment.Accounts,
+			reporter *cadenceValueMigrationReporter,
+		) []migrations.ValueMigration {
+			return []migrations.ValueMigration{
+				&capcons.CapabilityValueMigration{
+					CapabilityIDs: capabilityIDs,
+					Reporter:      reporter,
 				},
 			}
 		},
@@ -248,7 +273,7 @@ func (t *cadenceValueMigrationReporter) MigratedPathCapability(
 	addressPath interpreter.AddressPath,
 	borrowType *interpreter.ReferenceStaticType,
 ) {
-	t.rw.Write(capConsPathCapabilityMigration{
+	t.rw.Write(capConsPathCapabilityMigrationEntry{
 		AccountAddress: accountAddress,
 		AddressPath:    addressPath,
 		BorrowType:     borrowType,
@@ -259,7 +284,7 @@ func (t *cadenceValueMigrationReporter) MissingCapabilityID(
 	accountAddress common.Address,
 	addressPath interpreter.AddressPath,
 ) {
-	t.rw.Write(capConsMissingCapabilityID{
+	t.rw.Write(capConsMissingCapabilityIDEntry{
 		AccountAddress: accountAddress,
 		AddressPath:    addressPath,
 	})
@@ -269,7 +294,7 @@ func (t *cadenceValueMigrationReporter) MigratedLink(
 	accountAddressPath interpreter.AddressPath,
 	capabilityID interpreter.UInt64Value,
 ) {
-	t.rw.Write(capConsLinkMigration{
+	t.rw.Write(capConsLinkMigrationEntry{
 		AccountAddressPath: accountAddressPath,
 		CapabilityID:       capabilityID,
 	})
@@ -280,9 +305,13 @@ func (t *cadenceValueMigrationReporter) CyclicLink(err capcons.CyclicLinkError) 
 }
 
 func (t *cadenceValueMigrationReporter) MissingTarget(accountAddressPath interpreter.AddressPath) {
-	t.rw.Write(capConsMissingTarget{
+	t.rw.Write(capConsMissingTargetEntry{
 		AddressPath: accountAddressPath,
 	})
+}
+
+type reportEntry interface {
+	accountAddress() common.Address
 }
 
 type cadenceValueMigrationReportEntry struct {
@@ -291,22 +320,52 @@ type cadenceValueMigrationReportEntry struct {
 	Migration     string                    `json:"migration"`
 }
 
-type capConsLinkMigration struct {
+var _ reportEntry = cadenceValueMigrationReportEntry{}
+
+func (e cadenceValueMigrationReportEntry) accountAddress() common.Address {
+	return e.StorageKey.Address
+}
+
+type capConsLinkMigrationEntry struct {
 	AccountAddressPath interpreter.AddressPath `json:"address"`
 	CapabilityID       interpreter.UInt64Value `json:"capabilityID"`
 }
 
-type capConsPathCapabilityMigration struct {
+var _ reportEntry = capConsLinkMigrationEntry{}
+
+func (e capConsLinkMigrationEntry) accountAddress() common.Address {
+	return e.AccountAddressPath.Address
+}
+
+type capConsPathCapabilityMigrationEntry struct {
 	AccountAddress common.Address                   `json:"address"`
 	AddressPath    interpreter.AddressPath          `json:"addressPath"`
 	BorrowType     *interpreter.ReferenceStaticType `json:"borrowType"`
 }
 
-type capConsMissingCapabilityID struct {
+var _ reportEntry = capConsPathCapabilityMigrationEntry{}
+
+func (e capConsPathCapabilityMigrationEntry) accountAddress() common.Address {
+	return e.AccountAddress
+}
+
+type capConsMissingCapabilityIDEntry struct {
 	AccountAddress common.Address          `json:"address"`
 	AddressPath    interpreter.AddressPath `json:"addressPath"`
 }
 
-type capConsMissingTarget struct {
+var _ reportEntry = capConsMissingCapabilityIDEntry{}
+
+type capConsMissingTargetEntry struct {
 	AddressPath interpreter.AddressPath `json:"addressPath"`
+}
+
+func (e capConsMissingTargetEntry) accountAddress() common.Address {
+	return e.AddressPath.Address
+}
+
+var _ reportEntry = capConsMissingTargetEntry{}
+
+func (e capConsMissingCapabilityIDEntry) accountAddress() common.Address {
+	return e.AccountAddress
 }

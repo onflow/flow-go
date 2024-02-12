@@ -1,16 +1,16 @@
-access(all) contract Test {
+pub contract Test {
 
-	access(all) struct interface Foo {}
+	pub struct interface Foo {}
 
-	access(all) struct interface Bar {}
+	pub struct interface Bar {}
 
-	access(all) struct interface Baz {}
+	pub struct interface Baz {}
 
-	access(all) resource R {
-        access(all) fun foo() {}
+	pub resource R {
+        pub fun foo() {}
 	}
 
-	access(all) fun createR(): @R {
+	pub fun createR(): @R {
 		return <- create R()
 	}
 }

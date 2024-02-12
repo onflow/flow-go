@@ -3,6 +3,7 @@ package migrations
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -19,30 +20,30 @@ import (
 )
 
 type StagedContractsMigration struct {
-	log                   zerolog.Logger
-	mutex                 sync.RWMutex
-	contracts             map[common.Address]map[flow.RegisterID]Contract
-	contractsByLocation   map[common.Location][]byte
-	stagedContractsGetter func() []StagedContract
+	log                 zerolog.Logger
+	mutex               sync.RWMutex
+	contracts           map[common.Address]map[flow.RegisterID]Contract
+	contractsByLocation map[common.Location][]byte
+	stagedContracts     []StagedContract
 }
 
 type StagedContract struct {
 	Contract
-	address common.Address
+	Address common.Address
 }
 
 type Contract struct {
-	name string
-	code []byte
+	Name string
+	Code []byte
 }
 
 var _ AccountBasedMigration = &StagedContractsMigration{}
 
-func NewStagedContractsMigration(stagedContractsGetter func() []StagedContract) *StagedContractsMigration {
+func NewStagedContractsMigration(stagedContracts []StagedContract) *StagedContractsMigration {
 	return &StagedContractsMigration{
-		stagedContractsGetter: stagedContractsGetter,
-		contracts:             map[common.Address]map[flow.RegisterID]Contract{},
-		contractsByLocation:   map[common.Location][]byte{},
+		stagedContracts:     stagedContracts,
+		contracts:           map[common.Address]map[flow.RegisterID]Contract{},
+		contractsByLocation: map[common.Location][]byte{},
 	}
 }
 
@@ -51,7 +52,16 @@ func (m *StagedContractsMigration) Close() error {
 	defer m.mutex.RUnlock()
 
 	if len(m.contracts) > 0 {
-		return fmt.Errorf("failed to find all contract registers that need to be changed")
+		var sb strings.Builder
+		sb.WriteString("failed to find all contract registers that need to be changed:\n")
+		for address, contracts := range m.contracts {
+			_, _ = fmt.Fprintf(&sb, "- address: %s\n", address)
+			for registerID := range contracts {
+				_, _ = fmt.Fprintf(&sb, "  - %s\n", flow.RegisterIDContractName(registerID))
+			}
+		}
+		return fmt.Errorf(sb.String())
+
 	}
 
 	return nil
@@ -74,19 +84,18 @@ func (m *StagedContractsMigration) InitMigration(
 
 // registerContractUpdates prepares the contract updates as a map for easy lookup.
 func (m *StagedContractsMigration) registerContractUpdates() {
-	contractChanges := m.stagedContractsGetter()
-	for _, contractChange := range contractChanges {
+	for _, contractChange := range m.stagedContracts {
 		m.registerContractChange(contractChange)
 	}
 }
 
 func (m *StagedContractsMigration) registerContractChange(change StagedContract) {
-	address := change.address
+	address := change.Address
 	if _, ok := m.contracts[address]; !ok {
 		m.contracts[address] = map[flow.RegisterID]Contract{}
 	}
 
-	registerID := flow.ContractRegisterID(flow.ConvertAddress(address), change.name)
+	registerID := flow.ContractRegisterID(flow.ConvertAddress(address), change.Name)
 
 	_, exist := m.contracts[address][registerID]
 	if exist {
@@ -95,17 +104,17 @@ func (m *StagedContractsMigration) registerContractChange(change StagedContract)
 		m.log.Warn().Msgf(
 			"existing staged update found for contract %s.%s. Previous update will be overwritten.",
 			address.HexWithPrefix(),
-			change.name,
+			change.Name,
 		)
 	}
 
 	m.contracts[address][registerID] = change.Contract
 
 	location := common.AddressLocation{
-		Name:    change.name,
+		Name:    change.Name,
 		Address: address,
 	}
-	m.contractsByLocation[location] = change.Contract.code
+	m.contractsByLocation[location] = change.Contract.Code
 }
 
 func (m *StagedContractsMigration) contractUpdatesForAccount(
@@ -164,8 +173,8 @@ func (m *StagedContractsMigration) MigrateAccount(
 			continue
 		}
 
-		name := updatedContract.name
-		newCode := updatedContract.code
+		name := updatedContract.Name
+		newCode := updatedContract.Code
 		oldCode := payload.Value()
 
 		err = m.checkUpdateValidity(mr, address, name, newCode, oldCode)
@@ -190,7 +199,12 @@ func (m *StagedContractsMigration) MigrateAccount(
 	}
 
 	if len(contractUpdates) > 0 {
-		return nil, fmt.Errorf("failed to find all contract registers that need to be changed")
+		var sb strings.Builder
+		_, _ = fmt.Fprintf(&sb, "failed to find all contract registers that need to be changed for address %s:\n", address)
+		for registerID := range contractUpdates {
+			_, _ = fmt.Fprintf(&sb, "  - %s\n", flow.RegisterIDContractName(registerID))
+		}
+		return nil, fmt.Errorf(sb.String())
 	}
 
 	return payloads, nil
@@ -232,9 +246,4 @@ func (m *StagedContractsMigration) checkUpdateValidity(
 	)
 
 	return validator.Validate()
-}
-
-func GetStagedContracts() []StagedContract {
-	// TODO:
-	return nil
 }

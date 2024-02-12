@@ -114,7 +114,10 @@ func (m MigrationRuntimeInterface) GetAccountContractCode(
 	return m.Accounts.GetContract(location.Name, flow.Address(location.Address))
 }
 
-func (m MigrationRuntimeInterface) GetOrLoadProgram(location runtime.Location, load func() (*interpreter.Program, error)) (*interpreter.Program, error) {
+func (m MigrationRuntimeInterface) GetOrLoadProgram(
+	location runtime.Location,
+	load func() (*interpreter.Program, error),
+) (*interpreter.Program, error) {
 	if m.GetOrLoadProgramFunc != nil {
 		return m.GetOrLoadProgramFunc(location, load)
 	}

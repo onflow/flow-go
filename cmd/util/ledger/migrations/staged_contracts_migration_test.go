@@ -54,19 +54,17 @@ func TestStagedContractsMigration(t *testing.T) {
 		oldCode := "access(all) contract A {}"
 		newCode := "access(all) contract A { access(all) struct B {} }"
 
-		stagedContractsGetter := func() []StagedContract {
-			return []StagedContract{
-				{
-					Contract: Contract{
-						name: "A",
-						code: []byte(newCode),
-					},
-					address: address1,
+		stagedContracts := []StagedContract{
+			{
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(newCode),
 				},
-			}
+				Address: address1,
+			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContractsGetter)
+		migration := NewStagedContractsMigration(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -95,19 +93,17 @@ func TestStagedContractsMigration(t *testing.T) {
 		oldCode := "access(all) contract A {}"
 		newCode := "access(all) contract A { access(all) struct B () }"
 
-		stagedContractsGetter := func() []StagedContract {
-			return []StagedContract{
-				{
-					Contract: Contract{
-						name: "A",
-						code: []byte(newCode),
-					},
-					address: address1,
+		stagedContracts := []StagedContract{
+			{
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(newCode),
 				},
-			}
+				Address: address1,
+			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContractsGetter)
+		migration := NewStagedContractsMigration(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -138,19 +134,17 @@ func TestStagedContractsMigration(t *testing.T) {
 		oldCode := "access(all) contract A {"
 		newCode := "access(all) contract A { access(all) struct B {} }"
 
-		stagedContractsGetter := func() []StagedContract {
-			return []StagedContract{
-				{
-					Contract: Contract{
-						name: "A",
-						code: []byte(newCode),
-					},
-					address: address1,
+		stagedContracts := []StagedContract{
+			{
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(newCode),
 				},
-			}
+				Address: address1,
+			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContractsGetter)
+		migration := NewStagedContractsMigration(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -184,26 +178,24 @@ func TestStagedContractsMigration(t *testing.T) {
 		newCode1 := "access(all) contract A { access(all) struct C () }" // broken
 		newCode2 := "access(all) contract B { access(all) struct C {} }" // all good
 
-		stagedContractsGetter := func() []StagedContract {
-			return []StagedContract{
-				{
-					Contract: Contract{
-						name: "A",
-						code: []byte(newCode1),
-					},
-					address: address1,
+		stagedContracts := []StagedContract{
+			{
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(newCode1),
 				},
-				{
-					Contract: Contract{
-						name: "B",
-						code: []byte(newCode2),
-					},
-					address: address1,
+				Address: address1,
+			},
+			{
+				Contract: Contract{
+					Name: "B",
+					Code: []byte(newCode2),
 				},
-			}
+				Address: address1,
+			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContractsGetter)
+		migration := NewStagedContractsMigration(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -237,19 +229,17 @@ func TestStagedContractsMigration(t *testing.T) {
 		oldCode := "access(all) contract A {}"
 		newCode := "access(all) contract A { access(all) struct B {} }"
 
-		stagedContractsGetter := func() []StagedContract {
-			return []StagedContract{
-				{
-					Contract: Contract{
-						name: "A",
-						code: []byte(newCode),
-					},
-					address: address2,
+		stagedContracts := []StagedContract{
+			{
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(newCode),
 				},
-			}
+				Address: address2,
+			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContractsGetter)
+		migration := NewStagedContractsMigration(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -293,26 +283,24 @@ func TestStagedContractsMigration(t *testing.T) {
 		update1 := "access(all) contract A { access(all) struct B {} }"
 		update2 := "access(all) contract A { access(all) struct B {} access(all) struct C {} }"
 
-		stagedContractsGetter := func() []StagedContract {
-			return []StagedContract{
-				{
-					Contract: Contract{
-						name: "A",
-						code: []byte(update1),
-					},
-					address: address1,
+		stagedContracts := []StagedContract{
+			{
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(update1),
 				},
-				{
-					Contract: Contract{
-						name: "A",
-						code: []byte(update2),
-					},
-					address: address1,
+				Address: address1,
+			},
+			{
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(update2),
 				},
-			}
+				Address: address1,
+			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContractsGetter)
+		migration := NewStagedContractsMigration(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -379,26 +367,24 @@ func TestStagedContractsWithImports(t *testing.T) {
             }
         `
 
-		stagedContractsGetter := func() []StagedContract {
-			return []StagedContract{
-				{
-					Contract: Contract{
-						name: "A",
-						code: []byte(newCodeA),
-					},
-					address: address1,
+		stagedContracts := []StagedContract{
+			{
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(newCodeA),
 				},
-				{
-					Contract: Contract{
-						name: "B",
-						code: []byte(newCodeB),
-					},
-					address: address2,
+				Address: address1,
+			},
+			{
+				Contract: Contract{
+					Name: "B",
+					Code: []byte(newCodeB),
 				},
-			}
+				Address: address2,
+			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContractsGetter)
+		migration := NewStagedContractsMigration(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -447,19 +433,17 @@ func TestStagedContractsWithImports(t *testing.T) {
 			address2.HexWithPrefix(),
 		)
 
-		stagedContractsGetter := func() []StagedContract {
-			return []StagedContract{
-				{
-					Contract: Contract{
-						name: "A",
-						code: []byte(newCodeA),
-					},
-					address: address1,
+		stagedContracts := []StagedContract{
+			{
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(newCodeA),
 				},
-			}
+				Address: address1,
+			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContractsGetter)
+		migration := NewStagedContractsMigration(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -518,26 +502,24 @@ func TestStagedContractsWithImports(t *testing.T) {
 
 		newCodeC := `access(all) contract C {}`
 
-		stagedContractsGetter := func() []StagedContract {
-			return []StagedContract{
-				{
-					Contract: Contract{
-						name: "A",
-						code: []byte(newCodeA),
-					},
-					address: address1,
+		stagedContracts := []StagedContract{
+			{
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(newCodeA),
 				},
-				{
-					Contract: Contract{
-						name: "C",
-						code: []byte(newCodeC),
-					},
-					address: address1,
+				Address: address1,
+			},
+			{
+				Contract: Contract{
+					Name: "C",
+					Code: []byte(newCodeC),
 				},
-			}
+				Address: address1,
+			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContractsGetter)
+		migration := NewStagedContractsMigration(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
