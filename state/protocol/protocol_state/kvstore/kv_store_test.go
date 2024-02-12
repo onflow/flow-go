@@ -12,7 +12,7 @@ import (
 //   - instances should be equal after encoding, then decoding
 func TestEncodeDecode(t *testing.T) {
 	t.Run("v0", func(t *testing.T) {
-		model := modelv0{}
+		model := &modelv0{}
 
 		version, encoded, err := model.VersionedEncode()
 		require.NoError(t, err)
@@ -24,7 +24,7 @@ func TestEncodeDecode(t *testing.T) {
 	})
 
 	t.Run("v1", func(t *testing.T) {
-		model := modelv1{
+		model := &modelv1{
 			InvalidEpochTransitionAttempted: rand.Int()%2 == 0,
 		}
 
