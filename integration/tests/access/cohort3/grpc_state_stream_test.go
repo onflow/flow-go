@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"sync"
 	"testing"
 	"time"
@@ -212,14 +211,11 @@ func (r *ResponseTracker) Add(t *testing.T, blockHeight uint64, name string, eve
 		return
 	}
 
-	err := r.compare(t, r.r[blockHeight])
-	if err != nil {
-		log.Fatalf("failure comparing %d: %v", blockHeight, err)
-	}
+	r.compare(t, r.r[blockHeight])
 	delete(r.r, blockHeight)
 }
 
-func (r *ResponseTracker) compare(t *testing.T, data map[string]flow.BlockEvents) error {
+func (r *ResponseTracker) compare(t *testing.T, data map[string]flow.BlockEvents) {
 	controlData := data["control"]
 	testData := data["test"]
 
@@ -234,8 +230,6 @@ func (r *ResponseTracker) compare(t *testing.T, data map[string]flow.BlockEvents
 		require.Equal(t, controlData.Events[i].EventIndex, testData.Events[i].EventIndex)
 		require.True(t, bytes.Equal(controlData.Events[i].Payload, testData.Events[i].Payload))
 	}
-
-	return nil
 }
 
 // TODO: switch to SDK versions once crypto library is fixed to support the latest SDK version
