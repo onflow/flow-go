@@ -694,6 +694,12 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"state-stream-max-register-values",
 			defaultConfig.stateStreamConf.RegisterIDsRequestLimit,
 			"maximum number of register ids to include in a single request to the GetRegisters endpoint")
+
+		flags.StringVar(&builder.rpcConf.BackendConfig.EventQueryMode,
+			"event-query-mode",
+			defaultConfig.rpcConf.BackendConfig.EventQueryMode,
+			"mode to use when querying events. one of [local-only, execution-nodes-only(default), failover]")
+
 	}).ValidateFlags(func() error {
 		if builder.executionDataSyncEnabled {
 			if builder.executionDataConfig.FetchTimeout <= 0 {

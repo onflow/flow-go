@@ -468,6 +468,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		fmt.Sprintf("--state-stream-addr=%s:%s", observerName, testnet.ExecutionStatePort),
 		"--execution-data-dir=/data/execution-data",
 		"--execution-data-sync-enabled=true",
+		"--event-query-mode=execution-nodes-only",
 	)
 
 	service.AddExposedPorts(
