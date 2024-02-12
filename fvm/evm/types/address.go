@@ -4,6 +4,8 @@ import (
 	"bytes"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/runtime/sema"
 )
 
 // FlowEVMSpecialAddressPrefixLen captures the number of prefix bytes with constant values for special accounts (extended precompiles and COAs).
@@ -62,6 +64,17 @@ func NewAddressFromBytes(inp []byte) Address {
 // NewAddressFromString constructs a new address from an string
 func NewAddressFromString(str string) Address {
 	return NewAddressFromBytes([]byte(str))
+}
+
+var AddressBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.TheUInt8Type)
+var AddressBytesSemaType = sema.ByteArrayType
+
+func (a Address) ToCadenceValue() cadence.Array {
+	values := make([]cadence.Value, len(a))
+	for i, v := range a {
+		values[i] = cadence.NewUInt8(v)
+	}
+	return cadence.NewArray(values).WithType(AddressBytesCadenceType)
 }
 
 // IsACOAAddress returns true if the address is a COA address
