@@ -12,8 +12,13 @@ import (
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
+	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 )
 
 type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, PubSubAdapterConfig, CollectionClusterChangesConsumer) (PubSubAdapter, error)
@@ -60,6 +65,13 @@ type GossipSubBuilder interface {
 	// If the routing system has already been set, a fatal error is logged.
 	SetRoutingSystem(routing.Routing)
 
+	// OverrideDefaultRpcInspectorSuiteFactory overrides the default RPC inspector suite factory of the builder.
+	// A default RPC inspector suite factory is provided by the node. This function overrides the default factory.
+	// The purpose of override is to allow the node to provide a custom RPC inspector suite factory for sake of testing
+	// or experimentation.
+	// It is NOT recommended to override the default RPC inspector suite factory in production unless you know what you are doing.
+	OverrideDefaultRpcInspectorSuiteFactory(GossipSubRpcInspectorSuiteFactoryFunc)
+
 	// Build creates a new GossipSub pubsub system.
 	// It returns the newly created GossipSub pubsub system and any errors encountered during its creation.
 	//
@@ -72,6 +84,32 @@ type GossipSubBuilder interface {
 	// Note that on happy path, the returned error is nil. Any error returned is unexpected and should be handled as irrecoverable.
 	Build(irrecoverable.SignalerContext) (PubSubAdapter, error)
 }
+
+// GossipSubRpcInspectorSuiteFactoryFunc is a function that creates a new RPC inspector suite. It is used to create
+// RPC inspectors for the gossipsub protocol. The RPC inspectors are used to inspect and validate
+// incoming RPC messages before they are processed by the gossipsub protocol.
+// Args:
+// - logger: logger to use
+// - sporkID: spork ID of the node
+// - cfg: configuration for the RPC inspectors
+// - metrics: metrics to use for the RPC inspectors
+// - heroCacheMetricsFactory: metrics factory for the hero cache
+// - networkingType: networking type of the node, i.e., public or private
+// - identityProvider: identity provider of the node
+// Returns:
+// - p2p.GossipSubInspectorSuite: new RPC inspector suite
+// - error: error if any, any returned error is irrecoverable.
+type GossipSubRpcInspectorSuiteFactoryFunc func(
+	irrecoverable.SignalerContext,
+	zerolog.Logger,
+	flow.Identifier,
+	*p2pconfig.RpcInspectorParameters,
+	module.GossipSubMetrics,
+	metrics.HeroCacheMetricsFactory,
+	flownet.NetworkingType,
+	module.IdentityProvider,
+	func() TopicProvider,
+) (GossipSubInspectorSuite, error)
 
 // NodeBuilder is a builder pattern for creating a libp2p Node instance.
 type NodeBuilder interface {
@@ -104,6 +142,7 @@ type NodeBuilder interface {
 	// none
 	OverrideNodeConstructor(NodeConstructor) NodeBuilder
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
+	OverrideDefaultRpcInspectorSuiteFactory(GossipSubRpcInspectorSuiteFactoryFunc) NodeBuilder
 	Build() (LibP2PNode, error)
 }
 
