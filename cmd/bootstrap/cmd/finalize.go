@@ -602,6 +602,8 @@ func generateEmptyExecutionState(
 // the targeted end time for the epoch can be computed via `rootEpochTargetEndTime()`.
 // You can either let the tool choose default values, or specify a value for each config.
 func validateOrPopulateEpochTimingConfig() error {
+	// Default timing is intended for Benchnet, Localnet, etc.
+	// Manually specified timings for Mainnet, Testnet, Canary.
 	if flagUseDefaultEpochTargetEndTime {
 		// No other flags may be set
 		if !(flagEpochTimingRefTimestamp == 0 && flagEpochTimingDuration == 0 && flagEpochTimingRefCounter == 0) {
