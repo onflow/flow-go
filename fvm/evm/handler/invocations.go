@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -9,7 +10,7 @@ import (
 
 func COAOwnershipProofValidator(contractAddress flow.Address, backend types.Backend) func(proof *types.COAOwnershipProofInContext) (bool, error) {
 	return func(proof *types.COAOwnershipProofInContext) (bool, error) {
-		_, err := backend.Invoke(
+		value, err := backend.Invoke(
 			environment.ContractFunctionSpec{
 				AddressFromChain: func(_ flow.Chain) flow.Address {
 					return contractAddress
@@ -27,6 +28,9 @@ func COAOwnershipProofValidator(contractAddress flow.Address, backend types.Back
 			},
 			proof.ToCadenceValues(),
 		)
-		return err == nil, nil
+
+		// TODO: deal with error message if needed
+		ret := value.(cadence.Struct).Fields[0].(cadence.Bool)
+		return bool(ret), err
 	}
 }

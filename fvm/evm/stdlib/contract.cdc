@@ -233,6 +233,21 @@ contract EVM {
         return InternalEVM.decodeABI(types: types, data: data)
     }
 
+    /// ValidationResult returns the result of COA ownership proof validation
+    access(all)
+    struct ValidationResult {
+        access(all)
+        let isValid: Bool
+        
+        access(all)
+        let problem: String?
+
+        init(_ isValid: Bool,_ problem: String? ) {
+            self.isValid = isValid
+            self.problem = problem
+        }
+    }
+
     /// validateCOAOwnershipProof validates a COA ownership proof
     access(all)
     fun validateCOAOwnershipProof(
@@ -242,12 +257,15 @@ contract EVM {
         keyIndices: [UInt64],
         signatures: [[UInt8]],
         evmAddress: [UInt8; 20]
-    ) {
+    ): ValidationResult {
 
         // make signature set first 
         // check number of signatures matches number of key indices
-        assert(keyIndices.length == signatures.length,
-               message: "key indices size doesn't match the signatures")
+        if keyIndices.length != signatures.length {
+            return ValidationResult(false,
+                "key indices size doesn't match the signatures"
+            )
+        }
 
         var signatureSet: [Crypto.KeyListSignature] = []
         var idx = 0 
@@ -278,18 +296,32 @@ contract EVM {
             signatureSet: signatureSet,
             signedData: signedData
         )
-        assert(isValid, message: "signatures not valid")
+
+        if !isValid{
+            return ValidationResult(false,
+                "the given signatures are not valid or provide enough weight" 
+            )
+        }
 
         let coaRef = acc.getCapability(path)
             .borrow<&EVM.BridgedAccount{EVM.Addressable}>()
-            ?? panic("could not borrow bridge account's address")
+        
+        if coaRef == nil {
+             return ValidationResult(false,
+                    "could not borrow bridge account's resource"
+                )
+        }
 
         // verify evm address matching
         var i = 0
-        for item in coaRef.address().bytes {
-            assert(item == evmAddress[i], message: "evm address mismatch")
+        var addr = coaRef!.address()
+        for item in addr.bytes {
+            if item != evmAddress[i] {
+                return ValidationResult(false, "evm address mismatch")
+            }
             i = i +1
         }
-
+        
+        return ValidationResult(true, nil)
     }
 }
