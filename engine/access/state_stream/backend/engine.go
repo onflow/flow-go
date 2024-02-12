@@ -77,17 +77,8 @@ func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionDat
 
 	lg.Trace().Msg("received execution data")
 
-	header, err := e.headers.ByBlockID(executionData.BlockID)
+	err := e.backend.ProcessOnFinalizedBlock()
 	if err != nil {
-		// if the execution data is available, the block must be locally finalized
-		lg.Fatal().Err(err).Msg("failed to get header for execution data")
-		return
-	}
-
-	if ok := e.backend.setHighestHeight(header.Height); !ok {
-		// this means that the height was lower than the current highest height
-		// OnExecutionData is guaranteed by the requester to be called in order, but may be called
-		// multiple times for the same block.
 		lg.Debug().Msg("execution data for block already received")
 		return
 	}

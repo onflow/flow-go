@@ -62,7 +62,7 @@ type Config struct {
 type GetExecutionDataFunc func(context.Context, uint64) (*execution_data.BlockExecutionDataEntity, error)
 
 type StateStreamBackend struct {
-	BlocksWatcher *subscription.BlocksWatcher
+	subscription.ChainStateTracker
 
 	ExecutionDataBackend
 	EventsBackend
@@ -97,7 +97,7 @@ func New(
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
-	subscriptionHandler, err := subscription.NewBlocksWatcher(
+	chainStateTracker, err := subscription.NewChainStateTracker(
 		logger,
 		state,
 		rootHeight,
@@ -110,7 +110,7 @@ func New(
 	}
 
 	b := &StateStreamBackend{
-		BlocksWatcher:        subscriptionHandler,
+		ChainStateTracker:    chainStateTracker,
 		log:                  logger,
 		state:                state,
 		headers:              headers,
@@ -131,7 +131,7 @@ func New(
 		responseLimit:    config.ResponseLimit,
 		sendBufferSize:   int(config.ClientSendBufferSize),
 		getExecutionData: b.getExecutionData,
-		getStartHeight:   b.BlocksWatcher.GetStartHeight,
+		getStartHeight:   b.GetStartHeight,
 	}
 
 	b.EventsBackend = EventsBackend{
@@ -143,7 +143,7 @@ func New(
 		responseLimit:    config.ResponseLimit,
 		sendBufferSize:   int(config.ClientSendBufferSize),
 		getExecutionData: b.getExecutionData,
-		getStartHeight:   b.BlocksWatcher.GetStartHeight,
+		getStartHeight:   b.GetStartHeight,
 		useIndex:         useEventsIndex,
 	}
 
@@ -154,7 +154,7 @@ func New(
 // Expected errors during normal operation:
 // - storage.ErrNotFound or execution_data.BlobNotFoundError: execution data for the given block height is not available.
 func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64) (*execution_data.BlockExecutionDataEntity, error) {
-	highestHeight, err := b.BlocksWatcher.GetHighestHeight(flow.BlockStatusFinalized)
+	highestHeight, err := b.ChainStateTracker.GetHighestHeight(flow.BlockStatusFinalized)
 	if err != nil {
 		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
 	}
@@ -172,11 +172,6 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64
 	}
 
 	return execData, nil
-}
-
-// setHighestHeight sets the highest height for which execution data is available.
-func (b *StateStreamBackend) setHighestHeight(height uint64) bool {
-	return b.BlocksWatcher.SetFinalizedHighestHeight(height)
 }
 
 // GetRegisterValues returns the register values for the given register IDs at the given block height.

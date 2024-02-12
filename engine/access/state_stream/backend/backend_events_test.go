@@ -85,12 +85,12 @@ func (s *BackendEventsSuite) runTestSubscribeEvents() {
 			name:            "happy path - start from root block by height",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
 			startBlockID:    flow.ZeroID,
-			startHeight:     s.backend.BlocksWatcher.RootHeight, // start from root block
+			startHeight:     s.rootBlock.Header.Height, // start from root block
 		},
 		{
 			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1,                   // backfill all blocks
-			startBlockID:    s.backend.BlocksWatcher.RootBlockID, // start from root block
+			highestBackfill: len(s.blocks) - 1,       // backfill all blocks
+			startBlockID:    s.rootBlock.Header.ID(), // start from root block
 			startHeight:     0,
 		},
 	}
@@ -124,7 +124,8 @@ func (s *BackendEventsSuite) runTestSubscribeEvents() {
 			// this simulates a subscription on a past block
 			for i := 0; i <= test.highestBackfill; i++ {
 				s.T().Logf("backfilling block %d", i)
-				s.backend.setHighestHeight(s.blocks[i].Header.Height)
+				s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).
+					Return(s.blocks[i].Header.Height, nil).Maybe()
 			}
 
 			subCtx, subCancel := context.WithCancel(ctx)
@@ -137,7 +138,12 @@ func (s *BackendEventsSuite) runTestSubscribeEvents() {
 				// simulate new exec data received.
 				// exec data for all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
-					s.backend.setHighestHeight(b.Header.Height)
+					s.T().Logf("checking block %d %v", i, b.ID())
+
+					s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).Unset()
+					s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).
+						Return(b.Header.Height, nil).Maybe()
+
 					s.broadcaster.Publish()
 				}
 
@@ -197,7 +203,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.backend.BlocksWatcher.RootHeight-1, state_stream.EventFilter{})
+		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.rootBlock.Header.Height-1, state_stream.EventFilter{})
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 

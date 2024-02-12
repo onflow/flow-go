@@ -36,8 +36,29 @@ func NewStreamingData(maxStreams uint32) StreamingData {
 	}
 }
 
-// BlocksWatcher watches for new blocks and handles block-related operations.
-type BlocksWatcher struct {
+// ChainStateTracker represents state tracker for new blocks (finalized and sealed) and handles block-related operations.
+type ChainStateTracker interface {
+	// GetStartHeight returns the start height to use when searching.
+	// Only one of startBlockID and startHeight may be set. Otherwise, an InvalidArgument error is returned.
+	// If a block is provided and does not exist, a NotFound error is returned.
+	// If neither startBlockID nor startHeight is provided, the latest sealed block is used.
+	GetStartHeight(startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error)
+
+	// GetHighestHeight returns the highest height based on the specified block status. O
+	// Only flow.BlockStatusFinalized and flow.BlockStatusSealed allowed.
+	GetHighestHeight(blockStatus flow.BlockStatus) (uint64, error)
+
+	// ProcessOnFinalizedBlock drives the subscription logic when a block is finalized.
+	// The input to this callback is treated as trusted. This method should be executed on
+	// `OnFinalizedBlock` notifications from the node-internal consensus instance.
+	// No errors expected during normal operations.
+	ProcessOnFinalizedBlock() error
+}
+
+var _ ChainStateTracker = (*ChainStateTrackerImpl)(nil)
+
+// ChainStateTrackerImpl tracks for new blocks and handles block-related operations.
+type ChainStateTrackerImpl struct {
 	log         zerolog.Logger
 	state       protocol.State
 	headers     storage.Headers
@@ -51,21 +72,21 @@ type BlocksWatcher struct {
 	sealedHighestHeight counters.StrictMonotonousCounter
 }
 
-// NewBlocksWatcher creates a new BlocksWatcher instance.
-func NewBlocksWatcher(
+// NewChainStateTracker creates a new ChainStateTrackerImpl instance.
+func NewChainStateTracker(
 	log zerolog.Logger,
 	state protocol.State,
 	rootHeight uint64,
 	headers storage.Headers,
 	highestAvailableFinalizedHeight uint64,
 	broadcaster *engine.Broadcaster,
-) (*BlocksWatcher, error) {
+) (*ChainStateTrackerImpl, error) {
 	lastSealed, err := state.Sealed().Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve last sealed block: %w", err)
 	}
 
-	return &BlocksWatcher{
+	return &ChainStateTrackerImpl{
 		log:                    log,
 		state:                  state,
 		RootHeight:             rootHeight,
@@ -95,7 +116,7 @@ func NewBlocksWatcher(
 // - codes.InvalidArgument: If blockStatus is flow.BlockStatusUnknown, or both startBlockID and startHeight are provided.
 // - storage.ErrNotFound`: If a block is provided and does not exist.
 // - codes.Internal: If there is an internal error.
-func (h *BlocksWatcher) GetStartHeight(startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error) {
+func (h *ChainStateTrackerImpl) GetStartHeight(startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error) {
 	// block status could be only sealed and finalized
 	if blockStatus == flow.BlockStatusUnknown {
 		return 0, status.Errorf(codes.InvalidArgument, "block status could not be unknown")
@@ -176,7 +197,7 @@ func (h *BlocksWatcher) GetStartHeight(startBlockID flow.Identifier, startHeight
 }
 
 // GetHighestHeight returns the highest height based on the specified block status. Only flow.BlockStatusFinalized and flow.BlockStatusSealed allowed.
-func (h *BlocksWatcher) GetHighestHeight(blockStatus flow.BlockStatus) (uint64, error) {
+func (h *ChainStateTrackerImpl) GetHighestHeight(blockStatus flow.BlockStatus) (uint64, error) {
 	switch blockStatus {
 	case flow.BlockStatusFinalized:
 		return h.finalizedHighestHeight.Value(), nil
@@ -189,21 +210,11 @@ func (h *BlocksWatcher) GetHighestHeight(blockStatus flow.BlockStatus) (uint64, 
 	return 0, status.Errorf(codes.InvalidArgument, "could not get highest height for invalid status")
 }
 
-// SetFinalizedHighestHeight sets the highest finalized block height.
-func (h *BlocksWatcher) SetFinalizedHighestHeight(height uint64) bool {
-	return h.finalizedHighestHeight.Set(height)
-}
-
-// SetSealedHighestHeight sets the highest sealed block height.
-func (h *BlocksWatcher) SetSealedHighestHeight(height uint64) bool {
-	return h.sealedHighestHeight.Set(height)
-}
-
 // ProcessOnFinalizedBlock drives the subscription logic when a block is finalized.
 // The input to this callback is treated as trusted. This method should be executed on
 // `OnFinalizedBlock` notifications from the node-internal consensus instance.
 // No errors expected during normal operations.
-func (h *BlocksWatcher) ProcessOnFinalizedBlock() error {
+func (h *ChainStateTrackerImpl) ProcessOnFinalizedBlock() error {
 	// get the finalized header from state
 	finalizedHeader, err := h.state.Final().Head()
 	if err != nil {
@@ -213,7 +224,7 @@ func (h *BlocksWatcher) ProcessOnFinalizedBlock() error {
 		return status.Errorf(codes.Internal, "unable to get latest finalized header: %v", err)
 	}
 
-	if ok := h.SetFinalizedHighestHeight(finalizedHeader.Height); !ok {
+	if ok := h.finalizedHighestHeight.Set(finalizedHeader.Height); !ok {
 		return nil
 	}
 
@@ -226,7 +237,7 @@ func (h *BlocksWatcher) ProcessOnFinalizedBlock() error {
 		return status.Errorf(codes.Internal, "unable to get latest sealed header: %v", err)
 	}
 
-	if ok := h.SetSealedHighestHeight(sealedHeader.Height); !ok {
+	if ok := h.sealedHighestHeight.Set(sealedHeader.Height); !ok {
 		return nil
 	}
 
