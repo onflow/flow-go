@@ -1345,8 +1345,8 @@ github.com/onflow/atree v0.1.0-beta1.0.20211027184039-559ee654ece9/go.mod h1:+6x
 github.com/onflow/atree v0.6.0 h1:j7nQ2r8npznx4NX39zPpBYHmdy45f4xwoi+dm37Jk7c=
 github.com/onflow/atree v0.6.0/go.mod h1:gBHU0M05qCbv9NN0kijLWMgC47gHVNBIp4KmsVFi0tc=
 github.com/onflow/cadence v0.20.1/go.mod h1:7mzUvPZUIJztIbr9eTvs+fQjWWHTF8veC+yk4ihcNIA=
-github.com/onflow/cadence v0.42.8 h1:6OWhKMjL2Lql6a3L2xeA44uoOAVBp5+cMNE5BDPvo+E=
-github.com/onflow/cadence v0.42.8/go.mod h1:1wFd+LiNiN6qoZXof3MBdpM6d8BsxbVIxOA77LbIYmE=
+github.com/onflow/cadence v0.42.9 h1:EX+eak/Jjy9PyKcAEmOViGOHMyP/nCOwJO+deodZlJE=
+github.com/onflow/cadence v0.42.9/go.mod h1:1wFd+LiNiN6qoZXof3MBdpM6d8BsxbVIxOA77LbIYmE=
 github.com/onflow/crypto v0.25.0 h1:BeWbLsh3ZD13Ej+Uky6kg1PL1ZIVBDVX+2MVBNwqddg=
 github.com/onflow/crypto v0.25.0/go.mod h1:C8FbaX0x8y+FxWjbkHy0Q4EASCDR9bSPWZqlpCLYyVI=
 github.com/onflow/flow v0.3.4 h1:FXUWVdYB90f/rjNcY0Owo30gL790tiYff9Pb/sycXYE=
@@ -1364,8 +1364,8 @@ github.com/onflow/flow-go/crypto v0.21.3/go.mod h1:vI6V4CY3R6c4JKBxdcRiR/AnjBfL8
 github.com/onflow/flow-nft/lib/go/contracts v1.1.0 h1:rhUDeD27jhLwOqQKI/23008CYfnqXErrJvc4EFRP2a0=
 github.com/onflow/flow-nft/lib/go/contracts v1.1.0/go.mod h1:YsvzYng4htDgRB9sa9jxdwoTuuhjK8WYWXTyLkIigZY=
 github.com/onflow/flow/protobuf/go/flow v0.2.2/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
-github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231213135419-ae911cc351a2 h1:+rT+UsfTR39JZO8ht2+4fkaWfHw74SCj1fyz1lWuX8A=
-github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231213135419-ae911cc351a2/go.mod h1:NA2pX2nw8zuaxfKphhKsk00kWLwfd+tv8mS23YXO4Sk=
+github.com/onflow/flow/protobuf/go/flow v0.3.7 h1:+6sBdlE/u4ZMTVB9U1lA6Xn2Bd48lOOX96Bv9dNubsk=
+github.com/onflow/flow/protobuf/go/flow v0.3.7/go.mod h1:NA2pX2nw8zuaxfKphhKsk00kWLwfd+tv8mS23YXO4Sk=
 github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d h1:QcOAeEyF3iAUHv21LQ12sdcsr0yFrJGoGLyCAzYYtvI=
 github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d/go.mod h1:GCPpiyRoHncdqPj++zPr9ZOYBX4hpJ0pYZRYqSE8VKk=
 github.com/onflow/sdks v0.5.0 h1:2HCRibwqDaQ1c9oUApnkZtEAhWiNY2GTpRD5+ftdkN8=

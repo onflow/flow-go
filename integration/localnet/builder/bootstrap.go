@@ -428,8 +428,12 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		"--log-tx-time-to-executed",
 		"--log-tx-time-to-finalized-executed",
 		"--execution-data-sync-enabled=true",
-		"--public-network-execution-data-sync-enabled=true",
 		"--execution-data-dir=/data/execution-data",
+		"--public-network-execution-data-sync-enabled=true",
+		"--execution-data-indexing-enabled=true",
+		"--execution-state-dir=/data/execution-state",
+		"--script-execution-mode=execution-nodes-only",
+		"--event-query-mode=execution-nodes-only",
 	)
 
 	service.AddExposedPorts(

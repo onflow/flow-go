@@ -360,12 +360,17 @@ func (node NodeInfo) PartnerPublic() PartnerNodeInfoPub {
 // Identity returns the node info as a public Flow identity.
 func (node NodeInfo) Identity() *flow.Identity {
 	identity := &flow.Identity{
-		NodeID:        node.NodeID,
-		Address:       node.Address,
-		Role:          node.Role,
-		Weight:        node.Weight,
-		StakingPubKey: node.StakingPubKey(),
-		NetworkPubKey: node.NetworkPubKey(),
+		IdentitySkeleton: flow.IdentitySkeleton{
+			NodeID:        node.NodeID,
+			Address:       node.Address,
+			Role:          node.Role,
+			InitialWeight: node.Weight,
+			StakingPubKey: node.stakingPubKey,
+			NetworkPubKey: node.networkPubKey,
+		},
+		DynamicIdentity: flow.DynamicIdentity{
+			EpochParticipationStatus: flow.EpochParticipationStatusActive,
+		},
 	}
 	return identity
 }
@@ -376,7 +381,7 @@ func NodeInfoFromIdentity(identity *flow.Identity) NodeInfo {
 		identity.NodeID,
 		identity.Role,
 		identity.Address,
-		identity.Weight,
+		identity.InitialWeight,
 		identity.NetworkPubKey,
 		identity.StakingPubKey)
 }
@@ -386,7 +391,7 @@ func PrivateNodeInfoFromIdentity(identity *flow.Identity, networkKey, stakingKey
 		identity.NodeID,
 		identity.Role,
 		identity.Address,
-		identity.Weight,
+		identity.InitialWeight,
 		networkKey,
 		stakingKey,
 	)
@@ -403,10 +408,10 @@ func FilterByRole(nodes []NodeInfo, role flow.Role) []NodeInfo {
 	return filtered
 }
 
-// Sort sorts the NodeInfo list using the given order.
+// Sort sorts the NodeInfo list using the given ordering.
 //
 // The sorted list is returned and the original list is untouched.
-func Sort(nodes []NodeInfo, order flow.IdentityOrder) []NodeInfo {
+func Sort(nodes []NodeInfo, order flow.IdentityOrder[flow.Identity]) []NodeInfo {
 	dup := make([]NodeInfo, len(nodes))
 	copy(dup, nodes)
 	slices.SortFunc(dup, func(i, j NodeInfo) int {
