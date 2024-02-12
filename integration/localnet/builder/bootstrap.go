@@ -737,6 +737,10 @@ func prepareTestExecutionService(dockerServices Services, flowNodeContainerConfi
 	observerService := prepareExecutionService(containerConfig, 1, 1)
 	observerService.Command = append(observerService.Command,
 		"--observer-mode=true",
+		fmt.Sprintf("--bootstrap-node-addresses=%s:%s", testnet.PrimaryAN, testnet.PublicNetworkPort),
+		fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey),
+		// fmt.Sprintf("--upstream-node-addresses=%s:%s", testnet.PrimaryAN, testnet.GRPCSecurePort),
+		// fmt.Sprintf("--upstream-node-public-keys=%s", agPublicKey),
 	)
 
 	// Add a docker container for this named Observer
