@@ -2,10 +2,14 @@ package types
 
 import (
 	"bytes"
+	"fmt"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime/sema"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // FlowEVMSpecialAddressPrefixLen captures the number of prefix bytes with constant values for special accounts (extended precompiles and COAs).
@@ -20,6 +24,8 @@ import (
 // When used as a prefix in EVM addresses (20-bytes long), a prefix length of 12 bytes
 // leaves a variable part of 8 bytes (64 bits).
 const FlowEVMSpecialAddressPrefixLen = 12
+
+const COAAddressTemplate = "A.%v.EVM.BridgedAccountCreated"
 
 var (
 	// Using leading zeros for prefix helps with the storage compactness.
@@ -59,6 +65,23 @@ func (fa Address) ToCommon() gethCommon.Address {
 // NewAddressFromBytes constructs a new address from bytes
 func NewAddressFromBytes(inp []byte) Address {
 	return Address(gethCommon.BytesToAddress(inp))
+}
+
+func COAAddressFromFlowEvent(evmContractAddress flow.Address, event flow.Event) (Address, error) {
+	// check the type first
+	if string(event.Type) != fmt.Sprintf(COAAddressTemplate, evmContractAddress.Hex()) {
+		return Address{}, fmt.Errorf("wrong event type is passed")
+	}
+	// then decode
+	eventData, err := ccf.Decode(nil, event.Payload)
+	if err != nil {
+		return Address{}, err
+	}
+	addressBytes := make([]byte, AddressLength)
+	for i, v := range eventData.(cadence.Event).Fields[0].(cadence.Array).Values {
+		addressBytes[i] = v.ToGoValue().(byte)
+	}
+	return NewAddressFromBytes(addressBytes), nil
 }
 
 // NewAddressFromString constructs a new address from an string
