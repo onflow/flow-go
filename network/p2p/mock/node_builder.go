@@ -53,6 +53,22 @@ func (_m *NodeBuilder) Build() (p2p.LibP2PNode, error) {
 	return r0, r1
 }
 
+// OverrideDefaultRpcInspectorSuiteFactory provides a mock function with given fields: _a0
+func (_m *NodeBuilder) OverrideDefaultRpcInspectorSuiteFactory(_a0 p2p.GossipSubRpcInspectorFactoryFunc) p2p.NodeBuilder {
+	ret := _m.Called(_a0)
+
+	var r0 p2p.NodeBuilder
+	if rf, ok := ret.Get(0).(func(p2p.GossipSubRpcInspectorFactoryFunc) p2p.NodeBuilder); ok {
+		r0 = rf(_a0)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(p2p.NodeBuilder)
+		}
+	}
+
+	return r0
+}
+
 // OverrideGossipSubScoringConfig provides a mock function with given fields: _a0
 func (_m *NodeBuilder) OverrideGossipSubScoringConfig(_a0 *p2p.PeerScoringConfigOverride) p2p.NodeBuilder {
 	ret := _m.Called(_a0)

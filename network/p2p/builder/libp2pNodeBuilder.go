@@ -180,8 +180,8 @@ func (builder *LibP2PNodeBuilder) OverrideNodeConstructor(f p2p.NodeConstructor)
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) OverrideDefaultRpcInspectorSuiteFactory(factory p2p.GossipSubRpcInspectorSuiteFactoryFunc) p2p.NodeBuilder {
-	builder.gossipSubBuilder.OverrideDefaultRpcInspectorSuiteFactory(factory)
+func (builder *LibP2PNodeBuilder) OverrideDefaultRpcInspectorSuiteFactory(factory p2p.GossipSubRpcInspectorFactoryFunc) p2p.NodeBuilder {
+	builder.gossipSubBuilder.OverrideDefaultRpcInspectorFactory(factory)
 	return builder
 }
 

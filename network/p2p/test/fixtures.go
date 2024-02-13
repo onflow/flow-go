@@ -247,7 +247,7 @@ type NodeFixtureParameters struct {
 	GossipSubConfig                   p2p.GossipSubAdapterConfigFunc
 	MetricsCfg                        *p2pbuilderconfig.MetricsConfig
 	ResourceManager                   network.ResourceManager
-	GossipSubRpcInspectorSuiteFactory p2p.GossipSubRpcInspectorSuiteFactoryFunc
+	GossipSubRpcInspectorSuiteFactory p2p.GossipSubRpcInspectorFactoryFunc
 	FlowConfig                        *config.FlowConfig
 	UnicastRateLimiterDistributor     p2p.UnicastRateLimiterDistributor
 }
@@ -258,7 +258,7 @@ func WithUnicastRateLimitDistributor(distributor p2p.UnicastRateLimiterDistribut
 	}
 }
 
-func OverrideGossipSubRpcInspectorSuiteFactory(factory p2p.GossipSubRpcInspectorSuiteFactoryFunc) NodeFixtureParameterOption {
+func OverrideGossipSubRpcInspectorSuiteFactory(factory p2p.GossipSubRpcInspectorFactoryFunc) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.GossipSubRpcInspectorSuiteFactory = factory
 	}
@@ -807,22 +807,6 @@ func PeerIdSliceFixture(t *testing.T, n int) peer.IDSlice {
 func NewConnectionGater(idProvider module.IdentityProvider, allowListFilter p2p.PeerFilter) p2p.ConnectionGater {
 	filters := []p2p.PeerFilter{allowListFilter}
 	return connection.NewConnGater(unittest.Logger(), idProvider, connection.WithOnInterceptPeerDialFilters(filters), connection.WithOnInterceptSecuredFilters(filters))
-}
-
-// MockInspectorNotificationDistributorReadyDoneAware mocks the Ready and Done methods of the distributor to return a channel that is already closed,
-// so that the distributor is considered ready and done when the test needs.
-func MockInspectorNotificationDistributorReadyDoneAware(d *mockp2p.GossipSubInspectorNotificationDistributor) {
-	d.On("Start", mockery.Anything).Return().Maybe()
-	d.On("Ready").Return(func() <-chan struct{} {
-		ch := make(chan struct{})
-		close(ch)
-		return ch
-	}()).Maybe()
-	d.On("Done").Return(func() <-chan struct{} {
-		ch := make(chan struct{})
-		close(ch)
-		return ch
-	}()).Maybe()
 }
 
 // MockScoringRegistrySubscriptionValidatorReadyDoneAware mocks the Ready and Done methods of the subscription validator to return a channel that is already closed,

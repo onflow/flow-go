@@ -65,12 +65,12 @@ type GossipSubBuilder interface {
 	// If the routing system has already been set, a fatal error is logged.
 	SetRoutingSystem(routing.Routing)
 
-	// OverrideDefaultRpcInspectorSuiteFactory overrides the default RPC inspector suite factory of the builder.
+	// OverrideDefaultRpcInspectorFactory overrides the default RPC inspector suite factory of the builder.
 	// A default RPC inspector suite factory is provided by the node. This function overrides the default factory.
 	// The purpose of override is to allow the node to provide a custom RPC inspector suite factory for sake of testing
 	// or experimentation.
 	// It is NOT recommended to override the default RPC inspector suite factory in production unless you know what you are doing.
-	OverrideDefaultRpcInspectorSuiteFactory(GossipSubRpcInspectorSuiteFactoryFunc)
+	OverrideDefaultRpcInspectorFactory(GossipSubRpcInspectorFactoryFunc)
 
 	// Build creates a new GossipSub pubsub system.
 	// It returns the newly created GossipSub pubsub system and any errors encountered during its creation.
@@ -85,8 +85,8 @@ type GossipSubBuilder interface {
 	Build(irrecoverable.SignalerContext) (PubSubAdapter, error)
 }
 
-// GossipSubRpcInspectorSuiteFactoryFunc is a function that creates a new RPC inspector suite. It is used to create
-// RPC inspectors for the gossipsub protocol. The RPC inspectors are used to inspect and validate
+// GossipSubRpcInspectorFactoryFunc is a function that creates a new RPC inspector. It is used to create
+// an RPC inspector for the gossipsub protocol. The RPC inspectors are used to inspect and validate
 // incoming RPC messages before they are processed by the gossipsub protocol.
 // Args:
 // - logger: logger to use
@@ -97,10 +97,9 @@ type GossipSubBuilder interface {
 // - networkingType: networking type of the node, i.e., public or private
 // - identityProvider: identity provider of the node
 // Returns:
-// - p2p.GossipSubInspectorSuite: new RPC inspector suite
+// - GossipSubRPCInspector: new RPC inspector suite
 // - error: error if any, any returned error is irrecoverable.
-type GossipSubRpcInspectorSuiteFactoryFunc func(
-	irrecoverable.SignalerContext,
+type GossipSubRpcInspectorFactoryFunc func(
 	zerolog.Logger,
 	flow.Identifier,
 	*p2pconfig.RpcInspectorParameters,
@@ -109,7 +108,8 @@ type GossipSubRpcInspectorSuiteFactoryFunc func(
 	flownet.NetworkingType,
 	module.IdentityProvider,
 	func() TopicProvider,
-) (GossipSubInspectorSuite, error)
+	GossipSubInvCtrlMsgNotifConsumer,
+) (GossipSubMsgValidationRpcInspector, error)
 
 // NodeBuilder is a builder pattern for creating a libp2p Node instance.
 type NodeBuilder interface {
@@ -142,7 +142,7 @@ type NodeBuilder interface {
 	// none
 	OverrideNodeConstructor(NodeConstructor) NodeBuilder
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
-	OverrideDefaultRpcInspectorSuiteFactory(GossipSubRpcInspectorSuiteFactoryFunc) NodeBuilder
+	OverrideDefaultRpcInspectorSuiteFactory(GossipSubRpcInspectorFactoryFunc) NodeBuilder
 	Build() (LibP2PNode, error)
 }
 
