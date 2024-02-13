@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"math"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 	runtimeCommon "github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -70,7 +72,7 @@ func TestExtractExecutionState(t *testing.T) {
 				outdir,
 				10,
 				false,
-				false,
+				"",
 				nil,
 			)
 			require.Error(t, err)
@@ -217,6 +219,8 @@ func TestExtractExecutionState(t *testing.T) {
 func TestExtractPayloadsFromExecutionState(t *testing.T) {
 	metr := &metrics.NoopCollector{}
 
+	const payloadFileName = "root.payload"
+
 	t.Run("all payloads", func(t *testing.T) {
 		withDirs(t, func(_, execdir, outdir string) {
 
@@ -224,6 +228,8 @@ func TestExtractPayloadsFromExecutionState(t *testing.T) {
 				checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
 				checkpointsToKeep  = 1
 			)
+
+			outputPayloadFileName := filepath.Join(outdir, payloadFileName)
 
 			size := 10
 
@@ -273,14 +279,14 @@ func TestExtractPayloadsFromExecutionState(t *testing.T) {
 				"--state-commitment", hex.EncodeToString(stateCommitment[:]),
 				"--no-migration",
 				"--no-report",
-				"--extract-payloads-by-address", "all",
+				"--output-payload-filename", outputPayloadFileName,
 				"--chain", flow.Emulator.Chain().String()})
 
 			err = Cmd.Execute()
 			require.NoError(t, err)
 
 			// Verify exported payloads.
-			payloadsFromFile, err := readPayloadFile(zerolog.Nop(), outdir)
+			payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputPayloadFileName)
 			require.NoError(t, err)
 			require.Equal(t, len(keysValues), len(payloadsFromFile))
 
@@ -301,6 +307,8 @@ func TestExtractPayloadsFromExecutionState(t *testing.T) {
 				checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
 				checkpointsToKeep  = 1
 			)
+
+			outputPayloadFileName := filepath.Join(outdir, payloadFileName)
 
 			size := 10
 
@@ -376,6 +384,7 @@ func TestExtractPayloadsFromExecutionState(t *testing.T) {
 				"--state-commitment", hex.EncodeToString(stateCommitment[:]),
 				"--no-migration",
 				"--no-report",
+				"--output-payload-filename", outputPayloadFileName,
 				"--extract-payloads-by-address", strings.Join(addresses, ","),
 				"--chain", flow.Emulator.Chain().String()})
 
@@ -383,7 +392,7 @@ func TestExtractPayloadsFromExecutionState(t *testing.T) {
 			require.NoError(t, err)
 
 			// Verify exported payloads.
-			payloadsFromFile, err := readPayloadFile(zerolog.Nop(), outdir)
+			payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputPayloadFileName)
 			require.NoError(t, err)
 			require.Equal(t, len(selectedKeysValues), len(payloadsFromFile))
 
@@ -402,9 +411,13 @@ func TestExtractPayloadsFromExecutionState(t *testing.T) {
 // TestExtractStateFromPayloads tests state extraction with payload as input.
 func TestExtractStateFromPayloads(t *testing.T) {
 
+	const payloadFileName = "root.payload"
+
 	t.Run("create checkpoint", func(t *testing.T) {
 		withDirs(t, func(_, execdir, outdir string) {
 			size := 10
+
+			inputPayloadFileName := filepath.Join(execdir, payloadFileName)
 
 			// Generate some data
 			keysValues := make(map[string]keyPair)
@@ -423,7 +436,12 @@ func TestExtractStateFromPayloads(t *testing.T) {
 				}
 			}
 
-			numOfPayloadWritten, err := createPayloadFile(zerolog.Nop(), execdir, payloads, nil)
+			numOfPayloadWritten, err := util.CreatePayloadFile(
+				zerolog.Nop(),
+				inputPayloadFileName,
+				payloads,
+				nil,
+			)
 			require.NoError(t, err)
 			require.Equal(t, len(payloads), numOfPayloadWritten)
 
@@ -433,7 +451,9 @@ func TestExtractStateFromPayloads(t *testing.T) {
 				"--output-dir", outdir,
 				"--no-migration",
 				"--no-report",
-				"--use-payload-as-input",
+				"--state-commitment", "",
+				"--input-payload-filename", inputPayloadFileName,
+				"--output-payload-filename", "",
 				"--extract-payloads-by-address", "",
 				"--chain", flow.Emulator.Chain().String()})
 
@@ -464,6 +484,9 @@ func TestExtractStateFromPayloads(t *testing.T) {
 
 	t.Run("create payloads", func(t *testing.T) {
 		withDirs(t, func(_, execdir, outdir string) {
+			inputPayloadFileName := filepath.Join(execdir, payloadFileName)
+			outputPayloadFileName := filepath.Join(outdir, "selected.payload")
+
 			size := 10
 
 			// Generate some data
@@ -483,7 +506,12 @@ func TestExtractStateFromPayloads(t *testing.T) {
 				}
 			}
 
-			numOfPayloadWritten, err := createPayloadFile(zerolog.Nop(), execdir, payloads, nil)
+			numOfPayloadWritten, err := util.CreatePayloadFile(
+				zerolog.Nop(),
+				inputPayloadFileName,
+				payloads,
+				nil,
+			)
 			require.NoError(t, err)
 			require.Equal(t, len(payloads), numOfPayloadWritten)
 
@@ -493,15 +521,17 @@ func TestExtractStateFromPayloads(t *testing.T) {
 				"--output-dir", outdir,
 				"--no-migration",
 				"--no-report",
-				"--use-payload-as-input",
-				"--extract-payloads-by-address", "all",
+				"--state-commitment", "",
+				"--input-payload-filename", inputPayloadFileName,
+				"--output-payload-filename", outputPayloadFileName,
+				"--extract-payloads-by-address", "",
 				"--chain", flow.Emulator.Chain().String()})
 
 			err = Cmd.Execute()
 			require.NoError(t, err)
 
 			// Verify exported payloads.
-			payloadsFromFile, err := readPayloadFile(zerolog.Nop(), outdir)
+			payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputPayloadFileName)
 			require.NoError(t, err)
 			require.Equal(t, len(keysValues), len(payloadsFromFile))
 
