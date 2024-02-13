@@ -199,7 +199,7 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 		stakingCollectionAddress = mustHexAddress("0x95e019a17d0e23d7")
 		stakingProxyAddress = mustHexAddress("0x7aad92e5a0715d21")
 
-	case flow.Emulator:
+	case flow.Emulator, flow.Localnet:
 		stakingCollectionAddress = common.Address(systemContracts.FlowServiceAccount.Address)
 		stakingProxyAddress = common.Address(systemContracts.FlowServiceAccount.Address)
 
