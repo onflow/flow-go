@@ -197,7 +197,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 								return &types.Result{}, types.NewFatalError(fmt.Errorf("Fatal error"))
 							},
 						}
-						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+						handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, em)
 						assertPanic(t, isFatal, func() {
 							tx := eoa.PrepareSignAndEncodeTx(
 								t,
@@ -657,7 +657,7 @@ func TestHandler_TransactionTryRun(t *testing.T) {
 							return result, nil
 						},
 					}
-					handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+					handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, em)
 					tx := eoa.PrepareSignAndEncodeTx(
 						t,
 						gethCommon.Address{},
@@ -703,7 +703,7 @@ func TestHandler_TransactionTryRun(t *testing.T) {
 							return result, nil
 						},
 					}
-					handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+					handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, em)
 
 					tx := eoa.PrepareSignAndEncodeTx(
 						t,
@@ -738,7 +738,7 @@ func TestHandler_TransactionTryRun(t *testing.T) {
 							return &types.Result{}, types.NewEVMValidationError(evmErr)
 						},
 					}
-					handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+					handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, em)
 
 					coinbase := types.NewAddress(gethCommon.Address{})
 
