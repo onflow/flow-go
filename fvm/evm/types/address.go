@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime/sema"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
