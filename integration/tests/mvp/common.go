@@ -55,7 +55,7 @@ func RunMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork, acc
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
 		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
 		SetPayer(serviceAddress).
-		SetGasLimit(9999)
+		SetComputeLimit(9999)
 
 	childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	err = serviceAccountClient.SignAndSendTransaction(childCtx, createAccountTx)
@@ -109,7 +109,7 @@ func RunMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork, acc
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
 		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
 		SetPayer(serviceAddress).
-		SetGasLimit(9999)
+		SetComputeLimit(9999)
 
 	err = fundAccountTx.AddArgument(cadence.UFix64(1_0000_0000))
 	require.NoError(t, err)
@@ -150,7 +150,7 @@ func RunMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork, acc
 		SetProposalKey(newAccountAddress, 0, 0).
 		SetPayer(newAccountAddress).
 		AddAuthorizer(newAccountAddress).
-		SetGasLimit(9999)
+		SetComputeLimit(9999)
 
 	t.Log(">> creating counter...")
 

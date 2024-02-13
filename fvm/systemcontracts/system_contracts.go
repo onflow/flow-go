@@ -40,6 +40,9 @@ const (
 	ContractNameViewResolver        = "ViewResolver"
 	ContractNameEVM                 = "EVM"
 
+	// AccountNameEVMStorage is not a contract, but a special account that is used to store EVM state
+	AccountNameEVMStorage = "EVMStorageAccount"
+
 	// Unqualified names of service events (not including address prefix or contract name)
 
 	EventNameEpochSetup    = "EpochSetup"
@@ -61,7 +64,7 @@ const (
 	FungibleTokenAccountIndex = 2
 	FlowTokenAccountIndex     = 3
 	FlowFeesAccountIndex      = 4
-	EVMAccountIndex           = 5
+	EVMStorageAccountIndex    = 5
 )
 
 // Well-known addresses for system contracts on long-running networks.
@@ -79,10 +82,21 @@ var (
 	nftTokenAddressMainnet = flow.HexToAddress("1d7e57aa55817448")
 	// nftTokenAddressTestnet is the address of the NonFungibleToken contract on Testnet
 	nftTokenAddressTestnet = flow.HexToAddress("631e88ae7f1d7c20")
+
+	// evmStorageAddressTestnet is the address of the EVM state storage contract on Testnet
+	evmStorageAddressTestnet = flow.HexToAddress("1a54ed2be7552821")
+	// evmStorageAddressMainnet is the address of the EVM state storage contract on Mainnet
+	evmStorageAddressMainnet = flow.HexToAddress("d421a63faae318f9")
 )
 
 // SystemContract represents a system contract on a particular chain.
 type SystemContract struct {
+	Address flow.Address
+	Name    string
+}
+
+// SystemAccount represents an address used by the system.
+type SystemAccount struct {
 	Address flow.Address
 	Name    string
 }
@@ -131,7 +145,8 @@ type SystemContracts struct {
 	ViewResolver     SystemContract
 
 	// EVM related contracts
-	EVM SystemContract
+	EVMContract SystemContract
+	EVMStorage  SystemAccount
 }
 
 // AsTemplateEnv returns a template environment with all system contracts filled in.
@@ -184,7 +199,8 @@ func (c SystemContracts) All() []SystemContract {
 		c.MetadataViews,
 		c.ViewResolver,
 
-		c.EVM,
+		c.EVMContract,
+		// EVMStorage is not included here, since it is not a contract
 	}
 }
 
@@ -273,6 +289,17 @@ func init() {
 		}
 	}
 
+	evmStorageEVMFunc := func(chain flow.ChainID) flow.Address {
+		switch chain {
+		case flow.Mainnet:
+			return evmStorageAddressMainnet
+		case flow.Testnet:
+			return evmStorageAddressTestnet
+		default:
+			return nthAddressFunc(EVMStorageAccountIndex)(chain)
+		}
+	}
+
 	contractAddressFunc = map[string]func(id flow.ChainID) flow.Address{
 		ContractNameIDTableStaking: epochAddressFunc,
 		ContractNameEpoch:          epochAddressFunc,
@@ -292,12 +319,13 @@ func init() {
 		ContractNameMetadataViews:    nftTokenAddressFunc,
 		ContractNameViewResolver:     nftTokenAddressFunc,
 
-		ContractNameEVM: nthAddressFunc(EVMAccountIndex),
+		ContractNameEVM:       serviceAddressFunc,
+		AccountNameEVMStorage: evmStorageEVMFunc,
 	}
 
 	getSystemContractsForChain := func(chainID flow.ChainID) *SystemContracts {
 
-		contract := func(name string) SystemContract {
+		addressOfContract := func(name string) SystemContract {
 			addressFunc, ok := contractAddressFunc[name]
 			if !ok {
 				// this is a panic, since it can only happen if the code is wrong
@@ -310,26 +338,40 @@ func init() {
 			}
 		}
 
+		addressOfAccount := func(name string) SystemAccount {
+			addressFunc, ok := contractAddressFunc[name]
+			if !ok {
+				// this is a panic, since it can only happen if the code is wrong
+				panic(fmt.Sprintf("unknown system account name: %s", name))
+			}
+
+			return SystemAccount{
+				Address: addressFunc(chainID),
+				Name:    name,
+			}
+		}
+
 		contracts := &SystemContracts{
-			Epoch:          contract(ContractNameEpoch),
-			IDTableStaking: contract(ContractNameIDTableStaking),
-			ClusterQC:      contract(ContractNameClusterQC),
-			DKG:            contract(ContractNameDKG),
+			Epoch:          addressOfContract(ContractNameEpoch),
+			IDTableStaking: addressOfContract(ContractNameIDTableStaking),
+			ClusterQC:      addressOfContract(ContractNameClusterQC),
+			DKG:            addressOfContract(ContractNameDKG),
 
-			FlowServiceAccount:  contract(ContractNameServiceAccount),
-			NodeVersionBeacon:   contract(ContractNameNodeVersionBeacon),
-			RandomBeaconHistory: contract(ContractNameRandomBeaconHistory),
-			FlowStorageFees:     contract(ContractNameStorageFees),
+			FlowServiceAccount:  addressOfContract(ContractNameServiceAccount),
+			NodeVersionBeacon:   addressOfContract(ContractNameNodeVersionBeacon),
+			RandomBeaconHistory: addressOfContract(ContractNameRandomBeaconHistory),
+			FlowStorageFees:     addressOfContract(ContractNameStorageFees),
 
-			FlowFees:      contract(ContractNameFlowFees),
-			FlowToken:     contract(ContractNameFlowToken),
-			FungibleToken: contract(ContractNameFungibleToken),
+			FlowFees:      addressOfContract(ContractNameFlowFees),
+			FlowToken:     addressOfContract(ContractNameFlowToken),
+			FungibleToken: addressOfContract(ContractNameFungibleToken),
 
-			NonFungibleToken: contract(ContractNameNonFungibleToken),
-			MetadataViews:    contract(ContractNameMetadataViews),
-			ViewResolver:     contract(ContractNameViewResolver),
+			NonFungibleToken: addressOfContract(ContractNameNonFungibleToken),
+			MetadataViews:    addressOfContract(ContractNameMetadataViews),
+			ViewResolver:     addressOfContract(ContractNameViewResolver),
 
-			EVM: contract(ContractNameEVM),
+			EVMContract: addressOfContract(ContractNameEVM),
+			EVMStorage:  addressOfAccount(AccountNameEVMStorage),
 		}
 
 		return contracts

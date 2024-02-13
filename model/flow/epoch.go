@@ -8,9 +8,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/fxamacker/cbor/v2"
+	"github.com/onflow/crypto"
 	"github.com/vmihailenco/msgpack/v4"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
 )
 
@@ -63,15 +63,15 @@ const EpochSetupRandomSourceLength = 16
 // for the upcoming epoch. It contains the participants in the epoch, the
 // length, the cluster assignment, and the seed for leader selection.
 type EpochSetup struct {
-	Counter            uint64         // the number of the epoch
-	FirstView          uint64         // the first view of the epoch
-	DKGPhase1FinalView uint64         // the final view of DKG phase 1
-	DKGPhase2FinalView uint64         // the final view of DKG phase 2
-	DKGPhase3FinalView uint64         // the final view of DKG phase 3
-	FinalView          uint64         // the final view of the epoch
-	Participants       IdentityList   // all participants of the epoch
-	Assignments        AssignmentList // cluster assignment for the epoch
-	RandomSource       []byte         // source of randomness for epoch-specific setup tasks
+	Counter            uint64               // the number of the epoch
+	FirstView          uint64               // the first view of the epoch
+	DKGPhase1FinalView uint64               // the final view of DKG phase 1
+	DKGPhase2FinalView uint64               // the final view of DKG phase 2
+	DKGPhase3FinalView uint64               // the final view of DKG phase 3
+	FinalView          uint64               // the final view of the epoch
+	Participants       IdentitySkeletonList // all participants of the epoch in canonical order
+	Assignments        AssignmentList       // cluster assignment for the epoch with node IDs for each cluster in canonical order
+	RandomSource       []byte               // source of randomness for epoch-specific setup tasks
 }
 
 func (setup *EpochSetup) ServiceEvent() ServiceEvent {
@@ -105,7 +105,7 @@ func (setup *EpochSetup) EqualTo(other *EpochSetup) bool {
 	if setup.FinalView != other.FinalView {
 		return false
 	}
-	if !setup.Participants.EqualTo(other.Participants) {
+	if !IdentitySkeletonListEqualTo(setup.Participants, other.Participants) {
 		return false
 	}
 	if !setup.Assignments.EqualTo(other.Assignments) {
@@ -312,7 +312,7 @@ func (commit *EpochCommit) EqualTo(other *EpochCommit) bool {
 // ToDKGParticipantLookup constructs a DKG participant lookup from an identity
 // list and a key list. The identity list must be EXACTLY the same (order and
 // contents) as that used when initializing the corresponding DKG instance.
-func ToDKGParticipantLookup(participants IdentityList, keys []crypto.PublicKey) (map[Identifier]DKGParticipant, error) {
+func ToDKGParticipantLookup(participants IdentitySkeletonList, keys []crypto.PublicKey) (map[Identifier]DKGParticipant, error) {
 	if len(participants) != len(keys) {
 		return nil, fmt.Errorf("participant list (len=%d) does not match key list (len=%d)", len(participants), len(keys))
 	}
@@ -403,29 +403,6 @@ func (part DKGParticipant) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, encodableFromDKGParticipant(part))
 }
 
-// EpochStatus represents the status of the current and next epoch with respect
-// to a reference block. Concretely, it contains the IDs for all relevant
-// service events emitted as of the reference block. Events not yet emitted are
-// represented by ZeroID.
-type EpochStatus struct {
-	PreviousEpoch EventIDs // EpochSetup and EpochCommit events for the previous epoch
-	CurrentEpoch  EventIDs // EpochSetup and EpochCommit events for the current epoch
-	NextEpoch     EventIDs // EpochSetup and EpochCommit events for the next epoch
-	// InvalidServiceEventIncorporated encodes whether an invalid service event is
-	// incorporated in this fork. When this happens, epoch fallback is triggered
-	// AFTER the fork is finalized.
-	InvalidServiceEventIncorporated bool
-}
-
-// Copy returns a copy of the epoch status.
-func (es *EpochStatus) Copy() *EpochStatus {
-	return &EpochStatus{
-		PreviousEpoch: es.PreviousEpoch,
-		CurrentEpoch:  es.CurrentEpoch,
-		NextEpoch:     es.NextEpoch,
-	}
-}
-
 // EventIDs is a container for IDs of epoch service events.
 type EventIDs struct {
 	// SetupID is the ID of the EpochSetup event for the respective Epoch
@@ -434,68 +411,7 @@ type EventIDs struct {
 	CommitID Identifier
 }
 
-func NewEpochStatus(previousSetup, previousCommit, currentSetup, currentCommit, nextSetup, nextCommit Identifier) (*EpochStatus, error) {
-	status := &EpochStatus{
-		PreviousEpoch: EventIDs{
-			SetupID:  previousSetup,
-			CommitID: previousCommit,
-		},
-		CurrentEpoch: EventIDs{
-			SetupID:  currentSetup,
-			CommitID: currentCommit,
-		},
-		NextEpoch: EventIDs{
-			SetupID:  nextSetup,
-			CommitID: nextCommit,
-		},
-	}
-
-	err := status.Check()
-	if err != nil {
-		return nil, err
-	}
-	return status, nil
-}
-
-// Check checks that the status is well-formed, returning an error if it is not.
-// All errors indicate a malformed EpochStatus.
-func (es *EpochStatus) Check() error {
-
-	if es == nil {
-		return fmt.Errorf("nil epoch status")
-	}
-	// must reference either both or neither event IDs for previous epoch
-	if (es.PreviousEpoch.SetupID == ZeroID) != (es.PreviousEpoch.CommitID == ZeroID) {
-		return fmt.Errorf("epoch status with only setup or only commit service event")
-	}
-	// must reference event IDs for current epoch
-	if es.CurrentEpoch.SetupID == ZeroID || es.CurrentEpoch.CommitID == ZeroID {
-		return fmt.Errorf("epoch status with empty current epoch service events")
-	}
-	// must not reference a commit without a setup
-	if es.NextEpoch.SetupID == ZeroID && es.NextEpoch.CommitID != ZeroID {
-		return fmt.Errorf("epoch status with commit but no setup service event")
-	}
-	return nil
-}
-
-// Phase returns the phase for the CURRENT epoch, given this epoch status.
-// All errors indicate a malformed EpochStatus.
-func (es *EpochStatus) Phase() (EpochPhase, error) {
-
-	err := es.Check()
-	if err != nil {
-		return EpochPhaseUndefined, err
-	}
-	if es.NextEpoch.SetupID == ZeroID {
-		return EpochPhaseStaking, nil
-	}
-	if es.NextEpoch.CommitID == ZeroID {
-		return EpochPhaseSetup, nil
-	}
-	return EpochPhaseCommitted, nil
-}
-
-func (es *EpochStatus) HasPrevious() bool {
-	return es.PreviousEpoch.SetupID != ZeroID && es.PreviousEpoch.CommitID != ZeroID
+// ID returns hash of the event IDs.
+func (e *EventIDs) ID() Identifier {
+	return MakeID(e)
 }

@@ -11,7 +11,6 @@ import (
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -32,11 +31,11 @@ type blockSignerDecoderSuite struct {
 
 func (s *blockSignerDecoderSuite) SetupTest() {
 	// the default header fixture creates signerIDs for a committee of 10 nodes, so we prepare a committee same as that
-	s.allConsensus = unittest.IdentityListFixture(40, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
+	s.allConsensus = unittest.IdentityListFixture(40, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical[flow.Identity])
 
 	// mock consensus committee
 	s.committee = hotstuff.NewDynamicCommittee(s.T())
-	s.committee.On("IdentitiesByEpoch", mock.Anything).Return(s.allConsensus, nil).Maybe()
+	s.committee.On("IdentitiesByEpoch", mock.Anything).Return(s.allConsensus.ToSkeleton(), nil).Maybe()
 
 	// prepare valid test block:
 	voterIndices, err := signature.EncodeSignersToIndices(s.allConsensus.NodeIDs(), s.allConsensus.NodeIDs())
@@ -139,13 +138,13 @@ func (s *blockSignerDecoderSuite) Test_EpochTransition() {
 	//   PARENT <- | -- B
 	blockView := s.block.Header.View
 	parentView := s.block.Header.ParentView
-	epoch1Committee := s.allConsensus
+	epoch1Committee := s.allConsensus.ToSkeleton()
 	epoch2Committee, err := s.allConsensus.SamplePct(.8)
 	require.NoError(s.T(), err)
 
 	*s.committee = *hotstuff.NewDynamicCommittee(s.T())
 	s.committee.On("IdentitiesByEpoch", parentView).Return(epoch1Committee, nil).Maybe()
-	s.committee.On("IdentitiesByEpoch", blockView).Return(epoch2Committee, nil).Maybe()
+	s.committee.On("IdentitiesByEpoch", blockView).Return(epoch2Committee.ToSkeleton(), nil).Maybe()
 
 	ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
 	require.NoError(s.T(), err)

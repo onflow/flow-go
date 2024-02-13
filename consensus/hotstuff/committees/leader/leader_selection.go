@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/onflow/flow-go/crypto/random"
+	"github.com/onflow/crypto/random"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -84,25 +85,28 @@ func (l LeaderSelection) newInvalidViewError(view uint64) InvalidViewError {
 
 // ComputeLeaderSelection pre-generates a certain number of leader selections, and returns a
 // leader selection instance for querying the leader indexes for certain views.
-// firstView - the start view of the epoch, the generated leader selections start from this view.
-// rng - the deterministic source of randoms
-// count - the number of leader selections to be pre-generated and cached.
-// identities - the identities that contain the weight info, which is used as probability for
-// the identity to be selected as leader.
+// Inputs:
+//   - firstView: the start view of the epoch, the generated leader selections start from this view.
+//   - rng: the deterministic source of randoms
+//   - count: the number of leader selections to be pre-generated and cached.
+//   - identities the identities that contain the weight info, which is used as probability for
+//     the identity to be selected as leader.
+//
+// Identities with `InitialWeight=0` are accepted as long as there are nodes with positive weights.
+// Zero-weight nodes have zero probability of being selected as leaders in accordance with their weight.
 func ComputeLeaderSelection(
 	firstView uint64,
 	rng random.Rand,
 	count int,
-	identities flow.IdentityList,
+	identities flow.IdentitySkeletonList,
 ) (*LeaderSelection, error) {
-
 	if count < 1 {
 		return nil, fmt.Errorf("number of views must be positive (got %d)", count)
 	}
 
 	weights := make([]uint64, 0, len(identities))
 	for _, id := range identities {
-		weights = append(weights, id.Weight)
+		weights = append(weights, id.InitialWeight)
 	}
 
 	leaders, err := weightedRandomSelection(rng, count, weights)
@@ -117,7 +121,7 @@ func ComputeLeaderSelection(
 	}, nil
 }
 
-// weightedRandomSelection - given a random source source and a given count, pre-generate the indices of leader.
+// weightedRandomSelection - given a random source and a given count, pre-generate the indices of leader.
 // The chance to be selected as leader is proportional to its weight.
 // If an identity has 0 weight, it won't be selected as leader.
 // This algorithm is essentially Fitness proportionate selection:
@@ -127,11 +131,9 @@ func weightedRandomSelection(
 	count int,
 	weights []uint64,
 ) ([]uint16, error) {
-
 	if len(weights) == 0 {
 		return nil, fmt.Errorf("weights is empty")
 	}
-
 	if len(weights) >= math.MaxUint16 {
 		return nil, fmt.Errorf("number of possible leaders (%d) exceeds maximum (2^16-1)", len(weights))
 	}
@@ -148,7 +150,6 @@ func weightedRandomSelection(
 		cumsum += weight
 		weightSums = append(weightSums, cumsum)
 	}
-
 	if cumsum == 0 {
 		return nil, fmt.Errorf("total weight must be greater than 0")
 	}

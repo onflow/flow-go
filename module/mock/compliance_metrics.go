@@ -22,11 +22,6 @@ func (_m *ComplianceMetrics) BlockSealed(_a0 *flow.Block) {
 	_m.Called(_a0)
 }
 
-// CommittedEpochFinalView provides a mock function with given fields: view
-func (_m *ComplianceMetrics) CommittedEpochFinalView(view uint64) {
-	_m.Called(view)
-}
-
 // CurrentDKGPhase1FinalView provides a mock function with given fields: view
 func (_m *ComplianceMetrics) CurrentDKGPhase1FinalView(view uint64) {
 	_m.Called(view)

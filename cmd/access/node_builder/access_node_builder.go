@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/go-bitswap"
 	"github.com/rs/zerolog"
@@ -34,7 +36,6 @@ import (
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
@@ -119,34 +120,37 @@ import (
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type AccessNodeConfig struct {
-	supportsObserver             bool // True if this is an Access node that supports observers and consensus follower engines
-	collectionGRPCPort           uint
-	executionGRPCPort            uint
-	pingEnabled                  bool
-	nodeInfoFile                 string
-	apiRatelimits                map[string]int
-	apiBurstlimits               map[string]int
-	rpcConf                      rpc.Config
-	stateStreamConf              statestreambackend.Config
-	stateStreamFilterConf        map[string]int
-	ExecutionNodeAddress         string // deprecated
-	HistoricalAccessRPCs         []access.AccessAPIClient
-	logTxTimeToFinalized         bool
-	logTxTimeToExecuted          bool
-	logTxTimeToFinalizedExecuted bool
-	retryEnabled                 bool
-	rpcMetricsEnabled            bool
-	executionDataSyncEnabled     bool
-	executionDataDir             string
-	executionDataStartHeight     uint64
-	executionDataConfig          edrequester.ExecutionDataConfig
-	PublicNetworkConfig          PublicNetworkConfig
-	TxResultCacheSize            uint
-	TxErrorMessagesCacheSize     uint
-	executionDataIndexingEnabled bool
-	registersDBPath              string
-	checkpointFile               string
-	scriptExecutorConfig         query.QueryConfig
+	supportsObserver                  bool // True if this is an Access node that supports observers and consensus follower engines
+	collectionGRPCPort                uint
+	executionGRPCPort                 uint
+	pingEnabled                       bool
+	nodeInfoFile                      string
+	apiRatelimits                     map[string]int
+	apiBurstlimits                    map[string]int
+	rpcConf                           rpc.Config
+	stateStreamConf                   statestreambackend.Config
+	stateStreamFilterConf             map[string]int
+	ExecutionNodeAddress              string // deprecated
+	HistoricalAccessRPCs              []access.AccessAPIClient
+	logTxTimeToFinalized              bool
+	logTxTimeToExecuted               bool
+	logTxTimeToFinalizedExecuted      bool
+	retryEnabled                      bool
+	rpcMetricsEnabled                 bool
+	executionDataSyncEnabled          bool
+	publicNetworkExecutionDataEnabled bool
+	executionDataDir                  string
+	executionDataStartHeight          uint64
+	executionDataConfig               edrequester.ExecutionDataConfig
+	PublicNetworkConfig               PublicNetworkConfig
+	TxResultCacheSize                 uint
+	TxErrorMessagesCacheSize          uint
+	executionDataIndexingEnabled      bool
+	registersDBPath                   string
+	checkpointFile                    string
+	scriptExecutorConfig              query.QueryConfig
+	scriptExecMinBlock                uint64
+	scriptExecMaxBlock                uint64
 }
 
 type PublicNetworkConfig struct {
@@ -182,7 +186,8 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 					MaxFailures:    5,
 					MaxRequests:    1,
 				},
-				ScriptExecutionMode: backend.ScriptExecutionModeExecutionNodesOnly.String(), // default to ENs only for now
+				ScriptExecutionMode: backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				EventQueryMode:      backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
 			},
 			RestConfig: rest.Config{
 				ListenAddress: "",
@@ -221,9 +226,10 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			BindAddress: cmd.NotSet,
 			Metrics:     metrics.NewNoopCollector(),
 		},
-		executionDataSyncEnabled: true,
-		executionDataDir:         filepath.Join(homedir, ".flow", "execution_data"),
-		executionDataStartHeight: 0,
+		executionDataSyncEnabled:          true,
+		publicNetworkExecutionDataEnabled: false,
+		executionDataDir:                  filepath.Join(homedir, ".flow", "execution_data"),
+		executionDataStartHeight:          0,
 		executionDataConfig: edrequester.ExecutionDataConfig{
 			InitialBlockHeight: 0,
 			MaxSearchAhead:     edrequester.DefaultMaxSearchAhead,
@@ -236,6 +242,8 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registersDBPath:              filepath.Join(homedir, ".flow", "execution_state"),
 		checkpointFile:               cmd.NotSet,
 		scriptExecutorConfig:         query.NewDefaultConfig(),
+		scriptExecMinBlock:           0,
+		scriptExecMaxBlock:           math.MaxUint64,
 	}
 }
 
@@ -266,6 +274,7 @@ type FlowAccessNodeBuilder struct {
 	FollowerCore               module.HotStuffFollower
 	Validator                  hotstuff.Validator
 	ExecutionDataDownloader    execution_data.Downloader
+	PublicBlobService          network.BlobService
 	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
 	ExecutionDataStore         execution_data.ExecutionDataStore
 	ExecutionDataCache         *execdatacache.ExecutionDataCache
@@ -273,6 +282,8 @@ type FlowAccessNodeBuilder struct {
 	ExecutionIndexerCore       *indexer.IndexerCore
 	ScriptExecutor             *backend.ScriptExecutor
 	RegistersAsyncStore        *execution.RegistersAsyncStore
+	EventsIndex                *backend.EventsIndex
+	IndexerDependencies        *cmd.DependencyList
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -488,8 +499,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 	// setup dependency chain to ensure indexer starts after the requester
 	requesterDependable := module.NewProxiedReadyDoneAware()
-	indexerDependencies := cmd.NewDependencyList()
-	indexerDependencies.Add(requesterDependable)
+	builder.IndexerDependencies.Add(requesterDependable)
 
 	builder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
@@ -657,6 +667,28 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			return builder.ExecutionDataRequester, nil
 		})
 
+	if builder.publicNetworkExecutionDataEnabled {
+		builder.Component("public network execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			opts := []network.BlobServiceOption{
+				blob.WithBitswapOptions(
+					bitswap.WithTracer(
+						blob.NewTracer(node.Logger.With().Str("public_blob_service", channels.PublicExecutionDataService.String()).Logger()),
+					),
+				),
+			}
+
+			net := builder.AccessNodeConfig.PublicNetworkConfig.Network
+
+			var err error
+			builder.PublicBlobService, err = net.RegisterBlobService(channels.PublicExecutionDataService, ds, opts...)
+			if err != nil {
+				return nil, fmt.Errorf("could not register blob service: %w", err)
+			}
+
+			return builder.PublicBlobService, nil
+		})
+	}
+
 	if builder.executionDataIndexingEnabled {
 		var indexedBlockHeight storage.ConsumerProgress
 
@@ -667,10 +699,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
 				// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
 				indexedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
-				return nil
-			}).
-			Module("events storage", func(node *cmd.NodeConfig) error {
-				builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
 				return nil
 			}).
 			Module("transaction results storage", func(node *cmd.NodeConfig) error {
@@ -716,14 +744,20 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 					checkpointHeight := builder.SealedRootBlock.Header.Height
 
-					buutstrap, err := pStorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, builder.Logger)
+					if builder.SealedRootBlock.ID() != builder.RootSeal.BlockID {
+						return nil, fmt.Errorf("mismatching sealed root block and root seal: %v != %v",
+							builder.SealedRootBlock.ID(), builder.RootSeal.BlockID)
+					}
+
+					rootHash := ledger.RootHash(builder.RootSeal.FinalState)
+					bootstrap, err := pStorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, rootHash, builder.Logger)
 					if err != nil {
-						return nil, fmt.Errorf("could not create registers bootstrapper: %w", err)
+						return nil, fmt.Errorf("could not create registers bootstrap: %w", err)
 					}
 
 					// TODO: find a way to hook a context up to this to allow a graceful shutdown
 					workerCount := 10
-					err = buutstrap.IndexCheckpointFile(context.Background(), workerCount)
+					err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
 					if err != nil {
 						return nil, fmt.Errorf("could not load checkpoint file: %w", err)
 					}
@@ -744,6 +778,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.Storage.Headers,
 					builder.Storage.Events,
 					builder.Storage.LightTransactionResults,
+					builder.IngestEng.OnCollection,
 				)
 				if err != nil {
 					return nil, err
@@ -760,11 +795,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.ExecutionDataRequester.HighestConsecutiveHeight,
 					indexedBlockHeight,
 				)
-				if err != nil {
-					return nil, err
-				}
-
-				err = builder.RegistersAsyncStore.InitDataAvailable(registers)
 				if err != nil {
 					return nil, err
 				}
@@ -787,10 +817,23 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, err
 				}
 
-				builder.ScriptExecutor.InitReporter(builder.ExecutionIndexer, scripts)
+				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts)
+				if err != nil {
+					return nil, err
+				}
+
+				err = builder.EventsIndex.Initialize(builder.ExecutionIndexer)
+				if err != nil {
+					return nil, err
+				}
+
+				err = builder.RegistersAsyncStore.Initialize(registers)
+				if err != nil {
+					return nil, err
+				}
 
 				return builder.ExecutionIndexer, nil
-			}, indexerDependencies)
+			}, builder.IndexerDependencies)
 	}
 
 	if builder.stateStreamConf.ListenAddr != "" {
@@ -813,6 +856,16 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 			broadcaster := engine.NewBroadcaster()
 
+			eventQueryMode, err := backend.ParseIndexQueryMode(builder.rpcConf.BackendConfig.EventQueryMode)
+			if err != nil {
+				return nil, fmt.Errorf("could not parse event query mode: %w", err)
+			}
+
+			// use the events index for events if enabled and the node is configured to use it for
+			// regular event queries
+			useIndex := builder.executionDataIndexingEnabled &&
+				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
+
 			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,
 				builder.stateStreamConf,
@@ -825,7 +878,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				broadcaster,
 				builder.executionDataConfig.InitialBlockHeight,
 				highestAvailableHeight,
-				builder.RegistersAsyncStore)
+				builder.RegistersAsyncStore,
+				builder.EventsIndex,
+				useIndex,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
 			}
@@ -861,6 +917,7 @@ func FlowAccessNode(nodeBuilder *cmd.FlowNodeBuilder) *FlowAccessNodeBuilder {
 		AccessNodeConfig:    DefaultAccessNodeConfig(),
 		FlowNodeBuilder:     nodeBuilder,
 		FollowerDistributor: dist,
+		IndexerDependencies: cmd.NewDependencyList(),
 	}
 }
 
@@ -997,6 +1054,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"execution-data-sync-enabled",
 			defaultConfig.executionDataSyncEnabled,
 			"whether to enable the execution data sync protocol")
+		flags.BoolVar(&builder.publicNetworkExecutionDataEnabled,
+			"public-network-execution-data-sync-enabled",
+			defaultConfig.publicNetworkExecutionDataEnabled,
+			"[experimental] whether to enable the execution data sync protocol on public network")
 		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
 		flags.Uint64Var(&builder.executionDataStartHeight,
 			"execution-data-start-height",
@@ -1063,6 +1124,11 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVar(&builder.registersDBPath, "execution-state-dir", defaultConfig.registersDBPath, "directory to use for execution-state database")
 		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "execution-state checkpoint file")
 
+		flags.StringVar(&builder.rpcConf.BackendConfig.EventQueryMode,
+			"event-query-mode",
+			defaultConfig.rpcConf.BackendConfig.EventQueryMode,
+			"mode to use when querying events. one of [local-only, execution-nodes-only(default), failover]")
+
 		// Script Execution
 		flags.StringVar(&builder.rpcConf.BackendConfig.ScriptExecutionMode,
 			"script-execution-mode",
@@ -1084,6 +1150,14 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"script-execution-timeout",
 			defaultConfig.scriptExecutorConfig.ExecutionTimeLimit,
 			"timeout value for locally executed scripts. default: 10s")
+		flags.Uint64Var(&builder.scriptExecMinBlock,
+			"script-execution-min-height",
+			defaultConfig.scriptExecMinBlock,
+			"lowest block height to allow for script execution. default: no limit")
+		flags.Uint64Var(&builder.scriptExecMaxBlock,
+			"script-execution-max-height",
+			defaultConfig.scriptExecMaxBlock,
+			"highest block height to allow for script execution. default: no limit")
 
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
@@ -1195,8 +1269,8 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
 			return id.NewIdentityFilterIdentifierProvider(
 				filter.And(
-					filter.HasRole(flow.RoleConsensus),
-					filter.Not(filter.HasNodeID(node.Me.NodeID())),
+					filter.HasRole[flow.Identity](flow.RoleConsensus),
+					filter.Not(filter.HasNodeID[flow.Identity](node.Me.NodeID())),
 					underlay.NotEjectedFilter,
 				),
 				builder.IdentityProvider,
@@ -1258,6 +1332,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()
 	}
+
+	ingestionDependable := module.NewProxiedReadyDoneAware()
+	builder.IndexerDependencies.Add(ingestionDependable)
 
 	builder.
 		BuildConsensusFollower().
@@ -1395,11 +1472,19 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("backend script executor", func(node *cmd.NodeConfig) error {
-			builder.ScriptExecutor = backend.NewScriptExecutor()
+			builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
 			return nil
 		}).
 		Module("async register store", func(node *cmd.NodeConfig) error {
 			builder.RegistersAsyncStore = execution.NewRegistersAsyncStore()
+			return nil
+		}).
+		Module("events storage", func(node *cmd.NodeConfig) error {
+			builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
+			return nil
+		}).
+		Module("events index", func(node *cmd.NodeConfig) error {
+			builder.EventsIndex = backend.NewEventsIndex(builder.Storage.Events)
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -1434,9 +1519,17 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				),
 			}
 
-			scriptExecMode, err := backend.ParseScriptExecutionMode(config.BackendConfig.ScriptExecutionMode)
+			scriptExecMode, err := backend.ParseIndexQueryMode(config.BackendConfig.ScriptExecutionMode)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse script execution mode: %w", err)
+			}
+
+			eventQueryMode, err := backend.ParseIndexQueryMode(config.BackendConfig.EventQueryMode)
+			if err != nil {
+				return nil, fmt.Errorf("could not parse script execution mode: %w", err)
+			}
+			if eventQueryMode == backend.IndexQueryModeCompare {
+				return nil, fmt.Errorf("event query mode 'compare' is not supported")
 			}
 
 			nodeBackend, err := backend.New(backend.Params{
@@ -1463,6 +1556,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				TxErrorMessagesCacheSize:  builder.TxErrorMessagesCacheSize,
 				ScriptExecutor:            builder.ScriptExecutor,
 				ScriptExecutionMode:       scriptExecMode,
+				EventQueryMode:            eventQueryMode,
+				EventsIndex:               builder.EventsIndex,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
@@ -1508,7 +1603,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Me,
 				node.State,
 				channels.RequestCollections,
-				filter.HasRole(flow.RoleCollection),
+				filter.HasRole[flow.Identity](flow.RoleCollection),
 				func() flow.Entity { return &flow.Collection{} },
 			)
 			if err != nil {
@@ -1535,6 +1630,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if err != nil {
 				return nil, err
 			}
+			ingestionDependable.Init(builder.IngestEng)
 			builder.RequestEng.WithHandle(builder.IngestEng.OnCollection)
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.IngestEng.OnFinalizedBlock)
 
@@ -1699,7 +1795,6 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 	if err != nil {
 		return nil, fmt.Errorf("could not create connection manager: %w", err)
 	}
-
 	libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger, &builder.FlowConfig.NetworkConfig.GossipSub, &p2pbuilderconfig.MetricsConfig{
 		HeroCacheFactory: builder.HeroCacheMetricsFactory(),
 		Metrics:          networkMetrics,

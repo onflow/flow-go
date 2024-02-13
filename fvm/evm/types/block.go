@@ -1,6 +1,8 @@
 package types
 
 import (
+	"math/big"
+
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -15,11 +17,8 @@ type Block struct {
 	// Height returns the height of this block
 	Height uint64
 
-	// holds the total amount of the native token deposited in the evm side.
-	TotalSupply uint64
-
-	// StateRoot returns the EVM root hash of the state after executing this block
-	StateRoot gethCommon.Hash
+	// holds the total amount of the native token deposited in the evm side. (in attoflow)
+	TotalSupply *big.Int
 
 	// ReceiptRoot returns the root hash of the receipts emitted in this block
 	ReceiptRoot gethCommon.Hash
@@ -45,14 +44,13 @@ func (b *Block) AppendTxHash(txHash gethCommon.Hash) {
 }
 
 // NewBlock constructs a new block
-func NewBlock(height, uuidIndex, totalSupply uint64,
+func NewBlock(height, uuidIndex uint64, totalSupply *big.Int,
 	stateRoot, receiptRoot gethCommon.Hash,
 	txHashes []gethCommon.Hash,
 ) *Block {
 	return &Block{
 		Height:            height,
 		TotalSupply:       totalSupply,
-		StateRoot:         stateRoot,
 		ReceiptRoot:       receiptRoot,
 		TransactionHashes: txHashes,
 	}
@@ -69,6 +67,8 @@ func NewBlockFromBytes(encoded []byte) (*Block, error) {
 var GenesisBlock = &Block{
 	ParentBlockHash: gethCommon.Hash{},
 	Height:          uint64(0),
-	StateRoot:       gethTypes.EmptyRootHash,
+	TotalSupply:     new(big.Int),
 	ReceiptRoot:     gethTypes.EmptyRootHash,
 }
+
+var GenesisBlockHash, _ = GenesisBlock.Hash()

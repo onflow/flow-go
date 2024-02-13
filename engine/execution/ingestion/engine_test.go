@@ -8,12 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
 
 	enginePkg "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
@@ -25,7 +23,7 @@ import (
 	uploadermock "github.com/onflow/flow-go/engine/execution/ingestion/uploader/mock"
 	provider "github.com/onflow/flow-go/engine/execution/provider/mock"
 	stateMock "github.com/onflow/flow-go/engine/execution/state/mock"
-	"github.com/onflow/flow-go/engine/testutil/mocklocal"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
@@ -69,8 +67,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	myIdentity.Role = flow.RoleExecution
 	myIdentity.StakingPubKey = sk.PublicKey()
 
-	me := mocklocal.NewMockLocal(sk, myIdentity.ID(), t)
-
 	headers := storage.NewHeaders(t)
 	blocks := storage.NewBlocks(t)
 	collections := mocks.NewMockCollectionStore()
@@ -83,7 +79,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	var engine *Engine
 
 	defer func() {
-		<-engine.Done()
+		unittest.AssertClosesBefore(t, engine.Done(), 5*time.Second, "expect to stop before timeout")
 		computationManager.AssertExpectations(t)
 		protocolState.AssertExpectations(t)
 		executionState.AssertExpectations(t)
@@ -119,7 +115,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		unit,
 		log,
 		net,
-		me,
 		fetcher,
 		headers,
 		blocks,

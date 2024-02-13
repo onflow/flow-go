@@ -46,7 +46,7 @@ type API interface {
 	// GetRegisterValues returns register values for a set of register IDs at the provided block height.
 	GetRegisterValues(registerIDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error)
 	// SubscribeAccountStatuses subscribes to the streaming of account status changes starting from a specific block ID
-	//and block height, with an optional status filter.
+	// and block height, with an optional status filter.
 	SubscribeAccountStatuses(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter StatusFilter) Subscription
 }
 

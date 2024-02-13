@@ -1,32 +1,40 @@
 package emulator
 
 import (
+	"errors"
 	"math/big"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethCore "github.com/ethereum/go-ethereum/core"
-	gethRawDB "github.com/ethereum/go-ethereum/core/rawdb"
-	gethState "github.com/ethereum/go-ethereum/core/state"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
 	gethCrypto "github.com/ethereum/go-ethereum/crypto"
+	gethParams "github.com/ethereum/go-ethereum/params"
+	"github.com/onflow/atree"
 
+	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/types"
+	"github.com/onflow/flow-go/model/flow"
 )
+
+var ErrInvalidBalance = errors.New("invalid balance for transfer")
 
 // Emulator handles operations against evm runtime
 type Emulator struct {
-	Database types.Database
+	rootAddr flow.Address
+	ledger   atree.Ledger
 }
 
 var _ types.Emulator = &Emulator{}
 
 // NewEmulator constructs a new EVM Emulator
 func NewEmulator(
-	db types.Database,
+	ledger atree.Ledger,
+	rootAddr flow.Address,
 ) *Emulator {
 	return &Emulator{
-		Database: db,
+		rootAddr: rootAddr,
+		ledger:   ledger,
 	}
 }
 
@@ -35,12 +43,15 @@ func newConfig(ctx types.BlockContext) *Config {
 		WithBlockNumber(new(big.Int).SetUint64(ctx.BlockNumber)),
 		WithCoinbase(ctx.GasFeeCollector.ToCommon()),
 		WithDirectCallBaseGasUsage(ctx.DirectCallBaseGasUsage),
+		WithExtraPrecompiles(ctx.ExtraPrecompiles),
+		WithGetBlockHashFunction(ctx.GetHashFunc),
+		WithRandom(&ctx.Random),
 	)
 }
 
 // NewReadOnlyBlockView constructs a new readonly block view
 func (em *Emulator) NewReadOnlyBlockView(ctx types.BlockContext) (types.ReadOnlyBlockView, error) {
-	execState, err := newState(em.Database)
+	execState, err := state.NewStateDB(em.ledger, em.rootAddr)
 	return &ReadOnlyBlockView{
 		state: execState,
 	}, err
@@ -49,16 +60,18 @@ func (em *Emulator) NewReadOnlyBlockView(ctx types.BlockContext) (types.ReadOnly
 // NewBlockView constructs a new block view (mutable)
 func (em *Emulator) NewBlockView(ctx types.BlockContext) (types.BlockView, error) {
 	cfg := newConfig(ctx)
+	SetupPrecompile(cfg)
 	return &BlockView{
 		config:   cfg,
-		database: em.Database,
+		rootAddr: em.rootAddr,
+		ledger:   em.ledger,
 	}, nil
 }
 
 // ReadOnlyBlockView provides a read only view of a block
 // could be used multiple times for queries
 type ReadOnlyBlockView struct {
-	state *gethState.StateDB
+	state types.StateDB
 }
 
 // BalanceOf returns the balance of the given address
@@ -66,14 +79,19 @@ func (bv *ReadOnlyBlockView) BalanceOf(address types.Address) (*big.Int, error) 
 	return bv.state.GetBalance(address.ToCommon()), nil
 }
 
+// NonceOf returns the nonce of the given address
+func (bv *ReadOnlyBlockView) NonceOf(address types.Address) (uint64, error) {
+	return bv.state.GetNonce(address.ToCommon()), nil
+}
+
 // CodeOf returns the code of the given address
 func (bv *ReadOnlyBlockView) CodeOf(address types.Address) (types.Code, error) {
 	return bv.state.GetCode(address.ToCommon()), nil
 }
 
-// NonceOf returns the nonce of the given address
-func (bv *ReadOnlyBlockView) NonceOf(address types.Address) (uint64, error) {
-	return bv.state.GetNonce(address.ToCommon()), nil
+// CodeHashOf returns the code hash of the given address
+func (bv *ReadOnlyBlockView) CodeHashOf(address types.Address) ([]byte, error) {
+	return bv.state.GetCodeHash(address.ToCommon()).Bytes(), nil
 }
 
 // BlockView allows mutation of the evm state as part of a block
@@ -82,7 +100,8 @@ func (bv *ReadOnlyBlockView) NonceOf(address types.Address) (uint64, error) {
 // TODO: add block level commit (separation of trie commit to storage)
 type BlockView struct {
 	config   *Config
-	database types.Database
+	rootAddr flow.Address
+	ledger   atree.Ledger
 }
 
 // DirectCall executes a direct call
@@ -91,19 +110,19 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	var res *types.Result
 	switch call.SubType {
 	case types.DepositCallSubType:
-		res, err = proc.mintTo(call.To, call.Value)
+		return proc.mintTo(call.To, call.Value)
 	case types.WithdrawCallSubType:
-		res, err = proc.withdrawFrom(call.From, call.Value)
+		return proc.withdrawFrom(call.From, call.Value)
+	case types.DeployCallSubType:
+		if !call.EmptyToField() {
+			return proc.deployAt(call.From, call.To, call.Data, call.GasLimit, call.Value)
+		}
+		fallthrough
 	default:
-		res, err = proc.run(call.Message(), types.DirectCallTxType)
+		return proc.runDirect(call.Message(), types.DirectCallTxType)
 	}
-	if err != nil {
-		return res, err
-	}
-	return res, bl.commit(res.StateRootHash)
 }
 
 // RunTransaction runs an evm transaction
@@ -126,15 +145,11 @@ func (bl *BlockView) RunTransaction(
 	// update tx context origin
 	proc.evm.TxContext.Origin = msg.From
 	res, err := proc.run(msg, tx.Type())
-	if err != nil {
-		return res, err
-	}
-
-	return res, bl.commit(res.StateRootHash)
+	return res, err
 }
 
 func (bl *BlockView) newProcedure() (*procedure, error) {
-	execState, err := newState(bl.database)
+	execState, err := state.NewStateDB(bl.ledger, bl.rootAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -148,59 +163,27 @@ func (bl *BlockView) newProcedure() (*procedure, error) {
 			cfg.ChainConfig,
 			cfg.EVMConfig,
 		),
-		state:    execState,
-		database: bl.database,
+		state: execState,
 	}, nil
 }
 
-func (bl *BlockView) commit(rootHash gethCommon.Hash) error {
-	// commit atree changes back to the backend
-	err := bl.database.Commit(rootHash)
-	return handleCommitError(err)
-}
-
 type procedure struct {
-	config   *Config
-	evm      *gethVM.EVM
-	state    *gethState.StateDB
-	database types.Database
+	config *Config
+	evm    *gethVM.EVM
+	state  types.StateDB
 }
 
 // commit commits the changes to the state.
-func (proc *procedure) commit() (gethCommon.Hash, error) {
-	// commits the changes from the journal into the in memory trie.
-	// in the future if we want to move this to the block level we could use finalize
-	// to get the root hash
-	newRoot, err := proc.state.Commit(true)
-	if err != nil {
-		return gethTypes.EmptyRootHash, handleCommitError(err)
-	}
-
-	// flush the trie to the lower level db
-	// the reason we have to do this, is the original database
-	// is designed to keep changes in memory until the state.Commit
-	// is called then the changes moves into the trie, but the trie
-	// would stay in memory for faster transaction execution. you
-	// have to explicitly ask the trie to commit to the underlying storage
-	err = proc.state.Database().TrieDB().Commit(newRoot, false)
-	if err != nil {
-		return gethTypes.EmptyRootHash, handleCommitError(err)
-	}
-
-	// // remove the read registers (no history tracking)
-	// err = proc.database.DeleteAndCleanReadKey()
-	// if err != nil {
-	// 	return gethTypes.EmptyRootHash, types.NewFatalError(err)
-	// }
-	return newRoot, nil
+func (proc *procedure) commit() error {
+	return handleCommitError(proc.state.Commit())
 }
 
 func handleCommitError(err error) error {
 	if err == nil {
 		return nil
 	}
-	// if known types (database errors) don't do anything and return
-	if types.IsAFatalError(err) || types.IsADatabaseError(err) {
+	// if known types (state errors) don't do anything and return
+	if types.IsAFatalError(err) || types.IsAStateError(err) {
 		return err
 	}
 
@@ -209,7 +192,6 @@ func handleCommitError(err error) error {
 }
 
 func (proc *procedure) mintTo(address types.Address, amount *big.Int) (*types.Result, error) {
-	var err error
 	addr := address.ToCommon()
 	res := &types.Result{
 		GasConsumed: proc.config.DirectCallBaseGasUsage,
@@ -225,13 +207,10 @@ func (proc *procedure) mintTo(address types.Address, amount *big.Int) (*types.Re
 	proc.state.AddBalance(addr, amount)
 
 	// we don't need to increment any nonce, given the origin doesn't exist
-	res.StateRootHash, err = proc.commit()
-
-	return res, err
+	return res, proc.commit()
 }
 
 func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*types.Result, error) {
-	var err error
 
 	addr := address.ToCommon()
 	res := &types.Result{
@@ -240,12 +219,9 @@ func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*ty
 	}
 
 	// check if account exists
-	// while this method is only called from bridged accounts
-	// it might be the case that someone creates a bridged account
+	// while this method is only called for COAs
+	// it might be the case that someone creates a COA
 	// and never transfer tokens to and call for withdraw
-	// TODO: we might revisit this apporach and
-	// 		return res, types.ErrAccountDoesNotExist
-	// instead
 	if !proc.state.Exist(addr) {
 		proc.state.CreateAccount(addr)
 	}
@@ -264,8 +240,126 @@ func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*ty
 	nonce := proc.state.GetNonce(addr)
 	proc.state.SetNonce(addr, nonce+1)
 
-	res.StateRootHash, err = proc.commit()
-	return res, err
+	return res, proc.commit()
+}
+
+// deployAt deploys a contract at the given target address
+// behaviour should be similar to what evm.create internal method does with
+// a few differences, don't need to check for previous forks given this
+// functionality was not available to anyone, we don't need to
+// follow snapshoting, given we do commit/revert style in this code base.
+// in the future we might optimize this method accepting deploy-ready byte codes
+// and skip interpreter call, gas calculations and many checks.
+func (proc *procedure) deployAt(
+	caller types.Address,
+	to types.Address,
+	data types.Code,
+	gasLimit uint64,
+	value *big.Int,
+) (*types.Result, error) {
+	res := &types.Result{
+		TxType: types.DirectCallTxType,
+	}
+	addr := to.ToCommon()
+
+	// precheck 1 - check balance of the source
+	if value.Sign() != 0 &&
+		!proc.evm.Context.CanTransfer(proc.state, caller.ToCommon(), value) {
+		return res, gethVM.ErrInsufficientBalance
+	}
+
+	// precheck 2 - ensure there's no existing contract is deployed at the address
+	contractHash := proc.state.GetCodeHash(addr)
+	if proc.state.GetNonce(addr) != 0 ||
+		(contractHash != (gethCommon.Hash{}) && contractHash != gethTypes.EmptyCodeHash) {
+		return res, gethVM.ErrContractAddressCollision
+	}
+
+	callerCommon := caller.ToCommon()
+	// setup caller if doesn't exist
+	if !proc.state.Exist(callerCommon) {
+		proc.state.CreateAccount(callerCommon)
+	}
+	// increment the nonce for the caller
+	proc.state.SetNonce(callerCommon, proc.state.GetNonce(callerCommon)+1)
+
+	if value.Sign() < 0 {
+		return res, ErrInvalidBalance
+	}
+	// setup account
+	proc.state.CreateAccount(addr)
+	proc.state.SetNonce(addr, 1) // (EIP-158)
+	if value.Sign() > 0 {
+		proc.evm.Context.Transfer( // transfer value
+			proc.state,
+			caller.ToCommon(),
+			addr,
+			value,
+		)
+	}
+
+	// run code through interpreter
+	// this would check for errors and computes the final bytes to be stored under account
+	var err error
+	inter := gethVM.NewEVMInterpreter(proc.evm)
+	contract := gethVM.NewContract(
+		gethVM.AccountRef(caller.ToCommon()),
+		gethVM.AccountRef(addr),
+		value,
+		gasLimit)
+
+	contract.SetCallCode(&addr, gethCrypto.Keccak256Hash(data), data)
+	// update access list (Berlin)
+	proc.state.AddAddressToAccessList(addr)
+
+	ret, err := inter.Run(contract, nil, false)
+	gasCost := uint64(len(ret)) * gethParams.CreateDataGas
+	res.GasConsumed = gasCost
+
+	// handle errors
+	if err != nil {
+		// for all errors except this one consume all the remaining gas (Homestead)
+		if err != gethVM.ErrExecutionReverted {
+			res.GasConsumed = gasLimit
+		}
+		res.Failed = true
+		return res, err
+	}
+
+	// update gas usage
+	if gasCost > gasLimit {
+		// consume all the remaining gas (Homestead)
+		res.GasConsumed = gasLimit
+		res.Failed = true
+		return res, gethVM.ErrCodeStoreOutOfGas
+	}
+
+	// check max code size (EIP-158)
+	if len(ret) > gethParams.MaxCodeSize {
+		// consume all the remaining gas (Homestead)
+		res.GasConsumed = gasLimit
+		res.Failed = true
+		return res, gethVM.ErrMaxCodeSizeExceeded
+	}
+
+	// reject code starting with 0xEF (EIP-3541)
+	if len(ret) >= 1 && ret[0] == 0xEF {
+		// consume all the remaining gas (Homestead)
+		res.GasConsumed = gasLimit
+		res.Failed = true
+		return res, gethVM.ErrInvalidCode
+	}
+
+	proc.state.SetCode(addr, ret)
+	res.DeployedContractAddress = to
+	return res, proc.commit()
+}
+
+func (proc *procedure) runDirect(msg *gethCore.Message, txType uint8) (*types.Result, error) {
+	// set the nonce for the message (needed for some opeartions like deployment)
+	msg.Nonce = proc.state.GetNonce(msg.From)
+	proc.evm.TxContext.Origin = msg.From
+	return proc.run(msg, types.DirectCallTxType)
 }
 
 func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, error) {
@@ -281,8 +375,8 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 	).TransitionDb()
 	if err != nil {
 		res.Failed = true
-		// if the error is a fatal error or a non-fatal database error return it
-		if types.IsAFatalError(err) || types.IsADatabaseError(err) {
+		// if the error is a fatal error or a non-fatal state error return it
+		if types.IsAFatalError(err) || types.IsAStateError(err) {
 			return &res, err
 		}
 		// otherwise is a validation error (pre-check failure)
@@ -299,31 +393,43 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 			if msg.To == nil {
 				res.DeployedContractAddress = types.NewAddress(gethCrypto.CreateAddress(msg.From, msg.Nonce))
 			}
-			res.Logs = proc.state.Logs()
+			res.Logs = proc.state.Logs(
+				// TODO pass proper hash values
+				gethCommon.Hash{},
+				proc.config.BlockContext.BlockNumber.Uint64(),
+				gethCommon.Hash{},
+				0,
+			)
 		} else {
 			res.Failed = true
 			err = types.NewEVMExecutionError(execResult.Err)
 		}
 	}
-	var commitErr error
-	res.StateRootHash, commitErr = proc.commit()
+	commitErr := proc.commit()
 	if commitErr != nil {
 		return &res, commitErr
 	}
 	return &res, err
 }
 
-// Ramtin: this is the part of the code that we have to update if we hit performance problems
-// the NewDatabase from the RawDB might have to change.
-func newState(database types.Database) (*gethState.StateDB, error) {
-	root, err := database.GetRootHash()
-	if err != nil {
-		return nil, err
+func SetupPrecompile(cfg *Config) {
+	rules := cfg.ChainRules()
+	// captures the pointer to the map that has to be augmented
+	var precompiles map[gethCommon.Address]gethVM.PrecompiledContract
+	switch {
+	case rules.IsCancun:
+		precompiles = gethVM.PrecompiledContractsCancun
+	case rules.IsBerlin:
+		precompiles = gethVM.PrecompiledContractsBerlin
+	case rules.IsIstanbul:
+		precompiles = gethVM.PrecompiledContractsIstanbul
+	case rules.IsByzantium:
+		precompiles = gethVM.PrecompiledContractsByzantium
+	default:
+		precompiles = gethVM.PrecompiledContractsHomestead
 	}
-
-	return gethState.New(root,
-		gethState.NewDatabase(
-			gethRawDB.NewDatabase(database),
-		),
-		nil)
+	for addr, contract := range cfg.ExtraPrecompiles {
+		// we override if exist since we call this method on every block
+		precompiles[addr] = contract
+	}
 }

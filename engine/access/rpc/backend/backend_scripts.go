@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -37,7 +38,7 @@ type backendScripts struct {
 	loggedScripts     *lru.Cache[[md5.Size]byte, time.Time]
 	nodeCommunicator  Communicator
 	scriptExecutor    execution.ScriptExecutor
-	scriptExecMode    ScriptExecutionMode
+	scriptExecMode    IndexQueryMode
 }
 
 // scriptExecutionRequest encapsulates the data needed to execute a script to make it easier
@@ -118,15 +119,15 @@ func (b *backendScripts) executeScript(
 	scriptRequest *scriptExecutionRequest,
 ) ([]byte, error) {
 	switch b.scriptExecMode {
-	case ScriptExecutionModeExecutionNodesOnly:
+	case IndexQueryModeExecutionNodesOnly:
 		result, _, err := b.executeScriptOnAvailableExecutionNodes(ctx, scriptRequest)
 		return result, err
 
-	case ScriptExecutionModeLocalOnly:
+	case IndexQueryModeLocalOnly:
 		result, _, err := b.executeScriptLocally(ctx, scriptRequest)
 		return result, err
 
-	case ScriptExecutionModeFailover:
+	case IndexQueryModeFailover:
 		localResult, localDuration, localErr := b.executeScriptLocally(ctx, scriptRequest)
 		if localErr == nil || isInvalidArgumentError(localErr) || status.Code(localErr) == codes.Canceled {
 			return localResult, localErr
@@ -143,7 +144,7 @@ func (b *backendScripts) executeScript(
 
 		return execResult, execErr
 
-	case ScriptExecutionModeCompare:
+	case IndexQueryModeCompare:
 		execResult, execDuration, execErr := b.executeScriptOnAvailableExecutionNodes(ctx, scriptRequest)
 		// we can only compare the results if there were either no errors or a cadence error
 		// since we cannot distinguish the EN error as caused by the block being pruned or some other reason,
@@ -237,7 +238,7 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 	var execDuration time.Duration
 	errToReturn := b.nodeCommunicator.CallAvailableNode(
 		executors,
-		func(node *flow.Identity) error {
+		func(node *flow.IdentitySkeleton) error {
 			execStartTime := time.Now()
 
 			result, err = b.tryExecuteScriptOnExecutionNode(ctx, node.Address, r)
@@ -265,7 +266,7 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 
 			return nil
 		},
-		func(node *flow.Identity, err error) bool {
+		func(node *flow.IdentitySkeleton, err error) bool {
 			if status.Code(err) == codes.InvalidArgument {
 				lg.Debug().Err(err).
 					Str("script_executor_addr", node.Address).
@@ -332,13 +333,14 @@ func convertScriptExecutionError(err error, height uint64) error {
 		return nil
 	}
 
+	var failure fvmerrors.CodedFailure
+	if fvmerrors.As(err, &failure) {
+		return rpc.ConvertError(err, "failed to execute script", codes.Internal)
+	}
+
+	// general FVM/ledger errors
 	var coded fvmerrors.CodedError
 	if fvmerrors.As(err, &coded) {
-		// general FVM/ledger errors
-		if coded.Code().IsFailure() {
-			return rpc.ConvertError(err, "failed to execute script", codes.Internal)
-		}
-
 		switch coded.Code() {
 		case fvmerrors.ErrCodeScriptExecutionCancelledError:
 			return status.Errorf(codes.Canceled, "script execution canceled: %v", err)
@@ -361,7 +363,11 @@ func convertIndexError(err error, height uint64, defaultMsg string) error {
 		return nil
 	}
 
-	if errors.Is(err, execution.ErrDataNotAvailable) {
+	if errors.Is(err, indexer.ErrIndexNotInitialized) {
+		return status.Errorf(codes.FailedPrecondition, "data for block is not available: %v", err)
+	}
+
+	if errors.Is(err, storage.ErrHeightNotIndexed) {
 		return status.Errorf(codes.OutOfRange, "data for block height %d is not available", height)
 	}
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
@@ -30,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	realstate "github.com/onflow/flow-go/state"
+	realprotocol "github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -65,7 +67,6 @@ type Suite struct {
 	colClient              *access.AccessAPIClient
 	execClient             *access.ExecutionAPIClient
 	historicalAccessClient *access.AccessAPIClient
-	archiveClient          *access.AccessAPIClient
 
 	connectionFactory *connectionmock.ConnectionFactory
 	communicator      *backendmock.Communicator
@@ -97,7 +98,6 @@ func (suite *Suite) SetupTest() {
 	suite.receipts = new(storagemock.ExecutionReceipts)
 	suite.results = new(storagemock.ExecutionResults)
 	suite.colClient = new(access.AccessAPIClient)
-	suite.archiveClient = new(access.AccessAPIClient)
 	suite.execClient = new(access.ExecutionAPIClient)
 	suite.transactionResults = storagemock.NewLightTransactionResults(suite.T())
 	suite.chainID = flow.Testnet
@@ -157,8 +157,8 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state)
 		// build epoch 1
 		// Blocks in current State
 		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
@@ -204,8 +204,8 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state)
 
 		// building 2 epochs allows us to take a snapshot at a point in time where
 		// an epoch transition happens
@@ -260,8 +260,8 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state)
 		// build epoch 1
 		// Blocks in current State
 		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
@@ -308,8 +308,8 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state)
 		// build epoch 1
 		// Blocks in current State
 		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
@@ -368,8 +368,8 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), state).BuildEpoch().CompleteEpoch()
+	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state).BuildEpoch().CompleteEpoch()
 
 		// get heights of each phase in built epochs
 		epoch1, ok := epochBuilder.EpochHeights(1)
@@ -404,8 +404,8 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state)
 		// build epoch 1
 		// Blocks in current State
 		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
@@ -515,6 +515,9 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_AtBlockIDInternalError
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHeight() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	rootProtocolState, err := rootSnapshot.ProtocolState()
+	require.NoError(suite.T(), err)
+	rootProtocolStateID := rootProtocolState.Entry().ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
@@ -527,6 +530,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHei
 
 		// create a new block with root block as parent
 		newBlock := unittest.BlockWithParentFixture(rootBlock)
+		newBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		ctx := context.Background()
 		// add new block to the chain state
 		err = state.Extend(ctx, newBlock)
@@ -550,6 +554,9 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHei
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalizedAtHeight() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	rootProtocolState, err := rootSnapshot.ProtocolState()
+	require.NoError(suite.T(), err)
+	rootProtocolStateID := rootProtocolState.Entry().ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
@@ -562,7 +569,9 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalize
 
 		// create a new block with root block as parent
 		finalizedBlock := unittest.BlockWithParentFixture(rootBlock)
+		finalizedBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		orphanBlock := unittest.BlockWithParentFixture(rootBlock)
+		orphanBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		ctx := context.Background()
 
 		// add new block to the chain state
@@ -596,6 +605,9 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalize
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnexpectedErrorBlockIDByHeight() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	rootProtocolState, err := rootSnapshot.ProtocolState()
+	require.NoError(suite.T(), err)
+	rootProtocolStateID := rootProtocolState.Entry().ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
@@ -608,6 +620,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnexpectedErrorBlockID
 
 		// create a new block with root block as parent
 		newBlock := unittest.BlockWithParentFixture(rootBlock)
+		newBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		ctx := context.Background()
 		// add new block to the chain state
 		err = state.Extend(ctx, newBlock)
@@ -633,8 +646,8 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnexpectedErrorBlockID
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state)
 		// build epoch 1
 		// Blocks in current State
 		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
@@ -702,8 +715,8 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 func (suite *Suite) TestGetProtocolStateSnapshotByHeight() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state)
 		// build epoch 1
 		// Blocks in current State
 		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
@@ -745,11 +758,15 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight() {
 func (suite *Suite) TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	rootProtocolState, err := rootSnapshot.ProtocolState()
+	require.NoError(suite.T(), err)
+	rootProtocolStateID := rootProtocolState.Entry().ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
 		// create a new block with root block as parent
 		newBlock := unittest.BlockWithParentFixture(rootBlock)
+		newBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		ctx := context.Background()
 		// add new block to the chain state
 		err = state.Extend(ctx, newBlock)
@@ -780,8 +797,8 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks() {
 func (suite *Suite) TestGetProtocolStateSnapshotByHeight_InvalidSegment() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state)
 		// build epoch 1
 		// Blocks in current State
 		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
@@ -980,8 +997,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	params := suite.defaultBackendParams()
 
 	block := unittest.BlockFixture()
-	sporkRootBlockHeight, err := suite.state.Params().SporkRootBlockHeight()
-	suite.Require().NoError(err)
+	sporkRootBlockHeight := suite.state.Params().SporkRootBlockHeight()
 	block.Header.Height = sporkRootBlockHeight + 1
 	blockId := block.ID()
 
@@ -1473,159 +1489,6 @@ type mockCloser struct{}
 
 func (mc *mockCloser) Close() error { return nil }
 
-func (suite *Suite) TestGetEventsForBlockIDs() {
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-
-	exeNodeEventEncodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
-	events := generator.GetEventsWithEncoding(10, exeNodeEventEncodingVersion)
-	validExecutorIdentities := flow.IdentityList{}
-
-	setupStorage := func(n int) []*flow.Header {
-		headers := make([]*flow.Header, n)
-		ids := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-
-		for i := 0; i < n; i++ {
-			b := unittest.BlockFixture()
-			suite.headers.
-				On("ByBlockID", b.ID()).
-				Return(b.Header, nil).Once()
-
-			headers[i] = b.Header
-
-			receipt1 := unittest.ReceiptForBlockFixture(&b)
-			receipt1.ExecutorID = ids[0].NodeID
-			receipt2 := unittest.ReceiptForBlockFixture(&b)
-			receipt2.ExecutorID = ids[1].NodeID
-			receipt1.ExecutionResult = receipt2.ExecutionResult
-			suite.receipts.
-				On("ByBlockID", b.ID()).
-				Return(flow.ExecutionReceiptList{receipt1, receipt2}, nil).Once()
-			validExecutorIdentities = append(validExecutorIdentities, ids...)
-		}
-
-		return headers
-	}
-	blockHeaders := setupStorage(5)
-
-	suite.snapshot.On("Identities", mock.Anything).Return(validExecutorIdentities, nil)
-	validENIDs := flow.IdentifierList(validExecutorIdentities.NodeIDs())
-
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
-	// create the expected results from execution node and access node
-	exeResults := make([]*execproto.GetEventsForBlockIDsResponse_Result, len(blockHeaders))
-
-	for i := 0; i < len(blockHeaders); i++ {
-		exeResults[i] = &execproto.GetEventsForBlockIDsResponse_Result{
-			BlockId:     convert.IdentifierToMessage(blockHeaders[i].ID()),
-			BlockHeight: blockHeaders[i].Height,
-			Events:      convert.EventsToMessages(events),
-		}
-	}
-
-	expected := make([]flow.BlockEvents, len(blockHeaders))
-	expectedEvents := generator.GetEventsWithEncoding(10, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-	for i := 0; i < len(blockHeaders); i++ {
-		expected[i] = flow.BlockEvents{
-			BlockID:        blockHeaders[i].ID(),
-			BlockHeight:    blockHeaders[i].Height,
-			BlockTimestamp: blockHeaders[i].Timestamp,
-			Events:         expectedEvents,
-		}
-	}
-
-	// create the execution node response
-	exeResp := &execproto.GetEventsForBlockIDsResponse{
-		Results:              exeResults,
-		EventEncodingVersion: exeNodeEventEncodingVersion,
-	}
-
-	ctx := context.Background()
-
-	blockIDs := make([]flow.Identifier, len(blockHeaders))
-	for i, header := range blockHeaders {
-		blockIDs[i] = header.ID()
-	}
-	exeReq := &execproto.GetEventsForBlockIDsRequest{
-		BlockIds: convert.IdentifiersToMessages(blockIDs),
-		Type:     string(flow.EventAccountCreated),
-	}
-
-	// create receipt mocks that always returns empty
-	receipts := new(storagemock.ExecutionReceipts)
-	receipts.
-		On("ByBlockID", mock.Anything).
-		Return(flow.ExecutionReceiptList{}, nil)
-
-	// expect two calls to the executor api client (one for each of the following 2 test cases)
-	suite.execClient.
-		On("GetEventsForBlockIDs", ctx, exeReq).
-		Return(exeResp, nil).
-		Once()
-
-	suite.Run("with an execution node chosen using block ID form the list of Fixed ENs", func() {
-
-		params := suite.defaultBackendParams()
-		params.ConnFactory = connFactory
-		// set the fixed EN Identifiers to the generated execution IDs
-		params.FixedExecutionNodeIDs = validENIDs.Strings()
-
-		// create the handler
-		backend, err := New(params)
-		suite.Require().NoError(err)
-
-		// execute request
-		actual, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), blockIDs, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-		suite.checkResponse(actual, err)
-
-		suite.Require().Equal(expected, actual)
-	})
-
-	suite.Run("with an empty block ID list", func() {
-
-		params := suite.defaultBackendParams()
-		params.ExecutionReceipts = receipts
-		params.ConnFactory = connFactory
-		params.FixedExecutionNodeIDs = validENIDs.Strings()
-
-		// create the handler
-		backend, err := New(params)
-		suite.Require().NoError(err)
-
-		// execute request with an empty block id list and expect an empty list of events and no error
-		resp, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), []flow.Identifier{}, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-		require.NoError(suite.T(), err)
-		require.Empty(suite.T(), resp)
-	})
-
-	for _, version := range eventEncodingVersions {
-		suite.Run(fmt.Sprintf("test %s event encoding version for GetEventsForBlockIDs", version.String()), func() {
-			params := suite.defaultBackendParams()
-			params.ExecutionReceipts = receipts
-			params.ConnFactory = connFactory
-			params.FixedExecutionNodeIDs = validENIDs.Strings()
-
-			// create the handler
-			backend, err := New(params)
-			suite.Require().NoError(err)
-
-			// execute request with an empty block id list and expect an empty list of events and no error
-			result, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), []flow.Identifier{}, version)
-			expectedResult := generator.GetEventsWithEncoding(1, version)
-			suite.checkResponse(result, err)
-
-			for _, blockEvent := range result {
-				suite.Assert().Equal(blockEvent.Events, expectedResult)
-			}
-		})
-	}
-
-	suite.assertAllExpectations()
-}
-
 func (suite *Suite) TestGetExecutionResultByID() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
@@ -1748,300 +1611,6 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 	suite.assertAllExpectations()
 }
 
-func (suite *Suite) TestGetEventsForHeightRange() {
-	ctx := context.Background()
-	const minHeight uint64 = 5
-	const maxHeight uint64 = 10
-	var headHeight uint64
-	var blockHeaders []*flow.Header
-	var nodeIdentities flow.IdentityList
-
-	headersDB := make(map[uint64]*flow.Header) // backend for storage.Headers
-	var head *flow.Header                      // backend for Snapshot.Head
-
-	state := new(protocol.State)
-	snapshot := new(protocol.Snapshot)
-	state.On("Final").Return(snapshot, nil)
-	state.On("Sealed").Return(snapshot, nil)
-
-	rootHeader := unittest.BlockHeaderFixture()
-	stateParams := new(protocol.Params)
-	stateParams.On("FinalizedRoot").Return(rootHeader, nil)
-	state.On("Params").Return(stateParams).Maybe()
-
-	snapshot.On("Identities", mock.Anything).Return(
-		func(_ flow.IdentityFilter) flow.IdentityList {
-			return nodeIdentities
-		},
-		func(flow.IdentityFilter) error { return nil },
-	)
-
-	// mock Headers to pull from Headers backend
-	suite.headers.On("ByHeight", mock.Anything).Return(
-		func(height uint64) *flow.Header {
-			return headersDB[height]
-		},
-		func(height uint64) error {
-			_, ok := headersDB[height]
-			if !ok {
-				return storage.ErrNotFound
-			}
-			return nil
-		}).Maybe()
-
-	setupHeadHeight := func(height uint64) {
-		header := unittest.BlockHeaderFixture() // create a mock header
-		header.Height = height                  // set the header height
-		head = header
-	}
-
-	setupStorage := func(min uint64, max uint64) ([]*flow.Header, []*flow.ExecutionReceipt, flow.IdentityList) {
-		headersDB = make(map[uint64]*flow.Header) // reset backend
-
-		var headers []*flow.Header
-		var ers []*flow.ExecutionReceipt
-		var enIDs flow.IdentityList
-		for i := min; i <= max; i++ {
-			block := unittest.BlockFixture()
-			header := block.Header
-			headersDB[i] = header
-			headers = append(headers, header)
-			newErs, ids := suite.setupReceipts(&block)
-			ers = append(ers, newErs...)
-			enIDs = append(enIDs, ids...)
-		}
-		return headers, ers, enIDs
-	}
-
-	setupExecClient := func() []flow.BlockEvents {
-		blockIDs := make([]flow.Identifier, len(blockHeaders))
-		for i, header := range blockHeaders {
-			blockIDs[i] = header.ID()
-		}
-		execReq := &execproto.GetEventsForBlockIDsRequest{
-			BlockIds: convert.IdentifiersToMessages(blockIDs),
-			Type:     string(flow.EventAccountCreated),
-		}
-
-		results := make([]flow.BlockEvents, len(blockHeaders))
-		exeResults := make([]*execproto.GetEventsForBlockIDsResponse_Result, len(blockHeaders))
-
-		exeNodeEventEncodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
-
-		for i, header := range blockHeaders {
-			events := generator.GetEventsWithEncoding(1, exeNodeEventEncodingVersion)
-			height := header.Height
-
-			results[i] = flow.BlockEvents{
-				BlockID:        header.ID(),
-				BlockHeight:    height,
-				BlockTimestamp: header.Timestamp,
-				Events:         generator.GetEventsWithEncoding(1, entitiesproto.EventEncodingVersion_JSON_CDC_V0),
-			}
-
-			exeResults[i] = &execproto.GetEventsForBlockIDsResponse_Result{
-				BlockId:     convert.IdentifierToMessage(header.ID()),
-				BlockHeight: header.Height,
-				Events:      convert.EventsToMessages(events),
-			}
-		}
-
-		exeResp := &execproto.GetEventsForBlockIDsResponse{
-			Results:              exeResults,
-			EventEncodingVersion: exeNodeEventEncodingVersion,
-		}
-
-		suite.execClient.
-			On("GetEventsForBlockIDs", ctx, execReq).
-			Return(exeResp, nil).
-			Once()
-
-		return results
-	}
-
-	// tests that signaler context received error when node state is inconsistent
-	suite.Run("inconsistent node's state", func() {
-		headHeight = maxHeight - 1
-		setupHeadHeight(headHeight)
-
-		// setup mocks
-		stateParams.On("SporkID").Return(unittest.IdentifierFixture(), nil)
-		stateParams.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
-		stateParams.On("SporkRootBlockHeight").Return(headHeight, nil)
-		stateParams.On("SealedRoot").Return(head, nil)
-
-		params := suite.defaultBackendParams()
-		params.State = state
-
-		backend, err := New(params)
-		suite.Require().NoError(err)
-
-		err = fmt.Errorf("inconsistent node's state")
-		snapshot.On("Head").Return(nil, err).Once()
-
-		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
-			irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr))
-
-		actual, err := backend.GetEventsForHeightRange(signalerCtx, string(flow.EventAccountCreated), minHeight, maxHeight,
-			entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-		suite.Require().Error(err)
-		suite.Require().Nil(actual)
-	})
-
-	connFactory := suite.setupConnectionFactory()
-	// mock snapshot to return head backend
-	snapshot.On("Head").Return(
-		func() *flow.Header { return head },
-		func() error { return nil },
-	)
-
-	//suite.state = state
-	suite.Run("invalid request max height < min height", func() {
-		params := suite.defaultBackendParams()
-		params.ConnFactory = connFactory
-
-		backend, err := New(params)
-		suite.Require().NoError(err)
-
-		_, err = backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), maxHeight, minHeight, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-		suite.Require().Error(err)
-
-		suite.assertAllExpectations() // assert that request was not sent to execution node
-	})
-
-	suite.Run("valid request with min_height < max_height < last_sealed_block_height", func() {
-
-		headHeight = maxHeight + 1
-
-		// setup mocks
-		setupHeadHeight(headHeight)
-		blockHeaders, _, nodeIdentities = setupStorage(minHeight, maxHeight)
-		expectedResp := setupExecClient()
-		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentities.NodeIDs()).Strings()
-
-		stateParams.On("SporkID").Return(unittest.IdentifierFixture(), nil)
-		stateParams.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
-		stateParams.On("SporkRootBlockHeight").Return(headHeight, nil)
-		stateParams.On("SealedRoot").Return(head, nil)
-
-		params := suite.defaultBackendParams()
-		params.State = state
-		params.ConnFactory = connFactory
-		params.FixedExecutionNodeIDs = fixedENIdentifiersStr
-
-		backend, err := New(params)
-		suite.Require().NoError(err)
-
-		// execute request
-		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-
-		// check response
-		suite.checkResponse(actualResp, err)
-		suite.assertAllExpectations()
-		suite.Require().Equal(expectedResp, actualResp)
-	})
-
-	suite.Run("valid request with max_height > last_sealed_block_height", func() {
-		headHeight = maxHeight - 1
-		setupHeadHeight(headHeight)
-		blockHeaders, _, nodeIdentities = setupStorage(minHeight, headHeight)
-		expectedResp := setupExecClient()
-		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentities.NodeIDs()).Strings()
-
-		stateParams.On("SporkID").Return(unittest.IdentifierFixture(), nil)
-		stateParams.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
-		stateParams.On("SporkRootBlockHeight").Return(headHeight, nil)
-		stateParams.On("SealedRoot").Return(head, nil)
-
-		params := suite.defaultBackendParams()
-		params.State = state
-		params.ConnFactory = connFactory
-		params.FixedExecutionNodeIDs = fixedENIdentifiersStr
-
-		backend, err := New(params)
-		suite.Require().NoError(err)
-
-		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-		suite.checkResponse(actualResp, err)
-
-		suite.assertAllExpectations()
-		suite.Require().Equal(expectedResp, actualResp)
-	})
-
-	// set max height range to 1 and request range of 2
-	suite.Run("invalid request exceeding max height range", func() {
-		headHeight = maxHeight - 1
-		setupHeadHeight(headHeight)
-		blockHeaders, _, nodeIdentities = setupStorage(minHeight, headHeight)
-		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentities.NodeIDs()).Strings()
-
-		params := suite.defaultBackendParams()
-		params.ConnFactory = connFactory
-		params.MaxHeightRange = 1
-		params.FixedExecutionNodeIDs = fixedENIdentifiersStr
-
-		backend, err := New(params)
-		suite.Require().NoError(err)
-
-		_, err = backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, minHeight+1, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-		suite.Require().Error(err)
-	})
-
-	suite.Run("invalid request last_sealed_block_height < min height", func() {
-
-		// set sealed height to one less than the request start height
-		headHeight = minHeight - 1
-
-		// setup mocks
-		setupHeadHeight(headHeight)
-		blockHeaders, _, nodeIdentities = setupStorage(minHeight, maxHeight)
-		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentities.NodeIDs()).Strings()
-
-		params := suite.defaultBackendParams()
-		params.State = state
-		params.ConnFactory = connFactory
-		params.FixedExecutionNodeIDs = fixedENIdentifiersStr
-
-		backend, err := New(params)
-		suite.Require().NoError(err)
-
-		_, err = backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-		suite.Require().Error(err)
-	})
-
-	for _, version := range eventEncodingVersions {
-		suite.Run(fmt.Sprintf("test %s event encoding version for GetEventsForHeightRange", version.String()), func() {
-			headHeight = maxHeight - 1
-			setupHeadHeight(headHeight)
-			blockHeaders, _, nodeIdentities = setupStorage(minHeight, headHeight)
-			_ = setupExecClient()
-			fixedENIdentifiersStr := nodeIdentities.NodeIDs().Strings()
-
-			stateParams.On("SporkID").Return(unittest.IdentifierFixture(), nil)
-			stateParams.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
-			stateParams.On("SporkRootBlockHeight").Return(headHeight, nil)
-			stateParams.On("SealedRoot").Return(head, nil)
-
-			params := suite.defaultBackendParams()
-			params.State = state
-			params.ConnFactory = connFactory
-			params.FixedExecutionNodeIDs = fixedENIdentifiersStr
-
-			backend, err := New(params)
-			suite.Require().NoError(err)
-
-			result, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight, version)
-			expectedResult := generator.GetEventsWithEncoding(1, version)
-			suite.checkResponse(result, err)
-
-			for _, blockEvent := range result {
-				suite.Assert().Equal(blockEvent.Events, expectedResult)
-			}
-		})
-	}
-}
-
 func (suite *Suite) TestGetNodeVersionInfo() {
 	sporkRootBlock := unittest.BlockHeaderFixture()
 	nodeRootBlock := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(sporkRootBlock.Height + 100))
@@ -2077,72 +1646,6 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 		suite.Require().NoError(err)
 
 		suite.Require().Equal(expected, actual)
-	})
-
-	suite.Run("backend construct fails when SporkID lookup fails", func() {
-		stateParams := protocol.NewParams(suite.T())
-		stateParams.On("SporkID").Return(flow.ZeroID, fmt.Errorf("fail"))
-
-		state := protocol.NewState(suite.T())
-		state.On("Params").Return(stateParams, nil).Maybe()
-
-		params := suite.defaultBackendParams()
-		params.State = state
-
-		backend, err := New(params)
-		suite.Require().Error(err)
-		suite.Require().Nil(backend)
-	})
-
-	suite.Run("backend construct fails when ProtocolVersion lookup fails", func() {
-		stateParams := protocol.NewParams(suite.T())
-		stateParams.On("SporkID").Return(sporkID, nil)
-		stateParams.On("ProtocolVersion").Return(uint(0), fmt.Errorf("fail"))
-
-		state := protocol.NewState(suite.T())
-		state.On("Params").Return(stateParams, nil).Maybe()
-
-		params := suite.defaultBackendParams()
-		params.State = state
-
-		backend, err := New(params)
-		suite.Require().Error(err)
-		suite.Require().Nil(backend)
-	})
-
-	suite.Run("backend construct fails when SporkRootBlockHeight lookup fails", func() {
-		stateParams := protocol.NewParams(suite.T())
-		stateParams.On("SporkID").Return(sporkID, nil)
-		stateParams.On("ProtocolVersion").Return(protocolVersion, nil)
-		stateParams.On("SporkRootBlockHeight").Return(uint64(0), fmt.Errorf("fail"))
-
-		state := protocol.NewState(suite.T())
-		state.On("Params").Return(stateParams, nil).Maybe()
-
-		params := suite.defaultBackendParams()
-		params.State = state
-
-		backend, err := New(params)
-		suite.Require().Error(err)
-		suite.Require().Nil(backend)
-	})
-
-	suite.Run("backend construct fails when SealedRoot lookup fails", func() {
-		stateParams := protocol.NewParams(suite.T())
-		stateParams.On("SporkID").Return(sporkID, nil)
-		stateParams.On("ProtocolVersion").Return(protocolVersion, nil)
-		stateParams.On("SporkRootBlockHeight").Return(sporkRootBlock.Height, nil)
-		stateParams.On("SealedRoot").Return(nil, fmt.Errorf("fail"))
-
-		state := protocol.NewState(suite.T())
-		state.On("Params").Return(stateParams, nil).Maybe()
-
-		params := suite.defaultBackendParams()
-		params.State = state
-
-		backend, err := New(params)
-		suite.Require().Error(err)
-		suite.Require().Nil(backend)
 	})
 }
 
@@ -2208,11 +1711,11 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		func(id flow.Identifier) error { return nil })
 
 	suite.snapshot.On("Identities", mock.Anything).Return(
-		func(filter flow.IdentityFilter) flow.IdentityList {
+		func(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			// apply the filter passed in to the list of all the execution nodes
 			return allExecutionNodes.Filter(filter)
 		},
-		func(flow.IdentityFilter) error { return nil })
+		func(flow.IdentityFilter[flow.Identity]) error { return nil })
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
 	testExecutionNodesForBlockID := func(preferredENs, fixedENs, expectedENs flow.IdentityList) {
@@ -2235,17 +1738,20 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		execSelector, err := execNodeSelectorFactory.SelectNodes(allExecNodes)
 		require.NoError(suite.T(), err)
 
-		actualList := flow.IdentityList{}
+		actualList := flow.IdentitySkeletonList{}
 		for actual := execSelector.Next(); actual != nil; actual = execSelector.Next() {
 			actualList = append(actualList, actual)
 		}
 
-		if len(expectedENs) > maxNodesCnt {
-			for _, actual := range actualList {
-				require.Contains(suite.T(), expectedENs, actual)
+		{
+			expectedENs := expectedENs.ToSkeleton()
+			if len(expectedENs) > maxNodesCnt {
+				for _, actual := range actualList {
+					require.Contains(suite.T(), expectedENs, actual)
+				}
+			} else {
+				require.ElementsMatch(suite.T(), actualList, expectedENs)
 			}
-		} else {
-			require.ElementsMatch(suite.T(), actualList, expectedENs)
 		}
 	}
 	// if we don't find sufficient receipts, executionNodesForBlockID should return a list of random ENs
@@ -2263,7 +1769,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		execSelector, err := execNodeSelectorFactory.SelectNodes(allExecNodes)
 		require.NoError(suite.T(), err)
 
-		actualList := flow.IdentityList{}
+		actualList := flow.IdentitySkeletonList{}
 		for actual := execSelector.Next(); actual != nil; actual = execSelector.Next() {
 			actualList = append(actualList, actual)
 		}
@@ -2382,15 +1888,14 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
-	exeNodeEventEncodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
-	events := generator.GetEventsWithEncoding(1, exeNodeEventEncodingVersion)
-	eventMessages := convert.EventsToMessages(events)
+	ccfEvents, jsoncdcEvents := generateEncodedEvents(suite.T(), 1)
+	eventMessages := convert.EventsToMessages(ccfEvents)
 
 	for _, version := range eventEncodingVersions {
 		suite.Run(fmt.Sprintf("test %s event encoding version for GetTransactionResult", version.String()), func() {
 			exeEventResp := &execproto.GetTransactionResultResponse{
 				Events:               eventMessages,
-				EventEncodingVersion: exeNodeEventEncodingVersion,
+				EventEncodingVersion: entitiesproto.EventEncodingVersion_CCF_V0,
 			}
 
 			suite.execClient.
@@ -2402,8 +1907,15 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 				Once()
 
 			result, err := backend.GetTransactionResult(ctx, txId, blockId, flow.ZeroID, version)
-			expectedResult := generator.GetEventsWithEncoding(1, version)
 			suite.checkResponse(result, err)
+
+			var expectedResult []flow.Event
+			switch version {
+			case entitiesproto.EventEncodingVersion_CCF_V0:
+				expectedResult = append(expectedResult, ccfEvents...)
+			case entitiesproto.EventEncodingVersion_JSON_CDC_V0:
+				expectedResult = append(expectedResult, jsoncdcEvents...)
+			}
 
 			suite.Assert().Equal(result.Events, expectedResult)
 		})
@@ -2443,8 +1955,8 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 	suite.Require().NoError(err)
 
 	exeNodeEventEncodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
-	events := generator.GetEventsWithEncoding(1, exeNodeEventEncodingVersion)
-	eventMessages := convert.EventsToMessages(events)
+	ccfEvents, jsoncdcEvents := generateEncodedEvents(suite.T(), 1)
+	eventMessages := convert.EventsToMessages(ccfEvents)
 
 	for _, version := range eventEncodingVersions {
 		suite.Run(fmt.Sprintf("test %s event encoding version for GetTransactionResultByIndex", version.String()), func() {
@@ -2464,8 +1976,15 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 			result, err := backend.GetTransactionResultByIndex(ctx, blockId, index, version)
 			suite.checkResponse(result, err)
 
-			expectedResult := generator.GetEventsWithEncoding(1, version)
-			suite.Assert().Equal(result.Events, expectedResult)
+			var expectedResult []flow.Event
+			switch version {
+			case entitiesproto.EventEncodingVersion_CCF_V0:
+				expectedResult = append(expectedResult, ccfEvents...)
+			case entitiesproto.EventEncodingVersion_JSON_CDC_V0:
+				expectedResult = append(expectedResult, jsoncdcEvents...)
+			}
+
+			suite.Assert().Equal(expectedResult, result.Events)
 		})
 
 		suite.Run(fmt.Sprintf("test %s event encoding version for GetTransactionResultsByBlockID", version.String()), func() {
@@ -2488,7 +2007,14 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 			results, err := backend.GetTransactionResultsByBlockID(ctx, blockId, version)
 			suite.checkResponse(results, err)
 
-			expectedResult := generator.GetEventsWithEncoding(1, version)
+			var expectedResult []flow.Event
+			switch version {
+			case entitiesproto.EventEncodingVersion_CCF_V0:
+				expectedResult = append(expectedResult, ccfEvents...)
+			case entitiesproto.EventEncodingVersion_JSON_CDC_V0:
+				expectedResult = append(expectedResult, jsoncdcEvents...)
+			}
+
 			for _, result := range results {
 				suite.Assert().Equal(result.Events, expectedResult)
 			}
@@ -2590,6 +2116,17 @@ func getEvents(n int) []flow.Event {
 		events[i] = flow.Event{Type: flow.EventAccountCreated}
 	}
 	return events
+}
+
+func generateEncodedEvents(t *testing.T, n int) ([]flow.Event, []flow.Event) {
+	ccfEvents := generator.GetEventsWithEncoding(n, entities.EventEncodingVersion_CCF_V0)
+	jsonEvents := make([]flow.Event, n)
+	for i, e := range ccfEvents {
+		jsonEvent, err := convert.CcfEventToJsonEvent(e)
+		require.NoError(t, err)
+		jsonEvents[i] = *jsonEvent
+	}
+	return ccfEvents, jsonEvents
 }
 
 func (suite *Suite) defaultBackendParams() Params {

@@ -240,6 +240,7 @@ func (h *Handler) SubscribeAccountStatuses(request *executiondata.SubscribeAccou
 
 		filter, err = state_stream.NewStatusFilter(
 			reqFilter.GetEventType(),
+			h.chain,
 		)
 		if err != nil {
 			return status.Errorf(codes.InvalidArgument, "invalid event filter: %v", err)
@@ -292,9 +293,10 @@ func (h *Handler) SubscribeAccountStatuses(request *executiondata.SubscribeAccou
 		}
 
 		err = stream.Send(&executiondata.SubscribeAccountStatusesResponse{
-			BlockId: convert.IdentifierToMessage(resp.BlockID),
-			Address: convert.IdentifierToMessage(resp.BlockID),
-			Status:  string("dsf"),
+			BlockId:      convert.IdentifierToMessage(resp.BlockID),
+			Address:      convert.IdentifierToMessage(resp.BlockID),
+			Events:       events,
+			MessageIndex: 1,
 		})
 		if err != nil {
 			return rpc.ConvertError(err, "could not send response", codes.Internal)

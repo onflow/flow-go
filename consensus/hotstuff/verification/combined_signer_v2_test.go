@@ -3,6 +3,7 @@ package verification
 import (
 	"testing"
 
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -10,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
@@ -40,11 +40,11 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	beaconKeyStore.On("ByView", view).Return(beaconKey, nil)
 
 	stakingPriv := unittest.StakingPrivKeyFixture()
-	nodeID := unittest.IdentityFixture()
+	nodeID := &unittest.IdentityFixture().IdentitySkeleton
 	nodeID.NodeID = signerID
 	nodeID.StakingPubKey = stakingPriv.PublicKey()
 
-	me, err := local.New(nodeID, stakingPriv)
+	me, err := local.New(*nodeID, stakingPriv)
 	require.NoError(t, err)
 	signer := NewCombinedSigner(me, beaconKeyStore)
 
@@ -96,7 +96,7 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	require.ErrorIs(t, err, model.ErrInvalidSignature)
 
 	// vote by different signer should be invalid
-	wrongVoter := identities[1]
+	wrongVoter := &identities[1].IdentitySkeleton
 	wrongVoter.StakingPubKey = unittest.StakingPrivKeyFixture().PublicKey()
 	err = verifier.VerifyVote(wrongVoter, vote.SigData, block.View, block.BlockID)
 	require.ErrorIs(t, err, model.ErrInvalidSignature)
@@ -133,11 +133,11 @@ func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 	beaconKeyStore.On("ByView", view).Return(nil, module.ErrNoBeaconKeyForEpoch)
 
 	stakingPriv := unittest.StakingPrivKeyFixture()
-	nodeID := unittest.IdentityFixture()
+	nodeID := &unittest.IdentityFixture().IdentitySkeleton
 	nodeID.NodeID = signerID
 	nodeID.StakingPubKey = stakingPriv.PublicKey()
 
-	me, err := local.New(nodeID, stakingPriv)
+	me, err := local.New(*nodeID, stakingPriv)
 	require.NoError(t, err)
 	signer := NewCombinedSigner(me, beaconKeyStore)
 
@@ -200,7 +200,7 @@ func Test_VerifyQC_EmptySigners(t *testing.T) {
 	sigData, err := encoder.Encode(&emptySignersInput)
 	require.NoError(t, err)
 
-	err = verifier.VerifyQC([]*flow.Identity{}, sigData, block.View, block.BlockID)
+	err = verifier.VerifyQC(flow.IdentitySkeletonList{}, sigData, block.View, block.BlockID)
 	require.True(t, model.IsInsufficientSignaturesError(err))
 
 	err = verifier.VerifyQC(nil, sigData, block.View, block.BlockID)
@@ -218,7 +218,7 @@ func TestCombinedSign_BeaconKeyStore_ViewForUnknownEpoch(t *testing.T) {
 	nodeID := unittest.IdentityFixture()
 	nodeID.StakingPubKey = stakingPriv.PublicKey()
 
-	me, err := local.New(nodeID, stakingPriv)
+	me, err := local.New(nodeID.IdentitySkeleton, stakingPriv)
 	require.NoError(t, err)
 	signer := NewCombinedSigner(me, beaconKeyStore)
 

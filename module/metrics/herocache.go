@@ -169,18 +169,17 @@ func ApplicationLayerSpamRecordQueueMetricsFactory(f HeroCacheMetricsFactory, ne
 	return f(namespaceNetwork, r)
 }
 
-func GossipSubRPCMetricsObserverInspectorQueueMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
+func GossipSubRPCInspectorQueueMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
 	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
-	r := ResourceNetworkingRpcMetricsObserverInspectorQueue
+	r := ResourceNetworkingRpcValidationInspectorQueue
 	if networkType == network.PublicNetwork {
 		r = PrependPublicPrefix(r)
 	}
 	return f(namespaceNetwork, r)
 }
 
-func GossipSubRPCInspectorQueueMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
-	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
-	r := ResourceNetworkingRpcValidationInspectorQueue
+func GossipSubDuplicateMessageTrackerCacheMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
+	r := ResourceNetworkingGossipsubDuplicateMessagesTrackerCache
 	if networkType == network.PublicNetwork {
 		r = PrependPublicPrefix(r)
 	}

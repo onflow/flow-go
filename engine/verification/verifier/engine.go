@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/verification/utils"
 	chmodels "github.com/onflow/flow-go/model/chunks"
@@ -294,7 +294,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	// Extracting consensus node ids
 	// TODO state extraction should be done based on block references
 	consensusNodes, err := e.state.Final().
-		Identities(filter.HasRole(flow.RoleConsensus))
+		Identities(filter.HasRole[flow.Identity](flow.RoleConsensus))
 	if err != nil {
 		// TODO this error needs more advance handling after MVP
 		return fmt.Errorf("could not load consensus node IDs: %w", err)

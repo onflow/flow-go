@@ -1,7 +1,8 @@
 package module
 
 import (
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 )
@@ -81,5 +82,5 @@ type DKGController interface {
 type DKGControllerFactory interface {
 
 	// Create instantiates a new DKGController.
-	Create(dkgInstanceID string, participants flow.IdentityList, seed []byte) (DKGController, error)
+	Create(dkgInstanceID string, participants flow.IdentitySkeletonList, seed []byte) (DKGController, error)
 }

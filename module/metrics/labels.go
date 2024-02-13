@@ -60,6 +60,8 @@ const (
 	ResourceQC                                               = "qc"
 	ResourceMyReceipt                                        = "my_receipt"
 	ResourceCollection                                       = "collection"
+	ResourceProtocolState                                    = "protocol_state"
+	ResourceProtocolStateByBlockID                           = "protocol_state_by_block_id"
 	ResourceApproval                                         = "approval"
 	ResourceSeal                                             = "seal"
 	ResourcePendingIncorporatedSeal                          = "pending_incorporated_seal"
@@ -92,7 +94,6 @@ const (
 	ResourceNetworkingDisallowListNotificationQueue          = "networking_disallow_list_notification_queue"
 	ResourceNetworkingRpcInspectorNotificationQueue          = "networking_rpc_inspector_notification_queue"
 	ResourceNetworkingRpcValidationInspectorQueue            = "networking_rpc_validation_inspector_queue"
-	ResourceNetworkingRpcMetricsObserverInspectorQueue       = "networking_rpc_metrics_observer_inspector_queue"
 	ResourceNetworkingApplicationLayerSpamRecordCache        = "application_layer_spam_record_cache"
 	ResourceNetworkingApplicationLayerSpamReportQueue        = "application_layer_spam_report_queue"
 	ResourceNetworkingRpcClusterPrefixReceivedCache          = "rpc_cluster_prefixed_received_cache"
@@ -103,6 +104,7 @@ const (
 	ResourceNetworkingRPCSentTrackerCache                    = "gossipsub_rpc_sent_tracker_cache"
 	ResourceNetworkingRPCSentTrackerQueue                    = "gossipsub_rpc_sent_tracker_queue"
 	ResourceNetworkingUnicastDialConfigCache                 = "unicast_dial_config_cache"
+	ResourceNetworkingGossipsubDuplicateMessagesTrackerCache = "gossipsub_duplicate_messages_tracker_cache"
 
 	ResourceFollowerPendingBlocksCache         = "follower_pending_block_cache"           // follower engine
 	ResourceFollowerLoopCertifiedBlocksChannel = "follower_loop_certified_blocks_channel" // follower loop, certified blocks buffered channel

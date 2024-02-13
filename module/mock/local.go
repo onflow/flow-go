@@ -3,10 +3,10 @@
 package mock
 
 import (
-	crypto "github.com/onflow/flow-go/crypto"
+	crypto "github.com/onflow/crypto"
 	flow "github.com/onflow/flow-go/model/flow"
 
-	hash "github.com/onflow/flow-go/crypto/hash"
+	hash "github.com/onflow/crypto/hash"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -47,15 +47,15 @@ func (_m *Local) NodeID() flow.Identifier {
 }
 
 // NotMeFilter provides a mock function with given fields:
-func (_m *Local) NotMeFilter() flow.IdentityFilter {
+func (_m *Local) NotMeFilter() flow.IdentityFilter[flow.Identity] {
 	ret := _m.Called()
 
-	var r0 flow.IdentityFilter
-	if rf, ok := ret.Get(0).(func() flow.IdentityFilter); ok {
+	var r0 flow.IdentityFilter[flow.Identity]
+	if rf, ok := ret.Get(0).(func() flow.IdentityFilter[flow.Identity]); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.IdentityFilter)
+			r0 = ret.Get(0).(flow.IdentityFilter[flow.Identity])
 		}
 	}
 

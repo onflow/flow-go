@@ -6,6 +6,8 @@ import (
 	channels "github.com/onflow/flow-go/network/channels"
 	mock "github.com/stretchr/testify/mock"
 
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
+
 	time "time"
 )
 
@@ -24,6 +26,11 @@ func (_m *GossipSubMetrics) AsyncProcessingStarted() {
 	_m.Called()
 }
 
+// OnActiveClusterIDsNotSetErr provides a mock function with given fields:
+func (_m *GossipSubMetrics) OnActiveClusterIDsNotSetErr() {
+	_m.Called()
+}
+
 // OnAppSpecificScoreUpdated provides a mock function with given fields: _a0
 func (_m *GossipSubMetrics) OnAppSpecificScoreUpdated(_a0 float64) {
 	_m.Called(_a0)
@@ -34,19 +41,49 @@ func (_m *GossipSubMetrics) OnBehaviourPenaltyUpdated(_a0 float64) {
 	_m.Called(_a0)
 }
 
+// OnControlMessagesTruncated provides a mock function with given fields: messageType, diff
+func (_m *GossipSubMetrics) OnControlMessagesTruncated(messageType p2pmsg.ControlMessageType, diff int) {
+	_m.Called(messageType, diff)
+}
+
 // OnFirstMessageDeliveredUpdated provides a mock function with given fields: _a0, _a1
 func (_m *GossipSubMetrics) OnFirstMessageDeliveredUpdated(_a0 channels.Topic, _a1 float64) {
 	_m.Called(_a0, _a1)
 }
 
-// OnGraftReceived provides a mock function with given fields: count
-func (_m *GossipSubMetrics) OnGraftReceived(count int) {
-	_m.Called(count)
+// OnGraftDuplicateTopicIdsExceedThreshold provides a mock function with given fields:
+func (_m *GossipSubMetrics) OnGraftDuplicateTopicIdsExceedThreshold() {
+	_m.Called()
 }
 
-// OnIHaveReceived provides a mock function with given fields: count
-func (_m *GossipSubMetrics) OnIHaveReceived(count int) {
-	_m.Called(count)
+// OnGraftMessageInspected provides a mock function with given fields: duplicateTopicIds
+func (_m *GossipSubMetrics) OnGraftMessageInspected(duplicateTopicIds int) {
+	_m.Called(duplicateTopicIds)
+}
+
+// OnIHaveControlMessageIdsTruncated provides a mock function with given fields: diff
+func (_m *GossipSubMetrics) OnIHaveControlMessageIdsTruncated(diff int) {
+	_m.Called(diff)
+}
+
+// OnIHaveDuplicateMessageIdsExceedThreshold provides a mock function with given fields:
+func (_m *GossipSubMetrics) OnIHaveDuplicateMessageIdsExceedThreshold() {
+	_m.Called()
+}
+
+// OnIHaveDuplicateTopicIdsExceedThreshold provides a mock function with given fields:
+func (_m *GossipSubMetrics) OnIHaveDuplicateTopicIdsExceedThreshold() {
+	_m.Called()
+}
+
+// OnIHaveMessageIDsReceived provides a mock function with given fields: channel, msgIdCount
+func (_m *GossipSubMetrics) OnIHaveMessageIDsReceived(channel string, msgIdCount int) {
+	_m.Called(channel, msgIdCount)
+}
+
+// OnIHaveMessagesInspected provides a mock function with given fields: duplicateTopicIds, duplicateMessageIds
+func (_m *GossipSubMetrics) OnIHaveMessagesInspected(duplicateTopicIds int, duplicateMessageIds int) {
+	_m.Called(duplicateTopicIds, duplicateMessageIds)
 }
 
 // OnIPColocationFactorUpdated provides a mock function with given fields: _a0
@@ -54,29 +91,49 @@ func (_m *GossipSubMetrics) OnIPColocationFactorUpdated(_a0 float64) {
 	_m.Called(_a0)
 }
 
-// OnIWantReceived provides a mock function with given fields: count
-func (_m *GossipSubMetrics) OnIWantReceived(count int) {
-	_m.Called(count)
-}
-
-// OnIncomingRpcAcceptedFully provides a mock function with given fields:
-func (_m *GossipSubMetrics) OnIncomingRpcAcceptedFully() {
+// OnIWantCacheMissMessageIdsExceedThreshold provides a mock function with given fields:
+func (_m *GossipSubMetrics) OnIWantCacheMissMessageIdsExceedThreshold() {
 	_m.Called()
 }
 
-// OnIncomingRpcAcceptedOnlyForControlMessages provides a mock function with given fields:
-func (_m *GossipSubMetrics) OnIncomingRpcAcceptedOnlyForControlMessages() {
+// OnIWantControlMessageIdsTruncated provides a mock function with given fields: diff
+func (_m *GossipSubMetrics) OnIWantControlMessageIdsTruncated(diff int) {
+	_m.Called(diff)
+}
+
+// OnIWantDuplicateMessageIdsExceedThreshold provides a mock function with given fields:
+func (_m *GossipSubMetrics) OnIWantDuplicateMessageIdsExceedThreshold() {
 	_m.Called()
 }
 
-// OnIncomingRpcRejected provides a mock function with given fields:
-func (_m *GossipSubMetrics) OnIncomingRpcRejected() {
+// OnIWantMessageIDsReceived provides a mock function with given fields: msgIdCount
+func (_m *GossipSubMetrics) OnIWantMessageIDsReceived(msgIdCount int) {
+	_m.Called(msgIdCount)
+}
+
+// OnIWantMessagesInspected provides a mock function with given fields: duplicateCount, cacheMissCount
+func (_m *GossipSubMetrics) OnIWantMessagesInspected(duplicateCount int, cacheMissCount int) {
+	_m.Called(duplicateCount, cacheMissCount)
+}
+
+// OnIncomingRpcReceived provides a mock function with given fields: iHaveCount, iWantCount, graftCount, pruneCount, msgCount
+func (_m *GossipSubMetrics) OnIncomingRpcReceived(iHaveCount int, iWantCount int, graftCount int, pruneCount int, msgCount int) {
+	_m.Called(iHaveCount, iWantCount, graftCount, pruneCount, msgCount)
+}
+
+// OnInvalidControlMessageNotificationSent provides a mock function with given fields:
+func (_m *GossipSubMetrics) OnInvalidControlMessageNotificationSent() {
 	_m.Called()
 }
 
 // OnInvalidMessageDeliveredUpdated provides a mock function with given fields: _a0, _a1
 func (_m *GossipSubMetrics) OnInvalidMessageDeliveredUpdated(_a0 channels.Topic, _a1 float64) {
 	_m.Called(_a0, _a1)
+}
+
+// OnInvalidTopicIdDetectedForControlMessage provides a mock function with given fields: messageType
+func (_m *GossipSubMetrics) OnInvalidTopicIdDetectedForControlMessage(messageType p2pmsg.ControlMessageType) {
+	_m.Called(messageType)
 }
 
 // OnLocalMeshSizeUpdated provides a mock function with given fields: topic, size
@@ -154,14 +211,24 @@ func (_m *GossipSubMetrics) OnPeerThrottled() {
 	_m.Called()
 }
 
-// OnPruneReceived provides a mock function with given fields: count
-func (_m *GossipSubMetrics) OnPruneReceived(count int) {
-	_m.Called(count)
+// OnPruneDuplicateTopicIdsExceedThreshold provides a mock function with given fields:
+func (_m *GossipSubMetrics) OnPruneDuplicateTopicIdsExceedThreshold() {
+	_m.Called()
 }
 
-// OnPublishedGossipMessagesReceived provides a mock function with given fields: count
-func (_m *GossipSubMetrics) OnPublishedGossipMessagesReceived(count int) {
-	_m.Called(count)
+// OnPruneMessageInspected provides a mock function with given fields: duplicateTopicIds
+func (_m *GossipSubMetrics) OnPruneMessageInspected(duplicateTopicIds int) {
+	_m.Called(duplicateTopicIds)
+}
+
+// OnPublishMessageInspected provides a mock function with given fields: totalErrCount, invalidTopicIdsCount, invalidSubscriptionsCount, invalidSendersCount
+func (_m *GossipSubMetrics) OnPublishMessageInspected(totalErrCount int, invalidTopicIdsCount int, invalidSubscriptionsCount int, invalidSendersCount int) {
+	_m.Called(totalErrCount, invalidTopicIdsCount, invalidSubscriptionsCount, invalidSendersCount)
+}
+
+// OnPublishMessagesInspectionErrorExceedsThreshold provides a mock function with given fields:
+func (_m *GossipSubMetrics) OnPublishMessagesInspectionErrorExceedsThreshold() {
+	_m.Called()
 }
 
 // OnRpcReceived provides a mock function with given fields: msgCount, iHaveCount, iWantCount, graftCount, pruneCount
@@ -181,6 +248,11 @@ func (_m *GossipSubMetrics) OnTimeInMeshUpdated(_a0 channels.Topic, _a1 time.Dur
 
 // OnUndeliveredMessage provides a mock function with given fields:
 func (_m *GossipSubMetrics) OnUndeliveredMessage() {
+	_m.Called()
+}
+
+// OnUnstakedPeerInspectionFailed provides a mock function with given fields:
+func (_m *GossipSubMetrics) OnUnstakedPeerInspectionFailed() {
 	_m.Called()
 }
 

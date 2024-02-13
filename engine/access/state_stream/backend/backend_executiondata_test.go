@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
@@ -28,12 +29,14 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
+var chainID = flow.MonotonicEmulator
 var testEventTypes = []flow.EventType{
-	"A.0x1.Foo.Bar",
-	"A.0x2.Zoo.Moo",
-	"A.0x3.Goo.Hoo",
+	unittest.EventTypeFixture(chainID),
+	unittest.EventTypeFixture(chainID),
+	unittest.EventTypeFixture(chainID),
 }
 
 type BackendExecutionDataSuite struct {
@@ -43,10 +46,12 @@ type BackendExecutionDataSuite struct {
 	params         *protocolmock.Params
 	snapshot       *protocolmock.Snapshot
 	headers        *storagemock.Headers
+	events         *storagemock.Events
 	seals          *storagemock.Seals
 	results        *storagemock.ExecutionResults
 	registers      *storagemock.RegisterIndex
 	registersAsync *execution.RegistersAsyncStore
+	eventsIndex    *backend.EventsIndex
 
 	bs                blobs.Blobstore
 	eds               execution_data.ExecutionDataStore
@@ -56,7 +61,7 @@ type BackendExecutionDataSuite struct {
 	backend           *StateStreamBackend
 
 	blocks      []*flow.Block
-	blockEvents map[flow.Identifier]flow.EventsList
+	blockEvents map[flow.Identifier][]flow.Event
 	execDataMap map[flow.Identifier]*execution_data.BlockExecutionDataEntity
 	blockMap    map[uint64]*flow.Block
 	sealMap     map[flow.Identifier]*flow.Seal
@@ -75,6 +80,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	s.snapshot = protocolmock.NewSnapshot(s.T())
 	s.params = protocolmock.NewParams(s.T())
 	s.headers = storagemock.NewHeaders(s.T())
+	s.events = storagemock.NewEvents(s.T())
 	s.seals = storagemock.NewSeals(s.T())
 	s.results = storagemock.NewExecutionResults(s.T())
 
@@ -96,7 +102,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 	blockCount := 5
 	s.execDataMap = make(map[flow.Identifier]*execution_data.BlockExecutionDataEntity, blockCount)
-	s.blockEvents = make(map[flow.Identifier]flow.EventsList, blockCount)
+	s.blockEvents = make(map[flow.Identifier][]flow.Event, blockCount)
 	s.blockMap = make(map[uint64]*flow.Block, blockCount)
 	s.sealMap = make(map[flow.Identifier]*flow.Seal, blockCount)
 	s.resultMap = make(map[flow.Identifier]*flow.ExecutionResult, blockCount)
@@ -152,9 +158,10 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 	s.registerID = unittest.RegisterIDFixture()
 
+	s.eventsIndex = backend.NewEventsIndex(s.events)
 	s.registersAsync = execution.NewRegistersAsyncStore()
 	s.registers = storagemock.NewRegisterIndex(s.T())
-	err = s.registersAsync.InitDataAvailable(s.registers)
+	err = s.registersAsync.Initialize(s.registers)
 	require.NoError(s.T(), err)
 	s.registers.On("LatestHeight").Return(rootBlock.Header.Height).Maybe()
 	s.registers.On("FirstHeight").Return(rootBlock.Header.Height).Maybe()
@@ -170,82 +177,36 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	s.snapshot.On("Head").Return(s.blocks[0].Header, nil).Maybe()
 
 	s.seals.On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).Return(
-		func(blockID flow.Identifier) *flow.Seal {
-			if seal, ok := s.sealMap[blockID]; ok {
-				return seal
-			}
-			return nil
-		},
-		func(blockID flow.Identifier) error {
-			if _, ok := s.sealMap[blockID]; ok {
-				return nil
-			}
-			return storage.ErrNotFound
-		},
+		mocks.StorageMapGetter(s.sealMap),
 	).Maybe()
 
 	s.results.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(
-		func(resultID flow.Identifier) *flow.ExecutionResult {
-			if result, ok := s.resultMap[resultID]; ok {
-				return result
-			}
-			return nil
-		},
-		func(resultID flow.Identifier) error {
-			if _, ok := s.resultMap[resultID]; ok {
-				return nil
-			}
-			return storage.ErrNotFound
-		},
+		mocks.StorageMapGetter(s.resultMap),
 	).Maybe()
 
 	s.headers.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
-		func(blockID flow.Identifier) *flow.Header {
+		func(blockID flow.Identifier) (*flow.Header, error) {
 			for _, block := range s.blockMap {
 				if block.ID() == blockID {
-					return block.Header
+					return block.Header, nil
 				}
 			}
-			return nil
-		},
-		func(blockID flow.Identifier) error {
-			for _, block := range s.blockMap {
-				if block.ID() == blockID {
-					return nil
-				}
-			}
-			return storage.ErrNotFound
+			return nil, storage.ErrNotFound
 		},
 	).Maybe()
 
 	s.headers.On("ByHeight", mock.AnythingOfType("uint64")).Return(
-		func(height uint64) *flow.Header {
-			if block, ok := s.blockMap[height]; ok {
-				return block.Header
-			}
-			return nil
-		},
-		func(height uint64) error {
-			if _, ok := s.blockMap[height]; ok {
-				return nil
-			}
-			return storage.ErrNotFound
-		},
+		mocks.ConvertStorageOutput(
+			mocks.StorageMapGetter(s.blockMap),
+			func(block *flow.Block) *flow.Header { return block.Header },
+		),
 	).Maybe()
 
 	s.headers.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(
-		func(height uint64) flow.Identifier {
-			if block, ok := s.blockMap[height]; ok {
-				return block.Header.ID()
-			}
-			return flow.ZeroID
-		},
-		func(height uint64) error {
-			if _, ok := s.blockMap[height]; ok {
-				return nil
-			}
-			return storage.ErrNotFound
-		},
+		mocks.ConvertStorageOutput(
+			mocks.StorageMapGetter(s.blockMap),
+			func(block *flow.Block) flow.Identifier { return block.ID() },
+		),
 	).Maybe()
 
 	s.backend, err = New(
@@ -261,6 +222,8 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		rootBlock.Header.Height,
 		rootBlock.Header.Height, // initialize with no downloaded data
 		s.registersAsync,
+		s.eventsIndex,
+		false,
 	)
 	require.NoError(s.T(), err)
 }
@@ -449,18 +412,21 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 	})
 
 	s.Run("returns error if block height is out of range", func() {
-		_, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.backend.rootBlockHeight+1)
+		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.backend.rootBlockHeight+1)
+		require.Nil(s.T(), res)
 		require.Equal(s.T(), codes.OutOfRange, status.Code(err))
 	})
 
 	s.Run("returns error if register path is not indexed", func() {
 		falseID := flow.RegisterIDs{flow.RegisterID{Owner: "ha", Key: "ha"}}
-		_, err := s.backend.GetRegisterValues(falseID, s.backend.rootBlockHeight)
+		res, err := s.backend.GetRegisterValues(falseID, s.backend.rootBlockHeight)
+		require.Nil(s.T(), res)
 		require.Equal(s.T(), codes.NotFound, status.Code(err))
 	})
 
 	s.Run("returns error if too many registers are requested", func() {
-		_, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.registerRequestLimit+1), s.backend.rootBlockHeight)
+		res, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.registerRequestLimit+1), s.backend.rootBlockHeight)
+		require.Nil(s.T(), res)
 		require.Equal(s.T(), codes.InvalidArgument, status.Code(err))
 	})
 }

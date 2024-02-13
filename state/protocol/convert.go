@@ -3,11 +3,11 @@ package protocol
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/crypto"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 // ToEpochSetup converts an Epoch interface instance to the underlying concrete
@@ -123,7 +123,7 @@ func ToEpochCommit(epoch Epoch) (*flow.EpochCommit, error) {
 // participant keys from the DKG.
 // All errors indicate inconsistent or invalid inputs.
 // No errors are expected during normal operation.
-func GetDKGParticipantKeys(dkg DKG, participants flow.IdentityList) ([]crypto.PublicKey, error) {
+func GetDKGParticipantKeys(dkg DKG, participants flow.IdentitySkeletonList) ([]crypto.PublicKey, error) {
 
 	keys := make([]crypto.PublicKey, 0, len(participants))
 	for i, identity := range participants {
@@ -150,7 +150,7 @@ func GetDKGParticipantKeys(dkg DKG, participants flow.IdentityList) ([]crypto.Pu
 // DKG instance. The participants must exactly match the DKG instance configuration.
 // All errors indicate inconsistent or invalid inputs.
 // No errors are expected during normal operation.
-func ToDKGParticipantLookup(dkg DKG, participants flow.IdentityList) (map[flow.Identifier]flow.DKGParticipant, error) {
+func ToDKGParticipantLookup(dkg DKG, participants flow.IdentitySkeletonList) (map[flow.Identifier]flow.DKGParticipant, error) {
 
 	lookup := make(map[flow.Identifier]flow.DKGParticipant)
 	for _, identity := range participants {

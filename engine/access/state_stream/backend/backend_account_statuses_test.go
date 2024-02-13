@@ -93,13 +93,13 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatuses() {
 
 		t2 := test
 		t2.name = fmt.Sprintf("%s - some events", test.name)
-		t2.filters, err = state_stream.NewStatusFilter([]string{string(testEventTypes[0])})
+		t2.filters, err = state_stream.NewStatusFilter([]string{string(testEventTypes[0])}, chainID.Chain())
 		require.NoError(s.T(), err)
 		tests = append(tests, t2)
 
 		t3 := test
 		t3.name = fmt.Sprintf("%s - no events", test.name)
-		t3.filters, err = state_stream.NewStatusFilter([]string{"A.0x1.NonExistent.Event"})
+		t3.filters, err = state_stream.NewStatusFilter([]string{"A.0x1.NonExistent.Event"}, chainID.Chain())
 		require.NoError(s.T(), err)
 		tests = append(tests, t3)
 	}
@@ -146,6 +146,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatuses() {
 
 					assert.Equal(s.T(), b.Header.ID(), resp.BlockID)
 					assert.Equal(s.T(), b.Header.Height, resp.Height)
+					assert.Equal(s.T(), expectedEvents, resp.Events)
 				}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
 			}
 

@@ -3,20 +3,23 @@ package epochs
 import (
 	"encoding/hex"
 
-	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/flow-core-contracts/lib/go/contracts"
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	emulator "github.com/onflow/flow-emulator/emulator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/crypto"
+	"github.com/onflow/flow-core-contracts/lib/go/contracts"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
+
+	emulator "github.com/onflow/flow-emulator/emulator"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
-	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
@@ -78,10 +81,10 @@ func (s *Suite) deployEpochQCContract() {
 }
 
 // CreateClusterList creates a clustering with the nodes split evenly and returns the resulting `ClusterList`
-func (s *Suite) CreateClusterList(clusterCount, nodesPerCluster int) (flow.ClusterList, flow.IdentityList) {
+func (s *Suite) CreateClusterList(clusterCount, nodesPerCluster int) (flow.ClusterList, flow.IdentitySkeletonList) {
 
 	// create list of nodes to be used for the clustering
-	nodes := unittest.IdentityListFixture(clusterCount*nodesPerCluster, unittest.WithRole(flow.RoleCollection))
+	nodes := unittest.IdentityListFixture(clusterCount*nodesPerCluster, unittest.WithRole(flow.RoleCollection)).ToSkeleton()
 	// create cluster assignment
 	clusterAssignment := unittest.ClusterAssignment(uint(clusterCount), nodes)
 
@@ -98,7 +101,7 @@ func (s *Suite) PublishVoter() {
 	// sign and publish voter transaction
 	publishVoterTx := sdk.NewTransaction().
 		SetScript(templates.GeneratePublishVoterScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address).
@@ -118,7 +121,7 @@ func (s *Suite) StartVoting(clustering flow.ClusterList, clusterCount, nodesPerC
 	// submit admin transaction to start voting
 	startVotingTx := sdk.NewTransaction().
 		SetScript(templates.GenerateStartVotingScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address).
@@ -142,7 +145,7 @@ func (s *Suite) StartVoting(clustering flow.ClusterList, clusterCount, nodesPerC
 			cdcNodeID, err := cadence.NewString(node.NodeID.String())
 			require.NoError(s.T(), err)
 			nodeIDs = append(nodeIDs, cdcNodeID)
-			nodeWeights = append(nodeWeights, cadence.NewUInt64(node.Weight))
+			nodeWeights = append(nodeWeights, cadence.NewUInt64(node.InitialWeight))
 		}
 
 		clusterNodeIDs[index] = cadence.NewArray(nodeIDs)
@@ -174,7 +177,7 @@ func (s *Suite) CreateVoterResource(address sdk.Address, nodeID flow.Identifier,
 
 	registerVoterTx := sdk.NewTransaction().
 		SetScript(templates.GenerateCreateVoterScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address).
@@ -204,7 +207,7 @@ func (s *Suite) CreateVoterResource(address sdk.Address, nodeID flow.Identifier,
 func (s *Suite) StopVoting() {
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateStopVotingScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address).

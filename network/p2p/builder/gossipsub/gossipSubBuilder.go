@@ -20,7 +20,6 @@ import (
 	inspectorbuilder "github.com/onflow/flow-go/network/p2p/builder/inspector"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 	"github.com/onflow/flow-go/network/p2p/distributor"
-	"github.com/onflow/flow-go/network/p2p/inspector"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	p2pnode "github.com/onflow/flow-go/network/p2p/node"
 	"github.com/onflow/flow-go/network/p2p/scoring"
@@ -144,6 +143,8 @@ func (g *Builder) OverrideDefaultRpcInspectorSuiteFactory(factory p2p.GossipSubR
 // - sporkId: the spork id of the node.
 // - idProvider: the identity provider of the node.
 // - rpcInspectorConfig: the rpc inspector config of the node.
+// - subscriptionProviderPrams: the subscription provider params of the node.
+// - meshTracer: gossipsub mesh tracer.
 // Returns:
 // - a new gossipsub builder.
 // Note: the builder is not thread-safe. It should only be used in the main thread.
@@ -159,27 +160,37 @@ func NewGossipSubBuilder(logger zerolog.Logger,
 		Logger()
 
 	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                             lg,
-		Metrics:                            metricsCfg.Metrics,
-		IDProvider:                         idProvider,
-		LoggerInterval:                     gossipSubCfg.RpcTracer.LocalMeshLogInterval,
-		RpcSentTrackerCacheSize:            gossipSubCfg.RpcTracer.RPCSentTrackerCacheSize,
-		RpcSentTrackerWorkerQueueCacheSize: gossipSubCfg.RpcTracer.RPCSentTrackerQueueCacheSize,
-		RpcSentTrackerNumOfWorkers:         gossipSubCfg.RpcTracer.RpcSentTrackerNumOfWorkers,
+		Logger:         lg,
+		Metrics:        metricsCfg.Metrics,
+		IDProvider:     idProvider,
+		LoggerInterval: gossipSubCfg.RpcTracer.LocalMeshLogInterval,
+		RpcSentTracker: tracer.RpcSentTrackerConfig{
+			CacheSize:            gossipSubCfg.RpcTracer.RPCSentTrackerCacheSize,
+			WorkerQueueCacheSize: gossipSubCfg.RpcTracer.RPCSentTrackerQueueCacheSize,
+			WorkerQueueNumber:    gossipSubCfg.RpcTracer.RpcSentTrackerNumOfWorkers,
+		},
+		DuplicateMessageTrackerCacheConfig: gossipSubCfg.RpcTracer.DuplicateMessageTrackerConfig,
 		HeroCacheMetricsFactory:            metricsCfg.HeroCacheFactory,
 		NetworkingType:                     networkType,
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
 	b := &Builder{
-		logger:                   lg,
-		metricsCfg:               metricsCfg,
-		sporkId:                  sporkId,
-		networkType:              networkType,
-		idProvider:               idProvider,
-		gossipSubFactory:         defaultGossipSubFactory(),
-		gossipSubConfigFunc:      defaultGossipSubAdapterConfig(),
-		scoreOptionConfig:        scoring.NewScoreOptionConfig(lg, gossipSubCfg.ScoringParameters, metricsCfg.HeroCacheFactory, idProvider, networkType),
+		logger:              lg,
+		metricsCfg:          metricsCfg,
+		sporkId:             sporkId,
+		networkType:         networkType,
+		idProvider:          idProvider,
+		gossipSubFactory:    defaultGossipSubFactory(),
+		gossipSubConfigFunc: defaultGossipSubAdapterConfig(),
+		scoreOptionConfig: scoring.NewScoreOptionConfig(lg,
+			gossipSubCfg.ScoringParameters,
+			metricsCfg.HeroCacheFactory,
+			metricsCfg.Metrics,
+			idProvider,
+			meshTracer.DuplicateMessageCount,
+			networkType,
+		),
 		rpcInspectorSuiteFactory: defaultInspectorSuite(meshTracer),
 		gossipSubTracer:          meshTracer,
 		gossipSubCfg:             gossipSubCfg,
@@ -207,6 +218,7 @@ func defaultGossipSubAdapterConfig() p2p.GossipSubAdapterConfigFunc {
 // defaultInspectorSuite returns the default inspector suite factory function. It is used to create the default inspector suite.
 // Inspector suite is utilized to inspect the incoming gossipsub rpc messages from different perspectives.
 // Note: always use the default inspector suite factory function to create the inspector suite (unless you know what you are doing).
+// todo: this function can be simplified.
 func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcInspectorSuiteFactoryFunc {
 	return func(ctx irrecoverable.SignalerContext,
 		logger zerolog.Logger,
@@ -217,13 +229,7 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 		networkType network.NetworkingType,
 		idProvider module.IdentityProvider,
 		topicProvider func() p2p.TopicProvider) (p2p.GossipSubInspectorSuite, error) {
-		metricsInspector := inspector.NewControlMsgMetricsInspector(logger,
-			p2pnode.NewGossipSubControlMessageMetrics(gossipSubMetrics, logger),
-			inspectorCfg.Metrics.NumberOfWorkers,
-			[]queue.HeroStoreConfigOption{
-				queue.WithHeroStoreSizeLimit(inspectorCfg.Metrics.CacheSize),
-				queue.WithHeroStoreCollector(metrics.GossipSubRPCMetricsObserverInspectorQueueMetricFactory(heroCacheMetricsFactory, networkType)),
-			}...)
+
 		notificationDistributor := distributor.DefaultGossipSubInspectorNotificationDistributor(logger, []queue.HeroStoreConfigOption{
 			queue.WithHeroStoreSizeLimit(inspectorCfg.NotificationCacheSize),
 			queue.WithHeroStoreCollector(metrics.RpcInspectorNotificationQueueMetricFactory(heroCacheMetricsFactory, networkType))}...)
@@ -244,7 +250,7 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new control message valiadation inspector: %w", err)
 		}
-		return inspectorbuilder.NewGossipSubInspectorSuite(metricsInspector, rpcValidationInspector, notificationDistributor), nil
+		return inspectorbuilder.NewGossipSubInspectorSuite(rpcValidationInspector, notificationDistributor), nil
 	}
 }
 

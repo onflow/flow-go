@@ -1,6 +1,7 @@
 package testutils
 
 import (
+	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -9,11 +10,13 @@ import (
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -30,9 +33,12 @@ func RunWithTestFlowEVMRootAddress(t testing.TB, backend atree.Ledger, f func(fl
 
 func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
 	tb := &TestBackend{
-		TestValueStore:   GetSimpleValueStore(),
-		testEventEmitter: getSimpleEventEmitter(),
-		testMeter:        getSimpleMeter(),
+		TestValueStore:              GetSimpleValueStore(),
+		testEventEmitter:            getSimpleEventEmitter(),
+		testMeter:                   getSimpleMeter(),
+		TestBlockInfo:               &TestBlockInfo{},
+		TestRandomGenerator:         getSimpleRandomGenerator(),
+		TestContractFunctionInvoker: &TestContractFunctionInvoker{},
 	}
 	f(tb)
 }
@@ -52,24 +58,38 @@ func fullKey(owner, key []byte) string {
 func GetSimpleValueStore() *TestValueStore {
 	data := make(map[string][]byte)
 	allocator := make(map[string]uint64)
-
+	bytesRead := 0
+	bytesWritten := 0
 	return &TestValueStore{
 		GetValueFunc: func(owner, key []byte) ([]byte, error) {
-			return data[fullKey(owner, key)], nil
+			fk := fullKey(owner, key)
+			value := data[fk]
+			bytesRead += len(fk) + len(value)
+			return value, nil
 		},
 		SetValueFunc: func(owner, key, value []byte) error {
-			data[fullKey(owner, key)] = value
+			fk := fullKey(owner, key)
+			data[fk] = value
+			bytesWritten += len(fk) + len(value)
 			return nil
 		},
 		ValueExistsFunc: func(owner, key []byte) (bool, error) {
-			return len(data[fullKey(owner, key)]) > 0, nil
-
+			fk := fullKey(owner, key)
+			value := data[fk]
+			bytesRead += len(fk) + len(value)
+			return len(value) > 0, nil
 		},
 		AllocateStorageIndexFunc: func(owner []byte) (atree.StorageIndex, error) {
 			index := allocator[string(owner)]
+			// TODO: figure out why it result in a collision
+			if index == 0 {
+				index = 10
+			}
 			var data [8]byte
 			allocator[string(owner)] = index + 1
 			binary.BigEndian.PutUint64(data[:], index)
+			bytesRead += len(owner) + 8
+			bytesWritten += len(owner) + 8
 			return atree.StorageIndex(data), nil
 		},
 		TotalStorageSizeFunc: func() int {
@@ -82,8 +102,18 @@ func GetSimpleValueStore() *TestValueStore {
 			}
 			return size
 		},
+		TotalBytesReadFunc: func() int {
+			return bytesRead
+		},
+		TotalBytesWrittenFunc: func() int {
+			return bytesWritten
+		},
 		TotalStorageItemsFunc: func() int {
 			return len(maps.Keys(data)) + len(maps.Keys(allocator))
+		},
+		ResetStatsFunc: func() {
+			bytesRead = 0
+			bytesWritten = 0
 		},
 	}
 }
@@ -133,7 +163,12 @@ type TestBackend struct {
 	*TestValueStore
 	*testMeter
 	*testEventEmitter
+	*TestBlockInfo
+	*TestRandomGenerator
+	*TestContractFunctionInvoker
 }
+
+var _ types.Backend = &TestBackend{}
 
 func (tb *TestBackend) TotalStorageSize() int {
 	if tb.TotalStorageSizeFunc == nil {
@@ -149,13 +184,20 @@ func (tb *TestBackend) DropEvents() {
 	tb.reset()
 }
 
+func (tb *TestBackend) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+	return tb.GetValue([]byte(id.Owner), []byte(id.Key))
+}
+
 type TestValueStore struct {
 	GetValueFunc             func(owner, key []byte) ([]byte, error)
 	SetValueFunc             func(owner, key, value []byte) error
 	ValueExistsFunc          func(owner, key []byte) (bool, error)
 	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
 	TotalStorageSizeFunc     func() int
+	TotalBytesReadFunc       func() int
+	TotalBytesWrittenFunc    func() int
 	TotalStorageItemsFunc    func() int
+	ResetStatsFunc           func()
 }
 
 var _ environment.ValueStore = &TestValueStore{}
@@ -188,6 +230,20 @@ func (vs *TestValueStore) AllocateStorageIndex(owner []byte) (atree.StorageIndex
 	return vs.AllocateStorageIndexFunc(owner)
 }
 
+func (vs *TestValueStore) TotalBytesRead() int {
+	if vs.TotalBytesReadFunc == nil {
+		panic("method not set")
+	}
+	return vs.TotalBytesReadFunc()
+}
+
+func (vs *TestValueStore) TotalBytesWritten() int {
+	if vs.TotalBytesWrittenFunc == nil {
+		panic("method not set")
+	}
+	return vs.TotalBytesWrittenFunc()
+}
+
 func (vs *TestValueStore) TotalStorageSize() int {
 	if vs.TotalStorageSizeFunc == nil {
 		panic("method not set")
@@ -200,6 +256,13 @@ func (vs *TestValueStore) TotalStorageItems() int {
 		panic("method not set")
 	}
 	return vs.TotalStorageItemsFunc()
+}
+
+func (vs *TestValueStore) ResetStats() {
+	if vs.ResetStatsFunc == nil {
+		panic("method not set")
+	}
+	vs.ResetStatsFunc()
 }
 
 type testMeter struct {
@@ -331,4 +394,74 @@ func (vs *testEventEmitter) Reset() {
 		panic("method not set")
 	}
 	vs.reset()
+}
+
+type TestBlockInfo struct {
+	GetCurrentBlockHeightFunc func() (uint64, error)
+	GetBlockAtHeightFunc      func(height uint64) (runtime.Block, bool, error)
+}
+
+var _ environment.BlockInfo = &TestBlockInfo{}
+
+// GetCurrentBlockHeight returns the current block height.
+func (tb *TestBlockInfo) GetCurrentBlockHeight() (uint64, error) {
+	if tb.GetCurrentBlockHeightFunc == nil {
+		panic("GetCurrentBlockHeight method is not set")
+	}
+	return tb.GetCurrentBlockHeightFunc()
+}
+
+// GetBlockAtHeight returns the block at the given height.
+func (tb *TestBlockInfo) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
+	if tb.GetBlockAtHeightFunc == nil {
+		panic("GetBlockAtHeight method is not set")
+	}
+	return tb.GetBlockAtHeightFunc(height)
+}
+
+type TestRandomGenerator struct {
+	ReadRandomFunc func([]byte) error
+}
+
+var _ environment.RandomGenerator = &TestRandomGenerator{}
+
+func (t *TestRandomGenerator) ReadRandom(buffer []byte) error {
+	if t.ReadRandomFunc == nil {
+		panic("ReadRandomFunc method is not set")
+	}
+	return t.ReadRandomFunc(buffer)
+}
+
+func getSimpleRandomGenerator() *TestRandomGenerator {
+	return &TestRandomGenerator{
+		ReadRandomFunc: func(buffer []byte) error {
+			_, err := rand.Read(buffer)
+			return err
+		},
+	}
+}
+
+type TestContractFunctionInvoker struct {
+	InvokeFunc func(
+		spec environment.ContractFunctionSpec,
+		arguments []cadence.Value,
+	) (
+		cadence.Value,
+		error,
+	)
+}
+
+var _ environment.ContractFunctionInvoker = &TestContractFunctionInvoker{}
+
+func (t *TestContractFunctionInvoker) Invoke(
+	spec environment.ContractFunctionSpec,
+	arguments []cadence.Value,
+) (
+	cadence.Value,
+	error,
+) {
+	if t.InvokeFunc == nil {
+		panic("InvokeFunc method is not set")
+	}
+	return t.InvokeFunc(spec, arguments)
 }

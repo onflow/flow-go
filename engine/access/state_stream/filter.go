@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -77,7 +78,7 @@ func NewEventFilter(
 	// with criteria that will never match.
 	for _, event := range eventTypes {
 		eventType := flow.EventType(event)
-		if err := validateEventType(eventType); err != nil {
+		if err := validateEventType(eventType, chain); err != nil {
 			return EventFilter{}, err
 		}
 		f.EventTypes[eventType] = struct{}{}
@@ -105,6 +106,7 @@ func NewEventFilter(
 
 func NewStatusFilter(
 	eventTypes []string,
+	chain flow.Chain,
 ) (StatusFilter, error) {
 	// put some reasonable limits on the number of filters. Lookups use a map so they are fast,
 	// this just puts a cap on the memory consumed per filter.
@@ -120,7 +122,7 @@ func NewStatusFilter(
 	// with criteria that will never match.
 	for _, event := range eventTypes {
 		eventType := flow.EventType(event)
-		if err := validateEventType(eventType); err != nil {
+		if err := validateEventType(eventType, chain); err != nil {
 			return StatusFilter{}, err
 		}
 		f.Statuses[eventType] = struct{}{}
@@ -164,7 +166,7 @@ func (f *EventFilter) Match(event flow.Event) bool {
 		return true
 	}
 
-	parsed, err := ParseEvent(event.Type)
+	parsed, err := events.ParseEvent(event.Type)
 	if err != nil {
 		// TODO: log this error
 		return false
@@ -174,7 +176,7 @@ func (f *EventFilter) Match(event flow.Event) bool {
 		return true
 	}
 
-	if parsed.Type == AccountEventType {
+	if parsed.Type == events.AccountEventType {
 		_, ok := f.Addresses[parsed.Address]
 		return ok
 	}
@@ -193,13 +195,13 @@ func (f *StatusFilter) Match(event flow.Event) bool {
 		return true
 	}
 
-	parsed, err := ParseEvent(event.Type)
+	parsed, err := events.ParseEvent(event.Type)
 	if err != nil {
 		// TODO: log this error
 		return false
 	}
 
-	if parsed.Type == ProtocolEventType {
+	if parsed.Type == events.ProtocolEventType {
 		return true
 	}
 
@@ -207,8 +209,8 @@ func (f *StatusFilter) Match(event flow.Event) bool {
 }
 
 // validateEventType ensures that the event type matches the expected format
-func validateEventType(eventType flow.EventType) error {
-	_, err := ParseEvent(flow.EventType(eventType))
+func validateEventType(eventType flow.EventType, chain flow.Chain) error {
+	_, err := events.ValidateEvent(flow.EventType(eventType), chain)
 	if err != nil {
 		return fmt.Errorf("invalid event type %s: %w", eventType, err)
 	}

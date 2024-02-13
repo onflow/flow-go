@@ -8,6 +8,8 @@ import (
 
 	network "github.com/libp2p/go-libp2p/core/network"
 
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
+
 	peer "github.com/libp2p/go-libp2p/core/peer"
 
 	protocol "github.com/libp2p/go-libp2p/core/protocol"
@@ -110,6 +112,16 @@ func (_m *NetworkMetrics) DuplicateInboundMessagesDropped(topic string, _a1 stri
 	_m.Called(topic, _a1, messageType)
 }
 
+// DuplicateMessagePenalties provides a mock function with given fields: penalty
+func (_m *NetworkMetrics) DuplicateMessagePenalties(penalty float64) {
+	_m.Called(penalty)
+}
+
+// DuplicateMessagesCounts provides a mock function with given fields: count
+func (_m *NetworkMetrics) DuplicateMessagesCounts(count float64) {
+	_m.Called(count)
+}
+
 // InboundConnections provides a mock function with given fields: connectionCount
 func (_m *NetworkMetrics) InboundConnections(connectionCount uint) {
 	_m.Called(connectionCount)
@@ -140,6 +152,11 @@ func (_m *NetworkMetrics) MessageRemoved(priority int) {
 	_m.Called(priority)
 }
 
+// OnActiveClusterIDsNotSetErr provides a mock function with given fields:
+func (_m *NetworkMetrics) OnActiveClusterIDsNotSetErr() {
+	_m.Called()
+}
+
 // OnAppSpecificScoreUpdated provides a mock function with given fields: _a0
 func (_m *NetworkMetrics) OnAppSpecificScoreUpdated(_a0 float64) {
 	_m.Called(_a0)
@@ -148,6 +165,11 @@ func (_m *NetworkMetrics) OnAppSpecificScoreUpdated(_a0 float64) {
 // OnBehaviourPenaltyUpdated provides a mock function with given fields: _a0
 func (_m *NetworkMetrics) OnBehaviourPenaltyUpdated(_a0 float64) {
 	_m.Called(_a0)
+}
+
+// OnControlMessagesTruncated provides a mock function with given fields: messageType, diff
+func (_m *NetworkMetrics) OnControlMessagesTruncated(messageType p2pmsg.ControlMessageType, diff int) {
+	_m.Called(messageType, diff)
 }
 
 // OnDNSCacheHit provides a mock function with given fields:
@@ -190,14 +212,39 @@ func (_m *NetworkMetrics) OnFirstMessageDeliveredUpdated(_a0 channels.Topic, _a1
 	_m.Called(_a0, _a1)
 }
 
-// OnGraftReceived provides a mock function with given fields: count
-func (_m *NetworkMetrics) OnGraftReceived(count int) {
-	_m.Called(count)
+// OnGraftDuplicateTopicIdsExceedThreshold provides a mock function with given fields:
+func (_m *NetworkMetrics) OnGraftDuplicateTopicIdsExceedThreshold() {
+	_m.Called()
 }
 
-// OnIHaveReceived provides a mock function with given fields: count
-func (_m *NetworkMetrics) OnIHaveReceived(count int) {
-	_m.Called(count)
+// OnGraftMessageInspected provides a mock function with given fields: duplicateTopicIds
+func (_m *NetworkMetrics) OnGraftMessageInspected(duplicateTopicIds int) {
+	_m.Called(duplicateTopicIds)
+}
+
+// OnIHaveControlMessageIdsTruncated provides a mock function with given fields: diff
+func (_m *NetworkMetrics) OnIHaveControlMessageIdsTruncated(diff int) {
+	_m.Called(diff)
+}
+
+// OnIHaveDuplicateMessageIdsExceedThreshold provides a mock function with given fields:
+func (_m *NetworkMetrics) OnIHaveDuplicateMessageIdsExceedThreshold() {
+	_m.Called()
+}
+
+// OnIHaveDuplicateTopicIdsExceedThreshold provides a mock function with given fields:
+func (_m *NetworkMetrics) OnIHaveDuplicateTopicIdsExceedThreshold() {
+	_m.Called()
+}
+
+// OnIHaveMessageIDsReceived provides a mock function with given fields: channel, msgIdCount
+func (_m *NetworkMetrics) OnIHaveMessageIDsReceived(channel string, msgIdCount int) {
+	_m.Called(channel, msgIdCount)
+}
+
+// OnIHaveMessagesInspected provides a mock function with given fields: duplicateTopicIds, duplicateMessageIds
+func (_m *NetworkMetrics) OnIHaveMessagesInspected(duplicateTopicIds int, duplicateMessageIds int) {
+	_m.Called(duplicateTopicIds, duplicateMessageIds)
 }
 
 // OnIPColocationFactorUpdated provides a mock function with given fields: _a0
@@ -205,29 +252,49 @@ func (_m *NetworkMetrics) OnIPColocationFactorUpdated(_a0 float64) {
 	_m.Called(_a0)
 }
 
-// OnIWantReceived provides a mock function with given fields: count
-func (_m *NetworkMetrics) OnIWantReceived(count int) {
-	_m.Called(count)
-}
-
-// OnIncomingRpcAcceptedFully provides a mock function with given fields:
-func (_m *NetworkMetrics) OnIncomingRpcAcceptedFully() {
+// OnIWantCacheMissMessageIdsExceedThreshold provides a mock function with given fields:
+func (_m *NetworkMetrics) OnIWantCacheMissMessageIdsExceedThreshold() {
 	_m.Called()
 }
 
-// OnIncomingRpcAcceptedOnlyForControlMessages provides a mock function with given fields:
-func (_m *NetworkMetrics) OnIncomingRpcAcceptedOnlyForControlMessages() {
+// OnIWantControlMessageIdsTruncated provides a mock function with given fields: diff
+func (_m *NetworkMetrics) OnIWantControlMessageIdsTruncated(diff int) {
+	_m.Called(diff)
+}
+
+// OnIWantDuplicateMessageIdsExceedThreshold provides a mock function with given fields:
+func (_m *NetworkMetrics) OnIWantDuplicateMessageIdsExceedThreshold() {
 	_m.Called()
 }
 
-// OnIncomingRpcRejected provides a mock function with given fields:
-func (_m *NetworkMetrics) OnIncomingRpcRejected() {
+// OnIWantMessageIDsReceived provides a mock function with given fields: msgIdCount
+func (_m *NetworkMetrics) OnIWantMessageIDsReceived(msgIdCount int) {
+	_m.Called(msgIdCount)
+}
+
+// OnIWantMessagesInspected provides a mock function with given fields: duplicateCount, cacheMissCount
+func (_m *NetworkMetrics) OnIWantMessagesInspected(duplicateCount int, cacheMissCount int) {
+	_m.Called(duplicateCount, cacheMissCount)
+}
+
+// OnIncomingRpcReceived provides a mock function with given fields: iHaveCount, iWantCount, graftCount, pruneCount, msgCount
+func (_m *NetworkMetrics) OnIncomingRpcReceived(iHaveCount int, iWantCount int, graftCount int, pruneCount int, msgCount int) {
+	_m.Called(iHaveCount, iWantCount, graftCount, pruneCount, msgCount)
+}
+
+// OnInvalidControlMessageNotificationSent provides a mock function with given fields:
+func (_m *NetworkMetrics) OnInvalidControlMessageNotificationSent() {
 	_m.Called()
 }
 
 // OnInvalidMessageDeliveredUpdated provides a mock function with given fields: _a0, _a1
 func (_m *NetworkMetrics) OnInvalidMessageDeliveredUpdated(_a0 channels.Topic, _a1 float64) {
 	_m.Called(_a0, _a1)
+}
+
+// OnInvalidTopicIdDetectedForControlMessage provides a mock function with given fields: messageType
+func (_m *NetworkMetrics) OnInvalidTopicIdDetectedForControlMessage(messageType p2pmsg.ControlMessageType) {
+	_m.Called(messageType)
 }
 
 // OnLocalMeshSizeUpdated provides a mock function with given fields: topic, size
@@ -320,14 +387,24 @@ func (_m *NetworkMetrics) OnPeerThrottled() {
 	_m.Called()
 }
 
-// OnPruneReceived provides a mock function with given fields: count
-func (_m *NetworkMetrics) OnPruneReceived(count int) {
-	_m.Called(count)
+// OnPruneDuplicateTopicIdsExceedThreshold provides a mock function with given fields:
+func (_m *NetworkMetrics) OnPruneDuplicateTopicIdsExceedThreshold() {
+	_m.Called()
 }
 
-// OnPublishedGossipMessagesReceived provides a mock function with given fields: count
-func (_m *NetworkMetrics) OnPublishedGossipMessagesReceived(count int) {
-	_m.Called(count)
+// OnPruneMessageInspected provides a mock function with given fields: duplicateTopicIds
+func (_m *NetworkMetrics) OnPruneMessageInspected(duplicateTopicIds int) {
+	_m.Called(duplicateTopicIds)
+}
+
+// OnPublishMessageInspected provides a mock function with given fields: totalErrCount, invalidTopicIdsCount, invalidSubscriptionsCount, invalidSendersCount
+func (_m *NetworkMetrics) OnPublishMessageInspected(totalErrCount int, invalidTopicIdsCount int, invalidSubscriptionsCount int, invalidSendersCount int) {
+	_m.Called(totalErrCount, invalidTopicIdsCount, invalidSubscriptionsCount, invalidSendersCount)
+}
+
+// OnPublishMessagesInspectionErrorExceedsThreshold provides a mock function with given fields:
+func (_m *NetworkMetrics) OnPublishMessagesInspectionErrorExceedsThreshold() {
+	_m.Called()
 }
 
 // OnRateLimitedPeer provides a mock function with given fields: pid, role, msgType, topic, reason
@@ -382,6 +459,11 @@ func (_m *NetworkMetrics) OnUnauthorizedMessage(role string, msgType string, top
 
 // OnUndeliveredMessage provides a mock function with given fields:
 func (_m *NetworkMetrics) OnUndeliveredMessage() {
+	_m.Called()
+}
+
+// OnUnstakedPeerInspectionFailed provides a mock function with given fields:
+func (_m *NetworkMetrics) OnUnstakedPeerInspectionFailed() {
 	_m.Called()
 }
 

@@ -17,13 +17,13 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	discoveryBackoff "github.com/libp2p/go-libp2p/p2p/discovery/backoff"
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
 
 	"github.com/onflow/flow-go/config"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -512,7 +512,7 @@ func LetNodesDiscoverEachOther(t *testing.T, ctx context.Context, nodes []p2p.Li
 			if node == other {
 				continue
 			}
-			otherPInfo, err := utils.PeerAddressInfo(*ids[i])
+			otherPInfo, err := utils.PeerAddressInfo(ids[i].IdentitySkeleton)
 			require.NoError(t, err)
 			require.NoError(t, node.ConnectToPeer(ctx, otherPInfo))
 		}
@@ -825,6 +825,22 @@ func MockInspectorNotificationDistributorReadyDoneAware(d *mockp2p.GossipSubInsp
 	}()).Maybe()
 }
 
+// MockScoringRegistrySubscriptionValidatorReadyDoneAware mocks the Ready and Done methods of the subscription validator to return a channel that is already closed,
+// so that the distributor is considered ready and done when the test needs.
+func MockScoringRegistrySubscriptionValidatorReadyDoneAware(s *mockp2p.SubscriptionValidator) {
+	s.On("Start", mockery.Anything).Return().Maybe()
+	s.On("Ready").Return(func() <-chan struct{} {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}()).Maybe()
+	s.On("Done").Return(func() <-chan struct{} {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}()).Maybe()
+}
+
 // GossipSubRpcFixtures returns a slice of random message IDs for testing.
 // Args:
 // - t: *testing.T instance
@@ -914,6 +930,18 @@ func WithIHave(msgCount, msgIDCount int, topicId string) GossipSubCtrlOption {
 			}
 		}
 		msg.Ihave = iHaves
+	}
+}
+
+// WithIHaveMessageIDs adds iHave control messages with the given message IDs to the control message.
+func WithIHaveMessageIDs(msgIDs []string, topicId string) GossipSubCtrlOption {
+	return func(msg *pb.ControlMessage) {
+		msg.Ihave = []*pb.ControlIHave{
+			{
+				TopicID:    &topicId,
+				MessageIDs: msgIDs,
+			},
+		}
 	}
 }
 

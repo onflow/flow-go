@@ -86,11 +86,6 @@ type PubSubAdapterConfig interface {
 	WithInspectorSuite(GossipSubInspectorSuite)
 }
 
-// GossipSubControlMetricsObserver funcs used to observe gossipsub related metrics.
-type GossipSubControlMetricsObserver interface {
-	ObserveRPC(peer.ID, *pubsub.RPC)
-}
-
 // GossipSubRPCInspector app specific RPC inspector used to inspect and validate incoming RPC messages before they are processed by libp2p.
 // Implementations must:
 //   - be concurrency safe
@@ -180,6 +175,12 @@ type PubSubTracer interface {
 	component.Component
 	pubsub.RawTracer
 	RpcControlTracking
+	// DuplicateMessageCount returns the current duplicate message count for the peer.
+	// Args:
+	// - peer.ID: the peer ID.
+	// Returns:
+	// - float64: duplicate message count.
+	DuplicateMessageCount(peer.ID) float64
 	// GetLocalMeshPeers returns the list of peers in the mesh for the given topic.
 	// Args:
 	// - topic: the topic.
