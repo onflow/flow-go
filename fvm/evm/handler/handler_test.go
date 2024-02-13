@@ -275,13 +275,7 @@ func TestHandler_OpsWithoutEmulator(t *testing.T) {
 
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				blockchain, err := handler.NewBlockStore(backend, rootAddr)
-				require.NoError(t, err)
-
-				aa, err := handler.NewAddressAllocator(backend, rootAddr)
-				require.NoError(t, err)
-
-				h := handler.NewContractHandler(rootAddr, flowTokenAddress, blockchain, aa, backend, nil)
+				h := SetupHandler(t, backend, rootAddr)
 
 				coa := h.DeployCOA(12)
 				require.NotNil(t, coa)
