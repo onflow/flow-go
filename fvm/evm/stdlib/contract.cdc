@@ -1,7 +1,10 @@
+import Crypto
 import "FlowToken"
 
 access(all)
 contract EVM {
+
+    pub event BridgedAccountCreated(addressBytes: [UInt8; 20])
 
     /// EVMAddress is an EVM-compatible address
     access(all)
@@ -66,7 +69,14 @@ contract EVM {
     }
 
     access(all)
-    resource BridgedAccount {
+    resource interface Addressable {
+        /// The EVM address
+        access(all)
+        fun address(): EVMAddress
+    }
+
+    access(all)
+    resource BridgedAccount: Addressable  {
 
         access(self)
         var addressBytes: [UInt8; 20]
@@ -167,6 +177,7 @@ contract EVM {
         let acc <-create BridgedAccount()
         let addr = InternalEVM.createBridgedAccount(uuid: acc.uuid)
         acc.initAddress(addressBytes: addr)
+        emit BridgedAccountCreated(addressBytes: addr)
         return <-acc
     }
 
@@ -220,5 +231,65 @@ contract EVM {
         }
 
         return InternalEVM.decodeABI(types: types, data: data)
+    }
+
+    /// validateCOAOwnershipProof validates a COA ownership proof
+    access(all)
+    fun validateCOAOwnershipProof(
+        address: Address,
+        path: PublicPath,
+        signedData: [UInt8],
+        keyIndices: [UInt64],
+        signatures: [[UInt8]],
+        evmAddress: [UInt8; 20]
+    ) {
+
+        // make signature set first 
+        // check number of signatures matches number of key indices
+        assert(keyIndices.length == signatures.length,
+               message: "key indices size doesn't match the signatures")
+
+        var signatureSet: [Crypto.KeyListSignature] = []
+        var idx = 0 
+        for sig in signatures{
+            signatureSet.append(Crypto.KeyListSignature(
+                keyIndex: Int(keyIndices[Int(idx)]),
+                signature: sig
+            ))
+            idx = idx + 1
+        }
+
+        // fetch account
+        let acc = getAccount(address)
+
+        // constructing key list
+        let keyList = Crypto.KeyList()
+        for sig in signatureSet {
+            let key = acc.keys.get(keyIndex: sig.keyIndex)!
+            assert(!key.isRevoked, message: "revoked key is used")
+            keyList.add(
+              key.publicKey,
+              hashAlgorithm: key.hashAlgorithm,
+              weight: key.weight,
+           )
+        }
+
+        let isValid = keyList.verify(
+            signatureSet: signatureSet,
+            signedData: signedData
+        )
+        assert(isValid, message: "signatures not valid")
+
+        let coaRef = acc.getCapability(path)
+            .borrow<&EVM.BridgedAccount{EVM.Addressable}>()
+            ?? panic("could not borrow bridge account's address")
+
+        // verify evm address matching
+        var i = 0
+        for item in coaRef.address().bytes {
+            assert(item == evmAddress[i], message: "evm address mismatch")
+            i = i +1
+        }
+
     }
 }
