@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"fmt"
 	"math/big"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -58,6 +59,9 @@ func getPrecompiles(
 	archContract := precompiles.ArchContract(
 		archAddress,
 		backend.GetCurrentBlockHeight,
+		func(cpic *types.COAOwnershipProofInContext) (bool, error) {
+			return false, fmt.Errorf("not implemented")
+		},
 	)
 	return []types.Precompile{archContract}
 }
