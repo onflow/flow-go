@@ -33,11 +33,12 @@ func RunWithTestFlowEVMRootAddress(t testing.TB, backend atree.Ledger, f func(fl
 
 func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
 	tb := &TestBackend{
-		TestValueStore:      GetSimpleValueStore(),
-		testEventEmitter:    getSimpleEventEmitter(),
-		testMeter:           getSimpleMeter(),
-		TestBlockInfo:       &TestBlockInfo{},
-		TestRandomGenerator: getSimpleRandomGenerator(),
+		TestValueStore:              GetSimpleValueStore(),
+		testEventEmitter:            getSimpleEventEmitter(),
+		testMeter:                   getSimpleMeter(),
+		TestBlockInfo:               &TestBlockInfo{},
+		TestRandomGenerator:         getSimpleRandomGenerator(),
+		TestContractFunctionInvoker: &TestContractFunctionInvoker{},
 	}
 	f(tb)
 }
@@ -160,6 +161,7 @@ type TestBackend struct {
 	*testEventEmitter
 	*TestBlockInfo
 	*TestRandomGenerator
+	*TestContractFunctionInvoker
 }
 
 var _ types.Backend = &TestBackend{}
@@ -429,4 +431,29 @@ func getSimpleRandomGenerator() *TestRandomGenerator {
 			return err
 		},
 	}
+}
+
+type TestContractFunctionInvoker struct {
+	InvokeFunc func(
+		spec environment.ContractFunctionSpec,
+		arguments []cadence.Value,
+	) (
+		cadence.Value,
+		error,
+	)
+}
+
+var _ environment.ContractFunctionInvoker = &TestContractFunctionInvoker{}
+
+func (t *TestContractFunctionInvoker) Invoke(
+	spec environment.ContractFunctionSpec,
+	arguments []cadence.Value,
+) (
+	cadence.Value,
+	error,
+) {
+	if t.InvokeFunc == nil {
+		panic("InvokeFunc method is not set")
+	}
+	return t.InvokeFunc(spec, arguments)
 }
