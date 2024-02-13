@@ -3044,7 +3044,7 @@ func TestEVM(t *testing.T) {
 								log(data.length)
 								assert(data.length == 160)
 
-								let acc <- EVM.createBridgedAccount()
+								let acc <- EVM.createCadenceOwnedAccount()
 								destroy acc
 							}
 						}
@@ -3065,7 +3065,7 @@ func TestEVM(t *testing.T) {
 			assert.ErrorContains(
 				t,
 				output.Err,
-				"value of type `EVM` has no member `createBridgedAccount`",
+				"value of type `EVM` has no member `createCadenceOwnedAccount`",
 			)
 		}),
 	)
@@ -3087,7 +3087,7 @@ func TestEVM(t *testing.T) {
 				
 				pub fun main() {
 					let bal = EVM.Balance(attoflow: 1000000000000000000);
-					let acc <- EVM.createBridgedAccount();
+					let acc <- EVM.createCadenceOwnedAccount();
 					// withdraw insufficient balance
 					destroy acc.withdraw(balance: bal);
 					destroy acc;
@@ -3151,7 +3151,7 @@ func TestEVM(t *testing.T) {
 					import EVM from %s
 					
 					pub fun main() {
-						destroy <- EVM.createBridgedAccount();
+						destroy <- EVM.createCadenceOwnedAccount();
 					}
 				`, sc.EVMContract.Address.HexWithPrefix())))
 
@@ -3195,7 +3195,7 @@ func TestEVM(t *testing.T) {
 							let vaultRef = acc.borrow<&{FungibleToken.Provider}>(from: /storage/flowTokenVault)
 							?? panic("Could not borrow reference to the owner's Vault!")
 
-							let acc <- EVM.createBridgedAccount()
+							let acc <- EVM.createCadenceOwnedAccount()
 							let amount <- vaultRef.withdraw(amount: 0.0000001) as! @FlowToken.Vault
 							acc.deposit(from: <- amount)
 							destroy acc
