@@ -50,7 +50,7 @@ func rootEpochTargetEndTime() uint64 {
 		panic("invalid epoch timing config: must specify ALL of --epoch-target-end-time-ref-counter, --epoch-target-end-time-ref-timestamp, and --epoch-target-end-time-duration")
 	}
 	if flagEpochCounter < flagEpochTimingRefCounter {
-		panic("invalid epoch timing config: reference epoch counter must be before root epoch counter")
+		panic("invalid epoch timing config: reference epoch counter must be less than or equal to root epoch counter")
 	}
 	targetEndTime := flagEpochTimingRefTimestamp + (flagEpochCounter-flagEpochTimingRefCounter)*flagEpochTimingDuration
 	if targetEndTime <= uint64(time.Now().Unix()) {

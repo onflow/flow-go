@@ -624,7 +624,7 @@ func validateOrPopulateEpochTimingConfig() error {
 			return fmt.Errorf("invalid epoch timing config: must specify ALL of --epoch-timing-ref-counter, --epoch-timing-ref-timestamp, and --epoch-timing-duration")
 		}
 		if flagEpochCounter < flagEpochTimingRefCounter {
-			return fmt.Errorf("invalid epoch timing config: reference epoch counter must be before root epoch counter")
+			return fmt.Errorf("invalid epoch timing config: reference epoch counter must be less than or equal to root epoch counter")
 		}
 
 		// compute target end time for initial (root) epoch from flags: `TargetEndTime = RefTimestamp + (RootEpochCounter - RefEpochCounter) * Duration`
