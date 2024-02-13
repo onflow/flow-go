@@ -40,6 +40,15 @@ func (res *Result) VMErrorString() string {
 	return ""
 }
 
+// UpdateLogsWithBlockHash updates the logs with
+// block hash, this can't be done earlier given the
+// block hash is dependent on logs (Excluding the block hash feild)
+func (res *Result) UpdateLogsWithBlockHash(blockHash gethCommon.Hash) {
+	for _, log := range res.Logs {
+		log.BlockHash = blockHash
+	}
+}
+
 // Receipt constructs an EVM-style receipt
 // can be used by json-rpc and other integration to be returned.
 func (res *Result) Receipt() *gethTypes.ReceiptForStorage {

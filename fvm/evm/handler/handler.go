@@ -315,6 +315,13 @@ func (h *ContractHandler) executeAndHandleCall(
 
 	bp.AppendTxHash(res.TxHash)
 
+	// TODO we need to update the receipt hash for the block
+	blockHash, err := bp.Hash()
+	if err != nil {
+		return res, err
+	}
+	res.UpdateLogsWithBlockHash(blockHash)
+
 	if totalSupplyDiff != nil {
 		if deductSupplyDiff {
 			bp.TotalSupply = new(big.Int).Sub(bp.TotalSupply, totalSupplyDiff)
