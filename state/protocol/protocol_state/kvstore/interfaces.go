@@ -1,6 +1,6 @@
 package kvstore
 
-// This file contains versioned read and read-write interfaces to the Protocol State
+// This file contains versioned read and read-write interfaces to the Protocol State's
 // key-value store and are used by the Protocol State Machine.
 //
 // When a key is added or removed, this requires a new protocol state version:
