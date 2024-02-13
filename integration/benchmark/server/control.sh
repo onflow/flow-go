@@ -17,9 +17,14 @@ commits_file="/opt/commits.recent"
 # clear the file
 : > $commits_file
 
+# the load_types array stores the different types of loads that will be run on the commits
+load_types=("token-transfer" "evm-transfer")
 
-#git log  --merges --first-parent  --format="%S:%H:token-transfer" origin/master --since '1 week' --author-date-order | tee -a $commits_file
-
-# example for all commits on a single branch since master since 1 week ago with the load set to evm
-# TODO: change this before merging
-git log   --first-parent  --format="%S:%H:evm-transfer" origin/master..janez/tps-benchmark-evm-load --since '1 week' --author-date-order | head -n 1 | tee -a $commits_file
+# get the merge commits from the last week from master ordered by author date
+for commit in $(git log  --merges --first-parent  --format="%S:%H" origin/master --since '1 week' --author-date-order )
+do
+  for load in "${load_types[@]}"
+  do
+    echo "$commit:$load" | tee -a $commits_file
+  done
+done
