@@ -205,7 +205,7 @@ func OpenStorage(dbPath string, startHeight uint64, logger zerolog.Logger, opts 
 		opt(storage)
 	}
 
-	lg.Info().Msgf("initialize storage with start ehgith: %d", startHeight)
+	lg.Info().Msgf("initialize storage with start height: %d", startHeight)
 
 	if err := storage.init(startHeight); err != nil {
 		return nil, fmt.Errorf("failed to initialize storage: %w", err)
