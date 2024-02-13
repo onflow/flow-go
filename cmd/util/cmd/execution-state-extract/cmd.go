@@ -2,6 +2,8 @@ package extract
 
 import (
 	"encoding/hex"
+	"fmt"
+	"os"
 	"path"
 	"strings"
 
@@ -29,7 +31,8 @@ var (
 	flagNoReport                  bool
 	flagValidateMigration         bool
 	flagLogVerboseValidationError bool
-	flagInputPayload              bool
+	flagInputPayloadFileName      string
+	flagOutputPayloadFileName     string
 	flagOutputPayloadByAddresses  string
 )
 
@@ -74,17 +77,27 @@ func init() {
 		"log entire Cadence values on validation error (atree migration)")
 
 	Cmd.Flags().StringVar(
+		&flagInputPayloadFileName,
+		"input-payload-filename",
+		"",
+		"input payload file",
+	)
+
+	Cmd.Flags().StringVar(
+		&flagOutputPayloadFileName,
+		"output-payload-filename",
+		"",
+		"output payload file",
+	)
+
+	Cmd.Flags().StringVar(
+		// Extract payloads of specified addresses (comma separated list of hex-encoded addresses)
+		// to file specified by --output-payload-filename.
+		// If no address is specified (empty string) then this flag is ignored.
 		&flagOutputPayloadByAddresses,
 		"extract-payloads-by-address",
 		"",
-		"extract payloads of specified addresses (comma separated list of hex-encoded addresses or \"all\"", // empty string ignores this flag
-	)
-
-	Cmd.Flags().BoolVar(
-		&flagInputPayload,
-		"use-payload-as-input",
-		false,
-		"use payload file instead of checkpoint file as input",
+		"extract payloads of addresses (comma separated hex-encoded addresses) to file specified by output-payload-filename",
 	)
 }
 
@@ -94,6 +107,18 @@ func run(*cobra.Command, []string) {
 	if len(flagBlockHash) > 0 && len(flagStateCommitment) > 0 {
 		log.Fatal().Msg("cannot run the command with both block hash and state commitment as inputs, only one of them should be provided")
 		return
+	}
+
+	if len(flagBlockHash) == 0 && len(flagStateCommitment) == 0 && len(flagInputPayloadFileName) == 0 {
+		log.Fatal().Msg("--block-hash or --state-commitment or --input-payload-filename must be specified")
+	}
+
+	if len(flagInputPayloadFileName) > 0 && (len(flagBlockHash) > 0 || len(flagStateCommitment) > 0) {
+		log.Fatal().Msg("--input-payload-filename cannot be used with --block-hash or --state-commitment")
+	}
+
+	if len(flagOutputPayloadFileName) == 0 && len(flagOutputPayloadByAddresses) > 0 {
+		log.Fatal().Msg("--extract-payloads-by-address requires --output-payload-filename to be specified")
 	}
 
 	if len(flagBlockHash) > 0 {
@@ -130,64 +155,37 @@ func run(*cobra.Command, []string) {
 		log.Info().Msgf("extracting state by state commitment: %x", stateCommitment)
 	}
 
-	if len(flagBlockHash) == 0 && len(flagStateCommitment) == 0 && !flagInputPayload {
-		log.Fatal().Msg("no --block-hash or --state-commitment or --use-payload-as-input was specified")
+	if len(flagInputPayloadFileName) > 0 {
+		if _, err := os.Stat(flagInputPayloadFileName); os.IsNotExist(err) {
+			log.Fatal().Msgf("payload input file %s doesn't exist", flagInputPayloadFileName)
+		}
 	}
 
-	exportPayloads := len(flagOutputPayloadByAddresses) > 0
+	if len(flagOutputPayloadFileName) > 0 {
+		if _, err := os.Stat(flagOutputPayloadFileName); os.IsExist(err) {
+			log.Fatal().Msgf("payload output file %s exists", flagOutputPayloadFileName)
+		}
+	}
 
 	var exportedAddresses []runtimeCommon.Address
 
-	if exportPayloads {
+	if len(flagOutputPayloadByAddresses) > 0 {
 
 		addresses := strings.Split(flagOutputPayloadByAddresses, ",")
 
-		if len(addresses) == 1 && strings.TrimSpace(addresses[0]) == "all" {
-			// Extract payloads of the entire state.
-			log.Info().Msgf("Extracting state from %s, exporting all payloads to %s",
-				flagExecutionStateDir,
-				path.Join(flagOutputDir, FilenamePayloads),
-			)
-		} else {
-			// Extract payloads of specified accounts
-			for _, hexAddr := range addresses {
-				b, err := hex.DecodeString(strings.TrimSpace(hexAddr))
-				if err != nil {
-					log.Fatal().Err(err).Msgf("cannot hex decode address %s for payload export", strings.TrimSpace(hexAddr))
-				}
-
-				addr, err := runtimeCommon.BytesToAddress(b)
-				if err != nil {
-					log.Fatal().Err(err).Msgf("cannot decode address %x for payload export", b)
-				}
-
-				exportedAddresses = append(exportedAddresses, addr)
+		for _, hexAddr := range addresses {
+			b, err := hex.DecodeString(strings.TrimSpace(hexAddr))
+			if err != nil {
+				log.Fatal().Err(err).Msgf("cannot hex decode address %s for payload export", strings.TrimSpace(hexAddr))
 			}
 
-			log.Info().Msgf("Extracting state from %s, exporting payloads by addresses %v to %s",
-				flagExecutionStateDir,
-				flagOutputPayloadByAddresses,
-				path.Join(flagOutputDir, FilenamePayloads),
-			)
+			addr, err := runtimeCommon.BytesToAddress(b)
+			if err != nil {
+				log.Fatal().Err(err).Msgf("cannot decode address %x for payload export", b)
+			}
+
+			exportedAddresses = append(exportedAddresses, addr)
 		}
-
-	} else {
-		log.Info().Msgf("Extracting state from %s, exporting root checkpoint to %s, version: %v",
-			flagExecutionStateDir,
-			path.Join(flagOutputDir, bootstrap.FilenameWALRootCheckpoint),
-			6,
-		)
-	}
-
-	if flagInputPayload {
-		log.Info().Msgf("Payload input from %v, output dir: %s",
-			flagExecutionStateDir,
-			flagOutputDir)
-	} else {
-		log.Info().Msgf("Block state commitment: %s from %v, output dir: %s",
-			hex.EncodeToString(stateCommitment[:]),
-			flagExecutionStateDir,
-			flagOutputDir)
 	}
 
 	// err := ensureCheckpointFileExist(flagExecutionStateDir)
@@ -211,15 +209,51 @@ func run(*cobra.Command, []string) {
 		log.Warn().Msgf("atree migration has verbose validation error logging enabled which may increase size of log")
 	}
 
+	var inputMsg string
+	if len(flagInputPayloadFileName) > 0 {
+		// Input is payloads
+		inputMsg = fmt.Sprintf("reading payloads from %s", flagInputPayloadFileName)
+	} else {
+		// Input is execution state
+		inputMsg = fmt.Sprintf("reading block state commitment %s from %s",
+			hex.EncodeToString(stateCommitment[:]),
+			flagExecutionStateDir,
+		)
+	}
+
+	var outputMsg string
+	if len(flagOutputPayloadFileName) > 0 {
+		// Output is payload file
+		if len(exportedAddresses) == 0 {
+			outputMsg = fmt.Sprintf("exporting all payloads to %s", flagOutputPayloadFileName)
+		} else {
+			outputMsg = fmt.Sprintf(
+				"exporting payloads by addresses %v to %s",
+				flagOutputPayloadByAddresses,
+				flagOutputPayloadFileName,
+			)
+		}
+	} else {
+		// Output is checkpoint files
+		outputMsg = fmt.Sprintf(
+			"exporting root checkpoint to %s, version: %d",
+			path.Join(flagOutputDir, bootstrap.FilenameWALRootCheckpoint),
+			6,
+		)
+	}
+
+	log.Info().Msgf("%s, %s", inputMsg, outputMsg)
+
 	var err error
-	if flagInputPayload {
+	if len(flagInputPayloadFileName) > 0 {
 		err = extractExecutionStateFromPayloads(
 			log.Logger,
 			flagExecutionStateDir,
 			flagOutputDir,
 			flagNWorker,
 			!flagNoMigration,
-			exportPayloads,
+			flagInputPayloadFileName,
+			flagOutputPayloadFileName,
 			exportedAddresses,
 		)
 	} else {
@@ -230,7 +264,7 @@ func run(*cobra.Command, []string) {
 			flagOutputDir,
 			flagNWorker,
 			!flagNoMigration,
-			exportPayloads,
+			flagOutputPayloadFileName,
 			exportedAddresses,
 		)
 	}

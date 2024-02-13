@@ -13,6 +13,7 @@ import (
 
 	migrators "github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -36,7 +37,7 @@ func extractExecutionState(
 	outputDir string,
 	nWorker int, // number of concurrent worker to migation payloads
 	runMigrations bool,
-	exportPayloads bool,
+	outputPayloadFile string,
 	exportPayloadsByAddresses []common.Address,
 ) error {
 
@@ -115,10 +116,16 @@ func extractExecutionState(
 		log.Error().Err(err).Msgf("can not generate report for migrated state: %v", newMigratedState)
 	}
 
+	exportPayloads := len(outputPayloadFile) > 0
 	if exportPayloads {
 		payloads := newTrie.AllPayloads()
 
-		exportedPayloadCount, err := createPayloadFile(log, outputDir, payloads, exportPayloadsByAddresses)
+		exportedPayloadCount, err := util.CreatePayloadFile(
+			log,
+			outputPayloadFile,
+			payloads,
+			exportPayloadsByAddresses,
+		)
 		if err != nil {
 			return fmt.Errorf("cannot generate payloads file: %w", err)
 		}
@@ -192,16 +199,17 @@ func extractExecutionStateFromPayloads(
 	outputDir string,
 	nWorker int, // number of concurrent worker to migation payloads
 	runMigrations bool,
-	exportPayloads bool,
+	inputPayloadFile string,
+	outputPayloadFile string,
 	exportPayloadsByAddresses []common.Address,
 ) error {
 
-	payloads, err := readPayloadFile(log, dir)
+	payloads, err := util.ReadPayloadFile(log, inputPayloadFile)
 	if err != nil {
 		return err
 	}
 
-	log.Info().Msgf("read %d payloads\n", len(payloads))
+	log.Info().Msgf("read %d payloads", len(payloads))
 
 	migrations := newMigrations(log, dir, nWorker, runMigrations)
 
@@ -210,8 +218,14 @@ func extractExecutionStateFromPayloads(
 		return err
 	}
 
+	exportPayloads := len(outputPayloadFile) > 0
 	if exportPayloads {
-		exportedPayloadCount, err := createPayloadFile(log, outputDir, payloads, exportPayloadsByAddresses)
+		exportedPayloadCount, err := util.CreatePayloadFile(
+			log,
+			outputPayloadFile,
+			payloads,
+			exportPayloadsByAddresses,
+		)
 		if err != nil {
 			return fmt.Errorf("cannot generate payloads file: %w", err)
 		}

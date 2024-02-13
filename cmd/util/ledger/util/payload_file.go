@@ -1,4 +1,4 @@
-package extract
+package util
 
 import (
 	"bufio"
@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/rs/zerolog"
@@ -17,21 +16,18 @@ import (
 )
 
 const (
-	FilenamePayloads = "root.payloads"
-
 	defaultBufioWriteSize = 1024 * 32
 	defaultBufioReadSize  = 1024 * 32
 
 	payloadEncodingVersion = 1
 )
 
-func createPayloadFile(
+func CreatePayloadFile(
 	logger zerolog.Logger,
-	outputDir string,
+	payloadFile string,
 	payloads []*ledger.Payload,
 	addresses []common.Address,
 ) (int, error) {
-	payloadFile := filepath.Join(outputDir, FilenamePayloads)
 
 	f, err := os.Create(payloadFile)
 	if err != nil {
@@ -148,8 +144,7 @@ func includePayloadByAddresses(payload *ledger.Payload, addresses []common.Addre
 	return false, nil
 }
 
-func readPayloadFile(logger zerolog.Logger, inputDir string) ([]*ledger.Payload, error) {
-	payloadFile := filepath.Join(inputDir, FilenamePayloads)
+func ReadPayloadFile(logger zerolog.Logger, payloadFile string) ([]*ledger.Payload, error) {
 
 	if _, err := os.Stat(payloadFile); os.IsNotExist(err) {
 		return nil, fmt.Errorf("%s doesn't exist", payloadFile)
