@@ -215,7 +215,7 @@ func TestExtractExecutionState(t *testing.T) {
 
 // TestExtractPayloadsFromExecutionState tests state extraction with checkpoint as input and payload as output.
 func TestExtractPayloadsFromExecutionState(t *testing.T) {
-
+	t.Parallel()
 	metr := &metrics.NoopCollector{}
 
 	t.Run("all payloads", func(t *testing.T) {
