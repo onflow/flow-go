@@ -123,7 +123,7 @@ stop:
 
 .PHONY: load
 load:
-	go run ../benchmark/cmd/manual -log-level info -tps 1,10,100 -tps-durations 30s,30s
+	go run ../benchmark/cmd/manual -log-level info -tps 1,1,1 -tps-durations 30s,30s
 
 .PHONY: tps-ci-smoke
 tps-ci-smoke:
@@ -136,7 +136,7 @@ tps-ci: bootstrap-ci build-flow start-flow
 .PHONY: clean-data
 clean-data:
 	DOCKER_BUILDKIT=1 docker build -t environment-clean ../../cmd
-	docker run --mount=type=bind,source="$(CURRENT_DIRECTORY)"/data,target=/data environment-clean chmod -R 777 /data
+	docker run --rm --mount=type=bind,source="$(CURRENT_DIRECTORY)"/data,target=/data environment-clean chmod -R 777 /data
 
 	# deletes all generated files and folders from bootstrap and test running
 	rm -rf ./data
