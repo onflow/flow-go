@@ -160,6 +160,9 @@ network-config:
           # to avoid penalizing peers that are not malicious but are misbehaving due to bugs or other issues.
           # A topic id is considered duplicate if it appears more than once in a single GRAFT or PRUNE message.
           duplicate-topic-id-threshold: 50
+          # Maximum number of total invalid topic ids in a single GRAFT or PRUNE message, ideally this should be 0 but we allow for some tolerance
+          # to avoid penalizing peers that are not malicious but are misbehaving due to bugs or other issues.
+          invalid-topic-id-threshold: 50
         ihave:
           # The maximum allowed number of iHave messages in a single RPC message.
           #	Each iHave message represents the list of message ids. When the total number of iHave messages
@@ -181,6 +184,9 @@ network-config:
           # Ideally, an iHave message should not have any duplicate message IDs, hence a message id is considered duplicate when it is repeated more than once
           # within the same iHave message. When the total number of duplicate message ids in a single iHave message exceeds this threshold, the inspection of message will fail.
           duplicate-message-id-threshold: 100
+          # Maximum number of total invalid topic ids in a single IHAVE message, ideally this should be 0 but we allow for some tolerance
+          # to avoid penalizing peers that are not malicious but are misbehaving due to bugs or other issues.
+          invalid-topic-id-threshold: 50
         iwant:
           # The maximum allowed number of iWant messages in a single RPC message.
           #	Each iWant message represents the list of message ids. When the total number of iWant messages
