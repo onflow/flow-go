@@ -129,13 +129,14 @@ func includePayloadByAddresses(payload *ledger.Payload, addresses []common.Addre
 		return true, nil
 	}
 
-	for _, address := range addresses {
-		k, err := payload.Key()
-		if err != nil {
-			return false, fmt.Errorf("failed to get key from payload: %w", err)
-		}
+	k, err := payload.Key()
+	if err != nil {
+		return false, fmt.Errorf("failed to get key from payload: %w", err)
+	}
 
-		owner := k.KeyParts[0].Value
+	owner := k.KeyParts[0].Value
+
+	for _, address := range addresses {
 		if bytes.Equal(owner, address[:]) {
 			return true, nil
 		}
