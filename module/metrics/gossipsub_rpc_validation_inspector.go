@@ -323,7 +323,7 @@ func (c *GossipSubRpcValidationInspectorMetrics) AsyncProcessingFinished(duratio
 	c.rpcCtrlMsgAsyncProcessingTimeHistogram.Observe(duration.Seconds())
 }
 
-// OnControlMessageIDsTruncated tracks the number of times a control message was truncated.
+// OnControlMessagesTruncated tracks the number of times a control message was truncated.
 // Args:
 //
 //	messageType: the type of the control message that was truncated

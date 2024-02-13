@@ -366,6 +366,7 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 
 	duplicateTopicTracker := make(duplicateStrTracker)
 	totalDuplicateTopicIds := 0
+	totalInvalidTopicIdErrs := 0
 	defer func() {
 		// regardless of inspection result, update metrics
 		c.metrics.OnGraftMessageInspected(totalDuplicateTopicIds)
@@ -384,9 +385,12 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 		}
 		err, ctrlMsgType := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
+			totalInvalidTopicIdErrs++
 			// TODO: consider adding a threshold for this error similar to the duplicate topic id threshold.
 			c.metrics.OnInvalidTopicIdDetectedForControlMessage(p2pmsg.CtrlMsgGraft)
-			return err, ctrlMsgType
+			if totalInvalidTopicIdErrs > c.config.GraftPrune.InvalidTopicIdThreshold {
+				return err, ctrlMsgType
+			}
 		}
 	}
 	return nil, p2p.CtrlMsgNonClusterTopicType
@@ -413,6 +417,7 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 	}
 	tracker := make(duplicateStrTracker)
 	totalDuplicateTopicIds := 0
+	totalInvalidTopicIdErrs := 0
 	defer func() {
 		// regardless of inspection result, update metrics
 		c.metrics.OnPruneMessageInspected(totalDuplicateTopicIds)
@@ -430,9 +435,12 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 		}
 		err, ctrlMsgType := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
+			totalInvalidTopicIdErrs++
 			// TODO: consider adding a threshold for this error similar to the duplicate topic id threshold.
 			c.metrics.OnInvalidTopicIdDetectedForControlMessage(p2pmsg.CtrlMsgPrune)
-			return err, ctrlMsgType
+			if totalInvalidTopicIdErrs > c.config.GraftPrune.InvalidTopicIdThreshold {
+				return err, ctrlMsgType
+			}
 		}
 	}
 	return nil, p2p.CtrlMsgNonClusterTopicType
@@ -471,6 +479,7 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 	totalMessageIds := 0
 	totalDuplicateTopicIds := 0
 	totalDuplicateMessageIds := 0
+	totalInvalidTopicIdErrs := 0
 	defer func() {
 		// regardless of inspection result, update metrics
 		c.metrics.OnIHaveMessagesInspected(totalDuplicateTopicIds, totalDuplicateMessageIds)
@@ -483,9 +492,12 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 		// first check if the topic is valid, fail fast if it is not
 		err, ctrlMsgType := c.validateTopic(from, channels.Topic(topic), activeClusterIDS)
 		if err != nil {
+			totalInvalidTopicIdErrs++
 			// TODO: consider adding a threshold for this error similar to the duplicate topic id threshold.
 			c.metrics.OnInvalidTopicIdDetectedForControlMessage(p2pmsg.CtrlMsgIHave)
-			return err, ctrlMsgType
+			if totalInvalidTopicIdErrs > c.config.IHave.InvalidTopicIdThreshold {
+				return err, ctrlMsgType
+			}
 		}
 
 		// then track the topic ensuring it is not beyond a duplicate threshold.
