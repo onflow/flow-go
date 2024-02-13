@@ -54,6 +54,8 @@ import (
 	"github.com/onflow/flow-go/network"
 	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
+	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
 	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
 	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
@@ -617,7 +619,11 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 		return nil, fmt.Errorf("could not initialize network: %w", err)
 	}
 
-	fnb.EngineRegistry = net  // setting network as the fnb.Network for the engine-level components
+	if node.ObserverMode {
+		fnb.EngineRegistry = converter.NewNetwork(net, channels.SyncCommittee, channels.PublicSyncCommittee)
+	} else {
+		fnb.EngineRegistry = net // setting network as the fnb.Network for the engine-level components
+	}
 	fnb.NetworkUnderlay = net // setting network as the fnb.Underlay for the lower-level components
 
 	// register network ReadyDoneAware interface so other components can depend on it for startup
