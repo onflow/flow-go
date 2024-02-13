@@ -48,7 +48,7 @@ func SetupEnvironment(
 
 	aa := handler.NewAddressAllocator()
 
-	contractHandler := handler.NewContractHandler(common.Address(flowToken), bs, aa, backend, em)
+	contractHandler := handler.NewContractHandler(evmContractAccountAddress, common.Address(flowToken), bs, aa, backend, em)
 
 	stdlib.SetupEnvironment(runtimeEnv, contractHandler, evmContractAccountAddress)
 

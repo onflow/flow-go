@@ -132,7 +132,7 @@ func DecodeABIEncodedProof(input []byte) (*types.COAOwnershipProofInContext, err
 		return nil, err
 	}
 
-	signature, err := ReadBytes(input, index)
+	encodedProof, err := ReadBytes(input, index)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func DecodeABIEncodedProof(input []byte) (*types.COAOwnershipProofInContext, err
 	return types.NewCOAOwnershipProofInContext(
 		hash,
 		types.Address(caller),
-		signature,
+		encodedProof,
 	)
 }
 

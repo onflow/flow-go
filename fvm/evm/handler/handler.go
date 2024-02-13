@@ -2,7 +2,6 @@ package handler
 
 import (
 	"bytes"
-	"fmt"
 	"math/big"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -15,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/handler/coa"
 	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/types"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 const InvalidTransactionComputationCost = 1_000
@@ -22,12 +22,13 @@ const InvalidTransactionComputationCost = 1_000
 // ContractHandler is responsible for triggering calls to emulator, metering,
 // event emission and updating the block
 type ContractHandler struct {
-	flowTokenAddress common.Address
-	addressAllocator types.AddressAllocator
-	blockstore       types.BlockStore
-	backend          types.Backend
-	emulator         types.Emulator
-	precompiles      []types.Precompile
+	evmContractAddress flow.Address
+	flowTokenAddress   common.Address
+	blockStore         types.BlockStore
+	addressAllocator   types.AddressAllocator
+	backend            types.Backend
+	emulator           types.Emulator
+	precompiles        []types.Precompile
 }
 
 func (h *ContractHandler) FlowTokenAddress() common.Address {
@@ -37,6 +38,7 @@ func (h *ContractHandler) FlowTokenAddress() common.Address {
 var _ types.ContractHandler = &ContractHandler{}
 
 func NewContractHandler(
+	evmContractAddress flow.Address,
 	flowTokenAddress common.Address,
 	blockStore types.BlockStore,
 	addressAllocator types.AddressAllocator,
@@ -44,16 +46,18 @@ func NewContractHandler(
 	emulator types.Emulator,
 ) *ContractHandler {
 	return &ContractHandler{
-		flowTokenAddress: flowTokenAddress,
-		blockstore:       blockStore,
-		addressAllocator: addressAllocator,
-		backend:          backend,
-		emulator:         emulator,
-		precompiles:      getPrecompiles(addressAllocator, backend),
+		evmContractAddress: evmContractAddress,
+		flowTokenAddress:   flowTokenAddress,
+		blockStore:         blockStore,
+		addressAllocator:   addressAllocator,
+		backend:            backend,
+		emulator:           emulator,
+		precompiles:        getPrecompiles(evmContractAddress, addressAllocator, backend),
 	}
 }
 
 func getPrecompiles(
+	evmContractAddress flow.Address,
 	addressAllocator types.AddressAllocator,
 	backend types.Backend,
 ) []types.Precompile {
@@ -61,9 +65,7 @@ func getPrecompiles(
 	archContract := precompiles.ArchContract(
 		archAddress,
 		backend.GetCurrentBlockHeight,
-		func(cpic *types.COAOwnershipProofInContext) (bool, error) {
-			return false, fmt.Errorf("not implemented")
-		},
+		COAOwnershipProofValidator(evmContractAddress, backend),
 	)
 	return []types.Precompile{archContract}
 }
@@ -108,7 +110,7 @@ func (h *ContractHandler) AccountByAddress(addr types.Address, isAuthorized bool
 
 // LastExecutedBlock returns the last executed block
 func (h *ContractHandler) LastExecutedBlock() *types.Block {
-	block, err := h.blockstore.LatestBlock()
+	block, err := h.blockStore.LatestBlock()
 	panicOnAnyError(err)
 	return block
 }
@@ -196,7 +198,7 @@ func (h *ContractHandler) run(
 	}
 
 	// step 3 - update block proposal
-	bp, err := h.blockstore.BlockProposal()
+	bp, err := h.blockStore.BlockProposal()
 	if err != nil {
 		return res, err
 	}
@@ -221,7 +223,7 @@ func (h *ContractHandler) run(
 	}
 
 	// step 5 - commit block proposal
-	return res, h.blockstore.CommitBlockProposal()
+	return res, h.blockStore.CommitBlockProposal()
 }
 
 func (h *ContractHandler) checkGasLimit(limit types.GasLimit) error {
@@ -252,7 +254,7 @@ func (h *ContractHandler) emitEvent(event *types.Event) error {
 }
 
 func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
-	bp, err := h.blockstore.BlockProposal()
+	bp, err := h.blockStore.BlockProposal()
 	if err != nil {
 		return types.BlockContext{}, err
 	}
@@ -265,7 +267,7 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 		BlockNumber:            bp.Height,
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
 		GetHashFunc: func(n uint64) gethCommon.Hash {
-			hash, err := h.blockstore.BlockHash(n)
+			hash, err := h.blockStore.BlockHash(n)
 			panicOnAnyError(err) // we have to handle it here given we can't continue with it even in try case
 			return hash
 		},
@@ -309,7 +311,7 @@ func (h *ContractHandler) executeAndHandleCall(
 		return res, types.NewFatalError(err)
 	}
 
-	bp, err := h.blockstore.BlockProposal()
+	bp, err := h.blockStore.BlockProposal()
 	if err != nil {
 		return res, err
 	}
@@ -351,7 +353,7 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	// commit block proposal
-	return res, h.blockstore.CommitBlockProposal()
+	return res, h.blockStore.CommitBlockProposal()
 }
 
 type Account struct {
