@@ -29,15 +29,15 @@ type ProtocolKVStore interface {
 	// block that _proposes_ updated key-value store.
 	// Upon call, the anonymous function persists the specific map entry in the node's database.
 	// Protocol convention:
-	//   - Consider block B, whose ingestion might potentially lead to an updated protocol state. For example,
-	//     the protocol state changes if we seal some execution results emitting service events.
-	//   - For the key `blockID`, we use the identity of block B which _proposes_ this Protocol State. As value,
+	//   - Consider block B, whose ingestion might potentially lead to an updated KV store. For example,
+	//     the KV store changes if we seal some execution results emitting specific service events.
+	//   - For the key `blockID`, we use the identity of block B which _proposes_ this updated KV store. As value,
 	//     the hash of the resulting key-value store state at the end of processing B is to be used.
 	//   - CAUTION: The updated state requires confirmation by a QC and will only become active at the child block,
 	//     _after_ validating the QC.
 	//
 	// Expected errors during normal operations:
-	//   - storage.ErrAlreadyExists if a Protocol State for the given blockID has already been indexed
+	//   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed
 	IndexTx(blockID flow.Identifier, stateID flow.Identifier) func(*transaction.Tx) error
 
 	// ByID returns the key-value store model by its ID.
@@ -48,9 +48,9 @@ type ProtocolKVStore interface {
 	// ByBlockID retrieves the key-value store model that the block with the given ID proposes.
 	// CAUTION: this store state requires confirmation by a QC and will only become active at the child block,
 	// _after_ validating the QC. Protocol convention:
-	//   - Consider block B, whose ingestion might potentially lead to an updated store state.
-	// For example, the state changes if we seal some execution results emitting service events.
-	//   - For the key `blockID`, we use the identity of block B which _proposes_ this store. As value,
+	//   - Consider block B, whose ingestion might potentially lead to an updated KV store state.
+	// For example, the state changes if we seal some execution results emitting specific service events.
+	//   - For the key `blockID`, we use the identity of block B which _proposes_ this updated KV store. As value,
 	//     the hash of the resulting state at the end of processing B is to be used.
 	//   - CAUTION: The updated state requires confirmation by a QC and will only become active at the child block,
 	//     _after_ validating the QC.

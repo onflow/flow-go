@@ -20,6 +20,7 @@ var DefaultProtocolKVStoreCacheSize uint = 10
 // We want to be able to cover a broad interval of views without cache misses, so we use a bigger value.
 var DefaultProtocolKVStoreByBlockIDCacheSize uint = 1000
 
+// ProtocolKVStore implements persistent storage for storing KV stores.
 type ProtocolKVStore struct {
 	db *badger.DB
 
@@ -55,6 +56,8 @@ type ProtocolKVStore struct {
 
 var _ storage.ProtocolKVStore = (*ProtocolKVStore)(nil)
 
+// NewProtocolKVStore creates a ProtocolKVStore instance, which is a database of KV stores.
+// It supports storing, caching and retrieving by ID or the additionally indexed block ID.
 func NewProtocolKVStore(collector module.CacheMetrics,
 	db *badger.DB,
 	stateCacheSize uint,
@@ -69,6 +72,9 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 			}
 			return &kvStore, nil
 		}
+	}
+	storeByStateID := func(stateID flow.Identifier, data *storage.KeyValueStoreData) func(*transaction.Tx) error {
+		return transaction.WithTx(operation.InsertProtocolKVStore(stateID, data))
 	}
 
 	storeByBlockID := func(blockID flow.Identifier, stateID flow.Identifier) func(*transaction.Tx) error {
@@ -96,7 +102,7 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 		db: db,
 		cache: newCache[flow.Identifier, *storage.KeyValueStoreData](collector, metrics.ResourceProtocolKVStore,
 			withLimit[flow.Identifier, *storage.KeyValueStoreData](stateCacheSize),
-			withStore(noopStore[flow.Identifier, *storage.KeyValueStoreData]),
+			withStore(storeByStateID),
 			withRetrieve(retrieveByStateID)),
 		byBlockIdCache: newCache[flow.Identifier, flow.Identifier](collector, metrics.ResourceProtocolKVStoreByBlockID,
 			withLimit[flow.Identifier, flow.Identifier](stateByBlockIDCacheSize),
@@ -105,20 +111,54 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 	}
 }
 
+// StoreTx returns an anonymous function (intended to be executed as part of a badger transaction),
+// which persists the given model as part of a DB tx.
+// Expected errors of the returned anonymous function:
+//   - storage.ErrAlreadyExists if a model with the given id is already stored
 func (s *ProtocolKVStore) StoreTx(stateID flow.Identifier, data *storage.KeyValueStoreData) func(*transaction.Tx) error {
-	return transaction.WithTx(operation.InsertProtocolKVStore(stateID, data))
+	return s.cache.PutTx(stateID, data)
 }
 
+// IndexTx returns an anonymous function intended to be executed as part of a database transaction.
+// In a nutshell, we want to maintain a map from `blockID` to `stateID`, where `blockID` references the
+// block that _proposes_ updated key-value store.
+// Upon call, the anonymous function persists the specific map entry in the node's database.
+// Protocol convention:
+//   - Consider block B, whose ingestion might potentially lead to an updated KV store. For example,
+//     the KV store changes if we seal some execution results emitting specific service events.
+//   - For the key `blockID`, we use the identity of block B which _proposes_ this updated KV store. As value,
+//     the hash of the resulting key-value store state at the end of processing B is to be used.
+//   - CAUTION: The updated state requires confirmation by a QC and will only become active at the child block,
+//     _after_ validating the QC.
+//
+// Expected errors during normal operations:
+//   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed
 func (s *ProtocolKVStore) IndexTx(blockID flow.Identifier, stateID flow.Identifier) func(*transaction.Tx) error {
 	return s.byBlockIdCache.PutTx(blockID, stateID)
 }
 
+// ByID returns the key-value store model by its ID.
+// Expected errors during normal operations:
+//   - storage.ErrNotFound if no model with the given Identifier is known.
 func (s *ProtocolKVStore) ByID(id flow.Identifier) (*storage.KeyValueStoreData, error) {
 	tx := s.db.NewTransaction(false)
 	defer tx.Discard()
 	return s.cache.Get(id)(tx)
 }
 
+// ByBlockID retrieves the key-value store model that the block with the given ID proposes.
+// CAUTION: this store state requires confirmation by a QC and will only become active at the child block,
+// _after_ validating the QC. Protocol convention:
+//   - Consider block B, whose ingestion might potentially lead to an updated KV store state.
+//
+// For example, the state changes if we seal some execution results emitting specific service events.
+//   - For the key `blockID`, we use the identity of block B which _proposes_ this updated KV store. As value,
+//     the hash of the resulting state at the end of processing B is to be used.
+//   - CAUTION: The updated state requires confirmation by a QC and will only become active at the child block,
+//     _after_ validating the QC.
+//
+// Expected errors during normal operations:
+//   - storage.ErrNotFound if no model has been indexed for the given block.
 func (s *ProtocolKVStore) ByBlockID(blockID flow.Identifier) (*storage.KeyValueStoreData, error) {
 	tx := s.db.NewTransaction(false)
 	defer tx.Discard()
