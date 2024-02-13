@@ -16,7 +16,7 @@ import (
 func TestKeyValueStoreStorage(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := NewProtocolKVStore(metrics, DefaultProtocolStateCacheSize, DefaultProtocolStateByBlockIDCacheSize)
+		store := NewProtocolKVStore(metrics, db, DefaultProtocolKVStoreCacheSize, DefaultProtocolKVStoreByBlockIDCacheSize)
 
 		expected := &storage.KeyValueStoreData{
 			Version: 2,

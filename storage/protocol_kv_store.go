@@ -57,5 +57,5 @@ type ProtocolKVStore interface {
 	//
 	// Expected errors during normal operations:
 	//   - storage.ErrNotFound if no model has been indexed for the given block.
-	ByBlockID(blockID flow.Identifier) (*ProtocolKVStore, error)
+	ByBlockID(blockID flow.Identifier) (*KeyValueStoreData, error)
 }

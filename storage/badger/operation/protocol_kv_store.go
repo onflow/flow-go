@@ -19,8 +19,8 @@ func InsertProtocolKVStore(protocolKVStoreID flow.Identifier, protocolState *sto
 // Error returns:
 //   - storage.ErrNotFound if the key does not exist in the database
 //   - generic error in case of unexpected failure from the database layer
-func RetrieveProtocolKVStore(protocolKVStoreID flow.Identifier, protocolState *storage.KeyValueStoreData) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeProtocolKVStore, protocolKVStoreID), protocolState)
+func RetrieveProtocolKVStore(protocolKVStoreID flow.Identifier, kvStore *storage.KeyValueStoreData) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeProtocolKVStore, protocolKVStoreID), kvStore)
 }
 
 // IndexProtocolKVStore indexes a protocol KV store by block ID.
