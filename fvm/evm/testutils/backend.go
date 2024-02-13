@@ -81,6 +81,10 @@ func GetSimpleValueStore() *TestValueStore {
 		},
 		AllocateStorageIndexFunc: func(owner []byte) (atree.StorageIndex, error) {
 			index := allocator[string(owner)]
+			// TODO: figure out why it result in a collision
+			if index == 0 {
+				index = 10
+			}
 			var data [8]byte
 			allocator[string(owner)] = index + 1
 			binary.BigEndian.PutUint64(data[:], index)
@@ -178,6 +182,10 @@ func (tb *TestBackend) DropEvents() {
 		panic("method not set")
 	}
 	tb.reset()
+}
+
+func (tb *TestBackend) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+	return tb.GetValue([]byte(id.Owner), []byte(id.Key))
 }
 
 type TestValueStore struct {
