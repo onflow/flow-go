@@ -1,7 +1,6 @@
 package operation
 
 import (
-	"github.com/onflow/flow-go/storage"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -9,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
