@@ -358,7 +358,11 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 		),
 	}
 
-	if chainID != flow.Emulator {
+	switch chainID {
+	case flow.Emulator, flow.Localnet:
+		// skip
+
+	default:
 		contractChanges = append(
 			contractChanges,
 			SystemContractChange{
