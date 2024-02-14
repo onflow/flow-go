@@ -1942,12 +1942,6 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 
 	fnb.EnqueueNetworkInit()
 
-	// if fnb.ObserverMode {
-	// 	fnb.Component("upstream connector", func(_ *NodeConfig) (module.ReadyDoneAware, error) {
-	// 		return consensus_follower.NewUpstreamConnector(fnb.bootstrapIdentities, fnb.LibP2PNode, fnb.Logger), nil
-	// 	})
-	// }
-
 	fnb.EnqueuePingService()
 
 	if fnb.MetricsEnabled {
