@@ -273,6 +273,9 @@ const invalidCodeTransientNetwork = uint64(0x1cb159857af02018)
 // invalidCodeSandboxNetwork is the invalid codeword used for Sandbox network.
 const invalidCodeSandboxNetwork = uint64(0x1035ce4eff92ae01)
 
+// TODO: invalidCodePreviewNetwork is the invalid codeword used for Preview network.
+const invalidCodePreviewNetwork = uint64(0)
+
 // encodeWord encodes a word into a code word.
 // In Flow, the word is the account index while the code word
 // is the corresponding address.
