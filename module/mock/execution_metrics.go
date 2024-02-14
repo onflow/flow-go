@@ -46,6 +46,11 @@ func (_m *ExecutionMetrics) ExecutionBlockExecutionEffortVectorComponent(_a0 str
 	_m.Called(_a0, _a1)
 }
 
+// ExecutionCheckpointSize provides a mock function with given fields: bytes
+func (_m *ExecutionMetrics) ExecutionCheckpointSize(bytes int64) {
+	_m.Called(bytes)
+}
+
 // ExecutionChunkDataPackGenerated provides a mock function with given fields: proofSize, numberOfTransactions
 func (_m *ExecutionMetrics) ExecutionChunkDataPackGenerated(proofSize int, numberOfTransactions int) {
 	_m.Called(proofSize, numberOfTransactions)
