@@ -22,6 +22,7 @@ type ExecutionCollector struct {
 	lastFinalizedExecutedBlockHeightGauge   prometheus.Gauge
 	stateStorageDiskTotal                   prometheus.Gauge
 	storageStateCommitment                  prometheus.Gauge
+	checkpointSize                          prometheus.Gauge
 	forestApproxMemorySize                  prometheus.Gauge
 	forestNumberOfTrees                     prometheus.Gauge
 	latestTrieRegCount                      prometheus.Gauge
@@ -650,6 +651,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the execution state size on disk in bytes",
 		}),
 
+		// TODO: remove
 		storageStateCommitment: promauto.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemStateStorage,
@@ -797,6 +799,11 @@ func (ec *ExecutionCollector) ExecutionStateStorageDiskTotal(bytes int64) {
 // ExecutionStorageStateCommitment reports the storage size of a state commitment
 func (ec *ExecutionCollector) ExecutionStorageStateCommitment(bytes int64) {
 	ec.storageStateCommitment.Set(float64(bytes))
+}
+
+// ExecutionCheckpointSize reports the size of a checkpoint in bytes
+func (ec *ExecutionCollector) ExecutionCheckpointSize(bytes int64) {
+	ec.checkpointSize.Set(float64(bytes))
 }
 
 // ExecutionLastExecutedBlockHeight reports last executed block height
