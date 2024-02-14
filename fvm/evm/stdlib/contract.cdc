@@ -21,7 +21,7 @@ contract EVM {
 
         /// Balance of the address
         access(all)
-        fun balance(): Balance {
+        view fun balance(): Balance {
             let balance = InternalEVM.balance(
                 address: self.bytes
             )
@@ -57,13 +57,13 @@ contract EVM {
         /// (8 decimal points in compare to 18) might result in rounding down error.
         /// Use the toAttoFlow function if you care need more accuracy. 
         access(all)
-        fun inFLOW(): UFix64 {
+        view fun inFLOW(): UFix64 {
             return InternalEVM.castToFLOW(balance: self.attoflow)
         }
 
         /// Returns the balance in Atto-FLOW
         access(all)
-        fun inAttoFLOW(): UInt {
+        view fun inAttoFLOW(): UInt {
             return self.attoflow
         }
     }
@@ -72,11 +72,11 @@ contract EVM {
     resource interface Addressable {
         /// The EVM address
         access(all)
-        fun address(): EVMAddress
+        view fun address(): EVMAddress
     }
 
     access(all)
-    resource CadenceOwnedAccount: Addressable  {
+    resource CadenceOwnedAccount: Addressable {
 
         access(self)
         var addressBytes: [UInt8; 20]
@@ -101,14 +101,14 @@ contract EVM {
 
         /// The EVM address of the cadence owned account
         access(all)
-        fun address(): EVMAddress {
+        view fun address(): EVMAddress {
             // Always create a new EVMAddress instance
             return EVMAddress(bytes: self.addressBytes)
         }
 
         /// Get balance of the cadence owned account
         access(all)
-        fun balance(): Balance {
+        view fun balance(): Balance {
             return self.address().balance()
         }
 
