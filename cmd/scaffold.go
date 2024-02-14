@@ -1440,9 +1440,9 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 			Role:          flow.RoleExecution,
 			InitialWeight: 0,
 			NetworkPubKey: networkingPrivateKey.PublicKey(),
-			StakingPubKey: networkingPrivateKey.PublicKey(),
+			StakingPubKey: info.StakingPrivKey.PrivateKey.PublicKey(),
 		}
-		fnb.Me, err = local.New(id, networkingPrivateKey)
+		fnb.Me, err = local.New(id, info.StakingPrivKey.PrivateKey)
 		if err != nil {
 			return fmt.Errorf("could not initialize local: %w", err)
 		}
