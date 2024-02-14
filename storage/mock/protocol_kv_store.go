@@ -17,19 +17,19 @@ type ProtocolKVStore struct {
 }
 
 // ByBlockID provides a mock function with given fields: blockID
-func (_m *ProtocolKVStore) ByBlockID(blockID flow.Identifier) (*storage.ProtocolKVStore, error) {
+func (_m *ProtocolKVStore) ByBlockID(blockID flow.Identifier) (*storage.KeyValueStoreData, error) {
 	ret := _m.Called(blockID)
 
-	var r0 *storage.ProtocolKVStore
+	var r0 *storage.KeyValueStoreData
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (*storage.ProtocolKVStore, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (*storage.KeyValueStoreData, error)); ok {
 		return rf(blockID)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *storage.ProtocolKVStore); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *storage.KeyValueStoreData); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*storage.ProtocolKVStore)
+			r0 = ret.Get(0).(*storage.KeyValueStoreData)
 		}
 	}
 
