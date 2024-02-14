@@ -11,7 +11,7 @@ import (
 // Error returns:
 //   - storage.ErrAlreadyExists if the key already exists in the database.
 //   - generic error in case of unexpected failure from the database layer or encoding failure.
-func InsertProtocolKVStore(protocolKVStoreID flow.Identifier, protocolState *storage.KeyValueStoreData) func(*badger.Txn) error {
+func InsertProtocolKVStore(protocolKVStoreID flow.Identifier, kvStore *storage.KeyValueStoreData) func(*badger.Txn) error {
 	return insert(makePrefix(codeProtocolKVStore, protocolKVStoreID), protocolState)
 }
 

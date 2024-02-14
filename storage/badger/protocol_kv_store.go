@@ -62,8 +62,8 @@ var _ storage.ProtocolKVStore = (*ProtocolKVStore)(nil)
 // It supports storing, caching and retrieving by ID or the additionally indexed block ID.
 func NewProtocolKVStore(collector module.CacheMetrics,
 	db *badger.DB,
-	stateCacheSize uint,
-	stateByBlockIDCacheSize uint,
+	kvStoreCacheSize uint,
+	kvStoreByBlockIDCacheSize uint,
 ) *ProtocolKVStore {
 	retrieveByStateID := func(stateID flow.Identifier) func(tx *badger.Txn) (*storage.KeyValueStoreData, error) {
 		return func(tx *badger.Txn) (*storage.KeyValueStoreData, error) {
