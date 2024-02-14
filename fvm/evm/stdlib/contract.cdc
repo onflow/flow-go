@@ -3,8 +3,15 @@ import "FlowToken"
 
 access(all)
 contract EVM {
+    
+    // Entitlements enabling finer-graned access control on a CadenceOwnedAccount
+    access(all) entitlement Validate
+    access(all) entitlement Withdraw
+    access(all) entitlement Call
+    access(all) entitlement Deploy
+    access(all) entitlement Owner
 
-    pub event CadenceOwnedAccountCreated(addressBytes: [UInt8; 20])
+    access(all) event CadenceOwnedAccountCreated(addressBytes: [UInt8; 20])
 
     /// EVMAddress is an EVM-compatible address
     access(all)
@@ -106,6 +113,12 @@ contract EVM {
             return EVMAddress(bytes: self.addressBytes)
         }
 
+        /// The EVM address of the cadence owned account behind an entitlement, acting as proof of access
+        access(Validate)
+        view protectedAddress(): EVMAddress {
+            return self.address()
+        }
+
         /// Get balance of the cadence owned account
         access(all)
         view fun balance(): Balance {
@@ -126,7 +139,7 @@ contract EVM {
         /// given that Flow Token Vaults use UFix64s to store balances.
         /// If the given balance conversion to UFix64 results in 
         /// rounding error, this function would fail. 
-        access(all)
+        access(Owner | Withdraw)
         fun withdraw(balance: Balance): @FlowToken.Vault {
             let vault <- InternalEVM.withdraw(
                 from: self.addressBytes,
@@ -137,7 +150,7 @@ contract EVM {
 
         /// Deploys a contract to the EVM environment.
         /// Returns the address of the newly deployed contract
-        access(all)
+        access(Owner | Deploy)
         fun deploy(
             code: [UInt8],
             gasLimit: UInt64,
@@ -154,7 +167,7 @@ contract EVM {
 
         /// Calls a function with the given data.
         /// The execution is limited by the given amount of gas
-        access(all)
+        access(Owner | Call)
         fun call(
             to: EVMAddress,
             data: [UInt8],
