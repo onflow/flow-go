@@ -51,12 +51,12 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f
-	github.com/onflow/cadence v1.0.0-preview.2.0.20240213230739-27d2386c0cab
+	github.com/onflow/cadence v1.0.0-M7
 	github.com/onflow/crypto v0.25.0
 	github.com/onflow/flow v0.3.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.2-0.20240206003101-928bf99024d7
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.2-0.20240206003101-928bf99024d7
-	github.com/onflow/flow-go-sdk v1.0.0-M3
+	github.com/onflow/flow-go-sdk v1.0.0-M4
 	github.com/onflow/flow/protobuf/go/flow v0.3.7
 	github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
