@@ -1393,9 +1393,14 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 	}
 
 	if fnb.BaseConfig.ObserverMode {
-		networkingPrivateKey, err := LoadNetworkPrivateKey(fnb.BaseConfig.BootstrapDir, myID)
+		info, err := LoadPrivateNodeInfo(fnb.BaseConfig.BootstrapDir, myID)
 		if err != nil {
 			return fmt.Errorf("failed to load private node info: %w", err)
+		}
+
+		networkingPrivateKey, err := LoadNetworkPrivateKey(fnb.BaseConfig.BootstrapDir, myID)
+		if err != nil {
+			return fmt.Errorf("failed to load networking private key: %w", err)
 		}
 
 		pubKey, err := keyutils.LibP2PPublicKeyFromFlow(networkingPrivateKey.PublicKey())
@@ -1434,7 +1439,8 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 		}
 		fnb.NodeID = nodeID
 		fnb.NetworkKey = networkingPrivateKey
-		fnb.StakingKey = networkingPrivateKey
+		fnb.StakingKey = info.StakingPrivKey.PrivateKey
+
 		return nil
 	}
 
