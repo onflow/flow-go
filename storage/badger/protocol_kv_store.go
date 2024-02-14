@@ -37,20 +37,12 @@ type ProtocolKVStore struct {
 	// have the needed Epoch Setup and Commit events, since it starts with a RichProtocolStateEntry for the parent
 	// state and consumes Epoch Setup and Epoch Commit events. Though, we leave this optimization for later.
 	//
-	// `cache` only holds the distinct Protocol States. On the happy path, we expect something like 3 entries per epoch.
-	// On the optimal happy path we have 3 entries per epoch: one entry on epoch Switchover, one on receiving the Epoch Setup
-	// and one when seeing the Epoch Commit event. Let's be generous and assume we have 20 different Protocol States per epoch.
-	// Beyond that, we are certainly leaving the domain of normal operations that we optimize for. Therefore, a cache size of
-	// roughly 100 is a reasonable balance between performance and memory consumption.
+	// `cache` only holds the distinct KV stores. KV stores are rarely updated, so we will have a limited number
+	// of unique states. Lets be generous and assume we have 10 different KV stores used at the same time.
 	cache *Cache[flow.Identifier, *storage.KeyValueStoreData]
 
-	// byBlockIdCache is essentially an in-memory map from `Block.ID()` -> `ProtocolStateEntry.ID()`. The full
-	// Protocol state can be retrieved from the `cache` above.
-	// We populate the `byBlockIdCache` on store, because a new entry is added for every block and we probably also
-	// query the Protocol state for every block. So argument (ii) from above does not apply here. Furthermore,
-	// argument (i) from above also does not apply, because we already have the Protocol State's ID on store,
-	// so populating the cache is easy.
-	//
+	// byBlockIdCache is essentially an in-memory map from `Block.ID()` -> `KVStoreStateID`. The full
+	// *storage.KeyValueStoreData can be retrieved from the `cache` above.
 	// `byBlockIdCache` will contain an entry for every block. We want to be able to cover a broad interval of views
 	// without cache misses, so a cache size of roughly 1000 entries is reasonable.
 	byBlockIdCache *Cache[flow.Identifier, flow.Identifier]
