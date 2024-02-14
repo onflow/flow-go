@@ -103,11 +103,11 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 	return &ProtocolKVStore{
 		db: db,
 		cache: newCache[flow.Identifier, *storage.KeyValueStoreData](collector, metrics.ResourceProtocolKVStore,
-			withLimit[flow.Identifier, *storage.KeyValueStoreData](stateCacheSize),
+			withLimit[flow.Identifier, *storage.KeyValueStoreData](kvStoreCacheSize),
 			withStore(storeByStateID),
 			withRetrieve(retrieveByStateID)),
 		byBlockIdCache: newCache[flow.Identifier, flow.Identifier](collector, metrics.ResourceProtocolKVStoreByBlockID,
-			withLimit[flow.Identifier, flow.Identifier](stateByBlockIDCacheSize),
+			withLimit[flow.Identifier, flow.Identifier](kvStoreByBlockIDCacheSize),
 			withStore(storeByBlockID),
 			withRetrieve(retrieveByBlockID)),
 	}
