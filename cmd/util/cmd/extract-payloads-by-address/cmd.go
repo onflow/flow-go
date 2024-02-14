@@ -103,8 +103,10 @@ func overwritePayloadCountInFile(output string, numOfPayloadWritten int) error {
 	}
 	defer in.Close()
 
+	const cbor8BytesPositiveIntegerIndicator = 0x1b
+
 	var data [9]byte
-	data[0] = 0x1b
+	data[0] = cbor8BytesPositiveIntegerIndicator
 	binary.BigEndian.PutUint64(data[1:], uint64(numOfPayloadWritten))
 
 	n, err := in.WriteAt(data[:], 0)
