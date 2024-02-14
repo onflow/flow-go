@@ -816,7 +816,7 @@ func replaySegments(
 	updateFn func(update *ledger.TrieUpdate) error,
 	deleteFn func(rootHash ledger.RootHash) error,
 ) error {
-	sr, err := prometheusWAL.NewSegmentsRangeReader(prometheusWAL.SegmentRange{
+	sr, err := prometheusWAL.NewSegmentsRangeReader(unittest.Logger(), prometheusWAL.SegmentRange{
 		Dir:   dir,
 		First: 0,
 		Last:  to,
