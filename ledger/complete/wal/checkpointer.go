@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/go-units"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
@@ -252,7 +253,14 @@ func (c *Checkpointer) Checkpoint(to int) (err error) {
 		return fmt.Errorf("could not create checkpoint for %v: %w", to, err)
 	}
 
-	c.wal.log.Info().Msgf("created checkpoint %d with %d tries", to, len(tries))
+	checkpointFileSize, err := ReadCheckpointFileSize(c.wal.dir, fileName)
+	if err != nil {
+		return fmt.Errorf("could not read checkpoint file size: %w", err)
+	}
+
+	c.wal.log.Info().
+		Str("checkpoint file size", units.BytesSize(float64(checkpointFileSize))).
+		Msgf("created checkpoint %d with %d tries", to, len(tries))
 
 	return nil
 }

@@ -90,7 +90,7 @@ func TestCompactorCreation(t *testing.T) {
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
 			// so we should get at least `size` segments
 
-			compactor, err := NewCompactor(l, wal, unittest.Logger(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+			compactor, err := NewCompactor(l, wal, unittest.Logger(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metrics.NewNoopCollector())
 			require.NoError(t, err)
 
 			co := CompactorObserver{fromBound: 8, done: make(chan struct{})}
@@ -316,7 +316,7 @@ func TestCompactorSkipCheckpointing(t *testing.T) {
 		// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
 		// so we should get at least `size` segments
 
-		compactor, err := NewCompactor(l, wal, unittest.Logger(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+		compactor, err := NewCompactor(l, wal, unittest.Logger(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metrics.NewNoopCollector())
 		require.NoError(t, err)
 
 		co := CompactorObserver{fromBound: 8, done: make(chan struct{})}
@@ -442,7 +442,7 @@ func TestCompactorAccuracy(t *testing.T) {
 			l, err := NewLedger(wal, forestCapacity, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
 			require.NoError(t, err)
 
-			compactor, err := NewCompactor(l, wal, unittest.Logger(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+			compactor, err := NewCompactor(l, wal, unittest.Logger(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metrics.NewNoopCollector())
 			require.NoError(t, err)
 
 			fromBound := lastCheckpointNum + (size / 2)
@@ -552,7 +552,7 @@ func TestCompactorTriggeredByAdminTool(t *testing.T) {
 		l, err := NewLedger(wal, forestCapacity, metricsCollector, unittest.LoggerWithName("ledger"), DefaultPathFinderVersion)
 		require.NoError(t, err)
 
-		compactor, err := NewCompactor(l, wal, unittest.LoggerWithName("compactor"), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(true))
+		compactor, err := NewCompactor(l, wal, unittest.LoggerWithName("compactor"), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(true), metrics.NewNoopCollector())
 		require.NoError(t, err)
 
 		fmt.Println("should stop as soon as segment 5 is generated, which should trigger checkpoint 5 to be created")
@@ -656,7 +656,7 @@ func TestCompactorConcurrency(t *testing.T) {
 		l, err := NewLedger(wal, forestCapacity, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
 		require.NoError(t, err)
 
-		compactor, err := NewCompactor(l, wal, unittest.Logger(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+		compactor, err := NewCompactor(l, wal, unittest.Logger(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metrics.NewNoopCollector())
 		require.NoError(t, err)
 
 		fromBound := lastCheckpointNum + (size / 2 * numGoroutine)
