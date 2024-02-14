@@ -55,7 +55,7 @@ func NewCombinedVerifierV3(committee hotstuff.Replicas, packer hotstuff.Packer) 
 //
 // This implementation already support the cases, where the DKG committee is a
 // _strict subset_ of the full consensus committee.
-func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, view uint64, blockID flow.Identifier) error {
+func (c *CombinedVerifierV3) VerifyVote(signer *flow.IdentitySkeleton, sigData []byte, view uint64, blockID flow.Identifier) error {
 
 	// create the to-be-signed message
 	msg := MakeVoteMessage(view, blockID)
@@ -123,7 +123,7 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, v
 //
 // This implementation already support the cases, where the DKG committee is a
 // _strict subset_ of the full consensus committee.
-func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte, view uint64, blockID flow.Identifier) error {
+func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentitySkeletonList, sigData []byte, view uint64, blockID flow.Identifier) error {
 	signerIdentities := signers.Lookup()
 	dkg, err := c.committee.DKG(view)
 	if err != nil {
@@ -225,7 +225,7 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 //   - model.ErrInvalidSignature if a signature is invalid
 //   - unexpected errors should be treated as symptoms of bugs or uncovered
 //     edge cases in the logic (i.e. as fatal)
-func (c *CombinedVerifierV3) VerifyTC(signers flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64) error {
+func (c *CombinedVerifierV3) VerifyTC(signers flow.IdentitySkeletonList, sigData []byte, view uint64, highQCViews []uint64) error {
 	stakingPks := signers.PublicStakingKeys()
 	return verifyTCSignatureManyMessages(stakingPks, sigData, view, highQCViews, c.timeoutObjectHasher)
 }

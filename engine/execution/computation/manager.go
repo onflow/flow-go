@@ -35,6 +35,7 @@ type ComputationManager interface {
 		snapshot snapshot.StorageSnapshot,
 	) (
 		[]byte,
+		uint64,
 		error,
 	)
 
@@ -199,7 +200,7 @@ func (e *Manager) ExecuteScript(
 	arguments [][]byte,
 	blockHeader *flow.Header,
 	snapshot snapshot.StorageSnapshot,
-) ([]byte, error) {
+) ([]byte, uint64, error) {
 	return e.queryExecutor.ExecuteScript(ctx,
 		code,
 		arguments,

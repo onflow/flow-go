@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/index"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
@@ -84,7 +85,6 @@ func New(
 	config Config,
 	state protocol.State,
 	headers storage.Headers,
-	events storage.Events,
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	execDataStore execution_data.ExecutionDataStore,
@@ -93,6 +93,7 @@ func New(
 	rootHeight uint64,
 	highestAvailableHeight uint64,
 	registers *execution.RegistersAsyncStore,
+	eventsIndex *index.EventsIndex,
 	useEventsIndex bool,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
@@ -104,6 +105,8 @@ func New(
 		headers,
 		highestAvailableHeight,
 		broadcaster,
+		eventsIndex,
+		useEventsIndex,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize subscribtion handlear: %w", err)
@@ -136,7 +139,6 @@ func New(
 
 	b.EventsBackend = EventsBackend{
 		log:              logger,
-		events:           events,
 		headers:          headers,
 		broadcaster:      broadcaster,
 		sendTimeout:      config.ClientSendTimeout,
@@ -145,6 +147,7 @@ func New(
 		getExecutionData: b.getExecutionData,
 		getStartHeight:   b.GetStartHeight,
 		useIndex:         useEventsIndex,
+		eventsIndex:      eventsIndex,
 	}
 
 	return b, nil

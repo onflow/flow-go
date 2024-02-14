@@ -17,8 +17,8 @@ func IsNodeAuthorizedAt(snapshot Snapshot, id flow.Identifier) (bool, error) {
 	return CheckNodeStatusAt(
 		snapshot,
 		id,
-		filter.HasWeight(true),
-		filter.Not(filter.Ejected),
+		filter.HasInitialWeight[flow.Identity](true),
+		filter.IsValidCurrentEpochParticipant,
 	)
 }
 
@@ -32,9 +32,9 @@ func IsNodeAuthorizedWithRoleAt(snapshot Snapshot, id flow.Identifier, role flow
 	return CheckNodeStatusAt(
 		snapshot,
 		id,
-		filter.HasWeight(true),
-		filter.Not(filter.Ejected),
-		filter.HasRole(role),
+		filter.HasInitialWeight[flow.Identity](true),
+		filter.IsValidCurrentEpochParticipant,
+		filter.HasRole[flow.Identity](role),
 	)
 }
 
@@ -44,7 +44,7 @@ func IsNodeAuthorizedWithRoleAt(snapshot Snapshot, id flow.Identifier, role flow
 //   - state.ErrUnknownSnapshotReference if snapshot references an unknown block
 //
 // All other errors are unexpected and potential symptoms of internal state corruption.
-func CheckNodeStatusAt(snapshot Snapshot, id flow.Identifier, checks ...flow.IdentityFilter) (bool, error) {
+func CheckNodeStatusAt(snapshot Snapshot, id flow.Identifier, checks ...flow.IdentityFilter[flow.Identity]) (bool, error) {
 	identity, err := snapshot.Identity(id)
 	if IsIdentityNotFound(err) {
 		return false, nil
@@ -65,10 +65,7 @@ func CheckNodeStatusAt(snapshot Snapshot, id flow.Identifier, checks ...flow.Ide
 // IsSporkRootSnapshot returns whether the given snapshot is the state snapshot
 // representing the initial state for a spork.
 func IsSporkRootSnapshot(snapshot Snapshot) (bool, error) {
-	sporkRootBlockHeight, err := snapshot.Params().SporkRootBlockHeight()
-	if err != nil {
-		return false, fmt.Errorf("could not get snapshot root block height: %w", err)
-	}
+	sporkRootBlockHeight := snapshot.Params().SporkRootBlockHeight()
 	head, err := snapshot.Head()
 	if err != nil {
 		return false, fmt.Errorf("could not get snapshot head: %w", err)
@@ -126,14 +123,14 @@ func FindGuarantors(state State, guarantee *flow.CollectionGuarantee) ([]flow.Id
 //   - ErrMultipleSealsForSameHeight in case there are seals repeatedly sealing block at the same height
 //   - ErrDiscontinuousSeals in case there are height-gaps in the sealed blocks
 //   - storage.ErrNotFound if any of the seals references an unknown block
-func OrderedSeals(payload *flow.Payload, headers storage.Headers) ([]*flow.Seal, error) {
-	numSeals := uint64(len(payload.Seals))
+func OrderedSeals(blockSeals []*flow.Seal, headers storage.Headers) ([]*flow.Seal, error) {
+	numSeals := uint64(len(blockSeals))
 	if numSeals == 0 {
 		return nil, nil
 	}
 	heights := make([]uint64, numSeals)
 	minHeight := uint64(math.MaxUint64)
-	for i, seal := range payload.Seals {
+	for i, seal := range blockSeals {
 		header, err := headers.ByBlockID(seal.BlockID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get block (id=%x) for seal: %w", seal.BlockID, err) // storage.ErrNotFound or exception
@@ -146,7 +143,7 @@ func OrderedSeals(payload *flow.Payload, headers storage.Headers) ([]*flow.Seal,
 	// As seals in a valid payload must have consecutive heights, we can populate
 	// the ordered output by shifting by minHeight.
 	seals := make([]*flow.Seal, numSeals)
-	for i, seal := range payload.Seals {
+	for i, seal := range blockSeals {
 		idx := heights[i] - minHeight
 		// (0) Per construction, `minHeight` is the smallest value in the `heights` slice. Hence, `idx ≥ 0`
 		// (1) But if there are gaps in the heights of the sealed blocks (byzantine inputs),

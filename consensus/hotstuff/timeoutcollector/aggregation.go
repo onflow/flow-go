@@ -64,7 +64,7 @@ var _ hotstuff.TimeoutSignatureAggregator = (*TimeoutSignatureAggregator)(nil)
 // signature aggregation task in the protocol.
 func NewTimeoutSignatureAggregator(
 	view uint64, // view for which we are aggregating signatures
-	ids flow.IdentityList, // list of all authorized signers
+	ids flow.IdentitySkeletonList, // list of all authorized signers
 	dsTag string, // domain separation tag used by the signature
 ) (*TimeoutSignatureAggregator, error) {
 	if len(ids) == 0 {
@@ -82,7 +82,7 @@ func NewTimeoutSignatureAggregator(
 	for _, id := range ids {
 		idToInfo[id.NodeID] = signerInfo{
 			pk:     id.StakingPubKey,
-			weight: id.Weight,
+			weight: id.InitialWeight,
 		}
 	}
 

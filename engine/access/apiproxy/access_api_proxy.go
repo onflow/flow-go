@@ -243,7 +243,7 @@ type FlowAccessAPIForwarder struct {
 	*forwarder.Forwarder
 }
 
-func NewFlowAccessAPIForwarder(identities flow.IdentityList, connectionFactory connection.ConnectionFactory) (*FlowAccessAPIForwarder, error) {
+func NewFlowAccessAPIForwarder(identities flow.IdentitySkeletonList, connectionFactory connection.ConnectionFactory) (*FlowAccessAPIForwarder, error) {
 	forwarder, err := forwarder.NewForwarder(identities, connectionFactory)
 	if err != nil {
 		return nil, err

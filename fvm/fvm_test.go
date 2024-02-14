@@ -3086,7 +3086,7 @@ func TestEVM(t *testing.T) {
 				import EVM from %s
 				
 				pub fun main() {
-					let bal = EVM.Balance(flow: 1.0);
+					let bal = EVM.Balance(attoflow: 1000000000000000000);
 					let acc <- EVM.createBridgedAccount();
 					// withdraw insufficient balance
 					destroy acc.withdraw(balance: bal);
@@ -3110,7 +3110,10 @@ func TestEVM(t *testing.T) {
 	// we have implemented a snapshot wrapper to return an error from the EVM
 	t.Run("internal evm error handling", newVMTest().
 		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
-		withContextOptions(fvm.WithEVMEnabled(true)).
+		withContextOptions(
+			fvm.WithChain(flow.Emulator.Chain()),
+			fvm.WithEVMEnabled(true),
+		).
 		run(func(
 			t *testing.T,
 			vm fvm.VM,
@@ -3138,7 +3141,7 @@ func TestEVM(t *testing.T) {
 				errStorage.
 					On("Get", mockery.AnythingOfType("flow.RegisterID")).
 					Return(func(id flow.RegisterID) (flow.RegisterValue, error) {
-						if id.Key == "AddressAllocator" {
+						if id.Key == "LatestBlock" {
 							return nil, e.err
 						}
 						return snapshotTree.Get(id)
@@ -3217,10 +3220,10 @@ func TestEVM(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
-			require.Len(t, output.Events, 3)
+			require.Len(t, output.Events, 5)
 
 			evmLocation := types.EVMLocation{}
-			txExe, blockExe := output.Events[1], output.Events[2]
+			txExe, blockExe := output.Events[3], output.Events[4]
 			assert.Equal(t, evmLocation.TypeID(nil, string(types.EventTypeTransactionExecuted)), common.TypeID(txExe.Type))
 			assert.Equal(t, evmLocation.TypeID(nil, string(types.EventTypeBlockExecuted)), common.TypeID(blockExe.Type))
 		}),

@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/index"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/execution"
@@ -243,7 +244,6 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		conf,
 		suite.state,
 		suite.headers,
-		suite.events,
 		suite.seals,
 		suite.results,
 		nil,
@@ -252,6 +252,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		rootBlock.Header.Height,
 		rootBlock.Header.Height,
 		suite.registers,
+		index.NewEventsIndex(suite.events),
 		false,
 	)
 	assert.NoError(suite.T(), err)

@@ -81,14 +81,14 @@ func TestMVP_Bootstrap(t *testing.T) {
 	flowNetwork.RemoveContainers()
 
 	// pick 1 consensus node to restart with empty database and downloaded snapshot
-	cons := flowNetwork.Identities().Filter(filter.HasRole(flow.RoleConsensus))
+	cons := flowNetwork.Identities().Filter(filter.HasRole[flow.Identity](flow.RoleConsensus))
 	random, err := rand.Uintn(uint(len(cons)))
 	require.NoError(t, err)
 	con1 := cons[random]
 
 	t.Log("@@ booting from non-root state on consensus node ", con1.NodeID)
 
-	flowNetwork.DropDBs(filter.HasNodeID(con1.NodeID))
+	flowNetwork.DropDBs(filter.HasNodeID[flow.Identity](con1.NodeID))
 	con1Container := flowNetwork.ContainerByID(con1.NodeID)
 	con1Container.DropDB()
 	con1Container.WriteRootSnapshot(snapshot)

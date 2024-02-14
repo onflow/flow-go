@@ -61,7 +61,7 @@ func (s *SafetyRulesTestSuite) SetupTest() {
 	s.committee.On("Self").Return(s.ourIdentity.NodeID).Maybe()
 	s.committee.On("IdentityByBlock", mock.Anything, s.ourIdentity.NodeID).Return(s.ourIdentity, nil).Maybe()
 	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.proposal.Block.ProposerID).Return(s.proposerIdentity, nil).Maybe()
-	s.committee.On("IdentityByEpoch", mock.Anything, s.ourIdentity.NodeID).Return(s.ourIdentity, nil).Maybe()
+	s.committee.On("IdentityByEpoch", mock.Anything, s.ourIdentity.NodeID).Return(&s.ourIdentity.IdentitySkeleton, nil).Maybe()
 
 	s.safetyData = &hotstuff.SafetyData{
 		LockedOneChainView:      s.bootstrapBlock.View,

@@ -16,18 +16,19 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
+	"github.com/onflow/flow-go/engine/access/subscription/index"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
 type backendEvents struct {
 	headers           storage.Headers
-	events            storage.Events
 	executionReceipts storage.ExecutionReceipts
 	state             protocol.State
 	chain             flow.Chain
@@ -36,6 +37,7 @@ type backendEvents struct {
 	maxHeightRange    uint
 	nodeCommunicator  Communicator
 	queryMode         IndexQueryMode
+	eventsIndex       *index.EventsIndex
 }
 
 // blockMetadata is used to capture information about requested blocks to avoid repeated blockID
@@ -226,15 +228,17 @@ func (b *backendEvents) getBlockEventsFromStorage(
 ) ([]flow.BlockEvents, []blockMetadata, error) {
 	missing := make([]blockMetadata, 0)
 	resp := make([]flow.BlockEvents, 0)
+
 	for _, blockInfo := range blockInfos {
 		if ctx.Err() != nil {
 			return nil, nil, rpc.ConvertError(ctx.Err(), "failed to get events from storage", codes.Canceled)
 		}
 
-		events, err := b.events.ByBlockID(blockInfo.ID)
+		events, err := b.eventsIndex.GetEvents(blockInfo.ID, blockInfo.Height)
 		if err != nil {
-			// Note: if there are no events for a block, an empty slice is returned
-			if errors.Is(err, storage.ErrNotFound) {
+			if errors.Is(err, storage.ErrNotFound) ||
+				errors.Is(err, storage.ErrHeightNotIndexed) ||
+				errors.Is(err, indexer.ErrIndexNotInitialized) {
 				missing = append(missing, blockInfo)
 				continue
 			}
@@ -305,7 +309,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	}
 
 	var resp *execproto.GetEventsForBlockIDsResponse
-	var successfulNode *flow.Identity
+	var successfulNode *flow.IdentitySkeleton
 	resp, successfulNode, err = b.getEventsFromAnyExeNode(ctx, execNodes, req)
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to retrieve events from execution nodes", codes.Internal)
@@ -381,14 +385,13 @@ func verifyAndConvertToAccessEvents(
 // other ENs are logged and swallowed. If all ENs fail to return a valid response, then an
 // error aggregating all failures is returned.
 func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context,
-	execNodes flow.IdentityList,
-	req *execproto.GetEventsForBlockIDsRequest,
-) (*execproto.GetEventsForBlockIDsResponse, *flow.Identity, error) {
+	execNodes flow.IdentitySkeletonList,
+	req *execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, *flow.IdentitySkeleton, error) {
 	var resp *execproto.GetEventsForBlockIDsResponse
-	var execNode *flow.Identity
+	var execNode *flow.IdentitySkeleton
 	errToReturn := b.nodeCommunicator.CallAvailableNode(
 		execNodes,
-		func(node *flow.Identity) error {
+		func(node *flow.IdentitySkeleton) error {
 			var err error
 			start := time.Now()
 			resp, err = b.tryGetEvents(ctx, node, req)
@@ -418,9 +421,8 @@ func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context,
 }
 
 func (b *backendEvents) tryGetEvents(ctx context.Context,
-	execNode *flow.Identity,
-	req *execproto.GetEventsForBlockIDsRequest,
-) (*execproto.GetEventsForBlockIDsResponse, error) {
+	execNode *flow.IdentitySkeleton,
+	req *execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err

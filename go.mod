@@ -51,13 +51,13 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/onflow/atree v0.6.0
-	github.com/onflow/cadence v0.42.8
+	github.com/onflow/cadence v0.42.9
 	github.com/onflow/crypto v0.25.0
 	github.com/onflow/flow v0.3.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20231219201108-fbdb10b0a2da
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20231219201108-fbdb10b0a2da
 	github.com/onflow/flow-go-sdk v0.44.0
-	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231213135419-ae911cc351a2
+	github.com/onflow/flow/protobuf/go/flow v0.3.7
 	github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pierrec/lz4 v2.6.1+incompatible
@@ -319,4 +319,4 @@ require (
 )
 
 //TODO: Remove when onflow/flow branch will be merged
-replace github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231213135419-ae911cc351a2 => github.com/UlyanaAndrukhiv/flow/protobuf/go/flow v0.0.0-20240130165424-9895580205f1
+replace github.com/onflow/flow/protobuf/go/flow v0.3.7 => github.com/UlyanaAndrukhiv/flow/protobuf/go/flow v0.0.0-20240213131239-d2f7576ec830

@@ -197,7 +197,7 @@ func (h *handler) ExecuteScriptAtBlockID(
 		return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", blockID)
 	}
 
-	value, err := h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
+	value, compUsage, err := h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
 	if err != nil {
 		// todo check the error code instead
 		// return code 3 as this passes the litmus test in our context
@@ -205,7 +205,8 @@ func (h *handler) ExecuteScriptAtBlockID(
 	}
 
 	res := &execution.ExecuteScriptAtBlockIDResponse{
-		Value: value,
+		Value:            value,
+		ComputationUsage: compUsage,
 	}
 
 	return res, nil

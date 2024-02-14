@@ -114,8 +114,8 @@ github.com/StackExchange/wmi v1.2.1 h1:VIkavFPXSjcnS+O8yTq7NI32k0R5Aj+v39y29VYDO
 github.com/StackExchange/wmi v1.2.1/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9SBzvHz7e8=
 github.com/UlyanaAndrukhiv/flow-emulator v0.0.0-20240207154113-bc5ae380bb18 h1:bLRZKAZmVUsKKZB9/68Eb9RcLGqCUzGu0Q0ZAYj/PKE=
 github.com/UlyanaAndrukhiv/flow-emulator v0.0.0-20240207154113-bc5ae380bb18/go.mod h1:AUYfq/b0rQ+TEW8YCU+OtXARUimvkTeT32+0Mjmn/+k=
-github.com/UlyanaAndrukhiv/flow/protobuf/go/flow v0.0.0-20240130165424-9895580205f1 h1:hfuwHB6gui9dqg72uc579ewGN5CzxWRsnO328uucpdE=
-github.com/UlyanaAndrukhiv/flow/protobuf/go/flow v0.0.0-20240130165424-9895580205f1/go.mod h1:NA2pX2nw8zuaxfKphhKsk00kWLwfd+tv8mS23YXO4Sk=
+github.com/UlyanaAndrukhiv/flow/protobuf/go/flow v0.0.0-20240213131239-d2f7576ec830 h1:Z4Crc3ShlPfXUZ/Kd7nzYTUkpinSDiLqxCOGvkk8NOg=
+github.com/UlyanaAndrukhiv/flow/protobuf/go/flow v0.0.0-20240213131239-d2f7576ec830/go.mod h1:NA2pX2nw8zuaxfKphhKsk00kWLwfd+tv8mS23YXO4Sk=
 github.com/VictoriaMetrics/fastcache v1.5.3/go.mod h1:+jv9Ckb+za/P1ZRg/sulP5Ni1v49daAVERr0H3CuscE=
 github.com/VictoriaMetrics/fastcache v1.12.1 h1:i0mICQuojGDL3KblA7wUNlY5lOK6a4bwt3uRKnkZU40=
 github.com/VictoriaMetrics/fastcache v1.12.1/go.mod h1:tX04vaqcNoQeGLD+ra5pU5sWkuxnzWhEzLwhP9w653o=
@@ -1415,8 +1415,8 @@ github.com/onflow/atree v0.1.0-beta1.0.20211027184039-559ee654ece9/go.mod h1:+6x
 github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f h1:Z8/PgTqOgOg02MTRpTBYO2k16FE6z4wEOtaC2WBR9Xo=
 github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f/go.mod h1:xvP61FoOs95K7IYdIYRnNcYQGf4nbF/uuJ0tHf4DRuM=
 github.com/onflow/cadence v0.20.1/go.mod h1:7mzUvPZUIJztIbr9eTvs+fQjWWHTF8veC+yk4ihcNIA=
-github.com/onflow/cadence v0.42.8 h1:6OWhKMjL2Lql6a3L2xeA44uoOAVBp5+cMNE5BDPvo+E=
-github.com/onflow/cadence v0.42.8/go.mod h1:1wFd+LiNiN6qoZXof3MBdpM6d8BsxbVIxOA77LbIYmE=
+github.com/onflow/cadence v0.42.9 h1:EX+eak/Jjy9PyKcAEmOViGOHMyP/nCOwJO+deodZlJE=
+github.com/onflow/cadence v0.42.9/go.mod h1:1wFd+LiNiN6qoZXof3MBdpM6d8BsxbVIxOA77LbIYmE=
 github.com/onflow/crypto v0.25.0 h1:BeWbLsh3ZD13Ej+Uky6kg1PL1ZIVBDVX+2MVBNwqddg=
 github.com/onflow/crypto v0.25.0/go.mod h1:C8FbaX0x8y+FxWjbkHy0Q4EASCDR9bSPWZqlpCLYyVI=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20231219201108-fbdb10b0a2da h1:8CEioYNnP0rwjnRbKDgs8SmiQTsdaroeX4d/Q3pQuh4=

@@ -15,6 +15,8 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
+	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
@@ -44,6 +46,12 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromLocalStorage() {
 	s.events.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
 		mocks.StorageMapGetter(s.blockEvents),
 	)
+
+	reporter := syncmock.NewIndexReporter(s.T())
+	reporter.On("LowestIndexedHeight").Return(s.blocks[0].Header.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(s.blocks[len(s.blocks)-1].Header.Height, nil)
+	err := s.eventsIndex.Initialize(reporter)
+	s.Require().NoError(err)
 
 	s.runTestSubscribeEvents()
 }
@@ -224,5 +232,45 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 
 		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Header.Height+10, state_stream.EventFilter{})
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+	})
+
+	s.backend.useIndex = true
+	s.backend.EventsBackend.getStartHeight = s.chainStateTracker.GetStartHeight
+
+	s.Run("returns error for uninitialized index", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		s.chainStateTracker.On("GetStartHeight", flow.ZeroID, uint64(0), flow.BlockStatusFinalized).
+			Return(uint64(0), status.Errorf(codes.FailedPrecondition, "failed to get lowest indexed height: %v", indexer.ErrIndexNotInitialized)).
+			Once()
+
+		// Note: eventIndex.Initialize() is not called in this test
+		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, 0, state_stream.EventFilter{})
+		assert.Equal(s.T(), codes.FailedPrecondition, status.Code(sub.Err()), "expected FailedPrecondition, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+	})
+
+	s.Run("returns error for start below lowest indexed", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		s.chainStateTracker.On("GetStartHeight", flow.ZeroID, s.blocks[0].Header.Height, flow.BlockStatusFinalized).
+			Return(uint64(0), status.Errorf(codes.InvalidArgument, "start height %d is lower than lowest indexed height %d", s.blocks[0].Header.Height, 0)).
+			Once()
+
+		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.blocks[0].Header.Height, state_stream.EventFilter{})
+		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+	})
+
+	s.Run("returns error for start above highest indexed", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		s.chainStateTracker.On("GetStartHeight", flow.ZeroID, s.blocks[len(s.blocks)-1].Header.Height, flow.BlockStatusFinalized).
+			Return(uint64(0), status.Errorf(codes.InvalidArgument, "start height %d is higher than highest indexed height %d", s.blocks[len(s.blocks)-1].Header.Height, s.blocks[0].Header.Height)).
+			Once()
+
+		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Header.Height, state_stream.EventFilter{})
+		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 }

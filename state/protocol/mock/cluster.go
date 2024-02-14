@@ -57,15 +57,15 @@ func (_m *Cluster) Index() uint {
 }
 
 // Members provides a mock function with given fields:
-func (_m *Cluster) Members() flow.IdentityList {
+func (_m *Cluster) Members() flow.GenericIdentityList[flow.IdentitySkeleton] {
 	ret := _m.Called()
 
-	var r0 flow.IdentityList
-	if rf, ok := ret.Get(0).(func() flow.IdentityList); ok {
+	var r0 flow.GenericIdentityList[flow.IdentitySkeleton]
+	if rf, ok := ret.Get(0).(func() flow.GenericIdentityList[flow.IdentitySkeleton]); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.IdentityList)
+			r0 = ret.Get(0).(flow.GenericIdentityList[flow.IdentitySkeleton])
 		}
 	}
 
