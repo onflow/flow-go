@@ -293,8 +293,7 @@ contract EVM {
         )
         assert(isValid, message: "signatures not valid")
 
-        let coaRef = acc.getCapability(path)
-            .borrow<&EVM.CadenceOwnedAccount{EVM.Addressable}>()
+        let coaRef = acc.capabilities.borrow<&EVM.CadenceOwnedAccount>(path)
             ?? panic("could not borrow coa resource addressable capability")
 
         // verify evm address matching
