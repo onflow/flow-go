@@ -93,7 +93,7 @@ func NewBurnerDeploymentMigration(
 			Name: "Burner",
 			Code: coreContracts.Burner(),
 		},
-		chainID.Chain().ServiceAddress(),
+		BurnerAddressForChain(chainID),
 		logger,
 	)
 }

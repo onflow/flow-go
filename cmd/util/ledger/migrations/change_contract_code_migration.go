@@ -185,10 +185,44 @@ type SystemContractChangesOptions struct {
 	EVM EVMContractChange
 }
 
+func BurnerAddressForChain(chainID flow.ChainID) flow.Address {
+
+	systemContracts := systemcontracts.SystemContractsForChain(chainID)
+	serviceAccountAddress := systemContracts.FlowServiceAccount.Address
+	fungibleTokenAddress := systemContracts.FungibleToken.Address
+
+	switch chainID {
+	case flow.Mainnet, flow.Testnet:
+		return fungibleTokenAddress
+
+	case flow.Emulator, flow.Localnet:
+		return serviceAccountAddress
+
+	default:
+		panic(fmt.Errorf("unsupported chain ID: %s", chainID))
+	}
+}
+
 func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOptions) []SystemContractChange {
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
-	var stakingCollectionAddress, stakingProxyAddress common.Address
+	serviceAccountAddress := systemContracts.FlowServiceAccount.Address
+	idTableStakingAddress := systemContracts.IDTableStaking.Address
+	clusterQCAddress := systemContracts.ClusterQC.Address
+	dkgAddress := systemContracts.DKG.Address
+	fungibleTokenAddress := systemContracts.FungibleToken.Address
+	flowTokenAddress := systemContracts.FlowToken.Address
+	flowFeesAddress := systemContracts.FlowFees.Address
+	flowStorageFeesAddress := systemContracts.FlowStorageFees.Address
+	viewResolverAddress := systemContracts.ViewResolver.Address
+	metadataViewsAddress := systemContracts.MetadataViews.Address
+	fungibleTokenMetadataViewsAddress := common.Address(fungibleTokenAddress)
+	fungibleTokenSwitchboardAddress := common.Address(fungibleTokenAddress)
+
+	burnerAddress := BurnerAddressForChain(chainID)
+
+	var stakingCollectionAddress common.Address
+	var stakingProxyAddress common.Address
 
 	switch chainID {
 	case flow.Mainnet:
@@ -200,37 +234,35 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 		stakingProxyAddress = mustHexAddress("0x7aad92e5a0715d21")
 
 	case flow.Emulator, flow.Localnet:
-		stakingCollectionAddress = common.Address(systemContracts.FlowServiceAccount.Address)
-		stakingProxyAddress = common.Address(systemContracts.FlowServiceAccount.Address)
+		stakingCollectionAddress = common.Address(serviceAccountAddress)
+		stakingProxyAddress = common.Address(serviceAccountAddress)
 
 	default:
 		panic(fmt.Errorf("unsupported chain ID: %s", chainID))
 	}
 
 	lockedTokensAddress := stakingCollectionAddress
-	fungibleTokenMetadataViewsAddress := common.Address(systemContracts.FungibleToken.Address)
-	fungibleTokenSwitchboardAddress := common.Address(systemContracts.FungibleToken.Address)
 
 	contractChanges := []SystemContractChange{
 		// epoch related contracts
 		NewSystemContractChange(
 			systemContracts.Epoch,
 			coreContracts.FlowEpoch(
-				systemContracts.FungibleToken.Address.HexWithPrefix(),
-				systemContracts.FlowToken.Address.HexWithPrefix(),
-				systemContracts.IDTableStaking.Address.HexWithPrefix(),
-				systemContracts.ClusterQC.Address.HexWithPrefix(),
-				systemContracts.DKG.Address.HexWithPrefix(),
-				systemContracts.FlowFees.Address.HexWithPrefix(),
+				fungibleTokenAddress.HexWithPrefix(),
+				flowTokenAddress.HexWithPrefix(),
+				idTableStakingAddress.HexWithPrefix(),
+				clusterQCAddress.HexWithPrefix(),
+				dkgAddress.HexWithPrefix(),
+				flowFeesAddress.HexWithPrefix(),
 			),
 		),
 		NewSystemContractChange(
 			systemContracts.IDTableStaking,
 			coreContracts.FlowIDTableStaking(
-				systemContracts.FungibleToken.Address.HexWithPrefix(),
-				systemContracts.FlowToken.Address.HexWithPrefix(),
-				systemContracts.FlowFees.Address.HexWithPrefix(),
-				systemContracts.FlowServiceAccount.Address.HexWithPrefix(),
+				fungibleTokenAddress.HexWithPrefix(),
+				flowTokenAddress.HexWithPrefix(),
+				flowFeesAddress.HexWithPrefix(),
+				burnerAddress.HexWithPrefix(),
 				true,
 			),
 		),
@@ -247,10 +279,10 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 		NewSystemContractChange(
 			systemContracts.FlowServiceAccount,
 			coreContracts.FlowServiceAccount(
-				systemContracts.FungibleToken.Address.HexWithPrefix(),
-				systemContracts.FlowToken.Address.HexWithPrefix(),
-				systemContracts.FlowFees.Address.HexWithPrefix(),
-				systemContracts.FlowStorageFees.Address.HexWithPrefix(),
+				fungibleTokenAddress.HexWithPrefix(),
+				flowTokenAddress.HexWithPrefix(),
+				flowFeesAddress.HexWithPrefix(),
+				flowStorageFeesAddress.HexWithPrefix(),
 			),
 		),
 		NewSystemContractChange(
@@ -264,22 +296,22 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 		NewSystemContractChange(
 			systemContracts.FlowStorageFees,
 			coreContracts.FlowStorageFees(
-				systemContracts.FungibleToken.Address.HexWithPrefix(),
-				systemContracts.FlowToken.Address.HexWithPrefix(),
+				fungibleTokenAddress.HexWithPrefix(),
+				flowTokenAddress.HexWithPrefix(),
 			),
 		),
 		{
 			Address:      stakingCollectionAddress,
 			ContractName: "FlowStakingCollection",
 			NewContractCode: string(coreContracts.FlowStakingCollection(
-				systemContracts.FungibleToken.Address.HexWithPrefix(),
-				systemContracts.FlowToken.Address.HexWithPrefix(),
-				systemContracts.IDTableStaking.Address.HexWithPrefix(),
+				fungibleTokenAddress.HexWithPrefix(),
+				flowTokenAddress.HexWithPrefix(),
+				idTableStakingAddress.HexWithPrefix(),
 				stakingProxyAddress.HexWithPrefix(),
 				lockedTokensAddress.HexWithPrefix(),
-				systemContracts.FlowStorageFees.Address.HexWithPrefix(),
-				systemContracts.ClusterQC.Address.HexWithPrefix(),
-				systemContracts.DKG.Address.HexWithPrefix(),
+				flowStorageFeesAddress.HexWithPrefix(),
+				clusterQCAddress.HexWithPrefix(),
+				dkgAddress.HexWithPrefix(),
 				systemContracts.Epoch.Address.HexWithPrefix(),
 			)),
 		},
@@ -292,11 +324,11 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 			Address:      lockedTokensAddress,
 			ContractName: "LockedTokens",
 			NewContractCode: string(coreContracts.FlowLockedTokens(
-				systemContracts.FungibleToken.Address.HexWithPrefix(),
-				systemContracts.FlowToken.Address.HexWithPrefix(),
-				systemContracts.IDTableStaking.Address.HexWithPrefix(),
+				fungibleTokenAddress.HexWithPrefix(),
+				flowTokenAddress.HexWithPrefix(),
+				idTableStakingAddress.HexWithPrefix(),
 				stakingProxyAddress.HexWithPrefix(),
-				systemContracts.FlowStorageFees.Address.HexWithPrefix(),
+				flowStorageFeesAddress.HexWithPrefix(),
 			)),
 		},
 
@@ -304,26 +336,26 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 		NewSystemContractChange(
 			systemContracts.FlowFees,
 			coreContracts.FlowFees(
-				systemContracts.FungibleToken.Address.HexWithPrefix(),
-				systemContracts.FlowToken.Address.HexWithPrefix(),
-				systemContracts.FlowStorageFees.Address.HexWithPrefix(),
+				fungibleTokenAddress.HexWithPrefix(),
+				flowTokenAddress.HexWithPrefix(),
+				flowStorageFeesAddress.HexWithPrefix(),
 			),
 		),
 		NewSystemContractChange(
 			systemContracts.FlowToken,
 			coreContracts.FlowToken(
-				systemContracts.FungibleToken.Address.HexWithPrefix(),
+				fungibleTokenAddress.HexWithPrefix(),
 				fungibleTokenMetadataViewsAddress.HexWithPrefix(),
-				systemContracts.MetadataViews.Address.HexWithPrefix(),
-				systemContracts.ViewResolver.Address.HexWithPrefix(),
+				metadataViewsAddress.HexWithPrefix(),
+				burnerAddress.HexWithPrefix(),
 			),
 		),
 		NewSystemContractChange(
 			systemContracts.FungibleToken,
 			ftContracts.FungibleToken(
 				// Use `Hex()`, since this method adds the prefix.
-				systemContracts.ViewResolver.Address.Hex(),
-				systemContracts.FlowServiceAccount.Address.Hex(),
+				viewResolverAddress.Hex(),
+				burnerAddress.Hex(),
 			),
 		),
 		{
@@ -331,9 +363,9 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 			ContractName: "FungibleTokenMetadataViews",
 			NewContractCode: string(ftContracts.FungibleTokenMetadataViews(
 				// Use `Hex()`, since this method adds the prefix.
-				systemContracts.FungibleToken.Address.Hex(),
-				systemContracts.MetadataViews.Address.Hex(),
-				systemContracts.ViewResolver.Address.Hex(),
+				fungibleTokenAddress.Hex(),
+				metadataViewsAddress.Hex(),
+				viewResolverAddress.Hex(),
 			)),
 		},
 
@@ -341,15 +373,15 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 		NewSystemContractChange(
 			systemContracts.NonFungibleToken,
 			nftContracts.NonFungibleToken(
-				sdk.Address(systemContracts.ViewResolver.Address),
+				sdk.Address(viewResolverAddress),
 			),
 		),
 		NewSystemContractChange(
 			systemContracts.MetadataViews,
 			nftContracts.MetadataViews(
-				sdk.Address(systemContracts.FungibleToken.Address),
+				sdk.Address(fungibleTokenAddress),
 				sdk.Address(systemContracts.NonFungibleToken.Address),
-				sdk.Address(systemContracts.ViewResolver.Address),
+				sdk.Address(viewResolverAddress),
 			),
 		),
 		NewSystemContractChange(
@@ -369,7 +401,7 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 				Address:      fungibleTokenSwitchboardAddress,
 				ContractName: "FungibleTokenSwitchboard",
 				NewContractCode: string(ftContracts.FungibleTokenSwitchboard(
-					systemContracts.FungibleToken.Address.HexWithPrefix(),
+					fungibleTokenAddress.HexWithPrefix(),
 				)),
 			},
 		)
@@ -386,7 +418,7 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 			NewSystemContractChange(
 				systemContracts.EVMContract,
 				evm.ContractCode(
-					systemContracts.FlowToken.Address,
+					flowTokenAddress,
 					abiOnly,
 				),
 			),
