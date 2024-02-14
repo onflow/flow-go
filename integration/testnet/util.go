@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func makeDir(t *testing.T, base string, subdir string) string {
@@ -183,6 +184,9 @@ func WriteTestExecutionService(_ flow.Identifier, address, observerName, bootstr
 		return bootstrap.NodeInfo{}, err
 	}
 
+	ks := unittest.StakingKeys(1)
+	stakingKey := ks[0]
+
 	log.Info().Msgf("test execution node private key: %v, public key: %x, peerID: %v, nodeID: %v", networkKey, k, peerID, nodeID)
 
 	nodeInfo := bootstrap.NewPrivateNodeInfo(
@@ -191,7 +195,7 @@ func WriteTestExecutionService(_ flow.Identifier, address, observerName, bootstr
 		address,
 		0,
 		networkKey,
-		networkKey,
+		stakingKey,
 	)
 
 	path := fmt.Sprintf("%s/private-root-information/private-node-info_%v/%vjson",
