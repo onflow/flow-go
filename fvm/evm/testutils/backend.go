@@ -33,11 +33,12 @@ func RunWithTestFlowEVMRootAddress(t testing.TB, backend atree.Ledger, f func(fl
 
 func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
 	tb := &TestBackend{
-		TestValueStore:      GetSimpleValueStore(),
-		testEventEmitter:    getSimpleEventEmitter(),
-		testMeter:           getSimpleMeter(),
-		TestBlockInfo:       &TestBlockInfo{},
-		TestRandomGenerator: getSimpleRandomGenerator(),
+		TestValueStore:              GetSimpleValueStore(),
+		testEventEmitter:            getSimpleEventEmitter(),
+		testMeter:                   getSimpleMeter(),
+		TestBlockInfo:               &TestBlockInfo{},
+		TestRandomGenerator:         getSimpleRandomGenerator(),
+		TestContractFunctionInvoker: &TestContractFunctionInvoker{},
 	}
 	f(tb)
 }
@@ -80,6 +81,10 @@ func GetSimpleValueStore() *TestValueStore {
 		},
 		AllocateStorageIndexFunc: func(owner []byte) (atree.StorageIndex, error) {
 			index := allocator[string(owner)]
+			// TODO: figure out why it result in a collision
+			if index == 0 {
+				index = 10
+			}
 			var data [8]byte
 			allocator[string(owner)] = index + 1
 			binary.BigEndian.PutUint64(data[:], index)
@@ -160,6 +165,7 @@ type TestBackend struct {
 	*testEventEmitter
 	*TestBlockInfo
 	*TestRandomGenerator
+	*TestContractFunctionInvoker
 }
 
 var _ types.Backend = &TestBackend{}
@@ -176,6 +182,10 @@ func (tb *TestBackend) DropEvents() {
 		panic("method not set")
 	}
 	tb.reset()
+}
+
+func (tb *TestBackend) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+	return tb.GetValue([]byte(id.Owner), []byte(id.Key))
 }
 
 type TestValueStore struct {
@@ -429,4 +439,29 @@ func getSimpleRandomGenerator() *TestRandomGenerator {
 			return err
 		},
 	}
+}
+
+type TestContractFunctionInvoker struct {
+	InvokeFunc func(
+		spec environment.ContractFunctionSpec,
+		arguments []cadence.Value,
+	) (
+		cadence.Value,
+		error,
+	)
+}
+
+var _ environment.ContractFunctionInvoker = &TestContractFunctionInvoker{}
+
+func (t *TestContractFunctionInvoker) Invoke(
+	spec environment.ContractFunctionSpec,
+	arguments []cadence.Value,
+) (
+	cadence.Value,
+	error,
+) {
+	if t.InvokeFunc == nil {
+		panic("InvokeFunc method is not set")
+	}
+	return t.InvokeFunc(spec, arguments)
 }
