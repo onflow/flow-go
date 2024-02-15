@@ -3,6 +3,7 @@ package migrations
 import (
 	"context"
 	"fmt"
+	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"strings"
 	"sync"
 
@@ -24,7 +25,6 @@ type StagedContractsMigration struct {
 	mutex               sync.RWMutex
 	contracts           map[common.Address]map[flow.RegisterID]Contract
 	contractsByLocation map[common.Location][]byte
-	stagedContracts     []StagedContract
 }
 
 type StagedContract struct {
@@ -39,9 +39,8 @@ type Contract struct {
 
 var _ AccountBasedMigration = &StagedContractsMigration{}
 
-func NewStagedContractsMigration(stagedContracts []StagedContract) *StagedContractsMigration {
+func NewStagedContractsMigration() *StagedContractsMigration {
 	return &StagedContractsMigration{
-		stagedContracts:     stagedContracts,
 		contracts:           map[common.Address]map[flow.RegisterID]Contract{},
 		contractsByLocation: map[common.Location][]byte{},
 	}
@@ -77,25 +76,28 @@ func (m *StagedContractsMigration) InitMigration(
 		Str("migration", "StagedContractsMigration").
 		Logger()
 
-	m.registerContractUpdates()
-
 	return nil
 }
 
-// registerContractUpdates prepares the contract updates as a map for easy lookup.
-func (m *StagedContractsMigration) registerContractUpdates() {
-	for _, contractChange := range m.stagedContracts {
-		m.registerContractChange(contractChange)
+// RegisterContractUpdates prepares the contract updates as a map for easy lookup.
+func (m *StagedContractsMigration) RegisterContractUpdates(stagedContracts []StagedContract) {
+	for _, contractChange := range stagedContracts {
+		m.RegisterContractChange(contractChange)
 	}
 }
 
-func (m *StagedContractsMigration) registerContractChange(change StagedContract) {
+func (m *StagedContractsMigration) RegisterContractChange(change StagedContract) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
 	address := change.Address
 	if _, ok := m.contracts[address]; !ok {
 		m.contracts[address] = map[flow.RegisterID]Contract{}
 	}
 
-	registerID := flow.ContractRegisterID(flow.ConvertAddress(address), change.Name)
+	name := change.Name
+
+	registerID := flow.ContractRegisterID(flow.ConvertAddress(address), name)
 
 	_, exist := m.contracts[address][registerID]
 	if exist {
@@ -104,17 +106,17 @@ func (m *StagedContractsMigration) registerContractChange(change StagedContract)
 		m.log.Warn().Msgf(
 			"existing staged update found for contract %s.%s. Previous update will be overwritten.",
 			address.HexWithPrefix(),
-			change.Name,
+			name,
 		)
 	}
 
 	m.contracts[address][registerID] = change.Contract
 
 	location := common.AddressLocation{
-		Name:    change.Name,
+		Name:    name,
 		Address: address,
 	}
-	m.contractsByLocation[location] = change.Contract.Code
+	m.contractsByLocation[location] = change.Code
 }
 
 func (m *StagedContractsMigration) contractUpdatesForAccount(
@@ -144,8 +146,18 @@ func (m *StagedContractsMigration) MigrateAccount(
 		return payloads, nil
 	}
 
+	// TODO: get proper burner address
+	chain := flow.Emulator
+	burnerLocation := common.AddressLocation{
+		Name:    "Burner",
+		Address: common.Address(chain.Chain().ServiceAddress()),
+	}
+
 	config := util.RuntimeInterfaceConfig{
 		GetContractCodeFunc: func(location runtime.Location) ([]byte, error) {
+			if location == burnerLocation {
+				return coreContracts.Burner(), nil
+			}
 			return m.contractsByLocation[location], nil
 		},
 	}

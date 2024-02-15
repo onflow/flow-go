@@ -193,6 +193,9 @@ func NewCadence1ContractsMigrations(
 	stagedContracts []StagedContract,
 ) []ledger.Migration {
 
+	stagedContractsMigration := NewStagedContractsMigration()
+	stagedContractsMigration.RegisterContractUpdates(stagedContracts)
+
 	return []ledger.Migration{
 		NewAccountBasedMigration(
 			log,
@@ -211,7 +214,7 @@ func NewCadence1ContractsMigrations(
 			log,
 			nWorker,
 			[]AccountBasedMigration{
-				NewStagedContractsMigration(stagedContracts),
+				stagedContractsMigration,
 			},
 		),
 	}

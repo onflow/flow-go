@@ -23,6 +23,26 @@ func newContractPayload(address common.Address, contractName string, contract []
 	)
 }
 
+const contractA = `
+access(all) contract A { 
+    access(all) fun foo() {} 
+}`
+
+const updatedContractA = `
+access(all) contract A {
+    access(all) fun bar() {}
+}`
+
+const contractB = `
+access(all) contract B {
+    access(all) fun foo() {}
+}`
+
+const updatedContractB = `
+access(all) contract B {
+    access(all) fun bar() {}
+}`
+
 func TestChangeContractCodeMigration(t *testing.T) {
 	t.Parallel()
 
@@ -62,13 +82,13 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		payloads, err := migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte("A")),
+				newContractPayload(address1, "A", []byte(contractA)),
 			},
 		)
 
 		require.NoError(t, err)
 		require.Len(t, payloads, 1)
-		require.Equal(t, []byte("A"), []byte(payloads[0].Value()))
+		require.Equal(t, []byte(contractA), []byte(payloads[0].Value()))
 
 		err = migration.Close()
 		require.NoError(t, err)
@@ -87,20 +107,20 @@ func TestChangeContractCodeMigration(t *testing.T) {
 				Address: address1,
 				Contract: migrations.Contract{
 					Name: "A",
-					Code: []byte("B"),
+					Code: []byte(updatedContractA),
 				},
 			},
 		)
 
 		payloads, err := migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte("A")),
+				newContractPayload(address1, "A", []byte(contractA)),
 			},
 		)
 
 		require.NoError(t, err)
 		require.Len(t, payloads, 1)
-		require.Equal(t, []byte("B"), []byte(payloads[0].Value()))
+		require.Equal(t, updatedContractA, string(payloads[0].Value()))
 
 		err = migration.Close()
 		require.NoError(t, err)
@@ -119,22 +139,22 @@ func TestChangeContractCodeMigration(t *testing.T) {
 				Address: address1,
 				Contract: migrations.Contract{
 					Name: "A",
-					Code: []byte("B"),
+					Code: []byte(updatedContractA),
 				},
 			},
 		)
 
 		payloads, err := migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte("A")),
-				newContractPayload(address1, "B", []byte("A")),
+				newContractPayload(address1, "A", []byte(contractA)),
+				newContractPayload(address1, "B", []byte(contractB)),
 			},
 		)
 
 		require.NoError(t, err)
 		require.Len(t, payloads, 2)
-		require.Equal(t, []byte("B"), []byte(payloads[0].Value()))
-		require.Equal(t, []byte("A"), []byte(payloads[1].Value()))
+		require.Equal(t, []byte(updatedContractA), []byte(payloads[0].Value()))
+		require.Equal(t, []byte(contractB), []byte(payloads[1].Value()))
 
 		err = migration.Close()
 		require.NoError(t, err)
@@ -153,7 +173,7 @@ func TestChangeContractCodeMigration(t *testing.T) {
 				Address: address1,
 				Contract: migrations.Contract{
 					Name: "A",
-					Code: []byte("B"),
+					Code: []byte(updatedContractA),
 				},
 			},
 		)
@@ -162,22 +182,22 @@ func TestChangeContractCodeMigration(t *testing.T) {
 				Address: address1,
 				Contract: migrations.Contract{
 					Name: "B",
-					Code: []byte("B"),
+					Code: []byte(updatedContractB),
 				},
 			},
 		)
 
 		payloads, err := migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte("A")),
-				newContractPayload(address1, "B", []byte("A")),
+				newContractPayload(address1, "A", []byte(contractA)),
+				newContractPayload(address1, "B", []byte(contractB)),
 			},
 		)
 
 		require.NoError(t, err)
 		require.Len(t, payloads, 2)
-		require.Equal(t, []byte("B"), []byte(payloads[0].Value()))
-		require.Equal(t, []byte("B"), []byte(payloads[1].Value()))
+		require.Equal(t, []byte(updatedContractA), []byte(payloads[0].Value()))
+		require.Equal(t, []byte(updatedContractB), []byte(payloads[1].Value()))
 
 		err = migration.Close()
 		require.NoError(t, err)
@@ -196,22 +216,22 @@ func TestChangeContractCodeMigration(t *testing.T) {
 				Address: address1,
 				Contract: migrations.Contract{
 					Name: "A",
-					Code: []byte("B"),
+					Code: []byte(updatedContractA),
 				},
 			},
 		)
 
 		payloads, err := migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte("A")),
-				newContractPayload(address2, "A", []byte("A")),
+				newContractPayload(address1, "A", []byte(contractA)),
+				newContractPayload(address2, "A", []byte(contractA)),
 			},
 		)
 
 		require.NoError(t, err)
 		require.Len(t, payloads, 2)
-		require.Equal(t, []byte("B"), []byte(payloads[0].Value()))
-		require.Equal(t, []byte("A"), []byte(payloads[1].Value()))
+		require.Equal(t, []byte(updatedContractA), []byte(payloads[0].Value()))
+		require.Equal(t, []byte(contractA), []byte(payloads[1].Value()))
 
 		err = migration.Close()
 		require.NoError(t, err)
@@ -230,7 +250,7 @@ func TestChangeContractCodeMigration(t *testing.T) {
 				Address: address1,
 				Contract: migrations.Contract{
 					Name: "A",
-					Code: []byte("B"),
+					Code: []byte(updatedContractA),
 				},
 			},
 		)
@@ -239,14 +259,14 @@ func TestChangeContractCodeMigration(t *testing.T) {
 				Address: address1,
 				Contract: migrations.Contract{
 					Name: "B",
-					Code: []byte("B"),
+					Code: []byte(updatedContractB),
 				},
 			},
 		)
 
 		_, err = migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte("A")),
+				newContractPayload(address1, "A", []byte(contractA)),
 			},
 		)
 
@@ -266,14 +286,14 @@ func TestChangeContractCodeMigration(t *testing.T) {
 				Address: address2,
 				Contract: migrations.Contract{
 					Name: "A",
-					Code: []byte("B"),
+					Code: []byte(updatedContractA),
 				},
 			},
 		)
 
 		_, err = migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte("A")),
+				newContractPayload(address1, "A", []byte(contractA)),
 			},
 		)
 
