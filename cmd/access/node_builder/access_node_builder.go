@@ -1726,7 +1726,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 			msgValidators := publicNetworkMsgValidators(node.Logger.With().Bool("public", true).Logger(), node.IdentityProvider, builder.NodeID)
 
 			// by default, use an empty topology and discover peers using the DHT. this may result
-			// in fragmented public networks if there are no ANs/ONs that connect between them.
+			// in a fragmented public networks if there are no ANs/ONs that connect between them.
 			top := topology.NewEmptyTopology()
 
 			// if configured, seed the topology with a list of ANs to include in the topology.
@@ -1767,7 +1767,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 				Libp2pNode:            publicLibp2pNode,
 				Codec:                 cborcodec.NewCodec(),
 				Me:                    builder.Me,
-				Topology:              topology.EmptyTopology{}, // topology returns empty list since peers are not known upfront
+				Topology:              top,
 				Metrics:               builder.PublicNetworkConfig.Metrics,
 				BitSwapMetrics:        builder.Metrics.Bitswap,
 				IdentityProvider:      builder.IdentityProvider,
