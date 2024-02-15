@@ -53,7 +53,7 @@ func (_m *NodeBuilder) Build() (p2p.LibP2PNode, error) {
 	return r0, r1
 }
 
-// OverrideDefaultRpcInspectorSuiteFactory provides a mock function with given fields: _a0
+// OverrideDefaultRpcInspectorFactory provides a mock function with given fields: _a0
 func (_m *NodeBuilder) OverrideDefaultRpcInspectorFactory(_a0 p2p.GossipSubRpcInspectorFactoryFunc) p2p.NodeBuilder {
 	ret := _m.Called(_a0)
 
