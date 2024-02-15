@@ -244,18 +244,8 @@ func (collector *resultCollector) processTransactionResult(
 		Uint64("computation_used", output.ComputationUsed).
 		Uint64("memory_used", output.MemoryEstimate).
 		Int64("time_spent_in_ms", timeSpent.Milliseconds()).
+		Float64("normalized_time_per_computation", flow.NormalizedExecutionTimePerComputationUnit(timeSpent, output.ComputationUsed)).
 		Logger()
-
-	if output.ComputationUsed > 0 {
-		// log the normalized time per computation
-		// if the computation estimation is correct the value should be 1.
-		// if the value is greater than 1, the computation estimation is too low; we are underestimating transaction complexity (and thus undercharging).
-		// if the value is less than 1, the computation estimation is too high; we are overestimating transaction complexity (and thus overcharging).
-		logger = logger.With().
-			Float64("normalized_time_per_computation",
-				float64(timeSpent.Microseconds())/float64(output.ComputationUsed)*flow.EstimatedComputationPerMillisecond).
-			Logger()
-	}
 
 	if output.Err != nil {
 		logger = logger.With().

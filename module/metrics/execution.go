@@ -746,7 +746,7 @@ func (ec *ExecutionCollector) ExecutionBlockCachedPrograms(programs int) {
 	ec.blockCachedPrograms.Set(float64(programs))
 }
 
-// TransactionExecuted reports stats for executing a transaction
+// ExecutionTransactionExecuted reports stats for executing a transaction
 func (ec *ExecutionCollector) ExecutionTransactionExecuted(
 	dur time.Duration,
 	numConflictRetries int,
@@ -760,11 +760,8 @@ func (ec *ExecutionCollector) ExecutionTransactionExecuted(
 	ec.transactionExecutionTime.Observe(float64(dur.Milliseconds()))
 	ec.transactionConflictRetries.Observe(float64(numConflictRetries))
 	ec.transactionComputationUsed.Observe(float64(compUsed))
-	if compUsed > 0 {
-		// normalize so the value should be around 1
-		ec.transactionNormalizedTimePerComputation.Observe(
-			(float64(dur.Milliseconds()) / float64(compUsed)) * flow.EstimatedComputationPerMillisecond)
-	}
+	ec.transactionNormalizedTimePerComputation.Observe(
+		flow.NormalizedExecutionTimePerComputationUnit(dur, compUsed))
 	ec.transactionMemoryEstimate.Observe(float64(memoryUsed))
 	ec.transactionEmittedEvents.Observe(float64(eventCounts))
 	ec.transactionEventSize.Observe(float64(eventSize))
