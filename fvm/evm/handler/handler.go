@@ -62,7 +62,7 @@ func getPrecompiles(
 	archAddress := addressAllocator.AllocatePrecompileAddress(1)
 	archContract := precompiles.ArchContract(
 		archAddress,
-		backend.GetCurrentBlockHeight,
+		BlockHeightProvider(backend),
 		COAOwnershipProofValidator(evmContractAddress, backend),
 	)
 	return []types.Precompile{archContract}

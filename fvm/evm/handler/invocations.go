@@ -11,6 +11,17 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+func BlockHeightProvider(backend types.Backend) func() (uint64, error) {
+	return func() (uint64, error) {
+		h, err := backend.GetCurrentBlockHeight()
+		// if is a fatal error - panic
+		if types.IsAFatalError(err) {
+			panic(err)
+		}
+		return h, err
+	}
+}
+
 func COAOwnershipProofValidator(contractAddress flow.Address, backend types.Backend) func(proof *types.COAOwnershipProofInContext) (bool, error) {
 	return func(proof *types.COAOwnershipProofInContext) (bool, error) {
 		value, err := backend.Invoke(
@@ -31,6 +42,9 @@ func COAOwnershipProofValidator(contractAddress flow.Address, backend types.Back
 			},
 			proof.ToCadenceValues(),
 		)
+		if types.IsAFatalError(err) {
+			panic(err)
+		}
 		if err != nil {
 			return false, err
 		}
