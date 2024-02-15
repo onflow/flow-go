@@ -156,13 +156,13 @@ func NewCadence1ValueMigrations(
 	rwf reporters.ReportWriterFactory,
 	nWorker int,
 	chainID flow.ChainID,
-) (migrations []ledger.Migration) {
+) (migrations []AccountBasedMigration) {
 
 	// Populated by CadenceLinkValueMigrator,
 	// used by CadenceCapabilityValueMigrator
 	capabilityIDs := &capcons.CapabilityIDMapping{}
 
-	for _, accountBasedMigration := range []AccountBasedMigration{
+	return []AccountBasedMigration{
 		NewCadence1ValueMigrator(
 			rwf,
 			NewCadence1CompositeStaticTypeConverter(chainID),
@@ -170,23 +170,12 @@ func NewCadence1ValueMigrations(
 		),
 		NewCadence1LinkValueMigrator(rwf, capabilityIDs),
 		NewCadence1CapabilityValueMigrator(rwf, capabilityIDs),
-	} {
-		migrations = append(
-			migrations,
-			NewAccountBasedMigration(
-				log,
-				nWorker, []AccountBasedMigration{
-					accountBasedMigration,
-				},
-			),
-		)
 	}
-
-	return
 }
 
-func NewCadence1ContractsMigrations(
+func NewCadence1Migrations(
 	log zerolog.Logger,
+	rwf reporters.ReportWriterFactory,
 	nWorker int,
 	chainID flow.ChainID,
 	evmContractChange EVMContractChange,
@@ -194,6 +183,7 @@ func NewCadence1ContractsMigrations(
 ) []ledger.Migration {
 
 	return []ledger.Migration{
+
 		NewAccountBasedMigration(
 			log,
 			nWorker,
@@ -206,27 +196,16 @@ func NewCadence1ContractsMigrations(
 				),
 			},
 		),
+
 		NewBurnerDeploymentMigration(chainID, log),
+
 		NewAccountBasedMigration(
 			log,
 			nWorker,
-			[]AccountBasedMigration{
-				NewStagedContractsMigration(stagedContracts),
-			},
+			append(
+				[]AccountBasedMigration{NewStagedContractsMigration(stagedContracts)},
+				NewCadence1ValueMigrations(log, rwf, nWorker, chainID)...,
+			),
 		),
 	}
-}
-
-func NewCadence1Migrations(
-	log zerolog.Logger,
-	rwf reporters.ReportWriterFactory,
-	nWorker int,
-	chainID flow.ChainID,
-	evmContractChange EVMContractChange,
-	stagedContracts []StagedContract,
-) []ledger.Migration {
-	return common.Concat(
-		NewCadence1ContractsMigrations(log, nWorker, chainID, evmContractChange, stagedContracts),
-		NewCadence1ValueMigrations(log, rwf, nWorker, chainID),
-	)
 }
