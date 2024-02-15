@@ -41,6 +41,8 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 		DKGPhase2FinalView: 160,
 		DKGPhase3FinalView: 170,
 		RandomSource:       randomSource,
+		TargetDuration:     200,
+		TargetEndTime:      2000000000,
 		Assignments: flow.AssignmentList{
 			{
 				flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000001"),
@@ -114,7 +116,7 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 	return event, expected
 }
 
-// EpochCommitFixture returns an EpochCommit service event as a Cadence event
+// EpochCommitFixtureByChainID returns an EpochCommit service event as a Cadence event
 // representation and as a protocol model representation.
 func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
 
@@ -172,8 +174,7 @@ func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.Versio
 	return event, expected
 }
 
-func createEpochSetupEvent(randomSource []byte) cadence.Event {
-	randomSourceHex := hex.EncodeToString(randomSource)
+func createEpochSetupEvent(randomSourceHex string) cadence.Event {
 
 	return cadence.NewEvent([]cadence.Value{
 		// counter
@@ -202,6 +203,12 @@ func createEpochSetupEvent(randomSource []byte) cadence.Event {
 
 		// DKGPhase3FinalView
 		cadence.UInt64(170),
+
+		// targetDuration
+		cadence.UInt64(200),
+
+		// targetEndTime
+		cadence.UInt64(2000000000),
 	}).WithType(newFlowEpochEpochSetupEventType())
 }
 
@@ -592,7 +599,7 @@ func createEpochCollectors() cadence.Array {
 	}).WithType(cadence.NewVariableSizedArrayType(clusterType))
 }
 
-func createEpochCommittedEvent() cadence.Event {
+func createEpochCommitEvent() cadence.Event {
 
 	clusterQCType := newFlowClusterQCClusterQCStructType()
 
@@ -880,11 +887,19 @@ func newFlowEpochEpochSetupEventType() *cadence.EventType {
 				Identifier: "DKGPhase3FinalView",
 				Type:       cadence.UInt64Type,
 			},
+			{
+				Identifier: "targetDuration",
+				Type:       cadence.UInt64Type,
+			},
+			{
+				Identifier: "targetEndTime",
+				Type:       cadence.UInt64Type,
+			},
 		},
 	}
 }
 
-func newFlowEpochEpochCommittedEventType() *cadence.EventType {
+func newFlowEpochEpochCommitEventType() *cadence.EventType {
 
 	// A.01cf0e2f2f715450.FlowEpoch.EpochCommitted
 
@@ -1028,7 +1043,8 @@ func ufix64FromString(s string) cadence.UFix64 {
 }
 
 func EpochSetupFixtureCCF(randomSource []byte) []byte {
-	b, err := ccf.Encode(createEpochSetupEvent(randomSource))
+	randomSourceHex := hex.EncodeToString(randomSource)
+	b, err := ccf.Encode(createEpochSetupEvent(randomSourceHex))
 	if err != nil {
 		panic(err)
 	}
@@ -1046,34 +1062,7 @@ func EpochSetupCCFWithNonHexRandomSource() []byte {
 		randomSource = randomSource + "aa"
 	}
 
-	event := cadence.NewEvent([]cadence.Value{
-		// counter
-		cadence.NewUInt64(1),
-
-		// nodeInfo
-		createEpochNodes(),
-
-		// firstView
-		cadence.NewUInt64(100),
-
-		// finalView
-		cadence.NewUInt64(200),
-
-		// collectorClusters
-		createEpochCollectors(),
-
-		// randomSource
-		cadence.String(randomSource),
-
-		// DKGPhase1FinalView
-		cadence.UInt64(150),
-
-		// DKGPhase2FinalView
-		cadence.UInt64(160),
-
-		// DKGPhase3FinalView
-		cadence.UInt64(170),
-	}).WithType(newFlowEpochEpochSetupEventType())
+	event := createEpochSetupEvent(randomSource)
 
 	b, err := ccf.Encode(event)
 	if err != nil {
@@ -1087,7 +1076,7 @@ func EpochSetupCCFWithNonHexRandomSource() []byte {
 }
 
 var EpochCommitFixtureCCF = func() []byte {
-	b, err := ccf.Encode(createEpochCommittedEvent())
+	b, err := ccf.Encode(createEpochCommitEvent())
 	if err != nil {
 		panic(err)
 	}

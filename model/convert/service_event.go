@@ -52,7 +52,7 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 		return nil, invalidCadenceTypeError("payload", payload, cadence.Event{})
 	}
 
-	const expectedFieldCount = 9
+	const expectedFieldCount = 11
 	if len(cdcEvent.Fields) < expectedFieldCount {
 		return nil, fmt.Errorf(
 			"insufficient fields in EpochSetup event (%d < %d)",
@@ -76,6 +76,9 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 	var dkgPhase3FinalView cadence.UInt64
 	var cdcClusters cadence.Array
 	var cdcParticipants cadence.Array
+	var targetDuration cadence.UInt64    // Epoch duration [seconds]
+	var targetEndTimeUnix cadence.UInt64 // Unix time [seconds]
+
 	var foundFieldCount int
 
 	evt := cdcEvent.Type().(*cadence.EventType)
@@ -148,6 +151,28 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 				)
 			}
 
+		case "targetDuration":
+			foundFieldCount++
+			targetDuration, ok = cdcEvent.Fields[i].(cadence.UInt64)
+			if !ok {
+				return nil, invalidCadenceTypeError(
+					"targetDuration",
+					cdcEvent.Fields[i],
+					cadence.UInt64(0),
+				)
+			}
+
+		case "targetEndTime":
+			foundFieldCount++
+			targetEndTimeUnix, ok = cdcEvent.Fields[i].(cadence.UInt64)
+			if !ok {
+				return nil, invalidCadenceTypeError(
+					"targetEndTime",
+					cdcEvent.Fields[i],
+					cadence.UInt64(0),
+				)
+			}
+
 		case "DKGPhase1FinalView":
 			foundFieldCount++
 			dkgPhase1FinalView, ok = cdcEvent.Fields[i].(cadence.UInt64)
@@ -198,6 +223,8 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 		DKGPhase1FinalView: uint64(dkgPhase1FinalView),
 		DKGPhase2FinalView: uint64(dkgPhase2FinalView),
 		DKGPhase3FinalView: uint64(dkgPhase3FinalView),
+		TargetDuration:     uint64(targetDuration),
+		TargetEndTime:      uint64(targetEndTimeUnix),
 	}
 
 	// random source from the event must be a hex string
