@@ -250,6 +250,22 @@ contract EVM {
         ) as! Result
     }
 
+    /// mustRun the transaction through EVM.run but
+    /// rollback if the tx execution status is unknown or invalid.
+    /// note that this method does not rollback if transaction 
+    /// is executed but reporting VMerror as outcome of execution. 
+    /// (status: failed)
+    access(all)
+    fun mustRun(tx: [UInt8], coinbase: EVMAddress): Result {
+        var res = self.run(tx: tx, coinbase: coinbase)
+        assert(
+            res.status == Status.failed || res.status == Status.successful , 
+            message: "tx was not valid for execution" 
+        )
+        return res
+    }
+
+
     access(all)
     fun encodeABI(_ values: [AnyStruct]): [UInt8] {
         return InternalEVM.encodeABI(values)
