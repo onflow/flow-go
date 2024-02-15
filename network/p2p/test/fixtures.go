@@ -161,8 +161,8 @@ func NodeFixture(t *testing.T,
 		})
 	}
 
-	if parameters.GossipSubRpcInspectorSuiteFactory != nil {
-		builder.OverrideDefaultRpcInspectorSuiteFactory(parameters.GossipSubRpcInspectorSuiteFactory)
+	if parameters.GossipSubRpcInspectorFactory != nil {
+		builder.OverrideDefaultRpcInspectorFactory(parameters.GossipSubRpcInspectorFactory)
 	}
 
 	if parameters.ResourceManager != nil {
@@ -228,28 +228,28 @@ func RegisterPeerProviders(_ *testing.T, nodes []p2p.LibP2PNode) {
 type NodeFixtureParameterOption func(*NodeFixtureParameters)
 
 type NodeFixtureParameters struct {
-	HandlerFunc                       network.StreamHandler
-	NetworkingType                    flownet.NetworkingType
-	Unicasts                          []protocols.ProtocolName
-	Key                               crypto.PrivateKey
-	Address                           string
-	DhtOptions                        []dht.Option
-	Role                              flow.Role
-	Logger                            zerolog.Logger
-	PeerScoringEnabled                bool
-	IdProvider                        module.IdentityProvider
-	PeerScoringConfigOverride         *p2p.PeerScoringConfigOverride
-	PeerManagerConfig                 *p2pbuilderconfig.PeerManagerConfig
-	PeerProvider                      p2p.PeersProvider // peer manager parameter
-	ConnGater                         p2p.ConnectionGater
-	ConnManager                       connmgr.ConnManager
-	GossipSubFactory                  p2p.GossipSubFactoryFunc
-	GossipSubConfig                   p2p.GossipSubAdapterConfigFunc
-	MetricsCfg                        *p2pbuilderconfig.MetricsConfig
-	ResourceManager                   network.ResourceManager
-	GossipSubRpcInspectorSuiteFactory p2p.GossipSubRpcInspectorFactoryFunc
-	FlowConfig                        *config.FlowConfig
-	UnicastRateLimiterDistributor     p2p.UnicastRateLimiterDistributor
+	HandlerFunc                   network.StreamHandler
+	NetworkingType                flownet.NetworkingType
+	Unicasts                      []protocols.ProtocolName
+	Key                           crypto.PrivateKey
+	Address                       string
+	DhtOptions                    []dht.Option
+	Role                          flow.Role
+	Logger                        zerolog.Logger
+	PeerScoringEnabled            bool
+	IdProvider                    module.IdentityProvider
+	PeerScoringConfigOverride     *p2p.PeerScoringConfigOverride
+	PeerManagerConfig             *p2pbuilderconfig.PeerManagerConfig
+	PeerProvider                  p2p.PeersProvider // peer manager parameter
+	ConnGater                     p2p.ConnectionGater
+	ConnManager                   connmgr.ConnManager
+	GossipSubFactory              p2p.GossipSubFactoryFunc
+	GossipSubConfig               p2p.GossipSubAdapterConfigFunc
+	MetricsCfg                    *p2pbuilderconfig.MetricsConfig
+	ResourceManager               network.ResourceManager
+	GossipSubRpcInspectorFactory  p2p.GossipSubRpcInspectorFactoryFunc
+	FlowConfig                    *config.FlowConfig
+	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
 }
 
 func WithUnicastRateLimitDistributor(distributor p2p.UnicastRateLimiterDistributor) NodeFixtureParameterOption {
@@ -258,9 +258,9 @@ func WithUnicastRateLimitDistributor(distributor p2p.UnicastRateLimiterDistribut
 	}
 }
 
-func OverrideGossipSubRpcInspectorSuiteFactory(factory p2p.GossipSubRpcInspectorFactoryFunc) NodeFixtureParameterOption {
+func OverrideGossipSubRpcInspectorFactory(factory p2p.GossipSubRpcInspectorFactoryFunc) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
-		p.GossipSubRpcInspectorSuiteFactory = factory
+		p.GossipSubRpcInspectorFactory = factory
 	}
 }
 

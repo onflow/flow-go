@@ -413,6 +413,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	if ok := r.invCtrlMsgNotifWorkerPool.Submit(notification); !ok {
 		// we use a queue with a fixed size, so this can happen when queue is full or when the notification is duplicate.
 		// TODO: we have to add a metric for this case.
+		// TODO: we should not have deduplication for this case, as we need to penalize the peer for each misbehaviour, we need to add a nonce to the notification.
 		lg.Warn().Msg("gossipsub rpc inspector notification queue is full or notification is duplicate, discarding notification")
 	}
 	lg.Trace().Msg("gossipsub rpc inspector notification submitted to the queue")

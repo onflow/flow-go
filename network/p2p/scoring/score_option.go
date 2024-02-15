@@ -180,7 +180,8 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 			MeshMessageDeliveriesWindow:     cfg.params.PeerScoring.Internal.TopicParameters.MeshMessageDeliveriesWindow,
 			MeshMessageDeliveriesActivation: cfg.params.PeerScoring.Internal.TopicParameters.MeshMessageDeliveryActivation,
 		},
-		appScoreFunc: scoreRegistry.AppSpecificScoreFunc(),
+		appScoreFunc:     scoreRegistry.AppSpecificScoreFunc(),
+		appScoreRegistry: scoreRegistry,
 	}
 
 	// set the app specific penalty function for the penalty option

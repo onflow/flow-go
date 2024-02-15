@@ -142,7 +142,7 @@ type NodeBuilder interface {
 	// none
 	OverrideNodeConstructor(NodeConstructor) NodeBuilder
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
-	OverrideDefaultRpcInspectorSuiteFactory(GossipSubRpcInspectorFactoryFunc) NodeBuilder
+	OverrideDefaultRpcInspectorFactory(GossipSubRpcInspectorFactoryFunc) NodeBuilder
 	Build() (LibP2PNode, error)
 }
 
