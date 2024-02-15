@@ -118,6 +118,8 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatuses() {
 			subCtx, subCancel := context.WithCancel(ctx)
 			sub := s.backend.SubscribeAccountStatuses(subCtx, test.startBlockID, test.startHeight, test.filters)
 
+			expectedMsgIndex := uint64(0)
+
 			// loop over all of the blocks
 			for i, b := range s.blocks {
 				s.T().Logf("checking block %d %v", i, b.ID())
@@ -147,7 +149,10 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatuses() {
 					assert.Equal(s.T(), b.Header.ID(), resp.BlockID)
 					assert.Equal(s.T(), b.Header.Height, resp.Height)
 					assert.Equal(s.T(), expectedEvents, resp.Events)
+					assert.Equal(s.T(), expectedMsgIndex, resp.MessageIndex)
 				}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
+
+				expectedMsgIndex++
 			}
 
 			// make sure there are no new messages waiting. the channel should be opened with nothing waiting

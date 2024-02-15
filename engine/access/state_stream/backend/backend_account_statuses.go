@@ -10,12 +10,15 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
 type AccountStatusesResponse struct {
-	BlockID flow.Identifier
-	Height  uint64
+	BlockID      flow.Identifier
+	Height       uint64
+	Events       flow.EventsList
+	MessageIndex uint64
 }
 
 type AccountStatusesBackend struct {
@@ -35,14 +38,16 @@ func (b AccountStatusesBackend) SubscribeAccountStatuses(ctx context.Context, st
 		return NewFailedSubscription(err, "could not get start height")
 	}
 
-	sub := NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getAccountStatusResponseFactory(filter))
+	messageIndex := counters.NewMonotonousCounter(0)
+
+	sub := NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getAccountStatusResponseFactory(&messageIndex, filter))
 
 	go NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
 
 	return sub
 }
 
-func (b AccountStatusesBackend) getAccountStatusResponseFactory(filter state_stream.StatusFilter) GetDataByHeightFunc {
+func (b AccountStatusesBackend) getAccountStatusResponseFactory(messageIndex *counters.StrictMonotonousCounter, filter state_stream.StatusFilter) GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
 		executionData, err := b.getExecutionData(ctx, height)
 		if err != nil {
@@ -59,9 +64,17 @@ func (b AccountStatusesBackend) getAccountStatusResponseFactory(filter state_str
 			Uint64("height", height).
 			Msgf("sending %d events", len(events))
 
-		return &AccountStatusesResponse{
-			BlockID: executionData.BlockID,
-			Height:  height,
-		}, nil
+		response := &AccountStatusesResponse{
+			BlockID:      executionData.BlockID,
+			Height:       height,
+			Events:       events,
+			MessageIndex: messageIndex.Value(),
+		}
+
+		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
+			b.log.Debug().Msg("message index already incremented")
+		}
+
+		return response, nil
 	}
 }

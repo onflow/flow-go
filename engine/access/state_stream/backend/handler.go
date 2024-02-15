@@ -264,7 +264,7 @@ func (h *Handler) SubscribeAccountStatuses(request *executiondata.SubscribeAccou
 			return nil
 		}
 
-		resp, ok := v.(*EventsResponse)
+		resp, ok := v.(*AccountStatusesResponse)
 		if !ok {
 			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
 		}
@@ -296,7 +296,7 @@ func (h *Handler) SubscribeAccountStatuses(request *executiondata.SubscribeAccou
 			BlockId:      convert.IdentifierToMessage(resp.BlockID),
 			Address:      convert.IdentifierToMessage(resp.BlockID),
 			Events:       events,
-			MessageIndex: 1,
+			MessageIndex: resp.MessageIndex,
 		})
 		if err != nil {
 			return rpc.ConvertError(err, "could not send response", codes.Internal)
