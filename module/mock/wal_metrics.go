@@ -10,7 +10,7 @@ type WALMetrics struct {
 }
 
 // ExecutionCheckpointSize provides a mock function with given fields: bytes
-func (_m *WALMetrics) ExecutionCheckpointSize(bytes int64) {
+func (_m *WALMetrics) ExecutionCheckpointSize(bytes uint64) {
 	_m.Called(bytes)
 }
 

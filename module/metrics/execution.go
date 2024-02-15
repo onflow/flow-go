@@ -799,7 +799,7 @@ func (ec *ExecutionCollector) ExecutionStorageStateCommitment(bytes int64) {
 }
 
 // ExecutionCheckpointSize reports the size of a checkpoint in bytes
-func (ec *ExecutionCollector) ExecutionCheckpointSize(bytes int64) {
+func (ec *ExecutionCollector) ExecutionCheckpointSize(bytes uint64) {
 	ec.checkpointSize.Set(float64(bytes))
 }
 
