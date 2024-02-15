@@ -83,7 +83,7 @@ func (st *WorkerStatsTracker) Stop() {
 	st.wg.Wait()
 }
 
-func (st *WorkerStatsTracker) IncTxTimedout() {
+func (st *WorkerStatsTracker) IncTxTimedOut() {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 
@@ -125,18 +125,27 @@ func (st *WorkerStatsTracker) GetStats() WorkerStats {
 	return st.stats
 }
 
-func NewPeriodicStatsLogger(st *WorkerStatsTracker, log zerolog.Logger) *Worker {
-	w := NewWorker(0, 1*time.Second, func(workerID int) {
-		stats := st.GetStats()
-		log.Info().
-			Int("Workers", stats.Workers).
-			Int("TxsSent", stats.TxsSent).
-			Int("TxsTimedout", stats.TxsTimedout).
-			Int("TxsExecuted", stats.TxsExecuted).
-			Float64("TxsSentMovingAverage", stats.TxsSentMovingAverage).
-			Float64("TxsExecutedMovingAverage", stats.TxsExecutedMovingAverage).
-			Msg("worker stats")
-	})
+func NewPeriodicStatsLogger(
+	ctx context.Context,
+	st *WorkerStatsTracker,
+	log zerolog.Logger,
+) *Worker {
+	w := NewWorker(
+		ctx,
+		0,
+		1*time.Second,
+		func(workerID int) {
+			stats := st.GetStats()
+			log.Info().
+				Int("Workers", stats.Workers).
+				Int("TxsSent", stats.TxsSent).
+				Int("TxsTimedout", stats.TxsTimedout).
+				Int("TxsExecuted", stats.TxsExecuted).
+				Float64("TxsSentMovingAverage", stats.TxsSentMovingAverage).
+				Float64("TxsExecutedMovingAverage", stats.TxsExecutedMovingAverage).
+				Msg("worker stats")
+		},
+	)
 
 	return w
 }
