@@ -54,6 +54,8 @@ func constructRootEpochEvents(
 		Participants:       participants.Sort(flow.Canonical[flow.Identity]).ToSkeleton(),
 		Assignments:        assignments,
 		RandomSource:       GenerateRandomSeed(flow.EpochSetupRandomSourceLength),
+		TargetDuration:     flagEpochTimingDuration,
+		TargetEndTime:      rootEpochTargetEndTime(),
 	}
 
 	qcsWithSignerIDs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(clusterQCs))
