@@ -8,7 +8,6 @@ import (
 
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	coreContractstemplates "github.com/onflow/flow-core-contracts/lib/go/templates"
-	nftContracts "github.com/onflow/flow-nft/lib/go/contracts"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence/runtime/common"
@@ -346,7 +345,7 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 		),
 		NewSystemContractChange(
 			systemContracts.ViewResolver,
-			nftContracts.ViewResolver(),
+			coreContracts.ViewResolver(),
 		),
 	}
 
