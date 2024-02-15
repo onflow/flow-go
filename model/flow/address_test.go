@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -277,7 +276,7 @@ func testAddressesIntersection(t *testing.T) {
 
 		// a valid address in one network must be invalid in all other networks
 		r := uint64(rand.Intn(maxIndex - loop))
-		state := chain.newAddressGeneratorAtIndex(r) 
+		state := chain.newAddressGeneratorAtIndex(r)
 		for k := 0; k < loop; k++ {
 			address, err := state.NextAddress()
 			require.NoError(t, err)
@@ -293,14 +292,14 @@ func testAddressesIntersection(t *testing.T) {
 			}
 		}
 
-		// `invalidCodeWord` must be invalid in all networks 
+		// `invalidCodeWord` must be invalid in all networks
 		// for the remaining section of the test
 		require.NotEqual(t, invalidCodeWord, uint64(0))
 		invalidAddress := uint64ToAddress(invalidCodeWord)
 		check := chain.IsValid(invalidAddress)
 		require.False(t, check, "account address format should be invalid")
-		
-		// build invalid addresses using `invalidCodeWord` and make sure they all 
+
+		// build invalid addresses using `invalidCodeWord` and make sure they all
 		// fail the check for all networks
 		r = uint64(rand.Intn(maxIndex - loop))
 		state = chain.newAddressGeneratorAtIndex(r)
