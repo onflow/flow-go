@@ -1725,8 +1725,6 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 		Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			msgValidators := publicNetworkMsgValidators(node.Logger.With().Bool("public", true).Logger(), node.IdentityProvider, builder.NodeID)
 
-			middleware := builder.initMiddleware(builder.NodeID, builder.PublicNetworkConfig.Metrics, libp2pNode, msgValidators...)
-
 			// by default, use an empty topology and discover peers using the DHT. this may result
 			// in fragmented public networks if there are no ANs/ONs that connect between them.
 			top := topology.NewEmptyTopology()
