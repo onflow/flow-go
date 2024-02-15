@@ -9,9 +9,10 @@ import (
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/onflow/cadence/encoding/ccf"
 	cdcCommon "github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/flow-go/fvm/evm/types"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gotest.tools/assert"
+
+	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
 func TestEVMEventsCCFEncodingDecoding(t *testing.T) {
