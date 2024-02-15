@@ -99,7 +99,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 	checkReporters(t, rwf, address)
 
 	// Check error logs.
-	require.Nil(t, logWriter.logs)
+	require.Empty(t, logWriter.logs)
 }
 
 // TODO:

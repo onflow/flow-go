@@ -458,7 +458,7 @@ func NewSystemContactsMigration(
 	chainID flow.ChainID,
 	options SystemContractChangesOptions,
 ) *ChangeContractCodeMigration {
-	migration := &ChangeContractCodeMigration{}
+	migration := NewChangeContractCodeMigration()
 	for _, change := range SystemContractChanges(chainID, options) {
 		migration.RegisterContractChange(change)
 	}

@@ -238,11 +238,13 @@ func CheckContractUpdateValidity(
 		return err
 	}
 
-	validator := stdlib.NewLegacyContractUpdateValidator(
+	validator := stdlib.NewCadenceV042ToV1ContractUpdateValidator(
 		nil,
 		contractName,
+		mr,
 		oldProgram,
 		newProgram.Program,
+		mr.Interpreter.AllElaborations(),
 	)
 
 	return validator.Validate()
