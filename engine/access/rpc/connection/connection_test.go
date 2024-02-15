@@ -737,12 +737,20 @@ func TestConcurrentConnections(t *testing.T) {
 		en, closer := createExecNode()
 		defer closer()
 
+		// Note: rapid does not support concurrent calls to Draw for a given T, so they must be serialized
+		mu := sync.Mutex{}
+		getSleep := func() time.Duration {
+			mu.Lock()
+			defer mu.Unlock()
+			return time.Duration(rapid.Int64Range(100, 10_000).Draw(tt, "s"))
+		}
+
+		requestCount := rapid.IntRange(50, 1000).Draw(tt, "r")
 		responsesSent := atomic.NewInt32(0)
 		en.handler.
 			On("Ping", testifymock.Anything, req).
 			Return(func(_ context.Context, _ *execution.PingRequest) (*execution.PingResponse, error) {
-				sleepMicro := rapid.UintRange(100, 10_000).Draw(tt, "s")
-				time.Sleep(time.Duration(sleepMicro) * time.Microsecond)
+				time.Sleep(getSleep() * time.Microsecond)
 
 				// randomly fail ~25% of the time to test that client connection and reuse logic
 				// handles concurrent connect/disconnects
@@ -779,8 +787,6 @@ func TestConcurrentConnections(t *testing.T) {
 		ctx := context.Background()
 
 		// Generate random number of requests
-		requestCount := rapid.IntRange(50, 1000).Draw(tt, "r")
-
 		var wg sync.WaitGroup
 		wg.Add(requestCount)
 
