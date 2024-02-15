@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -55,31 +56,56 @@ func (m *CadenceBaseMigrator) InitMigration(
 	// The MigrateAccount function is only given the payloads for the account to be migrated.
 	// However, the migration needs to be able to get the code for contracts of any account.
 
-	fullPayloadSnapshot, err := util.NewPayloadSnapshot(allPayloads)
+	contracts, err := getContractMap(allPayloads)
 	if err != nil {
 		return err
 	}
 
-	m.runtimeInterfaceConfig = util.RuntimeInterfaceConfig{
+	m.runtimeInterfaceConfig.GetContractCodeFunc = func(location runtime.Location) ([]byte, error) {
+		addressLocation, ok := location.(common.AddressLocation)
+		if !ok {
+			return nil, nil
+		}
 
-		GetContractCodeFunc: func(location runtime.Location) ([]byte, error) {
-			addressLocation, ok := location.(common.AddressLocation)
-			if !ok {
-				return nil, nil
-			}
-			contractRegisterID := flow.ContractRegisterID(
-				flow.Address(addressLocation.Address),
-				addressLocation.Name,
-			)
-			contract, err := fullPayloadSnapshot.Get(contractRegisterID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get contract code: %w", err)
-			}
-			return contract, nil
-		},
+		contract, ok := contracts[addressLocation]
+		if !ok {
+			return nil, fmt.Errorf("failed to get contract code for location %s", location)
+		}
+
+		return contract, nil
 	}
 
 	return nil
+}
+
+func getContractMap(allPayloads []*ledger.Payload) (map[common.AddressLocation][]byte, error) {
+	contracts := make(map[common.AddressLocation][]byte)
+
+	for _, payload := range allPayloads {
+		registerID, registerValue, err := convert.PayloadToRegister(payload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert payload to register: %w", err)
+		}
+
+		contractName := flow.RegisterIDContractName(registerID)
+		if contractName == "" {
+			continue
+		}
+
+		address, err := common.BytesToAddress([]byte(registerID.Owner))
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert register owner to address: %w", err)
+		}
+
+		addressLocation := common.AddressLocation{
+			Address: address,
+			Name:    contractName,
+		}
+
+		contracts[addressLocation] = registerValue
+	}
+
+	return contracts, nil
 }
 
 func (m *CadenceBaseMigrator) MigrateAccount(
