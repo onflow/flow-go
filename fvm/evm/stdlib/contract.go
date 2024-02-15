@@ -1746,3 +1746,51 @@ func NewBalanceCadenceType(address common.Address) *cadence.StructType {
 		nil,
 	)
 }
+
+func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, error) {
+	str, ok := val.(cadence.Struct)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected value type")
+	}
+	if len(str.Fields) != 4 {
+		return nil, fmt.Errorf("invalid input: field count mismatch")
+	}
+
+	statusEnum, ok := str.Fields[0].(cadence.Enum)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for status field")
+	}
+
+	status, ok := statusEnum.Fields[0].(cadence.UInt8)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for status field")
+	}
+
+	errorCode, ok := str.Fields[1].(cadence.UInt64)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for error code field")
+	}
+
+	gasUsed, ok := str.Fields[2].(cadence.UInt64)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for gas field")
+	}
+
+	data, ok := str.Fields[3].(cadence.Array)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for data field")
+	}
+
+	convertedData := make([]byte, len(data.Values))
+	for i, value := range data.Values {
+		convertedData[i] = value.(cadence.UInt8).ToGoValue().(uint8)
+	}
+
+	return &types.ResultSummary{
+		Status:        types.Status(status),
+		ErrorCode:     types.ErrorCode(errorCode),
+		GasConsumed:   uint64(gasUsed),
+		ReturnedValue: convertedData,
+	}, nil
+
+}
