@@ -2,18 +2,17 @@ package cmd
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	madns "github.com/multiformats/go-multiaddr-dns"
+	"github.com/onflow/crypto"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/admin/commands"
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -25,12 +24,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/distributor"
-	"github.com/onflow/flow-go/network/p2p/dns"
-	"github.com/onflow/flow-go/network/p2p/middleware"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -140,7 +133,6 @@ type NodeBuilder interface {
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type BaseConfig struct {
-	NetworkConfig
 	nodeIDHex                   string
 	AdminAddr                   string
 	AdminCert                   string
@@ -176,45 +168,9 @@ type BaseConfig struct {
 	// ComplianceConfig configures either the compliance engine (consensus nodes)
 	// or the follower engine (all other node roles)
 	ComplianceConfig compliance.Config
-}
 
-type NetworkConfig struct {
-	// NetworkConnectionPruning determines whether connections to nodes
-	// that are not part of protocol state should be trimmed
-	// TODO: solely a fallback mechanism, can be removed upon reliable behavior in production.
-	NetworkConnectionPruning bool
-	// GossipSubConfig core gossipsub configuration.
-	GossipSubConfig *p2pbuilder.GossipSubConfig
-	// PreferredUnicastProtocols list of unicast protocols in preferred order
-	PreferredUnicastProtocols       []string
-	NetworkReceivedMessageCacheSize uint32
-
-	PeerUpdateInterval          time.Duration
-	UnicastMessageTimeout       time.Duration
-	DNSCacheTTL                 time.Duration
-	LibP2PResourceManagerConfig *p2pbuilder.ResourceManagerConfig
-	ConnectionManagerConfig     *connection.ManagerConfig
-	// UnicastCreateStreamRetryDelay initial delay used in the exponential backoff for create stream retries
-	UnicastCreateStreamRetryDelay time.Duration
-	// size of the queue for notifications about new peers in the disallow list.
-	DisallowListNotificationCacheSize uint32
-	// UnicastRateLimitersConfig configuration for all unicast rate limiters.
-	UnicastRateLimitersConfig *UnicastRateLimitersConfig
-}
-
-// UnicastRateLimitersConfig unicast rate limiter configuration for the message and bandwidth rate limiters.
-type UnicastRateLimitersConfig struct {
-	// DryRun setting this to true will disable connection disconnects and gating when unicast rate limiters are configured
-	DryRun bool
-	// LockoutDuration the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node
-	// after being rate limited.
-	LockoutDuration time.Duration
-	// MessageRateLimit amount of unicast messages that can be sent by a peer per second.
-	MessageRateLimit int
-	// BandwidthRateLimit bandwidth size in bytes a peer is allowed to send via unicast streams per second.
-	BandwidthRateLimit int
-	// BandwidthBurstLimit bandwidth size in bytes a peer is allowed to send via unicast streams at once.
-	BandwidthBurstLimit int
+	// FlowConfig Flow configuration.
+	FlowConfig config.FlowConfig
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -236,8 +192,8 @@ type NodeConfig struct {
 	ProtocolEvents    *events.Distributor
 	State             protocol.State
 	Resolver          madns.BasicResolver
-	Middleware        network.Middleware
-	Network           network.Network
+	EngineRegistry    network.EngineRegistry
+	NetworkUnderlay   network.Underlay
 	ConduitFactory    network.ConduitFactory
 	PingService       network.PingService
 	MsgValidators     []network.MessageValidator
@@ -248,7 +204,7 @@ type NodeConfig struct {
 	// list of dependencies for network peer manager startup
 	PeerManagerDependencies *DependencyList
 	// ReadyDoneAware implementation of the network middleware for DependableComponents
-	middlewareDependable *module.ProxiedReadyDoneAware
+	networkUnderlayDependable *module.ProxiedReadyDoneAware
 
 	// ID providers
 	IdentityProvider             module.IdentityProvider
@@ -257,51 +213,41 @@ type NodeConfig struct {
 
 	// root state information
 	RootSnapshot protocol.Snapshot
-	// cached properties of RootSnapshot for convenience
-	RootBlock   *flow.Block
-	RootQC      *flow.QuorumCertificate
-	RootResult  *flow.ExecutionResult
-	RootSeal    *flow.Seal
-	RootChainID flow.ChainID
-	SporkID     flow.Identifier
+	// excerpt of root snapshot and latest finalized snapshot, when we boot up
+	StateExcerptAtBoot
 
 	// bootstrapping options
 	SkipNwAddressBasedValidations bool
 
 	// UnicastRateLimiterDistributor notifies consumers when a peer's unicast message is rate limited.
 	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
-	// NodeDisallowListDistributor notifies consumers of updates to disallow listing of nodes.
-	NodeDisallowListDistributor p2p.DisallowListNotificationDistributor
+}
+
+// StateExcerptAtBoot stores information about the root snapshot and latest finalized block for use in bootstrapping.
+type StateExcerptAtBoot struct {
+	// properties of RootSnapshot for convenience
+	// For node bootstrapped with a root snapshot for the first block of a spork,
+	// 		FinalizedRootBlock and SealedRootBlock are the same block (special case of self-sealing block)
+	// For node bootstrapped with a root snapshot for a block above the first block of a spork (dynamically bootstrapped),
+	// 		FinalizedRootBlock.Height > SealedRootBlock.Height
+	FinalizedRootBlock  *flow.Block             // The last finalized block when bootstrapped.
+	SealedRootBlock     *flow.Block             // The last sealed block when bootstrapped.
+	RootQC              *flow.QuorumCertificate // QC for Finalized Root Block
+	RootResult          *flow.ExecutionResult   // Result for SealedRootBlock
+	RootSeal            *flow.Seal              //Seal for RootResult
+	RootChainID         flow.ChainID
+	SporkID             flow.Identifier
+	LastFinalizedHeader *flow.Header // last finalized header when the node boots up
 }
 
 func DefaultBaseConfig() *BaseConfig {
-	homedir, _ := os.UserHomeDir()
-	datadir := filepath.Join(homedir, ".flow", "database")
+	datadir := "/data/protocol"
 
 	// NOTE: if the codec used in the network component is ever changed any code relying on
 	// the message format specific to the codec must be updated. i.e: the AuthorizedSenderValidator.
 	codecFactory := func() network.Codec { return cbor.NewCodec() }
 
 	return &BaseConfig{
-		NetworkConfig: NetworkConfig{
-			UnicastCreateStreamRetryDelay:   unicast.DefaultRetryDelay,
-			PeerUpdateInterval:              connection.DefaultPeerUpdateInterval,
-			UnicastMessageTimeout:           middleware.DefaultUnicastTimeout,
-			NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
-			UnicastRateLimitersConfig: &UnicastRateLimitersConfig{
-				DryRun:              true,
-				LockoutDuration:     10,
-				MessageRateLimit:    0,
-				BandwidthRateLimit:  0,
-				BandwidthBurstLimit: middleware.LargeMsgMaxUnicastMsgSize,
-			},
-			GossipSubConfig:                   p2pbuilder.DefaultGossipSubConfig(),
-			DNSCacheTTL:                       dns.DefaultTimeToLive,
-			LibP2PResourceManagerConfig:       p2pbuilder.DefaultResourceManagerConfig(),
-			ConnectionManagerConfig:           connection.DefaultConnManagerConfig(),
-			NetworkConnectionPruning:          connection.PruningEnabled,
-			DisallowListNotificationCacheSize: distributor.DefaultDisallowListNotificationQueueCacheSize,
-		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,
 		AdminCert:        NotSet,

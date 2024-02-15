@@ -23,6 +23,14 @@ type UnicastManagerMetrics struct {
 	createStreamOnConnRetries *prometheus.HistogramVec
 	// Tracks the time it takes to create the stream after peer dialing completes and a connection is established.
 	createStreamOnConnTime *prometheus.HistogramVec
+	// Tracks the history of the stream retry budget updates.
+	streamRetryBudgetUpdates prometheus.Histogram
+	// Tracks the history of the dial retry budget updates.
+	dialRetryBudgetUpdates prometheus.Histogram
+	// Tracks the number of times the dial retry budget is reset to default.
+	dialRetryBudgetResetToDefault prometheus.Counter
+	// Tracks the number of times the stream creation retry budget is reset to default.
+	streamCreationRetryBudgetResetToDefault prometheus.Counter
 
 	prefix string
 }
@@ -92,6 +100,42 @@ func NewUnicastManagerMetrics(prefix string) *UnicastManagerMetrics {
 		}, []string{LabelSuccess},
 	)
 
+	uc.streamRetryBudgetUpdates = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      uc.prefix + "stream_creation_retry_budget",
+			Help:      "the history of the stream retry budget updates",
+			Buckets:   []float64{1, 2, 3, 4, 5, 10},
+		},
+	)
+
+	uc.dialRetryBudgetUpdates = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      uc.prefix + "dial_retry_budget",
+			Help:      "the history of the dial retry budget updates",
+			Buckets:   []float64{1, 2, 3, 4, 5, 10},
+		},
+	)
+
+	uc.streamCreationRetryBudgetResetToDefault = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      uc.prefix + "stream_creation_retry_budget_reset_to_default_total",
+			Help:      "the number of times the stream creation retry budget is reset to default by the unicast manager",
+		})
+
+	uc.dialRetryBudgetResetToDefault = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      uc.prefix + "dial_retry_budget_reset_to_default_total",
+			Help:      "the number of times the dial retry budget is reset to default by the unicast manager",
+		})
+
 	return uc
 }
 
@@ -133,4 +177,24 @@ func (u *UnicastManagerMetrics) OnStreamEstablished(duration time.Duration, atte
 func (u *UnicastManagerMetrics) OnEstablishStreamFailure(duration time.Duration, attempts int) {
 	u.createStreamOnConnRetries.WithLabelValues("false").Observe(float64(attempts))
 	u.createStreamOnConnTime.WithLabelValues("false").Observe(duration.Seconds())
+}
+
+// OnStreamCreationRetryBudgetUpdated tracks the history of the stream creation retry budget updates.
+func (u *UnicastManagerMetrics) OnStreamCreationRetryBudgetUpdated(budget uint64) {
+	u.dialRetryBudgetUpdates.Observe(float64(budget))
+}
+
+// OnDialRetryBudgetUpdated tracks the history of the dial retry budget updates.
+func (u *UnicastManagerMetrics) OnDialRetryBudgetUpdated(budget uint64) {
+	u.streamRetryBudgetUpdates.Observe(float64(budget))
+}
+
+// OnDialRetryBudgetResetToDefault tracks the number of times the dial retry budget is reset to default.
+func (u *UnicastManagerMetrics) OnDialRetryBudgetResetToDefault() {
+	u.dialRetryBudgetResetToDefault.Inc()
+}
+
+// OnStreamCreationRetryBudgetResetToDefault tracks the number of times the stream creation retry budget is reset to default.
+func (u *UnicastManagerMetrics) OnStreamCreationRetryBudgetResetToDefault() {
+	u.streamCreationRetryBudgetResetToDefault.Inc()
 }

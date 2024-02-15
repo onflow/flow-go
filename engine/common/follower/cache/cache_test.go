@@ -11,7 +11,8 @@ import (
 	"go.uber.org/atomic"
 	"golang.org/x/exp/slices"
 
-	"github.com/onflow/flow-go/engine/common/follower/cache/mock"
+	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -27,14 +28,14 @@ const defaultHeroCacheLimit = 1000
 type CacheSuite struct {
 	suite.Suite
 
-	onEquivocation *mock.OnEquivocation
-	cache          *Cache
+	consumer *mocks.ProposalViolationConsumer
+	cache    *Cache
 }
 
 func (s *CacheSuite) SetupTest() {
 	collector := metrics.NewNoopCollector()
-	s.onEquivocation = mock.NewOnEquivocation(s.T())
-	s.cache = NewCache(unittest.Logger(), defaultHeroCacheLimit, collector, s.onEquivocation.Execute)
+	s.consumer = mocks.NewProposalViolationConsumer(s.T())
+	s.cache = NewCache(unittest.Logger(), defaultHeroCacheLimit, collector, s.consumer)
 }
 
 // TestPeek tests if previously added blocks can be queried by block ID.
@@ -67,7 +68,8 @@ func (s *CacheSuite) TestBlocksEquivocation() {
 		block.Header.View = blocks[i].Header.View
 		// update parentID so blocks are still connected
 		block.Header.ParentID = equivocatedBlocks[i-1].ID()
-		s.onEquivocation.On("Execute", blocks[i], block).Once()
+		s.consumer.On("OnDoubleProposeDetected",
+			model.BlockFromFlow(blocks[i].Header), model.BlockFromFlow(block.Header)).Return().Once()
 	}
 	_, _, err = s.cache.AddBlocks(equivocatedBlocks)
 	require.NoError(s.T(), err)
@@ -166,6 +168,30 @@ func (s *CacheSuite) TestAddBatch() {
 	require.Equal(s.T(), blocks[len(blocks)-1].Header.QuorumCertificate(), certifyingQC)
 }
 
+// TestDuplicatedBatch checks that processing redundant inputs rejects batches where all blocks
+// already reside in the cache. Batches that have at least one new block should be accepted.
+func (s *CacheSuite) TestDuplicatedBatch() {
+	blocks := unittest.ChainFixtureFrom(10, unittest.BlockHeaderFixture())
+
+	certifiedBatch, certifyingQC, err := s.cache.AddBlocks(blocks[1:])
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), blocks[1:len(blocks)-1], certifiedBatch)
+	require.Equal(s.T(), blocks[len(blocks)-1].Header.QuorumCertificate(), certifyingQC)
+
+	// add same batch again, this has to be rejected as redundant input
+	certifiedBatch, certifyingQC, err = s.cache.AddBlocks(blocks[1:])
+	require.NoError(s.T(), err)
+	require.Empty(s.T(), certifiedBatch)
+	require.Nil(s.T(), certifyingQC)
+
+	// add batch with one extra leading block, this has to accepted even though 9 out of 10 blocks
+	// were already processed
+	certifiedBatch, certifyingQC, err = s.cache.AddBlocks(blocks)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), blocks[:len(blocks)-1], certifiedBatch)
+	require.Equal(s.T(), blocks[len(blocks)-1].Header.QuorumCertificate(), certifyingQC)
+}
+
 // TestPruneUpToView tests that blocks lower than pruned height will be properly filtered out from incoming batch.
 func (s *CacheSuite) TestPruneUpToView() {
 	blocks := unittest.ChainFixtureFrom(3, unittest.BlockHeaderFixture())
@@ -213,8 +239,8 @@ func (s *CacheSuite) TestConcurrentAdd() {
 	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*500, "should submit blocks before timeout")
 
 	require.Len(s.T(), allCertifiedBlocks, len(blocks)-1)
-	slices.SortFunc(allCertifiedBlocks, func(lhs *flow.Block, rhs *flow.Block) bool {
-		return lhs.Header.Height < rhs.Header.Height
+	slices.SortFunc(allCertifiedBlocks, func(lhs *flow.Block, rhs *flow.Block) int {
+		return int(lhs.Header.Height) - int(rhs.Header.Height)
 	})
 	require.Equal(s.T(), blocks[:len(blocks)-1], allCertifiedBlocks)
 }
@@ -291,7 +317,7 @@ func (s *CacheSuite) TestAddOverCacheLimit() {
 	// create blocks more than limit
 	workers := 10
 	blocksPerWorker := 10
-	s.cache = NewCache(unittest.Logger(), uint32(blocksPerWorker), metrics.NewNoopCollector(), s.onEquivocation.Execute)
+	s.cache = NewCache(unittest.Logger(), uint32(blocksPerWorker), metrics.NewNoopCollector(), s.consumer)
 
 	blocks := unittest.ChainFixtureFrom(blocksPerWorker*workers, unittest.BlockHeaderFixture())
 

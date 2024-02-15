@@ -12,46 +12,67 @@ import (
 
 const (
 	// [2_000, 3_000) reserved for the FVM
-	ComputationKindHash                       = 2001
-	ComputationKindVerifySignature            = 2002
-	ComputationKindAddAccountKey              = 2003
-	ComputationKindAddEncodedAccountKey       = 2004
-	ComputationKindAllocateStorageIndex       = 2005
-	ComputationKindCreateAccount              = 2006
-	ComputationKindEmitEvent                  = 2007
-	ComputationKindGenerateUUID               = 2008
-	ComputationKindGetAccountAvailableBalance = 2009
-	ComputationKindGetAccountBalance          = 2010
-	ComputationKindGetAccountContractCode     = 2011
-	ComputationKindGetAccountContractNames    = 2012
-	ComputationKindGetAccountKey              = 2013
-	ComputationKindGetBlockAtHeight           = 2014
-	ComputationKindGetCode                    = 2015
-	ComputationKindGetCurrentBlockHeight      = 2016
-	_                                         = 2017
-	ComputationKindGetStorageCapacity         = 2018
-	ComputationKindGetStorageUsed             = 2019
-	ComputationKindGetValue                   = 2020
-	ComputationKindRemoveAccountContractCode  = 2021
-	ComputationKindResolveLocation            = 2022
-	ComputationKindRevokeAccountKey           = 2023
-	ComputationKindRevokeEncodedAccountKey    = 2024
-	_                                         = 2025
-	ComputationKindSetValue                   = 2026
-	ComputationKindUpdateAccountContractCode  = 2027
-	ComputationKindValidatePublicKey          = 2028
-	ComputationKindValueExists                = 2029
-	ComputationKindAccountKeysCount           = 2030
-	ComputationKindBLSVerifyPOP               = 2031
-	ComputationKindBLSAggregateSignatures     = 2032
-	ComputationKindBLSAggregatePublicKeys     = 2033
-	ComputationKindGetOrLoadProgram           = 2034
+	ComputationKindHash = 2001 + iota
+	ComputationKindVerifySignature
+	ComputationKindAddAccountKey
+	ComputationKindAddEncodedAccountKey
+	ComputationKindAllocateStorageIndex
+	ComputationKindCreateAccount
+	ComputationKindEmitEvent
+	ComputationKindGenerateUUID
+	ComputationKindGetAccountAvailableBalance
+	ComputationKindGetAccountBalance
+	ComputationKindGetAccountContractCode
+	ComputationKindGetAccountContractNames
+	ComputationKindGetAccountKey
+	ComputationKindGetBlockAtHeight
+	ComputationKindGetCode
+	ComputationKindGetCurrentBlockHeight
+	_
+	ComputationKindGetStorageCapacity
+	ComputationKindGetStorageUsed
+	ComputationKindGetValue
+	ComputationKindRemoveAccountContractCode
+	ComputationKindResolveLocation
+	ComputationKindRevokeAccountKey
+	ComputationKindRevokeEncodedAccountKey
+	_
+	ComputationKindSetValue
+	ComputationKindUpdateAccountContractCode
+	ComputationKindValidatePublicKey
+	ComputationKindValueExists
+	ComputationKindAccountKeysCount
+	ComputationKindBLSVerifyPOP
+	ComputationKindBLSAggregateSignatures
+	ComputationKindBLSAggregatePublicKeys
+	ComputationKindGetOrLoadProgram
+	ComputationKindGenerateAccountLocalID
+	ComputationKindGetRandomSourceHistory
+	ComputationKindEVMGasUsage
+	ComputationKindRLPEncoding
+	ComputationKindRLPDecoding
+	ComputationKindEncodeEvent
+	_
+	ComputationKindEVMEncodeABI
+	ComputationKindEVMDecodeABI
 )
+
+// MainnetExecutionEffortWeights are the execution effort weights as they are
+// on mainnet from 18.8.2022
+var MainnetExecutionEffortWeights = meter.ExecutionEffortWeights{
+	common.ComputationKindStatement:          1569,
+	common.ComputationKindLoop:               1569,
+	common.ComputationKindFunctionInvocation: 1569,
+	ComputationKindGetValue:                  808,
+	ComputationKindCreateAccount:             2837670,
+	ComputationKindSetValue:                  765,
+}
 
 type Meter interface {
 	MeterComputation(common.ComputationKind, uint) error
 	ComputationUsed() (uint64, error)
 	ComputationIntensities() meter.MeteredComputationIntensities
+	ComputationAvailable(common.ComputationKind, uint) bool
 
 	MeterMemory(usage common.MemoryUsage) error
 	MemoryUsed() (uint64, error)
@@ -81,6 +102,13 @@ func (meter *meterImpl) MeterComputation(
 
 func (meter *meterImpl) ComputationIntensities() meter.MeteredComputationIntensities {
 	return meter.txnState.ComputationIntensities()
+}
+
+func (meter *meterImpl) ComputationAvailable(
+	kind common.ComputationKind,
+	intensity uint,
+) bool {
+	return meter.txnState.ComputationAvailable(kind, intensity)
 }
 
 func (meter *meterImpl) ComputationUsed() (uint64, error) {

@@ -92,12 +92,13 @@ var _ consensus.Compliance = (*ComplianceEngine)(nil)
 // interface `complianceCore` (this package) for detailed documentation of the algorithm.
 func NewComplianceLayer(
 	log zerolog.Logger,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
 	engMetrics module.EngineMetrics,
 	headers storage.Headers,
 	finalized *flow.Header,
 	core complianceCore,
+	config compliance.Config,
 	opts ...EngineOption,
 ) (*ComplianceEngine, error) {
 	// FIFO queue for inbound block proposals
@@ -115,7 +116,7 @@ func NewComplianceLayer(
 		log:                        log.With().Str("engine", "follower").Logger(),
 		me:                         me,
 		engMetrics:                 engMetrics,
-		config:                     compliance.DefaultConfig(),
+		config:                     config,
 		channel:                    channels.ReceiveBlocks,
 		pendingProposals:           pendingBlocks,
 		syncedBlocks:               syncedBlocks,
@@ -337,9 +338,10 @@ func (e *ComplianceEngine) submitConnectedBatch(log zerolog.Logger, latestFinali
 		log.Debug().Msgf("dropping range [%d, %d] below finalized view %d", blocks[0].Header.View, lastBlock.View, latestFinalizedView)
 		return
 	}
-	if lastBlock.View > latestFinalizedView+e.config.SkipNewProposalsThreshold {
+	skipNewProposalsThreshold := e.config.GetSkipNewProposalsThreshold()
+	if lastBlock.View > latestFinalizedView+skipNewProposalsThreshold {
 		log.Debug().
-			Uint64("skip_new_proposals_threshold", e.config.SkipNewProposalsThreshold).
+			Uint64("skip_new_proposals_threshold", skipNewProposalsThreshold).
 			Msgf("dropping range [%d, %d] too far ahead of locally finalized view %d",
 				blocks[0].Header.View, lastBlock.View, latestFinalizedView)
 		return

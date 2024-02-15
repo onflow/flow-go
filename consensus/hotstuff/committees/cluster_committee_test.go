@@ -12,7 +12,7 @@ import (
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
-	"github.com/onflow/flow-go/state/protocol/seed"
+	"github.com/onflow/flow-go/state/protocol/prg"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -49,14 +49,14 @@ func (suite *ClusterSuite) SetupTest() {
 	suite.members = unittest.IdentityListFixture(5, unittest.WithRole(flow.RoleCollection))
 	suite.me = suite.members[0]
 	counter := uint64(1)
-	suite.root = clusterstate.CanonicalRootBlock(counter, suite.members)
+	suite.root = clusterstate.CanonicalRootBlock(counter, suite.members.ToSkeleton())
 
 	suite.cluster.On("EpochCounter").Return(counter)
 	suite.cluster.On("Index").Return(uint(1))
-	suite.cluster.On("Members").Return(suite.members)
+	suite.cluster.On("Members").Return(suite.members.ToSkeleton())
 	suite.cluster.On("RootBlock").Return(suite.root)
 	suite.epoch.On("Counter").Return(counter, nil)
-	suite.epoch.On("RandomSource").Return(unittest.SeedFixture(seed.RandomSourceLength), nil)
+	suite.epoch.On("RandomSource").Return(unittest.SeedFixture(prg.RandomSourceLength), nil)
 
 	var err error
 	suite.com, err = NewClusterCommittee(
@@ -73,11 +73,11 @@ func (suite *ClusterSuite) SetupTest() {
 func (suite *ClusterSuite) TestThresholds() {
 	threshold, err := suite.com.QuorumThresholdForView(rand.Uint64())
 	suite.Require().NoError(err)
-	suite.Assert().Equal(WeightThresholdToBuildQC(suite.members.TotalWeight()), threshold)
+	suite.Assert().Equal(WeightThresholdToBuildQC(suite.members.ToSkeleton().TotalWeight()), threshold)
 
 	threshold, err = suite.com.TimeoutThresholdForView(rand.Uint64())
 	suite.Require().NoError(err)
-	suite.Assert().Equal(WeightThresholdToTimeout(suite.members.TotalWeight()), threshold)
+	suite.Assert().Equal(WeightThresholdToTimeout(suite.members.ToSkeleton().TotalWeight()), threshold)
 }
 
 // TestInvalidSigner tests that the InvalidSignerError sentinel is
@@ -97,20 +97,20 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 
 	// a real cluster member which continues to be a valid member
 	realClusterMember := suite.members[1]
-	// a real cluster member which loses all its weight between cluster initialization
+	// a real cluster member which unstaked and is not active anymore
 	// and the test's reference block
-	realNoWeightClusterMember := suite.members[2]
-	realNoWeightClusterMember.Weight = 0
+	realLeavingClusterMember := suite.members[2]
+	realLeavingClusterMember.EpochParticipationStatus = flow.EpochParticipationStatusLeaving
 	// a real cluster member which is ejected between cluster initialization and
 	// the test's reference block
 	realEjectedClusterMember := suite.members[3]
-	realEjectedClusterMember.Ejected = true
+	realEjectedClusterMember.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 	realNonClusterMember := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	fakeID := unittest.IdentifierFixture()
 
 	suite.state.On("AtBlockID", refID).Return(suite.snap)
 	suite.snap.On("Identity", realClusterMember.NodeID).Return(realClusterMember, nil)
-	suite.snap.On("Identity", realNoWeightClusterMember.NodeID).Return(realNoWeightClusterMember, nil)
+	suite.snap.On("Identity", realLeavingClusterMember.NodeID).Return(realLeavingClusterMember, nil)
 	suite.snap.On("Identity", realEjectedClusterMember.NodeID).Return(realEjectedClusterMember, nil)
 	suite.snap.On("Identity", realNonClusterMember.NodeID).Return(realNonClusterMember, nil)
 	suite.snap.On("Identity", fakeID).Return(nil, protocol.IdentityNotFoundError{})
@@ -130,6 +130,18 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 		})
 	})
 
+	suite.Run("should return ErrInvalidSigner for existent but not active cluster member", func() {
+		suite.Run("non-root block", func() {
+			_, err := suite.com.IdentityByBlock(nonRootBlockID, realLeavingClusterMember.NodeID)
+			suite.Assert().True(model.IsInvalidSignerError(err))
+		})
+		suite.Run("by epoch", func() {
+			actual, err := suite.com.IdentityByEpoch(rand.Uint64(), realLeavingClusterMember.NodeID)
+			suite.Require().NoError(err)
+			suite.Assert().Equal(realLeavingClusterMember.IdentitySkeleton, *actual)
+		})
+	})
+
 	suite.Run("should return InvalidSignerError for existent non-cluster-member", func() {
 		suite.Run("root block", func() {
 			_, err := suite.com.IdentityByBlock(rootBlockID, realNonClusterMember.NodeID)
@@ -146,12 +158,6 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 	})
 
 	suite.Run("should return ErrInvalidSigner for existent but ejected cluster member", func() {
-		// at the root block, the cluster member is not ejected yet
-		suite.Run("root block", func() {
-			actual, err := suite.com.IdentityByBlock(rootBlockID, realEjectedClusterMember.NodeID)
-			suite.Require().NoError(err)
-			suite.Assert().Equal(realEjectedClusterMember, actual)
-		})
 		suite.Run("non-root block", func() {
 			_, err := suite.com.IdentityByBlock(nonRootBlockID, realEjectedClusterMember.NodeID)
 			suite.Assert().True(model.IsInvalidSignerError(err))
@@ -159,25 +165,7 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 		suite.Run("by epoch", func() {
 			actual, err := suite.com.IdentityByEpoch(rand.Uint64(), realEjectedClusterMember.NodeID)
 			suite.Assert().NoError(err)
-			suite.Assert().Equal(realEjectedClusterMember, actual)
-		})
-	})
-
-	suite.Run("should return ErrInvalidSigner for existent but zero-weight cluster member", func() {
-		// at the root block, the cluster member has its initial weight
-		suite.Run("root block", func() {
-			actual, err := suite.com.IdentityByBlock(rootBlockID, realNoWeightClusterMember.NodeID)
-			suite.Require().NoError(err)
-			suite.Assert().Equal(realNoWeightClusterMember, actual)
-		})
-		suite.Run("non-root block", func() {
-			_, err := suite.com.IdentityByBlock(nonRootBlockID, realNoWeightClusterMember.NodeID)
-			suite.Assert().True(model.IsInvalidSignerError(err))
-		})
-		suite.Run("by epoch", func() {
-			actual, err := suite.com.IdentityByEpoch(rand.Uint64(), realNoWeightClusterMember.NodeID)
-			suite.Require().NoError(err)
-			suite.Assert().Equal(realNoWeightClusterMember, actual)
+			suite.Assert().Equal(realEjectedClusterMember.IdentitySkeleton, *actual)
 		})
 	})
 
@@ -195,7 +183,7 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 		suite.Run("by epoch", func() {
 			actual, err := suite.com.IdentityByEpoch(rand.Uint64(), realClusterMember.NodeID)
 			suite.Require().NoError(err)
-			suite.Assert().Equal(realClusterMember, actual)
+			suite.Assert().Equal(realClusterMember.IdentitySkeleton, *actual)
 		})
 	})
 }

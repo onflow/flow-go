@@ -3,7 +3,9 @@
 package mockp2p
 
 import (
+	flow "github.com/onflow/flow-go/model/flow"
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
+
 	mock "github.com/stretchr/testify/mock"
 
 	p2p "github.com/onflow/flow-go/network/p2p"
@@ -18,8 +20,13 @@ type GossipSubInspectorSuite struct {
 	mock.Mock
 }
 
-// AddInvCtrlMsgNotifConsumer provides a mock function with given fields: _a0
-func (_m *GossipSubInspectorSuite) AddInvCtrlMsgNotifConsumer(_a0 p2p.GossipSubInvCtrlMsgNotifConsumer) {
+// ActiveClustersChanged provides a mock function with given fields: _a0
+func (_m *GossipSubInspectorSuite) ActiveClustersChanged(_a0 flow.ChainIDList) {
+	_m.Called(_a0)
+}
+
+// AddInvalidControlMessageConsumer provides a mock function with given fields: _a0
+func (_m *GossipSubInspectorSuite) AddInvalidControlMessageConsumer(_a0 p2p.GossipSubInvCtrlMsgNotifConsumer) {
 	_m.Called(_a0)
 }
 

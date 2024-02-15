@@ -3,7 +3,9 @@
 package mocknetwork
 
 import (
+	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 	channels "github.com/onflow/flow-go/network/channels"
+
 	mock "github.com/stretchr/testify/mock"
 
 	network "github.com/onflow/flow-go/network"
@@ -14,9 +16,46 @@ type MisbehaviorReportManager struct {
 	mock.Mock
 }
 
+// Done provides a mock function with given fields:
+func (_m *MisbehaviorReportManager) Done() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
+}
+
 // HandleMisbehaviorReport provides a mock function with given fields: _a0, _a1
 func (_m *MisbehaviorReportManager) HandleMisbehaviorReport(_a0 channels.Channel, _a1 network.MisbehaviorReport) {
 	_m.Called(_a0, _a1)
+}
+
+// Ready provides a mock function with given fields:
+func (_m *MisbehaviorReportManager) Ready() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
+}
+
+// Start provides a mock function with given fields: _a0
+func (_m *MisbehaviorReportManager) Start(_a0 irrecoverable.SignalerContext) {
+	_m.Called(_a0)
 }
 
 type mockConstructorTestingTNewMisbehaviorReportManager interface {

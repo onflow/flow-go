@@ -4,6 +4,8 @@ package mockp2p
 
 import (
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
+	channels "github.com/onflow/flow-go/network/channels"
+
 	mock "github.com/stretchr/testify/mock"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
@@ -54,6 +56,36 @@ func (_m *PubSubTracer) DuplicateMessage(msg *pubsub.Message) {
 	_m.Called(msg)
 }
 
+// DuplicateMessageCount provides a mock function with given fields: _a0
+func (_m *PubSubTracer) DuplicateMessageCount(_a0 peer.ID) float64 {
+	ret := _m.Called(_a0)
+
+	var r0 float64
+	if rf, ok := ret.Get(0).(func(peer.ID) float64); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Get(0).(float64)
+	}
+
+	return r0
+}
+
+// GetLocalMeshPeers provides a mock function with given fields: topic
+func (_m *PubSubTracer) GetLocalMeshPeers(topic channels.Topic) []peer.ID {
+	ret := _m.Called(topic)
+
+	var r0 []peer.ID
+	if rf, ok := ret.Get(0).(func(channels.Topic) []peer.ID); ok {
+		r0 = rf(topic)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]peer.ID)
+		}
+	}
+
+	return r0
+}
+
 // Graft provides a mock function with given fields: p, topic
 func (_m *PubSubTracer) Graft(p peer.ID, topic string) {
 	_m.Called(p, topic)
@@ -62,6 +94,20 @@ func (_m *PubSubTracer) Graft(p peer.ID, topic string) {
 // Join provides a mock function with given fields: topic
 func (_m *PubSubTracer) Join(topic string) {
 	_m.Called(topic)
+}
+
+// LastHighestIHaveRPCSize provides a mock function with given fields:
+func (_m *PubSubTracer) LastHighestIHaveRPCSize() int64 {
+	ret := _m.Called()
+
+	var r0 int64
+	if rf, ok := ret.Get(0).(func() int64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	return r0
 }
 
 // Leave provides a mock function with given fields: topic
@@ -128,6 +174,20 @@ func (_m *PubSubTracer) UndeliverableMessage(msg *pubsub.Message) {
 // ValidateMessage provides a mock function with given fields: msg
 func (_m *PubSubTracer) ValidateMessage(msg *pubsub.Message) {
 	_m.Called(msg)
+}
+
+// WasIHaveRPCSent provides a mock function with given fields: messageID
+func (_m *PubSubTracer) WasIHaveRPCSent(messageID string) bool {
+	ret := _m.Called(messageID)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(string) bool); ok {
+		r0 = rf(messageID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
 }
 
 type mockConstructorTestingTNewPubSubTracer interface {

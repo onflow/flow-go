@@ -59,6 +59,7 @@ type slotBucket struct {
 }
 
 // Cache implements an array-based generic memory pool backed by a fixed total array.
+// Note that this implementation is NOT thread-safe, and the higher-level Backend is responsible for concurrency management.
 type Cache struct {
 	logger    zerolog.Logger
 	collector module.HeroCacheMetrics
@@ -108,16 +109,23 @@ type Cache struct {
 // The default overSizeFactor factor is different in the package code because slotsPerBucket is > 3.
 const DefaultOversizeFactor = uint32(8)
 
-func NewCache(sizeLimit uint32,
+func NewCache(
+	sizeLimit uint32,
 	oversizeFactor uint32,
 	ejectionMode heropool.EjectionMode,
 	logger zerolog.Logger,
 	collector module.HeroCacheMetrics,
-	opts ...CacheOpt) *Cache {
+	opts ...CacheOpt,
+) *Cache {
 
 	// total buckets.
 	capacity := uint64(sizeLimit * oversizeFactor)
 	bucketNum := capacity / slotsPerBucket
+	if bucketNum == 0 {
+		// we panic here because we don't want to continue with a zero bucketNum (it can cause a DoS attack).
+		panic("bucketNum cannot be zero, choose a bigger sizeLimit or a smaller oversizeFactor")
+	}
+
 	if capacity%slotsPerBucket != 0 {
 		// accounting for remainder.
 		bucketNum++
@@ -130,7 +138,7 @@ func NewCache(sizeLimit uint32,
 		sizeLimit:              sizeLimit,
 		buckets:                make([]slotBucket, bucketNum),
 		ejectionMode:           ejectionMode,
-		entities:               heropool.NewHeroPool(sizeLimit, ejectionMode),
+		entities:               heropool.NewHeroPool(sizeLimit, ejectionMode, logger),
 		availableSlotHistogram: make([]uint64, slotsPerBucket+1), // +1 is to account for empty buckets as well.
 		interactionCounter:     atomic.NewUint64(0),
 		lastTelemetryDump:      atomic.NewInt64(0),
@@ -196,6 +204,45 @@ func (c *Cache) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity
 	return newEntity, true
 }
 
+// AdjustWithInit adjusts the entity using the given function if the given identifier can be found. When the
+// entity is not found, it initializes the entity using the given init function and then applies the adjust function.
+// Args:
+// - entityID: the identifier of the entity to adjust.
+// - adjust: the function that adjusts the entity.
+// - init: the function that initializes the entity when it is not found.
+// Returns:
+//   - the adjusted entity.
+//
+// - a bool which indicates whether the entity was adjusted.
+func (c *Cache) AdjustWithInit(entityID flow.Identifier, adjust func(flow.Entity) flow.Entity, init func() flow.Entity) (flow.Entity, bool) {
+	defer c.logTelemetry()
+
+	if c.Has(entityID) {
+		return c.Adjust(entityID, adjust)
+	}
+	c.put(entityID, init())
+	return c.Adjust(entityID, adjust)
+}
+
+// GetWithInit returns the given entity from the backdata. If the entity does not exist, it creates a new entity
+// using the factory function and stores it in the backdata.
+// Args:
+// - entityID: the identifier of the entity to get.
+// - init: the function that initializes the entity when it is not found.
+// Returns:
+//   - the entity.
+//
+// - a bool which indicates whether the entity was found (or created).
+func (c *Cache) GetWithInit(entityID flow.Identifier, init func() flow.Entity) (flow.Entity, bool) {
+	defer c.logTelemetry()
+
+	if c.Has(entityID) {
+		return c.ByID(entityID)
+	}
+	c.put(entityID, init())
+	return c.ByID(entityID)
+}
+
 // ByID returns the given entity from the backdata.
 func (c *Cache) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 	defer c.logTelemetry()
@@ -205,7 +252,7 @@ func (c *Cache) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 }
 
 // Size returns the size of the backdata, i.e., total number of stored (entityId, entity) pairs.
-func (c Cache) Size() uint {
+func (c *Cache) Size() uint {
 	defer c.logTelemetry()
 
 	return uint(c.entities.Size())
@@ -213,12 +260,12 @@ func (c Cache) Size() uint {
 
 // Head returns the head of queue.
 // Boolean return value determines whether there is a head available.
-func (c Cache) Head() (flow.Entity, bool) {
+func (c *Cache) Head() (flow.Entity, bool) {
 	return c.entities.Head()
 }
 
 // All returns all entities stored in the backdata.
-func (c Cache) All() map[flow.Identifier]flow.Entity {
+func (c *Cache) All() map[flow.Identifier]flow.Entity {
 	defer c.logTelemetry()
 
 	entitiesList := c.entities.All()
@@ -234,7 +281,7 @@ func (c Cache) All() map[flow.Identifier]flow.Entity {
 }
 
 // Identifiers returns the list of identifiers of entities stored in the backdata.
-func (c Cache) Identifiers() flow.IdentifierList {
+func (c *Cache) Identifiers() flow.IdentifierList {
 	defer c.logTelemetry()
 
 	ids := make(flow.IdentifierList, c.entities.Size())
@@ -246,7 +293,7 @@ func (c Cache) Identifiers() flow.IdentifierList {
 }
 
 // Entities returns the list of entities stored in the backdata.
-func (c Cache) Entities() []flow.Entity {
+func (c *Cache) Entities() []flow.Entity {
 	defer c.logTelemetry()
 
 	entities := make([]flow.Entity, c.entities.Size())
@@ -262,7 +309,7 @@ func (c *Cache) Clear() {
 	defer c.logTelemetry()
 
 	c.buckets = make([]slotBucket, c.bucketNum)
-	c.entities = heropool.NewHeroPool(c.sizeLimit, c.ejectionMode)
+	c.entities = heropool.NewHeroPool(c.sizeLimit, c.ejectionMode, c.logger)
 	c.availableSlotHistogram = make([]uint64, slotsPerBucket+1)
 	c.interactionCounter = atomic.NewUint64(0)
 	c.lastTelemetryDump = atomic.NewInt64(0)
@@ -350,7 +397,7 @@ func (c *Cache) get(entityID flow.Identifier) (flow.Entity, bucketIndex, slotInd
 
 // entityId32of256AndBucketIndex determines the id prefix as well as the bucket index corresponding to the
 // given identifier.
-func (c Cache) entityId32of256AndBucketIndex(id flow.Identifier) (sha32of256, bucketIndex) {
+func (c *Cache) entityId32of256AndBucketIndex(id flow.Identifier) (sha32of256, bucketIndex) {
 	// uint64(id[0:8]) used to compute bucket index for which this identifier belongs to
 	b := binary.LittleEndian.Uint64(id[0:8]) % c.bucketNum
 
@@ -361,7 +408,7 @@ func (c Cache) entityId32of256AndBucketIndex(id flow.Identifier) (sha32of256, bu
 }
 
 // expiryThreshold returns the threshold for which all slots with index below threshold are considered old enough for eviction.
-func (c Cache) expiryThreshold() uint64 {
+func (c *Cache) expiryThreshold() uint64 {
 	var expiryThreshold uint64 = 0
 	if c.slotCount > uint64(c.sizeLimit) {
 		// total number of slots written are above the predefined limit
@@ -425,7 +472,7 @@ func (c *Cache) slotIndexInBucket(b bucketIndex, slotId sha32of256, entityId flo
 // ownerIndexOf maps the (bucketIndex, slotIndex) pair to a canonical unique (scalar) index.
 // This scalar index is used to represent this (bucketIndex, slotIndex) pair in the underlying
 // entities list.
-func (c Cache) ownerIndexOf(b bucketIndex, s slotIndex) uint64 {
+func (c *Cache) ownerIndexOf(b bucketIndex, s slotIndex) uint64 {
 	return (uint64(b) * slotsPerBucket) + uint64(s)
 }
 
@@ -478,7 +525,7 @@ func (c *Cache) logTelemetry() {
 			Logger()
 	}
 
-	lg.Info().Msg("logging telemetry")
+	lg.Debug().Msg("logging telemetry")
 	c.lastTelemetryDump.Store(runtimeNano())
 }
 

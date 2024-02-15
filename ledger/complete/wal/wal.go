@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	prometheusWAL "github.com/m4ksio/wal/wal"
+	prometheusWAL "github.com/onflow/wal/wal"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
@@ -29,7 +29,7 @@ type DiskWAL struct {
 func NewDiskWAL(logger zerolog.Logger, reg prometheus.Registerer, metrics module.WALMetrics, dir string, forestCapacity int, pathByteSize int, segmentSize int) (*DiskWAL, error) {
 	w, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize, false)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create disk wal from dir %v, segmentSize %v: %w", dir, segmentSize, err)
 	}
 	return &DiskWAL{
 		wal:            w,
@@ -149,7 +149,7 @@ func (w *DiskWAL) replay(
 	useCheckpoints bool,
 ) error {
 
-	w.log.Info().Msgf("loading checkpoint with WAL from %d to %d", from, to)
+	w.log.Info().Msgf("loading checkpoint with WAL from %d to %d, useCheckpoints %v", from, to, useCheckpoints)
 
 	if to < from {
 		return fmt.Errorf("end of range cannot be smaller than beginning")
@@ -178,6 +178,8 @@ func (w *DiskWAL) replay(
 			availableCheckpoints = getPossibleCheckpoints(allCheckpoints, from-1, to)
 		}
 
+		w.log.Info().Ints("checkpoints", availableCheckpoints).Msg("available checkpoints")
+
 		for len(availableCheckpoints) > 0 {
 			// as long as there are checkpoints to try, we always try with the last checkpoint file, since
 			// it allows us to load less segments.
@@ -194,7 +196,16 @@ func (w *DiskWAL) replay(
 				continue
 			}
 
-			w.log.Info().Int("checkpoint", latestCheckpoint).Msg("checkpoint loaded")
+			if len(forestSequencing) == 0 {
+				return fmt.Errorf("checkpoint loaded but has no trie")
+			}
+
+			firstTrie := forestSequencing[0].RootHash()
+			lastTrie := forestSequencing[len(forestSequencing)-1].RootHash()
+			w.log.Info().Int("checkpoint", latestCheckpoint).
+				Hex("first_trie", firstTrie[:]).
+				Hex("last_trie", lastTrie[:]).
+				Msg("checkpoint loaded")
 
 			err = checkpointFn(forestSequencing)
 			if err != nil {
@@ -206,12 +217,17 @@ func (w *DiskWAL) replay(
 		}
 
 		if loadedCheckpoint != -1 && loadedCheckpoint == to {
+			w.log.Info().Msgf("no checkpoint to load")
 			return nil
 		}
 
 		if loadedCheckpoint >= 0 {
 			startSegment = loadedCheckpoint + 1
 		}
+
+		w.log.Info().
+			Int("start_segment", startSegment).
+			Msg("starting replay from checkpoint segment")
 	}
 
 	if loadedCheckpoint == -1 && startSegment == 0 {
@@ -231,8 +247,13 @@ func (w *DiskWAL) replay(
 				return fmt.Errorf("error while handling root checkpoint: %w", err)
 			}
 
-			w.log.Info().Msgf("root checkpoint loaded")
+			rootHash := flattenedForest[len(flattenedForest)-1].RootHash()
+			w.log.Info().
+				Hex("root_hash", rootHash[:]).
+				Msg("root checkpoint loaded")
 			checkpointLoaded = true
+		} else {
+			w.log.Info().Msgf("no root checkpoint was found")
 		}
 	}
 
@@ -241,7 +262,7 @@ func (w *DiskWAL) replay(
 		Int("loaded_checkpoint", loadedCheckpoint).
 		Msgf("replaying segments from %d to %d", startSegment, to)
 
-	sr, err := prometheusWAL.NewSegmentsRangeReader(prometheusWAL.SegmentRange{
+	sr, err := prometheusWAL.NewSegmentsRangeReader(w.log, prometheusWAL.SegmentRange{
 		Dir:   w.wal.Dir(),
 		First: startSegment,
 		Last:  to,

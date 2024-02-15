@@ -32,12 +32,18 @@ import (
 //
 // Telemetry does NOT capture slashing notifications
 type TelemetryConsumer struct {
-	NoopConsumer
+	NoopTimeoutCollectorConsumer
+	NoopVoteCollectorConsumer
 	pathHandler  *PathHandler
 	noPathLogger zerolog.Logger
 }
 
-var _ hotstuff.Consumer = (*TelemetryConsumer)(nil)
+// Telemetry implements consumers for _all happy-path_ interfaces in consensus/hotstuff/notifications/telemetry.go:
+var _ hotstuff.ParticipantConsumer = (*TelemetryConsumer)(nil)
+var _ hotstuff.CommunicatorConsumer = (*TelemetryConsumer)(nil)
+var _ hotstuff.FinalizationConsumer = (*TelemetryConsumer)(nil)
+var _ hotstuff.VoteCollectorConsumer = (*TelemetryConsumer)(nil)
+var _ hotstuff.TimeoutCollectorConsumer = (*TelemetryConsumer)(nil)
 
 // NewTelemetryConsumer creates consumer that reports telemetry events using logger backend.
 // Logger MUST include `chain` parameter as part of log context with corresponding chain ID to correctly map telemetry events to chain.
@@ -238,6 +244,13 @@ func (t *TelemetryConsumer) OnCurrentViewDetails(currentView, finalizedView uint
 		Uint64("finalized_view", finalizedView).
 		Hex("current_leader", currentLeader[:]).
 		Msg("OnCurrentViewDetails")
+}
+
+func (t *TelemetryConsumer) OnViewChange(oldView, newView uint64) {
+	t.pathHandler.NextStep().
+		Uint64("old_view", oldView).
+		Uint64("new_view", newView).
+		Msg("OnViewChange")
 }
 
 // PathHandler maintains a notion of the current path through the state machine.

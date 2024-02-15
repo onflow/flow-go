@@ -2,7 +2,6 @@ package approvals
 
 import (
 	"fmt"
-	"math/rand"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -15,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 // **Emergency-sealing parameters**
@@ -360,9 +360,14 @@ func (ac *VerifyingAssignmentCollector) RequestMissingApprovals(observation cons
 				)
 			}
 
+			nonce, err := rand.Uint64()
+			if err != nil {
+				return 0, fmt.Errorf("nonce generation failed during request missing approvals: %w", err)
+			}
+
 			// prepare the request
 			req := &messages.ApprovalRequest{
-				Nonce:      rand.Uint64(),
+				Nonce:      nonce,
 				ResultID:   ac.ResultID(),
 				ChunkIndex: chunkIndex,
 			}
@@ -391,9 +396,9 @@ func (ac *VerifyingAssignmentCollector) RequestMissingApprovals(observation cons
 func authorizedVerifiersAtBlock(state protocol.State, blockID flow.Identifier) (map[flow.Identifier]*flow.Identity, error) {
 	authorizedVerifierList, err := state.AtBlockID(blockID).Identities(
 		filter.And(
-			filter.HasRole(flow.RoleVerification),
-			filter.HasWeight(true),
-			filter.Not(filter.Ejected),
+			filter.HasRole[flow.Identity](flow.RoleVerification),
+			filter.HasInitialWeight[flow.Identity](true),
+			filter.IsValidCurrentEpochParticipant,
 		))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve Identities for block %v: %w", blockID, err)

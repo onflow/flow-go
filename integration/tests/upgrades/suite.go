@@ -45,12 +45,12 @@ func (s *Suite) SetupTest() {
 	}()
 
 	collectionConfigs := []func(*testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--block-rate-delay=10ms"),
+		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=10ms"),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--block-rate-delay=10ms"),
+		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=10ms"),
 		testnet.WithAdditionalFlag(
 			fmt.Sprintf(
 				"--required-verification-seal-approvals=%d",
@@ -83,10 +83,12 @@ func (s *Suite) SetupTest() {
 			testnet.WithLogLevel(zerolog.WarnLevel),
 			testnet.WithID(s.exe1ID),
 			testnet.WithAdditionalFlag("--extensive-logging=true"),
+			testnet.WithAdditionalFlag("--max-graceful-stop-duration=1s"),
 		),
 		testnet.NewNodeConfig(
 			flow.RoleExecution,
 			testnet.WithLogLevel(zerolog.WarnLevel),
+			testnet.WithAdditionalFlag("--max-graceful-stop-duration=1s"),
 		),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),

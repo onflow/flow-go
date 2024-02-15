@@ -73,11 +73,6 @@ func (_m *Procedure) NewExecutor(ctx fvm.Context, txnState storage.TransactionPr
 	return r0
 }
 
-// SetOutput provides a mock function with given fields: output
-func (_m *Procedure) SetOutput(output fvm.ProcedureOutput) {
-	_m.Called(output)
-}
-
 // ShouldDisableMemoryAndInteractionLimits provides a mock function with given fields: ctx
 func (_m *Procedure) ShouldDisableMemoryAndInteractionLimits(ctx fvm.Context) bool {
 	ret := _m.Called(ctx)

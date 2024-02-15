@@ -3,7 +3,7 @@
 package mocknetwork
 
 import (
-	slashing "github.com/onflow/flow-go/network/slashing"
+	network "github.com/onflow/flow-go/network"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -13,32 +13,37 @@ type ViolationsConsumer struct {
 }
 
 // OnInvalidMsgError provides a mock function with given fields: violation
-func (_m *ViolationsConsumer) OnInvalidMsgError(violation *slashing.Violation) {
+func (_m *ViolationsConsumer) OnInvalidMsgError(violation *network.Violation) {
 	_m.Called(violation)
 }
 
 // OnSenderEjectedError provides a mock function with given fields: violation
-func (_m *ViolationsConsumer) OnSenderEjectedError(violation *slashing.Violation) {
+func (_m *ViolationsConsumer) OnSenderEjectedError(violation *network.Violation) {
 	_m.Called(violation)
 }
 
 // OnUnAuthorizedSenderError provides a mock function with given fields: violation
-func (_m *ViolationsConsumer) OnUnAuthorizedSenderError(violation *slashing.Violation) {
+func (_m *ViolationsConsumer) OnUnAuthorizedSenderError(violation *network.Violation) {
+	_m.Called(violation)
+}
+
+// OnUnauthorizedPublishOnChannel provides a mock function with given fields: violation
+func (_m *ViolationsConsumer) OnUnauthorizedPublishOnChannel(violation *network.Violation) {
 	_m.Called(violation)
 }
 
 // OnUnauthorizedUnicastOnChannel provides a mock function with given fields: violation
-func (_m *ViolationsConsumer) OnUnauthorizedUnicastOnChannel(violation *slashing.Violation) {
+func (_m *ViolationsConsumer) OnUnauthorizedUnicastOnChannel(violation *network.Violation) {
 	_m.Called(violation)
 }
 
 // OnUnexpectedError provides a mock function with given fields: violation
-func (_m *ViolationsConsumer) OnUnexpectedError(violation *slashing.Violation) {
+func (_m *ViolationsConsumer) OnUnexpectedError(violation *network.Violation) {
 	_m.Called(violation)
 }
 
 // OnUnknownMsgTypeError provides a mock function with given fields: violation
-func (_m *ViolationsConsumer) OnUnknownMsgTypeError(violation *slashing.Violation) {
+func (_m *ViolationsConsumer) OnUnknownMsgTypeError(violation *network.Violation) {
 	_m.Called(violation)
 }
 

@@ -1,14 +1,21 @@
 package utils
 
 import (
+	"context"
 	_ "embed"
+	"fmt"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	sdk "github.com/onflow/flow-go-sdk"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
+
+	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 //go:embed templates/create-and-setup-node.cdc
@@ -52,7 +59,7 @@ func MakeCreateAndSetupNodeTx(
 	script := []byte(templates.ReplaceAddresses(createAndSetupNodeTxScript, env))
 	tx := sdk.NewTransaction().
 		SetScript(script).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlockID).
 		SetProposalKey(service.Address, 0, service.Keys[0].SequenceNumber).
 		AddAuthorizer(service.Address).
@@ -158,7 +165,7 @@ func MakeAdminRemoveNodeTx(
 	accountKey := adminAccount.Keys[adminAccountKeyID]
 	tx := sdk.NewTransaction().
 		SetScript([]byte(templates.ReplaceAddresses(removeNodeTxScript, env))).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlockID).
 		SetProposalKey(adminAccount.Address, adminAccountKeyID, accountKey.SequenceNumber).
 		SetPayer(adminAccount.Address).
@@ -171,4 +178,26 @@ func MakeAdminRemoveNodeTx(
 	}
 
 	return tx, nil
+}
+
+// submitSmokeTestTransaction will submit a create account transaction to smoke test network
+// This ensures a single transaction can be sealed by the network.
+func CreateFlowAccount(ctx context.Context, client *testnet.Client) (sdk.Address, error) {
+	fullAccountKey := sdk.NewAccountKey().
+		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen).PublicKey()).
+		SetHashAlgo(sdkcrypto.SHA2_256).
+		SetWeight(sdk.AccountKeyWeightThreshold)
+
+	latestBlockID, err := client.GetLatestBlockID(ctx)
+	if err != nil {
+		return sdk.EmptyAddress, fmt.Errorf("failed to get latest block id: %w", err)
+	}
+
+	// createAccount will submit a create account transaction and wait for it to be sealed
+	addr, err := client.CreateAccount(ctx, fullAccountKey, sdk.Identifier(latestBlockID))
+	if err != nil {
+		return sdk.EmptyAddress, fmt.Errorf("failed to create account: %w", err)
+	}
+
+	return addr, nil
 }

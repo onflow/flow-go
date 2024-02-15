@@ -4,14 +4,13 @@ import (
 	"errors"
 	"math/rand"
 	"testing"
-	"time"
 
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/module"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/storage"
@@ -31,7 +30,6 @@ func TestBeaconKeyStore(t *testing.T) {
 }
 
 func (suite *BeaconKeyStore) SetupTest() {
-	rand.Seed(time.Now().Unix())
 	suite.epochLookup = mockmodule.NewEpochLookup(suite.T())
 	suite.beaconKeys = mockstorage.NewSafeBeaconKeys(suite.T())
 	suite.store = NewEpochAwareRandomBeaconKeyStore(suite.epochLookup, suite.beaconKeys)

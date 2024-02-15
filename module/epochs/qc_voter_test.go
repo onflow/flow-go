@@ -69,14 +69,14 @@ func (suite *Suite) SetupTest() {
 	suite.counter = rand.Uint64()
 
 	suite.nodes = unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleCollection))
-	suite.me = suite.nodes.Sample(1)[0]
+	suite.me = suite.nodes[rand.Intn(len(suite.nodes))]
 	suite.local.On("NodeID").Return(func() flow.Identifier {
 		return suite.me.NodeID
 	})
 
 	var err error
-	assignments := unittest.ClusterAssignment(2, suite.nodes)
-	suite.clustering, err = factory.NewClusterList(assignments, suite.nodes)
+	assignments := unittest.ClusterAssignment(2, suite.nodes.ToSkeleton())
+	suite.clustering, err = factory.NewClusterList(assignments, suite.nodes.ToSkeleton())
 	suite.Require().NoError(err)
 
 	suite.epoch.On("Counter").Return(suite.counter, nil)

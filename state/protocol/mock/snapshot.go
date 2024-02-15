@@ -109,23 +109,23 @@ func (_m *Snapshot) Head() (*flow.Header, error) {
 }
 
 // Identities provides a mock function with given fields: selector
-func (_m *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (_m *Snapshot) Identities(selector flow.IdentityFilter[flow.Identity]) (flow.GenericIdentityList[flow.Identity], error) {
 	ret := _m.Called(selector)
 
-	var r0 flow.IdentityList
+	var r0 flow.GenericIdentityList[flow.Identity]
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.IdentityFilter) (flow.IdentityList, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.IdentityFilter[flow.Identity]) (flow.GenericIdentityList[flow.Identity], error)); ok {
 		return rf(selector)
 	}
-	if rf, ok := ret.Get(0).(func(flow.IdentityFilter) flow.IdentityList); ok {
+	if rf, ok := ret.Get(0).(func(flow.IdentityFilter[flow.Identity]) flow.GenericIdentityList[flow.Identity]); ok {
 		r0 = rf(selector)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.IdentityList)
+			r0 = ret.Get(0).(flow.GenericIdentityList[flow.Identity])
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(flow.IdentityFilter) error); ok {
+	if rf, ok := ret.Get(1).(func(flow.IdentityFilter[flow.Identity]) error); ok {
 		r1 = rf(selector)
 	} else {
 		r1 = ret.Error(1)
@@ -189,6 +189,32 @@ func (_m *Snapshot) Phase() (flow.EpochPhase, error) {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(flow.EpochPhase)
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ProtocolState provides a mock function with given fields:
+func (_m *Snapshot) ProtocolState() (protocol.DynamicProtocolState, error) {
+	ret := _m.Called()
+
+	var r0 protocol.DynamicProtocolState
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (protocol.DynamicProtocolState, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() protocol.DynamicProtocolState); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(protocol.DynamicProtocolState)
+		}
 	}
 
 	if rf, ok := ret.Get(1).(func() error); ok {
@@ -301,6 +327,32 @@ func (_m *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.SealingSegment)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// VersionBeacon provides a mock function with given fields:
+func (_m *Snapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) {
+	ret := _m.Called()
+
+	var r0 *flow.SealedVersionBeacon
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (*flow.SealedVersionBeacon, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() *flow.SealedVersionBeacon); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.SealedVersionBeacon)
 		}
 	}
 

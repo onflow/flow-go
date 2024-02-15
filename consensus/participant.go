@@ -27,6 +27,7 @@ import (
 func NewParticipant(
 	log zerolog.Logger,
 	metrics module.HotstuffMetrics,
+	mempoolMetrics module.MempoolMetrics,
 	builder module.Builder,
 	finalized *flow.Header,
 	pending []*flow.Header,
@@ -58,29 +59,14 @@ func NewParticipant(
 	}
 
 	// initialize dynamically updatable timeout config
-	timeoutConfig, err := timeout.NewConfig(
-		cfg.TimeoutMinimum,
-		cfg.TimeoutMaximum,
-		cfg.TimeoutAdjustmentFactor,
-		cfg.HappyPathMaxRoundFailures,
-		cfg.BlockRateDelay,
-		cfg.MaxTimeoutObjectRebroadcastInterval,
-	)
+	timeoutConfig, err := timeout.NewConfig(cfg.TimeoutMinimum, cfg.TimeoutMaximum, cfg.TimeoutAdjustmentFactor, cfg.HappyPathMaxRoundFailures, cfg.MaxTimeoutObjectRebroadcastInterval)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize timeout config: %w", err)
 	}
 
-	// register as dynamically updatable via admin command
-	if cfg.Registrar != nil {
-		err = cfg.Registrar.RegisterDurationConfig("hotstuff-block-rate-delay", timeoutConfig.GetBlockRateDelay, timeoutConfig.SetBlockRateDelay)
-		if err != nil {
-			return nil, fmt.Errorf("failed to register block rate delay config: %w", err)
-		}
-	}
-
 	// initialize the pacemaker
 	controller := timeout.NewController(timeoutConfig)
-	pacemaker, err := pacemaker.New(controller, modules.Notifier, modules.Persist,
+	pacemaker, err := pacemaker.New(controller, cfg.ProposalDurationProvider, modules.Notifier, modules.Persist,
 		pacemaker.WithQCs(qcCollector.Retrieve()...),
 		pacemaker.WithTCs(tcCollector.Retrieve()...),
 	)
@@ -116,14 +102,14 @@ func NewParticipant(
 	}
 
 	// initialize and return the event loop
-	loop, err := eventloop.NewEventLoop(log, metrics, eventHandler, cfg.StartupTime)
+	loop, err := eventloop.NewEventLoop(log, metrics, mempoolMetrics, eventHandler, cfg.StartupTime)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize event loop: %w", err)
 	}
 
 	// add observer, event loop needs to receive events from distributor
-	modules.QCCreatedDistributor.AddConsumer(loop)
-	modules.TimeoutCollectorDistributor.AddConsumer(loop)
+	modules.VoteCollectorDistributor.AddVoteCollectorConsumer(loop)
+	modules.TimeoutCollectorDistributor.AddTimeoutCollectorConsumer(loop)
 
 	return loop, nil
 }
@@ -139,7 +125,7 @@ func NewValidator(metrics module.HotstuffMetrics, committee hotstuff.DynamicComm
 }
 
 // NewForks recovers trusted root and creates new forks manager
-func NewForks(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.FinalizationConsumer, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*forks.Forks, error) {
+func NewForks(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.FollowerConsumer, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*forks.Forks, error) {
 	// recover the trusted root
 	trustedRoot, err := recoverTrustedRoot(final, headers, rootHeader, rootQC)
 	if err != nil {

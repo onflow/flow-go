@@ -1,19 +1,23 @@
 package bootstrap
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	pStorage "github.com/onflow/flow-go/storage/pebble"
 )
 
 // an increased limit for bootstrapping
@@ -36,9 +40,10 @@ func (b *Bootstrapper) BootstrapLedger(
 	chain flow.Chain,
 	opts ...fvm.BootstrapProcedureOption,
 ) (flow.StateCommitment, error) {
+	startCommit := flow.StateCommitment(ledger.InitialState())
 	storageSnapshot := state.NewLedgerStorageSnapshot(
 		ledger,
-		flow.StateCommitment(ledger.InitialState()))
+		startCommit)
 
 	vm := fvm.NewVirtualMachine()
 
@@ -46,6 +51,8 @@ func (b *Bootstrapper) BootstrapLedger(
 		fvm.WithLogger(b.logger),
 		fvm.WithMaxStateInteractionSize(ledgerIntractionLimitNeededForBootstrapping),
 		fvm.WithChain(chain),
+		// TODO (JanezP): move this deeper
+		fvm.WithEVMEnabled(true),
 	)
 
 	bootstrap := fvm.Bootstrap(
@@ -58,10 +65,11 @@ func (b *Bootstrapper) BootstrapLedger(
 		return flow.DummyStateCommitment, err
 	}
 
-	newStateCommitment, _, err := state.CommitDelta(
+	newStateCommitment, _, _, err := state.CommitDelta(
 		ledger,
 		executionSnapshot,
-		flow.StateCommitment(ledger.InitialState()))
+		storehouse.NewExecutingBlockSnapshot(storageSnapshot, startCommit),
+	)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}
@@ -94,13 +102,22 @@ func (b *Bootstrapper) IsBootstrapped(db *badger.DB) (flow.StateCommitment, bool
 	return commit, true, nil
 }
 
-func (b *Bootstrapper) BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, genesis *flow.Header) error {
+func (b *Bootstrapper) BootstrapExecutionDatabase(
+	db *badger.DB,
+	rootSeal *flow.Seal,
+) error {
 
+	commit := rootSeal.FinalState
 	err := operation.RetryOnConflict(db.Update, func(txn *badger.Txn) error {
 
-		err := operation.InsertExecutedBlock(genesis.ID())(txn)
+		err := operation.InsertExecutedBlock(rootSeal.BlockID)(txn)
 		if err != nil {
 			return fmt.Errorf("could not index initial genesis execution block: %w", err)
+		}
+
+		err = operation.SkipDuplicates(operation.IndexExecutionResult(rootSeal.BlockID, rootSeal.ResultID))(txn)
+		if err != nil {
+			return fmt.Errorf("could not index result for root result: %w", err)
 		}
 
 		err = operation.IndexStateCommitment(flow.ZeroID, commit)(txn)
@@ -108,13 +125,13 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(db *badger.DB, commit flow.Sta
 			return fmt.Errorf("could not index void state commitment: %w", err)
 		}
 
-		err = operation.IndexStateCommitment(genesis.ID(), commit)(txn)
+		err = operation.IndexStateCommitment(rootSeal.BlockID, commit)(txn)
 		if err != nil {
 			return fmt.Errorf("could not index genesis state commitment: %w", err)
 		}
 
 		snapshots := make([]*snapshot.ExecutionSnapshot, 0)
-		err = operation.InsertExecutionStateInteractions(genesis.ID(), snapshots)(txn)
+		err = operation.InsertExecutionStateInteractions(rootSeal.BlockID, snapshots)(txn)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution state interactions: %w", err)
 		}
@@ -126,5 +143,23 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(db *badger.DB, commit flow.Sta
 		return err
 	}
 
+	return nil
+}
+
+func ImportRegistersFromCheckpoint(logger zerolog.Logger, checkpointFile string, checkpointHeight uint64, checkpointRootHash ledger.RootHash, pdb *pebble.DB, workerCount int) error {
+	logger.Info().Msgf("importing registers from checkpoint file %s at height %d with root hash: %v", checkpointFile, checkpointHeight, checkpointRootHash)
+
+	bootstrap, err := pStorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, checkpointRootHash, logger)
+	if err != nil {
+		return fmt.Errorf("could not create registers bootstrapper: %w", err)
+	}
+
+	// TODO: find a way to hook a context up to this to allow a graceful shutdown
+	err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
+	if err != nil {
+		return fmt.Errorf("could not load checkpoint file: %w", err)
+	}
+
+	logger.Info().Msgf("finish importing registers from checkpoint file %s at height %d", checkpointFile, checkpointHeight)
 	return nil
 }

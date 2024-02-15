@@ -33,16 +33,6 @@ func (_m *Consumer) OnDoubleProposeDetected(_a0 *model.Block, _a1 *model.Block) 
 	_m.Called(_a0, _a1)
 }
 
-// OnDoubleTimeoutDetected provides a mock function with given fields: _a0, _a1
-func (_m *Consumer) OnDoubleTimeoutDetected(_a0 *model.TimeoutObject, _a1 *model.TimeoutObject) {
-	_m.Called(_a0, _a1)
-}
-
-// OnDoubleVotingDetected provides a mock function with given fields: _a0, _a1
-func (_m *Consumer) OnDoubleVotingDetected(_a0 *model.Vote, _a1 *model.Vote) {
-	_m.Called(_a0, _a1)
-}
-
 // OnEventProcessed provides a mock function with given fields:
 func (_m *Consumer) OnEventProcessed() {
 	_m.Called()
@@ -53,13 +43,8 @@ func (_m *Consumer) OnFinalizedBlock(_a0 *model.Block) {
 	_m.Called(_a0)
 }
 
-// OnInvalidTimeoutDetected provides a mock function with given fields: err
-func (_m *Consumer) OnInvalidTimeoutDetected(err model.InvalidTimeoutError) {
-	_m.Called(err)
-}
-
-// OnInvalidVoteDetected provides a mock function with given fields: err
-func (_m *Consumer) OnInvalidVoteDetected(err model.InvalidVoteError) {
+// OnInvalidBlockDetected provides a mock function with given fields: err
+func (_m *Consumer) OnInvalidBlockDetected(err flow.Slashable[model.InvalidProposalError]) {
 	_m.Called(err)
 }
 
@@ -123,24 +108,9 @@ func (_m *Consumer) OnTcTriggeredViewChange(oldView uint64, newView uint64, tc *
 	_m.Called(oldView, newView, tc)
 }
 
-// OnTimeoutProcessed provides a mock function with given fields: timeout
-func (_m *Consumer) OnTimeoutProcessed(timeout *model.TimeoutObject) {
-	_m.Called(timeout)
-}
-
 // OnViewChange provides a mock function with given fields: oldView, newView
 func (_m *Consumer) OnViewChange(oldView uint64, newView uint64) {
 	_m.Called(oldView, newView)
-}
-
-// OnVoteForInvalidBlockDetected provides a mock function with given fields: vote, invalidProposal
-func (_m *Consumer) OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal) {
-	_m.Called(vote, invalidProposal)
-}
-
-// OnVoteProcessed provides a mock function with given fields: vote
-func (_m *Consumer) OnVoteProcessed(vote *model.Vote) {
-	_m.Called(vote)
 }
 
 type mockConstructorTestingTNewConsumer interface {

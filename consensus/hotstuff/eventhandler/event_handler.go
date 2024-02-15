@@ -334,10 +334,14 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	if e.committee.Self() != currentLeader {
 		return nil
 	}
-	for _, b := range e.forks.GetBlocksForView(curView) {
+	for _, b := range e.forks.GetBlocksForView(curView) { // on the happy path, this slice is empty
 		if b.ProposerID == e.committee.Self() {
 			log.Debug().Msg("already proposed for current view")
 			return nil
+		} else {
+			// sanity check: the following code should never be reached, as this node is the current leader, i.e.
+			// we should _not_ consider a proposal for this view from any other as valid and store it in forks.
+			return fmt.Errorf("this node (%v) is leader for the current view %d, but have a proposal from node %v for this view", currentLeader, curView, b.ProposerID)
 		}
 	}
 
@@ -359,7 +363,7 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	// Sanity checks to make sure that resulting proposal is valid:
 	// In its proposal, the leader for view N needs to present evidence that it has legitimately entered view N.
 	// As evidence, we include a QC or TC for view N-1, which should always be available as the PaceMaker advances
-	// to view N only after observing a QC or TC from view N-1. Moreover QC and TC are always processed together. As
+	// to view N only after observing a QC or TC from view N-1. Moreover, QC and TC are always processed together. As
 	// EventHandler is strictly single-threaded without reentrancy, we must have a QC or TC for the prior view (curView-1).
 	// Failing one of these sanity checks is a symptom of state corruption or a severe implementation bug.
 	if newestQC.View+1 != curView {
@@ -382,6 +386,8 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
 	}
 	proposedBlock := model.BlockFromFlow(flowProposal) // turn the signed flow header into a proposal
+	// determine target publication time (CAUTION: must happen before AddValidatedBlock)
+	targetPublicationTime := e.paceMaker.TargetPublicationTime(flowProposal.View, start, flowProposal.ParentID)
 
 	// we want to store created proposal in forks to make sure that we don't create more proposals for
 	// current view. Due to asynchronous nature of our design it's possible that after creating proposal
@@ -390,8 +396,10 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	if err != nil {
 		return fmt.Errorf("could not add newly created proposal (%v): %w", proposedBlock.BlockID, err)
 	}
+
 	log.Debug().
 		Uint64("block_view", proposedBlock.View).
+		Time("target_publication", targetPublicationTime).
 		Hex("block_id", proposedBlock.BlockID[:]).
 		Uint64("parent_view", newestQC.View).
 		Hex("parent_id", newestQC.BlockID[:]).
@@ -399,7 +407,6 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		Msg("forwarding proposal to communicator for broadcasting")
 
 	// raise a notification with proposal (also triggers broadcast)
-	targetPublicationTime := start.Add(e.paceMaker.BlockRateDelay())
 	e.notifier.OnOwnProposal(flowProposal, targetPublicationTime)
 	return nil
 }

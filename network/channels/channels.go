@@ -102,6 +102,7 @@ func PublicChannels() ChannelList {
 	return ChannelList{
 		PublicSyncCommittee,
 		PublicReceiveBlocks,
+		PublicExecutionDataService,
 	}
 }
 
@@ -154,9 +155,10 @@ const (
 	ProvideApprovalsByChunk  = RequestApprovalsByChunk
 
 	// Public network channels
-	PublicPushBlocks    = Channel("public-push-blocks")
-	PublicReceiveBlocks = PublicPushBlocks
-	PublicSyncCommittee = Channel("public-sync-committee")
+	PublicPushBlocks           = Channel("public-push-blocks")
+	PublicReceiveBlocks        = PublicPushBlocks
+	PublicSyncCommittee        = Channel("public-sync-committee")
+	PublicExecutionDataService = Channel("public-execution-data-service")
 
 	// Execution data service
 	ExecutionDataService = Channel("execution-data-service")
@@ -277,13 +279,52 @@ func ChannelFromTopic(topic Topic) (Channel, bool) {
 	return "", false
 }
 
-// SporkIDFromTopic returns the spork ID from a topic.
-// All errors returned from this function can be considered benign.
-func SporkIDFromTopic(topic Topic) (flow.Identifier, error) {
+// sporkIdFromTopic returns the pre-pended spork ID flow identifier for the topic.
+// A valid channel has a spork ID suffix:
+//
+//	channel/spork_id
+//
+// A generic error is returned if an error is encountered while converting the spork ID to flow Identifier or
+// the spork ID is missing.
+func sporkIdFromTopic(topic Topic) (flow.Identifier, error) {
 	if index := strings.LastIndex(topic.String(), "/"); index != -1 {
-		return flow.HexStringToIdentifier(string(topic)[index+1:])
+		id, err := flow.HexStringToIdentifier(string(topic)[index+1:])
+		if err != nil {
+			return flow.Identifier{}, fmt.Errorf("failed to get spork ID from topic %s: %w", topic, err)
+		}
+
+		return id, nil
 	}
-	return flow.Identifier{}, fmt.Errorf("spork ID is missing")
+	return flow.Identifier{}, fmt.Errorf("spork id missing from topic")
+}
+
+// sporkIdStrFromTopic returns the pre-pended spork ID string for the topic.
+// A valid channel has a spork ID suffix:
+//
+//	channel/spork_id
+//
+// A generic error is returned if an error is encountered while deriving the spork ID from the topic
+func sporkIdStrFromTopic(topic Topic) (string, error) {
+	sporkId, err := sporkIdFromTopic(topic)
+	if err != nil {
+		return "", err
+	}
+	return sporkId.String(), nil
+}
+
+// clusterIDStrFromTopic returns the appended cluster ID in flow.ChainID format for the cluster prefixed topic.
+// A valid cluster-prefixed channel includes the cluster prefix and cluster ID suffix:
+//
+//	sync-cluster/some_cluster_id
+//
+// A generic error is returned if the topic is malformed.
+func clusterIDStrFromTopic(topic Topic) (flow.ChainID, error) {
+	for prefix := range clusterChannelPrefixRoleMap {
+		if strings.HasPrefix(topic.String(), prefix) {
+			return flow.ChainID(strings.TrimPrefix(topic.String(), fmt.Sprintf("%s-", prefix))), nil
+		}
+	}
+	return "", fmt.Errorf("failed to get cluster ID from topic %s", topic)
 }
 
 // ConsensusCluster returns a dynamic cluster consensus channel based on
@@ -298,33 +339,63 @@ func SyncCluster(clusterID flow.ChainID) Channel {
 	return Channel(fmt.Sprintf("%s-%s", SyncClusterPrefix, clusterID))
 }
 
-// IsValidFlowTopic ensures the topic is a valid Flow network topic.
-// A valid Topic has the following properties:
-// - A Channel can be derived from the Topic and that channel exists.
-// - The sporkID part of the Topic is equal to the current network sporkID.
-// All errors returned from this function can be considered benign.
-func IsValidFlowTopic(topic Topic, expectedSporkID flow.Identifier) error {
-	channel, ok := ChannelFromTopic(topic)
-	if !ok {
-		return fmt.Errorf("invalid topic: failed to get channel from topic")
-	}
-	err := IsValidFlowChannel(channel)
+// IsValidNonClusterFlowTopic ensures the topic is a valid Flow network topic and
+// ensures the sporkID part of the Topic is equal to the current network sporkID.
+// Expected errors:
+// - InvalidTopicErr if the topic is not a if the topic is not a valid topic for the given spork.
+func IsValidNonClusterFlowTopic(topic Topic, expectedSporkID flow.Identifier) error {
+	sporkID, err := sporkIdStrFromTopic(topic)
 	if err != nil {
-		return fmt.Errorf("invalid topic: %w", err)
+		return NewInvalidTopicErr(topic, fmt.Errorf("failed to get spork ID from topic: %w", err))
 	}
 
-	if IsClusterChannel(channel) {
-		return nil
+	if sporkID != expectedSporkID.String() {
+		return NewInvalidTopicErr(topic, fmt.Errorf("invalid flow topic mismatch spork ID expected spork ID %s actual spork ID %s", expectedSporkID, sporkID))
 	}
 
-	sporkID, err := SporkIDFromTopic(topic)
+	return isValidFlowTopic(topic)
+}
+
+// IsValidFlowClusterTopic ensures the topic is a valid Flow network topic and
+// ensures the cluster ID part of the Topic is equal to one of the provided active cluster IDs.
+// All errors returned from this function can be considered benign.
+// Expected errors:
+// - InvalidTopicErr if the topic is not a valid Flow topic or the cluster ID cannot be derived from the topic.
+// - UnknownClusterIDErr if the cluster ID from the topic is not in the activeClusterIDS list.
+func IsValidFlowClusterTopic(topic Topic, activeClusterIDS flow.ChainIDList) error {
+	err := isValidFlowTopic(topic)
 	if err != nil {
 		return err
 	}
-	if sporkID != expectedSporkID {
-		return fmt.Errorf("invalid topic: wrong spork ID %s the current spork ID is %s", sporkID, expectedSporkID)
+
+	clusterID, err := clusterIDStrFromTopic(topic)
+	if err != nil {
+		return NewInvalidTopicErr(topic, fmt.Errorf("failed to get cluster ID from topic: %w", err))
 	}
 
+	for _, activeClusterID := range activeClusterIDS {
+		if clusterID == activeClusterID {
+			return nil
+		}
+	}
+
+	return NewUnknownClusterIdErr(clusterID, activeClusterIDS)
+}
+
+// isValidFlowTopic ensures the topic is a valid Flow network topic.
+// A valid Topic has the following properties:
+// - A Channel can be derived from the Topic and that channel exists.
+// Expected errors:
+// - InvalidTopicErr if the topic is not a valid Flow topic.
+func isValidFlowTopic(topic Topic) error {
+	channel, ok := ChannelFromTopic(topic)
+	if !ok {
+		return NewInvalidTopicErr(topic, fmt.Errorf("invalid topic: failed to get channel from topic"))
+	}
+	err := IsValidFlowChannel(channel)
+	if err != nil {
+		return NewInvalidTopicErr(topic, fmt.Errorf("invalid topic: %w", err))
+	}
 	return nil
 }
 

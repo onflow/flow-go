@@ -131,6 +131,30 @@ func (_m *Accounts) Exists(address flow.Address) (bool, error) {
 	return r0, r1
 }
 
+// GenerateAccountLocalID provides a mock function with given fields: address
+func (_m *Accounts) GenerateAccountLocalID(address flow.Address) (uint64, error) {
+	ret := _m.Called(address)
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.Address) (uint64, error)); ok {
+		return rf(address)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Address) uint64); ok {
+		r0 = rf(address)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Address) error); ok {
+		r1 = rf(address)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Get provides a mock function with given fields: address
 func (_m *Accounts) Get(address flow.Address) (*flow.Account, error) {
 	ret := _m.Called(address)

@@ -5,15 +5,15 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestHasValidIdentity_Unknown tests that when a peer has an unknown identity, the HasValidIdentity returns InvalidPeerIDError
 func TestHasValidIdentity_Unknown(t *testing.T) {
-	peerId := p2pfixtures.PeerIdFixture(t)
+	peerId := unittest.PeerIdFixture(t)
 	idProvider := mock.NewIdentityProvider(t)
 	idProvider.On("ByPeerID", peerId).Return(nil, false)
 
@@ -29,8 +29,8 @@ func TestHasValidIdentity_Ejected(t *testing.T) {
 	idProvider := mock.NewIdentityProvider(t)
 
 	ejectedIdentity := unittest.IdentityFixture()
-	ejectedIdentity.Ejected = true
-	peerId := p2pfixtures.PeerIdFixture(t)
+	ejectedIdentity.EpochParticipationStatus = flow.EpochParticipationStatusEjected
+	peerId := unittest.PeerIdFixture(t)
 	idProvider.On("ByPeerID", peerId).Return(ejectedIdentity, true)
 
 	identity, err := scoring.HasValidFlowIdentity(idProvider, peerId)
@@ -45,7 +45,7 @@ func TestHasValidIdentity_Valid(t *testing.T) {
 	idProvider := mock.NewIdentityProvider(t)
 
 	trueID := unittest.IdentityFixture()
-	peerId := p2pfixtures.PeerIdFixture(t)
+	peerId := unittest.PeerIdFixture(t)
 	idProvider.On("ByPeerID", peerId).Return(trueID, true)
 
 	identity, err := scoring.HasValidFlowIdentity(idProvider, peerId)

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/format"
 	"github.com/stretchr/testify/assert"
@@ -70,7 +71,7 @@ func createAccount(
 
 	require.Len(t, accountCreatedEvents, 1)
 
-	data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
+	data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 	require.NoError(t, err)
 	address := flow.ConvertAddress(
 		data.(cadence.Event).Fields[0].(cadence.Address))
@@ -407,7 +408,7 @@ func TestCreateAccount(t *testing.T) {
 				accountCreatedEvents := filterAccountCreatedEvents(output.Events)
 				require.Len(t, accountCreatedEvents, 1)
 
-				data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
+				data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 				require.NoError(t, err)
 				address := flow.ConvertAddress(
 					data.(cadence.Event).Fields[0].(cadence.Address))
@@ -450,7 +451,7 @@ func TestCreateAccount(t *testing.T) {
 					}
 					accountCreatedEventCount += 1
 
-					data, err := jsoncdc.Decode(nil, event.Payload)
+					data, err := ccf.Decode(nil, event.Payload)
 					require.NoError(t, err)
 					address := flow.ConvertAddress(
 						data.(cadence.Event).Fields[0].(cadence.Address))
@@ -1605,7 +1606,7 @@ func TestAccountBalanceFields(t *testing.T) {
 				_, output, err = vm.Run(ctx, script, snapshotTree)
 				assert.NoError(t, err)
 				assert.NoError(t, output.Err)
-				assert.Equal(t, cadence.UFix64(9999_3120), output.Value)
+				assert.Equal(t, cadence.UFix64(99_993_040), output.Value)
 			}),
 	)
 

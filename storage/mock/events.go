@@ -146,6 +146,20 @@ func (_m *Events) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uin
 	return r0, r1
 }
 
+// Store provides a mock function with given fields: blockID, blockEvents
+func (_m *Events) Store(blockID flow.Identifier, blockEvents []flow.EventsList) error {
+	ret := _m.Called(blockID, blockEvents)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.EventsList) error); ok {
+		r0 = rf(blockID, blockEvents)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 type mockConstructorTestingTNewEvents interface {
 	mock.TestingT
 	Cleanup(func())

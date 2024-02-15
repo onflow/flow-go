@@ -16,3 +16,11 @@ type Entity interface {
 	// data such as signatures.
 	Checksum() Identifier
 }
+
+func EntitiesToIDs[T Entity](entities []T) []Identifier {
+	ids := make([]Identifier, 0, len(entities))
+	for _, entity := range entities {
+		ids = append(ids, entity.ID())
+	}
+	return ids
+}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 )
@@ -57,6 +58,17 @@ func (mock *EpochQuery) Previous() protocol.Epoch {
 		return invalid.NewEpoch(protocol.ErrNoPreviousEpoch)
 	}
 	return epoch
+}
+
+// Phase returns a phase consistent with the current epoch state.
+func (mock *EpochQuery) Phase() flow.EpochPhase {
+	mock.mu.RLock()
+	defer mock.mu.RUnlock()
+	_, exists := mock.byCounter[mock.counter+1]
+	if exists {
+		return flow.EpochPhaseSetup
+	}
+	return flow.EpochPhaseStaking
 }
 
 func (mock *EpochQuery) ByCounter(counter uint64) protocol.Epoch {

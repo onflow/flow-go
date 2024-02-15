@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	prometheusWAL "github.com/m4ksio/wal/wal"
+	prometheusWAL "github.com/onflow/wal/wal"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -816,7 +816,7 @@ func replaySegments(
 	updateFn func(update *ledger.TrieUpdate) error,
 	deleteFn func(rootHash ledger.RootHash) error,
 ) error {
-	sr, err := prometheusWAL.NewSegmentsRangeReader(prometheusWAL.SegmentRange{
+	sr, err := prometheusWAL.NewSegmentsRangeReader(unittest.Logger(), prometheusWAL.SegmentRange{
 		Dir:   dir,
 		First: 0,
 		Last:  to,

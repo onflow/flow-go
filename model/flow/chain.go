@@ -12,6 +12,7 @@ import (
 //
 // Chain IDs are used used to prevent replay attacks and to support network-specific address generation.
 type ChainID string
+type ChainIDList []ChainID
 
 const (
 	// Mainnet is the chain ID for the mainnet chain.
@@ -38,6 +39,20 @@ const (
 	// MonotonicEmulator is the chain ID for the emulated node chain with monotonic address generation.
 	MonotonicEmulator ChainID = "flow-emulator-monotonic"
 )
+
+// AllChainIDs returns a list of all supported chain IDs.
+func AllChainIDs() ChainIDList {
+	return ChainIDList{
+		Mainnet,
+		Testnet,
+		Sandboxnet,
+		Benchnet,
+		Localnet,
+		Emulator,
+		BftTestnet,
+		MonotonicEmulator,
+	}
+}
 
 // Transient returns whether the chain ID is for a transient network.
 func (c ChainID) Transient() bool {

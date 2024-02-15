@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/compliance"
 	moduleconsensus "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -62,7 +63,7 @@ func TestFollowerHappyPath(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.Statuses,
+			all.ProtocolState,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -85,9 +86,12 @@ func TestFollowerHappyPath(t *testing.T) {
 		require.NoError(t, err)
 		rootQC, err := rootSnapshot.QuorumCertificate()
 		require.NoError(t, err)
+		rootProtocolState, err := rootSnapshot.ProtocolState()
+		require.NoError(t, err)
+		rootProtocolStateID := rootProtocolState.Entry().ID()
 
-		// Hack EECC.
-		// Since root snapshot is created with 1000 views for first epoch, we will forcefully enter EECC to avoid errors
+		// Hack EFM.
+		// Since root snapshot is created with 1000 views for first epoch, we will forcefully enter EFM to avoid errors
 		// related to epoch transitions.
 		db.NewTransaction(true)
 		err = db.Update(func(txn *badger.Txn) error {
@@ -95,7 +99,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		consensusConsumer := pubsub.NewFinalizationDistributor()
+		consensusConsumer := pubsub.NewFollowerDistributor()
 		// use real consensus modules
 		forks, err := consensus.NewForks(rootHeader, all.Headers, finalizer, consensusConsumer, rootHeader, rootQC)
 		require.NoError(t, err)
@@ -105,7 +109,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		validator.On("ValidateProposal", mock.Anything).Return(nil)
 
 		// initialize the follower loop
-		followerLoop, err := hotstuff.NewFollowerLoop(unittest.Logger(), forks)
+		followerLoop, err := hotstuff.NewFollowerLoop(unittest.Logger(), metrics, forks)
 		require.NoError(t, err)
 
 		syncCore := module.NewBlockRequester(t)
@@ -131,7 +135,16 @@ func TestFollowerHappyPath(t *testing.T) {
 		net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
 
 		// use real engine
-		engine, err := NewComplianceLayer(unittest.Logger(), net, me, metrics, all.Headers, rootHeader, followerCore)
+		engine, err := NewComplianceLayer(
+			unittest.Logger(),
+			net,
+			me,
+			metrics,
+			all.Headers,
+			rootHeader,
+			followerCore,
+			compliance.DefaultConfig(),
+		)
 		require.NoError(t, err)
 		// don't forget to subscribe for finalization notifications
 		consensusConsumer.AddOnBlockFinalizedConsumer(engine.OnFinalizedBlock)
@@ -153,6 +166,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		// ensure sequential block views - that way we can easily know which block will be finalized after the test
 		for i, block := range flowBlocks {
 			block.Header.View = block.Header.Height
+			block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			if i > 0 {
 				block.Header.ParentView = flowBlocks[i-1].Header.View
 				block.Header.ParentID = flowBlocks[i-1].Header.ID()

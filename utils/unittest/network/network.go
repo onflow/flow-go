@@ -24,7 +24,7 @@ type Network struct {
 	publishFunc PublishFunc
 }
 
-var _ network.Network = (*Network)(nil)
+var _ network.EngineRegistry = (*Network)(nil)
 
 // NewNetwork returns a new mock network.
 func NewNetwork() *Network {

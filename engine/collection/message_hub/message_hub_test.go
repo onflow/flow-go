@@ -2,7 +2,6 @@ package message_hub
 
 import (
 	"context"
-	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -68,13 +67,10 @@ type MessageHubSuite struct {
 }
 
 func (s *MessageHubSuite) SetupTest() {
-	// seed the RNG
-	rand.Seed(time.Now().UnixNano())
-
 	// initialize the paramaters
 	s.cluster = unittest.IdentityListFixture(3,
 		unittest.WithRole(flow.RoleCollection),
-		unittest.WithWeight(1000),
+		unittest.WithInitialWeight(1000),
 	)
 	s.myID = s.cluster[0].NodeID
 	s.clusterID = "cluster-id"
@@ -93,7 +89,7 @@ func (s *MessageHubSuite) SetupTest() {
 
 	// set up proto state mock
 	protoEpoch := &protocol.Epoch{}
-	clusters := flow.ClusterList{s.cluster}
+	clusters := flow.ClusterList{s.cluster.ToSkeleton()}
 	protoEpoch.On("Clustering").Return(clusters, nil)
 
 	protoQuery := &protocol.EpochQuery{}
@@ -102,7 +98,7 @@ func (s *MessageHubSuite) SetupTest() {
 	protoSnapshot := &protocol.Snapshot{}
 	protoSnapshot.On("Epochs").Return(protoQuery)
 	protoSnapshot.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return s.cluster.Filter(selector)
 		},
 		nil,

@@ -278,6 +278,20 @@ func (_m *Environment) CheckPayerBalanceAndGetMaxTxFees(payer flow.Address, incl
 	return r0, r1
 }
 
+// ComputationAvailable provides a mock function with given fields: _a0, _a1
+func (_m *Environment) ComputationAvailable(_a0 common.ComputationKind, _a1 uint) bool {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(common.ComputationKind, uint) bool); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // ComputationIntensities provides a mock function with given fields:
 func (_m *Environment) ComputationIntensities() meter.MeteredComputationIntensities {
 	ret := _m.Called()
@@ -459,6 +473,30 @@ func (_m *Environment) FlushPendingUpdates() (environment.ContractUpdates, error
 
 	if rf, ok := ret.Get(1).(func() error); ok {
 		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GenerateAccountID provides a mock function with given fields: address
+func (_m *Environment) GenerateAccountID(address common.Address) (uint64, error) {
+	ret := _m.Called(address)
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(common.Address) (uint64, error)); ok {
+		return rf(address)
+	}
+	if rf, ok := ret.Get(0).(func(common.Address) uint64); ok {
+		r0 = rf(address)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func(common.Address) error); ok {
+		r1 = rf(address)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -929,6 +967,32 @@ func (_m *Environment) InteractionUsed() (uint64, error) {
 	return r0, r1
 }
 
+// Invoke provides a mock function with given fields: spec, arguments
+func (_m *Environment) Invoke(spec environment.ContractFunctionSpec, arguments []cadence.Value) (cadence.Value, error) {
+	ret := _m.Called(spec, arguments)
+
+	var r0 cadence.Value
+	var r1 error
+	if rf, ok := ret.Get(0).(func(environment.ContractFunctionSpec, []cadence.Value) (cadence.Value, error)); ok {
+		return rf(spec, arguments)
+	}
+	if rf, ok := ret.Get(0).(func(environment.ContractFunctionSpec, []cadence.Value) cadence.Value); ok {
+		r0 = rf(spec, arguments)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(cadence.Value)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(environment.ContractFunctionSpec, []cadence.Value) error); ok {
+		r1 = rf(spec, arguments)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // IsServiceAccountAuthorizer provides a mock function with given fields:
 func (_m *Environment) IsServiceAccountAuthorizer() bool {
 	ret := _m.Called()
@@ -958,16 +1022,14 @@ func (_m *Environment) LimitAccountStorage() bool {
 }
 
 // Logger provides a mock function with given fields:
-func (_m *Environment) Logger() *zerolog.Logger {
+func (_m *Environment) Logger() zerolog.Logger {
 	ret := _m.Called()
 
-	var r0 *zerolog.Logger
-	if rf, ok := ret.Get(0).(func() *zerolog.Logger); ok {
+	var r0 zerolog.Logger
+	if rf, ok := ret.Get(0).(func() zerolog.Logger); ok {
 		r0 = rf()
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*zerolog.Logger)
-		}
+		r0 = ret.Get(0).(zerolog.Logger)
 	}
 
 	return r0
@@ -1061,6 +1123,46 @@ func (_m *Environment) ProgramLog(_a0 string) error {
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// RandomSourceHistory provides a mock function with given fields:
+func (_m *Environment) RandomSourceHistory() ([]byte, error) {
+	ret := _m.Called()
+
+	var r0 []byte
+	var r1 error
+	if rf, ok := ret.Get(0).(func() ([]byte, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() []byte); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]byte)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ReadRandom provides a mock function with given fields: _a0
+func (_m *Environment) ReadRandom(_a0 []byte) error {
+	ret := _m.Called(_a0)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]byte) error); ok {
 		r0 = rf(_a0)
 	} else {
 		r0 = ret.Error(0)
@@ -1293,30 +1395,6 @@ func (_m *Environment) TxIndex() uint32 {
 	}
 
 	return r0
-}
-
-// UnsafeRandom provides a mock function with given fields:
-func (_m *Environment) UnsafeRandom() (uint64, error) {
-	ret := _m.Called()
-
-	var r0 uint64
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return rf()
-	}
-	if rf, ok := ret.Get(0).(func() uint64); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
 }
 
 // UpdateAccountContractCode provides a mock function with given fields: location, code

@@ -4,16 +4,14 @@ import (
 	"context"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	p2pnode "github.com/onflow/flow-go/network/p2p/node"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 )
 
@@ -48,10 +46,4 @@ type CorruptP2PNode struct {
 func (n *CorruptP2PNode) Subscribe(topic channels.Topic, _ p2p.TopicValidatorFunc) (p2p.Subscription, error) {
 	topicValidator := AcceptAllTopicValidator()
 	return n.Node.Subscribe(topic, topicValidator)
-}
-
-// NewCorruptLibP2PNode returns corrupted libP2PNode that will subscribe to topics using the AcceptAllTopicValidator.
-func NewCorruptLibP2PNode(logger zerolog.Logger, host host.Host, pCache p2p.ProtocolPeerCache, peerManager p2p.PeerManager) p2p.LibP2PNode {
-	node := p2pnode.NewNode(logger, host, pCache, peerManager)
-	return &CorruptP2PNode{Node: node, logger: logger, codec: cbor.NewCodec()}
 }

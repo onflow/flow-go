@@ -6,16 +6,17 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"math/rand"
 	"reflect"
 
 	"github.com/ipfs/go-cid"
 	mh "github.com/multiformats/go-multihash"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/storage/merkle"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 const IdentifierLen = 32
@@ -26,8 +27,16 @@ type Identifier [IdentifierLen]byte
 // IdentifierFilter is a filter on identifiers.
 type IdentifierFilter func(Identifier) bool
 
-// IdentifierOrder is a sort for identifier
-type IdentifierOrder func(Identifier, Identifier) bool
+// IdentifierOrder is an order function for identifiers.
+//
+// It defines a strict weak ordering between identifiers.
+// It returns a negative number if the first identifier is "strictly less" than the second,
+// a positive number if the second identifier is "strictly less" than the first,
+// and zero if the two identifiers are equal.
+//
+// `IdentifierOrder` can be used to sort identifiers with
+// https://pkg.go.dev/golang.org/x/exp/slices#SortFunc.
+type IdentifierOrder func(Identifier, Identifier) int
 
 var (
 	// ZeroID is the lowest value in the 32-byte ID space.
@@ -179,21 +188,24 @@ func CheckConcatSum(sum Identifier, fps ...Identifier) bool {
 	return sum == computed
 }
 
-// Sample returns random sample of length 'size' of the ids
-// [Fisher-Yates shuffle](https://en.wikipedia.org/wiki/Fisher-Yates_shuffle).
-func Sample(size uint, ids ...Identifier) []Identifier {
+// Sample returns non-deterministic random sample of length 'size' of the ids
+func Sample(size uint, ids ...Identifier) ([]Identifier, error) {
 	n := uint(len(ids))
 	dup := make([]Identifier, 0, n)
 	dup = append(dup, ids...)
 	// if sample size is greater than total size, return all the elements
 	if n <= size {
-		return dup
+		return dup, nil
 	}
-	for i := uint(0); i < size; i++ {
-		j := uint(rand.Intn(int(n - i)))
-		dup[i], dup[j+i] = dup[j+i], dup[i]
+	swap := func(i, j uint) {
+		dup[i], dup[j] = dup[j], dup[i]
 	}
-	return dup[:size]
+
+	err := rand.Samples(n, size, swap)
+	if err != nil {
+		return nil, fmt.Errorf("generating randoms failed: %w", err)
+	}
+	return dup[:size], nil
 }
 
 func CidToId(c cid.Cid) (Identifier, error) {

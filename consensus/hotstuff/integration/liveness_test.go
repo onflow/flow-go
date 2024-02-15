@@ -36,7 +36,7 @@ func Test2TimeoutOutof7Instances(t *testing.T) {
 	participants := unittest.IdentityListFixture(healthyReplicas + notVotingReplicas)
 	instances := make([]*Instance, 0, healthyReplicas+notVotingReplicas)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 1.5, happyPathMaxRoundFailures, 0, maxTimeoutRebroadcast)
+	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 1.5, happyPathMaxRoundFailures, maxTimeoutRebroadcast)
 	require.NoError(t, err)
 
 	// set up five instances that work fully
@@ -103,8 +103,7 @@ func Test2TimeoutOutof4Instances(t *testing.T) {
 	participants := unittest.IdentityListFixture(healthyReplicas + replicasDroppingHappyPathMsgs)
 	instances := make([]*Instance, 0, healthyReplicas+replicasDroppingHappyPathMsgs)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(
-		10*time.Millisecond, 50*time.Millisecond, 1.5, happyPathMaxRoundFailures, 0, maxTimeoutRebroadcast)
+	timeouts, err := timeout.NewConfig(10*time.Millisecond, 50*time.Millisecond, 1.5, happyPathMaxRoundFailures, maxTimeoutRebroadcast)
 	require.NoError(t, err)
 
 	// set up two instances that work fully
@@ -173,7 +172,7 @@ func Test1TimeoutOutof5Instances(t *testing.T) {
 	participants := unittest.IdentityListFixture(healthyReplicas + blockedReplicas)
 	instances := make([]*Instance, 0, healthyReplicas+blockedReplicas)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 1.5, happyPathMaxRoundFailures, 0, maxTimeoutRebroadcast)
+	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 1.5, happyPathMaxRoundFailures, maxTimeoutRebroadcast)
 	require.NoError(t, err)
 
 	// set up instances that work fully
@@ -270,7 +269,7 @@ func TestBlockDelayIsHigherThanTimeout(t *testing.T) {
 	instances := make([]*Instance, 0, healthyReplicas+replicasNotGeneratingTimeouts)
 	root := DefaultRoot()
 	// set block rate delay to be bigger than minimal timeout
-	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 1.5, happyPathMaxRoundFailures, pmTimeout*2, maxTimeoutRebroadcast)
+	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 1.5, happyPathMaxRoundFailures, maxTimeoutRebroadcast)
 	require.NoError(t, err)
 
 	// set up 2 instances that fully work (incl. sending TimeoutObjects)
@@ -353,7 +352,7 @@ func TestAsyncClusterStartup(t *testing.T) {
 	instances := make([]*Instance, 0, replicas)
 	root := DefaultRoot()
 	// set block rate delay to be bigger than minimal timeout
-	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 1.5, 6, 0, maxTimeoutRebroadcast)
+	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 1.5, 6, maxTimeoutRebroadcast)
 	require.NoError(t, err)
 
 	// set up instances that work fully

@@ -1,8 +1,8 @@
-import MyFavContract from 0x%s
+import ComputationHeavy from 0x%s
 
 transaction {
   prepare(acct: AuthAccount) {}
   execute {
-    MyFavContract.ComputationHeavy()
+    ComputationHeavy.ComputationHeavy(1500)
   }
 }

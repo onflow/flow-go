@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
@@ -58,7 +59,7 @@ type HotStuffFollowerSuite struct {
 
 	headers       *mockstorage.Headers
 	finalizer     *mockmodule.Finalizer
-	notifier      *mockhotstuff.FinalizationConsumer
+	notifier      *mockhotstuff.FollowerConsumer
 	rootHeader    *flow.Header
 	rootQC        *flow.QuorumCertificate
 	finalized     *flow.Header
@@ -74,7 +75,7 @@ type HotStuffFollowerSuite struct {
 // SetupTest initializes all the components needed for the Follower.
 // The follower itself is instantiated in method BeforeTest
 func (s *HotStuffFollowerSuite) SetupTest() {
-	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
+	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical[flow.Identity])
 	s.mockConsensus = &MockConsensus{identities: identities}
 
 	// mock storage headers
@@ -84,7 +85,7 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	s.finalizer = mockmodule.NewFinalizer(s.T())
 
 	// mock consumer for finalization notifications
-	s.notifier = mockhotstuff.NewFinalizationConsumer(s.T())
+	s.notifier = mockhotstuff.NewFollowerConsumer(s.T())
 
 	// root block and QC
 	parentID, err := flow.HexStringToIdentifier("aa7693d498e9a087b1cadf5bfe9a1ff07829badc1915c210e482f369f9a00a70")
@@ -116,6 +117,7 @@ func (s *HotStuffFollowerSuite) BeforeTest(suiteName, testName string) {
 	var err error
 	s.follower, err = consensus.NewFollower(
 		zerolog.New(os.Stderr),
+		metrics.NewNoopCollector(),
 		s.headers,
 		s.finalizer,
 		s.notifier,

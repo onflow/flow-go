@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/crypto"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -18,7 +18,7 @@ import (
 // computed keys. Must be instantiated using secrets database.
 type DKGState struct {
 	db       *badger.DB
-	keyCache *Cache
+	keyCache *Cache[uint64, *encodable.RandomBeaconPrivKey]
 }
 
 // NewDKGState returns the DKGState implementation backed by Badger DB.
@@ -28,23 +28,20 @@ func NewDKGState(collector module.CacheMetrics, db *badger.DB) (*DKGState, error
 		return nil, fmt.Errorf("cannot instantiate dkg state storage in non-secret db: %w", err)
 	}
 
-	storeKey := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		epochCounter := key.(uint64)
-		info := val.(*encodable.RandomBeaconPrivKey)
+	storeKey := func(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(*transaction.Tx) error {
 		return transaction.WithTx(operation.InsertMyBeaconPrivateKey(epochCounter, info))
 	}
 
-	retrieveKey := func(key interface{}) func(*badger.Txn) (interface{}, error) {
-		epochCounter := key.(uint64)
-		var info encodable.RandomBeaconPrivKey
-		return func(tx *badger.Txn) (interface{}, error) {
+	retrieveKey := func(epochCounter uint64) func(*badger.Txn) (*encodable.RandomBeaconPrivKey, error) {
+		return func(tx *badger.Txn) (*encodable.RandomBeaconPrivKey, error) {
+			var info encodable.RandomBeaconPrivKey
 			err := operation.RetrieveMyBeaconPrivateKey(epochCounter, &info)(tx)
 			return &info, err
 		}
 	}
 
-	cache := newCache(collector, metrics.ResourceBeaconKey,
-		withLimit(10),
+	cache := newCache[uint64, *encodable.RandomBeaconPrivKey](collector, metrics.ResourceBeaconKey,
+		withLimit[uint64, *encodable.RandomBeaconPrivKey](10),
 		withStore(storeKey),
 		withRetrieve(retrieveKey),
 	)
@@ -67,7 +64,7 @@ func (ds *DKGState) retrieveKeyTx(epochCounter uint64) func(tx *badger.Txn) (*en
 		if err != nil {
 			return nil, err
 		}
-		return val.(*encodable.RandomBeaconPrivKey), nil
+		return val, nil
 	}
 }
 

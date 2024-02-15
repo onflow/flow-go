@@ -18,6 +18,8 @@ import (
 // Lets denote the highest block in the sealing segment as `head`. Per convention, `head` must be a
 // finalized block. Consider the chain of blocks leading up to `head` (included). The highest block
 // in chain leading up to `head` that is sealed, we denote as B.
+// In other words, head is the last finalized block, and B is the last sealed block,
+// block at height (B.Height + 1) is not sealed.
 type SealingSegment struct {
 	// Blocks contain the chain `B <- ... <- Head` in ascending height order.
 	// Formally, Blocks contains exactly (not more!) the history to satisfy condition
@@ -63,6 +65,11 @@ type SealingSegment struct {
 // used to produce this sealing segment.
 func (segment *SealingSegment) Highest() *Block {
 	return segment.Blocks[len(segment.Blocks)-1]
+}
+
+// Finalized returns the last finalized block, which is an alias of Highest
+func (segment *SealingSegment) Finalized() *Block {
+	return segment.Highest()
 }
 
 // Sealed returns the most recently sealed block based on head of sealing segment(highest block).
@@ -308,8 +315,8 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 
 	// SealingSegment must store extra blocks in ascending order, builder stores them in descending.
 	// Apply a sort to reverse the slice and use correct ordering.
-	slices.SortFunc(builder.extraBlocks, func(lhs, rhs *Block) bool {
-		return lhs.Header.Height < rhs.Header.Height
+	slices.SortFunc(builder.extraBlocks, func(lhs, rhs *Block) int {
+		return int(lhs.Header.Height) - int(rhs.Header.Height)
 	})
 
 	return &SealingSegment{

@@ -2,10 +2,8 @@ package ingestion
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -15,11 +13,11 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	"github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/module/mempool/entity"
@@ -27,8 +25,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/state/protocol"
 	psEvents "github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -38,79 +34,66 @@ import (
 type Engine struct {
 	psEvents.Noop // satisfy protocol events consumer interface
 
-	unit                   *engine.Unit
-	log                    zerolog.Logger
-	me                     module.Local
-	request                module.Requester // used to request collections
-	state                  protocol.State
-	blocks                 storage.Blocks
-	collections            storage.Collections
-	events                 storage.Events
-	serviceEvents          storage.ServiceEvents
-	transactionResults     storage.TransactionResults
-	computationManager     computation.ComputationManager
-	providerEngine         provider.ProviderEngine
-	mempool                *Mempool
-	execState              state.ExecutionState
-	metrics                module.ExecutionMetrics
-	maxCollectionHeight    uint64
-	tracer                 module.Tracer
-	extensiveLogging       bool
-	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
-	executionDataPruner    *pruner.Pruner
-	uploader               *uploader.Manager
-	stopControl            *StopControl
+	unit                *engine.Unit
+	log                 zerolog.Logger
+	collectionFetcher   CollectionFetcher
+	headers             storage.Headers // see comments on getHeaderByHeight for why we need it
+	blocks              storage.Blocks
+	collections         storage.Collections
+	computationManager  computation.ComputationManager
+	providerEngine      provider.ProviderEngine
+	mempool             *Mempool
+	execState           state.ExecutionState
+	metrics             module.ExecutionMetrics
+	tracer              module.Tracer
+	extensiveLogging    bool
+	executionDataPruner *pruner.Pruner
+	uploader            *uploader.Manager
+	stopControl         *stop.StopControl
+	loader              BlockLoader
 }
 
 func New(
+	unit *engine.Unit,
 	logger zerolog.Logger,
-	net network.Network,
-	me module.Local,
-	request module.Requester,
-	state protocol.State,
+	net network.EngineRegistry,
+	collectionFetcher CollectionFetcher,
+	headers storage.Headers,
 	blocks storage.Blocks,
 	collections storage.Collections,
-	events storage.Events,
-	serviceEvents storage.ServiceEvents,
-	transactionResults storage.TransactionResults,
 	executionEngine computation.ComputationManager,
 	providerEngine provider.ProviderEngine,
 	execState state.ExecutionState,
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	extLog bool,
-	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
 	pruner *pruner.Pruner,
 	uploader *uploader.Manager,
-	stopControl *StopControl,
+	stopControl *stop.StopControl,
+	loader BlockLoader,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
 	mempool := newMempool()
 
 	eng := Engine{
-		unit:                   engine.NewUnit(),
-		log:                    log,
-		me:                     me,
-		request:                request,
-		state:                  state,
-		blocks:                 blocks,
-		collections:            collections,
-		events:                 events,
-		serviceEvents:          serviceEvents,
-		transactionResults:     transactionResults,
-		computationManager:     executionEngine,
-		providerEngine:         providerEngine,
-		mempool:                mempool,
-		execState:              execState,
-		metrics:                metrics,
-		maxCollectionHeight:    0,
-		tracer:                 tracer,
-		extensiveLogging:       extLog,
-		checkAuthorizedAtBlock: checkAuthorizedAtBlock,
-		executionDataPruner:    pruner,
-		uploader:               uploader,
-		stopControl:            stopControl,
+		unit:                unit,
+		log:                 log,
+		collectionFetcher:   collectionFetcher,
+		headers:             headers,
+		blocks:              blocks,
+		collections:         collections,
+		computationManager:  executionEngine,
+		providerEngine:      providerEngine,
+		mempool:             mempool,
+		execState:           execState,
+		metrics:             metrics,
+		tracer:              tracer,
+		extensiveLogging:    extLog,
+		executionDataPruner: pruner,
+		uploader:            uploader,
+		stopControl:         stopControl,
+		loader:              loader,
 	}
 
 	return &eng, nil
@@ -119,15 +102,17 @@ func New(
 // Ready returns a channel that will close when the engine has
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
-	if !e.stopControl.IsPaused() {
-		if err := e.uploader.RetryUploads(); err != nil {
-			e.log.Warn().Msg("failed to re-upload all ComputationResults")
-		}
+	if e.stopControl.IsExecutionStopped() {
+		return e.unit.Ready()
+	}
 
-		err := e.reloadUnexecutedBlocks()
-		if err != nil {
-			e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")
-		}
+	if err := e.uploader.RetryUploads(); err != nil {
+		e.log.Warn().Msg("failed to re-upload all ComputationResults")
+	}
+
+	err := e.reloadUnexecutedBlocks()
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")
 	}
 
 	return e.unit.Ready()
@@ -139,162 +124,18 @@ func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
 
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	e.unit.Launch(func() {
-		err := e.process(e.me.NodeID(), event)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
-}
-
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(
-	channel channels.Channel,
-	originID flow.Identifier,
-	event interface{},
-) {
-	e.unit.Launch(func() {
-		err := e.process(originID, event)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
-}
-
 // ProcessLocal processes an event originating on the local node.
 func (e *Engine) ProcessLocal(event interface{}) error {
 	return fmt.Errorf("ingestion error does not process local events")
 }
 
-func (e *Engine) Process(
-	channel channels.Channel,
-	originID flow.Identifier,
-	event interface{},
-) error {
-	return e.unit.Do(func() error {
-		return e.process(originID, event)
-	})
-}
-
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	return nil
-}
-
-func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) (
-	[]flow.Identifier,
-	error,
-) {
-	// get finalized height
-	final, err := finalized.Head()
-	if err != nil {
-		return nil, fmt.Errorf("could not get finalized block: %w", err)
-	}
-
-	// find the first unexecuted and finalized block
-	// We iterate from the last finalized, check if it has been executed,
-	// if not, keep going to the lower height, until we find an executed
-	// block, and then the next height is the first unexecuted.
-	// If there is only one finalized, and it's executed (i.e. root block),
-	// then the firstUnexecuted is a unfinalized block, which is ok,
-	// because the next loop will ensure it only iterates through finalized
-	// blocks.
-	lastExecuted := final.Height
-
-	rootBlock, err := e.state.Params().Root()
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve root block: %w", err)
-	}
-
-	for ; lastExecuted > rootBlock.Height; lastExecuted-- {
-		header, err := e.state.AtHeight(lastExecuted).Head()
-		if err != nil {
-			return nil, fmt.Errorf("could not get header at height: %v, %w", lastExecuted, err)
-		}
-
-		executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, header.ID())
-		if err != nil {
-			return nil, fmt.Errorf("could not check whether block is executed: %w", err)
-		}
-
-		if executed {
-			break
-		}
-	}
-
-	firstUnexecuted := lastExecuted + 1
-
-	e.log.Info().Msgf("last finalized and executed height: %v", lastExecuted)
-
-	unexecuted := make([]flow.Identifier, 0)
-
-	// starting from the first unexecuted block, go through each unexecuted and finalized block
-	// reload its block to execution queues
-	for height := firstUnexecuted; height <= final.Height; height++ {
-		header, err := e.state.AtHeight(height).Head()
-		if err != nil {
-			return nil, fmt.Errorf("could not get header at height: %v, %w", height, err)
-		}
-
-		unexecuted = append(unexecuted, header.ID())
-	}
-
-	return unexecuted, nil
-}
-
-func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot) (
-	[]flow.Identifier,
-	error,
-) {
-	pendings, err := finalized.Descendants()
-	if err != nil {
-		return nil, fmt.Errorf("could not get pending blocks: %w", err)
-	}
-
-	unexecuted := make([]flow.Identifier, 0)
-
-	for _, pending := range pendings {
-		executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, pending)
-		if err != nil {
-			return nil, fmt.Errorf("could not check block executed or not: %w", err)
-		}
-
-		if !executed {
-			unexecuted = append(unexecuted, pending)
-		}
-	}
-
-	return unexecuted, nil
-}
-
-func (e *Engine) unexecutedBlocks() (
-	finalized []flow.Identifier,
-	pending []flow.Identifier,
-	err error,
-) {
-	// pin the snapshot so that finalizedUnexecutedBlocks and pendingUnexecutedBlocks are based
-	// on the same snapshot.
-	snapshot := e.state.Final()
-
-	finalized, err = e.finalizedUnexecutedBlocks(snapshot)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not read finalized unexecuted blocks")
-	}
-
-	pending, err = e.pendingUnexecutedBlocks(snapshot)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not read pending unexecuted blocks")
-	}
-
-	return finalized, pending, nil
-}
-
 // on nodes startup, we need to load all the unexecuted blocks to the execution queues.
 // blocks have to be loaded in the way that the parent has been loaded before loading its children
 func (e *Engine) reloadUnexecutedBlocks() error {
+	unexecuted, err := e.loader.LoadUnexecuted(e.unit.Ctx())
+	if err != nil {
+		return fmt.Errorf("could not load unexecuted blocks: %w", err)
+	}
 	// it's possible the BlockProcessable is called during the reloading, as the follower engine
 	// will receive blocks before ingestion engine is ready.
 	// The problem with that is, since the reloading hasn't finished yet, enqueuing the new block from
@@ -306,68 +147,6 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 		blockByCollection *stdmap.BlockByCollectionBackdata,
 		executionQueues *stdmap.QueuesBackdata,
 	) error {
-
-		// saving an executed block is currently not transactional, so it's possible
-		// the block is marked as executed but the receipt might not be saved during a crash.
-		// in order to mitigate this problem, we always re-execute the last executed and finalized
-		// block.
-		// there is an exception, if the last executed block is a root block, then don't execute it,
-		// because the root has already been executed during bootstrapping phase. And re-executing
-		// a root block will fail, because the root block doesn't have a parent block, and could not
-		// get the result of it.
-		// TODO: remove this, when saving a executed block is transactional
-		lastExecutedHeight, lastExecutedID, err := e.execState.GetHighestExecutedBlockID(e.unit.Ctx())
-		if err != nil {
-			return fmt.Errorf("could not get last executed: %w", err)
-		}
-
-		last, err := e.state.AtBlockID(lastExecutedID).Head()
-		if err != nil {
-			return fmt.Errorf("could not get last executed final by ID: %w", err)
-		}
-
-		// don't reload root block
-		rootBlock, err := e.state.Params().Root()
-		if err != nil {
-			return fmt.Errorf("failed to retrieve root block: %w", err)
-		}
-
-		isRoot := rootBlock.ID() == last.ID()
-		if !isRoot {
-			executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, lastExecutedID)
-			if err != nil {
-				return fmt.Errorf("cannot check is last exeucted final block has been executed %v: %w", lastExecutedID, err)
-			}
-			if !executed {
-				// this should not happen, but if it does, execution should still work
-				e.log.Warn().
-					Hex("block_id", lastExecutedID[:]).
-					Msg("block marked as highest executed one, but not executable - internal inconsistency")
-
-				err = e.reloadBlock(blockByCollection, executionQueues, lastExecutedID)
-				if err != nil {
-					return fmt.Errorf("could not reload the last executed final block: %v, %w", lastExecutedID, err)
-				}
-			}
-		}
-
-		finalized, pending, err := e.unexecutedBlocks()
-		if err != nil {
-			return fmt.Errorf("could not reload unexecuted blocks: %w", err)
-		}
-
-		unexecuted := append(finalized, pending...)
-
-		log := e.log.With().
-			Int("total", len(unexecuted)).
-			Int("finalized", len(finalized)).
-			Int("pending", len(pending)).
-			Uint64("last_executed", lastExecutedHeight).
-			Hex("last_executed_id", lastExecutedID[:]).
-			Logger()
-
-		log.Info().Msg("reloading unexecuted blocks")
-
 		for _, blockID := range unexecuted {
 			err := e.reloadBlock(blockByCollection, executionQueues, blockID)
 			if err != nil {
@@ -377,7 +156,7 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 			e.log.Debug().Hex("block_id", blockID[:]).Msg("reloaded block")
 		}
 
-		log.Info().Msg("all unexecuted have been successfully reloaded")
+		e.log.Info().Int("count", len(unexecuted)).Msg("all unexecuted have been successfully reloaded")
 
 		return nil
 	})
@@ -424,8 +203,11 @@ func (e *Engine) reloadBlock(
 // NOTE: Ready calls reloadUnexecutedBlocks during initialization, which handles dropped protocol events.
 func (e *Engine) BlockProcessable(b *flow.Header, _ *flow.QuorumCertificate) {
 
-	// skip if stopControl tells to skip
-	if !e.stopControl.blockProcessable(b) {
+	// TODO: this should not be blocking: https://github.com/onflow/flow-go/issues/4400
+
+	// skip if stopControl tells to skip, so that we can avoid fetching collections
+	// for this block
+	if !e.stopControl.ShouldExecuteBlock(b) {
 		return
 	}
 
@@ -445,12 +227,6 @@ func (e *Engine) BlockProcessable(b *flow.Header, _ *flow.QuorumCertificate) {
 	}
 }
 
-// BlockFinalized implements part of state.protocol.Consumer interface.
-// Method gets called for every finalized block
-func (e *Engine) BlockFinalized(h *flow.Header) {
-	e.stopControl.blockFinalized(e.unit.Ctx(), e.execState, h)
-}
-
 // Main handling
 
 // handle block will process the incoming block.
@@ -463,7 +239,7 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	span, _ := e.tracer.StartBlockSpan(ctx, blockID, trace.EXEHandleBlock)
 	defer span.End()
 
-	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
+	executed, err := e.execState.IsBlockExecuted(block.Header.Height, blockID)
 	if err != nil {
 		return fmt.Errorf("could not check whether block is executed: %w", err)
 	}
@@ -536,7 +312,7 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 	// check if the block's parent has been executed. (we can't execute the block if the parent has
 	// not been executed yet)
 	// check if there is a statecommitment for the parent block
-	parentCommitment, err := e.execState.StateCommitmentByBlockID(e.unit.Ctx(), block.Header.ParentID)
+	parentCommitment, err := e.execState.StateCommitmentByBlockID(block.Header.ParentID)
 
 	// if we found the statecommitment for the parent block, then add it to the executable block.
 	if err == nil {
@@ -575,6 +351,8 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 		Uint64("first_unexecuted_in_queue", firstUnexecutedHeight).
 		Bool("complete", complete).
 		Bool("head_of_queue", head).
+		Int("cols", len(executableBlock.Block.Payload.Guarantees)).
+		Int("missing_cols", len(missingCollections)).
 		Msg("block is enqueued")
 
 	return missingCollections, nil
@@ -586,16 +364,21 @@ func (e *Engine) executeBlock(
 	ctx context.Context,
 	executableBlock *entity.ExecutableBlock,
 ) {
+
+	// don't execute the block if the stop control says no
+	if !e.stopControl.ShouldExecuteBlock(executableBlock.Block.Header) {
+		return
+	}
+
 	lg := e.log.With().
 		Hex("block_id", logging.Entity(executableBlock)).
 		Uint64("height", executableBlock.Block.Header.Height).
+		Int("collections", len(executableBlock.CompleteCollections)).
 		Logger()
 
 	lg.Info().Msg("executing block")
 
 	startedAt := time.Now()
-
-	e.stopControl.executingBlockHeight(executableBlock.Block.Header.Height)
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEExecuteBlock)
 	defer span.End()
@@ -609,7 +392,10 @@ func (e *Engine) executeBlock(
 		return
 	}
 
-	snapshot := e.execState.NewStorageSnapshot(*executableBlock.StartState)
+	snapshot := e.execState.NewStorageSnapshot(*executableBlock.StartState,
+		executableBlock.Block.Header.ParentID,
+		executableBlock.Block.Header.Height-1,
+	)
 
 	computationResult, err := e.computationManager.ComputeBlock(
 		ctx,
@@ -644,29 +430,11 @@ func (e *Engine) executeBlock(
 		return
 	}
 
-	// if the receipt is for a sealed block, then no need to broadcast it.
-	lastSealed, err := e.state.Sealed().Head()
-	if err != nil {
-		lg.Fatal().Err(err).Msg("could not get sealed block before broadcasting")
-	}
-
 	receipt := computationResult.ExecutionReceipt
-	isExecutedBlockSealed := executableBlock.Block.Header.Height <= lastSealed.Height
-	broadcasted := false
-
-	if !isExecutedBlockSealed {
-		authorizedAtBlock, err := e.checkAuthorizedAtBlock(executableBlock.ID())
-		if err != nil {
-			lg.Fatal().Err(err).Msg("could not check staking status")
-		}
-		if authorizedAtBlock {
-			err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
-			if err != nil {
-				lg.Err(err).Msg("critical: failed to broadcast the receipt")
-			} else {
-				broadcasted = true
-			}
-		}
+	broadcasted, err := e.providerEngine.BroadcastExecutionReceipt(
+		ctx, executableBlock.Block.Header.Height, receipt)
+	if err != nil {
+		lg.Err(err).Msg("critical: failed to broadcast the receipt")
 	}
 
 	finalEndState := computationResult.CurrentEndState()
@@ -678,14 +446,13 @@ func (e *Engine) executeBlock(
 		Hex("receipt_id", logging.Entity(receipt)).
 		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
 		Hex("execution_data_id", receipt.ExecutionResult.ExecutionDataID[:]).
-		Bool("sealed", isExecutedBlockSealed).
+		Bool("state_changed", finalEndState != *executableBlock.StartState).
+		Uint64("num_txs", nonSystemTransactionCount(receipt.ExecutionResult)).
 		Bool("broadcasted", broadcasted).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("block executed")
 
-	for computationKind, intensity := range computationResult.ComputationIntensities {
-		e.metrics.ExecutionBlockExecutionEffortVectorComponent(computationKind.String(), intensity)
-	}
+	e.stopControl.OnBlockExecuted(executableBlock.Block.Header)
 
 	err = e.onBlockExecuted(executableBlock, finalEndState)
 	if err != nil {
@@ -698,7 +465,14 @@ func (e *Engine) executeBlock(
 
 	e.unit.Ctx()
 
-	e.stopControl.blockExecuted(executableBlock.Block.Header)
+}
+
+func nonSystemTransactionCount(result flow.ExecutionResult) uint64 {
+	count := uint64(0)
+	for _, chunk := range result.Chunks {
+		count += chunk.NumberOfTransactions
+	}
+	return count
 }
 
 // we've executed the block, now we need to check:
@@ -736,6 +510,7 @@ func (e *Engine) onBlockExecuted(
 			// find the block that was just executed
 			executionQueue, exists := executionQueues.ByID(executed.ID())
 			if !exists {
+				logQueueState(e.log, executionQueues, executed.ID())
 				// when the block no longer exists in the queue, it means there was a race condition that
 				// two onBlockExecuted was called for the same block, and one process has already removed the
 				// block from the queue, so we will print an error here
@@ -791,8 +566,9 @@ func (e *Engine) onBlockExecuted(
 		})
 
 	if err != nil {
-		e.log.Err(err).
+		e.log.Fatal().Err(err).
 			Hex("block", logging.Entity(executed)).
+			Uint64("height", executed.Block.Header.Height).
 			Msg("error while requeueing blocks after execution")
 	}
 
@@ -869,7 +645,7 @@ func (e *Engine) handleCollection(
 
 	lg := e.log.With().Hex("collection_id", collID[:]).Logger()
 
-	lg.Info().Hex("sender", originID[:]).Msg("handle collection")
+	lg.Info().Hex("sender", originID[:]).Int("len", collection.Len()).Msg("handle collection")
 	defer func(startTime time.Time) {
 		lg.Info().TimeDiff("duration", time.Now(), startTime).Msg("collection handled")
 	}(time.Now())
@@ -911,12 +687,7 @@ func (e *Engine) addCollectionToMempool(
 				blockID)
 		}
 
-		// record collection max height metrics
-		blockHeight := executableBlock.Block.Header.Height
-		if blockHeight > e.maxCollectionHeight {
-			e.metrics.UpdateCollectionMaxHeight(blockHeight)
-			e.maxCollectionHeight = blockHeight
-		}
+		e.metrics.UpdateCollectionMaxHeight(executableBlock.Block.Header.Height)
 
 		if completeCollection.IsCompleted() {
 			// already received transactions for this collection
@@ -1042,105 +813,6 @@ func (e *Engine) matchAndFindMissingCollections(
 	return missingCollections, nil
 }
 
-func (e *Engine) ExecuteScriptAtBlockID(
-	ctx context.Context,
-	script []byte,
-	arguments [][]byte,
-	blockID flow.Identifier,
-) ([]byte, error) {
-
-	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
-	}
-
-	// return early if state with the given state commitment is not in memory
-	// and already purged. This reduces allocations for scripts targeting old blocks.
-	if !e.execState.HasState(stateCommit) {
-		return nil, fmt.Errorf("failed to execute script at block (%s): state commitment not found (%s). this error usually happens if the reference block for this script is not set to a recent block", blockID.String(), hex.EncodeToString(stateCommit[:]))
-	}
-
-	block, err := e.state.AtBlockID(blockID).Head()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
-	}
-
-	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
-
-	if e.extensiveLogging {
-		args := make([]string, 0)
-		for _, a := range arguments {
-			args = append(args, hex.EncodeToString(a))
-		}
-		e.log.Debug().
-			Hex("block_id", logging.ID(blockID)).
-			Uint64("block_height", block.Height).
-			Hex("state_commitment", stateCommit[:]).
-			Hex("script_hex", script).
-			Str("args", strings.Join(args[:], ",")).
-			Msg("extensive log: executed script content")
-	}
-	return e.computationManager.ExecuteScript(
-		ctx,
-		script,
-		arguments,
-		block,
-		blockSnapshot)
-}
-
-func (e *Engine) GetRegisterAtBlockID(
-	ctx context.Context,
-	owner, key []byte,
-	blockID flow.Identifier,
-) ([]byte, error) {
-
-	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
-	}
-
-	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
-
-	id := flow.NewRegisterID(string(owner), string(key))
-	data, err := blockSnapshot.Get(id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get the register (%s): %w", id, err)
-	}
-
-	return data, nil
-}
-
-func (e *Engine) GetAccount(
-	ctx context.Context,
-	addr flow.Address,
-	blockID flow.Identifier,
-) (*flow.Account, error) {
-	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
-	}
-
-	// return early if state with the given state commitment is not in memory
-	// and already purged. This reduces allocations for get accounts targeting old blocks.
-	if !e.execState.HasState(stateCommit) {
-		return nil, fmt.Errorf(
-			"failed to get account at block (%s): state commitment not "+
-				"found (%s). this error usually happens if the reference "+
-				"block for this script is not set to a recent block.",
-			blockID.String(),
-			hex.EncodeToString(stateCommit[:]))
-	}
-
-	block, err := e.state.AtBlockID(blockID).Head()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
-	}
-
-	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
-
-	return e.computationManager.GetAccount(ctx, addr, block, blockSnapshot)
-}
-
 // save the execution result of a block
 func (e *Engine) saveExecutionResults(
 	ctx context.Context,
@@ -1257,7 +929,7 @@ func (e *Engine) fetchAndHandleCollection(
 			return fmt.Errorf("error while querying for collection: %w", err)
 		}
 
-		err = e.fetchCollection(blockID, height, guarantee)
+		err = e.collectionFetcher.FetchCollection(blockID, height, guarantee)
 		if err != nil {
 			return fmt.Errorf("could not fetch collection: %w", err)
 		}
@@ -1266,42 +938,18 @@ func (e *Engine) fetchAndHandleCollection(
 
 	// make sure that the requests are dispatched immediately by the requester
 	if fetched {
-		e.request.Force()
+		e.collectionFetcher.Force()
 		e.metrics.ExecutionCollectionRequestSent()
 	}
 
 	return nil
 }
 
-// fetchCollection takes a guarantee and forwards to requester engine for fetching the collection
-// any error returned are fatal error
-func (e *Engine) fetchCollection(
-	blockID flow.Identifier,
-	height uint64,
-	guarantee *flow.CollectionGuarantee,
-) error {
-	e.log.Debug().
-		Hex("block", blockID[:]).
-		Hex("collection_id", logging.ID(guarantee.ID())).
-		Msg("requesting collection")
+func logQueueState(log zerolog.Logger, queues *stdmap.QueuesBackdata, blockID flow.Identifier) {
+	all := queues.All()
 
-	guarantors, err := protocol.FindGuarantors(e.state, guarantee)
-	if err != nil {
-		// execution node executes certified blocks, which means there is a quorum of consensus nodes who
-		// have validated the block payload. And that validation includes checking the guarantors are correct.
-		// Based on that assumption, failing to find guarantors for guarantees contained in an incorporated block
-		// should be treated as fatal error
-		e.log.Fatal().Err(err).Msgf("failed to find guarantors for guarantee %v at block %v, height %v",
-			guarantee.ID(),
-			blockID,
-			height,
-		)
-		return fmt.Errorf("could not find guarantors: %w", err)
+	log.With().Hex("queue_state__executed_block_id", blockID[:]).Int("count", len(all)).Logger()
+	for i, queue := range all {
+		log.Error().Msgf("%v-th queue state: %v", i, queue.String())
 	}
-	// queue the collection to be requested from one of the guarantors
-	e.request.EntityByID(guarantee.ID(), filter.And(
-		filter.HasNodeID(guarantors...),
-	))
-
-	return nil
 }

@@ -17,22 +17,20 @@ import (
 // ExecutionResults implements persistent storage for execution results.
 type ExecutionResults struct {
 	db    *badger.DB
-	cache *Cache
+	cache *Cache[flow.Identifier, *flow.ExecutionResult]
 }
 
 var _ storage.ExecutionResults = (*ExecutionResults)(nil)
 
 func NewExecutionResults(collector module.CacheMetrics, db *badger.DB) *ExecutionResults {
 
-	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		result := val.(*flow.ExecutionResult)
+	store := func(_ flow.Identifier, result *flow.ExecutionResult) func(*transaction.Tx) error {
 		return transaction.WithTx(operation.SkipDuplicates(operation.InsertExecutionResult(result)))
 	}
 
-	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
-		resultID := key.(flow.Identifier)
-		var result flow.ExecutionResult
-		return func(tx *badger.Txn) (interface{}, error) {
+	retrieve := func(resultID flow.Identifier) func(tx *badger.Txn) (*flow.ExecutionResult, error) {
+		return func(tx *badger.Txn) (*flow.ExecutionResult, error) {
+			var result flow.ExecutionResult
 			err := operation.RetrieveExecutionResult(resultID, &result)(tx)
 			return &result, err
 		}
@@ -40,8 +38,8 @@ func NewExecutionResults(collector module.CacheMetrics, db *badger.DB) *Executio
 
 	res := &ExecutionResults{
 		db: db,
-		cache: newCache(collector, metrics.ResourceResult,
-			withLimit(flow.DefaultTransactionExpiry+100),
+		cache: newCache[flow.Identifier, *flow.ExecutionResult](collector, metrics.ResourceResult,
+			withLimit[flow.Identifier, *flow.ExecutionResult](flow.DefaultTransactionExpiry+100),
 			withStore(store),
 			withRetrieve(retrieve)),
 	}
@@ -59,7 +57,7 @@ func (r *ExecutionResults) byID(resultID flow.Identifier) func(*badger.Txn) (*fl
 		if err != nil {
 			return nil, err
 		}
-		return val.(*flow.ExecutionResult), nil
+		return val, nil
 	}
 }
 

@@ -13,51 +13,31 @@ type Params struct {
 }
 
 // ChainID provides a mock function with given fields:
-func (_m *Params) ChainID() (flow.ChainID, error) {
+func (_m *Params) ChainID() flow.ChainID {
 	ret := _m.Called()
 
 	var r0 flow.ChainID
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (flow.ChainID, error)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() flow.ChainID); ok {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(flow.ChainID)
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // EpochCommitSafetyThreshold provides a mock function with given fields:
-func (_m *Params) EpochCommitSafetyThreshold() (uint64, error) {
+func (_m *Params) EpochCommitSafetyThreshold() uint64 {
 	ret := _m.Called()
 
 	var r0 uint64
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() uint64); ok {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // EpochFallbackTriggered provides a mock function with given fields:
@@ -84,39 +64,11 @@ func (_m *Params) EpochFallbackTriggered() (bool, error) {
 	return r0, r1
 }
 
-// ProtocolVersion provides a mock function with given fields:
-func (_m *Params) ProtocolVersion() (uint, error) {
-	ret := _m.Called()
-
-	var r0 uint
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (uint, error)); ok {
-		return rf()
-	}
-	if rf, ok := ret.Get(0).(func() uint); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(uint)
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// Root provides a mock function with given fields:
-func (_m *Params) Root() (*flow.Header, error) {
+// FinalizedRoot provides a mock function with given fields:
+func (_m *Params) FinalizedRoot() *flow.Header {
 	ret := _m.Called()
 
 	var r0 *flow.Header
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (*flow.Header, error)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() *flow.Header); ok {
 		r0 = rf()
 	} else {
@@ -125,24 +77,28 @@ func (_m *Params) Root() (*flow.Header, error) {
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	return r0
+}
+
+// ProtocolVersion provides a mock function with given fields:
+func (_m *Params) ProtocolVersion() uint {
+	ret := _m.Called()
+
+	var r0 uint
+	if rf, ok := ret.Get(0).(func() uint); ok {
+		r0 = rf()
 	} else {
-		r1 = ret.Error(1)
+		r0 = ret.Get(0).(uint)
 	}
 
-	return r0, r1
+	return r0
 }
 
 // Seal provides a mock function with given fields:
-func (_m *Params) Seal() (*flow.Seal, error) {
+func (_m *Params) Seal() *flow.Seal {
 	ret := _m.Called()
 
 	var r0 *flow.Seal
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (*flow.Seal, error)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() *flow.Seal); ok {
 		r0 = rf()
 	} else {
@@ -151,24 +107,30 @@ func (_m *Params) Seal() (*flow.Seal, error) {
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	return r0
+}
+
+// SealedRoot provides a mock function with given fields:
+func (_m *Params) SealedRoot() *flow.Header {
+	ret := _m.Called()
+
+	var r0 *flow.Header
+	if rf, ok := ret.Get(0).(func() *flow.Header); ok {
+		r0 = rf()
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Header)
+		}
 	}
 
-	return r0, r1
+	return r0
 }
 
 // SporkID provides a mock function with given fields:
-func (_m *Params) SporkID() (flow.Identifier, error) {
+func (_m *Params) SporkID() flow.Identifier {
 	ret := _m.Called()
 
 	var r0 flow.Identifier
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (flow.Identifier, error)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() flow.Identifier); ok {
 		r0 = rf()
 	} else {
@@ -177,37 +139,21 @@ func (_m *Params) SporkID() (flow.Identifier, error) {
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // SporkRootBlockHeight provides a mock function with given fields:
-func (_m *Params) SporkRootBlockHeight() (uint64, error) {
+func (_m *Params) SporkRootBlockHeight() uint64 {
 	ret := _m.Called()
 
 	var r0 uint64
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() uint64); ok {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 type mockConstructorTestingTNewParams interface {

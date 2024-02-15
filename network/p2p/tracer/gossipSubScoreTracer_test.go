@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -55,13 +56,13 @@ func TestGossipSubScoreTracer(t *testing.T) {
 
 	// 1. Creates a logger hook to count the number of times the score logs at the interval specified.
 	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.InfoLevel {
+		if level == zerolog.DebugLevel {
 			if message == tracer.PeerScoreLogMessage {
 				loggerCycle.Inc()
 			}
 		}
 	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.InfoLevel).Hook(hook)
+	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).Hook(hook)
 
 	// sets some fixed scores for the nodes for sake of testing based on their roles.
 	consensusScore := float64(87)
@@ -72,19 +73,26 @@ func TestGossipSubScoreTracer(t *testing.T) {
 	topic1 := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 
 	// 3. Creates three nodes with different roles and sets their roles as consensus, access, and tracer, respectively.
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+	// tracer will update the score and local mesh every 1 second (for testing purposes)
+	cfg.NetworkConfig.GossipSub.RpcTracer.LocalMeshLogInterval = 1 * time.Second
+	cfg.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
+	// the libp2p node updates the subscription list as well as the app-specific score every 10 milliseconds (for testing purposes)
+	cfg.NetworkConfig.GossipSub.SubscriptionProvider.UpdateInterval = 10 * time.Millisecond
+	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond
 	tracerNode, tracerId := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
+		idProvider,
 		p2ptest.WithMetricsCollector(&mockPeerScoreMetrics{
 			NoopCollector: metrics.NoopCollector{},
 			c:             scoreMetrics,
 		}),
 		p2ptest.WithLogger(logger),
-		p2ptest.WithPeerScoreTracerInterval(1*time.Second), // set the peer score log interval to 1 second for sake of testing.
-		p2ptest.WithPeerScoringEnabled(idProvider),         // enable peer scoring for sake of testing.
-		// 4. Sets some fixed scores for the nodes for the sake of testing based on their roles.
-		p2ptest.WithPeerScoreParamsOption(&p2p.PeerScoringConfig{
+		p2ptest.OverrideFlowConfig(cfg),
+		p2ptest.EnablePeerScoringWithOverride(&p2p.PeerScoringConfigOverride{
 			AppSpecificScoreParams: func(pid peer.ID) float64 {
 				id, ok := idProvider.ByPeerID(pid)
 				require.True(t, ok)
@@ -124,28 +132,30 @@ func TestGossipSubScoreTracer(t *testing.T) {
 		}),
 		p2ptest.WithRole(flow.RoleConsensus))
 
-	idProvider.On("ByPeerID", tracerNode.Host().ID()).Return(&tracerId, true).Maybe()
+	idProvider.On("ByPeerID", tracerNode.ID()).Return(&tracerId, true).Maybe()
 
 	consensusNode, consensusId := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
+		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus))
-	idProvider.On("ByPeerID", consensusNode.Host().ID()).Return(&consensusId, true).Maybe()
+	idProvider.On("ByPeerID", consensusNode.ID()).Return(&consensusId, true).Maybe()
 
 	accessNode, accessId := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
+		idProvider,
 		p2ptest.WithRole(flow.RoleAccess))
-	idProvider.On("ByPeerID", accessNode.Host().ID()).Return(&accessId, true).Maybe()
+	idProvider.On("ByPeerID", accessNode.ID()).Return(&accessId, true).Maybe()
 
 	nodes := []p2p.LibP2PNode{tracerNode, consensusNode, accessNode}
 	ids := flow.IdentityList{&tracerId, &consensusId, &accessId}
 
 	// 5. Starts the nodes and lets them discover each other.
-	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
-	defer p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
@@ -162,7 +172,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 	scoreMetrics.On("SetWarningStateCount", uint(0)).Return()
 
 	// 6. Subscribes the nodes to a common topic.
-	_, err := tracerNode.Subscribe(
+	_, err = tracerNode.Subscribe(
 		topic1,
 		validator.TopicValidator(
 			unittest.Logger(),
@@ -185,55 +195,53 @@ func TestGossipSubScoreTracer(t *testing.T) {
 
 	// 7. Expects the tracer node to have the correct app scores, a non-zero score, an existing behaviour score, an existing
 	// IP score, and an existing mesh score.
-	assert.Eventually(t, func() bool {
+	require.Eventually(t, func() bool {
 		// we expect the tracerNode to have the consensusNodes and accessNodes with the correct app scores.
-		exposer, ok := tracerNode.PeerScoreExposer()
-		require.True(t, ok)
-
-		score, ok := exposer.GetAppScore(consensusNode.Host().ID())
+		exposer := tracerNode.PeerScoreExposer()
+		score, ok := exposer.GetAppScore(consensusNode.ID())
 		if !ok || score != consensusScore {
 			return false
 		}
 
-		score, ok = exposer.GetAppScore(accessNode.Host().ID())
+		score, ok = exposer.GetAppScore(accessNode.ID())
 		if !ok || score != accessScore {
 			return false
 		}
 
 		// we expect the tracerNode to have the consensusNodes and accessNodes with a non-zero score.
-		score, ok = exposer.GetScore(consensusNode.Host().ID())
+		score, ok = exposer.GetScore(consensusNode.ID())
 		if !ok || score == 0 {
 			return false
 		}
 
-		score, ok = exposer.GetScore(accessNode.Host().ID())
+		score, ok = exposer.GetScore(accessNode.ID())
 		if !ok || score == 0 {
 			return false
 		}
 
 		// we expect the tracerNode to have the consensusNodes and accessNodes with an existing behaviour score and ip score.
-		_, ok = exposer.GetBehaviourPenalty(consensusNode.Host().ID())
+		_, ok = exposer.GetBehaviourPenalty(consensusNode.ID())
 		if !ok {
 			return false
 		}
 
-		_, ok = exposer.GetIPColocationFactor(consensusNode.Host().ID())
+		_, ok = exposer.GetIPColocationFactor(consensusNode.ID())
 		if !ok {
 			return false
 		}
 
-		_, ok = exposer.GetBehaviourPenalty(accessNode.Host().ID())
+		_, ok = exposer.GetBehaviourPenalty(accessNode.ID())
 		if !ok {
 			return false
 		}
 
-		_, ok = exposer.GetIPColocationFactor(accessNode.Host().ID())
+		_, ok = exposer.GetIPColocationFactor(accessNode.ID())
 		if !ok {
 			return false
 		}
 
 		// we expect the tracerNode to have the consensusNodes and accessNodes with an existing mesh score.
-		consensusMeshScores, ok := exposer.GetTopicScores(consensusNode.Host().ID())
+		consensusMeshScores, ok := exposer.GetTopicScores(consensusNode.ID())
 		if !ok {
 			return false
 		}
@@ -242,7 +250,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 			return false
 		}
 
-		accessMeshScore, ok := exposer.GetTopicScores(accessNode.Host().ID())
+		accessMeshScore, ok := exposer.GetTopicScores(accessNode.ID())
 		if !ok {
 			return false
 		}

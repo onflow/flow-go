@@ -2,23 +2,19 @@ package cmd
 
 import (
 	"encoding/hex"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	model "github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const rootBlockHappyPathLogs = "^deterministic bootstrapping random seed" +
-	"collecting partner network and staking keys" +
+const rootBlockHappyPathLogs = "collecting partner network and staking keys" +
 	`read \d+ partner node configuration files` +
 	`read \d+ weights for partner nodes` +
 	"generating internal private networking and staking keys" +
@@ -34,6 +30,12 @@ const rootBlockHappyPathLogs = "^deterministic bootstrapping random seed" +
 	`finished running DKG` +
 	`.+/random-beacon.priv.json` +
 	`wrote file \S+/root-dkg-data.priv.json` +
+	`computing collection node clusters` +
+	`constructing root blocks for collection node clusters` +
+	`constructing root QCs for collection node clusters` +
+	`constructing root header` +
+	`constructing intermediary bootstrapping data` +
+	`wrote file \S+/intermediary-bootstrapping-data.json` +
 	`constructing root block` +
 	`wrote file \S+/root-block.json` +
 	`constructing and writing votes` +
@@ -42,7 +44,6 @@ const rootBlockHappyPathLogs = "^deterministic bootstrapping random seed" +
 var rootBlockHappyPathRegex = regexp.MustCompile(rootBlockHappyPathLogs)
 
 func TestRootBlock_HappyPath(t *testing.T) {
-	deterministicSeed := GenerateRandomSeed(flow.EpochSetupRandomSourceLength)
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"
 	rootHeight := uint64(12332)
@@ -59,9 +60,16 @@ func TestRootBlock_HappyPath(t *testing.T) {
 		flagRootParent = hex.EncodeToString(rootParent[:])
 		flagRootChain = chainName
 		flagRootHeight = rootHeight
-
-		// set deterministic bootstrapping seed
-		flagBootstrapRandomSeed = deterministicSeed
+		flagEpochCounter = 0
+		flagNumViewsInEpoch = 100_000
+		flagNumViewsInStakingAuction = 50_000
+		flagNumViewsInDKGPhase = 2_000
+		flagEpochCommitSafetyThreshold = 1_000
+		flagProtocolVersion = 42
+		flagUseDefaultEpochTargetEndTime = true
+		flagEpochTimingRefCounter = 0
+		flagEpochTimingRefTimestamp = 0
+		flagEpochTimingDuration = 0
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
@@ -73,61 +81,5 @@ func TestRootBlock_HappyPath(t *testing.T) {
 		// check if root protocol snapshot exists
 		rootBlockDataPath := filepath.Join(bootDir, model.PathRootBlockData)
 		assert.FileExists(t, rootBlockDataPath)
-	})
-}
-
-func TestRootBlock_Deterministic(t *testing.T) {
-	deterministicSeed := GenerateRandomSeed(flow.EpochSetupRandomSourceLength)
-	rootParent := unittest.StateCommitmentFixture()
-	chainName := "main"
-	rootHeight := uint64(1000)
-
-	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
-
-		flagOutdir = bootDir
-
-		flagConfig = configPath
-		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerWeights = partnerWeights
-		flagInternalNodePrivInfoDir = internalPrivDir
-
-		flagRootParent = hex.EncodeToString(rootParent[:])
-		flagRootChain = chainName
-		flagRootHeight = rootHeight
-
-		// set deterministic bootstrapping seed
-		flagBootstrapRandomSeed = deterministicSeed
-
-		hook := zeroLoggerHook{logs: &strings.Builder{}}
-		log = log.Hook(hook)
-
-		rootBlock(nil, nil)
-		require.Regexp(t, rootBlockHappyPathRegex, hook.logs.String())
-		hook.logs.Reset()
-
-		// check if root protocol snapshot exists
-		rootBlockDataPath := filepath.Join(bootDir, model.PathRootBlockData)
-		assert.FileExists(t, rootBlockDataPath)
-
-		// read snapshot
-		firstRootBlockData, err := utils.ReadRootBlock(rootBlockDataPath)
-		require.NoError(t, err)
-
-		// delete snapshot file
-		err = os.Remove(rootBlockDataPath)
-		require.NoError(t, err)
-
-		rootBlock(nil, nil)
-		require.Regexp(t, rootBlockHappyPathRegex, hook.logs.String())
-		hook.logs.Reset()
-
-		// check if root protocol snapshot exists
-		assert.FileExists(t, rootBlockDataPath)
-
-		// read snapshot
-		secondRootBlockData, err := utils.ReadRootBlock(rootBlockDataPath)
-		require.NoError(t, err)
-
-		assert.Equal(t, firstRootBlockData, secondRootBlockData)
 	})
 }

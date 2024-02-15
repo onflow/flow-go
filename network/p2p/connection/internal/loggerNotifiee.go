@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 )
 
 type LoggerNotifiee struct {
@@ -24,30 +25,30 @@ func NewLoggerNotifiee(logger zerolog.Logger, metrics module.LibP2PConnectionMet
 
 func (l *LoggerNotifiee) Listen(_ network.Network, multiaddr multiaddr.Multiaddr) {
 	// just log the multiaddress on which we listen
-	l.logger.Info().Str("multiaddress", multiaddr.String()).Msg("listen started")
+	l.logger.Debug().Str("multiaddress", multiaddr.String()).Msg("listen started")
 }
 
 func (l *LoggerNotifiee) ListenClose(_ network.Network, multiaddr multiaddr.Multiaddr) {
-	l.logger.Info().Str("multiaddress", multiaddr.String()).Msg("listen stopped")
+	l.logger.Debug().Str("multiaddress", multiaddr.String()).Msg("listen stopped")
 }
 
 func (l *LoggerNotifiee) Connected(n network.Network, conn network.Conn) {
 	l.updateConnectionMetric(n)
 	lg := l.connectionUpdateLogger(n, conn)
-	lg.Info().Msg("connection established")
+	lg.Debug().Msg("connection established")
 }
 
 func (l *LoggerNotifiee) Disconnected(n network.Network, conn network.Conn) {
 	l.updateConnectionMetric(n)
 	lg := l.connectionUpdateLogger(n, conn)
-	lg.Warn().Msg("connection closed")
+	lg.Debug().Msg("connection closed")
 }
 
 func (l *LoggerNotifiee) connectionUpdateLogger(n network.Network, con network.Conn) zerolog.Logger {
 	return l.logger.With().
-		Str("remote_peer", con.RemotePeer().String()).
+		Str("remote_peer", p2plogging.PeerId(con.RemotePeer())).
 		Str("remote_address", con.RemoteMultiaddr().String()).
-		Str("local_peer", con.LocalPeer().String()).
+		Str("local_peer", p2plogging.PeerId(con.LocalPeer())).
 		Str("local_address", con.LocalMultiaddr().String()).
 		Str("direction", con.Stat().Direction.String()).
 		Int("total_connections", len(n.Conns())).Logger()

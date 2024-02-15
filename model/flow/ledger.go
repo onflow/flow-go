@@ -13,7 +13,7 @@ import (
 
 const (
 	// Service level keys (owner is empty):
-	UUIDKey         = "uuid"
+	UUIDKeyPrefix   = "uuid"
 	AddressStateKey = "account_address_state"
 
 	// Account level keys
@@ -38,9 +38,17 @@ var AddressStateRegisterID = RegisterID{
 	Key:   AddressStateKey,
 }
 
-var UUIDRegisterID = RegisterID{
-	Owner: "",
-	Key:   UUIDKey,
+func UUIDRegisterID(partition byte) RegisterID {
+	// NOTE: partition 0 uses "uuid" as key to maintain backwards compatibility.
+	key := UUIDKeyPrefix
+	if partition != 0 {
+		key = fmt.Sprintf("%s_%d", UUIDKeyPrefix, partition)
+	}
+
+	return RegisterID{
+		Owner: "",
+		Key:   key,
+	}
 }
 
 func AccountStatusRegisterID(address Address) RegisterID {
@@ -73,14 +81,22 @@ func ContractRegisterID(address Address, contractName string) RegisterID {
 
 func CadenceRegisterID(owner []byte, key []byte) RegisterID {
 	return RegisterID{
-		Owner: string(BytesToAddress(owner).Bytes()),
+		Owner: addressToOwner(BytesToAddress(owner)),
 		Key:   string(key),
 	}
 }
 
-func NewRegisterID(owner, key string) RegisterID {
+func NewRegisterID(owner Address, key string) RegisterID {
+	// global registers have an empty owner field
+	ownerString := ""
+
+	// all other registers have the account's address
+	if owner != EmptyAddress {
+		ownerString = addressToOwner(owner)
+	}
+
 	return RegisterID{
-		Owner: addressToOwner(BytesToAddress([]byte(owner))),
+		Owner: ownerString,
 		Key:   key,
 	}
 }
@@ -90,10 +106,12 @@ func NewRegisterID(owner, key string) RegisterID {
 func (id RegisterID) IsInternalState() bool {
 	// check if is a service level key (owner is empty)
 	// cases:
-	//      - "", "uuid"
+	//      - "", "uuid" (for shard index 0)
+	//      - "", "uuid_%d" (for shard index > 0)
 	//      - "", "account_address_state"
-	if len(id.Owner) == 0 && (id.Key == UUIDKey || id.Key == AddressStateKey) {
-		return true
+	if len(id.Owner) == 0 {
+		return strings.HasPrefix(id.Key, UUIDKeyPrefix) ||
+			id.Key == AddressStateKey
 	}
 
 	// check account level keys
@@ -118,7 +136,6 @@ func (id RegisterID) IsSlabIndex() bool {
 	return len(id.Key) == 9 && id.Key[0] == '$'
 }
 
-// TODO(patrick): pretty print flow internal register ids.
 // String returns formatted string representation of the RegisterID.
 func (id RegisterID) String() string {
 	formattedKey := ""

@@ -33,7 +33,20 @@ spec:
         nodeType: verification
         owner: {{ $.Values.owner }}
         service: flow
-    spec:
+    spec:  
+      nodeSelector:
+        iam.gke.io/gke-metadata-server-enabled: "true"
+      serviceAccountName: "benchnet-configuration-reader"
+      initContainers:
+        - name: bootstrap-download
+          image: gcr.io/google.com/cloudsdktool/google-cloud-cli:372.0.0
+          command: 
+            - 'sh'
+            - '-c'
+            - "mkdir -p /data/bootstrap; cd /data/bootstrap; gsutil cp gs://{{ $.Values.configurationBucket }}/{{ $.Values.networkId }}.tar - | tar -x"
+          volumeMounts:
+            - name: data
+              mountPath: /data
       containers:
         - name: {{ $k }}
           image: {{ $v.image }}
@@ -61,59 +74,11 @@ spec:
             - name: data
               mountPath: /data
 
-            - name: node-info-priv-json
-              readOnly: true
-              mountPath: /bootstrap/private-root-information/private-node-info_{{ $v.nodeId }}/node-info.priv.json
-              subPath: node-info.priv.json
-
-            - name: node-info-pub-json
-              readOnly: true
-              mountPath: /bootstrap/public-root-information/node-infos.pub.json
-              subPath: node-infos.pub.json
-
-            - name: root-block-json
-              readOnly: true
-              mountPath: /bootstrap/public-root-information/root-block.json
-              subPath: root-block.json
-
-            - name: root-protocol-state-snapshot-json
-              readOnly: true
-              mountPath: /bootstrap/public-root-information/root-protocol-state-snapshot.json
-              subPath: root-protocol-state-snapshot.json
-
-            - name: secretsdb-key
-              readOnly: true
-              mountPath: /bootstrap/private-root-information/private-node-info_{{ $v.nodeId }}/secretsdb-key
-              subPath: secretsdb-key
-
           {{ if $v.resources }}
           resources: {{ $v.resources | toYaml | nindent 12 }}
           {{ else}}
           resources: {{ $.Values.verification.defaults.resources | toYaml | nindent 12 }}
           {{ end }}
-
-      volumes:
-
-        - name: node-info-priv-json
-          secret: 
-            secretName: {{ $.Values.networkId }}.{{ $v.nodeId }}.node-info.priv.json
-
-        - name: node-info-pub-json
-          secret: 
-            secretName: {{ $.Values.networkId }}.node-infos.pub.json
-
-        - name: root-block-json
-          secret: 
-            secretName: {{ $.Values.networkId }}.root-block.json
-
-        - name: root-protocol-state-snapshot-json
-          secret: 
-            secretName: {{ $.Values.networkId }}.root-protocol-state-snapshot.json
-
-        - name: secretsdb-key
-          secret: 
-            secretName: {{ $.Values.networkId }}.{{ $v.nodeId }}.secretsdb-key
-
   volumeClaimTemplates:
     - metadata:
         name: data

@@ -82,7 +82,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 	}
 	colNodes := testnet.NewNodeConfigSet(nNodes, flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.InfoLevel),
-		testnet.WithAdditionalFlag("--block-rate-delay=1ms"),
+		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=1ms"),
 	)
 
 	suite.nClusters = nClusters
@@ -142,7 +142,7 @@ func (suite *CollectorSuite) Clusters() flow.ClusterList {
 	setup, ok := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	suite.Require().True(ok)
 
-	collectors := suite.net.Identities().Filter(filter.HasRole(flow.RoleCollection))
+	collectors := suite.net.Identities().Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 	clusters, err := factory.NewClusterList(setup.Assignments, collectors)
 	suite.Require().Nil(err)
 	return clusters
@@ -170,7 +170,7 @@ func (suite *CollectorSuite) NextTransaction(opts ...func(*sdk.Transaction)) *sd
 	return tx
 }
 
-func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transaction {
+func (suite *CollectorSuite) TxForCluster(target flow.IdentitySkeletonList) *sdk.Transaction {
 	acct := suite.acct
 
 	tx := suite.NextTransaction()
@@ -331,7 +331,7 @@ func (suite *CollectorSuite) Collector(clusterIdx, nodeIdx uint) *testnet.Contai
 	node, ok := cluster.ByIndex(nodeIdx)
 	require.True(suite.T(), ok, "invalid node index")
 
-	return suite.net.ContainerByID(node.ID())
+	return suite.net.ContainerByID(node.NodeID)
 }
 
 // ClusterStateFor returns a cluster state instance for the collector node with the given ID.

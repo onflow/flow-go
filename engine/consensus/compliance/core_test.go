@@ -2,9 +2,7 @@ package compliance
 
 import (
 	"errors"
-	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -58,35 +56,33 @@ type CommonSuite struct {
 	childrenDB map[flow.Identifier][]flow.Slashable[*flow.Block]
 
 	// mocked dependencies
-	me                *module.Local
-	metrics           *metrics.NoopCollector
-	tracer            realModule.Tracer
-	headers           *storage.Headers
-	payloads          *storage.Payloads
-	state             *protocol.ParticipantState
-	snapshot          *protocol.Snapshot
-	con               *mocknetwork.Conduit
-	net               *mocknetwork.Network
-	prov              *consensus.ProposalProvider
-	pending           *module.PendingBlockBuffer
-	hotstuff          *module.HotStuff
-	sync              *module.BlockRequester
-	validator         *hotstuff.Validator
-	voteAggregator    *hotstuff.VoteAggregator
-	timeoutAggregator *hotstuff.TimeoutAggregator
+	me                        *module.Local
+	metrics                   *metrics.NoopCollector
+	tracer                    realModule.Tracer
+	headers                   *storage.Headers
+	payloads                  *storage.Payloads
+	state                     *protocol.ParticipantState
+	snapshot                  *protocol.Snapshot
+	con                       *mocknetwork.Conduit
+	net                       *mocknetwork.Network
+	prov                      *consensus.ProposalProvider
+	pending                   *module.PendingBlockBuffer
+	hotstuff                  *module.HotStuff
+	sync                      *module.BlockRequester
+	proposalViolationNotifier *hotstuff.ProposalViolationConsumer
+	validator                 *hotstuff.Validator
+	voteAggregator            *hotstuff.VoteAggregator
+	timeoutAggregator         *hotstuff.TimeoutAggregator
 
 	// engine under test
 	core *Core
 }
 
 func (cs *CommonSuite) SetupTest() {
-	// seed the RNG
-	rand.Seed(time.Now().UnixNano())
-
 	// initialize the paramaters
 	cs.participants = unittest.IdentityListFixture(3,
 		unittest.WithRole(flow.RoleConsensus),
-		unittest.WithWeight(1000),
+		unittest.WithInitialWeight(1000),
 	)
 	cs.myID = cs.participants[0].NodeID
 	block := unittest.BlockFixture()
@@ -176,7 +172,7 @@ func (cs *CommonSuite) SetupTest() {
 	// set up protocol snapshot mock
 	cs.snapshot = &protocol.Snapshot{}
 	cs.snapshot.On("Identities", mock.Anything).Return(
-		func(filter flow.IdentityFilter) flow.IdentityList {
+		func(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return cs.participants.Filter(filter)
 		},
 		nil,
@@ -251,6 +247,9 @@ func (cs *CommonSuite) SetupTest() {
 	// set up no-op tracer
 	cs.tracer = trace.NewNoopTracer()
 
+	// set up notifier for reporting protocol violations
+	cs.proposalViolationNotifier = hotstuff.NewProposalViolationConsumer(cs.T())
+
 	// initialize the engine
 	e, err := NewCore(
 		unittest.Logger(),
@@ -258,6 +257,7 @@ func (cs *CommonSuite) SetupTest() {
 		cs.metrics,
 		cs.metrics,
 		cs.metrics,
+		cs.proposalViolationNotifier,
 		cs.tracer,
 		cs.headers,
 		cs.payloads,
@@ -268,6 +268,7 @@ func (cs *CommonSuite) SetupTest() {
 		cs.hotstuff,
 		cs.voteAggregator,
 		cs.timeoutAggregator,
+		compliance.DefaultConfig(),
 	)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
@@ -290,7 +291,10 @@ func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 	cs.hotstuff.On("SubmitProposal", hotstuffProposal)
 
 	// it should be processed without error
-	err := cs.core.OnBlockProposal(originID, proposal)
+	err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+		OriginID: originID,
+		Message:  proposal,
+	})
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
 	// we should extend the state with the header
@@ -316,7 +320,10 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 	cs.hotstuff.On("SubmitProposal", hotstuffProposal)
 
 	// it should be processed without error
-	err := cs.core.OnBlockProposal(originID, proposal)
+	err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+		OriginID: originID,
+		Message:  proposal,
+	})
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
 	// we should extend the state with the header
@@ -331,7 +338,10 @@ func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 	block.Header.View = cs.head.View + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
 	proposal := unittest.ProposalFromBlock(&block)
 
-	err := cs.core.OnBlockProposal(originID, proposal)
+	err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+		OriginID: originID,
+		Message:  proposal,
+	})
 	require.NoError(cs.T(), err)
 
 	// block should be dropped - not added to state or cache
@@ -362,12 +372,20 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 	cs.Run("invalid block error", func() {
 		// the block fails HotStuff validation
 		*cs.validator = *hotstuff.NewValidator(cs.T())
-		cs.validator.On("ValidateProposal", hotstuffProposal).Return(model.InvalidBlockError{})
+		sentinelError := model.NewInvalidProposalErrorf(hotstuffProposal, "")
+		cs.validator.On("ValidateProposal", hotstuffProposal).Return(sentinelError)
+		cs.proposalViolationNotifier.On("OnInvalidBlockDetected", flow.Slashable[model.InvalidProposalError]{
+			OriginID: originID,
+			Message:  sentinelError.(model.InvalidProposalError),
+		}).Return().Once()
 		// we should notify VoteAggregator about the invalid block
 		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 
 		// the expected error should be handled within the Core
-		err := cs.core.OnBlockProposal(originID, proposal)
+		err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+			OriginID: originID,
+			Message:  proposal,
+		})
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
 		// we should not extend the state with the header
@@ -382,7 +400,10 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(model.ErrViewForUnknownEpoch)
 
 		// the expected error should be handled within the Core
-		err := cs.core.OnBlockProposal(originID, proposal)
+		err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+			OriginID: originID,
+			Message:  proposal,
+		})
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
 		// we should not extend the state with the header
@@ -398,7 +419,10 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(unexpectedErr)
 
 		// the error should be propagated
-		err := cs.core.OnBlockProposal(originID, proposal)
+		err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+			OriginID: originID,
+			Message:  proposal,
+		})
 		require.ErrorIs(cs.T(), err, unexpectedErr)
 
 		// we should not extend the state with the header
@@ -434,12 +458,22 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		// make sure we fail to extend the state
 		*cs.state = protocol.ParticipantState{}
 		cs.state.On("Final").Return(func() protint.Snapshot { return cs.snapshot })
-		cs.state.On("Extend", mock.Anything, mock.Anything).Return(state.NewInvalidExtensionError(""))
+		sentinelErr := state.NewInvalidExtensionError("")
+		cs.state.On("Extend", mock.Anything, mock.Anything).Return(sentinelErr)
+		cs.proposalViolationNotifier.On("OnInvalidBlockDetected", mock.Anything).Run(func(args mock.Arguments) {
+			err := args.Get(0).(flow.Slashable[model.InvalidProposalError])
+			require.ErrorIs(cs.T(), err.Message, sentinelErr)
+			require.Equal(cs.T(), err.Message.InvalidProposal, hotstuffProposal)
+			require.Equal(cs.T(), err.OriginID, originID)
+		}).Return().Once()
 		// we should notify VoteAggregator about the invalid block
 		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 
 		// the expected error should be handled within the Core
-		err := cs.core.OnBlockProposal(originID, proposal)
+		err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+			OriginID: originID,
+			Message:  proposal,
+		})
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
 		// we should extend the state with the header
@@ -457,7 +491,10 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		cs.state.On("Extend", mock.Anything, mock.Anything).Return(state.NewOutdatedExtensionError(""))
 
 		// the expected error should be handled within the Core
-		err := cs.core.OnBlockProposal(originID, proposal)
+		err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+			OriginID: originID,
+			Message:  proposal,
+		})
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
 		// we should extend the state with the header
@@ -476,7 +513,10 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		cs.state.On("Extend", mock.Anything, mock.Anything).Return(unexpectedErr)
 
 		// it should be processed without error
-		err := cs.core.OnBlockProposal(originID, proposal)
+		err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+			OriginID: originID,
+			Message:  proposal,
+		})
 		require.ErrorIs(cs.T(), err, unexpectedErr)
 
 		// we should extend the state with the header
@@ -518,7 +558,10 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	}
 
 	// execute the connected children handling
-	err := cs.core.processBlockAndDescendants(parent)
+	err := cs.core.processBlockAndDescendants(flow.Slashable[*flow.Block]{
+		OriginID: unittest.IdentifierFixture(),
+		Message:  parent,
+	})
 	require.NoError(cs.T(), err, "should pass handling children")
 
 	// make sure we drop the cache after trying to process
@@ -551,7 +594,10 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	// process all the descendants
 	for _, proposal := range proposals {
 		// process and make sure no error occurs (as they are unverifiable)
-		err := cs.core.OnBlockProposal(originID, proposal)
+		err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+			OriginID: originID,
+			Message:  proposal,
+		})
 		require.NoError(cs.T(), err, "proposal buffering should pass")
 
 		// make sure no block is forwarded to hotstuff
@@ -587,7 +633,10 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	cs.voteAggregator.On("AddBlock", mock.Anything).Times(4)
 
 	// process the root proposal
-	err := cs.core.OnBlockProposal(originID, missingProposal)
+	err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+		OriginID: originID,
+		Message:  missingProposal,
+	})
 	require.NoError(cs.T(), err, "root proposal should pass")
 
 	// all proposals should be processed

@@ -81,6 +81,11 @@ func (_m *ExecutionMetrics) ExecutionLastExecutedBlockHeight(height uint64) {
 	_m.Called(height)
 }
 
+// ExecutionLastFinalizedExecutedBlockHeight provides a mock function with given fields: height
+func (_m *ExecutionMetrics) ExecutionLastFinalizedExecutedBlockHeight(height uint64) {
+	_m.Called(height)
+}
+
 // ExecutionScriptExecuted provides a mock function with given fields: dur, compUsed, memoryUsed, memoryEstimate
 func (_m *ExecutionMetrics) ExecutionScriptExecuted(dur time.Duration, compUsed uint64, memoryUsed uint64, memoryEstimate uint64) {
 	_m.Called(dur, compUsed, memoryUsed, memoryEstimate)
@@ -96,9 +101,9 @@ func (_m *ExecutionMetrics) ExecutionSync(syncing bool) {
 	_m.Called(syncing)
 }
 
-// ExecutionTransactionExecuted provides a mock function with given fields: dur, compUsed, memoryUsed, actualMemoryUsed, eventCounts, eventSize, failed
-func (_m *ExecutionMetrics) ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, memoryUsed uint64, actualMemoryUsed uint64, eventCounts int, eventSize int, failed bool) {
-	_m.Called(dur, compUsed, memoryUsed, actualMemoryUsed, eventCounts, eventSize, failed)
+// ExecutionTransactionExecuted provides a mock function with given fields: dur, numTxnConflictRetries, compUsed, memoryUsed, eventCounts, eventSize, failed
+func (_m *ExecutionMetrics) ExecutionTransactionExecuted(dur time.Duration, numTxnConflictRetries int, compUsed uint64, memoryUsed uint64, eventCounts int, eventSize int, failed bool) {
+	_m.Called(dur, numTxnConflictRetries, compUsed, memoryUsed, eventCounts, eventSize, failed)
 }
 
 // FinishBlockReceivedToExecuted provides a mock function with given fields: blockID

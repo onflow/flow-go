@@ -11,11 +11,14 @@ import (
 	finalizer "github.com/onflow/flow-go/module/finalizer/collection"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/network"
+	clusterstate "github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
 type BuilderFactory struct {
 	db               *badger.DB
+	protoState       protocol.State
 	mainChainHeaders storage.Headers
 	trace            module.Tracer
 	opts             []builder.Opt
@@ -26,6 +29,7 @@ type BuilderFactory struct {
 
 func NewBuilderFactory(
 	db *badger.DB,
+	protoState protocol.State,
 	mainChainHeaders storage.Headers,
 	trace module.Tracer,
 	metrics module.CollectionMetrics,
@@ -36,6 +40,7 @@ func NewBuilderFactory(
 
 	factory := &BuilderFactory{
 		db:               db,
+		protoState:       protoState,
 		mainChainHeaders: mainChainHeaders,
 		trace:            trace,
 		metrics:          metrics,
@@ -47,6 +52,7 @@ func NewBuilderFactory(
 }
 
 func (f *BuilderFactory) Create(
+	clusterState clusterstate.State,
 	clusterHeaders storage.Headers,
 	clusterPayloads storage.ClusterPayloads,
 	pool mempool.Transactions,
@@ -56,6 +62,8 @@ func (f *BuilderFactory) Create(
 	build, err := builder.NewBuilder(
 		f.db,
 		f.trace,
+		f.protoState,
+		clusterState,
 		f.mainChainHeaders,
 		clusterHeaders,
 		clusterPayloads,

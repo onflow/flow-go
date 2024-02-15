@@ -8,14 +8,19 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
+	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -23,6 +28,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/state/protocol"
+	protocolMock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -281,7 +288,7 @@ func CreateAccountsWithSimpleAddresses(
 
 		for _, event := range output.Events {
 			if event.Type == flow.EventAccountCreated {
-				data, err := jsoncdc.Decode(nil, event.Payload)
+				data, err := ccf.Decode(nil, event.Payload)
 				if err != nil {
 					return snapshotTree, nil, errors.New(
 						"error decoding events")
@@ -624,4 +631,31 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 			},
 		},
 	}
+}
+
+// EntropyProviderFixture returns an entropy provider mock that
+// supports RandomSource().
+// If input is nil, a random source fixture is generated.
+func EntropyProviderFixture(source []byte) environment.EntropyProvider {
+	if source == nil {
+		source = unittest.SignatureFixture()
+	}
+	provider := envMock.EntropyProvider{}
+	provider.On("RandomSource").Return(source, nil)
+	return &provider
+}
+
+// ProtocolStateWithSourceFixture returns a protocol state mock that only
+// supports AtBlockID to return a snapshot mock.
+// The snapshot mock only supports RandomSource().
+// If input is nil, a random source fixture is generated.
+func ProtocolStateWithSourceFixture(source []byte) protocol.State {
+	if source == nil {
+		source = unittest.SignatureFixture()
+	}
+	snapshot := &protocolMock.Snapshot{}
+	snapshot.On("RandomSource").Return(source, nil)
+	state := protocolMock.State{}
+	state.On("AtBlockID", mock.Anything).Return(snapshot)
+	return &state
 }

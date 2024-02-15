@@ -11,16 +11,18 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestWithEmulator(t *testing.T) {
-	suite.Run(t, new(DKGSuite))
+	suite.Run(t, new(EmulatorSuite))
 }
 
-func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
+func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 
 	nodes := s.nodes[:goodNodes]
 
@@ -49,16 +51,16 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 		DKGPhase2FinalView: 200,
 		DKGPhase3FinalView: 250,
 		FinalView:          300,
-		Participants:       s.netIDs,
-		RandomSource:       []byte("random bytes for seed"),
+		Participants:       s.netIDs.ToSkeleton(),
+		RandomSource:       unittest.EpochSetupRandomSourceFixture(),
 	}
 
 	// create the EpochSetup that will trigger the next DKG run with all the
 	// desired parameters
 	nextEpochSetup := flow.EpochSetup{
 		Counter:      currentCounter + 1,
-		Participants: s.netIDs,
-		RandomSource: []byte("random bytes for seed"),
+		Participants: s.netIDs.ToSkeleton(),
+		RandomSource: unittest.EpochSetupRandomSourceFixture(),
 		FirstView:    301,
 		FinalView:    600,
 	}
@@ -67,10 +69,8 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 
 	for _, node := range nodes {
 		node.setEpochs(s.T(), currentEpochSetup, nextEpochSetup, firstBlock)
-	}
-
-	for _, n := range nodes {
-		n.Ready()
+		node.Start()
+		unittest.RequireCloseBefore(s.T(), node.Ready(), time.Second, "failed to start up")
 	}
 
 	// trigger the EpochSetupPhaseStarted event for all nodes, effectively
@@ -118,7 +118,8 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 	}
 
 	for _, n := range nodes {
-		n.Done()
+		n.Stop()
+		unittest.RequireCloseBefore(s.T(), n.Done(), time.Second, "nodes did not shutdown")
 	}
 
 	// DKG is completed if one value was proposed by a majority of nodes
@@ -183,13 +184,13 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 }
 
 // TestHappyPath checks that DKG works when all nodes are good
-func (s *DKGSuite) TestHappyPath() {
+func (s *EmulatorSuite) TestHappyPath() {
 	s.runTest(numberOfNodes, false)
 }
 
 // TestNodesDown checks that DKG still works with the maximum number of bad
 // nodes.
-func (s *DKGSuite) TestNodesDown() {
+func (s *EmulatorSuite) TestNodesDown() {
 	minHonestNodes := numberOfNodes - msig.RandomBeaconThreshold(numberOfNodes)
 	s.runTest(minHonestNodes, false)
 }
@@ -198,6 +199,6 @@ func (s *DKGSuite) TestNodesDown() {
 // between the node and the DKG smart-contract ( this covers connection issues
 // between consensus node and access node, as well as connection issues between
 // access node and execution node, or the execution node being down).
-func (s *DKGSuite) TestEmulatorProblems() {
+func (s *EmulatorSuite) TestEmulatorProblems() {
 	s.runTest(numberOfNodes, true)
 }

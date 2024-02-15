@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
-	"github.com/onflow/flow-go/state/protocol/seed"
+	"github.com/onflow/flow-go/state/protocol/prg"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
@@ -181,7 +181,7 @@ func (suite *ConsensusSuite) TestConstruction_CommittedNextEpoch() {
 	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter+1)
 }
 
-// TestConstruction_EpochFallbackTriggered tests construction when EECC has been triggered.
+// TestConstruction_EpochFallbackTriggered tests construction when EFM has been triggered.
 // Both current and the injected fallback epoch should be cached after construction.
 func (suite *ConsensusSuite) TestConstruction_EpochFallbackTriggered() {
 	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, unittest.SeedFixture(32), true)
@@ -262,21 +262,29 @@ func (suite *ConsensusSuite) TestIdentitiesByBlock() {
 	t := suite.T()
 
 	realIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	zeroWeightConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithWeight(0))
-	ejectedConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithEjected(true))
+	joiningConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithParticipationStatus(flow.EpochParticipationStatusJoining))
+	leavingConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithParticipationStatus(flow.EpochParticipationStatusLeaving))
+	ejectedConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithParticipationStatus(flow.EpochParticipationStatusEjected))
 	validNonConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	validConsensusIdentities := []*flow.Identity{
+		realIdentity,
+		joiningConsensusIdentity,
+		leavingConsensusIdentity,
+		validNonConsensusIdentity,
+		ejectedConsensusIdentity,
+	}
 	fakeID := unittest.IdentifierFixture()
 	blockID := unittest.IdentifierFixture()
 
 	// create a mock epoch for leader selection setup in constructor
-	currEpoch := newMockEpoch(1, unittest.IdentityListFixture(10), 1, 100, unittest.SeedFixture(seed.RandomSourceLength), true)
+	currEpoch := newMockEpoch(1, unittest.IdentityListFixture(10), 1, 100, unittest.SeedFixture(prg.RandomSourceLength), true)
 	suite.epochs.Add(currEpoch)
 
 	suite.state.On("AtBlockID", blockID).Return(suite.snapshot)
-	suite.snapshot.On("Identity", realIdentity.NodeID).Return(realIdentity, nil)
-	suite.snapshot.On("Identity", zeroWeightConsensusIdentity.NodeID).Return(zeroWeightConsensusIdentity, nil)
-	suite.snapshot.On("Identity", ejectedConsensusIdentity.NodeID).Return(ejectedConsensusIdentity, nil)
-	suite.snapshot.On("Identity", validNonConsensusIdentity.NodeID).Return(validNonConsensusIdentity, nil)
+	for _, identity := range validConsensusIdentities {
+		i := identity // copy
+		suite.snapshot.On("Identity", i.NodeID).Return(i, nil)
+	}
 	suite.snapshot.On("Identity", fakeID).Return(nil, protocol.IdentityNotFoundError{})
 
 	suite.CreateAndStartCommittee()
@@ -287,8 +295,13 @@ func (suite *ConsensusSuite) TestIdentitiesByBlock() {
 	})
 
 	t.Run("existent but non-committee-member identity should return InvalidSignerError", func(t *testing.T) {
-		t.Run("zero-weight consensus node", func(t *testing.T) {
-			_, err := suite.committee.IdentityByBlock(blockID, zeroWeightConsensusIdentity.NodeID)
+		t.Run("joining consensus node", func(t *testing.T) {
+			_, err := suite.committee.IdentityByBlock(blockID, joiningConsensusIdentity.NodeID)
+			require.True(t, model.IsInvalidSignerError(err))
+		})
+
+		t.Run("leaving consensus node", func(t *testing.T) {
+			_, err := suite.committee.IdentityByBlock(blockID, leavingConsensusIdentity.NodeID)
 			require.True(t, model.IsInvalidSignerError(err))
 		})
 
@@ -327,8 +340,10 @@ func (suite *ConsensusSuite) TestIdentitiesByEpoch() {
 	// epoch 1 identities with varying conditions which would disqualify them
 	// from committee participation
 	realIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	zeroWeightConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithWeight(0))
-	ejectedConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithEjected(true))
+	zeroWeightConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus),
+		unittest.WithInitialWeight(0))
+	ejectedConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus),
+		unittest.WithParticipationStatus(flow.EpochParticipationStatusEjected))
 	validNonConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	epoch1Identities := flow.IdentityList{realIdentity, zeroWeightConsensusIdentity, ejectedConsensusIdentity, validNonConsensusIdentity}
 
@@ -337,9 +352,9 @@ func (suite *ConsensusSuite) TestIdentitiesByEpoch() {
 	epoch2Identities := flow.IdentityList{epoch2Identity}
 
 	// create a mock epoch for leader selection setup in constructor
-	epoch1 := newMockEpoch(suite.currentEpochCounter, epoch1Identities, 1, 100, unittest.SeedFixture(seed.RandomSourceLength), true)
+	epoch1 := newMockEpoch(suite.currentEpochCounter, epoch1Identities, 1, 100, unittest.SeedFixture(prg.RandomSourceLength), true)
 	// initially epoch 2 is not committed
-	epoch2 := newMockEpoch(suite.currentEpochCounter+1, epoch2Identities, 101, 200, unittest.SeedFixture(seed.RandomSourceLength), true)
+	epoch2 := newMockEpoch(suite.currentEpochCounter+1, epoch2Identities, 101, 200, unittest.SeedFixture(prg.RandomSourceLength), true)
 	suite.epochs.Add(epoch1)
 
 	suite.CreateAndStartCommittee()
@@ -356,11 +371,6 @@ func (suite *ConsensusSuite) TestIdentitiesByEpoch() {
 				require.True(t, model.IsInvalidSignerError(err))
 			})
 
-			t.Run("ejected consensus node", func(t *testing.T) {
-				_, err := suite.committee.IdentityByEpoch(unittest.Uint64InRange(1, 100), ejectedConsensusIdentity.NodeID)
-				require.True(t, model.IsInvalidSignerError(err))
-			})
-
 			t.Run("otherwise valid non-consensus node", func(t *testing.T) {
 				_, err := suite.committee.IdentityByEpoch(unittest.Uint64InRange(1, 100), validNonConsensusIdentity.NodeID)
 				require.True(t, model.IsInvalidSignerError(err))
@@ -370,7 +380,7 @@ func (suite *ConsensusSuite) TestIdentitiesByEpoch() {
 		t.Run("should be able to retrieve real identity", func(t *testing.T) {
 			actual, err := suite.committee.IdentityByEpoch(unittest.Uint64InRange(1, 100), realIdentity.NodeID)
 			require.NoError(t, err)
-			require.Equal(t, realIdentity, actual)
+			require.Equal(t, realIdentity.IdentitySkeleton, *actual)
 		})
 
 		t.Run("should return ErrViewForUnknownEpoch for view outside existing epoch", func(t *testing.T) {
@@ -387,7 +397,7 @@ func (suite *ConsensusSuite) TestIdentitiesByEpoch() {
 		t.Run("should be able to retrieve epoch 1 identity in epoch 1", func(t *testing.T) {
 			actual, err := suite.committee.IdentityByEpoch(unittest.Uint64InRange(1, 100), realIdentity.NodeID)
 			require.NoError(t, err)
-			require.Equal(t, realIdentity, actual)
+			require.Equal(t, realIdentity.IdentitySkeleton, *actual)
 		})
 
 		t.Run("should be unable to retrieve epoch 1 identity in epoch 2", func(t *testing.T) {
@@ -405,7 +415,7 @@ func (suite *ConsensusSuite) TestIdentitiesByEpoch() {
 		t.Run("should be able to retrieve epoch 2 identity in epoch 2", func(t *testing.T) {
 			actual, err := suite.committee.IdentityByEpoch(unittest.Uint64InRange(101, 200), epoch2Identity.NodeID)
 			require.NoError(t, err)
-			require.Equal(t, epoch2Identity, actual)
+			require.Equal(t, epoch2Identity.IdentitySkeleton, *actual)
 		})
 
 		t.Run("should return ErrViewForUnknownEpoch for view outside existing epochs", func(t *testing.T) {
@@ -428,8 +438,8 @@ func (suite *ConsensusSuite) TestThresholds() {
 
 	identities := unittest.IdentityListFixture(10)
 
-	prevEpoch := newMockEpoch(suite.currentEpochCounter-1, identities.Map(mapfunc.WithWeight(100)), 1, 100, unittest.SeedFixture(seed.RandomSourceLength), true)
-	currEpoch := newMockEpoch(suite.currentEpochCounter, identities.Map(mapfunc.WithWeight(200)), 101, 200, unittest.SeedFixture(32), true)
+	prevEpoch := newMockEpoch(suite.currentEpochCounter-1, identities.Map(mapfunc.WithInitialWeight(100)), 1, 100, unittest.SeedFixture(prg.RandomSourceLength), true)
+	currEpoch := newMockEpoch(suite.currentEpochCounter, identities.Map(mapfunc.WithInitialWeight(200)), 101, 200, unittest.SeedFixture(32), true)
 	suite.epochs.Add(prevEpoch)
 	suite.epochs.Add(currEpoch)
 
@@ -466,7 +476,7 @@ func (suite *ConsensusSuite) TestThresholds() {
 	})
 
 	// now, add a valid next epoch
-	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, identities.Map(mapfunc.WithWeight(300)), 201, 300, unittest.SeedFixture(seed.RandomSourceLength), true)
+	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, identities.Map(mapfunc.WithInitialWeight(300)), 201, 300, unittest.SeedFixture(prg.RandomSourceLength), true)
 	suite.CommitEpoch(nextEpoch)
 
 	t.Run("next epoch ready", func(t *testing.T) {
@@ -517,7 +527,7 @@ func (suite *ConsensusSuite) TestLeaderForView() {
 
 	identities := unittest.IdentityListFixture(10)
 
-	prevEpoch := newMockEpoch(suite.currentEpochCounter-1, identities, 1, 100, unittest.SeedFixture(seed.RandomSourceLength), true)
+	prevEpoch := newMockEpoch(suite.currentEpochCounter-1, identities, 1, 100, unittest.SeedFixture(prg.RandomSourceLength), true)
 	currEpoch := newMockEpoch(suite.currentEpochCounter, identities, 101, 200, unittest.SeedFixture(32), true)
 	suite.epochs.Add(currEpoch)
 	suite.epochs.Add(prevEpoch)
@@ -550,7 +560,7 @@ func (suite *ConsensusSuite) TestLeaderForView() {
 	})
 
 	// now, add a valid next epoch
-	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, identities, 201, 300, unittest.SeedFixture(seed.RandomSourceLength), true)
+	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, identities, 201, 300, unittest.SeedFixture(prg.RandomSourceLength), true)
 	suite.CommitEpoch(nextEpoch)
 
 	t.Run("next epoch ready", func(t *testing.T) {
@@ -597,7 +607,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 	currentEpochCounter := firstEpochCounter
 	epochFinalView := uint64(100)
 
-	epoch1 := newMockEpoch(currentEpochCounter, identities, 1, epochFinalView, unittest.SeedFixture(seed.RandomSourceLength), true)
+	epoch1 := newMockEpoch(currentEpochCounter, identities, 1, epochFinalView, unittest.SeedFixture(prg.RandomSourceLength), true)
 
 	// create mocks
 	state := new(protocolmock.State)
@@ -634,7 +644,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 		firstView := epochFinalView + 1
 		epochFinalView = epochFinalView + 100
 		currentEpochCounter++
-		nextEpoch := newMockEpoch(currentEpochCounter, identities, firstView, epochFinalView, unittest.SeedFixture(seed.RandomSourceLength), true)
+		nextEpoch := newMockEpoch(currentEpochCounter, identities, firstView, epochFinalView, unittest.SeedFixture(prg.RandomSourceLength), true)
 		epochQuery.Add(nextEpoch)
 
 		currentEpochPhase = flow.EpochPhaseCommitted
@@ -679,7 +689,7 @@ func newMockEpoch(counter uint64, identities flow.IdentityList, firstView uint64
 
 	epoch := new(protocolmock.Epoch)
 	epoch.On("Counter").Return(counter, nil)
-	epoch.On("InitialIdentities").Return(identities, nil)
+	epoch.On("InitialIdentities").Return(identities.ToSkeleton(), nil)
 	epoch.On("FirstView").Return(firstView, nil)
 	epoch.On("FinalView").Return(finalView, nil)
 	if committed {

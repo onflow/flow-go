@@ -8,5 +8,5 @@ import (
 type EventLoop interface {
 	module.HotStuff
 	TimeoutCollectorConsumer
-	QCCreatedConsumer
+	VoteCollectorConsumer
 }

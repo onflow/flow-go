@@ -11,8 +11,11 @@ import (
 	"github.com/onflow/flow-go/insecure/corruptnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
-	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
+	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
+	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -70,24 +73,24 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			myAddr = cnb.FlowNodeBuilder.BaseConfig.BindAddr
 		}
 
-		uniCfg := &p2pconfig.UnicastConfig{
-			StreamRetryInterval:    cnb.UnicastCreateStreamRetryDelay,
+		uniCfg := &p2pbuilderconfig.UnicastConfig{
 			RateLimiterDistributor: cnb.UnicastRateLimiterDistributor,
+			Unicast:                cnb.FlowConfig.NetworkConfig.Unicast,
 		}
 
-		connGaterCfg := &p2pconfig.ConnectionGaterConfig{
+		connGaterCfg := &p2pbuilderconfig.ConnectionGaterConfig{
 			InterceptPeerDialFilters: []p2p.PeerFilter{}, // disable connection gater onInterceptPeerDialFilters
 			InterceptSecuredFilters:  []p2p.PeerFilter{}, // disable connection gater onInterceptSecuredFilters
 		}
 
-		peerManagerCfg := &p2pconfig.PeerManagerConfig{
-			ConnectionPruning: cnb.NetworkConnectionPruning,
-			UpdateInterval:    cnb.PeerUpdateInterval,
+		peerManagerCfg := &p2pbuilderconfig.PeerManagerConfig{
+			ConnectionPruning: cnb.FlowConfig.NetworkConfig.NetworkConnectionPruning,
+			UpdateInterval:    cnb.FlowConfig.NetworkConfig.PeerUpdateInterval,
+			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
 		}
 
 		// create default libp2p factory if corrupt node should enable the topic validator
-		libP2PNodeFactory := corruptlibp2p.NewCorruptLibP2PNodeFactory(
-			cnb.Logger,
+		corruptLibp2pNode, err := corruptlibp2p.InitCorruptLibp2pNode(cnb.Logger,
 			cnb.RootChainID,
 			myAddr,
 			cnb.NetworkKey,
@@ -96,28 +99,28 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			cnb.Metrics.Network,
 			cnb.Resolver,
 			cnb.BaseConfig.NodeRole,
-			connGaterCfg,
-			// run peer manager with the specified interval and let it also prune connections
+			connGaterCfg, // run peer manager with the specified interval and let it also prune connections
 			peerManagerCfg,
 			uniCfg,
-			cnb.GossipSubConfig,
+			cnb.FlowConfig.NetworkConfig,
+			&p2p.DisallowListCacheConfig{
+				MaxSize: cnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
+				Metrics: metrics.DisallowListCacheMetricsFactory(cnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
+			},
 			cnb.TopicValidatorDisabled,
 			cnb.WithPubSubMessageSigning,
-			cnb.WithPubSubStrictSignatureVerification,
-		)
-
-		libp2pNode, err := libP2PNodeFactory()
+			cnb.WithPubSubStrictSignatureVerification)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create libp2p node: %w", err)
 		}
-		cnb.LibP2PNode = libp2pNode
+		cnb.LibP2PNode = corruptLibp2pNode
 		cnb.Logger.Info().
 			Hex("node_id", logging.ID(cnb.NodeID)).
 			Str("address", myAddr).
 			Bool("topic_validator_disabled", cnb.TopicValidatorDisabled).
 			Msg("corrupted libp2p node initialized")
 
-		return libp2pNode, nil
+		return corruptLibp2pNode, nil
 	})
 	cnb.FlowNodeBuilder.OverrideComponent(cmd.NetworkComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		myAddr := cnb.FlowNodeBuilder.NodeConfig.Me.Address()
@@ -142,21 +145,14 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 
 		// initializes corruptible network that acts as a wrapper around the original flow network of the node, hence
 		// allowing a remote attacker to control the ingress and egress traffic of the node.
-		corruptibleNetwork, err := corruptnet.NewCorruptNetwork(
-			cnb.Logger,
-			cnb.RootChainID,
-			address,
-			cnb.Me,
-			cnb.CodecFactory(),
-			flowNetwork,
-			ccf)
+		corruptibleNetwork, err := corruptnet.NewCorruptNetwork(cnb.Logger, cnb.RootChainID, address, cnb.Me, cnb.CodecFactory(), flowNetwork, ccf)
 		if err != nil {
 			return nil, fmt.Errorf("could not create corruptible network: %w", err)
 		}
 		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Str("address", address).Msg("corruptible network initiated")
 
 		// override the original flow network with the corruptible network.
-		cnb.Network = corruptibleNetwork
+		cnb.EngineRegistry = corruptibleNetwork
 
 		return corruptibleNetwork, nil
 	})

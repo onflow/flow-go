@@ -1,0 +1,22 @@
+name: Verify Tag
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  SemVer-Check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if tag is SemVer compliant
+        # the tag should be in semver format, but can optionally be prepended by "any_text_with_slashes/" and "v"
+        # valid examples crypto/v0.24.5-fvm, tools/flaky_test_monitor/v0.23.5, v0.23.5, 0.23.5-fvm
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          if [[ "${TAG_NAME}" =~ ^(.+\/)*v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*)(\.(0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*))*))?(\+([0-9a-zA-Z-]+(\.[0-9a-zA-Z-]+)*))?$ ]]; then
+            echo "Tag $TAG_NAME is SemVer compliant"
+          else
+            echo "Tag $TAG_NAME is not SemVer compliant"
+            exit 1
+          fi

@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"errors"
+
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/cluster"
@@ -10,14 +12,23 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 )
 
-// Construct cluster assignment with internal and partner nodes uniformly
-// distributed across clusters. This function will produce the same cluster
-// assignments for the same partner and internal lists, and the same seed.
-func constructClusterAssignment(partnerNodes, internalNodes []model.NodeInfo, seed int64) (flow.AssignmentList, flow.ClusterList) {
+// Construct random cluster assignment with internal and partner nodes.
+// The number of clusters is read from the `flagCollectionClusters` flag.
+// The number of nodes in each cluster is deterministic and only depends on the number of clusters
+// and the number of nodes. The repartition of internal and partner nodes is also deterministic
+// and only depends on the number of clusters and nodes.
+// The identity of internal and partner nodes in each cluster is the non-deterministic and is randomized
+// using the system entropy.
+// The function guarantees a specific constraint when partitioning the nodes into clusters:
+// Each cluster must contain strictly more than 2/3 of internal nodes. If the constraint can't be
+// satisfied, an exception is returned.
+// Note that if an exception is returned with a certain number of internal/partner nodes, there is no chance
+// of succeeding the assignment by re-running the function without increasing the internal nodes ratio.
+func constructClusterAssignment(partnerNodes, internalNodes []model.NodeInfo) (flow.AssignmentList, flow.ClusterList, error) {
 
-	partners := model.ToIdentityList(partnerNodes).Filter(filter.HasRole(flow.RoleCollection))
-	internals := model.ToIdentityList(internalNodes).Filter(filter.HasRole(flow.RoleCollection))
-	nClusters := flagCollectionClusters
+	partners := model.ToIdentityList(partnerNodes).Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
+	internals := model.ToIdentityList(internalNodes).Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
+	nClusters := int(flagCollectionClusters)
 	nCollectors := len(partners) + len(internals)
 
 	// ensure we have at least as many collection nodes as clusters
@@ -26,33 +37,48 @@ func constructClusterAssignment(partnerNodes, internalNodes []model.NodeInfo, se
 			nCollectors, flagCollectionClusters)
 	}
 
-	// deterministically shuffle both collector lists based on the input seed
-	// by using a different seed each spork, we will have different clusters
-	// even with the same collectors
-	partners = partners.DeterministicShuffle(seed)
-	internals = internals.DeterministicShuffle(seed)
+	// shuffle both collector lists based on a non-deterministic algorithm
+	partners, err := partners.Shuffle()
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not shuffle partners")
+	}
+	internals, err = internals.Shuffle()
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not shuffle internals")
+	}
 
 	identifierLists := make([]flow.IdentifierList, nClusters)
+	// array to track the 2/3 internal-nodes constraint (internal_nodes > 2 * partner_nodes)
+	constraint := make([]int, nClusters)
 
 	// first, round-robin internal nodes into each cluster
 	for i, node := range internals {
-		identifierLists[i%len(identifierLists)] = append(identifierLists[i%len(identifierLists)], node.NodeID)
+		identifierLists[i%nClusters] = append(identifierLists[i%nClusters], node.NodeID)
+		constraint[i%nClusters] += 1
 	}
 
 	// next, round-robin partner nodes into each cluster
 	for i, node := range partners {
 		identifierLists[i%len(identifierLists)] = append(identifierLists[i%len(identifierLists)], node.NodeID)
+		constraint[i%nClusters] -= 2
+	}
+
+	// check the 2/3 constraint: for every cluster `i`, constraint[i] must be strictly positive
+	for i := 0; i < nClusters; i++ {
+		if constraint[i] <= 0 {
+			return nil, nil, errors.New("there isn't enough internal nodes to have at least 2/3 internal nodes in each cluster")
+		}
 	}
 
 	assignments := assignment.FromIdentifierLists(identifierLists)
 
 	collectors := append(partners, internals...)
-	clusters, err := factory.NewClusterList(assignments, collectors)
+	clusters, err := factory.NewClusterList(assignments, collectors.ToSkeleton())
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not create cluster list")
 	}
 
-	return assignments, clusters
+	return assignments, clusters, nil
 }
 
 func constructRootQCsForClusters(
@@ -83,7 +109,7 @@ func constructRootQCsForClusters(
 // Filters a list of nodes to include only nodes that will sign the QC for the
 // given cluster. The resulting list of nodes is only nodes that are in the
 // given cluster AND are not partner nodes (ie. we have the private keys).
-func filterClusterSigners(cluster flow.IdentityList, nodeInfos []model.NodeInfo) []model.NodeInfo {
+func filterClusterSigners(cluster flow.IdentitySkeletonList, nodeInfos []model.NodeInfo) []model.NodeInfo {
 
 	var filtered []model.NodeInfo
 	for _, node := range nodeInfos {

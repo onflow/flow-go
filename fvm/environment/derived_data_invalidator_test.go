@@ -257,18 +257,14 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		snapshotTree)
 	require.NoError(t, err)
 
-	nestedTxn := state.NewTransactionState(
+	blockDatabase := storage.NewBlockDatabase(
 		snapshotTree.Append(executionSnapshot),
-		state.DefaultParameters())
+		0,
+		nil)
 
-	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
-	derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
+	txnState, err := blockDatabase.NewTransaction(0, state.DefaultParameters())
 	require.NoError(t, err)
 
-	txnState := storage.SerialTransaction{
-		NestedTransactionPreparer: nestedTxn,
-		DerivedTransactionData:    derivedTxnData,
-	}
 	computer := fvm.NewMeterParamOverridesComputer(ctx, txnState)
 
 	overrides, err := computer.Compute(txnState, struct{}{})
@@ -304,19 +300,21 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 	executionSnapshot, err = txnState.FinalizeMainTransaction()
 	require.NoError(t, err)
 
+	owner := ctx.Chain.ServiceAddress()
+	otherOwner := unittest.RandomAddressFixtureForChain(ctx.Chain.ChainID())
+
 	for _, registerId := range executionSnapshot.AllRegisterIDs() {
 		checkForUpdates(registerId, true)
 		checkForUpdates(
-			flow.NewRegisterID("other owner", registerId.Key),
+			flow.NewRegisterID(otherOwner, registerId.Key),
 			false)
 	}
 
-	owner := string(ctx.Chain.ServiceAddress().Bytes())
 	stabIndexKey := flow.NewRegisterID(owner, "$12345678")
 	require.True(t, stabIndexKey.IsSlabIndex())
 
 	checkForUpdates(stabIndexKey, true)
 	checkForUpdates(flow.NewRegisterID(owner, "other keys"), false)
-	checkForUpdates(flow.NewRegisterID("other owner", stabIndexKey.Key), false)
-	checkForUpdates(flow.NewRegisterID("other owner", "other key"), false)
+	checkForUpdates(flow.NewRegisterID(otherOwner, stabIndexKey.Key), false)
+	checkForUpdates(flow.NewRegisterID(otherOwner, "other key"), false)
 }

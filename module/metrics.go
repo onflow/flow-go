@@ -1,15 +1,18 @@
 package module
 
 import (
+	"context"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
+	httpmetrics "github.com/slok/go-http-metrics/metrics"
 
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/channels"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
 type EntriesFunc func() uint
@@ -40,52 +43,144 @@ type NetworkSecurityMetrics interface {
 
 	// OnRateLimitedPeer tracks the number of rate limited unicast messages seen on the network.
 	OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string)
+
+	// OnViolationReportSkipped tracks the number of slashing violations consumer violations that were not
+	// reported for misbehavior when the identity of the sender not known.
+	OnViolationReportSkipped()
 }
 
-// GossipSubRouterMetrics encapsulates the metrics collectors for GossipSubRouter module of the networking layer.
-// It mostly collects the metrics related to the control message exchange between nodes over the GossipSub protocol.
-type GossipSubRouterMetrics interface {
-	// OnIncomingRpcAcceptedFully tracks the number of RPC messages received by the node that are fully accepted.
-	// An RPC may contain any number of control messages, i.e., IHAVE, IWANT, GRAFT, PRUNE, as well as the actual messages.
-	// A fully accepted RPC means that all the control messages are accepted and all the messages are accepted.
-	OnIncomingRpcAcceptedFully()
+// GossipSubRpcInspectorMetrics encapsulates the metrics collectors for GossipSub RPC Inspector module of the networking layer.
+// The RPC inspector is the entry point of the GossipSub protocol. It inspects the incoming RPC messages and decides
+// whether to accept, prune, or reject the RPC message.
+// The GossipSubRpcInspectorMetrics tracks the number of RPC messages received by the local node from other nodes over
+// the GossipSub protocol. It also tracks the number of control messages included in the RPC messages, i.e., IHAVE, IWANT,
+// GRAFT, PRUNE. It also tracks the number of actual messages included in the RPC messages.
+// The GossipSubRpcInspectorMetrics differs from LocalGossipSubRouterMetrics in that the former tracks the messages
+// received by the local node from other nodes over the GossipSub protocol but may not all be accepted by the local node,
+// e.g., due to RPC pruning or throttling; while the latter tracks the local node's view of the GossipSub protocol, i.e., entirely
+// containing the messages that are accepted by the local node (either as whole RPC or only for the control messages).
+// Having this distinction is useful for debugging and troubleshooting the GossipSub protocol, for example, the number of
+// messages received by the local node from other nodes over the GossipSub protocol may be much higher than the number
+// of messages accepted by the local node, which may indicate that the local node is throttling the incoming messages.
+type GossipSubRpcInspectorMetrics interface {
+	// OnIWantMessageIDsReceived tracks the number of message ids received by the node from other nodes on an RPC.
+	// Note: this function is called on each IWANT message received by the node, not on each message id received.
+	OnIWantMessageIDsReceived(msgIdCount int)
 
-	// OnIncomingRpcAcceptedOnlyForControlMessages tracks the number of RPC messages received by the node that are accepted
-	// only for the control messages, i.e., only for the included IHAVE, IWANT, GRAFT, PRUNE. However, the actual messages
-	// included in the RPC are not accepted.
-	// This happens mostly when the validation pipeline of GossipSub is throttled, and cannot accept more actual messages for
-	// validation.
-	OnIncomingRpcAcceptedOnlyForControlMessages()
+	// OnIHaveMessageIDsReceived tracks the number of message ids received by the node from other nodes on an iHave message.
+	// This function is called on each iHave message received by the node.
+	// Args:
+	// - channel: the channel on which the iHave message was received.
+	// - msgIdCount: the number of message ids received on the iHave message.
+	OnIHaveMessageIDsReceived(channel string, msgIdCount int)
 
-	// OnIncomingRpcRejected tracks the number of RPC messages received by the node that are rejected.
-	// This happens mostly when the RPC is coming from a low-scored peer based on the peer scoring module of GossipSub.
-	OnIncomingRpcRejected()
-
-	// OnIWantReceived tracks the number of IWANT messages received by the node from other nodes over an RPC message.
-	// iWant is a control message that is sent by a node to request a message that it has seen advertised in an iHAVE message.
-	OnIWantReceived(count int)
-
-	// OnIHaveReceived tracks the number of IHAVE messages received by the node from other nodes over an RPC message.
-	// iHave is a control message that is sent by a node to another node to indicate that it has a new gossiped message.
-	OnIHaveReceived(count int)
-
-	// OnGraftReceived tracks the number of GRAFT messages received by the node from other nodes over an RPC message.
-	// GRAFT is a control message of GossipSub protocol that connects two nodes over a topic directly as gossip partners.
-	OnGraftReceived(count int)
-
-	// OnPruneReceived tracks the number of PRUNE messages received by the node from other nodes over an RPC message.
-	// PRUNE is a control message of GossipSub protocol that disconnects two nodes over a topic.
-	OnPruneReceived(count int)
-
-	// OnPublishedGossipMessagesReceived tracks the number of gossip messages received by the node from other nodes over an
-	// RPC message.
-	OnPublishedGossipMessagesReceived(count int)
+	// OnIncomingRpcReceived tracks the number of RPC messages received by the node.
+	// Args:
+	// 	iHaveCount: the number of iHAVE messages included in the RPC.
+	// 	iWantCount: the number of iWANT messages included in the RPC.
+	// 	graftCount: the number of GRAFT messages included in the RPC.
+	// 	pruneCount: the number of PRUNE messages included in the RPC.
+	// 	msgCount: the number of publish messages included in the RPC.
+	OnIncomingRpcReceived(iHaveCount, iWantCount, graftCount, pruneCount, msgCount int)
 }
 
-// GossipSubLocalMeshMetrics encapsulates the metrics collectors for GossipSub mesh of the networking layer.
-type GossipSubLocalMeshMetrics interface {
+// GossipSubScoringRegistryMetrics encapsulates the metrics collectors for collecting metrics related to the Gossipsub scoring registry.
+// GossipSubScoringRegistryMetrics encapsulates various metrics collectors offering insights into penalties and
+// other factors used by the scoring registry to compute the application-specific score. It focuses on tracking internal
+// aspects of the application-specific score, distinguishing itself from GossipSubScoringMetrics.
+type GossipSubScoringRegistryMetrics interface {
+	// DuplicateMessagePenalties tracks the duplicate message penalty for a node.
+	DuplicateMessagePenalties(penalty float64)
+	// DuplicateMessagesCounts tracks the duplicate message count for a node.
+	DuplicateMessagesCounts(count float64)
+}
+
+// LocalGossipSubRouterMetrics encapsulates the metrics collectors for GossipSub router of the local node.
+// It gives a lens into the local GossipSub node's view of the GossipSub protocol.
+// LocalGossipSubRouterMetrics differs from GossipSubRpcInspectorMetrics in that the former tracks the local node's view
+// of the GossipSub protocol, while the latter tracks the messages received by the local node from other nodes over the
+// GossipSub protocol but may not all be accepted by the local node, e.g., due to RPC pruning or throttling.
+// Having this distinction is useful for debugging and troubleshooting the GossipSub protocol, for example, the number of
+// messages received by the local node from other nodes over the GossipSub protocol may be much higher than the number
+// of messages accepted by the local node, which may indicate that the local node is throttling the incoming messages.
+type LocalGossipSubRouterMetrics interface {
 	// OnLocalMeshSizeUpdated tracks the size of the local mesh for a topic.
 	OnLocalMeshSizeUpdated(topic string, size int)
+
+	// OnPeerAddedToProtocol is called when the local node receives a stream from a peer on a gossipsub-related protocol.
+	// Args:
+	// 	protocol: the protocol name that the peer is connected to.
+	OnPeerAddedToProtocol(protocol string)
+
+	// OnPeerRemovedFromProtocol is called when the local considers a remote peer blacklisted or unavailable.
+	OnPeerRemovedFromProtocol()
+
+	// OnLocalPeerJoinedTopic is called when the local node subscribes to a gossipsub topic.
+	OnLocalPeerJoinedTopic()
+
+	// OnLocalPeerLeftTopic is called when the local node unsubscribes from a gossipsub topic.
+	OnLocalPeerLeftTopic()
+
+	// OnPeerGraftTopic is called when the local node receives a GRAFT message from a remote peer on a topic.
+	// Note: the received GRAFT at this point is considered passed the RPC inspection, and is accepted by the local node.
+	OnPeerGraftTopic(topic string)
+
+	// OnPeerPruneTopic is called when the local node receives a PRUNE message from a remote peer on a topic.
+	// Note: the received PRUNE at this point is considered passed the RPC inspection, and is accepted by the local node.
+	OnPeerPruneTopic(topic string)
+
+	// OnMessageEnteredValidation is called when a received pubsub message enters the validation pipeline. It is the
+	// internal validation pipeline of GossipSub protocol. The message may be rejected or accepted by the validation
+	// pipeline.
+	OnMessageEnteredValidation(size int)
+
+	// OnMessageRejected is called when a received pubsub message is rejected by the validation pipeline.
+	// Args:
+	//
+	//	reason: the reason for rejection.
+	// 	size: the size of the message in bytes.
+	OnMessageRejected(size int, reason string)
+
+	// OnMessageDuplicate is called when a received pubsub message is a duplicate of a previously received message, and
+	// is dropped.
+	// Args:
+	// 	size: the size of the message in bytes.
+	OnMessageDuplicate(size int)
+
+	// OnPeerThrottled is called when a peer is throttled by the local node, i.e., the local node is not accepting any
+	// pubsub message from the peer but may still accept control messages.
+	OnPeerThrottled()
+
+	// OnRpcReceived is called when an RPC message is received by the local node. The received RPC is considered
+	// passed the RPC inspection, and is accepted by the local node.
+	// Args:
+	// 	msgCount: the number of messages included in the RPC.
+	// 	iHaveCount: the number of iHAVE messages included in the RPC.
+	// 	iWantCount: the number of iWANT messages included in the RPC.
+	// 	graftCount: the number of GRAFT messages included in the RPC.
+	// 	pruneCount: the number of PRUNE messages included in the RPC.
+	OnRpcReceived(msgCount int, iHaveCount int, iWantCount int, graftCount int, pruneCount int)
+
+	// OnRpcSent is called when an RPC message is sent by the local node.
+	// Note: the sent RPC is considered passed the RPC inspection, and is accepted by the local node.
+	// Args:
+	// 	msgCount: the number of messages included in the RPC.
+	// 	iHaveCount: the number of iHAVE messages included in the RPC.
+	// 	iWantCount: the number of iWANT messages included in the RPC.
+	// 	graftCount: the number of GRAFT messages included in the RPC.
+	// 	pruneCount: the number of PRUNE messages included in the RPC.
+	OnRpcSent(msgCount int, iHaveCount int, iWantCount int, graftCount int, pruneCount int)
+
+	// OnOutboundRpcDropped is called when an outbound RPC message is dropped by the local node, typically because the local node
+	// outbound message queue is full; or the RPC is big and the local node cannot fragment it.
+	OnOutboundRpcDropped()
+
+	// OnUndeliveredMessage is called when a message is not delivered at least one subscriber of the topic, for example when
+	// the subscriber is too slow to process the message.
+	OnUndeliveredMessage()
+
+	// OnMessageDeliveredToAllSubscribers is called when a message is delivered to all subscribers of the topic.
+	OnMessageDeliveredToAllSubscribers(size int)
 }
 
 // UnicastManagerMetrics unicast manager metrics.
@@ -106,12 +201,25 @@ type UnicastManagerMetrics interface {
 	// OnEstablishStreamFailure tracks the amount of time taken and number of retry attempts used when the unicast manager cannot establish
 	// a stream on the open connection between two peers.
 	OnEstablishStreamFailure(duration time.Duration, attempts int)
+
+	// OnDialRetryBudgetUpdated tracks the history of the dial retry budget updates.
+	OnDialRetryBudgetUpdated(budget uint64)
+
+	// OnStreamCreationRetryBudgetUpdated tracks the history of the stream creation retry budget updates.
+	OnStreamCreationRetryBudgetUpdated(budget uint64)
+
+	// OnDialRetryBudgetResetToDefault tracks the number of times the dial retry budget is reset to default.
+	OnDialRetryBudgetResetToDefault()
+
+	// OnStreamCreationRetryBudgetResetToDefault tracks the number of times the stream creation retry budget is reset to default.
+	OnStreamCreationRetryBudgetResetToDefault()
 }
 
 type GossipSubMetrics interface {
 	GossipSubScoringMetrics
-	GossipSubRouterMetrics
-	GossipSubLocalMeshMetrics
+	GossipSubRpcInspectorMetrics
+	LocalGossipSubRouterMetrics
+	GossipSubRpcValidationInspectorMetrics
 }
 
 type LibP2PMetrics interface {
@@ -121,6 +229,7 @@ type LibP2PMetrics interface {
 	rcmgr.MetricsReporter
 	LibP2PConnectionMetrics
 	UnicastManagerMetrics
+	GossipSubScoringRegistryMetrics
 }
 
 // GossipSubScoringMetrics encapsulates the metrics collectors for the peer scoring module of GossipSub protocol.
@@ -148,6 +257,116 @@ type GossipSubScoringMetrics interface {
 	SetWarningStateCount(uint)
 }
 
+// GossipSubRpcValidationInspectorMetrics encapsulates the metrics collectors for the gossipsub rpc validation control message inspectors.
+type GossipSubRpcValidationInspectorMetrics interface {
+	GossipSubRpcInspectorMetrics
+
+	// AsyncProcessingStarted increments the metric tracking the number of inspect message request being processed by workers in the rpc validator worker pool.
+	AsyncProcessingStarted()
+	// AsyncProcessingFinished tracks the time spent by a rpc validation inspector worker to process an inspect message request asynchronously and decrements the metric tracking
+	// the number of inspect message requests  being processed asynchronously by the rpc validation inspector workers.
+	AsyncProcessingFinished(duration time.Duration)
+
+	// OnIHaveControlMessageIdsTruncated tracks the number of times message ids on an iHave message were truncated.
+	// Note that this function is called only when the message ids are truncated from an iHave message, not when the iHave message itself is truncated.
+	// This is different from the OnControlMessagesTruncated function which is called when a slice of control messages truncated from an RPC with all their message ids.
+	// Args:
+	//
+	//	diff: the number of actual messages truncated.
+	OnIHaveControlMessageIdsTruncated(diff int)
+
+	// OnIWantControlMessageIdsTruncated tracks the number of times message ids on an iWant message were truncated.
+	// Note that this function is called only when the message ids are truncated from an iWant message, not when the iWant message itself is truncated.
+	// This is different from the OnControlMessagesTruncated function which is called when a slice of control messages truncated from an RPC with all their message ids.
+	// Args:
+	// 	diff: the number of actual messages truncated.
+	OnIWantControlMessageIdsTruncated(diff int)
+
+	// OnControlMessagesTruncated tracks the number of times a slice of control messages is truncated from an RPC with all their included message ids.
+	// Args:
+	//
+	//	messageType: the type of the control message that was truncated
+	//	diff: the number of control messages truncated.
+	OnControlMessagesTruncated(messageType p2pmsg.ControlMessageType, diff int)
+
+	// OnIWantMessagesInspected tracks the number of duplicate and cache miss message ids received by the node on iWant messages at the end of the async inspection iWants
+	// across one RPC, regardless of the result of the inspection.
+	//
+	//	duplicateCount: the total number of duplicate message ids received by the node on the iWant messages at the end of the async inspection of the RPC.
+	//	cacheMissCount: the total number of cache miss message ids received by the node on the iWant message at the end of the async inspection of the RPC.
+	OnIWantMessagesInspected(duplicateCount int, cacheMissCount int)
+
+	// OnIWantDuplicateMessageIdsExceedThreshold tracks the number of times that async inspection of iWant messages failed due to the total number of duplicate message ids
+	// received by the node on the iWant messages of a single RPC exceeding the threshold, which results in a misbehaviour report.
+	OnIWantDuplicateMessageIdsExceedThreshold()
+
+	// OnIWantCacheMissMessageIdsExceedThreshold tracks the number of times that async inspection of iWant messages failed due to the total
+	// number of cache miss message ids received by the node on the iWant messages of a single RPC exceeding the threshold, which results in a misbehaviour report.
+	OnIWantCacheMissMessageIdsExceedThreshold()
+
+	// OnIHaveMessagesInspected is called at the end of the async inspection of iHave messages of a single RPC, regardless of the result of the inspection.
+	// It tracks the number of duplicate topic ids and duplicate message ids received by the node on the iHave messages of that single RPC at the end of the async inspection iHaves.
+	// Args:
+	//
+	//	duplicateTopicIds: the total number of duplicate topic ids received by the node on the iHave messages at the end of the async inspection of the RPC.
+	//	duplicateMessageIds: the number of duplicate message ids received by the node on the iHave messages at the end of the async inspection of the RPC.
+	OnIHaveMessagesInspected(duplicateTopicIds int, duplicateMessageIds int)
+
+	// OnIHaveDuplicateTopicIdsExceedThreshold tracks the number of times that the async inspection of iHave messages of a single RPC failed due to the total number of duplicate topic ids
+	// received by the node on the iHave messages of that RPC exceeding the threshold, which results in a misbehaviour report.
+	OnIHaveDuplicateTopicIdsExceedThreshold()
+
+	// OnIHaveDuplicateMessageIdsExceedThreshold tracks the number of times that the async inspection of iHave messages of a single RPC failed due to the total number of duplicate message ids
+	// received by the node on an iHave message exceeding the threshold, which results in a misbehaviour report.
+	OnIHaveDuplicateMessageIdsExceedThreshold()
+
+	// OnInvalidTopicIdDetectedForControlMessage tracks the number of times that the async inspection of a control message type on a single RPC failed due to an invalid topic id.
+	// Args:
+	// - messageType: the type of the control message that was truncated.
+	OnInvalidTopicIdDetectedForControlMessage(messageType p2pmsg.ControlMessageType)
+
+	// OnActiveClusterIDsNotSetErr tracks the number of times that the async inspection of a control message type on a single RPC failed due to active cluster ids not set inspection failure.
+	// This is not causing a misbehaviour report.
+	OnActiveClusterIDsNotSetErr()
+
+	// OnUnstakedPeerInspectionFailed tracks the number of times that the async inspection of a control message type on a single RPC failed due to unstaked peer inspection failure.
+	// This is not causing a misbehaviour report.
+	OnUnstakedPeerInspectionFailed()
+
+	// OnInvalidControlMessageNotificationSent tracks the number of times that the async inspection of a control message failed and resulted in dissemination of an invalid control message was sent.
+	OnInvalidControlMessageNotificationSent()
+
+	// OnPublishMessagesInspectionErrorExceedsThreshold tracks the number of times that async inspection of publish messages failed due to the number of errors.
+	OnPublishMessagesInspectionErrorExceedsThreshold()
+
+	// OnPruneDuplicateTopicIdsExceedThreshold tracks the number of times that the async inspection of prune messages for an RPC failed due to the number of duplicate topic ids
+	// received by the node on prune messages of the same RPC excesses threshold, which results in a misbehaviour report.
+	OnPruneDuplicateTopicIdsExceedThreshold()
+
+	// OnPruneMessageInspected is called at the end of the async inspection of prune messages of the RPC, regardless of the result of the inspection.
+	// Args:
+	// 	duplicateTopicIds: the number of duplicate topic ids received by the node on the prune messages of the RPC at the end of the async inspection prunes.
+	OnPruneMessageInspected(duplicateTopicIds int)
+
+	// OnGraftDuplicateTopicIdsExceedThreshold tracks the number of times that the async inspection of the graft messages of a single RPC failed due to the number of duplicate topic ids
+	// received by the node on graft messages of the same RPC excesses threshold, which results in a misbehaviour report.
+	OnGraftDuplicateTopicIdsExceedThreshold()
+
+	// OnGraftMessageInspected is called at the end of the async inspection of graft messages of a single RPC, regardless of the result of the inspection.
+	// Args:
+	// 	duplicateTopicIds: the number of duplicate topic ids received by the node on the graft messages at the end of the async inspection of a single RPC.
+	OnGraftMessageInspected(duplicateTopicIds int)
+
+	// OnPublishMessageInspected is called at the end of the async inspection of publish messages of a single RPC, regardless of the result of the inspection.
+	// It tracks the total number of errors detected during the async inspection of the rpc together with their individual breakdown.
+	// Args:
+	// - errCount: the number of errors that occurred during the async inspection of publish messages.
+	// - invalidTopicIdsCount: the number of times that an invalid topic id was detected during the async inspection of publish messages.
+	// - invalidSubscriptionsCount: the number of times that an invalid subscription was detected during the async inspection of publish messages.
+	// - invalidSendersCount: the number of times that an invalid sender was detected during the async inspection of publish messages.
+	OnPublishMessageInspected(totalErrCount int, invalidTopicIdsCount int, invalidSubscriptionsCount int, invalidSendersCount int)
+}
+
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.
 type NetworkInboundQueueMetrics interface {
 
@@ -165,6 +384,8 @@ type NetworkInboundQueueMetrics interface {
 type NetworkCoreMetrics interface {
 	NetworkInboundQueueMetrics
 	AlspMetrics
+	NetworkSecurityMetrics
+
 	// OutboundMessageSent collects metrics related to a message sent by the node.
 	OutboundMessageSent(sizeBytes int, topic string, protocol string, messageType string)
 	// InboundMessageReceived collects metrics related to a message received by the node.
@@ -206,7 +427,6 @@ type AlspMetrics interface {
 // NetworkMetrics is the blanket abstraction that encapsulates the metrics collectors for the networking layer.
 type NetworkMetrics interface {
 	LibP2PMetrics
-	NetworkSecurityMetrics
 	NetworkCoreMetrics
 }
 
@@ -232,7 +452,6 @@ type EngineMetrics interface {
 
 type ComplianceMetrics interface {
 	FinalizedHeight(height uint64)
-	CommittedEpochFinalView(view uint64)
 	EpochTransitionHeight(height uint64)
 	SealedHeight(height uint64)
 	BlockFinalized(*flow.Block)
@@ -324,6 +543,26 @@ type HotstuffMetrics interface {
 	// PayloadProductionDuration measures the time which the HotStuff's core logic
 	// spends in the module.Builder component, i.e. the with generating block payloads.
 	PayloadProductionDuration(duration time.Duration)
+
+	// TimeoutCollectorsRange collects information from the node's `TimeoutAggregator` component.
+	// Specifically, it measurers the number of views for which we are currently collecting timeouts
+	// (i.e. the number of `TimeoutCollector` instances we are maintaining) and their lowest/highest view.
+	TimeoutCollectorsRange(lowestRetainedView uint64, newestViewCreatedCollector uint64, activeCollectors int)
+}
+
+type CruiseCtlMetrics interface {
+
+	// PIDError measures the current error values for the proportional, integration,
+	// and derivative terms of the PID controller.
+	PIDError(p, i, d float64)
+
+	// TargetProposalDuration measures the current value of the Block Time Controller output:
+	// the target duration from parent to child proposal.
+	TargetProposalDuration(duration time.Duration)
+
+	// ControllerOutput measures the output of the cruise control PID controller.
+	// Concretely, this is the quantity to subtract from the baseline view duration.
+	ControllerOutput(duration time.Duration)
 }
 
 type CollectionMetrics interface {
@@ -522,6 +761,19 @@ type ExecutionDataRequesterMetrics interface {
 	FetchRetried()
 }
 
+type ExecutionStateIndexerMetrics interface {
+	// BlockIndexed records metrics from indexing execution data from a single block.
+	BlockIndexed(height uint64, duration time.Duration, events, registers, transactionResults int)
+
+	// BlockReindexed records that a previously indexed block was indexed again.
+	BlockReindexed()
+
+	// InitializeLatestHeight records the latest height that has been indexed.
+	// This should only be used during startup. After startup, use BlockIndexed to record newly
+	// indexed heights.
+	InitializeLatestHeight(height uint64)
+}
+
 type RuntimeMetrics interface {
 	// RuntimeTransactionParsed reports the time spent parsing a single transaction
 	RuntimeTransactionParsed(dur time.Duration)
@@ -569,7 +821,14 @@ type ExecutionDataPrunerMetrics interface {
 	Pruned(height uint64, duration time.Duration)
 }
 
-type AccessMetrics interface {
+type RestMetrics interface {
+	// Example recorder taken from:
+	// https://github.com/slok/go-http-metrics/blob/master/metrics/prometheus/prometheus.go
+	httpmetrics.Recorder
+	AddTotalRequests(ctx context.Context, method string, routeName string)
+}
+
+type GRPCConnectionPoolMetrics interface {
 	// TotalConnectionsInPool updates the number connections to collection/execution nodes stored in the pool, and the size of the pool
 	TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint)
 
@@ -590,6 +849,19 @@ type AccessMetrics interface {
 
 	// ConnectionFromPoolEvicted tracks the number of times a cached connection is evicted from the cache
 	ConnectionFromPoolEvicted()
+}
+
+type AccessMetrics interface {
+	RestMetrics
+	GRPCConnectionPoolMetrics
+	TransactionMetrics
+	BackendScriptsMetrics
+
+	// UpdateExecutionReceiptMaxHeight is called whenever we store an execution receipt from a block from a newer height
+	UpdateExecutionReceiptMaxHeight(height uint64)
+
+	// UpdateLastFullBlockHeight tracks the height of the last block for which all collections were received
+	UpdateLastFullBlockHeight(height uint64)
 }
 
 type ExecutionResultStats struct {
@@ -634,6 +906,9 @@ type ExecutionMetrics interface {
 	// ExecutionLastExecutedBlockHeight reports last executed block height
 	ExecutionLastExecutedBlockHeight(height uint64)
 
+	// ExecutionLastFinalizedExecutedBlockHeight reports last finalized and executed block height
+	ExecutionLastFinalizedExecutedBlockHeight(height uint64)
+
 	// ExecutionBlockExecuted reports the total time and computation spent on executing a block
 	ExecutionBlockExecuted(dur time.Duration, stats ExecutionResultStats)
 
@@ -647,9 +922,13 @@ type ExecutionMetrics interface {
 	ExecutionCollectionExecuted(dur time.Duration, stats ExecutionResultStats)
 
 	// ExecutionTransactionExecuted reports stats on executing a single transaction
-	ExecutionTransactionExecuted(dur time.Duration,
-		compUsed, memoryUsed, actualMemoryUsed uint64,
-		eventCounts, eventSize int,
+	ExecutionTransactionExecuted(
+		dur time.Duration,
+		numTxnConflictRetries int,
+		compUsed uint64,
+		memoryUsed uint64,
+		eventCounts int,
+		eventSize int,
 		failed bool)
 
 	// ExecutionChunkDataPackGenerated reports stats on chunk data pack generation
@@ -677,13 +956,37 @@ type ExecutionMetrics interface {
 }
 
 type BackendScriptsMetrics interface {
-	// Record the round trip time while executing a script
+	// ScriptExecuted records the round trip time while executing a script
 	ScriptExecuted(dur time.Duration, size int)
+
+	// ScriptExecutionErrorLocal records script execution failures from local execution
+	ScriptExecutionErrorLocal()
+
+	// ScriptExecutionErrorOnExecutionNode records script execution failures on Execution Nodes
+	ScriptExecutionErrorOnExecutionNode()
+
+	// ScriptExecutionResultMismatch records script execution result mismatches between local and
+	// execution nodes
+	ScriptExecutionResultMismatch()
+
+	// ScriptExecutionResultMatch records script execution result matches between local and
+	// execution nodes
+	ScriptExecutionResultMatch()
+
+	// ScriptExecutionErrorMismatch records script execution error mismatches between local and
+	// execution nodes
+	ScriptExecutionErrorMismatch()
+
+	// ScriptExecutionErrorMatch records script execution error matches between local and
+	// execution nodes
+	ScriptExecutionErrorMatch()
+
+	// ScriptExecutionNotIndexed records script execution matches where data for the block is not
+	// indexed locally yet
+	ScriptExecutionNotIndexed()
 }
 
 type TransactionMetrics interface {
-	BackendScriptsMetrics
-
 	// Record the round trip time while getting a transaction result
 	TransactionResultFetched(dur time.Duration, size int)
 
@@ -703,9 +1006,6 @@ type TransactionMetrics interface {
 
 	// TransactionSubmissionFailed should be called whenever we try to submit a transaction and it fails
 	TransactionSubmissionFailed()
-
-	// UpdateExecutionReceiptMaxHeight is called whenever we store an execution receipt from a block from a newer height
-	UpdateExecutionReceiptMaxHeight(height uint64)
 }
 
 type PingMetrics interface {

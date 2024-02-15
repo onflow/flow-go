@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/filter/id"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -22,7 +21,7 @@ import (
 //  2. for the decoding step, we offer an optimized convenience function to directly
 //     decode to full identities: Indices --decode--> Identities
 func TestEncodeDecodeIdentities(t *testing.T) {
-	canonicalIdentities := unittest.IdentityListFixture(20)
+	canonicalIdentities := unittest.IdentityListFixture(20).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 	canonicalIdentifiers := canonicalIdentities.NodeIDs()
 	for s := 0; s < 20; s++ {
 		for e := s; e < 20; e++ {
@@ -110,9 +109,9 @@ func Test_EncodeSignerToIndicesAndSigType(t *testing.T) {
 		numRandomBeaconSigners := rapid.IntRange(0, committeeSize-numStakingSigners).Draw(t, "numRandomBeaconSigners").(int)
 
 		// create committee
-		committeeIdentities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
+		committeeIdentities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical[flow.Identity])
 		committee := committeeIdentities.NodeIDs()
-		stakingSigners, beaconSigners := sampleSigners(committee, numStakingSigners, numRandomBeaconSigners)
+		stakingSigners, beaconSigners := sampleSigners(t, committee, numStakingSigners, numRandomBeaconSigners)
 
 		// encode
 		prefixed, sigTypes, err := signature.EncodeSignerToIndicesAndSigType(committee, stakingSigners, beaconSigners)
@@ -126,7 +125,7 @@ func Test_EncodeSignerToIndicesAndSigType(t *testing.T) {
 		correctEncoding(t, signerIndices, committee, unorderedSigners)
 
 		// check sigTypes
-		canSigners := committeeIdentities.Filter(filter.HasNodeID(unorderedSigners...)).NodeIDs() // generates list of signer IDs in canonical order
+		canSigners := committeeIdentities.Filter(filter.HasNodeID[flow.Identity](unorderedSigners...)).NodeIDs() // generates list of signer IDs in canonical order
 		correctEncoding(t, sigTypes, canSigners, beaconSigners)
 	})
 }
@@ -148,44 +147,45 @@ func Test_DecodeSigTypeToStakingAndBeaconSigners(t *testing.T) {
 		numRandomBeaconSigners := rapid.IntRange(0, committeeSize-numStakingSigners).Draw(t, "numRandomBeaconSigners").(int)
 
 		// create committee
-		committeeIdentities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
+		committeeIdentities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).
+			Sort(flow.Canonical[flow.Identity])
 		committee := committeeIdentities.NodeIDs()
-		stakingSigners, beaconSigners := sampleSigners(committee, numStakingSigners, numRandomBeaconSigners)
+		stakingSigners, beaconSigners := sampleSigners(t, committee, numStakingSigners, numRandomBeaconSigners)
 
 		// encode
 		signerIndices, sigTypes, err := signature.EncodeSignerToIndicesAndSigType(committee, stakingSigners, beaconSigners)
 		require.NoError(t, err)
 
 		// decode
-		decSignerIdentites, err := signature.DecodeSignerIndicesToIdentities(committeeIdentities, signerIndices)
+		decSignerIdentites, err := signature.DecodeSignerIndicesToIdentities(committeeIdentities.ToSkeleton(), signerIndices)
 		require.NoError(t, err)
 		decStakingSigners, decBeaconSigners, err := signature.DecodeSigTypeToStakingAndBeaconSigners(decSignerIdentites, sigTypes)
 		require.NoError(t, err)
 
 		// verify; note that there is a slightly different convention between Filter and the decoding logic:
 		// Filter returns nil for an empty list, while the decoding logic returns an instance of an empty slice
-		sigIdentities := committeeIdentities.Filter(filter.Or(filter.HasNodeID(stakingSigners...), filter.HasNodeID(beaconSigners...))) // signer identities in canonical order
+		sigIdentities := committeeIdentities.Filter(
+			filter.Or(filter.HasNodeID[flow.Identity](stakingSigners...), filter.HasNodeID[flow.Identity](beaconSigners...))).ToSkeleton() // signer identities in canonical order
 		if len(stakingSigners)+len(decBeaconSigners) > 0 {
 			require.Equal(t, sigIdentities, decSignerIdentites)
 		}
 		if len(stakingSigners) == 0 {
 			require.Empty(t, decStakingSigners)
 		} else {
-			require.Equal(t, committeeIdentities.Filter(filter.HasNodeID(stakingSigners...)), decStakingSigners)
+			require.Equal(t, committeeIdentities.Filter(filter.HasNodeID[flow.Identity](stakingSigners...)).ToSkeleton(), decStakingSigners)
 		}
 		if len(decBeaconSigners) == 0 {
 			require.Empty(t, decBeaconSigners)
 		} else {
-			require.Equal(t, committeeIdentities.Filter(filter.HasNodeID(beaconSigners...)), decBeaconSigners)
+			require.Equal(t, committeeIdentities.Filter(filter.HasNodeID[flow.Identity](beaconSigners...)).ToSkeleton(), decBeaconSigners)
 		}
 	})
 }
 
 func Test_ValidPaddingErrIncompatibleBitVectorLength(t *testing.T) {
-	var signers flow.IdentityList
 	var err error
 	// if bits is multiply of 8, then there is no padding needed, any sig type can be decoded.
-	signers = unittest.IdentityListFixture(16)
+	signers := unittest.IdentityListFixture(16).ToSkeleton()
 
 	// 16 bits needs 2 bytes, provided 2 bytes
 	_, _, err = signature.DecodeSigTypeToStakingAndBeaconSigners(signers, unittest.RandomBytes(2))
@@ -202,7 +202,7 @@ func Test_ValidPaddingErrIncompatibleBitVectorLength(t *testing.T) {
 	require.ErrorIs(t, err, signature.ErrIncompatibleBitVectorLength, "low-level error representing the failure should be ErrIncompatibleBitVectorLength")
 
 	// if bits is not multiply of 8, then padding is needed
-	signers = unittest.IdentityListFixture(15)
+	signers = unittest.IdentityListFixture(15).ToSkeleton()
 	_, _, err = signature.DecodeSigTypeToStakingAndBeaconSigners(signers, []byte{byte(255), byte(254)})
 	require.NoError(t, err)
 
@@ -218,30 +218,30 @@ func Test_ValidPaddingErrIncompatibleBitVectorLength(t *testing.T) {
 
 	// if bits is not multiply of 8,
 	// 1 byte more
-	signers = unittest.IdentityListFixture(0)
+	signers = unittest.IdentityListFixture(0).ToSkeleton()
 	_, _, err = signature.DecodeSigTypeToStakingAndBeaconSigners(signers, []byte{byte(255)})
 	require.True(t, signature.IsInvalidSigTypesError(err), "API-level error should be InvalidSigTypesError")
 	require.ErrorIs(t, err, signature.ErrIncompatibleBitVectorLength, "low-level error representing the failure should be ErrIncompatibleBitVectorLength")
 
 	// 1 byte more
-	signers = unittest.IdentityListFixture(1)
+	signers = unittest.IdentityListFixture(1).ToSkeleton()
 	_, _, err = signature.DecodeSigTypeToStakingAndBeaconSigners(signers, []byte{byte(0), byte(0)})
 	require.True(t, signature.IsInvalidSigTypesError(err), "API-level error should be InvalidSigTypesError")
 	require.ErrorIs(t, err, signature.ErrIncompatibleBitVectorLength, "low-level error representing the failure should be ErrIncompatibleBitVectorLength")
 
 	// 1 byte less
-	signers = unittest.IdentityListFixture(7)
+	signers = unittest.IdentityListFixture(7).ToSkeleton()
 	_, _, err = signature.DecodeSigTypeToStakingAndBeaconSigners(signers, []byte{})
 	require.True(t, signature.IsInvalidSigTypesError(err), "API-level error should be InvalidSigTypesError")
 	require.ErrorIs(t, err, signature.ErrIncompatibleBitVectorLength, "low-level error representing the failure should be ErrIncompatibleBitVectorLength")
 }
 
 func TestValidPaddingErrIllegallyPaddedBitVector(t *testing.T) {
-	var signers flow.IdentityList
+	var signers flow.IdentitySkeletonList
 	var err error
 	// if bits is multiply of 8, then there is no padding needed, any sig type can be decoded.
 	for count := 1; count < 8; count++ {
-		signers = unittest.IdentityListFixture(count)
+		signers = unittest.IdentityListFixture(count).ToSkeleton()
 		_, _, err = signature.DecodeSigTypeToStakingAndBeaconSigners(signers, []byte{byte(255)}) // last bit should be 0, but 1
 		require.True(t, signature.IsInvalidSigTypesError(err), "API-level error should be InvalidSigTypesError")
 		require.ErrorIs(t, err, signature.ErrIllegallyPaddedBitVector, "low-level error representing the failure should be ErrIllegallyPaddedBitVector")
@@ -252,7 +252,7 @@ func TestValidPaddingErrIllegallyPaddedBitVector(t *testing.T) {
 	}
 
 	for count := 9; count < 16; count++ {
-		signers = unittest.IdentityListFixture(count)
+		signers = unittest.IdentityListFixture(count).ToSkeleton()
 		_, _, err = signature.DecodeSigTypeToStakingAndBeaconSigners(signers, []byte{byte(255), byte(255)}) // last bit should be 0, but 1
 		require.True(t, signature.IsInvalidSigTypesError(err), "API-level error should be InvalidSigTypesError")
 		require.ErrorIs(t, err, signature.ErrIllegallyPaddedBitVector, "low-level error representing the failure should be ErrIllegallyPaddedBitVector")
@@ -274,9 +274,10 @@ func Test_EncodeSignersToIndices(t *testing.T) {
 		numSigners := rapid.IntRange(0, committeeSize).Draw(t, "numSigners").(int)
 
 		// create committee
-		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
+		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical[flow.Identity])
 		committee := identities.NodeIDs()
-		signers := committee.Sample(uint(numSigners))
+		signers, err := committee.Sample(uint(numSigners))
+		require.NoError(t, err)
 
 		// encode
 		prefixed, err := signature.EncodeSignersToIndices(committee, signers)
@@ -303,9 +304,10 @@ func Test_DecodeSignerIndicesToIdentifiers(t *testing.T) {
 		numSigners := rapid.IntRange(0, committeeSize).Draw(t, "numSigners").(int)
 
 		// create committee
-		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
+		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical[flow.Identity])
 		committee := identities.NodeIDs()
-		signers := committee.Sample(uint(numSigners))
+		signers, err := committee.Sample(uint(numSigners))
+		require.NoError(t, err)
 		sort.Sort(signers)
 
 		// encode
@@ -332,30 +334,33 @@ func Test_DecodeSignerIndicesToIdentifiers(t *testing.T) {
 const UpperBoundCommitteeSize = 272
 
 func Test_DecodeSignerIndicesToIdentities(t *testing.T) {
-
 	rapid.Check(t, func(t *rapid.T) {
 		// select total committee size, number of random beacon signers and number of staking signers
 		committeeSize := rapid.IntRange(1, UpperBoundCommitteeSize).Draw(t, "committeeSize").(int)
 		numSigners := rapid.IntRange(0, committeeSize).Draw(t, "numSigners").(int)
 
 		// create committee
-		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
-		signers := identities.Sample(uint(numSigners))
+		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical[flow.Identity])
+		fullSigners, err := identities.Sample(uint(numSigners))
+		require.NoError(t, err)
+		signers := fullSigners.ToSkeleton()
 
 		// encode
 		signerIndices, err := signature.EncodeSignersToIndices(identities.NodeIDs(), signers.NodeIDs())
 		require.NoError(t, err)
 
 		// decode and verify
-		decodedSigners, err := signature.DecodeSignerIndicesToIdentities(identities, signerIndices)
+		decodedSigners, err := signature.DecodeSignerIndicesToIdentities(identities.ToSkeleton(), signerIndices)
 		require.NoError(t, err)
-		require.Equal(t, signers.Sort(order.Canonical), decodedSigners.Sort(order.Canonical))
+
+		require.Equal(t, signers.Sort(flow.Canonical[flow.IdentitySkeleton]), decodedSigners.Sort(flow.Canonical[flow.IdentitySkeleton]))
 	})
 }
 
 // sampleSigners takes `committee` and samples to _disjoint_ subsets
 // (`stakingSigners` and `randomBeaconSigners`) with the specified cardinality
 func sampleSigners(
+	t *rapid.T,
 	committee flow.IdentifierList,
 	numStakingSigners int,
 	numRandomBeaconSigners int,
@@ -364,9 +369,12 @@ func sampleSigners(
 		panic(fmt.Sprintf("Cannot sample %d nodes out of a committee is size %d", numStakingSigners+numRandomBeaconSigners, len(committee)))
 	}
 
-	stakingSigners = committee.Sample(uint(numStakingSigners))
+	var err error
+	stakingSigners, err = committee.Sample(uint(numStakingSigners))
+	require.NoError(t, err)
 	remaining := committee.Filter(id.Not(id.In(stakingSigners...)))
-	randomBeaconSigners = remaining.Sample(uint(numRandomBeaconSigners))
+	randomBeaconSigners, err = remaining.Sample(uint(numRandomBeaconSigners))
+	require.NoError(t, err)
 	return
 }
 

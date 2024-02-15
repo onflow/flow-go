@@ -15,7 +15,7 @@ import (
 
 type SyncEngineFactory struct {
 	log     zerolog.Logger
-	net     network.Network
+	net     network.EngineRegistry
 	me      module.Local
 	metrics module.EngineMetrics
 }
@@ -23,7 +23,7 @@ type SyncEngineFactory struct {
 func NewSyncEngineFactory(
 	log zerolog.Logger,
 	metrics module.EngineMetrics,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
 ) (*SyncEngineFactory, error) {
 
@@ -37,7 +37,7 @@ func NewSyncEngineFactory(
 }
 
 func (f *SyncEngineFactory) Create(
-	participants flow.IdentityList,
+	participants flow.IdentitySkeletonList,
 	state cluster.State,
 	blocks storage.ClusterBlocks,
 	core *chainsync.Core,

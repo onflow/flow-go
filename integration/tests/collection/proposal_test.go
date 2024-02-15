@@ -13,11 +13,9 @@ import (
 
 	"github.com/onflow/flow-go/integration/convert"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestMultiCluster(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky as it often hits port already allocated, since too many containers are created")
 	suite.Run(t, new(MultiClusterSuite))
 }
 

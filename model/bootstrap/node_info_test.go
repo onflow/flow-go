@@ -9,14 +9,36 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestSort(t *testing.T) {
+func TestIdentityListCanonical(t *testing.T) {
 	nodes := unittest.NodeInfosFixture(20)
-	nodes = bootstrap.Sort(nodes, order.Canonical)
-	require.True(t, bootstrap.ToIdentityList(nodes).Sorted(order.Canonical))
+	// make sure the list is not sorted
+	nodes[0].NodeID[0], nodes[1].NodeID[0] = 2, 1
+	require.False(t, flow.IsIdentifierCanonical(nodes[0].NodeID, nodes[1].NodeID))
+	ids := bootstrap.ToIdentityList(nodes)
+	assert.False(t, flow.IsIdentityListCanonical(ids))
+
+	// make a copy of the original list of nodes
+	nodesCopy := make([]bootstrap.NodeInfo, len(nodes))
+	copy(nodesCopy, nodes)
+
+	sortedNodes := bootstrap.Sort(nodes, flow.Canonical[flow.Identity])
+	sortedIds := bootstrap.ToIdentityList(sortedNodes)
+	require.True(t, flow.IsIdentityListCanonical(sortedIds))
+	// make sure original list didn't change
+	assert.Equal(t, nodesCopy, nodes)
+
+	// check `IsIdentityListCanonical` detects order equality in a sorted list
+	nodes[1] = nodes[10] // add a duplication
+	copy(nodesCopy, nodes)
+	sortedNodes = bootstrap.Sort(nodes, flow.Canonical[flow.Identity])
+	sortedIds = bootstrap.ToIdentityList(sortedNodes)
+	assert.False(t, flow.IsIdentityListCanonical(sortedIds))
+	// make sure original list didn't change
+	assert.Equal(t, nodesCopy, nodes)
 }
 
 func TestNodeConfigEncodingJSON(t *testing.T) {
@@ -50,7 +72,7 @@ func TestNodeInfoPubEncodingJSON(t *testing.T) {
 		var dec bootstrap.NodeInfoPub
 		err = json.Unmarshal(enc, &dec)
 		require.NoError(t, err)
-		assert.Equal(t, conf, dec)
+		assert.True(t, dec.Equals(&conf))
 	})
 	t.Run("compat: should accept old files using Stake field", func(t *testing.T) {
 		conf := unittest.NodeInfoFixture().Public()
@@ -61,6 +83,6 @@ func TestNodeInfoPubEncodingJSON(t *testing.T) {
 		var dec bootstrap.NodeInfoPub
 		err = json.Unmarshal(enc, &dec)
 		require.NoError(t, err)
-		assert.Equal(t, conf, dec)
+		assert.True(t, dec.Equals(&conf))
 	})
 }

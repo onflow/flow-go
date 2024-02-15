@@ -1,14 +1,12 @@
-//go:build relic
-// +build relic
-
 package verification
 
 import (
 	"fmt"
 
+	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
 )
@@ -37,7 +35,7 @@ func NewStakingVerifier() *StakingVerifier {
 //   - model.ErrInvalidSignature is the signature is invalid
 //   - unexpected errors should be treated as symptoms of bugs or uncovered
 //     edge cases in the logic (i.e. as fatal)
-func (v *StakingVerifier) VerifyVote(signer *flow.Identity, sigData []byte, view uint64, blockID flow.Identifier) error {
+func (v *StakingVerifier) VerifyVote(signer *flow.IdentitySkeleton, sigData []byte, view uint64, blockID flow.Identifier) error {
 
 	// create the to-be-signed message
 	msg := MakeVoteMessage(view, blockID)
@@ -65,7 +63,7 @@ func (v *StakingVerifier) VerifyVote(signer *flow.Identity, sigData []byte, view
 //     edge cases in the logic (i.e. as fatal)
 //
 // In the single verification case, `sigData` represents a single signature (`crypto.Signature`).
-func (v *StakingVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, view uint64, blockID flow.Identifier) error {
+func (v *StakingVerifier) VerifyQC(signers flow.IdentitySkeletonList, sigData []byte, view uint64, blockID flow.Identifier) error {
 	msg := MakeVoteMessage(view, blockID)
 
 	err := verifyAggregatedSignatureOneMessage(signers.PublicStakingKeys(), sigData, v.stakingHasher, msg)
@@ -85,6 +83,6 @@ func (v *StakingVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, vi
 //   - model.ErrInvalidSignature if a signature is invalid
 //   - unexpected errors should be treated as symptoms of bugs or uncovered
 //     edge cases in the logic (i.e. as fatal)
-func (v *StakingVerifier) VerifyTC(signers flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64) error {
+func (v *StakingVerifier) VerifyTC(signers flow.IdentitySkeletonList, sigData []byte, view uint64, highQCViews []uint64) error {
 	return verifyTCSignatureManyMessages(signers.PublicStakingKeys(), sigData, view, highQCViews, v.timeoutObjectHasher)
 }

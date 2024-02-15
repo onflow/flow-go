@@ -217,7 +217,7 @@ func createMessages(messageCnt int, priorityFunc queue.MessagePriorityFunc) map[
 }
 
 func randomPriority(_ interface{}) (queue.Priority, error) {
-	rand.Seed(time.Now().UnixNano())
+
 	p := rand.Intn(int(queue.HighPriority-queue.LowPriority+1)) + int(queue.LowPriority)
 	return queue.Priority(p), nil
 }

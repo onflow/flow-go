@@ -6,9 +6,15 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
+type ObserverMetrics interface {
+	RecordRPC(handler, rpc string, code codes.Code)
+}
+
 type ObserverCollector struct {
 	rpcs *prometheus.CounterVec
 }
+
+var _ ObserverMetrics = (*ObserverCollector)(nil)
 
 func NewObserverCollector() *ObserverCollector {
 	return &ObserverCollector{

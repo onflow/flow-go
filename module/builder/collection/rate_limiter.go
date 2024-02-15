@@ -11,6 +11,12 @@ type rateLimiter struct {
 
 	// maximum rate of transactions/payer/collection (from Config)
 	rate float64
+	// Derived fields based on the rate. Only one will be used:
+	//  - if rate >= 1, then txPerBlock is set to the number of transactions allowed per payer per block
+	//  - if rate < 1, then blocksPerTx is set to the number of consecutive blocks in which one transaction per payer is allowed
+	txPerBlock  uint
+	blocksPerTx uint64
+
 	// set of unlimited payer address (from Config)
 	unlimited map[flow.Address]struct{}
 	// height of the collection we are building
@@ -30,6 +36,11 @@ func newRateLimiter(conf Config, height uint64) *rateLimiter {
 		height:                 height,
 		latestCollectionHeight: make(map[flow.Address]uint64),
 		txIncludedCount:        make(map[flow.Address]uint),
+	}
+	if limiter.rate >= 1 {
+		limiter.txPerBlock = uint(math.Floor(limiter.rate))
+	} else {
+		limiter.blocksPerTx = uint64(math.Ceil(1 / limiter.rate))
 	}
 	return limiter
 }
@@ -69,7 +80,7 @@ func (limiter *rateLimiter) shouldRateLimit(tx *flow.TransactionBody) bool {
 	// if rate >=1, we only consider the current collection and rate limit once
 	// the number of transactions for the payer exceeds rate
 	if limiter.rate >= 1 {
-		if limiter.txIncludedCount[payer] >= uint(math.Floor(limiter.rate)) {
+		if limiter.txIncludedCount[payer] >= limiter.txPerBlock {
 			return true
 		}
 	}
@@ -94,7 +105,7 @@ func (limiter *rateLimiter) shouldRateLimit(tx *flow.TransactionBody) bool {
 			return false
 		}
 
-		if limiter.height-latestHeight < uint64(math.Ceil(1/limiter.rate)) {
+		if limiter.height-latestHeight < limiter.blocksPerTx {
 			return true
 		}
 	}

@@ -37,7 +37,7 @@ func main() {
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			rpcEng, err := engine.New(node.Network, node.Logger, node.Me, node.State, rpcConf)
+			rpcEng, err := engine.New(node.EngineRegistry, node.Logger, node.Me, node.State, rpcConf)
 			return rpcEng, err
 		})
 

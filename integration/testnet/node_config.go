@@ -1,6 +1,7 @@
 package testnet
 
 import (
+	"fmt"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -32,12 +33,15 @@ type NodeConfig struct {
 func (n NodeConfigs) Filter(filters ...NodeConfigFilter) NodeConfigs {
 	nodeConfigs := make(NodeConfigs, 0)
 	for _, config := range n {
-		filter := false
+		passedAllFilters := true
 		for _, f := range filters {
-			filter = f(config)
+			if !f(config) {
+				passedAllFilters = false
+				break
+			}
 		}
 
-		if filter {
+		if passedAllFilters {
 			nodeConfigs = append(nodeConfigs, config)
 		}
 	}
@@ -138,5 +142,17 @@ func AsGhost() func(config *NodeConfig) {
 func WithAdditionalFlag(flag string) func(config *NodeConfig) {
 	return func(config *NodeConfig) {
 		config.AdditionalFlags = append(config.AdditionalFlags, flag)
+	}
+}
+
+// WithAdditionalFlagf adds additional flags to the command using a formatted string
+func WithAdditionalFlagf(format string, a ...any) func(config *NodeConfig) {
+	return WithAdditionalFlag(fmt.Sprintf(format, a...))
+}
+
+// WithMetricsServer exposes the metrics server
+func WithMetricsServer() func(config *NodeConfig) {
+	return func(config *NodeConfig) {
+		config.EnableMetricsServer = true
 	}
 }

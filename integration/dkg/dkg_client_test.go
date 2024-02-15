@@ -10,9 +10,11 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
-	emulator "github.com/onflow/flow-emulator"
 
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+	emulator "github.com/onflow/flow-emulator/emulator"
+
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
@@ -21,7 +23,6 @@ import (
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/dkg"
@@ -34,7 +35,7 @@ type ClientSuite struct {
 	contractClient *dkg.Client
 
 	env            templates.Environment
-	blockchain     *emulator.Blockchain
+	blockchain     emulator.Emulator
 	emulatorClient *utils.EmulatorClient
 
 	dkgAddress    sdk.Address
@@ -49,7 +50,7 @@ func TestDKGClient(t *testing.T) {
 // Setup Test creates the blockchain client, the emulated blockchain and deploys
 // the DKG contract to the emulator
 func (s *ClientSuite) SetupTest() {
-	blockchain, err := emulator.NewBlockchain(emulator.WithStorageLimitEnabled(false))
+	blockchain, err := emulator.New(emulator.WithStorageLimitEnabled(false))
 	require.NoError(s.T(), err)
 
 	s.blockchain = blockchain
@@ -68,7 +69,7 @@ func (s *ClientSuite) deployDKGContract() {
 	code := contracts.FlowDKG()
 
 	// deploy the contract to the emulator
-	dkgAddress, err := s.blockchain.CreateAccount([]*sdk.AccountKey{accountKey}, []sdktemplates.Contract{
+	dkgAddress, err := s.emulatorClient.CreateAccount([]*sdk.AccountKey{accountKey}, []sdktemplates.Contract{
 		{
 			Name:   "FlowDKG",
 			Source: string(code),
@@ -202,7 +203,7 @@ func (s *ClientSuite) prepareDKG(participants []flow.Identifier) []*dkg.Client {
 
 		// create account key, address and signer for participant
 		accountKey, signer := test.AccountKeyGenerator().NewWithSigner()
-		address, err := s.blockchain.CreateAccount([]*sdk.AccountKey{accountKey}, nil)
+		address, err := s.emulatorClient.CreateAccount([]*sdk.AccountKey{accountKey}, nil)
 		require.NoError(s.T(), err)
 
 		accountKeys[index], addresses[index], signers[index] = accountKey, address, signer
@@ -230,7 +231,7 @@ func (s *ClientSuite) setUpAdmin() {
 	// set up admin resource
 	setUpAdminTx := sdk.NewTransaction().
 		SetScript(templates.GeneratePublishDKGParticipantScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index,
 			s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address).
@@ -258,7 +259,7 @@ func (s *ClientSuite) startDKGWithParticipants(nodeIDs []flow.Identifier) {
 	// start DKG using admin resource
 	startDKGTx := sdk.NewTransaction().
 		SetScript(templates.GenerateStartDKGScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index,
 			s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address).
@@ -289,7 +290,7 @@ func (s *ClientSuite) createParticipant(nodeID flow.Identifier, authoriser sdk.A
 	// create DKG partcipant
 	createParticipantTx := sdk.NewTransaction().
 		SetScript(templates.GenerateCreateDKGParticipantScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index,
 			s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address).

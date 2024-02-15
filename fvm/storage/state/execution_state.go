@@ -16,29 +16,6 @@ const (
 	DefaultMaxValueSize = 256_000_000 // ~256MB
 )
 
-// TOOD(patrick): rm View interface after delta view is deleted.
-type View interface {
-	NewChild() *ExecutionState
-
-	Finalize() *snapshot.ExecutionSnapshot
-	Merge(child *snapshot.ExecutionSnapshot) error
-
-	Storage
-}
-
-// TOOD(patrick): rm Storage interface after delta view is deleted.
-// Storage is the storage interface used by the virtual machine to read and
-// write register values.
-type Storage interface {
-	// TODO(patrick): remove once fvm.VM.Run() is deprecated
-	Peek(id flow.RegisterID) (flow.RegisterValue, error)
-
-	Set(id flow.RegisterID, value flow.RegisterValue) error
-	Get(id flow.RegisterID) (flow.RegisterValue, error)
-
-	DropChanges() error
-}
-
 // State represents the execution state
 // it holds draft of updates and captures
 // all register touches
@@ -229,6 +206,19 @@ func (state *ExecutionState) MeterComputation(kind common.ComputationKind, inten
 		return state.meter.MeterComputation(kind, intensity)
 	}
 	return nil
+}
+
+// ComputationAvailable checks if enough computation capacity is available without metering
+func (state *ExecutionState) ComputationAvailable(kind common.ComputationKind, intensity uint) bool {
+	if state.finalized {
+		// if state is finalized return false
+		return false
+	}
+
+	if state.enforceLimits {
+		return state.meter.ComputationAvailable(kind, intensity)
+	}
+	return true
 }
 
 // TotalComputationUsed returns total computation used

@@ -5,7 +5,6 @@ import (
 
 	libp2pnet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/multiformats/go-multiaddr"
 
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
@@ -14,7 +13,7 @@ import (
 type UnicastManager interface {
 	// WithDefaultHandler sets the default stream handler for this unicast manager. The default handler is utilized
 	// as the core handler for other unicast protocols, e.g., compressions.
-	WithDefaultHandler(defaultHandler libp2pnet.StreamHandler)
+	SetDefaultHandler(defaultHandler libp2pnet.StreamHandler)
 	// Register registers given protocol name as preferred unicast. Each invocation of register prioritizes the current protocol
 	// over previously registered ones.
 	// All errors returned from this function can be considered benign.
@@ -23,5 +22,5 @@ type UnicastManager interface {
 	// it either creates a successful stream or runs out of options. Creating stream on each protocol is tried at most `maxAttempts`, and then falls
 	// back to the less preferred one.
 	// All errors returned from this function can be considered benign.
-	CreateStream(ctx context.Context, peerID peer.ID, maxAttempts int) (libp2pnet.Stream, []multiaddr.Multiaddr, error)
+	CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error)
 }

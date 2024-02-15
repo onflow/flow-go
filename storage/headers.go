@@ -24,8 +24,8 @@ type Headers interface {
 	// No errors are expected during normal operation.
 	Exists(blockID flow.Identifier) (bool, error)
 
-	// BlockIDByHeight the block ID that is finalized at the given height. It is an optimized version
-	// of `ByHeight` that skips retrieving the block. Expected errors during normal operations:
+	// BlockIDByHeight returns the block ID that is finalized at the given height. It is an optimized
+	// version of `ByHeight` that skips retrieving the block. Expected errors during normal operations:
 	//  * `storage.ErrNotFound` if no finalized block is known at given height
 	BlockIDByHeight(height uint64) (flow.Identifier, error)
 

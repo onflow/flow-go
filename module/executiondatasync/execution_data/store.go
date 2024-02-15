@@ -12,17 +12,24 @@ import (
 	"github.com/onflow/flow-go/module/blobs"
 )
 
-// ExecutionDataStore handles adding / getting execution data to / from a local blobstore
-type ExecutionDataStore interface {
-	// GetExecutionData gets the BlockExecutionData for the given root ID from the blobstore.
-	// The returned error will be:
-	// - MalformedDataError if some level of the blob tree cannot be properly deserialized
+// ExecutionDataGetter handles getting execution data from a blobstore
+type ExecutionDataGetter interface {
+	// Get gets the BlockExecutionData for the given root ID from the blobstore.
+	// Expected errors during normal operations:
 	// - BlobNotFoundError if some CID in the blob tree could not be found from the blobstore
-	GetExecutionData(ctx context.Context, rootID flow.Identifier) (*BlockExecutionData, error)
+	// - MalformedDataError if some level of the blob tree cannot be properly deserialized
+	// - BlobSizeLimitExceededError if some blob in the blob tree exceeds the maximum allowed size
+	Get(ctx context.Context, rootID flow.Identifier) (*BlockExecutionData, error)
+}
 
-	// AddExecutionData constructs a blob tree for the given BlockExecutionData and adds it to the
-	// blobstore, and then returns the root CID.
-	AddExecutionData(ctx context.Context, executionData *BlockExecutionData) (flow.Identifier, error)
+// ExecutionDataStore handles adding / getting execution data to / from a blobstore
+type ExecutionDataStore interface {
+	ExecutionDataGetter
+
+	// Add constructs a blob tree for the given BlockExecutionData, adds it to the blobstore,
+	// then returns the root CID.
+	// No errors are expected during normal operation.
+	Add(ctx context.Context, executionData *BlockExecutionData) (flow.Identifier, error)
 }
 
 type ExecutionDataStoreOption func(*store)
@@ -33,6 +40,8 @@ func WithMaxBlobSize(size int) ExecutionDataStoreOption {
 		s.maxBlobSize = size
 	}
 }
+
+var _ ExecutionDataStore = (*store)(nil)
 
 type store struct {
 	blobstore   blobs.Blobstore
@@ -55,8 +64,11 @@ func NewExecutionDataStore(blobstore blobs.Blobstore, serializer Serializer, opt
 	return s
 }
 
-func (s *store) AddExecutionData(ctx context.Context, executionData *BlockExecutionData) (flow.Identifier, error) {
-	executionDataRoot := &BlockExecutionDataRoot{
+// Add constructs a blob tree for the given BlockExecutionData, adds it to the blobstore,
+// then returns the rootID.
+// No errors are expected during normal operation.
+func (s *store) Add(ctx context.Context, executionData *BlockExecutionData) (flow.Identifier, error) {
+	executionDataRoot := &flow.BlockExecutionDataRoot{
 		BlockID:               executionData.BlockID,
 		ChunkExecutionDataIDs: make([]cid.Cid, len(executionData.ChunkExecutionDatas)),
 	}
@@ -75,6 +87,13 @@ func (s *store) AddExecutionData(ctx context.Context, executionData *BlockExecut
 		return flow.ZeroID, fmt.Errorf("could not serialize execution data root: %w", err)
 	}
 
+	// this should never happen unless either:
+	// - maxBlobSize is set too low
+	// - an enormous number of chunks are included in the block
+	//   e.g. given a 1MB max size, 32 byte CID and 32 byte blockID:
+	//   1MB/32byes - 1 = 32767 chunk CIDs
+	// if the number of chunks in a block ever exceeds this, we will need to update the root blob
+	// generation to support splitting it up into a tree similar to addChunkExecutionData
 	if buf.Len() > s.maxBlobSize {
 		return flow.ZeroID, errors.New("root blob exceeds blob size limit")
 	}
@@ -92,24 +111,38 @@ func (s *store) AddExecutionData(ctx context.Context, executionData *BlockExecut
 	return rootID, nil
 }
 
+// addChunkExecutionData constructs a blob tree for the given ChunkExecutionData, adds it to the
+// blobstore, and returns the root CID.
+// No errors are expected during normal operation.
 func (s *store) addChunkExecutionData(ctx context.Context, chunkExecutionData *ChunkExecutionData) (cid.Cid, error) {
 	var v interface{} = chunkExecutionData
 
+	// given an arbitrarily large v, split it into blobs of size up to maxBlobSize, adding them to
+	// the blobstore. Then, combine the list of CIDs added into a second level of blobs, and repeat.
+	// This produces a tree of blobs, where the leaves are the actual data, and each internal node
+	// contains a list of CIDs for its children.
 	for i := 0; ; i++ {
+		// chunk and store the data, then get the list of CIDs added
 		cids, err := s.addBlobs(ctx, v)
 		if err != nil {
 			return cid.Undef, fmt.Errorf("failed to add blob tree level at height %d: %w", i, err)
 		}
 
+		// once a single CID is left, we have reached the root of the tree
 		if len(cids) == 1 {
 			return cids[0], nil
 		}
 
+		// the next level is the list of CIDs added in this level
 		v = cids
 	}
 }
 
+// addBlobs splits the given value into blobs of size up to maxBlobSize, adds them to the blobstore,
+// then returns the CIDs for each blob added.
+// No errors are expected during normal operation.
 func (s *store) addBlobs(ctx context.Context, v interface{}) ([]cid.Cid, error) {
+	// first, serialize the data into a large byte slice
 	buf := new(bytes.Buffer)
 	if err := s.serializer.Serialize(buf, v); err != nil {
 		return nil, fmt.Errorf("could not serialize execution data root: %w", err)
@@ -119,6 +152,7 @@ func (s *store) addBlobs(ctx context.Context, v interface{}) ([]cid.Cid, error) 
 	var cids []cid.Cid
 	var blbs []blobs.Blob
 
+	// next, chunk the data into blobs of size up to maxBlobSize
 	for len(data) > 0 {
 		blobLen := s.maxBlobSize
 		if len(data) < blobLen {
@@ -131,6 +165,7 @@ func (s *store) addBlobs(ctx context.Context, v interface{}) ([]cid.Cid, error) 
 		cids = append(cids, blob.Cid())
 	}
 
+	// finally, add the blobs to the blobstore and return the list of CIDs
 	if err := s.blobstore.PutMany(ctx, blbs); err != nil {
 		return nil, fmt.Errorf("could not add blobs: %w", err)
 	}
@@ -138,9 +173,14 @@ func (s *store) addBlobs(ctx context.Context, v interface{}) ([]cid.Cid, error) 
 	return cids, nil
 }
 
-func (s *store) GetExecutionData(ctx context.Context, rootID flow.Identifier) (*BlockExecutionData, error) {
+// Get gets the BlockExecutionData for the given root ID from the blobstore.
+// Expected errors during normal operations:
+// - BlobNotFoundError if some CID in the blob tree could not be found from the blobstore
+// - MalformedDataError if some level of the blob tree cannot be properly deserialized
+func (s *store) Get(ctx context.Context, rootID flow.Identifier) (*BlockExecutionData, error) {
 	rootCid := flow.IdToCid(rootID)
 
+	// first, get the root blob. it will contain a list of blobs, one for each chunk
 	rootBlob, err := s.blobstore.Get(ctx, rootCid)
 	if err != nil {
 		if errors.Is(err, blobs.ErrNotFound) {
@@ -155,11 +195,12 @@ func (s *store) GetExecutionData(ctx context.Context, rootID flow.Identifier) (*
 		return nil, NewMalformedDataError(err)
 	}
 
-	executionDataRoot, ok := rootData.(*BlockExecutionDataRoot)
+	executionDataRoot, ok := rootData.(*flow.BlockExecutionDataRoot)
 	if !ok {
 		return nil, NewMalformedDataError(fmt.Errorf("root blob does not deserialize to a BlockExecutionDataRoot, got %T instead", rootData))
 	}
 
+	// next, get each chunk blob and deserialize it
 	blockExecutionData := &BlockExecutionData{
 		BlockID:             executionDataRoot.BlockID,
 		ChunkExecutionDatas: make([]*ChunkExecutionData, len(executionDataRoot.ChunkExecutionDataIDs)),
@@ -177,9 +218,14 @@ func (s *store) GetExecutionData(ctx context.Context, rootID flow.Identifier) (*
 	return blockExecutionData, nil
 }
 
+// getChunkExecutionData gets the ChunkExecutionData for the given CID from the blobstore.
+// Expected errors during normal operations:
+// - BlobNotFoundError if some CID in the blob tree could not be found from the blobstore
+// - MalformedDataError if some level of the blob tree cannot be properly deserialized
 func (s *store) getChunkExecutionData(ctx context.Context, chunkExecutionDataID cid.Cid) (*ChunkExecutionData, error) {
 	cids := []cid.Cid{chunkExecutionDataID}
 
+	// given a root CID, get the blob tree level by level, until we reach the full ChunkExecutionData
 	for i := 0; ; i++ {
 		v, err := s.getBlobs(ctx, cids)
 		if err != nil {
@@ -197,9 +243,14 @@ func (s *store) getChunkExecutionData(ctx context.Context, chunkExecutionDataID 
 	}
 }
 
+// getBlobs gets the blobs for the given CIDs from the blobstore, deserializes them, and returns
+// the deserialized value.
+// - BlobNotFoundError if any of the CIDs could not be found from the blobstore
+// - MalformedDataError if any of the blobs cannot be properly deserialized
 func (s *store) getBlobs(ctx context.Context, cids []cid.Cid) (interface{}, error) {
 	buf := new(bytes.Buffer)
 
+	// get each blob and append the raw data to the buffer
 	for _, cid := range cids {
 		blob, err := s.blobstore.Get(ctx, cid)
 		if err != nil {
@@ -216,6 +267,7 @@ func (s *store) getBlobs(ctx context.Context, cids []cid.Cid) (interface{}, erro
 		}
 	}
 
+	// deserialize the buffer into a value, and return it
 	v, err := s.serializer.Deserialize(buf)
 	if err != nil {
 		return nil, NewMalformedDataError(err)

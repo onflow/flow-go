@@ -52,7 +52,7 @@ type Engine struct {
 	channel        channels.Channel
 	requestHandler *engine.MessageHandler
 	requestQueue   engine.MessageStore
-	selector       flow.IdentityFilter
+	selector       flow.IdentityFilter[flow.Identity]
 	retrieve       RetrieveFunc
 	// buffered channel for EntityRequest workers to pick and process.
 	requestChannel chan *internal.EntityRequest
@@ -66,19 +66,19 @@ var _ network.MessageProcessor = (*Engine)(nil)
 func New(
 	log zerolog.Logger,
 	metrics module.EngineMetrics,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
 	state protocol.State,
 	requestQueue engine.MessageStore,
 	requestWorkers uint,
 	channel channels.Channel,
-	selector flow.IdentityFilter,
+	selector flow.IdentityFilter[flow.Identity],
 	retrieve RetrieveFunc) (*Engine, error) {
 
 	// make sure we don't respond to request sent by self or unauthorized nodes
 	selector = filter.And(
 		selector,
-		filter.Not(filter.HasNodeID(me.NodeID())),
+		filter.Not(filter.HasNodeID[flow.Identity](me.NodeID())),
 	)
 
 	handler := engine.NewMessageHandler(
@@ -198,7 +198,7 @@ func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 	// for the handler to make sure the requester is authorized for this resource
 	requesters, err := e.state.Final().Identities(filter.And(
 		e.selector,
-		filter.HasNodeID(request.OriginId)),
+		filter.HasNodeID[flow.Identity](request.OriginId)),
 	)
 	if err != nil {
 		return fmt.Errorf("could not get requesters: %w", err)

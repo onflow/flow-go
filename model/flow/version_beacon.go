@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/coreos/go-semver/semver"
@@ -39,7 +40,8 @@ type VersionBeacon struct {
 }
 
 // SealedVersionBeacon is a VersionBeacon with a SealHeight field.
-// Version beacons are effective only after they are sealed.
+// Version beacons are effective only after the results containing the version beacon
+// are sealed.
 type SealedVersionBeacon struct {
 	*VersionBeacon
 	SealHeight uint64
@@ -144,4 +146,12 @@ func (v *VersionBeacon) Validate() error {
 	}
 
 	return nil
+}
+
+func (v *VersionBeacon) String() string {
+	var buffer bytes.Buffer
+	for _, boundary := range v.VersionBoundaries {
+		buffer.WriteString(fmt.Sprintf("%d:%s ", boundary.BlockHeight, boundary.Version))
+	}
+	return buffer.String()
 }

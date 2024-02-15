@@ -25,7 +25,7 @@ type VoteCollector struct {
 	sync.Mutex
 	log                      zerolog.Logger
 	workers                  hotstuff.Workers
-	notifier                 hotstuff.Consumer
+	notifier                 hotstuff.VoteAggregationConsumer
 	createVerifyingProcessor VerifyingVoteProcessorFactory
 
 	votesCache     VotesCache
@@ -47,7 +47,7 @@ type atomicValueWrapper struct {
 
 func NewStateMachineFactory(
 	log zerolog.Logger,
-	notifier hotstuff.Consumer,
+	notifier hotstuff.VoteAggregationConsumer,
 	verifyingVoteProcessorFactory VerifyingVoteProcessorFactory,
 ) voteaggregator.NewCollectorFactoryMethod {
 	return func(view uint64, workers hotstuff.Workers) (hotstuff.VoteCollector, error) {
@@ -59,7 +59,7 @@ func NewStateMachine(
 	view uint64,
 	log zerolog.Logger,
 	workers hotstuff.Workers,
-	notifier hotstuff.Consumer,
+	notifier hotstuff.VoteAggregationConsumer,
 	verifyingVoteProcessorFactory VerifyingVoteProcessorFactory,
 ) *VoteCollector {
 	log = log.With().

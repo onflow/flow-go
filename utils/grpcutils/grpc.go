@@ -8,14 +8,18 @@ import (
 
 	lcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	libp2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
+	"github.com/onflow/crypto"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
-// DefaultMaxMsgSize use 20MB as the default message size limit.
-// grpc library default is 4MB
-const DefaultMaxMsgSize = 1024 * 1024 * 20
+// NoCompressor use when no specific compressor name provided, which effectively means no compression.
+const NoCompressor = ""
+
+// DefaultMaxMsgSize use 1 GiB as the default message size limit.
+// This enforces a sane max message size, while still allowing for reasonably large messages.
+// grpc library default is 4 MiB.
+const DefaultMaxMsgSize = 1 << (10 * 3) // 1 GiB
 
 // CertificateConfig is used to configure an Certificate
 type CertificateConfig struct {

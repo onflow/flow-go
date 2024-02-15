@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -199,7 +200,10 @@ func demo() {
 
 			tryRandomCall(func() {
 				block := unittest.BlockFixture()
-				pendingBlocks.Add(unittest.IdentifierFixture(), &block)
+				pendingBlocks.Add(flow.Slashable[*flow.Block]{
+					OriginID: unittest.IdentifierFixture(),
+					Message:  &block,
+				})
 			})
 
 			// adds a synthetic 1 s delay for verification duration

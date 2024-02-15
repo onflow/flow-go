@@ -197,7 +197,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 // A block is considered as valid if it's a valid extension of existing forks.
 // Note it doesn't check if it's conflicting with finalized block
 // During normal operations, the following error returns are expected:
-//   - model.InvalidBlockError if the block is invalid
+//   - model.InvalidProposalError if the block is invalid
 //   - model.ErrViewForUnknownEpoch if the proposal refers unknown epoch
 //
 // Any other error should be treated as exception
@@ -208,7 +208,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	// validate the proposer's vote and get his identity
 	_, err := v.ValidateVote(proposal.ProposerVote())
 	if model.IsInvalidVoteError(err) {
-		return newInvalidBlockError(block, fmt.Errorf("invalid proposer signature: %w", err))
+		return model.NewInvalidProposalErrorf(proposal, "invalid proposer signature: %w", err)
 	}
 	if err != nil {
 		return fmt.Errorf("error verifying leader signature for block %x: %w", block.BlockID, err)
@@ -220,7 +220,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		return fmt.Errorf("error determining leader for block %x: %w", block.BlockID, err)
 	}
 	if leader != block.ProposerID {
-		return newInvalidBlockError(block, fmt.Errorf("proposer %s is not leader (%s) for view %d", block.ProposerID, leader, block.View))
+		return model.NewInvalidProposalErrorf(proposal, "proposer %s is not leader (%s) for view %d", block.ProposerID, leader, block.View)
 	}
 
 	// The Block must contain a proof that the primary legitimately entered the respective view.
@@ -231,23 +231,23 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	if !lastViewSuccessful {
 		// check if proposal is correctly structured
 		if proposal.LastViewTC == nil {
-			return newInvalidBlockError(block, fmt.Errorf("QC in block is not for previous view, so expecting a TC but none is included in block"))
+			return model.NewInvalidProposalErrorf(proposal, "QC in block is not for previous view, so expecting a TC but none is included in block")
 		}
 
 		// check if included TC is for previous view
 		if proposal.Block.View != proposal.LastViewTC.View+1 {
-			return newInvalidBlockError(block, fmt.Errorf("QC in block is not for previous view, so expecting a TC for view %d but got TC for view %d", proposal.Block.View-1, proposal.LastViewTC.View))
+			return model.NewInvalidProposalErrorf(proposal, "QC in block is not for previous view, so expecting a TC for view %d but got TC for view %d", proposal.Block.View-1, proposal.LastViewTC.View)
 		}
 
 		// Check if proposal extends either the newest QC specified in the TC, or a newer QC
 		// in edge cases a leader may construct a TC and QC concurrently such that TC contains
 		// an older QC - in these case we still want to build on the newest QC, so this case is allowed.
 		if proposal.Block.QC.View < proposal.LastViewTC.NewestQC.View {
-			return newInvalidBlockError(block, fmt.Errorf("TC in block contains a newer QC than the block itself, which is a protocol violation"))
+			return model.NewInvalidProposalErrorf(proposal, "TC in block contains a newer QC than the block itself, which is a protocol violation")
 		}
 	} else if proposal.LastViewTC != nil {
 		// last view ended with QC, including TC is a protocol violation
-		return newInvalidBlockError(block, fmt.Errorf("last view has ended with QC but proposal includes LastViewTC"))
+		return model.NewInvalidProposalErrorf(proposal, "last view has ended with QC but proposal includes LastViewTC")
 	}
 
 	// Check signatures, keep the most expensive the last to check
@@ -256,7 +256,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	err = v.ValidateQC(qc)
 	if err != nil {
 		if model.IsInvalidQCError(err) {
-			return newInvalidBlockError(block, fmt.Errorf("invalid qc included: %w", err))
+			return model.NewInvalidProposalErrorf(proposal, "invalid qc included: %w", err)
 		}
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {
 			// We require each replica to be bootstrapped with a QC pointing to a finalized block. Therefore, we should know the
@@ -272,7 +272,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		err = v.ValidateTC(proposal.LastViewTC)
 		if err != nil {
 			if model.IsInvalidTCError(err) {
-				return newInvalidBlockError(block, fmt.Errorf("proposals TC's is not valid: %w", err))
+				return model.NewInvalidProposalErrorf(proposal, "proposals TC's is not valid: %w", err)
 			}
 			if errors.Is(err, model.ErrViewForUnknownEpoch) {
 				// We require each replica to be bootstrapped with a QC pointing to a finalized block. Therefore, we should know the
@@ -294,7 +294,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 //   - model.ErrViewForUnknownEpoch if the vote refers unknown epoch
 //
 // Any other error should be treated as exception
-func (v *Validator) ValidateVote(vote *model.Vote) (*flow.Identity, error) {
+func (v *Validator) ValidateVote(vote *model.Vote) (*flow.IdentitySkeleton, error) {
 	voter, err := v.committee.IdentityByEpoch(vote.View, vote.SignerID)
 	if model.IsInvalidSignerError(err) {
 		return nil, newInvalidVoteError(vote, err)
@@ -321,14 +321,6 @@ func (v *Validator) ValidateVote(vote *model.Vote) (*flow.Identity, error) {
 	}
 
 	return voter, nil
-}
-
-func newInvalidBlockError(block *model.Block, err error) error {
-	return model.InvalidBlockError{
-		BlockID: block.BlockID,
-		View:    block.View,
-		Err:     err,
-	}
 }
 
 func newInvalidQCError(qc *flow.QuorumCertificate, err error) error {

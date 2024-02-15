@@ -9,7 +9,7 @@ import (
 const COMMIT_DATE = "2021-09-21T18:06:25-07:00"
 const COMMIT_SHA = "46baf6c6be29af9c040bc14195e195848598bbae"
 const JOB_STARTED = "2021-09-21T21:06:25-07:00"
-const CRYPTO_HASH_PACKAGE = "github.com/onflow/flow-go/crypto/hash"
+const CRYPTO_HASH_PACKAGE = "github.com/onflow/crypto/hash"
 const RUN_ID = "12345"
 
 // Level1TestData is used by tests to store what the expected test result should be and what the raw
@@ -225,7 +225,7 @@ func GetTestData_Level1_1Count1FailRestPass() common.Level1Summary {
 	}
 }
 
-// GetTestData_Level1_1CountAllPass represents a level 1 summary (as exptected output from level 1 parser)
+// GetTestData_Level1_1CountAllPass represents a level 1 summary (as expected output from level 1 parser)
 // with multiple passed tests, count=1.
 func GetTestData_Level1_1CountAllPass() common.Level1Summary {
 	return []common.Level1TestResult{

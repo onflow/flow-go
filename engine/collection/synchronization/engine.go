@@ -5,7 +5,6 @@ package synchronization
 import (
 	"errors"
 	"fmt"
-	"math/rand"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -27,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 // defaultSyncResponseQueueCapacity maximum capacity of sync responses queue
@@ -42,7 +42,7 @@ type Engine struct {
 	log          zerolog.Logger
 	metrics      module.EngineMetrics
 	me           module.Local
-	participants flow.IdentityList
+	participants flow.IdentitySkeletonList
 	con          network.Conduit
 	comp         collection.Compliance // compliance layer engine
 
@@ -62,9 +62,9 @@ type Engine struct {
 func New(
 	log zerolog.Logger,
 	metrics module.EngineMetrics,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
-	participants flow.IdentityList,
+	participants flow.IdentitySkeletonList,
 	state cluster.State,
 	blocks storage.ClusterBlocks,
 	comp collection.Compliance,
@@ -88,7 +88,7 @@ func New(
 		log:          log.With().Str("engine", "cluster_synchronization").Logger(),
 		metrics:      metrics,
 		me:           me,
-		participants: participants.Filter(filter.Not(filter.HasNodeID(me.NodeID()))),
+		participants: participants.Filter(filter.Not(filter.HasNodeID[flow.IdentitySkeleton](me.NodeID()))),
 		comp:         comp,
 		core:         core,
 		pollInterval: opt.PollInterval,
@@ -100,11 +100,7 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("could not setup message handler")
 	}
-
-	chainID, err := state.Params().ChainID()
-	if err != nil {
-		return nil, fmt.Errorf("could not get chain ID: %w", err)
-	}
+	chainID := state.Params().ChainID()
 
 	// register the engine with the network layer and store the conduit
 	con, err := net.Register(channels.SyncCluster(chainID), e)
@@ -361,9 +357,19 @@ func (e *Engine) pollHeight() {
 		return
 	}
 
+	nonce, err := rand.Uint64()
+	if err != nil {
+		// TODO: this error should be returned by pollHeight()
+		// it is logged for now since the only error possible is related to a failure
+		// of the system entropy generation. Such error is going to cause failures in other
+		// components where it's handled properly and will lead to crashing the module.
+		e.log.Error().Err(err).Msg("nonce generation failed during pollHeight")
+		return
+	}
+
 	// send the request for synchronization
 	req := &messages.SyncRequest{
-		Nonce:  rand.Uint64(),
+		Nonce:  nonce,
 		Height: head.Height,
 	}
 	err = e.con.Multicast(req, synccore.DefaultPollNodes, e.participants.NodeIDs()...)
@@ -379,12 +385,21 @@ func (e *Engine) sendRequests(ranges []chainsync.Range, batches []chainsync.Batc
 	var errs *multierror.Error
 
 	for _, ran := range ranges {
+		nonce, err := rand.Uint64()
+		if err != nil {
+			// TODO: this error should be returned by sendRequests
+			// it is logged for now since the only error possible is related to a failure
+			// of the system entropy generation. Such error is going to cause failures in other
+			// components where it's handled properly and will lead to crashing the module.
+			e.log.Error().Err(err).Msg("nonce generation failed during range request")
+			return
+		}
 		req := &messages.RangeRequest{
-			Nonce:      rand.Uint64(),
+			Nonce:      nonce,
 			FromHeight: ran.From,
 			ToHeight:   ran.To,
 		}
-		err := e.con.Multicast(req, synccore.DefaultBlockRequestNodes, e.participants.NodeIDs()...)
+		err = e.con.Multicast(req, synccore.DefaultBlockRequestNodes, e.participants.NodeIDs()...)
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("could not submit range request: %w", err))
 			continue
@@ -399,11 +414,20 @@ func (e *Engine) sendRequests(ranges []chainsync.Range, batches []chainsync.Batc
 	}
 
 	for _, batch := range batches {
+		nonce, err := rand.Uint64()
+		if err != nil {
+			// TODO: this error should be returned by sendRequests
+			// it is logged for now since the only error possible is related to a failure
+			// of the system entropy generation. Such error is going to cause failures in other
+			// components where it's handled properly and will lead to crashing the module.
+			e.log.Error().Err(err).Msg("nonce generation failed during batch request")
+			return
+		}
 		req := &messages.BatchRequest{
-			Nonce:    rand.Uint64(),
+			Nonce:    nonce,
 			BlockIDs: batch.BlockIDs,
 		}
-		err := e.con.Multicast(req, synccore.DefaultBlockRequestNodes, e.participants.NodeIDs()...)
+		err = e.con.Multicast(req, synccore.DefaultBlockRequestNodes, e.participants.NodeIDs()...)
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("could not submit batch request: %w", err))
 			continue

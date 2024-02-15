@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 )
 
 var (
@@ -18,7 +20,7 @@ type ErrIllegalConnectionState struct {
 }
 
 func (e ErrIllegalConnectionState) Error() string {
-	return fmt.Sprintf("unexpected connection status to peer %s: received NotConnected status while connection list is not empty %d ", e.pid.String(), e.numOfConns)
+	return fmt.Sprintf("unexpected connection status to peer %s: received NotConnected status while connection list is not empty %d ", p2plogging.PeerId(e.pid), e.numOfConns)
 }
 
 // NewConnectionStatusErr returns a new ErrIllegalConnectionState.

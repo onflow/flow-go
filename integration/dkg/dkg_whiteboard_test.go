@@ -6,17 +6,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/module"
-
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
+
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
 	"github.com/onflow/flow-go/engine/testutil"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/dkg"
+	"github.com/onflow/flow-go/module/metrics"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
@@ -34,14 +36,19 @@ func createNodes(
 	hub *stub.Hub,
 	chainID flow.ChainID,
 	whiteboard *whiteboard,
-	conIdentities flow.IdentityList,
+	conIdentities []bootstrap.NodeInfo,
 	currentEpochSetup flow.EpochSetup,
 	nextEpochSetup flow.EpochSetup,
-	firstBlock *flow.Header) ([]*node, flow.IdentityList) {
+	firstBlock *flow.Header) []*node {
+
+	identities := make(flow.IdentityList, 0, len(conIdentities))
+	for _, identity := range conIdentities {
+		identities = append(identities, identity.Identity())
+	}
 
 	// We need to initialise the nodes with a list of identities that contain
 	// all roles, otherwise there would be an error initialising the first epoch
-	identities := unittest.CompleteIdentitySet(conIdentities...)
+	identities = unittest.CompleteIdentitySet(identities...)
 
 	nodes := []*node{}
 	for _, id := range conIdentities {
@@ -56,14 +63,14 @@ func createNodes(
 			firstBlock))
 	}
 
-	return nodes, conIdentities
+	return nodes
 }
 
 // createNode instantiates a node with a network hub, a whiteboard reference,
 // and a pre-set EpochSetup that will be used to trigger the next DKG run.
 func createNode(
 	t *testing.T,
-	id *flow.Identity,
+	id bootstrap.NodeInfo,
 	ids []*flow.Identity,
 	hub *stub.Hub,
 	chainID flow.ChainID,
@@ -123,6 +130,8 @@ func createNode(
 		core.Net,
 		core.Me,
 		brokerTunnel,
+		metrics.NewNoopCollector(),
+		dkgeng.DefaultMessagingEngineConfig(),
 	)
 	require.NoError(t, err)
 
@@ -134,12 +143,6 @@ func createNode(
 		}
 	})
 	controllerFactoryLogger := zerolog.New(os.Stdout).Hook(hook)
-
-	// create a config with no delays for tests
-	config := dkg.ControllerConfig{
-		BaseStartDelay:                0,
-		BaseHandleFirstBroadcastDelay: 0,
-	}
 
 	// the reactor engine reacts to new views being finalized and drives the
 	// DKG protocol
@@ -153,7 +156,6 @@ func createNode(
 			core.Me,
 			[]module.DKGContractClient{NewWhiteboardClient(id.NodeID, whiteboard)},
 			brokerTunnel,
-			config,
 		),
 		viewsObserver,
 	)
@@ -164,6 +166,7 @@ func createNode(
 	safeBeaconKeys := badger.NewSafeBeaconPrivateKeys(dkgState)
 
 	node := node{
+		t:               t,
 		GenericNode:     core,
 		dkgState:        dkgState,
 		safeBeaconKeys:  safeBeaconKeys,
@@ -174,6 +177,7 @@ func createNode(
 	return &node
 }
 
+// TestWithWhiteboard tests the DKG protocol against a mocked out DKG smart contract (whiteboard).
 func TestWithWhiteboard(t *testing.T) {
 
 	// hub is an in-memory test network that enables nodes to communicate using
@@ -189,7 +193,11 @@ func TestWithWhiteboard(t *testing.T) {
 
 	// we run the DKG protocol with N consensus nodes
 	N := 10
-	conIdentities := unittest.IdentityListFixture(N, unittest.WithRole(flow.RoleConsensus))
+	bootstrapNodesInfo := unittest.PrivateNodeInfosFixture(N, unittest.WithRole(flow.RoleConsensus))
+	conIdentities := make(flow.IdentitySkeletonList, 0, len(bootstrapNodesInfo))
+	for _, identity := range bootstrapNodesInfo {
+		conIdentities = append(conIdentities, &identity.Identity().IdentitySkeleton)
+	}
 
 	// The EpochSetup event is received at view 100. The phase transitions are
 	// at views 150, 200, and 250. In between phase transitions, the controller
@@ -222,32 +230,32 @@ func TestWithWhiteboard(t *testing.T) {
 		DKGPhase2FinalView: 200,
 		DKGPhase3FinalView: 250,
 		FinalView:          300,
-		Participants:       conIdentities,
-		RandomSource:       []byte("random bytes for seed"),
+		Participants:       conIdentities.ToSkeleton(),
+		RandomSource:       unittest.EpochSetupRandomSourceFixture(),
 	}
 
 	// create the EpochSetup that will trigger the next DKG run with all the
 	// desired parameters
 	nextEpochSetup := flow.EpochSetup{
 		Counter:      currentCounter + 1,
-		Participants: conIdentities,
-		RandomSource: []byte("random bytes for seed"),
+		Participants: conIdentities.ToSkeleton(),
+		RandomSource: unittest.EpochSetupRandomSourceFixture(),
 	}
 
-	nodes, _ := createNodes(
+	nodes := createNodes(
 		t,
 		hub,
 		chainID,
 		whiteboard,
-		conIdentities,
+		bootstrapNodesInfo,
 		currentEpochSetup,
 		nextEpochSetup,
 		firstBlock)
 
-	for _, n := range nodes {
-		n.Ready()
+	for _, node := range nodes {
+		node.Start()
+		unittest.RequireCloseBefore(t, node.Ready(), time.Second, "failed to start up")
 	}
-
 	// trigger the EpochSetupPhaseStarted event for all nodes, effectively
 	// starting the next DKG run
 	for _, n := range nodes {
@@ -265,7 +273,8 @@ func TestWithWhiteboard(t *testing.T) {
 	}
 
 	for _, n := range nodes {
-		n.Done()
+		n.Stop()
+		unittest.RequireCloseBefore(t, n.Done(), time.Second, "nodes did not shutdown")
 	}
 
 	t.Logf("there are %d result(s)", len(whiteboard.results))

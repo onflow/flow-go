@@ -92,7 +92,7 @@ func NewEngine(log zerolog.Logger,
 	engineMetrics module.EngineMetrics,
 	mempool module.MempoolMetrics,
 	sealingTracker consensus.SealingTracker,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
 	headers storage.Headers,
 	payloads storage.Payloads,
@@ -104,10 +104,7 @@ func NewEngine(log zerolog.Logger,
 	sealsMempool mempool.IncorporatedResultSeals,
 	requiredApprovalsForSealConstructionGetter module.SealingConfigsGetter,
 ) (*Engine, error) {
-	rootHeader, err := state.Params().Root()
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve root block: %w", err)
-	}
+	rootHeader := state.Params().FinalizedRoot()
 
 	unit := engine.NewUnit()
 	e := &Engine{
@@ -124,7 +121,7 @@ func NewEngine(log zerolog.Logger,
 		rootHeader:    rootHeader,
 	}
 
-	err = e.setupTrustedInboundQueues()
+	err := e.setupTrustedInboundQueues()
 	if err != nil {
 		return nil, fmt.Errorf("initialization of inbound queues for trusted inputs failed: %w", err)
 	}

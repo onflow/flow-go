@@ -1,6 +1,7 @@
 package synchronization
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -11,7 +12,9 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/chainsync"
-	"github.com/onflow/flow-go/module/lifecycle"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/events"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/storage"
@@ -30,18 +33,26 @@ const defaultBatchRequestQueueCapacity = 500
 // defaultEngineRequestsWorkers number of workers to dispatch events for requests
 const defaultEngineRequestsWorkers = 8
 
+// RequestHandler encapsulates message queues and processing logic for the sync engine.
+// It logically separates request processing from active participation (sending requests),
+// primarily to simplify nodes which bridge the public and private networks.
+//
+// The RequestHandlerEngine embeds RequestHandler to create an engine which only responds
+// to requests on the public network (does not send requests over this network).
+// The Engine embeds RequestHandler and additionally includes logic for sending sync requests.
+//
+// Although the RequestHandler defines a notifier, message queue, and processing worker logic,
+// it is not itself a component.Component and does not manage any worker threads. The containing
+// engine is responsible for starting the worker threads for processing requests.
 type RequestHandler struct {
-	lm   *lifecycle.LifecycleManager
-	unit *engine.Unit
-
 	me      module.Local
 	log     zerolog.Logger
 	metrics module.EngineMetrics
 
-	blocks          storage.Blocks
-	core            module.SyncCore
-	finalizedHeader *FinalizedHeaderCache
-	responseSender  ResponseSender
+	blocks               storage.Blocks
+	finalizedHeaderCache module.FinalizedHeaderCache
+	core                 module.SyncCore
+	responseSender       ResponseSender
 
 	pendingSyncRequests   engine.MessageStore    // message store for *message.SyncRequest
 	pendingBatchRequests  engine.MessageStore    // message store for *message.BatchRequest
@@ -56,22 +67,20 @@ func NewRequestHandler(
 	metrics module.EngineMetrics,
 	responseSender ResponseSender,
 	me module.Local,
+	finalizedHeaderCache *events.FinalizedHeaderCache,
 	blocks storage.Blocks,
 	core module.SyncCore,
-	finalizedHeader *FinalizedHeaderCache,
 	queueMissingHeights bool,
 ) *RequestHandler {
 	r := &RequestHandler{
-		unit:                engine.NewUnit(),
-		lm:                  lifecycle.NewLifecycleManager(),
-		me:                  me,
-		log:                 log.With().Str("engine", "synchronization").Logger(),
-		metrics:             metrics,
-		blocks:              blocks,
-		core:                core,
-		finalizedHeader:     finalizedHeader,
-		responseSender:      responseSender,
-		queueMissingHeights: queueMissingHeights,
+		me:                   me,
+		log:                  log.With().Str("engine", "synchronization").Logger(),
+		metrics:              metrics,
+		finalizedHeaderCache: finalizedHeaderCache,
+		blocks:               blocks,
+		core:                 core,
+		responseSender:       responseSender,
+		queueMissingHeights:  queueMissingHeights,
 	}
 
 	r.setupRequestMessageHandler()
@@ -79,10 +88,10 @@ func NewRequestHandler(
 	return r
 }
 
-// Process processes the given event from the node with the given origin ID in
-// a blocking manner. It returns the potential processing error when done.
+// Process processes the given event from the node with the given origin ID in a blocking manner.
+// No errors are expected during normal operation.
 func (r *RequestHandler) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
-	err := r.process(originID, event)
+	err := r.requestMessageHandler.Process(originID, event)
 	if err != nil {
 		if engine.IsIncompatibleInputTypeError(err) {
 			r.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
@@ -91,14 +100,6 @@ func (r *RequestHandler) Process(channel channels.Channel, originID flow.Identif
 		return fmt.Errorf("unexpected error while processing engine message: %w", err)
 	}
 	return nil
-}
-
-// process processes events for the synchronization request handler engine.
-// Error returns:
-//   - IncompatibleInputTypeError if input has unexpected type
-//   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
-func (r *RequestHandler) process(originID flow.Identifier, event interface{}) error {
-	return r.requestMessageHandler.Process(originID, event)
 }
 
 // setupRequestMessageHandler initializes the inbound queues and the MessageHandler for UNTRUSTED requests.
@@ -148,29 +149,30 @@ func (r *RequestHandler) setupRequestMessageHandler() {
 // onSyncRequest processes an outgoing handshake; if we have a higher height, we
 // inform the other node of it, so they can organize their block downloads. If
 // we have a lower height, we add the difference to our own download queue.
+// No errors are expected during normal operation.
 func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *messages.SyncRequest) error {
-	final := r.finalizedHeader.Get()
+	finalizedHeader := r.finalizedHeaderCache.Get()
 
 	logger := r.log.With().Str("origin_id", originID.String()).Logger()
 	logger.Debug().
 		Uint64("origin_height", req.Height).
-		Uint64("local_height", final.Height).
+		Uint64("local_height", finalizedHeader.Height).
 		Msg("received new sync request")
 
 	if r.queueMissingHeights {
 		// queue any missing heights as needed
-		r.core.HandleHeight(final, req.Height)
+		r.core.HandleHeight(finalizedHeader, req.Height)
 	}
 
 	// don't bother sending a response if we're within tolerance or if we're
 	// behind the requester
-	if r.core.WithinTolerance(final, req.Height) || req.Height > final.Height {
+	if r.core.WithinTolerance(finalizedHeader, req.Height) || req.Height > finalizedHeader.Height {
 		return nil
 	}
 
 	// if we're sufficiently ahead of the requester, send a response
 	res := &messages.SyncResponse{
-		Height: final.Height,
+		Height: finalizedHeader.Height,
 		Nonce:  req.Nonce,
 	}
 	err := r.responseSender.SendResponse(res, originID)
@@ -184,15 +186,16 @@ func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *messages.S
 }
 
 // onRangeRequest processes a request for a range of blocks by height.
+// No errors are expected during normal operation.
 func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.RangeRequest) error {
 	logger := r.log.With().Str("origin_id", originID.String()).Logger()
 	logger.Debug().Msg("received new range request")
 
 	// get the latest final state to know if we can fulfill the request
-	head := r.finalizedHeader.Get()
+	finalizedHeader := r.finalizedHeaderCache.Get()
 
 	// if we don't have anything to send, we can bail right away
-	if head.Height < req.FromHeight || req.FromHeight > req.ToHeight {
+	if finalizedHeader.Height < req.FromHeight || req.FromHeight > req.ToHeight {
 		return nil
 	}
 
@@ -217,7 +220,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 		req.ToHeight = maxHeight
 	}
 
-	// get all of the blocks, one by one
+	// get all the blocks, one by one
 	blocks := make([]messages.UntrustedBlock, 0, req.ToHeight-req.FromHeight+1)
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
 		block, err := r.blocks.ByHeight(height)
@@ -325,10 +328,10 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 }
 
 // processAvailableRequests is processor of pending events which drives events from networking layer to business logic.
-func (r *RequestHandler) processAvailableRequests() error {
+func (r *RequestHandler) processAvailableRequests(ctx context.Context) error {
 	for {
 		select {
-		case <-r.unit.Quit():
+		case <-ctx.Done():
 			return nil
 		default:
 		}
@@ -366,39 +369,24 @@ func (r *RequestHandler) processAvailableRequests() error {
 	}
 }
 
-// requestProcessingLoop is a separate goroutine that performs processing of queued requests
-func (r *RequestHandler) requestProcessingLoop() {
+// requestProcessingWorker is a separate goroutine that performs processing of queued requests.
+// Multiple instances may be invoked. It is invoked and managed by the Engine or RequestHandlerEngine
+// which embeds this RequestHandler.
+func (r *RequestHandler) requestProcessingWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
 	notifier := r.requestMessageHandler.GetNotifier()
+	done := ctx.Done()
 	for {
 		select {
-		case <-r.unit.Quit():
+		case <-done:
 			return
 		case <-notifier:
-			err := r.processAvailableRequests()
+			err := r.processAvailableRequests(ctx)
 			if err != nil {
-				r.log.Fatal().Err(err).Msg("internal error processing queued requests")
+				r.log.Err(err).Msg("internal error processing queued requests")
+				ctx.Throw(err)
 			}
 		}
 	}
-}
-
-// Ready returns a ready channel that is closed once the engine has fully started.
-func (r *RequestHandler) Ready() <-chan struct{} {
-	r.lm.OnStart(func() {
-		<-r.finalizedHeader.Ready()
-		for i := 0; i < defaultEngineRequestsWorkers; i++ {
-			r.unit.Launch(r.requestProcessingLoop)
-		}
-	})
-	return r.lm.Started()
-}
-
-// Done returns a done channel that is closed once the engine has fully stopped.
-func (r *RequestHandler) Done() <-chan struct{} {
-	r.lm.OnStop(func() {
-		// wait for all request processing workers to exit
-		<-r.unit.Done()
-		<-r.finalizedHeader.Done()
-	})
-	return r.lm.Stopped()
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -56,11 +57,11 @@ type Engine struct {
 	epochs map[uint64]*RunningEpochComponents // epoch-scoped components per epoch
 
 	// internal event notifications
-	epochTransitionEvents        chan *flow.Header // sends first block of new epoch
-	epochSetupPhaseStartedEvents chan *flow.Header // sends first block of EpochSetup phase
-	epochStopEvents              chan uint64       // sends counter of epoch to stop
-
-	cm *component.ComponentManager
+	epochTransitionEvents        chan *flow.Header        // sends first block of new epoch
+	epochSetupPhaseStartedEvents chan *flow.Header        // sends first block of EpochSetup phase
+	epochStopEvents              chan uint64              // sends counter of epoch to stop
+	clusterIDUpdateDistributor   collection.ClusterEvents // sends cluster ID updates to consumers
+	cm                           *component.ComponentManager
 	component.Component
 }
 
@@ -75,6 +76,7 @@ func New(
 	voter module.ClusterRootQCVoter,
 	factory EpochComponentsFactory,
 	heightEvents events.Heights,
+	clusterIDUpdateDistributor collection.ClusterEvents,
 ) (*Engine, error) {
 	e := &Engine{
 		log:                          log.With().Str("engine", "epochmgr").Logger(),
@@ -89,6 +91,7 @@ func New(
 		epochTransitionEvents:        make(chan *flow.Header, 1),
 		epochSetupPhaseStartedEvents: make(chan *flow.Header, 1),
 		epochStopEvents:              make(chan uint64, 1),
+		clusterIDUpdateDistributor:   clusterIDUpdateDistributor,
 	}
 
 	e.cm = component.NewComponentManagerBuilder().
@@ -448,7 +451,6 @@ func (e *Engine) onEpochSetupPhaseStarted(ctx irrecoverable.SignalerContext, nex
 // No errors are expected during normal operation.
 func (e *Engine) startEpochComponents(engineCtx irrecoverable.SignalerContext, counter uint64, components *EpochComponents) error {
 	epochCtx, cancel, errCh := irrecoverable.WithSignallerAndCancel(engineCtx)
-
 	// start component using its own context
 	components.Start(epochCtx)
 	go e.handleEpochErrors(engineCtx, errCh)
@@ -456,6 +458,11 @@ func (e *Engine) startEpochComponents(engineCtx irrecoverable.SignalerContext, c
 	select {
 	case <-components.Ready():
 		e.storeEpochComponents(counter, NewRunningEpochComponents(components, cancel))
+		activeClusterIDS, err := e.activeClusterIDs()
+		if err != nil {
+			return fmt.Errorf("failed to get active cluster IDs: %w", err)
+		}
+		e.clusterIDUpdateDistributor.ActiveClustersChanged(activeClusterIDS)
 		return nil
 	case <-time.After(e.startupTimeout):
 		cancel() // cancel current context if we didn't start in time
@@ -481,6 +488,11 @@ func (e *Engine) stopEpochComponents(counter uint64) error {
 	case <-components.Done():
 		e.removeEpoch(counter)
 		e.pools.ForEpoch(counter).Clear()
+		activeClusterIDS, err := e.activeClusterIDs()
+		if err != nil {
+			return fmt.Errorf("failed to get active cluster IDs: %w", err)
+		}
+		e.clusterIDUpdateDistributor.ActiveClustersChanged(activeClusterIDS)
 		return nil
 	case <-time.After(e.startupTimeout):
 		return fmt.Errorf("could not stop epoch %d components after %s", counter, e.startupTimeout)
@@ -511,4 +523,17 @@ func (e *Engine) removeEpoch(counter uint64) {
 	e.mu.Lock()
 	delete(e.epochs, counter)
 	e.mu.Unlock()
+}
+
+// activeClusterIDs returns the active canonical cluster ID's for the assigned collection clusters.
+// No errors are expected during normal operation.
+func (e *Engine) activeClusterIDs() (flow.ChainIDList, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	clusterIDs := make(flow.ChainIDList, 0)
+	for _, epoch := range e.epochs {
+		chainID := epoch.state.Params().ChainID() // cached, does not hit database
+		clusterIDs = append(clusterIDs, chainID)
+	}
+	return clusterIDs, nil
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 )
 
 // IdentityProviderIDTranslator implements an `p2p.IDTranslator` which provides ID
@@ -31,13 +32,13 @@ func (t *IdentityProviderIDTranslator) GetFlowID(p peer.ID) (flow.Identifier, er
 	}
 	ids := t.idProvider.Identities(filter.HasNetworkingKey(flowKey))
 	if len(ids) == 0 {
-		return flow.ZeroID, fmt.Errorf("could not find identity corresponding to peer id %v", p.String())
+		return flow.ZeroID, fmt.Errorf("could not find identity corresponding to peer id %v", p2plogging.PeerId(p))
 	}
 	return ids[0].NodeID, nil
 }
 
 func (t *IdentityProviderIDTranslator) GetPeerID(n flow.Identifier) (peer.ID, error) {
-	ids := t.idProvider.Identities(filter.HasNodeID(n))
+	ids := t.idProvider.Identities(filter.HasNodeID[flow.Identity](n))
 	if len(ids) == 0 {
 		return "", fmt.Errorf("could not find identity with id %v", n.String())
 	}

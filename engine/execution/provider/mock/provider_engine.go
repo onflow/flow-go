@@ -17,18 +17,28 @@ type ProviderEngine struct {
 	mock.Mock
 }
 
-// BroadcastExecutionReceipt provides a mock function with given fields: _a0, _a1
-func (_m *ProviderEngine) BroadcastExecutionReceipt(_a0 context.Context, _a1 *flow.ExecutionReceipt) error {
-	ret := _m.Called(_a0, _a1)
+// BroadcastExecutionReceipt provides a mock function with given fields: _a0, _a1, _a2
+func (_m *ProviderEngine) BroadcastExecutionReceipt(_a0 context.Context, _a1 uint64, _a2 *flow.ExecutionReceipt) (bool, error) {
+	ret := _m.Called(_a0, _a1, _a2)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.ExecutionReceipt) error); ok {
-		r0 = rf(_a0, _a1)
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, *flow.ExecutionReceipt) (bool, error)); ok {
+		return rf(_a0, _a1, _a2)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, *flow.ExecutionReceipt) bool); ok {
+		r0 = rf(_a0, _a1, _a2)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, uint64, *flow.ExecutionReceipt) error); ok {
+		r1 = rf(_a0, _a1, _a2)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // Process provides a mock function with given fields: channel, originID, message

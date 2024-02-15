@@ -3,15 +3,14 @@ package backend
 import (
 	"context"
 
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/execution"
-
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	realstorage "github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -19,8 +18,6 @@ import (
 
 // TestTransactionRetry tests that the retry mechanism will send retries at specific times
 func (suite *Suite) TestTransactionRetry() {
-
-	// ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
 	block := unittest.BlockFixture()
@@ -39,30 +36,13 @@ func (suite *Suite) TestTransactionRetry() {
 	// collection storage returns a not found error
 	suite.collections.On("LightByTransactionID", transactionBody.ID()).Return(nil, realstorage.ErrNotFound)
 
-	// txID := transactionBody.ID()
-	// blockID := block.ID()
+	params := suite.defaultBackendParams()
+
 	// Setup Handler + Retry
-	backend := New(suite.state,
-		suite.colClient,
-		nil,
-		suite.blocks,
-		suite.headers,
-		suite.collections,
-		suite.transactions,
-		suite.receipts,
-		suite.results,
-		suite.chainID,
-		metrics.NewNoopCollector(),
-		nil,
-		false,
-		DefaultMaxHeightRange,
-		nil,
-		nil,
-		suite.log,
-		DefaultSnapshotHistoryLimit,
-		nil,
-	)
-	retry := newRetry().SetBackend(backend).Activate()
+	backend, err := New(params)
+	suite.Require().NoError(err)
+
+	retry := newRetry(suite.log).SetBackend(backend).Activate()
 	backend.retry = retry
 
 	retry.RegisterTransaction(block.Header.Height, transactionBody)
@@ -70,17 +50,20 @@ func (suite *Suite) TestTransactionRetry() {
 	suite.colClient.On("SendTransaction", mock.Anything, mock.Anything).Return(&access.SendTransactionResponse{}, nil)
 
 	// Don't retry on every height
-	retry.Retry(block.Header.Height + 1)
+	err = retry.Retry(block.Header.Height + 1)
+	suite.Require().NoError(err)
 
 	suite.colClient.AssertNotCalled(suite.T(), "SendTransaction", mock.Anything, mock.Anything)
 
 	// Retry every `retryFrequency`
-	retry.Retry(block.Header.Height + retryFrequency)
+	err = retry.Retry(block.Header.Height + retryFrequency)
+	suite.Require().NoError(err)
 
 	suite.colClient.AssertNumberOfCalls(suite.T(), "SendTransaction", 1)
 
 	// do not retry if expired
-	retry.Retry(block.Header.Height + retryFrequency + flow.DefaultTransactionExpiry)
+	err = retry.Retry(block.Header.Height + retryFrequency + flow.DefaultTransactionExpiry)
+	suite.Require().NoError(err)
 
 	// Should've still only been called once
 	suite.colClient.AssertNumberOfCalls(suite.T(), "SendTransaction", 1)
@@ -90,7 +73,6 @@ func (suite *Suite) TestTransactionRetry() {
 
 // TestSuccessfulTransactionsDontRetry tests that the retry mechanism will send retries at specific times
 func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
-
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
@@ -130,28 +112,13 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	suite.snapshot.On("Identities", mock.Anything).Return(enIDs, nil)
 	connFactory := suite.setupConnectionFactory()
 
-	// Setup Handler + Retry
-	backend := New(suite.state,
-		suite.colClient,
-		nil,
-		suite.blocks,
-		suite.headers,
-		suite.collections,
-		suite.transactions,
-		suite.receipts,
-		suite.results,
-		suite.chainID,
-		metrics.NewNoopCollector(),
-		connFactory,
-		false,
-		DefaultMaxHeightRange,
-		nil,
-		nil,
-		suite.log,
-		DefaultSnapshotHistoryLimit,
-		nil,
-	)
-	retry := newRetry().SetBackend(backend).Activate()
+	params := suite.defaultBackendParams()
+	params.ConnFactory = connFactory
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
+
+	retry := newRetry(suite.log).SetBackend(backend).Activate()
 	backend.retry = retry
 
 	retry.RegisterTransaction(block.Header.Height, transactionBody)
@@ -159,26 +126,38 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	suite.colClient.On("SendTransaction", mock.Anything, mock.Anything).Return(&access.SendTransactionResponse{}, nil)
 
 	// return not found to return finalized status
-	suite.execClient.On("GetTransactionResult", ctx, &exeEventReq).Return(&exeEventResp, status.Errorf(codes.NotFound, "not found")).Once()
+	suite.execClient.On("GetTransactionResult", ctx, &exeEventReq).
+		Return(&exeEventResp, status.Errorf(codes.NotFound, "not found")).
+		Times(len(enIDs)) // should call each EN once
+
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
-	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
+	result, err := backend.GetTransactionResult(
+		ctx,
+		txID,
+		flow.ZeroID,
+		flow.ZeroID,
+		entities.EventEncodingVersion_JSON_CDC_V0,
+	)
 	suite.checkResponse(result, err)
 
-	// status should be finalized since the sealed blocks is smaller in height
+	// status should be finalized since the sealed Blocks is smaller in height
 	suite.Assert().Equal(flow.TransactionStatusFinalized, result.Status)
 
 	// Don't retry now now that block is finalized
-	retry.Retry(block.Header.Height + 1)
+	err = retry.Retry(block.Header.Height + 1)
+	suite.Require().NoError(err)
 
 	suite.colClient.AssertNotCalled(suite.T(), "SendTransaction", mock.Anything, mock.Anything)
 
 	// Don't retry now now that block is finalized
-	retry.Retry(block.Header.Height + retryFrequency)
+	err = retry.Retry(block.Header.Height + retryFrequency)
+	suite.Require().NoError(err)
 
 	suite.colClient.AssertNotCalled(suite.T(), "SendTransaction", mock.Anything, mock.Anything)
 
 	// Don't retry now now that block is finalized
-	retry.Retry(block.Header.Height + retryFrequency + flow.DefaultTransactionExpiry)
+	err = retry.Retry(block.Header.Height + retryFrequency + flow.DefaultTransactionExpiry)
+	suite.Require().NoError(err)
 
 	// Should've still should not be called
 	suite.colClient.AssertNotCalled(suite.T(), "SendTransaction", mock.Anything, mock.Anything)

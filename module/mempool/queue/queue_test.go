@@ -1,6 +1,8 @@
 package queue
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -289,4 +291,23 @@ func TestQueue(t *testing.T) {
 	//	assert.Error(t, err)
 	//})
 
+	t.Run("String()", func(t *testing.T) {
+		// a <- c <- d <- f
+		queue := NewQueue(a)
+		stored, _ := queue.TryAdd(c)
+		require.True(t, stored)
+		stored, _ = queue.TryAdd(d)
+		require.True(t, stored)
+		stored, _ = queue.TryAdd(f)
+		require.True(t, stored)
+		var builder strings.Builder
+		builder.WriteString(fmt.Sprintf("Header: %v\n", a.ID()))
+		builder.WriteString(fmt.Sprintf("Highest: %v\n", f.ID()))
+		builder.WriteString("Size: 4, Height: 3\n")
+		builder.WriteString(fmt.Sprintf("Node(height: %v): %v (children: 1)\n", a.Height(), a.ID()))
+		builder.WriteString(fmt.Sprintf("|- Node(height: %v): %v (children: 1)\n", c.Height(), c.ID()))
+		builder.WriteString(fmt.Sprintf("   |- Node(height: %v): %v (children: 1)\n", d.Height(), d.ID()))
+		builder.WriteString(fmt.Sprintf("      |- Node(height: %v): %v (children: 0)\n", f.Height(), f.ID()))
+		require.Equal(t, builder.String(), queue.String())
+	})
 }

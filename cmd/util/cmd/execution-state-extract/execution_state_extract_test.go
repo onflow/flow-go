@@ -60,14 +60,12 @@ func TestExtractExecutionState(t *testing.T) {
 	t.Run("empty WAL doesn't find anything", func(t *testing.T) {
 		withDirs(t, func(datadir, execdir, outdir string) {
 			err := extractExecutionState(
+				zerolog.Nop(),
 				execdir,
 				unittest.StateCommitmentFixture(),
 				outdir,
-				zerolog.Nop(),
-				flow.Emulator.Chain(),
-				false,
-				false,
 				10,
+				false,
 			)
 			require.Error(t, err)
 		})

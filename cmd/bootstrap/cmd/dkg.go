@@ -3,8 +3,9 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/onflow/crypto"
+
 	bootstrapDKG "github.com/onflow/flow-go/cmd/bootstrap/dkg"
-	"github.com/onflow/flow-go/crypto"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
@@ -19,7 +20,7 @@ func runBeaconKG(nodes []model.NodeInfo) dkg.DKGData {
 	log.Debug().Msgf("will run DKG")
 	var dkgData dkg.DKGData
 	var err error
-	dkgData, err = bootstrapDKG.RandomBeaconKG(n, GenerateRandomSeed(crypto.SeedMinLenDKG))
+	dkgData, err = bootstrapDKG.RandomBeaconKG(n, GenerateRandomSeed(crypto.KeyGenSeedMinLen))
 	if err != nil {
 		log.Fatal().Err(err).Msg("error running DKG")
 	}

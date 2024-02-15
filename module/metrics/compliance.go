@@ -13,13 +13,12 @@ import (
 type ComplianceCollector struct {
 	finalizedHeight                 prometheus.Gauge
 	sealedHeight                    prometheus.Gauge
-	finalizedBlocks                 *prometheus.CounterVec
+	finalizedBlocks                 prometheus.Counter
 	sealedBlocks                    prometheus.Counter
 	finalizedPayload                *prometheus.CounterVec
 	sealedPayload                   *prometheus.CounterVec
 	lastBlockFinalizedAt            time.Time
 	finalizedBlocksPerSecond        prometheus.Summary
-	committedEpochFinalView         prometheus.Gauge
 	lastEpochTransitionHeight       prometheus.Gauge
 	currentEpochCounter             prometheus.Gauge
 	currentEpochPhase               prometheus.Gauge
@@ -48,13 +47,6 @@ func NewComplianceCollector() *ComplianceCollector {
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
 			Help:      "the current epoch's phase",
-		}),
-
-		committedEpochFinalView: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "committed_epoch_final_view",
-			Namespace: namespaceConsensus,
-			Subsystem: subsystemCompliance,
-			Help:      "the final view of the committed epoch with the greatest counter",
 		}),
 
 		lastEpochTransitionHeight: promauto.NewGauge(prometheus.GaugeOpts{
@@ -105,12 +97,12 @@ func NewComplianceCollector() *ComplianceCollector {
 			Help:      "the last sealed height",
 		}),
 
-		finalizedBlocks: promauto.NewCounterVec(prometheus.CounterOpts{
+		finalizedBlocks: promauto.NewCounter(prometheus.CounterOpts{
 			Name:      "finalized_blocks_total",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
 			Help:      "the number of finalized blocks",
-		}, []string{LabelProposer}),
+		}),
 
 		sealedBlocks: promauto.NewCounter(prometheus.CounterOpts{
 			Name:      "sealed_blocks_total",
@@ -170,11 +162,11 @@ func (cc *ComplianceCollector) FinalizedHeight(height uint64) {
 func (cc *ComplianceCollector) BlockFinalized(block *flow.Block) {
 	now := time.Now()
 	if !cc.lastBlockFinalizedAt.IsZero() {
-		cc.finalizedBlocksPerSecond.Observe(1 / now.Sub(cc.lastBlockFinalizedAt).Seconds())
+		cc.finalizedBlocksPerSecond.Observe(1.0 / now.Sub(cc.lastBlockFinalizedAt).Seconds())
 	}
 	cc.lastBlockFinalizedAt = now
 
-	cc.finalizedBlocks.With(prometheus.Labels{LabelProposer: block.Header.ProposerID.String()}).Inc()
+	cc.finalizedBlocks.Inc()
 	cc.finalizedPayload.With(prometheus.Labels{LabelResource: ResourceGuarantee}).Add(float64(len(block.Payload.Guarantees)))
 	cc.finalizedPayload.With(prometheus.Labels{LabelResource: ResourceSeal}).Add(float64(len(block.Payload.Seals)))
 }
@@ -189,10 +181,6 @@ func (cc *ComplianceCollector) BlockSealed(block *flow.Block) {
 	cc.sealedBlocks.Inc()
 	cc.sealedPayload.With(prometheus.Labels{LabelResource: ResourceGuarantee}).Add(float64(len(block.Payload.Guarantees)))
 	cc.sealedPayload.With(prometheus.Labels{LabelResource: ResourceSeal}).Add(float64(len(block.Payload.Seals)))
-}
-
-func (cc *ComplianceCollector) CommittedEpochFinalView(view uint64) {
-	cc.committedEpochFinalView.Set(float64(view))
 }
 
 func (cc *ComplianceCollector) EpochTransitionHeight(height uint64) {

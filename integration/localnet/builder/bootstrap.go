@@ -51,24 +51,25 @@ const (
 )
 
 var (
-	collectionCount        int
-	consensusCount         int
-	executionCount         int
-	verificationCount      int
-	accessCount            int
-	observerCount          int
-	nClusters              uint
-	numViewsInStakingPhase uint64
-	numViewsInDKGPhase     uint64
-	numViewsEpoch          uint64
-	profiler               bool
-	profileUploader        bool
-	tracing                bool
-	cadenceTracing         bool
-	extesiveTracing        bool
-	consensusDelay         time.Duration
-	collectionDelay        time.Duration
-	logLevel               string
+	collectionCount            int
+	consensusCount             int
+	executionCount             int
+	verificationCount          int
+	accessCount                int
+	observerCount              int
+	nClusters                  uint
+	numViewsInStakingPhase     uint64
+	numViewsInDKGPhase         uint64
+	numViewsEpoch              uint64
+	epochCommitSafetyThreshold uint64
+	profiler                   bool
+	profileUploader            bool
+	tracing                    bool
+	cadenceTracing             bool
+	extesiveTracing            bool
+	consensusDelay             time.Duration
+	collectionDelay            time.Duration
+	logLevel                   string
 
 	ports *PortAllocator
 )
@@ -84,6 +85,7 @@ func init() {
 	flag.Uint64Var(&numViewsEpoch, "epoch-length", 10000, "number of views in epoch")
 	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 2000, "number of views in epoch staking phase")
 	flag.Uint64Var(&numViewsInDKGPhase, "epoch-dkg-phase-length", 2000, "number of views in epoch dkg phase")
+	flag.Uint64Var(&epochCommitSafetyThreshold, "epoch-commit-safety-threshold", 1000, "number of views for safety threshold T (assume: one finalization occurs within T blocks)")
 	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
 	flag.BoolVar(&profileUploader, "profile-uploader", DefaultProfileUploader, "whether to upload profiles to the cloud")
 	flag.BoolVar(&tracing, "tracing", DefaultTracing, "whether to enable low-overhead tracing in flow")
@@ -128,6 +130,9 @@ func main() {
 	}
 	if numViewsInDKGPhase != 0 {
 		flowNetworkOpts = append(flowNetworkOpts, testnet.WithViewsInDKGPhase(numViewsInDKGPhase))
+	}
+	if epochCommitSafetyThreshold != 0 {
+		flowNetworkOpts = append(flowNetworkOpts, testnet.WithEpochCommitSafetyThreshold(epochCommitSafetyThreshold))
 	}
 	flowNetworkConf := testnet.NewNetworkConfig("localnet", flowNodes, flowNetworkOpts...)
 	displayFlowNetworkConf(flowNetworkConf)
@@ -336,7 +341,7 @@ func prepareConsensusService(container testnet.ContainerConfig, i int, n int) Se
 
 	timeout := 1200*time.Millisecond + consensusDelay
 	service.Command = append(service.Command,
-		fmt.Sprintf("--block-rate-delay=%s", consensusDelay),
+		fmt.Sprintf("--cruise-ctl-fallback-proposal-duration=%s", consensusDelay),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		"--chunk-alpha=1",
 		"--emergency-sealing-active=false",
@@ -363,7 +368,6 @@ func prepareCollectionService(container testnet.ContainerConfig, i int, n int) S
 
 	timeout := 1200*time.Millisecond + collectionDelay
 	service.Command = append(service.Command,
-		fmt.Sprintf("--block-rate-delay=%s", collectionDelay),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--ingress-addr=%s:%s", container.ContainerName, testnet.GRPCPort),
 		"--insecure-access-api=false",
@@ -396,6 +400,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
 		fmt.Sprintf("--extensive-tracing=%t", extesiveTracing),
 		"--execution-data-dir=/data/execution-data",
+		"--chunk-data-pack-dir=/data/chunk-data-pack",
 	)
 
 	service.Volumes = append(service.Volumes,
@@ -424,7 +429,11 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		"--log-tx-time-to-finalized-executed",
 		"--execution-data-sync-enabled=true",
 		"--execution-data-dir=/data/execution-data",
-		fmt.Sprintf("--state-stream-addr=%s:%s", container.ContainerName, testnet.ExecutionStatePort),
+		"--public-network-execution-data-sync-enabled=true",
+		"--execution-data-indexing-enabled=true",
+		"--execution-state-dir=/data/execution-state",
+		"--script-execution-mode=execution-nodes-only",
+		"--event-query-mode=execution-nodes-only",
 	)
 
 	service.AddExposedPorts(
@@ -454,12 +463,16 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		fmt.Sprintf("--rpc-addr=%s:%s", observerName, testnet.GRPCPort),
 		fmt.Sprintf("--secure-rpc-addr=%s:%s", observerName, testnet.GRPCSecurePort),
 		fmt.Sprintf("--http-addr=%s:%s", observerName, testnet.GRPCWebPort),
+		fmt.Sprintf("--rest-addr=%s:%s", observerName, testnet.RESTPort),
+		"--execution-data-dir=/data/execution-data",
+		"--execution-data-sync-enabled=true",
 	)
 
 	service.AddExposedPorts(
 		testnet.GRPCPort,
 		testnet.GRPCSecurePort,
 		testnet.GRPCWebPort,
+		testnet.RESTPort,
 	)
 
 	// observer services rely on the access gateway
@@ -517,7 +530,7 @@ func defaultService(name, role, dataDir, profilerDir string, i int) Service {
 			Dockerfile: "cmd/Dockerfile",
 			Args: map[string]string{
 				"TARGET":  fmt.Sprintf("./cmd/%s", role),
-				"VERSION": build.Semver(),
+				"VERSION": build.Version(),
 				"COMMIT":  build.Commit(),
 				"GOARCH":  runtime.GOARCH,
 			},

@@ -38,17 +38,18 @@ const defaultPendingBlocksCacheCapacity = 1000
 // Generally is NOT concurrency safe but some functions can be used in concurrent setup.
 type ComplianceCore struct {
 	*component.ComponentManager
-	log                 zerolog.Logger
-	mempoolMetrics      module.MempoolMetrics
-	tracer              module.Tracer
-	pendingCache        *cache.Cache
-	pendingTree         *pending_tree.PendingTree
-	state               protocol.FollowerState
-	follower            module.HotStuffFollower
-	validator           hotstuff.Validator
-	sync                module.BlockRequester
-	certifiedRangesChan chan CertifiedBlocks // delivers ranges of certified blocks to main core worker
-	finalizedBlocksChan chan *flow.Header    // delivers finalized blocks to main core worker.
+	log                       zerolog.Logger
+	mempoolMetrics            module.MempoolMetrics
+	tracer                    module.Tracer
+	proposalViolationNotifier hotstuff.ProposalViolationConsumer
+	pendingCache              *cache.Cache
+	pendingTree               *pending_tree.PendingTree
+	state                     protocol.FollowerState
+	follower                  module.HotStuffFollower
+	validator                 hotstuff.Validator
+	sync                      module.BlockRequester
+	certifiedRangesChan       chan CertifiedBlocks // delivers ranges of certified blocks to main core worker
+	finalizedBlocksChan       chan *flow.Header    // delivers finalized blocks to main core worker.
 }
 
 var _ complianceCore = (*ComplianceCore)(nil)
@@ -58,34 +59,31 @@ var _ complianceCore = (*ComplianceCore)(nil)
 func NewComplianceCore(log zerolog.Logger,
 	mempoolMetrics module.MempoolMetrics,
 	heroCacheCollector module.HeroCacheMetrics,
-	finalizationConsumer hotstuff.FinalizationConsumer,
+	followerConsumer hotstuff.FollowerConsumer,
 	state protocol.FollowerState,
 	follower module.HotStuffFollower,
 	validator hotstuff.Validator,
 	sync module.BlockRequester,
 	tracer module.Tracer,
 ) (*ComplianceCore, error) {
-	onEquivocation := func(block, otherBlock *flow.Block) {
-		finalizationConsumer.OnDoubleProposeDetected(model.BlockFromFlow(block.Header), model.BlockFromFlow(otherBlock.Header))
-	}
-
 	finalizedBlock, err := state.Final().Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not query finalized block: %w", err)
 	}
 
 	c := &ComplianceCore{
-		log:                 log.With().Str("engine", "follower_core").Logger(),
-		mempoolMetrics:      mempoolMetrics,
-		state:               state,
-		pendingCache:        cache.NewCache(log, defaultPendingBlocksCacheCapacity, heroCacheCollector, onEquivocation),
-		pendingTree:         pending_tree.NewPendingTree(finalizedBlock),
-		follower:            follower,
-		validator:           validator,
-		sync:                sync,
-		tracer:              tracer,
-		certifiedRangesChan: make(chan CertifiedBlocks, defaultCertifiedRangeChannelCapacity),
-		finalizedBlocksChan: make(chan *flow.Header, defaultFinalizedBlocksChannelCapacity),
+		log:                       log.With().Str("engine", "follower_core").Logger(),
+		mempoolMetrics:            mempoolMetrics,
+		state:                     state,
+		proposalViolationNotifier: followerConsumer,
+		pendingCache:              cache.NewCache(log, defaultPendingBlocksCacheCapacity, heroCacheCollector, followerConsumer),
+		pendingTree:               pending_tree.NewPendingTree(finalizedBlock),
+		follower:                  follower,
+		validator:                 validator,
+		sync:                      sync,
+		tracer:                    tracer,
+		certifiedRangesChan:       make(chan CertifiedBlocks, defaultCertifiedRangeChannelCapacity),
+		finalizedBlocksChan:       make(chan *flow.Header, defaultFinalizedBlocksChannelCapacity),
 	}
 
 	// prune cache to latest finalized view
@@ -134,16 +132,18 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 		// 1. The block has been signed by the legitimate primary for the view. This is important in case
 		//    there are multiple blocks for the view. We need to differentiate the following byzantine cases:
 		//     (i) Some other consensus node that is _not_ primary is trying to publish a block.
-		//         This would result in the validation below failing with an `InvalidBlockError`.
+		//         This would result in the validation below failing with an `InvalidProposalError`.
 		//    (ii) The legitimate primary for the view is equivocating. In this case, the validity check
 		//         below would pass. Though, the `PendingTree` would eventually notice this, when we connect
 		//         the equivocating blocks to the latest finalized block.
 		// 2. The QC within the block is valid. A valid QC proves validity of all ancestors.
 		err := c.validator.ValidateProposal(hotstuffProposal)
 		if err != nil {
-			if model.IsInvalidBlockError(err) {
-				// TODO potential slashing
-				log.Err(err).Msgf("received invalid block proposal (potential slashing evidence)")
+			if invalidBlockError, ok := model.AsInvalidProposalError(err); ok {
+				c.proposalViolationNotifier.OnInvalidBlockDetected(flow.Slashable[model.InvalidProposalError]{
+					OriginID: originID,
+					Message:  *invalidBlockError,
+				})
 				return nil
 			}
 			if errors.Is(err, model.ErrViewForUnknownEpoch) {

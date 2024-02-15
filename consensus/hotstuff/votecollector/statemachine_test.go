@@ -32,7 +32,7 @@ type StateMachineTestSuite struct {
 	suite.Suite
 
 	view             uint64
-	notifier         *mocks.Consumer
+	notifier         *mocks.VoteAggregationConsumer
 	workerPool       *workerpool.WorkerPool
 	factoryMethod    VerifyingVoteProcessorFactory
 	mockedProcessors map[flow.Identifier]*mocks.VerifyingVoteProcessor
@@ -49,7 +49,7 @@ func (s *StateMachineTestSuite) TearDownTest() {
 func (s *StateMachineTestSuite) SetupTest() {
 	s.view = 1000
 	s.mockedProcessors = make(map[flow.Identifier]*mocks.VerifyingVoteProcessor)
-	s.notifier = &mocks.Consumer{}
+	s.notifier = mocks.NewVoteAggregationConsumer(s.T())
 
 	s.factoryMethod = func(log zerolog.Logger, block *model.Proposal) (hotstuff.VerifyingVoteProcessor, error) {
 		if processor, found := s.mockedProcessors[block.Block.BlockID]; found {
@@ -152,7 +152,6 @@ func (s *StateMachineTestSuite) TestAddVote_VerifyingState() {
 	s.T().Run("add-invalid-vote", func(t *testing.T) {
 		vote := unittest.VoteForBlockFixture(block, unittest.WithVoteView(s.view))
 		processor.On("Process", vote).Return(model.NewInvalidVoteErrorf(vote, "")).Once()
-		s.notifier.On("OnVoteProcessed", vote).Once()
 		s.notifier.On("OnInvalidVoteDetected", mock.Anything).Run(func(args mock.Arguments) {
 			invalidVoteErr := args.Get(0).(model.InvalidVoteError)
 			require.Equal(s.T(), vote, invalidVoteErr.Vote)

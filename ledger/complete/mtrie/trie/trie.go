@@ -748,7 +748,7 @@ func EmptyTrieRootHash() ledger.RootHash {
 }
 
 // AllPayloads returns all payloads
-func (mt *MTrie) AllPayloads() []ledger.Payload {
+func (mt *MTrie) AllPayloads() []*ledger.Payload {
 	return mt.root.AllPayloads()
 }
 
@@ -830,4 +830,32 @@ func minInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// TraverseNodes traverses all nodes of the trie in DFS order
+func TraverseNodes(trie *MTrie, processNode func(*node.Node) error) error {
+	return traverseRecursive(trie.root, processNode)
+}
+
+func traverseRecursive(n *node.Node, processNode func(*node.Node) error) error {
+	if n == nil {
+		return nil
+	}
+
+	err := processNode(n)
+	if err != nil {
+		return err
+	}
+
+	err = traverseRecursive(n.LeftChild(), processNode)
+	if err != nil {
+		return err
+	}
+
+	err = traverseRecursive(n.RightChild(), processNode)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

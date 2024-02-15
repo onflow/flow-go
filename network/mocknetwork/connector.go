@@ -15,9 +15,9 @@ type Connector struct {
 	mock.Mock
 }
 
-// UpdatePeers provides a mock function with given fields: ctx, peerIDs
-func (_m *Connector) UpdatePeers(ctx context.Context, peerIDs peer.IDSlice) {
-	_m.Called(ctx, peerIDs)
+// Connect provides a mock function with given fields: ctx, peerChan
+func (_m *Connector) Connect(ctx context.Context, peerChan <-chan peer.AddrInfo) {
+	_m.Called(ctx, peerChan)
 }
 
 type mockConstructorTestingTNewConnector interface {

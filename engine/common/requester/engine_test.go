@@ -29,7 +29,6 @@ func TestEntityByID(t *testing.T) {
 	request := Engine{
 		unit:  engine.NewUnit(),
 		items: make(map[flow.Identifier]*Item),
-		rng:   rand.New(rand.NewSource(0)),
 	}
 
 	now := time.Now().UTC()
@@ -55,7 +54,7 @@ func TestDispatchRequestVarious(t *testing.T) {
 
 	final := &protocol.Snapshot{}
 	final.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return identities.Filter(selector)
 		},
 		nil,
@@ -135,8 +134,7 @@ func TestDispatchRequestVarious(t *testing.T) {
 		con:      con,
 		items:    items,
 		requests: make(map[uint64]*messages.EntityRequest),
-		selector: filter.HasNodeID(targetID),
-		rng:      rand.New(rand.NewSource(0)),
+		selector: filter.HasNodeID[flow.Identity](targetID),
 	}
 	dispatched, err := request.dispatchRequest()
 	require.NoError(t, err)
@@ -165,7 +163,7 @@ func TestDispatchRequestBatchSize(t *testing.T) {
 
 	final := &protocol.Snapshot{}
 	final.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return identities.Filter(selector)
 		},
 		nil,
@@ -213,7 +211,6 @@ func TestDispatchRequestBatchSize(t *testing.T) {
 		items:    items,
 		requests: make(map[uint64]*messages.EntityRequest),
 		selector: filter.Any,
-		rng:      rand.New(rand.NewSource(0)),
 	}
 	dispatched, err := request.dispatchRequest()
 	require.NoError(t, err)
@@ -229,7 +226,7 @@ func TestOnEntityResponseValid(t *testing.T) {
 
 	final := &protocol.Snapshot{}
 	final.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return identities.Filter(selector)
 		},
 		nil,
@@ -286,14 +283,13 @@ func TestOnEntityResponseValid(t *testing.T) {
 		state:    state,
 		items:    make(map[flow.Identifier]*Item),
 		requests: make(map[uint64]*messages.EntityRequest),
-		selector: filter.HasNodeID(targetID),
+		selector: filter.HasNodeID[flow.Identity](targetID),
 		create:   func() flow.Entity { return &flow.Collection{} },
 		handle: func(flow.Identifier, flow.Entity) {
 			if called.Inc() >= 2 {
 				close(done)
 			}
 		},
-		rng: rand.New(rand.NewSource(0)),
 	}
 
 	request.items[iwanted1.EntityID] = iwanted1
@@ -328,7 +324,7 @@ func TestOnEntityIntegrityCheck(t *testing.T) {
 
 	final := &protocol.Snapshot{}
 	final.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return identities.Filter(selector)
 		},
 		nil,
@@ -374,10 +370,9 @@ func TestOnEntityIntegrityCheck(t *testing.T) {
 		state:    state,
 		items:    make(map[flow.Identifier]*Item),
 		requests: make(map[uint64]*messages.EntityRequest),
-		selector: filter.HasNodeID(targetID),
+		selector: filter.HasNodeID[flow.Identity](targetID),
 		create:   func() flow.Entity { return &flow.Collection{} },
 		handle:   func(flow.Identifier, flow.Entity) { close(called) },
-		rng:      rand.New(rand.NewSource(0)),
 	}
 
 	request.items[iwanted.EntityID] = iwanted
@@ -413,7 +408,7 @@ func TestOriginValidation(t *testing.T) {
 
 	final := &protocol.Snapshot{}
 	final.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return identities.Filter(selector)
 		},
 		nil,
@@ -435,7 +430,7 @@ func TestOriginValidation(t *testing.T) {
 	iwanted := &Item{
 		EntityID:       wanted.ID(),
 		LastRequested:  now,
-		ExtraSelector:  filter.HasNodeID(targetID),
+		ExtraSelector:  filter.HasNodeID[flow.Identity](targetID),
 		checkIntegrity: true,
 	}
 
@@ -463,7 +458,7 @@ func TestOriginValidation(t *testing.T) {
 		me,
 		state,
 		"",
-		filter.HasNodeID(targetID),
+		filter.HasNodeID[flow.Identity](targetID),
 		func() flow.Entity { return &flow.Collection{} },
 	)
 	assert.NoError(t, err)

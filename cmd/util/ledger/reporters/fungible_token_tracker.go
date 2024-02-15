@@ -13,10 +13,10 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
-	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -41,7 +41,8 @@ type FungibleTokenTracker struct {
 }
 
 func FlowTokenTypeID(chain flow.Chain) string {
-	return fmt.Sprintf("A.%s.FlowToken.Vault", fvm.FlowTokenAddress(chain).Hex())
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	return fmt.Sprintf("A.%s.FlowToken.Vault", sc.FlowToken.Address.Hex())
 }
 
 func NewFungibleTokenTracker(logger zerolog.Logger, rwf ReportWriterFactory, chain flow.Chain, vaultTypeIDs []string) *FungibleTokenTracker {
@@ -146,7 +147,7 @@ func (r *FungibleTokenTracker) worker(
 			state.DefaultParameters())
 		accounts := environment.NewAccounts(txnState)
 		storage := cadenceRuntime.NewStorage(
-			&migrations.AccountsAtreeLedger{Accounts: accounts},
+			&util.AccountsAtreeLedger{Accounts: accounts},
 			nil,
 		)
 
@@ -165,7 +166,8 @@ func (r *FungibleTokenTracker) worker(
 			itr := storageMap.Iterator(inter)
 			key, value := itr.Next()
 			for value != nil {
-				r.iterateChildren(append([]string{domain}, key), j.owner, value)
+				identifier := string(key.(interpreter.StringAtreeValue))
+				r.iterateChildren(append([]string{domain}, identifier), j.owner, value)
 				key, value = itr.Next()
 			}
 		}
@@ -212,8 +214,11 @@ func (r *FungibleTokenTracker) iterateChildren(tr trace, addr flow.Address, valu
 
 		// iterate over fields of the composite value (skip the ones that are not resource typed)
 		compValue.ForEachField(inter,
-			func(key string, value interpreter.Value) {
+			func(key string, value interpreter.Value) (resume bool) {
 				r.iterateChildren(append(tr, key), addr, value)
+
+				// continue iteration
+				return true
 			})
 	}
 }

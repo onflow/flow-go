@@ -9,4 +9,7 @@ go get github.com/onflow/flow-core-contracts/lib/go/templates@$1
 cd integration
 go get github.com/onflow/flow-core-contracts/lib/go/contracts@$1
 go get github.com/onflow/flow-core-contracts/lib/go/templates@$1
+cd ../insecure/
+go get github.com/onflow/flow-core-contracts/lib/go/contracts@$1
+go get github.com/onflow/flow-core-contracts/lib/go/templates@$1
 cd ..

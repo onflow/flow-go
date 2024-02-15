@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -22,9 +23,9 @@ func TestFromSnapshot(t *testing.T) {
 	identities := unittest.IdentityListFixture(10, unittest.WithAllRoles())
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 
-	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
-
-		epochBuilder := unittest.NewEpochBuilder(t, state)
+	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, fullState *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
+		state := fullState.FollowerState
+		epochBuilder := unittest.NewEpochBuilder(t, mutableState, state)
 		// build epoch 1 (prepare epoch 2)
 		epochBuilder.
 			BuildEpoch().
@@ -40,10 +41,9 @@ func TestFromSnapshot(t *testing.T) {
 		epoch2, ok := epochBuilder.EpochHeights(2)
 		require.True(t, ok)
 
-		// test that we are able retrieve an in-memory version of root snapshot
+		// test that we are able to retrieve an in-memory version of root snapshot
 		t.Run("root snapshot", func(t *testing.T) {
-			root, err := state.Params().Root()
-			require.NoError(t, err)
+			root := state.Params().FinalizedRoot()
 			expected := state.AtHeight(root.Height)
 			actual, err := inmem.FromSnapshot(expected)
 			require.NoError(t, err)
@@ -99,6 +99,36 @@ func TestFromSnapshot(t *testing.T) {
 				assertSnapshotsEqual(t, expected, actual)
 				testEncodeDecode(t, actual)
 			})
+		})
+
+		// ensure last version beacon is included
+		t.Run("version beacon", func(t *testing.T) {
+
+			expectedVB := &flow.SealedVersionBeacon{
+				VersionBeacon: unittest.VersionBeaconFixture(
+					unittest.WithBoundaries(
+						flow.VersionBoundary{
+							BlockHeight: 1012,
+							Version:     "1.2.3",
+						}),
+				),
+			}
+			unittest.AddVersionBeacon(t, expectedVB.VersionBeacon, state)
+
+			expected := state.Final()
+			head, err := expected.Head()
+			require.NoError(t, err)
+
+			expectedVB.SealHeight = head.Height
+
+			actual, err := inmem.FromSnapshot(expected)
+			require.NoError(t, err)
+			assertSnapshotsEqual(t, expected, actual)
+			testEncodeDecode(t, actual)
+
+			actualVB, err := actual.VersionBeacon()
+			require.NoError(t, err)
+			require.Equal(t, expectedVB, actualVB)
 		})
 	})
 }

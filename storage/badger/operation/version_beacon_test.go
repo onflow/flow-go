@@ -51,18 +51,18 @@ func TestResults_IndexByServiceEvents(t *testing.T) {
 		}
 
 		// indexing 3 version beacons at different heights
-		err := db.Update(IndexVersionBeaconByHeight(vb1))
+		err := db.Update(IndexVersionBeaconByHeight(&vb1))
 		require.NoError(t, err)
 
-		err = db.Update(IndexVersionBeaconByHeight(vb2))
+		err = db.Update(IndexVersionBeaconByHeight(&vb2))
 		require.NoError(t, err)
 
-		err = db.Update(IndexVersionBeaconByHeight(vb3))
+		err = db.Update(IndexVersionBeaconByHeight(&vb3))
 		require.NoError(t, err)
 
 		// index version beacon 2 again to make sure we tolerate duplicates
 		// it is possible for two or more events of the same type to be from the same height
-		err = db.Update(IndexVersionBeaconByHeight(vb2))
+		err = db.Update(IndexVersionBeaconByHeight(&vb2))
 		require.NoError(t, err)
 
 		t.Run("retrieve exact height match", func(t *testing.T) {

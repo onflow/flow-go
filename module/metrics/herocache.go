@@ -6,6 +6,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network"
 )
 
 const subsystemHeroCache = "hero_cache"
@@ -63,9 +64,57 @@ func NewNoopHeroCacheMetricsFactory() HeroCacheMetricsFactory {
 	}
 }
 
-func NetworkReceiveCacheMetricsFactory(f HeroCacheMetricsFactory, publicNetwork bool) module.HeroCacheMetrics {
+func NetworkReceiveCacheMetricsFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
 	r := ResourceNetworkingReceiveCache
-	if publicNetwork {
+	if networkType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
+}
+
+func NewSubscriptionRecordCacheMetricsFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
+	r := ResourceNetworkingSubscriptionRecordsCache
+	if networkType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
+}
+
+// NewGossipSubApplicationSpecificScoreCacheMetrics is the factory method for creating a new HeroCacheCollector for the
+// application specific score cache of the GossipSub peer scoring module. The application specific score cache is used
+// to keep track of the application specific score of peers in GossipSub.
+// Args:
+// - f: the HeroCacheMetricsFactory to create the collector
+// Returns:
+// - a HeroCacheMetrics for the application specific score cache
+func NewGossipSubApplicationSpecificScoreCacheMetrics(f HeroCacheMetricsFactory, networkingType network.NetworkingType) module.HeroCacheMetrics {
+	r := ResourceNetworkingGossipSubApplicationSpecificScoreCache
+	if networkingType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
+}
+
+// DisallowListCacheMetricsFactory is the factory method for creating a new HeroCacheCollector for the disallow list cache.
+// The disallow-list cache is used to keep track of peers that are disallow-listed and the reasons for it.
+// Args:
+// - f: the HeroCacheMetricsFactory to create the collector
+// - networkingType: the networking type of the cache, i.e., whether it is used for the public or the private network
+// Returns:
+// - a HeroCacheMetrics for the disallow list cache
+func DisallowListCacheMetricsFactory(f HeroCacheMetricsFactory, networkingType network.NetworkingType) module.HeroCacheMetrics {
+	r := ResourceNetworkingDisallowListCache
+	if networkingType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
+}
+
+// GossipSubSpamRecordCacheMetricsFactory is the factory method for creating a new HeroCacheCollector for the spam record cache.
+// The spam record cache is used to keep track of peers that are spamming the network and the reasons for it.
+func GossipSubSpamRecordCacheMetricsFactory(f HeroCacheMetricsFactory, networkingType network.NetworkingType) module.HeroCacheMetrics {
+	r := ResourceNetworkingGossipSubSpamRecordCache
+	if networkingType == network.PublicNetwork {
 		r = PrependPublicPrefix(r)
 	}
 	return f(namespaceNetwork, r)
@@ -95,27 +144,94 @@ func DisallowListNotificationQueueMetricFactory(registrar prometheus.Registerer)
 	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDisallowListNotificationQueue, registrar)
 }
 
-func GossipSubRPCMetricsObserverInspectorQueueMetricFactory(f HeroCacheMetricsFactory, publicNetwork bool) module.HeroCacheMetrics {
-	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
-	r := ResourceNetworkingRpcMetricsObserverInspectorQueue
-	if publicNetwork {
-		r = ResourceNetworkingPublicRpcMetricsObserverInspectorQueue
+func ApplicationLayerSpamRecordCacheMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
+	r := ResourceNetworkingApplicationLayerSpamRecordCache
+	if networkType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+
+	return f(namespaceNetwork, r)
+}
+
+func DialConfigCacheMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
+	r := ResourceNetworkingUnicastDialConfigCache
+	if networkType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
 	}
 	return f(namespaceNetwork, r)
 }
 
-func GossipSubRPCInspectorQueueMetricFactory(f HeroCacheMetricsFactory, publicNetwork bool) module.HeroCacheMetrics {
+func ApplicationLayerSpamRecordQueueMetricsFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
+	r := ResourceNetworkingApplicationLayerSpamReportQueue
+	if networkType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
+}
+
+func GossipSubRPCInspectorQueueMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
 	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
 	r := ResourceNetworkingRpcValidationInspectorQueue
-	if publicNetwork {
-		r = ResourceNetworkingPublicRpcValidationInspectorQueue
+	if networkType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
 	}
 	return f(namespaceNetwork, r)
 }
 
-func RpcInspectorNotificationQueueMetricFactory(f HeroCacheMetricsFactory, publicNetwork bool) module.HeroCacheMetrics {
+func GossipSubDuplicateMessageTrackerCacheMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
+	r := ResourceNetworkingGossipsubDuplicateMessagesTrackerCache
+	if networkType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
+}
+
+func GossipSubRPCSentTrackerMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
+	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
+	r := ResourceNetworkingRPCSentTrackerCache
+	if networkType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
+}
+
+func GossipSubRPCSentTrackerQueueMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
+	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
+	r := ResourceNetworkingRPCSentTrackerQueue
+	if networkType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
+}
+
+func RpcInspectorNotificationQueueMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
 	r := ResourceNetworkingRpcInspectorNotificationQueue
-	if publicNetwork {
+	if networkType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
+}
+
+func GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
+	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
+	r := ResourceNetworkingRpcClusterPrefixReceivedCache
+	if networkType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
+}
+
+// GossipSubAppSpecificScoreUpdateQueueMetricFactory is the factory method for creating a new HeroCacheCollector for the
+// app-specific score update queue of the GossipSub peer scoring module. The app-specific score update queue is used to
+// queue the update requests for the app-specific score of peers. The update requests are queued in a worker pool and
+// processed asynchronously.
+// Args:
+// - f: the HeroCacheMetricsFactory to create the collector
+// Returns:
+// - a HeroCacheMetrics for the app-specific score update queue.
+func GossipSubAppSpecificScoreUpdateQueueMetricFactory(f HeroCacheMetricsFactory, networkingType network.NetworkingType) module.HeroCacheMetrics {
+	r := ResourceNetworkingAppSpecificScoreUpdateQueue
+	if networkingType == network.PublicNetwork {
 		r = PrependPublicPrefix(r)
 	}
 	return f(namespaceNetwork, r)

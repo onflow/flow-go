@@ -86,7 +86,7 @@ type MessageHub struct {
 	ownOutboundVotes           *fifoqueue.FifoQueue // queue for handling outgoing vote transmissions
 	ownOutboundProposals       *fifoqueue.FifoQueue // queue for handling outgoing proposal transmissions
 	ownOutboundTimeouts        *fifoqueue.FifoQueue // queue for handling outgoing timeout transmissions
-	clusterIdentityFilter      flow.IdentityFilter
+	clusterIdentityFilter      flow.IdentityFilter[flow.Identity]
 
 	// injected dependencies
 	compliance        collection.Compliance      // handler of incoming block proposals
@@ -102,7 +102,7 @@ var _ hotstuff.CommunicatorConsumer = (*MessageHub)(nil)
 // No errors are expected during normal operations.
 func NewMessageHub(log zerolog.Logger,
 	engineMetrics module.EngineMetrics,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
 	compliance collection.Compliance,
 	hotstuff module.HotStuff,
@@ -150,16 +150,13 @@ func NewMessageHub(log zerolog.Logger,
 		ownOutboundProposals:       ownOutboundProposals,
 		ownOutboundTimeouts:        ownOutboundTimeouts,
 		clusterIdentityFilter: filter.And(
-			filter.In(currentCluster),
-			filter.Not(filter.HasNodeID(me.NodeID())),
+			filter.Adapt(filter.In(currentCluster)),
+			filter.Not(filter.HasNodeID[flow.Identity](me.NodeID())),
 		),
 	}
 
 	// register network conduit
-	chainID, err := clusterState.Params().ChainID()
-	if err != nil {
-		return nil, fmt.Errorf("could not get chain ID: %w", err)
-	}
+	chainID := clusterState.Params().ChainID()
 	conduit, err := net.Register(channels.ConsensusCluster(chainID), hub)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
@@ -440,7 +437,12 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 		}
 		h.forwardToOwnTimeoutAggregator(t)
 	default:
-		h.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, message, channel)
+		h.log.Warn().
+			Bool(logging.KeySuspicious, true).
+			Hex("origin_id", logging.ID(originID)).
+			Str("message_type", fmt.Sprintf("%T", message)).
+			Str("channel", channel.String()).
+			Msgf("delivered unsupported message type")
 	}
 	return nil
 }

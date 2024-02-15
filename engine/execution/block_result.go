@@ -1,7 +1,6 @@
 package execution
 
 import (
-	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -13,9 +12,7 @@ type BlockExecutionResult struct {
 	*entity.ExecutableBlock
 
 	collectionExecutionResults []CollectionExecutionResult
-
-	// TODO(patrick): switch this to execution snapshot
-	ComputationIntensities meter.MeteredComputationIntensities
+	ExecutionDataRoot          *flow.BlockExecutionDataRoot // full root data structure produced from block
 }
 
 // NewPopulatedBlockExecutionResult constructs a new BlockExecutionResult,
@@ -25,7 +22,6 @@ func NewPopulatedBlockExecutionResult(eb *entity.ExecutableBlock) *BlockExecutio
 	return &BlockExecutionResult{
 		ExecutableBlock:            eb,
 		collectionExecutionResults: make([]CollectionExecutionResult, chunkCounts),
-		ComputationIntensities:     make(meter.MeteredComputationIntensities),
 	}
 }
 
@@ -94,6 +90,25 @@ func (er *BlockExecutionResult) AllConvertedServiceEvents() flow.ServiceEventLis
 		if len(ce.convertedServiceEvents) > 0 {
 			res = append(res, ce.convertedServiceEvents...)
 		}
+	}
+	return res
+}
+
+// AllUpdatedRegisters returns all updated unique register entries
+// Note: order is not determinstic
+func (er *BlockExecutionResult) AllUpdatedRegisters() []flow.RegisterEntry {
+	updates := make(map[flow.RegisterID]flow.RegisterValue)
+	for _, ce := range er.collectionExecutionResults {
+		for regID, regVal := range ce.executionSnapshot.WriteSet {
+			updates[regID] = regVal
+		}
+	}
+	res := make([]flow.RegisterEntry, 0, len(updates))
+	for regID, regVal := range updates {
+		res = append(res, flow.RegisterEntry{
+			Key:   regID,
+			Value: regVal,
+		})
 	}
 	return res
 }
@@ -177,6 +192,7 @@ func (ar *BlockAttestationResult) ChunkAt(index int) *flow.Chunk {
 		len(execRes.TransactionResults()),
 		attestRes.eventCommit,
 		attestRes.endStateCommit,
+		execRes.executionSnapshot.TotalComputationUsed(),
 	)
 }
 
@@ -206,6 +222,7 @@ func (ar *BlockAttestationResult) ChunkDataPackAt(index int) *flow.ChunkDataPack
 		attestRes.startStateCommit,
 		attestRes.stateProof,
 		collection,
+		*ar.ExecutionDataRoot,
 	)
 }
 

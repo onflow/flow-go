@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/signature"
 )
@@ -68,7 +69,7 @@ func NewWeightedSignatureAggregator(
 	idToInfo := make(map[flow.Identifier]signerInfo)
 	for i, id := range ids {
 		idToInfo[id.NodeID] = signerInfo{
-			weight: id.Weight,
+			weight: id.InitialWeight,
 			index:  i,
 		}
 	}

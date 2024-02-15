@@ -32,17 +32,17 @@ func (_m *Downloader) Done() <-chan struct{} {
 	return r0
 }
 
-// Download provides a mock function with given fields: ctx, executionDataID
-func (_m *Downloader) Download(ctx context.Context, executionDataID flow.Identifier) (*execution_data.BlockExecutionData, error) {
-	ret := _m.Called(ctx, executionDataID)
+// Get provides a mock function with given fields: ctx, rootID
+func (_m *Downloader) Get(ctx context.Context, rootID flow.Identifier) (*execution_data.BlockExecutionData, error) {
+	ret := _m.Called(ctx, rootID)
 
 	var r0 *execution_data.BlockExecutionData
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) (*execution_data.BlockExecutionData, error)); ok {
-		return rf(ctx, executionDataID)
+		return rf(ctx, rootID)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) *execution_data.BlockExecutionData); ok {
-		r0 = rf(ctx, executionDataID)
+		r0 = rf(ctx, rootID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*execution_data.BlockExecutionData)
@@ -50,7 +50,7 @@ func (_m *Downloader) Download(ctx context.Context, executionDataID flow.Identif
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
-		r1 = rf(ctx, executionDataID)
+		r1 = rf(ctx, rootID)
 	} else {
 		r1 = ret.Error(1)
 	}

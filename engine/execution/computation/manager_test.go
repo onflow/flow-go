@@ -30,8 +30,10 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -66,7 +68,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain)
 	tx1.SetProposalKey(chain.ServiceAddress(), 0, 0).
-		SetGasLimit(1000).
+		SetComputeLimit(1000).
 		SetPayer(chain.ServiceAddress())
 
 	err = testutil.SignPayload(tx1, accounts[0], privateKeys[0])
@@ -77,7 +79,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	tx2 := testutil.CreateCounterTransaction(accounts[0], accounts[1])
 	tx2.SetProposalKey(chain.ServiceAddress(), 0, 0).
-		SetGasLimit(1000).
+		SetComputeLimit(1000).
 		SetPayer(chain.ServiceAddress())
 
 	err = testutil.SignPayload(tx2, accounts[1], privateKeys[1])
@@ -141,7 +143,9 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil)
+		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
+		testMaxConcurrency)
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)
@@ -192,6 +196,7 @@ func TestComputeBlock_Uploader(t *testing.T) {
 		Return(nil, nil)
 
 	computationResult := unittest2.ComputationResultFixture(
+		t,
 		unittest.IdentifierFixture(),
 		[][]flow.Identifier{
 			{unittest.IdentifierFixture()},
@@ -236,13 +241,15 @@ func TestExecuteScript(t *testing.T) {
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx, fvm.WithExecutionMemoryLimit(math.MaxUint64))
 
+	sc := systemcontracts.SystemContractsForChain(execCtx.Chain.ChainID())
+
 	script := []byte(fmt.Sprintf(
 		`
 			import FungibleToken from %s
 
 			pub fun main() {}
 		`,
-		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
+		sc.FungibleToken.Address.HexWithPrefix(),
 	))
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
@@ -260,19 +267,20 @@ func TestExecuteScript(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		me,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		execCtx,
 		committer.NewNoopViewCommitter(),
 		prov,
 		ComputationConfig{
 			QueryConfig:          query.NewDefaultConfig(),
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 		},
 	)
 	require.NoError(t, err)
 
 	header := unittest.BlockHeaderFixture()
-	_, err = engine.ExecuteScript(
+	_, _, err = engine.ExecuteScript(
 		context.Background(),
 		script,
 		nil,
@@ -300,13 +308,15 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 			return nil, fmt.Errorf("error getting register")
 		})
 
+	sc := systemcontracts.SystemContractsForChain(execCtx.Chain.ChainID())
+
 	script := []byte(fmt.Sprintf(
 		`
 			pub fun main(): UFix64 {
 				return getAccount(%s).balance
 			}
 		`,
-		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
+		sc.FungibleToken.Address.HexWithPrefix(),
 	))
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
@@ -324,19 +334,20 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		me,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		execCtx,
 		committer.NewNoopViewCommitter(),
 		prov,
 		ComputationConfig{
 			QueryConfig:          query.NewDefaultConfig(),
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 		},
 	)
 	require.NoError(t, err)
 
 	header := unittest.BlockHeaderFixture()
-	_, err = engine.ExecuteScript(
+	_, _, err = engine.ExecuteScript(
 		context.Background(),
 		script,
 		nil,
@@ -369,13 +380,14 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		ctx,
 		committer.NewNoopViewCommitter(),
 		prov,
 		ComputationConfig{
 			QueryConfig:          query.NewDefaultConfig(),
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 			NewCustomVirtualMachine: func() fvm.VM {
 				return &PanickingVM{}
 			},
@@ -383,7 +395,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = manager.ExecuteScript(
+	_, _, err = manager.ExecuteScript(
 		context.Background(),
 		[]byte("whatever"),
 		nil,
@@ -391,7 +403,6 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 		nil)
 
 	require.Error(t, err)
-
 	require.Contains(t, buffer.String(), "Verunsicherung")
 }
 
@@ -419,7 +430,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		ctx,
 		committer.NewNoopViewCommitter(),
 		prov,
@@ -429,6 +440,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 				ExecutionTimeLimit: query.DefaultExecutionTimeLimit,
 			},
 			DerivedDataCacheSize: 10,
+			MaxConcurrency:       1,
 			NewCustomVirtualMachine: func() fvm.VM {
 				return &LongRunningVM{duration: 2 * time.Millisecond}
 			},
@@ -436,7 +448,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = manager.ExecuteScript(
+	_, _, err = manager.ExecuteScript(
 		context.Background(),
 		[]byte("whatever"),
 		nil,
@@ -444,7 +456,6 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 		nil)
 
 	require.NoError(t, err)
-
 	require.Contains(t, buffer.String(), "exceeded threshold")
 }
 
@@ -472,7 +483,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		ctx,
 		committer.NewNoopViewCommitter(),
 		prov,
@@ -482,6 +493,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 				ExecutionTimeLimit: query.DefaultExecutionTimeLimit,
 			},
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 			NewCustomVirtualMachine: func() fvm.VM {
 				return &LongRunningVM{duration: 0}
 			},
@@ -489,7 +501,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = manager.ExecuteScript(
+	_, _, err = manager.ExecuteScript(
 		context.Background(),
 		[]byte("whatever"),
 		nil,
@@ -497,11 +509,34 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 		nil)
 
 	require.NoError(t, err)
-
 	require.NotContains(t, buffer.String(), "exceeded threshold")
 }
 
+type PanickingExecutor struct{}
+
+func (PanickingExecutor) Cleanup() {}
+
+func (PanickingExecutor) Preprocess() error {
+	return nil
+}
+
+func (PanickingExecutor) Execute() error {
+	panic("panic, but expected with sentinel for test: Verunsicherung ")
+}
+
+func (PanickingExecutor) Output() fvm.ProcedureOutput {
+	return fvm.ProcedureOutput{}
+}
+
 type PanickingVM struct{}
+
+func (p *PanickingVM) NewExecutor(
+	f fvm.Context,
+	procedure fvm.Procedure,
+	txn storage.TransactionPreparer,
+) fvm.ProcedureExecutor {
+	return PanickingExecutor{}
+}
 
 func (p *PanickingVM) Run(
 	f fvm.Context,
@@ -526,8 +561,39 @@ func (p *PanickingVM) GetAccount(
 	panic("not expected")
 }
 
+type LongRunningExecutor struct {
+	duration time.Duration
+}
+
+func (LongRunningExecutor) Cleanup() {}
+
+func (LongRunningExecutor) Preprocess() error {
+	return nil
+}
+
+func (l LongRunningExecutor) Execute() error {
+	time.Sleep(l.duration)
+	return nil
+}
+
+func (LongRunningExecutor) Output() fvm.ProcedureOutput {
+	return fvm.ProcedureOutput{
+		Value: cadence.NewVoid(),
+	}
+}
+
 type LongRunningVM struct {
 	duration time.Duration
+}
+
+func (l *LongRunningVM) NewExecutor(
+	f fvm.Context,
+	procedure fvm.Procedure,
+	txn storage.TransactionPreparer,
+) fvm.ProcedureExecutor {
+	return LongRunningExecutor{
+		duration: l.duration,
+	}
 }
 
 func (l *LongRunningVM) Run(
@@ -584,7 +650,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		fvm.NewContext(),
 		committer.NewNoopViewCommitter(),
 		nil,
@@ -594,6 +660,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 				ExecutionTimeLimit: timeout,
 			},
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 		},
 	)
 
@@ -610,7 +677,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 	`)
 
 	header := unittest.BlockHeaderFixture()
-	value, err := manager.ExecuteScript(
+	value, _, err := manager.ExecuteScript(
 		context.Background(),
 		script,
 		nil,
@@ -630,7 +697,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		fvm.NewContext(),
 		committer.NewNoopViewCommitter(),
 		nil,
@@ -640,6 +707,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 				ExecutionTimeLimit: timeout,
 			},
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 		},
 	)
 
@@ -663,7 +731,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		header := unittest.BlockHeaderFixture()
-		value, err = manager.ExecuteScript(
+		value, _, err = manager.ExecuteScript(
 			reqCtx,
 			script,
 			nil,
@@ -771,7 +839,8 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		me,
 		prov,
 		nil,
-	)
+		testutil.ProtocolStateWithSourceFixture(nil),
+		testMaxConcurrency)
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)
@@ -839,7 +908,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		metrics.NewExecutionCollector(ctx.Tracer),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		ctx,
 		committer.NewNoopViewCommitter(),
 		nil,
@@ -849,6 +918,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 				ExecutionTimeLimit: timeout,
 			},
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 		},
 	)
 	vm := manager.vm
@@ -877,7 +947,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	`)
 
 	header := unittest.BlockHeaderFixture()
-	_, err = manager.ExecuteScript(
+	_, compUsed, err := manager.ExecuteScript(
 		context.Background(),
 		script,
 		[][]byte{jsoncdc.MustEncode(address)},
@@ -885,6 +955,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		snapshotTree)
 
 	require.NoError(t, err)
+	require.Greater(t, compUsed, uint64(0))
 
 	env := environment.NewScriptEnvironmentFromStorageSnapshot(
 		ctx.EnvironmentParams,
@@ -893,11 +964,10 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	rt := env.BorrowCadenceRuntime()
 	defer env.ReturnCadenceRuntime(rt)
 
-	v, err := rt.ReadStored(
-		commonAddress,
-		cadence.NewPath("storage", "x"),
-	)
+	path, err := cadence.NewPath(common.PathDomainStorage, "x")
+	require.NoError(t, err)
 
+	v, err := rt.ReadStored(commonAddress, path)
 	// the save should not update account storage by writing the updates
 	// back to the snapshotTree
 	require.NoError(t, err)

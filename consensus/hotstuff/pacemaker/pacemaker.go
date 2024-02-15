@@ -27,14 +27,17 @@ import (
 //
 // Not concurrency safe.
 type ActivePaceMaker struct {
+	hotstuff.ProposalDurationProvider
+
 	ctx            context.Context
 	timeoutControl *timeout.Controller
-	notifier       hotstuff.Consumer
+	notifier       hotstuff.ParticipantConsumer
 	viewTracker    viewTracker
 	started        bool
 }
 
 var _ hotstuff.PaceMaker = (*ActivePaceMaker)(nil)
+var _ hotstuff.ProposalDurationProvider = (*ActivePaceMaker)(nil)
 
 // New creates a new ActivePaceMaker instance
 //   - startView is the view for the pacemaker to start with.
@@ -45,6 +48,7 @@ var _ hotstuff.PaceMaker = (*ActivePaceMaker)(nil)
 // * model.ConfigurationError if initial LivenessData is invalid
 func New(
 	timeoutController *timeout.Controller,
+	proposalDurationProvider hotstuff.ProposalDurationProvider,
 	notifier hotstuff.Consumer,
 	persist hotstuff.Persister,
 	recovery ...recoveryInformation,
@@ -55,10 +59,11 @@ func New(
 	}
 
 	pm := &ActivePaceMaker{
-		timeoutControl: timeoutController,
-		notifier:       notifier,
-		viewTracker:    vt,
-		started:        false,
+		ProposalDurationProvider: proposalDurationProvider,
+		timeoutControl:           timeoutController,
+		notifier:                 notifier,
+		viewTracker:              vt,
+		started:                  false,
 	}
 	for _, recoveryAction := range recovery {
 		err = recoveryAction(pm)
@@ -84,9 +89,6 @@ func (p *ActivePaceMaker) LastViewTC() *flow.TimeoutCertificate { return p.viewT
 // timeout.
 // To get the timeout for the next timeout, you need to call TimeoutChannel() again.
 func (p *ActivePaceMaker) TimeoutChannel() <-chan time.Time { return p.timeoutControl.Channel() }
-
-// BlockRateDelay returns the delay for broadcasting its own proposals.
-func (p *ActivePaceMaker) BlockRateDelay() time.Duration { return p.timeoutControl.BlockRateDelay() }
 
 // ProcessQC notifies the pacemaker with a new QC, which might allow pacemaker to
 // fast-forward its view. In contrast to `ProcessTC`, this function does _not_ handle `nil` inputs.
@@ -171,7 +173,7 @@ type recoveryInformation func(p *ActivePaceMaker) error
 
 // WithQCs informs the PaceMaker about the given QCs. Old and nil QCs are accepted (no-op).
 func WithQCs(qcs ...*flow.QuorumCertificate) recoveryInformation {
-	// To avoid excessive data base writes during initialization, we pre-filter the newest QC
+	// To avoid excessive database writes during initialization, we pre-filter the newest QC
 	// here and only hand that one to the viewTracker. For recovery, we allow the special case
 	// of nil QCs, because the genesis block has no QC.
 	tracker := tracker.NewNewestQCTracker()

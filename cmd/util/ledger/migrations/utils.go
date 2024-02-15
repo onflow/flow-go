@@ -5,39 +5,9 @@ import (
 
 	"github.com/onflow/atree"
 
-	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-func KeyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
-	if len(key.KeyParts) != 2 ||
-		key.KeyParts[0].Type != state.KeyPartOwner ||
-		key.KeyParts[1].Type != state.KeyPartKey {
-		return flow.RegisterID{}, fmt.Errorf("key not in expected format %s", key.String())
-	}
-
-	return flow.NewRegisterID(
-		string(key.KeyParts[0].Value),
-		string(key.KeyParts[1].Value),
-	), nil
-}
-
-func registerIDToKey(registerID flow.RegisterID) ledger.Key {
-	newKey := ledger.Key{}
-	newKey.KeyParts = []ledger.KeyPart{
-		{
-			Type:  state.KeyPartOwner,
-			Value: []byte(registerID.Owner),
-		},
-		{
-			Type:  state.KeyPartKey,
-			Value: []byte(registerID.Key),
-		},
-	}
-	return newKey
-}
 
 type AccountsAtreeLedger struct {
 	Accounts environment.Accounts
@@ -52,7 +22,7 @@ var _ atree.Ledger = &AccountsAtreeLedger{}
 func (a *AccountsAtreeLedger) GetValue(owner, key []byte) ([]byte, error) {
 	v, err := a.Accounts.GetValue(
 		flow.NewRegisterID(
-			string(flow.BytesToAddress(owner).Bytes()),
+			flow.BytesToAddress(owner),
 			string(key)))
 	if err != nil {
 		return nil, fmt.Errorf("getting value failed: %w", err)
@@ -63,7 +33,7 @@ func (a *AccountsAtreeLedger) GetValue(owner, key []byte) ([]byte, error) {
 func (a *AccountsAtreeLedger) SetValue(owner, key, value []byte) error {
 	err := a.Accounts.SetValue(
 		flow.NewRegisterID(
-			string(flow.BytesToAddress(owner).Bytes()),
+			flow.BytesToAddress(owner),
 			string(key)),
 		value)
 	if err != nil {

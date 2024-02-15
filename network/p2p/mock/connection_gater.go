@@ -10,6 +10,8 @@ import (
 
 	network "github.com/libp2p/go-libp2p/core/network"
 
+	p2p "github.com/onflow/flow-go/network/p2p"
+
 	peer "github.com/libp2p/go-libp2p/core/peer"
 )
 
@@ -96,6 +98,11 @@ func (_m *ConnectionGater) InterceptUpgraded(_a0 network.Conn) (bool, control.Di
 	}
 
 	return r0, r1
+}
+
+// SetDisallowListOracle provides a mock function with given fields: oracle
+func (_m *ConnectionGater) SetDisallowListOracle(oracle p2p.DisallowListOracle) {
+	_m.Called(oracle)
 }
 
 type mockConstructorTestingTNewConnectionGater interface {

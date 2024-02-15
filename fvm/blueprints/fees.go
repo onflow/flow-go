@@ -15,15 +15,15 @@ import (
 )
 
 var TransactionFeesExecutionEffortWeightsPath = cadence.Path{
-	Domain:     common.PathDomainStorage.Identifier(),
+	Domain:     common.PathDomainStorage,
 	Identifier: "executionEffortWeights",
 }
 var TransactionFeesExecutionMemoryWeightsPath = cadence.Path{
-	Domain:     common.PathDomainStorage.Identifier(),
+	Domain:     common.PathDomainStorage,
 	Identifier: "executionMemoryWeights",
 }
 var TransactionFeesExecutionMemoryLimitPath = cadence.Path{
-	Domain:     common.PathDomainStorage.Identifier(),
+	Domain:     common.PathDomainStorage,
 	Identifier: "executionMemoryLimit",
 }
 
@@ -35,6 +35,9 @@ var setupParametersTransactionTemplate string
 
 //go:embed scripts/setupStorageForServiceAccountsTemplate.cdc
 var setupStorageForServiceAccountsTemplate string
+
+//go:embed scripts/setupStorageForAccount.cdc
+var setupStorageForAccountTemplate string
 
 //go:embed scripts/setupFeesTransactionTemplate.cdc
 var setupFeesTransactionTemplate string
@@ -114,6 +117,22 @@ func SetupStorageForServiceAccountsTransaction(
 		AddAuthorizer(fungibleToken).
 		AddAuthorizer(flowToken).
 		AddAuthorizer(feeContract)
+}
+
+func SetupStorageForAccountTransaction(
+	account, service, fungibleToken, flowToken flow.Address,
+) *flow.TransactionBody {
+	return flow.NewTransactionBody().
+		SetScript([]byte(templates.ReplaceAddresses(setupStorageForAccountTemplate,
+			templates.Environment{
+				ServiceAccountAddress: service.Hex(),
+				StorageFeesAddress:    service.Hex(),
+				FungibleTokenAddress:  fungibleToken.Hex(),
+				FlowTokenAddress:      flowToken.Hex(),
+			})),
+		).
+		AddAuthorizer(account).
+		AddAuthorizer(service)
 }
 
 func SetupFeesTransaction(

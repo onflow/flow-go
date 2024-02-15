@@ -3,26 +3,32 @@ package backend
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/storage"
 )
 
 // retryFrequency has to be less than TransactionExpiry or else this module does nothing
-const retryFrequency uint64 = 120 // blocks
+const retryFrequency uint64 = 120 // Blocks
 
 // Retry implements a simple retry mechanism for transaction submission.
 type Retry struct {
 	mu sync.RWMutex
-	// pending transactions
+	// pending Transactions
 	transactionByReferencBlockHeight map[uint64]map[flow.Identifier]*flow.TransactionBody
 	backend                          *Backend
 	active                           bool
+	log                              zerolog.Logger // default logger
 }
 
-func newRetry() *Retry {
+func newRetry(log zerolog.Logger) *Retry {
 	return &Retry{
+		log:                              log,
 		transactionByReferencBlockHeight: map[uint64]map[flow.Identifier]*flow.TransactionBody{},
 	}
 }
@@ -41,13 +47,19 @@ func (r *Retry) SetBackend(b *Backend) *Retry {
 	return r
 }
 
-func (r *Retry) Retry(height uint64) {
+// Retry attempts to resend transactions for a specified block height.
+// It performs cleanup operations, including pruning old transactions, and retries sending
+// transactions that are still pending.
+// The method takes a block height as input. If the provided height is lower than
+// flow.DefaultTransactionExpiry, no retries are performed, and the method returns nil.
+// No errors expected during normal operations.
+func (r *Retry) Retry(height uint64) error {
 	// No need to retry if height is lower than DefaultTransactionExpiry
 	if height < flow.DefaultTransactionExpiry {
-		return
+		return nil
 	}
 
-	// naive cleanup for now, prune every 120 blocks
+	// naive cleanup for now, prune every 120 Blocks
 	if height%retryFrequency == 0 {
 		r.prune(height)
 	}
@@ -55,20 +67,13 @@ func (r *Retry) Retry(height uint64) {
 	heightToRetry := height - flow.DefaultTransactionExpiry + retryFrequency
 
 	for heightToRetry < height {
-		r.retryTxsAtHeight(heightToRetry)
-
+		err := r.retryTxsAtHeight(heightToRetry)
+		if err != nil {
+			return err
+		}
 		heightToRetry = heightToRetry + retryFrequency
 	}
-
-}
-
-func (b *Retry) Notify(signal interface{}) bool {
-	height, ok := signal.(uint64)
-	if !ok {
-		return false
-	}
-	b.Retry(height)
-	return true
+	return nil
 }
 
 // RegisterTransaction adds a transaction that could possibly be retried
@@ -84,7 +89,7 @@ func (r *Retry) RegisterTransaction(height uint64, tx *flow.TransactionBody) {
 func (r *Retry) prune(height uint64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	// If height is less than the default, there will be no expired transactions
+	// If height is less than the default, there will be no expired Transactions
 	if height < flow.DefaultTransactionExpiry {
 		return
 	}
@@ -95,7 +100,13 @@ func (r *Retry) prune(height uint64) {
 	}
 }
 
-func (r *Retry) retryTxsAtHeight(heightToRetry uint64) {
+// retryTxsAtHeight retries transactions at a specific block height.
+// It looks up transactions at the specified height and retries sending
+// raw transactions for those that are still pending. It also cleans up
+// transactions that are no longer pending or have an unknown status.
+// Error returns:
+//   - errors are unexpected and potentially symptoms of internal implementation bugs or state corruption (fatal).
+func (r *Retry) retryTxsAtHeight(heightToRetry uint64) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	txsAtHeight := r.transactionByReferencBlockHeight[heightToRetry]
@@ -104,7 +115,7 @@ func (r *Retry) retryTxsAtHeight(heightToRetry uint64) {
 		block, err := r.backend.lookupBlock(txID)
 		if err != nil {
 			if !errors.Is(err, storage.ErrNotFound) {
-				continue
+				return err
 			}
 			block = nil
 		}
@@ -112,13 +123,20 @@ func (r *Retry) retryTxsAtHeight(heightToRetry uint64) {
 		// find the transaction status
 		status, err := r.backend.deriveTransactionStatus(tx, false, block)
 		if err != nil {
+			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
+				return err
+			}
 			continue
 		}
 		if status == flow.TransactionStatusPending {
-			_ = r.backend.SendRawTransaction(context.Background(), tx)
+			err = r.backend.SendRawTransaction(context.Background(), tx)
+			if err != nil {
+				r.log.Info().Str("retry", fmt.Sprintf("retryTxsAtHeight: %v", heightToRetry)).Err(err).Msg("failed to send raw transactions")
+			}
 		} else if status != flow.TransactionStatusUnknown {
 			// not pending or unknown, don't need to retry anymore
 			delete(txsAtHeight, txID)
 		}
 	}
+	return nil
 }

@@ -23,9 +23,10 @@ import (
 //
 // CAUTION: all pending blocks are required to be valid (guaranteed if the block passed the compliance layer)
 func NewFollower(log zerolog.Logger,
+	mempoolMetrics module.MempoolMetrics,
 	headers storage.Headers,
 	updater module.Finalizer,
-	notifier hotstuff.FinalizationConsumer,
+	notifier hotstuff.FollowerConsumer,
 	rootHeader *flow.Header,
 	rootQC *flow.QuorumCertificate,
 	finalized *flow.Header,
@@ -43,7 +44,7 @@ func NewFollower(log zerolog.Logger,
 	}
 
 	// initialize the follower loop
-	loop, err := hotstuff.NewFollowerLoop(log, forks)
+	loop, err := hotstuff.NewFollowerLoop(log, mempoolMetrics, forks)
 	if err != nil {
 		return nil, fmt.Errorf("could not create follower loop: %w", err)
 	}

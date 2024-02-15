@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -41,8 +42,8 @@ func TestFilterSubscribe(t *testing.T) {
 	unstakedKey := unittest.NetworkingPrivKeyFixture()
 	unstakedNode := p2pfixtures.CreateNode(t, unstakedKey, sporkId, zerolog.Nop(), ids)
 
-	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(node2.Host())))
-	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(unstakedNode.Host())))
+	require.NoError(t, node1.ConnectToPeer(context.TODO(), *host.InfoFromHost(node2.Host())))
+	require.NoError(t, node1.ConnectToPeer(context.TODO(), *host.InfoFromHost(unstakedNode.Host())))
 
 	badTopic := channels.TopicFromChannel(channels.SyncCommittee, sporkId)
 
@@ -67,7 +68,7 @@ func TestFilterSubscribe(t *testing.T) {
 	// check that node1 and node2 don't accept unstakedNode as a peer
 	require.Never(t, func() bool {
 		for _, pid := range node1.ListPeers(badTopic.String()) {
-			if pid == unstakedNode.Host().ID() {
+			if pid == unstakedNode.ID() {
 				return true
 			}
 		}
@@ -78,16 +79,26 @@ func TestFilterSubscribe(t *testing.T) {
 	wg.Add(2)
 
 	testPublish := func(wg *sync.WaitGroup, from p2p.LibP2PNode, sub p2p.Subscription) {
-		data := []byte("hello")
 
-		err := from.Publish(context.TODO(), badTopic, data)
+		outgoingMessageScope, err := message.NewOutgoingScope(
+			ids.NodeIDs(),
+			channels.TopicFromChannel(channels.SyncCommittee, sporkId),
+			[]byte("hello"),
+			unittest.NetworkCodec().Encode,
+			message.ProtocolTypePubSub)
+		require.NoError(t, err)
+
+		err = from.Publish(context.TODO(), outgoingMessageScope)
 		require.NoError(t, err)
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		msg, err := sub.Next(ctx)
 		cancel()
 		require.NoError(t, err)
-		require.Equal(t, msg.Data, data)
+
+		expectedReceivedData, err := outgoingMessageScope.Proto().Marshal()
+		require.NoError(t, err)
+		require.Equal(t, msg.Data, expectedReceivedData)
 
 		ctx, cancel = context.WithTimeout(context.Background(), time.Second)
 		_, err = unstakedSub.Next(ctx)
@@ -122,8 +133,8 @@ func TestCanSubscribe(t *testing.T) {
 		flow.IdentityList{identity},
 		p2pfixtures.WithSubscriptionFilter(subscriptionFilter(identity, flow.IdentityList{identity})))
 
-	p2ptest.StartNode(t, signalerCtx, collectionNode, 100*time.Millisecond)
-	defer p2ptest.StopNode(t, collectionNode, cancel, 1*time.Second)
+	p2ptest.StartNode(t, signalerCtx, collectionNode)
+	defer p2ptest.StopNode(t, collectionNode, cancel)
 
 	logger := unittest.Logger()
 	topicValidator := flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter())

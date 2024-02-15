@@ -2,6 +2,7 @@ package corruptlibp2p_test
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -30,17 +31,18 @@ func TestSpam_IHave(t *testing.T) {
 	const messagesToSpam = 3
 	sporkId := unittest.IdentifierFixture()
 	role := flow.RoleConsensus
-
-	gsrSpammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkId, role)
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
+	gsrSpammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkId, role, idProvider)
 
 	allSpamIHavesReceived := sync.WaitGroup{}
 	allSpamIHavesReceived.Add(messagesToSpam)
 
 	var iHaveReceivedCtlMsgs []pb.ControlMessage
-	victimNode, _ := p2ptest.NodeFixture(
+	victimNode, victimIdentity := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
+		idProvider,
 		p2ptest.WithRole(role),
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
@@ -54,28 +56,28 @@ func TestSpam_IHave(t *testing.T) {
 				return nil
 			})),
 	)
-
+	idProvider.SetIdentities(flow.IdentityList{&victimIdentity, &gsrSpammer.SpammerId})
 	// starts nodes
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	defer cancel()
 	nodes := []p2p.LibP2PNode{gsrSpammer.SpammerNode, victimNode}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 5*time.Second)
-	defer p2ptest.StopNodes(t, nodes, cancel, 5*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	gsrSpammer.Start(t)
 
 	// prior to the test we should ensure that spammer and victim connect.
 	// this is vital as the spammer will circumvent the normal pubsub subscription mechanism and send iHAVE messages directly to the victim.
 	// without a prior connection established, directly spamming pubsub messages may cause a race condition in the pubsub implementation.
-	p2ptest.EnsureConnected(t, ctx, nodes)
-	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
-		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-		return unittest.ProposalFixture(), blockTopic
+	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
+	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
+	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
+		return unittest.ProposalFixture()
 	})
 
 	// prepare to spam - generate iHAVE control messages
-	iHaveSentCtlMsgs := gsrSpammer.GenerateCtlMessages(messagesToSpam, corruptlibp2p.WithIHave(messagesToSpam, 5))
+	iHaveSentCtlMsgs := gsrSpammer.GenerateCtlMessages(messagesToSpam, p2ptest.WithIHave(messagesToSpam, 5, fmt.Sprintf("%s/%s", channels.PushBlocks, sporkId)))
 
 	// start spamming the victim peer
 	gsrSpammer.SpamControlMessage(t, victimNode, iHaveSentCtlMsgs)

@@ -14,16 +14,17 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	emulator "github.com/onflow/flow-emulator"
+	emulator "github.com/onflow/flow-emulator/emulator"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
+	"github.com/onflow/flow-go/module/metrics"
 
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
 	"github.com/onflow/flow-go/engine/testutil"
-	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -38,13 +39,14 @@ import (
 
 const numberOfNodes = 10
 
-type DKGSuite struct {
+// EmulatorSuite tests the DKG protocol against the DKG smart contract running on the Emulator.
+type EmulatorSuite struct {
 	suite.Suite
 
 	chainID                flow.ChainID
 	hub                    *stub.Hub // in-mem test network
 	env                    templates.Environment
-	blockchain             *emulator.Blockchain
+	blockchain             emulator.Emulator
 	adminEmulatorClient    *utils.EmulatorClient
 	adminDKGContractClient *dkg.Client
 	dkgAddress             sdk.Address
@@ -57,14 +59,15 @@ type DKGSuite struct {
 	nodes        []*node
 }
 
-func (s *DKGSuite) SetupTest() {
+func (s *EmulatorSuite) SetupTest() {
 	s.initEmulator()
 	s.deployDKGContract()
 	s.setupDKGAdmin()
 
-	s.netIDs = unittest.IdentityListFixture(numberOfNodes, unittest.WithRole(flow.RoleConsensus))
-	for _, id := range s.netIDs {
+	boostrapNodesInfo := unittest.PrivateNodeInfosFixture(numberOfNodes, unittest.WithRole(flow.RoleConsensus))
+	for _, id := range boostrapNodesInfo {
 		s.nodeAccounts = append(s.nodeAccounts, s.createAndFundAccount(id))
+		s.netIDs = append(s.netIDs, id.Identity())
 	}
 
 	for _, acc := range s.nodeAccounts {
@@ -78,7 +81,7 @@ func (s *DKGSuite) SetupTest() {
 	}
 }
 
-func (s *DKGSuite) BeforeTest(suiteName, testName string) {
+func (s *EmulatorSuite) BeforeTest(_, testName string) {
 	// In the happy case we add a log hook to check if the DKGBroker emits Warn
 	// logs (which it shouldn't)
 	if testName == "TestHappyPath" {
@@ -86,13 +89,14 @@ func (s *DKGSuite) BeforeTest(suiteName, testName string) {
 	}
 	// We need to initialise the nodes with a list of identities that contain
 	// all roles, otherwise there would be an error initialising the first epoch
+
 	identities := unittest.CompleteIdentitySet(s.netIDs...)
 	for _, node := range s.nodes {
 		s.initEngines(node, identities)
 	}
 }
 
-func (s *DKGSuite) TearDownTest() {
+func (s *EmulatorSuite) TearDownTest() {
 	s.hub = nil
 	s.blockchain = nil
 	s.adminEmulatorClient = nil
@@ -104,14 +108,14 @@ func (s *DKGSuite) TearDownTest() {
 }
 
 // initEmulator initializes the emulator and the admin emulator client
-func (s *DKGSuite) initEmulator() {
+func (s *EmulatorSuite) initEmulator() {
 	s.chainID = flow.Emulator
 
-	blockchain, err := emulator.NewBlockchain(
+	blockchain, err := emulator.New(
 		emulator.WithTransactionExpiry(flow.DefaultTransactionExpiry),
 		emulator.WithStorageLimitEnabled(false),
 	)
-	require.NoError(s.T(), err)
+	s.Require().NoError(err)
 
 	s.blockchain = blockchain
 
@@ -122,12 +126,12 @@ func (s *DKGSuite) initEmulator() {
 
 // deployDKGContract deploys the DKG contract to the emulator and initializes
 // the admin DKG contract client
-func (s *DKGSuite) deployDKGContract() {
+func (s *EmulatorSuite) deployDKGContract() {
 	// create new account keys for the DKG contract
 	dkgAccountKey, dkgAccountSigner := test.AccountKeyGenerator().NewWithSigner()
 
 	// deploy the contract to the emulator
-	dkgAddress, err := s.blockchain.CreateAccount([]*sdk.AccountKey{dkgAccountKey}, []sdktemplates.Contract{
+	dkgAddress, err := s.adminEmulatorClient.CreateAccount([]*sdk.AccountKey{dkgAccountKey}, []sdktemplates.Contract{
 		{
 			Name:   "FlowDKG",
 			Source: string(contracts.FlowDKG()),
@@ -153,10 +157,10 @@ func (s *DKGSuite) deployDKGContract() {
 		s.dkgAddress.String(), 0)
 }
 
-func (s *DKGSuite) setupDKGAdmin() {
+func (s *EmulatorSuite) setupDKGAdmin() {
 	setUpAdminTx := sdk.NewTransaction().
 		SetScript(templates.GeneratePublishDKGParticipantScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(
 			s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index,
@@ -173,7 +177,7 @@ func (s *DKGSuite) setupDKGAdmin() {
 }
 
 // createAndFundAccount creates a nodeAccount and funds it in the emulator
-func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
+func (s *EmulatorSuite) createAndFundAccount(netID bootstrap.NodeInfo) *nodeAccount {
 	accountPrivateKey := lib.RandomPrivateKey()
 	accountKey := sdk.NewAccountKey().
 		FromPrivateKey(accountPrivateKey).
@@ -184,11 +188,13 @@ func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 	accountSigner, err := sdkcrypto.NewInMemorySigner(accountPrivateKey, accountKey.HashAlgo)
 	require.NoError(s.T(), err)
 
+	sc := systemcontracts.SystemContractsForChain(s.chainID)
+
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	create Flow account
 	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-	newAccountAddress, err := s.blockchain.CreateAccount(
+	newAccountAddress, err := s.adminEmulatorClient.CreateAccount(
 		[]*sdk.AccountKey{accountKey},
 		[]sdktemplates.Contract{},
 	)
@@ -220,8 +226,8 @@ func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 					receiverRef.deposit(from: <-self.sentVault)
 				  }
 				}`,
-					fvm.FungibleTokenAddress(s.chainID.Chain()).Hex(),
-					fvm.FlowTokenAddress(s.chainID.Chain()).Hex(),
+					sc.FungibleToken.Address.Hex(),
+					sc.FlowToken.Address.Hex(),
 				))).
 		AddAuthorizer(s.blockchain.ServiceKey().Address).
 		SetProposalKey(
@@ -268,7 +274,7 @@ func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 
 // createNode creates a DKG test node from an account and initializes its DKG
 // smart-contract client
-func (s *DKGSuite) createNode(account *nodeAccount) *node {
+func (s *EmulatorSuite) createNode(account *nodeAccount) *node {
 	emulatorClient := utils.NewEmulatorClient(s.blockchain)
 	contractClient := dkg.NewClient(
 		zerolog.Nop(),
@@ -281,12 +287,13 @@ func (s *DKGSuite) createNode(account *nodeAccount) *node {
 	)
 	dkgClientWrapper := NewDKGClientWrapper(contractClient)
 	return &node{
+		t:                 s.T(),
 		account:           account,
 		dkgContractClient: dkgClientWrapper,
 	}
 }
 
-func (s *DKGSuite) startDKGWithParticipants(accounts []*nodeAccount) {
+func (s *EmulatorSuite) startDKGWithParticipants(accounts []*nodeAccount) {
 	// convert node identifiers to candece.Value to be passed in as TX argument
 	valueNodeIDs := make([]cadence.Value, 0, len(accounts))
 	for _, account := range accounts {
@@ -298,7 +305,7 @@ func (s *DKGSuite) startDKGWithParticipants(accounts []*nodeAccount) {
 	// start DKG using admin resource
 	startDKGTx := sdk.NewTransaction().
 		SetScript(templates.GenerateStartDKGScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(
 			s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index,
@@ -322,10 +329,10 @@ func (s *DKGSuite) startDKGWithParticipants(accounts []*nodeAccount) {
 	assert.ElementsMatch(s.T(), valueNodeIDs, result.(cadence.Array).Values)
 }
 
-func (s *DKGSuite) claimDKGParticipant(node *node) {
+func (s *EmulatorSuite) claimDKGParticipant(node *node) {
 	createParticipantTx := sdk.NewTransaction().
 		SetScript(templates.GenerateCreateDKGParticipantScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(
 			s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index,
@@ -358,7 +365,7 @@ func (s *DKGSuite) claimDKGParticipant(node *node) {
 }
 
 // sendDummyTx submits a transaction from the service account
-func (s *DKGSuite) sendDummyTx() (*flow.Block, error) {
+func (s *EmulatorSuite) sendDummyTx() (*flow.Block, error) {
 	// we are using an account-creation transaction but it doesnt matter; we
 	// could be using anything other transaction
 	createAccountTx, err := sdktemplates.CreateAccount(
@@ -384,13 +391,13 @@ func (s *DKGSuite) sendDummyTx() (*flow.Block, error) {
 	return block, err
 }
 
-func (s *DKGSuite) isDKGCompleted() bool {
+func (s *EmulatorSuite) isDKGCompleted() bool {
 	template := templates.GenerateGetDKGCompletedScript(s.env)
 	value := s.executeScript(template, nil)
 	return value.ToGoValue().(bool)
 }
 
-func (s *DKGSuite) getResult() []string {
+func (s *EmulatorSuite) getResult() []string {
 	script := fmt.Sprintf(`
 	import FlowDKG from 0x%s
 
@@ -414,7 +421,7 @@ func (s *DKGSuite) getResult() []string {
 	return dkgResult
 }
 
-func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
+func (s *EmulatorSuite) initEngines(node *node, ids flow.IdentityList) {
 	core := testutil.GenericNodeFromParticipants(s.T(), s.hub, node.account.netID, ids, s.chainID)
 	core.Log = zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
 
@@ -439,6 +446,8 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 		core.Net,
 		core.Me,
 		brokerTunnel,
+		metrics.NewNoopCollector(),
+		dkgeng.DefaultMessagingEngineConfig(),
 	)
 	require.NoError(s.T(), err)
 
@@ -454,12 +463,6 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 		controllerFactoryLogger = zerolog.New(os.Stdout).Hook(hook)
 	}
 
-	// create a config with no delays for tests
-	config := dkg.ControllerConfig{
-		BaseStartDelay:                0,
-		BaseHandleFirstBroadcastDelay: 0,
-	}
-
 	// the reactor engine reacts to new views being finalized and drives the
 	// DKG protocol
 	reactorEngine := dkgeng.NewReactorEngine(
@@ -472,7 +475,6 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 			core.Me,
 			[]module.DKGContractClient{node.dkgContractClient},
 			brokerTunnel,
-			config,
 		),
 		viewsObserver,
 	)
@@ -489,7 +491,7 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 
 // prepareAndSubmit adds a block reference and signs a transaction before
 // submitting it via the admin emulator client.
-func (s *DKGSuite) prepareAndSubmit(tx *sdk.Transaction, signerAddresses []sdk.Address, signers []sdkcrypto.Signer) (*flow.Block, error) {
+func (s *EmulatorSuite) prepareAndSubmit(tx *sdk.Transaction, signerAddresses []sdk.Address, signers []sdkcrypto.Signer) (*flow.Block, error) {
 
 	// set block reference
 	latestBlock, err := s.adminEmulatorClient.GetLatestBlock(context.Background(), true)
@@ -518,7 +520,7 @@ func (s *DKGSuite) prepareAndSubmit(tx *sdk.Transaction, signerAddresses []sdk.A
 }
 
 // executeScript runs a cadence script on the emulator blockchain
-func (s *DKGSuite) executeScript(script []byte, arguments [][]byte) cadence.Value {
+func (s *EmulatorSuite) executeScript(script []byte, arguments [][]byte) cadence.Value {
 	result, err := s.blockchain.ExecuteScript(script, arguments)
 	require.NoError(s.T(), err)
 	require.True(s.T(), result.Succeeded())

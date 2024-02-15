@@ -125,7 +125,7 @@ func (factory *EpochComponentsFactory) Create(
 	// get the transaction pool for the epoch
 	pool := factory.pools.ForEpoch(epochCounter)
 
-	builder, finalizer, err := factory.builder.Create(headers, payloads, pool, epochCounter)
+	builder, finalizer, err := factory.builder.Create(state, headers, payloads, pool, epochCounter)
 	if err != nil {
 		err = fmt.Errorf("could not create builder/finalizer: %w", err)
 		return
@@ -161,6 +161,7 @@ func (factory *EpochComponentsFactory) Create(
 
 	complianceEng, err := factory.compliance.Create(
 		metrics,
+		hotstuffModules.Notifier,
 		mutableState,
 		headers,
 		payloads,
@@ -175,7 +176,7 @@ func (factory *EpochComponentsFactory) Create(
 		return
 	}
 	compliance = complianceEng
-	hotstuffModules.FinalizationDistributor.AddOnBlockFinalizedConsumer(complianceEng.OnFinalizedBlock)
+	hotstuffModules.Notifier.AddOnBlockFinalizedConsumer(complianceEng.OnFinalizedBlock)
 
 	sync, err = factory.sync.Create(cluster.Members(), state, blocks, syncCore, complianceEng)
 	if err != nil {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gammazero/workerpool"
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -31,9 +32,8 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -84,7 +84,8 @@ type Instance struct {
 }
 
 type MockedCommunicatorConsumer struct {
-	notifications.NoopPartialConsumer
+	notifications.NoopProposalViolationConsumer
+	notifications.NoopParticipantConsumer
 	notifications.NoopFinalizationConsumer
 	*mocks.CommunicatorConsumer
 }
@@ -169,14 +170,14 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 
 	// program the hotstuff committee state
 	in.committee.On("IdentitiesByEpoch", mock.Anything).Return(
-		func(_ uint64) flow.IdentityList {
-			return in.participants
+		func(_ uint64) flow.IdentitySkeletonList {
+			return in.participants.ToSkeleton()
 		},
 		nil,
 	)
 	for _, participant := range in.participants {
 		in.committee.On("IdentityByBlock", mock.Anything, participant.NodeID).Return(participant, nil)
-		in.committee.On("IdentityByEpoch", mock.Anything, participant.NodeID).Return(participant, nil)
+		in.committee.On("IdentityByEpoch", mock.Anything, participant.NodeID).Return(&participant.IdentitySkeleton, nil)
 	}
 	in.committee.On("Self").Return(in.localID)
 	in.committee.On("LeaderForView", mock.Anything).Return(
@@ -184,12 +185,12 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			return in.participants[int(view)%len(in.participants)].NodeID
 		}, nil,
 	)
-	in.committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(in.participants.TotalWeight()), nil)
-	in.committee.On("TimeoutThresholdForView", mock.Anything).Return(committees.WeightThresholdToTimeout(in.participants.TotalWeight()), nil)
+	in.committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(in.participants.ToSkeleton().TotalWeight()), nil)
+	in.committee.On("TimeoutThresholdForView", mock.Anything).Return(committees.WeightThresholdToTimeout(in.participants.ToSkeleton().TotalWeight()), nil)
 
 	// program the builder module behaviour
-	in.builder.On("BuildOn", mock.Anything, mock.Anything).Return(
-		func(parentID flow.Identifier, setter func(*flow.Header) error) *flow.Header {
+	in.builder.On("BuildOn", mock.Anything, mock.Anything, mock.Anything).Return(
+		func(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) *flow.Header {
 			in.updatingBlocks.Lock()
 			defer in.updatingBlocks.Unlock()
 
@@ -206,10 +207,11 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				Timestamp:   time.Now().UTC(),
 			}
 			require.NoError(t, setter(header))
+			require.NoError(t, sign(header))
 			in.headers[header.ID()] = header
 			return header
 		},
-		func(parentID flow.Identifier, setter func(*flow.Header) error) error {
+		func(parentID flow.Identifier, _ func(*flow.Header) error, _ func(*flow.Header) error) error {
 			in.updatingBlocks.RLock()
 			_, ok := in.headers[parentID]
 			in.updatingBlocks.RUnlock()
@@ -390,7 +392,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 
 	// initialize the pacemaker
 	controller := timeout.NewController(cfg.Timeouts)
-	in.pacemaker, err = pacemaker.New(controller, notifier, in.persist)
+	in.pacemaker, err = pacemaker.New(controller, pacemaker.NoProposalDelay(), notifier, in.persist)
 	require.NoError(t, err)
 
 	// initialize the forks handler
@@ -412,14 +414,14 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		in.queue <- qc
 	}
 
-	minRequiredWeight := committees.WeightThresholdToBuildQC(uint64(in.participants.Count()) * weight)
+	minRequiredWeight := committees.WeightThresholdToBuildQC(uint64(len(in.participants)) * weight)
 	voteProcessorFactory := mocks.NewVoteProcessorFactory(t)
 	voteProcessorFactory.On("Create", mock.Anything, mock.Anything).Return(
 		func(log zerolog.Logger, proposal *model.Proposal) hotstuff.VerifyingVoteProcessor {
 			stakingSigAggtor := helper.MakeWeightedSignatureAggregator(weight)
 			stakingSigAggtor.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
-			rbRector := helper.MakeRandomBeaconReconstructor(msig.RandomBeaconThreshold(int(in.participants.Count())))
+			rbRector := helper.MakeRandomBeaconReconstructor(msig.RandomBeaconThreshold(len(in.participants)))
 			rbRector.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
 			return votecollector.NewCombinedVoteProcessor(
@@ -431,7 +433,8 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			)
 		}, nil).Maybe()
 
-	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
+	voteAggregationDistributor := pubsub.NewVoteAggregationDistributor()
+	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, voteAggregationDistributor, voteProcessorFactory.Create)
 	voteCollectors := voteaggregator.NewVoteCollectors(log, livenessData.CurrentView, workerpool.New(2), createCollectorFactoryMethod)
 
 	metricsCollector := metrics.NewNoopCollector()
@@ -442,14 +445,14 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		metricsCollector,
 		metricsCollector,
 		metricsCollector,
-		notifier,
+		voteAggregationDistributor,
 		livenessData.CurrentView,
 		voteCollectors,
 	)
 	require.NoError(t, err)
 
 	// initialize factories for timeout collector and timeout processor
-	collectorDistributor := pubsub.NewTimeoutCollectorDistributor()
+	timeoutAggregationDistributor := pubsub.NewTimeoutAggregationDistributor()
 	timeoutProcessorFactory := mocks.NewTimeoutProcessorFactory(t)
 	timeoutProcessorFactory.On("Create", mock.Anything).Return(
 		func(view uint64) hotstuff.TimeoutProcessor {
@@ -466,7 +469,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 					newestView.Set(newestQCView)
 					identity, ok := in.participants.ByNodeID(signerID)
 					require.True(t, ok)
-					return totalWeight.Add(identity.Weight)
+					return totalWeight.Add(identity.InitialWeight)
 				}, nil,
 			).Maybe()
 			aggregator.On("Aggregate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
@@ -490,18 +493,22 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				in.committee,
 				in.validator,
 				aggregator,
-				collectorDistributor,
+				timeoutAggregationDistributor,
 			)
 			require.NoError(t, err)
 			return p
 		}, nil).Maybe()
 	timeoutCollectorFactory := timeoutcollector.NewTimeoutCollectorFactory(
 		unittest.Logger(),
-		notifier,
-		collectorDistributor,
+		timeoutAggregationDistributor,
 		timeoutProcessorFactory,
 	)
-	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livenessData.CurrentView, timeoutCollectorFactory)
+	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(
+		log,
+		metricsCollector,
+		livenessData.CurrentView,
+		timeoutCollectorFactory,
+	)
 
 	// initialize the timeout aggregator
 	in.timeoutAggregator, err = timeoutaggregator.NewTimeoutAggregator(
@@ -509,7 +516,6 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		metricsCollector,
 		metricsCollector,
 		metricsCollector,
-		notifier,
 		livenessData.CurrentView,
 		timeoutCollectors,
 	)
@@ -538,8 +544,10 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	)
 	require.NoError(t, err)
 
-	collectorDistributor.AddConsumer(logConsumer)
-	collectorDistributor.AddConsumer(&in)
+	timeoutAggregationDistributor.AddTimeoutCollectorConsumer(logConsumer)
+	timeoutAggregationDistributor.AddTimeoutCollectorConsumer(&in)
+
+	voteAggregationDistributor.AddVoteCollectorConsumer(logConsumer)
 
 	return &in
 }
@@ -664,3 +672,5 @@ func (in *Instance) OnNewQcDiscovered(qc *flow.QuorumCertificate) {
 func (in *Instance) OnNewTcDiscovered(tc *flow.TimeoutCertificate) {
 	in.queue <- tc
 }
+
+func (in *Instance) OnTimeoutProcessed(*model.TimeoutObject) {}

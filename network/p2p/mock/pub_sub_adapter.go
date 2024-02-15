@@ -3,7 +3,11 @@
 package mockp2p
 
 import (
+	flow "github.com/onflow/flow-go/model/flow"
+	channels "github.com/onflow/flow-go/network/channels"
+
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
+
 	mock "github.com/stretchr/testify/mock"
 
 	p2p "github.com/onflow/flow-go/network/p2p"
@@ -16,6 +20,11 @@ type PubSubAdapter struct {
 	mock.Mock
 }
 
+// ActiveClustersChanged provides a mock function with given fields: _a0
+func (_m *PubSubAdapter) ActiveClustersChanged(_a0 flow.ChainIDList) {
+	_m.Called(_a0)
+}
+
 // Done provides a mock function with given fields:
 func (_m *PubSubAdapter) Done() <-chan struct{} {
 	ret := _m.Called()
@@ -26,6 +35,22 @@ func (_m *PubSubAdapter) Done() <-chan struct{} {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
+}
+
+// GetLocalMeshPeers provides a mock function with given fields: topic
+func (_m *PubSubAdapter) GetLocalMeshPeers(topic channels.Topic) []peer.ID {
+	ret := _m.Called(topic)
+
+	var r0 []peer.ID
+	if rf, ok := ret.Get(0).(func(channels.Topic) []peer.ID); ok {
+		r0 = rf(topic)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]peer.ID)
 		}
 	}
 
@@ -84,6 +109,22 @@ func (_m *PubSubAdapter) ListPeers(topic string) []peer.ID {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]peer.ID)
+		}
+	}
+
+	return r0
+}
+
+// PeerScoreExposer provides a mock function with given fields:
+func (_m *PubSubAdapter) PeerScoreExposer() p2p.PeerScoreExposer {
+	ret := _m.Called()
+
+	var r0 p2p.PeerScoreExposer
+	if rf, ok := ret.Get(0).(func() p2p.PeerScoreExposer); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(p2p.PeerScoreExposer)
 		}
 	}
 

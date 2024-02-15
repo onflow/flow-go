@@ -33,7 +33,8 @@ type HeroStore struct {
 	q *HeroQueue
 }
 
-func NewHeroStore(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *HeroStore {
+func NewHeroStore(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics,
+) *HeroStore {
 	return &HeroStore{
 		q: NewHeroQueue(sizeLimit, logger, collector),
 	}

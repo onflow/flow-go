@@ -17,6 +17,16 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/state"
 )
 
+func ProcedureStateParameters(
+	ctx Context,
+	proc Procedure,
+) state.StateParameters {
+	return state.DefaultParameters().
+		WithMeterParameters(getBasicMeterParameters(ctx, proc)).
+		WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
+		WithMaxValueSizeAllowed(ctx.MaxStateValueSize)
+}
+
 // getBasicMeterParameters returns the set of meter parameters used for
 // general procedure execution.  Subparts of the procedure execution may
 // specify custom meter parameters via nested transactions.

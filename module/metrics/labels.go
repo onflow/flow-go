@@ -19,6 +19,11 @@ const (
 	LabelConnectionUseFD     = "usefd" // whether the connection is using a file descriptor
 	LabelSuccess             = "success"
 	LabelMisbehavior         = "misbehavior"
+	LabelHandler             = "handler"
+	LabelStatusCode          = "code"
+	LabelMethod              = "method"
+	LabelService             = "service"
+	LabelRejectionReason     = "rejection_reason"
 )
 
 const (
@@ -55,6 +60,8 @@ const (
 	ResourceQC                                               = "qc"
 	ResourceMyReceipt                                        = "my_receipt"
 	ResourceCollection                                       = "collection"
+	ResourceProtocolState                                    = "protocol_state"
+	ResourceProtocolStateByBlockID                           = "protocol_state_by_block_id"
 	ResourceApproval                                         = "approval"
 	ResourceSeal                                             = "seal"
 	ResourcePendingIncorporatedSeal                          = "pending_incorporated_seal"
@@ -81,35 +88,46 @@ const (
 	ResourceEpochCommit                                      = "epoch_commit"
 	ResourceEpochStatus                                      = "epoch_status"
 	ResourceNetworkingReceiveCache                           = "networking_received_message" // networking layer
+	ResourceNetworkingSubscriptionRecordsCache               = "subscription_records_cache"  // networking layer
 	ResourceNetworkingDnsIpCache                             = "networking_dns_ip_cache"     // networking layer
 	ResourceNetworkingDnsTxtCache                            = "networking_dns_txt_cache"    // networking layer
 	ResourceNetworkingDisallowListNotificationQueue          = "networking_disallow_list_notification_queue"
 	ResourceNetworkingRpcInspectorNotificationQueue          = "networking_rpc_inspector_notification_queue"
 	ResourceNetworkingRpcValidationInspectorQueue            = "networking_rpc_validation_inspector_queue"
-	ResourceNetworkingRpcMetricsObserverInspectorQueue       = "networking_rpc_metrics_observer_inspector_queue"
-	ResourceNetworkingPublicRpcValidationInspectorQueue      = "networking_public_rpc_validation_inspector_queue"
-	ResourceNetworkingPublicRpcMetricsObserverInspectorQueue = "networking_public_rpc_metrics_observer_inspector_queue"
+	ResourceNetworkingApplicationLayerSpamRecordCache        = "application_layer_spam_record_cache"
+	ResourceNetworkingApplicationLayerSpamReportQueue        = "application_layer_spam_report_queue"
+	ResourceNetworkingRpcClusterPrefixReceivedCache          = "rpc_cluster_prefixed_received_cache"
+	ResourceNetworkingAppSpecificScoreUpdateQueue            = "gossipsub_app_specific_score_update_queue"
+	ResourceNetworkingGossipSubApplicationSpecificScoreCache = "gossipsub_application_specific_score_cache"
+	ResourceNetworkingGossipSubSpamRecordCache               = "gossipsub_spam_record_cache"
+	ResourceNetworkingDisallowListCache                      = "disallow_list_cache"
+	ResourceNetworkingRPCSentTrackerCache                    = "gossipsub_rpc_sent_tracker_cache"
+	ResourceNetworkingRPCSentTrackerQueue                    = "gossipsub_rpc_sent_tracker_queue"
+	ResourceNetworkingUnicastDialConfigCache                 = "unicast_dial_config_cache"
+	ResourceNetworkingGossipsubDuplicateMessagesTrackerCache = "gossipsub_duplicate_messages_tracker_cache"
 
-	ResourceFollowerPendingBlocksCache = "follower_pending_block_cache"      // follower engine
-	ResourceClusterBlockProposalQueue  = "cluster_compliance_proposal_queue" // collection node, compliance engine
-	ResourceTransactionIngestQueue     = "ingest_transaction_queue"          // collection node, ingest engine
-	ResourceBeaconKey                  = "beacon-key"                        // consensus node, DKG engine
-	ResourceApprovalQueue              = "sealing_approval_queue"            // consensus node, sealing engine
-	ResourceReceiptQueue               = "sealing_receipt_queue"             // consensus node, sealing engine
-	ResourceApprovalResponseQueue      = "sealing_approval_response_queue"   // consensus node, sealing engine
-	ResourceBlockResponseQueue         = "compliance_block_response_queue"   // consensus node, compliance engine
-	ResourceBlockProposalQueue         = "compliance_proposal_queue"         // consensus node, compliance engine
-	ResourceBlockVoteQueue             = "vote_aggregator_queue"             // consensus/collection node, vote aggregator
-	ResourceTimeoutObjectQueue         = "timeout_aggregator_queue"          // consensus/collection node, timeout aggregator
-	ResourceCollectionGuaranteesQueue  = "ingestion_col_guarantee_queue"     // consensus node, ingestion engine
-	ResourceChunkDataPack              = "chunk_data_pack"                   // execution node
-	ResourceChunkDataPackRequests      = "chunk_data_pack_request"           // execution node
-	ResourceEvents                     = "events"                            // execution node
-	ResourceServiceEvents              = "service_events"                    // execution node
-	ResourceTransactionResults         = "transaction_results"               // execution node
-	ResourceTransactionResultIndices   = "transaction_result_indices"        // execution node
-	ResourceTransactionResultByBlock   = "transaction_result_by_block"       // execution node
-	ResourceExecutionDataCache         = "execution_data_cache"              // access node
+	ResourceFollowerPendingBlocksCache         = "follower_pending_block_cache"           // follower engine
+	ResourceFollowerLoopCertifiedBlocksChannel = "follower_loop_certified_blocks_channel" // follower loop, certified blocks buffered channel
+	ResourceClusterBlockProposalQueue          = "cluster_compliance_proposal_queue"      // collection node, compliance engine
+	ResourceTransactionIngestQueue             = "ingest_transaction_queue"               // collection node, ingest engine
+	ResourceBeaconKey                          = "beacon-key"                             // consensus node, DKG engine
+	ResourceDKGMessage                         = "dkg_private_message"                    // consensus, DKG messaging engine
+	ResourceApprovalQueue                      = "sealing_approval_queue"                 // consensus node, sealing engine
+	ResourceReceiptQueue                       = "sealing_receipt_queue"                  // consensus node, sealing engine
+	ResourceApprovalResponseQueue              = "sealing_approval_response_queue"        // consensus node, sealing engine
+	ResourceBlockResponseQueue                 = "compliance_block_response_queue"        // consensus node, compliance engine
+	ResourceBlockProposalQueue                 = "compliance_proposal_queue"              // consensus node, compliance engine
+	ResourceBlockVoteQueue                     = "vote_aggregator_queue"                  // consensus/collection node, vote aggregator
+	ResourceTimeoutObjectQueue                 = "timeout_aggregator_queue"               // consensus/collection node, timeout aggregator
+	ResourceCollectionGuaranteesQueue          = "ingestion_col_guarantee_queue"          // consensus node, ingestion engine
+	ResourceChunkDataPack                      = "chunk_data_pack"                        // execution node
+	ResourceChunkDataPackRequests              = "chunk_data_pack_request"                // execution node
+	ResourceEvents                             = "events"                                 // execution node
+	ResourceServiceEvents                      = "service_events"                         // execution node
+	ResourceTransactionResults                 = "transaction_results"                    // execution node
+	ResourceTransactionResultIndices           = "transaction_result_indices"             // execution node
+	ResourceTransactionResultByBlock           = "transaction_result_by_block"            // execution node
+	ResourceExecutionDataCache                 = "execution_data_cache"                   // access node
 )
 
 const (

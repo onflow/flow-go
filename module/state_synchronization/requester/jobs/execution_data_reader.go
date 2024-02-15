@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 )
@@ -19,15 +20,14 @@ type BlockEntry struct {
 	ExecutionData *execution_data.BlockExecutionDataEntity
 }
 
+var _ module.Jobs = (*ExecutionDataReader)(nil)
+
 // ExecutionDataReader provides an abstraction for consumers to read blocks as job.
 type ExecutionDataReader struct {
-	downloader execution_data.Downloader
-	headers    storage.Headers
-	results    storage.ExecutionResults
-	seals      storage.Seals
+	store *cache.ExecutionDataCache
 
-	fetchTimeout           time.Duration
-	highestAvailableHeight func() uint64
+	fetchTimeout             time.Duration
+	highestConsecutiveHeight func() (uint64, error)
 
 	// TODO: refactor this to accept a context in AtIndex instead of storing it on the struct.
 	// This requires also refactoring jobqueue.Consumer
@@ -36,20 +36,14 @@ type ExecutionDataReader struct {
 
 // NewExecutionDataReader creates and returns a ExecutionDataReader.
 func NewExecutionDataReader(
-	downloader execution_data.Downloader,
-	headers storage.Headers,
-	results storage.ExecutionResults,
-	seals storage.Seals,
+	store *cache.ExecutionDataCache,
 	fetchTimeout time.Duration,
-	highestAvailableHeight func() uint64,
+	highestConsecutiveHeight func() (uint64, error),
 ) *ExecutionDataReader {
 	return &ExecutionDataReader{
-		downloader:             downloader,
-		headers:                headers,
-		results:                results,
-		seals:                  seals,
-		fetchTimeout:           fetchTimeout,
-		highestAvailableHeight: highestAvailableHeight,
+		store:                    store,
+		fetchTimeout:             fetchTimeout,
+		highestConsecutiveHeight: highestConsecutiveHeight,
 	}
 }
 
@@ -67,14 +61,22 @@ func (r *ExecutionDataReader) AtIndex(height uint64) (module.Job, error) {
 		return nil, fmt.Errorf("execution data reader is not initialized")
 	}
 
-	// height has not been downloaded, so height is not available yet
-	if height > r.highestAvailableHeight() {
+	// data for the requested height or a lower height, has not been downloaded yet.
+	highestHeight, err := r.highestConsecutiveHeight()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get highest height: %w", err)
+	}
+
+	if height > highestHeight {
 		return nil, storage.ErrNotFound
 	}
 
-	executionData, err := r.getExecutionData(r.ctx, height)
+	ctx, cancel := context.WithTimeout(r.ctx, r.fetchTimeout)
+	defer cancel()
+
+	executionData, err := r.store.ByHeight(ctx, height)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get execution data for height %d: %w", height, err)
 	}
 
 	return BlockEntryToJob(&BlockEntry{
@@ -86,36 +88,5 @@ func (r *ExecutionDataReader) AtIndex(height uint64) (module.Job, error) {
 
 // Head returns the highest consecutive block height with downloaded execution data
 func (r *ExecutionDataReader) Head() (uint64, error) {
-	return r.highestAvailableHeight(), nil
-}
-
-// getExecutionData returns the ExecutionData for the given block height.
-// This is used by the execution data reader to get the ExecutionData for a block.
-func (r *ExecutionDataReader) getExecutionData(signalCtx irrecoverable.SignalerContext, height uint64) (*execution_data.BlockExecutionDataEntity, error) {
-	header, err := r.headers.ByHeight(height)
-	if err != nil {
-		return nil, fmt.Errorf("failed to lookup header for height %d: %w", height, err)
-	}
-
-	// get the ExecutionResultID for the block from the block's seal
-	seal, err := r.seals.FinalizedSealForBlock(header.ID())
-	if err != nil {
-		return nil, fmt.Errorf("failed to lookup seal for block %s: %w", header.ID(), err)
-	}
-
-	result, err := r.results.ByID(seal.ResultID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to lookup execution result for block %s: %w", header.ID(), err)
-	}
-
-	ctx, cancel := context.WithTimeout(signalCtx, r.fetchTimeout)
-	defer cancel()
-
-	executionData, err := r.downloader.Download(ctx, result.ExecutionDataID)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to get execution data for block %s: %w", header.ID(), err)
-	}
-
-	return execution_data.NewBlockExecutionDataEntity(result.ExecutionDataID, executionData), nil
+	return r.highestConsecutiveHeight()
 }

@@ -2,7 +2,6 @@ package message_hub
 
 import (
 	"context"
-	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -65,13 +64,10 @@ type MessageHubSuite struct {
 }
 
 func (s *MessageHubSuite) SetupTest() {
-	// seed the RNG
-	rand.Seed(time.Now().UnixNano())
-
 	// initialize the paramaters
 	s.participants = unittest.IdentityListFixture(3,
 		unittest.WithRole(flow.RoleConsensus),
-		unittest.WithWeight(1000),
+		unittest.WithInitialWeight(1000),
 	)
 	s.myID = s.participants[0].NodeID
 	block := unittest.BlockFixture()
@@ -125,7 +121,7 @@ func (s *MessageHubSuite) SetupTest() {
 	// set up protocol snapshot mock
 	s.snapshot = &protocol.Snapshot{}
 	s.snapshot.On("Identities", mock.Anything).Return(
-		func(filter flow.IdentityFilter) flow.IdentityList {
+		func(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return s.participants.Filter(filter)
 		},
 		nil,

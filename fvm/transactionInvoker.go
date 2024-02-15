@@ -12,11 +12,13 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -180,6 +182,22 @@ func (executor *transactionExecutor) preprocess() error {
 // infrequently modified and are expensive to compute.  For now this includes
 // reading meter parameter overrides and parsing programs.
 func (executor *transactionExecutor) preprocessTransactionBody() error {
+	// setup evm
+	if executor.ctx.EVMEnabled {
+		chain := executor.ctx.Chain
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		err := evm.SetupEnvironment(
+			chain.ChainID(),
+			executor.env,
+			executor.cadenceRuntime.TxRuntimeEnv,
+			chain.ServiceAddress(),
+			sc.FlowToken.Address,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
 	meterParams, err := getBodyMeterParameters(
 		executor.ctx,
 		executor.proc,
@@ -224,6 +242,22 @@ func (executor *transactionExecutor) execute() error {
 }
 
 func (executor *transactionExecutor) ExecuteTransactionBody() error {
+	// setup evm
+	if executor.ctx.EVMEnabled {
+		chain := executor.ctx.Chain
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		err := evm.SetupEnvironment(
+			chain.ChainID(),
+			executor.env,
+			executor.cadenceRuntime.TxRuntimeEnv,
+			chain.ServiceAddress(),
+			sc.FlowToken.Address,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
 	var invalidator derived.TransactionInvalidator
 	if !executor.errs.CollectedError() {
 
@@ -286,7 +320,8 @@ func (executor *transactionExecutor) deductTransactionFees() (err error) {
 
 // logExecutionIntensities logs execution intensities of the transaction
 func (executor *transactionExecutor) logExecutionIntensities() {
-	if !executor.env.Logger().Debug().Enabled() {
+	log := executor.env.Logger()
+	if !log.Debug().Enabled() {
 		return
 	}
 
@@ -298,7 +333,7 @@ func (executor *transactionExecutor) logExecutionIntensities() {
 	for s, u := range executor.txnState.MemoryIntensities() {
 		memory.Uint(strconv.FormatUint(uint64(s), 10), u)
 	}
-	executor.env.Logger().Debug().
+	log.Debug().
 		Uint64("ledgerInteractionUsed", executor.txnState.InteractionUsed()).
 		Uint64("computationUsed", executor.txnState.TotalComputationUsed()).
 		Uint64("memoryEstimate", executor.txnState.TotalMemoryEstimate()).
@@ -371,6 +406,7 @@ func (executor *transactionExecutor) normalExecution() (
 	// actual balance, for the purpose of calculating storage capacity, because the payer will have to pay for this tx.
 	executor.txnState.RunWithAllLimitsDisabled(func() {
 		err = executor.CheckStorageLimits(
+			executor.ctx,
 			executor.env,
 			bodySnapshot,
 			executor.proc.Transaction.Payer,
@@ -391,7 +427,8 @@ func (executor *transactionExecutor) normalExecution() (
 // Clear changes and try to deduct fees again.
 func (executor *transactionExecutor) errorExecution() {
 	// log transaction as failed
-	executor.env.Logger().Info().
+	log := executor.env.Logger()
+	log.Info().
 		Err(executor.errs.ErrorOrNil()).
 		Msg("transaction executed with error")
 
@@ -408,7 +445,7 @@ func (executor *transactionExecutor) errorExecution() {
 
 	// if fee deduction fails just do clean up and exit
 	if feesError != nil {
-		executor.env.Logger().Info().
+		log.Info().
 			Err(feesError).
 			Msg("transaction fee deduction executed with error")
 

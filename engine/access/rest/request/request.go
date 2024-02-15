@@ -54,6 +54,12 @@ func (rd *Request) GetAccountRequest() (GetAccount, error) {
 	return req, err
 }
 
+func (rd *Request) GetAccountKeyRequest() (GetAccountKey, error) {
+	var req GetAccountKey
+	err := req.Build(rd)
+	return req, err
+}
+
 func (rd *Request) GetExecutionResultByBlockIDsRequest() (GetExecutionResultByBlockIDs, error) {
 	var req GetExecutionResultByBlockIDs
 	err := req.Build(rd)
@@ -86,6 +92,12 @@ func (rd *Request) GetEventsRequest() (GetEvents, error) {
 
 func (rd *Request) CreateTransactionRequest() (CreateTransaction, error) {
 	var req CreateTransaction
+	err := req.Build(rd)
+	return req, err
+}
+
+func (rd *Request) SubscribeEventsRequest() (SubscribeEvents, error) {
+	var req SubscribeEvents
 	err := req.Build(rd)
 	return req, err
 }

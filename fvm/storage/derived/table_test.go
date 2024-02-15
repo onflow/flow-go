@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func newEmptyTestBlock() *DerivedDataTable[string, *string] {
@@ -482,7 +483,7 @@ func TestDerivedDataTableCommitWriteOnlyTransactionWithInvalidation(t *testing.T
 	require.Equal(t, 0, len(block.EntriesForTestingOnly()))
 }
 
-func TestDerivedDataTableCommitUseOriginalEntryOnDuplicateWriteEntries(t *testing.T) {
+func TestDerivedDataTableCommitErrorOnDuplicateWriteEntries(t *testing.T) {
 	block := newEmptyTestBlock()
 
 	testSetupTxn, err := block.NewTableTransaction(0, 11)
@@ -514,7 +515,9 @@ func TestDerivedDataTableCommitUseOriginalEntryOnDuplicateWriteEntries(t *testin
 	testTxn.SetForTestingOnly(key, otherValue, otherSnapshot)
 
 	err = testTxn.Commit()
-	require.NoError(t, err)
+
+	require.Error(t, err)
+	require.True(t, errors.IsRetryableConflictError(err))
 
 	entries = block.EntriesForTestingOnly()
 	require.Equal(t, 1, len(entries))
@@ -523,11 +526,6 @@ func TestDerivedDataTableCommitUseOriginalEntryOnDuplicateWriteEntries(t *testin
 	require.True(t, ok)
 
 	require.Same(t, expectedEntry, actualEntry)
-	require.False(t, actualEntry.isInvalid)
-	require.Same(t, expectedValue, actualEntry.Value)
-	require.Same(t, expectedSnapshot, actualEntry.ExecutionSnapshot)
-	require.NotSame(t, otherValue, actualEntry.Value)
-	require.NotSame(t, otherSnapshot, actualEntry.ExecutionSnapshot)
 }
 
 func TestDerivedDataTableCommitReadOnlyTransactionNoInvalidation(t *testing.T) {
@@ -965,7 +963,7 @@ func (computer *testValueComputer) Compute(
 func TestDerivedDataTableGetOrCompute(t *testing.T) {
 	blockDerivedData := NewEmptyTable[flow.RegisterID, int](0)
 
-	key := flow.NewRegisterID("addr", "key")
+	key := flow.NewRegisterID(unittest.RandomAddressFixture(), "key")
 	value := 12345
 
 	t.Run("compute value", func(t *testing.T) {

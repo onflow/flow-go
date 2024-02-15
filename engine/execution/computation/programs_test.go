@@ -10,7 +10,7 @@ import (
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -33,6 +33,10 @@ import (
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
+)
+
+const (
+	testMaxConcurrency = 2
 )
 
 func TestPrograms_TestContractUpdates(t *testing.T) {
@@ -133,7 +137,9 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil)
+		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
+		testMaxConcurrency)
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)
@@ -243,7 +249,9 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil)
+		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
+		testMaxConcurrency)
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)
@@ -543,7 +551,7 @@ func prepareTx(t *testing.T,
 }
 
 func hasValidEventValue(t *testing.T, event flow.Event, value int) {
-	data, err := jsoncdc.Decode(nil, event.Payload)
+	data, err := ccf.Decode(nil, event.Payload)
 	require.NoError(t, err)
 	assert.Equal(t, int16(value), data.(cadence.Event).Fields[0].ToGoValue())
 }

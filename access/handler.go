@@ -3,28 +3,24 @@ package access
 import (
 	"context"
 
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-)
 
-type FinalizedHeaderCache interface {
-	Get() *flow.Header
-}
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+)
 
 type Handler struct {
 	api                  API
 	chain                flow.Chain
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
-	finalizedHeaderCache FinalizedHeaderCache
+	finalizedHeaderCache module.FinalizedHeaderCache
 	me                   module.Local
 }
 
@@ -33,7 +29,7 @@ type HandlerOption func(*Handler)
 
 var _ access.AccessAPIServer = (*Handler)(nil)
 
-func NewHandler(api API, chain flow.Chain, finalizedHeader FinalizedHeaderCache, me module.Local, options ...HandlerOption) *Handler {
+func NewHandler(api API, chain flow.Chain, finalizedHeader module.FinalizedHeaderCache, me module.Local, options ...HandlerOption) *Handler {
 	h := &Handler{
 		api:                  api,
 		chain:                chain,
@@ -69,10 +65,12 @@ func (h *Handler) GetNodeVersionInfo(
 
 	return &access.GetNodeVersionInfoResponse{
 		Info: &entities.NodeVersionInfo{
-			Semver:          nodeVersionInfo.Semver,
-			Commit:          nodeVersionInfo.Commit,
-			SporkId:         nodeVersionInfo.SporkId[:],
-			ProtocolVersion: nodeVersionInfo.ProtocolVersion,
+			Semver:               nodeVersionInfo.Semver,
+			Commit:               nodeVersionInfo.Commit,
+			SporkId:              nodeVersionInfo.SporkId[:],
+			ProtocolVersion:      nodeVersionInfo.ProtocolVersion,
+			SporkRootBlockHeight: nodeVersionInfo.SporkRootBlockHeight,
+			NodeRootBlockHeight:  nodeVersionInfo.NodeRootBlockHeight,
 		},
 	}, nil
 }
@@ -119,7 +117,7 @@ func (h *Handler) GetBlockHeaderByID(
 ) (*access.BlockHeaderResponse, error) {
 	id, err := convert.BlockID(req.GetId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 	header, status, err := h.api.GetBlockHeaderByID(ctx, id)
 	if err != nil {
@@ -159,7 +157,7 @@ func (h *Handler) GetBlockByID(
 ) (*access.BlockResponse, error) {
 	id, err := convert.BlockID(req.GetId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 	block, status, err := h.api.GetBlockByID(ctx, id)
 	if err != nil {
@@ -177,7 +175,7 @@ func (h *Handler) GetCollectionByID(
 
 	id, err := convert.CollectionID(req.GetId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid collection id: %v", err)
 	}
 
 	col, err := h.api.GetCollectionByID(ctx, id)
@@ -232,7 +230,7 @@ func (h *Handler) GetTransaction(
 
 	id, err := convert.TransactionID(req.GetId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid transaction id: %v", err)
 	}
 
 	tx, err := h.api.GetTransaction(ctx, id)
@@ -255,7 +253,7 @@ func (h *Handler) GetTransactionResult(
 
 	transactionID, err := convert.TransactionID(req.GetId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid transaction id: %v", err)
 	}
 
 	blockId := flow.ZeroID
@@ -263,7 +261,7 @@ func (h *Handler) GetTransactionResult(
 	if requestBlockId != nil {
 		blockId, err = convert.BlockID(requestBlockId)
 		if err != nil {
-			return nil, err
+			return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 		}
 	}
 
@@ -272,11 +270,12 @@ func (h *Handler) GetTransactionResult(
 	if requestCollectionId != nil {
 		collectionId, err = convert.CollectionID(requestCollectionId)
 		if err != nil {
-			return nil, err
+			return nil, status.Errorf(codes.InvalidArgument, "invalid collection id: %v", err)
 		}
 	}
 
-	result, err := h.api.GetTransactionResult(ctx, transactionID, blockId, collectionId)
+	eventEncodingVersion := req.GetEventEncodingVersion()
+	result, err := h.api.GetTransactionResult(ctx, transactionID, blockId, collectionId, eventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -295,15 +294,61 @@ func (h *Handler) GetTransactionResultsByBlockID(
 
 	id, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 
-	results, err := h.api.GetTransactionResultsByBlockID(ctx, id)
+	eventEncodingVersion := req.GetEventEncodingVersion()
+
+	results, err := h.api.GetTransactionResultsByBlockID(ctx, id, eventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
 
 	message := TransactionResultsToMessage(results)
+	message.Metadata = metadata
+
+	return message, nil
+}
+
+func (h *Handler) GetSystemTransaction(
+	ctx context.Context,
+	req *access.GetSystemTransactionRequest,
+) (*access.TransactionResponse, error) {
+	metadata := h.buildMetadataResponse()
+
+	id, err := convert.BlockID(req.GetBlockId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
+	}
+
+	tx, err := h.api.GetSystemTransaction(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.TransactionResponse{
+		Transaction: convert.TransactionToMessage(*tx),
+		Metadata:    metadata,
+	}, nil
+}
+
+func (h *Handler) GetSystemTransactionResult(
+	ctx context.Context,
+	req *access.GetSystemTransactionResultRequest,
+) (*access.TransactionResultResponse, error) {
+	metadata := h.buildMetadataResponse()
+
+	id, err := convert.BlockID(req.GetBlockId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
+	}
+
+	result, err := h.api.GetSystemTransactionResult(ctx, id, req.GetEventEncodingVersion())
+	if err != nil {
+		return nil, err
+	}
+
+	message := TransactionResultToMessage(result)
 	message.Metadata = metadata
 
 	return message, nil
@@ -317,7 +362,7 @@ func (h *Handler) GetTransactionsByBlockID(
 
 	id, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 
 	transactions, err := h.api.GetTransactionsByBlockID(ctx, id)
@@ -341,10 +386,12 @@ func (h *Handler) GetTransactionResultByIndex(
 
 	blockID, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 
-	result, err := h.api.GetTransactionResultByIndex(ctx, blockID, req.GetIndex())
+	eventEncodingVersion := req.GetEventEncodingVersion()
+
+	result, err := h.api.GetTransactionResultByIndex(ctx, blockID, req.GetIndex(), eventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -362,7 +409,10 @@ func (h *Handler) GetAccount(
 ) (*access.GetAccountResponse, error) {
 	metadata := h.buildMetadataResponse()
 
-	address := flow.BytesToAddress(req.GetAddress())
+	address, err := convert.Address(req.GetAddress(), h.chain)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
+	}
 
 	account, err := h.api.GetAccount(ctx, address)
 	if err != nil {
@@ -389,7 +439,7 @@ func (h *Handler) GetAccountAtLatestBlock(
 
 	address, err := convert.Address(req.GetAddress(), h.chain)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
 	account, err := h.api.GetAccountAtLatestBlock(ctx, address)
@@ -416,7 +466,7 @@ func (h *Handler) GetAccountAtBlockHeight(
 
 	address, err := convert.Address(req.GetAddress(), h.chain)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
 	account, err := h.api.GetAccountAtBlockHeight(ctx, address, req.GetBlockHeight())
@@ -515,12 +565,14 @@ func (h *Handler) GetEventsForHeightRange(
 	startHeight := req.GetStartHeight()
 	endHeight := req.GetEndHeight()
 
-	results, err := h.api.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight)
+	eventEncodingVersion := req.GetEventEncodingVersion()
+
+	results, err := h.api.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight, eventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	resultEvents, err := blockEventsToMessages(results)
+	resultEvents, err := convert.BlockEventsToMessages(results)
 	if err != nil {
 		return nil, err
 	}
@@ -547,12 +599,14 @@ func (h *Handler) GetEventsForBlockIDs(
 		return nil, err
 	}
 
-	results, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs)
+	eventEncodingVersion := req.GetEventEncodingVersion()
+
+	results, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs, eventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	resultEvents, err := blockEventsToMessages(results)
+	resultEvents, err := convert.BlockEventsToMessages(results)
 	if err != nil {
 		return nil, err
 	}
@@ -578,6 +632,38 @@ func (h *Handler) GetLatestProtocolStateSnapshot(ctx context.Context, req *acces
 	}, nil
 }
 
+// GetProtocolStateSnapshotByBlockID returns serializable Snapshot by blockID
+func (h *Handler) GetProtocolStateSnapshotByBlockID(ctx context.Context, req *access.GetProtocolStateSnapshotByBlockIDRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	metadata := h.buildMetadataResponse()
+
+	blockID := convert.MessageToIdentifier(req.GetBlockId())
+
+	snapshot, err := h.api.GetProtocolStateSnapshotByBlockID(ctx, blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.ProtocolStateSnapshotResponse{
+		SerializedSnapshot: snapshot,
+		Metadata:           metadata,
+	}, nil
+}
+
+// GetProtocolStateSnapshotByHeight returns serializable Snapshot by block height
+func (h *Handler) GetProtocolStateSnapshotByHeight(ctx context.Context, req *access.GetProtocolStateSnapshotByHeightRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	metadata := h.buildMetadataResponse()
+
+	snapshot, err := h.api.GetProtocolStateSnapshotByHeight(ctx, req.GetBlockHeight())
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.ProtocolStateSnapshotResponse{
+		SerializedSnapshot: snapshot,
+		Metadata:           metadata,
+	}, nil
+}
+
 // GetExecutionResultForBlockID returns the latest received execution result for the given block ID.
 // AN might receive multiple receipts with conflicting results for unsealed blocks.
 // If this case happens, since AN is not able to determine which result is the correct one until the block is sealed, it has to pick one result to respond to this query. For now, we return the result from the latest received receipt.
@@ -592,6 +678,27 @@ func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *access.
 	}
 
 	return executionResultToMessages(result, metadata)
+}
+
+// GetExecutionResultByID returns the execution result for the given ID.
+func (h *Handler) GetExecutionResultByID(ctx context.Context, req *access.GetExecutionResultByIDRequest) (*access.ExecutionResultByIDResponse, error) {
+	metadata := h.buildMetadataResponse()
+
+	blockID := convert.MessageToIdentifier(req.GetId())
+
+	result, err := h.api.GetExecutionResultByID(ctx, blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	execResult, err := convert.ExecutionResultToMessage(result)
+	if err != nil {
+		return nil, err
+	}
+	return &access.ExecutionResultByIDResponse{
+		ExecutionResult: execResult,
+		Metadata:        metadata,
+	}, nil
 }
 
 func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flow.BlockStatus) (*access.BlockResponse, error) {
@@ -660,34 +767,6 @@ func executionResultToMessages(er *flow.ExecutionResult, metadata *entities.Meta
 	return &access.ExecutionResultForBlockIDResponse{
 		ExecutionResult: execResult,
 		Metadata:        metadata,
-	}, nil
-}
-
-func blockEventsToMessages(blocks []flow.BlockEvents) ([]*access.EventsResponse_Result, error) {
-	results := make([]*access.EventsResponse_Result, len(blocks))
-
-	for i, block := range blocks {
-		event, err := blockEventsToMessage(block)
-		if err != nil {
-			return nil, err
-		}
-		results[i] = event
-	}
-
-	return results, nil
-}
-
-func blockEventsToMessage(block flow.BlockEvents) (*access.EventsResponse_Result, error) {
-	eventMessages := make([]*entities.Event, len(block.Events))
-	for i, event := range block.Events {
-		eventMessages[i] = convert.EventToMessage(event)
-	}
-	timestamp := timestamppb.New(block.BlockTimestamp)
-	return &access.EventsResponse_Result{
-		BlockId:        block.BlockID[:],
-		BlockHeight:    block.BlockHeight,
-		BlockTimestamp: timestamp,
-		Events:         eventMessages,
 	}, nil
 }
 

@@ -10,26 +10,30 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 	return flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(`
+		SetScript([]byte(fmt.Sprintf(
+			`
 							// This transaction is a template for a transaction that
 							// could be used by anyone to send tokens to another account
 							// that has been set up to receive tokens.
@@ -68,7 +72,10 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 									// Deposit the withdrawn tokens in the recipient's receiver
 									receiverRef.deposit(from: <-self.sentVault)
 								}
-							}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain))),
+							}`,
+			sc.FungibleToken.Address.Hex(),
+			sc.FlowToken.Address.Hex(),
+		)),
 		)
 }
 
@@ -902,7 +909,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 		t.Run(tt.label, func(t *testing.T) {
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(tt.script)).
-				SetGasLimit(tt.gasLimit)
+				SetComputeLimit(tt.gasLimit)
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
@@ -941,6 +948,9 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		// The evm account has a storage exception, and if we don't bootstrap with evm,
+		// the first created account will have that address.
+		fvm.WithSetupEVMEnabled(true),
 	}
 
 	t.Run("Storing too much data fails", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
@@ -1008,9 +1018,11 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 					chain)
 				require.NoError(t, err)
 
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 				// deposit more flow to increase capacity
 				txBody := flow.NewTransactionBody().
-					SetScript([]byte(fmt.Sprintf(`
+					SetScript([]byte(fmt.Sprintf(
+						`
 					import FungibleToken from %s
 					import FlowToken from %s
 
@@ -1026,10 +1038,12 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 								?? panic("Could not borrow receiver reference to the recipient's Vault")
 							receiver.deposit(from: <-payment)
 						}
-					}`, fvm.FungibleTokenAddress(chain).HexWithPrefix(),
-						fvm.FlowTokenAddress(chain).HexWithPrefix(),
+					}`,
+						sc.FungibleToken.Address.HexWithPrefix(),
+						sc.FlowToken.Address.HexWithPrefix(),
 						"Container",
-						hex.EncodeToString([]byte(script))))).
+						hex.EncodeToString([]byte(script)),
+					))).
 					AddAuthorizer(accounts[0]).
 					AddAuthorizer(chain.ServiceAddress()).
 					SetProposalKey(chain.ServiceAddress(), 0, 0).
@@ -1613,7 +1627,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 		// read the address of the account created (e.g. "0x01" and convert it
 		// to flow.address)
-		data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
+		data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 		require.NoError(t, err)
 		address := flow.ConvertAddress(
 			data.(cadence.Event).Fields[0].(cadence.Address))
@@ -1663,31 +1677,30 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	})
 }
 
-func TestBlockContext_UnsafeRandom(t *testing.T) {
-
-	t.Parallel()
-
+func TestBlockContext_Random(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
-
 	header := &flow.Header{Height: 42}
-
+	source := testutil.EntropyProviderFixture(nil)
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithBlockHeader(header),
+		fvm.WithEntropyProvider(source),
 		fvm.WithCadenceLogging(true),
 	)
 
-	t.Run("works as transaction", func(t *testing.T) {
-		txBody := flow.NewTransactionBody().
-			SetScript([]byte(`
-                transaction {
-                    execute {
-                        let rand = unsafeRandom()
-                        log(rand)
-                    }
-                }
-            `))
+	tx_code := []byte(`
+	transaction {
+		execute {
+			let rand1 = unsafeRandom()
+			log(rand1)
+			let rand2 = unsafeRandom()
+			log(rand2)
+		}
+	}
+	`)
 
+	getTxRandoms := func(t *testing.T) [2]uint64 {
+		txBody := flow.NewTransactionBody().SetScript(tx_code)
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		require.NoError(t, err)
 
@@ -1697,13 +1710,78 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 			testutil.RootBootstrappedLedger(vm, ctx))
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
+		require.Len(t, output.Logs, 2)
 
-		require.Len(t, output.Logs, 1)
-
-		num, err := strconv.ParseUint(output.Logs[0], 10, 64)
+		r1, err := strconv.ParseUint(output.Logs[0], 10, 64)
 		require.NoError(t, err)
-		require.Equal(t, uint64(0x7515f254adc6f8af), num)
+		r2, err := strconv.ParseUint(output.Logs[1], 10, 64)
+		require.NoError(t, err)
+		return [2]uint64{r1, r2}
+	}
+
+	// - checks that unsafeRandom works on transactions
+	// - (sanity) checks that two successive randoms aren't equal
+	t.Run("single transaction", func(t *testing.T) {
+		randoms := getTxRandoms(t)
+		require.NotEqual(t, randoms[1], randoms[0], "extremely unlikely to be equal")
 	})
+
+	// checks that two transactions with different IDs do not generate the same randoms
+	t.Run("two transactions", func(t *testing.T) {
+		// getLoggedRandoms generates different tx IDs because envelope signature is randomized
+		randoms1 := getTxRandoms(t)
+		randoms2 := getTxRandoms(t)
+		require.NotEqual(t, randoms1[0], randoms2[0], "extremely unlikely to be equal")
+	})
+
+	script_string := `
+	pub fun main(a: Int8) {
+		let rand = unsafeRandom()
+		log(rand)
+		let rand%d = unsafeRandom()
+		log(rand%d)
+	}
+	`
+
+	getScriptRandoms := func(t *testing.T, codeSalt int, arg int) [2]uint64 {
+		script_code := []byte(fmt.Sprintf(script_string, codeSalt, codeSalt))
+		script := fvm.Script(script_code).WithArguments(
+			jsoncdc.MustEncode(cadence.Int8(arg)))
+
+		_, output, err := vm.Run(ctx, script, testutil.RootBootstrappedLedger(vm, ctx))
+		require.NoError(t, err)
+		require.NoError(t, output.Err)
+
+		r1, err := strconv.ParseUint(output.Logs[0], 10, 64)
+		require.NoError(t, err)
+		r2, err := strconv.ParseUint(output.Logs[1], 10, 64)
+		require.NoError(t, err)
+		return [2]uint64{r1, r2}
+	}
+
+	// - checks that unsafeRandom works on scripts
+	// - (sanity) checks that two successive randoms aren't equal
+	t.Run("single script", func(t *testing.T) {
+		randoms := getScriptRandoms(t, 1, 0)
+		require.NotEqual(t, randoms[1], randoms[0], "extremely unlikely to be equal")
+	})
+
+	// checks that two scripts with different codes do not generate the same randoms
+	t.Run("two script codes", func(t *testing.T) {
+		// getScriptRandoms generates different scripts IDs using different codes
+		randoms1 := getScriptRandoms(t, 1, 0)
+		randoms2 := getScriptRandoms(t, 2, 0)
+		require.NotEqual(t, randoms1[0], randoms2[0], "extremely unlikely to be equal")
+	})
+
+	// checks that two scripts with same codes but different arguments do not generate the same randoms
+	t.Run("same script codes different arguments", func(t *testing.T) {
+		// getScriptRandoms generates different scripts IDs using different arguments
+		randoms1 := getScriptRandoms(t, 1, 0)
+		randoms2 := getScriptRandoms(t, 1, 1)
+		require.NotEqual(t, randoms1[0], randoms2[0], "extremely unlikely to be equal")
+	})
+
 }
 
 func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t *testing.T) {
@@ -1734,7 +1812,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 
 	require.Len(t, accountCreatedEvents, 1)
 
-	data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
+	data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 	require.NoError(t, err)
 	address := flow.ConvertAddress(
 		data.(cadence.Event).Fields[0].(cadence.Address))
@@ -1751,7 +1829,9 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		address flow.Address,
 	) uint64 {
 
-		code := []byte(fmt.Sprintf(`
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		code := []byte(fmt.Sprintf(
+			`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
 
@@ -1763,7 +1843,10 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 
 						return vaultRef.balance
 					}
-				`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain)))
+				`,
+			sc.FungibleToken.Address.Hex(),
+			sc.FlowToken.Address.Hex(),
+		))
 		script := fvm.Script(code).WithArguments(
 			jsoncdc.MustEncode(cadence.NewAddress(address)),
 		)
@@ -1779,6 +1862,9 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionMemoryLimit(math.MaxUint64),
+		// The evm account has a storage exception, and if we don't bootstrap with evm,
+		// the first created account will have that address.
+		fvm.WithSetupEVMEnabled(true),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced

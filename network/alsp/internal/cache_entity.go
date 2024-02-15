@@ -2,7 +2,7 @@ package internal
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/alsp"
+	"github.com/onflow/flow-go/network/alsp/model"
 )
 
 // ProtocolSpamRecordEntity is an entity that represents a spam record. It is internally
@@ -10,7 +10,7 @@ import (
 // The identifier of this entity is the origin id of the spam record. This entails that the spam records
 // are deduplicated by origin id.
 type ProtocolSpamRecordEntity struct {
-	alsp.ProtocolSpamRecord
+	model.ProtocolSpamRecord
 }
 
 var _ flow.Entity = (*ProtocolSpamRecordEntity)(nil)

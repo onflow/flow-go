@@ -91,7 +91,7 @@ happy path is either
        Benign failure cases are represented as typed sentinel errors
        ([basic errors](https://pkg.go.dev/errors#New) and [higher-level errors](https://dev.to/tigorlazuardi/go-creating-custom-error-wrapper-and-do-proper-error-equality-check-11k7)),
        so we can do type checks.  
-   2. _exception: the error a potential symptom of internal state corruption_.  
+   2. _exception: the error is a potential symptom of internal state corruption_.  
       For example, a failed sanity check. In this case, the error is most likely fatal.
       <br /><br />
 
@@ -102,16 +102,76 @@ happy path is either
      Therefore, changing the set of specified sentinel errors is generally considered a breaking API change. 
 
 
-2. **All errors beyond the specified, benign sentinel errors ere considered unexpected failures, i.e. a symptom for potential state corruption.**       
+2. **All errors beyond the specified, benign sentinel errors are considered unexpected failures, i.e. a symptom of potential state corruption.**       
    * We employ a fundamental principle of [High Assurance Software Engineering](https://www.researchgate.net/publication/228563190_High_Assurance_Software_Development),
 where we treat everything beyond the known benign errors as critical failures. In unexpected failure cases, we assume that the vertex's in-memory state has been
 broken and proper functioning is no longer guaranteed. The only safe route of recovery is to restart the vertex from a previously persisted, safe state.
 Per convention, a vertex should throw any unexpected exceptions using the related [irrecoverable context](https://github.com/onflow/flow-go/blob/277b6515add6136946913747efebd508f0419a25/module/irrecoverable/irrecoverable.go).
-   * Many components in our BFT system can return benign errors (type (i)) and exceptions (type (ii))
-   * Use the special `irrecoverable.exception` [error type](https://github.com/onflow/flow-go/blob/master/module/irrecoverable/exception.go#L7-L26) to denote an unexpected error (and strip any sentinel information from the error stack)
+   * Many components in our BFT system can return benign errors (type (i)) and irrecoverable exceptions (type (ii))
 
-    
-3. _Optional Simplification for components that solely return benign errors._
+3. **Whether a particular error is benign or an exception depends on the caller's context. Errors _cannot_ be categorized as benign or exception based on their type alone.**
+
+   ![Error Handling](/docs/ErrorHandling.png)
+
+   * For example, consider `storage.ErrNotFound` that could be returned by the storage lager, when querying a block by ID
+   (method [`Headers.ByBlockID(flow.Identifier)`](https://github.com/onflow/flow-go/blob/a918616c7b541b772c254e7eaaae3573561e6c0a/storage/headers.go#L15-L18)).
+   In many cases, `storage.ErrNotFound` is expected, for instance if a node is receiving a new block proposal and checks whether the parent has already been ingested
+   or needs to be requested from a different node. In contrast, if we are querying a block that we know is already finalized and the storage returns a `storage.ErrNotFound`
+   something is badly broken. 
+   * Use the special `irrecoverable.exception` [error type](https://github.com/onflow/flow-go/blob/master/module/irrecoverable/exception.go#L7-L26)
+     to denote an unexpected error (and strip any sentinel information from the error stack).
+   
+     This is for any scenario when a higher-level function is interpreting a sentinel returned from a lower-level function as an exception.
+     To construct an example, lets look at our `storage.Blocks` API, which has a [`ByHeight` method](https://github.com/onflow/flow-go/blob/a918616c7b541b772c254e7eaaae3573561e6c0a/storage/blocks.go#L24-L26)
+     to retrieve _finalized_ blocks by height. The following could be a hypothetical implementation:
+      ```golang
+      // ByHeight retrieves the finalized block for the given height.
+      // From the perspective of the storage layer, the following errors are benign:
+      //   - storage.ErrNotFound if no finalized block at the given height is known
+      func ByHeight(height uint64) (*flow.Block, error) {
+          // Step 1: retrieve the ID of the finalized block for the given height. We expect
+          // `storage.ErrNotFound` during normal operations, if no block at height has been
+          // finalized. We just bubble this sentinel up, as it already has the expected type.
+          blockID, err := retrieveBlockIdByHeight(height)
+          if err != nil {
+              return nil, fmt.Errorf("could not query block by height: %w", err)
+          }
+
+          // Step 2: retrieve full block by ID. Function `retrieveBlockByID` returns
+          // `storage.ErrNotFound` in case no block with the given ID is known. In other parts
+          // of the code that also use `retrieveBlockByID`, this would be expected during normal
+          // operations. However, here we are querying a block, which the storage layer has
+          // already indexed. Failure to retrieve the block implies our storage is corrupted.
+          block, err := retrieveBlockByID(blockID)
+          if err != nil {
+              // We cannot bubble up `storage.ErrNotFound` as this would hide this irrecoverable
+              // failure behind a benign sentinel error. We use the `Exception` wrapper, which
+              // also implements the error `interface` but provides no `Unwrap` method. Thereby,
+              // the `err`s sentinel type is hidden from upstream type checks, and consequently 
+              // classified as unexpected, i.e. irrecoverable exceptions. 
+              return nil, irrecoverable.NewExceptionf("storage inconsistency, failed to" +
+                        "retrieve full block for indexed and finalized block %x: %w", blockID, err)
+          }
+          return block, nil
+      }
+      ```
+     Functions **may** use `irrecoverable.NewExceptionf` when:
+       - they are interpreting any error returning from a 3rd party module as unexpected
+       - they are reacting to an unexpected condition internal to their stack frame and returning a generic error
+  
+     Functions **must** usd `irrecoverable.NewExceptionf` when:
+       - they are interpreting any documented sentinel error returned from a flow-go module as unexpected
+
+     For brief illustration, let us consider some function body, in which there are multiple subsequent calls to other lower-level functions.
+     In most scenarios, a particular sentinel type is either always or never expected during normal operations.  If it is expected,
+     then the sentinel type should be documented. If it is consistently not expected, the error should _not_ be mentioned in the 
+     function's godoc. In the absence of positive affirmation that `error` is an expected and benign sentinel, the error is to be
+     treated as an irrecoverable exception. So if a sentinel type `T` is consistently not expected throughout the function's body, make 
+     sure the sentinel `T` is not mentioned in the function's godoc. The latter is fully sufficient to classify `T` as an irrecoverable
+     exception.   
+
+
+5. _Optional Simplification for components that solely return benign errors._
    * In this case, you _can_ use untyped errors to represent benign error cases (e.g. using `fmt.Errorf`).
    * By using untyped errors, the code would be _breaking with our best practice guideline_ that benign errors should be represented as typed sentinel errors.
 Therefore, whenever all returned errors are benign, please clearly document this _for each public functions individually_.
@@ -160,7 +220,8 @@ For example, a statement like the following would be sufficient:
 * Handle errors at a level, where you still have enough context to decide whether the error is expected during normal
   operations.
 * Errors of unexpected types are indicators that the node's internal state might be corrupted.
-    - Use the special `irrecoverable.exception` [error type](https://github.com/onflow/flow-go/blob/master/module/irrecoverable/exception.go#L7-L26) at the point an unexpected error is being returned, or when an error returned from another function is interpreted as unexpected
+
+
 ### Anti-Pattern
 
 Continuing on a best-effort basis is not an option, i.e. the following is an anti-pattern in the context of Flow:

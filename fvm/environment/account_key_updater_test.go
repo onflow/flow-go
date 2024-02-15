@@ -9,11 +9,11 @@ import (
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/tracing"
@@ -219,4 +219,7 @@ func (f FakeAccounts) GetStorageUsed(_ flow.Address) (uint64, error)          { 
 func (f FakeAccounts) SetValue(_ flow.RegisterID, _ []byte) error             { return nil }
 func (f FakeAccounts) AllocateStorageIndex(_ flow.Address) (atree.StorageIndex, error) {
 	return atree.StorageIndex{}, nil
+}
+func (f FakeAccounts) GenerateAccountLocalID(address flow.Address) (uint64, error) {
+	return 0, nil
 }

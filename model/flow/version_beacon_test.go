@@ -213,3 +213,14 @@ func TestValidate(t *testing.T) {
 		})
 	}
 }
+
+func TestVersionBeaconString(t *testing.T) {
+	vb := &flow.VersionBeacon{
+		VersionBoundaries: []flow.VersionBoundary{
+			{BlockHeight: 1, Version: "0.21.37"},
+			{BlockHeight: 200, Version: "0.21.37-patch.1"},
+		},
+		Sequence: 1,
+	}
+	require.Equal(t, "1:0.21.37 200:0.21.37-patch.1 ", vb.String())
+}

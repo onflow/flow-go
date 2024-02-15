@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -47,7 +46,6 @@ func TestBootstrapAndOpen(t *testing.T) {
 		require.NoError(t, err)
 
 		complianceMetrics := new(mock.ComplianceMetrics)
-		complianceMetrics.On("CommittedEpochFinalView", finalView).Once()
 		complianceMetrics.On("CurrentEpochCounter", counter).Once()
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
 		complianceMetrics.On("CurrentEpochFinalView", finalView).Once()
@@ -73,7 +71,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.Statuses,
+			all.ProtocolState,
 			all.VersionBeacons,
 		)
 		require.NoError(t, err)
@@ -81,6 +79,10 @@ func TestBootstrapAndOpen(t *testing.T) {
 		complianceMetrics.AssertExpectations(t)
 
 		unittest.AssertSnapshotsEqual(t, rootSnapshot, state.Final())
+
+		vb, err := state.Final().VersionBeacon()
+		require.NoError(t, err)
+		require.Nil(t, vb)
 	})
 }
 
@@ -98,8 +100,8 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 	require.NoError(t, err)
 
 	// build an epoch on the root state and return a snapshot from the committed phase
-	committedPhaseSnapshot := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
-		unittest.NewEpochBuilder(t, state).BuildEpoch().CompleteEpoch()
+	committedPhaseSnapshot := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
+		unittest.NewEpochBuilder(t, mutableState, state).BuildEpoch().CompleteEpoch()
 
 		// find the point where we transition to the epoch committed phase
 		for height := rootBlock.Height + 1; ; height++ {
@@ -114,11 +116,6 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 	protoutil.RunWithBootstrapState(t, committedPhaseSnapshot, func(db *badger.DB, _ *bprotocol.State) {
 
 		complianceMetrics := new(mock.ComplianceMetrics)
-
-		// expect the final view metric to be set to next epoch's final view
-		finalView, err := committedPhaseSnapshot.Epochs().Next().FinalView()
-		require.NoError(t, err)
-		complianceMetrics.On("CommittedEpochFinalView", finalView).Once()
 
 		// expect counter to be set to current epochs counter
 		counter, err := committedPhaseSnapshot.Epochs().Current().Counter()
@@ -154,7 +151,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.Statuses,
+			all.ProtocolState,
 			all.VersionBeacons,
 		)
 		require.NoError(t, err)
@@ -187,8 +184,8 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 	})
 
 	t.Run("with next epoch", func(t *testing.T) {
-		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
-			builder := unittest.NewEpochBuilder(t, state)
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
+			builder := unittest.NewEpochBuilder(t, mutableState, state)
 			builder.BuildEpoch().CompleteEpoch()
 			heights, ok := builder.EpochHeights(1)
 			require.True(t, ok)
@@ -214,8 +211,8 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 	t.Run("with previous epoch", func(t *testing.T) {
 		var epoch1FinalHeight uint64
 		var epoch2FirstHeight uint64
-		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
-			builder := unittest.NewEpochBuilder(t, state)
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
+			builder := unittest.NewEpochBuilder(t, mutableState, state)
 			builder.
 				BuildEpoch().CompleteEpoch(). // build epoch 2
 				BuildEpoch()                  // build epoch 3
@@ -257,26 +254,34 @@ func TestBootstrapNonRoot(t *testing.T) {
 	// start with a regular post-spork root snapshot
 	participants := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	rootBlock, err := rootSnapshot.Head()
 	require.NoError(t, err)
 
 	// should be able to bootstrap from snapshot after sealing a non-root block
 	// ROOT <- B1 <- B2(R1) <- B3(S1) <- CHILD
 	t.Run("with sealed block", func(t *testing.T) {
-		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
 			block1 := unittest.BlockWithParentFixture(rootBlock)
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			buildFinalizedBlock(t, state, block1)
 
 			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 			block2 := unittest.BlockWithParentFixture(block1.Header)
-			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+			block2.SetPayload(unittest.PayloadFixture(
+				unittest.WithReceipts(receipt1),
+				unittest.WithProtocolStateID(rootProtocolStateID)))
 			buildFinalizedBlock(t, state, block2)
 
+			seals := []*flow.Seal{seal1}
 			block3 := unittest.BlockWithParentFixture(block2.Header)
-			block3.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1)))
+			block3.SetPayload(flow.Payload{
+				Seals:           seals,
+				ProtocolStateID: calculateExpectedStateId(t, mutableState)(block3.Header, seals),
+			})
 			buildFinalizedBlock(t, state, block3)
 
-			child := unittest.BlockWithParentFixture(block3.Header)
+			child := unittest.BlockWithParentProtocolState(block3)
 			buildBlock(t, state, child)
 
 			return state.AtBlockID(block3.ID())
@@ -299,8 +304,8 @@ func TestBootstrapNonRoot(t *testing.T) {
 	})
 
 	t.Run("with setup next epoch", func(t *testing.T) {
-		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
-			unittest.NewEpochBuilder(t, state).BuildEpoch()
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
+			unittest.NewEpochBuilder(t, mutableState, state).BuildEpoch()
 
 			// find the point where we transition to the epoch setup phase
 			for height := rootBlock.Height + 1; ; height++ {
@@ -319,8 +324,8 @@ func TestBootstrapNonRoot(t *testing.T) {
 	})
 
 	t.Run("with committed next epoch", func(t *testing.T) {
-		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
-			unittest.NewEpochBuilder(t, state).BuildEpoch().CompleteEpoch()
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
+			unittest.NewEpochBuilder(t, mutableState, state).BuildEpoch().CompleteEpoch()
 
 			// find the point where we transition to the epoch committed phase
 			for height := rootBlock.Height + 1; ; height++ {
@@ -339,8 +344,8 @@ func TestBootstrapNonRoot(t *testing.T) {
 	})
 
 	t.Run("with previous and next epoch", func(t *testing.T) {
-		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
-			unittest.NewEpochBuilder(t, state).
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
+			unittest.NewEpochBuilder(t, mutableState, state).
 				BuildEpoch().CompleteEpoch(). // build epoch 2
 				BuildEpoch()                  // build epoch 3
 
@@ -379,7 +384,7 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 	})
 
 	t.Run("zero weight", func(t *testing.T) {
-		zeroWeightIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification), unittest.WithWeight(0))
+		zeroWeightIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification), unittest.WithInitialWeight(0))
 		participants := unittest.CompleteIdentitySet(zeroWeightIdentity)
 		root := unittest.RootSnapshotFixture(participants)
 		bootstrap(t, root, func(state *bprotocol.State, err error) {
@@ -422,7 +427,9 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 		root := unittest.RootSnapshotFixture(participants)
 		// randomly shuffle the identities so they are not canonically ordered
 		encodable := root.Encodable()
-		encodable.Identities = participants.DeterministicShuffle(time.Now().UnixNano())
+		var err error
+		encodable.Epochs.Current.InitialIdentities, err = participants.ToSkeleton().Shuffle()
+		require.NoError(t, err)
 		root = inmem.SnapshotFromEncodable(encodable)
 		bootstrap(t, root, func(state *bprotocol.State, err error) {
 			assert.Error(t, err)
@@ -536,7 +543,7 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 		all.QuorumCertificates,
 		all.Setups,
 		all.EpochCommits,
-		all.Statuses,
+		all.ProtocolState,
 		all.VersionBeacons,
 		rootSnapshot,
 	)
@@ -549,10 +556,10 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 //
 // This is used for generating valid snapshots to use when testing bootstrapping
 // from non-root states.
-func snapshotAfter(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.FollowerState) protocol.Snapshot) protocol.Snapshot {
+func snapshotAfter(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.FollowerState, protocol.MutableProtocolState) protocol.Snapshot) protocol.Snapshot {
 	var after protocol.Snapshot
-	protoutil.RunWithFollowerProtocolState(t, rootSnapshot, func(_ *badger.DB, state *bprotocol.FollowerState) {
-		snap := f(state)
+	protoutil.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(_ *badger.DB, state *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
+		snap := f(state.FollowerState, mutableState)
 		var err error
 		after, err = inmem.FromSnapshot(snap)
 		require.NoError(t, err)
@@ -580,8 +587,7 @@ func assertSealingSegmentBlocksQueryableAfterBootstrap(t *testing.T, snapshot pr
 		segment, err := state.Final().SealingSegment()
 		require.NoError(t, err)
 
-		rootBlock, err := state.Params().Root()
-		require.NoError(t, err)
+		rootBlock := state.Params().FinalizedRoot()
 
 		// root block should be the highest block from the sealing segment
 		assert.Equal(t, segment.Highest().Header, rootBlock)

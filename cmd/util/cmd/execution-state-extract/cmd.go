@@ -2,7 +2,6 @@ package extract
 
 import (
 	"encoding/hex"
-	"fmt"
 	"path"
 
 	"github.com/rs/zerolog/log"
@@ -16,26 +15,18 @@ import (
 )
 
 var (
-	flagExecutionStateDir string
-	flagOutputDir         string
-	flagBlockHash         string
-	flagStateCommitment   string
-	flagDatadir           string
-	flagChain             string
-	flagNoMigration       bool
-	flagNoReport          bool
-	flagNWorker           int
+	flagExecutionStateDir         string
+	flagOutputDir                 string
+	flagBlockHash                 string
+	flagStateCommitment           string
+	flagDatadir                   string
+	flagChain                     string
+	flagNWorker                   int
+	flagNoMigration               bool
+	flagNoReport                  bool
+	flagValidateMigration         bool
+	flagLogVerboseValidationError bool
 )
-
-func getChain(chainName string) (chain flow.Chain, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("invalid chain: %s", r)
-		}
-	}()
-	chain = flow.ChainID(chainName).Chain()
-	return
-}
 
 var Cmd = &cobra.Command{
 	Use:   "execution-state-extract",
@@ -53,7 +44,6 @@ func init() {
 	_ = Cmd.MarkFlagRequired("output-dir")
 
 	Cmd.Flags().StringVar(&flagChain, "chain", "", "Chain name")
-	_ = Cmd.MarkFlagRequired("chain")
 
 	Cmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "",
 		"state commitment (hex-encoded, 64 characters)")
@@ -71,6 +61,13 @@ func init() {
 		"don't report the state")
 
 	Cmd.Flags().IntVar(&flagNWorker, "n-migrate-worker", 10, "number of workers to migrate payload concurrently")
+
+	Cmd.Flags().BoolVar(&flagValidateMigration, "validate", false,
+		"validate migrated Cadence values (atree migration)")
+
+	Cmd.Flags().BoolVar(&flagLogVerboseValidationError, "log-verbose-validation-error", false,
+		"log entire Cadence values on validation error (atree migration)")
+
 }
 
 func run(*cobra.Command, []string) {
@@ -135,20 +132,29 @@ func run(*cobra.Command, []string) {
 	// 	log.Fatal().Err(err).Msgf("cannot ensure checkpoint file exist in folder %v", flagExecutionStateDir)
 	// }
 
-	chain, err := getChain(flagChain)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("invalid chain name")
+	if len(flagChain) > 0 {
+		log.Warn().Msgf("--chain flag is deprecated")
 	}
 
-	err = extractExecutionState(
+	if flagNoReport {
+		log.Warn().Msgf("--no-report flag is deprecated")
+	}
+
+	if flagValidateMigration {
+		log.Warn().Msgf("atree migration validation flag is enabled and will increase duration of migration")
+	}
+
+	if flagLogVerboseValidationError {
+		log.Warn().Msgf("atree migration has verbose validation error logging enabled which may increase size of log")
+	}
+
+	err := extractExecutionState(
+		log.Logger,
 		flagExecutionStateDir,
 		stateCommitment,
 		flagOutputDir,
-		log.Logger,
-		chain,
-		!flagNoMigration,
-		!flagNoReport,
 		flagNWorker,
+		!flagNoMigration,
 	)
 
 	if err != nil {

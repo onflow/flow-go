@@ -1,3 +1,14 @@
+// Package rand is a wrapper around `crypto/rand` that uses the system RNG underneath
+// to extract secure entropy.
+//
+// It implements useful tools that are not exported by the `crypto/rand` package.
+// This package should be used instead of `math/rand` for any use-case requiring
+// a secure randomness. It provides similar APIs to the ones provided by `math/rand`.
+// This package does not implement any determinstic RNG (Pseudo-RNG) based on
+// user input seeds. For the deterministic use-cases please use `github.com/onflow/crypto/random`.
+//
+// Functions in this package may return an error if the underlying system implementation fails
+// to read new randoms. When that happens, this package considers it an irrecoverable exception.
 package rand
 
 import (
@@ -6,13 +17,11 @@ import (
 	"fmt"
 )
 
-// This package is a wrppaer around true RNG crypto/rand.
-// It implements useful tools using the true RNG and that
-// are not exported by the crypto/rand package.
-// This package does not implement any determinstic RNG (Pseudo RNG)
-// unlike the package flow-go/crypto/random.
-
-// returns a random uint64
+// Uint64 returns a random uint64.
+//
+// It returns:
+//   - (0, exception) if crypto/rand fails to provide entropy which is likely a result of a system error.
+//   - (random, nil) otherwise
 func Uint64() (uint64, error) {
 	// allocate a new memory at each call. Another possibility
 	// is to use a global variable but that would make the package non thread safe
@@ -24,8 +33,13 @@ func Uint64() (uint64, error) {
 	return r, nil
 }
 
-// returns a random uint64 strictly less than n
-// errors if n==0
+// Uint64n returns a random uint64 strictly less than `n`.
+// `n` has to be a strictly positive integer.
+//
+// It returns:
+//   - (0, exception) if `n==0`
+//   - (0, exception) if crypto/rand fails to provide entropy which is likely a result of a system error.
+//   - (random, nil) otherwise
 func Uint64n(n uint64) (uint64, error) {
 	if n == 0 {
 		return 0, fmt.Errorf("n should be strictly positive, got %d", n)
@@ -66,7 +80,11 @@ func Uint64n(n uint64) (uint64, error) {
 	return random, nil
 }
 
-// returns a random uint32
+// Uint32 returns a random uint32.
+//
+// It returns:
+//   - (0, exception) if crypto/rand fails to provide entropy which is likely a result of a system error.
+//   - (random, nil) otherwise
 func Uint32() (uint32, error) {
 	// for 64-bits machines, doing 64 bits operations and then casting
 	// should be faster than dealing with 32 bits operations
@@ -74,21 +92,35 @@ func Uint32() (uint32, error) {
 	return uint32(r), err
 }
 
-// returns a random uint32 strictly less than n
-// errors if n==0
+// Uint32n returns a random uint32 strictly less than `n`.
+// `n` has to be a strictly positive integer.
+//
+// It returns an error:
+//   - (0, exception) if `n==0`
+//   - (0, exception) if crypto/rand fails to provide entropy which is likely a result of a system error.
+//   - (random, nil) otherwise
 func Uint32n(n uint32) (uint32, error) {
 	r, err := Uint64n(uint64(n))
 	return uint32(r), err
 }
 
-// returns a random uint
+// Uint returns a random uint.
+//
+// It returns:
+//   - (0, exception) if crypto/rand fails to provide entropy which is likely a result of a system error.
+//   - (random, nil) otherwise
 func Uint() (uint, error) {
 	r, err := Uint64()
 	return uint(r), err
 }
 
-// returns a random uint strictly less than n
-// errors if n==0
+// Uintn returns a random uint strictly less than `n`.
+// `n` has to be a strictly positive integer.
+//
+// It returns an error:
+//   - (0, exception) if `n==0`
+//   - (0, exception) if crypto/rand fails to provide entropy which is likely a result of a system error.
+//   - (random, nil) otherwise
 func Uintn(n uint) (uint, error) {
 	r, err := Uint64n(uint64(n))
 	return uint(r), err
@@ -99,22 +131,29 @@ func Uintn(n uint) (uint, error) {
 // It is not deterministic.
 //
 // It implements Fisher-Yates Shuffle using crypto/rand as a source of randoms.
+// It uses O(1) space and O(n) time
 //
-// O(1) space and O(n) time
+// It returns:
+//   - (exception) if crypto/rand fails to provide entropy which is likely a result of a system error.
+//   - (nil) otherwise
 func Shuffle(n uint, swap func(i, j uint)) error {
 	return Samples(n, n, swap)
 }
 
-// Samples picks randomly m elements out of n elemnts in a data structure
+// Samples picks randomly `m` elements out of `n` elements in a data structure
 // and places them in random order at indices [0,m-1],
 // the swapping being implemented in place. The data structure is defined
-// by the `swap` function.
-// Sampling is not deterministic.
+// by the `swap` function itself.
+// Sampling is not deterministic like the other functions of the package.
 //
-// It implements the first (m) elements of Fisher-Yates Shuffle using
-// crypto/rand as a source of randoms.
+// It implements the first `m` elements of Fisher-Yates Shuffle using
+// crypto/rand as a source of randoms. `m` has to be less or equal to `n`.
+// It uses O(1) space and O(m) time
 //
-// O(1) space and O(m) time
+// It returns:
+//   - (exception) if `n < m`
+//   - (exception) if crypto/rand fails to provide entropy which is likely a result of a system error.
+//   - (nil) otherwise
 func Samples(n uint, m uint, swap func(i, j uint)) error {
 	if n < m {
 		return fmt.Errorf("sample size (%d) cannot be larger than entire population (%d)", m, n)

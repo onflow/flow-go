@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -16,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/state_synchronization"
@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // The ExecutionDataRequester downloads ExecutionData for sealed blocks from other participants in
@@ -115,7 +116,6 @@ type ExecutionDataConfig struct {
 
 type executionDataRequester struct {
 	component.Component
-	cm         *component.ComponentManager
 	downloader execution_data.Downloader
 	metrics    module.ExecutionDataRequesterMetrics
 	config     ExecutionDataConfig
@@ -123,8 +123,6 @@ type executionDataRequester struct {
 
 	// Local db objects
 	headers storage.Headers
-	results storage.ExecutionResults
-	seals   storage.Seals
 
 	executionDataReader *jobs.ExecutionDataReader
 
@@ -135,10 +133,8 @@ type executionDataRequester struct {
 	blockConsumer        *jobqueue.ComponentConsumer
 	notificationConsumer *jobqueue.ComponentConsumer
 
-	// List of callbacks to call when ExecutionData is successfully fetched for a block
-	consumers []state_synchronization.OnExecutionDataReceivedConsumer
-
-	consumerMu sync.RWMutex
+	execDataCache *cache.ExecutionDataCache
+	distributor   *ExecutionDataDistributor
 }
 
 var _ state_synchronization.ExecutionDataRequester = (*executionDataRequester)(nil)
@@ -148,23 +144,23 @@ func New(
 	log zerolog.Logger,
 	edrMetrics module.ExecutionDataRequesterMetrics,
 	downloader execution_data.Downloader,
+	execDataCache *cache.ExecutionDataCache,
 	processedHeight storage.ConsumerProgress,
 	processedNotifications storage.ConsumerProgress,
 	state protocol.State,
 	headers storage.Headers,
-	results storage.ExecutionResults,
-	seals storage.Seals,
 	cfg ExecutionDataConfig,
-) state_synchronization.ExecutionDataRequester {
+	distributor *ExecutionDataDistributor,
+) (state_synchronization.ExecutionDataRequester, error) {
 	e := &executionDataRequester{
 		log:                  log.With().Str("component", "execution_data_requester").Logger(),
 		downloader:           downloader,
+		execDataCache:        execDataCache,
 		metrics:              edrMetrics,
 		headers:              headers,
-		results:              results,
-		seals:                seals,
 		config:               cfg,
 		finalizationNotifier: engine.NewNotifier(),
+		distributor:          distributor,
 	}
 
 	executionDataNotifier := engine.NewNotifier()
@@ -183,7 +179,7 @@ func New(
 	// from `processedHeight + 1`. If the database is empty, rootHeight will be used to init the
 	// last processed height. Once the execution data is fetched and stored, it notifies
 	// `executionDataNotifier`.
-	e.blockConsumer = jobqueue.NewComponentConsumer(
+	blockConsumer, err := jobqueue.NewComponentConsumer(
 		e.log.With().Str("module", "block_consumer").Logger(),
 		e.finalizationNotifier.Channel(), // to listen to finalization events to find newly sealed blocks
 		processedHeight,                  // read and persist the downloaded height
@@ -193,26 +189,30 @@ func New(
 		fetchWorkers,                     // the number of concurrent workers
 		e.config.MaxSearchAhead,          // max number of unsent notifications to allow before pausing new fetches
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create block consumer: %w", err)
+	}
+	e.blockConsumer = blockConsumer
+
 	// notifies notificationConsumer when new ExecutionData blobs are available
 	// SetPostNotifier will notify executionDataNotifier AFTER e.blockConsumer.LastProcessedIndex is updated.
 	// Even though it doesn't guarantee to notify for every height at least once, the notificationConsumer is
-	// able to guarantee to process every height at least once, because the notificationConsumer finds new job
-	// using executionDataReader which finds new height using e.blockConsumer.LastProcessedIndex
+	// able to guarantee to process every height at least once, because the notificationConsumer finds new jobs
+	// using executionDataReader which finds new heights using e.blockConsumer.LastProcessedIndex
 	e.blockConsumer.SetPostNotifier(func(module.JobID) { executionDataNotifier.Notify() })
 
 	// jobqueue Jobs object tracks downloaded execution data by height. This is used by the
 	// notificationConsumer to get downloaded execution data from storage.
 	e.executionDataReader = jobs.NewExecutionDataReader(
-		e.downloader,
-		e.headers,
-		e.results,
-		e.seals,
+		e.execDataCache,
 		e.config.FetchTimeout,
 		// method to get highest consecutive height that has downloaded execution data. it is used
 		// here by the notification job consumer to discover new jobs.
 		// Note: we don't want to notify notificationConsumer for a block if it has not downloaded
 		// execution data yet.
-		e.blockConsumer.LastProcessedIndex,
+		func() (uint64, error) {
+			return e.blockConsumer.LastProcessedIndex(), nil
+		},
 	)
 
 	// notificationConsumer consumes `OnExecutionDataFetched` events, and ensures its consumer
@@ -226,7 +226,7 @@ func New(
 	// `e.consumers`.
 	// Note: the `e.consumers` will be guaranteed to receive at least one `OnExecutionDataFetched` event
 	// for each sealed block in consecutive block height order.
-	e.notificationConsumer = jobqueue.NewComponentConsumer(
+	e.notificationConsumer, err = jobqueue.NewComponentConsumer(
 		e.log.With().Str("module", "notification_consumer").Logger(),
 		executionDataNotifier.Channel(), // listen for notifications from the block consumer
 		processedNotifications,          // read and persist the notified height
@@ -236,32 +236,35 @@ func New(
 		1,                               // use a single worker to ensure notification is delivered in consecutive order
 		0,                               // search ahead limit controlled by worker count
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create notification consumer: %w", err)
+	}
 
-	builder := component.NewComponentManagerBuilder().
+	e.Component = component.NewComponentManagerBuilder().
 		AddWorker(e.runBlockConsumer).
-		AddWorker(e.runNotificationConsumer)
+		AddWorker(e.runNotificationConsumer).
+		Build()
 
-	e.cm = builder.Build()
-	e.Component = e.cm
-
-	return e
+	return e, nil
 }
 
-// OnBlockFinalized accepts block finalization notifications from the FinalizationDistributor
+// OnBlockFinalized accepts block finalization notifications from the FollowerDistributor
 func (e *executionDataRequester) OnBlockFinalized(*model.Block) {
 	e.finalizationNotifier.Notify()
 }
 
-// AddOnExecutionDataReceivedConsumer adds a callback to be called when a new ExecutionData is received
-// Callback Implementations must:
-//   - be concurrency safe
-//   - be non-blocking
-//   - handle repetition of the same events (with some processing overhead).
-func (e *executionDataRequester) AddOnExecutionDataReceivedConsumer(fn state_synchronization.OnExecutionDataReceivedConsumer) {
-	e.consumerMu.Lock()
-	defer e.consumerMu.Unlock()
+// HighestConsecutiveHeight returns the highest consecutive block height for which ExecutionData
+// has been received.
+// This method must only be called after the component is Ready. If it is called early, an error is returned.
+func (e *executionDataRequester) HighestConsecutiveHeight() (uint64, error) {
+	select {
+	case <-e.blockConsumer.Ready():
+	default:
+		// LastProcessedIndex is not meaningful until the component has completed startup
+		return 0, fmt.Errorf("HighestConsecutiveHeight must not be called before the component is ready")
+	}
 
-	e.consumers = append(e.consumers, fn)
+	return e.blockConsumer.LastProcessedIndex(), nil
 }
 
 // runBlockConsumer runs the blockConsumer component
@@ -361,7 +364,7 @@ func (e *executionDataRequester) processSealedHeight(ctx irrecoverable.SignalerC
 	})
 }
 
-func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerContext, blockID flow.Identifier, height uint64, fetchTimeout time.Duration) error {
+func (e *executionDataRequester) processFetchRequest(parentCtx irrecoverable.SignalerContext, blockID flow.Identifier, height uint64, fetchTimeout time.Duration) error {
 	logger := e.log.With().
 		Str("block_id", blockID.String()).
 		Uint64("height", height).
@@ -369,24 +372,15 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 
 	logger.Debug().Msg("processing fetch request")
 
-	seal, err := e.seals.FinalizedSealForBlock(blockID)
-	if err != nil {
-		ctx.Throw(fmt.Errorf("failed to get seal for block %s: %w", blockID, err))
-	}
-
-	result, err := e.results.ByID(seal.ResultID)
-	if err != nil {
-		ctx.Throw(fmt.Errorf("failed to lookup execution result for block %s: %w", blockID, err))
-	}
-
-	logger = logger.With().Str("execution_data_id", result.ExecutionDataID.String()).Logger()
-
 	start := time.Now()
 	e.metrics.ExecutionDataFetchStarted()
 
 	logger.Debug().Msg("downloading execution data")
 
-	_, err = e.fetchExecutionData(ctx, result.ExecutionDataID, fetchTimeout)
+	ctx, cancel := context.WithTimeout(parentCtx, fetchTimeout)
+	defer cancel()
+
+	execData, err := e.execDataCache.ByBlockID(ctx, blockID)
 
 	e.metrics.ExecutionDataFetchFinished(time.Since(start), err == nil, height)
 
@@ -409,29 +403,14 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 	if err != nil {
 		logger.Error().Err(err).Msg("unexpected error fetching execution data")
 
-		ctx.Throw(err)
+		parentCtx.Throw(err)
 	}
 
-	logger.Info().Msg("execution data fetched")
+	logger.Info().
+		Hex("execution_data_id", logging.ID(execData.ID())).
+		Msg("execution data fetched")
 
 	return nil
-}
-
-// fetchExecutionData fetches the ExecutionData by its ID, and times out if fetchTimeout is exceeded
-func (e *executionDataRequester) fetchExecutionData(signalerCtx irrecoverable.SignalerContext, executionDataID flow.Identifier, fetchTimeout time.Duration) (*execution_data.BlockExecutionData, error) {
-	ctx, cancel := context.WithTimeout(signalerCtx, fetchTimeout)
-	defer cancel()
-
-	// Get the data from the network
-	// this is a blocking call, won't be unblocked until either hitting error (including timeout) or
-	// the data is received
-	executionData, err := e.downloader.Download(ctx, executionDataID)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return executionData, nil
 }
 
 // Notification Worker Methods
@@ -443,26 +422,16 @@ func (e *executionDataRequester) processNotificationJob(ctx irrecoverable.Signal
 		ctx.Throw(fmt.Errorf("failed to convert job to entry: %w", err))
 	}
 
-	e.processNotification(ctx, entry.Height, entry.ExecutionData)
-	jobComplete()
-}
-
-func (e *executionDataRequester) processNotification(ctx irrecoverable.SignalerContext, height uint64, executionData *execution_data.BlockExecutionDataEntity) {
-	e.log.Debug().Msgf("notifying for block %d", height)
+	e.log.Debug().
+		Hex("block_id", logging.ID(entry.BlockID)).
+		Uint64("height", entry.Height).
+		Msgf("notifying for block")
 
 	// send notifications
-	e.notifyConsumers(executionData)
+	e.distributor.OnExecutionDataReceived(entry.ExecutionData)
+	jobComplete()
 
-	e.metrics.NotificationSent(height)
-}
-
-func (e *executionDataRequester) notifyConsumers(executionData *execution_data.BlockExecutionDataEntity) {
-	e.consumerMu.RLock()
-	defer e.consumerMu.RUnlock()
-
-	for _, fn := range e.consumers {
-		fn(executionData)
-	}
+	e.metrics.NotificationSent(entry.Height)
 }
 
 func isInvalidBlobError(err error) bool {

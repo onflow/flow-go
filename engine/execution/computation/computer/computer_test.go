@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sync/atomic"
 	"testing"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -26,17 +27,23 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
+	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -48,6 +55,10 @@ import (
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
+)
+
+const (
+	testMaxConcurrency = 2
 )
 
 func incStateCommitment(startState flow.StateCommitment) flow.StateCommitment {
@@ -62,22 +73,46 @@ type fakeCommitter struct {
 
 func (committer *fakeCommitter) CommitView(
 	view *snapshot.ExecutionSnapshot,
-	startState flow.StateCommitment,
+	baseStorageSnapshot execution.ExtendableStorageSnapshot,
 ) (
 	flow.StateCommitment,
 	[]byte,
 	*ledger.TrieUpdate,
+	execution.ExtendableStorageSnapshot,
 	error,
 ) {
 	committer.callCount++
 
+	startState := baseStorageSnapshot.Commitment()
 	endState := incStateCommitment(startState)
 
-	trieUpdate := &ledger.TrieUpdate{}
-	trieUpdate.RootHash[0] = byte(committer.callCount)
-	return endState,
+	reg := unittest.MakeOwnerReg("key", fmt.Sprintf("%v", committer.callCount))
+	regKey := convert.RegisterIDToLedgerKey(reg.Key)
+	path, err := pathfinder.KeyToPath(
+		regKey,
+		complete.DefaultPathFinderVersion,
+	)
+	if err != nil {
+		return flow.DummyStateCommitment, nil, nil, nil, err
+	}
+	trieUpdate := &ledger.TrieUpdate{
+		RootHash: ledger.RootHash(startState),
+		Paths: []ledger.Path{
+			path,
+		},
+		Payloads: []*ledger.Payload{
+			ledger.NewPayload(regKey, reg.Value),
+		},
+	}
+
+	newStorageSnapshot := baseStorageSnapshot.Extend(endState, map[flow.RegisterID]flow.RegisterValue{
+		reg.Key: reg.Value,
+	})
+
+	return newStorageSnapshot.Commitment(),
 		[]byte{byte(committer.callCount)},
 		trieUpdate,
+		newStorageSnapshot,
 		nil
 }
 
@@ -95,9 +130,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("single collection", func(t *testing.T) {
 
-		execCtx := fvm.NewContext(
-			fvm.WithDerivedBlockData(derived.NewEmptyDerivedBlockData(0)),
-		)
+		execCtx := fvm.NewContext()
 
 		vm := &testVM{
 			t:                    t,
@@ -123,9 +156,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		exemetrics.On("ExecutionTransactionExecuted",
 			mock.Anything, // duration
+			mock.Anything, // conflict retry count
 			mock.Anything, // computation used
 			mock.Anything, // memory used
-			mock.Anything, // actual memory used
 			mock.Anything, // number of events
 			mock.Anything, // size of events
 			false).        // no failure
@@ -166,7 +199,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer,
 			me,
 			prov,
-			nil)
+			nil,
+			testutil.ProtocolStateWithSourceFixture(nil),
+			testMaxConcurrency)
 		require.NoError(t, err)
 
 		// create a block with 1 collection with 2 transactions
@@ -262,14 +297,17 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			chunkDataPack1.Collection,
 			chunkExecutionData1.Collection)
 		assert.NotNil(t, chunkExecutionData1.TrieUpdate)
-		assert.Equal(t, byte(1), chunkExecutionData1.TrieUpdate.RootHash[0])
+		assert.Equal(t, ledger.RootHash(chunk1.StartState), chunkExecutionData1.TrieUpdate.RootHash)
 
 		chunkExecutionData2 := result.ChunkExecutionDatas[1]
 		assert.NotNil(t, chunkExecutionData2.Collection)
 		assert.NotNil(t, chunkExecutionData2.TrieUpdate)
-		assert.Equal(t, byte(2), chunkExecutionData2.TrieUpdate.RootHash[0])
+		assert.Equal(t, ledger.RootHash(chunk2.StartState), chunkExecutionData2.TrieUpdate.RootHash)
 
-		assert.Equal(t, 3, vm.callCount)
+		assert.GreaterOrEqual(t, vm.CallCount(), 3)
+		// if every transaction is retried once, then the call count should be
+		// (1+totalTransactionCount) /2 * totalTransactionCount
+		assert.LessOrEqual(t, vm.CallCount(), (1+3)/2*3)
 	})
 
 	t.Run("empty block still computes system chunk", func(t *testing.T) {
@@ -299,22 +337,26 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer,
 			me,
 			prov,
-			nil)
+			nil,
+			testutil.ProtocolStateWithSourceFixture(nil),
+			testMaxConcurrency)
 		require.NoError(t, err)
 
 		// create an empty block
 		block := generateBlock(0, 0, rag)
 		derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
-			Return(
-				&snapshot.ExecutionSnapshot{},
-				fvm.ProcedureOutput{},
-				nil).
+		vm.On("NewExecutor", mock.Anything, mock.Anything, mock.Anything).
+			Return(noOpExecutor{}).
 			Once() // just system chunk
 
+		snapshot := storehouse.NewExecutingBlockSnapshot(
+			snapshot.MapStorageSnapshot{},
+			unittest.StateCommitmentFixture(),
+		)
+
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil, nil).
+			Return(nil, nil, nil, snapshot, nil).
 			Once() // just system chunk
 
 		result, err := exe.ExecuteBlock(
@@ -398,14 +440,21 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			comm,
 			me,
 			prov,
-			nil)
+			nil,
+			testutil.ProtocolStateWithSourceFixture(nil),
+			testMaxConcurrency)
 		require.NoError(t, err)
 
 		// create an empty block
 		block := generateBlock(0, 0, rag)
 
+		snapshot := storehouse.NewExecutingBlockSnapshot(
+			snapshot.MapStorageSnapshot{},
+			unittest.StateCommitmentFixture(),
+		)
+
 		comm.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil, nil).
+			Return(nil, nil, nil, snapshot, nil).
 			Once() // just system chunk
 
 		result, err := exe.ExecuteBlock(
@@ -456,7 +505,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer,
 			me,
 			prov,
-			nil)
+			nil,
+			testutil.ProtocolStateWithSourceFixture(nil),
+			testMaxConcurrency)
 		require.NoError(t, err)
 
 		collectionCount := 2
@@ -469,8 +520,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
 		derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
+		snapshot := storehouse.NewExecutingBlockSnapshot(
+			snapshot.MapStorageSnapshot{},
+			unittest.StateCommitmentFixture(),
+		)
+
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil, nil).
+			Return(nil, nil, nil, snapshot, nil).
 			Times(collectionCount + 1)
 
 		result, err := exe.ExecuteBlock(
@@ -523,7 +579,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		assertEventHashesMatch(t, collectionCount+1, result)
 
-		assert.Equal(t, totalTransactionCount, vm.callCount)
+		assert.GreaterOrEqual(t, vm.CallCount(), totalTransactionCount)
+		// if every transaction is retried once, then the call count should be
+		// (1+totalTransactionCount) /2 * totalTransactionCount
+		assert.LessOrEqual(t, vm.CallCount(), (1+totalTransactionCount)/2*totalTransactionCount)
 	})
 
 	t.Run(
@@ -537,22 +596,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			collectionCount := 2
 			transactionsPerCollection := 2
 
-			totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 // +1 for system chunk
-
 			// create a block with 2 collections with 2 transactions each
 			block := generateBlock(collectionCount, transactionsPerCollection, rag)
 
-			ordinaryEvent := cadence.Event{
-				EventType: &cadence.EventType{
-					Location:            stdlib.FlowLocation{},
-					QualifiedIdentifier: "what.ever",
-				},
-			}
+			serviceEvents := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
 
-			serviceEvents, err := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
-			require.NoError(t, err)
-
-			payload, err := json.Decode(nil, []byte(unittest.EpochSetupFixtureJSON))
+			randomSource := unittest.EpochSetupRandomSourceFixture()
+			payload, err := ccf.Decode(nil, unittest.EpochSetupFixtureCCF(randomSource))
 			require.NoError(t, err)
 
 			serviceEventA, ok := payload.(cadence.Event)
@@ -563,7 +613,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			}
 			serviceEventA.EventType.QualifiedIdentifier = serviceEvents.EpochSetup.QualifiedIdentifier()
 
-			payload, err = json.Decode(nil, []byte(unittest.EpochCommitFixtureJSON))
+			payload, err = ccf.Decode(nil, unittest.EpochCommitFixtureCCF)
 			require.NoError(t, err)
 
 			serviceEventB, ok := payload.(cadence.Event)
@@ -574,7 +624,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			}
 			serviceEventB.EventType.QualifiedIdentifier = serviceEvents.EpochCommit.QualifiedIdentifier()
 
-			payload, err = json.Decode(nil, []byte(unittest.VersionBeaconFixtureJSON))
+			payload, err = ccf.Decode(nil, unittest.VersionBeaconFixtureCCF)
 			require.NoError(t, err)
 
 			serviceEventC, ok := payload.(cadence.Event)
@@ -585,26 +635,55 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			}
 			serviceEventC.EventType.QualifiedIdentifier = serviceEvents.VersionBeacon.QualifiedIdentifier()
 
+			transactions := []*flow.TransactionBody{}
+			for _, col := range block.Collections() {
+				transactions = append(transactions, col.Transactions...)
+			}
+
 			// events to emit for each iteration/transaction
-			events := make([][]cadence.Event, totalTransactionCount)
-			events[0] = nil
-			events[1] = []cadence.Event{serviceEventA, ordinaryEvent}
-			events[2] = []cadence.Event{ordinaryEvent}
-			events[3] = nil
-			events[4] = []cadence.Event{serviceEventB, serviceEventC}
+			events := map[common.Location][]cadence.Event{
+				common.TransactionLocation(transactions[0].ID()): nil,
+				common.TransactionLocation(transactions[1].ID()): {
+					serviceEventA,
+					{
+						EventType: &cadence.EventType{
+							Location:            stdlib.FlowLocation{},
+							QualifiedIdentifier: "what.ever",
+						},
+					},
+				},
+				common.TransactionLocation(transactions[2].ID()): {
+					{
+						EventType: &cadence.EventType{
+							Location:            stdlib.FlowLocation{},
+							QualifiedIdentifier: "what.ever",
+						},
+					},
+				},
+				common.TransactionLocation(transactions[3].ID()): nil,
+			}
+
+			systemTransactionEvents := []cadence.Event{
+				serviceEventB,
+				serviceEventC,
+			}
 
 			emittingRuntime := &testRuntime{
 				executeTransaction: func(
 					script runtime.Script,
 					context runtime.Context,
 				) error {
-					for _, e := range events[0] {
+					scriptEvents, ok := events[context.Location]
+					if !ok {
+						scriptEvents = systemTransactionEvents
+					}
+
+					for _, e := range scriptEvents {
 						err := context.Interface.EmitEvent(e)
 						if err != nil {
 							return err
 						}
 					}
-					events = events[1:]
 					return nil
 				},
 				readStored: func(
@@ -652,7 +731,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				me,
 				prov,
 				nil,
-			)
+				testutil.ProtocolStateWithSourceFixture(nil),
+				testMaxConcurrency)
 			require.NoError(t, err)
 
 			result, err := exe.ExecuteBlock(
@@ -761,7 +841,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer.NewNoopViewCommitter(),
 			me,
 			prov,
-			nil)
+			nil,
+			testutil.ProtocolStateWithSourceFixture(nil),
+			testMaxConcurrency)
 		require.NoError(t, err)
 
 		const collectionCount = 2
@@ -799,15 +881,21 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		const collectionCount = 2
 		const transactionCount = 2
+		block := generateBlock(collectionCount, transactionCount, rag)
 
-		var executionCalls int
+		normalTransactions := map[common.Location]struct{}{}
+		for _, col := range block.Collections() {
+			for _, txn := range col.Transactions {
+				loc := common.TransactionLocation(txn.ID())
+				normalTransactions[loc] = struct{}{}
+			}
+		}
 
 		rt := &testRuntime{
 			executeTransaction: func(script runtime.Script, r runtime.Context) error {
 
-				executionCalls++
-
-				// NOTE: set a program and revert all transactions but the system chunk transaction
+				// NOTE: set a program and revert all transactions but the
+				// system chunk transaction
 				_, err := r.Interface.GetOrLoadProgram(
 					contractLocation,
 					func() (*interpreter.Program, error) {
@@ -816,13 +904,14 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				)
 				require.NoError(t, err)
 
-				if executionCalls > collectionCount*transactionCount {
-					return nil
+				_, ok := normalTransactions[r.Location]
+				if ok {
+					return runtime.Error{
+						Err: fmt.Errorf("TX reverted"),
+					}
 				}
 
-				return runtime.Error{
-					Err: fmt.Errorf("TX reverted"),
-				}
+				return nil
 			},
 			readStored: func(
 				address common.Address,
@@ -865,10 +954,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer.NewNoopViewCommitter(),
 			me,
 			prov,
-			nil)
+			nil,
+			testutil.ProtocolStateWithSourceFixture(nil),
+			testMaxConcurrency)
 		require.NoError(t, err)
-
-		block := generateBlock(collectionCount, transactionCount, rag)
 
 		key := flow.AccountStatusRegisterID(
 			flow.BytesToAddress(address.Bytes()))
@@ -883,6 +972,60 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, result.AllExecutionSnapshots(), collectionCount+1) // +1 system chunk
 	})
+
+	t.Run("internal error", func(t *testing.T) {
+		execCtx := fvm.NewContext()
+
+		committer := new(computermock.ViewCommitter)
+
+		bservice := requesterunit.MockBlobService(
+			blockstore.NewBlockstore(
+				dssync.MutexWrap(datastore.NewMapDatastore())))
+		trackerStorage := mocktracker.NewMockStorage()
+
+		prov := provider.NewProvider(
+			zerolog.Nop(),
+			metrics.NewNoopCollector(),
+			execution_data.DefaultSerializer,
+			bservice,
+			trackerStorage)
+
+		exe, err := computer.NewBlockComputer(
+			errorVM{errorAt: 5},
+			execCtx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			committer,
+			me,
+			prov,
+			nil,
+			testutil.ProtocolStateWithSourceFixture(nil),
+			testMaxConcurrency)
+		require.NoError(t, err)
+
+		collectionCount := 5
+		transactionsPerCollection := 3
+		block := generateBlock(collectionCount, transactionsPerCollection, rag)
+
+		snapshot := storehouse.NewExecutingBlockSnapshot(
+			snapshot.MapStorageSnapshot{},
+			unittest.StateCommitmentFixture(),
+		)
+
+		committer.On("CommitView", mock.Anything, mock.Anything).
+			Return(nil, nil, nil, snapshot, nil).
+			Times(collectionCount + 1)
+
+		_, err = exe.ExecuteBlock(
+			context.Background(),
+			unittest.IdentifierFixture(),
+			block,
+			nil,
+			derived.NewEmptyDerivedBlockData(0))
+		assert.ErrorContains(t, err, "boom - internal error")
+	})
+
 }
 
 func assertEventHashesMatch(
@@ -1101,14 +1244,19 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
 
 	committer := new(computermock.ViewCommitter)
+	snapshot := storehouse.NewExecutingBlockSnapshot(
+		snapshot.MapStorageSnapshot{},
+		unittest.StateCommitmentFixture(),
+	)
+
 	committer.On("CommitView", mock.Anything, mock.Anything).
-		Return(nil, nil, nil, nil).
+		Return(nil, nil, nil, snapshot, nil).
 		Times(1) // only system chunk
 
 	noopCollector := metrics.NewNoopCollector()
 
 	expectedNumberOfEvents := 3
-	expectedEventSize := 1721
+	expectedEventSize := 1493
 	// bootstrapping does not cache programs
 	expectedCachedPrograms := 0
 
@@ -1127,9 +1275,9 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	metrics.On("ExecutionTransactionExecuted",
 		mock.Anything, // duration
+		mock.Anything, // conflict retry count
 		mock.Anything, // computation used
 		mock.Anything, // memory used
-		mock.Anything, // actual memory used
 		expectedNumberOfEvents,
 		expectedEventSize,
 		false).
@@ -1149,6 +1297,12 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		Return(nil).
 		Times(1) // block
 
+	metrics.On(
+		"ExecutionBlockExecutionEffortVectorComponent",
+		mock.Anything,
+		mock.Anything).
+		Return(nil)
+
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := mocktracker.NewMockStorage()
 
@@ -1166,6 +1320,8 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
+	constRandomSource := make([]byte, 32)
+
 	exe, err := computer.NewBlockComputer(
 		vm,
 		execCtx,
@@ -1175,7 +1331,9 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		committer,
 		me,
 		prov,
-		nil)
+		nil,
+		testutil.ProtocolStateWithSourceFixture(constRandomSource),
+		testMaxConcurrency)
 	require.NoError(t, err)
 
 	// create empty block, it will have system collection attached while executing
@@ -1269,12 +1427,77 @@ func generateCollection(
 	}
 }
 
+type noOpExecutor struct{}
+
+func (noOpExecutor) Cleanup() {}
+
+func (noOpExecutor) Preprocess() error {
+	return nil
+}
+
+func (noOpExecutor) Execute() error {
+	return nil
+}
+
+func (noOpExecutor) Output() fvm.ProcedureOutput {
+	return fvm.ProcedureOutput{}
+}
+
 type testVM struct {
 	t                    *testing.T
 	eventsPerTransaction int
 
-	callCount int
+	callCount int32 // atomic variable
 	err       fvmErrors.CodedError
+}
+
+type testExecutor struct {
+	*testVM
+
+	ctx      fvm.Context
+	proc     fvm.Procedure
+	txnState storage.TransactionPreparer
+}
+
+func (testExecutor) Cleanup() {
+}
+
+func (testExecutor) Preprocess() error {
+	return nil
+}
+
+func (executor *testExecutor) Execute() error {
+	atomic.AddInt32(&executor.callCount, 1)
+
+	getSetAProgram(executor.t, executor.txnState)
+
+	return nil
+}
+
+func (executor *testExecutor) Output() fvm.ProcedureOutput {
+	txn := executor.proc.(*fvm.TransactionProcedure)
+
+	return fvm.ProcedureOutput{
+		Events: generateEvents(executor.eventsPerTransaction, txn.TxIndex),
+		Err:    executor.err,
+	}
+}
+
+func (vm *testVM) NewExecutor(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	txnState storage.TransactionPreparer,
+) fvm.ProcedureExecutor {
+	return &testExecutor{
+		testVM:   vm,
+		proc:     proc,
+		ctx:      ctx,
+		txnState: txnState,
+	}
+}
+
+func (vm *testVM) CallCount() int {
+	return int(atomic.LoadInt32(&vm.callCount))
 }
 
 func (vm *testVM) Run(
@@ -1286,24 +1509,27 @@ func (vm *testVM) Run(
 	fvm.ProcedureOutput,
 	error,
 ) {
-	vm.callCount += 1
+	database := storage.NewBlockDatabase(
+		storageSnapshot,
+		proc.ExecutionTime(),
+		ctx.DerivedBlockData)
 
-	txn := proc.(*fvm.TransactionProcedure)
-
-	derivedTxnData, err := ctx.DerivedBlockData.NewDerivedTransactionData(
-		txn.ExecutionTime(),
-		txn.ExecutionTime())
+	txn, err := database.NewTransaction(
+		proc.ExecutionTime(),
+		state.DefaultParameters())
 	require.NoError(vm.t, err)
 
-	getSetAProgram(vm.t, storageSnapshot, derivedTxnData)
+	executor := vm.NewExecutor(ctx, proc, txn)
+	err = fvm.Run(executor)
+	require.NoError(vm.t, err)
 
-	snapshot := &snapshot.ExecutionSnapshot{}
-	output := fvm.ProcedureOutput{
-		Events: generateEvents(vm.eventsPerTransaction, txn.TxIndex),
-		Err:    vm.err,
-	}
+	err = txn.Finalize()
+	require.NoError(vm.t, err)
 
-	return snapshot, output, nil
+	executionSnapshot, err := txn.Commit()
+	require.NoError(vm.t, err)
+
+	return executionSnapshot, executor.Output(), nil
 }
 
 func (testVM) GetAccount(
@@ -1331,21 +1557,77 @@ func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 	return events
 }
 
+type errorVM struct {
+	errorAt logical.Time
+}
+
+type errorExecutor struct {
+	err error
+}
+
+func (errorExecutor) Cleanup() {}
+
+func (errorExecutor) Preprocess() error {
+	return nil
+}
+
+func (e errorExecutor) Execute() error {
+	return e.err
+}
+
+func (errorExecutor) Output() fvm.ProcedureOutput {
+	return fvm.ProcedureOutput{}
+}
+
+func (vm errorVM) NewExecutor(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	txn storage.TransactionPreparer,
+) fvm.ProcedureExecutor {
+	var err error
+	if proc.ExecutionTime() == vm.errorAt {
+		err = fmt.Errorf("boom - internal error")
+	}
+
+	return errorExecutor{err: err}
+}
+
+func (vm errorVM) Run(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	*snapshot.ExecutionSnapshot,
+	fvm.ProcedureOutput,
+	error,
+) {
+	var err error
+	if proc.ExecutionTime() == vm.errorAt {
+		err = fmt.Errorf("boom - internal error")
+	}
+	return &snapshot.ExecutionSnapshot{}, fvm.ProcedureOutput{}, err
+}
+
+func (errorVM) GetAccount(
+	ctx fvm.Context,
+	addr flow.Address,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	*flow.Account,
+	error,
+) {
+	panic("not implemented")
+}
+
 func getSetAProgram(
 	t *testing.T,
-	storageSnapshot snapshot.StorageSnapshot,
-	derivedTxnData *derived.DerivedTransactionData,
+	txnState storage.TransactionPreparer,
 ) {
-
-	txnState := state.NewTransactionState(
-		storageSnapshot,
-		state.DefaultParameters())
-
 	loc := common.AddressLocation{
 		Name:    "SomeContract",
 		Address: common.MustBytesToAddress([]byte{0x1}),
 	}
-	_, err := derivedTxnData.GetOrComputeProgram(
+	_, err := txnState.GetOrComputeProgram(
 		txnState,
 		loc,
 		&programLoader{
@@ -1354,9 +1636,6 @@ func getSetAProgram(
 			},
 		},
 	)
-	require.NoError(t, err)
-
-	err = derivedTxnData.Commit()
 	require.NoError(t, err)
 }
 
