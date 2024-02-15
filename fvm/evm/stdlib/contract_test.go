@@ -2980,7 +2980,10 @@ func TestBridgedAccountCall(t *testing.T) {
 	expectedBalance, err := cadence.NewUFix64FromParts(1, 23000000)
 	require.NoError(t, err)
 
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
 	handler := &testContractHandler{
+		evmContractAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
 			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.True(t, isAuthorized)
@@ -3007,8 +3010,6 @@ func TestBridgedAccountCall(t *testing.T) {
 		},
 	}
 
-	contractsAddress := flow.BytesToAddress([]byte{0x1})
-
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
@@ -3031,7 +3032,7 @@ func TestBridgedAccountCall(t *testing.T) {
               value: bal
           )
           destroy bridgedAccount
-          return response
+          return response.data
       }
    `)
 
