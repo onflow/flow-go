@@ -21,7 +21,7 @@ type ProtocolKVStore interface {
 	// StoreTx returns an anonymous function (intended to be executed as part of a badger transaction),
 	// which persists the given KV-store snapshot as part of a DB tx.
 	// Expected errors of the returned anonymous function:
-	//   - storage.ErrAlreadyExists if a model with the given id is already stored
+	//   - storage.ErrAlreadyExists if a KV-store snapshot with the given id is already stored.
 	StoreTx(stateID flow.Identifier, data *KeyValueStoreData) func(*transaction.Tx) error
 
 	// IndexTx returns an anonymous function intended to be executed as part of a database transaction.
@@ -36,7 +36,7 @@ type ProtocolKVStore interface {
 	//     _after_ validating the QC.
 	//
 	// Expected errors during normal operations:
-	//   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed
+	//   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed.
 	IndexTx(blockID flow.Identifier, stateID flow.Identifier) func(*transaction.Tx) error
 
 	// ByID retrieves the KV store snapshot with the given ID.

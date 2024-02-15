@@ -100,7 +100,7 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 // StoreTx returns an anonymous function (intended to be executed as part of a badger transaction),
 // which persists the given KV-store snapshot as part of a DB tx.
 // Expected errors of the returned anonymous function:
-//   - storage.ErrAlreadyExists if a KV-store snapshot with the given id is already stored
+//   - storage.ErrAlreadyExists if a KV-store snapshot with the given id is already stored.
 func (s *ProtocolKVStore) StoreTx(stateID flow.Identifier, data *storage.KeyValueStoreData) func(*transaction.Tx) error {
 	return s.cache.PutTx(stateID, data)
 }
@@ -117,7 +117,7 @@ func (s *ProtocolKVStore) StoreTx(stateID flow.Identifier, data *storage.KeyValu
 //     _after_ validating the QC.
 //
 // Expected errors during normal operations:
-//   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed
+//   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed.
 func (s *ProtocolKVStore) IndexTx(blockID flow.Identifier, stateID flow.Identifier) func(*transaction.Tx) error {
 	return s.byBlockIdCache.PutTx(blockID, stateID)
 }
@@ -135,8 +135,7 @@ func (s *ProtocolKVStore) ByID(id flow.Identifier) (*storage.KeyValueStoreData, 
 // CAUTION: this store snapshot requires confirmation by a QC and will only become active at the child block,
 // _after_ validating the QC. Protocol convention:
 //   - Consider block B, whose ingestion might potentially lead to an updated KV store state.
-//
-// For example, the state changes if we seal some execution results emitting specific service events.
+//     For example, the state changes if we seal some execution results emitting specific service events.
 //   - For the key `blockID`, we use the identity of block B which _proposes_ this updated KV store. As value,
 //     the hash of the resulting state at the end of processing B is to be used.
 //   - CAUTION: The updated state requires confirmation by a QC and will only become active at the child block,
