@@ -493,7 +493,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
 	var bsDependable *module.ProxiedReadyDoneAware
-	var publicBsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
 	var executionDataStoreCache *execdatacache.ExecutionDataCache
@@ -542,11 +541,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		Module("blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {
 			bsDependable = module.NewProxiedReadyDoneAware()
 			builder.PeerManagerDependencies.Add(bsDependable)
-			return nil
-		}).
-		Module("public blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {
-			publicBsDependable = module.NewProxiedReadyDoneAware()
-			builder.PeerManagerDependencies.Add(publicBsDependable)
 			return nil
 		}).
 		Module("execution datastore", func(node *cmd.NodeConfig) error {
@@ -674,6 +668,13 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		})
 
 	if builder.publicNetworkExecutionDataEnabled {
+		var publicBsDependable *module.ProxiedReadyDoneAware
+
+		builder.Module("public blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {
+			publicBsDependable = module.NewProxiedReadyDoneAware()
+			builder.PeerManagerDependencies.Add(publicBsDependable)
+			return nil
+		})
 		builder.Component("public network execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			opts := []network.BlobServiceOption{
 				blob.WithBitswapOptions(
