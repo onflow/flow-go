@@ -55,6 +55,7 @@ const (
 	codeBlockIDToFinalizedSeal     = 44 // index _finalized_ seal by sealed block ID
 	codeBlockIDToQuorumCertificate = 45 // index of quorum certificates by block ID
 	codeProtocolStateByBlockID     = 46 // index of protocol state entry by block ID
+	codeProtocolKVStoreByBlockID   = 47 // index of protocol KV store entry by block ID
 
 	// codes for indexing multiple identifiers by identifier
 	codeBlockChildren          = 50 // index mapping block ID to children blocks
@@ -77,6 +78,7 @@ const (
 	codeDKGEnded         = 65 // flag that the DKG for an epoch has ended (stores end state)
 	codeVersionBeacon    = 67 // flag for storing version beacons
 	codeProtocolState    = 68
+	codeProtocolKVStore  = 69
 
 	// code for ComputationResult upload status storage
 	// NOTE: for now only GCP uploader is supported. When other uploader (AWS e.g.) needs to
