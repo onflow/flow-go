@@ -122,7 +122,7 @@ func ReadCheckpointFileSize(dir string, fileName string) (int64, error) {
 }
 
 func allFilePaths(dir string, fileName string) []string {
-	paths := make([]string, 1+subtrieCount+1)
+	paths := make([]string, 0, 1+subtrieCount+1)
 	paths = append(paths, filePathCheckpointHeader(dir, fileName))
 	for i := 0; i < subtrieCount; i++ {
 		subTriePath, _, _ := filePathSubTries(dir, fileName, i)

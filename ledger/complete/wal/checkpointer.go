@@ -259,7 +259,7 @@ func (c *Checkpointer) Checkpoint(to int) (err error) {
 	}
 
 	c.wal.log.Info().
-		Str("checkpoint file size", units.BytesSize(float64(checkpointFileSize))).
+		Str("checkpoint_file_size", units.BytesSize(float64(checkpointFileSize))).
 		Msgf("created checkpoint %d with %d tries", to, len(tries))
 
 	return nil
