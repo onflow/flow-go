@@ -2768,7 +2768,9 @@ func TestEVMRun(t *testing.T) {
 
 	runCalled := false
 
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
 	handler := &testContractHandler{
+		evmContractAddress: common.Address(contractsAddress),
 		run: func(tx []byte, coinbase types.Address) *types.ResultSummary {
 			runCalled = true
 
@@ -2785,8 +2787,6 @@ func TestEVMRun(t *testing.T) {
 		},
 	}
 
-	contractsAddress := flow.BytesToAddress([]byte{0x1})
-
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
@@ -2796,9 +2796,11 @@ func TestEVMRun(t *testing.T) {
       import EVM from 0x1
 
       access(all)
-      fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
+      fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): UInt8 {
           let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-          EVM.run(tx: tx, coinbase: coinbase)
+          let res = EVM.run(tx: tx, coinbase: coinbase)
+		  let st = res.status
+		  return st.rawValue
       }
     `)
 
@@ -2845,7 +2847,7 @@ func TestEVMRun(t *testing.T) {
 
 	// Run script
 
-	_, err := rt.ExecuteScript(
+	val, err := rt.ExecuteScript(
 		runtime.Script{
 			Source:    script,
 			Arguments: EncodeArgs([]cadence.Value{evmTx, coinbase}),
@@ -2858,6 +2860,7 @@ func TestEVMRun(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	assert.Equal(t, types.StatusSuccessful, types.Status(val.(cadence.UInt8)))
 	assert.True(t, runCalled)
 }
 

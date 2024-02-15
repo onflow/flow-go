@@ -47,6 +47,7 @@ const ContractName = "EVM"
 const evmAddressTypeBytesFieldName = "bytes"
 const evmAddressTypeQualifiedIdentifier = "EVM.EVMAddress"
 const evmResultTypeQualifiedIdentifier = "EVM.Result"
+const evmStatusTypeQualifiedIdentifier = "EVM.Status"
 
 const abiEncodingByteSize = 32
 
@@ -981,18 +982,29 @@ func NewResultValue(
 	inter *interpreter.Interpreter,
 	locationRange interpreter.LocationRange,
 	result *types.ResultSummary) *interpreter.CompositeValue {
+	loc := common.NewAddressLocation(gauge, handler.EVMContractAddress(), ContractName)
 	return interpreter.NewCompositeValue(
 		inter,
 		locationRange,
-		common.NewAddressLocation(gauge, handler.EVMContractAddress(), ContractName),
+		loc,
 		evmResultTypeQualifiedIdentifier,
 		common.CompositeKindStructure,
 		[]interpreter.CompositeField{
 			{
 				Name: "status",
-				Value: interpreter.NewUInt8Value(gauge, func() uint8 {
-					return uint8(result.Status)
-				}),
+				Value: interpreter.NewEnumCaseValue(
+					inter,
+					locationRange,
+					&sema.CompositeType{
+						Location:   loc,
+						Identifier: evmStatusTypeQualifiedIdentifier,
+						Kind:       common.CompositeKindEnum,
+					},
+					interpreter.NewUInt8Value(gauge, func() uint8 {
+						return uint8(result.Status)
+					}),
+					nil,
+				),
 			},
 			{
 				Name: "errorCode",
