@@ -79,7 +79,7 @@ type ResultSummary struct {
 	ErrorCode               ErrorCode
 	GasConsumed             uint64
 	DeployedContractAddress Address
-	ReturnedValue           []byte
+	ReturnedValue           Data
 }
 
 func NewResultSummary(res *Result, validationError error) *ResultSummary {

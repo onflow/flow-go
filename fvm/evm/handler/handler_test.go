@@ -420,7 +420,8 @@ func TestHandler_COA(t *testing.T) {
 					0, 0, 0, 0, 0, 0, 0, 0,
 					0, 0, 0, 0, 0, 0, 0, 0,
 				})
-				require.Equal(t, expected, ret)
+				require.Equal(t, types.StatusSuccessful, ret.Status)
+				require.Equal(t, expected, ret.ReturnedValue)
 			})
 		})
 	})
