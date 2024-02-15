@@ -1,6 +1,6 @@
-import FlowEpoch from 0xEPOCHADDRESS
-import NodeVersionBeacon from 0xNODEVERSIONBEACONADDRESS
-import RandomBeaconHistory from 0xRANDOMBEACONHISTORYADDRESS
+import FlowEpoch from "FlowEpoch"
+import NodeVersionBeacon from "NodeVersionBeacon"
+import RandomBeaconHistory from "RandomBeaconHistory"
 
 transaction {
     prepare(serviceAccount: auth(BorrowValue) &Account) {

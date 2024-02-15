@@ -44,6 +44,7 @@ func DeployEpochTransaction(service flow.Address, contract []byte, epochConfig e
 				},
 			),
 		)).
+		AddArgument(jsoncdc.MustEncode(cadence.String("FlowEpoch"))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddArgument(jsoncdc.MustEncode(epochConfig.CurrentEpochCounter)).
 		AddArgument(jsoncdc.MustEncode(epochConfig.NumViewsInEpoch)).

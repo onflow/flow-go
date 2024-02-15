@@ -2,8 +2,8 @@
 // to add a Vault resource to their account
 // so that they can use the flowToken
 
-import FungibleToken from 0xFUNGIBLETOKENADDRESS
-import FlowToken from 0xFLOWTOKENADDRESS
+import FungibleToken from "FungibleToken"
+import FlowToken from "FlowToken"
 
 transaction {
 

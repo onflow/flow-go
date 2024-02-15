@@ -18,8 +18,8 @@ var tokenTransferTransactionTemplate string
 // TokenTransferTransaction returns a transaction script for transferring `amount` flow tokens to `toAddr` address
 func TokenTransferTransaction(ftAddr, flowToken, toAddr *flowsdk.Address, amount float64) (*flowsdk.Transaction, error) {
 
-	withFTAddr := strings.Replace(tokenTransferTransactionTemplate, "0xFUNGIBLETOKENADDRESS", "0x"+ftAddr.Hex(), 1)
-	withFlowTokenAddr := strings.Replace(withFTAddr, "0xTOKENADDRESS", "0x"+flowToken.Hex(), 1)
+	withFTAddr := strings.Replace(tokenTransferTransactionTemplate, "\"FungibleToken\"", "0x"+ftAddr.Hex(), 1)
+	withFlowTokenAddr := strings.Replace(withFTAddr, "\"FlowToken\"", "0x"+flowToken.Hex(), 1)
 
 	tx := flowsdk.NewTransaction().
 		SetScript([]byte(withFlowTokenAddr))

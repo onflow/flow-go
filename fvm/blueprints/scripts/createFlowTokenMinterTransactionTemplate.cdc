@@ -1,4 +1,4 @@
-import FlowToken from 0xFLOWTOKENADDRESS
+import FlowToken from "FlowToken"
 
 transaction {
 	prepare(serviceAccount: auth(Storage) &Account) {
