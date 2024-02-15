@@ -106,16 +106,16 @@ func OpenAndReadCheckpointV6(dir string, fileName string, logger zerolog.Logger)
 }
 
 // ReadCheckpointFileSize returns the total size of the checkpoint file
-func ReadCheckpointFileSize(dir string, fileName string) (int64, error) {
+func ReadCheckpointFileSize(dir string, fileName string) (uint64, error) {
 	paths := allFilePaths(dir, fileName)
-	totalSize := int64(0)
+	totalSize := uint64(0)
 	for _, path := range paths {
 		fileInfo, err := os.Stat(path)
 		if err != nil {
 			return 0, fmt.Errorf("could not get file info for %v: %w", path, err)
 		}
 
-		totalSize += fileInfo.Size()
+		totalSize += uint64(fileInfo.Size())
 	}
 
 	return totalSize, nil
