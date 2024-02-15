@@ -3,6 +3,8 @@ package migrations
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"strings"
 	"sync"
 
@@ -23,12 +25,19 @@ import (
 )
 
 type ChangeContractCodeMigration struct {
-	log       zerolog.Logger
-	mutex     sync.RWMutex
-	contracts map[common.Address]map[flow.RegisterID]string
+	log                 zerolog.Logger
+	mutex               sync.RWMutex
+	contracts           map[common.Address]map[flow.RegisterID]Contract
+	contractsByLocation map[common.Location][]byte
 }
 
 var _ AccountBasedMigration = (*ChangeContractCodeMigration)(nil)
+
+func NewChangeContractCodeMigration() *ChangeContractCodeMigration {
+	return &ChangeContractCodeMigration{
+		contractsByLocation: map[common.Location][]byte{},
+	}
+}
 
 func (d *ChangeContractCodeMigration) Close() error {
 	d.mutex.RLock()
@@ -68,7 +77,7 @@ func (d *ChangeContractCodeMigration) MigrateAccount(
 	payloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
 
-	contracts, ok := (func() (map[flow.RegisterID]string, bool) {
+	contracts, ok := (func() (map[flow.RegisterID]Contract, bool) {
 		d.mutex.Lock()
 		defer d.mutex.Unlock()
 
@@ -84,6 +93,17 @@ func (d *ChangeContractCodeMigration) MigrateAccount(
 	if !ok {
 		// no contracts to change on this address
 		return payloads, nil
+	}
+
+	config := util.RuntimeInterfaceConfig{
+		GetContractCodeFunc: func(location runtime.Location) ([]byte, error) {
+			return d.contractsByLocation[location], nil
+		},
+	}
+
+	mr, err := newMigratorRuntime(address, payloads, config)
+	if err != nil {
+		return nil, err
 	}
 
 	for payloadIndex, payload := range payloads {
@@ -104,10 +124,24 @@ func (d *ChangeContractCodeMigration) MigrateAccount(
 			continue
 		}
 
+		name := newContract.Name
+		newCode := newContract.Code
+		oldCode := payload.Value()
+
+		err = CheckContractUpdateValidity(mr, address, name, newCode, oldCode)
+		if err != nil {
+			d.log.Error().Err(err).
+				Msgf(
+					"fail to update contract %s in account %s",
+					name,
+					address.HexWithPrefix(),
+				)
+		}
+
 		// change contract code
 		payloads[payloadIndex] = ledger.NewPayload(
 			key,
-			[]byte(newContract),
+			newCode,
 		)
 
 		// TODO: maybe log diff between old and new
@@ -130,46 +164,54 @@ func (d *ChangeContractCodeMigration) MigrateAccount(
 }
 
 func (d *ChangeContractCodeMigration) RegisterContractChange(
-	address common.Address,
-	contractName string,
-	newContractCode string,
+	change StagedContract,
 ) (
-	previousNewContractCode string,
+	previousNewContractCode Contract,
 ) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
 	if d.contracts == nil {
-		d.contracts = map[common.Address]map[flow.RegisterID]string{}
+		d.contracts = map[common.Address]map[flow.RegisterID]Contract{}
 	}
 
+	address := change.Address
+
 	if _, ok := d.contracts[address]; !ok {
-		d.contracts[address] = map[flow.RegisterID]string{}
+		d.contracts[address] = map[flow.RegisterID]Contract{}
 	}
+
+	contractName := change.Name
+	newContractCode := change.Code
 
 	registerID := flow.ContractRegisterID(flow.ConvertAddress(address), contractName)
 
 	previousNewContractCode = d.contracts[address][registerID]
 
-	d.contracts[address][registerID] = newContractCode
+	d.contracts[address][registerID] = Contract{
+		Name: contractName,
+		Code: newContractCode,
+	}
+
+	location := common.AddressLocation{
+		Name:    contractName,
+		Address: address,
+	}
+	d.contractsByLocation[location] = newContractCode
 
 	return
-}
-
-type SystemContractChange struct {
-	Address         common.Address
-	ContractName    string
-	NewContractCode string
 }
 
 func NewSystemContractChange(
 	systemContract systemcontracts.SystemContract,
 	newContractCode []byte,
-) SystemContractChange {
-	return SystemContractChange{
-		Address:         common.Address(systemContract.Address),
-		ContractName:    systemContract.Name,
-		NewContractCode: string(newContractCode),
+) StagedContract {
+	return StagedContract{
+		Address: common.Address(systemContract.Address),
+		Contract: Contract{
+			Name: systemContract.Name,
+			Code: newContractCode,
+		},
 	}
 }
 
@@ -185,7 +227,7 @@ type SystemContractChangesOptions struct {
 	EVM EVMContractChange
 }
 
-func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOptions) []SystemContractChange {
+func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOptions) []StagedContract {
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
 	var stakingCollectionAddress, stakingProxyAddress common.Address
@@ -211,7 +253,7 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 	fungibleTokenMetadataViewsAddress := common.Address(systemContracts.FungibleToken.Address)
 	fungibleTokenSwitchboardAddress := common.Address(systemContracts.FungibleToken.Address)
 
-	contractChanges := []SystemContractChange{
+	contractChanges := []StagedContract{
 		// epoch related contracts
 		NewSystemContractChange(
 			systemContracts.Epoch,
@@ -269,35 +311,41 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 			),
 		),
 		{
-			Address:      stakingCollectionAddress,
-			ContractName: "FlowStakingCollection",
-			NewContractCode: string(coreContracts.FlowStakingCollection(
-				systemContracts.FungibleToken.Address.HexWithPrefix(),
-				systemContracts.FlowToken.Address.HexWithPrefix(),
-				systemContracts.IDTableStaking.Address.HexWithPrefix(),
-				stakingProxyAddress.HexWithPrefix(),
-				lockedTokensAddress.HexWithPrefix(),
-				systemContracts.FlowStorageFees.Address.HexWithPrefix(),
-				systemContracts.ClusterQC.Address.HexWithPrefix(),
-				systemContracts.DKG.Address.HexWithPrefix(),
-				systemContracts.Epoch.Address.HexWithPrefix(),
-			)),
+			Address: stakingCollectionAddress,
+			Contract: Contract{
+				Name: "FlowStakingCollection",
+				Code: coreContracts.FlowStakingCollection(
+					systemContracts.FungibleToken.Address.HexWithPrefix(),
+					systemContracts.FlowToken.Address.HexWithPrefix(),
+					systemContracts.IDTableStaking.Address.HexWithPrefix(),
+					stakingProxyAddress.HexWithPrefix(),
+					lockedTokensAddress.HexWithPrefix(),
+					systemContracts.FlowStorageFees.Address.HexWithPrefix(),
+					systemContracts.ClusterQC.Address.HexWithPrefix(),
+					systemContracts.DKG.Address.HexWithPrefix(),
+					systemContracts.Epoch.Address.HexWithPrefix(),
+				),
+			},
 		},
 		{
-			Address:         stakingProxyAddress,
-			ContractName:    "StakingProxy",
-			NewContractCode: string(coreContracts.FlowStakingProxy()),
+			Address: stakingProxyAddress,
+			Contract: Contract{
+				Name: "StakingProxy",
+				Code: coreContracts.FlowStakingProxy(),
+			},
 		},
 		{
-			Address:      lockedTokensAddress,
-			ContractName: "LockedTokens",
-			NewContractCode: string(coreContracts.FlowLockedTokens(
-				systemContracts.FungibleToken.Address.HexWithPrefix(),
-				systemContracts.FlowToken.Address.HexWithPrefix(),
-				systemContracts.IDTableStaking.Address.HexWithPrefix(),
-				stakingProxyAddress.HexWithPrefix(),
-				systemContracts.FlowStorageFees.Address.HexWithPrefix(),
-			)),
+			Address: lockedTokensAddress,
+			Contract: Contract{
+				Name: "LockedTokens",
+				Code: coreContracts.FlowLockedTokens(
+					systemContracts.FungibleToken.Address.HexWithPrefix(),
+					systemContracts.FlowToken.Address.HexWithPrefix(),
+					systemContracts.IDTableStaking.Address.HexWithPrefix(),
+					stakingProxyAddress.HexWithPrefix(),
+					systemContracts.FlowStorageFees.Address.HexWithPrefix(),
+				),
+			},
 		},
 
 		// token related contracts
@@ -327,14 +375,16 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 			),
 		),
 		{
-			Address:      fungibleTokenMetadataViewsAddress,
-			ContractName: "FungibleTokenMetadataViews",
-			NewContractCode: string(ftContracts.FungibleTokenMetadataViews(
-				// Use `Hex()`, since this method adds the prefix.
-				systemContracts.FungibleToken.Address.Hex(),
-				systemContracts.MetadataViews.Address.Hex(),
-				systemContracts.ViewResolver.Address.Hex(),
-			)),
+			Address: fungibleTokenMetadataViewsAddress,
+			Contract: Contract{
+				Name: "FungibleTokenMetadataViews",
+				Code: ftContracts.FungibleTokenMetadataViews(
+					// Use `Hex()`, since this method adds the prefix.
+					systemContracts.FungibleToken.Address.Hex(),
+					systemContracts.MetadataViews.Address.Hex(),
+					systemContracts.ViewResolver.Address.Hex(),
+				),
+			},
 		},
 
 		// NFT related contracts
@@ -361,12 +411,14 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 	if chainID != flow.Emulator {
 		contractChanges = append(
 			contractChanges,
-			SystemContractChange{
-				Address:      fungibleTokenSwitchboardAddress,
-				ContractName: "FungibleTokenSwitchboard",
-				NewContractCode: string(ftContracts.FungibleTokenSwitchboard(
-					systemContracts.FungibleToken.Address.HexWithPrefix(),
-				)),
+			StagedContract{
+				Address: fungibleTokenSwitchboardAddress,
+				Contract: Contract{
+					Name: "FungibleTokenSwitchboard",
+					Code: ftContracts.FungibleTokenSwitchboard(
+						systemContracts.FungibleToken.Address.HexWithPrefix(),
+					),
+				},
 			},
 		)
 	}
@@ -408,11 +460,7 @@ func NewSystemContactsMigration(
 ) *ChangeContractCodeMigration {
 	migration := &ChangeContractCodeMigration{}
 	for _, change := range SystemContractChanges(chainID, options) {
-		migration.RegisterContractChange(
-			change.Address,
-			change.ContractName,
-			change.NewContractCode,
-		)
+		migration.RegisterContractChange(change)
 	}
 	return migration
 }

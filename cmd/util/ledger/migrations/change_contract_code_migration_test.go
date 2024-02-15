@@ -37,7 +37,7 @@ func TestChangeContractCodeMigration(t *testing.T) {
 	t.Run("no contracts", func(t *testing.T) {
 		t.Parallel()
 
-		migration := migrations.ChangeContractCodeMigration{}
+		migration := migrations.NewChangeContractCodeMigration()
 		log := zerolog.New(zerolog.NewTestWriter(t))
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -55,7 +55,7 @@ func TestChangeContractCodeMigration(t *testing.T) {
 	t.Run("1 contract - dont migrate", func(t *testing.T) {
 		t.Parallel()
 
-		migration := migrations.ChangeContractCodeMigration{}
+		migration := migrations.NewChangeContractCodeMigration()
 		log := zerolog.New(zerolog.NewTestWriter(t))
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -77,12 +77,20 @@ func TestChangeContractCodeMigration(t *testing.T) {
 	t.Run("1 contract - migrate", func(t *testing.T) {
 		t.Parallel()
 
-		migration := migrations.ChangeContractCodeMigration{}
+		migration := migrations.NewChangeContractCodeMigration()
 		log := zerolog.New(zerolog.NewTestWriter(t))
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
-		migration.RegisterContractChange(address1, "A", "B")
+		migration.RegisterContractChange(
+			migrations.StagedContract{
+				Address: address1,
+				Contract: migrations.Contract{
+					Name: "A",
+					Code: []byte("B"),
+				},
+			},
+		)
 
 		payloads, err := migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
@@ -101,12 +109,20 @@ func TestChangeContractCodeMigration(t *testing.T) {
 	t.Run("2 contracts - migrate 1", func(t *testing.T) {
 		t.Parallel()
 
-		migration := migrations.ChangeContractCodeMigration{}
+		migration := migrations.NewChangeContractCodeMigration()
 		log := zerolog.New(zerolog.NewTestWriter(t))
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
-		migration.RegisterContractChange(address1, "A", "B")
+		migration.RegisterContractChange(
+			migrations.StagedContract{
+				Address: address1,
+				Contract: migrations.Contract{
+					Name: "A",
+					Code: []byte("B"),
+				},
+			},
+		)
 
 		payloads, err := migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
@@ -127,13 +143,29 @@ func TestChangeContractCodeMigration(t *testing.T) {
 	t.Run("2 contracts - migrate 2", func(t *testing.T) {
 		t.Parallel()
 
-		migration := migrations.ChangeContractCodeMigration{}
+		migration := migrations.NewChangeContractCodeMigration()
 		log := zerolog.New(zerolog.NewTestWriter(t))
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
-		migration.RegisterContractChange(address1, "A", "B")
-		migration.RegisterContractChange(address1, "B", "B")
+		migration.RegisterContractChange(
+			migrations.StagedContract{
+				Address: address1,
+				Contract: migrations.Contract{
+					Name: "A",
+					Code: []byte("B"),
+				},
+			},
+		)
+		migration.RegisterContractChange(
+			migrations.StagedContract{
+				Address: address1,
+				Contract: migrations.Contract{
+					Name: "B",
+					Code: []byte("B"),
+				},
+			},
+		)
 
 		payloads, err := migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
@@ -154,12 +186,20 @@ func TestChangeContractCodeMigration(t *testing.T) {
 	t.Run("2 contracts on different accounts - migrate 1", func(t *testing.T) {
 		t.Parallel()
 
-		migration := migrations.ChangeContractCodeMigration{}
+		migration := migrations.NewChangeContractCodeMigration()
 		log := zerolog.New(zerolog.NewTestWriter(t))
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
-		migration.RegisterContractChange(address1, "A", "B")
+		migration.RegisterContractChange(
+			migrations.StagedContract{
+				Address: address1,
+				Contract: migrations.Contract{
+					Name: "A",
+					Code: []byte("B"),
+				},
+			},
+		)
 
 		payloads, err := migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
@@ -180,13 +220,29 @@ func TestChangeContractCodeMigration(t *testing.T) {
 	t.Run("not all contracts on one account migrated", func(t *testing.T) {
 		t.Parallel()
 
-		migration := migrations.ChangeContractCodeMigration{}
+		migration := migrations.NewChangeContractCodeMigration()
 		log := zerolog.New(zerolog.NewTestWriter(t))
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
-		migration.RegisterContractChange(address1, "A", "B")
-		migration.RegisterContractChange(address1, "B", "B")
+		migration.RegisterContractChange(
+			migrations.StagedContract{
+				Address: address1,
+				Contract: migrations.Contract{
+					Name: "A",
+					Code: []byte("B"),
+				},
+			},
+		)
+		migration.RegisterContractChange(
+			migrations.StagedContract{
+				Address: address1,
+				Contract: migrations.Contract{
+					Name: "B",
+					Code: []byte("B"),
+				},
+			},
+		)
 
 		_, err = migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
@@ -200,12 +256,20 @@ func TestChangeContractCodeMigration(t *testing.T) {
 	t.Run("not all accounts migrated", func(t *testing.T) {
 		t.Parallel()
 
-		migration := migrations.ChangeContractCodeMigration{}
+		migration := migrations.NewChangeContractCodeMigration()
 		log := zerolog.New(zerolog.NewTestWriter(t))
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
-		migration.RegisterContractChange(address2, "A", "B")
+		migration.RegisterContractChange(
+			migrations.StagedContract{
+				Address: address2,
+				Contract: migrations.Contract{
+					Name: "A",
+					Code: []byte("B"),
+				},
+			},
+		)
 
 		_, err = migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{

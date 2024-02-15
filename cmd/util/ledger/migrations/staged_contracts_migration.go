@@ -177,7 +177,7 @@ func (m *StagedContractsMigration) MigrateAccount(
 		newCode := updatedContract.Code
 		oldCode := payload.Value()
 
-		err = m.checkUpdateValidity(mr, address, name, newCode, oldCode)
+		err = CheckContractUpdateValidity(mr, address, name, newCode, oldCode)
 		if err != nil {
 			m.log.Error().Err(err).
 				Msgf(
@@ -210,7 +210,7 @@ func (m *StagedContractsMigration) MigrateAccount(
 	return payloads, nil
 }
 
-func (m *StagedContractsMigration) checkUpdateValidity(
+func CheckContractUpdateValidity(
 	mr *migratorRuntime,
 	address common.Address,
 	contractName string,
