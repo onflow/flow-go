@@ -1137,6 +1137,8 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		Participants:       participants.ToSkeleton(),
 		Assignments:        clusterAssignments,
 		RandomSource:       randomSource,
+		TargetDuration:     networkConf.ViewsInEpoch, // 1view/s
+		TargetEndTime:      uint64(time.Now().Unix()) + networkConf.ViewsInEpoch,
 	}
 
 	epochCommit := &flow.EpochCommit{
@@ -1175,6 +1177,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		trieDir,
 		unittest.ServiceAccountPublicKey,
 		chain,
+		fvm.WithRootBlock(root.Header),
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
