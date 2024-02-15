@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"fmt"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/sema"
 
@@ -29,9 +31,13 @@ func COAOwnershipProofValidator(contractAddress flow.Address, backend types.Back
 			},
 			proof.ToCadenceValues(),
 		)
-
-		// TODO: deal with error message if needed
-		ret := value.(cadence.Struct).Fields[0].(cadence.Bool)
-		return bool(ret), err
+		if err != nil {
+			return false, err
+		}
+		data, ok := value.(cadence.Struct)
+		if !ok || len(data.Fields) == 0 {
+			return false, fmt.Errorf("invalid output data received from validateCOAOwnershipProof")
+		}
+		return bool(data.Fields[0].(cadence.Bool)), nil
 	}
 }
