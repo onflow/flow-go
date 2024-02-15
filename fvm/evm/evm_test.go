@@ -329,12 +329,17 @@ func TestCadenceArch(t *testing.T) {
 					import EVM from %s
 
 					transaction {
-						prepare(account: AuthAccount) {
+						prepare(account: auth(Capabilities, SaveValue) &Account) {
 							let bridgedAccount1 <- EVM.createBridgedAccount()
-							account.save<@EVM.BridgedAccount>(<-bridgedAccount1,
-																to: /storage/bridgedAccount)
-							account.link<&EVM.BridgedAccount{EVM.Addressable}>(/public/bridgedAccount,
-																				target: /storage/bridgedAccount)
+
+							account.storage.save<@EVM.BridgedAccount>(
+							    <-bridgedAccount1,
+							    to: /storage/bridgedAccount
+							)
+
+							let bridgedAccount = account.capabilities.storage
+							    .issue<&EVM.BridgedAccount>(/storage/bridgedAccount)
+							account.capabilities.publish(bridgedAccount, at: /public/bridgedAccount)
 						}
 					}
                 `,

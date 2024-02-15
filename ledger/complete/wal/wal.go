@@ -262,7 +262,7 @@ func (w *DiskWAL) replay(
 		Int("loaded_checkpoint", loadedCheckpoint).
 		Msgf("replaying segments from %d to %d", startSegment, to)
 
-	sr, err := prometheusWAL.NewSegmentsRangeReader(w.log, prometheusWAL.SegmentRange{
+	sr, err := prometheusWAL.NewSegmentsRangeReader(prometheusWAL.SegmentRange{
 		Dir:   w.wal.Dir(),
 		First: startSegment,
 		Last:  to,

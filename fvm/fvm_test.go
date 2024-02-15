@@ -2986,7 +2986,7 @@ func TestEVM(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
-			require.Len(t, output.Events, 6)
+			require.Len(t, output.Events, 7)
 
 			evmLocation := types.EVMLocation{}
 
@@ -3002,6 +3002,7 @@ func TestEVM(t *testing.T) {
 				[]common.TypeID{
 					evmLocation.TypeID(nil, string(types.EventTypeTransactionExecuted)),
 					evmLocation.TypeID(nil, string(types.EventTypeBlockExecuted)),
+					"A.f8d6e0586b0a20c7.EVM.BridgedAccountCreated",
 					"A.0ae53cb6e3f42a79.FlowToken.TokensWithdrawn",
 					"A.ee82856bf20e2aa6.FungibleToken.Withdrawn",
 					evmLocation.TypeID(nil, string(types.EventTypeTransactionExecuted)),

@@ -12,9 +12,9 @@ access(all) contract LedgerHeavy {
 
     access(all) struct Item {
 
-            pub let itemID: UInt32
+            access(all) let itemID: UInt32
 
-            pub let metadata: {String: String}
+            access(all) let metadata: {String: String}
 
             init(_ metadata: {String: String}) {
                 self.itemID = LedgerHeavy.itemCounter

@@ -4,7 +4,8 @@ import "FlowToken"
 access(all)
 contract EVM {
 
-    pub event BridgedAccountCreated(addressBytes: [UInt8; 20])
+    access(all)
+    event BridgedAccountCreated(addressBytes: [UInt8; 20])
 
     /// EVMAddress is an EVM-compatible address
     access(all)
@@ -276,12 +277,12 @@ contract EVM {
 
         let isValid = keyList.verify(
             signatureSet: signatureSet,
-            signedData: signedData
+            signedData: signedData,
+            domainSeparationTag: "FLOW-V0.0-user"
         )
         assert(isValid, message: "signatures not valid")
 
-        let coaRef = acc.getCapability(path)
-            .borrow<&EVM.BridgedAccount{EVM.Addressable}>()
+        let coaRef = acc.capabilities.borrow<&EVM.BridgedAccount>(path)
             ?? panic("could not borrow bridge account's address")
 
         // verify evm address matching
