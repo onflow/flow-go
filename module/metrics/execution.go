@@ -657,6 +657,13 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the storage size of a state commitment in bytes",
 		}),
 
+		checkpointSize: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemStateStorage,
+			Name:      "checkpoint_size_bytes",
+			Help:      "the size of a checkpoint in bytes",
+		}),
+
 		stateSyncActive: promauto.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemIngestion,
