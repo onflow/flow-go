@@ -164,6 +164,7 @@ func testAddressConstants(t *testing.T) {
 	}
 }
 
+// invalid code word for all networks
 const invalidCodeWord = uint64(0xab2ae42382900010)
 
 func testAddressGeneration(t *testing.T) {
@@ -274,16 +275,17 @@ func testAddressesIntersection(t *testing.T) {
 
 		chain := chainID.Chain()
 
-		// All valid test addresses must fail Flow Mainnet check
+		// a valid address in one network must be invalid in all other networks
 		r := uint64(rand.Intn(maxIndex - loop))
-		state := chain.newAddressGeneratorAtIndex(r)
+		state := chain.newAddressGeneratorAtIndex(r) 
 		for k := 0; k < loop; k++ {
 			address, err := state.NextAddress()
 			require.NoError(t, err)
 			for _, otherChain := range chainIDs {
 				if chainID != otherChain {
 					check := otherChain.Chain().IsValid(address)
-					assert.False(t, check, "test account address format should be invalid in Flow")
+					assert.False(t, check, "address %s belongs to %s and should be invalid in %s",
+						address, chainID, otherChain)
 				} else {
 					sameChainCheck := chain.IsValid(address)
 					require.True(t, sameChainCheck)
@@ -291,33 +293,21 @@ func testAddressesIntersection(t *testing.T) {
 			}
 		}
 
-		// sanity check: mainnet addresses must fail the test check
-		r = uint64(rand.Intn(maxIndex - loop))
-		for k := 0; k < loop; k++ {
-			for _, otherChain := range chainIDs {
-				if chainID != otherChain {
-					invalidAddress, err := otherChain.Chain().newAddressGeneratorAtIndex(r).NextAddress()
-					require.NoError(t, err)
-					check := chain.IsValid(invalidAddress)
-					assert.False(t, check, "account address format should be invalid")
-				}
-			}
-		}
-
-		// sanity check of invalid account addresses in all networks
+		// `invalidCodeWord` must be invalid in all networks 
+		// for the remaining section of the test
 		require.NotEqual(t, invalidCodeWord, uint64(0))
 		invalidAddress := uint64ToAddress(invalidCodeWord)
 		check := chain.IsValid(invalidAddress)
-		assert.False(t, check, "account address format should be invalid")
+		require.False(t, check, "account address format should be invalid")
+		
+		// build invalid addresses using `invalidCodeWord` and make sure they all 
+		// fail the check for all networks
 		r = uint64(rand.Intn(maxIndex - loop))
-
 		state = chain.newAddressGeneratorAtIndex(r)
 		for k := 0; k < loop; k++ {
 			address, err := state.NextAddress()
 			require.NoError(t, err)
 			invalidAddress = uint64ToAddress(address.uint64() ^ invalidCodeWord)
-
-			// must fail test network check
 			check = chain.IsValid(invalidAddress)
 			assert.False(t, check, "account address format should be invalid")
 		}
