@@ -83,7 +83,7 @@ type ResultSummary struct {
 }
 
 func NewResultSummary(res *Result, validationError error) *ResultSummary {
-	var rs *ResultSummary
+	rs := &ResultSummary{}
 
 	if res != nil {
 		rs.GasConsumed = res.GasConsumed
@@ -100,7 +100,7 @@ func NewResultSummary(res *Result, validationError error) *ResultSummary {
 	if res.VMError != nil {
 		rs.ErrorCode = ExecutionErrorCode(res.VMError)
 		rs.Status = StatusFailed
-
+		return rs
 	}
 
 	rs.Status = StatusSuccessful
