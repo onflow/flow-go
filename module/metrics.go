@@ -730,7 +730,7 @@ type LedgerMetrics interface {
 
 type WALMetrics interface {
 	// ExecutionCheckpointSize reports the size of a checkpoint in bytes
-	ExecutionCheckpointSize(bytes int64)
+	ExecutionCheckpointSize(bytes uint64)
 }
 
 type RateLimitedBlockstoreMetrics interface {

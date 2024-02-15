@@ -348,8 +348,6 @@ func createCheckpoint(checkpointer *realWAL.Checkpointer, logger zerolog.Logger,
 
 	metrics.ExecutionCheckpointSize(size)
 
-	// metrics.ExecutionSize
-
 	duration := time.Since(startTime)
 	logger.Info().Float64("total_time_s", duration.Seconds()).Msgf("created checkpoint %d", checkpointNum)
 
