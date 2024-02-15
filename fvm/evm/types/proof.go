@@ -14,7 +14,7 @@ import (
 
 type FlowAddress flow.Address
 
-var FlowAddressCadenceType = cadence.TheAddressType
+var FlowAddressCadenceType = cadence.AddressType
 var FlowAddressSemaType = sema.TheAddressType
 
 func (addr FlowAddress) ToCadenceValue() cadence.Address {
@@ -23,7 +23,7 @@ func (addr FlowAddress) ToCadenceValue() cadence.Address {
 
 type PublicPath string
 
-var PublicPathCadenceType = cadence.ThePathType
+var PublicPathCadenceType = cadence.PathType
 var PublicPathSemaType = sema.PathType
 
 func (p PublicPath) ToCadenceValue() cadence.Path {
@@ -35,7 +35,7 @@ func (p PublicPath) ToCadenceValue() cadence.Path {
 
 type SignedData []byte
 
-var SignedDataCadenceType = cadence.NewVariableSizedArrayType(cadence.TheUInt8Type)
+var SignedDataCadenceType = cadence.NewVariableSizedArrayType(cadence.UInt8Type)
 var SignedDataSemaType = sema.ByteArrayType
 
 func (sd SignedData) ToCadenceValue() cadence.Array {
@@ -48,7 +48,7 @@ func (sd SignedData) ToCadenceValue() cadence.Array {
 
 type KeyIndices []uint64
 
-var KeyIndicesCadenceType = cadence.NewVariableSizedArrayType(cadence.TheUInt64Type)
+var KeyIndicesCadenceType = cadence.NewVariableSizedArrayType(cadence.UInt64Type)
 var KeyIndicesSemaType = &sema.VariableSizedType{Type: sema.UInt64Type}
 
 func (ki KeyIndices) ToCadenceValue() cadence.Array {
@@ -65,7 +65,7 @@ func (ki KeyIndices) Count() int {
 
 type Signature []byte
 
-var SignatureCadenceType = cadence.NewVariableSizedArrayType(cadence.TheUInt8Type)
+var SignatureCadenceType = cadence.NewVariableSizedArrayType(cadence.UInt8Type)
 
 func (s Signature) ToCadenceValue() cadence.Array {
 	values := make([]cadence.Value, len(s))
