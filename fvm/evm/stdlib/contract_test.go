@@ -25,18 +25,23 @@ import (
 )
 
 type testContractHandler struct {
-	flowTokenAddress  common.Address
-	deployCOA         func(uint64) types.Address
-	accountByAddress  func(types.Address, bool) types.Account
-	lastExecutedBlock func() *types.Block
-	run               func(tx []byte, coinbase types.Address)
+	flowTokenAddress   common.Address
+	evmContractAddress common.Address
+	deployCOA          func(uint64) types.Address
+	accountByAddress   func(types.Address, bool) types.Account
+	lastExecutedBlock  func() *types.Block
+	run                func(tx []byte, coinbase types.Address) *types.ResultSummary
 }
+
+var _ types.ContractHandler = &testContractHandler{}
 
 func (t *testContractHandler) FlowTokenAddress() common.Address {
 	return t.flowTokenAddress
 }
 
-var _ types.ContractHandler = &testContractHandler{}
+func (t *testContractHandler) EVMContractAddress() common.Address {
+	return t.evmContractAddress
+}
 
 func (t *testContractHandler) DeployCOA(uuid uint64) types.Address {
 	if t.deployCOA == nil {
@@ -61,11 +66,11 @@ func (t *testContractHandler) LastExecutedBlock() *types.Block {
 	return t.lastExecutedBlock()
 }
 
-func (t *testContractHandler) Run(tx []byte, coinbase types.Address) {
+func (t *testContractHandler) Run(tx []byte, coinbase types.Address) *types.ResultSummary {
 	if t.run == nil {
 		panic("unexpected Run")
 	}
-	t.run(tx, coinbase)
+	return t.run(tx, coinbase)
 }
 
 type testFlowAccount struct {
@@ -77,7 +82,7 @@ type testFlowAccount struct {
 	deposit  func(vault *types.FLOWTokenVault)
 	withdraw func(balance types.Balance) *types.FLOWTokenVault
 	deploy   func(code types.Code, limit types.GasLimit, balance types.Balance) types.Address
-	call     func(address types.Address, data types.Data, limit types.GasLimit, balance types.Balance) types.Data
+	call     func(address types.Address, data types.Data, limit types.GasLimit, balance types.Balance) *types.ResultSummary
 }
 
 var _ types.Account = &testFlowAccount{}
@@ -135,7 +140,7 @@ func (t *testFlowAccount) Deploy(code types.Code, limit types.GasLimit, balance 
 	return t.deploy(code, limit, balance)
 }
 
-func (t *testFlowAccount) Call(address types.Address, data types.Data, limit types.GasLimit, balance types.Balance) types.Data {
+func (t *testFlowAccount) Call(address types.Address, data types.Data, limit types.GasLimit, balance types.Balance) *types.ResultSummary {
 	if t.call == nil {
 		panic("unexpected Call")
 	}
@@ -2764,7 +2769,7 @@ func TestEVMRun(t *testing.T) {
 	runCalled := false
 
 	handler := &testContractHandler{
-		run: func(tx []byte, coinbase types.Address) {
+		run: func(tx []byte, coinbase types.Address) *types.ResultSummary {
 			runCalled = true
 
 			assert.Equal(t, []byte{1, 2, 3}, tx)
@@ -2774,7 +2779,9 @@ func TestEVMRun(t *testing.T) {
 				},
 				coinbase,
 			)
-
+			return &types.ResultSummary{
+				Status: types.StatusSuccessful,
+			}
 		},
 	}
 
@@ -2985,13 +2992,16 @@ func TestBridgedAccountCall(t *testing.T) {
 					data types.Data,
 					limit types.GasLimit,
 					balance types.Balance,
-				) types.Data {
+				) *types.ResultSummary {
 					assert.Equal(t, types.Address{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, toAddress)
 					assert.Equal(t, types.Data{4, 5, 6}, data)
 					assert.Equal(t, types.GasLimit(9999), limit)
 					assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
 
-					return types.Data{3, 1, 4}
+					return &types.ResultSummary{
+						Status:        types.StatusSuccessful,
+						ReturnedValue: types.Data{3, 1, 4},
+					}
 				},
 			}
 		},

@@ -46,6 +46,7 @@ func ContractCode(flowTokenAddress flow.Address, evmAbiOnly bool) []byte {
 const ContractName = "EVM"
 const evmAddressTypeBytesFieldName = "bytes"
 const evmAddressTypeQualifiedIdentifier = "EVM.EVMAddress"
+const evmResultTypeQualifiedIdentifier = "EVM.Result"
 
 const abiEncodingByteSize = 32
 
@@ -967,10 +968,50 @@ func newInternalEVMTypeRunFunction(
 			// Run
 
 			cb := types.NewAddressFromBytes(coinbase)
-			handler.Run(transaction, cb)
+			result := handler.Run(transaction, cb)
 
-			return interpreter.Void
+			return NewResultValue(handler, gauge, inter, locationRange, result)
 		},
+	)
+}
+
+func NewResultValue(
+	handler types.ContractHandler,
+	gauge common.MemoryGauge,
+	inter *interpreter.Interpreter,
+	locationRange interpreter.LocationRange,
+	result *types.ResultSummary) *interpreter.CompositeValue {
+	return interpreter.NewCompositeValue(
+		inter,
+		locationRange,
+		common.NewAddressLocation(gauge, handler.EVMContractAddress(), ContractName),
+		evmResultTypeQualifiedIdentifier,
+		common.CompositeKindStructure,
+		[]interpreter.CompositeField{
+			{
+				Name: "status",
+				Value: interpreter.NewUInt8Value(gauge, func() uint8 {
+					return uint8(result.Status)
+				}),
+			},
+			{
+				Name: "errorCode",
+				Value: interpreter.NewUInt64Value(gauge, func() uint64 {
+					return uint64(result.ErrorCode)
+				}),
+			},
+			{
+				Name: "gasUsed",
+				Value: interpreter.NewUInt64Value(gauge, func() uint64 {
+					return uint64(result.GasConsumed)
+				}),
+			},
+			{
+				Name:  "data",
+				Value: interpreter.ByteSliceToByteArrayValue(inter, result.ReturnedValue),
+			},
+		},
+		common.ZeroAddress,
 	)
 }
 
@@ -1022,7 +1063,7 @@ var internalEVMTypeCallFunctionType = &sema.FunctionType{
 			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
 		},
 	},
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 
 func AddressBytesArrayValueToEVMAddress(
@@ -1132,7 +1173,7 @@ func newInternalEVMTypeCallFunction(
 			account := handler.AccountByAddress(fromAddress, isAuthorized)
 			result := account.Call(toAddress, data, gasLimit, balance)
 
-			return interpreter.ByteSliceToByteArrayValue(inter, result)
+			return NewResultValue(handler, gauge, inter, locationRange, result)
 		},
 	)
 }

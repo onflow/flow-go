@@ -81,7 +81,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 					)
 
 					// successfully run (no-panic)
-					handler.Run(tx, coinbase)
+					handler.RunOrPanic(tx, coinbase)
 
 					// check gas usage
 					// TODO: uncomment and investigate me
@@ -148,7 +148,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 					assertPanic(t, isNotFatal, func() {
 						// invalid RLP encoding
 						invalidTx := "badencoding"
-						handler.Run([]byte(invalidTx), coinbase)
+						handler.RunOrPanic([]byte(invalidTx), coinbase)
 					})
 
 					// test gas limit (non fatal)
@@ -163,7 +163,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 							big.NewInt(1),
 						)
 
-						handler.Run([]byte(tx), coinbase)
+						handler.RunOrPanic([]byte(tx), coinbase)
 					})
 
 					// tx validation error
@@ -178,7 +178,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 							big.NewInt(1),
 						)
 
-						handler.Run([]byte(tx), coinbase)
+						handler.RunOrPanic([]byte(tx), coinbase)
 					})
 				})
 			})
@@ -207,7 +207,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 								100_000,
 								big.NewInt(1),
 							)
-							handler.Run([]byte(tx), types.NewAddress(gethCommon.Address{}))
+							handler.RunOrPanic([]byte(tx), types.NewAddress(gethCommon.Address{}))
 						})
 					})
 				})
@@ -256,7 +256,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 				require.Equal(t, types.NewBalanceFromUFix64(0), account2.Balance())
 
 				// no panic means success here
-				handler.Run(tx, account2.Address())
+				handler.RunOrPanic(tx, account2.Address())
 				expected, err = types.SubBalance(orgBalance, deduction)
 				require.NoError(t, err)
 				expected, err = types.AddBalance(expected, addition)
@@ -557,13 +557,13 @@ func TestHandler_COA(t *testing.T) {
 					math.MaxUint64,
 					types.NewBalanceFromUFix64(0))
 
-				ret := foa.Call(
+				res := foa.Call(
 					addr,
 					testContract.MakeCallData(t, "retrieve"),
 					math.MaxUint64,
 					types.NewBalanceFromUFix64(0))
 
-				require.Equal(t, num, new(big.Int).SetBytes(ret))
+				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue))
 			})
 		})
 	})
@@ -588,7 +588,7 @@ func TestHandler_COA(t *testing.T) {
 				arch := handler.MakePrecompileAddress(1)
 
 				ret := foa.Call(arch, precompiles.FlowBlockHeightFuncSig[:], math.MaxUint64, types.NewBalanceFromUFix64(0))
-				require.Equal(t, big.NewInt(int64(blockHeight)), new(big.Int).SetBytes(ret))
+				require.Equal(t, big.NewInt(int64(blockHeight)), new(big.Int).SetBytes(ret.ReturnedValue))
 			})
 		})
 	})
@@ -621,7 +621,7 @@ func TestHandler_COA(t *testing.T) {
 					math.MaxUint64,
 					types.EmptyBalance)
 
-				require.Equal(t, random.Bytes(), []byte(ret))
+				require.Equal(t, random.Bytes(), []byte(ret.ReturnedValue))
 			})
 		})
 	})
@@ -667,7 +667,7 @@ func TestHandler_TransactionTryRun(t *testing.T) {
 						big.NewInt(1),
 					)
 
-					rs := handler.TryRun(tx, types.NewAddress(gethCommon.Address{}))
+					rs := handler.Run(tx, types.NewAddress(gethCommon.Address{}))
 					require.Equal(t, types.StatusSuccessful, rs.Status)
 					require.Equal(t, result.GasConsumed, rs.GasConsumed)
 					require.Equal(t, types.ErrCodeNoError, rs.ErrorCode)
@@ -714,7 +714,7 @@ func TestHandler_TransactionTryRun(t *testing.T) {
 						big.NewInt(1),
 					)
 
-					rs := handler.TryRun(tx, types.NewAddress(gethCommon.Address{}))
+					rs := handler.Run(tx, types.NewAddress(gethCommon.Address{}))
 					require.Equal(t, types.StatusFailed, rs.Status)
 					require.Equal(t, result.GasConsumed, rs.GasConsumed)
 					require.Equal(t, types.ExecutionErrCodeOutOfGas, rs.ErrorCode)
@@ -752,7 +752,7 @@ func TestHandler_TransactionTryRun(t *testing.T) {
 						big.NewInt(1),
 					)
 
-					rs := handler.TryRun([]byte(tx), coinbase)
+					rs := handler.Run([]byte(tx), coinbase)
 					require.Equal(t, types.StatusInvalid, rs.Status)
 					require.Equal(t, types.ValidationErrCodeInsufficientComputation, rs.ErrorCode)
 
@@ -765,7 +765,7 @@ func TestHandler_TransactionTryRun(t *testing.T) {
 						big.NewInt(1),
 					)
 
-					rs = handler.TryRun([]byte(tx), coinbase)
+					rs = handler.Run([]byte(tx), coinbase)
 					require.Equal(t, types.StatusInvalid, rs.Status)
 					require.Equal(t, types.ValidationErrCodeNonceTooLow, rs.ErrorCode)
 				})

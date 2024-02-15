@@ -68,6 +68,65 @@ contract EVM {
         }
     }
 
+    /// reports the status of evm execution.
+    access(all) enum Status: UInt8 {
+        /// is (rarely) returned when status is unknown
+        /// and something has gone very wrong.
+        access(all) case unknown
+
+        /// is returned when execution of an evm transaction/call
+        /// has failed at the validation step (e.g. nonce mismatch).
+        /// An invalid transaction/call is rejected to be executed 
+        /// or be included in a block.
+        access(all) case invalid
+
+        /// is returned when execution of an evm transaction/call 
+        /// has been successful but the vm has reported an error as 
+        /// the outcome of execution (e.g. running out of gas). 
+        /// A failed tx/call is included in a block.
+        /// Note that resubmission of a failed transaction would 
+        /// result in invalid status in the second attempt, given 
+        /// the nonce would be come invalid. 
+        access(all) case failed
+
+        /// is returned when execution of an evm transaction/call
+        /// has been successful and no error is reported by the vm.
+        access(all) case successful
+    }
+
+    /// reports the outcome of evm transaction/call execution attempt
+    access(all) struct Result {
+        /// status of the execution
+        access(all)
+        let status: Status
+
+        /// error code (error code zero means no error)
+        access(all)
+        let errorCode: UInt64
+
+        /// returns the amount of gas metered during 
+        /// evm execution
+        access(all)
+        let gasUsed: UInt64
+
+        /// returns the data that is returned from 
+        /// the evm for the call. For coa.deploy 
+        /// calls it returns the address bytes of the 
+        /// newly deployed contract.
+        access(all)
+        let data: [UInt8]
+
+        init(status: UInt8, 
+             errorCode: UInt64, 
+             gasUsed: UInt64,
+             data: [UInt8]) {
+            self.status = Status(rawValue: status)!
+            self.errorCode = errorCode
+            self.gasUsed = gasUsed
+            self.data = data
+        }
+    }
+
     access(all)
     resource interface Addressable {
         /// The EVM address
@@ -160,14 +219,14 @@ contract EVM {
             data: [UInt8],
             gasLimit: UInt64,
             value: Balance
-        ): [UInt8] {
-             return InternalEVM.call(
-                 from: self.addressBytes,
-                 to: to.bytes,
-                 data: data,
-                 gasLimit: gasLimit,
-                 value: value.attoflow
-            )
+        ): Result {
+            return InternalEVM.call(
+                from: self.addressBytes,
+                to: to.bytes,
+                data: data,
+                gasLimit: gasLimit,
+                value: value.attoflow
+            ) as! Result
         }
     }
 
@@ -183,12 +242,12 @@ contract EVM {
 
     /// Runs an a RLP-encoded EVM transaction, deducts the gas fees,
     /// and deposits the gas fees into the provided coinbase address.
-    ///
-    /// Returns true if the transaction was successful,
-    /// and returns false otherwise
     access(all)
-    fun run(tx: [UInt8], coinbase: EVMAddress) {
-        InternalEVM.run(tx: tx, coinbase: coinbase.bytes)
+    fun run(tx: [UInt8], coinbase: EVMAddress): Result {
+        return InternalEVM.run(
+                tx: tx, 
+                coinbase: coinbase.bytes
+        ) as! Result
     }
 
     access(all)
