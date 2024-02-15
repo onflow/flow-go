@@ -2476,19 +2476,12 @@ github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20240205224107-320aa3cf09e0/
 github.com/onflow/flow-ft/lib/go/templates v0.7.1-0.20240213220156-959b70719876 h1:fZj39XxayIL7uvKvonNI3MtQM3wsFJ8oRl/XW/0rn7A=
 github.com/onflow/flow-ft/lib/go/templates v0.7.1-0.20240213220156-959b70719876/go.mod h1:uQ8XFqmMK2jxyBSVrmyuwdWjTEb+6zGjRYotfDJ5pAE=
 github.com/onflow/flow-go-sdk v1.0.0-M1/go.mod h1:TDW0MNuCs4SvqYRUzkbRnRmHQL1h4X8wURsCw9P9beo=
-<<<<<<< HEAD
 github.com/onflow/flow-go-sdk v1.0.0-M4 h1:dGtgZvaIfBR5/9I9nm5nLm69V5pLcSz9vXmzCb1lyzM=
 github.com/onflow/flow-go-sdk v1.0.0-M4/go.mod h1:HIGOKJVR47QNs81sPHmZDVcLr+syNkmbgEMLQGDmmEo=
-github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20240205233530-86ee8c352fa6 h1:/2vvjKkWG/3cKP3IpgiGNqXi0yskn4GmNTjmeCwMoz8=
-github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20240205233530-86ee8c352fa6/go.mod h1:2gpbza+uzs1k7x31hkpBPlggIRkI53Suo0n2AyA2HcE=
-=======
-github.com/onflow/flow-go-sdk v1.0.0-M3 h1:8ZWn+dmJGoFJ1jTHxS02rVftGwU+2dJkhXpBzvSBWKs=
-github.com/onflow/flow-go-sdk v1.0.0-M3/go.mod h1:MZi3kMUCGDek4Yjlg/g57f2QO3M0tQeDn9GVMFJYReQ=
 github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20240214230837-cd2c42e54b4a h1:xMEtuQp4+ltfEZcw+4smv4wechSBAus4yEAtPghXZeQ=
 github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20240214230837-cd2c42e54b4a/go.mod h1:2gpbza+uzs1k7x31hkpBPlggIRkI53Suo0n2AyA2HcE=
 github.com/onflow/flow-nft/lib/go/templates v0.0.0-20240213205729-48f42d9896f8 h1:BqgQgXktxVFv8erjCaSHpL0CP+pa5M8g655GyF/t4JM=
 github.com/onflow/flow-nft/lib/go/templates v0.0.0-20240213205729-48f42d9896f8/go.mod h1:p+2hRvtjLUR3MW1NsoJe5Gqgr2eeH49QB6+s6ze00w0=
->>>>>>> 358365acc3 (use new core contracts getters that use templates.Environment)
 github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231121210617-52ee94b830c2/go.mod h1:NA2pX2nw8zuaxfKphhKsk00kWLwfd+tv8mS23YXO4Sk=
 github.com/onflow/flow/protobuf/go/flow v0.3.7 h1:+6sBdlE/u4ZMTVB9U1lA6Xn2Bd48lOOX96Bv9dNubsk=
 github.com/onflow/flow/protobuf/go/flow v0.3.7/go.mod h1:NA2pX2nw8zuaxfKphhKsk00kWLwfd+tv8mS23YXO4Sk=
