@@ -26,7 +26,7 @@ func RetrieveProtocolKVStore(protocolKVStoreID flow.Identifier, kvStore *storage
 // IndexProtocolKVStore indexes a protocol KV store by block ID.
 // Error returns:
 //   - storage.ErrAlreadyExists if the key already exists in the database.
-//   - generic error in case of unexpected failure from the database layer or encoding failure.
+//   - generic error in case of unexpected failure from the database layer
 func IndexProtocolKVStore(blockID flow.Identifier, protocolKVStoreID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeProtocolKVStoreByBlockID, blockID), protocolKVStoreID)
 }
