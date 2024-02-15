@@ -38,10 +38,10 @@ import (
 
 var flowTokenAddress = common.MustBytesToAddress(systemcontracts.SystemContractsForChain(flow.Emulator).FlowToken.Address.Bytes())
 
-func TestHandler_TransactionRun(t *testing.T) {
+func TestHandler_TransactionRunOrPanic(t *testing.T) {
 	t.Parallel()
 
-	t.Run("test - transaction run (happy case)", func(t *testing.T) {
+	t.Run("test RunOrPanic run (happy case)", func(t *testing.T) {
 		t.Parallel()
 
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
@@ -127,7 +127,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 		})
 	})
 
-	t.Run("test - transaction run (unhappy non-fatal cases)", func(t *testing.T) {
+	t.Run("test RunOrPanic (unhappy non-fatal cases)", func(t *testing.T) {
 		t.Parallel()
 
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
@@ -184,7 +184,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 			})
 		})
 
-		t.Run("test - transaction run (fatal cases)", func(t *testing.T) {
+		t.Run("test RunOrPanic (fatal cases)", func(t *testing.T) {
 			t.Parallel()
 
 			testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
@@ -215,7 +215,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 		})
 	})
 
-	t.Run("test running transaction (with integrated emulator)", func(t *testing.T) {
+	t.Run("test RunOrPanic (with integrated emulator)", func(t *testing.T) {
 		t.Parallel()
 
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
@@ -630,10 +630,10 @@ func TestHandler_COA(t *testing.T) {
 	// TODO add test with test emulator for unhappy cases (emulator)
 }
 
-func TestHandler_TransactionTryRun(t *testing.T) {
+func TestHandler_TransactionRun(t *testing.T) {
 	t.Parallel()
 
-	t.Run("test - transaction try run (success)", func(t *testing.T) {
+	t.Run("test - transaction run (success)", func(t *testing.T) {
 		t.Parallel()
 
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
@@ -678,7 +678,7 @@ func TestHandler_TransactionTryRun(t *testing.T) {
 		})
 	})
 
-	t.Run("test - transaction try run (failed)", func(t *testing.T) {
+	t.Run("test - transaction run (failed)", func(t *testing.T) {
 		t.Parallel()
 
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
@@ -725,7 +725,7 @@ func TestHandler_TransactionTryRun(t *testing.T) {
 		})
 	})
 
-	t.Run("test - transaction try run (unhappy cases)", func(t *testing.T) {
+	t.Run("test - transaction run (unhappy cases)", func(t *testing.T) {
 		t.Parallel()
 
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
