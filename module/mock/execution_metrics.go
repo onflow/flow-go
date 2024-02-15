@@ -47,7 +47,7 @@ func (_m *ExecutionMetrics) ExecutionBlockExecutionEffortVectorComponent(_a0 str
 }
 
 // ExecutionCheckpointSize provides a mock function with given fields: bytes
-func (_m *ExecutionMetrics) ExecutionCheckpointSize(bytes int64) {
+func (_m *ExecutionMetrics) ExecutionCheckpointSize(bytes uint64) {
 	_m.Called(bytes)
 }
 
