@@ -42,10 +42,10 @@ func COAOwnershipProofValidator(contractAddress flow.Address, backend types.Back
 			},
 			proof.ToCadenceValues(),
 		)
-		if types.IsAFatalError(err) {
-			panic(err)
-		}
 		if err != nil {
+			if types.IsAFatalError(err) {
+				panic(err)
+			}
 			return false, err
 		}
 		data, ok := value.(cadence.Struct)
