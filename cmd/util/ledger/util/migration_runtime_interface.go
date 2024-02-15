@@ -118,10 +118,6 @@ func (m MigrationRuntimeInterface) GetOrLoadProgram(
 	location runtime.Location,
 	load func() (*interpreter.Program, error),
 ) (*interpreter.Program, error) {
-	if m.GetOrLoadProgramFunc != nil {
-		return m.GetOrLoadProgramFunc(location, load)
-	}
-
 	return m.Programs.GetOrLoadProgram(location, load)
 }
 
@@ -306,9 +302,6 @@ func (m MigrationRuntimeInterface) RecordTrace(_ string, _ runtime.Location, _ t
 }
 
 type RuntimeInterfaceConfig struct {
-	// GetOrLoadProgramFunc allows for injecting extra logic
-	GetOrLoadProgramFunc func(location runtime.Location, load func() (*interpreter.Program, error)) (*interpreter.Program, error)
-
 	// GetContractCodeFunc allows for injecting extra logic for code lookup
 	GetContractCodeFunc func(location runtime.Location) ([]byte, error)
 }
