@@ -2,7 +2,6 @@ package backend
 
 import (
 	"bytes"
-	"log"
 	"math"
 	"sort"
 	"testing"
@@ -74,15 +73,6 @@ func TestGetEvents(t *testing.T) {
 		}
 		return cmp < 0
 	})
-
-	for i := range storedEvents {
-		log.Printf("storedEvents[%d]: %v %v %v",
-			i,
-			storedEvents[i].TransactionID,
-			storedEvents[i].TransactionIndex,
-			storedEvents[i].EventIndex,
-		)
-	}
 
 	events := storagemock.NewEvents(t)
 	header := unittest.BlockHeaderFixture()
