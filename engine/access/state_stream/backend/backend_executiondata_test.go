@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/index"
 	subscriptionmock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
@@ -33,12 +34,14 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
-var chainID = flow.MonotonicEmulator
-var testEventTypes = []flow.EventType{
-	unittest.EventTypeFixture(chainID),
-	unittest.EventTypeFixture(chainID),
-	unittest.EventTypeFixture(chainID),
-}
+var (
+	chainID        = flow.MonotonicEmulator
+	testEventTypes = []flow.EventType{
+		unittest.EventTypeFixture(chainID),
+		unittest.EventTypeFixture(chainID),
+		unittest.EventTypeFixture(chainID),
+	}
+)
 
 type BackendExecutionDataSuite struct {
 	suite.Suite
@@ -52,14 +55,16 @@ type BackendExecutionDataSuite struct {
 	results        *storagemock.ExecutionResults
 	registers      *storagemock.RegisterIndex
 	registersAsync *execution.RegistersAsyncStore
+	eventsIndex    *index.EventsIndex
 
-	bs                blobs.Blobstore
-	eds               execution_data.ExecutionDataStore
-	broadcaster       *engine.Broadcaster
-	execDataCache     *cache.ExecutionDataCache
-	execDataHeroCache *herocache.BlockExecutionData
-	chainStateTracker *subscriptionmock.ChainStateTracker
-	backend           *StateStreamBackend
+	bs                    blobs.Blobstore
+	eds                   execution_data.ExecutionDataStore
+	broadcaster           *engine.Broadcaster
+	execDataCache         *cache.ExecutionDataCache
+	execDataHeroCache     *herocache.BlockExecutionData
+	chainStateTracker     *subscriptionmock.ChainStateTracker
+	backend               *StateStreamBackend
+	chainStateTrackerReal subscription.ChainStateTracker
 
 	blocks      []*flow.Block
 	blockEvents map[flow.Identifier][]flow.Event
@@ -162,9 +167,10 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 	s.registerID = unittest.RegisterIDFixture()
 
+	s.eventsIndex = index.NewEventsIndex(s.events)
 	s.registersAsync = execution.NewRegistersAsyncStore()
 	s.registers = storagemock.NewRegisterIndex(s.T())
-	err = s.registersAsync.InitDataAvailable(s.registers)
+	err = s.registersAsync.Initialize(s.registers)
 	require.NoError(s.T(), err)
 	s.registers.On("LatestHeight").Return(s.rootBlock.Header.Height).Maybe()
 	s.registers.On("FirstHeight").Return(s.rootBlock.Header.Height).Maybe()
@@ -217,19 +223,39 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		conf,
 		s.state,
 		s.headers,
-		s.events,
 		s.seals,
 		s.results,
 		s.eds,
 		s.execDataCache,
 		s.broadcaster,
-		s.rootBlock.Header.Height,
-		s.rootBlock.Header.Height, // initialize with no downloaded data
 		s.registersAsync,
+		s.eventsIndex,
+		false,
+		s.chainStateTracker,
+	)
+	require.NoError(s.T(), err)
+
+	// create real chain state tracker to use GetStartHeight from it, instead of mocking
+	s.chainStateTrackerReal, err = subscription.NewChainStateTracker(
+		logger,
+		s.state,
+		s.rootBlock.Header.Height,
+		s.headers,
+		s.rootBlock.Header.Height,
+		s.broadcaster,
+		s.eventsIndex,
 		false,
 	)
 	require.NoError(s.T(), err)
-	s.backend.ChainStateTracker = s.chainStateTracker
+
+	s.chainStateTracker.On(
+		"GetStartHeight",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Return(func(startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error) {
+		return s.chainStateTrackerReal.GetStartHeight(startBlockID, startHeight, blockStatus)
+	}, nil).Maybe()
 }
 
 func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
@@ -420,18 +446,21 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 	})
 
 	s.Run("returns error if block height is out of range", func() {
-		_, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.rootBlock.Header.Height+1)
+		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.rootBlock.Header.Height+1)
+		require.Nil(s.T(), res)
 		require.Equal(s.T(), codes.OutOfRange, status.Code(err))
 	})
 
 	s.Run("returns error if register path is not indexed", func() {
 		falseID := flow.RegisterIDs{flow.RegisterID{Owner: "ha", Key: "ha"}}
-		_, err := s.backend.GetRegisterValues(falseID, s.rootBlock.Header.Height)
+		res, err := s.backend.GetRegisterValues(falseID, s.rootBlock.Header.Height)
+		require.Nil(s.T(), res)
 		require.Equal(s.T(), codes.NotFound, status.Code(err))
 	})
 
 	s.Run("returns error if too many registers are requested", func() {
-		_, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.registerRequestLimit+1), s.rootBlock.Header.Height)
+		res, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.registerRequestLimit+1), s.rootBlock.Header.Height)
+		require.Nil(s.T(), res)
 		require.Equal(s.T(), codes.InvalidArgument, status.Code(err))
 	})
 }

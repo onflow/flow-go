@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/handler"
+	"github.com/onflow/flow-go/fvm/evm/handler/coa"
 	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -66,7 +67,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 							return result, nil
 						},
 					}
-					handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+					handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, em)
 
 					coinbase := types.NewAddress(gethCommon.Address{})
 
@@ -144,7 +145,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 							return &types.Result{}, types.NewEVMExecutionError(fmt.Errorf("some sort of error"))
 						},
 					}
-					handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+					handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, em)
 
 					coinbase := types.NewAddress(gethCommon.Address{})
 
@@ -198,7 +199,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 				eoa := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
 
 				// deposit 1 Flow to the foa account
-				addr := handler.AllocateAddress()
+				addr := handler.DeployCOA(1)
 				orgBalance := types.NewBalanceFromUFix64(types.OneFlowInUFix64)
 				vault := types.NewFlowTokenVault(orgBalance)
 				foa := handler.AccountByAddress(addr, true)
@@ -224,7 +225,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 				)
 
 				// setup coinbase
-				foa2 := handler.AllocateAddress()
+				foa2 := handler.DeployCOA(2)
 				account2 := handler.AccountByAddress(foa2, true)
 				require.Equal(t, types.NewBalanceFromUFix64(0), account2.Balance())
 
@@ -236,7 +237,6 @@ func TestHandler_TransactionRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, expected, foa.Balance())
 
-				// fees has been collected to the coinbase
 				require.NotEqual(t, types.NewBalanceFromUFix64(0), account2.Balance())
 			})
 		})
@@ -275,34 +275,26 @@ func TestHandler_OpsWithoutEmulator(t *testing.T) {
 
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				blockchain, err := handler.NewBlockStore(backend, rootAddr)
-				require.NoError(t, err)
+				h := SetupHandler(t, backend, rootAddr)
 
-				aa, err := handler.NewAddressAllocator(backend, rootAddr)
-				require.NoError(t, err)
+				coa := h.DeployCOA(12)
+				require.NotNil(t, coa)
 
-				h := handler.NewContractHandler(flowTokenAddress, blockchain, aa, backend, nil)
-
-				foa := h.AllocateAddress()
-				require.NotNil(t, foa)
-
-				expectedAddress := handler.MakeCOAAddress(1)
-				require.Equal(t, expectedAddress, foa)
+				expectedAddress := handler.MakeCOAAddress(12)
+				require.Equal(t, expectedAddress, coa)
 			})
 		})
 	})
 }
 
-func TestHandler_BridgedAccount(t *testing.T) {
-
+func TestHandler_COA(t *testing.T) {
+	t.Parallel()
 	t.Run("test deposit/withdraw (with integrated emulator)", func(t *testing.T) {
-		t.Parallel()
-
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				handler := SetupHandler(t, backend, rootAddr)
 
-				foa := handler.AccountByAddress(handler.AllocateAddress(), true)
+				foa := handler.AccountByAddress(handler.DeployCOA(1), true)
 				require.NotNil(t, foa)
 
 				zeroBalance := types.NewBalance(big.NewInt(0))
@@ -320,18 +312,20 @@ func TestHandler_BridgedAccount(t *testing.T) {
 				require.Equal(t, zeroBalance, foa.Balance())
 
 				events := backend.Events()
-				require.Len(t, events, 4)
+				require.Len(t, events, 6)
+
+				// first two transactions are for COA setup
 
 				// transaction event
-				event := events[0]
+				event := events[2]
 				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
 
 				// block event
-				event = events[1]
+				event = events[3]
 				assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
 
 				// transaction event
-				event = events[2]
+				event = events[4]
 				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
 				_, err := jsoncdc.Decode(nil, event.Payload)
 				require.NoError(t, err)
@@ -340,13 +334,13 @@ func TestHandler_BridgedAccount(t *testing.T) {
 				// assert.Equal(t, balance, ret.Amount)
 
 				// block event
-				event = events[3]
+				event = events[5]
 				assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
 
 				// check gas usage
 				computationUsed, err := backend.ComputationUsed()
 				require.NoError(t, err)
-				require.Equal(t, types.DefaultDirectCallBaseGasUsage*2, computationUsed)
+				require.Greater(t, computationUsed, types.DefaultDirectCallBaseGasUsage*3)
 
 				// Withdraw with invalid balance
 				assertPanic(t, types.IsWithdrawBalanceRoundingError, func() {
@@ -355,7 +349,52 @@ func TestHandler_BridgedAccount(t *testing.T) {
 					// then withdraw invalid balance
 					foa.Withdraw(types.NewBalance(big.NewInt(1)))
 				})
+			})
+		})
+	})
 
+	t.Run("test coa deployment", func(t *testing.T) {
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				h := SetupHandler(t, backend, rootAddr)
+
+				coa1 := h.DeployCOA(1)
+				acc := h.AccountByAddress(coa1, true)
+				require.NotEmpty(t, acc.Code())
+
+				// make a second account with some money
+				coa2 := h.DeployCOA(2)
+				acc2 := h.AccountByAddress(coa2, true)
+				acc2.Deposit(types.NewFlowTokenVault(types.MakeABalanceInFlow(100)))
+
+				// transfer money to COA
+				acc2.Transfer(
+					coa1,
+					types.MakeABalanceInFlow(1),
+				)
+
+				// make a call to the contract
+				ret := acc2.Call(
+					coa1,
+					testutils.MakeCallData(t,
+						coa.ContractABIJSON,
+						"onERC721Received",
+						gethCommon.Address{1},
+						gethCommon.Address{1},
+						big.NewInt(0),
+						[]byte{'A'},
+					),
+					types.GasLimit(3_000_000),
+					types.EmptyBalance)
+
+				// 0x150b7a02
+				expected := types.Data([]byte{
+					21, 11, 122, 2, 0, 0, 0, 0,
+					0, 0, 0, 0, 0, 0, 0, 0,
+					0, 0, 0, 0, 0, 0, 0, 0,
+					0, 0, 0, 0, 0, 0, 0, 0,
+				})
+				require.Equal(t, expected, ret)
 			})
 		})
 	})
@@ -374,7 +413,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 					assertPanic(t, types.IsAUnAuthroizedMethodCallError, func() {
 						em := &testutils.TestEmulator{}
 
-						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+						handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, em)
 
 						account := handler.AccountByAddress(testutils.RandomAddress(t), false)
 						account.Withdraw(types.NewBalanceFromUFix64(1))
@@ -388,7 +427,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 							},
 						}
 
-						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+						handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
 						account.Withdraw(types.NewBalanceFromUFix64(1))
@@ -402,7 +441,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 							},
 						}
 
-						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+						handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
 						account.Withdraw(types.NewBalanceFromUFix64(0))
@@ -416,7 +455,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 							},
 						}
 
-						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+						handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
 						account.Withdraw(types.NewBalanceFromUFix64(0))
@@ -446,7 +485,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 							},
 						}
 
-						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+						handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
 						account.Deposit(types.NewFlowTokenVault(types.NewBalanceFromUFix64(1)))
@@ -460,7 +499,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 							},
 						}
 
-						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+						handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
 						account.Deposit(types.NewFlowTokenVault(types.NewBalanceFromUFix64(1)))
@@ -478,19 +517,20 @@ func TestHandler_BridgedAccount(t *testing.T) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				handler := SetupHandler(t, backend, rootAddr)
 
-				foa := handler.AccountByAddress(handler.AllocateAddress(), true)
+				foa := handler.AccountByAddress(handler.DeployCOA(1), true)
 				require.NotNil(t, foa)
 
 				// deposit 10000 flow
-				vault := types.NewFlowTokenVault(types.MakeABalanceInFlow(10000))
+				bal := types.MakeABalanceInFlow(10000)
+				vault := types.NewFlowTokenVault(bal)
 				foa.Deposit(vault)
+				require.Equal(t, bal, foa.Balance())
 
 				testContract := testutils.GetStorageTestContract(t)
 				addr := foa.Deploy(testContract.ByteCode, math.MaxUint64, types.NewBalanceFromUFix64(0))
 				require.NotNil(t, addr)
 
 				num := big.NewInt(22)
-
 				_ = foa.Call(
 					addr,
 					testContract.MakeCallData(t, "store", num),
@@ -519,7 +559,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				h := SetupHandler(t, backend, rootAddr)
 
-				foa := h.AccountByAddress(h.AllocateAddress(), true)
+				foa := h.AccountByAddress(h.DeployCOA(1), true)
 				require.NotNil(t, foa)
 
 				vault := types.NewFlowTokenVault(types.MakeABalanceInFlow(10000))
@@ -545,7 +585,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				handler := SetupHandler(t, backend, rootAddr)
 
-				foa := handler.AccountByAddress(handler.AllocateAddress(), true)
+				foa := handler.AccountByAddress(handler.DeployCOA(1), true)
 				require.NotNil(t, foa)
 
 				vault := types.NewFlowTokenVault(types.MakeABalanceInFlow(100))
@@ -600,6 +640,6 @@ func SetupHandler(t testing.TB, backend types.Backend, rootAddr flow.Address) *h
 
 	emulator := emulator.NewEmulator(backend, rootAddr)
 
-	handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, emulator)
+	handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, emulator)
 	return handler
 }

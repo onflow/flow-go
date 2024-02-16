@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"encoding/hex"
+	"fmt"
+	"math/rand"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -23,16 +25,14 @@ const finalizeHappyPathLogs = "collecting partner network and staking keys" +
 	`read \d+ internal private node-info files` +
 	`read internal node configurations` +
 	`read \d+ weights for internal nodes` +
-	`checking constraints on consensus/cluster nodes` +
+	`checking constraints on consensus nodes` +
 	`assembling network and staking keys` +
 	`reading root block data` +
 	`reading root block votes` +
 	`read vote .*` +
 	`reading dkg data` +
+	`reading intermediary bootstrapping data` +
 	`constructing root QC` +
-	`computing collection node clusters` +
-	`constructing root blocks for collection node clusters` +
-	`constructing root QCs for collection node clusters` +
 	`constructing root execution result and block seal` +
 	`constructing root protocol snapshot` +
 	`wrote file \S+/root-protocol-state-snapshot.json` +
@@ -68,17 +68,22 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagRootChain = chainName
 		flagRootParent = hex.EncodeToString(rootParent[:])
 		flagRootHeight = rootHeight
-
-		// rootBlock will generate DKG and place it into bootDir/public-root-information
-		rootBlock(nil, nil)
-
 		flagRootCommit = hex.EncodeToString(rootCommit[:])
 		flagEpochCounter = epochCounter
 		flagNumViewsInEpoch = 100_000
 		flagNumViewsInStakingAuction = 50_000
 		flagNumViewsInDKGPhase = 2_000
 		flagEpochCommitSafetyThreshold = 1_000
-		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
+		flagUseDefaultEpochTargetEndTime = true
+		flagEpochTimingRefCounter = 0
+		flagEpochTimingRefTimestamp = 0
+		flagEpochTimingDuration = 0
+
+		// rootBlock will generate DKG and place it into bootDir/public-root-information
+		rootBlock(nil, nil)
+
+		flagRootBlockPath = filepath.Join(bootDir, model.PathRootBlockData)
+		flagIntermediaryBootstrappingDataPath = filepath.Join(bootDir, model.PathIntermediaryBootstrappingData)
 		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
 		flagRootBlockVotesDir = filepath.Join(bootDir, model.DirnameRootBlockVotes)
 
@@ -86,6 +91,7 @@ func TestFinalize_HappyPath(t *testing.T) {
 		log = log.Hook(hook)
 
 		finalize(nil, nil)
+		fmt.Println(hook.logs.String())
 		assert.Regexp(t, finalizeHappyPathRegex, hook.logs.String())
 		hook.logs.Reset()
 
@@ -116,6 +122,49 @@ func TestClusterAssignment(t *testing.T) {
 	require.Error(t, err)
 	// revert the flag value
 	flagCollectionClusters = tmp
+}
+
+func TestEpochTimingConfig(t *testing.T) {
+	// Reset flags after test is completed
+	defer func(_flagDefault bool, _flagRefCounter, _flagRefTs, _flagDur uint64) {
+		flagUseDefaultEpochTargetEndTime = _flagDefault
+		flagEpochTimingRefCounter = _flagRefCounter
+		flagEpochTimingRefTimestamp = _flagRefTs
+		flagEpochTimingDuration = _flagDur
+	}(flagUseDefaultEpochTargetEndTime, flagEpochTimingRefCounter, flagEpochTimingRefTimestamp, flagEpochTimingDuration)
+
+	flags := []*uint64{&flagEpochTimingRefCounter, &flagEpochTimingRefTimestamp, &flagEpochTimingDuration}
+	t.Run("if default is set, no other flag may be set", func(t *testing.T) {
+		flagUseDefaultEpochTargetEndTime = true
+		for _, flag := range flags {
+			*flag = rand.Uint64()%100 + 1
+			err := validateOrPopulateEpochTimingConfig()
+			assert.Error(t, err)
+			*flag = 0 // set the flag back to 0
+		}
+		err := validateOrPopulateEpochTimingConfig()
+		assert.NoError(t, err)
+	})
+
+	t.Run("if default is not set, all other flags must be set", func(t *testing.T) {
+		flagUseDefaultEpochTargetEndTime = false
+		// First set all required flags and ensure validation passes
+		flagEpochTimingRefCounter = rand.Uint64() % flagEpochCounter
+		flagEpochTimingDuration = rand.Uint64()%100_000 + 1
+		flagEpochTimingRefTimestamp = rand.Uint64()
+
+		err := validateOrPopulateEpochTimingConfig()
+		assert.NoError(t, err)
+
+		// Next, check that validation fails if any one flag is not set
+		// NOTE: we do not include refCounter here, because it is allowed to be zero.
+		for _, flag := range []*uint64{&flagEpochTimingRefTimestamp, &flagEpochTimingDuration} {
+			*flag = 0
+			err := validateOrPopulateEpochTimingConfig()
+			assert.Error(t, err)
+			*flag = rand.Uint64()%100 + 1 // set the flag back to a non-zero value
+		}
+	})
 }
 
 // Check about the number of internal/partner nodes in each cluster. The identites

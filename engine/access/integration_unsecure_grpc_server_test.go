@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/index"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/execution"
@@ -46,19 +47,20 @@ import (
 // on the same port
 type SameGRPCPortTestSuite struct {
 	suite.Suite
-	state          *protocol.State
-	snapshot       *protocol.Snapshot
-	epochQuery     *protocol.EpochQuery
-	log            zerolog.Logger
-	net            *network.EngineRegistry
-	request        *module.Requester
-	collClient     *accessmock.AccessAPIClient
-	execClient     *accessmock.ExecutionAPIClient
-	me             *module.Local
-	chainID        flow.ChainID
-	metrics        *metrics.NoopCollector
-	rpcEng         *rpc.Engine
-	stateStreamEng *statestreambackend.Engine
+	state             *protocol.State
+	snapshot          *protocol.Snapshot
+	epochQuery        *protocol.EpochQuery
+	log               zerolog.Logger
+	net               *network.EngineRegistry
+	request           *module.Requester
+	collClient        *accessmock.AccessAPIClient
+	execClient        *accessmock.ExecutionAPIClient
+	me                *module.Local
+	chainID           flow.ChainID
+	metrics           *metrics.NoopCollector
+	rpcEng            *rpc.Engine
+	stateStreamEng    *statestreambackend.Engine
+	chainStateTracker subscription.ChainStateTracker
 
 	// storage
 	blocks       *storagemock.Blocks
@@ -238,21 +240,34 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		ClientSendBufferSize: subscription.DefaultSendBufferSize,
 	}
 
+	eventIndexer := index.NewEventsIndex(suite.events)
+
+	suite.chainStateTracker, err = subscription.NewChainStateTracker(
+		suite.log,
+		suite.state,
+		rootBlock.Header.Height,
+		suite.headers,
+		rootBlock.Header.Height,
+		suite.broadcaster,
+		eventIndexer,
+		false,
+	)
+	require.NoError(suite.T(), err)
+
 	stateStreamBackend, err := statestreambackend.New(
 		suite.log,
 		conf,
 		suite.state,
 		suite.headers,
-		suite.events,
 		suite.seals,
 		suite.results,
 		nil,
 		suite.execDataCache,
 		nil,
-		rootBlock.Header.Height,
-		rootBlock.Header.Height,
 		suite.registers,
+		eventIndexer,
 		false,
+		suite.chainStateTracker,
 	)
 	assert.NoError(suite.T(), err)
 

@@ -156,7 +156,6 @@ generate-fvm-env-wrappers:
 generate-mocks: install-mock-generators
 	mockery --name '(Connector|PingInfoProvider)' --dir=network/p2p --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
 	CGO_CFLAGS=$(CRYPTO_FLAG) mockgen -destination=storage/mocks/storage.go -package=mocks github.com/onflow/flow-go/storage Blocks,Headers,Payloads,Collections,Commits,Events,ServiceEvents,TransactionResults
-	CGO_CFLAGS=$(CRYPTO_FLAG) mockgen -destination=module/mocks/network.go -package=mocks github.com/onflow/flow-go/module Local,Requester
 	CGO_CFLAGS=$(CRYPTO_FLAG) mockgen -destination=network/mocknetwork/mock_network.go -package=mocknetwork github.com/onflow/flow-go/network EngineRegistry
 	mockery --name='.*' --dir=integration/benchmark/mocksiface --case=underscore --output="integration/benchmark/mock" --outpkg="mock"
 	mockery --name=ExecutionDataStore --dir=module/executiondatasync/execution_data --case=underscore --output="./module/executiondatasync/execution_data/mock" --outpkg="mock"
@@ -178,6 +177,7 @@ generate-mocks: install-mock-generators
 	mockery --name '.*' --dir=storage --case=underscore --output="./storage/mock" --outpkg="mock"
 	mockery --name '.*' --dir="state/protocol" --case=underscore --output="state/protocol/mock" --outpkg="mock"
 	mockery --name '.*' --dir="state/protocol/events" --case=underscore --output="./state/protocol/events/mock" --outpkg="mock"
+	mockery --name '.*' --dir="state/protocol/protocol_state" --case=underscore --output="state/protocol/protocol_state/mock" --outpkg="mock"
 	mockery --name '.*' --dir=engine/execution/computation/computer --case=underscore --output="./engine/execution/computation/computer/mock" --outpkg="mock"
 	mockery --name '.*' --dir=engine/execution/state --case=underscore --output="./engine/execution/state/mock" --outpkg="mock"
 	mockery --name '.*' --dir=engine/collection --case=underscore --output="./engine/collection/mock" --outpkg="mock"

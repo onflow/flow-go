@@ -54,18 +54,20 @@ const (
 	codeRefHeightToClusterBlock    = 43 // index reference block height to cluster block IDs
 	codeBlockIDToFinalizedSeal     = 44 // index _finalized_ seal by sealed block ID
 	codeBlockIDToQuorumCertificate = 45 // index of quorum certificates by block ID
+	codeProtocolStateByBlockID     = 46 // index of protocol state entry by block ID
 
 	// codes for indexing multiple identifiers by identifier
-	codeBlockChildren     = 50 // index mapping block ID to children blocks
-	_                     = 51 // DEPRECATED: 51 was used for identity indexes before epochs
-	codePayloadGuarantees = 52 // index mapping block ID to payload guarantees
-	codePayloadSeals      = 53 // index mapping block ID to payload seals
-	codeCollectionBlock   = 54 // index mapping collection ID to block ID
-	codeOwnBlockReceipt   = 55 // index mapping block ID to execution receipt ID for execution nodes
-	codeBlockEpochStatus  = 56 // index mapping block ID to epoch status
-	codePayloadReceipts   = 57 // index mapping block ID  to payload receipts
-	codePayloadResults    = 58 // index mapping block ID to payload results
-	codeAllBlockReceipts  = 59 // index mapping of blockID to multiple receipts
+	codeBlockChildren          = 50 // index mapping block ID to children blocks
+	_                          = 51 // DEPRECATED: 51 was used for identity indexes before epochs
+	codePayloadGuarantees      = 52 // index mapping block ID to payload guarantees
+	codePayloadSeals           = 53 // index mapping block ID to payload seals
+	codeCollectionBlock        = 54 // index mapping collection ID to block ID
+	codeOwnBlockReceipt        = 55 // index mapping block ID to execution receipt ID for execution nodes
+	_                          = 56 // DEPRECATED: 56 was used for block->epoch status prior to Dynamic Protocol State in Mainnet25
+	codePayloadReceipts        = 57 // index mapping block ID to payload receipts
+	codePayloadResults         = 58 // index mapping block ID to payload results
+	codeAllBlockReceipts       = 59 // index mapping of blockID to multiple receipts
+	codePayloadProtocolStateID = 60 // index mapping block ID to payload protocol state ID
 
 	// codes related to protocol level information
 	codeEpochSetup       = 61 // EpochSetup service event, keyed by ID
@@ -74,6 +76,7 @@ const (
 	codeDKGStarted       = 64 // flag that the DKG for an epoch has been started
 	codeDKGEnded         = 65 // flag that the DKG for an epoch has ended (stores end state)
 	codeVersionBeacon    = 67 // flag for storing version beacons
+	codeProtocolState    = 68
 
 	// code for ComputationResult upload status storage
 	// NOTE: for now only GCP uploader is supported. When other uploader (AWS e.g.) needs to

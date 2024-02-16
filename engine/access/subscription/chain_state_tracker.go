@@ -11,8 +11,11 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -59,12 +62,14 @@ var _ ChainStateTracker = (*ChainStateTrackerImpl)(nil)
 
 // ChainStateTrackerImpl tracks for new blocks and handles block-related operations.
 type ChainStateTrackerImpl struct {
-	log         zerolog.Logger
-	state       protocol.State
-	headers     storage.Headers
-	broadcaster *engine.Broadcaster
-	RootHeight  uint64
-	RootBlockID flow.Identifier
+	log             zerolog.Logger
+	state           protocol.State
+	headers         storage.Headers
+	broadcaster     *engine.Broadcaster
+	indexReporter   state_synchronization.IndexReporter
+	useIndex        bool
+	rootBlockHeight uint64
+	rootBlockID     flow.Identifier
 
 	// finalizedHighestHeight contains the highest consecutive block height for which we have received a new notification.
 	finalizedHighestHeight counters.StrictMonotonousCounter
@@ -80,6 +85,8 @@ func NewChainStateTracker(
 	headers storage.Headers,
 	highestAvailableFinalizedHeight uint64,
 	broadcaster *engine.Broadcaster,
+	indexReporter state_synchronization.IndexReporter,
+	useIndex bool,
 ) (*ChainStateTrackerImpl, error) {
 	lastSealed, err := state.Sealed().Head()
 	if err != nil {
@@ -89,12 +96,14 @@ func NewChainStateTracker(
 	return &ChainStateTrackerImpl{
 		log:                    log,
 		state:                  state,
-		RootHeight:             rootHeight,
-		RootBlockID:            flow.ZeroID,
+		rootBlockHeight:        rootHeight,
+		rootBlockID:            flow.ZeroID,
 		headers:                headers,
 		finalizedHighestHeight: counters.NewMonotonousCounter(highestAvailableFinalizedHeight),
 		sealedHighestHeight:    counters.NewMonotonousCounter(lastSealed.Height),
 		broadcaster:            broadcaster,
+		indexReporter:          indexReporter,
+		useIndex:               useIndex,
 	}, nil
 }
 
@@ -116,7 +125,7 @@ func NewChainStateTracker(
 // - codes.InvalidArgument: If blockStatus is flow.BlockStatusUnknown, or both startBlockID and startHeight are provided.
 // - storage.ErrNotFound`: If a block is provided and does not exist.
 // - codes.Internal: If there is an internal error.
-func (h *ChainStateTrackerImpl) GetStartHeight(startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error) {
+func (h *ChainStateTrackerImpl) GetStartHeight(startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (height uint64, err error) {
 	// block status could be only sealed and finalized
 	if blockStatus == flow.BlockStatusUnknown {
 		return 0, status.Errorf(codes.InvalidArgument, "block status could not be unknown")
@@ -127,73 +136,100 @@ func (h *ChainStateTrackerImpl) GetStartHeight(startBlockID flow.Identifier, sta
 		return 0, status.Errorf(codes.InvalidArgument, "only one of start block ID and start height may be provided")
 	}
 
-	if h.RootBlockID == flow.ZeroID {
-		// cache the root block height and ID for runtime lookups.
-		rootBlockID, err := h.headers.BlockIDByHeight(h.RootHeight)
-		if err != nil {
-			return 0, fmt.Errorf("could not get root block ID: %w", err)
+	// ensure that the resolved start height is available
+	defer func() {
+		if err == nil {
+			height, err = h.checkStartHeight(height)
 		}
-		h.RootBlockID = rootBlockID
-	}
+	}()
 
-	// if the start block is the root block, there will not be an execution data. skip it and
-	// begin from the next block.
-	// Note: we can skip the block lookup since it was already done in the constructor
-	if startBlockID == h.RootBlockID ||
-		// Note: there is a corner case when rootBlockHeight == 0:
-		// since the default value of an uint64 is 0, when checking if startHeight matches the root block
-		// we also need to check that startBlockID is unset, otherwise we may incorrectly set the start height
-		// for non-matching startBlockIDs.
-		(startHeight == h.RootHeight && startBlockID == flow.ZeroID) {
-		return h.RootHeight + 1, nil
-	}
-
-	var header *flow.Header
-	var err error
-	// invalid or missing block IDs will result in an error
 	if startBlockID != flow.ZeroID {
-		header, err = h.headers.ByBlockID(startBlockID)
-		if err != nil {
-			return 0, rpc.ConvertStorageError(fmt.Errorf("could not get header for block %v: %w", startBlockID, err))
-		}
-
-		if blockStatus == flow.BlockStatusFinalized {
-			return header.Height, nil
-		}
+		return h.startHeightFromBlockID(startBlockID)
 	}
 
-	// heights that have not been indexed yet will result in an error
 	if startHeight > 0 {
-		if startHeight < h.RootHeight {
-			return 0, status.Errorf(codes.InvalidArgument, "start height must be greater than or equal to the root height %d", h.RootHeight)
-		}
-
-		header, err = h.headers.ByHeight(startHeight)
-		if err != nil {
-			return 0, rpc.ConvertStorageError(fmt.Errorf("could not get header for height %d: %w", startHeight, err))
-		}
-
-		if blockStatus == flow.BlockStatusFinalized {
-			return header.Height, nil
-		}
-	}
-
-	lastSealed, err := h.state.Sealed().Head()
-	if err != nil {
-		return 0, status.Errorf(codes.Internal, "could not get latest sealed block: %v", err)
-	}
-
-	// this checking if start block is sealed
-	if header != nil {
-		if header.Height > lastSealed.Height {
-			return 0, status.Errorf(codes.InvalidArgument, "provided start block must be sealed. Latest sealed block %v with the height %d", lastSealed.ID(), lastSealed.Height)
-		}
-
-		return header.Height, nil
+		return h.startHeightFromHeight(startHeight)
 	}
 
 	// if no start block was provided, use the latest sealed block
-	return lastSealed.Height, nil
+	header, err := h.state.Sealed().Head()
+	if err != nil {
+		return 0, status.Errorf(codes.Internal, "could not get latest sealed block: %v", err)
+	}
+	return header.Height, nil
+}
+
+func (h *ChainStateTrackerImpl) startHeightFromBlockID(startBlockID flow.Identifier) (uint64, error) {
+	header, err := h.headers.ByBlockID(startBlockID)
+	if err != nil {
+		return 0, rpc.ConvertStorageError(fmt.Errorf("could not get header for block %v: %w", startBlockID, err))
+	}
+	return header.Height, nil
+}
+
+func (h *ChainStateTrackerImpl) startHeightFromHeight(startHeight uint64) (uint64, error) {
+	if startHeight < h.rootBlockHeight {
+		return 0, status.Errorf(codes.InvalidArgument, "start height must be greater than or equal to the root height %d", h.rootBlockHeight)
+	}
+
+	header, err := h.headers.ByHeight(startHeight)
+	if err != nil {
+		return 0, rpc.ConvertStorageError(fmt.Errorf("could not get header for height %d: %w", startHeight, err))
+	}
+	return header.Height, nil
+}
+
+func (h *ChainStateTrackerImpl) checkStartHeight(height uint64) (uint64, error) {
+	// if the start block is the root block, there will not be an execution data. skip it and
+	// begin from the next block.
+	if height == h.rootBlockHeight {
+		height = h.rootBlockHeight + 1
+	}
+
+	if !h.useIndex {
+		return height, nil
+	}
+
+	lowestHeight, highestHeight, err := h.getIndexerHeights()
+	if err != nil {
+		return 0, err
+	}
+
+	if height < lowestHeight {
+		return 0, status.Errorf(codes.InvalidArgument, "start height %d is lower than lowest indexed height %d", height, lowestHeight)
+	}
+
+	if height > highestHeight {
+		return 0, status.Errorf(codes.InvalidArgument, "start height %d is higher than highest indexed height %d", height, highestHeight)
+	}
+
+	return height, nil
+}
+
+// getIndexerHeights returns the lowest and highest indexed block heights
+// Expected errors during normal operation:
+// - codes.FailedPrecondition: if the index reporter is not ready yet.
+// - codes.Internal: if there was any other error getting the heights.
+func (h *ChainStateTrackerImpl) getIndexerHeights() (uint64, uint64, error) {
+	lowestHeight, err := h.indexReporter.LowestIndexedHeight()
+	if err != nil {
+		if errors.Is(err, storage.ErrHeightNotIndexed) || errors.Is(err, indexer.ErrIndexNotInitialized) {
+			// the index is not ready yet, but likely will be eventually
+			return 0, 0, status.Errorf(codes.FailedPrecondition, "failed to get lowest indexed height: %v", err)
+		}
+		return 0, 0, rpc.ConvertError(err, "failed to get lowest indexed height", codes.Internal)
+	}
+
+	highestHeight, err := h.indexReporter.HighestIndexedHeight()
+	if err != nil {
+		if errors.Is(err, storage.ErrHeightNotIndexed) || errors.Is(err, indexer.ErrIndexNotInitialized) {
+			// the index is not ready yet, but likely will be eventually
+			return 0, 0, status.Errorf(codes.FailedPrecondition, "failed to get highest indexed height: %v", err)
+		}
+		return 0, 0, rpc.ConvertError(err, "failed to get highest indexed height", codes.Internal)
+	}
+
+	return lowestHeight, highestHeight, nil
 }
 
 // GetHighestHeight returns the highest height based on the specified block status. Only flow.BlockStatusFinalized and flow.BlockStatusSealed allowed.

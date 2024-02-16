@@ -162,6 +162,14 @@ type RandomBeaconPubKey struct {
 	crypto.PublicKey
 }
 
+func WrapRandomBeaconPubKeys(keys []crypto.PublicKey) []RandomBeaconPubKey {
+	encodables := make([]RandomBeaconPubKey, len(keys))
+	for i := range keys {
+		encodables[i] = RandomBeaconPubKey{PublicKey: keys[i]}
+	}
+	return encodables
+}
+
 func (pub RandomBeaconPubKey) MarshalJSON() ([]byte, error) {
 	if pub.PublicKey == nil {
 		return json.Marshal(nil)

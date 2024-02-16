@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	realstate "github.com/onflow/flow-go/state"
+	realprotocol "github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -125,17 +126,17 @@ func (suite *Suite) TestPing() {
 }
 
 func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
-	params := suite.defaultBackendParams()
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
-
 	// setup the mocks
 	block := unittest.BlockHeaderFixture()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Head").Return(block, nil).Once()
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
 	suite.snapshot.On("Head").Return(block, nil).Once()
+
+	params := suite.defaultBackendParams()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	// query the handler for the latest finalized block
 	header, stat, err := backend.GetLatestBlockHeader(context.Background(), false)
@@ -156,8 +157,8 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state)
 		// build epoch 1
 		// Blocks in current State
 		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
@@ -203,8 +204,8 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state)
 
 		// building 2 epochs allows us to take a snapshot at a point in time where
 		// an epoch transition happens
@@ -259,8 +260,8 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state)
 		// build epoch 1
 		// Blocks in current State
 		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
@@ -307,8 +308,8 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state)
 		// build epoch 1
 		// Blocks in current State
 		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
@@ -367,8 +368,8 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), state).BuildEpoch().CompleteEpoch()
+	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state).BuildEpoch().CompleteEpoch()
 
 		// get heights of each phase in built epochs
 		epoch1, ok := epochBuilder.EpochHeights(1)
@@ -403,8 +404,8 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state)
 		// build epoch 1
 		// Blocks in current State
 		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
@@ -514,6 +515,9 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_AtBlockIDInternalError
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHeight() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	rootProtocolState, err := rootSnapshot.ProtocolState()
+	require.NoError(suite.T(), err)
+	rootProtocolStateID := rootProtocolState.Entry().ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
@@ -526,6 +530,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHei
 
 		// create a new block with root block as parent
 		newBlock := unittest.BlockWithParentFixture(rootBlock)
+		newBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		ctx := context.Background()
 		// add new block to the chain state
 		err = state.Extend(ctx, newBlock)
@@ -549,6 +554,9 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHei
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalizedAtHeight() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	rootProtocolState, err := rootSnapshot.ProtocolState()
+	require.NoError(suite.T(), err)
+	rootProtocolStateID := rootProtocolState.Entry().ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
@@ -561,7 +569,9 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalize
 
 		// create a new block with root block as parent
 		finalizedBlock := unittest.BlockWithParentFixture(rootBlock)
+		finalizedBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		orphanBlock := unittest.BlockWithParentFixture(rootBlock)
+		orphanBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		ctx := context.Background()
 
 		// add new block to the chain state
@@ -595,6 +605,9 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalize
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnexpectedErrorBlockIDByHeight() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	rootProtocolState, err := rootSnapshot.ProtocolState()
+	require.NoError(suite.T(), err)
+	rootProtocolStateID := rootProtocolState.Entry().ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
@@ -607,6 +620,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnexpectedErrorBlockID
 
 		// create a new block with root block as parent
 		newBlock := unittest.BlockWithParentFixture(rootBlock)
+		newBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		ctx := context.Background()
 		// add new block to the chain state
 		err = state.Extend(ctx, newBlock)
@@ -632,8 +646,8 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnexpectedErrorBlockID
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state)
 		// build epoch 1
 		// Blocks in current State
 		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
@@ -701,8 +715,8 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 func (suite *Suite) TestGetProtocolStateSnapshotByHeight() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state)
 		// build epoch 1
 		// Blocks in current State
 		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
@@ -744,11 +758,15 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight() {
 func (suite *Suite) TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	rootProtocolState, err := rootSnapshot.ProtocolState()
+	require.NoError(suite.T(), err)
+	rootProtocolStateID := rootProtocolState.Entry().ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
 		// create a new block with root block as parent
 		newBlock := unittest.BlockWithParentFixture(rootBlock)
+		newBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		ctx := context.Background()
 		// add new block to the chain state
 		err = state.Extend(ctx, newBlock)
@@ -779,8 +797,8 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks() {
 func (suite *Suite) TestGetProtocolStateSnapshotByHeight_InvalidSegment() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state)
 		// build epoch 1
 		// Blocks in current State
 		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
@@ -813,14 +831,14 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight_InvalidSegment() {
 }
 
 func (suite *Suite) TestGetLatestSealedBlockHeader() {
+	// setup the mocks
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	suite.state.On("Sealed").Return(suite.snapshot, nil)
+
 	params := suite.defaultBackendParams()
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
-
-	// setup the mocks
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-	suite.state.On("Sealed").Return(suite.snapshot, nil)
 
 	suite.Run("GetLatestSealedBlockHeader - happy path", func() {
 		block := unittest.BlockHeaderFixture()
@@ -858,12 +876,8 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 }
 
 func (suite *Suite) TestGetTransaction() {
-	params := suite.defaultBackendParams()
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
-
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	transaction := unittest.TransactionFixture()
 	expected := transaction.TransactionBody
 
@@ -871,6 +885,11 @@ func (suite *Suite) TestGetTransaction() {
 		On("ByID", transaction.ID()).
 		Return(&expected, nil).
 		Once()
+
+	params := suite.defaultBackendParams()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	actual, err := backend.GetTransaction(context.Background(), transaction.ID())
 	suite.checkResponse(actual, err)
@@ -881,18 +900,19 @@ func (suite *Suite) TestGetTransaction() {
 }
 
 func (suite *Suite) TestGetCollection() {
-	params := suite.defaultBackendParams()
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
-
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	expected := unittest.CollectionFixture(1).Light()
 
 	suite.collections.
 		On("LightByID", expected.ID()).
 		Return(&expected, nil).
 		Once()
+
+	params := suite.defaultBackendParams()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	actual, err := backend.GetCollectionByID(context.Background(), expected.ID())
 	suite.transactions.AssertExpectations(suite.T())
@@ -904,6 +924,8 @@ func (suite *Suite) TestGetCollection() {
 
 // TestGetTransactionResultByIndex tests that the request is forwarded to EN
 func (suite *Suite) TestGetTransactionResultByIndex() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	ctx := context.Background()
 	block := unittest.BlockFixture()
 	blockId := block.ID()
@@ -939,8 +961,6 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-
 	suite.execClient.
 		On("GetTransactionResultByIndex", mock.Anything, exeEventReq).
 		Return(exeEventResp, nil)
@@ -971,12 +991,13 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 }
 
 func (suite *Suite) TestGetTransactionResultsByBlockID() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	ctx := context.Background()
 	params := suite.defaultBackendParams()
 
 	block := unittest.BlockFixture()
-	sporkRootBlockHeight, err := suite.state.Params().SporkRootBlockHeight()
-	suite.Require().NoError(err)
+	sporkRootBlockHeight := suite.state.Params().SporkRootBlockHeight()
 	block.Header.Height = sporkRootBlockHeight + 1
 	blockId := block.ID()
 
@@ -1008,7 +1029,6 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.execClient.
 		On("GetTransactionResultsByBlockID", mock.Anything, exeEventReq).
 		Return(exeEventResp, nil)
@@ -1041,6 +1061,8 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 // TestTransactionStatusTransition tests that the status of transaction changes from Finalized to Sealed
 // when the protocol State is updated
 func (suite *Suite) TestTransactionStatusTransition() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
@@ -1053,24 +1075,9 @@ func (suite *Suite) TestTransactionStatusTransition() {
 			unittest.WithGuarantees(
 				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...)))
 
-	params := suite.defaultBackendParams()
-
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
-	// the connection factory should be used to get the execution node client
-	params.ConnFactory = connFactory
-	_, fixedENIDs := suite.setupReceipts(&block)
-	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
-
 	suite.snapshot.
 		On("Head").
 		Return(headBlock.Header, nil)
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	light := collection.Light()
 	suite.collections.On("LightByID", light.ID()).Return(&light, nil)
@@ -1092,8 +1099,13 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	txID := transactionBody.ID()
 	blockID := block.ID()
+	_, fixedENIDs := suite.setupReceipts(&block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
+
+	// create a mock connection factory
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 	exeEventReq := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
@@ -1103,6 +1115,14 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	exeEventResp := &execproto.GetTransactionResultResponse{
 		Events: nil,
 	}
+
+	params := suite.defaultBackendParams()
+	// the connection factory should be used to get the execution node client
+	params.ConnFactory = connFactory
+	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	// Successfully return empty event list
 	suite.execClient.
@@ -1159,10 +1179,8 @@ func (suite *Suite) TestTransactionStatusTransition() {
 // TestTransactionExpiredStatusTransition tests that the status
 // of transaction changes from Pending to Expired when enough Blocks pass
 func (suite *Suite) TestTransactionExpiredStatusTransition() {
-	params := suite.defaultBackendParams()
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
@@ -1204,8 +1222,10 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 
 	txID := transactionBody.ID()
 
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	params := suite.defaultBackendParams()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	// should return pending status when we have not observed an expiry block
 	suite.Run("pending", func() {
@@ -1261,16 +1281,6 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 
 // TestTransactionPendingToFinalizedStatusTransition tests that the status of transaction changes from Finalized to Expired
 func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
-	// create a mock connection factory
-	connFactory := suite.setupConnectionFactory()
-
-	params := suite.defaultBackendParams()
-	params.ConnFactory = connFactory
-	params.MaxHeightRange = TEST_MAX_HEIGHT
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
-
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
@@ -1358,6 +1368,16 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		Return(exeEventResp, status.Errorf(codes.NotFound, "not found")).
 		Times(len(enIDs)) // should call each EN once
 
+	// create a mock connection factory
+	connFactory := suite.setupConnectionFactory()
+
+	params := suite.defaultBackendParams()
+	params.ConnFactory = connFactory
+	params.MaxHeightRange = TEST_MAX_HEIGHT
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
+
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
 
 	// should return pending status when we have not observed collection for the transaction
@@ -1407,13 +1427,13 @@ func (suite *Suite) TestTransactionResultUnknown() {
 }
 
 func (suite *Suite) TestGetLatestFinalizedBlock() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+
 	params := suite.defaultBackendParams()
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
-
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
 	suite.Run("GetLatestFinalizedBlock - happy path", func() {
 		// setup the mocks
@@ -1469,6 +1489,8 @@ type mockCloser struct{}
 func (mc *mockCloser) Close() error { return nil }
 
 func (suite *Suite) TestGetExecutionResultByID() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	validExecutorIdentities := flow.IdentityList{}
 	validENIDs := flow.IdentifierList(validExecutorIdentities.NodeIDs())
 
@@ -1527,6 +1549,8 @@ func (suite *Suite) TestGetExecutionResultByID() {
 }
 
 func (suite *Suite) TestGetExecutionResultByBlockID() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	validExecutorIdentities := flow.IdentityList{}
 	validENIDs := flow.IdentifierList(validExecutorIdentities.NodeIDs())
 
@@ -1601,7 +1625,6 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 
 		state := protocol.NewState(suite.T())
 		state.On("Params").Return(stateParams, nil).Maybe()
-		state.On("Sealed").Return(suite.snapshot, nil).Once()
 
 		expected := &accessflow.NodeVersionInfo{
 			Semver:               build.Version(),
@@ -1622,72 +1645,6 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 		suite.Require().NoError(err)
 
 		suite.Require().Equal(expected, actual)
-	})
-
-	suite.Run("backend construct fails when SporkID lookup fails", func() {
-		stateParams := protocol.NewParams(suite.T())
-		stateParams.On("SporkID").Return(flow.ZeroID, fmt.Errorf("fail"))
-
-		state := protocol.NewState(suite.T())
-		state.On("Params").Return(stateParams, nil).Maybe()
-
-		params := suite.defaultBackendParams()
-		params.State = state
-
-		backend, err := New(params)
-		suite.Require().Error(err)
-		suite.Require().Nil(backend)
-	})
-
-	suite.Run("backend construct fails when ProtocolVersion lookup fails", func() {
-		stateParams := protocol.NewParams(suite.T())
-		stateParams.On("SporkID").Return(sporkID, nil)
-		stateParams.On("ProtocolVersion").Return(uint(0), fmt.Errorf("fail"))
-
-		state := protocol.NewState(suite.T())
-		state.On("Params").Return(stateParams, nil).Maybe()
-
-		params := suite.defaultBackendParams()
-		params.State = state
-
-		backend, err := New(params)
-		suite.Require().Error(err)
-		suite.Require().Nil(backend)
-	})
-
-	suite.Run("backend construct fails when SporkRootBlockHeight lookup fails", func() {
-		stateParams := protocol.NewParams(suite.T())
-		stateParams.On("SporkID").Return(sporkID, nil)
-		stateParams.On("ProtocolVersion").Return(protocolVersion, nil)
-		stateParams.On("SporkRootBlockHeight").Return(uint64(0), fmt.Errorf("fail"))
-
-		state := protocol.NewState(suite.T())
-		state.On("Params").Return(stateParams, nil).Maybe()
-
-		params := suite.defaultBackendParams()
-		params.State = state
-
-		backend, err := New(params)
-		suite.Require().Error(err)
-		suite.Require().Nil(backend)
-	})
-
-	suite.Run("backend construct fails when SealedRoot lookup fails", func() {
-		stateParams := protocol.NewParams(suite.T())
-		stateParams.On("SporkID").Return(sporkID, nil)
-		stateParams.On("ProtocolVersion").Return(protocolVersion, nil)
-		stateParams.On("SporkRootBlockHeight").Return(sporkRootBlock.Height, nil)
-		stateParams.On("SealedRoot").Return(nil, fmt.Errorf("fail"))
-
-		state := protocol.NewState(suite.T())
-		state.On("Params").Return(stateParams, nil).Maybe()
-
-		params := suite.defaultBackendParams()
-		params.State = state
-
-		backend, err := New(params)
-		suite.Require().Error(err)
-		suite.Require().Nil(backend)
 	})
 }
 
@@ -1753,11 +1710,11 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		func(id flow.Identifier) error { return nil })
 
 	suite.snapshot.On("Identities", mock.Anything).Return(
-		func(filter flow.IdentityFilter) flow.IdentityList {
+		func(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			// apply the filter passed in to the list of all the execution nodes
 			return allExecutionNodes.Filter(filter)
 		},
-		func(flow.IdentityFilter) error { return nil })
+		func(flow.IdentityFilter[flow.Identity]) error { return nil })
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
 	testExecutionNodesForBlockID := func(preferredENs, fixedENs, expectedENs flow.IdentityList) {
@@ -1780,17 +1737,20 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		execSelector, err := execNodeSelectorFactory.SelectNodes(allExecNodes)
 		require.NoError(suite.T(), err)
 
-		actualList := flow.IdentityList{}
+		actualList := flow.IdentitySkeletonList{}
 		for actual := execSelector.Next(); actual != nil; actual = execSelector.Next() {
 			actualList = append(actualList, actual)
 		}
 
-		if len(expectedENs) > maxNodesCnt {
-			for _, actual := range actualList {
-				require.Contains(suite.T(), expectedENs, actual)
+		{
+			expectedENs := expectedENs.ToSkeleton()
+			if len(expectedENs) > maxNodesCnt {
+				for _, actual := range actualList {
+					require.Contains(suite.T(), expectedENs, actual)
+				}
+			} else {
+				require.ElementsMatch(suite.T(), actualList, expectedENs)
 			}
-		} else {
-			require.ElementsMatch(suite.T(), actualList, expectedENs)
 		}
 	}
 	// if we don't find sufficient receipts, executionNodesForBlockID should return a list of random ENs
@@ -1808,7 +1768,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		execSelector, err := execNodeSelectorFactory.SelectNodes(allExecNodes)
 		require.NoError(suite.T(), err)
 
-		actualList := flow.IdentityList{}
+		actualList := flow.IdentitySkeletonList{}
 		for actual := execSelector.Next(); actual != nil; actual = execSelector.Next() {
 			actualList = append(actualList, actual)
 		}
@@ -2169,11 +2129,6 @@ func generateEncodedEvents(t *testing.T, n int) ([]flow.Event, []flow.Event) {
 }
 
 func (suite *Suite) defaultBackendParams() Params {
-	// mocked seal state head for creation new backend
-	blockHeader := unittest.BlockHeaderFixture()
-	suite.snapshot.On("Head").Return(blockHeader, nil).Once()
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
-
 	return Params{
 		State:                    suite.state,
 		Blocks:                   suite.blocks,
@@ -2191,5 +2146,6 @@ func (suite *Suite) defaultBackendParams() Params {
 		AccessMetrics:            metrics.NewNoopCollector(),
 		Log:                      suite.log,
 		TxErrorMessagesCacheSize: 1000,
+		ChainStateTracker:        nil,
 	}
 }

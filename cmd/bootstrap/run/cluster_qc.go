@@ -18,7 +18,10 @@ import (
 )
 
 // GenerateClusterRootQC creates votes and generates a QC based on participant data
-func GenerateClusterRootQC(signers []bootstrap.NodeInfo, allCommitteeMembers flow.IdentityList, clusterBlock *cluster.Block) (*flow.QuorumCertificate, error) {
+func GenerateClusterRootQC(signers []bootstrap.NodeInfo, allCommitteeMembers flow.IdentitySkeletonList, clusterBlock *cluster.Block) (*flow.QuorumCertificate, error) {
+	if !allCommitteeMembers.Sorted(flow.Canonical[flow.IdentitySkeleton]) {
+		return nil, fmt.Errorf("can't create root cluster QC: committee members are not sorted in canonical order")
+	}
 	clusterRootBlock := model.GenesisBlockFromFlow(clusterBlock.Header)
 
 	// STEP 1: create votes for cluster root block
@@ -27,9 +30,21 @@ func GenerateClusterRootQC(signers []bootstrap.NodeInfo, allCommitteeMembers flo
 		return nil, err
 	}
 
+	// STEP 1.5: patch committee to include dynamic identities. This is a temporary measure until bootstrapping is refactored.
+	// We need a Committee for creating the cluster's root QC and the Committee requires dynamic identities to be instantiated.
+	// The clustering for root block contain only static identities, since there no state transitions have happened yet.
+	dynamicCommitteeMembers := make(flow.IdentityList, 0, len(allCommitteeMembers))
+	for _, participant := range allCommitteeMembers {
+		dynamicCommitteeMembers = append(dynamicCommitteeMembers, &flow.Identity{
+			IdentitySkeleton: *participant,
+			DynamicIdentity: flow.DynamicIdentity{
+				EpochParticipationStatus: flow.EpochParticipationStatusActive,
+			},
+		})
+	}
+
 	// STEP 2: create VoteProcessor
-	ordered := allCommitteeMembers.Sort(flow.Canonical)
-	committee, err := committees.NewStaticCommittee(ordered, flow.Identifier{}, nil, nil)
+	committee, err := committees.NewStaticCommittee(dynamicCommitteeMembers, flow.Identifier{}, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +94,7 @@ func createRootBlockVotes(participants []bootstrap.NodeInfo, rootBlock *model.Bl
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve private keys for participant: %w", err)
 		}
-		me, err := local.New(participant.Identity(), keys.StakingKey)
+		me, err := local.New(participant.Identity().IdentitySkeleton, keys.StakingKey)
 		if err != nil {
 			return nil, err
 		}

@@ -289,7 +289,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create collection node cluster
 		count := 2
-		collNodes := unittest.IdentityListFixture(count, unittest.WithRole(flow.RoleCollection))
+		collNodes := unittest.IdentityListFixture(count, unittest.WithRole(flow.RoleCollection)).ToSkeleton()
 		assignments := unittest.ClusterAssignment(uint(count), collNodes)
 		clusters, err := factory.NewClusterList(assignments, collNodes)
 		suite.Require().Nil(err)
@@ -1188,7 +1188,7 @@ func (suite *Suite) createChain() (*flow.Block, *flow.Collection) {
 	collection := unittest.CollectionFixture(10)
 	refBlockID := unittest.IdentifierFixture()
 	// prepare cluster committee members
-	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole(flow.RoleCollection))
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 	// guarantee signers must be cluster committee members, so that access will fetch collection from
 	// the signers that are specified by guarantee.SignerIndices
 	indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
@@ -1203,7 +1203,7 @@ func (suite *Suite) createChain() (*flow.Block, *flow.Collection) {
 	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee)))
 
 	cluster := new(protocol.Cluster)
-	cluster.On("Members").Return(clusterCommittee, nil)
+	cluster.On("Members").Return(clusterCommittee.ToSkeleton(), nil)
 	epoch := new(protocol.Epoch)
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs := new(protocol.EpochQuery)

@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -237,7 +238,7 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 	var execDuration time.Duration
 	errToReturn := b.nodeCommunicator.CallAvailableNode(
 		executors,
-		func(node *flow.Identity) error {
+		func(node *flow.IdentitySkeleton) error {
 			execStartTime := time.Now()
 
 			result, err = b.tryExecuteScriptOnExecutionNode(ctx, node.Address, r)
@@ -265,7 +266,7 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 
 			return nil
 		},
-		func(node *flow.Identity, err error) bool {
+		func(node *flow.IdentitySkeleton, err error) bool {
 			if status.Code(err) == codes.InvalidArgument {
 				lg.Debug().Err(err).
 					Str("script_executor_addr", node.Address).
@@ -362,7 +363,11 @@ func convertIndexError(err error, height uint64, defaultMsg string) error {
 		return nil
 	}
 
-	if errors.Is(err, execution.ErrDataNotAvailable) {
+	if errors.Is(err, indexer.ErrIndexNotInitialized) {
+		return status.Errorf(codes.FailedPrecondition, "data for block is not available: %v", err)
+	}
+
+	if errors.Is(err, storage.ErrHeightNotIndexed) {
 		return status.Errorf(codes.OutOfRange, "data for block height %d is not available", height)
 	}
 

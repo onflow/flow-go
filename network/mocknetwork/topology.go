@@ -13,15 +13,15 @@ type Topology struct {
 }
 
 // Fanout provides a mock function with given fields: ids
-func (_m *Topology) Fanout(ids flow.IdentityList) flow.IdentityList {
+func (_m *Topology) Fanout(ids flow.GenericIdentityList[flow.Identity]) flow.GenericIdentityList[flow.Identity] {
 	ret := _m.Called(ids)
 
-	var r0 flow.IdentityList
-	if rf, ok := ret.Get(0).(func(flow.IdentityList) flow.IdentityList); ok {
+	var r0 flow.GenericIdentityList[flow.Identity]
+	if rf, ok := ret.Get(0).(func(flow.GenericIdentityList[flow.Identity]) flow.GenericIdentityList[flow.Identity]); ok {
 		r0 = rf(ids)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.IdentityList)
+			r0 = ret.Get(0).(flow.GenericIdentityList[flow.Identity])
 		}
 	}
 

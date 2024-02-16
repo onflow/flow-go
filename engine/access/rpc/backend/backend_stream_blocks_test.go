@@ -37,15 +37,16 @@ type BackendBlocksSuite struct {
 	snapshot *protocol.Snapshot
 	log      zerolog.Logger
 
-	blocks             *storagemock.Blocks
-	headers            *storagemock.Headers
-	collections        *storagemock.Collections
-	transactions       *storagemock.Transactions
-	receipts           *storagemock.ExecutionReceipts
-	results            *storagemock.ExecutionResults
-	transactionResults *storagemock.LightTransactionResults
-	seals              *storagemock.Seals
-	chainStateTracker  *subscriptionmock.ChainStateTracker
+	blocks                *storagemock.Blocks
+	headers               *storagemock.Headers
+	collections           *storagemock.Collections
+	transactions          *storagemock.Transactions
+	receipts              *storagemock.ExecutionReceipts
+	results               *storagemock.ExecutionResults
+	transactionResults    *storagemock.LightTransactionResults
+	seals                 *storagemock.Seals
+	chainStateTracker     *subscriptionmock.ChainStateTracker
+	chainStateTrackerReal subscription.ChainStateTracker
 
 	colClient              *access.AccessAPIClient
 	execClient             *access.ExecutionAPIClient
@@ -212,8 +213,28 @@ func (s *BackendBlocksSuite) SetupTest() {
 	var err error
 	s.backend, err = New(s.backendParams())
 	require.NoError(s.T(), err)
-	s.backend.ChainStateTracker = s.chainStateTracker
-	s.backend.backendSubscribeBlocks.getHighestHeight = s.chainStateTracker.GetHighestHeight
+
+	// create real chain state tracker to use GetStartHeight from it, instead of mocking
+	s.chainStateTrackerReal, err = subscription.NewChainStateTracker(
+		s.log,
+		s.state,
+		s.rootBlock.Header.Height,
+		s.headers,
+		s.rootBlock.Header.Height,
+		s.broadcaster,
+		nil,
+		false,
+	)
+	require.NoError(s.T(), err)
+
+	s.chainStateTracker.On(
+		"GetStartHeight",
+		mock.AnythingOfType("flow.Identifier"),
+		mock.AnythingOfType("uint64"),
+		mock.AnythingOfType("flow.BlockStatus"),
+	).Return(func(startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error) {
+		return s.chainStateTrackerReal.GetStartHeight(startBlockID, startHeight, blockStatus)
+	}, nil)
 }
 
 // backendParams returns the Params configuration for the backend.
@@ -236,13 +257,12 @@ func (s *BackendBlocksSuite) backendParams() Params {
 		Log:                      s.log,
 		TxErrorMessagesCacheSize: 1000,
 		SubscriptionParams: SubscriptionParams{
-			SendTimeout:            subscription.DefaultSendTimeout,
-			SendBufferSize:         subscription.DefaultSendBufferSize,
-			ResponseLimit:          subscription.DefaultResponseLimit,
-			Broadcaster:            s.broadcaster,
-			RootHeight:             s.rootBlock.Header.Height,
-			HighestAvailableHeight: s.rootBlock.Header.Height,
+			SendTimeout:    subscription.DefaultSendTimeout,
+			SendBufferSize: subscription.DefaultSendBufferSize,
+			ResponseLimit:  subscription.DefaultResponseLimit,
+			Broadcaster:    s.broadcaster,
 		},
+		ChainStateTracker: s.chainStateTracker,
 	}
 }
 
@@ -337,50 +357,43 @@ func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 		tests = append(tests, t2)
 	}
 
+	setupChainStateMock := func(blockStatus flow.BlockStatus, highestHeader *flow.Header) {
+		s.chainStateTracker.On("GetHighestHeight", mock.Anything).Unset()
+		s.chainStateTracker.On("GetHighestHeight", blockStatus).Return(highestHeader.Height, nil)
+
+		if blockStatus == flow.BlockStatusSealed {
+			s.snapshot.On("Head").Unset()
+			s.snapshot.On("Head").Return(highestHeader, nil)
+		}
+	}
+
 	for _, test := range tests {
 		s.Run(test.name, func() {
 			// add "backfill" block - blocks that are already in the database before the test starts
 			// this simulates a subscription on a past block
 			if test.highestBackfill > 0 {
-				if test.blockStatus == flow.BlockStatusFinalized {
-					s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).Unset()
-					s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).
-						Return(s.blocksArray[test.highestBackfill].Header.Height, nil)
-				} else {
-					s.snapshot.On("Head").Return(s.blocksArray[test.highestBackfill].Header, nil)
-					s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusSealed).Unset()
-					s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusSealed).
-						Return(s.blocksArray[test.highestBackfill].Header.Height, nil)
-				}
+				setupChainStateMock(test.blockStatus, s.blocksArray[test.highestBackfill].Header)
 			}
 
 			subCtx, subCancel := context.WithCancel(ctx)
 			sub := s.backend.SubscribeBlocks(subCtx, test.startBlockID, test.startHeight, test.blockStatus)
 
-			//loop over all blocks
+			// loop over all blocks
 			for i, b := range s.blocksArray {
 				s.T().Logf("checking block %d %v %d", i, b.ID(), b.Header.Height)
 
 				// simulate new block received.
 				// all blocks with index <= highestBackfill were already received
-				if int(i) > test.highestBackfill {
-					if test.blockStatus == flow.BlockStatusFinalized {
-						s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).Unset()
-						s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).
-							Return(b.Header.Height, nil)
-					} else {
-						s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusSealed).Unset()
-						s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusSealed).
-							Return(b.Header.Height, nil)
-						s.snapshot.On("Head").Return(b.Header, nil)
-					}
+				if i > test.highestBackfill {
+					setupChainStateMock(test.blockStatus, b.Header)
+
 					s.broadcaster.Publish()
 				}
 
 				// consume block from subscription
 				unittest.RequireReturnsBefore(s.T(), func() {
 					v, ok := <-sub.Channel()
-					require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v: err: %v", b.Header.Height, b.ID(), sub.Err())
+					require.True(s.T(), ok, "channel closed while waiting for exec data for block %x %v: err: %v", b.Header.Height, b.ID(), sub.Err())
 
 					actualBlock, ok := v.(*flow.Block)
 					require.True(s.T(), ok, "unexpected response type: %T", v)
@@ -388,7 +401,6 @@ func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 					s.Require().Equal(b.Header.Height, actualBlock.Header.Height)
 					s.Require().Equal(b.Header.ID(), actualBlock.Header.ID())
 					s.Require().Equal(*b, *actualBlock)
-
 				}, time.Second, fmt.Sprintf("timed out waiting for block %d %v", b.Header.Height, b.ID()))
 			}
 
@@ -440,7 +452,8 @@ func (s *BackendBlocksSuite) TestSubscribeBlocksHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeBlocks(subCtx, s.rootBlock.Header.ID(), 0, flow.BlockStatusUnknown)
+		var height uint64 = 0
+		sub := s.backend.SubscribeBlocks(subCtx, s.rootBlock.Header.ID(), height, flow.BlockStatusUnknown)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -448,7 +461,8 @@ func (s *BackendBlocksSuite) TestSubscribeBlocksHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeBlocks(subCtx, unittest.IdentifierFixture(), 1, flow.BlockStatusFinalized)
+		var height uint64 = 1
+		sub := s.backend.SubscribeBlocks(subCtx, unittest.IdentifierFixture(), height, flow.BlockStatusFinalized)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()))
 	})
 
@@ -456,7 +470,8 @@ func (s *BackendBlocksSuite) TestSubscribeBlocksHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeBlocks(subCtx, flow.ZeroID, s.rootBlock.Header.Height-1, flow.BlockStatusFinalized)
+		height := s.rootBlock.Header.Height - 1
+		sub := s.backend.SubscribeBlocks(subCtx, flow.ZeroID, height, flow.BlockStatusFinalized)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -464,7 +479,8 @@ func (s *BackendBlocksSuite) TestSubscribeBlocksHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeBlocks(subCtx, unittest.IdentifierFixture(), 0, flow.BlockStatusFinalized)
+		var height uint64 = 0
+		sub := s.backend.SubscribeBlocks(subCtx, unittest.IdentifierFixture(), height, flow.BlockStatusFinalized)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -472,7 +488,8 @@ func (s *BackendBlocksSuite) TestSubscribeBlocksHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeBlocks(subCtx, flow.ZeroID, s.blocksArray[len(s.blocksArray)-1].Header.Height+10, flow.BlockStatusFinalized)
+		height := s.blocksArray[len(s.blocksArray)-1].Header.Height + 10
+		sub := s.backend.SubscribeBlocks(subCtx, flow.ZeroID, height, flow.BlockStatusFinalized)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 }
