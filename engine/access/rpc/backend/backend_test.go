@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/onflow/flow-go/engine/access/subscription"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
@@ -127,17 +126,17 @@ func (suite *Suite) TestPing() {
 }
 
 func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
-	params := suite.defaultBackendParams()
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
-
 	// setup the mocks
 	block := unittest.BlockHeaderFixture()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Head").Return(block, nil).Once()
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
 	suite.snapshot.On("Head").Return(block, nil).Once()
+
+	params := suite.defaultBackendParams()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	// query the handler for the latest finalized block
 	header, stat, err := backend.GetLatestBlockHeader(context.Background(), false)
@@ -832,14 +831,14 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight_InvalidSegment() {
 }
 
 func (suite *Suite) TestGetLatestSealedBlockHeader() {
+	// setup the mocks
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	suite.state.On("Sealed").Return(suite.snapshot, nil)
+
 	params := suite.defaultBackendParams()
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
-
-	// setup the mocks
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-	suite.state.On("Sealed").Return(suite.snapshot, nil)
 
 	suite.Run("GetLatestSealedBlockHeader - happy path", func() {
 		block := unittest.BlockHeaderFixture()
@@ -877,12 +876,8 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 }
 
 func (suite *Suite) TestGetTransaction() {
-	params := suite.defaultBackendParams()
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
-
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	transaction := unittest.TransactionFixture()
 	expected := transaction.TransactionBody
 
@@ -890,6 +885,11 @@ func (suite *Suite) TestGetTransaction() {
 		On("ByID", transaction.ID()).
 		Return(&expected, nil).
 		Once()
+
+	params := suite.defaultBackendParams()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	actual, err := backend.GetTransaction(context.Background(), transaction.ID())
 	suite.checkResponse(actual, err)
@@ -900,10 +900,7 @@ func (suite *Suite) TestGetTransaction() {
 }
 
 func (suite *Suite) TestGetCollection() {
-	params := suite.defaultBackendParams()
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	expected := unittest.CollectionFixture(1).Light()
@@ -912,6 +909,11 @@ func (suite *Suite) TestGetCollection() {
 		On("LightByID", expected.ID()).
 		Return(&expected, nil).
 		Once()
+
+	params := suite.defaultBackendParams()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	actual, err := backend.GetCollectionByID(context.Background(), expected.ID())
 	suite.transactions.AssertExpectations(suite.T())
@@ -923,6 +925,8 @@ func (suite *Suite) TestGetCollection() {
 
 // TestGetTransactionResultByIndex tests that the request is forwarded to EN
 func (suite *Suite) TestGetTransactionResultByIndex() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	ctx := context.Background()
 	block := unittest.BlockFixture()
 	blockId := block.ID()
@@ -958,8 +962,6 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-
 	suite.execClient.
 		On("GetTransactionResultByIndex", mock.Anything, exeEventReq).
 		Return(exeEventResp, nil)
@@ -990,6 +992,8 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 }
 
 func (suite *Suite) TestGetTransactionResultsByBlockID() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	ctx := context.Background()
 	params := suite.defaultBackendParams()
 
@@ -1026,7 +1030,6 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.execClient.
 		On("GetTransactionResultsByBlockID", mock.Anything, exeEventReq).
 		Return(exeEventResp, nil)
@@ -1059,6 +1062,8 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 // TestTransactionStatusTransition tests that the status of transaction changes from Finalized to Sealed
 // when the protocol State is updated
 func (suite *Suite) TestTransactionStatusTransition() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
@@ -1071,24 +1076,9 @@ func (suite *Suite) TestTransactionStatusTransition() {
 			unittest.WithGuarantees(
 				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...)))
 
-	params := suite.defaultBackendParams()
-
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
-	// the connection factory should be used to get the execution node client
-	params.ConnFactory = connFactory
-	_, fixedENIDs := suite.setupReceipts(&block)
-	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
-
 	suite.snapshot.
 		On("Head").
 		Return(headBlock.Header, nil)
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	light := collection.Light()
 	suite.collections.On("LightByID", light.ID()).Return(&light, nil)
@@ -1110,8 +1100,13 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	txID := transactionBody.ID()
 	blockID := block.ID()
+	_, fixedENIDs := suite.setupReceipts(&block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
+
+	// create a mock connection factory
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 	exeEventReq := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
@@ -1121,6 +1116,14 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	exeEventResp := &execproto.GetTransactionResultResponse{
 		Events: nil,
 	}
+
+	params := suite.defaultBackendParams()
+	// the connection factory should be used to get the execution node client
+	params.ConnFactory = connFactory
+	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	// Successfully return empty event list
 	suite.execClient.
@@ -1177,10 +1180,8 @@ func (suite *Suite) TestTransactionStatusTransition() {
 // TestTransactionExpiredStatusTransition tests that the status
 // of transaction changes from Pending to Expired when enough Blocks pass
 func (suite *Suite) TestTransactionExpiredStatusTransition() {
-	params := suite.defaultBackendParams()
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
@@ -1222,8 +1223,10 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 
 	txID := transactionBody.ID()
 
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	params := suite.defaultBackendParams()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	// should return pending status when we have not observed an expiry block
 	suite.Run("pending", func() {
@@ -1279,16 +1282,6 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 
 // TestTransactionPendingToFinalizedStatusTransition tests that the status of transaction changes from Finalized to Expired
 func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
-	// create a mock connection factory
-	connFactory := suite.setupConnectionFactory()
-
-	params := suite.defaultBackendParams()
-	params.ConnFactory = connFactory
-	params.MaxHeightRange = TEST_MAX_HEIGHT
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
-
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
@@ -1376,6 +1369,16 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		Return(exeEventResp, status.Errorf(codes.NotFound, "not found")).
 		Times(len(enIDs)) // should call each EN once
 
+	// create a mock connection factory
+	connFactory := suite.setupConnectionFactory()
+
+	params := suite.defaultBackendParams()
+	params.ConnFactory = connFactory
+	params.MaxHeightRange = TEST_MAX_HEIGHT
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
+
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
 
 	// should return pending status when we have not observed collection for the transaction
@@ -1425,13 +1428,13 @@ func (suite *Suite) TestTransactionResultUnknown() {
 }
 
 func (suite *Suite) TestGetLatestFinalizedBlock() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+
 	params := suite.defaultBackendParams()
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
-
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
 	suite.Run("GetLatestFinalizedBlock - happy path", func() {
 		// setup the mocks
@@ -1487,6 +1490,8 @@ type mockCloser struct{}
 func (mc *mockCloser) Close() error { return nil }
 
 func (suite *Suite) TestGetExecutionResultByID() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	validExecutorIdentities := flow.IdentityList{}
 	validENIDs := flow.IdentifierList(validExecutorIdentities.NodeIDs())
 
@@ -1619,7 +1624,6 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 
 		state := protocol.NewState(suite.T())
 		state.On("Params").Return(stateParams, nil).Maybe()
-		state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 		expected := &accessflow.NodeVersionInfo{
 			Semver:               build.Version(),
@@ -2124,23 +2128,6 @@ func generateEncodedEvents(t *testing.T, n int) ([]flow.Event, []flow.Event) {
 }
 
 func (suite *Suite) defaultBackendParams() Params {
-	// mocked seal state head for creation new backend
-	blockHeader := unittest.BlockHeaderFixture()
-	suite.snapshot.On("Head").Return(blockHeader, nil).Once()
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
-
-	chainStateTracker, err := subscription.NewChainStateTracker(
-		suite.log,
-		suite.state,
-		blockHeader.Height,
-		suite.headers,
-		blockHeader.Height,
-		nil,
-		nil,
-		false,
-	)
-	require.NoError(suite.T(), err)
-
 	return Params{
 		State:                    suite.state,
 		Blocks:                   suite.blocks,
@@ -2158,6 +2145,6 @@ func (suite *Suite) defaultBackendParams() Params {
 		AccessMetrics:            metrics.NewNoopCollector(),
 		Log:                      suite.log,
 		TxErrorMessagesCacheSize: 1000,
-		ChainStateTracker:        chainStateTracker,
+		ChainStateTracker:        nil,
 	}
 }
