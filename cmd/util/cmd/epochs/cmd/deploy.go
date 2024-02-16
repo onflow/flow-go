@@ -11,7 +11,6 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
-	coreContractstemplates "github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	epochcmdutil "github.com/onflow/flow-go/cmd/util/cmd/epochs/utils"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -257,14 +256,11 @@ func getDeployEpochTransactionText(snapshot *inmem.Snapshot) []byte {
 	chainID := head.ChainID
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
-	env := coreContractstemplates.Environment{
-		FungibleTokenAddress:     flagFungibleTokenAddress,
-		FlowTokenAddress:         flagFlowTokenAddress,
-		IDTableAddress:           flagIDTableAddress,
-		QuorumCertificateAddress: systemContracts.ClusterQC.Address.Hex(),
-		DkgAddress:               systemContracts.DKG.Address.Hex(),
-		FlowFeesAddress:          flagFlowFeesAddress,
-	}
+	env := systemContracts.AsTemplateEnv()
+	env.FungibleTokenAddress = flagFungibleTokenAddress
+	env.FlowTokenAddress = flagFlowTokenAddress
+	env.IDTableAddress = flagIDTableAddress
+	env.FlowFeesAddress = flagFlowFeesAddress
 
 	// epoch contract name and get code for contract
 	epochContractCode := contracts.FlowEpoch(

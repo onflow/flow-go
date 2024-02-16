@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
-	coreContractstemplates "github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence/runtime/common"
@@ -203,22 +202,8 @@ func BurnerAddressForChain(chainID flow.ChainID) flow.Address {
 func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOptions) []SystemContractChange {
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
-	env := coreContractstemplates.Environment{
-		ServiceAccountAddress:             systemContracts.FlowServiceAccount.Address.Hex(),
-		ViewResolverAddress:               systemContracts.ViewResolver.Address.Hex(),
-		BurnerAddress:                     BurnerAddressForChain(chainID).Hex(),
-		FungibleTokenAddress:              systemContracts.FungibleToken.Address.Hex(),
-		NonFungibleTokenAddress:           systemContracts.NonFungibleToken.Address.Hex(),
-		MetadataViewsAddress:              systemContracts.MetadataViews.Address.Hex(),
-		FungibleTokenMetadataViewsAddress: systemContracts.FungibleToken.Address.Hex(),
-		FungibleTokenSwitchboardAddress:   systemContracts.FungibleToken.Address.Hex(),
-		FlowTokenAddress:                  systemContracts.FlowToken.Address.Hex(),
-		IDTableAddress:                    systemContracts.IDTableStaking.Address.Hex(),
-		QuorumCertificateAddress:          systemContracts.ClusterQC.Address.Hex(),
-		DkgAddress:                        systemContracts.DKG.Address.Hex(),
-		FlowFeesAddress:                   systemContracts.FlowFees.Address.Hex(),
-		StorageFeesAddress:                systemContracts.FlowStorageFees.Address.Hex(),
-	}
+	env := systemContracts.AsTemplateEnv()
+	env.BurnerAddress = BurnerAddressForChain(chainID).Hex()
 
 	switch chainID {
 	case flow.Mainnet:
