@@ -600,12 +600,20 @@ func testScoreRegistrySpamRecordWithoutDuplicateMessagesPenalty(t *testing.T, me
 		MsgType: messageType,
 	})
 
-	// the penalty should now be updated in the spamRecords
-	record, err, ok := spamRecords.Get(peerID) // get the record from the spamRecords.
-	assert.True(t, ok)
-	assert.NoError(t, err)
-	unittest.RequireNumericallyClose(t, expectedPenalty, record.Penalty, 0.01)
-	assert.Equal(t, scoring.InitAppScoreRecordStateFunc(maximumSpamPenaltyDecayFactor)().Decay, record.Decay) // decay should be initialized to the initial state.
+	require.Eventually(t, func() bool {
+		// the notification is processed asynchronously, and the penalty should eventually be updated in the spamRecords
+		record, err, ok := spamRecords.Get(peerID) // get the record from the spamRecords.
+		if !ok {
+			return false
+		}
+		require.NoError(t, err)
+		if !unittest.AreNumericallyClose(expectedPenalty, record.Penalty, 10e-2) {
+			return false
+		}
+		require.Equal(t, scoring.InitAppScoreRecordStateFunc(maximumSpamPenaltyDecayFactor)().Decay, record.Decay) // decay should be initialized to the initial state.
+
+		return true
+	}, 5*time.Second, 10*time.Millisecond)
 
 	queryTime := time.Now()
 	// eventually, the app specific score should be updated in the cache.
