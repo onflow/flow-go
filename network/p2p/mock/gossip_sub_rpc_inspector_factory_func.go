@@ -25,19 +25,19 @@ type GossipSubRpcInspectorFactoryFunc struct {
 }
 
 // Execute provides a mock function with given fields: _a0, _a1, _a2, _a3, _a4, _a5, _a6, _a7, _a8
-func (_m *GossipSubRpcInspectorFactoryFunc) Execute(_a0 zerolog.Logger, _a1 flow.Identifier, _a2 *p2pconfig.RpcInspectorParameters, _a3 module.GossipSubMetrics, _a4 metrics.HeroCacheMetricsFactory, _a5 network.NetworkingType, _a6 module.IdentityProvider, _a7 func() p2p.TopicProvider, _a8 p2p.GossipSubInvCtrlMsgNotifConsumer) (p2p.GossipSubMsgValidationRpcInspector, error) {
+func (_m *GossipSubRpcInspectorFactoryFunc) Execute(_a0 zerolog.Logger, _a1 flow.Identifier, _a2 *p2pconfig.RpcInspectorParameters, _a3 module.GossipSubMetrics, _a4 metrics.HeroCacheMetricsFactory, _a5 network.NetworkingType, _a6 module.IdentityProvider, _a7 func() p2p.TopicProvider, _a8 p2p.GossipSubInvCtrlMsgNotifConsumer) (p2p.GossipSubRPCInspector, error) {
 	ret := _m.Called(_a0, _a1, _a2, _a3, _a4, _a5, _a6, _a7, _a8)
 
-	var r0 p2p.GossipSubMsgValidationRpcInspector
+	var r0 p2p.GossipSubRPCInspector
 	var r1 error
-	if rf, ok := ret.Get(0).(func(zerolog.Logger, flow.Identifier, *p2pconfig.RpcInspectorParameters, module.GossipSubMetrics, metrics.HeroCacheMetricsFactory, network.NetworkingType, module.IdentityProvider, func() p2p.TopicProvider, p2p.GossipSubInvCtrlMsgNotifConsumer) (p2p.GossipSubMsgValidationRpcInspector, error)); ok {
+	if rf, ok := ret.Get(0).(func(zerolog.Logger, flow.Identifier, *p2pconfig.RpcInspectorParameters, module.GossipSubMetrics, metrics.HeroCacheMetricsFactory, network.NetworkingType, module.IdentityProvider, func() p2p.TopicProvider, p2p.GossipSubInvCtrlMsgNotifConsumer) (p2p.GossipSubRPCInspector, error)); ok {
 		return rf(_a0, _a1, _a2, _a3, _a4, _a5, _a6, _a7, _a8)
 	}
-	if rf, ok := ret.Get(0).(func(zerolog.Logger, flow.Identifier, *p2pconfig.RpcInspectorParameters, module.GossipSubMetrics, metrics.HeroCacheMetricsFactory, network.NetworkingType, module.IdentityProvider, func() p2p.TopicProvider, p2p.GossipSubInvCtrlMsgNotifConsumer) p2p.GossipSubMsgValidationRpcInspector); ok {
+	if rf, ok := ret.Get(0).(func(zerolog.Logger, flow.Identifier, *p2pconfig.RpcInspectorParameters, module.GossipSubMetrics, metrics.HeroCacheMetricsFactory, network.NetworkingType, module.IdentityProvider, func() p2p.TopicProvider, p2p.GossipSubInvCtrlMsgNotifConsumer) p2p.GossipSubRPCInspector); ok {
 		r0 = rf(_a0, _a1, _a2, _a3, _a4, _a5, _a6, _a7, _a8)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(p2p.GossipSubMsgValidationRpcInspector)
+			r0 = ret.Get(0).(p2p.GossipSubRPCInspector)
 		}
 	}
 

@@ -109,7 +109,7 @@ type GossipSubRpcInspectorFactoryFunc func(
 	module.IdentityProvider,
 	func() TopicProvider,
 	GossipSubInvCtrlMsgNotifConsumer,
-) (GossipSubMsgValidationRpcInspector, error)
+) (GossipSubRPCInspector, error)
 
 // NodeBuilder is a builder pattern for creating a libp2p Node instance.
 type NodeBuilder interface {

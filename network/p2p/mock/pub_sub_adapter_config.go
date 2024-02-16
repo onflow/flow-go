@@ -25,7 +25,7 @@ func (_m *PubSubAdapterConfig) WithRoutingDiscovery(_a0 routing.ContentRouting) 
 }
 
 // WithRpcInspector provides a mock function with given fields: _a0
-func (_m *PubSubAdapterConfig) WithRpcInspector(_a0 p2p.GossipSubMsgValidationRpcInspector) {
+func (_m *PubSubAdapterConfig) WithRpcInspector(_a0 p2p.GossipSubRPCInspector) {
 	_m.Called(_a0)
 }
 

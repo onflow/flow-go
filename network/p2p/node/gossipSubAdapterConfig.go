@@ -82,7 +82,7 @@ func (g *GossipSubAdapterConfig) WithMessageIdFunction(f func([]byte) string) {
 // - suite: the inspector suite to use
 // Returns:
 // -None
-func (g *GossipSubAdapterConfig) WithRpcInspector(inspector p2p.GossipSubMsgValidationRpcInspector) {
+func (g *GossipSubAdapterConfig) WithRpcInspector(inspector p2p.GossipSubRPCInspector) {
 	g.options = append(g.options, pubsub.WithAppSpecificRpcInspector(inspector.Inspect))
 	g.inspector = inspector
 }

@@ -419,6 +419,12 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	lg.Trace().Msg("gossipsub rpc inspector notification submitted to the queue")
 }
 
+// handleMisbehaviourReport is the worker function that is called by the worker pool to handle the misbehaviour report of a peer.
+// The function is called in a non-blocking way, and the worker pool is used to limit the number of concurrent executions of the function.
+// Args:
+// - notification: the notification of the misbehaviour report of a peer.
+// Returns:
+// - error: an error if the update failed; any returned error is an irrecoverable error and indicates a bug or misconfiguration.
 func (r *GossipSubAppSpecificScoreRegistry) handleMisbehaviourReport(notification *p2p.InvCtrlMsgNotif) error {
 	// we use mutex to ensure the method is concurrency safe.
 	lg := r.logger.With().

@@ -46,7 +46,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond // speed up the test
 
 	var notificationConsumer p2p.GossipSubInvCtrlMsgNotifConsumer
-	inspector := mockp2p.NewGossipSubMsgValidationRpcInspector(t)
+	inspector := mockp2p.NewGossipSubRPCInspector(t)
 	inspector.On("Inspect", mocktestify.Anything, mocktestify.Anything).Return(nil) // no-op for the inspector
 	inspector.On("ActiveClustersChanged", mocktestify.Anything).Return().Maybe()    // no-op for the inspector
 	inspector.On("Start", mocktestify.Anything).Return(nil)                         // no-op for the inspector
@@ -74,7 +74,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 			_ flownet.NetworkingType,
 			_ module.IdentityProvider,
 			_ func() p2p.TopicProvider,
-			consumer p2p.GossipSubInvCtrlMsgNotifConsumer) (p2p.GossipSubMsgValidationRpcInspector, error) {
+			consumer p2p.GossipSubInvCtrlMsgNotifConsumer) (p2p.GossipSubRPCInspector, error) {
 			// short-wire the consumer
 			notificationConsumer = consumer
 			return inspector, nil

@@ -203,7 +203,7 @@ func defaultRpcInspectorFactory(tracer p2p.PubSubTracer) p2p.GossipSubRpcInspect
 		networkingType network.NetworkingType,
 		idProvider module.IdentityProvider,
 		topicProvider func() p2p.TopicProvider,
-		notificationConsumer p2p.GossipSubInvCtrlMsgNotifConsumer) (p2p.GossipSubMsgValidationRpcInspector, error) {
+		notificationConsumer p2p.GossipSubInvCtrlMsgNotifConsumer) (p2p.GossipSubRPCInspector, error) {
 		return validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 			Logger:                  logger.With().Str("component", "rpc-inspector").Logger(),
 			SporkID:                 sporkId,
@@ -265,6 +265,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 
 	var scoreOpt *scoring.ScoreOption
 	var scoreTracer p2p.PeerScoreTracer
+	var consumer p2p.GossipSubInvCtrlMsgNotifConsumer
 	// currently, peer scoring is not supported for public networks.
 	if g.gossipSubCfg.PeerScoringEnabled && g.networkType != network.PublicNetwork {
 		// wires the gossipsub score option to the subscription provider.
@@ -289,6 +290,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 			return nil, fmt.Errorf("could not create gossipsub score option: %w", err)
 		}
 		gossipSubConfigs.WithScoreOption(scoreOpt)
+		consumer = scoreOpt // the score option is the consumer of the invalid control message notifications.
 
 		if g.gossipSubCfg.RpcTracer.ScoreTracerInterval > 0 {
 			scoreTracer = tracer.NewGossipSubScoreTracer(g.logger, g.idProvider, g.metricsCfg.Metrics, g.gossipSubCfg.RpcTracer.ScoreTracerInterval)
@@ -298,6 +300,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 		g.logger.Warn().
 			Str(logging.KeyNetworkingSecurity, "true").
 			Msg("gossipsub peer scoring is disabled")
+		consumer = scoring.NewNoopInvCtrlMsgNotifConsumer() // no-op consumer as peer scoring is disabled.
 	}
 
 	rpcValidationInspector, err := g.rpcInspectorFactory(
@@ -311,7 +314,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 		func() p2p.TopicProvider {
 			return gossipSub
 		},
-		scoreOpt)
+		consumer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new rpc valiadation inspector: %w", err)
 	}
