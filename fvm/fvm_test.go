@@ -38,16 +38,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// from 18.8.2022
-var mainnetExecutionEffortWeights = meter.ExecutionEffortWeights{
-	common.ComputationKindStatement:          1569,
-	common.ComputationKindLoop:               1569,
-	common.ComputationKindFunctionInvocation: 1569,
-	environment.ComputationKindGetValue:      808,
-	environment.ComputationKindCreateAccount: 2837670,
-	environment.ComputationKindSetValue:      765,
-}
-
 type vmTest struct {
 	bootstrapOptions []fvm.BootstrapProcedureOption
 	contextOptions   []fvm.Option
@@ -1046,7 +1036,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		t.Run(fmt.Sprintf("Transaction Fees %d: %s", i, tc.name), newVMTest().withBootstrapProcedureOptions(
 			fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 			fvm.WithExecutionMemoryLimit(math.MaxUint64),
-			fvm.WithExecutionEffortWeights(mainnetExecutionEffortWeights),
+			fvm.WithExecutionEffortWeights(environment.MainnetExecutionEffortWeights),
 			fvm.WithExecutionMemoryWeights(meter.DefaultMemoryWeights),
 		).withContextOptions(
 			fvm.WithTransactionFeesEnabled(true),
@@ -1063,7 +1053,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 			fvm.WithExecutionMemoryLimit(math.MaxUint64),
-			fvm.WithExecutionEffortWeights(mainnetExecutionEffortWeights),
+			fvm.WithExecutionEffortWeights(environment.MainnetExecutionEffortWeights),
 			fvm.WithExecutionMemoryWeights(meter.DefaultMemoryWeights),
 		).withContextOptions(
 			fvm.WithTransactionFeesEnabled(true),
@@ -3220,10 +3210,10 @@ func TestEVM(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
-			require.Len(t, output.Events, 5)
+			require.Len(t, output.Events, 6)
 
 			evmLocation := types.EVMLocation{}
-			txExe, blockExe := output.Events[3], output.Events[4]
+			txExe, blockExe := output.Events[4], output.Events[5]
 			assert.Equal(t, evmLocation.TypeID(nil, string(types.EventTypeTransactionExecuted)), common.TypeID(txExe.Type))
 			assert.Equal(t, evmLocation.TypeID(nil, string(types.EventTypeBlockExecuted)), common.TypeID(blockExe.Type))
 		}),
