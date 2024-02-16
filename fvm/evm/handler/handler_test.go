@@ -129,10 +129,6 @@ func TestHandler_TransactionRun(t *testing.T) {
 					err = evmTx.UnmarshalBinary(tx)
 					require.NoError(t, err)
 
-					fmt.Println(cadenceEvent.String())
-					js, _ := evmTx.MarshalJSON()
-					fmt.Println(evmTx.Hash(), string(js))
-
 					for j, f := range cadenceEvent.GetFields() {
 						if f.Identifier == "transactionHashes" {
 							txsRaw := cadenceEvent.GetFieldValues()[j]
