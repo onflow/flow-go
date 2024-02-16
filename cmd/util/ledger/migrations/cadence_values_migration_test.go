@@ -89,7 +89,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 
 	for _, migration := range migrations {
 		payloads, err = migration(payloads)
-		require.NoError(t, err)
+		require.NoError(t, err, "migration failed, logs: %v", logWriter.logs)
 	}
 
 	// Assert the migrated payloads
