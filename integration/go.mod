@@ -19,7 +19,7 @@ require (
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v1.3.0
-	github.com/onflow/cadence v1.0.0-preview.2.0.20240215024233-4dc882e61d91
+	github.com/onflow/cadence v1.0.0-preview.2.0.20240215231353-cab2c8a091f1
 	github.com/onflow/crypto v0.25.0
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.2-0.20240216154240-9d90f6a1002b
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.2-0.20240215154014-70c9655b5713

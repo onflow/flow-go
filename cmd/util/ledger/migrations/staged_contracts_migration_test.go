@@ -327,6 +327,33 @@ func TestStagedContractsMigration(t *testing.T) {
 		require.Len(t, payloads, 1)
 		require.Equal(t, update2, string(payloads[0].Value()))
 	})
+
+	t.Run("missing old contract", func(t *testing.T) {
+		t.Parallel()
+
+		newCode := "access(all) contract A { access(all) struct B {} }"
+
+		stagedContracts := []StagedContract{
+			{
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(newCode),
+				},
+				Address: address1,
+			},
+		}
+
+		migration := NewStagedContractsMigration(stagedContracts)
+
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+		err := migration.InitMigration(log, nil, 0)
+		require.NoError(t, err)
+
+		// NOTE: no payloads
+		_, err = migration.MigrateAccount(ctx, address1, nil)
+		require.ErrorContains(t, err, "failed to find all contract registers that need to be changed")
+	})
 }
 
 func TestStagedContractsWithImports(t *testing.T) {

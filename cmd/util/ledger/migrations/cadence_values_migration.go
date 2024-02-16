@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -251,8 +252,9 @@ func NewCadence1CapabilityValueMigrator(
 
 // cadenceValueMigrationReporter is the reporter for cadence value migrations
 type cadenceValueMigrationReporter struct {
-	rw  reporters.ReportWriter
-	log zerolog.Logger
+	rw                           reporters.ReportWriter
+	log                          zerolog.Logger
+	reportedProgramLoadingErrors map[common.Location]struct{}
 }
 
 var _ capcons.LinkMigrationReporter = &cadenceValueMigrationReporter{}
@@ -261,8 +263,9 @@ var _ migrations.Reporter = &cadenceValueMigrationReporter{}
 
 func newValueMigrationReporter(rw reporters.ReportWriter, log zerolog.Logger) *cadenceValueMigrationReporter {
 	return &cadenceValueMigrationReporter{
-		rw:  rw,
-		log: log,
+		rw:                           rw,
+		log:                          log,
+		reportedProgramLoadingErrors: make(map[common.Location]struct{}),
 	}
 }
 
@@ -284,13 +287,31 @@ func (t *cadenceValueMigrationReporter) Error(
 	migration string,
 	err error,
 ) {
+	var message string
+
+	// Only report program loading errors once,
+	// omit full error message for subsequent occurrences
+
+	var programLoadingError environment.ProgramLoadingError
+	if errors.As(err, &programLoadingError) {
+		location := programLoadingError.Location
+		if _, ok := t.reportedProgramLoadingErrors[location]; ok {
+			message = "error getting program"
+		}
+		t.reportedProgramLoadingErrors[location] = struct{}{}
+	}
+
+	if message == "" {
+		message = err.Error()
+	}
+
 	t.log.Error().Msgf(
 		"failed to run %s in account %s, domain %s, key %s: %s",
 		migration,
 		storageKey.Address,
 		storageKey.Key,
 		storageMapKey,
-		err,
+		message,
 	)
 }
 
