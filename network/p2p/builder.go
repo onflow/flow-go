@@ -141,8 +141,31 @@ type NodeBuilder interface {
 	// Returns:
 	// none
 	OverrideNodeConstructor(NodeConstructor) NodeBuilder
-	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
+
+	// OverrideGossipSubFactory overrides the default gossipsub factory for the GossipSub protocol.
+	// The purpose of override is to allow the node to provide a custom gossipsub factory for sake of testing or experimentation.
+	// Note: it is not recommended to override the default gossipsub factory in production unless you know what you are doing.
+	// Args:
+	// - factory: custom gossipsub factory
+	// Returns:
+	// - NodeBuilder: the node builder
+	OverrideGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
+
+	// OverrideDefaultRpcInspectorFactory overrides the default rpc inspector factory for the GossipSub protocol.
+	// The purpose of override is to allow the node to provide a custom rpc inspector factory for sake of testing or experimentation.
+	// Note: it is not recommended to override the default rpc inspector factory in production unless you know what you are doing.
+	// Args:
+	// - factory: custom rpc inspector factory
+	// Returns:
+	// - NodeBuilder: the node builder
 	OverrideDefaultRpcInspectorFactory(GossipSubRpcInspectorFactoryFunc) NodeBuilder
+
+	// Build creates a new libp2p node. It returns the newly created libp2p node and any errors encountered during its creation.
+	// Args:
+	// none
+	// Returns:
+	// - LibP2PNode: a new libp2p node
+	// - error: if an error occurs during the creation of the libp2p node, it is returned. Otherwise, nil is returned. Any error returned is unexpected and should be handled as irrecoverable.
 	Build() (LibP2PNode, error)
 }
 

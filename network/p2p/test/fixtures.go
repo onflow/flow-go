@@ -178,7 +178,7 @@ func NodeFixture(t *testing.T,
 	}
 
 	if parameters.GossipSubFactory != nil && parameters.GossipSubConfig != nil {
-		builder.SetGossipSubFactory(parameters.GossipSubFactory, parameters.GossipSubConfig)
+		builder.OverrideGossipSubFactory(parameters.GossipSubFactory, parameters.GossipSubConfig)
 	}
 
 	if parameters.ConnManager != nil {
