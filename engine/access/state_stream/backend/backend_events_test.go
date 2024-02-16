@@ -1,8 +1,10 @@
 package backend
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"sort"
 	"testing"
 	"time"
 
@@ -42,8 +44,23 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromExecutionData() {
 // extracted from local storage
 func (s *BackendEventsSuite) TestSubscribeEventsFromLocalStorage() {
 	s.backend.useIndex = true
+
+	// events returned from the db are sorted by txID, txIndex, then eventIndex.
+	// reproduce that here to ensure output order works as expected
+	blockEvents := make(map[flow.Identifier][]flow.Event)
+	for _, b := range s.blocks {
+		events := make([]flow.Event, len(s.blockEvents[b.ID()]))
+		for i, event := range s.blockEvents[b.ID()] {
+			events[i] = event
+		}
+		sort.Slice(events, func(i, j int) bool {
+			return bytes.Compare(events[i].TransactionID[:], events[j].TransactionID[:]) < 0
+		})
+		blockEvents[b.ID()] = events
+	}
+
 	s.events.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
-		mocks.StorageMapGetter(s.blockEvents),
+		mocks.StorageMapGetter(blockEvents),
 	)
 
 	reporter := syncmock.NewIndexReporter(s.T())

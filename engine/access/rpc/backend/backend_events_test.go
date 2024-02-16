@@ -1,8 +1,10 @@
 package backend
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"sort"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -115,10 +117,20 @@ func (s *BackendEventsSuite) SetupTest() {
 	s.blockEvents = generator.GetEventsWithEncoding(10, entities.EventEncodingVersion_CCF_V0)
 	targetEvent = string(s.blockEvents[0].Type)
 
+	// events returned from the db are sorted by txID, txIndex, then eventIndex.
+	// reproduce that here to ensure output order works as expected
+	returnBlockEvents := make([]flow.Event, 0, len(s.blockEvents))
+	for _, event := range s.blockEvents {
+		returnBlockEvents = append(returnBlockEvents, event)
+	}
+	sort.Slice(returnBlockEvents, func(i, j int) bool {
+		return bytes.Compare(returnBlockEvents[i].TransactionID[:], returnBlockEvents[j].TransactionID[:]) < 0
+	})
+
 	s.events.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) ([]flow.Event, error) {
 		for _, headerID := range s.blockIDs {
 			if blockID == headerID {
-				return s.blockEvents, nil
+				return returnBlockEvents, nil
 			}
 		}
 		return nil, storage.ErrNotFound
