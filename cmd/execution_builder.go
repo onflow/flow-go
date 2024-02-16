@@ -971,7 +971,7 @@ func (exeNode *ExecutionNode) LoadObserverCollectionIndexer(
 	// This ensures that it simply returns a not found error if the blob doesn't exist
 	// instead of attempting to download it from the network.
 	executionDataCache := execdatacache.NewExecutionDataCache(
-		exeNode.executionDataStore,
+		executionDataDownloader,
 		node.Storage.Headers,
 		node.Storage.Seals,
 		node.Storage.Results,
