@@ -83,8 +83,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/state_synchronization/collection"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
+	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/blob"
@@ -956,12 +955,13 @@ func (exeNode *ExecutionNode) LoadObserverCollectionIndexer(
 	module.ReadyDoneAware,
 	error,
 ) {
-	if !node.BaseConfig.ObserverMode {
+	if !node.ObserverMode {
 		return &module.NoopReadyDoneAware{}, nil
 	}
 
-	indexedBlockHeight := bstorage.NewConsumerProgress(node.DB, module.ConsumeProgressCollectionIndexerBlockHeight)
-	core := collection.NewIndexer(node.Storage.Collections)
+	execDataDistributor := edrequester.NewExecutionDataDistributor()
+
+	executionDataDownloader := execution_data.NewDownloader(exeNode.blobService)
 
 	var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 	execDataCacheBackend := herocache.NewBlockExecutionData(10, node.Logger, heroCacheCollector)
@@ -969,7 +969,7 @@ func (exeNode *ExecutionNode) LoadObserverCollectionIndexer(
 	// Execution Data cache that uses a blobstore as the backend (instead of a downloader)
 	// This ensures that it simply returns a not found error if the blob doesn't exist
 	// instead of attempting to download it from the network.
-	executionDataStoreCache := execdatacache.NewExecutionDataCache(
+	executionDataCache := execdatacache.NewExecutionDataCache(
 		exeNode.executionDataStore,
 		node.Storage.Headers,
 		node.Storage.Seals,
@@ -977,32 +977,42 @@ func (exeNode *ExecutionNode) LoadObserverCollectionIndexer(
 		execDataCacheBackend,
 	)
 
-	reader := finalizedreader.NewFinalizedReader(node.Storage.Headers, node.LastFinalizedHeader.Height)
-	collIndexer, err := indexer.NewIndexer(
-		node.Logger,
-		node.SealedRootBlock.Header.Height,
-		func() (uint64, error) {
-			return node.SealedRootBlock.Header.Height, nil
-		},
-		core,
-		executionDataStoreCache,
-		func() (uint64, error) {
-			return reader.LatestFinalizedHight(), nil
-		},
-		indexedBlockHeight,
-	)
+	processedBlockHeight := bstorage.NewConsumerProgress(node.DB, module.ConsumeProgressExecutionDataRequesterBlockHeight)
+	processedNotifications := bstorage.NewConsumerProgress(node.DB, module.ConsumeProgressExecutionDataRequesterNotification)
 
-	node.ProtocolEvents.AddConsumer(reader)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create execution indexer: %w", err)
+	executionDataConfig := edrequester.ExecutionDataConfig{
+		InitialBlockHeight: node.SealedRootBlock.Header.Height,
+		MaxSearchAhead:     edrequester.DefaultMaxSearchAhead,
+		FetchTimeout:       edrequester.DefaultFetchTimeout,
+		MaxFetchTimeout:    edrequester.DefaultMaxFetchTimeout,
+		RetryDelay:         edrequester.DefaultRetryDelay,
+		MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 	}
 
-	core.WithHandler(func(col *flow.Collection) {
-		exeNode.ingestionEng.OnCollection(exeNode.builder.NodeID, col)
+	r, err := edrequester.New(
+		node.Logger,
+		metrics.NewExecutionDataRequesterCollector(),
+		executionDataDownloader,
+		executionDataCache,
+		processedBlockHeight,
+		processedNotifications,
+		node.State,
+		node.Storage.Headers,
+		executionDataConfig,
+		execDataDistributor,
+	)
+
+	if err != nil {
+		return &module.NoopReadyDoneAware{}, err
+	}
+
+	execDataDistributor.AddOnExecutionDataReceivedConsumer(func(data *execution_data.BlockExecutionDataEntity) {
+		for _, chunk := range data.BlockExecutionData.ChunkExecutionDatas {
+			exeNode.ingestionEng.OnCollection(exeNode.builder.NodeID, chunk.Collection)
+		}
 	})
 
-	return collIndexer, nil
+	return r, nil
 }
 
 func (exeNode *ExecutionNode) LoadCheckerEngine(

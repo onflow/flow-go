@@ -82,7 +82,7 @@ func NewIndexer(
 		r.exeDataReader,
 		initHeight,
 		r.processExecutionData,
-		workersCount,
+		workersCount, // TODO configurable
 		searchAhead,
 	)
 	if err != nil {
