@@ -68,6 +68,7 @@ func newMigratorRuntime(
 			accounts,
 		),
 		RuntimeInterfaceConfig: config,
+		ProgramErrors:          map[common.Location]error{},
 	}
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{

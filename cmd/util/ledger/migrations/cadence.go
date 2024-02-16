@@ -162,14 +162,25 @@ func NewCadence1ValueMigrations(
 	// used by CadenceCapabilityValueMigrator
 	capabilityIDs := &capcons.CapabilityIDMapping{}
 
+	errorMessageHandler := &errorMessageHandler{}
+
 	for _, accountBasedMigration := range []AccountBasedMigration{
 		NewCadence1ValueMigrator(
 			rwf,
+			errorMessageHandler,
 			NewCadence1CompositeStaticTypeConverter(chainID),
 			NewCadence1InterfaceStaticTypeConverter(chainID),
 		),
-		NewCadence1LinkValueMigrator(rwf, capabilityIDs),
-		NewCadence1CapabilityValueMigrator(rwf, capabilityIDs),
+		NewCadence1LinkValueMigrator(
+			rwf,
+			errorMessageHandler,
+			capabilityIDs,
+		),
+		NewCadence1CapabilityValueMigrator(
+			rwf,
+			errorMessageHandler,
+			capabilityIDs,
+		),
 	} {
 		migrations = append(
 			migrations,
@@ -226,7 +237,18 @@ func NewCadence1Migrations(
 	stagedContracts []StagedContract,
 ) []ledger.Migration {
 	return common.Concat(
-		NewCadence1ContractsMigrations(log, nWorker, chainID, evmContractChange, stagedContracts),
-		NewCadence1ValueMigrations(log, rwf, nWorker, chainID),
+		NewCadence1ContractsMigrations(
+			log,
+			nWorker,
+			chainID,
+			evmContractChange,
+			stagedContracts,
+		),
+		NewCadence1ValueMigrations(
+			log,
+			rwf,
+			nWorker,
+			chainID,
+		),
 	)
 }
