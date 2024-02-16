@@ -2463,8 +2463,8 @@ github.com/olekukonko/tablewriter v0.0.5/go.mod h1:hPp6KlRPjbx+hW8ykQs1w3UBbZlj6
 github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f h1:Z8/PgTqOgOg02MTRpTBYO2k16FE6z4wEOtaC2WBR9Xo=
 github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f/go.mod h1:xvP61FoOs95K7IYdIYRnNcYQGf4nbF/uuJ0tHf4DRuM=
 github.com/onflow/cadence v1.0.0-M3/go.mod h1:odXGZZ/wGNA5mwT8bC9v8u8EXACHllB2ABSZK65TGL8=
-github.com/onflow/cadence v1.0.0-preview.2.0.20240215142754-d00bb4dde5c4 h1:LHICva0XtkrGuWbzEnKpX3AYG5L8Aj2HIa4Zh2+x/8g=
-github.com/onflow/cadence v1.0.0-preview.2.0.20240215142754-d00bb4dde5c4/go.mod h1:a4mccDU90hmuxCLUFzs9J/ANG/rYbFa36h4Z0bBAqNU=
+github.com/onflow/cadence v1.0.0-preview.2.0.20240216110422-a67dbbf21171 h1:l9AQBie6xFp3+vv+pWfUctSR6Uax7j5RZpAhP2z06So=
+github.com/onflow/cadence v1.0.0-preview.2.0.20240216110422-a67dbbf21171/go.mod h1:a4mccDU90hmuxCLUFzs9J/ANG/rYbFa36h4Z0bBAqNU=
 github.com/onflow/crypto v0.25.0 h1:BeWbLsh3ZD13Ej+Uky6kg1PL1ZIVBDVX+2MVBNwqddg=
 github.com/onflow/crypto v0.25.0/go.mod h1:C8FbaX0x8y+FxWjbkHy0Q4EASCDR9bSPWZqlpCLYyVI=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.2-0.20240206003101-928bf99024d7 h1:OI/4F2NK/X/4x3dTUFFDGtuOsSa9pX+jjBeSEcBrY/M=

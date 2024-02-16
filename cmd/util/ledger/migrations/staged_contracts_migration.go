@@ -10,7 +10,9 @@ import (
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/old_parser"
+	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
@@ -169,9 +171,16 @@ func (m *StagedContractsMigration) MigrateAccount(
 		return payloads, nil
 	}
 
+	elaborations := map[common.Location]*sema.Elaboration{}
+
 	config := util.RuntimeInterfaceConfig{
 		GetContractCodeFunc: func(location runtime.Location) ([]byte, error) {
 			return m.contractsByLocation[location], nil
+		},
+		GetOrLoadProgramListener: func(location runtime.Location, program *interpreter.Program, err error) {
+			if err == nil {
+				elaborations[location] = program.Elaboration
+			}
 		},
 	}
 
@@ -209,6 +218,7 @@ func (m *StagedContractsMigration) MigrateAccount(
 				name,
 				newCode,
 				oldCode,
+				elaborations,
 			)
 		}
 
@@ -250,6 +260,7 @@ func CheckContractUpdateValidity(
 	contractName string,
 	newCode []byte,
 	oldCode ledger.Value,
+	elaborations map[common.Location]*sema.Elaboration,
 ) error {
 	location := common.AddressLocation{
 		Name:    contractName,
@@ -278,7 +289,7 @@ func CheckContractUpdateValidity(
 		mr,
 		oldProgram,
 		newProgram.Program,
-		mr.Interpreter.AllElaborations(),
+		elaborations,
 	)
 
 	return validator.Validate()
