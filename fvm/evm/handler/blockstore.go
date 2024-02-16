@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	BlockHashListCapacity    = 256
+	BlockHashListCapacity    = 16
 	BlockStoreLatestBlockKey = "LatestBlock"
 	BlockStoreBlockHashesKey = "LatestBlockHashes"
 )

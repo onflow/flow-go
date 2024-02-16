@@ -29,6 +29,15 @@ const MeterExecutionInternalPrecisionBytes = 16
 
 type ExecutionEffortWeights map[common.ComputationKind]uint64
 
+func (weights ExecutionEffortWeights) ComputationFromIntensities(intensities MeteredComputationIntensities) uint64 {
+	var result uint64
+	for kind, weight := range weights {
+		intensity := uint64(intensities[kind])
+		result += weight * intensity
+	}
+	return result >> MeterExecutionInternalPrecisionBytes
+}
+
 type ComputationMeterParameters struct {
 	computationLimit   uint64
 	computationWeights ExecutionEffortWeights
