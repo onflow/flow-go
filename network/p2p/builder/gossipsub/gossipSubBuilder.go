@@ -57,8 +57,16 @@ func (g *Builder) SetHost(h host.Host) {
 	g.h = h
 }
 
+// OverrideDefaultRpcInspectorFactory overrides the default rpc inspector factory of the builder.
+// If the rpc inspector factory has already been set, a warning is logged.
+// Note: it is not recommended to override the default rpc inspector factory in production unless you know what you are doing.
+// The purpose of this function is to allow for testing and development.
+// Args:
+// - factoryFunc: the factory function to override the default rpc inspector factory.
+// Returns:
+// none
 func (g *Builder) OverrideDefaultRpcInspectorFactory(factoryFunc p2p.GossipSubRpcInspectorFactoryFunc) {
-	g.logger.Warn().Msg("overriding default rpc inspector factory, not recommended for production")
+	g.logger.Warn().Bool(logging.KeySuspicious, true).Msg("overriding default rpc inspector factory, not recommended for production")
 	g.rpcInspectorFactory = factoryFunc
 }
 
@@ -194,6 +202,12 @@ func NewGossipSubBuilder(logger zerolog.Logger,
 	return b
 }
 
+// defaultRpcInspectorFactory returns the default rpc inspector factory function. It is used to create the default rpc inspector factory.
+// Note: always use the default rpc inspector factory function to create the rpc inspector factory (unless you know what you are doing).
+// Args:
+// - tracer: the tracer of the node.
+// Returns:
+// - a new rpc inspector factory function.
 func defaultRpcInspectorFactory(tracer p2p.PubSubTracer) p2p.GossipSubRpcInspectorFactoryFunc {
 	return func(logger zerolog.Logger,
 		sporkId flow.Identifier,
@@ -263,8 +277,16 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 		gossipSubConfigs.WithSubscriptionFilter(g.subscriptionFilter)
 	}
 
+	// scoreOpt is the score option for the GossipSub pubsub system. It is a self-contained component that is used carry over the
+	// peer scoring parameters (including the entire app-specific score function) and inject it into the GossipSub pubsub system at creation time.
 	var scoreOpt *scoring.ScoreOption
+	// scoreTracer is the peer score tracer for the GossipSub pubsub system. It is used to trace the peer scores.
+	// It is only created if peer scoring is enabled. Otherwise, it is nil.
 	var scoreTracer p2p.PeerScoreTracer
+	// consumer is the consumer of the invalid control message notifications; i.e., the component that should be nlotified when
+	// an RPC validation fails. This component is responsible for taking action on the notification. Currently, the score option
+	// is the consumer of the invalid control message notifications.
+	// When the peer scoring is disabled, the consumer is a no-op consumer.
 	var consumer p2p.GossipSubInvCtrlMsgNotifConsumer
 	// currently, peer scoring is not supported for public networks.
 	if g.gossipSubCfg.PeerScoringEnabled && g.networkType != network.PublicNetwork {
@@ -299,7 +321,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 	} else {
 		g.logger.Warn().
 			Str(logging.KeyNetworkingSecurity, "true").
-			Msg("gossipsub peer scoring is disabled")
+			Msg("gossipsub peer scoring is disabled, no-op consumer will be used for invalid control message notifications.")
 		consumer = scoring.NewNoopInvCtrlMsgNotifConsumer() // no-op consumer as peer scoring is disabled.
 	}
 
