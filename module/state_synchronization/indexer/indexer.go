@@ -49,7 +49,7 @@ type Indexer struct {
 	log             zerolog.Logger
 	exeDataReader   *jobs.ExecutionDataReader
 	exeDataNotifier engine.Notifier
-	indexer         *IndexerCore
+	indexer         state_synchronization.ExecutionDataIndexer
 	jobConsumer     *jobqueue.ComponentConsumer
 	registers       storage.RegisterIndex
 }
@@ -59,7 +59,7 @@ func NewIndexer(
 	log zerolog.Logger,
 	initHeight uint64,
 	registers storage.RegisterIndex,
-	indexer *IndexerCore,
+	indexer state_synchronization.ExecutionDataIndexer,
 	executionCache *cache.ExecutionDataCache,
 	executionDataLatestHeight func() (uint64, error),
 	processedHeight storage.ConsumerProgress,
