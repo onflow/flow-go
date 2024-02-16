@@ -9,7 +9,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type statsPusherImpl struct {
+type StatsPusherImpl struct {
 	pusher *push.Pusher
 	cancel context.CancelFunc
 	done   chan struct{}
@@ -22,10 +22,10 @@ func NewStatsPusher(
 	pushgateway string,
 	job string,
 	gatherer prometheus.Gatherer,
-) *statsPusherImpl {
+) *StatsPusherImpl {
 
 	localCtx, cancel := context.WithCancel(ctx)
-	sp := &statsPusherImpl{
+	sp := &StatsPusherImpl{
 		pusher: push.New(pushgateway, job).Gatherer(gatherer),
 		done:   make(chan struct{}),
 		cancel: cancel,
@@ -60,7 +60,7 @@ func NewStatsPusher(
 }
 
 // Stop the stats pusher and waits for it to finish.
-func (sp *statsPusherImpl) Stop() {
+func (sp *StatsPusherImpl) Stop() {
 	sp.cancel()
 	<-sp.done
 }
