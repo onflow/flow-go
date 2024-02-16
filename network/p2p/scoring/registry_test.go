@@ -384,29 +384,31 @@ func testScoreRegistrySpamRecordWithSubscriptionPenalty(t *testing.T, messageTyp
 		MsgType: messageType,
 	})
 
-	// the penalty should now be updated.
-	record, err, ok := spamRecords.Get(peerID) // get the record from the spamRecords.
-	assert.True(t, ok)
-	assert.NoError(t, err)
-	assert.Less(t, math.Abs(expectedPenalty-record.Penalty), 10e-3)
-	assert.Equal(t, scoring.InitAppScoreRecordStateFunc(maximumSpamPenaltyDecayFactor)().Decay, record.Decay) // decay should be initialized to the initial state.
-
 	queryTime := time.Now()
-	// eventually, the app specific score should be updated in the cache.
 	require.Eventually(t, func() bool {
-		// calling the app specific score function when there is no app specific score in the cache should eventually update the cache.
-		score := reg.AppSpecificScoreFunc()(peerID)
+		// the notification is processed asynchronously, and the penalty should eventually be updated in the spamRecords
+		record, err, ok := spamRecords.Get(peerID) // get the record from the spamRecords.
+		if !ok {
+			return false
+		}
+		require.NoError(t, err)
+		if !unittest.AreNumericallyClose(expectedPenalty, record.Penalty, 10e-2) {
+			return false
+		}
+		require.Equal(t, scoring.InitAppScoreRecordStateFunc(maximumSpamPenaltyDecayFactor)().Decay, record.Decay) // decay should be initialized to the initial state.
+
+		// eventually, the app specific score should be updated in the cache.
 		// the peer has spam record as well as an unknown identity. Hence, the app specific score should be the spam penalty
 		// and the staking penalty.
-		// As the app specific score in the cache and spam penalty in the spamRecords are updated at different times, we account for 0.1% error.
-		return unittest.AreNumericallyClose(expectedPenalty+scoreOptParameters.InvalidSubscriptionPenalty, score, 0.01)
-	}, 5*time.Second, 10*time.Millisecond)
+		// As the app specific score in the cache and spam penalty in the spamRecords are updated at different times, we account for 5% error.
+		return unittest.AreNumericallyClose(expectedPenalty+scoreOptParameters.InvalidSubscriptionPenalty, reg.AppSpecificScoreFunc()(peerID), 0.05)
+	}, 5*time.Second, 100*time.Millisecond)
 
 	// the app specific score should now be updated in the cache.
 	score, updated, exists = appScoreCache.Get(peerID) // get the score from the cache.
 	require.True(t, exists)
 	require.True(t, updated.After(queryTime))
-	unittest.RequireNumericallyClose(t, expectedPenalty+scoreOptParameters.InvalidSubscriptionPenalty, score, 0.01)
+	unittest.RequireNumericallyClose(t, expectedPenalty+scoreOptParameters.InvalidSubscriptionPenalty, score, 0.1) // account for maximum 10% error due to decays and asynchrony.
 
 	// stop the registry.
 	cancel()
