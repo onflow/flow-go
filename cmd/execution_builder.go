@@ -359,7 +359,11 @@ func (exeNode *ExecutionNode) LoadBlobService(
 		opts = append(opts, blob.WithRateLimit(float64(exeNode.exeConf.blobstoreRateLimit), exeNode.exeConf.blobstoreBurstLimit))
 	}
 
-	bs, err := node.EngineRegistry.RegisterBlobService(channels.ExecutionDataService, exeNode.executionDataDatastore, opts...)
+	edsChannel := channels.ExecutionDataService
+	if node.ObserverMode {
+		edsChannel = channels.PublicExecutionDataService
+	}
+	bs, err := node.EngineRegistry.RegisterBlobService(edsChannel, exeNode.executionDataDatastore, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register blob service: %w", err)
 	}
