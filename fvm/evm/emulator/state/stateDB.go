@@ -12,7 +12,6 @@ import (
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/atree"
 
-	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -460,9 +459,9 @@ func wrapError(err error) error {
 		return types.NewFatalError(err)
 	}
 
-	// if is fvm fatal error
-	if errors.IsFailure(err) {
-		return types.NewFatalError(err)
+	// if is a fatal error
+	if types.IsAFatalError(err) {
+		return err
 	}
 
 	return types.NewStateError(err)

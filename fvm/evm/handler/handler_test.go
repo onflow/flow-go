@@ -13,7 +13,9 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethCore "github.com/ethereum/go-ethereum/core"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethVM "github.com/ethereum/go-ethereum/core/vm"
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
@@ -46,11 +48,9 @@ func TestHandler_TransactionRun(t *testing.T) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 
-					bs, err := handler.NewBlockStore(backend, rootAddr)
-					require.NoError(t, err)
+					bs := handler.NewBlockStore(backend, rootAddr)
 
-					aa, err := handler.NewAddressAllocator(backend, rootAddr)
-					require.NoError(t, err)
+					aa := handler.NewAddressAllocator()
 
 					result := &types.Result{
 						DeployedContractAddress: types.Address(testutils.RandomAddress(t)),
@@ -127,22 +127,17 @@ func TestHandler_TransactionRun(t *testing.T) {
 		})
 	})
 
-	t.Run("test - transaction run (unhappy cases)", func(t *testing.T) {
+	t.Run("test - transaction run (unhappy non-fatal cases)", func(t *testing.T) {
 		t.Parallel()
 
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
-
-					bs, err := handler.NewBlockStore(backend, rootAddr)
-					require.NoError(t, err)
-
-					aa, err := handler.NewAddressAllocator(backend, rootAddr)
-					require.NoError(t, err)
-
+					bs := handler.NewBlockStore(backend, rootAddr)
+					aa := handler.NewAddressAllocator()
 					em := &testutils.TestEmulator{
 						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
-							return &types.Result{}, types.NewEVMExecutionError(fmt.Errorf("some sort of error"))
+							return &types.Result{}, types.NewEVMValidationError(fmt.Errorf("some sort of validation error"))
 						},
 					}
 					handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, em)
@@ -171,18 +166,49 @@ func TestHandler_TransactionRun(t *testing.T) {
 						handler.Run([]byte(tx), coinbase)
 					})
 
-					// tx execution failure
-					tx := eoa.PrepareSignAndEncodeTx(
-						t,
-						gethCommon.Address{},
-						nil,
-						nil,
-						100_000,
-						big.NewInt(1),
-					)
-
+					// tx validation error
 					assertPanic(t, isNotFatal, func() {
+						// tx execution failure
+						tx := eoa.PrepareSignAndEncodeTx(
+							t,
+							gethCommon.Address{},
+							nil,
+							nil,
+							100_000,
+							big.NewInt(1),
+						)
+
 						handler.Run([]byte(tx), coinbase)
+					})
+				})
+			})
+		})
+
+		t.Run("test - transaction run (fatal cases)", func(t *testing.T) {
+			t.Parallel()
+
+			testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+				testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+					testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+						bs := handler.NewBlockStore(backend, rootAddr)
+						aa := handler.NewAddressAllocator()
+						em := &testutils.TestEmulator{
+							RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
+								return &types.Result{}, types.NewFatalError(fmt.Errorf("Fatal error"))
+							},
+						}
+						handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, em)
+						assertPanic(t, errors.IsFailure, func() {
+							tx := eoa.PrepareSignAndEncodeTx(
+								t,
+								gethCommon.Address{},
+								nil,
+								nil,
+								100_000,
+								big.NewInt(1),
+							)
+							handler.Run([]byte(tx), types.NewAddress(gethCommon.Address{}))
+						})
 					})
 				})
 			})
@@ -403,11 +429,8 @@ func TestHandler_COA(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
-					bs, err := handler.NewBlockStore(backend, rootAddr)
-					require.NoError(t, err)
-
-					aa, err := handler.NewAddressAllocator(backend, rootAddr)
-					require.NoError(t, err)
+					bs := handler.NewBlockStore(backend, rootAddr)
+					aa := handler.NewAddressAllocator()
 
 					// Withdraw calls are only possible within FOA accounts
 					assertPanic(t, types.IsAUnAuthroizedMethodCallError, func() {
@@ -419,11 +442,11 @@ func TestHandler_COA(t *testing.T) {
 						account.Withdraw(types.NewBalanceFromUFix64(1))
 					})
 
-					// test insufficient total supply
+					// test insufficient total supply error
 					assertPanic(t, types.IsAInsufficientTotalSupplyError, func() {
 						em := &testutils.TestEmulator{
 							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
-								return &types.Result{}, types.NewEVMExecutionError(fmt.Errorf("some sort of error"))
+								return &types.Result{}, nil
 							},
 						}
 
@@ -434,10 +457,10 @@ func TestHandler_COA(t *testing.T) {
 					})
 
 					// test non fatal error of emulator
-					assertPanic(t, types.IsEVMExecutionError, func() {
+					assertPanic(t, isNotFatal, func() {
 						em := &testutils.TestEmulator{
 							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
-								return &types.Result{}, types.NewEVMExecutionError(fmt.Errorf("some sort of error"))
+								return &types.Result{}, types.NewEVMValidationError(fmt.Errorf("some sort of error"))
 							},
 						}
 
@@ -471,17 +494,14 @@ func TestHandler_COA(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
-					bs, err := handler.NewBlockStore(backend, rootAddr)
-					require.NoError(t, err)
-
-					aa, err := handler.NewAddressAllocator(backend, rootAddr)
-					require.NoError(t, err)
+					bs := handler.NewBlockStore(backend, rootAddr)
+					aa := handler.NewAddressAllocator()
 
 					// test non fatal error of emulator
-					assertPanic(t, types.IsEVMExecutionError, func() {
+					assertPanic(t, isNotFatal, func() {
 						em := &testutils.TestEmulator{
 							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
-								return &types.Result{}, types.NewEVMExecutionError(fmt.Errorf("some sort of error"))
+								return &types.Result{}, fmt.Errorf("some sort of error")
 							},
 						}
 
@@ -609,6 +629,151 @@ func TestHandler_COA(t *testing.T) {
 	// TODO add test with test emulator for unhappy cases (emulator)
 }
 
+func TestHandler_TransactionTryRun(t *testing.T) {
+	t.Parallel()
+
+	t.Run("test - transaction try run (success)", func(t *testing.T) {
+		t.Parallel()
+
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+
+					bs := handler.NewBlockStore(backend, rootAddr)
+					aa := handler.NewAddressAllocator()
+
+					result := &types.Result{
+						DeployedContractAddress: types.Address(testutils.RandomAddress(t)),
+						ReturnedValue:           testutils.RandomData(t),
+						GasConsumed:             testutils.RandomGas(1000),
+						Logs: []*gethTypes.Log{
+							testutils.GetRandomLogFixture(t),
+							testutils.GetRandomLogFixture(t),
+						},
+					}
+
+					em := &testutils.TestEmulator{
+						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
+							return result, nil
+						},
+					}
+					handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, em)
+					tx := eoa.PrepareSignAndEncodeTx(
+						t,
+						gethCommon.Address{},
+						nil,
+						nil,
+						100_000,
+						big.NewInt(1),
+					)
+
+					rs := handler.TryRun(tx, types.NewAddress(gethCommon.Address{}))
+					require.Equal(t, types.StatusSuccessful, rs.Status)
+					require.Equal(t, result.GasConsumed, rs.GasConsumed)
+					require.Equal(t, types.ErrCodeNoError, rs.ErrorCode)
+
+				})
+			})
+		})
+	})
+
+	t.Run("test - transaction try run (failed)", func(t *testing.T) {
+		t.Parallel()
+
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+
+					bs := handler.NewBlockStore(backend, rootAddr)
+					aa := handler.NewAddressAllocator()
+
+					result := &types.Result{
+						VMError:                 gethVM.ErrOutOfGas,
+						DeployedContractAddress: types.Address(testutils.RandomAddress(t)),
+						ReturnedValue:           testutils.RandomData(t),
+						GasConsumed:             testutils.RandomGas(1000),
+						Logs: []*gethTypes.Log{
+							testutils.GetRandomLogFixture(t),
+							testutils.GetRandomLogFixture(t),
+						},
+					}
+
+					em := &testutils.TestEmulator{
+						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
+							return result, nil
+						},
+					}
+					handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, em)
+
+					tx := eoa.PrepareSignAndEncodeTx(
+						t,
+						gethCommon.Address{},
+						nil,
+						nil,
+						100_000,
+						big.NewInt(1),
+					)
+
+					rs := handler.TryRun(tx, types.NewAddress(gethCommon.Address{}))
+					require.Equal(t, types.StatusFailed, rs.Status)
+					require.Equal(t, result.GasConsumed, rs.GasConsumed)
+					require.Equal(t, types.ExecutionErrCodeOutOfGas, rs.ErrorCode)
+
+				})
+			})
+		})
+	})
+
+	t.Run("test - transaction try run (unhappy cases)", func(t *testing.T) {
+		t.Parallel()
+
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+					bs := handler.NewBlockStore(backend, rootAddr)
+					aa := handler.NewAddressAllocator()
+					evmErr := fmt.Errorf("%w: next nonce %v, tx nonce %v", gethCore.ErrNonceTooLow, 1, 0)
+					em := &testutils.TestEmulator{
+						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
+							return &types.Result{}, types.NewEVMValidationError(evmErr)
+						},
+					}
+					handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, em)
+
+					coinbase := types.NewAddress(gethCommon.Address{})
+
+					gasLimit := uint64(testutils.TestComputationLimit + 1)
+					tx := eoa.PrepareSignAndEncodeTx(
+						t,
+						gethCommon.Address{},
+						nil,
+						nil,
+						gasLimit,
+						big.NewInt(1),
+					)
+
+					rs := handler.TryRun([]byte(tx), coinbase)
+					require.Equal(t, types.StatusInvalid, rs.Status)
+					require.Equal(t, types.ValidationErrCodeInsufficientComputation, rs.ErrorCode)
+
+					tx = eoa.PrepareSignAndEncodeTx(
+						t,
+						gethCommon.Address{},
+						nil,
+						nil,
+						100,
+						big.NewInt(1),
+					)
+
+					rs = handler.TryRun([]byte(tx), coinbase)
+					require.Equal(t, types.StatusInvalid, rs.Status)
+					require.Equal(t, types.ValidationErrCodeNonceTooLow, rs.ErrorCode)
+				})
+			})
+		})
+	})
+}
+
 // returns true if error passes the checks
 type checkError func(error) bool
 
@@ -632,12 +797,8 @@ func assertPanic(t *testing.T, check checkError, f func()) {
 }
 
 func SetupHandler(t testing.TB, backend types.Backend, rootAddr flow.Address) *handler.ContractHandler {
-	bs, err := handler.NewBlockStore(backend, rootAddr)
-	require.NoError(t, err)
-
-	aa, err := handler.NewAddressAllocator(backend, rootAddr)
-	require.NoError(t, err)
-
+	bs := handler.NewBlockStore(backend, rootAddr)
+	aa := handler.NewAddressAllocator()
 	emulator := emulator.NewEmulator(backend, rootAddr)
 
 	handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, emulator)
