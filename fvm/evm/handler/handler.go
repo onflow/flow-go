@@ -99,7 +99,10 @@ func (h *ContractHandler) deployCOA(uuid uint64) (types.Address, error) {
 		return types.Address{}, err
 	}
 	res, err := h.executeAndHandleCall(ctx, call, nil, false)
-	return res.DeployedContractAddress, err
+	if err != nil {
+		return types.Address{}, err
+	}
+	return res.DeployedContractAddress, nil
 }
 
 // AccountByAddress returns the account for the given address,

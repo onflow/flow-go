@@ -198,7 +198,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 							},
 						}
 						handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, em)
-						assertPanic(t, isFatal, func() {
+						assertPanic(t, errors.IsFailure, func() {
 							tx := eoa.PrepareSignAndEncodeTx(
 								t,
 								gethCommon.Address{},
@@ -777,12 +777,8 @@ func TestHandler_TransactionTryRun(t *testing.T) {
 // returns true if error passes the checks
 type checkError func(error) bool
 
-var isFatal = func(err error) bool {
-	return errors.IsFailure(err)
-}
-
 var isNotFatal = func(err error) bool {
-	return !isFatal(err)
+	return !errors.IsFailure(err)
 }
 
 func assertPanic(t *testing.T, check checkError, f func()) {

@@ -459,5 +459,10 @@ func wrapError(err error) error {
 		return types.NewFatalError(err)
 	}
 
+	// if is a fatal error
+	if types.IsAFatalError(err) {
+		return err
+	}
+
 	return types.NewStateError(err)
 }

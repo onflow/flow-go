@@ -223,8 +223,7 @@ func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*ty
 	// check the source account balance
 	// if balance is lower than amount needed for withdrawal, error out
 	if proc.state.GetBalance(addr).Cmp(amount) < 0 {
-		res.VMError = gethVM.ErrInsufficientBalance
-		return res, nil
+		return res, gethCore.ErrInsufficientFundsForTransfer
 	}
 
 	// sub balance
@@ -264,8 +263,7 @@ func (proc *procedure) deployAt(
 	// precheck 1 - check balance of the source
 	if value.Sign() != 0 &&
 		!proc.evm.Context.CanTransfer(proc.state, caller.ToCommon(), value) {
-		res.VMError = gethVM.ErrInsufficientBalance
-		return res, nil
+		return res, gethCore.ErrInsufficientFundsForTransfer
 	}
 
 	// precheck 2 - ensure there's no existing eoa or contract is deployed at the address

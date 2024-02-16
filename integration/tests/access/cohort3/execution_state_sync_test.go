@@ -33,8 +33,9 @@ type ExecutionStateSyncSuite struct {
 
 	log zerolog.Logger
 
-	bridgeID flow.Identifier
-	ghostID  flow.Identifier
+	bridgeID     flow.Identifier
+	ghostID      flow.Identifier
+	observerName string
 
 	// root context for the current test
 	ctx    context.Context
@@ -75,11 +76,12 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 	bridgeANConfig := testnet.NewNodeConfig(
 		flow.RoleAccess,
 		testnet.WithID(s.bridgeID),
-		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithLogLevel(zerolog.InfoLevel),
 		testnet.WithAdditionalFlag("--supports-observer=true"),
 		testnet.WithAdditionalFlag("--execution-data-sync-enabled=true"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir)),
 		testnet.WithAdditionalFlag("--execution-data-retry-delay=1s"),
+		testnet.WithAdditionalFlagf("--public-network-execution-data-sync-enabled=true"),
 	)
 
 	// add the ghost (access) node config
@@ -108,10 +110,20 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
 		bridgeANConfig,
 		ghostNode,
-		// TODO: add observer
 	}
 
-	conf := testnet.NewNetworkConfig("execution state sync test", net)
+	// add the observer node config
+	s.observerName = testnet.PrimaryON
+	observers := []testnet.ObserverConfig{{
+		ContainerName: s.observerName,
+		LogLevel:      zerolog.DebugLevel,
+		AdditionalFlags: []string{
+			fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
+			"--execution-data-sync-enabled=true",
+		},
+	}}
+
+	conf := testnet.NewNetworkConfig("execution state sync test", net, testnet.WithObservers(observers...))
 	s.net = testnet.PrepareFlowNetwork(s.T(), conf, flow.Localnet)
 }
 
@@ -119,7 +131,7 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 // successfully sync the data
 func (s *ExecutionStateSyncSuite) TestHappyPath() {
 	// Let the network run for this many blocks
-	runBlocks := uint64(20)
+	runBlocks := uint64(60)
 
 	// We will check that execution data was downloaded for this many blocks
 	// It has to be less than runBlocks since it's not possible to see which height the AN stopped
@@ -135,31 +147,55 @@ func (s *ExecutionStateSyncSuite) TestHappyPath() {
 	s.BlockState.WaitForSealed(s.T(), blockA.Header.Height+runBlocks)
 	s.net.StopContainers()
 
+	metrics := metrics.NewNoopCollector()
+
 	// start an execution data service using the Access Node's execution data db
 	an := s.net.ContainerByID(s.bridgeID)
-	eds := s.nodeExecutionDataStore(an)
+	anEds := s.nodeExecutionDataStore(an)
 
 	// setup storage objects needed to get the execution data id
-	db, err := an.DB()
+	anDB, err := an.DB()
 	require.NoError(s.T(), err, "could not open db")
 
-	metrics := metrics.NewNoopCollector()
-	headers := storage.NewHeaders(metrics, db)
-	results := storage.NewExecutionResults(metrics, db)
+	anHeaders := storage.NewHeaders(metrics, anDB)
+	anResults := storage.NewExecutionResults(metrics, anDB)
+
+	// start an execution data service using the Observer Node's execution data db
+	on := s.net.ContainerByName(s.observerName)
+	onEds := s.nodeExecutionDataStore(on)
+
+	// setup storage objects needed to get the execution data id
+	onDB, err := on.DB()
+	require.NoError(s.T(), err, "could not open db")
+
+	onHeaders := storage.NewHeaders(metrics, onDB)
+	onResults := storage.NewExecutionResults(metrics, onDB)
 
 	// Loop through checkBlocks and verify the execution data was downloaded correctly
 	for i := blockA.Header.Height; i <= blockA.Header.Height+checkBlocks; i++ {
-		header, err := headers.ByHeight(i)
-		require.NoError(s.T(), err, "could not get header")
+		// access node
+		header, err := anHeaders.ByHeight(i)
+		require.NoError(s.T(), err, "%s: could not get header", testnet.PrimaryAN)
 
-		result, err := results.ByBlockID(header.ID())
-		require.NoError(s.T(), err, "could not get sealed result")
+		result, err := anResults.ByBlockID(header.ID())
+		require.NoError(s.T(), err, "%s: could not get sealed result", testnet.PrimaryAN)
 
-		s.T().Logf("getting execution data for height %d, block %s, execution_data %s", header.Height, header.ID(), result.ExecutionDataID)
+		ed, err := anEds.Get(s.ctx, result.ExecutionDataID)
+		if assert.NoError(s.T(), err, "%s: could not get execution data for height %v", testnet.PrimaryAN, i) {
+			s.T().Logf("%s: got execution data for height %d", testnet.PrimaryAN, i)
+			assert.Equal(s.T(), header.ID(), ed.BlockID)
+		}
 
-		ed, err := eds.Get(s.ctx, result.ExecutionDataID)
-		if assert.NoError(s.T(), err, "could not get execution data for height %v", i) {
-			s.T().Logf("got execution data for height %d", i)
+		// observer node
+		header, err = onHeaders.ByHeight(i)
+		require.NoError(s.T(), err, "%s: could not get header", testnet.PrimaryON)
+
+		result, err = onResults.ByID(result.ID())
+		require.NoError(s.T(), err, "%s: could not get sealed result from ON`s storage", testnet.PrimaryON)
+
+		ed, err = onEds.Get(s.ctx, result.ExecutionDataID)
+		if assert.NoError(s.T(), err, "%s: could not get execution data for height %v", testnet.PrimaryON, i) {
+			s.T().Logf("%s: got execution data for height %d", testnet.PrimaryON, i)
 			assert.Equal(s.T(), header.ID(), ed.BlockID)
 		}
 	}
