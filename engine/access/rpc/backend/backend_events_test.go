@@ -119,10 +119,9 @@ func (s *BackendEventsSuite) SetupTest() {
 
 	// events returned from the db are sorted by txID, txIndex, then eventIndex.
 	// reproduce that here to ensure output order works as expected
-	returnBlockEvents := make([]flow.Event, 0, len(s.blockEvents))
-	for _, event := range s.blockEvents {
-		returnBlockEvents = append(returnBlockEvents, event)
-	}
+	returnBlockEvents := make([]flow.Event, len(s.blockEvents))
+	copy(returnBlockEvents, s.blockEvents)
+
 	sort.Slice(returnBlockEvents, func(i, j int) bool {
 		return bytes.Compare(returnBlockEvents[i].TransactionID[:], returnBlockEvents[j].TransactionID[:]) < 0
 	})

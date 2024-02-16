@@ -54,7 +54,14 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromLocalStorage() {
 			events[i] = event
 		}
 		sort.Slice(events, func(i, j int) bool {
-			return bytes.Compare(events[i].TransactionID[:], events[j].TransactionID[:]) < 0
+			cmp := bytes.Compare(events[i].TransactionID[:], events[j].TransactionID[:])
+			if cmp == 0 {
+				if events[i].TransactionIndex == events[j].TransactionIndex {
+					return events[i].EventIndex < events[j].EventIndex
+				}
+				return events[i].TransactionIndex < events[j].TransactionIndex
+			}
+			return cmp < 0
 		})
 		blockEvents[b.ID()] = events
 	}
