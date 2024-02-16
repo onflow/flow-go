@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/antihax/optional"
-	"github.com/onflow/flow-go/engine/access/subscription"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -28,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
