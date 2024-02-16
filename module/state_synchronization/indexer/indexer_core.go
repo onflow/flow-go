@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/logging"
@@ -32,6 +33,8 @@ type IndexerCore struct {
 
 	collectionHandler requester.HandleFunc
 }
+
+var _ state_synchronization.ExecutionDataIndexer = (*IndexerCore)(nil)
 
 // New execution state indexer used to ingest block execution data and index it by height.
 // The passed RegisterIndex storage must be populated to include the first and last height otherwise the indexer

@@ -22,3 +22,8 @@ type ExecutionDataRequester interface {
 	// This method must only be called after the component is Ready. If it is called early, an error is returned.
 	HighestConsecutiveHeight() (uint64, error)
 }
+
+// ExecutionDataIndexer is a component that indexes ExecutionData into a database
+type ExecutionDataIndexer interface {
+	IndexBlockData(data *execution_data.BlockExecutionDataEntity) error
+}
