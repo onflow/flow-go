@@ -16,7 +16,6 @@ import (
 
 type AccountStatusesResponse struct {
 	BlockID      flow.Identifier
-	Height       uint64
 	Events       flow.EventsList
 	MessageIndex uint64
 }
@@ -66,7 +65,6 @@ func (b AccountStatusesBackend) getAccountStatusResponseFactory(messageIndex *co
 
 		response := &AccountStatusesResponse{
 			BlockID:      executionData.BlockID,
-			Height:       height,
 			Events:       events,
 			MessageIndex: messageIndex.Value(),
 		}

@@ -318,4 +318,4 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-replace github.com/onflow/flow/protobuf/go/flow v0.3.7 => github.com/AndriiDiachuk/flow/protobuf/go/flow v0.0.0-20240213134321-e287bb08035b
+replace github.com/onflow/flow/protobuf/go/flow v0.3.7 => github.com/AndriiDiachuk/flow/protobuf/go/flow v0.0.0-20240216100013-13b14085de00

@@ -294,7 +294,7 @@ func (h *Handler) SubscribeAccountStatuses(request *executiondata.SubscribeAccou
 
 		err = stream.Send(&executiondata.SubscribeAccountStatusesResponse{
 			BlockId:      convert.IdentifierToMessage(resp.BlockID),
-			Address:      convert.IdentifierToMessage(resp.BlockID),
+			Address:      request.GetAddress(),
 			Events:       events,
 			MessageIndex: resp.MessageIndex,
 		})
