@@ -8,9 +8,8 @@ import (
 
 	gethABI "github.com/ethereum/go-ethereum/accounts/abi"
 	gethCommon "github.com/ethereum/go-ethereum/common"
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/atree"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/testutils/contracts"
@@ -51,38 +50,6 @@ func GetDummyKittyTestContract(t testing.TB) *TestContract {
 	return &TestContract{
 		ABI:      contracts.DummyKittyContractABIJSON,
 		ByteCode: contracts.DummyKittyContractBytes,
-	}
-}
-
-func GetSelfDestructTestContract(tb testing.TB) *TestContract {
-	bytecode, err := hex.DecodeString("6080604052608180600f5f395ff3fe6080604052348015600e575f80fd5b50600436106026575f3560e01c806383197ef014602a575b5f80fd5b60306032565b005b3373ffffffffffffffffffffffffffffffffffffffff16fffea2646970667358221220a29c41b43845784caa870cd38e1eb6abe7b1f79a50d59ea6ae51d8337eb3b2fd64736f6c63430008160033")
-	require.NoError(tb, err)
-
-	return &TestContract{
-		Code: `
-			contract TestDestruct {
-				constructor() payable {}
-			
-				function destroy() public {
-					selfdestruct(payable(msg.sender));
-				}
-			}
-		`,
-		ABI: `[
-			{
-				"inputs": [],
-				"stateMutability": "payable",
-				"type": "constructor"
-			},
-			{
-				"inputs": [],
-				"name": "destroy",
-				"outputs": [],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			}
-		]`,
-		ByteCode: bytecode,
 	}
 }
 
