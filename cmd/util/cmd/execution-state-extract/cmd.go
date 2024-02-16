@@ -76,6 +76,12 @@ func init() {
 	Cmd.Flags().BoolVar(&flagLogVerboseValidationError, "log-verbose-validation-error", false,
 		"log entire Cadence values on validation error (atree migration)")
 
+	// If specified, the state will consist of payloads from the given input payload file.
+	// If not specified, then the state will be extracted from the latest checkpoint file.
+	// This flag can be used to reduce total duration of migrations when state extraction involves
+	// multiple migrations because it helps avoid repeatedly reading from checkpoint file to rebuild trie.
+	// The input payload file must be created by state extraction running with either
+	// flagOutputPayloadFileName or flagOutputPayloadByAddresses.
 	Cmd.Flags().StringVar(
 		&flagInputPayloadFileName,
 		"input-payload-filename",
@@ -117,6 +123,7 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Msg("--input-payload-filename cannot be used with --block-hash or --state-commitment")
 	}
 
+	// When flagOutputPayloadByAddresses is specified, flagOutputPayloadFileName is required.
 	if len(flagOutputPayloadFileName) == 0 && len(flagOutputPayloadByAddresses) > 0 {
 		log.Fatal().Msg("--extract-payloads-by-address requires --output-payload-filename to be specified")
 	}
@@ -242,7 +249,7 @@ func run(*cobra.Command, []string) {
 		)
 	}
 
-	log.Info().Msgf("%s, %s", inputMsg, outputMsg)
+	log.Info().Msgf("state extraction plan: %s, %s", inputMsg, outputMsg)
 
 	var err error
 	if len(flagInputPayloadFileName) > 0 {
