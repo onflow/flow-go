@@ -375,7 +375,7 @@ func TestSelfdestruct(t *testing.T) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			testutils.RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *testutils.EOATestAccount) {
 
-				testContract := testutils.GetSelfDestructTestContract(t)
+				testContract := testutils.GetStorageTestContract(t)
 				testAddress := types.NewAddressFromString("testaddr")
 				startBalance := big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(gethParams.Ether))
 				deployBalance := big.NewInt(0).Mul(big.NewInt(10), big.NewInt(gethParams.Ether))
