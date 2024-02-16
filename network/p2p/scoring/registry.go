@@ -408,6 +408,7 @@ func (r *GossipSubAppSpecificScoreRegistry) duplicateMessagesPenalty(pid peer.ID
 // OnInvalidControlMessageNotification is called when a new invalid control message notification is distributed.
 // Any error on consuming event must handle internally.
 // The implementation must be concurrency safe, but can be blocking.
+// Note: there is no real-time guarantee on processing the notification.
 func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(notification *p2p.InvCtrlMsgNotif) {
 	lg := r.logger.With().Str("peer_id", p2plogging.PeerId(notification.PeerID)).Logger()
 	if ok := r.invCtrlMsgNotifWorkerPool.Submit(notification); !ok {

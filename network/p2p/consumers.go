@@ -73,5 +73,6 @@ type GossipSubInvCtrlMsgNotifConsumer interface {
 	// OnInvalidControlMessageNotification is called when a new invalid control message notification is distributed.
 	// Any error on consuming event must handle internally.
 	// The implementation must be concurrency safe and non-blocking.
+	// Note: there is no real-time guarantee on processing the notification.
 	OnInvalidControlMessageNotification(*InvCtrlMsgNotif)
 }

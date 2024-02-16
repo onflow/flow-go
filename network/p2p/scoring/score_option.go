@@ -269,6 +269,7 @@ func (s *ScoreOption) TopicScoreParams(topic *pubsub.Topic) *pubsub.TopicScorePa
 // OnInvalidControlMessageNotification is called when a new invalid control message notification is distributed.
 // Any error on consuming event must handle internally.
 // The implementation must be concurrency safe and non-blocking.
+// Note: there is no real-time guarantee on processing the notification.
 func (s *ScoreOption) OnInvalidControlMessageNotification(notif *p2p.InvCtrlMsgNotif) {
 	s.appScoreRegistry.OnInvalidControlMessageNotification(notif)
 }
