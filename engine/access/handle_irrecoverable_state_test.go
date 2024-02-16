@@ -12,7 +12,6 @@ import (
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -27,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
-	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -144,19 +142,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 		nil).Build()
 
 	blockHeader := unittest.BlockHeaderFixture()
-	suite.snapshot.On("Head").Return(blockHeader, nil).Twice()
-
-	chainStateTracker, err := subscription.NewChainStateTracker(
-		suite.log,
-		suite.state,
-		blockHeader.Height,
-		suite.headers,
-		blockHeader.Height,
-		nil,
-		nil,
-		false,
-	)
-	require.NoError(suite.T(), err)
+	suite.snapshot.On("Head").Return(blockHeader, nil).Once()
 
 	bnd, err := backend.New(backend.Params{
 		State:                suite.state,
@@ -171,7 +157,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 		Log:                  suite.log,
 		SnapshotHistoryLimit: 0,
 		Communicator:         backend.NewNodeCommunicator(false),
-		ChainStateTracker:    chainStateTracker,
+		ChainStateTracker:    nil,
 	})
 	suite.Require().NoError(err)
 
