@@ -902,7 +902,6 @@ func (suite *Suite) TestGetTransaction() {
 func (suite *Suite) TestGetCollection() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	expected := unittest.CollectionFixture(1).Light()
 
 	suite.collections.
@@ -1550,6 +1549,8 @@ func (suite *Suite) TestGetExecutionResultByID() {
 }
 
 func (suite *Suite) TestGetExecutionResultByBlockID() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	validExecutorIdentities := flow.IdentityList{}
 	validENIDs := flow.IdentifierList(validExecutorIdentities.NodeIDs())
 
