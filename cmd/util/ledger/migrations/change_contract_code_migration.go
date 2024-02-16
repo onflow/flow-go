@@ -3,8 +3,6 @@ package migrations
 import (
 	"fmt"
 
-	"github.com/rs/zerolog"
-
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	ftContracts "github.com/onflow/flow-ft/lib/go/contracts"
 	nftContracts "github.com/onflow/flow-nft/lib/go/contracts"
@@ -15,7 +13,6 @@ import (
 
 	evm "github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -25,23 +22,13 @@ type ChangeContractCodeMigration struct {
 
 var _ AccountBasedMigration = (*ChangeContractCodeMigration)(nil)
 
-func NewChangeContractCodeMigration() *ChangeContractCodeMigration {
+func NewChangeContractCodeMigration(chainID flow.ChainID) *ChangeContractCodeMigration {
 	return &ChangeContractCodeMigration{
-		StagedContractsMigration: NewStagedContractsMigration(),
+		StagedContractsMigration: NewStagedContractsMigration(chainID).
+			// TODO:
+			//WithContractUpdateValidation().
+			WithName("ChangeContractCodeMigration"),
 	}
-}
-
-func (d *ChangeContractCodeMigration) InitMigration(
-	log zerolog.Logger,
-	_ []*ledger.Payload,
-	_ int,
-) error {
-	d.log = log.
-		With().
-		Str("migration", "ChangeContractCodeMigration").
-		Logger()
-
-	return nil
 }
 
 func NewSystemContractChange(
@@ -300,7 +287,7 @@ func NewSystemContactsMigration(
 	chainID flow.ChainID,
 	options SystemContractChangesOptions,
 ) *ChangeContractCodeMigration {
-	migration := NewChangeContractCodeMigration()
+	migration := NewChangeContractCodeMigration(chainID)
 	for _, change := range SystemContractChanges(chainID, options) {
 		migration.RegisterContractChange(change)
 	}

@@ -64,7 +64,7 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration()
+		migration := NewStagedContractsMigration(flow.Emulator)
 		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
@@ -104,7 +104,8 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration()
+		migration := NewStagedContractsMigration(flow.Emulator).
+			WithContractUpdateValidation()
 		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
@@ -146,7 +147,8 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration()
+		migration := NewStagedContractsMigration(flow.Emulator).
+			WithContractUpdateValidation()
 		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
@@ -198,7 +200,8 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration()
+		migration := NewStagedContractsMigration(flow.Emulator).
+			WithContractUpdateValidation()
 		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
@@ -243,7 +246,7 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration()
+		migration := NewStagedContractsMigration(flow.Emulator)
 		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
@@ -305,7 +308,7 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration()
+		migration := NewStagedContractsMigration(flow.Emulator)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -391,7 +394,7 @@ func TestStagedContractsWithImports(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration()
+		migration := NewStagedContractsMigration(flow.Emulator)
 		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
@@ -451,7 +454,8 @@ func TestStagedContractsWithImports(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration()
+		migration := NewStagedContractsMigration(flow.Emulator).
+			WithContractUpdateValidation()
 		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
@@ -528,7 +532,8 @@ func TestStagedContractsWithImports(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration()
+		migration := NewStagedContractsMigration(flow.Emulator).
+			WithContractUpdateValidation()
 		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}

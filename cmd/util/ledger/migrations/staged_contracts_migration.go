@@ -3,7 +3,6 @@ package migrations
 import (
 	"context"
 	"fmt"
-	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"strings"
 	"sync"
 
@@ -18,13 +17,18 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
+
+	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 )
 
 type StagedContractsMigration struct {
-	log                 zerolog.Logger
-	mutex               sync.RWMutex
-	contracts           map[common.Address]map[flow.RegisterID]Contract
-	contractsByLocation map[common.Location][]byte
+	name                   string
+	chainID                flow.ChainID
+	log                    zerolog.Logger
+	mutex                  sync.RWMutex
+	stagedContracts        map[common.Address]map[flow.RegisterID]Contract
+	contractsByLocation    map[common.Location][]byte
+	enableUpdateValidation bool
 }
 
 type StagedContract struct {
@@ -39,21 +43,33 @@ type Contract struct {
 
 var _ AccountBasedMigration = &StagedContractsMigration{}
 
-func NewStagedContractsMigration() *StagedContractsMigration {
+func NewStagedContractsMigration(chainID flow.ChainID) *StagedContractsMigration {
 	return &StagedContractsMigration{
-		contracts:           map[common.Address]map[flow.RegisterID]Contract{},
+		name:                "StagedContractsMigration",
+		chainID:             chainID,
+		stagedContracts:     map[common.Address]map[flow.RegisterID]Contract{},
 		contractsByLocation: map[common.Location][]byte{},
 	}
+}
+
+func (m *StagedContractsMigration) WithContractUpdateValidation() *StagedContractsMigration {
+	m.enableUpdateValidation = true
+	return m
+}
+
+func (m *StagedContractsMigration) WithName(name string) *StagedContractsMigration {
+	m.name = name
+	return m
 }
 
 func (m *StagedContractsMigration) Close() error {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	if len(m.contracts) > 0 {
+	if len(m.stagedContracts) > 0 {
 		var sb strings.Builder
 		sb.WriteString("failed to find all contract registers that need to be changed:\n")
-		for address, contracts := range m.contracts {
+		for address, contracts := range m.stagedContracts {
 			_, _ = fmt.Fprintf(&sb, "- address: %s\n", address)
 			for registerID := range contracts {
 				_, _ = fmt.Fprintf(&sb, "  - %s\n", flow.RegisterIDContractName(registerID))
@@ -73,8 +89,15 @@ func (m *StagedContractsMigration) InitMigration(
 ) error {
 	m.log = log.
 		With().
-		Str("migration", "StagedContractsMigration").
+		Str("migration", m.name).
 		Logger()
+
+	// Manually register burner contract
+	burnerLocation := common.AddressLocation{
+		Name:    "Burner",
+		Address: common.Address(m.chainID.Chain().ServiceAddress()),
+	}
+	m.contractsByLocation[burnerLocation] = coreContracts.Burner()
 
 	return nil
 }
@@ -91,15 +114,15 @@ func (m *StagedContractsMigration) RegisterContractChange(change StagedContract)
 	defer m.mutex.Unlock()
 
 	address := change.Address
-	if _, ok := m.contracts[address]; !ok {
-		m.contracts[address] = map[flow.RegisterID]Contract{}
+	if _, ok := m.stagedContracts[address]; !ok {
+		m.stagedContracts[address] = map[flow.RegisterID]Contract{}
 	}
 
 	name := change.Name
 
 	registerID := flow.ContractRegisterID(flow.ConvertAddress(address), name)
 
-	_, exist := m.contracts[address][registerID]
+	_, exist := m.stagedContracts[address][registerID]
 	if exist {
 		// Staged multiple updates for the same contract.
 		// Overwrite the previous update.
@@ -110,7 +133,7 @@ func (m *StagedContractsMigration) RegisterContractChange(change StagedContract)
 		)
 	}
 
-	m.contracts[address][registerID] = change.Contract
+	m.stagedContracts[address][registerID] = change.Contract
 
 	location := common.AddressLocation{
 		Name:    name,
@@ -125,11 +148,11 @@ func (m *StagedContractsMigration) contractUpdatesForAccount(
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	contracts, ok := m.contracts[address]
+	contracts, ok := m.stagedContracts[address]
 
 	// remove address from set of addresses
 	// to keep track of which addresses are left to change
-	delete(m.contracts, address)
+	delete(m.stagedContracts, address)
 
 	return contracts, ok
 }
@@ -146,18 +169,8 @@ func (m *StagedContractsMigration) MigrateAccount(
 		return payloads, nil
 	}
 
-	// TODO: get proper burner address
-	chain := flow.Emulator
-	burnerLocation := common.AddressLocation{
-		Name:    "Burner",
-		Address: common.Address(chain.Chain().ServiceAddress()),
-	}
-
 	config := util.RuntimeInterfaceConfig{
 		GetContractCodeFunc: func(location runtime.Location) ([]byte, error) {
-			if location == burnerLocation {
-				return coreContracts.Burner(), nil
-			}
 			return m.contractsByLocation[location], nil
 		},
 	}
@@ -189,7 +202,16 @@ func (m *StagedContractsMigration) MigrateAccount(
 		newCode := updatedContract.Code
 		oldCode := payload.Value()
 
-		err = CheckContractUpdateValidity(mr, address, name, newCode, oldCode)
+		if m.enableUpdateValidation {
+			err = CheckContractUpdateValidity(
+				mr,
+				address,
+				name,
+				newCode,
+				oldCode,
+			)
+		}
+
 		if err != nil {
 			m.log.Error().Err(err).
 				Msgf(
@@ -251,7 +273,7 @@ func CheckContractUpdateValidity(
 	}
 
 	validator := stdlib.NewCadenceV042ToV1ContractUpdateValidator(
-		nil,
+		location,
 		contractName,
 		mr,
 		oldProgram,

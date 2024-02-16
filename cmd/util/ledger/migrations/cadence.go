@@ -193,7 +193,7 @@ func NewCadence1ContractsMigrations(
 	stagedContracts []StagedContract,
 ) []ledger.Migration {
 
-	stagedContractsMigration := NewStagedContractsMigration()
+	stagedContractsMigration := NewStagedContractsMigration(chainID)
 	stagedContractsMigration.RegisterContractUpdates(stagedContracts)
 
 	return []ledger.Migration{
