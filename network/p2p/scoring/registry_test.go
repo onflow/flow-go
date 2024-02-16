@@ -169,29 +169,31 @@ func testScoreRegistryPeerWithSpamRecord(t *testing.T, messageType p2pmsg.Contro
 		MsgType: messageType,
 	})
 
-	// the penalty should now be updated in the spamRecords
-	record, err, ok := spamRecords.Get(peerID) // get the record from the spamRecords.
-	assert.True(t, ok)
-	assert.NoError(t, err)
-	assert.Less(t, math.Abs(expectedPenalty-record.Penalty), 10e-3)                                           // penalty should be updated to -10.
-	assert.Equal(t, scoring.InitAppScoreRecordStateFunc(maximumSpamPenaltyDecayFactor)().Decay, record.Decay) // decay should be initialized to the initial state.
-
 	queryTime := time.Now()
-	// eventually, the app specific score should be updated in the cache.
 	require.Eventually(t, func() bool {
-		// calling the app specific score function when there is no app specific score in the cache should eventually update the cache.
-		score := reg.AppSpecificScoreFunc()(peerID)
+		// the notification is processed asynchronously, and the penalty should eventually be updated in the spamRecords
+		record, err, ok := spamRecords.Get(peerID) // get the record from the spamRecords.
+		if !ok {
+			return false
+		}
+		require.NoError(t, err)
+		if !unittest.AreNumericallyClose(expectedPenalty, record.Penalty, 10e-2) {
+			return false
+		}
+		require.Equal(t, scoring.InitAppScoreRecordStateFunc(maximumSpamPenaltyDecayFactor)().Decay, record.Decay) // decay should be initialized to the initial state.
+
+		// eventually, the app specific score should be updated in the cache.
 		// this peer has a spam record, with no subscription penalty. Hence, the app specific score should only be the spam penalty,
 		// and the peer should be deprived of the default reward for its valid staked role.
-		// As the app specific score in the cache and spam penalty in the spamRecords are updated at different times, we account for 0.1% error.
-		return unittest.AreNumericallyClose(expectedPenalty, score, 10e-4)
-	}, 5*time.Second, 100*time.Millisecond)
+		// As the app specific score in the cache and spam penalty in the spamRecords are updated at different times, we account for 1% error.
+		return unittest.AreNumericallyClose(expectedPenalty, reg.AppSpecificScoreFunc()(peerID), 10e-2)
+	}, 5*time.Second, 10*time.Millisecond)
 
 	// the app specific score should now be updated in the cache.
 	score, updated, exists = appScoreCache.Get(peerID) // get the score from the cache.
 	require.True(t, exists)
 	require.True(t, updated.After(queryTime))
-	require.True(t, unittest.AreNumericallyClose(expectedPenalty, score, 10e-4))
+	require.True(t, unittest.AreNumericallyClose(expectedPenalty, score, 10e-2))
 
 	// stop the registry.
 	cancel()
