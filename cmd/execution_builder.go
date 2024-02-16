@@ -232,7 +232,8 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("collection requester engine", exeNode.LoadCollectionRequesterEngine).
 		Component("receipt provider engine", exeNode.LoadReceiptProviderEngine).
 		Component("synchronization engine", exeNode.LoadSynchronizationEngine).
-		Component("grpc server", exeNode.LoadGrpcServer)
+		Component("grpc server", exeNode.LoadGrpcServer).
+		Component("observer collection indexer", exeNode.LoadObserverCollectionIndexer)
 }
 
 func (exeNode *ExecutionNode) LoadMutableFollowerState(node *NodeConfig) error {
