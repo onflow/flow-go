@@ -46,29 +46,29 @@ var _ state_synchronization.IndexReporter = (*Indexer)(nil)
 // notify new data is available and kick off indexing.
 type Indexer struct {
 	component.Component
-	log             zerolog.Logger
-	exeDataReader   *jobs.ExecutionDataReader
-	exeDataNotifier engine.Notifier
-	indexer         state_synchronization.ExecutionDataIndexer
-	jobConsumer     *jobqueue.ComponentConsumer
-	registers       storage.RegisterIndex
+	log                       zerolog.Logger
+	exeDataReader             *jobs.ExecutionDataReader
+	exeDataNotifier           engine.Notifier
+	indexer                   state_synchronization.ExecutionDataIndexer
+	jobConsumer               *jobqueue.ComponentConsumer
+	executionDataLowestHeight func() (uint64, error)
 }
 
 // NewIndexer creates a new execution worker.
 func NewIndexer(
 	log zerolog.Logger,
 	initHeight uint64,
-	registers storage.RegisterIndex,
+	executionDataLowestHeight func() (uint64, error),
 	indexer state_synchronization.ExecutionDataIndexer,
 	executionCache *cache.ExecutionDataCache,
 	executionDataLatestHeight func() (uint64, error),
 	processedHeight storage.ConsumerProgress,
 ) (*Indexer, error) {
 	r := &Indexer{
-		log:             log.With().Str("module", "execution_indexer").Logger(),
-		exeDataNotifier: engine.NewNotifier(),
-		indexer:         indexer,
-		registers:       registers,
+		log:                       log.With().Str("module", "execution_indexer").Logger(),
+		exeDataNotifier:           engine.NewNotifier(),
+		indexer:                   indexer,
+		executionDataLowestHeight: executionDataLowestHeight,
 	}
 
 	r.exeDataReader = jobs.NewExecutionDataReader(executionCache, fetchTimeout, executionDataLatestHeight)
@@ -107,7 +107,7 @@ func (i *Indexer) LowestIndexedHeight() (uint64, error) {
 	// TODO: use a separate value to track the lowest indexed height. We're using the registers db's
 	// value here to start because it's convenient. When pruning support is added, this will need to
 	// be updated.
-	return i.registers.FirstHeight(), nil
+	return i.executionDataLowestHeight()
 }
 
 // HighestIndexedHeight returns the highest height indexed by the execution indexer.

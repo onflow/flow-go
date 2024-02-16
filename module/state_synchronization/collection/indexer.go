@@ -3,25 +3,21 @@ package collection
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/storage"
 )
 
 type Indexer struct {
 	collections storage.Collections
-	handler     state_synchronization.CollectionHandler
+	handler     func(*flow.Collection)
 }
-
-var _ state_synchronization.ExecutionDataIndexer = (*Indexer)(nil)
 
 func NewIndexer(
 	collections storage.Collections,
-	handler state_synchronization.CollectionHandler,
 ) *Indexer {
 	return &Indexer{
 		collections: collections,
-		handler:     handler,
 	}
 }
 
@@ -37,14 +33,12 @@ func (i *Indexer) IndexBlockData(data *execution_data.BlockExecutionDataEntity) 
 				err)
 		}
 
-		err = i.handler.HandleCollection(chunk.Collection)
-		if err != nil {
-			return fmt.Errorf("failed to handle collection for block %v, coll ID %v: %w",
-				data.ID(),
-				chunk.Collection.ID(),
-				err)
-		}
+		i.handler(chunk.Collection)
 	}
 
 	return nil
+}
+
+func (i *Indexer) WithHandler(handler func(*flow.Collection)) {
+	i.handler = handler
 }
