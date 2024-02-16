@@ -16,8 +16,11 @@ import (
 )
 
 func TestEVMEventsCCFEncodingDecoding(t *testing.T) {
+	t.Parallel()
 
 	t.Run("evm.BlockExecuted", func(t *testing.T) {
+		t.Parallel()
+
 		block := &types.Block{
 			Height:          2,
 			TotalSupply:     big.NewInt(1500),
@@ -49,6 +52,8 @@ func TestEVMEventsCCFEncodingDecoding(t *testing.T) {
 	})
 
 	t.Run("evm.TransactionExecuted", func(t *testing.T) {
+		t.Parallel()
+
 		txEncoded, err := hex.DecodeString("fff83b81ff0194000000000000000000000000000000000000000094000000000000000000000000000000000000000180895150ae84a8cdf00000825208")
 		require.NoError(t, err)
 		txHash := gethCommon.HexToHash("0xf3593c3eb9ac1125f31acfa5520877f223279f6238a670936e65a710ccd44641")
