@@ -19,7 +19,6 @@ import (
 	discoveryBackoff "github.com/libp2p/go-libp2p/p2p/discovery/backoff"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
-	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
 
@@ -37,7 +36,6 @@ import (
 	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
-	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
@@ -807,22 +805,6 @@ func PeerIdSliceFixture(t *testing.T, n int) peer.IDSlice {
 func NewConnectionGater(idProvider module.IdentityProvider, allowListFilter p2p.PeerFilter) p2p.ConnectionGater {
 	filters := []p2p.PeerFilter{allowListFilter}
 	return connection.NewConnGater(unittest.Logger(), idProvider, connection.WithOnInterceptPeerDialFilters(filters), connection.WithOnInterceptSecuredFilters(filters))
-}
-
-// MockScoringRegistrySubscriptionValidatorReadyDoneAware mocks the Ready and Done methods of the subscription validator to return a channel that is already closed,
-// so that the distributor is considered ready and done when the test needs.
-func MockScoringRegistrySubscriptionValidatorReadyDoneAware(s *mockp2p.SubscriptionValidator) {
-	s.On("Start", mockery.Anything).Return().Maybe()
-	s.On("Ready").Return(func() <-chan struct{} {
-		ch := make(chan struct{})
-		close(ch)
-		return ch
-	}()).Maybe()
-	s.On("Done").Return(func() <-chan struct{} {
-		ch := make(chan struct{})
-		close(ch)
-		return ch
-	}()).Maybe()
 }
 
 // GossipSubRpcFixtures returns a slice of random message IDs for testing.
