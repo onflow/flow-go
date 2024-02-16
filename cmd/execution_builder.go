@@ -1004,6 +1004,9 @@ func (exeNode *ExecutionNode) LoadObserverCollectionIndexer(
 		return &module.NoopReadyDoneAware{}, err
 	}
 
+	// subscribe the block finalization event, and trigger workers to fetch execution data
+	exeNode.followerDistributor.AddOnBlockFinalizedConsumer(r.OnBlockFinalized)
+
 	execDataDistributor.AddOnExecutionDataReceivedConsumer(func(data *execution_data.BlockExecutionDataEntity) {
 		for _, chunk := range data.BlockExecutionData.ChunkExecutionDatas {
 			exeNode.ingestionEng.OnCollection(exeNode.builder.NodeID, chunk.Collection)
