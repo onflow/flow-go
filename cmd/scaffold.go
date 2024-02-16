@@ -1392,7 +1392,7 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 		return fmt.Errorf("could not parse node identifier: %w", err)
 	}
 
-	if fnb.BaseConfig.ObserverMode {
+	if fnb.ObserverMode {
 		info, err := LoadPrivateNodeInfo(fnb.BaseConfig.BootstrapDir, myID)
 		if err != nil {
 			return fmt.Errorf("failed to load private node info: %w", err)
