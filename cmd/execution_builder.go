@@ -74,13 +74,17 @@ import (
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/module/finalizedreader"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/state_synchronization/collection"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/blob"
@@ -88,6 +92,7 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	storageerr "github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
@@ -213,6 +218,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		// TODO: will re-visit this once storehouse has implemented new WAL for checkpoint file of
 		// payloadless trie.
 		// Component("execution data pruner", exeNode.LoadExecutionDataPruner).
+		Component("observer collection indexer", exeNode.LoadObserverCollectionIndexer).
 		Component("blob service", exeNode.LoadBlobService).
 		Component("block data upload manager", exeNode.LoadBlockUploaderManager).
 		Component("GCP block data uploader", exeNode.LoadGCPBlockDataUploader).
@@ -942,6 +948,61 @@ func (exeNode *ExecutionNode) LoadExecutionDataPruner(
 		pruner.WithThreshold(exeNode.exeConf.executionDataPrunerThreshold),
 	)
 	return exeNode.executionDataPruner, err
+}
+
+func (exeNode *ExecutionNode) LoadObserverCollectionIndexer(
+	node *NodeConfig,
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+	if !node.BaseConfig.ObserverMode {
+		return &module.NoopReadyDoneAware{}, nil
+	}
+
+	indexedBlockHeight := bstorage.NewConsumerProgress(node.DB, module.ConsumeProgressCollectionIndexerBlockHeight)
+	core := collection.NewIndexer(node.Storage.Collections)
+
+	var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+	execDataCacheBackend := herocache.NewBlockExecutionData(10, node.Logger, heroCacheCollector)
+
+	// Execution Data cache that uses a blobstore as the backend (instead of a downloader)
+	// This ensures that it simply returns a not found error if the blob doesn't exist
+	// instead of attempting to download it from the network.
+	executionDataStoreCache := execdatacache.NewExecutionDataCache(
+		exeNode.executionDataStore,
+		node.Storage.Headers,
+		node.Storage.Seals,
+		node.Storage.Results,
+		execDataCacheBackend,
+	)
+
+	reader := finalizedreader.NewFinalizedReader(node.Storage.Headers, node.LastFinalizedHeader.Height)
+	collIndexer, err := indexer.NewIndexer(
+		node.Logger,
+		node.SealedRootBlock.Header.Height,
+		func() (uint64, error) {
+			return node.SealedRootBlock.Header.Height, nil
+		},
+		core,
+		executionDataStoreCache,
+		func() (uint64, error) {
+			return reader.LatestFinalizedHight(), nil
+		},
+		indexedBlockHeight,
+	)
+
+	node.ProtocolEvents.AddConsumer(reader)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create execution indexer: %w", err)
+	}
+
+	core.WithHandler(func(col *flow.Collection) {
+		exeNode.ingestionEng.OnCollection(exeNode.builder.NodeID, col)
+	})
+
+	return collIndexer, nil
 }
 
 func (exeNode *ExecutionNode) LoadCheckerEngine(

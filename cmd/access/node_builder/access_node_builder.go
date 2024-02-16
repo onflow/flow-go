@@ -764,7 +764,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.ExecutionIndexer, err = indexer.NewIndexer(
 					builder.Logger,
 					registers.FirstHeight(),
-					registers,
+					func() (uint64, error) {
+						return registers.FirstHeight(), nil
+					},
 					indexerCore,
 					executionDataStoreCache,
 					builder.ExecutionDataRequester.HighestConsecutiveHeight,
