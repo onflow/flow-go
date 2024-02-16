@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"github.com/antihax/optional"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -144,6 +146,18 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 	blockHeader := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(blockHeader, nil).Twice()
 
+	chainStateTracker, err := subscription.NewChainStateTracker(
+		suite.log,
+		suite.state,
+		blockHeader.Height,
+		suite.headers,
+		blockHeader.Height,
+		nil,
+		nil,
+		false,
+	)
+	require.NoError(suite.T(), err)
+
 	bnd, err := backend.New(backend.Params{
 		State:                suite.state,
 		CollectionRPC:        suite.collClient,
@@ -157,6 +171,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 		Log:                  suite.log,
 		SnapshotHistoryLimit: 0,
 		Communicator:         backend.NewNodeCommunicator(false),
+		ChainStateTracker:    chainStateTracker,
 	})
 	suite.Require().NoError(err)
 

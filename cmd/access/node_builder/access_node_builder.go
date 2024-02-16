@@ -153,7 +153,6 @@ type AccessNodeConfig struct {
 	scriptExecutorConfig              query.QueryConfig
 	scriptExecMinBlock                uint64
 	scriptExecMaxBlock                uint64
-	broadcaster                       *engine.Broadcaster
 }
 
 type PublicNetworkConfig struct {
@@ -245,7 +244,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registersDBPath:              filepath.Join(homedir, ".flow", "execution_state"),
 		checkpointFile:               cmd.NotSet,
 		scriptExecutorConfig:         query.NewDefaultConfig(),
-		broadcaster:                  nil,
 		scriptExecMinBlock:           0,
 		scriptExecMaxBlock:           math.MaxUint64,
 	}
@@ -306,6 +304,8 @@ type FlowAccessNodeBuilder struct {
 	unsecureGrpcServer    *grpcserver.GrpcServer
 	stateStreamGrpcServer *grpcserver.GrpcServer
 
+	broadcaster        *engine.Broadcaster
+	chainStateTracker  subscription.ChainStateTracker
 	stateStreamBackend *statestreambackend.StateStreamBackend
 }
 
@@ -511,7 +511,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
 			datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
-			err := os.MkdirAll(datastoreDir, 0700)
+			err := os.MkdirAll(datastoreDir, 0o700)
 			if err != nil {
 				return err
 			}
@@ -870,6 +870,22 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			useIndex := builder.executionDataIndexingEnabled &&
 				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
 
+			// create ChainStateTracker that will track for new blocks (finalized and sealed) and
+			// handles block-related operations.
+			builder.chainStateTracker, err = subscription.NewChainStateTracker(
+				node.Logger,
+				node.State,
+				builder.executionDataConfig.InitialBlockHeight,
+				node.Storage.Headers,
+				highestAvailableHeight,
+				builder.broadcaster,
+				builder.EventsIndex,
+				useIndex,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to initialize subscribtion handlear: %w", err)
+			}
+
 			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,
 				builder.stateStreamConf,
@@ -880,11 +896,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.ExecutionDataStore,
 				executionDataStoreCache,
 				builder.broadcaster,
-				builder.executionDataConfig.InitialBlockHeight,
-				highestAvailableHeight,
 				builder.RegistersAsyncStore,
 				builder.EventsIndex,
 				useIndex,
+				builder.chainStateTracker,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
@@ -926,7 +941,6 @@ func FlowAccessNode(nodeBuilder *cmd.FlowNodeBuilder) *FlowAccessNodeBuilder {
 }
 
 func (builder *FlowAccessNodeBuilder) ParseFlags() error {
-
 	builder.BaseFlags()
 
 	builder.extraFlags()
@@ -1162,7 +1176,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"script-execution-max-height",
 			defaultConfig.scriptExecMaxBlock,
 			"highest block height to allow for script execution. default: no limit")
-
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -1528,11 +1541,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("could not parse script execution mode: %w", err)
 			}
 
-			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
-			if err != nil {
-				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
-			}
-
 			eventQueryMode, err := backend.ParseIndexQueryMode(config.BackendConfig.EventQueryMode)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse script execution mode: %w", err)
@@ -1571,13 +1579,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ScriptExecutor:            builder.ScriptExecutor,
 				ScriptExecutionMode:       scriptExecMode,
 				EventQueryMode:            eventQueryMode,
+				ChainStateTracker:         builder.chainStateTracker,
 				SubscriptionParams: backend.SubscriptionParams{
-					Broadcaster:            builder.broadcaster,
-					SendTimeout:            builder.stateStreamConf.ClientSendTimeout,
-					ResponseLimit:          builder.stateStreamConf.ResponseLimit,
-					SendBufferSize:         int(builder.stateStreamConf.ClientSendBufferSize),
-					RootHeight:             builder.executionDataConfig.InitialBlockHeight,
-					HighestAvailableHeight: highestAvailableHeight,
+					Broadcaster:    builder.broadcaster,
+					SendTimeout:    builder.stateStreamConf.ClientSendTimeout,
+					ResponseLimit:  builder.stateStreamConf.ResponseLimit,
+					SendBufferSize: int(builder.stateStreamConf.ClientSendBufferSize),
 				},
 				UseIndex:    useIndex,
 				EventsIndex: builder.EventsIndex,
@@ -1711,7 +1718,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.nodeInfoFile,
 			node.PingService,
 		)
-
 		if err != nil {
 			return nil, fmt.Errorf("could not create ping engine: %w", err)
 		}
@@ -1813,7 +1819,8 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 // - The libp2p node instance for the public network.
 // - Any error encountered during initialization. Any error should be considered fatal.
 func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.PrivateKey, bindAddress string, networkMetrics module.LibP2PMetrics) (p2p.LibP2PNode,
-	error) {
+	error,
+) {
 	connManager, err := connection.NewConnManager(builder.Logger, networkMetrics, &builder.FlowConfig.NetworkConfig.ConnectionManager)
 	if err != nil {
 		return nil, fmt.Errorf("could not create connection manager: %w", err)
@@ -1849,7 +1856,6 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 			return dht.NewDHT(ctx, h, protocols.FlowPublicDHTProtocolID(builder.SporkID), builder.Logger, networkMetrics, dht.AsServer())
 		}).
 		Build()
-
 	if err != nil {
 		return nil, fmt.Errorf("could not build libp2p node for staked access node: %w", err)
 	}

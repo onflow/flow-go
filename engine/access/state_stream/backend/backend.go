@@ -90,27 +90,12 @@ func New(
 	execDataStore execution_data.ExecutionDataStore,
 	execDataCache *cache.ExecutionDataCache,
 	broadcaster *engine.Broadcaster,
-	rootHeight uint64,
-	highestAvailableHeight uint64,
 	registers *execution.RegistersAsyncStore,
 	eventsIndex *index.EventsIndex,
 	useEventsIndex bool,
+	chainStateTracker subscription.ChainStateTracker,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
-
-	chainStateTracker, err := subscription.NewChainStateTracker(
-		logger,
-		state,
-		rootHeight,
-		headers,
-		highestAvailableHeight,
-		broadcaster,
-		eventsIndex,
-		useEventsIndex,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize subscribtion handlear: %w", err)
-	}
 
 	b := &StateStreamBackend{
 		ChainStateTracker:    chainStateTracker,

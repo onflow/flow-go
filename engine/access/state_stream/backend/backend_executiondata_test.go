@@ -34,12 +34,14 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
-var chainID = flow.MonotonicEmulator
-var testEventTypes = []flow.EventType{
-	unittest.EventTypeFixture(chainID),
-	unittest.EventTypeFixture(chainID),
-	unittest.EventTypeFixture(chainID),
-}
+var (
+	chainID        = flow.MonotonicEmulator
+	testEventTypes = []flow.EventType{
+		unittest.EventTypeFixture(chainID),
+		unittest.EventTypeFixture(chainID),
+		unittest.EventTypeFixture(chainID),
+	}
+)
 
 type BackendExecutionDataSuite struct {
 	suite.Suite
@@ -55,13 +57,14 @@ type BackendExecutionDataSuite struct {
 	registersAsync *execution.RegistersAsyncStore
 	eventsIndex    *index.EventsIndex
 
-	bs                blobs.Blobstore
-	eds               execution_data.ExecutionDataStore
-	broadcaster       *engine.Broadcaster
-	execDataCache     *cache.ExecutionDataCache
-	execDataHeroCache *herocache.BlockExecutionData
-	chainStateTracker *subscriptionmock.ChainStateTracker
-	backend           *StateStreamBackend
+	bs                    blobs.Blobstore
+	eds                   execution_data.ExecutionDataStore
+	broadcaster           *engine.Broadcaster
+	execDataCache         *cache.ExecutionDataCache
+	execDataHeroCache     *herocache.BlockExecutionData
+	chainStateTracker     *subscriptionmock.ChainStateTracker
+	backend               *StateStreamBackend
+	chainStateTrackerReal subscription.ChainStateTracker
 
 	blocks      []*flow.Block
 	blockEvents map[flow.Identifier][]flow.Event
@@ -225,14 +228,34 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		s.eds,
 		s.execDataCache,
 		s.broadcaster,
-		s.rootBlock.Header.Height,
-		s.rootBlock.Header.Height, // initialize with no downloaded data
 		s.registersAsync,
+		s.eventsIndex,
+		false,
+		s.chainStateTracker,
+	)
+	require.NoError(s.T(), err)
+
+	// create real chain state tracker to use GetStartHeight from it, instead of mocking
+	s.chainStateTrackerReal, err = subscription.NewChainStateTracker(
+		logger,
+		s.state,
+		s.rootBlock.Header.Height,
+		s.headers,
+		s.rootBlock.Header.Height,
+		s.broadcaster,
 		s.eventsIndex,
 		false,
 	)
 	require.NoError(s.T(), err)
-	s.backend.ChainStateTracker = s.chainStateTracker
+
+	s.chainStateTracker.On(
+		"GetStartHeight",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Return(func(startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error) {
+		return s.chainStateTrackerReal.GetStartHeight(startBlockID, startHeight, blockStatus)
+	}, nil).Maybe()
 }
 
 func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {

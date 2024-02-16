@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
@@ -1618,7 +1619,7 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 
 		state := protocol.NewState(suite.T())
 		state.On("Params").Return(stateParams, nil).Maybe()
-		state.On("Sealed").Return(suite.snapshot, nil).Once()
+		state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 		expected := &accessflow.NodeVersionInfo{
 			Semver:               build.Version(),
@@ -2128,6 +2129,18 @@ func (suite *Suite) defaultBackendParams() Params {
 	suite.snapshot.On("Head").Return(blockHeader, nil).Once()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
 
+	chainStateTracker, err := subscription.NewChainStateTracker(
+		suite.log,
+		suite.state,
+		blockHeader.Height,
+		suite.headers,
+		blockHeader.Height,
+		nil,
+		nil,
+		false,
+	)
+	require.NoError(suite.T(), err)
+
 	return Params{
 		State:                    suite.state,
 		Blocks:                   suite.blocks,
@@ -2145,5 +2158,6 @@ func (suite *Suite) defaultBackendParams() Params {
 		AccessMetrics:            metrics.NewNoopCollector(),
 		Log:                      suite.log,
 		TxErrorMessagesCacheSize: 1000,
+		ChainStateTracker:        chainStateTracker,
 	}
 }

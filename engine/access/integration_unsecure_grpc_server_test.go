@@ -47,19 +47,20 @@ import (
 // on the same port
 type SameGRPCPortTestSuite struct {
 	suite.Suite
-	state          *protocol.State
-	snapshot       *protocol.Snapshot
-	epochQuery     *protocol.EpochQuery
-	log            zerolog.Logger
-	net            *network.EngineRegistry
-	request        *module.Requester
-	collClient     *accessmock.AccessAPIClient
-	execClient     *accessmock.ExecutionAPIClient
-	me             *module.Local
-	chainID        flow.ChainID
-	metrics        *metrics.NoopCollector
-	rpcEng         *rpc.Engine
-	stateStreamEng *statestreambackend.Engine
+	state             *protocol.State
+	snapshot          *protocol.Snapshot
+	epochQuery        *protocol.EpochQuery
+	log               zerolog.Logger
+	net               *network.EngineRegistry
+	request           *module.Requester
+	collClient        *accessmock.AccessAPIClient
+	execClient        *accessmock.ExecutionAPIClient
+	me                *module.Local
+	chainID           flow.ChainID
+	metrics           *metrics.NoopCollector
+	rpcEng            *rpc.Engine
+	stateStreamEng    *statestreambackend.Engine
+	chainStateTracker subscription.ChainStateTracker
 
 	// storage
 	blocks       *storagemock.Blocks
@@ -239,6 +240,20 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		ClientSendBufferSize: subscription.DefaultSendBufferSize,
 	}
 
+	eventIndexer := index.NewEventsIndex(suite.events)
+
+	suite.chainStateTracker, err = subscription.NewChainStateTracker(
+		suite.log,
+		suite.state,
+		rootBlock.Header.Height,
+		suite.headers,
+		rootBlock.Header.Height,
+		suite.broadcaster,
+		eventIndexer,
+		false,
+	)
+	require.NoError(suite.T(), err)
+
 	stateStreamBackend, err := statestreambackend.New(
 		suite.log,
 		conf,
@@ -249,11 +264,10 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		nil,
 		suite.execDataCache,
 		nil,
-		rootBlock.Header.Height,
-		rootBlock.Header.Height,
 		suite.registers,
-		index.NewEventsIndex(suite.events),
+		eventIndexer,
 		false,
+		suite.chainStateTracker,
 	)
 	assert.NoError(suite.T(), err)
 

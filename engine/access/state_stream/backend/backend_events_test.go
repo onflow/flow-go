@@ -234,8 +234,8 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
-	s.backend.useIndex = true
-	s.backend.EventsBackend.getStartHeight = s.chainStateTracker.GetStartHeight
+	// Unset GetStartHeight to mock new behavior instead of default one
+	s.chainStateTracker.On("GetStartHeight", mock.Anything, mock.Anything, mock.Anything).Unset()
 
 	s.Run("returns error for uninitialized index", func() {
 		subCtx, subCancel := context.WithCancel(ctx)

@@ -45,8 +45,10 @@ const DefaultLoggedScriptsCacheSize = 1_000_000
 // DefaultConnectionPoolSize is the default size for the connection pool to collection and execution nodes
 const DefaultConnectionPoolSize = 250
 
-var preferredENIdentifiers flow.IdentifierList
-var fixedENIdentifiers flow.IdentifierList
+var (
+	preferredENIdentifiers flow.IdentifierList
+	fixedENIdentifiers     flow.IdentifierList
+)
 
 // Backend implements the Access API.
 //
@@ -109,6 +111,7 @@ type Params struct {
 	ScriptExecutor            execution.ScriptExecutor
 	ScriptExecutionMode       IndexQueryMode
 	EventQueryMode            IndexQueryMode
+	ChainStateTracker         subscription.ChainStateTracker
 	SubscriptionParams        SubscriptionParams
 
 	EventsIndex *index.EventsIndex
@@ -120,9 +123,6 @@ type SubscriptionParams struct {
 	SendTimeout    time.Duration
 	ResponseLimit  float64
 	SendBufferSize int
-
-	RootHeight             uint64
-	HighestAvailableHeight uint64
 }
 
 // New creates backend instance
@@ -160,23 +160,9 @@ func New(params Params) (*Backend, error) {
 	// initialize node version info
 	nodeInfo := getNodeVersionInfo(params.State.Params())
 
-	chainStateTracker, err := subscription.NewChainStateTracker(
-		params.Log,
-		params.State,
-		params.SubscriptionParams.RootHeight,
-		params.Headers,
-		params.SubscriptionParams.HighestAvailableHeight,
-		params.SubscriptionParams.Broadcaster,
-		params.EventsIndex,
-		params.UseIndex,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize subscribtion handlear: %w", err)
-	}
-
 	b := &Backend{
 		state:             params.State,
-		ChainStateTracker: chainStateTracker,
+		ChainStateTracker: params.ChainStateTracker,
 		// create the sub-backends
 		backendScripts: backendScripts{
 			log:               params.Log,
@@ -263,8 +249,12 @@ func New(params Params) (*Backend, error) {
 		chainID:           params.ChainID,
 		nodeInfo:          nodeInfo,
 	}
-	b.backendSubscribeBlocks.getStartHeight = b.GetStartHeight
-	b.backendSubscribeBlocks.getHighestHeight = b.GetHighestHeight
+
+	// NOTE: The ChainStateTracker is currently only used by the access node and not by the observer node.
+	if params.ChainStateTracker != nil {
+		b.backendSubscribeBlocks.getStartHeight = b.GetStartHeight
+		b.backendSubscribeBlocks.getHighestHeight = b.GetHighestHeight
+	}
 
 	retry.SetBackend(b)
 
@@ -294,7 +284,6 @@ func NewCache(
 		log.Debug().Str("grpc_conn_evicted", client.Address).Msg("closing grpc connection evicted from pool")
 		metrics.ConnectionFromPoolEvicted()
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
 	}
@@ -333,7 +322,6 @@ func configureTransactionValidator(state protocol.State, chainID flow.ChainID) *
 
 // Ping responds to requests when the server is up.
 func (b *Backend) Ping(ctx context.Context) error {
-
 	// staticCollectionRPC is only set if a collection node address was provided at startup
 	if b.staticCollectionRPC != nil {
 		_, err := b.staticCollectionRPC.Ping(ctx, &accessproto.PingRequest{})
@@ -402,7 +390,6 @@ func executionNodesForBlockID(
 	state protocol.State,
 	log zerolog.Logger,
 ) (flow.IdentitySkeletonList, error) {
-
 	var (
 		executorIDs flow.IdentifierList
 		err         error
@@ -443,7 +430,7 @@ func executionNodesForBlockID(
 			case <-ctx.Done():
 				return nil, ctx.Err()
 			case <-time.After(100 * time.Millisecond << time.Duration(attempt)):
-				//retry after an exponential backoff
+				// retry after an exponential backoff
 			}
 		}
 
@@ -478,7 +465,6 @@ func findAllExecutionNodes(
 	executionReceipts storage.ExecutionReceipts,
 	log zerolog.Logger,
 ) (flow.IdentifierList, error) {
-
 	// lookup the receipt's storage with the block ID
 	allReceipts, err := executionReceipts.ByBlockID(blockID)
 	if err != nil {
@@ -535,7 +521,6 @@ func findAllExecutionNodes(
 // e.g. If execution nodes in identity table are {1,2,3,4}, preferred ENs are defined as {2,3,4}
 // and the executor IDs is {1,2,3}, then {2, 3} is returned as the chosen subset of ENs
 func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList) (flow.IdentitySkeletonList, error) {
-
 	allENs, err := state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive all execution IDs: %w", err)
