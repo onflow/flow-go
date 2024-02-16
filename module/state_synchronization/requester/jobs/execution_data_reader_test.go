@@ -91,7 +91,7 @@ func (suite *ExecutionDataReaderSuite) reset() {
 	)
 
 	suite.downloader = new(exedatamock.Downloader)
-	executionDataCacheSize := uint32(100) // Use local value to avoid cycle dependency on subscription package
+	var executionDataCacheSize uint32 = 100 // Use local value to avoid cycle dependency on subscription package
 
 	heroCache := herocache.NewBlockExecutionData(executionDataCacheSize, unittest.Logger(), metrics.NewNoopCollector())
 	cache := cache.NewExecutionDataCache(suite.downloader, suite.headers, suite.seals, suite.results, heroCache)
