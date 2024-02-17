@@ -108,9 +108,9 @@ func TestEVMAddressDeposit(t *testing.T) {
 					let vault <- minter.mintTokens(amount: 1.23)
 					destroy minter
 
-					let bridgedAccount <- EVM.createBridgedAccount()
-					bridgedAccount.deposit(from: <-vault)
-					destroy bridgedAccount
+					let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+					cadenceOwnedAccount.deposit(from: <-vault)
+					destroy cadenceOwnedAccount
 				}
                 `,
 				sc.EVMContract.Address.HexWithPrefix(),
@@ -158,14 +158,14 @@ func TestCOAWithdraw(t *testing.T) {
 					let vault <- minter.mintTokens(amount: 2.34)
 					destroy minter
 
-					let bridgedAccount <- EVM.createBridgedAccount()
-					bridgedAccount.deposit(from: <-vault)
+					let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+					cadenceOwnedAccount.deposit(from: <-vault)
 
 					let bal = EVM.Balance(attoflow: 0)
 					bal.setFLOW(flow: 1.23)
-					let vault2 <- bridgedAccount.withdraw(balance: bal)
+					let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
 					let balance = vault2.balance
-					destroy bridgedAccount
+					destroy cadenceOwnedAccount
 					destroy vault2
 
 					return balance
@@ -190,7 +190,7 @@ func TestCOAWithdraw(t *testing.T) {
 		})
 }
 
-func TestBridgedAccountDeploy(t *testing.T) {
+func TestCadenceOwnedAccountDeploy(t *testing.T) {
 	t.Parallel()
 	chain := flow.Emulator.Chain()
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
@@ -215,15 +215,15 @@ func TestBridgedAccountDeploy(t *testing.T) {
 					let vault <- minter.mintTokens(amount: 2.34)
 					destroy minter
 
-					let bridgedAccount <- EVM.createBridgedAccount()
-					bridgedAccount.deposit(from: <-vault)
+					let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+					cadenceOwnedAccount.deposit(from: <-vault)
 
-					let address = bridgedAccount.deploy(
+					let address = cadenceOwnedAccount.deploy(
 						code: [],
 						gasLimit: 53000,
 						value: EVM.Balance(attoflow: 1230000000000000000)
 					)
-					destroy bridgedAccount
+					destroy cadenceOwnedAccount
 					return address.bytes
 				}
                 `,
@@ -330,16 +330,16 @@ func TestCadenceArch(t *testing.T) {
 
 					transaction {
 						prepare(account: auth(Capabilities, SaveValue) &Account) {
-							let bridgedAccount1 <- EVM.createBridgedAccount()
+							let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
 
-							account.storage.save<@EVM.BridgedAccount>(
-							    <-bridgedAccount1,
-							    to: /storage/bridgedAccount
-							)
+							account.storage.save(
+                                <-cadenceOwnedAccount,
+								to: /storage/coa
+                            )
 
-							let bridgedAccount = account.capabilities.storage
-							    .issue<&EVM.BridgedAccount>(/storage/bridgedAccount)
-							account.capabilities.publish(bridgedAccount, at: /public/bridgedAccount)
+							let cap = account.capabilities.storage
+							    .issue<&EVM.CadenceOwnedAccount>(/storage/coa)
+							account.capabilities.publish(cap, at: /public/coa)
 						}
 					}
                 `,
@@ -356,7 +356,7 @@ func TestCadenceArch(t *testing.T) {
 				require.NoError(t, output.Err)
 				snapshot = snapshot.Append(es)
 
-				// 3rd event is the bridged account created event
+				// 3rd event is the cadence owned account created event
 				coaAddress, err := types.COAAddressFromFlowEvent(sc.EVMContract.Address, output.Events[2])
 				require.NoError(t, err)
 
@@ -371,7 +371,7 @@ func TestCadenceArch(t *testing.T) {
 				proof := types.COAOwnershipProof{
 					KeyIndices:     []uint64{0},
 					Address:        types.FlowAddress(account),
-					CapabilityPath: "bridgedAccount",
+					CapabilityPath: "coa",
 					Signatures:     []types.Signature{types.Signature(sig)},
 				}
 
