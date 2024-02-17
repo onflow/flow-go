@@ -136,8 +136,6 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 
 	reporter := newValueMigrationReporter(m.reporter, m.log, m.errorMessageHandler)
 
-	m.log.Info().Msg("Migrating cadence values")
-
 	migration.Migrate(
 		&migrations.AddressSliceIterator{
 			Addresses: []common.Address{
@@ -150,7 +148,6 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		),
 	)
 
-	m.log.Info().Msg("Committing changes")
 	err = migration.Commit()
 	if err != nil {
 		return nil, fmt.Errorf("failed to commit changes: %w", err)
