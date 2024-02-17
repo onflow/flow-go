@@ -72,7 +72,7 @@ func TestEVMEventsCCFEncodingDecoding(t *testing.T) {
 			},
 		}
 		txResult := &types.Result{
-			Failed:                  false,
+			VMError:                 nil,
 			TxType:                  255,
 			GasConsumed:             23200,
 			DeployedContractAddress: types.EmptyAddress,
