@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
@@ -56,13 +57,14 @@ func TestEVMEventsCCFEncodingDecoding(t *testing.T) {
 
 		txEncoded, err := hex.DecodeString("fff83b81ff0194000000000000000000000000000000000000000094000000000000000000000000000000000000000180895150ae84a8cdf00000825208")
 		require.NoError(t, err)
-		txHash := gethCommon.HexToHash("0xf3593c3eb9ac1125f31acfa5520877f223279f6238a670936e65a710ccd44641")
+		txHash := testutils.RandomCommonHash(t)
+		blockHash := testutils.RandomCommonHash(t)
 		data, err := hex.DecodeString("000000000000000000000000000000000000000000000000000000000000002a")
 		require.NoError(t, err)
 		log := &gethTypes.Log{
 			Index:       0,
 			BlockNumber: 2,
-			BlockHash:   gethCommon.HexToHash("0xf3593c3eb9ac1125f31acfa5520877f223279f6238a670936e65a710ccd44641"),
+			BlockHash:   blockHash,
 			TxHash:      txHash,
 			TxIndex:     0,
 			Address:     gethCommon.HexToAddress("0x99466ed2e37b892a2ee3e9cd55a98b68f5735db2"),
@@ -83,6 +85,7 @@ func TestEVMEventsCCFEncodingDecoding(t *testing.T) {
 		event := types.NewTransactionExecutedEvent(
 			2,
 			txEncoded,
+			blockHash,
 			txHash,
 			txResult,
 		)
