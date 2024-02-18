@@ -27,7 +27,7 @@ type ContractHandler interface {
 
 	// AccountByAddress returns an account by address
 	// if isAuthorized is set, it allows for functionality like `call`, `deploy`
-	// should only be set for bridged accounts only.
+	// should only be set for the cadence owned accounts only.
 	AccountByAddress(address Address, isAuthorized bool) Account
 
 	// LastExecutedBlock returns information about the last executed block

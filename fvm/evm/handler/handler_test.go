@@ -77,6 +77,12 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 						big.NewInt(1),
 					)
 
+					// calculate tx id to match it
+					var evmTx gethTypes.Transaction
+					err := evmTx.UnmarshalBinary(tx)
+					require.NoError(t, err)
+					result.TxHash = evmTx.Hash()
+
 					// successfully run (no-panic)
 					handler.RunOrPanic(tx, coinbase)
 
@@ -117,7 +123,25 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					// check block event
 					event = events[1]
 					assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
-					_, err = jsoncdc.Decode(nil, event.Payload)
+					ev, err = jsoncdc.Decode(nil, event.Payload)
+					require.NoError(t, err)
+
+					// make sure block transaction list references the above transaction id
+					cadenceEvent, ok = ev.(cadence.Event)
+					require.True(t, ok)
+
+					for j, f := range cadenceEvent.GetFields() {
+						if f.Identifier == "transactionHashes" {
+							txsRaw := cadenceEvent.GetFieldValues()[j]
+							txs, ok := txsRaw.(cadence.Array)
+							require.True(t, ok)
+							// we know there's only one tx for now in block
+							eventTxID := txs.Values[0].ToGoValue().(string)
+							// make sure the transaction id included in the block transaction list is the same as tx sumbmitted
+							assert.Equal(t, evmTx.Hash().String(), eventTxID)
+						}
+					}
+
 					require.NoError(t, err)
 				})
 			})
@@ -195,7 +219,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 							},
 						}
 						handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, em)
-						assertPanic(t, isFatal, func() {
+						assertPanic(t, errors.IsFailure, func() {
 							tx := eoa.PrepareSignAndEncodeTx(
 								t,
 								gethCommon.Address{},
@@ -775,12 +799,8 @@ func TestHandler_TransactionRun(t *testing.T) {
 // returns true if error passes the checks
 type checkError func(error) bool
 
-var isFatal = func(err error) bool {
-	return errors.IsFailure(err)
-}
-
 var isNotFatal = func(err error) bool {
-	return !isFatal(err)
+	return !errors.IsFailure(err)
 }
 
 func assertPanic(t *testing.T, check checkError, f func()) {
