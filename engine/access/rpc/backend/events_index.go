@@ -25,6 +25,9 @@ func NewEventsIndex(events storage.Events) *EventsIndex {
 	}
 }
 
+// Initialize replaces nil value with actual reporter instance
+// Expected errors:
+// - If the reporter was already initialized, return error
 func (e *EventsIndex) Initialize(indexReporter state_synchronization.IndexReporter) error {
 	if e.reporter.CompareAndSwap(nil, &indexReporter) {
 		return nil

@@ -1085,7 +1085,7 @@ func (b *backendTransactions) LookupErrorMessageByIndex(
 	height uint64,
 	index uint32,
 ) (string, error) {
-	txResult, err := b.txResultsIndex.GetResultsByBlockIDTransactionIndex(blockID, height, index)
+	txResult, err := b.txResultsIndex.ByBlockIDTransactionIndex(blockID, height, index)
 	if err != nil {
 		return "", rpc.ConvertStorageError(err)
 	}

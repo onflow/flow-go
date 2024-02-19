@@ -45,6 +45,8 @@ type TransactionsLocalDataProvider struct {
 // Expected errors during normal operation:
 //   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
 //   - codes.Internal: Event payload conversion failed.
+//   - indexer.ErrIndexNotInitialized: txResultsIndex not initialized
+//   - storage.ErrHeightNotIndexed: txResultsIndex return it when data is unavailable
 //   - All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
 //     getter or when deriving transaction status.
 func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
@@ -54,9 +56,9 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*access.TransactionResult, error) {
 	blockID := block.ID()
-	txResult, err := t.txResultsIndex.GetResultsByBlockIDTransactionID(blockID, block.Header.Height, transactionID)
+	txResult, err := t.txResultsIndex.ByBlockIDTransactionID(blockID, block.Header.Height, transactionID)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, rpc.ConvertIndexError(err, block.Header.Height, "failed to get transaction result")
 	}
 
 	var txErrorMessage string
@@ -109,6 +111,8 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 // Expected errors during normal operation:
 //   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
 //   - codes.Internal: Event payload conversion failed.
+//   - indexer.ErrIndexNotInitialized: txResultsIndex not initialized
+//   - storage.ErrHeightNotIndexed: txResultsIndex return it when data is unavailable
 //   - All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
 //     getter or when deriving transaction status.
 func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorage(
@@ -119,7 +123,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 	blockID := block.ID()
 	txResults, err := t.txResultsIndex.ByBlockID(blockID, block.Header.Height)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, rpc.ConvertIndexError(err, block.Header.Height, "failed to get transaction result")
 	}
 
 	txErrors, err := t.txErrorMessages.LookupErrorMessagesByBlockID(ctx, blockID, block.Header.Height)
@@ -190,6 +194,8 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 // Expected errors during normal operation:
 //   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
 //   - codes.Internal: Event payload conversion failed.
+//   - indexer.ErrIndexNotInitialized: txResultsIndex not initialized
+//   - storage.ErrHeightNotIndexed: txResultsIndex return it when data is unavailable
 //   - All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
 //     getter or when deriving transaction status.
 func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
@@ -199,9 +205,9 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*access.TransactionResult, error) {
 	blockID := block.ID()
-	txResult, err := t.txResultsIndex.GetResultsByBlockIDTransactionIndex(blockID, block.Header.Height, index)
+	txResult, err := t.txResultsIndex.ByBlockIDTransactionIndex(blockID, block.Header.Height, index)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, rpc.ConvertIndexError(err, block.Header.Height, "failed to get transaction result")
 	}
 
 	var txErrorMessage string

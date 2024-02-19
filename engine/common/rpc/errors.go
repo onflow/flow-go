@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -64,6 +65,27 @@ func ConvertStorageError(err error) error {
 	}
 
 	return status.Errorf(codes.Internal, "failed to find: %v", err)
+}
+
+// convertIndexError converts errors related to index to a gRPC error
+func ConvertIndexError(err error, height uint64, defaultMsg string) error {
+	if err == nil {
+		return nil
+	}
+
+	if errors.Is(err, indexer.ErrIndexNotInitialized) {
+		return status.Errorf(codes.FailedPrecondition, "data for block is not available: %v", err)
+	}
+
+	if errors.Is(err, storage.ErrHeightNotIndexed) {
+		return status.Errorf(codes.OutOfRange, "data for block height %d is not available", height)
+	}
+
+	if errors.Is(err, storage.ErrNotFound) {
+		return status.Errorf(codes.NotFound, "data not found: %v", err)
+	}
+
+	return ConvertError(err, defaultMsg, codes.Internal)
 }
 
 // ConvertMultiError converts a multierror to a grpc status error.

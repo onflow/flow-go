@@ -25,6 +25,9 @@ func NewTransactionResultsIndex(results storage.LightTransactionResults) *Transa
 	}
 }
 
+// Initialize replaces nil value with actual reporter instance
+// Expected errors:
+// - If the reporter was already initialized, return error
 func (t *TransactionResultsIndex) Initialize(indexReporter state_synchronization.IndexReporter) error {
 	if t.reporter.CompareAndSwap(nil, &indexReporter) {
 		return nil
@@ -40,7 +43,7 @@ func (t *TransactionResultsIndex) ByBlockID(blockID flow.Identifier, height uint
 	return t.results.ByBlockID(blockID)
 }
 
-func (t *TransactionResultsIndex) GetResultsByBlockIDTransactionID(blockID flow.Identifier, height uint64, txID flow.Identifier) (*flow.LightTransactionResult, error) {
+func (t *TransactionResultsIndex) ByBlockIDTransactionID(blockID flow.Identifier, height uint64, txID flow.Identifier) (*flow.LightTransactionResult, error) {
 	if err := t.checkDataAvailable(height); err != nil {
 		return nil, err
 	}
@@ -48,7 +51,7 @@ func (t *TransactionResultsIndex) GetResultsByBlockIDTransactionID(blockID flow.
 	return t.results.ByBlockIDTransactionID(blockID, txID)
 }
 
-func (t *TransactionResultsIndex) GetResultsByBlockIDTransactionIndex(blockID flow.Identifier, height uint64, index uint32) (*flow.LightTransactionResult, error) {
+func (t *TransactionResultsIndex) ByBlockIDTransactionIndex(blockID flow.Identifier, height uint64, index uint32) (*flow.LightTransactionResult, error) {
 	if err := t.checkDataAvailable(height); err != nil {
 		return nil, err
 	}
@@ -58,7 +61,7 @@ func (t *TransactionResultsIndex) GetResultsByBlockIDTransactionIndex(blockID fl
 
 // LowestIndexedHeight returns the lowest height indexed by the execution state indexer.
 // Expected errors:
-// - indexer.ErrIndexNotInitialized: if the EventsIndex has not been initialized
+// - indexer.ErrIndexNotInitialized: if the TransactionResultsIndex has not been initialized
 func (t *TransactionResultsIndex) LowestIndexedHeight() (uint64, error) {
 	reporter, err := t.getReporter()
 	if err != nil {
@@ -70,7 +73,7 @@ func (t *TransactionResultsIndex) LowestIndexedHeight() (uint64, error) {
 
 // HighestIndexedHeight returns the highest height indexed by the execution state indexer.
 // Expected errors:
-// - indexer.ErrIndexNotInitialized: if the EventsIndex has not been initialized
+// - indexer.ErrIndexNotInitialized: if the TransactionResultsIndex has not been initialized
 func (t *TransactionResultsIndex) HighestIndexedHeight() (uint64, error) {
 	reporter, err := t.getReporter()
 	if err != nil {
