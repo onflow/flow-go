@@ -46,6 +46,7 @@ func ContractCode(flowTokenAddress flow.Address, evmAbiOnly bool) []byte {
 const ContractName = "EVM"
 const evmAddressTypeBytesFieldName = "bytes"
 const evmAddressTypeQualifiedIdentifier = "EVM.EVMAddress"
+const evmBalanceTypeQualifiedIdentifier = "EVM.Balance"
 const evmResultTypeQualifiedIdentifier = "EVM.Result"
 const evmStatusTypeQualifiedIdentifier = "EVM.Status"
 
@@ -928,7 +929,7 @@ var internalEVMTypeRunFunctionType = &sema.FunctionType{
 			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
 		},
 	},
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 
 func newInternalEVMTypeRunFunction(
@@ -1736,7 +1737,7 @@ func NewEVMAddressCadenceType(address common.Address) *cadence.StructType {
 func NewBalanceCadenceType(address common.Address) *cadence.StructType {
 	return cadence.NewStructType(
 		common.NewAddressLocation(nil, address, ContractName),
-		"EVM.Balance",
+		evmBalanceTypeQualifiedIdentifier,
 		[]cadence.Field{
 			{
 				Identifier: "attoflow",
