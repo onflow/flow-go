@@ -4,27 +4,26 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
-
-	"github.com/onflow/flow-go/storage"
-
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
 	access "github.com/onflow/flow-go/engine/access/mock"
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	subscriptionmock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/metrics"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
 type TransactionStatusSuite struct {
@@ -51,6 +50,7 @@ type TransactionStatusSuite struct {
 
 	connectionFactory *connectionmock.ConnectionFactory
 	communicator      *backendmock.Communicator
+	chainStateTracker *subscriptionmock.ChainStateTracker
 
 	chainID flow.ChainID
 
@@ -102,13 +102,10 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.connectionFactory = connectionmock.NewConnectionFactory(s.T())
 	s.communicator = new(backendmock.Communicator)
 	s.broadcaster = engine.NewBroadcaster()
+	s.chainStateTracker = subscriptionmock.NewChainStateTracker(s.T())
 
 	// generate blockCount consecutive blocks with associated seal, result and execution data
-	rootBlockHeader := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	s.rootBlock = unittest.BlockFixture()
-	rootBlockHeader.PayloadHash = s.rootBlock.Header.PayloadHash
-	s.rootBlock.Header = rootBlockHeader
-
 	s.sealedBlock = &s.rootBlock
 	s.finalizedBlock = unittest.BlockWithParentFixture(s.sealedBlock.Header)
 	s.blocksArray = []*flow.Block{
@@ -137,7 +134,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 					return nil
 				}
 				return storage.ErrNotFound
-			})
+			}).Maybe()
 
 	s.seals.On("HighestInFork", mock.AnythingOfType("flow.Identifier")).Return(
 		func(_ flow.Identifier) (*flow.Seal, error) {
@@ -195,7 +192,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 
 	s.state.On("Sealed").Return(s.sealedSnapshot, nil).Maybe()
 	s.state.On("Final").Return(s.finalSnapshot, nil).Maybe()
-	s.state.On("AtBlockID", s.finalizedBlock.ID()).Return(s.finalSnapshot, nil)
+	s.state.On("AtBlockID", mock.Anything).Return(s.finalSnapshot, nil)
 
 	s.sealedSnapshot.On("Head").Return(func() *flow.Header {
 		return s.sealedBlock.Header
@@ -204,12 +201,18 @@ func (s *TransactionStatusSuite) SetupTest() {
 		return s.finalizedBlock.Header
 	}, nil).Maybe()
 
+	s.chainStateTracker.On("GetStartHeight", mock.Anything, mock.Anything, mock.Anything).Return(func(id flow.Identifier, _ uint64, _ flow.BlockStatus) (uint64, error) {
+		finalizedHeader := s.finalizedBlock.Header
+		return finalizedHeader.Height, nil
+	}, nil).Once()
+	s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).Return(func(_ flow.BlockStatus) (uint64, error) {
+		finalizedHeader := s.finalizedBlock.Header
+		return finalizedHeader.Height, nil
+	}, nil)
+
 	var err error
 	s.backend, err = New(s.backendParams())
 	require.NoError(s.T(), err)
-
-	s.backend.SetFinalizedHighestHeight(s.finalizedBlock.Header.Height)
-	s.backend.SetSealedHighestHeight(s.sealedBlock.Header.Height)
 }
 
 // backendParams returns the Params configuration for the backend.
@@ -231,14 +234,12 @@ func (s *TransactionStatusSuite) backendParams() Params {
 		AccessMetrics:            metrics.NewNoopCollector(),
 		Log:                      s.log,
 		TxErrorMessagesCacheSize: 1000,
+		ChainStateTracker:        s.chainStateTracker,
 		SubscriptionParams: SubscriptionParams{
-			SendTimeout:            subscription.DefaultSendTimeout,
-			SendBufferSize:         subscription.DefaultSendBufferSize,
-			ResponseLimit:          subscription.DefaultResponseLimit,
-			Broadcaster:            s.broadcaster,
-			RootHeight:             s.rootBlock.Header.Height,
-			HighestAvailableHeight: s.rootBlock.Header.Height,
-			Seals:                  s.seals,
+			SendTimeout:    subscription.DefaultSendTimeout,
+			SendBufferSize: subscription.DefaultSendBufferSize,
+			ResponseLimit:  subscription.DefaultResponseLimit,
+			Broadcaster:    s.broadcaster,
 		},
 	}
 }
@@ -249,13 +250,13 @@ func (s *TransactionStatusSuite) addNewFinalizedBlock(parent *flow.Header, optio
 		option(s.finalizedBlock)
 	}
 
-	s.state.On("AtBlockID", s.finalizedBlock.ID()).Return(s.finalSnapshot, nil)
+	s.state.On("AtBlockID", mock.Anything).Unset()
+	s.state.On("AtBlockID", mock.Anything).Return(s.finalSnapshot, nil)
 
 	s.blocksArray = append(s.blocksArray, s.finalizedBlock)
 	s.blockMap[s.finalizedBlock.Header.Height] = s.finalizedBlock
 
-	err := s.backend.ProcessSubscriptionOnFinalizedBlock(s.finalizedBlock.Header)
-	require.NoError(s.T(), err)
+	s.broadcaster.Publish()
 }
 
 // TestSubscribeTransactionStatus tests the functionality of the SendAndSubscribeTransactionStatuses method in the Backend.
@@ -268,26 +269,29 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatus() {
 	transaction := unittest.TransactionFixture()
 	transaction.SetReferenceBlockID(s.finalizedBlock.ID())
 	txId := transaction.ID()
-
-	expectedMsg := uint64(0)
+	expectedMsgIndexCounter := counters.NewMonotonousCounter(0)
 
 	// Create a special common function to read subscription messages from the channel and check converting it to transaction info
 	// and check results for correctness
 	checkNewSubscriptionMessage := func(sub subscription.Subscription, expectedTxStatus flow.TransactionStatus) {
+		s.log.Debug().Msg(fmt.Sprintf("!!! checkNewSubscriptionMessage: %s", expectedTxStatus.String()))
 		unittest.RequireReturnsBefore(s.T(), func() {
-			v, ok := <-sub.Channel()
-			require.True(s.T(), ok,
-				"channel closed while waiting for transaction info:\n\t- txID %v\n\t- blockID: %v \n\t- err: %v",
-				txId, s.finalizedBlock.ID(), sub.Err())
-			txInfo, ok := v.(*convert.TransactionSubscribeInfo)
+		v, ok := <-sub.Channel()
+		require.True(s.T(), ok,
+			"channel closed while waiting for transaction info:\n\t- txID %x\n\t- blockID: %x \n\t- err: %v",
+			txId, s.finalizedBlock.ID(), sub.Err())
 
-			require.True(s.T(), ok, "unexpected response type: %T", v)
-			assert.Equal(s.T(), txId, txInfo.ID)
-			assert.Equal(s.T(), expectedTxStatus, txInfo.Status)
-			assert.Equal(s.T(), expectedMsg, txInfo.MessageIndex)
-		}, time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %v\n\t- blockID: %v", txId, s.finalizedBlock.ID()))
+		txInfo, ok := v.(*convert.TransactionSubscribeInfo)
+		require.True(s.T(), ok, "unexpected response type: %T", v)
 
-		expectedMsg++
+		assert.Equal(s.T(), txId, txInfo.ID)
+		assert.Equal(s.T(), expectedTxStatus, txInfo.Status)
+
+		expectedMsgIndex := expectedMsgIndexCounter.Value()
+		assert.Equal(s.T(), expectedMsgIndex, txInfo.MessageIndex)
+		wasSet := expectedMsgIndexCounter.Set(expectedMsgIndex + 1)
+		require.True(s.T(), wasSet)
+		}, time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
 	}
 
 	// 1. Subscribe to transaction status and receive the first message with pending status
@@ -320,8 +324,8 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatus() {
 
 	// 5. Stop subscription
 	cancel()
-
-	// Ensure subscription shuts down gracefully
+	
+	Ensure subscription shuts down gracefully
 	unittest.RequireReturnsBefore(s.T(), func() {
 		v, ok := <-sub.Channel()
 		assert.Nil(s.T(), v)

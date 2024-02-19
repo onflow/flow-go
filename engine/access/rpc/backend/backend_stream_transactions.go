@@ -70,9 +70,7 @@ func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(ctx c
 	sub := subscription.NewHeightBasedSubscription(
 		b.sendBufferSize,
 		nextHeight,
-		func(_ context.Context, height uint64) (interface{}, error) {
-			return b.backendSubscribeTransactions(&txInfo, height)
-		},
+		b.backendSubscribeTransactions(&txInfo),
 	)
 
 	go subscription.NewStreamer(b.log, b.Broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
@@ -80,57 +78,54 @@ func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(ctx c
 	return sub
 }
 
-func (b *backendSubscribeTransactions) backendSubscribeTransactions(
-	txInfo *TransactionSubscriptionMetadata,
-	height uint64,
-) (interface{}, error) {
-	highestHeight, err := b.getHighestHeight(flow.BlockStatusFinalized)
-	if err != nil {
-		return nil, fmt.Errorf("could not get highest height for block %d: %w", height, err)
-	}
+func (b *backendSubscribeTransactions) backendSubscribeTransactions(txInfo *TransactionSubscriptionMetadata) func(context.Context, uint64) (interface{}, error) {
+	return func(_ context.Context, height uint64) (interface{}, error) {
+		executed := txInfo.blockWithTx != nil
+		if !executed {
+			highestHeight, err := b.getHighestHeight(flow.BlockStatusFinalized)
+			
+			if err != nil {
+				return nil, fmt.Errorf("could not get highest height for block %d: %w", height, err)
+			}
 
-	// fail early if no notification has been received for the given block height.
-	// note: it's possible for the data to exist in the data store before the notification is
-	// received. this ensures a consistent view is available to all streams.
-	if height > highestHeight {
-		return nil, fmt.Errorf("block %d is not available yet: %w", height, storage.ErrNotFound)
-	}
+			// fail early if no notification has been received for the given block height.
+			if height > highestHeight {
+				return nil, fmt.Errorf("block %d is not available yet: %w", height, storage.ErrNotFound)
+			}
 
-	executed := txInfo.blockWithTx != nil
-	if !executed {
-		// since we are querying a finalized or sealed block, we can use the height index and save an ID computation
-		block, err := b.blocks.ByHeight(height)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "could not get block by height: %v", err)
-		}
+			// since we are querying a finalized or sealed block, we can use the height index and save an ID computation
+			block, err := b.blocks.ByHeight(height)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "could not get block by height: %v", err)
+			}
 
-		result, err := b.results.ByBlockIDTransactionID(block.ID(), txInfo.txID)
-		if err != nil {
-			err = rpc.ConvertStorageError(err)
-			if status.Code(err) != codes.NotFound {
-				return nil, err
+			result, err := b.results.ByBlockIDTransactionID(block.ID(), txInfo.txID)
+			if err != nil {
+				err = rpc.ConvertStorageError(err)
+				if status.Code(err) != codes.NotFound {
+					return nil, err
+				}
+			}
+
+			if result != nil {
+				txInfo.blockWithTx = block
 			}
 		}
 
-		if result != nil {
-			txInfo.blockWithTx = block
+		txStatus, err := b.deriveTransactionStatus(txInfo.txBody, executed, txInfo.blockWithTx)
+		if err != nil {
+			return nil, rpc.ConvertStorageError(err)
 		}
-	}
 
-	txStatus, err := b.deriveTransactionStatus(txInfo.txBody, executed, txInfo.blockWithTx)
-	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
-	}
+		messageIndex := txInfo.messageIndex.Value()
+		if ok := txInfo.messageIndex.Set(messageIndex + 1); !ok {
+			b.log.Debug().Msg("message index already incremented")
+		}
 
-	response := &convert.TransactionSubscribeInfo{
-		ID:           txInfo.txID,
-		Status:       txStatus,
-		MessageIndex: txInfo.messageIndex.Value(),
+		return &convert.TransactionSubscribeInfo{
+			ID:           txInfo.txID,
+			Status:       txStatus,
+			MessageIndex: messageIndex,
+		}, nil
 	}
-
-	if ok := txInfo.messageIndex.Set(txInfo.messageIndex.Value() + 1); !ok {
-		b.log.Debug().Msg("message index already incremented")
-	}
-
-	return response, nil
 }
