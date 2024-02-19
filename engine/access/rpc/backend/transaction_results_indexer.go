@@ -35,6 +35,11 @@ func (t *TransactionResultsIndex) Initialize(indexReporter state_synchronization
 	return fmt.Errorf("index reporter already initialized")
 }
 
+// ByBlockID checks data availability and returns all transaction results for a block
+// Expected errors:
+//   - indexer.ErrIndexNotInitialized: if the TransactionResultsIndex has not been initialized
+//   - storage.ErrHeightNotIndexed: returned, when data is unavailable
+//   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
 func (t *TransactionResultsIndex) ByBlockID(blockID flow.Identifier, height uint64) ([]flow.LightTransactionResult, error) {
 	if err := t.checkDataAvailable(height); err != nil {
 		return nil, err
@@ -43,6 +48,11 @@ func (t *TransactionResultsIndex) ByBlockID(blockID flow.Identifier, height uint
 	return t.results.ByBlockID(blockID)
 }
 
+// ByBlockIDTransactionID checks data availability and return the transaction result for the given block ID and transaction ID
+// Expected errors:
+//   - indexer.ErrIndexNotInitialized: if the TransactionResultsIndex has not been initialized
+//   - storage.ErrHeightNotIndexed: returned, when data is unavailable
+//   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
 func (t *TransactionResultsIndex) ByBlockIDTransactionID(blockID flow.Identifier, height uint64, txID flow.Identifier) (*flow.LightTransactionResult, error) {
 	if err := t.checkDataAvailable(height); err != nil {
 		return nil, err
@@ -51,6 +61,11 @@ func (t *TransactionResultsIndex) ByBlockIDTransactionID(blockID flow.Identifier
 	return t.results.ByBlockIDTransactionID(blockID, txID)
 }
 
+// ByBlockIDTransactionIndex checks data availability and return the transaction result for the given blockID and transaction index
+// Expected errors:
+//   - indexer.ErrIndexNotInitialized: if the TransactionResultsIndex has not been initialized
+//   - storage.ErrHeightNotIndexed: returned, when data is unavailable
+//   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
 func (t *TransactionResultsIndex) ByBlockIDTransactionIndex(blockID flow.Identifier, height uint64, index uint32) (*flow.LightTransactionResult, error) {
 	if err := t.checkDataAvailable(height); err != nil {
 		return nil, err
