@@ -109,6 +109,9 @@ const (
 	// PrimaryAN is the container name for the primary access node to use for API requests
 	PrimaryAN = "access_1"
 
+	// PrimaryON is the container name for the primary observer node to use for API requests
+	PrimaryON = "observer_1"
+
 	DefaultViewsInStakingAuction      uint64 = 5
 	DefaultViewsInDKGPhase            uint64 = 50
 	DefaultViewsInEpoch               uint64 = 200
@@ -1137,6 +1140,8 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		Participants:       participants.ToSkeleton(),
 		Assignments:        clusterAssignments,
 		RandomSource:       randomSource,
+		TargetDuration:     networkConf.ViewsInEpoch, // 1view/s
+		TargetEndTime:      uint64(time.Now().Unix()) + networkConf.ViewsInEpoch,
 	}
 
 	epochCommit := &flow.EpochCommit{
@@ -1175,6 +1180,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		trieDir,
 		unittest.ServiceAccountPublicKey,
 		chain,
+		fvm.WithRootBlock(root.Header),
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),

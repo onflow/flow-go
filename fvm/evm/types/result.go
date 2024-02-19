@@ -1,6 +1,7 @@
 package types
 
 import (
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -12,8 +13,7 @@ import (
 // but we take a different apporach here and include more data so that
 // it requires less work for anyone who tracks and consume results.
 type Result struct {
-	// a boolean that is set to false if the execution has failed (non-fatal)
-	Failed bool
+	VMError error
 	// type of transaction defined by the evm package
 	// see DirectCallTxType as extra type we added type for direct calls.
 	TxType uint8
@@ -25,6 +25,19 @@ type Result struct {
 	ReturnedValue []byte
 	// EVM logs (events that are emited by evm)
 	Logs []*gethTypes.Log
+	// TX hash holdes the cached value of tx hash
+	TxHash gethCommon.Hash
+}
+
+func (res *Result) Failed() bool {
+	return res.VMError != nil
+}
+
+func (res *Result) VMErrorString() string {
+	if res.VMError != nil {
+		return res.VMError.Error()
+	}
+	return ""
 }
 
 // Receipt constructs an EVM-style receipt
@@ -36,7 +49,7 @@ func (res *Result) Receipt() *gethTypes.ReceiptForStorage {
 		Logs:              res.Logs,
 		ContractAddress:   res.DeployedContractAddress.ToCommon(),
 	}
-	if res.Failed {
+	if res.Failed() {
 		receipt.Status = gethTypes.ReceiptStatusFailed
 	} else {
 		receipt.Status = gethTypes.ReceiptStatusSuccessful
@@ -44,4 +57,28 @@ func (res *Result) Receipt() *gethTypes.ReceiptForStorage {
 
 	receipt.Bloom = gethTypes.CreateBloom(gethTypes.Receipts{receipt})
 	return (*gethTypes.ReceiptForStorage)(receipt)
+}
+
+// Status captures the status of an interaction to the emulator
+type Status uint8
+
+var (
+	StatusUnknown Status = 0
+	// StatusInvalid shows that the transaction was not a valid
+	// transaction and rejected to be executed and included in any block.
+	StatusInvalid Status = 1
+	// StatusFailed shows that the transaction has been executed,
+	// but the output of the execution was an error
+	// for this case a block is formed and receipts are available
+	StatusFailed Status = 2
+	// StatusFailed shows that the transaction has been executed and the execution has returned success
+	// for this case a block is formed and receipts are available
+	StatusSuccessful Status = 3
+)
+
+// ResultSummary summerizes the outcome of a EVM call or tx run
+type ResultSummary struct {
+	Status      Status
+	ErrorCode   ErrorCode
+	GasConsumed uint64
 }
