@@ -68,6 +68,11 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 		if err != nil {
 			return nil, err
 		}
+
+		if len(txErrorMessage) == 0 {
+			return nil, status.Errorf(codes.Internal, "transaction error message is empty for tx ID: %s block ID: %s", txResult.TransactionID, blockID)
+		}
+
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
@@ -81,7 +86,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 
 	events, err := t.eventsIndex.GetEventsByTransactionID(blockID, block.Header.Height, transactionID)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, rpc.ConvertIndexError(err, block.Header.Height, "failed to get events")
 	}
 
 	// events are encoded in CCF format in storage. convert to JSON-CDC if requested
@@ -141,6 +146,9 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 		var txStatusCode uint = 0
 		if txResult.Failed {
 			txErrorMessage = txErrors[txResult.TransactionID]
+			if len(txErrorMessage) == 0 {
+				return nil, status.Errorf(codes.Internal, "transaction error message is empty for tx ID: %s block ID: %s", txID, blockID)
+			}
 			txStatusCode = 1
 		}
 
@@ -154,7 +162,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 
 		events, err := t.eventsIndex.GetEventsByTransactionID(blockID, block.Header.Height, txResult.TransactionID)
 		if err != nil {
-			return nil, rpc.ConvertStorageError(err)
+			return nil, rpc.ConvertIndexError(err, block.Header.Height, "failed to get events")
 		}
 
 		// events are encoded in CCF format in storage. convert to JSON-CDC if requested
@@ -218,6 +226,10 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 			return nil, err
 		}
 
+		if len(txErrorMessage) == 0 {
+			return nil, status.Errorf(codes.Internal, "transaction error message is empty for tx ID: %s block ID: %s", txResult.TransactionID, blockID)
+		}
+
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
@@ -231,7 +243,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 
 	events, err := t.eventsIndex.GetEventsByTransactionIndex(blockID, block.Header.Height, index)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, rpc.ConvertIndexError(err, block.Header.Height, "failed to get events")
 	}
 
 	// events are encoded in CCF format in storage. convert to JSON-CDC if requested
