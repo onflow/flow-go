@@ -1025,13 +1025,13 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 	return resp, nil
 }
 
-// LookupErrorMessageByTransactionId returns transaction error message for specified transaction.
+// LookupErrorMessageByTransactionID returns transaction error message for specified transaction.
 // If an error message for transaction can be found in the cache then it will be used to serve the request, otherwise
 // an RPC call will be made to the EN to fetch that error message, fetched value will be cached in the LRU cache.
 // Expected errors during normal operation:
 //   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 //   - status.Error - remote GRPC call to EN has failed.
-func (b *backendTransactions) LookupErrorMessageByTransactionId(
+func (b *backendTransactions) LookupErrorMessageByTransactionID(
 	ctx context.Context,
 	blockID flow.Identifier,
 	transactionID flow.Identifier,
@@ -1137,7 +1137,7 @@ func (b *backendTransactions) LookupErrorMessagesByBlockID(
 	blockID flow.Identifier,
 	height uint64,
 ) (map[flow.Identifier]string, error) {
-	txResults, err := b.txResultsIndex.GetResultsByBlockID(blockID, height)
+	txResults, err := b.txResultsIndex.ByBlockID(blockID, height)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}

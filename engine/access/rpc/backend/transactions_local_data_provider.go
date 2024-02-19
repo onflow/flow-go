@@ -21,7 +21,7 @@ import (
 )
 
 type TransactionErrorMessage interface {
-	// LookupErrorMessageByTransactionId is a function type for getting transaction error message.
+	// LookupErrorMessageByTransactionID is a function type for getting transaction error message.
 	LookupErrorMessageByTransactionID(ctx context.Context, blockID flow.Identifier, transactionID flow.Identifier) (string, error)
 
 	// LookupErrorMessageByIndex is a function type for getting transaction error message by index.
@@ -62,7 +62,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 	var txErrorMessage string
 	var txStatusCode uint = 0
 	if txResult.Failed {
-		txErrorMessage, err = t.txErrorMessages.LookupErrorMessageByTransactionId(ctx, blockID, transactionID)
+		txErrorMessage, err = t.txErrorMessages.LookupErrorMessageByTransactionID(ctx, blockID, transactionID)
 		if err != nil {
 			return nil, err
 		}
@@ -117,7 +117,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]*access.TransactionResult, error) {
 	blockID := block.ID()
-	txResults, err := t.txResultsIndex.GetResultsByBlockID(blockID, block.Header.Height)
+	txResults, err := t.txResultsIndex.ByBlockID(blockID, block.Header.Height)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}

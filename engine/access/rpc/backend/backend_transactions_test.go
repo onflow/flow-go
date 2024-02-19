@@ -374,13 +374,13 @@ func (suite *Suite) TestLookupTransactionErrorMessage_HappyPath() {
 
 	suite.execClient.On("GetTransactionErrorMessage", mock.Anything, exeEventReq).Return(exeEventResp, nil).Once()
 
-	errMsg, err := backend.LookupErrorMessageByTransactionId(context.Background(), blockId, failedTxId)
+	errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, failedTxId)
 	suite.Require().NoError(err)
 	suite.Require().Equal(expectedErrorMsg, errMsg)
 
 	// ensure the transaction error message is cached after retrieval; we do this by mocking the grpc call
 	// only once
-	errMsg, err = backend.LookupErrorMessageByTransactionId(context.Background(), blockId, failedTxId)
+	errMsg, err = backend.LookupErrorMessageByTransactionID(context.Background(), blockId, failedTxId)
 	suite.Require().NoError(err)
 	suite.Require().Equal(expectedErrorMsg, errMsg)
 	suite.assertAllExpectations()
@@ -414,7 +414,7 @@ func (suite *Suite) TestLookupTransactionErrorMessage_FailedToFetch() {
 	suite.execClient.On("GetTransactionErrorMessage", mock.Anything, mock.Anything).Return(nil,
 		status.Error(codes.Unavailable, "")).Twice()
 
-	errMsg, err := backend.LookupErrorMessageByTransactionId(context.Background(), blockId, failedTxId)
+	errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, failedTxId)
 	suite.Require().Error(err)
 	suite.Require().Equal(codes.Unavailable, status.Code(err))
 	suite.Require().Empty(errMsg)
