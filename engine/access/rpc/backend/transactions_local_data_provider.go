@@ -22,7 +22,7 @@ import (
 
 type TransactionErrorMessage interface {
 	// LookupErrorMessageByTransactionId is a function type for getting transaction error message.
-	LookupErrorMessageByTransactionId(ctx context.Context, blockID flow.Identifier, transactionID flow.Identifier) (string, error)
+	LookupErrorMessageByTransactionID(ctx context.Context, blockID flow.Identifier, transactionID flow.Identifier) (string, error)
 
 	// LookupErrorMessageByIndex is a function type for getting transaction error message by index.
 	LookupErrorMessageByIndex(ctx context.Context, blockID flow.Identifier, height uint64, index uint32) (string, error)
@@ -69,7 +69,6 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
-	// tx body is irrelevant to status if it's in an executed block
 	txStatus, err := t.deriveTransactionStatus(blockID, block.Header.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
@@ -141,7 +140,6 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 			txStatusCode = 1
 		}
 
-		// tx body is irrelevant to status if it's in an executed block
 		txStatus, err := t.deriveTransactionStatus(blockID, block.Header.Height, true)
 		if err != nil {
 			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
@@ -217,7 +215,6 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
-	// tx body is irrelevant to status if it's in an executed block
 	txStatus, err := t.deriveTransactionStatus(blockID, block.Header.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {

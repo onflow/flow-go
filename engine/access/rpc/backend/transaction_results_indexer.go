@@ -32,7 +32,7 @@ func (t *TransactionResultsIndex) Initialize(indexReporter state_synchronization
 	return fmt.Errorf("index reporter already initialized")
 }
 
-func (t *TransactionResultsIndex) GetResultsByBlockID(blockID flow.Identifier, height uint64) ([]flow.LightTransactionResult, error) {
+func (t *TransactionResultsIndex) ByBlockID(blockID flow.Identifier, height uint64) ([]flow.LightTransactionResult, error) {
 	if err := t.checkDataAvailable(height); err != nil {
 		return nil, err
 	}

@@ -285,7 +285,7 @@ func (b *backendTransactions) GetTransactionResult(
 	if block != nil {
 		txResult, err = b.lookupTransactionResult(ctx, txID, block, requiredEventEncodingVersion)
 		if err != nil {
-			return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
+			return nil, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
 		}
 
 		// an additional check to ensure the correctness of the collection ID.
