@@ -120,36 +120,37 @@ import (
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type AccessNodeConfig struct {
-	supportsObserver             bool // True if this is an Access node that supports observers and consensus follower engines
-	collectionGRPCPort           uint
-	executionGRPCPort            uint
-	pingEnabled                  bool
-	nodeInfoFile                 string
-	apiRatelimits                map[string]int
-	apiBurstlimits               map[string]int
-	rpcConf                      rpc.Config
-	stateStreamConf              statestreambackend.Config
-	stateStreamFilterConf        map[string]int
-	ExecutionNodeAddress         string // deprecated
-	HistoricalAccessRPCs         []access.AccessAPIClient
-	logTxTimeToFinalized         bool
-	logTxTimeToExecuted          bool
-	logTxTimeToFinalizedExecuted bool
-	retryEnabled                 bool
-	rpcMetricsEnabled            bool
-	executionDataSyncEnabled     bool
-	executionDataDir             string
-	executionDataStartHeight     uint64
-	executionDataConfig          edrequester.ExecutionDataConfig
-	PublicNetworkConfig          PublicNetworkConfig
-	TxResultCacheSize            uint
-	TxErrorMessagesCacheSize     uint
-	executionDataIndexingEnabled bool
-	registersDBPath              string
-	checkpointFile               string
-	scriptExecutorConfig         query.QueryConfig
-	scriptExecMinBlock           uint64
-	scriptExecMaxBlock           uint64
+	supportsObserver                  bool // True if this is an Access node that supports observers and consensus follower engines
+	collectionGRPCPort                uint
+	executionGRPCPort                 uint
+	pingEnabled                       bool
+	nodeInfoFile                      string
+	apiRatelimits                     map[string]int
+	apiBurstlimits                    map[string]int
+	rpcConf                           rpc.Config
+	stateStreamConf                   statestreambackend.Config
+	stateStreamFilterConf             map[string]int
+	ExecutionNodeAddress              string // deprecated
+	HistoricalAccessRPCs              []access.AccessAPIClient
+	logTxTimeToFinalized              bool
+	logTxTimeToExecuted               bool
+	logTxTimeToFinalizedExecuted      bool
+	retryEnabled                      bool
+	rpcMetricsEnabled                 bool
+	executionDataSyncEnabled          bool
+	publicNetworkExecutionDataEnabled bool
+	executionDataDir                  string
+	executionDataStartHeight          uint64
+	executionDataConfig               edrequester.ExecutionDataConfig
+	PublicNetworkConfig               PublicNetworkConfig
+	TxResultCacheSize                 uint
+	TxErrorMessagesCacheSize          uint
+	executionDataIndexingEnabled      bool
+	registersDBPath                   string
+	checkpointFile                    string
+	scriptExecutorConfig              query.QueryConfig
+	scriptExecMinBlock                uint64
+	scriptExecMaxBlock                uint64
 }
 
 type PublicNetworkConfig struct {
@@ -226,9 +227,10 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			BindAddress: cmd.NotSet,
 			Metrics:     metrics.NewNoopCollector(),
 		},
-		executionDataSyncEnabled: true,
-		executionDataDir:         filepath.Join(homedir, ".flow", "execution_data"),
-		executionDataStartHeight: 0,
+		executionDataSyncEnabled:          true,
+		publicNetworkExecutionDataEnabled: false,
+		executionDataDir:                  filepath.Join(homedir, ".flow", "execution_data"),
+		executionDataStartHeight:          0,
 		executionDataConfig: edrequester.ExecutionDataConfig{
 			InitialBlockHeight: 0,
 			MaxSearchAhead:     edrequester.DefaultMaxSearchAhead,
@@ -273,6 +275,7 @@ type FlowAccessNodeBuilder struct {
 	FollowerCore               module.HotStuffFollower
 	Validator                  hotstuff.Validator
 	ExecutionDataDownloader    execution_data.Downloader
+	PublicBlobService          network.BlobService
 	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
 	ExecutionDataStore         execution_data.ExecutionDataStore
 	ExecutionDataCache         *execdatacache.ExecutionDataCache
@@ -666,6 +669,39 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			return builder.ExecutionDataRequester, nil
 		})
 
+	if builder.publicNetworkExecutionDataEnabled {
+		var publicBsDependable *module.ProxiedReadyDoneAware
+
+		builder.Module("public blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {
+			publicBsDependable = module.NewProxiedReadyDoneAware()
+			builder.PeerManagerDependencies.Add(publicBsDependable)
+			return nil
+		})
+		builder.Component("public network execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			opts := []network.BlobServiceOption{
+				blob.WithBitswapOptions(
+					bitswap.WithTracer(
+						blob.NewTracer(node.Logger.With().Str("public_blob_service", channels.PublicExecutionDataService.String()).Logger()),
+					),
+				),
+			}
+
+			net := builder.AccessNodeConfig.PublicNetworkConfig.Network
+
+			var err error
+			builder.PublicBlobService, err = net.RegisterBlobService(channels.PublicExecutionDataService, ds, opts...)
+			if err != nil {
+				return nil, fmt.Errorf("could not register blob service: %w", err)
+			}
+
+			// add blobservice into ReadyDoneAware dependency passed to peer manager
+			// this starts the blob service and configures peer manager to wait for the blobservice
+			// to be ready before starting
+			publicBsDependable.Init(builder.PublicBlobService)
+			return &module.NoopReadyDoneAware{}, nil
+		})
+	}
+
 	if builder.executionDataIndexingEnabled {
 		var indexedBlockHeight storage.ConsumerProgress
 
@@ -1035,6 +1071,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"execution-data-sync-enabled",
 			defaultConfig.executionDataSyncEnabled,
 			"whether to enable the execution data sync protocol")
+		flags.BoolVar(&builder.publicNetworkExecutionDataEnabled,
+			"public-network-execution-data-sync-enabled",
+			defaultConfig.publicNetworkExecutionDataEnabled,
+			"[experimental] whether to enable the execution data sync protocol on public network")
 		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
 		flags.Uint64Var(&builder.executionDataStartHeight,
 			"execution-data-start-height",

@@ -12,7 +12,6 @@ import (
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/atree"
 
-	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -264,7 +263,6 @@ func (db *StateDB) Snapshot() int {
 // Logs returns the list of logs
 // it also update each log with the block and tx info
 func (db *StateDB) Logs(
-	blockHash gethCommon.Hash,
 	blockNumber uint64,
 	txHash gethCommon.Hash,
 	txIndex uint,
@@ -273,7 +271,6 @@ func (db *StateDB) Logs(
 	for _, view := range db.views {
 		for _, log := range view.Logs() {
 			log.BlockNumber = blockNumber
-			log.BlockHash = blockHash
 			log.TxHash = txHash
 			log.TxIndex = txIndex
 			allLogs = append(allLogs, log)
@@ -460,9 +457,9 @@ func wrapError(err error) error {
 		return types.NewFatalError(err)
 	}
 
-	// if is fvm fatal error
-	if errors.IsFailure(err) {
-		return types.NewFatalError(err)
+	// if is a fatal error
+	if types.IsAFatalError(err) {
+		return err
 	}
 
 	return types.NewStateError(err)

@@ -19,9 +19,13 @@ type Worker struct {
 	wg sync.WaitGroup
 }
 
-func NewWorker(workerID int, interval time.Duration, work workFunc) *Worker {
-	// TODO(rbtz): pass in real context
-	ctx, cancel := context.WithCancel(context.TODO())
+func NewWorker(
+	ctx context.Context,
+	workerID int,
+	interval time.Duration,
+	work workFunc,
+) *Worker {
+	ctx, cancel := context.WithCancel(ctx)
 
 	return &Worker{
 		workerID: workerID,
