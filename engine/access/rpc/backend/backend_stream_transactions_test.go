@@ -4,6 +4,13 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
+
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
 	access "github.com/onflow/flow-go/engine/access/mock"
@@ -19,11 +26,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 )
 
 type TransactionStatusSuite struct {
@@ -276,21 +278,21 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatus() {
 	checkNewSubscriptionMessage := func(sub subscription.Subscription, expectedTxStatus flow.TransactionStatus) {
 		s.log.Debug().Msg(fmt.Sprintf("!!! checkNewSubscriptionMessage: %s", expectedTxStatus.String()))
 		unittest.RequireReturnsBefore(s.T(), func() {
-		v, ok := <-sub.Channel()
-		require.True(s.T(), ok,
-			"channel closed while waiting for transaction info:\n\t- txID %x\n\t- blockID: %x \n\t- err: %v",
-			txId, s.finalizedBlock.ID(), sub.Err())
+			v, ok := <-sub.Channel()
+			require.True(s.T(), ok,
+				"channel closed while waiting for transaction info:\n\t- txID %x\n\t- blockID: %x \n\t- err: %v",
+				txId, s.finalizedBlock.ID(), sub.Err())
 
-		txInfo, ok := v.(*convert.TransactionSubscribeInfo)
-		require.True(s.T(), ok, "unexpected response type: %T", v)
+			txInfo, ok := v.(*convert.TransactionSubscribeInfo)
+			require.True(s.T(), ok, "unexpected response type: %T", v)
 
-		assert.Equal(s.T(), txId, txInfo.ID)
-		assert.Equal(s.T(), expectedTxStatus, txInfo.Status)
+			assert.Equal(s.T(), txId, txInfo.ID)
+			assert.Equal(s.T(), expectedTxStatus, txInfo.Status)
 
-		expectedMsgIndex := expectedMsgIndexCounter.Value()
-		assert.Equal(s.T(), expectedMsgIndex, txInfo.MessageIndex)
-		wasSet := expectedMsgIndexCounter.Set(expectedMsgIndex + 1)
-		require.True(s.T(), wasSet)
+			expectedMsgIndex := expectedMsgIndexCounter.Value()
+			assert.Equal(s.T(), expectedMsgIndex, txInfo.MessageIndex)
+			wasSet := expectedMsgIndexCounter.Set(expectedMsgIndex + 1)
+			require.True(s.T(), wasSet)
 		}, time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
 	}
 
@@ -324,8 +326,8 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatus() {
 
 	// 5. Stop subscription
 	cancel()
-	
-	Ensure subscription shuts down gracefully
+
+	// Ensure subscription shuts down gracefully
 	unittest.RequireReturnsBefore(s.T(), func() {
 		v, ok := <-sub.Channel()
 		assert.Nil(s.T(), v)

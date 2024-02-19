@@ -83,7 +83,7 @@ func (b *backendSubscribeTransactions) backendSubscribeTransactions(txInfo *Tran
 		executed := txInfo.blockWithTx != nil
 		if !executed {
 			highestHeight, err := b.getHighestHeight(flow.BlockStatusFinalized)
-			
+
 			if err != nil {
 				return nil, fmt.Errorf("could not get highest height for block %d: %w", height, err)
 			}
