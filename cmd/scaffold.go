@@ -1284,12 +1284,21 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
 	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Sandboxnet || fnb.RootChainID == flow.Mainnet {
+	switch fnb.RootChainID {
+	case flow.Testnet,
+		flow.Sandboxnet,
+		flow.Previewnet,
+		flow.Mainnet:
 		vmOpts = append(vmOpts,
 			fvm.WithTransactionFeesEnabled(true),
 		)
 	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Sandboxnet || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet {
+	switch fnb.RootChainID {
+	case flow.Testnet,
+		flow.Sandboxnet,
+		flow.Previewnet,
+		flow.Localnet,
+		flow.Benchnet:
 		vmOpts = append(vmOpts,
 			fvm.WithContractDeploymentRestricted(false),
 		)
