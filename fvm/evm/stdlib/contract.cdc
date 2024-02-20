@@ -260,12 +260,12 @@ contract EVM {
     /// of the execution (status: failed).
     access(all)
     fun mustRun(tx: [UInt8], coinbase: EVMAddress): Result {
-        var res = self.run(tx: tx, coinbase: coinbase)
+        let result = self.run(tx: tx, coinbase: coinbase)
         assert(
-            res.status == Status.failed || res.status == Status.successful,
+            result.status == Status.failed || result.status == Status.successful,
             message: "tx is not valid for execution"
         )
-        return res
+        return result
     }
 
     access(all)
