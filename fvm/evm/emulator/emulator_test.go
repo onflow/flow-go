@@ -404,7 +404,7 @@ func TestSelfdestruct(t *testing.T) {
 				// setup the test with funded account and deploying a selfdestruct contract.
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						_, err := blk.DirectCall(types.NewDepositCall(testAddress, startBalance))
+						_, err := blk.DirectCall(types.NewDepositCall(testAddress, startBalance, 0))
 						require.NoError(t, err)
 					})
 
@@ -414,7 +414,8 @@ func TestSelfdestruct(t *testing.T) {
 								testAddress,
 								testContract.ByteCode,
 								math.MaxUint64,
-								deployBalance),
+								deployBalance,
+								0),
 						)
 						require.NoError(t, err)
 						contractAddr = res.DeployedContractAddress
