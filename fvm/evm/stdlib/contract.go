@@ -929,6 +929,7 @@ var internalEVMTypeRunFunctionType = &sema.FunctionType{
 			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
 		},
 	},
+	// Actually EVM.Result, but cannot refer to it here
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 
@@ -982,7 +983,8 @@ func NewResultValue(
 	gauge common.MemoryGauge,
 	inter *interpreter.Interpreter,
 	locationRange interpreter.LocationRange,
-	result *types.ResultSummary) *interpreter.CompositeValue {
+	result *types.ResultSummary,
+) *interpreter.CompositeValue {
 	loc := common.NewAddressLocation(gauge, handler.EVMContractAddress(), ContractName)
 	return interpreter.NewCompositeValue(
 		inter,
@@ -1016,7 +1018,7 @@ func NewResultValue(
 			{
 				Name: "gasUsed",
 				Value: interpreter.NewUInt64Value(gauge, func() uint64 {
-					return uint64(result.GasConsumed)
+					return result.GasConsumed
 				}),
 			},
 			{
@@ -1076,6 +1078,7 @@ var internalEVMTypeCallFunctionType = &sema.FunctionType{
 			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
 		},
 	},
+	// Actually EVM.Result, but cannot refer to it here
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 

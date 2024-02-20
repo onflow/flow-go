@@ -4,7 +4,8 @@ import "FlowToken"
 access(all)
 contract EVM {
 
-    pub event CadenceOwnedAccountCreated(addressBytes: [UInt8; 20])
+    access(all)
+    event CadenceOwnedAccountCreated(addressBytes: [UInt8; 20])
 
     /// EVMAddress is an EVM-compatible address
     access(all)
@@ -34,7 +35,7 @@ contract EVM {
 
         /// The balance in atto-FLOW
         /// Atto-FLOW is the smallest denomination of FLOW (1e18 FLOW)
-        /// that is used to store account balances inside EVM 
+        /// that is used to store account balances inside EVM
         /// similar to the way WEI is used to store ETH divisible to 18 decimal places.
         access(all)
         var attoflow: UInt
@@ -45,17 +46,17 @@ contract EVM {
             self.attoflow = attoflow
         }
 
-        /// Sets the balance by a UFix64 (8 decimal points), the format 
-        /// that is used in Cadence to store FLOW tokens.  
+        /// Sets the balance by a UFix64 (8 decimal points), the format
+        /// that is used in Cadence to store FLOW tokens.
         access(all)
         fun setFLOW(flow: UFix64){
             self.attoflow = InternalEVM.castToAttoFLOW(balance: flow)
         }
 
         /// Casts the balance to a UFix64 (rounding down)
-        /// Warning! casting a balance to a UFix64 which supports a lower level of precision 
+        /// Warning! casting a balance to a UFix64 which supports a lower level of precision
         /// (8 decimal points in compare to 18) might result in rounding down error.
-        /// Use the toAttoFlow function if you care need more accuracy. 
+        /// Use the toAttoFlow function if you care need more accuracy.
         access(all)
         fun inFLOW(): UFix64 {
             return InternalEVM.castToFLOW(balance: self.attoflow)
@@ -76,17 +77,17 @@ contract EVM {
 
         /// is returned when execution of an evm transaction/call
         /// has failed at the validation step (e.g. nonce mismatch).
-        /// An invalid transaction/call is rejected to be executed 
+        /// An invalid transaction/call is rejected to be executed
         /// or be included in a block.
         access(all) case invalid
 
-        /// is returned when execution of an evm transaction/call 
-        /// has been successful but the vm has reported an error as 
-        /// the outcome of execution (e.g. running out of gas). 
+        /// is returned when execution of an evm transaction/call
+        /// has been successful but the vm has reported an error as
+        /// the outcome of execution (e.g. running out of gas).
         /// A failed tx/call is included in a block.
-        /// Note that resubmission of a failed transaction would 
-        /// result in invalid status in the second attempt, given 
-        /// the nonce would be come invalid. 
+        /// Note that resubmission of a failed transaction would
+        /// result in invalid status in the second attempt, given
+        /// the nonce would be come invalid.
         access(all) case failed
 
         /// is returned when execution of an evm transaction/call
@@ -104,23 +105,25 @@ contract EVM {
         access(all)
         let errorCode: UInt64
 
-        /// returns the amount of gas metered during 
+        /// returns the amount of gas metered during
         /// evm execution
         access(all)
         let gasUsed: UInt64
 
-        /// returns the data that is returned from 
-        /// the evm for the call. For coa.deploy 
-        /// calls it returns the address bytes of the 
+        /// returns the data that is returned from
+        /// the evm for the call. For coa.deploy
+        /// calls it returns the address bytes of the
         /// newly deployed contract.
         access(all)
         let data: [UInt8]
 
-        init(status: UInt8, 
-             errorCode: UInt64, 
-             gasUsed: UInt64,
-             data: [UInt8]) {
-            self.status = Status(rawValue: status)!
+        init(
+            status: Status,
+            errorCode: UInt64,
+            gasUsed: UInt64,
+            data: [UInt8]
+        ) {
+            self.status = status
             self.errorCode = errorCode
             self.gasUsed = gasUsed
             self.data = data
@@ -145,7 +148,7 @@ contract EVM {
             // but updated through initAddress later
             // we have to do this since we need resource id (uuid)
             // to calculate the EVM address for this cadence owned account
-            self.addressBytes = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] 
+            self.addressBytes = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         }
 
         access(contract)
@@ -181,10 +184,10 @@ contract EVM {
         }
 
         /// Withdraws the balance from the cadence owned account's balance
-        /// Note that amounts smaller than 10nF (10e-8) can't be withdrawn 
+        /// Note that amounts smaller than 10nF (10e-8) can't be withdrawn
         /// given that Flow Token Vaults use UFix64s to store balances.
-        /// If the given balance conversion to UFix64 results in 
-        /// rounding error, this function would fail. 
+        /// If the given balance conversion to UFix64 results in
+        /// rounding error, this function would fail.
         access(all)
         fun withdraw(balance: Balance): @FlowToken.Vault {
             let vault <- InternalEVM.withdraw(
@@ -245,22 +248,22 @@ contract EVM {
     access(all)
     fun run(tx: [UInt8], coinbase: EVMAddress): Result {
         return InternalEVM.run(
-                tx: tx, 
+                tx: tx,
                 coinbase: coinbase.bytes
         ) as! Result
     }
 
-    /// mustRun runs the transaction using EVM.run yet it 
+    /// mustRun runs the transaction using EVM.run yet it
     /// rollback if the tx execution status is unknown or invalid.
-    /// Note that this method does not rollback if transaction 
+    /// Note that this method does not rollback if transaction
     /// is executed but an vm error is reported as the outcome
     /// of the execution (status: failed).
     access(all)
     fun mustRun(tx: [UInt8], coinbase: EVMAddress): Result {
         var res = self.run(tx: tx, coinbase: coinbase)
         assert(
-            res.status == Status.failed || res.status == Status.successful , 
-            message: "tx is not valid for execution" 
+            res.status == Status.failed || res.status == Status.successful,
+            message: "tx is not valid for execution"
         )
         return res
     }
@@ -318,19 +321,17 @@ contract EVM {
         evmAddress: [UInt8; 20]
     ) {
 
-        // make signature set first 
+        // make signature set first
         // check number of signatures matches number of key indices
         assert(keyIndices.length == signatures.length,
                message: "key indices size doesn't match the signatures")
 
         var signatureSet: [Crypto.KeyListSignature] = []
-        var idx = 0 
-        for sig in signatures{
+        for signatureIndex, signature in signatures{
             signatureSet.append(Crypto.KeyListSignature(
-                keyIndex: Int(keyIndices[Int(idx)]),
-                signature: sig
+                keyIndex: Int(keyIndices[signatureIndex]),
+                signature: signature
             ))
-            idx = idx + 1
         }
 
         // fetch account
@@ -338,8 +339,8 @@ contract EVM {
 
         // constructing key list
         let keyList = Crypto.KeyList()
-        for sig in signatureSet {
-            let key = acc.keys.get(keyIndex: sig.keyIndex)!
+        for signature in signatureSet {
+            let key = acc.keys.get(keyIndex: signature.keyIndex)!
             assert(!key.isRevoked, message: "revoked key is used")
             keyList.add(
               key.publicKey,
@@ -359,11 +360,8 @@ contract EVM {
             ?? panic("could not borrow coa resource addressable capability")
 
         // verify evm address matching
-        var i = 0
-        for item in coaRef.address().bytes {
-            assert(item == evmAddress[i], message: "evm address mismatch")
-            i = i +1
+        for index, item in coaRef.address().bytes {
+            assert(item == evmAddress[index], message: "evm address mismatch")
         }
-
     }
 }
