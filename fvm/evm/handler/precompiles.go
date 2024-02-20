@@ -29,9 +29,7 @@ func preparePrecompiles(
 func blockHeightProvider(backend types.Backend) func() (uint64, error) {
 	return func() (uint64, error) {
 		h, err := backend.GetCurrentBlockHeight()
-		// if is a fatal error - panic
-		// TODO: add panic on Backend errors as well
-		if types.IsAFatalError(err) {
+		if types.IsAFatalError(err) || types.IsABackendError(err) {
 			panic(err)
 		}
 		return h, err
@@ -59,8 +57,7 @@ func coaOwnershipProofValidator(contractAddress flow.Address, backend types.Back
 			proof.ToCadenceValues(),
 		)
 		if err != nil {
-			// TODO: add panic on Backend errors as well
-			if types.IsAFatalError(err) {
+			if types.IsAFatalError(err) || types.IsABackendError(err) {
 				panic(err)
 			}
 			return false, err
