@@ -423,7 +423,7 @@ func TestSelfdestruct(t *testing.T) {
 							GasLimit: 100_000,
 						})
 						require.NoError(t, err)
-						require.False(t, res.Failed)
+						require.False(t, res.Failed())
 					})
 
 					// after calling selfdestruct the balance should be returned to the caller and
