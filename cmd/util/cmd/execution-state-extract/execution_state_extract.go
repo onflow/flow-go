@@ -70,7 +70,7 @@ func extractExecutionState(
 
 	log.Info().Msg("init compactor")
 
-	compactor, err := complete.NewCompactor(led, diskWal, log, complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	compactor, err := complete.NewCompactor(led, diskWal, log, complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), &metrics.NoopCollector{})
 	if err != nil {
 		return fmt.Errorf("cannot create compactor: %w", err)
 	}
