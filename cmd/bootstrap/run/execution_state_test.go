@@ -1,6 +1,8 @@
 package run
 
 import (
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"path/filepath"
 	"testing"
@@ -48,4 +50,25 @@ func generateServiceAccountPrivateKey(seed []byte) (flow.AccountPrivateKey, erro
 		SignAlgo:   crypto.ECDSASecp256k1,
 		HashAlgo:   hash.SHA2_256,
 	}, nil
+}
+
+func TestPrintServiceKey(t *testing.T) {
+	hexString := "" // Replace this with your actual hex-encoded string
+
+	// Decode the hex string to bytes
+	decodedBytes, err := hex.DecodeString(hexString)
+	require.NoError(t, err)
+
+	priv, err := crypto.DecodePrivateKey(crypto.ECDSASecp256k1, decodedBytes)
+	require.NoError(t, err)
+
+	sk := flow.AccountPrivateKey{
+		PrivateKey: priv,
+		SignAlgo:   crypto.ECDSASecp256k1,
+		HashAlgo:   hash.SHA2_256,
+	}
+
+	encodedData := base64.StdEncoding.EncodeToString(sk.PublicKey(1000).PublicKey.Encode())
+	fmt.Print(encodedData)
+
 }
