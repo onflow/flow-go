@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	FlowEVMTestnetChainID = big.NewInt(666)
-	FlowEVMMainnetChainID = big.NewInt(777)
+	FlowEVMTestnetChainID = big.NewInt(6666)
+	FlowEVMMainnetChainID = big.NewInt(7777)
 	BlockLevelGasLimit    = uint64(math.MaxUint64)
 	zero                  = uint64(0)
 )
