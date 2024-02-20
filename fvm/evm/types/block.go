@@ -5,6 +5,7 @@ import (
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethCrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -35,7 +36,7 @@ func (b *Block) ToBytes() ([]byte, error) {
 // Hash returns the hash of the block
 func (b *Block) Hash() (gethCommon.Hash, error) {
 	data, err := b.ToBytes()
-	return gethCommon.BytesToHash(data), err
+	return gethCrypto.Keccak256Hash(data), err
 }
 
 // AppendTxHash appends a transaction hash to the list of transaction hashes of the block

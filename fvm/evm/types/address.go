@@ -25,7 +25,7 @@ import (
 // leaves a variable part of 8 bytes (64 bits).
 const FlowEVMSpecialAddressPrefixLen = 12
 
-const COAAddressTemplate = "A.%v.EVM.BridgedAccountCreated"
+const COAAddressTemplate = "A.%v.EVM.CadenceOwnedAccountCreated"
 
 var (
 	// Using leading zeros for prefix helps with the storage compactness.

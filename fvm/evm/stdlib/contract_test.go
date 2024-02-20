@@ -2866,7 +2866,7 @@ func TestEVMRun(t *testing.T) {
 	assert.True(t, runCalled)
 }
 
-func TestEVMCreateBridgedAccount(t *testing.T) {
+func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 
 	t.Parallel()
 
@@ -2889,12 +2889,12 @@ func TestEVMCreateBridgedAccount(t *testing.T) {
 
       access(all)
       fun main(): [UInt8; 20] {
-          let bridgedAccount1 <- EVM.createBridgedAccount()
-          destroy bridgedAccount1
+          let cadenceOwnedAccount1 <- EVM.createCadenceOwnedAccount()
+          destroy cadenceOwnedAccount1
 
-          let bridgedAccount2 <- EVM.createBridgedAccount()
-          let bytes = bridgedAccount2.address().bytes
-          destroy bridgedAccount2
+          let cadenceOwnedAccount2 <- EVM.createCadenceOwnedAccount()
+          let bytes = cadenceOwnedAccount2.address().bytes
+          destroy cadenceOwnedAccount2
 
           return bytes
       }
@@ -2978,7 +2978,7 @@ func TestEVMCreateBridgedAccount(t *testing.T) {
 	require.Equal(t, expected, actual)
 }
 
-func TestBridgedAccountCall(t *testing.T) {
+func TestCadenceOwnedAccountCall(t *testing.T) {
 
 	t.Parallel()
 
@@ -3021,10 +3021,10 @@ func TestBridgedAccountCall(t *testing.T) {
 
       access(all)
       fun main(): [UInt8] {
-          let bridgedAccount <- EVM.createBridgedAccount()
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
 		  let bal = EVM.Balance(attoflow: 0)
 		  bal.setFLOW(flow: 1.23)
-          let response = bridgedAccount.call(
+          let response = cadenceOwnedAccount.call(
               to: EVM.EVMAddress(
                   bytes: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
               ),
@@ -3032,7 +3032,7 @@ func TestBridgedAccountCall(t *testing.T) {
               gasLimit: 9999,
               value: bal
           )
-          destroy bridgedAccount
+          destroy cadenceOwnedAccount
           return response
       }
    `)
@@ -3149,9 +3149,9 @@ func TestEVMAddressDeposit(t *testing.T) {
           let vault <- minter.mintTokens(amount: 1.23)
           destroy minter
 
-          let bridgedAccount <- EVM.createBridgedAccount()
-          bridgedAccount.deposit(from: <-vault)
-		  destroy bridgedAccount
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+          cadenceOwnedAccount.deposit(from: <-vault)
+		  destroy cadenceOwnedAccount
       }
    `)
 
@@ -3213,7 +3213,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 	require.True(t, deposited)
 }
 
-func TestBridgedAccountWithdraw(t *testing.T) {
+func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 
 	t.Parallel()
 
@@ -3272,12 +3272,12 @@ func TestBridgedAccountWithdraw(t *testing.T) {
           let vault <- minter.mintTokens(amount: 2.34)
           destroy minter
 
-          let bridgedAccount <- EVM.createBridgedAccount()
-          bridgedAccount.deposit(from: <-vault)
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+          cadenceOwnedAccount.deposit(from: <-vault)
 
-          let vault2 <- bridgedAccount.withdraw(balance: EVM.Balance(attoflow: 1230000000000000000))
+          let vault2 <- cadenceOwnedAccount.withdraw(balance: EVM.Balance(attoflow: 1230000000000000000))
           let balance = vault2.balance
-          destroy bridgedAccount
+          destroy cadenceOwnedAccount
           destroy vault2
 
           return balance
@@ -3344,7 +3344,7 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 	assert.Equal(t, expectedWithdrawBalance, result)
 }
 
-func TestBridgedAccountDeploy(t *testing.T) {
+func TestCadenceOwnedAccountDeploy(t *testing.T) {
 
 	t.Parallel()
 
@@ -3386,13 +3386,13 @@ func TestBridgedAccountDeploy(t *testing.T) {
 
       access(all)
       fun main(): [UInt8; 20] {
-          let bridgedAccount <- EVM.createBridgedAccount()
-          let address = bridgedAccount.deploy(
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+          let address = cadenceOwnedAccount.deploy(
               code: [4, 5, 6],
               gasLimit: 9999,
               value: EVM.Balance(attoflow: 1230000000000000000)
           )
-          destroy bridgedAccount
+          destroy cadenceOwnedAccount
           return address.bytes
       }
    `)
@@ -3509,9 +3509,9 @@ func TestEVMAccountBalance(t *testing.T) {
 
       access(all)
       fun main(): EVM.Balance {
-          let bridgedAccount <- EVM.createBridgedAccount()
-          let balance = bridgedAccount.balance()
-          destroy bridgedAccount
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+          let balance = cadenceOwnedAccount.balance()
+          destroy cadenceOwnedAccount
           return balance
       }
     `)
@@ -3609,9 +3609,9 @@ func TestEVMAccountBalanceForABIOnlyContract(t *testing.T) {
 
       access(all)
       fun main(): EVM.Balance {
-          let bridgedAccount <- EVM.createBridgedAccount()
-          let balance = bridgedAccount.balance()
-          destroy bridgedAccount
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+          let balance = cadenceOwnedAccount.balance()
+          destroy cadenceOwnedAccount
           return balance
       }
     `)
@@ -3679,7 +3679,7 @@ func TestEVMAccountBalanceForABIOnlyContract(t *testing.T) {
 	assert.ErrorContains(
 		t,
 		err,
-		"error: value of type `EVM` has no member `createBridgedAccount`",
+		"error: value of type `EVM` has no member `createCadenceOwnedAccount`",
 	)
 }
 
@@ -3692,7 +3692,7 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 	proof := &types.COAOwnershipProofInContext{
 		COAOwnershipProof: types.COAOwnershipProof{
 			Address:        types.FlowAddress(contractsAddress),
-			CapabilityPath: "bridgedAccount",
+			CapabilityPath: "coa",
 			Signatures:     []types.Signature{[]byte("signature")},
 			KeyIndices:     []uint64{0},
 		},
@@ -3776,16 +3776,16 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 
 		transaction {
 			prepare(account: auth(Capabilities, SaveValue) &Account) {
-				let bridgedAccount1 <- EVM.createBridgedAccount()
+				let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
 
-				account.storage.save<@EVM.BridgedAccount>(
-				    <-bridgedAccount1,
-					to: /storage/bridgedAccount
+				account.storage.save(
+				    <-cadenceOwnedAccount,
+					to: /storage/coa
 				)
 
-				let bridgedAccount = account.capabilities.storage
-				    .issue<&EVM.BridgedAccount>(/storage/bridgedAccount)
-				account.capabilities.publish(bridgedAccount, at: /public/bridgedAccount)
+				let cap = account.capabilities.storage
+				    .issue<&EVM.CadenceOwnedAccount>(/storage/coa)
+				account.capabilities.publish(cap, at: /public/coa)
 			}
 		}`)
 
