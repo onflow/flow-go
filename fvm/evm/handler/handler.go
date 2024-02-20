@@ -71,12 +71,14 @@ func (h *ContractHandler) deployCOA(uuid uint64) (types.Address, error) {
 	}
 
 	factory := h.addressAllocator.COAFactoryAddress()
+	factoryAccount := h.AccountByAddress(factory, false)
 	call := types.NewDeployCallWithTargetAddress(
 		factory,
 		target,
 		coa.ContractBytes,
 		uint64(gaslimit),
 		new(big.Int),
+		factoryAccount.Nonce(),
 	)
 
 	ctx, err := h.getBlockContext()
@@ -373,6 +375,23 @@ func (a *Account) Address() types.Address {
 	return a.address
 }
 
+// Nonce returns the nonce of this account
+//
+// TODO: we might need to meter computation for read only operations as well
+// currently the storage limits is enforced
+func (a *Account) Nonce() uint64 {
+	ctx, err := a.fch.getBlockContext()
+	panicOnAnyError(err)
+
+	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
+	panicOnAnyError(err)
+
+	nonce, err := blk.NonceOf(a.address)
+	panicOnAnyError(err)
+
+	return nonce
+}
+
 // Balance returns the balance of this account
 //
 // TODO: we might need to meter computation for read only operations as well
@@ -447,9 +466,13 @@ func (a *Account) Deposit(v *types.FLOWTokenVault) {
 }
 
 func (a *Account) deposit(v *types.FLOWTokenVault) error {
+	bridge := a.fch.addressAllocator.NativeTokenBridgeAddress()
+	bridgeAccount := a.fch.AccountByAddress(bridge, false)
+
 	call := types.NewDepositCall(
 		a.address,
 		v.Balance(),
+		bridgeAccount.Nonce(),
 	)
 	ctx, err := a.precheck(false, types.GasLimit(call.GasLimit))
 	if err != nil {
@@ -471,6 +494,7 @@ func (a *Account) withdraw(b types.Balance) (*types.FLOWTokenVault, error) {
 	call := types.NewWithdrawCall(
 		a.address,
 		b,
+		a.Nonce(),
 	)
 
 	ctx, err := a.precheck(true, types.GasLimit(call.GasLimit))
@@ -502,6 +526,7 @@ func (a *Account) transfer(to types.Address, balance types.Balance) error {
 		a.address,
 		to,
 		balance,
+		a.Nonce(),
 	)
 	ctx, err := a.precheck(true, types.GasLimit(call.GasLimit))
 	if err != nil {
@@ -531,6 +556,7 @@ func (a *Account) deploy(code types.Code, gaslimit types.GasLimit, balance types
 		code,
 		uint64(gaslimit),
 		balance,
+		a.Nonce(),
 	)
 	res, err := a.fch.executeAndHandleCall(ctx, call, nil, false)
 	if err != nil {
@@ -560,6 +586,7 @@ func (a *Account) call(to types.Address, data types.Data, gaslimit types.GasLimi
 		data,
 		uint64(gaslimit),
 		balance,
+		a.Nonce(),
 	)
 
 	res, err := a.fch.executeAndHandleCall(ctx, call, nil, false)
