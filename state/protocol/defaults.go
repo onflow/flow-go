@@ -12,7 +12,7 @@ import (
 // more details on this value.
 func DefaultEpochCommitSafetyThreshold(chain flow.ChainID) (uint64, error) {
 	switch chain {
-	case flow.Mainnet, flow.Testnet, flow.Sandboxnet:
+	case flow.Mainnet, flow.Testnet, flow.Sandboxnet, flow.Previewnet:
 		return 1_000, nil
 	case flow.Localnet, flow.Benchnet, flow.BftTestnet, flow.Emulator:
 		return 100, nil
