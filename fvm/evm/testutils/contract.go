@@ -63,8 +63,6 @@ func DeployContract(t testing.TB, caller types.Address, tc *TestContract, led at
 	// deploy contract
 	e := emulator.NewEmulator(led, flowEVMRootAddress)
 
-	caller := types.NewAddress(gethCommon.Address{})
-
 	ctx := types.NewDefaultBlockContext(2)
 
 	bl, err := e.NewReadOnlyBlockView(ctx)
