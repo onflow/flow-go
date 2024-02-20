@@ -46,6 +46,7 @@ func (b AccountStatusesBackend) SubscribeAccountStatuses(ctx context.Context, st
 	return sub
 }
 
+// getAccountStatusResponseFactory returns a function function that returns the account statuses response for a given height.
 func (b AccountStatusesBackend) getAccountStatusResponseFactory(messageIndex *counters.StrictMonotonousCounter, filter state_stream.StatusFilter) GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
 		executionData, err := b.getExecutionData(ctx, height)
