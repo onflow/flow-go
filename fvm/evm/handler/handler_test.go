@@ -456,7 +456,11 @@ func TestHandler_COA(t *testing.T) {
 
 					// Withdraw calls are only possible within FOA accounts
 					assertPanic(t, types.IsAUnAuthroizedMethodCallError, func() {
-						em := &testutils.TestEmulator{}
+						em := &testutils.TestEmulator{
+							NonceOfFunc: func(address types.Address) (uint64, error) {
+								return 0, nil
+							},
+						}
 
 						handler := handler.NewContractHandler(rootAddr, flowTokenAddress, bs, aa, backend, em)
 
@@ -467,6 +471,9 @@ func TestHandler_COA(t *testing.T) {
 					// test insufficient total supply error
 					assertPanic(t, types.IsAInsufficientTotalSupplyError, func() {
 						em := &testutils.TestEmulator{
+							NonceOfFunc: func(address types.Address) (uint64, error) {
+								return 0, nil
+							},
 							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
 								return &types.Result{}, nil
 							},
@@ -481,6 +488,9 @@ func TestHandler_COA(t *testing.T) {
 					// test non fatal error of emulator
 					assertPanic(t, isNotFatal, func() {
 						em := &testutils.TestEmulator{
+							NonceOfFunc: func(address types.Address) (uint64, error) {
+								return 0, nil
+							},
 							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
 								return &types.Result{}, types.NewEVMValidationError(fmt.Errorf("some sort of error"))
 							},
@@ -495,6 +505,9 @@ func TestHandler_COA(t *testing.T) {
 					// test fatal error of emulator
 					assertPanic(t, types.IsAFatalError, func() {
 						em := &testutils.TestEmulator{
+							NonceOfFunc: func(address types.Address) (uint64, error) {
+								return 0, nil
+							},
 							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
 								return &types.Result{}, types.NewFatalError(fmt.Errorf("some sort of fatal error"))
 							},
@@ -522,6 +535,9 @@ func TestHandler_COA(t *testing.T) {
 					// test non fatal error of emulator
 					assertPanic(t, isNotFatal, func() {
 						em := &testutils.TestEmulator{
+							NonceOfFunc: func(address types.Address) (uint64, error) {
+								return 0, nil
+							},
 							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
 								return &types.Result{}, fmt.Errorf("some sort of error")
 							},
@@ -536,6 +552,9 @@ func TestHandler_COA(t *testing.T) {
 					// test fatal error of emulator
 					assertPanic(t, types.IsAFatalError, func() {
 						em := &testutils.TestEmulator{
+							NonceOfFunc: func(address types.Address) (uint64, error) {
+								return 0, nil
+							},
 							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
 								return &types.Result{}, types.NewFatalError(fmt.Errorf("some sort of fatal error"))
 							},

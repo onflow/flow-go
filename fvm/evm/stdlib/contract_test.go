@@ -78,6 +78,7 @@ type testFlowAccount struct {
 	balance  func() types.Balance
 	code     func() types.Code
 	codeHash func() []byte
+	nonce    func() uint64
 	transfer func(address types.Address, balance types.Balance)
 	deposit  func(vault *types.FLOWTokenVault)
 	withdraw func(balance types.Balance) *types.FLOWTokenVault
@@ -110,6 +111,13 @@ func (t *testFlowAccount) CodeHash() []byte {
 		return nil
 	}
 	return t.codeHash()
+}
+
+func (t *testFlowAccount) Nonce() uint64 {
+	if t.nonce == nil {
+		return 0
+	}
+	return t.nonce()
 }
 
 func (t *testFlowAccount) Transfer(address types.Address, balance types.Balance) {

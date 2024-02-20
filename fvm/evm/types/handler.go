@@ -52,6 +52,10 @@ type AddressAllocator interface {
 	// COAFactoryAddress returns the address for the COA factory
 	COAFactoryAddress() Address
 
+	// NativeTokenBridgeAddress returns the address for the native token bridge
+	// used for deposit and withdraw calls
+	NativeTokenBridgeAddress() Address
+
 	// AllocateAddress allocates an address by index to be used by a precompile contract
 	AllocatePrecompileAddress(index uint64) Address
 }
