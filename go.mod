@@ -107,6 +107,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230711213910-baad011d2b13
 	github.com/onflow/flow-nft/lib/go/contracts v1.1.0
+	github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d
 	github.com/onflow/wal v0.0.0-20240208022732-d756cd497d3b
 	github.com/slok/go-http-metrics v0.10.0
 	github.com/sony/gobreaker v0.5.0
@@ -184,6 +185,7 @@ require (
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gofrs/flock v0.8.1 // indirect
+	github.com/golang/glog v1.1.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/s2a-go v0.1.7 // indirect
@@ -239,6 +241,7 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
+	github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 // indirect
 	github.com/miekg/dns v1.1.57 // indirect
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b // indirect
 	github.com/mikioh/tcpopt v0.0.0-20190314235656-172688c1accc // indirect
