@@ -134,14 +134,13 @@ func testAddressConstants(t *testing.T) {
 	for _, chainID := range chainIDs {
 
 		chain := chainID.Chain()
-		if chainID != Emulator {
-			// check the Zero and Root constants
-			expected := uint64ToAddress(uint64(chainID.getChainCodeWord()))
 
-			assert.Equal(t, chain.zeroAddress(), expected)
-			expected = uint64ToAddress(generatorMatrixRows[0] ^ uint64(chainID.getChainCodeWord()))
-			assert.Equal(t, chain.ServiceAddress(), expected)
-		}
+		// check the Zero and Root constants
+		expected := uint64ToAddress(uint64(chainID.getChainCodeWord()))
+
+		assert.Equal(t, chain.zeroAddress(), expected)
+		expected = uint64ToAddress(generatorMatrixRows[0] ^ uint64(chainID.getChainCodeWord()))
+		assert.Equal(t, chain.ServiceAddress(), expected)
 
 		// check the transition from account zero to root
 		state := chain.NewAddressGenerator()
@@ -197,7 +196,7 @@ func testAddressGeneration(t *testing.T) {
 		}
 
 		// sanity check of addresses weights in Flow.
-		// All addresses hamming weights must be less than d.
+		// All addresses hamming weights must be larger than d.
 		// this is only a sanity check of the implementation and not an exhaustive proof
 		if chainID == Mainnet {
 			r := uint64(rand.Intn(maxIndex - loop))
@@ -210,27 +209,23 @@ func testAddressGeneration(t *testing.T) {
 			}
 		}
 
-		if chainID == Mainnet {
-
-			// sanity check of address distances.
-			// All distances between any two addresses must be less than d.
-			// this is only a sanity check of the implementation and not an exhaustive proof
-			r := uint64(rand.Intn(maxIndex - loop - 1))
-			state = chain.newAddressGeneratorAtIndex(r)
-			refAddress, err := state.NextAddress()
+		// sanity check of address distances.
+		// All distances between any two addresses must be larger than d.
+		// this is only a sanity check of the implementation and not an exhaustive proof
+		r := uint64(rand.Intn(maxIndex - loop - 1))
+		state = chain.newAddressGeneratorAtIndex(r)
+		refAddress, err := state.NextAddress()
+		require.NoError(t, err)
+		for i := 0; i < loop; i++ {
+			address, err := state.NextAddress()
 			require.NoError(t, err)
-			for i := 0; i < loop; i++ {
-				address, err := state.NextAddress()
-				require.NoError(t, err)
-				distance := bits.OnesCount64(address.uint64() ^ refAddress.uint64())
-				assert.LessOrEqual(t, linearCodeD, distance)
-			}
-
+			distance := bits.OnesCount64(address.uint64() ^ refAddress.uint64())
+			assert.LessOrEqual(t, linearCodeD, distance)
 		}
 
 		// sanity check of valid account addresses.
 		// All valid addresses must pass IsValid.
-		r := uint64(rand.Intn(maxIndex - loop))
+		r = uint64(rand.Intn(maxIndex - loop))
 		state = chain.newAddressGeneratorAtIndex(r)
 		for i := 0; i < loop; i++ {
 			address, err := state.NextAddress()
