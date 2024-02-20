@@ -4,8 +4,8 @@ import "FlowToken"
 access(all)
 contract EVM {
 
-    access(all)
-    event BridgedAccountCreated(addressBytes: [UInt8; 20])
+     access(all)
+     event CadenceOwnedAccountCreated(addressBytes: [UInt8; 20])
 
     /// EVMAddress is an EVM-compatible address
     access(all)
@@ -35,7 +35,7 @@ contract EVM {
 
         /// The balance in atto-FLOW
         /// Atto-FLOW is the smallest denomination of FLOW (1e18 FLOW)
-        /// that is used to store account balances inside EVM 
+        /// that is used to store account balances inside EVM
         /// similar to the way WEI is used to store ETH divisible to 18 decimal places.
         access(all)
         var attoflow: UInt
@@ -46,17 +46,17 @@ contract EVM {
             self.attoflow = attoflow
         }
 
-        /// Sets the balance by a UFix64 (8 decimal points), the format 
-        /// that is used in Cadence to store FLOW tokens.  
+        /// Sets the balance by a UFix64 (8 decimal points), the format
+        /// that is used in Cadence to store FLOW tokens.
         access(all)
         fun setFLOW(flow: UFix64){
             self.attoflow = InternalEVM.castToAttoFLOW(balance: flow)
         }
 
         /// Casts the balance to a UFix64 (rounding down)
-        /// Warning! casting a balance to a UFix64 which supports a lower level of precision 
+        /// Warning! casting a balance to a UFix64 which supports a lower level of precision
         /// (8 decimal points in compare to 18) might result in rounding down error.
-        /// Use the toAttoFlow function if you care need more accuracy. 
+        /// Use the toAttoFlow function if you care need more accuracy.
         access(all)
         fun inFLOW(): UFix64 {
             return InternalEVM.castToFLOW(balance: self.attoflow)
@@ -77,7 +77,7 @@ contract EVM {
     }
 
     access(all)
-    resource BridgedAccount: Addressable  {
+    resource CadenceOwnedAccount: Addressable  {
 
         access(self)
         var addressBytes: [UInt8; 20]
@@ -86,8 +86,8 @@ contract EVM {
             // address is initially set to zero
             // but updated through initAddress later
             // we have to do this since we need resource id (uuid)
-            // to calculate the EVM address for this bridge account
-            self.addressBytes = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] 
+            // to calculate the EVM address for this cadence owned account
+            self.addressBytes = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         }
 
         access(contract)
@@ -100,20 +100,20 @@ contract EVM {
            self.addressBytes = addressBytes
         }
 
-        /// The EVM address of the bridged account
+        /// The EVM address of the cadence owned account
         access(all)
         fun address(): EVMAddress {
             // Always create a new EVMAddress instance
             return EVMAddress(bytes: self.addressBytes)
         }
 
-        /// Get balance of the bridged account
+        /// Get balance of the cadence owned account
         access(all)
         fun balance(): Balance {
             return self.address().balance()
         }
 
-        /// Deposits the given vault into the bridged account's balance
+        /// Deposits the given vault into the cadence owned account's balance
         access(all)
         fun deposit(from: @FlowToken.Vault) {
             InternalEVM.deposit(
@@ -122,11 +122,11 @@ contract EVM {
             )
         }
 
-        /// Withdraws the balance from the bridged account's balance
-        /// Note that amounts smaller than 10nF (10e-8) can't be withdrawn 
+        /// Withdraws the balance from the cadence owned account's balance
+        /// Note that amounts smaller than 10nF (10e-8) can't be withdrawn
         /// given that Flow Token Vaults use UFix64s to store balances.
-        /// If the given balance conversion to UFix64 results in 
-        /// rounding error, this function would fail. 
+        /// If the given balance conversion to UFix64 results in
+        /// rounding error, this function would fail.
         access(all)
         fun withdraw(balance: Balance): @FlowToken.Vault {
             let vault <- InternalEVM.withdraw(
@@ -172,13 +172,13 @@ contract EVM {
         }
     }
 
-    /// Creates a new bridged account
+    /// Creates a new cadence owned account
     access(all)
-    fun createBridgedAccount(): @BridgedAccount {
-        let acc <-create BridgedAccount()
-        let addr = InternalEVM.createBridgedAccount(uuid: acc.uuid)
+    fun createCadenceOwnedAccount(): @CadenceOwnedAccount {
+        let acc <-create CadenceOwnedAccount()
+        let addr = InternalEVM.createCadenceOwnedAccount(uuid: acc.uuid)
         acc.initAddress(addressBytes: addr)
-        emit BridgedAccountCreated(addressBytes: addr)
+        emit CadenceOwnedAccountCreated(addressBytes: addr)
         return <-acc
     }
 
@@ -245,13 +245,13 @@ contract EVM {
         evmAddress: [UInt8; 20]
     ) {
 
-        // make signature set first 
+        // make signature set first
         // check number of signatures matches number of key indices
         assert(keyIndices.length == signatures.length,
                message: "key indices size doesn't match the signatures")
 
         var signatureSet: [Crypto.KeyListSignature] = []
-        var idx = 0 
+        var idx = 0
         for sig in signatures{
             signatureSet.append(Crypto.KeyListSignature(
                 keyIndex: Int(keyIndices[Int(idx)]),
@@ -282,8 +282,8 @@ contract EVM {
         )
         assert(isValid, message: "signatures not valid")
 
-        let coaRef = acc.capabilities.borrow<&EVM.BridgedAccount>(path)
-            ?? panic("could not borrow bridge account's address")
+        let coaRef = acc.capabilities.borrow<&EVM.CadenceOwnedAccount>(path)
+            ?? panic("could not borrow Cadence-owned account's address")
 
         // verify evm address matching
         var i = 0
