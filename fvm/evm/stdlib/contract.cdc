@@ -242,7 +242,7 @@ contract EVM {
         access(all)
         let problem: String?
 
-        init(_ isValid: Bool,_ problem: String? ) {
+        init(isValid: Bool, problem: String?) {
             self.isValid = isValid
             self.problem = problem
         }
@@ -262,8 +262,9 @@ contract EVM {
         // make signature set first 
         // check number of signatures matches number of key indices
         if keyIndices.length != signatures.length {
-            return ValidationResult(false,
-                "key indices size doesn't match the signatures"
+            return ValidationResult(
+                isValid: false,
+                problem: "key indices size doesn't match the signatures"
             )
         }
 
@@ -298,8 +299,9 @@ contract EVM {
         )
 
         if !isValid{
-            return ValidationResult(false,
-                "the given signatures are not valid or provide enough weight" 
+            return ValidationResult(
+                isValid: false,
+                problem: "the given signatures are not valid or provide enough weight" 
             )
         }
 
@@ -307,9 +309,10 @@ contract EVM {
             .borrow<&EVM.CadenceOwnedAccount{EVM.Addressable}>()
         
         if coaRef == nil {
-             return ValidationResult(false,
-                    "could not borrow bridge account's resource"
-                )
+             return ValidationResult(
+                 isValid: false,
+                 problem: "could not borrow bridge account's resource"
+             )
         }
 
         // verify evm address matching
@@ -317,11 +320,17 @@ contract EVM {
         var addr = coaRef!.address()
         for item in addr.bytes {
             if item != evmAddress[i] {
-                return ValidationResult(false, "evm address mismatch")
+                return ValidationResult(
+                    isValid: false,
+                    problem: "EVM address mismatch"
+                )
             }
             i = i +1
         }
         
-        return ValidationResult(true, nil)
+        return ValidationResult(
+        	isValid: true,
+        	problem: nil
+        )
     }
 }
