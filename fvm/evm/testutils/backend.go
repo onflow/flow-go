@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
-	"math"
 	"testing"
 
 	"github.com/onflow/atree"
@@ -22,7 +21,7 @@ import (
 )
 
 var TestFlowEVMRootAddress = flow.BytesToAddress([]byte("FlowEVM"))
-var TestComputationLimit = uint(math.MaxUint64 - 1)
+var TestComputationLimit = uint(100_000_000)
 
 func RunWithTestFlowEVMRootAddress(t testing.TB, backend atree.Ledger, f func(flow.Address)) {
 	as := environment.NewAccountStatus()
@@ -33,11 +32,12 @@ func RunWithTestFlowEVMRootAddress(t testing.TB, backend atree.Ledger, f func(fl
 
 func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
 	tb := &TestBackend{
-		TestValueStore:      GetSimpleValueStore(),
-		testEventEmitter:    getSimpleEventEmitter(),
-		testMeter:           getSimpleMeter(),
-		TestBlockInfo:       &TestBlockInfo{},
-		TestRandomGenerator: getSimpleRandomGenerator(),
+		TestValueStore:              GetSimpleValueStore(),
+		testEventEmitter:            getSimpleEventEmitter(),
+		testMeter:                   getSimpleMeter(),
+		TestBlockInfo:               &TestBlockInfo{},
+		TestRandomGenerator:         getSimpleRandomGenerator(),
+		TestContractFunctionInvoker: &TestContractFunctionInvoker{},
 	}
 	f(tb)
 }
@@ -80,6 +80,10 @@ func GetSimpleValueStore() *TestValueStore {
 		},
 		AllocateStorageIndexFunc: func(owner []byte) (atree.StorageIndex, error) {
 			index := allocator[string(owner)]
+			// TODO: figure out why it result in a collision
+			if index == 0 {
+				index = 10
+			}
 			var data [8]byte
 			allocator[string(owner)] = index + 1
 			binary.BigEndian.PutUint64(data[:], index)
@@ -135,18 +139,17 @@ func getSimpleEventEmitter() *testEventEmitter {
 }
 
 func getSimpleMeter() *testMeter {
-	computationLimit := TestComputationLimit
 	compUsed := uint(0)
 	return &testMeter{
 		meterComputation: func(kind common.ComputationKind, intensity uint) error {
 			compUsed += intensity
-			if compUsed > computationLimit {
-				return fmt.Errorf("computation limit has hit %d", computationLimit)
+			if compUsed > TestComputationLimit {
+				return fmt.Errorf("computation limit has hit %d", TestComputationLimit)
 			}
 			return nil
 		},
 		hasComputationCapacity: func(kind common.ComputationKind, intensity uint) bool {
-			return compUsed+intensity < computationLimit
+			return compUsed+intensity < TestComputationLimit
 		},
 		computationUsed: func() (uint64, error) {
 			return uint64(compUsed), nil
@@ -160,6 +163,7 @@ type TestBackend struct {
 	*testEventEmitter
 	*TestBlockInfo
 	*TestRandomGenerator
+	*TestContractFunctionInvoker
 }
 
 var _ types.Backend = &TestBackend{}
@@ -176,6 +180,10 @@ func (tb *TestBackend) DropEvents() {
 		panic("method not set")
 	}
 	tb.reset()
+}
+
+func (tb *TestBackend) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+	return tb.GetValue([]byte(id.Owner), []byte(id.Key))
 }
 
 type TestValueStore struct {
@@ -429,4 +437,29 @@ func getSimpleRandomGenerator() *TestRandomGenerator {
 			return err
 		},
 	}
+}
+
+type TestContractFunctionInvoker struct {
+	InvokeFunc func(
+		spec environment.ContractFunctionSpec,
+		arguments []cadence.Value,
+	) (
+		cadence.Value,
+		error,
+	)
+}
+
+var _ environment.ContractFunctionInvoker = &TestContractFunctionInvoker{}
+
+func (t *TestContractFunctionInvoker) Invoke(
+	spec environment.ContractFunctionSpec,
+	arguments []cadence.Value,
+) (
+	cadence.Value,
+	error,
+) {
+	if t.InvokeFunc == nil {
+		panic("InvokeFunc method is not set")
+	}
+	return t.InvokeFunc(spec, arguments)
 }

@@ -112,6 +112,16 @@ func (_m *NetworkMetrics) DuplicateInboundMessagesDropped(topic string, _a1 stri
 	_m.Called(topic, _a1, messageType)
 }
 
+// DuplicateMessagePenalties provides a mock function with given fields: penalty
+func (_m *NetworkMetrics) DuplicateMessagePenalties(penalty float64) {
+	_m.Called(penalty)
+}
+
+// DuplicateMessagesCounts provides a mock function with given fields: count
+func (_m *NetworkMetrics) DuplicateMessagesCounts(count float64) {
+	_m.Called(count)
+}
+
 // InboundConnections provides a mock function with given fields: connectionCount
 func (_m *NetworkMetrics) InboundConnections(connectionCount uint) {
 	_m.Called(connectionCount)

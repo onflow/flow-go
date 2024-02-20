@@ -6,11 +6,12 @@ import (
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethCore "github.com/ethereum/go-ethereum/core"
 	gethCrypto "github.com/ethereum/go-ethereum/crypto"
+	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
 const (
-	// tx type 255 is used for direct calls from bridged accounts
+	// tx type 255 is used for direct calls from COAs
 	DirectCallTxType = byte(255)
 
 	UnknownCallSubType  = byte(0)
@@ -20,7 +21,11 @@ const (
 	DeployCallSubType   = byte(4)
 	ContractCallSubType = byte(5)
 
-	TransferGasUsage = 21_000
+	DepositCallGasLimit  = gethParams.TxGas
+	WithdrawCallGasLimit = gethParams.TxGas
+
+	// 21_000 is the minimum for a transaction + max gas allowed for receive/fallback methods
+	DefaultGasLimitForTokenTransfer = 21_000 + 2_300
 )
 
 // DirectCall captures all the data related to a direct call to evm
@@ -52,7 +57,7 @@ func (dc *DirectCall) Hash() (gethCommon.Hash, error) {
 // Message constructs a core.Message from the direct call
 func (dc *DirectCall) Message() *gethCore.Message {
 	var to *gethCommon.Address
-	if dc.To != EmptyAddress {
+	if !dc.EmptyToField() {
 		ct := dc.To.ToCommon()
 		to = &ct
 	}
@@ -63,11 +68,16 @@ func (dc *DirectCall) Message() *gethCore.Message {
 		Data:      dc.Data,
 		GasLimit:  dc.GasLimit,
 		GasPrice:  big.NewInt(0), // price is set to zero fo direct calls
-		GasTipCap: big.NewInt(1), // also known as maxPriorityFeePerGas
-		GasFeeCap: big.NewInt(2), // also known as maxFeePerGas
+		GasTipCap: big.NewInt(1), // also known as maxPriorityFeePerGas (in GWei)
+		GasFeeCap: big.NewInt(2), // also known as maxFeePerGas (in GWei)
 		// AccessList:        tx.AccessList(), // TODO revisit this value, the cost matter but performance might
 		SkipAccountChecks: true, // this would let us not set the nonce
 	}
+}
+
+// EmptyToField returns true if `to` field contains an empty address
+func (dc *DirectCall) EmptyToField() bool {
+	return dc.To == EmptyAddress
 }
 
 func NewDepositCall(address Address, amount *big.Int) *DirectCall {
@@ -78,7 +88,7 @@ func NewDepositCall(address Address, amount *big.Int) *DirectCall {
 		To:       address,
 		Data:     nil,
 		Value:    amount,
-		GasLimit: TransferGasUsage,
+		GasLimit: DepositCallGasLimit,
 	}
 }
 
@@ -90,7 +100,7 @@ func NewWithdrawCall(address Address, amount *big.Int) *DirectCall {
 		To:       EmptyAddress,
 		Data:     nil,
 		Value:    amount,
-		GasLimit: TransferGasUsage,
+		GasLimit: WithdrawCallGasLimit,
 	}
 }
 
@@ -102,11 +112,16 @@ func NewTransferCall(from Address, to Address, amount *big.Int) *DirectCall {
 		To:       to,
 		Data:     nil,
 		Value:    amount,
-		GasLimit: TransferGasUsage,
+		GasLimit: DefaultGasLimitForTokenTransfer,
 	}
 }
 
-func NewDeployCall(caller Address, code Code, gasLimit uint64, value *big.Int) *DirectCall {
+func NewDeployCall(
+	caller Address,
+	code Code,
+	gasLimit uint64,
+	value *big.Int,
+) *DirectCall {
 	return &DirectCall{
 		Type:     DirectCallTxType,
 		SubType:  DeployCallSubType,
@@ -118,7 +133,34 @@ func NewDeployCall(caller Address, code Code, gasLimit uint64, value *big.Int) *
 	}
 }
 
-func NewContractCall(caller Address, to Address, data Data, gasLimit uint64, value *big.Int) *DirectCall {
+// this subtype should only be used internally for
+// deploying contracts at given addresses (e.g. COA account init setup)
+// should not be used for other means.
+func NewDeployCallWithTargetAddress(
+	caller Address,
+	to Address,
+	code Code,
+	gasLimit uint64,
+	value *big.Int,
+) *DirectCall {
+	return &DirectCall{
+		Type:     DirectCallTxType,
+		SubType:  DeployCallSubType,
+		From:     caller,
+		To:       to,
+		Data:     code,
+		Value:    value,
+		GasLimit: gasLimit,
+	}
+}
+
+func NewContractCall(
+	caller Address,
+	to Address,
+	data Data,
+	gasLimit uint64,
+	value *big.Int,
+) *DirectCall {
 	return &DirectCall{
 		Type:     DirectCallTxType,
 		SubType:  ContractCallSubType,
@@ -128,4 +170,15 @@ func NewContractCall(caller Address, to Address, data Data, gasLimit uint64, val
 		Value:    value,
 		GasLimit: gasLimit,
 	}
+}
+
+type GasLimit uint64
+
+type Code []byte
+
+type Data []byte
+
+// AsBigInt process the data and return it as a big integer
+func (d Data) AsBigInt() *big.Int {
+	return new(big.Int).SetBytes(d)
 }

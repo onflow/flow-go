@@ -1,7 +1,10 @@
+import Crypto
 import "FlowToken"
 
 access(all)
 contract EVM {
+
+    pub event CadenceOwnedAccountCreated(addressBytes: [UInt8; 20])
 
     /// EVMAddress is an EVM-compatible address
     access(all)
@@ -66,29 +69,50 @@ contract EVM {
     }
 
     access(all)
-    resource BridgedAccount {
+    resource interface Addressable {
+        /// The EVM address
+        access(all)
+        fun address(): EVMAddress
+    }
+
+    access(all)
+    resource CadenceOwnedAccount: Addressable  {
 
         access(self)
-        let addressBytes: [UInt8; 20]
+        var addressBytes: [UInt8; 20]
 
-        init(addressBytes: [UInt8; 20]) {
+        init() {
+            // address is initially set to zero
+            // but updated through initAddress later
+            // we have to do this since we need resource id (uuid)
+            // to calculate the EVM address for this cadence owned account
+            self.addressBytes = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] 
+        }
+
+        access(contract)
+        fun initAddress(addressBytes: [UInt8; 20]) {
+           // only allow set address for the first time
+           // check address is empty
+            for item in self.addressBytes {
+                assert(item == 0, message: "address byte is not empty")
+            }
            self.addressBytes = addressBytes
         }
 
-        /// The EVM address of the bridged account
+        /// The EVM address of the cadence owned account
         access(all)
         fun address(): EVMAddress {
             // Always create a new EVMAddress instance
             return EVMAddress(bytes: self.addressBytes)
         }
 
-        /// Get balance of the bridged account
+        /// Get balance of the cadence owned account
         access(all)
         fun balance(): Balance {
             return self.address().balance()
         }
 
-        /// Deposits the given vault into the bridged account's balance
+        /// Deposits the given vault into the cadence owned account's balance
         access(all)
         fun deposit(from: @FlowToken.Vault) {
             InternalEVM.deposit(
@@ -97,7 +121,7 @@ contract EVM {
             )
         }
 
-        /// Withdraws the balance from the bridged account's balance
+        /// Withdraws the balance from the cadence owned account's balance
         /// Note that amounts smaller than 10nF (10e-8) can't be withdrawn 
         /// given that Flow Token Vaults use UFix64s to store balances.
         /// If the given balance conversion to UFix64 results in 
@@ -147,12 +171,14 @@ contract EVM {
         }
     }
 
-    /// Creates a new bridged account
+    /// Creates a new cadence owned account
     access(all)
-    fun createBridgedAccount(): @BridgedAccount {
-        return <-create BridgedAccount(
-            addressBytes: InternalEVM.createBridgedAccount()
-        )
+    fun createCadenceOwnedAccount(): @CadenceOwnedAccount {
+        let acc <-create CadenceOwnedAccount()
+        let addr = InternalEVM.createCadenceOwnedAccount(uuid: acc.uuid)
+        acc.initAddress(addressBytes: addr)
+        emit CadenceOwnedAccountCreated(addressBytes: addr)
+        return <-acc
     }
 
     /// Runs an a RLP-encoded EVM transaction, deducts the gas fees,
@@ -205,5 +231,65 @@ contract EVM {
         }
 
         return InternalEVM.decodeABI(types: types, data: data)
+    }
+
+    /// validateCOAOwnershipProof validates a COA ownership proof
+    access(all)
+    fun validateCOAOwnershipProof(
+        address: Address,
+        path: PublicPath,
+        signedData: [UInt8],
+        keyIndices: [UInt64],
+        signatures: [[UInt8]],
+        evmAddress: [UInt8; 20]
+    ) {
+
+        // make signature set first 
+        // check number of signatures matches number of key indices
+        assert(keyIndices.length == signatures.length,
+               message: "key indices size doesn't match the signatures")
+
+        var signatureSet: [Crypto.KeyListSignature] = []
+        var idx = 0 
+        for sig in signatures{
+            signatureSet.append(Crypto.KeyListSignature(
+                keyIndex: Int(keyIndices[Int(idx)]),
+                signature: sig
+            ))
+            idx = idx + 1
+        }
+
+        // fetch account
+        let acc = getAccount(address)
+
+        // constructing key list
+        let keyList = Crypto.KeyList()
+        for sig in signatureSet {
+            let key = acc.keys.get(keyIndex: sig.keyIndex)!
+            assert(!key.isRevoked, message: "revoked key is used")
+            keyList.add(
+              key.publicKey,
+              hashAlgorithm: key.hashAlgorithm,
+              weight: key.weight,
+           )
+        }
+
+        let isValid = keyList.verify(
+            signatureSet: signatureSet,
+            signedData: signedData
+        )
+        assert(isValid, message: "signatures not valid")
+
+        let coaRef = acc.getCapability(path)
+            .borrow<&EVM.CadenceOwnedAccount{EVM.Addressable}>()
+            ?? panic("could not borrow coa resource addressable capability")
+
+        // verify evm address matching
+        var i = 0
+        for item in coaRef.address().bytes {
+            assert(item == evmAddress[i], message: "evm address mismatch")
+            i = i +1
+        }
+
     }
 }

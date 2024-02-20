@@ -30,7 +30,7 @@ var contractCode string
 //go:embed abiOnlyContract.cdc
 var abiOnlyContractCode string
 
-var flowTokenImportPattern = regexp.MustCompile(`^import "FlowToken"\n`)
+var flowTokenImportPattern = regexp.MustCompile(`(?m)^import "FlowToken"\n`)
 
 func ContractCode(flowTokenAddress flow.Address, evmAbiOnly bool) []byte {
 	if evmAbiOnly {
@@ -1137,22 +1137,32 @@ func newInternalEVMTypeCallFunction(
 	)
 }
 
-const internalEVMTypeCreateBridgedAccountFunctionName = "createBridgedAccount"
+const internalEVMTypeCreateCadenceOwnedAccountFunctionName = "createCadenceOwnedAccount"
 
-var internalEVMTypeCreateBridgedAccountFunctionType = &sema.FunctionType{
+var internalEVMTypeCreateCadenceOwnedAccountFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "uuid",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
+		},
+	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
 }
 
-func newInternalEVMTypeCreateBridgedAccountFunction(
+func newInternalEVMTypeCreateCadenceOwnedAccountFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewHostFunctionValue(
 		gauge,
-		internalEVMTypeCreateBridgedAccountFunctionType,
+		internalEVMTypeCreateCadenceOwnedAccountFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			inter := invocation.Interpreter
-			address := handler.AllocateAddress()
+			uuid, ok := invocation.Arguments[0].(interpreter.UInt64Value)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+			address := handler.DeployCOA(uint64(uuid))
 			return EVMAddressToAddressBytesArrayValue(inter, address)
 		},
 	)
@@ -1522,17 +1532,17 @@ func NewInternalEVMContractValue(
 		internalEVMContractStaticType,
 		InternalEVMContractType.Fields,
 		map[string]interpreter.Value{
-			internalEVMTypeRunFunctionName:                  newInternalEVMTypeRunFunction(gauge, handler),
-			internalEVMTypeCreateBridgedAccountFunctionName: newInternalEVMTypeCreateBridgedAccountFunction(gauge, handler),
-			internalEVMTypeCallFunctionName:                 newInternalEVMTypeCallFunction(gauge, handler),
-			internalEVMTypeDepositFunctionName:              newInternalEVMTypeDepositFunction(gauge, handler),
-			internalEVMTypeWithdrawFunctionName:             newInternalEVMTypeWithdrawFunction(gauge, handler),
-			internalEVMTypeDeployFunctionName:               newInternalEVMTypeDeployFunction(gauge, handler),
-			internalEVMTypeBalanceFunctionName:              newInternalEVMTypeBalanceFunction(gauge, handler),
-			internalEVMTypeEncodeABIFunctionName:            newInternalEVMTypeEncodeABIFunction(gauge, location),
-			internalEVMTypeDecodeABIFunctionName:            newInternalEVMTypeDecodeABIFunction(gauge, location),
-			internalEVMTypeCastToAttoFLOWFunctionName:       newInternalEVMTypeCastToAttoFLOWFunction(gauge, handler),
-			internalEVMTypeCastToFLOWFunctionName:           newInternalEVMTypeCastToFLOWFunction(gauge, handler),
+			internalEVMTypeRunFunctionName:                       newInternalEVMTypeRunFunction(gauge, handler),
+			internalEVMTypeCreateCadenceOwnedAccountFunctionName: newInternalEVMTypeCreateCadenceOwnedAccountFunction(gauge, handler),
+			internalEVMTypeCallFunctionName:                      newInternalEVMTypeCallFunction(gauge, handler),
+			internalEVMTypeDepositFunctionName:                   newInternalEVMTypeDepositFunction(gauge, handler),
+			internalEVMTypeWithdrawFunctionName:                  newInternalEVMTypeWithdrawFunction(gauge, handler),
+			internalEVMTypeDeployFunctionName:                    newInternalEVMTypeDeployFunction(gauge, handler),
+			internalEVMTypeBalanceFunctionName:                   newInternalEVMTypeBalanceFunction(gauge, handler),
+			internalEVMTypeEncodeABIFunctionName:                 newInternalEVMTypeEncodeABIFunction(gauge, location),
+			internalEVMTypeDecodeABIFunctionName:                 newInternalEVMTypeDecodeABIFunction(gauge, location),
+			internalEVMTypeCastToAttoFLOWFunctionName:            newInternalEVMTypeCastToAttoFLOWFunction(gauge, handler),
+			internalEVMTypeCastToFLOWFunctionName:                newInternalEVMTypeCastToFLOWFunction(gauge, handler),
 		},
 		nil,
 		nil,
@@ -1557,8 +1567,8 @@ var InternalEVMContractType = func() *sema.CompositeType {
 		),
 		sema.NewUnmeteredPublicFunctionMember(
 			ty,
-			internalEVMTypeCreateBridgedAccountFunctionName,
-			internalEVMTypeCreateBridgedAccountFunctionType,
+			internalEVMTypeCreateCadenceOwnedAccountFunctionName,
+			internalEVMTypeCreateCadenceOwnedAccountFunctionType,
 			"",
 		),
 		sema.NewUnmeteredPublicFunctionMember(
