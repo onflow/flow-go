@@ -38,14 +38,40 @@ func (b *backendSubscribeBlocks) SubscribeBlocks(ctx context.Context, startBlock
 		return subscription.NewFailedSubscription(err, "could not get start height")
 	}
 
-	sub := subscription.NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getResponse(blockStatus))
+	sub := subscription.NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getBlockResponse(blockStatus))
 	go subscription.NewStreamer(b.log, b.Broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
 
 	return sub
 }
 
-// getResponse returns a GetDataByHeightFunc that retrieves block information for the specified height.
-func (b *backendSubscribeBlocks) getResponse(blockStatus flow.BlockStatus) subscription.GetDataByHeightFunc {
+// SubscribeBlockHeaders subscribes to block headers starting from a specified block ID or height and with a given block status.
+func (b *backendSubscribeBlocks) SubscribeBlockHeaders(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
+	nextHeight, err := b.getStartHeight(startBlockID, startHeight, blockStatus)
+	if err != nil {
+		return subscription.NewFailedSubscription(err, "could not get start height")
+	}
+
+	sub := subscription.NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getBlockHeaderResponse(blockStatus))
+	go subscription.NewStreamer(b.log, b.Broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
+
+	return sub
+}
+
+// SubscribeBlockDigests subscribes to lightweight blocks starting from a specified block ID or height and with a given block status.
+func (b *backendSubscribeBlocks) SubscribeBlockDigests(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
+	nextHeight, err := b.getStartHeight(startBlockID, startHeight, blockStatus)
+	if err != nil {
+		return subscription.NewFailedSubscription(err, "could not get start height")
+	}
+
+	sub := subscription.NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getBlockDigestResponse(blockStatus))
+	go subscription.NewStreamer(b.log, b.Broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
+
+	return sub
+}
+
+// getBlockResponse returns a GetDataByHeightFunc that retrieves block information for the specified height.
+func (b *backendSubscribeBlocks) getBlockResponse(blockStatus flow.BlockStatus) subscription.GetDataByHeightFunc {
 	return func(_ context.Context, height uint64) (interface{}, error) {
 		block, err := b.getBlock(height, blockStatus)
 		if err != nil {
@@ -58,6 +84,44 @@ func (b *backendSubscribeBlocks) getResponse(blockStatus flow.BlockStatus) subsc
 			Msgf("sending block info")
 
 		return block, nil
+	}
+}
+
+// getBlockHeaderResponse returns a GetDataByHeightFunc that retrieves block header information for the specified height.
+func (b *backendSubscribeBlocks) getBlockHeaderResponse(blockStatus flow.BlockStatus) subscription.GetDataByHeightFunc {
+	return func(_ context.Context, height uint64) (interface{}, error) {
+		block, err := b.getBlock(height, blockStatus)
+		if err != nil {
+			return nil, fmt.Errorf("could not get block by height %d: %w", height, err)
+		}
+
+		b.log.Trace().
+			Hex("block_id", logging.ID(block.ID())).
+			Uint64("height", height).
+			Msgf("sending block header info")
+
+		return block.Header, nil
+	}
+}
+
+// getBlockDigestResponse returns a GetDataByHeightFunc that retrieves lightweight block information for the specified height.
+func (b *backendSubscribeBlocks) getBlockDigestResponse(blockStatus flow.BlockStatus) subscription.GetDataByHeightFunc {
+	return func(_ context.Context, height uint64) (interface{}, error) {
+		block, err := b.getBlock(height, blockStatus)
+		if err != nil {
+			return nil, fmt.Errorf("could not get block by height %d: %w", height, err)
+		}
+
+		b.log.Trace().
+			Hex("block_id", logging.ID(block.ID())).
+			Uint64("height", height).
+			Msgf("sending lightweight block info")
+
+		return &flow.LightweightBlock{
+			ID:        block.ID(),
+			Height:    block.Header.Height,
+			Timestamp: block.Header.Timestamp,
+		}, nil
 	}
 }
 

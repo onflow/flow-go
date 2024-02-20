@@ -6,6 +6,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
@@ -723,17 +724,13 @@ func (h *Handler) SubscribeBlocks(request *access.SubscribeBlocksRequest, stream
 	h.StreamCount.Add(1)
 	defer h.StreamCount.Add(-1)
 
-	startBlockID := flow.ZeroID
-	if request.GetStartBlockId() != nil {
-		blockID, err := convert.BlockID(request.GetStartBlockId())
-		if err != nil {
-			return status.Errorf(codes.InvalidArgument, "could not convert start block ID: %v", err)
-		}
-		startBlockID = blockID
+	startBlockID, err := h.getStartBlockID(request.StartBlockId)
+	if err != nil {
+		return status.Errorf(codes.InvalidArgument, "invalid start block ID argument: %v", err)
 	}
 
 	blockStatus := convert.MessageToBlockStatus(request.BlockStatus)
-	err := checkBlockStatus(blockStatus)
+	err = checkBlockStatus(blockStatus)
 	if err != nil {
 		return status.Errorf(codes.InvalidArgument, "invalid block status argument: %v", err)
 	}
@@ -748,18 +745,18 @@ func (h *Handler) SubscribeBlocks(request *access.SubscribeBlocksRequest, stream
 			return nil
 		}
 
-		blockResp, ok := v.(*flow.Block)
+		block, ok := v.(*flow.Block)
 		if !ok {
 			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
 		}
 
-		resp, err := h.blockResponse(blockResp, request.GetFullBlockResponse(), blockStatus)
+		msgBlockResponse, err := h.blockResponse(block, request.GetFullBlockResponse(), blockStatus)
 		if err != nil {
 			return rpc.ConvertError(err, "could not convert block to message", codes.Internal)
 		}
 
 		err = stream.Send(&access.SubscribeBlocksResponse{
-			Block: resp.Block,
+			Block: msgBlockResponse.Block,
 		})
 		if err != nil {
 			return rpc.ConvertError(err, "could not send response", codes.Internal)
@@ -767,7 +764,132 @@ func (h *Handler) SubscribeBlocks(request *access.SubscribeBlocksRequest, stream
 	}
 }
 
-func (h *Handler) SendAndSubscribeTransactionStatuses(request *access.SendAndSubscribeTransactionStatusesRequest, stream access.AccessAPI_SendAndSubscribeTransactionStatusesServer) error {
+// SubscribeBlockHeaders streams finalized or sealed block headers starting at the requested
+// start block, up until the latest available block header. Once the latest is
+// reached, the stream will remain open and responses are sent for each new
+// block header as it becomes available.
+//
+// Each block header are filtered by the provided block status, and only
+// those block headers that match the status are returned.
+func (h *Handler) SubscribeBlockHeaders(request *access.SubscribeBlockHeadersRequest, stream access.AccessAPI_SubscribeBlockHeadersServer) error {
+	// check if the maximum number of streams is reached
+	if h.StreamCount.Load() >= h.MaxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
+
+	startBlockID, err := h.getStartBlockID(request.StartBlockId)
+	if err != nil {
+		return status.Errorf(codes.InvalidArgument, "invalid start block ID argument: %v", err)
+	}
+
+	blockStatus := convert.MessageToBlockStatus(request.BlockStatus)
+	err = checkBlockStatus(blockStatus)
+	if err != nil {
+		return status.Errorf(codes.InvalidArgument, "invalid block status argument: %v", err)
+	}
+
+	sub := h.api.SubscribeBlockHeaders(stream.Context(), startBlockID, request.GetStartBlockHeight(), blockStatus)
+	for {
+		v, ok := <-sub.Channel()
+		if !ok {
+			if sub.Err() != nil {
+				return rpc.ConvertError(sub.Err(), "stream encountered an error", codes.Internal)
+			}
+			return nil
+		}
+
+		header, ok := v.(*flow.Header)
+		if !ok {
+			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
+		}
+
+		signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(header)
+		if err != nil {
+			return err // the block was retrieved from local storage - so no errors are expected
+		}
+
+		msgHeader, err := convert.BlockHeaderToMessage(header, signerIDs)
+		if err != nil {
+			return err
+		}
+
+		err = stream.Send(&access.SubscribeBlockHeadersResponse{
+			Header: msgHeader,
+		})
+		if err != nil {
+			return rpc.ConvertError(err, "could not send response", codes.Internal)
+		}
+	}
+}
+
+// SubscribeBlockDigests streams finalized or sealed lightweight block starting at the requested
+// start block, up until the latest available block. Once the latest is
+// reached, the stream will remain open and responses are sent for each new
+// block as it becomes available.
+//
+// Each lightweight block are filtered by the provided block status, and only
+// those blocks that match the status are returned.
+func (h *Handler) SubscribeBlockDigests(request *access.SubscribeBlockDigestsRequest, stream access.AccessAPI_SubscribeBlockDigestsServer) error {
+	// check if the maximum number of streams is reached
+	if h.StreamCount.Load() >= h.MaxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
+
+	startBlockID, err := h.getStartBlockID(request.StartBlockId)
+	if err != nil {
+		return status.Errorf(codes.InvalidArgument, "invalid start block ID argument: %v", err)
+	}
+
+	blockStatus := convert.MessageToBlockStatus(request.BlockStatus)
+	err = checkBlockStatus(blockStatus)
+	if err != nil {
+		return status.Errorf(codes.InvalidArgument, "invalid block status argument: %v", err)
+	}
+
+	sub := h.api.SubscribeBlockDigests(stream.Context(), startBlockID, request.GetStartBlockHeight(), blockStatus)
+	for {
+		v, ok := <-sub.Channel()
+		if !ok {
+			if sub.Err() != nil {
+				return rpc.ConvertError(sub.Err(), "stream encountered an error", codes.Internal)
+			}
+			return nil
+		}
+
+		lightweightBlock, ok := v.(*flow.LightweightBlock)
+		if !ok {
+			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
+		}
+
+		err = stream.Send(&access.SubscribeBlockDigestsResponse{
+			BlockId:        convert.IdentifierToMessage(lightweightBlock.ID),
+			BlockHeight:    lightweightBlock.Height,
+			BlockTimestamp: timestamppb.New(lightweightBlock.Timestamp),
+		})
+		if err != nil {
+			return rpc.ConvertError(err, "could not send response", codes.Internal)
+		}
+	}
+}
+
+func (h *Handler) getStartBlockID(blockID []byte) (flow.Identifier, error) {
+	startBlockID := flow.ZeroID
+	if blockID != nil {
+		id, err := convert.BlockID(blockID)
+		if err != nil {
+			return startBlockID, status.Errorf(codes.InvalidArgument, "could not convert start block ID: %v", err)
+		}
+		startBlockID = id
+	}
+
+	return startBlockID, nil
+}
+
+func (h *Handler) SendAndSubscribeTransactionStatuses(_ *access.SendAndSubscribeTransactionStatusesRequest, _ access.AccessAPI_SendAndSubscribeTransactionStatusesServer) error {
 	panic("not implemented!")
 }
 

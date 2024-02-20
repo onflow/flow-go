@@ -65,6 +65,26 @@ type BackendBlocksSuite struct {
 	sealMap     map[flow.Identifier]*flow.Seal
 
 	backend *Backend
+
+	tests      []testType
+	errorTests []errorTestType
+}
+
+type testType struct {
+	name              string
+	highestBackfill   int
+	startBlockID      flow.Identifier
+	startHeight       uint64
+	blockStatus       flow.BlockStatus
+	fullBlockResponse bool
+}
+
+type errorTestType struct {
+	name              string
+	startBlockID      flow.Identifier
+	startHeight       uint64
+	blockStatus       flow.BlockStatus
+	expectedErrorCode codes.Code
 }
 
 func TestBackendBlocksSuite(t *testing.T) {
@@ -235,6 +255,9 @@ func (s *BackendBlocksSuite) SetupTest() {
 	).Return(func(startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error) {
 		return s.chainStateTrackerReal.GetStartHeight(startBlockID, startHeight, blockStatus)
 	}, nil)
+
+	s.setupTestCases()
+	s.setupErrorTestCases()
 }
 
 // backendParams returns the Params configuration for the backend.
@@ -263,6 +286,105 @@ func (s *BackendBlocksSuite) backendParams() Params {
 			Broadcaster:    s.broadcaster,
 		},
 		ChainStateTracker: s.chainStateTracker,
+	}
+}
+
+func (s *BackendBlocksSuite) setupTestCases() {
+	baseTests := []testType{
+		{
+			name:            "happy path - all new blocks",
+			highestBackfill: -1, // no backfill
+			startBlockID:    flow.ZeroID,
+			startHeight:     s.rootBlock.Header.Height,
+		},
+		{
+			name:            "happy path - partial backfill",
+			highestBackfill: 2, // backfill the first 3 blocks
+			startBlockID:    flow.ZeroID,
+			startHeight:     s.rootBlock.Header.Height,
+		},
+		{
+			name:            "happy path - complete backfill",
+			highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
+			startBlockID:    s.blocksArray[0].ID(),
+			startHeight:     0,
+		},
+		{
+			name:            "happy path - start from root block by height",
+			highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
+			startBlockID:    flow.ZeroID,
+			startHeight:     s.rootBlock.Header.Height, // start from root block
+		},
+		{
+			name:            "happy path - start from root block by id",
+			highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
+			startBlockID:    s.rootBlock.ID(),       // start from root block
+			startHeight:     0,
+		},
+	}
+
+	// create variations for each of the base test
+	s.tests = make([]testType, 0, len(baseTests)*2)
+	for _, test := range baseTests {
+		t1 := test
+		t1.name = fmt.Sprintf("%s - finalized blocks", test.name)
+		t1.blockStatus = flow.BlockStatusFinalized
+		s.tests = append(s.tests, t1)
+
+		t2 := test
+		t2.name = fmt.Sprintf("%s - sealed blocks", test.name)
+		t2.blockStatus = flow.BlockStatusSealed
+		s.tests = append(s.tests, t2)
+	}
+}
+
+func (s *BackendBlocksSuite) setupErrorTestCases() {
+	s.errorTests = []errorTestType{
+		{
+			name:              "returns error for unknown block status",
+			startBlockID:      s.rootBlock.Header.ID(),
+			startHeight:       0,
+			blockStatus:       flow.BlockStatusUnknown,
+			expectedErrorCode: codes.InvalidArgument,
+		},
+		{
+			name:              "returns error if both start blockID and start height are provided",
+			startBlockID:      unittest.IdentifierFixture(),
+			startHeight:       1,
+			blockStatus:       flow.BlockStatusFinalized,
+			expectedErrorCode: codes.InvalidArgument,
+		},
+		{
+			name:              "returns error for start height before root height",
+			startBlockID:      flow.ZeroID,
+			startHeight:       s.rootBlock.Header.Height - 1,
+			blockStatus:       flow.BlockStatusFinalized,
+			expectedErrorCode: codes.InvalidArgument,
+		},
+		{
+			name:              "returns error for unindexed start blockID",
+			startBlockID:      unittest.IdentifierFixture(),
+			startHeight:       0,
+			blockStatus:       flow.BlockStatusFinalized,
+			expectedErrorCode: codes.NotFound,
+		},
+		{
+			name:              "returns error for unindexed start height",
+			startBlockID:      flow.ZeroID,
+			startHeight:       s.blocksArray[len(s.blocksArray)-1].Header.Height + 10,
+			blockStatus:       flow.BlockStatusFinalized,
+			expectedErrorCode: codes.NotFound,
+		},
+	}
+}
+
+func (s *BackendBlocksSuite) setupChainStateMock(blockStatus flow.BlockStatus, highestHeader *flow.Header) {
+	s.chainStateTracker.On("GetHighestHeight", mock.Anything).Unset()
+	s.chainStateTracker.On("GetHighestHeight", blockStatus).Return(highestHeader.Height, nil)
+
+	if blockStatus == flow.BlockStatusSealed {
+		s.snapshot.On("Head").Unset()
+		s.snapshot.On("Head").Return(highestHeader, nil)
 	}
 }
 
@@ -301,78 +423,12 @@ func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	type testType struct {
-		name              string
-		highestBackfill   int
-		startBlockID      flow.Identifier
-		startHeight       uint64
-		blockStatus       flow.BlockStatus
-		fullBlockResponse bool
-	}
-
-	baseTests := []testType{
-		{
-			name:            "happy path - all new blocks",
-			highestBackfill: -1, // no backfill
-			startBlockID:    flow.ZeroID,
-			startHeight:     s.rootBlock.Header.Height,
-		},
-		{
-			name:            "happy path - partial backfill",
-			highestBackfill: 2, // backfill the first 3 blocks
-			startBlockID:    flow.ZeroID,
-			startHeight:     s.rootBlock.Header.Height,
-		},
-		{
-			name:            "happy path - complete backfill",
-			highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
-			startBlockID:    s.blocksArray[0].ID(),
-			startHeight:     0,
-		},
-		{
-			name:            "happy path - start from root block by height",
-			highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
-			startBlockID:    flow.ZeroID,
-			startHeight:     s.rootBlock.Header.Height, // start from root block
-		},
-		{
-			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
-			startBlockID:    s.rootBlock.ID(),       // start from root block
-			startHeight:     0,
-		},
-	}
-
-	// create variations for each of the base test
-	tests := make([]testType, 0, len(baseTests)*2)
-	for _, test := range baseTests {
-		t1 := test
-		t1.name = fmt.Sprintf("%s - finalized blocks", test.name)
-		t1.blockStatus = flow.BlockStatusFinalized
-		tests = append(tests, t1)
-
-		t2 := test
-		t2.name = fmt.Sprintf("%s - sealed blocks", test.name)
-		t2.blockStatus = flow.BlockStatusSealed
-		tests = append(tests, t2)
-	}
-
-	setupChainStateMock := func(blockStatus flow.BlockStatus, highestHeader *flow.Header) {
-		s.chainStateTracker.On("GetHighestHeight", mock.Anything).Unset()
-		s.chainStateTracker.On("GetHighestHeight", blockStatus).Return(highestHeader.Height, nil)
-
-		if blockStatus == flow.BlockStatusSealed {
-			s.snapshot.On("Head").Unset()
-			s.snapshot.On("Head").Return(highestHeader, nil)
-		}
-	}
-
-	for _, test := range tests {
+	for _, test := range s.tests {
 		s.Run(test.name, func() {
 			// add "backfill" block - blocks that are already in the database before the test starts
 			// this simulates a subscription on a past block
 			if test.highestBackfill > 0 {
-				setupChainStateMock(test.blockStatus, s.blocksArray[test.highestBackfill].Header)
+				s.setupChainStateMock(test.blockStatus, s.blocksArray[test.highestBackfill].Header)
 			}
 
 			subCtx, subCancel := context.WithCancel(ctx)
@@ -385,7 +441,7 @@ func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 				// simulate new block received.
 				// all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
-					setupChainStateMock(test.blockStatus, b.Header)
+					s.setupChainStateMock(test.blockStatus, b.Header)
 
 					s.broadcaster.Publish()
 				}
@@ -448,48 +504,13 @@ func (s *BackendBlocksSuite) TestSubscribeBlocksHandlesErrors() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	s.Run("returns error for unknown block status", func() {
-		subCtx, subCancel := context.WithCancel(ctx)
-		defer subCancel()
+	for _, test := range s.errorTests {
+		s.Run(test.name, func() {
+			subCtx, subCancel := context.WithCancel(ctx)
+			defer subCancel()
 
-		var height uint64 = 0
-		sub := s.backend.SubscribeBlocks(subCtx, s.rootBlock.Header.ID(), height, flow.BlockStatusUnknown)
-		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
-	})
-
-	s.Run("returns error if both start blockID and start height are provided", func() {
-		subCtx, subCancel := context.WithCancel(ctx)
-		defer subCancel()
-
-		var height uint64 = 1
-		sub := s.backend.SubscribeBlocks(subCtx, unittest.IdentifierFixture(), height, flow.BlockStatusFinalized)
-		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()))
-	})
-
-	s.Run("returns error for start height before root height", func() {
-		subCtx, subCancel := context.WithCancel(ctx)
-		defer subCancel()
-
-		height := s.rootBlock.Header.Height - 1
-		sub := s.backend.SubscribeBlocks(subCtx, flow.ZeroID, height, flow.BlockStatusFinalized)
-		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
-	})
-
-	s.Run("returns error for unindexed start blockID", func() {
-		subCtx, subCancel := context.WithCancel(ctx)
-		defer subCancel()
-
-		var height uint64 = 0
-		sub := s.backend.SubscribeBlocks(subCtx, unittest.IdentifierFixture(), height, flow.BlockStatusFinalized)
-		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
-	})
-
-	s.Run("returns error for unindexed start height", func() {
-		subCtx, subCancel := context.WithCancel(ctx)
-		defer subCancel()
-
-		height := s.blocksArray[len(s.blocksArray)-1].Header.Height + 10
-		sub := s.backend.SubscribeBlocks(subCtx, flow.ZeroID, height, flow.BlockStatusFinalized)
-		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
-	})
+			sub := s.backend.SubscribeBlocks(subCtx, test.startBlockID, test.startHeight, test.blockStatus)
+			assert.Equal(s.T(), test.expectedErrorCode, status.Code(sub.Err()), "expected %s, got %v: %v", test.expectedErrorCode, status.Code(sub.Err()).String(), sub.Err())
+		})
+	}
 }

@@ -62,6 +62,24 @@ type API interface {
 	// Each block is filtered by the provided block status, and only
 	// those blocks that match the status are returned.
 	SubscribeBlocks(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription
+	// SubscribeBlockHeaders streams finalized or sealed block headers starting at the requested
+	// start block, up until the latest available block header. Once the latest is
+	// reached, the stream will remain open and responses are sent for each new
+	// block header as it becomes available.
+	//
+	// Each block header are filtered by the provided block status, and only
+	// those block headers that match the status are returned.
+	//
+	// This is a lighter version of `SubscribeBlocks` as it will never include the heavy `BlockPayload`.
+	SubscribeBlockHeaders(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription
+	// SubscribeBlockDigests streams finalized or sealed lightweight block starting at the requested
+	// start block, up until the latest available block. Once the latest is
+	// reached, the stream will remain open and responses are sent for each new
+	// block as it becomes available.
+	//
+	// Each lightweight block are filtered by the provided block status, and only
+	// those blocks that match the status are returned.
+	SubscribeBlockDigests(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription
 }
 
 // TODO: Combine this with flow.TransactionResult?
