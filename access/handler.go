@@ -724,15 +724,9 @@ func (h *Handler) SubscribeBlocks(request *access.SubscribeBlocksRequest, stream
 	h.StreamCount.Add(1)
 	defer h.StreamCount.Add(-1)
 
-	startBlockID, err := h.getStartBlockID(request.StartBlockId)
+	startBlockID, blockStatus, err := h.getStartData(request.StartBlockId, request.BlockStatus)
 	if err != nil {
-		return status.Errorf(codes.InvalidArgument, "invalid start block ID argument: %v", err)
-	}
-
-	blockStatus := convert.MessageToBlockStatus(request.BlockStatus)
-	err = checkBlockStatus(blockStatus)
-	if err != nil {
-		return status.Errorf(codes.InvalidArgument, "invalid block status argument: %v", err)
+		return status.Errorf(codes.InvalidArgument, "invalid argument: %v", err)
 	}
 
 	sub := h.api.SubscribeBlocks(stream.Context(), startBlockID, request.GetStartBlockHeight(), blockStatus)
@@ -779,15 +773,9 @@ func (h *Handler) SubscribeBlockHeaders(request *access.SubscribeBlockHeadersReq
 	h.StreamCount.Add(1)
 	defer h.StreamCount.Add(-1)
 
-	startBlockID, err := h.getStartBlockID(request.StartBlockId)
+	startBlockID, blockStatus, err := h.getStartData(request.StartBlockId, request.BlockStatus)
 	if err != nil {
-		return status.Errorf(codes.InvalidArgument, "invalid start block ID argument: %v", err)
-	}
-
-	blockStatus := convert.MessageToBlockStatus(request.BlockStatus)
-	err = checkBlockStatus(blockStatus)
-	if err != nil {
-		return status.Errorf(codes.InvalidArgument, "invalid block status argument: %v", err)
+		return status.Errorf(codes.InvalidArgument, "invalid argument: %v", err)
 	}
 
 	sub := h.api.SubscribeBlockHeaders(stream.Context(), startBlockID, request.GetStartBlockHeight(), blockStatus)
@@ -839,15 +827,9 @@ func (h *Handler) SubscribeBlockDigests(request *access.SubscribeBlockDigestsReq
 	h.StreamCount.Add(1)
 	defer h.StreamCount.Add(-1)
 
-	startBlockID, err := h.getStartBlockID(request.StartBlockId)
+	startBlockID, blockStatus, err := h.getStartData(request.StartBlockId, request.BlockStatus)
 	if err != nil {
-		return status.Errorf(codes.InvalidArgument, "invalid start block ID argument: %v", err)
-	}
-
-	blockStatus := convert.MessageToBlockStatus(request.BlockStatus)
-	err = checkBlockStatus(blockStatus)
-	if err != nil {
-		return status.Errorf(codes.InvalidArgument, "invalid block status argument: %v", err)
+		return status.Errorf(codes.InvalidArgument, "invalid argument: %v", err)
 	}
 
 	sub := h.api.SubscribeBlockDigests(stream.Context(), startBlockID, request.GetStartBlockHeight(), blockStatus)
@@ -874,6 +856,20 @@ func (h *Handler) SubscribeBlockDigests(request *access.SubscribeBlockDigestsReq
 			return rpc.ConvertError(err, "could not send response", codes.Internal)
 		}
 	}
+}
+
+func (h *Handler) getStartData(msgStartBlockID []byte, msgBlockStatus entities.BlockStatus) (flow.Identifier, flow.BlockStatus, error) {
+	startBlockID, err := h.getStartBlockID(msgStartBlockID)
+	if err != nil {
+		return flow.ZeroID, flow.BlockStatusUnknown, status.Errorf(codes.InvalidArgument, "invalid start block ID argument: %v", err)
+	}
+
+	blockStatus := convert.MessageToBlockStatus(msgBlockStatus)
+	err = checkBlockStatus(blockStatus)
+	if err != nil {
+		return flow.ZeroID, flow.BlockStatusUnknown, status.Errorf(codes.InvalidArgument, "invalid block status argument: %v", err)
+	}
+	return startBlockID, blockStatus, nil
 }
 
 func (h *Handler) getStartBlockID(blockID []byte) (flow.Identifier, error) {
