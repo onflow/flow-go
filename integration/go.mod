@@ -311,7 +311,7 @@ require (
 	github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
-	github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.11-flow-expose-msg.0.20230703223453-544e2fe28a26 // indirect
+	github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.11-flow-expose-msg.0.20240220190333-03695dea34a3 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	github.com/zeebo/blake3 v0.2.3 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
