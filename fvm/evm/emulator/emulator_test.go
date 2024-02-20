@@ -353,7 +353,7 @@ func TestDeployAtFunctionality(t *testing.T) {
 					})
 					// test deployment to an address that is already exist
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						_, err := blk.DirectCall(
+						res, err := blk.DirectCall(
 							types.NewDeployCallWithTargetAddress(
 								testAccount,
 								target,
@@ -362,11 +362,12 @@ func TestDeployAtFunctionality(t *testing.T) {
 								amountToBeTransfered,
 								0),
 						)
-						require.Equal(t, gethVM.ErrContractAddressCollision, err)
+						require.NoError(t, err)
+						require.Equal(t, gethVM.ErrContractAddressCollision, res.VMError)
 					})
 					// test deployment with not enough gas
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						_, err := blk.DirectCall(
+						res, err := blk.DirectCall(
 							types.NewDeployCallWithTargetAddress(
 								testAccount,
 								types.Address{3, 4, 5},
@@ -375,7 +376,8 @@ func TestDeployAtFunctionality(t *testing.T) {
 								new(big.Int),
 								0),
 						)
-						require.Equal(t, fmt.Errorf("out of gas"), err)
+						require.NoError(t, err)
+						require.Equal(t, fmt.Errorf("out of gas"), res.VMError)
 					})
 				})
 			})
