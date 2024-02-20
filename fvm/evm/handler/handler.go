@@ -206,14 +206,21 @@ func (h *ContractHandler) run(
 		return res, err
 	}
 
-	txHash := tx.Hash()
-	bp.AppendTxHash(txHash)
+	bp.AppendTxHash(res.TxHash)
+
+	// TODO: in the future we might update the receipt hash here
+
+	blockHash, err := bp.Hash()
+	if err != nil {
+		return res, err
+	}
 
 	// step 4 - emit events
 	err = h.emitEvent(types.NewTransactionExecutedEvent(
 		bp.Height,
 		rlpEncodedTx,
-		txHash,
+		blockHash,
+		res.TxHash,
 		res,
 	))
 	if err != nil {
@@ -309,17 +316,18 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	// update block proposal
-	callHash, err := call.Hash()
-	if err != nil {
-		return res, types.NewFatalError(err)
-	}
-
 	bp, err := h.blockStore.BlockProposal()
 	if err != nil {
 		return res, err
 	}
 
-	bp.AppendTxHash(callHash)
+	bp.AppendTxHash(res.TxHash)
+	// TODO: in the future we might update the receipt hash here
+
+	blockHash, err := bp.Hash()
+	if err != nil {
+		return res, err
+	}
 
 	if totalSupplyDiff != nil {
 		if deductSupplyDiff {
@@ -342,7 +350,8 @@ func (h *ContractHandler) executeAndHandleCall(
 		types.NewTransactionExecutedEvent(
 			bp.Height,
 			encoded,
-			callHash,
+			blockHash,
+			res.TxHash,
 			res,
 		),
 	)

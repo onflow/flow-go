@@ -77,6 +77,12 @@ func TestHandler_TransactionRun(t *testing.T) {
 						big.NewInt(1),
 					)
 
+					// calculate tx id to match it
+					var evmTx gethTypes.Transaction
+					err := evmTx.UnmarshalBinary(tx)
+					require.NoError(t, err)
+					result.TxHash = evmTx.Hash()
+
 					// successfully run (no-panic)
 					handler.Run(tx, coinbase)
 
@@ -123,11 +129,6 @@ func TestHandler_TransactionRun(t *testing.T) {
 					// make sure block transaction list references the above transaction id
 					cadenceEvent, ok = ev.(cadence.Event)
 					require.True(t, ok)
-
-					// calculate tx id to match it
-					var evmTx gethTypes.Transaction
-					err = evmTx.UnmarshalBinary(tx)
-					require.NoError(t, err)
 
 					for j, f := range cadenceEvent.GetFields() {
 						if f.Identifier == "transactionHashes" {

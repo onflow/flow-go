@@ -263,7 +263,6 @@ func (db *StateDB) Snapshot() int {
 // Logs returns the list of logs
 // it also update each log with the block and tx info
 func (db *StateDB) Logs(
-	blockHash gethCommon.Hash,
 	blockNumber uint64,
 	txHash gethCommon.Hash,
 	txIndex uint,
@@ -272,7 +271,6 @@ func (db *StateDB) Logs(
 	for _, view := range db.views {
 		for _, log := range view.Logs() {
 			log.BlockNumber = blockNumber
-			log.BlockHash = blockHash
 			log.TxHash = txHash
 			log.TxIndex = txIndex
 			allLogs = append(allLogs, log)

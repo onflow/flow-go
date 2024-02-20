@@ -107,6 +107,10 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	txHash, err := call.Hash()
+	if err != nil {
+		return nil, err
+	}
 	switch call.SubType {
 	case types.DepositCallSubType:
 		return proc.mintTo(call.To, call.Value)
@@ -118,7 +122,9 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 		}
 		fallthrough
 	default:
-		return proc.runDirect(call.Message(), types.DirectCallTxType)
+		// TODO: when we support mutiple calls per block, we need
+		// to update the value zero here for tx index
+		return proc.runDirect(call.Message(), txHash, 0, types.DirectCallTxType)
 	}
 }
 
@@ -139,9 +145,17 @@ func (bl *BlockView) RunTransaction(
 		return res, types.NewEVMValidationError(err)
 	}
 
+	txHash := tx.Hash()
+
 	// update tx context origin
 	proc.evm.TxContext.Origin = msg.From
-	res, err = proc.run(msg, tx.Type())
+	// TODO: when we support multiple tx per block we need to update
+	// the tx index here to proper value
+	res, err = proc.run(msg, txHash, 0, tx.Type())
+	if err != nil {
+		return nil, err
+	}
+	res.TxHash = txHash
 	return res, err
 }
 
@@ -351,16 +365,27 @@ func (proc *procedure) deployAt(
 	return res, proc.commit()
 }
 
-func (proc *procedure) runDirect(msg *gethCore.Message, txType uint8) (*types.Result, error) {
+func (proc *procedure) runDirect(
+	msg *gethCore.Message,
+	txHash gethCommon.Hash,
+	txIndex uint,
+	txType uint8,
+) (*types.Result, error) {
 	// set the nonce for the message (needed for some opeartions like deployment)
 	msg.Nonce = proc.state.GetNonce(msg.From)
 	proc.evm.TxContext.Origin = msg.From
-	return proc.run(msg, types.DirectCallTxType)
+	return proc.run(msg, txHash, txIndex, types.DirectCallTxType)
 }
 
-func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, error) {
+func (proc *procedure) run(
+	msg *gethCore.Message,
+	txHash gethCommon.Hash,
+	txIndex uint,
+	txType uint8,
+) (*types.Result, error) {
 	res := types.Result{
 		TxType: txType,
+		TxHash: txHash,
 	}
 
 	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
@@ -390,12 +415,11 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 			if msg.To == nil {
 				res.DeployedContractAddress = types.NewAddress(gethCrypto.CreateAddress(msg.From, msg.Nonce))
 			}
+			// replace tx index and tx hash
 			res.Logs = proc.state.Logs(
-				// TODO pass proper hash values
-				gethCommon.Hash{},
 				proc.config.BlockContext.BlockNumber.Uint64(),
-				gethCommon.Hash{},
-				0,
+				txHash,
+				txIndex,
 			)
 		} else {
 			// execResult.Err is VM errors (we don't return it as error)
