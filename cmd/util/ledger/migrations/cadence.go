@@ -15,30 +15,35 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func NewCadence1InterfaceStaticTypeConverter(chainID flow.ChainID) statictypes.InterfaceTypeConverterFunc {
+func NewInterfaceTypeConversionRules(chainID flow.ChainID) StaticTypeMigrationRules {
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
 	oldFungibleTokenResolverType, newFungibleTokenResolverType := fungibleTokenResolverRule(systemContracts)
 
-	rules := StaticTypeMigrationRules{
+	return StaticTypeMigrationRules{
 		oldFungibleTokenResolverType.ID(): newFungibleTokenResolverType,
 	}
-
-	return NewStaticTypeMigrator[*interpreter.InterfaceStaticType](rules)
 }
 
-func NewCadence1CompositeStaticTypeConverter(chainID flow.ChainID) statictypes.CompositeTypeConverterFunc {
-
+func NewCompositeTypeConversionRules(chainID flow.ChainID) StaticTypeMigrationRules {
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
 	oldFungibleTokenVaultCompositeType, newFungibleTokenVaultType := fungibleTokenVaultRule(systemContracts)
 	oldNonFungibleTokenNFTCompositeType, newNonFungibleTokenNFTType := nonFungibleTokenNFTRule(systemContracts)
 
-	rules := StaticTypeMigrationRules{
+	return StaticTypeMigrationRules{
 		oldFungibleTokenVaultCompositeType.ID():  newFungibleTokenVaultType,
 		oldNonFungibleTokenNFTCompositeType.ID(): newNonFungibleTokenNFTType,
 	}
+}
 
+func NewCadence1InterfaceStaticTypeConverter(chainID flow.ChainID) statictypes.InterfaceTypeConverterFunc {
+	rules := NewInterfaceTypeConversionRules(chainID)
+	return NewStaticTypeMigrator[*interpreter.InterfaceStaticType](rules)
+}
+
+func NewCadence1CompositeStaticTypeConverter(chainID flow.ChainID) statictypes.CompositeTypeConverterFunc {
+	rules := NewCompositeTypeConversionRules(chainID)
 	return NewStaticTypeMigrator[*interpreter.CompositeStaticType](rules)
 }
 
@@ -193,7 +198,9 @@ func NewCadence1ContractsMigrations(
 	stagedContracts []StagedContract,
 ) []ledger.Migration {
 
-	stagedContractsMigration := NewStagedContractsMigration(chainID)
+	stagedContractsMigration := NewStagedContractsMigration(chainID).
+		WithContractUpdateValidation()
+
 	stagedContractsMigration.RegisterContractUpdates(stagedContracts)
 
 	return []ledger.Migration{

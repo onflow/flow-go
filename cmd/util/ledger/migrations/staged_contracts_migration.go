@@ -24,13 +24,14 @@ import (
 )
 
 type StagedContractsMigration struct {
-	name                   string
-	chainID                flow.ChainID
-	log                    zerolog.Logger
-	mutex                  sync.RWMutex
-	stagedContracts        map[common.Address]map[flow.RegisterID]Contract
-	contractsByLocation    map[common.Location][]byte
-	enableUpdateValidation bool
+	name                           string
+	chainID                        flow.ChainID
+	log                            zerolog.Logger
+	mutex                          sync.RWMutex
+	stagedContracts                map[common.Address]map[flow.RegisterID]Contract
+	contractsByLocation            map[common.Location][]byte
+	enableUpdateValidation         bool
+	userDefinedTypeChangeCheckFunc func(oldTypeID common.TypeID, newTypeID common.TypeID) (checked bool, valid bool)
 }
 
 type StagedContract struct {
@@ -56,6 +57,7 @@ func NewStagedContractsMigration(chainID flow.ChainID) *StagedContractsMigration
 
 func (m *StagedContractsMigration) WithContractUpdateValidation() *StagedContractsMigration {
 	m.enableUpdateValidation = true
+	m.userDefinedTypeChangeCheckFunc = newUserDefinedTypeChangeCheckerFunc(m.chainID)
 	return m
 }
 
@@ -212,7 +214,7 @@ func (m *StagedContractsMigration) MigrateAccount(
 		oldCode := payload.Value()
 
 		if m.enableUpdateValidation {
-			err = CheckContractUpdateValidity(
+			err = m.checkContractUpdateValidity(
 				mr,
 				address,
 				name,
@@ -254,7 +256,7 @@ func (m *StagedContractsMigration) MigrateAccount(
 	return payloads, nil
 }
 
-func CheckContractUpdateValidity(
+func (m *StagedContractsMigration) checkContractUpdateValidity(
 	mr *migratorRuntime,
 	address common.Address,
 	contractName string,
@@ -292,5 +294,34 @@ func CheckContractUpdateValidity(
 		elaborations,
 	)
 
+	validator.WithUserDefinedTypeChangeChecker(
+		m.userDefinedTypeChangeCheckFunc,
+	)
+
 	return validator.Validate()
+}
+
+func newUserDefinedTypeChangeCheckerFunc(
+	chainID flow.ChainID,
+) func(oldTypeID common.TypeID, newTypeID common.TypeID) (checked, valid bool) {
+
+	typeChangeRules := map[common.TypeID]common.TypeID{}
+
+	compositeTypeRules := NewCompositeTypeConversionRules(chainID)
+	for typeID, newStaticType := range compositeTypeRules {
+		typeChangeRules[typeID] = newStaticType.ID()
+	}
+
+	interfaceTypeRules := NewInterfaceTypeConversionRules(chainID)
+	for typeID, newStaticType := range interfaceTypeRules {
+		typeChangeRules[typeID] = newStaticType.ID()
+	}
+
+	return func(oldTypeID common.TypeID, newTypeID common.TypeID) (checked, valid bool) {
+		expectedNewTypeID, found := typeChangeRules[oldTypeID]
+		if found {
+			return true, expectedNewTypeID == newTypeID
+		}
+		return false, false
+	}
 }
