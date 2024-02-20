@@ -858,6 +858,17 @@ func (h *Handler) SubscribeBlockDigests(request *access.SubscribeBlockDigestsReq
 	}
 }
 
+// getStartData processes subscription start data.
+// It takes a byte slice representing the start block ID and a BlockStatus from the entities package.
+// The method returns a flow.Identifier representing the start block ID, a flow.BlockStatus representing the block status,
+// and an error if any issues are encountered during the processing.
+//
+// Returns:
+// - flow.Identifier: The start block id for searching.
+// - flow.BlockStatus: Block status.
+// - error: An error indicating the result of the operation, if any.
+// Errors:
+// - codes.InvalidArgument: If blockStatus is flow.BlockStatusUnknown, or startBlockID could not convert to flow.Identifier.
 func (h *Handler) getStartData(msgStartBlockID []byte, msgBlockStatus entities.BlockStatus) (flow.Identifier, flow.BlockStatus, error) {
 	startBlockID, err := h.getStartBlockID(msgStartBlockID)
 	if err != nil {
@@ -872,6 +883,10 @@ func (h *Handler) getStartData(msgStartBlockID []byte, msgBlockStatus entities.B
 	return startBlockID, blockStatus, nil
 }
 
+// getStartBlockID converts a byte slice to a flow.Identifier.
+// It takes a byte slice representing a block ID and returns a flow.Identifier representing the processed block ID.
+// Errors:
+// - codes.InvalidArgument: If startBlockID could not convert to flow.Identifier.
 func (h *Handler) getStartBlockID(blockID []byte) (flow.Identifier, error) {
 	startBlockID := flow.ZeroID
 	if blockID != nil {
@@ -886,7 +901,8 @@ func (h *Handler) getStartBlockID(blockID []byte) (flow.Identifier, error) {
 }
 
 func (h *Handler) SendAndSubscribeTransactionStatuses(_ *access.SendAndSubscribeTransactionStatusesRequest, _ access.AccessAPI_SendAndSubscribeTransactionStatusesServer) error {
-	panic("not implemented!")
+	// not implemented
+	return nil
 }
 
 func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flow.BlockStatus) (*access.BlockResponse, error) {

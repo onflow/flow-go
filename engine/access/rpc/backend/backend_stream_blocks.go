@@ -33,38 +33,27 @@ type backendSubscribeBlocks struct {
 
 // SubscribeBlocks subscribes to blocks starting from a specified block ID or height and with a given block status.
 func (b *backendSubscribeBlocks) SubscribeBlocks(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
-	nextHeight, err := b.getStartHeight(startBlockID, startHeight, blockStatus)
-	if err != nil {
-		return subscription.NewFailedSubscription(err, "could not get start height")
-	}
-
-	sub := subscription.NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getBlockResponse(blockStatus))
-	go subscription.NewStreamer(b.log, b.Broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
-
-	return sub
+	return b.subscribe(ctx, startBlockID, startHeight, blockStatus, b.getBlockResponse(blockStatus))
 }
 
 // SubscribeBlockHeaders subscribes to block headers starting from a specified block ID or height and with a given block status.
 func (b *backendSubscribeBlocks) SubscribeBlockHeaders(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
-	nextHeight, err := b.getStartHeight(startBlockID, startHeight, blockStatus)
-	if err != nil {
-		return subscription.NewFailedSubscription(err, "could not get start height")
-	}
-
-	sub := subscription.NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getBlockHeaderResponse(blockStatus))
-	go subscription.NewStreamer(b.log, b.Broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
-
-	return sub
+	return b.subscribe(ctx, startBlockID, startHeight, blockStatus, b.getBlockHeaderResponse(blockStatus))
 }
 
 // SubscribeBlockDigests subscribes to lightweight blocks starting from a specified block ID or height and with a given block status.
 func (b *backendSubscribeBlocks) SubscribeBlockDigests(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
+	return b.subscribe(ctx, startBlockID, startHeight, blockStatus, b.getBlockDigestResponse(blockStatus))
+}
+
+// subscribe is common method of the backendSubscribeBlocks struct that allows clients to subscribe to different types of block data.
+func (b *backendSubscribeBlocks) subscribe(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus, getData subscription.GetDataByHeightFunc) subscription.Subscription {
 	nextHeight, err := b.getStartHeight(startBlockID, startHeight, blockStatus)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")
 	}
 
-	sub := subscription.NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getBlockDigestResponse(blockStatus))
+	sub := subscription.NewHeightBasedSubscription(b.sendBufferSize, nextHeight, getData)
 	go subscription.NewStreamer(b.log, b.Broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
 
 	return sub
