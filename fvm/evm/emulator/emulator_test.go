@@ -43,13 +43,15 @@ func TestNativeTokenBridging(t *testing.T) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			originalBalance := big.NewInt(10000)
 			testAccount := types.NewAddressFromString("test")
+			nonce := uint64(0)
 
 			t.Run("mint tokens to the first account", func(t *testing.T) {
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						res, err := blk.DirectCall(types.NewDepositCall(testAccount, originalBalance))
+						res, err := blk.DirectCall(types.NewDepositCall(testAccount, originalBalance, nonce))
 						require.NoError(t, err)
 						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
+						nonce += 1
 					})
 				})
 			})
@@ -64,9 +66,10 @@ func TestNativeTokenBridging(t *testing.T) {
 				})
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						res, err := blk.DirectCall(types.NewWithdrawCall(testAccount, amount))
+						res, err := blk.DirectCall(types.NewWithdrawCall(testAccount, amount, nonce))
 						require.NoError(t, err)
 						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
+						nonce += 1
 					})
 				})
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
@@ -89,14 +92,17 @@ func TestContractInteraction(t *testing.T) {
 			testContract := testutils.GetStorageTestContract(t)
 
 			testAccount := types.NewAddressFromString("test")
+			nonce := uint64(0)
+
 			amount := big.NewInt(0).Mul(big.NewInt(1337), big.NewInt(gethParams.Ether))
 			amountToBeTransfered := big.NewInt(0).Mul(big.NewInt(100), big.NewInt(gethParams.Ether))
 
 			// fund test account
 			RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 				RunWithNewBlockView(t, env, func(blk types.BlockView) {
-					_, err := blk.DirectCall(types.NewDepositCall(testAccount, amount))
+					_, err := blk.DirectCall(types.NewDepositCall(testAccount, amount, nonce))
 					require.NoError(t, err)
+					nonce += 1
 				})
 			})
 
@@ -110,10 +116,12 @@ func TestContractInteraction(t *testing.T) {
 								testAccount,
 								testContract.ByteCode,
 								math.MaxUint64,
-								amountToBeTransfered),
+								amountToBeTransfered,
+								nonce),
 						)
 						require.NoError(t, err)
 						contractAddr = res.DeployedContractAddress
+						nonce += 1
 					})
 					RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
 						require.NotNil(t, contractAddr)
@@ -143,10 +151,12 @@ func TestContractInteraction(t *testing.T) {
 								testContract.MakeCallData(t, "store", num),
 								1_000_000,
 								big.NewInt(0), // this should be zero because the contract doesn't have receiver
+								nonce,
 							),
 						)
 						require.NoError(t, err)
 						require.GreaterOrEqual(t, res.GasConsumed, uint64(40_000))
+						nonce += 1
 					})
 				})
 
@@ -159,9 +169,11 @@ func TestContractInteraction(t *testing.T) {
 								testContract.MakeCallData(t, "retrieve"),
 								1_000_000,
 								big.NewInt(0), // this should be zero because the contract doesn't have receiver
+								nonce,
 							),
 						)
 						require.NoError(t, err)
+						nonce += 1
 
 						ret := new(big.Int).SetBytes(res.ReturnedValue)
 						require.Equal(t, num, ret)
@@ -178,9 +190,11 @@ func TestContractInteraction(t *testing.T) {
 								testContract.MakeCallData(t, "blockNumber"),
 								1_000_000,
 								big.NewInt(0), // this should be zero because the contract doesn't have receiver
+								nonce,
 							),
 						)
 						require.NoError(t, err)
+						nonce += 1
 
 						ret := new(big.Int).SetBytes(res.ReturnedValue)
 						require.Equal(t, blockNumber, ret)
@@ -193,7 +207,7 @@ func TestContractInteraction(t *testing.T) {
 				fAddr := account.Address()
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						_, err := blk.DirectCall(types.NewDepositCall(fAddr, amount))
+						_, err := blk.DirectCall(types.NewDepositCall(fAddr, amount, account.Nonce()))
 						require.NoError(t, err)
 					})
 				})
@@ -204,7 +218,7 @@ func TestContractInteraction(t *testing.T) {
 					coinbaseOrgBalance := gethCommon.Big1
 					// small amount of money to create account
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						_, err := blk.DirectCall(types.NewDepositCall(ctx.GasFeeCollector, coinbaseOrgBalance))
+						_, err := blk.DirectCall(types.NewDepositCall(ctx.GasFeeCollector, coinbaseOrgBalance, 0))
 						require.NoError(t, err)
 					})
 
@@ -240,7 +254,7 @@ func TestContractInteraction(t *testing.T) {
 				fAddr := account.Address()
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						_, err := blk.DirectCall(types.NewDepositCall(fAddr, amount))
+						_, err := blk.DirectCall(types.NewDepositCall(fAddr, amount, account.Nonce()))
 						require.NoError(t, err)
 					})
 				})
@@ -301,7 +315,7 @@ func TestDeployAtFunctionality(t *testing.T) {
 			// fund test account
 			RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 				RunWithNewBlockView(t, env, func(blk types.BlockView) {
-					_, err := blk.DirectCall(types.NewDepositCall(testAccount, amount))
+					_, err := blk.DirectCall(types.NewDepositCall(testAccount, amount, 0))
 					require.NoError(t, err)
 				})
 			})
@@ -316,7 +330,9 @@ func TestDeployAtFunctionality(t *testing.T) {
 								target,
 								testContract.ByteCode,
 								math.MaxUint64,
-								amountToBeTransfered),
+								amountToBeTransfered,
+								0,
+							),
 						)
 						require.NoError(t, err)
 						require.Equal(t, target, res.DeployedContractAddress)
@@ -343,7 +359,8 @@ func TestDeployAtFunctionality(t *testing.T) {
 								target,
 								testContract.ByteCode,
 								math.MaxUint64,
-								amountToBeTransfered),
+								amountToBeTransfered,
+								0),
 						)
 						require.NoError(t, err)
 						require.Equal(t, gethVM.ErrContractAddressCollision, res.VMError)
@@ -356,7 +373,8 @@ func TestDeployAtFunctionality(t *testing.T) {
 								types.Address{3, 4, 5},
 								testContract.ByteCode,
 								100,
-								new(big.Int)),
+								new(big.Int),
+								0),
 						)
 						require.NoError(t, err)
 						require.Equal(t, fmt.Errorf("out of gas"), res.VMError)
@@ -463,14 +481,14 @@ func TestTransfers(t *testing.T) {
 
 			RunWithNewEmulator(t, backend, rootAddr, func(em *emulator.Emulator) {
 				RunWithNewBlockView(t, em, func(blk types.BlockView) {
-					_, err := blk.DirectCall(types.NewDepositCall(testAccount1, amount))
+					_, err := blk.DirectCall(types.NewDepositCall(testAccount1, amount, 0))
 					require.NoError(t, err)
 				})
 			})
 
 			RunWithNewEmulator(t, backend, rootAddr, func(em *emulator.Emulator) {
 				RunWithNewBlockView(t, em, func(blk types.BlockView) {
-					_, err := blk.DirectCall(types.NewTransferCall(testAccount1, testAccount2, amountToBeTransfered))
+					_, err := blk.DirectCall(types.NewTransferCall(testAccount1, testAccount2, amountToBeTransfered, 0))
 					require.NoError(t, err)
 				})
 			})
@@ -498,13 +516,13 @@ func TestStorageNoSideEffect(t *testing.T) {
 			testAccount := types.NewAddressFromString("test")
 			amount := big.NewInt(10)
 			RunWithNewBlockView(t, em, func(blk types.BlockView) {
-				_, err = blk.DirectCall(types.NewDepositCall(testAccount, amount))
+				_, err = blk.DirectCall(types.NewDepositCall(testAccount, amount, 0))
 				require.NoError(t, err)
 			})
 
 			orgSize := backend.TotalStorageSize()
 			RunWithNewBlockView(t, em, func(blk types.BlockView) {
-				_, err = blk.DirectCall(types.NewDepositCall(testAccount, amount))
+				_, err = blk.DirectCall(types.NewDepositCall(testAccount, amount, 0))
 				require.NoError(t, err)
 			})
 			require.Equal(t, orgSize, backend.TotalStorageSize())
@@ -520,7 +538,7 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 				testAccount := types.NewAddressFromString("test")
 				amount := big.NewInt(10_000_000)
 				RunWithNewBlockView(t, em, func(blk types.BlockView) {
-					_, err := blk.DirectCall(types.NewDepositCall(testAccount, amount))
+					_, err := blk.DirectCall(types.NewDepositCall(testAccount, amount, 0))
 					require.NoError(t, err)
 				})
 
@@ -553,6 +571,7 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 						input,
 						1_000_000,
 						big.NewInt(0), // this should be zero because the contract doesn't have receiver
+						0,
 					),
 				)
 				require.NoError(t, err)
