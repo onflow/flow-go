@@ -261,8 +261,15 @@ const (
 	maxIndex = (1 << linearCodeK) - 1
 )
 
-// The following are invalid code-words in the [64,45] code.
-// These constants are used to generate non-Flow-Mainnet addresses
+// The following constants are invalid code-words in the [64,45] code, generated randomly.
+// These constants are used to generate non-Flow-Mainnet addresses.
+//
+// Flow-Mainnet address space uses the original [64,45] code, while each network
+// uses an orthogonal space obtained by adding a specific invalid code word to the
+// original [64,45] code. The linearity of the code guarantees that all the obtained
+// spaces are disjoint, as long as all invalid code words are distinct.
+//
+// Spaces intersection is validated in `testAddressesIntersection`.
 
 // invalidCodeTestNetwork is the invalid codeword used for long-lived test networks.
 const invalidCodeTestNetwork = uint64(0x6834ba37b3980209)
