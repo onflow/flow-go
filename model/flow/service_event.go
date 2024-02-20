@@ -19,9 +19,10 @@ func (set ServiceEventType) String() string {
 }
 
 const (
-	ServiceEventSetup         ServiceEventType = "setup"
-	ServiceEventCommit        ServiceEventType = "commit"
-	ServiceEventVersionBeacon ServiceEventType = "version-beacon"
+	ServiceEventSetup                       ServiceEventType = "setup"
+	ServiceEventCommit                      ServiceEventType = "commit"
+	ServiceEventVersionBeacon               ServiceEventType = "version-beacon"
+	ServiceEventProtocolStateVersionUpgrade ServiceEventType = "protocol-state-version-upgrade"
 )
 
 // ServiceEvent represents a service event, which is a special event that when

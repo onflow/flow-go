@@ -20,7 +20,8 @@ func (v VersionBoundary) Semver() (*semver.Version, error) {
 }
 
 // VersionBeacon represents a service event specifying the required software versions
-// for upcoming blocks.
+// for executing upcoming blocks. It ensures that Execution and Verification Nodes are
+// using consistent versions of Cadence when executing the same blocks.
 //
 // It contains a VersionBoundaries field, which is an ordered list of VersionBoundary
 // (sorted by VersionBoundary.BlockHeight). While heights are strictly
@@ -154,4 +155,20 @@ func (v *VersionBeacon) String() string {
 		buffer.WriteString(fmt.Sprintf("%d:%s ", boundary.BlockHeight, boundary.Version))
 	}
 	return buffer.String()
+}
+
+// ProtocolStateVersionUpgrade is a service event emitted by the FlowServiceAccount
+// to signal an upgrade to the Protocol State version. `NewProtocolStateVersion`
+// must be strictly greater than the currently active Protocol State Version,
+// otherwise the service event is ignored.
+// If the node software supports `NewProtocolStateVersion`, then it immediately
+// begins using this Protocol State Version, beginning with the block which
+// seals the `ProtocolStateVersionUpgrade` service event. Otherwise, the node
+// software stops processing blocks, until it is manually updated to a compatible
+// software version.
+// The Protocol State version must be incremented when:
+//   - a change is made to the Protocol State Machine
+//   - a new key is added or removed from the Protocol State Key-Value Store
+type ProtocolStateVersionUpgrade struct {
+	NewProtocolStateVersion uint64
 }
