@@ -1,7 +1,6 @@
 package run
 
 import (
-	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"path/filepath"
@@ -68,7 +67,8 @@ func TestPrintServiceKey(t *testing.T) {
 		HashAlgo:   hash.SHA2_256,
 	}
 
-	encodedData := base64.StdEncoding.EncodeToString(sk.PublicKey(1000).PublicKey.Encode())
-	fmt.Print(encodedData)
-
+	pk := sk.PublicKey(1000)
+	bytes, err := pk.MarshalJSON()
+	require.NoError(t, err)
+	fmt.Print(string(bytes))
 }
