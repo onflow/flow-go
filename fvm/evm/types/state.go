@@ -17,7 +17,6 @@ type StateDB interface {
 
 	// Logs collects and prepares logs
 	Logs(
-		blockHash gethCommon.Hash,
 		blockNumber uint64,
 		txHash gethCommon.Hash,
 		txIndex uint,

@@ -4,7 +4,7 @@ import "FlowToken"
 access(all)
 contract EVM {
 
-    pub event BridgedAccountCreated(addressBytes: [UInt8; 20])
+    pub event CadenceOwnedAccountCreated(addressBytes: [UInt8; 20])
 
     /// EVMAddress is an EVM-compatible address
     access(all)
@@ -76,7 +76,7 @@ contract EVM {
     }
 
     access(all)
-    resource BridgedAccount: Addressable  {
+    resource CadenceOwnedAccount: Addressable  {
 
         access(self)
         var addressBytes: [UInt8; 20]
@@ -85,7 +85,7 @@ contract EVM {
             // address is initially set to zero
             // but updated through initAddress later
             // we have to do this since we need resource id (uuid)
-            // to calculate the EVM address for this bridge account
+            // to calculate the EVM address for this cadence owned account
             self.addressBytes = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] 
         }
 
@@ -99,20 +99,20 @@ contract EVM {
            self.addressBytes = addressBytes
         }
 
-        /// The EVM address of the bridged account
+        /// The EVM address of the cadence owned account
         access(all)
         fun address(): EVMAddress {
             // Always create a new EVMAddress instance
             return EVMAddress(bytes: self.addressBytes)
         }
 
-        /// Get balance of the bridged account
+        /// Get balance of the cadence owned account
         access(all)
         fun balance(): Balance {
             return self.address().balance()
         }
 
-        /// Deposits the given vault into the bridged account's balance
+        /// Deposits the given vault into the cadence owned account's balance
         access(all)
         fun deposit(from: @FlowToken.Vault) {
             InternalEVM.deposit(
@@ -121,7 +121,7 @@ contract EVM {
             )
         }
 
-        /// Withdraws the balance from the bridged account's balance
+        /// Withdraws the balance from the cadence owned account's balance
         /// Note that amounts smaller than 10nF (10e-8) can't be withdrawn 
         /// given that Flow Token Vaults use UFix64s to store balances.
         /// If the given balance conversion to UFix64 results in 
@@ -171,13 +171,13 @@ contract EVM {
         }
     }
 
-    /// Creates a new bridged account
+    /// Creates a new cadence owned account
     access(all)
-    fun createBridgedAccount(): @BridgedAccount {
-        let acc <-create BridgedAccount()
-        let addr = InternalEVM.createBridgedAccount(uuid: acc.uuid)
+    fun createCadenceOwnedAccount(): @CadenceOwnedAccount {
+        let acc <-create CadenceOwnedAccount()
+        let addr = InternalEVM.createCadenceOwnedAccount(uuid: acc.uuid)
         acc.initAddress(addressBytes: addr)
-        emit BridgedAccountCreated(addressBytes: addr)
+        emit CadenceOwnedAccountCreated(addressBytes: addr)
         return <-acc
     }
 
@@ -304,7 +304,7 @@ contract EVM {
         }
 
         let coaRef = acc.getCapability(path)
-            .borrow<&EVM.BridgedAccount{EVM.Addressable}>()
+            .borrow<&EVM.CadenceOwnedAccount{EVM.Addressable}>()
         
         if coaRef == nil {
              return ValidationResult(false,

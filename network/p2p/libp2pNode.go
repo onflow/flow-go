@@ -87,7 +87,7 @@ type Routable interface {
 
 // UnicastManagement abstracts the unicast management capabilities of the node.
 type UnicastManagement interface {
-	// OpenProtectedStream opens a new stream to a peer with a protection tag. The protection tag can be used to ensure
+	// OpenAndWriteOnStream opens a new stream to a peer with a protection tag. The protection tag can be used to ensure
 	// that the connection to the peer is maintained for a particular purpose. The stream is opened to the given peerID
 	// and writingLogic is executed on the stream. The created stream does not need to be reused and can be inexpensively
 	// created for each send. Moreover, the stream creation does not incur a round-trip time as the stream negotiation happens
