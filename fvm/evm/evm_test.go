@@ -43,9 +43,9 @@ func TestEVMRun(t *testing.T) {
 					import EVM from %s
 
 					access(all)
-					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
+					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
 						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-						EVM.run(tx: tx, coinbase: coinbase)
+						return EVM.run(tx: tx, coinbase: coinbase)
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
@@ -79,6 +79,11 @@ func TestEVMRun(t *testing.T) {
 					snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
+
+				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+				require.Equal(t, types.StatusSuccessful, res.Status)
+				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 			})
 	})
 }
