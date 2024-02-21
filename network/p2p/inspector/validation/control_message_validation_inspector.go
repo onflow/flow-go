@@ -380,7 +380,7 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 			// check if the total number of duplicates exceeds the configured threshold.
 			if totalDuplicateTopicIds > c.config.GraftPrune.DuplicateTopicIdThreshold {
 				c.metrics.OnGraftDuplicateTopicIdsExceedThreshold()
-				return NewDuplicateTopicErr(topic.String(), totalDuplicateTopicIds, p2pmsg.CtrlMsgGraft), p2p.CtrlMsgNonClusterTopicType
+				return NewDuplicateTopicIDThresholdExceeded(totalDuplicateTopicIds, len(grafts), c.config.GraftPrune.DuplicateTopicIdThreshold), p2p.CtrlMsgNonClusterTopicType
 			}
 		}
 		err, ctrlMsgType := c.validateTopic(from, topic, activeClusterIDS)
@@ -388,7 +388,7 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 			totalInvalidTopicIdErrs++
 			c.metrics.OnInvalidTopicIdDetectedForControlMessage(p2pmsg.CtrlMsgGraft)
 			if totalInvalidTopicIdErrs > c.config.GraftPrune.InvalidTopicIdThreshold {
-				return err, ctrlMsgType
+				return NewInvalidTopicIDThresholdExceeded(totalInvalidTopicIdErrs, c.config.GraftPrune.InvalidTopicIdThreshold), ctrlMsgType
 			}
 		}
 	}
@@ -429,7 +429,7 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 			// check if the total number of duplicates exceeds the configured threshold.
 			if totalDuplicateTopicIds > c.config.GraftPrune.DuplicateTopicIdThreshold {
 				c.metrics.OnPruneDuplicateTopicIdsExceedThreshold()
-				return NewDuplicateTopicErr(topic.String(), totalDuplicateTopicIds, p2pmsg.CtrlMsgPrune), p2p.CtrlMsgNonClusterTopicType
+				return NewDuplicateTopicIDThresholdExceeded(totalDuplicateTopicIds, len(prunes), c.config.GraftPrune.DuplicateTopicIdThreshold), p2p.CtrlMsgNonClusterTopicType
 			}
 		}
 		err, ctrlMsgType := c.validateTopic(from, topic, activeClusterIDS)
@@ -437,7 +437,7 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 			totalInvalidTopicIdErrs++
 			c.metrics.OnInvalidTopicIdDetectedForControlMessage(p2pmsg.CtrlMsgPrune)
 			if totalInvalidTopicIdErrs > c.config.GraftPrune.InvalidTopicIdThreshold {
-				return err, ctrlMsgType
+				return NewInvalidTopicIDThresholdExceeded(totalInvalidTopicIdErrs, c.config.GraftPrune.InvalidTopicIdThreshold), ctrlMsgType
 			}
 		}
 	}
@@ -493,7 +493,7 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 			totalInvalidTopicIdErrs++
 			c.metrics.OnInvalidTopicIdDetectedForControlMessage(p2pmsg.CtrlMsgIHave)
 			if totalInvalidTopicIdErrs > c.config.IHave.InvalidTopicIdThreshold {
-				return err, ctrlMsgType
+				return NewInvalidTopicIDThresholdExceeded(totalInvalidTopicIdErrs, c.config.IHave.InvalidTopicIdThreshold), ctrlMsgType
 			}
 		}
 
@@ -503,7 +503,7 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 			// the topic is duplicated, check if the total number of duplicates exceeds the configured threshold
 			if totalDuplicateTopicIds > c.config.IHave.DuplicateTopicIdThreshold {
 				c.metrics.OnIHaveDuplicateTopicIdsExceedThreshold()
-				return NewDuplicateTopicErr(topic, totalDuplicateTopicIds, p2pmsg.CtrlMsgIHave), p2p.CtrlMsgNonClusterTopicType
+				return NewDuplicateTopicIDThresholdExceeded(totalDuplicateTopicIds, len(ihaves), c.config.IHave.DuplicateTopicIdThreshold), p2p.CtrlMsgNonClusterTopicType
 			}
 		}
 

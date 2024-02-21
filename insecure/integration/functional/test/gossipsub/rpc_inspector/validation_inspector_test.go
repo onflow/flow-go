@@ -199,7 +199,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
-			require.True(t, validation.IsDuplicateTopicErr(notification.Error))
+			require.True(t, validation.IsDuplicateTopicIDThresholdExceeded(notification.Error))
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			switch notification.MsgType {
 			case p2pmsg.CtrlMsgGraft:

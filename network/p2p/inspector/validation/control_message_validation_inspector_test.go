@@ -417,7 +417,7 @@ func TestGraftInspection_InvalidTopic_AboveThreshold(t *testing.T) {
 	invalidSporkIDTopicReq := unittest.P2PRPCFixture(unittest.WithGrafts(invalidSporkIDTopicGrafts...))
 
 	from := unittest.PeerIdFixture(t)
-	checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgGraft, channels.IsInvalidTopicErr, p2p.CtrlMsgNonClusterTopicType)
+	checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgGraft, validation.IsInvalidTopicIDThresholdExceeded, p2p.CtrlMsgNonClusterTopicType)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 	distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(checkNotification)
 
@@ -484,7 +484,7 @@ func TestGraftInspection_DuplicateTopicIds_AboveThreshold(t *testing.T) {
 		require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "expected p2p.CtrlMsgNonClusterTopicType notification type, no RPC with cluster prefixed topic sent in this test")
 		require.Equal(t, from, notification.PeerID)
 		require.Equal(t, p2pmsg.CtrlMsgGraft, notification.MsgType)
-		require.True(t, validation.IsDuplicateTopicErr(notification.Error))
+		require.True(t, validation.IsDuplicateTopicIDThresholdExceeded(notification.Error))
 	})
 
 	inspector.Start(signalerCtx)
@@ -573,7 +573,7 @@ func TestPruneInspection_InvalidTopic_AboveThreshold(t *testing.T) {
 	invalidSporkIDTopicReq := unittest.P2PRPCFixture(unittest.WithPrunes(invalidSporkIDTopicPrunes...))
 
 	from := unittest.PeerIdFixture(t)
-	checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgPrune, channels.IsInvalidTopicErr, p2p.CtrlMsgNonClusterTopicType)
+	checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgPrune, validation.IsInvalidTopicIDThresholdExceeded, p2p.CtrlMsgNonClusterTopicType)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 	distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(checkNotification)
 
@@ -614,7 +614,7 @@ func TestPruneInspection_DuplicateTopicIds_AboveThreshold(t *testing.T) {
 		require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "expected p2p.CtrlMsgNonClusterTopicType notification type, no RPC with cluster prefixed topic sent in this test")
 		require.Equal(t, from, notification.PeerID)
 		require.Equal(t, p2pmsg.CtrlMsgPrune, notification.MsgType)
-		require.True(t, validation.IsDuplicateTopicErr(notification.Error))
+		require.True(t, validation.IsDuplicateTopicIDThresholdExceeded(notification.Error))
 	})
 
 	inspector.Start(signalerCtx)
@@ -734,7 +734,7 @@ func TestIHaveInspection_InvalidTopic_AboveThreshold(t *testing.T) {
 
 	from := unittest.PeerIdFixture(t)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
-	checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgIHave, channels.IsInvalidTopicErr, p2p.CtrlMsgNonClusterTopicType)
+	checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgIHave, validation.IsInvalidTopicIDThresholdExceeded, p2p.CtrlMsgNonClusterTopicType)
 	distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(checkNotification)
 
 	inspector.Start(signalerCtx)
@@ -806,7 +806,7 @@ func TestIHaveInspection_DuplicateTopicIds_AboveThreshold(t *testing.T) {
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 
 	// one notification should be disseminated for invalid messages when the number of duplicates exceeds the threshold
-	checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgIHave, validation.IsDuplicateTopicErr, p2p.CtrlMsgNonClusterTopicType)
+	checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgIHave, validation.IsDuplicateTopicIDThresholdExceeded, p2p.CtrlMsgNonClusterTopicType)
 	distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 	inspector.Start(signalerCtx)
 	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
@@ -1284,7 +1284,7 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		from := unittest.PeerIdFixture(t)
 		identity := unittest.IdentityFixture()
 		idProvider.On("ByPeerID", from).Return(identity, true).Times(11)
-		checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgGraft, channels.IsUnknownClusterIDErr, p2p.CtrlMsgTopicTypeClusterPrefixed)
+		checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgGraft, validation.IsInvalidTopicIDThresholdExceeded, p2p.CtrlMsgTopicTypeClusterPrefixed)
 		inspectMsgRpc := unittest.P2PRPCFixture(unittest.WithGrafts(unittest.P2PRPCGraftFixture(&clusterPrefixedTopic)))
 		inspector.ActiveClustersChanged(flow.ChainIDList{flow.ChainID(unittest.IdentifierFixture().String())})
 		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
