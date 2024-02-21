@@ -248,11 +248,11 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.BoolVar(&fnb.BaseConfig.ObserverMode, "observer-mode", defaultConfig.ObserverMode, "whether the node is running in observer mode")
 	if fnb.BaseConfig.ObserverMode {
 		fnb.flags.StringSliceVar(&fnb.bootstrapNodePublicKeys,
-			"bootstrap-node-public-keys",
+			"observer-mode-bootstrap-node-public-keys",
 			nil,
 			"the networking public key of the bootstrap access node if this is an observer (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 		fnb.flags.StringSliceVar(&fnb.bootstrapNodeAddresses,
-			"bootstrap-node-addresses",
+			"observer-mode-bootstrap-node-addresses",
 			nil,
 			"the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 	}
