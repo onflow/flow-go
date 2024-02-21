@@ -514,7 +514,7 @@ func Test_WAL(t *testing.T) {
 		led, err := complete.NewLedger(diskWal, size, metricsCollector, logger, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
-		compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), size, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+		compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), size, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metrics.NewNoopCollector())
 		require.NoError(t, err)
 
 		<-compactor.Ready()
@@ -551,7 +551,7 @@ func Test_WAL(t *testing.T) {
 		led2, err := complete.NewLedger(diskWal2, size+10, metricsCollector, logger, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
-		compactor2, err := complete.NewCompactor(led2, diskWal2, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+		compactor2, err := complete.NewCompactor(led2, diskWal2, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metrics.NewNoopCollector())
 		require.NoError(t, err)
 
 		<-compactor2.Ready()
@@ -613,7 +613,7 @@ func TestLedgerFunctionality(t *testing.T) {
 			require.NoError(t, err)
 			led, err := complete.NewLedger(diskWal, activeTries, metricsCollector, logger, complete.DefaultPathFinderVersion)
 			assert.NoError(t, err)
-			compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), uint(activeTries), checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+			compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), uint(activeTries), checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metrics.NewNoopCollector())
 			require.NoError(t, err)
 			<-compactor.Ready()
 
@@ -730,7 +730,7 @@ func TestWALUpdateFailuresBubbleUp(t *testing.T) {
 		led, err := complete.NewLedger(w, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
-		compactor, err := complete.NewCompactor(led, w, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+		compactor, err := complete.NewCompactor(led, w, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metrics.NewNoopCollector())
 		require.NoError(t, err)
 
 		<-compactor.Ready()
