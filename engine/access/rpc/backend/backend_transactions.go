@@ -121,7 +121,6 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 // chooseCollectionNodes finds a random subset of size sampleSize of collection node addresses from the
 // collection node cluster responsible for the given tx
 func (b *backendTransactions) chooseCollectionNodes(txID flow.Identifier) (flow.IdentitySkeletonList, error) {
-
 	// retrieve the set of collector clusters
 	clusters, err := b.state.Final().Epochs().Current().Clustering()
 	if err != nil {
@@ -688,46 +687,35 @@ func (b *backendTransactions) lookupTransactionResult(
 	block *flow.Block,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*access.TransactionResult, error) {
+	var txResult *access.TransactionResult
+	var err error
 	switch b.txResultQueryMode {
 	case IndexQueryModeExecutionNodesOnly:
-		txResult, err := b.getTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
-		if err != nil {
-			// if either the execution node reported no results or there were not enough execution results
-			if status.Code(err) == codes.NotFound {
-				// No result yet, indicate that it has not been executed
-				return nil, nil
-			}
-			// Other Error trying to retrieve the result, return with err
-			return nil, err
-		}
-
-		// considered executed as long as some result is returned, even if it's an error message
-		return txResult, nil
-	case IndexQueryModeLocalOnly:
-		return b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion)
-	case IndexQueryModeFailover:
-		txResult, err := b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion)
-		if err == nil {
-			return txResult, nil
-		}
-
-		// If any error occurs with local storage - request transaction result from EN
 		txResult, err = b.getTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
+	case IndexQueryModeLocalOnly:
+		txResult, err = b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion)
+	case IndexQueryModeFailover:
+		txResult, err = b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion)
 		if err != nil {
-			// if either the execution node reported no results or the execution node could not be chosen
-			if status.Code(err) == codes.NotFound {
-				// No result yet, indicate that it has not been executed
-				return nil, nil
-			}
-			// Other Error trying to retrieve the result, return with err
-			return nil, err
+			// If any error occurs with local storage - request transaction result from EN
+			txResult, err = b.getTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
 		}
-
-		// considered executed as long as some result is returned, even if it's an error message
-		return txResult, nil
 	default:
 		return nil, status.Errorf(codes.Internal, "unknown transaction result query mode: %v", b.txResultQueryMode)
 	}
+
+	if err != nil {
+		// if either the storage or execution node reported no results or there were not enough execution results
+		if status.Code(err) == codes.NotFound {
+			// No result yet, indicate that it has not been executed
+			return nil, nil
+		}
+		// Other Error trying to retrieve the result, return with err
+		return nil, err
+	}
+
+	// considered executed as long as some result is returned, even if it's an error message
+	return txResult, nil
 }
 
 func (b *backendTransactions) getHistoricalTransaction(
