@@ -1030,7 +1030,10 @@ func (exeNode *ExecutionNode) LoadObserverCollectionIndexer(
 		}
 
 		// notify the collection requester that collections have been received
-		exeNode.collectionRequester.ProcessLocal(res)
+		err := exeNode.collectionRequester.ProcessLocal(res)
+		if err != nil {
+			node.Logger.Fatal().Err(err).Msgf("failed to process collection from local execution data for block %v", data.BlockExecutionData.BlockID)
+		}
 	})
 
 	return r, nil
