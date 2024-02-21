@@ -15,6 +15,7 @@ import (
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
+	"github.com/onflow/flow-go/fvm/evm/testutils"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -90,6 +91,7 @@ func TestEVMRun(t *testing.T) {
 
 func TestEVMAddressDeposit(t *testing.T) {
 	t.Parallel()
+
 	chain := flow.Emulator.Chain()
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 	RunWithNewEnvironment(t,
@@ -125,15 +127,12 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 			script := fvm.Script(code)
 
-			executionSnapshot, output, err := vm.Run(
+			_, output, err := vm.Run(
 				ctx,
 				script,
 				snapshot)
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
-
-			// TODO:
-			_ = executionSnapshot
 		})
 }
 
@@ -186,19 +185,16 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				script := fvm.Script(code)
 
-				executionSnapshot, output, err := vm.Run(
+				_, output, err := vm.Run(
 					ctx,
 					script,
 					snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
-
-				// TODO:
-				_ = executionSnapshot
 			})
 	})
 
-	t.Run("test coa withdraw", func(t *testing.T) {
+	t.Run("test coa transfer", func(t *testing.T) {
 		t.Parallel()
 
 		RunWithNewEnvironment(t,
@@ -215,7 +211,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				import FlowToken from %s
 
 				access(all)
-				fun main(): UFix64 {
+				fun main(address: [UInt8; 20]): UFix64 {
 					let admin = getAuthAccount(%s)
 						.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
 					let minter <- admin.createNewMinter(allowedAmount: 2.34)
@@ -227,12 +223,20 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 					let bal = EVM.Balance(0)
 					bal.setFLOW(flow: 1.23)
-					let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
-					let balance = vault2.balance
-					destroy cadenceOwnedAccount
-					destroy vault2
 
-					return balance
+					let recipientEVMAddress = EVM.EVMAddress(bytes: address)
+
+					let res = cadenceOwnedAccount.call(
+						to: recipientEVMAddress,
+						data: [],
+						gasLimit: 100_000,
+						value: bal,
+					)
+
+					assert(res.status == EVM.Status.successful, message: "transfer call was not successful")
+
+					destroy cadenceOwnedAccount
+					return recipientEVMAddress.balance().inFLOW()
 				}
 				`,
 					sc.EVMContract.Address.HexWithPrefix(),
@@ -240,17 +244,22 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					sc.FlowServiceAccount.Address.HexWithPrefix(),
 				))
 
-				script := fvm.Script(code)
+				addr := cadence.NewArray(
+					ConvertToCadence(testutils.RandomAddress(t).Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
 
-				executionSnapshot, output, err := vm.Run(
+				script := fvm.Script(code).WithArguments(
+					json.MustEncode(addr),
+				)
+
+				_, output, err := vm.Run(
 					ctx,
 					script,
 					snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				// TODO:
-				_ = executionSnapshot
+				require.Equal(t, uint64(123000000), uint64(output.Value.(cadence.UFix64)))
 			})
 	})
 
