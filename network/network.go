@@ -56,24 +56,6 @@ type EngineRegistry interface {
 	RegisterPingService(pingProtocolID protocol.ID, pingInfoProvider PingInfoProvider) (PingService, error)
 }
 
-type NoopEngineRegister struct {
-	module.NoopComponent
-}
-
-func (n NoopEngineRegister) Register(channel channels.Channel, messageProcessor MessageProcessor) (Conduit, error) {
-	return nil, nil
-}
-
-func (n NoopEngineRegister) RegisterBlobService(channel channels.Channel, store datastore.Batching, opts ...BlobServiceOption) (BlobService, error) {
-	return nil, nil
-}
-
-func (n NoopEngineRegister) RegisterPingService(pingProtocolID protocol.ID, pingInfoProvider PingInfoProvider) (PingService, error) {
-	return nil, nil
-}
-
-var _ EngineRegistry = (*NoopEngineRegister)(nil)
-
 // ConduitAdapter is one of the networking layer interfaces in Flow (i.e., EngineRegistry, ConduitAdapter, and Underlay). It represents the interface that networking layer
 // offers to a single conduit which enables the conduit to send different types of messages i.e., unicast, multicast,
 // and publish, to other conduits on the network.
