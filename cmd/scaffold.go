@@ -160,7 +160,6 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	// bind configuration parameters
 	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", defaultConfig.nodeIDHex, "identity of our node")
 	fnb.flags.StringVar(&fnb.BaseConfig.BindAddr, "bind", defaultConfig.BindAddr, "address to bind on")
-	fnb.flags.BoolVar(&fnb.BaseConfig.ObserverMode, "observer-mode", defaultConfig.ObserverMode, "whether the node is running in observer mode")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultConfig.BootstrapDir, "path to the bootstrap directory")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the public database (protocol state)")
 	fnb.flags.StringVar(&fnb.BaseConfig.secretsdir, "secretsdir", defaultConfig.secretsdir, "directory to store private database (secrets)")
@@ -246,14 +245,17 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		defaultConfig.ComplianceConfig.SkipNewProposalsThreshold,
 		"threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
 
-	fnb.flags.StringSliceVar(&fnb.bootstrapNodePublicKeys,
-		"bootstrap-node-public-keys",
-		nil,
-		"the networking public key of the bootstrap access node if this is an observer (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
-	fnb.flags.StringSliceVar(&fnb.bootstrapNodeAddresses,
-		"bootstrap-node-addresses",
-		nil,
-		"the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
+	fnb.flags.BoolVar(&fnb.BaseConfig.ObserverMode, "observer-mode", defaultConfig.ObserverMode, "whether the node is running in observer mode")
+	if fnb.BaseConfig.ObserverMode {
+		fnb.flags.StringSliceVar(&fnb.bootstrapNodePublicKeys,
+			"bootstrap-node-public-keys",
+			nil,
+			"the networking public key of the bootstrap access node if this is an observer (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
+		fnb.flags.StringSliceVar(&fnb.bootstrapNodeAddresses,
+			"bootstrap-node-addresses",
+			nil,
+			"the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
+	}
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -400,70 +402,14 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 	fnb.Component(LibP2PNodeComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		if fnb.ObserverMode {
-			var pis []peer.AddrInfo
-
-			ids, err := BootstrapIdentities(fnb.bootstrapNodeAddresses, fnb.bootstrapNodePublicKeys)
+			// observer mode only init pulbic libp2p node
+			publicLibp2pNode, err := fnb.BuildPublicLibp2pNode()
 			if err != nil {
-				return nil, fmt.Errorf("could not create bootstrap identities: %w", err)
+				return nil, fmt.Errorf("could not build public libp2p node: %w", err)
 			}
+			fnb.LibP2PNode = publicLibp2pNode
 
-			for _, b := range ids {
-				pi, err := utils.PeerAddressInfo(*b)
-				if err != nil {
-					return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
-				}
-
-				pis = append(pis, pi)
-			}
-
-			myAddr := fnb.NodeConfig.Me.Address()
-			if fnb.BaseConfig.BindAddr != NotSet {
-				myAddr = fnb.BaseConfig.BindAddr
-			}
-
-			node, err := p2pbuilder.NewNodeBuilder(
-				fnb.Logger,
-				&fnb.FlowConfig.NetworkConfig.GossipSub,
-				&p2pbuilderconfig.MetricsConfig{
-					HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
-					Metrics:          fnb.Metrics.Network,
-				},
-				network.PublicNetwork,
-				myAddr,
-				fnb.NetworkKey,
-				fnb.SporkID,
-				fnb.IdentityProvider,
-				&fnb.FlowConfig.NetworkConfig.ResourceManager,
-				p2pbuilderconfig.PeerManagerDisableConfig(), // disable peer manager for observer node.
-				&p2p.DisallowListCacheConfig{
-					MaxSize: fnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
-					Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PublicNetwork),
-				},
-				&p2pbuilderconfig.UnicastConfig{
-					Unicast: fnb.FlowConfig.NetworkConfig.Unicast,
-				}).
-				SetSubscriptionFilter(
-					subscription.NewRoleBasedFilter(
-						subscription.UnstakedRole, fnb.IdentityProvider,
-					),
-				).
-				SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
-					return p2pdht.NewDHT(ctx, h, protocols.FlowPublicDHTProtocolID(fnb.SporkID),
-						fnb.Logger,
-						fnb.Metrics.Network,
-						p2pdht.AsClient(),
-						dht.BootstrapPeers(pis...),
-					)
-				}).
-				Build()
-
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize libp2p node for observer: %w", err)
-			}
-
-			fnb.LibP2PNode = node
-
-			return node, nil
+			return publicLibp2pNode, nil
 		}
 
 		myAddr := fnb.NodeConfig.Me.Address()
@@ -541,6 +487,89 @@ func (fnb *FlowNodeBuilder) HeroCacheMetricsFactory() metrics.HeroCacheMetricsFa
 		return metrics.NewHeroCacheMetricsFactory(fnb.MetricsRegisterer)
 	}
 	return metrics.NewNoopHeroCacheMetricsFactory()
+}
+
+// initPublicLibp2pNode creates a libp2p node for the observer service in the public (unstaked) network.
+// The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
+// The LibP2P host is created with the following options:
+// * DHT as client and seeded with the given bootstrap peers
+// * The specified bind address as the listen address
+// * The passed in private key as the libp2p key
+// * No connection gater
+// * No connection manager
+// * No peer manager
+// * Default libp2p pubsub options.
+// Args:
+// - networkKey: the private key to use for the libp2p node
+// Returns:
+// - p2p.LibP2PNode: the libp2p node
+// - error: if any error occurs. Any error returned is considered irrecoverable.
+func (fnb *FlowNodeBuilder) BuildPublicLibp2pNode() (p2p.LibP2PNode, error) {
+	var pis []peer.AddrInfo
+
+	ids, err := BootstrapIdentities(fnb.bootstrapNodeAddresses, fnb.bootstrapNodePublicKeys)
+	if err != nil {
+		return nil, fmt.Errorf("could not create bootstrap identities: %w", err)
+	}
+
+	for _, b := range ids {
+		pi, err := utils.PeerAddressInfo(*b)
+		if err != nil {
+			return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
+		}
+
+		pis = append(pis, pi)
+	}
+
+	for _, b := range ids {
+		pi, err := utils.PeerAddressInfo(*b)
+		if err != nil {
+			return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
+		}
+
+		pis = append(pis, pi)
+	}
+
+	node, err := p2pbuilder.NewNodeBuilder(
+		fnb.Logger,
+		&fnb.FlowConfig.NetworkConfig.GossipSub,
+		&p2pbuilderconfig.MetricsConfig{
+			HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
+			Metrics:          fnb.Metrics.Network,
+		},
+		network.PublicNetwork,
+		fnb.BaseConfig.BindAddr,
+		fnb.NetworkKey,
+		fnb.SporkID,
+		fnb.IdentityProvider,
+		&fnb.FlowConfig.NetworkConfig.ResourceManager,
+		p2pbuilderconfig.PeerManagerDisableConfig(), // disable peer manager for observer node.
+		&p2p.DisallowListCacheConfig{
+			MaxSize: fnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
+			Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PublicNetwork),
+		},
+		&p2pbuilderconfig.UnicastConfig{
+			Unicast: fnb.FlowConfig.NetworkConfig.Unicast,
+		}).
+		SetSubscriptionFilter(
+			subscription.NewRoleBasedFilter(
+				subscription.UnstakedRole, fnb.IdentityProvider,
+			),
+		).
+		SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
+			return p2pdht.NewDHT(ctx, h, protocols.FlowPublicDHTProtocolID(fnb.SporkID),
+				fnb.Logger,
+				fnb.Metrics.Network,
+				p2pdht.AsClient(),
+				dht.BootstrapPeers(pis...),
+			)
+		}).
+		Build()
+
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize libp2p node for observer: %w", err)
+	}
+	return node, nil
 }
 
 func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
