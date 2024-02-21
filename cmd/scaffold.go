@@ -140,7 +140,6 @@ type FlowNodeBuilder struct {
 	adminCommandBootstrapper *admin.CommandRunnerBootstrapper
 	adminCommands            map[string]func(config *NodeConfig) commands.AdminCommand
 	componentBuilder         component.ComponentManagerBuilder
-	peerID                   peer.ID
 	bootstrapNodeAddresses   []string
 	bootstrapNodePublicKeys  []string
 
@@ -755,10 +754,6 @@ func (fnb *FlowNodeBuilder) initNodeInfo() error {
 		return fmt.Errorf("cannot start without node ID")
 	}
 
-	if fnb.BaseConfig.ObserverMode {
-		return nil
-	}
-
 	nodeID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
 	if err != nil {
 		return fmt.Errorf("could not parse node ID from string (id: %v): %w", fnb.BaseConfig.nodeIDHex, err)
@@ -769,11 +764,44 @@ func (fnb *FlowNodeBuilder) initNodeInfo() error {
 		return fmt.Errorf("failed to load private node info: %w", err)
 	}
 
-	fnb.NodeID = nodeID
-	fnb.NetworkKey = info.NetworkPrivKey.PrivateKey
 	fnb.StakingKey = info.StakingPrivKey.PrivateKey
 
+	if fnb.ObserverMode {
+		networkingPrivateKey, err := LoadNetworkPrivateKey(fnb.BaseConfig.BootstrapDir, nodeID)
+		if err != nil {
+			return fmt.Errorf("failed to load networking private key: %w", err)
+		}
+
+		peerID, err := peerIDFromNetworkKey(networkingPrivateKey)
+		if err != nil {
+			return fmt.Errorf("could not get peer ID from network key: %w", err)
+		}
+
+		// public node ID for observer is derived from peer ID which is derived from networking private key
+		pubNodeID, err := translator.NewPublicNetworkIDTranslator().GetFlowID(peerID)
+		if err != nil {
+			return fmt.Errorf("could not get flow node ID: %w", err)
+		}
+
+		fnb.NodeID = pubNodeID
+		fnb.NetworkKey = networkingPrivateKey
+
+		return nil
+	}
+
+	fnb.NodeID = nodeID
+	fnb.NetworkKey = info.NetworkPrivKey.PrivateKey
+
 	return nil
+}
+
+func peerIDFromNetworkKey(privateKey crypto.PrivateKey) (peer.ID, error) {
+	pubKey, err := keyutils.LibP2PPublicKeyFromFlow(privateKey.PublicKey())
+	if err != nil {
+		return "", fmt.Errorf("could not load libp2p public key: %w", err)
+	}
+
+	return peer.IDFromPublicKey(pubKey)
 }
 
 func (fnb *FlowNodeBuilder) initLogger() error {
@@ -1152,18 +1180,23 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 			return fmt.Errorf("could not initialize ProtocolStateIDCache: %w", err)
 		}
 
+		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
+		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
+		disallowListWrapper, err := cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
+			return fnb.NetworkUnderlay
+		})
+		if err != nil {
+			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
+		}
+		node.IdentityProvider = disallowListWrapper
+
 		if node.ObserverMode {
 			fnb.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
-			// The following wrapper allows to black-list byzantine nodes via an admin command:
-			// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
-			fnb.IdentityProvider, err = cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
-				return fnb.NetworkUnderlay
-			})
+			peerID, err := peerIDFromNetworkKey(fnb.NetworkKey)
 			if err != nil {
-				return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
+				return fmt.Errorf("could not get peer ID from network key: %w", err)
 			}
-
 			// use the default identifier provider
 			fnb.SyncEngineIdentifierProvider = id.NewCustomIdentifierProvider(func() flow.IdentifierList {
 				pids := fnb.LibP2PNode.GetPeersForProtocol(protocols.FlowProtocolID(fnb.SporkID))
@@ -1171,12 +1204,11 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 				for _, pid := range pids {
 					// exclude own Identifier
-					if pid == fnb.peerID {
+					if pid == peerID {
 						continue
 					}
 
 					if flowID, err := fnb.IDTranslator.GetFlowID(pid); err != nil {
-						// TODO: this is an instance of "log error and continue with best effort" anti-pattern
 						fnb.Logger.Err(err).Str("peer", p2plogging.PeerId(pid)).Msg("failed to translate to Flow ID")
 					} else {
 						result = append(result, flowID)
@@ -1190,16 +1222,6 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		}
 
 		node.IDTranslator = idCache
-
-		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
-		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
-		disallowListWrapper, err := cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
-			return fnb.NetworkUnderlay
-		})
-		if err != nil {
-			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
-		}
-		node.IdentityProvider = disallowListWrapper
 
 		// register the disallow list wrapper for dynamic configuration via admin command
 		err = node.ConfigManager.RegisterIdentifierListConfig("network-id-provider-blocklist",
@@ -1383,67 +1405,30 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 }
 
 func (fnb *FlowNodeBuilder) initLocal() error {
-	// Verify that my ID (as given in the configuration) is known to the network
-	// (i.e. protocol state). There are two cases that will cause the following error:
-	// 1) used the wrong node id, which is not part of the identity list of the finalized state
-	// 2) the node id is a new one for a new spork, but the bootstrap data has not been updated.
-	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
-	if err != nil {
-		return fmt.Errorf("could not parse node identifier: %w", err)
-	}
-
+	// NodeID has been set in initNodeInfo
+	myID := fnb.NodeID
 	if fnb.ObserverMode {
-		info, err := LoadPrivateNodeInfo(fnb.BaseConfig.BootstrapDir, myID)
-		if err != nil {
-			return fmt.Errorf("failed to load private node info: %w", err)
-		}
-
-		networkingPrivateKey, err := LoadNetworkPrivateKey(fnb.BaseConfig.BootstrapDir, myID)
-		if err != nil {
-			return fmt.Errorf("failed to load networking private key: %w", err)
-		}
-
-		pubKey, err := keyutils.LibP2PPublicKeyFromFlow(networkingPrivateKey.PublicKey())
-		if err != nil {
-			return fmt.Errorf("could not load networking public key: %w", err)
-		}
-
-		k, err := pubKey.Raw()
-		if err != nil {
-			return err
-		}
-
-		fnb.Logger.Info().Msgf("private key: %v, pub key: %x", networkingPrivateKey, k)
-
-		fnb.peerID, err = peer.IDFromPublicKey(pubKey)
-		if err != nil {
-			return fmt.Errorf("could not get peer ID from public key: %w", err)
-		}
-
-		nodeID, err := translator.NewPublicNetworkIDTranslator().GetFlowID(fnb.peerID)
-		if err != nil {
-			return fmt.Errorf("could not get flow node ID: %w", err)
-		}
-
 		id := flow.IdentitySkeleton{
-			NodeID:        nodeID,
-			Address:       "test_execution_1:2137",
+			NodeID:        myID,
+			Address:       "test_execution_1:2137", // TODO
 			Role:          flow.RoleExecution,
 			InitialWeight: 0,
-			NetworkPubKey: networkingPrivateKey.PublicKey(),
-			StakingPubKey: info.StakingPrivKey.PrivateKey.PublicKey(),
+			NetworkPubKey: fnb.NetworkKey.PublicKey(),
+			StakingPubKey: fnb.StakingKey.PublicKey(),
 		}
-		fnb.Me, err = local.New(id, info.StakingPrivKey.PrivateKey)
+		var err error
+		fnb.Me, err = local.New(id, fnb.StakingKey)
 		if err != nil {
 			return fmt.Errorf("could not initialize local: %w", err)
 		}
-		fnb.NodeID = nodeID
-		fnb.NetworkKey = networkingPrivateKey
-		fnb.StakingKey = info.StakingPrivKey.PrivateKey
 
 		return nil
 	}
 
+	// Verify that my ID (as given in the configuration) is known to the network
+	// (i.e. protocol state). There are two cases that will cause the following error:
+	// 1) used the wrong node id, which is not part of the identity list of the finalized state
+	// 2) the node id is a new one for a new spork, but the bootstrap data has not been updated.
 	self, err := fnb.State.Final().Identity(myID)
 	if err != nil {
 		return fmt.Errorf("node identity not found in the identity list of the finalized state (id: %v) : %w", myID,
