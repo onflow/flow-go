@@ -80,22 +80,22 @@ type ServiceEventMarshaller interface {
 }
 
 type marshallerImpl struct {
-	MarshalFunc   func(v interface{}) ([]byte, error)
-	UnmarshalFunc func(data []byte, v interface{}) error
+	marshalFunc   func(v interface{}) ([]byte, error)
+	unmarshalFunc func(data []byte, v interface{}) error
 }
 
 var (
 	ServiceEventJSONMarshaller = marshallerImpl{
-		MarshalFunc:   json.Marshal,
-		UnmarshalFunc: json.Unmarshal,
+		marshalFunc:   json.Marshal,
+		unmarshalFunc: json.Unmarshal,
 	}
 	ServiceEventMSGPACKMarshaller = marshallerImpl{
-		MarshalFunc:   msgpack.Marshal,
-		UnmarshalFunc: msgpack.Unmarshal,
+		marshalFunc:   msgpack.Marshal,
+		unmarshalFunc: msgpack.Unmarshal,
 	}
 	ServiceEventCBORMarshaller = marshallerImpl{
-		MarshalFunc:   cborcodec.EncMode.Marshal,
-		UnmarshalFunc: cbor.Unmarshal,
+		marshalFunc:   cborcodec.EncMode.Marshal,
+		unmarshalFunc: cbor.Unmarshal,
 	}
 )
 
@@ -105,7 +105,7 @@ func (marshaller marshallerImpl) UnmarshalWrapped(b []byte) (ServiceEvent, error
 	var eventTypeWrapper struct {
 		Type ServiceEventType
 	}
-	err := marshaller.UnmarshalFunc(b, &eventTypeWrapper)
+	err := marshaller.unmarshalFunc(b, &eventTypeWrapper)
 	if err != nil {
 		return ServiceEvent{}, err
 	}
@@ -139,7 +139,7 @@ func (marshaller marshallerImpl) UnmarshalWrapped(b []byte) (ServiceEvent, error
 // No errors are expected during normal operation.
 func unmarshalWrapped[E any](b []byte, marshaller marshallerImpl) (*E, error) {
 	eventWrapper := serviceEventUnmarshalWrapper[E]{}
-	err := marshaller.UnmarshalFunc(b, &eventWrapper)
+	err := marshaller.unmarshalFunc(b, &eventWrapper)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +164,7 @@ func (marshaller marshallerImpl) UnmarshalWithType(b []byte, eventType ServiceEv
 		return ServiceEvent{}, fmt.Errorf("invalid type: %s", eventType)
 	}
 
-	err := marshaller.UnmarshalFunc(b, event)
+	err := marshaller.unmarshalFunc(b, event)
 	if err != nil {
 		return ServiceEvent{},
 			fmt.Errorf(
