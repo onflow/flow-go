@@ -252,7 +252,6 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 		go func() {
 			defer workersDone.Done()
 			var readyOnce sync.Once
-			fmt.Println("worker: ", worker)
 			worker(signalerCtx, func() {
 				readyOnce.Do(func() {
 					workersReady.Done()

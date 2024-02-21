@@ -46,13 +46,12 @@ var _ state_synchronization.IndexReporter = (*Indexer)(nil)
 // notify new data is available and kick off indexing.
 type Indexer struct {
 	component.Component
-	log                       zerolog.Logger
-	exeDataReader             *jobs.ExecutionDataReader
-	exeDataNotifier           engine.Notifier
-	indexer                   *IndexerCore
-	jobConsumer               *jobqueue.ComponentConsumer
-	registers                 storage.RegisterIndex
-	executionDataLowestHeight func() (uint64, error)
+	log             zerolog.Logger
+	exeDataReader   *jobs.ExecutionDataReader
+	exeDataNotifier engine.Notifier
+	indexer         *IndexerCore
+	jobConsumer     *jobqueue.ComponentConsumer
+	registers       storage.RegisterIndex
 }
 
 // NewIndexer creates a new execution worker.
@@ -60,17 +59,15 @@ func NewIndexer(
 	log zerolog.Logger,
 	initHeight uint64,
 	registers storage.RegisterIndex,
-	executionDataLowestHeight func() (uint64, error),
 	indexer *IndexerCore,
 	executionCache *cache.ExecutionDataCache,
 	executionDataLatestHeight func() (uint64, error),
 	processedHeight storage.ConsumerProgress,
 ) (*Indexer, error) {
 	r := &Indexer{
-		log:                       log.With().Str("module", "execution_indexer").Logger(),
-		exeDataNotifier:           engine.NewNotifier(),
-		indexer:                   indexer,
-		executionDataLowestHeight: executionDataLowestHeight,
+		log:             log.With().Str("module", "execution_indexer").Logger(),
+		exeDataNotifier: engine.NewNotifier(),
+		indexer:         indexer,
 	}
 
 	r.exeDataReader = jobs.NewExecutionDataReader(executionCache, fetchTimeout, executionDataLatestHeight)
