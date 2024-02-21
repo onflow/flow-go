@@ -69,9 +69,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/network/p2p/translator"
-	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/network/validator"
@@ -223,7 +221,7 @@ func (builder *ObserverServiceBuilder) deriveBootstrapPeerIdentities() error {
 		return nil
 	}
 
-	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
+	ids, err := cmd.BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
 	if err != nil {
 		return fmt.Errorf("failed to derive bootstrap peer identities: %w", err)
 	}
@@ -638,37 +636,6 @@ func publicNetworkMsgValidators(log zerolog.Logger, idProvider module.IdentityPr
 	}
 }
 
-// BootstrapIdentities converts the bootstrap node addresses and keys to a Flow Identity list where
-// each Flow Identity is initialized with the passed address, the networking key
-// and the Node ID set to ZeroID, role set to Access, 0 stake and no staking key.
-func BootstrapIdentities(addresses []string, keys []string) (flow.IdentitySkeletonList, error) {
-	if len(addresses) != len(keys) {
-		return nil, fmt.Errorf("number of addresses and keys provided for the boostrap nodes don't match")
-	}
-
-	ids := make(flow.IdentitySkeletonList, len(addresses))
-	for i, address := range addresses {
-		bytes, err := hex.DecodeString(keys[i])
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode secured GRPC server public key hex %w", err)
-		}
-
-		publicFlowNetworkingKey, err := crypto.DecodePublicKey(crypto.ECDSAP256, bytes)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get public flow networking key could not decode public key bytes %w", err)
-		}
-
-		// create the identity of the peer by setting only the relevant fields
-		ids[i] = &flow.IdentitySkeleton{
-			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the public network it does not apply
-			Address:       address,
-			Role:          flow.RoleAccess, // the upstream node has to be an access node
-			NetworkPubKey: publicFlowNetworkingKey,
-		}
-	}
-	return ids, nil
-}
-
 func (builder *ObserverServiceBuilder) initNodeInfo() error {
 	// use the networking key that was loaded from the configured file
 	networkingKey, err := loadNetworkingKey(builder.observerNetworkingKeyPath)
@@ -703,7 +670,6 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 		if err != nil {
 			return fmt.Errorf("could not initialize ProtocolStateIDCache: %w", err)
 		}
-		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
@@ -714,29 +680,19 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
 		}
 
-		// use the default identifier provider
-		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
-			return id.NewCustomIdentifierProvider(func() flow.IdentifierList {
-				pids := builder.LibP2PNode.GetPeersForProtocol(protocols.FlowProtocolID(builder.SporkID))
-				result := make(flow.IdentifierList, 0, len(pids))
-
-				for _, pid := range pids {
-					// exclude own Identifier
-					if pid == builder.peerID {
-						continue
-					}
-
-					if flowID, err := builder.IDTranslator.GetFlowID(pid); err != nil {
-						// TODO: this is an instance of "log error and continue with best effort" anti-pattern
-						builder.Logger.Err(err).Str("peer", p2plogging.PeerId(pid)).Msg("failed to translate to Flow ID")
-					} else {
-						result = append(result, flowID)
-					}
-				}
-
-				return result
-			})
+		idTranslator, factory, err := cmd.CreatePublicIDTranslatorAndIdentifierProvider(
+			builder.Logger,
+			builder.NetworkKey,
+			builder.SporkID,
+			builder.LibP2PNode,
+			idCache,
+		)
+		if err != nil {
+			return fmt.Errorf("could not initialize public ID translator and identifier provider: %w", err)
 		}
+
+		builder.IDTranslator = idTranslator
+		builder.SyncEngineParticipantsProviderFactory = factory
 
 		return nil
 	})
