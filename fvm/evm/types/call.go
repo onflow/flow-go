@@ -71,8 +71,8 @@ func (dc *DirectCall) Message() *gethCore.Message {
 		Nonce:     dc.Nonce,
 		GasLimit:  dc.GasLimit,
 		GasPrice:  big.NewInt(0), // price is set to zero fo direct calls
-		GasTipCap: big.NewInt(1), // also known as maxPriorityFeePerGas (in GWei)
-		GasFeeCap: big.NewInt(2), // also known as maxFeePerGas (in GWei)
+		GasTipCap: big.NewInt(0), // also known as maxPriorityFeePerGas (in GWei)
+		GasFeeCap: big.NewInt(0), // also known as maxFeePerGas (in GWei)
 		// AccessList:        tx.AccessList(), // TODO revisit this value, the cost matter but performance might
 		SkipAccountChecks: true, // this would let us not set the nonce
 	}
