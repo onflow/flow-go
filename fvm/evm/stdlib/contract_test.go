@@ -3722,7 +3722,6 @@ func TestEVMAccountBalanceForABIOnlyContract(t *testing.T) {
 }
 
 func TestEVMValidateCOAOwnershipProof(t *testing.T) {
-
 	t.Parallel()
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
