@@ -36,6 +36,7 @@ func extractExecutionState(
 	runMigrations bool,
 	chainID flow.ChainID,
 	evmContractChange migrators.EVMContractChange,
+	stagedContractsFile string,
 ) error {
 
 	log.Info().Msg("init WAL")
@@ -96,8 +97,10 @@ func extractExecutionState(
 
 	var migrations []ledger.Migration
 
-	// TODO:
-	var stagedContracts []migrators.StagedContract
+	stagedContracts, err := migrators.StagedContractsFromCSV(stagedContractsFile)
+	if err != nil {
+		return err
+	}
 
 	if runMigrations {
 		rwf := reporters.NewReportFileWriterFactory(dir, log)
