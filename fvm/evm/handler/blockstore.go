@@ -45,12 +45,12 @@ func (bs *BlockStore) BlockProposal() (*types.Block, error) {
 		return nil, err
 	}
 
-	bs.blockProposal = &types.Block{
-		Height:            lastExecutedBlock.Height + 1,
-		ParentBlockHash:   parentHash,
-		TotalSupply:       lastExecutedBlock.TotalSupply,
-		TransactionHashes: make([]gethCommon.Hash, 0),
-	}
+	bs.blockProposal = types.NewBlock(parentHash,
+		lastExecutedBlock.Height+1,
+		lastExecutedBlock.TotalSupply,
+		gethCommon.Hash{},
+		make([]gethCommon.Hash, 0),
+	)
 	return bs.blockProposal, nil
 }
 

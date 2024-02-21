@@ -100,6 +100,7 @@ func init() {
 type TransactionExecutedPayload struct {
 	BlockHeight uint64
 	TxEncoded   []byte
+	BlockHash   gethCommon.Hash
 	TxHash      gethCommon.Hash
 	Result      *Result
 }
@@ -120,6 +121,7 @@ func (p *TransactionExecutedPayload) CadenceEvent() (cadence.Event, error) {
 			string(EventTypeTransactionExecuted),
 			[]cadence.Field{
 				cadence.NewField("blockHeight", cadence.UInt64Type),
+				cadence.NewField("blockHash", cadence.StringType),
 				cadence.NewField("transactionHash", cadence.StringType),
 				cadence.NewField("transaction", cadence.StringType),
 				cadence.NewField("failed", cadence.BoolType),
@@ -134,6 +136,7 @@ func (p *TransactionExecutedPayload) CadenceEvent() (cadence.Event, error) {
 		),
 		Fields: []cadence.Value{
 			cadence.NewUInt64(p.BlockHeight),
+			cadence.String(p.BlockHash.String()),
 			cadence.String(p.TxHash.String()),
 			cadence.String(hex.EncodeToString(p.TxEncoded)),
 			cadence.Bool(p.Result.Failed()),
@@ -150,6 +153,7 @@ func (p *TransactionExecutedPayload) CadenceEvent() (cadence.Event, error) {
 func NewTransactionExecutedEvent(
 	height uint64,
 	txEncoded []byte,
+	blockHash gethCommon.Hash,
 	txHash gethCommon.Hash,
 	result *Result,
 ) *Event {
@@ -157,6 +161,7 @@ func NewTransactionExecutedEvent(
 		Etype: EventTypeTransactionExecuted,
 		Payload: &TransactionExecutedPayload{
 			BlockHeight: height,
+			BlockHash:   blockHash,
 			TxEncoded:   txEncoded,
 			TxHash:      txHash,
 			Result:      result,

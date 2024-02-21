@@ -45,11 +45,15 @@ func (b *Block) AppendTxHash(txHash gethCommon.Hash) {
 }
 
 // NewBlock constructs a new block
-func NewBlock(height, uuidIndex uint64, totalSupply *big.Int,
-	stateRoot, receiptRoot gethCommon.Hash,
+func NewBlock(
+	parentBlockHash gethCommon.Hash,
+	height uint64,
+	totalSupply *big.Int,
+	receiptRoot gethCommon.Hash,
 	txHashes []gethCommon.Hash,
 ) *Block {
 	return &Block{
+		ParentBlockHash:   parentBlockHash,
 		Height:            height,
 		TotalSupply:       totalSupply,
 		ReceiptRoot:       receiptRoot,

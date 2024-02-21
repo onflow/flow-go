@@ -1,6 +1,7 @@
 package types
 
 import (
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -24,6 +25,8 @@ type Result struct {
 	ReturnedValue []byte
 	// EVM logs (events that are emited by evm)
 	Logs []*gethTypes.Log
+	// TX hash holdes the cached value of tx hash
+	TxHash gethCommon.Hash
 }
 
 func (res *Result) Failed() bool {
