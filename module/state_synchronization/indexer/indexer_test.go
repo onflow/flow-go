@@ -78,9 +78,7 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 	test.worker, err = NewIndexer(
 		unittest.Logger(),
 		test.first().Header.Height,
-		func() (uint64, error) {
-			return registers.FirstHeight(), nil
-		},
+		registers,
 		indexerCoreTest.indexer,
 		exeCache,
 		test.latestHeight,

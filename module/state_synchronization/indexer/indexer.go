@@ -49,8 +49,9 @@ type Indexer struct {
 	log                       zerolog.Logger
 	exeDataReader             *jobs.ExecutionDataReader
 	exeDataNotifier           engine.Notifier
-	indexer                   state_synchronization.ExecutionDataIndexer
+	indexer                   *IndexerCore
 	jobConsumer               *jobqueue.ComponentConsumer
+	registers                 storage.RegisterIndex
 	executionDataLowestHeight func() (uint64, error)
 }
 
@@ -58,8 +59,9 @@ type Indexer struct {
 func NewIndexer(
 	log zerolog.Logger,
 	initHeight uint64,
+	registers storage.RegisterIndex,
 	executionDataLowestHeight func() (uint64, error),
-	indexer state_synchronization.ExecutionDataIndexer,
+	indexer *IndexerCore,
 	executionCache *cache.ExecutionDataCache,
 	executionDataLatestHeight func() (uint64, error),
 	processedHeight storage.ConsumerProgress,
@@ -82,7 +84,7 @@ func NewIndexer(
 		r.exeDataReader,
 		initHeight,
 		r.processExecutionData,
-		workersCount, // TODO configurable
+		workersCount,
 		searchAhead,
 	)
 	if err != nil {
@@ -107,7 +109,7 @@ func (i *Indexer) LowestIndexedHeight() (uint64, error) {
 	// TODO: use a separate value to track the lowest indexed height. We're using the registers db's
 	// value here to start because it's convenient. When pruning support is added, this will need to
 	// be updated.
-	return i.executionDataLowestHeight()
+	return i.registers.FirstHeight(), nil
 }
 
 // HighestIndexedHeight returns the highest height indexed by the execution indexer.
