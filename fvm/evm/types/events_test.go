@@ -155,7 +155,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		assert.Equal(
 			t,
 			tep.DeployedContractAddress,
-			hex.EncodeToString(txResult.DeployedContractAddress.Bytes()),
+			txResult.DeployedContractAddress.ToCommon().Hex(),
 		)
 		assert.Equal(t, tep.ReturnedValue, data)
 
@@ -207,7 +207,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		assert.Equal(
 			t,
 			tep.DeployedContractAddress,
-			hex.EncodeToString(txResult.DeployedContractAddress.Bytes()),
+			txResult.DeployedContractAddress.ToCommon().Hex(),
 		)
 		assert.Equal(t, tep.ReturnedValue, data)
 
