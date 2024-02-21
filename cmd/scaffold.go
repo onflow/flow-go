@@ -1418,15 +1418,27 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 	// NodeID has been set in initNodeInfo
 	myID := fnb.NodeID
 	if fnb.ObserverMode {
+		nodeID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
+		if err != nil {
+			return fmt.Errorf("could not parse node ID from string (id: %v): %w", fnb.BaseConfig.nodeIDHex, err)
+		}
+		info, err := LoadPrivateNodeInfo(fnb.BaseConfig.BootstrapDir, nodeID)
+		if err != nil {
+			return fmt.Errorf("could not load private node info: %w", err)
+		}
+
+		if info.Role != flow.RoleExecution {
+			return fmt.Errorf("observer node must have execution role")
+		}
+
 		id := flow.IdentitySkeleton{
 			NodeID:        myID,
-			Address:       "test_execution_1:2137", // TODO
-			Role:          flow.RoleExecution,
+			Address:       info.Address,
+			Role:          info.Role,
 			InitialWeight: 0,
 			NetworkPubKey: fnb.NetworkKey.PublicKey(),
 			StakingPubKey: fnb.StakingKey.PublicKey(),
 		}
-		var err error
 		fnb.Me, err = local.New(id, fnb.StakingKey)
 		if err != nil {
 			return fmt.Errorf("could not initialize local: %w", err)
