@@ -142,8 +142,6 @@ type FlowNodeBuilder struct {
 	componentBuilder         component.ComponentManagerBuilder
 	bootstrapNodeAddresses   []string
 	bootstrapNodePublicKeys  []string
-
-	bootstrapIdentities flow.IdentitySkeletonList // the identity list of bootstrap peers the node uses to discover other nodes
 }
 
 var _ NodeBuilder = (*FlowNodeBuilder)(nil)
@@ -409,9 +407,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 				return nil, fmt.Errorf("could not create bootstrap identities: %w", err)
 			}
 
-			fnb.bootstrapIdentities = ids
-
-			for _, b := range fnb.bootstrapIdentities {
+			for _, b := range ids {
 				pi, err := utils.PeerAddressInfo(*b)
 				if err != nil {
 					return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
