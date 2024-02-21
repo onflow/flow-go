@@ -45,9 +45,10 @@ const (
 
 	// Unqualified names of service events (not including address prefix or contract name)
 
-	EventNameEpochSetup    = "EpochSetup"
-	EventNameEpochCommit   = "EpochCommit"
-	EventNameVersionBeacon = "VersionBeacon"
+	EventNameEpochSetup                  = "EpochSetup"
+	EventNameEpochCommit                 = "EpochCommit"
+	EventNameVersionBeacon               = "VersionBeacon"
+	EventNameProtocolStateVersionUpgrade = "ProtocolStateVersionUpgrade"
 
 	//  Unqualified names of service event contract functions (not including address prefix or contract name)
 
@@ -206,9 +207,10 @@ func (c SystemContracts) All() []SystemContract {
 
 // ServiceEvents is a container for all service events on a particular chain.
 type ServiceEvents struct {
-	EpochSetup    ServiceEvent
-	EpochCommit   ServiceEvent
-	VersionBeacon ServiceEvent
+	EpochSetup                  ServiceEvent
+	EpochCommit                 ServiceEvent
+	VersionBeacon               ServiceEvent
+	ProtocolStateVersionUpgrade ServiceEvent
 }
 
 // All returns all service events as a slice.
@@ -217,6 +219,7 @@ func (se ServiceEvents) All() []ServiceEvent {
 		se.EpochSetup,
 		se.EpochCommit,
 		se.VersionBeacon,
+		se.ProtocolStateVersionUpgrade,
 	}
 }
 
@@ -394,9 +397,10 @@ func init() {
 		}
 
 		events := &ServiceEvents{
-			EpochSetup:    event(ContractNameEpoch, EventNameEpochSetup),
-			EpochCommit:   event(ContractNameEpoch, EventNameEpochCommit),
-			VersionBeacon: event(ContractNameNodeVersionBeacon, EventNameVersionBeacon),
+			EpochSetup:                  event(ContractNameEpoch, EventNameEpochSetup),
+			EpochCommit:                 event(ContractNameEpoch, EventNameEpochCommit),
+			VersionBeacon:               event(ContractNameNodeVersionBeacon, EventNameVersionBeacon),
+			ProtocolStateVersionUpgrade: event(ContractNameServiceAccount, EventNameProtocolStateVersionUpgrade),
 		}
 
 		return events
