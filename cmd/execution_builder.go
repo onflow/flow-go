@@ -23,6 +23,7 @@ import (
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
+	"github.com/vmihailenco/msgpack"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/admin/commands"
@@ -70,6 +71,7 @@ import (
 	modelbootstrap "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
@@ -1015,9 +1017,20 @@ func (exeNode *ExecutionNode) LoadObserverCollectionIndexer(
 	exeNode.followerDistributor.AddOnBlockFinalizedConsumer(r.OnBlockFinalized)
 
 	execDataDistributor.AddOnExecutionDataReceivedConsumer(func(data *execution_data.BlockExecutionDataEntity) {
-		for _, chunk := range data.BlockExecutionData.ChunkExecutionDatas {
-			exeNode.ingestionEng.OnCollection(exeNode.builder.NodeID, chunk.Collection)
+		if len(data.BlockExecutionData.ChunkExecutionDatas) == 0 {
+			return
 		}
+
+		res := &messages.EntityResponse{}
+		for _, chunk := range data.BlockExecutionData.ChunkExecutionDatas {
+			col := chunk.Collection
+			blob, _ := msgpack.Marshal(col)
+			res.EntityIDs = append(res.EntityIDs, col.ID())
+			res.Blobs = append(res.Blobs, blob)
+		}
+
+		// notify the collection requester that collections have been received
+		exeNode.collectionRequester.ProcessLocal(res)
 	})
 
 	return r, nil
