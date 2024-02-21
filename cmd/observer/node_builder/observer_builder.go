@@ -1,7 +1,6 @@
 package node_builder
 
 import (
-	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -9,10 +8,7 @@ import (
 	"strings"
 	"time"
 
-	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
@@ -57,17 +53,12 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
-	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
-	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
-	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
-	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
-	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/network/validator"
@@ -715,78 +706,6 @@ func (builder *ObserverServiceBuilder) validateParams() error {
 	return nil
 }
 
-// initPublicLibp2pNode creates a libp2p node for the observer service in the public (unstaked) network.
-// The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
-// The LibP2P host is created with the following options:
-// * DHT as client and seeded with the given bootstrap peers
-// * The specified bind address as the listen address
-// * The passed in private key as the libp2p key
-// * No connection gater
-// * No connection manager
-// * No peer manager
-// * Default libp2p pubsub options.
-// Args:
-// - networkKey: the private key to use for the libp2p node
-// Returns:
-// - p2p.LibP2PNode: the libp2p node
-// - error: if any error occurs. Any error returned is considered irrecoverable.
-func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.PrivateKey) (p2p.LibP2PNode, error) {
-	var pis []peer.AddrInfo
-
-	for _, b := range builder.bootstrapIdentities {
-		pi, err := utils.PeerAddressInfo(*b)
-		if err != nil {
-			return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
-		}
-
-		pis = append(pis, pi)
-	}
-
-	node, err := p2pbuilder.NewNodeBuilder(
-		builder.Logger,
-		&builder.FlowConfig.NetworkConfig.GossipSub,
-		&p2pbuilderconfig.MetricsConfig{
-			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
-			Metrics:          builder.Metrics.Network,
-		},
-		network.PublicNetwork,
-		builder.BaseConfig.BindAddr,
-		networkKey,
-		builder.SporkID,
-		builder.IdentityProvider,
-		&builder.FlowConfig.NetworkConfig.ResourceManager,
-		p2pbuilderconfig.PeerManagerDisableConfig(), // disable peer manager for observer node.
-		&p2p.DisallowListCacheConfig{
-			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
-			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
-		},
-		&p2pbuilderconfig.UnicastConfig{
-			Unicast: builder.FlowConfig.NetworkConfig.Unicast,
-		}).
-		SetSubscriptionFilter(
-			subscription.NewRoleBasedFilter(
-				subscription.UnstakedRole, builder.IdentityProvider,
-			),
-		).
-		SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
-			return p2pdht.NewDHT(ctx, h, protocols.FlowPublicDHTProtocolID(builder.SporkID),
-				builder.Logger,
-				builder.Metrics.Network,
-				p2pdht.AsClient(),
-				dht.BootstrapPeers(pis...),
-			)
-		}).
-		Build()
-
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize libp2p node for observer: %w", err)
-	}
-
-	builder.LibP2PNode = node
-
-	return builder.LibP2PNode, nil
-}
-
 // initObserverLocal initializes the observer's ID, network key and network address
 // Currently, it reads a node-info.priv.json like any other node.
 // TODO: read the node ID from the special bootstrap files
@@ -823,7 +742,7 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 	builder.
 		Component("public libp2p node", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
-			publicLibp2pNode, err = builder.initPublicLibp2pNode(node.NetworkKey)
+			publicLibp2pNode, err = builder.BuildPublicLibp2pNode()
 			if err != nil {
 				return nil, fmt.Errorf("could not create public libp2p node: %w", err)
 			}
