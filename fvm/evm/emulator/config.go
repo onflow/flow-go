@@ -87,7 +87,7 @@ func defaultConfig() *Config {
 			CanTransfer: gethCore.CanTransfer,
 			Transfer:    gethCore.Transfer,
 			GasLimit:    BlockLevelGasLimit,
-			BaseFee:     big.NewInt(0),
+			BaseFee:     nil,
 			GetHash: func(n uint64) gethCommon.Hash {
 				return gethCommon.Hash{}
 			},
