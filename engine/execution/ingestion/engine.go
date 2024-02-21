@@ -431,8 +431,7 @@ func (e *Engine) executeBlock(
 	}
 
 	receipt := computationResult.ExecutionReceipt
-	broadcasted := false
-	broadcasted, err = e.providerEngine.BroadcastExecutionReceipt(
+	broadcasted, err := e.providerEngine.BroadcastExecutionReceipt(
 		ctx, executableBlock.Block.Header.Height, receipt)
 	if err != nil {
 		lg.Err(err).Msg("critical: failed to broadcast the receipt")
