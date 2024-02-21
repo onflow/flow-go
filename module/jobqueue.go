@@ -12,7 +12,6 @@ const (
 	ConsumeProgressExecutionDataRequesterNotification = "ConsumeProgressExecutionDataRequesterNotification"
 
 	ConsumeProgressExecutionDataIndexerBlockHeight = "ConsumeProgressExecutionDataIndexerBlockHeight"
-	ConsumeProgressCollectionIndexerBlockHeight    = "ConsumeProgressCollectionIndexerBlockHeight"
 )
 
 // JobID is a unique ID of the job.
