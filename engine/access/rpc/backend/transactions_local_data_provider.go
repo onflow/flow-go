@@ -70,7 +70,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 		}
 
 		if len(txErrorMessage) == 0 {
-			return nil, status.Errorf(codes.Internal, "transaction error message is empty for tx ID: %s block ID: %s", txResult.TransactionID, blockID)
+			return nil, status.Errorf(codes.Internal, "transaction failed but error message is empty for tx ID: %s block ID: %s", txResult.TransactionID, blockID)
 		}
 
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
@@ -147,7 +147,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 		if txResult.Failed {
 			txErrorMessage = txErrors[txResult.TransactionID]
 			if len(txErrorMessage) == 0 {
-				return nil, status.Errorf(codes.Internal, "transaction error message is empty for tx ID: %s block ID: %s", txID, blockID)
+				return nil, status.Errorf(codes.Internal, "transaction failed but error message is empty for tx ID: %s block ID: %s", txID, blockID)
 			}
 			txStatusCode = 1
 		}
@@ -227,7 +227,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 		}
 
 		if len(txErrorMessage) == 0 {
-			return nil, status.Errorf(codes.Internal, "transaction error message is empty for tx ID: %s block ID: %s", txResult.TransactionID, blockID)
+			return nil, status.Errorf(codes.Internal, "transaction failed but error message is empty for tx ID: %s block ID: %s", txResult.TransactionID, blockID)
 		}
 
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
