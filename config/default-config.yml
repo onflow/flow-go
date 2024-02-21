@@ -160,7 +160,7 @@ network-config:
           # to avoid penalizing peers that are not malicious but are misbehaving due to bugs or other issues.
           # A topic id is considered duplicate if it appears more than once in a single GRAFT or PRUNE message.
           duplicate-topic-id-threshold: 50
-          # Maximum number of total invalid topic ids in a single GRAFT or PRUNE message, ideally this should be 0 but we allow for some tolerance
+          # Maximum number of total invalid topic ids in GRAFTs/PRUNEs of a single RPC, ideally this should be 0 but we allow for some tolerance
           # to avoid penalizing peers that are not malicious but are misbehaving due to bugs or other issues.
           invalid-topic-id-threshold: 50
         ihave:
