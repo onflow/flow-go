@@ -10,6 +10,7 @@ import (
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
+	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 	mockery "github.com/stretchr/testify/mock"
@@ -989,6 +990,24 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 // The victim node is configured to use the GossipSubInspector to detect spam and the scoring system to mitigate spam.
 // The test ensures that the victim node is disconnected from the spammer node on the GossipSub mesh after the spam detection is triggered.
 func TestGossipSubSpamMitigationIntegration(t *testing.T) {
+	t.Run("gossipsub spam mitigation invalid grafts", func(t *testing.T) {
+		testGossipSubSpamMitigationIntegration(t, p2pmsg.CtrlMsgGraft)
+	})
+	t.Run("gossipsub spam mitigation invalid prunes", func(t *testing.T) {
+		testGossipSubSpamMitigationIntegration(t, p2pmsg.CtrlMsgPrune)
+	})
+	t.Run("gossipsub spam mitigation invalid ihaves", func(t *testing.T) {
+		testGossipSubSpamMitigationIntegration(t, p2pmsg.CtrlMsgIHave)
+	})
+}
+
+// testGossipSubSpamMitigationIntegration tests that the spam mitigation feature of GossipSub is working as expected.
+// The test puts together the spam detection (through the GossipSubInspector) and the spam mitigation (through the
+// scoring system) and ensures that the mitigation is triggered when the spam detection detects spam.
+// The test scenario involves a spammer node that sends a large number of control messages for the specified control message type to a victim node.
+// The victim node is configured to use the GossipSubInspector to detect spam and the scoring system to mitigate spam.
+// The test ensures that the victim node is disconnected from the spammer node on the GossipSub mesh after the spam detection is triggered.
+func testGossipSubSpamMitigationIntegration(t *testing.T, msgType p2pmsg.ControlMessageType) {
 	idProvider := mock.NewIdentityProvider(t)
 	sporkID := unittest.IdentifierFixture()
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, flow.RoleConsensus, idProvider)
@@ -1029,8 +1048,8 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 		}
 	})
 
-	spamRpcCount := 100            // total number of individual rpc messages to send
-	spamCtrlMsgCount := int64(100) // total number of control messages to send on each RPC
+	spamRpcCount := 1000            // total number of individual rpc messages to send
+	spamCtrlMsgCount := int64(1000) // total number of control messages to send on each RPC
 
 	// unknownTopic is an unknown topic to the victim node but shaped like a valid topic (i.e., it has the correct prefix and spork ID).
 	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", p2ptest.GossipSubTopicIdFixture(), sporkID))
@@ -1059,29 +1078,39 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 		return unittest.ProposalFixture()
 	})
 
-	// prepares spam graft and prune messages with different strategies.
-	graftCtlMsgsWithUnknownTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithGraft(spamRpcCount, unknownTopic.String()))
-	graftCtlMsgsWithMalformedTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithGraft(spamRpcCount, malformedTopic.String()))
-	graftCtlMsgsInvalidSporkIDTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithGraft(spamRpcCount, invalidSporkIDTopic.String()))
-	graftCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), // sets duplicate to +2 above the threshold to ensure that the victim node will penalize the spammer node
-		p2ptest.WithGraft(cfg.NetworkConfig.GossipSub.RpcInspector.Validation.GraftPrune.DuplicateTopicIdThreshold+2, duplicateTopic.String()))
+	var unknownTopicSpam []pubsub_pb.ControlMessage
+	var malformedTopicSpam []pubsub_pb.ControlMessage
+	var invalidSporkIDTopicSpam []pubsub_pb.ControlMessage
+	var duplicateTopicSpam []pubsub_pb.ControlMessage
 
-	pruneCtlMsgsWithUnknownTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithPrune(spamRpcCount, unknownTopic.String()))
-	pruneCtlMsgsWithMalformedTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithPrune(spamRpcCount, malformedTopic.String()))
-	pruneCtlMsgsInvalidSporkIDTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithGraft(spamRpcCount, invalidSporkIDTopic.String()))
-	pruneCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), // sets duplicate to +2 above the threshold to ensure that the victim node will penalize the spammer node
-		p2ptest.WithPrune(cfg.NetworkConfig.GossipSub.RpcInspector.Validation.GraftPrune.DuplicateTopicIdThreshold+2, duplicateTopic.String()))
+	switch msgType {
+	case p2pmsg.CtrlMsgGraft:
+		unknownTopicSpam = spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithGraft(spamRpcCount, unknownTopic.String()))
+		malformedTopicSpam = spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithGraft(spamRpcCount, malformedTopic.String()))
+		invalidSporkIDTopicSpam = spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithGraft(spamRpcCount, invalidSporkIDTopic.String()))
+		duplicateTopicSpam = spammer.GenerateCtlMessages(int(spamCtrlMsgCount), // sets duplicate to +2 above the threshold to ensure that the victim node will penalize the spammer node
+			p2ptest.WithGraft(cfg.NetworkConfig.GossipSub.RpcInspector.Validation.GraftPrune.DuplicateTopicIdThreshold+2, duplicateTopic.String()))
+	case p2pmsg.CtrlMsgPrune:
+		unknownTopicSpam = spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithPrune(spamRpcCount, unknownTopic.String()))
+		malformedTopicSpam = spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithPrune(spamRpcCount, malformedTopic.String()))
+		invalidSporkIDTopicSpam = spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithGraft(spamRpcCount, invalidSporkIDTopic.String()))
+		duplicateTopicSpam = spammer.GenerateCtlMessages(int(spamCtrlMsgCount), // sets duplicate to +2 above the threshold to ensure that the victim node will penalize the spammer node
+			p2ptest.WithPrune(cfg.NetworkConfig.GossipSub.RpcInspector.Validation.GraftPrune.DuplicateTopicIdThreshold+2, duplicateTopic.String()))
+	case p2pmsg.CtrlMsgIHave:
+		unknownTopicSpam = spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithIHave(spamRpcCount, 100, unknownTopic.String()))
+		malformedTopicSpam = spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithIHave(spamRpcCount, 100, malformedTopic.String()))
+		invalidSporkIDTopicSpam = spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithIHave(spamRpcCount, 100, invalidSporkIDTopic.String()))
+		duplicateTopicSpam = spammer.GenerateCtlMessages(int(spamCtrlMsgCount), // sets duplicate to +2 above the threshold to ensure that the victim node will penalize the spammer node
+			p2ptest.WithIHave(cfg.NetworkConfig.GossipSub.RpcInspector.Validation.IHave.DuplicateTopicIdThreshold+spamRpcCount, 100, duplicateTopic.String()))
+	default:
+		t.Fatal("invalid control message type expected graft or prune")
+	}
 
 	// start spamming the victim peer
-	spammer.SpamControlMessage(t, victimNode, graftCtlMsgsWithUnknownTopic)
-	spammer.SpamControlMessage(t, victimNode, graftCtlMsgsWithMalformedTopic)
-	spammer.SpamControlMessage(t, victimNode, graftCtlMsgsInvalidSporkIDTopic)
-	spammer.SpamControlMessage(t, victimNode, graftCtlMsgsDuplicateTopic)
-
-	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsWithUnknownTopic)
-	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsWithMalformedTopic)
-	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsInvalidSporkIDTopic)
-	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsDuplicateTopic)
+	spammer.SpamControlMessage(t, victimNode, unknownTopicSpam)
+	spammer.SpamControlMessage(t, victimNode, malformedTopicSpam)
+	spammer.SpamControlMessage(t, victimNode, invalidSporkIDTopicSpam)
+	spammer.SpamControlMessage(t, victimNode, duplicateTopicSpam)
 	scoreOptParameters := cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Thresholds
 	// wait for three GossipSub heartbeat intervals to ensure that the victim node has penalized the spammer node.
 	require.Eventually(t, func() bool {
