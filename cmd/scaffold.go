@@ -1441,6 +1441,8 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 		}
 
 		id := flow.IdentitySkeleton{
+			// observer mode uses the node id derived from the network key,
+			// rather than the node id from the node info file
 			NodeID:        myID,
 			Address:       info.Address,
 			Role:          info.Role,

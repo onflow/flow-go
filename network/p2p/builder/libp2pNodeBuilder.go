@@ -215,7 +215,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		}
 
 		opts = append(opts, libp2p.ResourceManager(mgr))
-		builder.logger.Info().Msgf("default libp2p resource manager is enabled with metrics: %v", builder.networkKey)
+		builder.logger.Info().Msgf("default libp2p resource manager is enabled with metrics, pubkey: %s", builder.networkKey.PublicKey())
 	}
 
 	if builder.connManager != nil {
