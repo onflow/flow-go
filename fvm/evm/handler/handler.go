@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/handler/coa"
-	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -52,22 +51,8 @@ func NewContractHandler(
 		addressAllocator:   addressAllocator,
 		backend:            backend,
 		emulator:           emulator,
-		precompiles:        getPrecompiles(evmContractAddress, addressAllocator, backend),
+		precompiles:        preparePrecompiles(evmContractAddress, addressAllocator, backend),
 	}
-}
-
-func getPrecompiles(
-	evmContractAddress flow.Address,
-	addressAllocator types.AddressAllocator,
-	backend types.Backend,
-) []types.Precompile {
-	archAddress := addressAllocator.AllocatePrecompileAddress(1)
-	archContract := precompiles.ArchContract(
-		archAddress,
-		backend.GetCurrentBlockHeight,
-		COAOwnershipProofValidator(evmContractAddress, backend),
-	)
-	return []types.Precompile{archContract}
 }
 
 // DeployCOA deploys a cadence-owned-account and returns the address
