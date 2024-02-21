@@ -48,6 +48,7 @@ type EngineRegistry interface {
 
 	// RegisterBlobService registers a BlobService on the given channel, using the given datastore to retrieve values.
 	// The returned BlobService can be used to request blocks from the network.
+	// RegisterBlobService starts the BlobService component using the network's context.
 	// TODO: We should return a function that can be called to unregister / close the BlobService
 	RegisterBlobService(channel channels.Channel, store datastore.Batching, opts ...BlobServiceOption) (BlobService, error)
 

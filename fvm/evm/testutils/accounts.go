@@ -97,6 +97,10 @@ func (a *EOATestAccount) signTx(
 	return tx
 }
 
+func (a *EOATestAccount) Nonce() uint64 {
+	return a.nonce
+}
+
 func (a *EOATestAccount) SetNonce(nonce uint64) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
@@ -134,6 +138,7 @@ func FundAndGetEOATestAccount(t testing.TB, led atree.Ledger, flowEVMRootAddress
 		types.NewDepositCall(
 			account.Address(),
 			new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)),
+			account.nonce,
 		),
 	)
 	require.NoError(t, err)
