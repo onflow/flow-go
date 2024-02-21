@@ -35,7 +35,12 @@ func (e *EventsIndex) Initialize(indexReporter state_synchronization.IndexReport
 	return fmt.Errorf("index reporter already initialized")
 }
 
-func (e *EventsIndex) GetEvents(blockID flow.Identifier, height uint64) ([]flow.Event, error) {
+// ByBlockID checks data availability and returns events for a block
+// Expected errors:
+//   - indexer.ErrIndexNotInitialized: if the EventsIndex has not been initialized
+//   - storage.ErrHeightNotIndexed: returned, when data is unavailable
+//   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
+func (e *EventsIndex) ByBlockID(blockID flow.Identifier, height uint64) ([]flow.Event, error) {
 	if err := e.checkDataAvailable(height); err != nil {
 		return nil, err
 	}
@@ -43,7 +48,12 @@ func (e *EventsIndex) GetEvents(blockID flow.Identifier, height uint64) ([]flow.
 	return e.events.ByBlockID(blockID)
 }
 
-func (e *EventsIndex) GetEventsByTransactionID(blockID flow.Identifier, height uint64, transactionID flow.Identifier) ([]flow.Event, error) {
+// ByBlockIDTransactionID checks data availability and return events for the given block ID and transaction ID
+// Expected errors:
+//   - indexer.ErrIndexNotInitialized: if the EventsIndex has not been initialized
+//   - storage.ErrHeightNotIndexed: returned, when data is unavailable
+//   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
+func (e *EventsIndex) ByBlockIDTransactionID(blockID flow.Identifier, height uint64, transactionID flow.Identifier) ([]flow.Event, error) {
 	if err := e.checkDataAvailable(height); err != nil {
 		return nil, err
 	}
@@ -51,7 +61,12 @@ func (e *EventsIndex) GetEventsByTransactionID(blockID flow.Identifier, height u
 	return e.events.ByBlockIDTransactionID(blockID, transactionID)
 }
 
-func (e *EventsIndex) GetEventsByTransactionIndex(blockID flow.Identifier, height uint64, txIndex uint32) ([]flow.Event, error) {
+// ByBlockIDTransactionIndex checks data availability and return events for the transaction at given index in a given block
+// Expected errors:
+//   - indexer.ErrIndexNotInitialized: if the EventsIndex has not been initialized
+//   - storage.ErrHeightNotIndexed: returned, when data is unavailable
+//   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
+func (e *EventsIndex) ByBlockIDTransactionIndex(blockID flow.Identifier, height uint64, txIndex uint32) ([]flow.Event, error) {
 	if err := e.checkDataAvailable(height); err != nil {
 		return nil, err
 	}

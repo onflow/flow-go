@@ -84,7 +84,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	events, err := t.eventsIndex.GetEventsByTransactionID(blockID, block.Header.Height, transactionID)
+	events, err := t.eventsIndex.ByBlockIDTransactionID(blockID, block.Header.Height, transactionID)
 	if err != nil {
 		return nil, rpc.ConvertIndexError(err, block.Header.Height, "failed to get events")
 	}
@@ -160,7 +160,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 			return nil, rpc.ConvertStorageError(err)
 		}
 
-		events, err := t.eventsIndex.GetEventsByTransactionID(blockID, block.Header.Height, txResult.TransactionID)
+		events, err := t.eventsIndex.ByBlockIDTransactionID(blockID, block.Header.Height, txResult.TransactionID)
 		if err != nil {
 			return nil, rpc.ConvertIndexError(err, block.Header.Height, "failed to get events")
 		}
@@ -241,7 +241,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	events, err := t.eventsIndex.GetEventsByTransactionIndex(blockID, block.Header.Height, index)
+	events, err := t.eventsIndex.ByBlockIDTransactionIndex(blockID, block.Header.Height, index)
 	if err != nil {
 		return nil, rpc.ConvertIndexError(err, block.Header.Height, "failed to get events")
 	}
