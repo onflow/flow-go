@@ -305,15 +305,12 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				script := fvm.Script(code)
 
-				executionSnapshot, output, err := vm.Run(
+				_, output, err := vm.Run(
 					ctx,
 					script,
 					snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
-
-				// TODO:
-				_ = executionSnapshot
 			})
 	})
 
@@ -358,15 +355,12 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				script := fvm.Script(code)
 
-				executionSnapshot, output, err := vm.Run(
+				_, output, err := vm.Run(
 					ctx,
 					script,
 					snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
-
-				// TODO:
-				_ = executionSnapshot
 			})
 	})
 }
