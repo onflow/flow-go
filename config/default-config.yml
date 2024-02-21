@@ -185,7 +185,7 @@ network-config:
           # within the same iHave message. When the total number of duplicate message ids in a single iHave message exceeds this threshold, the inspection of message will fail.
           duplicate-message-id-threshold: 100
           # Maximum number of total invalid topic ids in an IHAVE message on a single RPC, ideally this should be 0 but we allow for some tolerance
-          # to avoid penalizing peers that are not malicious but are misbehaving due to bugs or other issues.
+          # to avoid penalizing peers that are not malicious but are misbehaving due to bugs or other issues.  Exceeding this threshold causes RPC inspection failure with an invalid control message notification (penalty).
           invalid-topic-id-threshold: 50
         iwant:
           # The maximum allowed number of iWant messages in a single RPC message.
