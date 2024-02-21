@@ -56,9 +56,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/network/p2p/translator"
-	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/network/validator"
@@ -186,7 +184,7 @@ func (builder *ObserverServiceBuilder) deriveBootstrapPeerIdentities() error {
 		return nil
 	}
 
-	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
+	ids, err := cmd.BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
 	if err != nil {
 		return fmt.Errorf("failed to derive bootstrap peer identities: %w", err)
 	}
@@ -608,7 +606,6 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 		if err != nil {
 			return fmt.Errorf("could not initialize ProtocolStateIDCache: %w", err)
 		}
-		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
@@ -619,29 +616,19 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
 		}
 
-		// use the default identifier provider
-		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
-			return id.NewCustomIdentifierProvider(func() flow.IdentifierList {
-				pids := builder.LibP2PNode.GetPeersForProtocol(protocols.FlowProtocolID(builder.SporkID))
-				result := make(flow.IdentifierList, 0, len(pids))
-
-				for _, pid := range pids {
-					// exclude own Identifier
-					if pid == builder.peerID {
-						continue
-					}
-
-					if flowID, err := builder.IDTranslator.GetFlowID(pid); err != nil {
-						// TODO: this is an instance of "log error and continue with best effort" anti-pattern
-						builder.Logger.Err(err).Str("peer", p2plogging.PeerId(pid)).Msg("failed to translate to Flow ID")
-					} else {
-						result = append(result, flowID)
-					}
-				}
-
-				return result
-			})
+		idTranslator, factory, err := cmd.CreatePublicIDTranslatorAndIdentifierProvider(
+			builder.Logger,
+			builder.NetworkKey,
+			builder.SporkID,
+			builder.LibP2PNode,
+			idCache,
+		)
+		if err != nil {
+			return fmt.Errorf("could not initialize public ID translator and identifier provider: %w", err)
 		}
+
+		builder.IDTranslator = idTranslator
+		builder.SyncEngineParticipantsProviderFactory = factory
 
 		return nil
 	})
