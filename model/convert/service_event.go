@@ -3,7 +3,6 @@ package convert
 import (
 	"encoding/hex"
 	"fmt"
-
 	"github.com/coreos/go-semver/semver"
 
 	"github.com/onflow/cadence"
@@ -29,6 +28,8 @@ func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, e
 		return convertServiceEventEpochCommit(event)
 	case events.VersionBeacon.EventType():
 		return convertServiceEventVersionBeacon(event)
+	case events.ProtocolStateVersionUpgrade.EventType():
+		return convertServiceEventProtocolStateVersionUpgrade(event)
 	default:
 		return nil, fmt.Errorf("invalid event type: %s", event.Type)
 	}
@@ -881,6 +882,39 @@ func invalidCadenceTypeError(
 		actualType.Type().ID(),
 		expectedType.Type().ID(),
 	)
+}
+
+func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.ServiceEvent, error) {
+	payload, err := ccf.Decode(nil, event.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
+	}
+
+	versionUpgrade, err := DecodeCadenceValue("ProtocolStateVersionUpgrade payload", payload,
+		func(cdcEvent cadence.Event) (flow.ProtocolStateVersionUpgrade, error) {
+			const expectedFieldCount = 1
+			if len(cdcEvent.Fields) < expectedFieldCount {
+				return flow.ProtocolStateVersionUpgrade{}, fmt.Errorf("unexpected number of fields in ProtocolStateVersionUpgrade (%d < %d)",
+					len(cdcEvent.Fields), expectedFieldCount)
+			}
+
+			if cdcEvent.Type() == nil {
+				return flow.ProtocolStateVersionUpgrade{}, fmt.Errorf("ProtocolStateVersionUpgrade event doesn't have type")
+			}
+
+			var newProtocolVersion cadence.Value
+			var foundFieldCount int
+
+			evt := cdcEvent.Type().(*cadence.EventType)
+
+			for i, f := range evt.Fields {
+				switch f.Identifier {
+				case "newProtocolVersion":
+					foundFieldCount++
+					newProtocolVersion = cdcEvent.Fields[i]
+				}
+			}
+		})
 }
 
 func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, error) {

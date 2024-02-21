@@ -15,6 +15,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TODO remove - all unused
+
 func TestEventConversion(t *testing.T) {
 
 	chainID := flow.Emulator

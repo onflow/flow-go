@@ -84,6 +84,8 @@ type marshallerImpl struct {
 	unmarshalFunc func(data []byte, v interface{}) error
 }
 
+var _ ServiceEventMarshaller = (*marshallerImpl)(nil)
+
 var (
 	ServiceEventJSONMarshaller = marshallerImpl{
 		marshalFunc:   json.Marshal,
