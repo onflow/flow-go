@@ -52,5 +52,5 @@ type Account interface {
 	// if no data is provided it would behave as transfering tokens to the
 	// target address
 	// works only for COAs
-	Call(Address, Data, GasLimit, Balance) Data
+	Call(Address, Data, GasLimit, Balance) *ResultSummary
 }

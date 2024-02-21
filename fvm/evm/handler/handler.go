@@ -34,6 +34,10 @@ func (h *ContractHandler) FlowTokenAddress() common.Address {
 	return h.flowTokenAddress
 }
 
+func (h *ContractHandler) EVMContractAddress() common.Address {
+	return common.Address(h.evmContractAddress)
+}
+
 var _ types.ContractHandler = &ContractHandler{}
 
 func NewContractHandler(
@@ -105,34 +109,19 @@ func (h *ContractHandler) LastExecutedBlock() *types.Block {
 	return block
 }
 
-// Run runs an rlpencoded evm transaction and
+// RunOrPanic runs an rlpencoded evm transaction and
 // collects the gas fees and pay it to the coinbase address provided.
-func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) {
+func (h *ContractHandler) RunOrPanic(rlpEncodedTx []byte, coinbase types.Address) {
 	_, err := h.run(rlpEncodedTx, coinbase)
 	panicOnAnyError(err)
 }
 
-// TryRun tries to run an rlpencoded evm transaction and
+// Run tries to run an rlpencoded evm transaction and
 // collects the gas fees and pay it to the coinbase address provided.
-func (h *ContractHandler) TryRun(rlpEncodedTx []byte, coinbase types.Address) *types.ResultSummary {
+func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) *types.ResultSummary {
 	res, err := h.run(rlpEncodedTx, coinbase)
-	rs := &types.ResultSummary{
-		Status: types.StatusSuccessful,
-	}
-	if err != nil {
-		panicOnFatalOrBackendError(err)
-		// remaining errors are validation errors
-		rs.ErrorCode = ValidationErrorCode(err)
-		rs.Status = types.StatusInvalid
-		return rs
-	}
-	if res.VMError != nil {
-		rs.ErrorCode = ExecutionErrorCode(res.VMError)
-		rs.Status = types.StatusFailed
-		rs.GasConsumed = res.GasConsumed
-	}
-	rs.GasConsumed = res.GasConsumed
-	return rs
+	panicOnFatalOrBackendError(err)
+	return types.NewResultSummary(res, err)
 }
 
 func (h *ContractHandler) run(
@@ -569,13 +558,13 @@ func (a *Account) deploy(code types.Code, gaslimit types.GasLimit, balance types
 // it would limit the gas used according to the limit provided
 // given it doesn't goes beyond what Flow transaction allows.
 // the balance would be deducted from the OFA account and would be transferred to the target address
-func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimit, balance types.Balance) types.Data {
-	data, err := a.call(to, data, gaslimit, balance)
-	panicOnAnyError(err)
-	return data
+func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimit, balance types.Balance) *types.ResultSummary {
+	res, err := a.call(to, data, gaslimit, balance)
+	panicOnFatalOrBackendError(err)
+	return types.NewResultSummary(res, err)
 }
 
-func (a *Account) call(to types.Address, data types.Data, gaslimit types.GasLimit, balance types.Balance) (types.Data, error) {
+func (a *Account) call(to types.Address, data types.Data, gaslimit types.GasLimit, balance types.Balance) (*types.Result, error) {
 	ctx, err := a.precheck(true, gaslimit)
 	if err != nil {
 		return nil, err
@@ -589,11 +578,7 @@ func (a *Account) call(to types.Address, data types.Data, gaslimit types.GasLimi
 		a.Nonce(),
 	)
 
-	res, err := a.fch.executeAndHandleCall(ctx, call, nil, false)
-	if err != nil {
-		return nil, err
-	}
-	return res.ReturnedValue, nil
+	return a.fch.executeAndHandleCall(ctx, call, nil, false)
 }
 
 func (a *Account) precheck(authroized bool, gaslimit types.GasLimit) (types.BlockContext, error) {
