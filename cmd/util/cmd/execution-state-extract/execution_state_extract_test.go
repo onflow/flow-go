@@ -237,7 +237,7 @@ func TestExtractPayloadsFromExecutionState(t *testing.T) {
 			require.NoError(t, err)
 			f, err := complete.NewLedger(diskWal, size*10, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
 			require.NoError(t, err)
-			compactor, err := complete.NewCompactor(f, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+			compactor, err := complete.NewCompactor(f, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false), &metrics.NoopCollector{})
 			require.NoError(t, err)
 			<-compactor.Ready()
 
@@ -316,7 +316,7 @@ func TestExtractPayloadsFromExecutionState(t *testing.T) {
 			require.NoError(t, err)
 			f, err := complete.NewLedger(diskWal, size*10, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
 			require.NoError(t, err)
-			compactor, err := complete.NewCompactor(f, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+			compactor, err := complete.NewCompactor(f, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false), &metrics.NoopCollector{})
 			require.NoError(t, err)
 			<-compactor.Ready()
 
