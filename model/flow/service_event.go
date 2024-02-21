@@ -37,6 +37,16 @@ type ServiceEvent struct {
 	Event interface{}
 }
 
+// TODO doc
+type serviceEventUnmarshalWrapper[E any] struct {
+	Type  ServiceEventType
+	Event E
+}
+
+func (wrapper serviceEventUnmarshalWrapper[E]) getEvent() any {
+	return wrapper.Event
+}
+
 // ServiceEventList is a handy container to enable comparisons
 type ServiceEventList []ServiceEvent
 
@@ -62,15 +72,14 @@ func (sel ServiceEventList) EqualTo(other ServiceEventList) (bool, error) {
 	return true, nil
 }
 
+// ServiceEventMarshaller marshals and unmarshals all types of service events.
 type ServiceEventMarshaller interface {
-	Unmarshal(b []byte) (ServiceEvent, error)
-	UnmarshalWithType(
-		b []byte,
-		eventType ServiceEventType,
-	) (
-		ServiceEvent,
-		error,
-	)
+	// UnmarshalWrapped unmarshals the service event and returns it as a wrapped ServiceEvent type.
+	// The input bytes must be encoded as a generic wrapped ServiceEvent type.
+	UnmarshalWrapped(b []byte) (ServiceEvent, error)
+	// UnmarshalWithType unmarshals the service event and returns it as a wrapped ServiceEvent type.
+	// The input bytes must be encoded as a specific event type (for example, EpochSetup).
+	UnmarshalWithType(b []byte, eventType ServiceEventType) (ServiceEvent, error)
 }
 
 type marshallerImpl struct {
@@ -93,38 +102,54 @@ var (
 	}
 )
 
-func (marshaller marshallerImpl) Unmarshal(b []byte) (
-	ServiceEvent,
-	error,
-) {
-	var enc map[string]interface{}
-	err := marshaller.UnmarshalFunc(b, &enc)
+// UnmarshalWrapped unmarshals the service event and returns it as a wrapped ServiceEvent type.
+// The input bytes must be encoded as a generic wrapped ServiceEvent type.
+func (marshaller marshallerImpl) UnmarshalWrapped(b []byte) (ServiceEvent, error) {
+	var eventTypeWrapper struct {
+		Type ServiceEventType
+	}
+	err := marshaller.UnmarshalFunc(b, &eventTypeWrapper)
 	if err != nil {
 		return ServiceEvent{}, err
 	}
+	eventType := eventTypeWrapper.Type
 
-	tp, ok := enc["Type"].(string)
-	if !ok {
-		return ServiceEvent{}, fmt.Errorf("missing type key")
-	}
-	ev, ok := enc["Event"]
-	if !ok {
-		return ServiceEvent{}, fmt.Errorf("missing event key")
+	var event any
+	switch eventType {
+	case ServiceEventSetup:
+		event, err = unmarshalWrapped[EpochSetup](b, marshaller)
+	case ServiceEventCommit:
+		event, err = unmarshalWrapped[EpochCommit](b, marshaller)
+	case ServiceEventVersionBeacon:
+		event, err = unmarshalWrapped[VersionBeacon](b, marshaller)
+	case ServiceEventProtocolStateVersionUpgrade:
+		event, err = unmarshalWrapped[ProtocolStateVersionUpgrade](b, marshaller)
+	default:
+		return ServiceEvent{}, fmt.Errorf("invalid type: %s", eventType)
 	}
 
-	// re-marshal the event, we'll unmarshal it into the appropriate type
-	evb, err := marshaller.MarshalFunc(ev)
 	if err != nil {
-		return ServiceEvent{}, err
+		return ServiceEvent{}, fmt.Errorf("failed to unmarshal to service event to type %s: %w", eventType, err)
 	}
-
-	return marshaller.UnmarshalWithType(evb, ServiceEventType(tp))
+	return ServiceEvent{
+		Type:  eventType,
+		Event: event,
+	}, nil
 }
 
-func (marshaller marshallerImpl) UnmarshalWithType(
-	b []byte,
-	eventType ServiceEventType,
-) (ServiceEvent, error) {
+func unmarshalWrapped[E any](b []byte, marshaller marshallerImpl) (*E, error) {
+	eventWrapper := serviceEventUnmarshalWrapper[E]{}
+	err := marshaller.UnmarshalFunc(b, &eventWrapper)
+	if err != nil {
+		return nil, err
+	}
+
+	return &eventWrapper.Event, nil
+}
+
+// UnmarshalWithType unmarshals the service event and returns it as a wrapped ServiceEvent type.
+// The input bytes must be encoded as a specific event type (for example, EpochSetup).
+func (marshaller marshallerImpl) UnmarshalWithType(b []byte, eventType ServiceEventType) (ServiceEvent, error) {
 	var event interface{}
 	switch eventType {
 	case ServiceEventSetup:
@@ -133,6 +158,8 @@ func (marshaller marshallerImpl) UnmarshalWithType(
 		event = new(EpochCommit)
 	case ServiceEventVersionBeacon:
 		event = new(VersionBeacon)
+	case ServiceEventProtocolStateVersionUpgrade:
+		event = new(ProtocolStateVersionUpgrade)
 	default:
 		return ServiceEvent{}, fmt.Errorf("invalid type: %s", eventType)
 	}
@@ -154,7 +181,7 @@ func (marshaller marshallerImpl) UnmarshalWithType(
 }
 
 func (se *ServiceEvent) UnmarshalJSON(b []byte) error {
-	e, err := ServiceEventJSONMarshaller.Unmarshal(b)
+	e, err := ServiceEventJSONMarshaller.UnmarshalWrapped(b)
 	if err != nil {
 		return err
 	}
@@ -163,7 +190,7 @@ func (se *ServiceEvent) UnmarshalJSON(b []byte) error {
 }
 
 func (se *ServiceEvent) UnmarshalMsgpack(b []byte) error {
-	e, err := ServiceEventMSGPACKMarshaller.Unmarshal(b)
+	e, err := ServiceEventMSGPACKMarshaller.UnmarshalWrapped(b)
 	if err != nil {
 		return err
 	}
@@ -172,7 +199,7 @@ func (se *ServiceEvent) UnmarshalMsgpack(b []byte) error {
 }
 
 func (se *ServiceEvent) UnmarshalCBOR(b []byte) error {
-	e, err := ServiceEventCBORMarshaller.Unmarshal(b)
+	e, err := ServiceEventCBORMarshaller.UnmarshalWrapped(b)
 	if err != nil {
 		return err
 	}
@@ -232,6 +259,23 @@ func (se *ServiceEvent) EqualTo(other *ServiceEvent) (bool, error) {
 			return false,
 				fmt.Errorf(
 					"internal invalid type for ServiceEventVersionBeacon: %T",
+					other.Event,
+				)
+		}
+		return version.EqualTo(otherVersion), nil
+	case ServiceEventProtocolStateVersionUpgrade:
+		version, ok := se.Event.(*ProtocolStateVersionUpgrade)
+		if !ok {
+			return false, fmt.Errorf(
+				"internal invalid type for ProtocolStateVersionUpgrade: %T",
+				se.Event,
+			)
+		}
+		otherVersion, ok := other.Event.(*ProtocolStateVersionUpgrade)
+		if !ok {
+			return false,
+				fmt.Errorf(
+					"internal invalid type for ProtocolStateVersionUpgrade: %T",
 					other.Event,
 				)
 		}

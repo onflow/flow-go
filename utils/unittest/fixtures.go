@@ -2141,6 +2141,12 @@ func VersionBeaconFixture(options ...func(*flow.VersionBeacon)) *flow.VersionBea
 	return versionTable
 }
 
+func ProtocolStateVersionUpgradeFixture() *flow.ProtocolStateVersionUpgrade {
+	return &flow.ProtocolStateVersionUpgrade{
+		NewProtocolStateVersion: rand.Uint64(),
+	}
+}
+
 // BootstrapFixture generates all the artifacts necessary to bootstrap the
 // protocol state.
 func BootstrapFixture(

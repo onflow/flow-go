@@ -172,3 +172,16 @@ func (v *VersionBeacon) String() string {
 type ProtocolStateVersionUpgrade struct {
 	NewProtocolStateVersion uint64
 }
+
+// EqualTo returns true if the two events are equivalent.
+func (u *ProtocolStateVersionUpgrade) EqualTo(other *ProtocolStateVersionUpgrade) bool {
+	return u.NewProtocolStateVersion == other.NewProtocolStateVersion
+}
+
+// ServiceEvent returns the event as a generic ServiceEvent type.
+func (u *ProtocolStateVersionUpgrade) ServiceEvent() ServiceEvent {
+	return ServiceEvent{
+		Type:  ServiceEventProtocolStateVersionUpgrade,
+		Event: u,
+	}
+}
