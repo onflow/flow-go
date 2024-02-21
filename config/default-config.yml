@@ -161,7 +161,7 @@ network-config:
           # A topic id is considered duplicate if it appears more than once in a single GRAFT or PRUNE message.
           duplicate-topic-id-threshold: 50
           # Maximum number of total invalid topic ids in GRAFTs/PRUNEs of a single RPC, ideally this should be 0 but we allow for some tolerance
-          # to avoid penalizing peers that are not malicious but are misbehaving due to bugs or other issues.
+          # to avoid penalizing peers that are not malicious but are misbehaving due to bugs or other issues. Exceeding this threshold causes RPC inspection failure with an invalid control message notification (penalty).
           invalid-topic-id-threshold: 50
         ihave:
           # The maximum allowed number of iHave messages in a single RPC message.
