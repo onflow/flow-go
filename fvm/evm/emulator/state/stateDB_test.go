@@ -170,7 +170,7 @@ func TestStateDB(t *testing.T) {
 		db.AddLog(testutils.GetRandomLogFixture(t))
 		db.RevertToSnapshot(snapshot)
 
-		ret := db.Logs(gethCommon.Hash{}, 1, gethCommon.Hash{}, 1)
+		ret := db.Logs(1, gethCommon.Hash{}, 1)
 		require.Equal(t, ret, logs)
 	})
 

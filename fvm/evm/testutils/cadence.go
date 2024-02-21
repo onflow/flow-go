@@ -9,45 +9,71 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
-	"testing"
 	"time"
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 	cadenceStdlib "github.com/onflow/cadence/runtime/stdlib"
-	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
 )
 
-// TODO: replace with Cadence runtime testing utils once available https://github.com/onflow/cadence/pull/2800
-
-func SingleIdentifierLocationResolver(t testing.TB) func(
-	identifiers []runtime.Identifier,
-	location runtime.Location,
+// LocationResolver is a location Cadence runtime interface location resolver
+// very similar to ContractReader.ResolveLocation,
+// but it does not look up available contract names
+func LocationResolver(
+	identifiers []ast.Identifier,
+	location common.Location,
 ) (
-	[]runtime.ResolvedLocation,
-	error,
+	result []sema.ResolvedLocation,
+	err error,
 ) {
-	return func(identifiers []runtime.Identifier, location runtime.Location) ([]runtime.ResolvedLocation, error) {
-		require.Len(t, identifiers, 1)
-		require.IsType(t, common.AddressLocation{}, location)
+	addressLocation, isAddress := location.(common.AddressLocation)
 
+	// if the location is not an address location, e.g. an identifier location
+	// (`import Crypto`), then return a single resolved location which declares
+	// all identifiers.
+	if !isAddress {
 		return []runtime.ResolvedLocation{
 			{
-				Location: common.AddressLocation{
-					Address: location.(common.AddressLocation).Address,
-					Name:    identifiers[0].Identifier,
-				},
+				Location:    location,
 				Identifiers: identifiers,
 			},
 		}, nil
 	}
+
+	// if the location is an address,
+	// and no specific identifiers where requested in the import statement,
+	// then assume the imported identifier is the address location's identifier (the contract)
+	if len(identifiers) == 0 {
+		identifiers = []ast.Identifier{
+			{Identifier: addressLocation.Name},
+		}
+	}
+
+	// return one resolved location per identifier.
+	// each resolved location is an address contract location
+	resolvedLocations := make([]runtime.ResolvedLocation, len(identifiers))
+	for i := range resolvedLocations {
+		identifier := identifiers[i]
+		resolvedLocations[i] = runtime.ResolvedLocation{
+			Location: common.AddressLocation{
+				Address: addressLocation.Address,
+				Name:    identifier.Identifier,
+			},
+			Identifiers: []runtime.Identifier{identifier},
+		}
+	}
+
+	return resolvedLocations, nil
 }
+
+// TODO: replace with Cadence runtime testing utils once available https://github.com/onflow/cadence/pull/2800
 
 func newLocationGenerator[T ~[32]byte]() func() T {
 	var count uint64

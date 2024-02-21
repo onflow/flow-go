@@ -38,16 +38,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// from 18.8.2022
-var mainnetExecutionEffortWeights = meter.ExecutionEffortWeights{
-	common.ComputationKindStatement:          1569,
-	common.ComputationKindLoop:               1569,
-	common.ComputationKindFunctionInvocation: 1569,
-	environment.ComputationKindGetValue:      808,
-	environment.ComputationKindCreateAccount: 2837670,
-	environment.ComputationKindSetValue:      765,
-}
-
 type vmTest struct {
 	bootstrapOptions []fvm.BootstrapProcedureOption
 	contextOptions   []fvm.Option
@@ -1046,7 +1036,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		t.Run(fmt.Sprintf("Transaction Fees %d: %s", i, tc.name), newVMTest().withBootstrapProcedureOptions(
 			fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 			fvm.WithExecutionMemoryLimit(math.MaxUint64),
-			fvm.WithExecutionEffortWeights(mainnetExecutionEffortWeights),
+			fvm.WithExecutionEffortWeights(environment.MainnetExecutionEffortWeights),
 			fvm.WithExecutionMemoryWeights(meter.DefaultMemoryWeights),
 		).withContextOptions(
 			fvm.WithTransactionFeesEnabled(true),
@@ -1063,7 +1053,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 			fvm.WithExecutionMemoryLimit(math.MaxUint64),
-			fvm.WithExecutionEffortWeights(mainnetExecutionEffortWeights),
+			fvm.WithExecutionEffortWeights(environment.MainnetExecutionEffortWeights),
 			fvm.WithExecutionMemoryWeights(meter.DefaultMemoryWeights),
 		).withContextOptions(
 			fvm.WithTransactionFeesEnabled(true),
@@ -3044,7 +3034,7 @@ func TestEVM(t *testing.T) {
 								log(data.length)
 								assert(data.length == 160)
 
-								let acc <- EVM.createBridgedAccount()
+								let acc <- EVM.createCadenceOwnedAccount()
 								destroy acc
 							}
 						}
@@ -3065,7 +3055,7 @@ func TestEVM(t *testing.T) {
 			assert.ErrorContains(
 				t,
 				output.Err,
-				"value of type `EVM` has no member `createBridgedAccount`",
+				"value of type `EVM` has no member `createCadenceOwnedAccount`",
 			)
 		}),
 	)
@@ -3073,7 +3063,10 @@ func TestEVM(t *testing.T) {
 	// this test makes sure the execution error is correctly handled and returned as a correct type
 	t.Run("execution reverted", newVMTest().
 		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
-		withContextOptions(fvm.WithEVMEnabled(true)).
+		withContextOptions(
+			fvm.WithChain(flow.Emulator.Chain()),
+			fvm.WithEVMEnabled(true),
+		).
 		run(func(
 			t *testing.T,
 			vm fvm.VM,
@@ -3087,7 +3080,7 @@ func TestEVM(t *testing.T) {
 				
 				pub fun main() {
 					let bal = EVM.Balance(attoflow: 1000000000000000000);
-					let acc <- EVM.createBridgedAccount();
+					let acc <- EVM.createCadenceOwnedAccount();
 					// withdraw insufficient balance
 					destroy acc.withdraw(balance: bal);
 					destroy acc;
@@ -3151,7 +3144,7 @@ func TestEVM(t *testing.T) {
 					import EVM from %s
 					
 					pub fun main() {
-						destroy <- EVM.createBridgedAccount();
+						destroy <- EVM.createCadenceOwnedAccount();
 					}
 				`, sc.EVMContract.Address.HexWithPrefix())))
 
@@ -3195,7 +3188,7 @@ func TestEVM(t *testing.T) {
 							let vaultRef = acc.borrow<&{FungibleToken.Provider}>(from: /storage/flowTokenVault)
 							?? panic("Could not borrow reference to the owner's Vault!")
 
-							let acc <- EVM.createBridgedAccount()
+							let acc <- EVM.createCadenceOwnedAccount()
 							let amount <- vaultRef.withdraw(amount: 0.0000001) as! @FlowToken.Vault
 							acc.deposit(from: <- amount)
 							destroy acc
@@ -3220,10 +3213,10 @@ func TestEVM(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
-			require.Len(t, output.Events, 5)
+			require.Len(t, output.Events, 6)
 
 			evmLocation := types.EVMLocation{}
-			txExe, blockExe := output.Events[3], output.Events[4]
+			txExe, blockExe := output.Events[4], output.Events[5]
 			assert.Equal(t, evmLocation.TypeID(nil, string(types.EventTypeTransactionExecuted)), common.TypeID(txExe.Type))
 			assert.Equal(t, evmLocation.TypeID(nil, string(types.EventTypeBlockExecuted)), common.TypeID(blockExe.Type))
 		}),
