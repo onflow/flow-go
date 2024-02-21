@@ -881,6 +881,7 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedgerWALCompactor(
 		exeNode.exeConf.checkpointDistance,
 		exeNode.exeConf.checkpointsToKeep,
 		exeNode.toTriggerCheckpoint, // compactor will listen to the signal from admin tool for force triggering checkpointing
+		exeNode.collector,
 	)
 }
 

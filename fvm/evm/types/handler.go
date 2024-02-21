@@ -3,8 +3,6 @@ package types
 import (
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/cadence/runtime/common"
-
-	"github.com/onflow/flow-go/fvm/environment"
 )
 
 // EVM is an account inside FVM with special access to the underlying infrastructure
@@ -29,7 +27,7 @@ type ContractHandler interface {
 
 	// AccountByAddress returns an account by address
 	// if isAuthorized is set, it allows for functionality like `call`, `deploy`
-	// should only be set for bridged accounts only.
+	// should only be set for the cadence owned accounts only.
 	AccountByAddress(address Address, isAuthorized bool) Account
 
 	// LastExecutedBlock returns information about the last executed block
@@ -43,16 +41,6 @@ type ContractHandler interface {
 	FlowTokenAddress() common.Address
 }
 
-// Backend passes the FVM functionality needed inside the handler
-type Backend interface {
-	environment.ValueStore
-	environment.Meter
-	environment.EventEmitter
-	environment.BlockInfo
-	environment.RandomGenerator
-	environment.ContractFunctionInvoker
-}
-
 // AddressAllocator allocates addresses, used by the handler
 type AddressAllocator interface {
 	// AllocateAddress allocates an address to be used by a COA resource
@@ -60,6 +48,10 @@ type AddressAllocator interface {
 
 	// COAFactoryAddress returns the address for the COA factory
 	COAFactoryAddress() Address
+
+	// NativeTokenBridgeAddress returns the address for the native token bridge
+	// used for deposit and withdraw calls
+	NativeTokenBridgeAddress() Address
 
 	// AllocateAddress allocates an address by index to be used by a precompile contract
 	AllocatePrecompileAddress(index uint64) Address
