@@ -137,21 +137,24 @@ func TestEVMAddressDeposit(t *testing.T) {
 		})
 }
 
-func TestCOAWithdraw(t *testing.T) {
-
+func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 	t.Parallel()
 	chain := flow.Emulator.Chain()
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-	RunWithNewEnvironment(t,
-		chain, func(
-			ctx fvm.Context,
-			vm fvm.VM,
-			snapshot snapshot.SnapshotTree,
-			testContract *TestContract,
-			testAccount *EOATestAccount,
-		) {
-			code := []byte(fmt.Sprintf(
-				`
+
+	t.Run("test coa withdraw", func(t *testing.T) {
+		t.Parallel()
+
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				code := []byte(fmt.Sprintf(
+					`
 				import EVM from %s
 				import FlowToken from %s
 
@@ -176,44 +179,43 @@ func TestCOAWithdraw(t *testing.T) {
 					return balance
 				}
 				`,
-				sc.EVMContract.Address.HexWithPrefix(),
-				sc.FlowToken.Address.HexWithPrefix(),
-				sc.FlowServiceAccount.Address.HexWithPrefix(),
-			))
+					sc.EVMContract.Address.HexWithPrefix(),
+					sc.FlowToken.Address.HexWithPrefix(),
+					sc.FlowServiceAccount.Address.HexWithPrefix(),
+				))
 
-			script := fvm.Script(code)
+				script := fvm.Script(code)
 
-			executionSnapshot, output, err := vm.Run(
-				ctx,
-				script,
-				snapshot)
-			require.NoError(t, err)
-			require.NoError(t, output.Err)
+				executionSnapshot, output, err := vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
 
-			// TODO:
-			_ = executionSnapshot
-		})
-}
+				// TODO:
+				_ = executionSnapshot
+			})
+	})
 
-func TestCadenceOwnedAccountDeploy(t *testing.T) {
-	t.Parallel()
-	chain := flow.Emulator.Chain()
-	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-	RunWithNewEnvironment(t,
-		chain, func(
-			ctx fvm.Context,
-			vm fvm.VM,
-			snapshot snapshot.SnapshotTree,
-			testContract *TestContract,
-			testAccount *EOATestAccount,
-		) {
-			code := []byte(fmt.Sprintf(
-				`
+	t.Run("test coa withdraw", func(t *testing.T) {
+		t.Parallel()
+
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				code := []byte(fmt.Sprintf(
+					`
 				import EVM from %s
 				import FlowToken from %s
 
 				access(all)
-				fun main(): [UInt8; 20] {
+				fun main(): UFix64 {
 					let admin = getAuthAccount(%s)
 						.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
 					let minter <- admin.createNewMinter(allowedAmount: 2.34)
@@ -223,32 +225,141 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 					let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
 					cadenceOwnedAccount.deposit(from: <-vault)
 
-					let address = cadenceOwnedAccount.deploy(
-						code: [],
-						gasLimit: 53000,
-						value: EVM.Balance(attoflow: 1230000000000000000)
-					)
+					let bal = EVM.Balance(0)
+					bal.setFLOW(flow: 1.23)
+					let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
+					let balance = vault2.balance
 					destroy cadenceOwnedAccount
-					return address.bytes
+					destroy vault2
+
+					return balance
 				}
-                `,
-				sc.EVMContract.Address.HexWithPrefix(),
-				sc.FlowToken.Address.HexWithPrefix(),
-				sc.FlowServiceAccount.Address.HexWithPrefix(),
-			))
+				`,
+					sc.EVMContract.Address.HexWithPrefix(),
+					sc.FlowToken.Address.HexWithPrefix(),
+					sc.FlowServiceAccount.Address.HexWithPrefix(),
+				))
 
-			script := fvm.Script(code)
+				script := fvm.Script(code)
 
-			executionSnapshot, output, err := vm.Run(
-				ctx,
-				script,
-				snapshot)
-			require.NoError(t, err)
-			require.NoError(t, output.Err)
+				executionSnapshot, output, err := vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
 
-			// TODO:
-			_ = executionSnapshot
-		})
+				// TODO:
+				_ = executionSnapshot
+			})
+	})
+
+	t.Run("test coa deploy", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				code := []byte(fmt.Sprintf(
+					`
+				import EVM from %s
+				import FlowToken from %s
+
+				access(all)
+				fun main(): UFix64 {
+					let admin = getAuthAccount(%s)
+						.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+					let minter <- admin.createNewMinter(allowedAmount: 2.34)
+					let vault <- minter.mintTokens(amount: 2.34)
+					destroy minter
+
+					let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+					cadenceOwnedAccount.deposit(from: <-vault)
+
+					let bal = EVM.Balance(0)
+					bal.setFLOW(flow: 1.23)
+					let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
+					let balance = vault2.balance
+					destroy cadenceOwnedAccount
+					destroy vault2
+
+					return balance
+				}
+				`,
+					sc.EVMContract.Address.HexWithPrefix(),
+					sc.FlowToken.Address.HexWithPrefix(),
+					sc.FlowServiceAccount.Address.HexWithPrefix(),
+				))
+
+				script := fvm.Script(code)
+
+				executionSnapshot, output, err := vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				// TODO:
+				_ = executionSnapshot
+			})
+	})
+
+	t.Run("test coa deploy", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+					import FlowToken from %s
+	
+					access(all)
+					fun main(): [UInt8; 20] {
+						let admin = getAuthAccount(%s)
+							.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+						let minter <- admin.createNewMinter(allowedAmount: 2.34)
+						let vault <- minter.mintTokens(amount: 2.34)
+						destroy minter
+	
+						let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+						cadenceOwnedAccount.deposit(from: <-vault)
+	
+						let address = cadenceOwnedAccount.deploy(
+							code: [],
+							gasLimit: 53000,
+							value: EVM.Balance(attoflow: 1230000000000000000)
+						)
+						destroy cadenceOwnedAccount
+						return address.bytes
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+					sc.FlowToken.Address.HexWithPrefix(),
+					sc.FlowServiceAccount.Address.HexWithPrefix(),
+				))
+
+				script := fvm.Script(code)
+
+				executionSnapshot, output, err := vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				// TODO:
+				_ = executionSnapshot
+			})
+	})
 }
 
 func TestCadenceArch(t *testing.T) {
