@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/observable"
 )
@@ -57,6 +58,7 @@ type Compactor struct {
 	stopCh                               chan chan struct{}
 	trieUpdateCh                         <-chan *WALTrieUpdate
 	triggerCheckpointOnNextSegmentFinish *atomic.Bool // to trigger checkpoint manually
+	metrics                              module.WALMetrics
 }
 
 // NewCompactor creates new Compactor which writes WAL record and triggers
@@ -76,6 +78,7 @@ func NewCompactor(
 	checkpointDistance uint,
 	checkpointsToKeep uint,
 	triggerCheckpointOnNextSegmentFinish *atomic.Bool,
+	metrics module.WALMetrics,
 ) (*Compactor, error) {
 	if checkpointDistance < 1 {
 		checkpointDistance = 1
@@ -114,6 +117,7 @@ func NewCompactor(
 		checkpointDistance:                   checkpointDistance,
 		checkpointsToKeep:                    checkpointsToKeep,
 		triggerCheckpointOnNextSegmentFinish: triggerCheckpointOnNextSegmentFinish,
+		metrics:                              metrics,
 	}, nil
 }
 
@@ -288,7 +292,7 @@ Loop:
 // Since this function is only for checkpointing, Compactor isn't affected by returned error.
 func (c *Compactor) checkpoint(ctx context.Context, tries []*trie.MTrie, checkpointNum int) error {
 
-	err := createCheckpoint(c.checkpointer, c.logger, tries, checkpointNum)
+	err := createCheckpoint(c.checkpointer, c.logger, tries, checkpointNum, c.metrics)
 	if err != nil {
 		return &createCheckpointError{num: checkpointNum, err: err}
 	}
@@ -325,7 +329,7 @@ func (c *Compactor) checkpoint(ctx context.Context, tries []*trie.MTrie, checkpo
 // createCheckpoint creates checkpoint with given checkpointNum and tries.
 // Errors indicate that checkpoint file can't be created.
 // Caller should handle returned errors by retrying checkpointing when appropriate.
-func createCheckpoint(checkpointer *realWAL.Checkpointer, logger zerolog.Logger, tries []*trie.MTrie, checkpointNum int) error {
+func createCheckpoint(checkpointer *realWAL.Checkpointer, logger zerolog.Logger, tries []*trie.MTrie, checkpointNum int, metrics module.WALMetrics) error {
 
 	logger.Info().Msgf("serializing checkpoint %d with %v tries", checkpointNum, len(tries))
 
@@ -336,6 +340,13 @@ func createCheckpoint(checkpointer *realWAL.Checkpointer, logger zerolog.Logger,
 	if err != nil {
 		return fmt.Errorf("error serializing checkpoint (%d): %w", checkpointNum, err)
 	}
+
+	size, err := realWAL.ReadCheckpointFileSize(checkpointer.Dir(), fileName)
+	if err != nil {
+		return fmt.Errorf("error reading checkpoint file size (%d): %w", checkpointNum, err)
+	}
+
+	metrics.ExecutionCheckpointSize(size)
 
 	duration := time.Since(startTime)
 	logger.Info().Float64("total_time_s", duration.Seconds()).Msgf("created checkpoint %d", checkpointNum)
