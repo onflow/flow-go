@@ -397,20 +397,20 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	}
 
 	fnb.Component(LibP2PNodeComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		myAddr := fnb.NodeConfig.Me.Address()
+		if fnb.BaseConfig.BindAddr != NotSet {
+			myAddr = fnb.BaseConfig.BindAddr
+		}
+
 		if fnb.ObserverMode {
 			// observer mode only init pulbic libp2p node
-			publicLibp2pNode, err := fnb.BuildPublicLibp2pNode()
+			publicLibp2pNode, err := fnb.BuildPublicLibp2pNode(myAddr)
 			if err != nil {
 				return nil, fmt.Errorf("could not build public libp2p node: %w", err)
 			}
 			fnb.LibP2PNode = publicLibp2pNode
 
 			return publicLibp2pNode, nil
-		}
-
-		myAddr := fnb.NodeConfig.Me.Address()
-		if fnb.BaseConfig.BindAddr != NotSet {
-			myAddr = fnb.BaseConfig.BindAddr
 		}
 
 		dhtActivationStatus, err := DhtSystemActivationStatus(fnb.NodeRole)
@@ -500,7 +500,7 @@ func (fnb *FlowNodeBuilder) HeroCacheMetricsFactory() metrics.HeroCacheMetricsFa
 // Returns:
 // - p2p.LibP2PNode: the libp2p node
 // - error: if any error occurs. Any error returned is considered irrecoverable.
-func (fnb *FlowNodeBuilder) BuildPublicLibp2pNode() (p2p.LibP2PNode, error) {
+func (fnb *FlowNodeBuilder) BuildPublicLibp2pNode(address string) (p2p.LibP2PNode, error) {
 	var pis []peer.AddrInfo
 
 	ids, err := BootstrapIdentities(fnb.bootstrapNodeAddresses, fnb.bootstrapNodePublicKeys)
@@ -534,7 +534,7 @@ func (fnb *FlowNodeBuilder) BuildPublicLibp2pNode() (p2p.LibP2PNode, error) {
 			Metrics:          fnb.Metrics.Network,
 		},
 		network.PublicNetwork,
-		fnb.BaseConfig.BindAddr,
+		address,
 		fnb.NetworkKey,
 		fnb.SporkID,
 		fnb.IdentityProvider,
