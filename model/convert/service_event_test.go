@@ -15,8 +15,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TODO remove - all unused
-
 func TestEventConversion(t *testing.T) {
 
 	chainID := flow.Emulator
@@ -124,6 +122,21 @@ func TestEventConversion(t *testing.T) {
 			assert.Equal(t, expected, actual)
 		},
 	)
+
+	t.Run("protocol state version upgrade", func(t *testing.T) {
+		fixture, expected := unittest.ProtocolStateVersionUpgradeFixtureByChainID(chainID)
+
+		// convert Cadence types to Go types
+		event, err := convert.ServiceEvent(chainID, fixture)
+		require.NoError(t, err)
+		require.NotNil(t, event)
+
+		// cast event type to version beacon
+		actual, ok := event.Event.(*flow.ProtocolStateVersionUpgrade)
+		require.True(t, ok)
+
+		assert.Equal(t, expected, actual)
+	})
 }
 
 func TestDecodeCadenceValue(t *testing.T) {
