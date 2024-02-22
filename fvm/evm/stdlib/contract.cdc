@@ -3,7 +3,7 @@ import "FlowToken"
 
 access(all)
 contract EVM {
-    
+
     // Entitlements enabling finer-graned access control on a CadenceOwnedAccount
     access(all) entitlement Validate
     access(all) entitlement Withdraw
@@ -49,7 +49,7 @@ contract EVM {
 
         /// Constructs a new balance
         access(all)
-        init(attoflow: UInt) {
+        view init(attoflow: UInt) {
             self.attoflow = attoflow
         }
 
@@ -199,8 +199,8 @@ contract EVM {
         /// Withdraws the balance from the cadence owned account's balance
         /// Note that amounts smaller than 10nF (10e-8) can't be withdrawn
         /// given that Flow Token Vaults use UFix64s to store balances.
-        /// If the given balance conversion to UFix64 results in 
-        /// rounding error, this function would fail. 
+        /// If the given balance conversion to UFix64 results in
+        /// rounding error, this function would fail.
         access(Owner | Withdraw)
         fun withdraw(balance: Balance): @FlowToken.Vault {
             let vault <- InternalEVM.withdraw(
@@ -328,7 +328,7 @@ contract EVM {
     struct ValidationResult {
         access(all)
         let isValid: Bool
-        
+
         access(all)
         let problem: String?
 
@@ -390,12 +390,12 @@ contract EVM {
         if !isValid{
             return ValidationResult(
                 isValid: false,
-                problem: "the given signatures are not valid or provide enough weight" 
+                problem: "the given signatures are not valid or provide enough weight"
             )
         }
 
         let coaRef = acc.capabilities.borrow<&EVM.CadenceOwnedAccount>(path)
-        
+
         if coaRef == nil {
              return ValidationResult(
                  isValid: false,
@@ -413,7 +413,7 @@ contract EVM {
                 )
             }
         }
-        
+
         return ValidationResult(
         	isValid: true,
         	problem: nil
