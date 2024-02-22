@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ipfs/boxo/bitswap"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/onflow/crypto"
 	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/go-bitswap"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
@@ -1521,12 +1521,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			cacheSize := int(backendConfig.ConnectionPoolSize)
 
 			var connBackendCache *rpcConnection.Cache
+			var err error
 			if cacheSize > 0 {
-				backendCache, err := backend.NewCache(node.Logger, accessMetrics, cacheSize)
+				connBackendCache, err = rpcConnection.NewCache(node.Logger, accessMetrics, cacheSize)
 				if err != nil {
-					return nil, fmt.Errorf("could not initialize backend cache: %w", err)
+					return nil, fmt.Errorf("could not initialize connection cache: %w", err)
 				}
-				connBackendCache = rpcConnection.NewCache(backendCache, cacheSize)
 			}
 
 			connFactory := &rpcConnection.ConnectionFactoryImpl{
@@ -1537,9 +1537,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				AccessMetrics:             accessMetrics,
 				Log:                       node.Logger,
 				Manager: rpcConnection.NewManager(
-					connBackendCache,
 					node.Logger,
 					accessMetrics,
+					connBackendCache,
 					config.MaxMsgSize,
 					backendConfig.CircuitBreakerConfig,
 					config.CompressorName,

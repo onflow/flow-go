@@ -29,6 +29,10 @@ contract Storage {
         return block.prevrandao;
     }
 
+    function destroy() public {
+        selfdestruct(payable(msg.sender));
+    }
+
     function verifyArchCallToFlowBlockHeight(uint64 expected) public view returns (uint64){
         (bool ok, bytes memory data) = cadenceArch.staticcall(abi.encodeWithSignature("flowBlockHeight()"));
         require(ok, "unsuccessful call to arch ");
