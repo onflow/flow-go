@@ -107,8 +107,6 @@ func TestContractInteraction(t *testing.T) {
 			})
 
 			var contractAddr types.Address
-			account := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
-			fAddr := account.Address()
 
 			t.Run("deploy contract", func(t *testing.T) {
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
@@ -205,6 +203,8 @@ func TestContractInteraction(t *testing.T) {
 			})
 
 			t.Run("test sending transactions (happy case)", func(t *testing.T) {
+				account := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
+				fAddr := account.Address()
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
 						_, err := blk.DirectCall(types.NewDepositCall(fAddr, amount, account.Nonce()))
@@ -218,7 +218,7 @@ func TestContractInteraction(t *testing.T) {
 					coinbaseOrgBalance := gethCommon.Big1
 					// small amount of money to create account
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						_, err := blk.DirectCall(types.NewDepositCall(ctx.GasFeeCollector, coinbaseOrgBalance, 1))
+						_, err := blk.DirectCall(types.NewDepositCall(ctx.GasFeeCollector, coinbaseOrgBalance, 0))
 						require.NoError(t, err)
 					})
 
@@ -235,7 +235,8 @@ func TestContractInteraction(t *testing.T) {
 					)
 					res, err := blk.RunTransaction(tx)
 					require.NoError(t, err)
-					require.Nil(t, res.VMError)
+					require.NoError(t, res.VMError)
+					require.Greater(t, res.GasConsumed, uint64(0))
 
 					// check the balance of coinbase
 					RunWithNewReadOnlyBlockView(t, env, func(blk2 types.ReadOnlyBlockView) {
@@ -251,42 +252,52 @@ func TestContractInteraction(t *testing.T) {
 				})
 			})
 
-			t.Run("test running transactions with zero gas fee", func(t *testing.T) {
+			t.Run("test runing transactions with dynamic fees (happy case)", func(t *testing.T) {
+				account := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
+				fAddr := account.Address()
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
 						_, err := blk.DirectCall(types.NewDepositCall(fAddr, amount, account.Nonce()))
 						require.NoError(t, err)
 					})
 				})
+				account.SetNonce(account.Nonce() + 1)
 
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
 					ctx.GasFeeCollector = types.NewAddressFromString("coinbase")
+					coinbaseOrgBalance := gethCommon.Big1
+					// small amount of money to create account
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						_, err := blk.DirectCall(types.NewDepositCall(ctx.GasFeeCollector, coinbaseOrgBalance, 1))
+						require.NoError(t, err)
+					})
 
 					blk, err := env.NewBlockView(ctx)
 					require.NoError(t, err)
-					tx := account.PrepareAndSignTx(
+					tx := account.SignTx(
 						t,
-						testAccount.ToCommon(), // to
-						nil,                    // data
-						big.NewInt(1000),       // amount
-						gethParams.TxGas,       // gas limit
-						nil,                    // gas fee
+						gethTypes.NewTx(&gethTypes.DynamicFeeTx{
+							Nonce:     account.Nonce(),
+							GasTipCap: big.NewInt(2),
+							GasFeeCap: big.NewInt(3),
+							Gas:       gethParams.TxGas,
+							To:        &gethCommon.Address{},
+							Value:     big.NewInt(1),
+						}),
 					)
+					account.SetNonce(account.Nonce() + 1)
+
 					res, err := blk.RunTransaction(tx)
 					require.NoError(t, err)
-					require.Nil(t, res.VMError)
-
-					// check the balance of coinbase (no change is expected)
-					RunWithNewReadOnlyBlockView(t, env, func(blk2 types.ReadOnlyBlockView) {
-						nonce, err := blk2.NonceOf(fAddr)
-						require.NoError(t, err)
-						require.Equal(t, 2, int(nonce))
-					})
+					require.NoError(t, res.VMError)
+					require.Greater(t, res.GasConsumed, uint64(0))
 				})
 			})
 
 			t.Run("test sending transactions (invalid nonce)", func(t *testing.T) {
+				account := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
+				fAddr := account.Address()
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
 						_, err := blk.DirectCall(types.NewDepositCall(fAddr, amount, account.Nonce()))
