@@ -6,12 +6,12 @@ import (
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
-	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/module"
 )
 
