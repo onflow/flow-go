@@ -400,7 +400,7 @@ func init() {
 			EpochSetup:                  event(ContractNameEpoch, EventNameEpochSetup),
 			EpochCommit:                 event(ContractNameEpoch, EventNameEpochCommit),
 			VersionBeacon:               event(ContractNameNodeVersionBeacon, EventNameVersionBeacon),
-			ProtocolStateVersionUpgrade: event(ContractNameServiceAccount, EventNameProtocolStateVersionUpgrade),
+			ProtocolStateVersionUpgrade: event(ContractNameNodeVersionBeacon, EventNameProtocolStateVersionUpgrade),
 		}
 
 		return events
