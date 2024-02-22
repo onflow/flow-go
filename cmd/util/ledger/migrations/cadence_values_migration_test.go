@@ -119,7 +119,7 @@ func checkMigratedPayloads(
 
 	storageMap := mr.Storage.GetStorageMap(address, common.PathDomainStorage.Identifier(), false)
 	require.NotNil(t, storageMap)
-	require.Equal(t, 11, int(storageMap.Count()))
+	require.Equal(t, 12, int(storageMap.Count()))
 
 	iterator := storageMap.Iterator(mr.Interpreter)
 
@@ -241,7 +241,7 @@ func checkMigratedPayloads(
 			common.CompositeKindResource,
 			[]interpreter.CompositeField{
 				{
-					Value: interpreter.NewUnmeteredUInt64Value(1369094286720630784),
+					Value: interpreter.NewUnmeteredUInt64Value(360287970189639680),
 					Name:  "uuid",
 				},
 			},
@@ -254,6 +254,12 @@ func checkMigratedPayloads(
 				interpreter.NewAddressValue(nil, address),
 				interpreter.NewReferenceStaticType(nil, entitlementAuthorization(), rResourceType),
 			),
+		),
+
+		interpreter.NewUnmeteredCapabilityValue(
+			interpreter.NewUnmeteredUInt64Value(2),
+			interpreter.NewAddressValue(nil, address),
+			interpreter.NewReferenceStaticType(nil, entitlementAuthorization(), rResourceType),
 		),
 
 		interpreter.NewDictionaryValue(
@@ -498,6 +504,28 @@ func checkReporters(
 				"EntitlementsMigration",
 				"linkR",
 				common.PathDomainPublic,
+			),
+
+			// untyped capability
+			capConsPathCapabilityMigrationEntry{
+				AccountAddress: address,
+				AddressPath: interpreter.AddressPath{
+					Address: address,
+					Path: interpreter.NewUnmeteredPathValue(
+						common.PathDomainPublic,
+						"linkR",
+					),
+				},
+				BorrowType: interpreter.NewReferenceStaticType(
+					nil,
+					entitlementAuthorization(),
+					rResourceType,
+				),
+			},
+			newCadenceValueMigrationReportEntry(
+				"CapabilityValueMigration",
+				"untyped_capability",
+				common.PathDomainStorage,
 			),
 
 			// Account-typed keys in dictionary
