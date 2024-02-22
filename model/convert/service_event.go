@@ -902,7 +902,7 @@ func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.Ser
 				return flow.ProtocolStateVersionUpgrade{}, fmt.Errorf("ProtocolStateVersionUpgrade event doesn't have type")
 			}
 
-			var newProtocolVersion cadence.Value
+			var newProtocolVersionValue cadence.Value
 			var foundFieldCount int
 
 			evt := cdcEvent.Type().(*cadence.EventType)
@@ -911,10 +911,39 @@ func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.Ser
 				switch f.Identifier {
 				case "newProtocolVersion":
 					foundFieldCount++
-					newProtocolVersion = cdcEvent.Fields[i]
+					newProtocolVersionValue = cdcEvent.Fields[i]
 				}
 			}
+
+			if foundFieldCount != expectedFieldCount {
+				return flow.ProtocolStateVersionUpgrade{}, fmt.Errorf(
+					"VersionBeacon event required fields not found (%d != %d)",
+					foundFieldCount,
+					expectedFieldCount,
+				)
+			}
+
+			newProtocolVersion, err := DecodeCadenceValue(
+				".newProtocolVersion", newProtocolVersionValue, func(cadenceVal cadence.UInt64) (uint64, error) {
+					return uint64(cadenceVal), err
+				},
+			)
+			if err != nil {
+				return flow.ProtocolStateVersionUpgrade{}, err
+			}
+
+			return flow.ProtocolStateVersionUpgrade{
+				NewProtocolStateVersion: newProtocolVersion,
+			}, err
 		})
+
+	// create the service event
+	serviceEvent := &flow.ServiceEvent{
+		Type:  flow.ServiceEventProtocolStateVersionUpgrade,
+		Event: &versionUpgrade,
+	}
+
+	return serviceEvent, nil
 }
 
 func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, error) {
