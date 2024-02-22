@@ -43,6 +43,10 @@ func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, e
 // CONVENTION: in the returned `EpochSetup` event,
 //   - Node identities listed in `EpochSetup.Participants` are in CANONICAL ORDER
 //   - for each cluster assignment (i.e. element in `EpochSetup.Assignments`), the nodeIDs are listed in CANONICAL ORDER
+//
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
 func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error) {
 	// decode bytes using ccf
 	payload, err := ccf.Decode(nil, event.Payload)
@@ -245,7 +249,10 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 }
 
 // convertServiceEventEpochCommit converts a service event encoded as the generic
-// flow.Event type to a ServiceEvent type for an EpochCommit event
+// flow.Event type to a ServiceEvent type for an EpochCommit event.
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
 func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error) {
 	// decode bytes using ccf
 	payload, err := ccf.Decode(nil, event.Payload)
@@ -887,6 +894,11 @@ func invalidCadenceTypeError(
 	)
 }
 
+// convertServiceEventProtocolStateVersionUpgrade converts a Cadence instance of the VersionBeacon
+// service event to the protocol-internal representation.
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
 func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.ServiceEvent, error) {
 	payload, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
@@ -949,6 +961,11 @@ func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.Ser
 	return serviceEvent, nil
 }
 
+// convertServiceEventVersionBeacon converts a Cadence instance of the VersionBeacon
+// service event to the protocol-internal representation.
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
 func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, error) {
 	payload, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
