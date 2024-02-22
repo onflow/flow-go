@@ -96,15 +96,13 @@ func checkServiceEvents(t *testing.T, chainID flow.ChainID) {
 
 	epochContractAddr := address(ContractNameEpoch)
 	versionContractAddr := address(ContractNameNodeVersionBeacon)
-	serviceAccountAddr := address(ContractNameServiceAccount)
 	// entries may not be empty
 	assert.NotEqual(t, flow.EmptyAddress, epochContractAddr)
 	assert.NotEqual(t, flow.EmptyAddress, versionContractAddr)
-	assert.NotEqual(t, flow.EmptyAddress, serviceAccountAddr)
 
 	// entries must match internal mapping
 	assert.Equal(t, epochContractAddr, events.EpochSetup.Address)
 	assert.Equal(t, epochContractAddr, events.EpochCommit.Address)
 	assert.Equal(t, versionContractAddr, events.VersionBeacon.Address)
-	assert.Equal(t, serviceAccountAddr, events.ProtocolStateVersionUpgrade.Address)
+	assert.Equal(t, versionContractAddr, events.ProtocolStateVersionUpgrade.Address)
 }

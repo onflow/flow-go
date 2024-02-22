@@ -87,10 +87,12 @@ type marshallerImpl struct {
 var _ ServiceEventMarshaller = (*marshallerImpl)(nil)
 
 var (
+	// CAUTION: Json and MsgPack are to be used only for trusted data sources
 	ServiceEventJSONMarshaller = marshallerImpl{
 		marshalFunc:   json.Marshal,
 		unmarshalFunc: json.Unmarshal,
 	}
+	// CAUTION: Json and MsgPack are to be used only for trusted data sources
 	ServiceEventMSGPACKMarshaller = marshallerImpl{
 		marshalFunc:   msgpack.Marshal,
 		unmarshalFunc: msgpack.Unmarshal,
