@@ -201,7 +201,7 @@ func NewCadence1ValueMigrator(
 func NewCadence1LinkValueMigrator(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
-	capabilityIDs *capcons.CapabilityIDMapping,
+	capabilityMapping *capcons.CapabilityMapping,
 ) *CadenceBaseMigrator {
 	return &CadenceBaseMigrator{
 		name:     "cadence-link-value-migration",
@@ -218,7 +218,7 @@ func NewCadence1LinkValueMigrator(
 			)
 			return []migrations.ValueMigration{
 				&capcons.LinkValueMigration{
-					CapabilityIDs:      capabilityIDs,
+					CapabilityMapping:  capabilityMapping,
 					AccountIDGenerator: idGenerator,
 					Reporter:           reporter,
 				},
@@ -235,7 +235,7 @@ func NewCadence1LinkValueMigrator(
 func NewCadence1CapabilityValueMigrator(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
-	capabilityIDs *capcons.CapabilityIDMapping,
+	capabilityMapping *capcons.CapabilityMapping,
 ) *CadenceBaseMigrator {
 	return &CadenceBaseMigrator{
 		name:     "cadence-capability-value-migration",
@@ -247,8 +247,8 @@ func NewCadence1CapabilityValueMigrator(
 		) []migrations.ValueMigration {
 			return []migrations.ValueMigration{
 				&capcons.CapabilityValueMigration{
-					CapabilityIDs: capabilityIDs,
-					Reporter:      reporter,
+					CapabilityMapping: capabilityMapping,
+					Reporter:          reporter,
 				},
 			}
 		},

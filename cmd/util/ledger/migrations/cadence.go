@@ -160,7 +160,7 @@ func NewCadence1ValueMigrations(
 
 	// Populated by CadenceLinkValueMigrator,
 	// used by CadenceCapabilityValueMigrator
-	capabilityIDs := &capcons.CapabilityIDMapping{}
+	capabilityMapping := &capcons.CapabilityMapping{}
 
 	errorMessageHandler := &errorMessageHandler{}
 
@@ -174,12 +174,12 @@ func NewCadence1ValueMigrations(
 		NewCadence1LinkValueMigrator(
 			rwf,
 			errorMessageHandler,
-			capabilityIDs,
+			capabilityMapping,
 		),
 		NewCadence1CapabilityValueMigrator(
 			rwf,
 			errorMessageHandler,
-			capabilityIDs,
+			capabilityMapping,
 		),
 	} {
 		migrations = append(

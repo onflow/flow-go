@@ -1284,12 +1284,21 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
 	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Sandboxnet || fnb.RootChainID == flow.Mainnet {
+	switch fnb.RootChainID {
+	case flow.Testnet,
+		flow.Sandboxnet,
+		flow.Previewnet,
+		flow.Mainnet:
 		vmOpts = append(vmOpts,
 			fvm.WithTransactionFeesEnabled(true),
 		)
 	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Sandboxnet || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet {
+	switch fnb.RootChainID {
+	case flow.Testnet,
+		flow.Sandboxnet,
+		flow.Previewnet,
+		flow.Localnet,
+		flow.Benchnet:
 		vmOpts = append(vmOpts,
 			fvm.WithContractDeploymentRestricted(false),
 		)
@@ -1299,6 +1308,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 
 // handleModules initializes the given module.
 func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) error {
+	fnb.Logger.Info().Str("module", v.name).Msg("module initialization started")
 	err := v.fn(fnb.NodeConfig)
 	if err != nil {
 		return fmt.Errorf("module %s initialization failed: %w", v.name, err)
@@ -1398,6 +1408,7 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, dependencies <
 
 		logger := fnb.Logger.With().Str("component", v.name).Logger()
 
+		logger.Info().Msg("component initialization started")
 		// First, build the component using the factory method.
 		readyAware, err := v.fn(fnb.NodeConfig)
 		if err != nil {
@@ -1469,6 +1480,7 @@ func (fnb *FlowNodeBuilder) handleRestartableComponent(v namedComponentFunc, par
 
 		// This may be called multiple times if the component is restarted
 		componentFactory := func() (component.Component, error) {
+			log.Info().Msg("component initialization started")
 			c, err := v.fn(fnb.NodeConfig)
 			if err != nil {
 				return nil, err

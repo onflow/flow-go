@@ -35,6 +35,11 @@ var (
 	flagNumViewsInEpoch            uint64
 	flagNumViewsInStakingAuction   uint64
 	flagNumViewsInDKGPhase         uint64
+	// Epoch target end time config
+	flagUseDefaultEpochTargetEndTime bool
+	flagEpochTimingRefCounter        uint64
+	flagEpochTimingRefTimestamp      uint64
+	flagEpochTimingDuration          uint64
 )
 
 // rootBlockCmd represents the rootBlock command
@@ -83,7 +88,7 @@ func addRootBlockCmdFlags() {
 	cmd.MarkFlagRequired(rootBlockCmd, "epoch-dkg-phase-length")
 
 	// required parameters for generation of root block, root execution result and root block seal
-	rootBlockCmd.Flags().StringVar(&flagRootChain, "root-chain", "local", "chain ID for the root block (can be 'main', 'test', 'sandbox', 'bench', or 'local'")
+	rootBlockCmd.Flags().StringVar(&flagRootChain, "root-chain", "local", "chain ID for the root block (can be 'main', 'test', 'sandbox', 'preview', 'bench', or 'local'")
 	rootBlockCmd.Flags().StringVar(&flagRootParent, "root-parent", "0000000000000000000000000000000000000000000000000000000000000000", "ID for the parent of the root block")
 	rootBlockCmd.Flags().Uint64Var(&flagRootHeight, "root-height", 0, "height of the root block")
 	rootBlockCmd.Flags().StringVar(&flagRootTimestamp, "root-timestamp", time.Now().UTC().Format(time.RFC3339), "timestamp of the root block (RFC3339)")
@@ -95,6 +100,25 @@ func addRootBlockCmdFlags() {
 	cmd.MarkFlagRequired(rootBlockCmd, "root-height")
 	cmd.MarkFlagRequired(rootBlockCmd, "protocol-version")
 	cmd.MarkFlagRequired(rootBlockCmd, "epoch-commit-safety-threshold")
+
+	// Epoch timing config - these values must be set identically to `EpochTimingConfig` in the FlowEpoch smart contract.
+	// See https://github.com/onflow/flow-core-contracts/blob/240579784e9bb8d97d91d0e3213614e25562c078/contracts/epochs/FlowEpoch.cdc#L259-L266
+	// Must specify either:
+	//   1. --use-default-epoch-timing and no other `--epoch-timing*` flags
+	//   2. All `--epoch-timing*` flags except --use-default-epoch-timing
+	//
+	// Use Option 1 for Benchnet, Localnet, etc.
+	// Use Option 2 for Mainnet, Testnet, Canary.
+	rootBlockCmd.Flags().BoolVar(&flagUseDefaultEpochTargetEndTime, "use-default-epoch-timing", false, "whether to use the default target end time")
+	rootBlockCmd.Flags().Uint64Var(&flagEpochTimingRefCounter, "epoch-timing-ref-counter", 0, "the reference epoch for computing the root epoch's target end time")
+	rootBlockCmd.Flags().Uint64Var(&flagEpochTimingRefTimestamp, "epoch-timing-ref-timestamp", 0, "the end time of the reference epoch, specified in second-precision Unix time, to use to compute the root epoch's target end time")
+	rootBlockCmd.Flags().Uint64Var(&flagEpochTimingDuration, "epoch-timing-duration", 0, "the duration of each epoch in seconds, used to compute the root epoch's target end time")
+
+	rootBlockCmd.MarkFlagsOneRequired("use-default-epoch-timing", "epoch-timing-ref-counter", "epoch-timing-ref-timestamp", "epoch-timing-duration")
+	rootBlockCmd.MarkFlagsRequiredTogether("epoch-timing-ref-counter", "epoch-timing-ref-timestamp", "epoch-timing-duration")
+	for _, flag := range []string{"epoch-timing-ref-counter", "epoch-timing-ref-timestamp", "epoch-timing-duration"} {
+		rootBlockCmd.MarkFlagsMutuallyExclusive("use-default-epoch-timing", flag)
+	}
 }
 
 func rootBlock(cmd *cobra.Command, args []string) {
@@ -113,6 +137,10 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	err := validateEpochConfig()
 	if err != nil {
 		log.Fatal().Err(err).Msg("invalid or unsafe epoch commit threshold config")
+	}
+	err = validateOrPopulateEpochTimingConfig()
+	if err != nil {
+		log.Fatal().Err(err).Msg("invalid epoch timing config")
 	}
 
 	log.Info().Msg("collecting partner network and staking keys")

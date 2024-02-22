@@ -3,10 +3,7 @@ package handler
 import (
 	"encoding/binary"
 
-	"github.com/onflow/atree"
-
 	"github.com/onflow/flow-go/fvm/evm/types"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 const (
@@ -22,22 +19,21 @@ const (
 )
 
 type AddressAllocator struct {
-	led         atree.Ledger
-	flexAddress flow.Address
 }
 
 var _ types.AddressAllocator = &AddressAllocator{}
 
 // NewAddressAllocator constructs a new statefull address allocator
-func NewAddressAllocator(led atree.Ledger, flexAddress flow.Address) (*AddressAllocator, error) {
-	return &AddressAllocator{
-		led:         led,
-		flexAddress: flexAddress,
-	}, nil
+func NewAddressAllocator() *AddressAllocator {
+	return &AddressAllocator{}
 }
 
 func (aa *AddressAllocator) COAFactoryAddress() types.Address {
 	return MakeCOAAddress(0)
+}
+
+func (aa *AddressAllocator) NativeTokenBridgeAddress() types.Address {
+	return MakePrecompileAddress(0)
 }
 
 // AllocateCOAAddress allocates an address for COA

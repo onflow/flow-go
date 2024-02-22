@@ -27,6 +27,7 @@ var (
 	flagNoReport                  bool
 	flagValidateMigration         bool
 	flagLogVerboseValidationError bool
+	flagStagedContractsFile       string
 )
 
 var Cmd = &cobra.Command{
@@ -69,6 +70,9 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagLogVerboseValidationError, "log-verbose-validation-error", false,
 		"log entire Cadence values on validation error (atree migration)")
+
+	Cmd.Flags().StringVar(&flagStagedContractsFile, "staged-contracts", "",
+		"Staged contracts CSV file")
 }
 
 func run(*cobra.Command, []string) {
@@ -157,6 +161,7 @@ func run(*cobra.Command, []string) {
 		chain.ChainID(),
 		// TODO:
 		migrations.EVMContractChangeNone,
+		flagStagedContractsFile,
 	)
 
 	if err != nil {
