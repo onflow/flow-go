@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence/runtime"
@@ -241,11 +242,14 @@ func (m *StagedContractsMigration) checkUpdateValidity(
 		return err
 	}
 
-	validator := stdlib.NewLegacyContractUpdateValidator(
-		nil,
+	validator := stdlib.NewCadenceV042ToV1ContractUpdateValidator(
+		location,
 		contractName,
+		mr.ContractNamesProvider,
 		oldProgram,
 		newProgram.Program,
+		// TODO:
+		map[common.Location]*sema.Elaboration{},
 	)
 
 	return validator.Validate()
