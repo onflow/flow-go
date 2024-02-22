@@ -573,7 +573,7 @@ func TestStagedContractsFromCSV(t *testing.T) {
 		contracts, err := StagedContractsFromCSV(path)
 		require.NoError(t, err)
 
-		require.Len(t, contracts, 3)
+		require.Len(t, contracts, 4)
 		assert.Equal(
 			t,
 			contracts,
@@ -590,6 +590,22 @@ func TestStagedContractsFromCSV(t *testing.T) {
 					Contract: Contract{
 						Name: "Bar",
 						Code: []byte("access(all) contract Bar{}"),
+					},
+				},
+				{
+					Address: common.MustBytesToAddress([]byte{0x2}),
+					Contract: Contract{
+						Name: "MultilineContract",
+						Code: []byte(`
+import Foo from 0x01
+
+access(all)
+contract MultilineContract{
+  init() {
+      var a = "hello"
+  }
+}
+`),
 					},
 				},
 				{
