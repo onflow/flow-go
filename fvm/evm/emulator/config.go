@@ -13,10 +13,10 @@ import (
 )
 
 var (
-	FlowEVMTestnetChainID = big.NewInt(646)
-	FlowEVMMainnetChainID = big.NewInt(747)
-	BlockLevelGasLimit    = uint64(math.MaxUint64)
-	zero                  = uint64(0)
+	DefaultBlockLevelGasLimit = uint64(math.MaxUint64)
+	DefaultBaseFee            = big.NewInt(0)
+	zero                      = uint64(0)
+	bigZero                   = big.NewInt(0)
 )
 
 // Config sets the required parameters
@@ -50,22 +50,22 @@ func (c *Config) ChainRules() gethParams.Rules {
 // and set a proper height for the specific release based on the Flow EVM heights
 // so it could gets activated at a desired time.
 var DefaultChainConfig = &gethParams.ChainConfig{
-	ChainID: FlowEVMTestnetChainID, // default is testnet
+	ChainID: types.FlowEVMTestnetChainID, // default is testnet
 
 	// Fork scheduling based on block heights
-	HomesteadBlock:      big.NewInt(0),
-	DAOForkBlock:        big.NewInt(0),
+	HomesteadBlock:      bigZero,
+	DAOForkBlock:        bigZero,
 	DAOForkSupport:      false,
-	EIP150Block:         big.NewInt(0),
-	EIP155Block:         big.NewInt(0),
-	EIP158Block:         big.NewInt(0),
-	ByzantiumBlock:      big.NewInt(0), // already on Byzantium
-	ConstantinopleBlock: big.NewInt(0), // already on Constantinople
-	PetersburgBlock:     big.NewInt(0), // already on Petersburg
-	IstanbulBlock:       big.NewInt(0), // already on Istanbul
-	BerlinBlock:         big.NewInt(0), // already on Berlin
-	LondonBlock:         big.NewInt(0), // already on London
-	MuirGlacierBlock:    big.NewInt(0), // already on MuirGlacier
+	EIP150Block:         bigZero,
+	EIP155Block:         bigZero,
+	EIP158Block:         bigZero,
+	ByzantiumBlock:      bigZero, // already on Byzantium
+	ConstantinopleBlock: bigZero, // already on Constantinople
+	PetersburgBlock:     bigZero, // already on Petersburg
+	IstanbulBlock:       bigZero, // already on Istanbul
+	BerlinBlock:         bigZero, // already on Berlin
+	LondonBlock:         bigZero, // already on London
+	MuirGlacierBlock:    bigZero, // already on MuirGlacier
 
 	// Fork scheduling based on timestamps
 	ShanghaiTime: &zero, // already on Shanghai
@@ -86,8 +86,8 @@ func defaultConfig() *Config {
 		BlockContext: &gethVM.BlockContext{
 			CanTransfer: gethCore.CanTransfer,
 			Transfer:    gethCore.Transfer,
-			GasLimit:    BlockLevelGasLimit,
-			BaseFee:     big.NewInt(0),
+			GasLimit:    DefaultBlockLevelGasLimit,
+			BaseFee:     DefaultBaseFee,
 			GetHash: func(n uint64) gethCommon.Hash {
 				return gethCommon.Hash{}
 			},
@@ -106,21 +106,12 @@ func NewConfig(opts ...Option) *Config {
 
 type Option func(*Config) *Config
 
-// WithMainnetChainID sets the chain ID to flow evm testnet
-func WithTestnetChainID() Option {
+// WithChainID sets the evm chain ID
+func WithChainID(chainID *big.Int) Option {
 	return func(c *Config) *Config {
-		c.ChainConfig.ChainID = FlowEVMTestnetChainID
+		c.ChainConfig.ChainID = chainID
 		return c
 	}
-}
-
-// WithMainnetChainID sets the chain ID to flow evm mainnet
-func WithMainnetChainID() Option {
-	return func(c *Config) *Config {
-		c.ChainConfig.ChainID = FlowEVMMainnetChainID
-		return c
-	}
-
 }
 
 // WithOrigin sets the origin of the transaction (signer)
