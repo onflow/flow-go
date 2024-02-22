@@ -538,8 +538,6 @@ func (e *Engine) onBlockExecuted(
 	e.metrics.ExecutionStorageStateCommitment(int64(len(finalState)))
 	e.metrics.ExecutionLastExecutedBlockHeight(executed.Block.Header.Height)
 
-	// e.checkStateSyncStop(executed.Block.Header.Height)
-
 	missingCollections := make(map[*entity.ExecutableBlock][]*flow.CollectionGuarantee)
 	err := e.mempool.Run(
 		func(

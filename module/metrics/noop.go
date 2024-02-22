@@ -162,6 +162,7 @@ func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)  
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                 {}
 func (nc *NoopCollector) ExecutionComputationUsedPerBlock(computation uint64)                   {}
 func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)                           {}
+func (nc *NoopCollector) ExecutionCheckpointSize(bytes uint64)                                  {}
 func (nc *NoopCollector) ExecutionLastExecutedBlockHeight(height uint64)                        {}
 func (nc *NoopCollector) ExecutionLastFinalizedExecutedBlockHeight(height uint64)               {}
 func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _ module.ExecutionResultStats) {}
