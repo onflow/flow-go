@@ -21,6 +21,10 @@ const (
 	DeployCallSubType   = byte(4)
 	ContractCallSubType = byte(5)
 
+	// Note that these gas values might need to change if we
+	// change the transaction (e.g. add accesslist),
+	// then it has to be updated to use Intrinsic function
+	// to calculate the minimum gas needed to run the transaction.
 	DepositCallGasLimit  = gethParams.TxGas
 	WithdrawCallGasLimit = gethParams.TxGas
 
