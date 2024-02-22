@@ -253,13 +253,8 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 		return types.BlockContext{}, err
 	}
 
-	chainID := types.FlowEVMTestnetChainID
-	if h.flowChainID == flow.Mainnet {
-		chainID = types.FlowEVMMainnetChainID
-	}
-
 	return types.BlockContext{
-		ChainID:                chainID,
+		ChainID:                types.EVMChainIDFromFlowChainID(h.flowChainID),
 		BlockNumber:            bp.Height,
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
 		GetHashFunc: func(n uint64) gethCommon.Hash {
