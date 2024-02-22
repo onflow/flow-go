@@ -130,7 +130,7 @@ func CreatePublicIDTranslatorAndIdentifierProvider(
 	logger zerolog.Logger,
 	networkKey crypto.PrivateKey,
 	sporkID flow.Identifier,
-	libp2pNode p2p.LibP2PNode,
+	getLibp2pNode func() p2p.LibP2PNode,
 	idCache *cache.ProtocolStateIDCache,
 ) (
 	p2p.IDTranslator,
@@ -145,7 +145,7 @@ func CreatePublicIDTranslatorAndIdentifierProvider(
 	// use the default identifier provider
 	factory := func() module.IdentifierProvider {
 		return id.NewCustomIdentifierProvider(func() flow.IdentifierList {
-			pids := libp2pNode.GetPeersForProtocol(protocols.FlowProtocolID(sporkID))
+			pids := getLibp2pNode().GetPeersForProtocol(protocols.FlowProtocolID(sporkID))
 			result := make(flow.IdentifierList, 0, len(pids))
 
 			for _, pid := range pids {

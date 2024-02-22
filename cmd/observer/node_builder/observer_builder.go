@@ -684,7 +684,9 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 			builder.Logger,
 			builder.NetworkKey,
 			builder.SporkID,
-			builder.LibP2PNode,
+			func() p2p.LibP2PNode {
+				return builder.LibP2PNode
+			},
 			idCache,
 		)
 		if err != nil {
