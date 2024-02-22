@@ -240,7 +240,6 @@ func DefaultFVMOptions(chainID flow.ChainID, cadenceTracing bool, extensiveTraci
 					AttachmentsEnabled: chainID != flow.Mainnet,
 				},
 			)),
-		fvm.WithEVMEnabled(true),
 	}
 
 	if extensiveTracing {
