@@ -23,7 +23,7 @@ contract EVM {
         let bytes: [UInt8; 20]
 
         /// Constructs a new EVM address from the given byte representation
-        init(bytes: [UInt8; 20]) {
+        view init(bytes: [UInt8; 20]) {
             self.bytes = bytes
         }
 
@@ -175,12 +175,6 @@ contract EVM {
             return EVMAddress(bytes: self.addressBytes)
         }
 
-        /// The EVM address of the cadence owned account behind an entitlement, acting as proof of access
-        access(Validate)
-        view protectedAddress(): EVMAddress {
-            return self.address()
-        }
-
         /// Get balance of the cadence owned account
         access(all)
         view fun balance(): Balance {
@@ -194,6 +188,12 @@ contract EVM {
                 from: <-from,
                 to: self.addressBytes
             )
+        }
+
+        /// The EVM address of the cadence owned account behind an entitlement, acting as proof of access
+        access(Owner | Validate)
+        view fun protectedAddress(): EVMAddress {
+            return self.address()
         }
 
         /// Withdraws the balance from the cadence owned account's balance
