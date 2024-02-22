@@ -78,7 +78,34 @@ var (
 
 // ResultSummary summerizes the outcome of a EVM call or tx run
 type ResultSummary struct {
-	Status      Status
-	ErrorCode   ErrorCode
-	GasConsumed uint64
+	Status                  Status
+	ErrorCode               ErrorCode
+	GasConsumed             uint64
+	DeployedContractAddress Address
+	ReturnedValue           Data
+}
+
+func NewResultSummary(res *Result, validationError error) *ResultSummary {
+	rs := &ResultSummary{}
+
+	if res != nil {
+		rs.GasConsumed = res.GasConsumed
+		rs.DeployedContractAddress = res.DeployedContractAddress
+		rs.ReturnedValue = res.ReturnedValue
+	}
+
+	if validationError != nil {
+		rs.ErrorCode = ValidationErrorCode(validationError)
+		rs.Status = StatusInvalid
+		return rs
+	}
+
+	if res.VMError != nil {
+		rs.ErrorCode = ExecutionErrorCode(res.VMError)
+		rs.Status = StatusFailed
+		return rs
+	}
+
+	rs.Status = StatusSuccessful
+	return rs
 }
