@@ -168,6 +168,9 @@ func WriteTestExecutionService(_ flow.Identifier, address, observerName, bootstr
 	}
 
 	pubKey, err := keyutils.LibP2PPublicKeyFromFlow(networkKey.PublicKey())
+	if err != nil {
+		return bootstrap.NodeInfo{}, fmt.Errorf("could not get libp2p public key from flow public key: %w", err)
+	}
 
 	peerID, err := peer.IDFromPublicKey(pubKey)
 	if err != nil {
