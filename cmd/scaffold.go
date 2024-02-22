@@ -243,6 +243,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		defaultConfig.ComplianceConfig.SkipNewProposalsThreshold,
 		"threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
 
+	// observer mode allows a unstaked execution node to fetch blocks from a public staked access node, and being able to execute blocks
 	fnb.flags.BoolVar(&fnb.BaseConfig.ObserverMode, "observer-mode", defaultConfig.ObserverMode, "whether the node is running in observer mode")
 	fnb.flags.StringSliceVar(&fnb.bootstrapNodePublicKeys,
 		"observer-mode-bootstrap-node-public-keys",
@@ -603,6 +604,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 
 	networkType := network.PrivateNetwork
 	if fnb.ObserverMode {
+		// observer mode uses public network
 		networkType = network.PublicNetwork
 	}
 
@@ -788,6 +790,8 @@ func (fnb *FlowNodeBuilder) initNodeInfo() error {
 	fnb.StakingKey = info.StakingPrivKey.PrivateKey
 
 	if fnb.ObserverMode {
+		// observer mode uses a network private key with different format than the staked node,
+		// so it has to load the network private key from a separate file
 		networkingPrivateKey, err := LoadNetworkPrivateKey(fnb.BaseConfig.BootstrapDir, nodeID)
 		if err != nil {
 			return fmt.Errorf("failed to load networking private key: %w", err)
@@ -798,7 +802,7 @@ func (fnb *FlowNodeBuilder) initNodeInfo() error {
 			return fmt.Errorf("could not get peer ID from network key: %w", err)
 		}
 
-		// public node ID for observer is derived from peer ID which is derived from networking private key
+		// public node ID for observer is derived from peer ID which is derived from network key
 		pubNodeID, err := translator.NewPublicNetworkIDTranslator().GetFlowID(peerID)
 		if err != nil {
 			return fmt.Errorf("could not get flow node ID: %w", err)
@@ -1212,10 +1216,15 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		node.IdentityProvider = disallowListWrapper
 
 		if node.ObserverMode {
+			// identifier providers decides which node to connect to when syncing blocks,
+			// in observer mode, the peer nodes have to be specific public access node,
+			// rather than the staked consensus nodes.
 			idTranslator, factory, err := CreatePublicIDTranslatorAndIdentifierProvider(
 				fnb.Logger,
 				fnb.NetworkKey,
 				fnb.SporkID,
+				// fnb.LibP2PNode is not created yet, until EnqueueNetworkInit is called.
+				// so we pass a function that will return the LibP2PNode when called.
 				func() p2p.LibP2PNode {
 					return fnb.LibP2PNode
 				},
@@ -1428,7 +1437,7 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 		}
 
 		if info.Role != flow.RoleExecution {
-			return fmt.Errorf("observer node must have execution role")
+			return fmt.Errorf("observer mode is only available for execution nodes")
 		}
 
 		id := flow.IdentitySkeleton{
