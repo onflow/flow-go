@@ -120,11 +120,16 @@ func extractExecutionState(
 	if exportPayloads {
 		payloads := newTrie.AllPayloads()
 
+		// Sort payloads to produce deterministic payload file with
+		// same sequence of payloads inside.
+		payloads = util.SortPayloadsByAddress(payloads, nWorker)
+
 		exportedPayloadCount, err := util.CreatePayloadFile(
 			log,
 			outputPayloadFile,
 			payloads,
 			exportPayloadsByAddresses,
+			false, // payloads represents entire state.
 		)
 		if err != nil {
 			return fmt.Errorf("cannot generate payloads file: %w", err)
@@ -204,7 +209,7 @@ func extractExecutionStateFromPayloads(
 	exportPayloadsByAddresses []common.Address,
 ) error {
 
-	payloads, err := util.ReadPayloadFile(log, inputPayloadFile)
+	inputPayloadsFromPartialState, payloads, err := util.ReadPayloadFile(log, inputPayloadFile)
 	if err != nil {
 		return err
 	}
@@ -220,11 +225,16 @@ func extractExecutionStateFromPayloads(
 
 	exportPayloads := len(outputPayloadFile) > 0
 	if exportPayloads {
+		// Sort payloads to produce deterministic payload file with
+		// same sequence of payloads inside.
+		payloads = util.SortPayloadsByAddress(payloads, nWorker)
+
 		exportedPayloadCount, err := util.CreatePayloadFile(
 			log,
 			outputPayloadFile,
 			payloads,
 			exportPayloadsByAddresses,
+			inputPayloadsFromPartialState,
 		)
 		if err != nil {
 			return fmt.Errorf("cannot generate payloads file: %w", err)
