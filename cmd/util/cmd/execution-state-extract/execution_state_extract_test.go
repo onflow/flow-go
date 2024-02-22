@@ -286,9 +286,10 @@ func TestExtractPayloadsFromExecutionState(t *testing.T) {
 			require.NoError(t, err)
 
 			// Verify exported payloads.
-			payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputPayloadFileName)
+			partialState, payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputPayloadFileName)
 			require.NoError(t, err)
 			require.Equal(t, len(keysValues), len(payloadsFromFile))
+			require.False(t, partialState)
 
 			for _, payloadFromFile := range payloadsFromFile {
 				k, err := payloadFromFile.Key()
@@ -392,9 +393,10 @@ func TestExtractPayloadsFromExecutionState(t *testing.T) {
 			require.NoError(t, err)
 
 			// Verify exported payloads.
-			payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputPayloadFileName)
+			partialState, payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputPayloadFileName)
 			require.NoError(t, err)
 			require.Equal(t, len(selectedKeysValues), len(payloadsFromFile))
+			require.True(t, partialState)
 
 			for _, payloadFromFile := range payloadsFromFile {
 				k, err := payloadFromFile.Key()
@@ -441,6 +443,7 @@ func TestExtractStateFromPayloads(t *testing.T) {
 				inputPayloadFileName,
 				payloads,
 				nil,
+				false,
 			)
 			require.NoError(t, err)
 			require.Equal(t, len(payloads), numOfPayloadWritten)
@@ -511,6 +514,7 @@ func TestExtractStateFromPayloads(t *testing.T) {
 				inputPayloadFileName,
 				payloads,
 				nil,
+				false,
 			)
 			require.NoError(t, err)
 			require.Equal(t, len(payloads), numOfPayloadWritten)
@@ -531,9 +535,79 @@ func TestExtractStateFromPayloads(t *testing.T) {
 			require.NoError(t, err)
 
 			// Verify exported payloads.
-			payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputPayloadFileName)
+			partialState, payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputPayloadFileName)
 			require.NoError(t, err)
 			require.Equal(t, len(keysValues), len(payloadsFromFile))
+			require.False(t, partialState)
+
+			for _, payloadFromFile := range payloadsFromFile {
+				k, err := payloadFromFile.Key()
+				require.NoError(t, err)
+
+				kv, exist := keysValues[k.String()]
+				require.True(t, exist)
+
+				require.Equal(t, kv.value, payloadFromFile.Value())
+			}
+		})
+	})
+
+	t.Run("input is partial state", func(t *testing.T) {
+		withDirs(t, func(_, execdir, outdir string) {
+			size := 10
+
+			inputPayloadFileName := filepath.Join(execdir, payloadFileName)
+			outputPayloadFileName := filepath.Join(outdir, "selected.payload")
+
+			// Generate some data
+			keysValues := make(map[string]keyPair)
+			var payloads []*ledger.Payload
+
+			for i := 0; i < size; i++ {
+				keys, values := getSampleKeyValues(i)
+
+				for j, key := range keys {
+					keysValues[key.String()] = keyPair{
+						key:   key,
+						value: values[j],
+					}
+
+					payloads = append(payloads, ledger.NewPayload(key, values[j]))
+				}
+			}
+
+			// Create input payload file that represents partial state
+			numOfPayloadWritten, err := util.CreatePayloadFile(
+				zerolog.Nop(),
+				inputPayloadFileName,
+				payloads,
+				nil,
+				true,
+			)
+			require.NoError(t, err)
+			require.Equal(t, len(payloads), numOfPayloadWritten)
+
+			// Since input payload file is partial state, --allow-partial-state-from-payload-file must be specified.
+			Cmd.SetArgs([]string{
+				"--execution-state-dir", execdir,
+				"--output-dir", outdir,
+				"--no-migration",
+				"--no-report",
+				"--state-commitment", "",
+				"--input-payload-filename", inputPayloadFileName,
+				"--output-payload-filename", outputPayloadFileName,
+				"--extract-payloads-by-address", "",
+				"--allow-partial-state-from-payload-file",
+				"--chain", flow.Emulator.Chain().String()})
+
+			err = Cmd.Execute()
+			require.NoError(t, err)
+
+			// Verify exported payloads.
+			partialState, payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputPayloadFileName)
+			require.NoError(t, err)
+			require.Equal(t, len(keysValues), len(payloadsFromFile))
+			require.True(t, partialState)
 
 			for _, payloadFromFile := range payloadsFromFile {
 				k, err := payloadFromFile.Key()
