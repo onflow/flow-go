@@ -1303,6 +1303,7 @@ func newInternalEVMTypeDepositFunction(
 const internalEVMTypeBalanceFunctionName = "balance"
 
 var internalEVMTypeBalanceFunctionType = &sema.FunctionType{
+	Purity: sema.FunctionPurityView,
 	Parameters: []sema.Parameter{
 		{
 			Label:          "address",
@@ -1516,6 +1517,7 @@ func newInternalEVMTypeDeployFunction(
 const internalEVMTypeCastToAttoFLOWFunctionName = "castToAttoFLOW"
 
 var internalEVMTypeCastToAttoFLOWFunctionType = &sema.FunctionType{
+	Purity: sema.FunctionPurityView,
 	Parameters: []sema.Parameter{
 		{
 			Label:          "balance",
@@ -1527,7 +1529,6 @@ var internalEVMTypeCastToAttoFLOWFunctionType = &sema.FunctionType{
 
 func newInternalEVMTypeCastToAttoFLOWFunction(
 	gauge common.MemoryGauge,
-	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewHostFunctionValue(
 		gauge,
@@ -1546,6 +1547,7 @@ func newInternalEVMTypeCastToAttoFLOWFunction(
 const internalEVMTypeCastToFLOWFunctionName = "castToFLOW"
 
 var internalEVMTypeCastToFLOWFunctionType = &sema.FunctionType{
+	Purity: sema.FunctionPurityView,
 	Parameters: []sema.Parameter{
 		{
 			Label:          "balance",
@@ -1557,7 +1559,6 @@ var internalEVMTypeCastToFLOWFunctionType = &sema.FunctionType{
 
 func newInternalEVMTypeCastToFLOWFunction(
 	gauge common.MemoryGauge,
-	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewHostFunctionValue(
 		gauge,
@@ -1598,8 +1599,8 @@ func NewInternalEVMContractValue(
 			internalEVMTypeBalanceFunctionName:                   newInternalEVMTypeBalanceFunction(gauge, handler),
 			internalEVMTypeEncodeABIFunctionName:                 newInternalEVMTypeEncodeABIFunction(gauge, location),
 			internalEVMTypeDecodeABIFunctionName:                 newInternalEVMTypeDecodeABIFunction(gauge, location),
-			internalEVMTypeCastToAttoFLOWFunctionName:            newInternalEVMTypeCastToAttoFLOWFunction(gauge, handler),
-			internalEVMTypeCastToFLOWFunctionName:                newInternalEVMTypeCastToFLOWFunction(gauge, handler),
+			internalEVMTypeCastToAttoFLOWFunctionName:            newInternalEVMTypeCastToAttoFLOWFunction(gauge),
+			internalEVMTypeCastToFLOWFunctionName:                newInternalEVMTypeCastToFLOWFunction(gauge),
 		},
 		nil,
 		nil,
