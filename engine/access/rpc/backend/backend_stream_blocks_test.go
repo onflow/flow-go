@@ -15,8 +15,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
-	access "github.com/onflow/flow-go/engine/access/mock"
-	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	subscriptionmock "github.com/onflow/flow-go/engine/access/subscription/mock"
@@ -39,22 +37,10 @@ type BackendBlocksSuite struct {
 
 	blocks                *storagemock.Blocks
 	headers               *storagemock.Headers
-	collections           *storagemock.Collections
-	transactions          *storagemock.Transactions
-	receipts              *storagemock.ExecutionReceipts
-	results               *storagemock.ExecutionResults
-	transactionResults    *storagemock.LightTransactionResults
-	seals                 *storagemock.Seals
 	chainStateTracker     *subscriptionmock.ChainStateTracker
 	chainStateTrackerReal subscription.ChainStateTracker
 
-	colClient              *access.AccessAPIClient
-	execClient             *access.ExecutionAPIClient
-	historicalAccessClient *access.AccessAPIClient
-	archiveClient          *access.AccessAPIClient
-
 	connectionFactory *connectionmock.ConnectionFactory
-	communicator      *backendmock.Communicator
 
 	chainID flow.ChainID
 
@@ -62,7 +48,6 @@ type BackendBlocksSuite struct {
 	blocksArray []*flow.Block
 	blockMap    map[uint64]*flow.Block
 	rootBlock   flow.Block
-	sealMap     map[flow.Identifier]*flow.Seal
 
 	backend *Backend
 
@@ -99,7 +84,6 @@ func (s *BackendBlocksSuite) SetupTest() {
 	header := unittest.BlockHeaderFixture()
 
 	params := new(protocol.Params)
-	params.On("FinalizedRoot").Return(header, nil)
 	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
 	params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
 	params.On("SporkRootBlockHeight").Return(header.Height, nil)
@@ -108,28 +92,15 @@ func (s *BackendBlocksSuite) SetupTest() {
 
 	s.blocks = new(storagemock.Blocks)
 	s.headers = new(storagemock.Headers)
-	s.transactions = new(storagemock.Transactions)
-	s.collections = new(storagemock.Collections)
-	s.receipts = new(storagemock.ExecutionReceipts)
-	s.results = new(storagemock.ExecutionResults)
-	s.seals = new(storagemock.Seals)
-	s.colClient = new(access.AccessAPIClient)
-	s.archiveClient = new(access.AccessAPIClient)
-	s.execClient = new(access.ExecutionAPIClient)
-	s.transactionResults = storagemock.NewLightTransactionResults(s.T())
 	s.chainID = flow.Testnet
-	s.historicalAccessClient = new(access.AccessAPIClient)
 	s.connectionFactory = connectionmock.NewConnectionFactory(s.T())
 	s.chainStateTracker = subscriptionmock.NewChainStateTracker(s.T())
-
-	s.communicator = new(backendmock.Communicator)
 
 	s.broadcaster = engine.NewBroadcaster()
 
 	blockCount := 5
 	s.blockMap = make(map[uint64]*flow.Block, blockCount)
 	s.blocksArray = make([]*flow.Block, 0, blockCount)
-	s.sealMap = make(map[flow.Identifier]*flow.Seal, blockCount)
 
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	s.rootBlock = unittest.BlockFixture()
@@ -143,24 +114,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 
 		s.blocksArray = append(s.blocksArray, block)
 		s.blockMap[block.Header.Height] = block
-		seal := unittest.BlockSealsFixture(1)[0]
-		s.sealMap[block.ID()] = seal
 	}
-
-	s.seals.On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).Return(
-		func(blockID flow.Identifier) *flow.Seal {
-			if seal, ok := s.sealMap[blockID]; ok {
-				return seal
-			}
-			return nil
-		},
-		func(blockID flow.Identifier) error {
-			if _, ok := s.sealMap[blockID]; ok {
-				return nil
-			}
-			return storage.ErrNotFound
-		},
-	).Maybe()
 
 	s.headers.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
 		func(blockID flow.Identifier) *flow.Header {
@@ -196,21 +150,6 @@ func (s *BackendBlocksSuite) SetupTest() {
 		},
 	).Maybe()
 
-	s.headers.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(
-		func(height uint64) flow.Identifier {
-			if block, ok := s.blockMap[height]; ok {
-				return block.Header.ID()
-			}
-			return flow.ZeroID
-		},
-		func(height uint64) error {
-			if _, ok := s.blockMap[height]; ok {
-				return nil
-			}
-			return storage.ErrNotFound
-		},
-	).Maybe()
-
 	s.blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(
 		func(height uint64) *flow.Block {
 			if block, ok := s.blockMap[height]; ok {
@@ -236,7 +175,6 @@ func (s *BackendBlocksSuite) SetupTest() {
 
 	// create real chain state tracker to use GetStartHeight from it, instead of mocking
 	s.chainStateTrackerReal, err = subscription.NewChainStateTracker(
-		s.log,
 		s.state,
 		s.rootBlock.Header.Height,
 		s.headers,
@@ -266,16 +204,9 @@ func (s *BackendBlocksSuite) backendParams() Params {
 		State:                    s.state,
 		Blocks:                   s.blocks,
 		Headers:                  s.headers,
-		Collections:              s.collections,
-		Transactions:             s.transactions,
-		ExecutionReceipts:        s.receipts,
-		ExecutionResults:         s.results,
-		LightTransactionResults:  s.transactionResults,
 		ChainID:                  s.chainID,
-		CollectionRPC:            s.colClient,
 		MaxHeightRange:           DefaultMaxHeightRange,
 		SnapshotHistoryLimit:     DefaultSnapshotHistoryLimit,
-		Communicator:             NewNodeCommunicator(false),
 		AccessMetrics:            metrics.NewNoopCollector(),
 		Log:                      s.log,
 		TxErrorMessagesCacheSize: 1000,

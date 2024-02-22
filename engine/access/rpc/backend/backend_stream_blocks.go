@@ -116,11 +116,11 @@ func (b *backendSubscribeBlocks) getBlockDigestResponse(blockStatus flow.BlockSt
 
 // getBlock returns the block for the given block height.
 // Expected errors during normal operation:
-// - storage.ErrNotFound or execution_data.BlobNotFoundError: block for the given block height is not available.
+// - storage.ErrNotFound: block for the given block height is not available.
 func (b *backendSubscribeBlocks) getBlock(height uint64, expectedBlockStatus flow.BlockStatus) (*flow.Block, error) {
 	highestHeight, err := b.getHighestHeight(expectedBlockStatus)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not get block by height: %v", err)
+		return nil, status.Errorf(codes.Internal, "could not get highest available height: %v", err)
 	}
 
 	// fail early if no notification has been received for the given block height.

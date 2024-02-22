@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/rs/zerolog"
-
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -47,8 +45,8 @@ type ChainStateTracker interface {
 	// If neither startBlockID nor startHeight is provided, the latest sealed block is used.
 	GetStartHeight(startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error)
 
-	// GetHighestHeight returns the highest height based on the specified block status. O
-	// Only flow.BlockStatusFinalized and flow.BlockStatusSealed allowed.
+	// GetHighestHeight returns the highest height based on the specified block status.
+	// Only flow.BlockStatusFinalized and flow.BlockStatusSealed are allowed.
 	GetHighestHeight(blockStatus flow.BlockStatus) (uint64, error)
 
 	// ProcessOnFinalizedBlock drives the subscription logic when a block is finalized.
@@ -62,14 +60,12 @@ var _ ChainStateTracker = (*ChainStateTrackerImpl)(nil)
 
 // ChainStateTrackerImpl tracks for new blocks and handles block-related operations.
 type ChainStateTrackerImpl struct {
-	log             zerolog.Logger
 	state           protocol.State
 	headers         storage.Headers
 	broadcaster     *engine.Broadcaster
 	indexReporter   state_synchronization.IndexReporter
 	useIndex        bool
 	rootBlockHeight uint64
-	rootBlockID     flow.Identifier
 
 	// finalizedHighestHeight contains the highest consecutive block height for which we have received a new notification.
 	finalizedHighestHeight counters.StrictMonotonousCounter
@@ -79,7 +75,6 @@ type ChainStateTrackerImpl struct {
 
 // NewChainStateTracker creates a new ChainStateTrackerImpl instance.
 func NewChainStateTracker(
-	log zerolog.Logger,
 	state protocol.State,
 	rootHeight uint64,
 	headers storage.Headers,
@@ -94,10 +89,8 @@ func NewChainStateTracker(
 	}
 
 	return &ChainStateTrackerImpl{
-		log:                    log,
 		state:                  state,
 		rootBlockHeight:        rootHeight,
-		rootBlockID:            flow.ZeroID,
 		headers:                headers,
 		finalizedHighestHeight: counters.NewMonotonousCounter(highestAvailableFinalizedHeight),
 		sealedHighestHeight:    counters.NewMonotonousCounter(lastSealed.Height),
@@ -154,8 +147,9 @@ func (h *ChainStateTrackerImpl) GetStartHeight(startBlockID flow.Identifier, sta
 	// if no start block was provided, use the latest sealed block
 	header, err := h.state.Sealed().Head()
 	if err != nil {
-		return 0, status.Errorf(codes.Internal, "could not get latest sealed block: %v", err)
+		return 0, fmt.Errorf("unable to get latest sealed block: %w", err)
 	}
+
 	return header.Height, nil
 }
 
@@ -239,11 +233,9 @@ func (h *ChainStateTrackerImpl) GetHighestHeight(blockStatus flow.BlockStatus) (
 		return h.finalizedHighestHeight.Value(), nil
 	case flow.BlockStatusSealed:
 		return h.sealedHighestHeight.Value(), nil
-	case flow.BlockStatusUnknown:
-		return 0, status.Errorf(codes.InvalidArgument, "could not get highest height for block with unknown status")
+	default:
+		return 0, status.Errorf(codes.InvalidArgument, "could not get highest height for unsupported status")
 	}
-
-	return 0, status.Errorf(codes.InvalidArgument, "could not get highest height for invalid status")
 }
 
 // ProcessOnFinalizedBlock drives the subscription logic when a block is finalized.
@@ -254,10 +246,7 @@ func (h *ChainStateTrackerImpl) ProcessOnFinalizedBlock() error {
 	// get the finalized header from state
 	finalizedHeader, err := h.state.Final().Head()
 	if err != nil {
-		// this header MUST exist in the db, otherwise the node likely has inconsistent state.
-		// Don't crash as a result of an external API request, but other components will likely panic.
-		h.log.Err(err).Msg("failed to get latest block header. potentially inconsistent protocol state.")
-		return status.Errorf(codes.Internal, "unable to get latest finalized header: %v", err)
+		return fmt.Errorf("unable to get latest finalized header: %w", err)
 	}
 
 	if ok := h.finalizedHighestHeight.Set(finalizedHeader.Height); !ok {
@@ -267,10 +256,7 @@ func (h *ChainStateTrackerImpl) ProcessOnFinalizedBlock() error {
 	// get the latest seal header from storage
 	sealedHeader, err := h.state.Sealed().Head()
 	if err != nil {
-		// this header MUST exist in the db, otherwise the node likely has inconsistent state.
-		// Don't crash as a result of an external API request, but other components will likely panic.
-		h.log.Err(err).Msg("failed to get latest block header. potentially inconsistent protocol state.")
-		return status.Errorf(codes.Internal, "unable to get latest sealed header: %v", err)
+		return fmt.Errorf("unable to get latest sealed header: %w", err)
 	}
 
 	if ok := h.sealedHighestHeight.Set(sealedHeader.Height); !ok {

@@ -243,7 +243,6 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	eventIndexer := index.NewEventsIndex(suite.events)
 
 	suite.chainStateTracker, err = subscription.NewChainStateTracker(
-		suite.log,
 		suite.state,
 		rootBlock.Header.Height,
 		suite.headers,

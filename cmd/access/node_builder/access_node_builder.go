@@ -884,7 +884,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			// create ChainStateTracker that will track for new blocks (finalized and sealed) and
 			// handles block-related operations.
 			builder.chainStateTracker, err = subscription.NewChainStateTracker(
-				node.Logger,
 				node.State,
 				builder.executionDataConfig.InitialBlockHeight,
 				node.Storage.Headers,

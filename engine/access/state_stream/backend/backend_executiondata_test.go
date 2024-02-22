@@ -237,7 +237,6 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 	// create real chain state tracker to use GetStartHeight from it, instead of mocking
 	s.chainStateTrackerReal, err = subscription.NewChainStateTracker(
-		logger,
 		s.state,
 		s.rootBlock.Header.Height,
 		s.headers,
