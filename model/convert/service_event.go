@@ -3,8 +3,8 @@ package convert
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/coreos/go-semver/semver"
 
+	"github.com/coreos/go-semver/semver"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/crypto"
