@@ -1283,7 +1283,6 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithChain(fnb.RootChainID.Chain()),
 		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
-		fvm.WithEVMEnabled(true),
 	}
 	switch fnb.RootChainID {
 	case flow.Testnet,
