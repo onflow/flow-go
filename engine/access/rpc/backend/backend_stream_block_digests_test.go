@@ -94,8 +94,8 @@ func (s *BackendBlockDigestSuite) TestSubscribeBlockDigests() {
 					actualBlock, ok := v.(*flow.LightweightBlock)
 					require.True(s.T(), ok, "unexpected response type: %T", v)
 
-					s.Require().Equal(b.Header.Height, actualBlock.Height)
 					s.Require().Equal(b.Header.ID(), actualBlock.ID)
+					s.Require().Equal(b.Header.Height, actualBlock.Height)
 					s.Require().Equal(b.Header.Timestamp, actualBlock.Timestamp)
 				}, time.Second, fmt.Sprintf("timed out waiting for block %d %v", b.Header.Height, b.ID()))
 			}

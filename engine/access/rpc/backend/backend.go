@@ -237,6 +237,7 @@ func New(params Params) (*Backend, error) {
 		backendSubscribeBlocks: backendSubscribeBlocks{
 			log:            params.Log,
 			state:          params.State,
+			headers:        params.Headers,
 			blocks:         params.Blocks,
 			Broadcaster:    params.SubscriptionParams.Broadcaster,
 			sendTimeout:    params.SubscriptionParams.SendTimeout,

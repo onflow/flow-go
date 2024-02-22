@@ -22,6 +22,7 @@ type backendSubscribeBlocks struct {
 	log            zerolog.Logger
 	state          protocol.State
 	blocks         storage.Blocks
+	headers        storage.Headers
 	Broadcaster    *engine.Broadcaster
 	sendTimeout    time.Duration
 	responseLimit  float64
@@ -79,55 +80,66 @@ func (b *backendSubscribeBlocks) getBlockResponse(blockStatus flow.BlockStatus) 
 // getBlockHeaderResponse returns a GetDataByHeightFunc that retrieves block header information for the specified height.
 func (b *backendSubscribeBlocks) getBlockHeaderResponse(blockStatus flow.BlockStatus) subscription.GetDataByHeightFunc {
 	return func(_ context.Context, height uint64) (interface{}, error) {
-		block, err := b.getBlock(height, blockStatus)
+		header, err := b.getBlockHeader(height, blockStatus)
 		if err != nil {
 			return nil, fmt.Errorf("could not get block by height %d: %w", height, err)
 		}
 
 		b.log.Trace().
-			Hex("block_id", logging.ID(block.ID())).
+			Hex("block_id", logging.ID(header.ID())).
 			Uint64("height", height).
 			Msgf("sending block header info")
 
-		return block.Header, nil
+		return header, nil
 	}
 }
 
 // getBlockDigestResponse returns a GetDataByHeightFunc that retrieves lightweight block information for the specified height.
 func (b *backendSubscribeBlocks) getBlockDigestResponse(blockStatus flow.BlockStatus) subscription.GetDataByHeightFunc {
 	return func(_ context.Context, height uint64) (interface{}, error) {
-		block, err := b.getBlock(height, blockStatus)
+		header, err := b.getBlockHeader(height, blockStatus)
 		if err != nil {
 			return nil, fmt.Errorf("could not get block by height %d: %w", height, err)
 		}
 
 		b.log.Trace().
-			Hex("block_id", logging.ID(block.ID())).
+			Hex("block_id", logging.ID(header.ID())).
 			Uint64("height", height).
 			Msgf("sending lightweight block info")
 
 		return &flow.LightweightBlock{
-			ID:        block.ID(),
-			Height:    block.Header.Height,
-			Timestamp: block.Header.Timestamp,
+			ID:        header.ID(),
+			Height:    header.Height,
+			Timestamp: header.Timestamp,
 		}, nil
 	}
+}
+
+// getBlockHeader returns the block header for the given block height.
+// Expected errors during normal operation:
+// - storage.ErrNotFound: block for the given block height is not available.
+func (b *backendSubscribeBlocks) getBlockHeader(height uint64, expectedBlockStatus flow.BlockStatus) (*flow.Header, error) {
+	err := b.validateHeight(height, expectedBlockStatus)
+	if err != nil {
+		return nil, err
+	}
+
+	// since we are querying a finalized or sealed block header, we can use the height index and save an ID computation
+	header, err := b.headers.ByHeight(height)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not get block header by height: %v", err)
+	}
+
+	return header, nil
 }
 
 // getBlock returns the block for the given block height.
 // Expected errors during normal operation:
 // - storage.ErrNotFound: block for the given block height is not available.
 func (b *backendSubscribeBlocks) getBlock(height uint64, expectedBlockStatus flow.BlockStatus) (*flow.Block, error) {
-	highestHeight, err := b.getHighestHeight(expectedBlockStatus)
+	err := b.validateHeight(height, expectedBlockStatus)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not get highest available height: %v", err)
-	}
-
-	// fail early if no notification has been received for the given block height.
-	// note: it's possible for the data to exist in the data store before the notification is
-	// received. this ensures a consistent view is available to all streams.
-	if height > highestHeight {
-		return nil, fmt.Errorf("block %d is not available yet: %w", height, storage.ErrNotFound)
+		return nil, err
 	}
 
 	// since we are querying a finalized or sealed block, we can use the height index and save an ID computation
@@ -137,4 +149,20 @@ func (b *backendSubscribeBlocks) getBlock(height uint64, expectedBlockStatus flo
 	}
 
 	return block, nil
+}
+
+func (b *backendSubscribeBlocks) validateHeight(height uint64, expectedBlockStatus flow.BlockStatus) error {
+	highestHeight, err := b.getHighestHeight(expectedBlockStatus)
+	if err != nil {
+		return fmt.Errorf("could not get highest available height: %v", err)
+	}
+
+	// fail early if no notification has been received for the given block height.
+	// note: it's possible for the data to exist in the data store before the notification is
+	// received. this ensures a consistent view is available to all streams.
+	if height > highestHeight {
+		return fmt.Errorf("block %d is not available yet: %w", height, storage.ErrNotFound)
+	}
+
+	return nil
 }
