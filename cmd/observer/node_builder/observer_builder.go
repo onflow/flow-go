@@ -729,7 +729,7 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 	builder.
 		Component("public libp2p node", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
-			publicLibp2pNode, err = builder.BuildPublicLibp2pNode()
+			publicLibp2pNode, err = builder.BuildPublicLibp2pNode(builder.BaseConfig.BindAddr)
 			if err != nil {
 				return nil, fmt.Errorf("could not create public libp2p node: %w", err)
 			}
