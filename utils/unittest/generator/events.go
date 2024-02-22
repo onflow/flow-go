@@ -57,11 +57,11 @@ func (g *Events) New() flow.Event {
 		Fields: []cadence.Field{
 			{
 				Identifier: "a",
-				Type:       cadence.IntType{},
+				Type:       cadence.IntType,
 			},
 			{
 				Identifier: "b",
-				Type:       cadence.StringType{},
+				Type:       cadence.StringType,
 			},
 		},
 	}

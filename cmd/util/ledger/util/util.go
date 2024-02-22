@@ -1,7 +1,12 @@
 package util
 
 import (
+	"database/sql"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime/common"
@@ -152,3 +157,121 @@ func IsServiceLevelAddress(address common.Address) bool {
 }
 
 var _ atree.Ledger = &PayloadsReadonlyLedger{}
+
+func PayloadsFromEmulatorSnapshot(snapshotPath string) ([]*ledger.Payload, error) {
+	db, err := sql.Open("sqlite", snapshotPath)
+	if err != nil {
+		return nil, err
+	}
+
+	payloads, _, _, err := PayloadsAndAccountsFromEmulatorSnapshot(db)
+	return payloads, err
+}
+
+func PayloadsAndAccountsFromEmulatorSnapshot(db *sql.DB) (
+	[]*ledger.Payload,
+	map[flow.RegisterID]PayloadMetaInfo,
+	[]common.Address,
+	error,
+) {
+	rows, err := db.Query("SELECT key, value, version, height FROM ledger")
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	var payloads []*ledger.Payload
+	var accounts []common.Address
+	accountsSet := make(map[common.Address]struct{})
+
+	payloadSet := make(map[flow.RegisterID]PayloadMetaInfo)
+
+	for rows.Next() {
+		var hexKey, hexValue string
+		var height, version uint64
+
+		err := rows.Scan(&hexKey, &hexValue, &height, &version)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		key, err := hex.DecodeString(hexKey)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		value, err := hex.DecodeString(hexValue)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		registerId, address := registerIDKeyFromString(string(key))
+
+		if _, contains := accountsSet[address]; !contains {
+			accountsSet[address] = struct{}{}
+			accounts = append(accounts, address)
+		}
+
+		ledgerKey := convert.RegisterIDToLedgerKey(registerId)
+
+		payload := ledger.NewPayload(
+			ledgerKey,
+			value,
+		)
+
+		payloads = append(payloads, payload)
+		payloadSet[registerId] = PayloadMetaInfo{
+			Height:  height,
+			Version: version,
+		}
+	}
+
+	return payloads, payloadSet, accounts, nil
+}
+
+// registerIDKeyFromString is the inverse of `flow.RegisterID.String()` method.
+func registerIDKeyFromString(s string) (flow.RegisterID, common.Address) {
+	parts := strings.SplitN(s, "/", 2)
+
+	owner := parts[0]
+	key := parts[1]
+
+	address, err := common.HexToAddress(owner)
+	if err != nil {
+		panic(err)
+	}
+
+	var decodedKey string
+
+	switch key[0] {
+	case '$':
+		b := make([]byte, 9)
+		b[0] = '$'
+
+		int64Value, err := strconv.ParseInt(key[1:], 10, 64)
+		if err != nil {
+			panic(err)
+		}
+
+		binary.BigEndian.PutUint64(b[1:], uint64(int64Value))
+
+		decodedKey = string(b)
+	case '#':
+		decoded, err := hex.DecodeString(key[1:])
+		if err != nil {
+			panic(err)
+		}
+		decodedKey = string(decoded)
+	default:
+		panic("Invalid register key")
+	}
+
+	return flow.RegisterID{
+			Owner: string(address.Bytes()),
+			Key:   decodedKey,
+		},
+		address
+}
+
+type PayloadMetaInfo struct {
+	Height, Version uint64
+}

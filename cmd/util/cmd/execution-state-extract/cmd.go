@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -26,6 +27,7 @@ var (
 	flagNoReport                  bool
 	flagValidateMigration         bool
 	flagLogVerboseValidationError bool
+	flagStagedContractsFile       string
 )
 
 var Cmd = &cobra.Command{
@@ -44,6 +46,7 @@ func init() {
 	_ = Cmd.MarkFlagRequired("output-dir")
 
 	Cmd.Flags().StringVar(&flagChain, "chain", "", "Chain name")
+	_ = Cmd.MarkFlagRequired("chain")
 
 	Cmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "",
 		"state commitment (hex-encoded, 64 characters)")
@@ -68,6 +71,8 @@ func init() {
 	Cmd.Flags().BoolVar(&flagLogVerboseValidationError, "log-verbose-validation-error", false,
 		"log entire Cadence values on validation error (atree migration)")
 
+	Cmd.Flags().StringVar(&flagStagedContractsFile, "staged-contracts", "",
+		"Staged contracts CSV file")
 }
 
 func run(*cobra.Command, []string) {
@@ -132,9 +137,7 @@ func run(*cobra.Command, []string) {
 	// 	log.Fatal().Err(err).Msgf("cannot ensure checkpoint file exist in folder %v", flagExecutionStateDir)
 	// }
 
-	if len(flagChain) > 0 {
-		log.Warn().Msgf("--chain flag is deprecated")
-	}
+	chain := flow.ChainID(flagChain).Chain()
 
 	if flagNoReport {
 		log.Warn().Msgf("--no-report flag is deprecated")
@@ -155,6 +158,10 @@ func run(*cobra.Command, []string) {
 		flagOutputDir,
 		flagNWorker,
 		!flagNoMigration,
+		chain.ChainID(),
+		// TODO:
+		migrations.EVMContractChangeNone,
+		flagStagedContractsFile,
 	)
 
 	if err != nil {

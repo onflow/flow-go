@@ -1,8 +1,8 @@
-import MyFavContract from 0x%s
+import EventHeavy from 0x%s
 
 transaction {
-  prepare(acct: AuthAccount) {}
+  prepare(acct: &Account) {}
   execute {
-    MyFavContract.EventHeavy(220)
+    EventHeavy.EventHeavy(220)
   }
 }

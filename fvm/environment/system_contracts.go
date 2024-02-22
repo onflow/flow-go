@@ -90,7 +90,16 @@ var verifyPayersBalanceForTransactionExecutionSpec = ContractFunctionSpec{
 	LocationName:     systemcontracts.ContractNameFlowFees,
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_verifyPayersBalanceForTransactionExecution,
 	ArgumentTypes: []sema.Type{
-		sema.AuthAccountType,
+		sema.NewReferenceType(
+			nil,
+			sema.NewEntitlementSetAccess(
+				[]*sema.EntitlementType{
+					sema.BorrowValueType,
+				},
+				sema.Conjunction,
+			),
+			sema.AccountType,
+		),
 		sema.UInt64Type,
 		sema.UInt64Type,
 	},
@@ -122,7 +131,16 @@ var deductTransactionFeeSpec = ContractFunctionSpec{
 	LocationName:     systemcontracts.ContractNameFlowFees,
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_deductTransactionFee,
 	ArgumentTypes: []sema.Type{
-		sema.AuthAccountType,
+		sema.NewReferenceType(
+			nil,
+			sema.NewEntitlementSetAccess(
+				[]*sema.EntitlementType{
+					sema.BorrowValueType,
+				},
+				sema.Conjunction,
+			),
+			sema.AccountType,
+		),
 		sema.UInt64Type,
 		sema.UInt64Type,
 	},
@@ -151,8 +169,28 @@ var setupNewAccountSpec = ContractFunctionSpec{
 	LocationName:     systemcontracts.ContractNameServiceAccount,
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_setupNewAccount,
 	ArgumentTypes: []sema.Type{
-		sema.AuthAccountType,
-		sema.AuthAccountType,
+		sema.NewReferenceType(
+			nil,
+			sema.NewEntitlementSetAccess(
+				[]*sema.EntitlementType{
+					sema.SaveValueType,
+					sema.BorrowValueType,
+					sema.CapabilitiesType,
+				},
+				sema.Conjunction,
+			),
+			sema.AccountType,
+		),
+		sema.NewReferenceType(
+			nil,
+			sema.NewEntitlementSetAccess(
+				[]*sema.EntitlementType{
+					sema.BorrowValueType,
+				},
+				sema.Conjunction,
+			),
+			sema.AccountType,
+		),
 	},
 }
 
@@ -198,7 +236,11 @@ var accountBalanceInvocationSpec = ContractFunctionSpec{
 	LocationName:     systemcontracts.ContractNameServiceAccount,
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_defaultTokenBalance,
 	ArgumentTypes: []sema.Type{
-		sema.PublicAccountType,
+		sema.NewReferenceType(
+			nil,
+			sema.UnauthorizedAccess,
+			sema.AccountType,
+		),
 	},
 }
 

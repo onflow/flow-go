@@ -13,7 +13,7 @@ import (
 func TestGetScript_InvalidParse(t *testing.T) {
 	var getScript GetScript
 
-	validScript := fmt.Sprintf(`{ "script": "%s", "arguments": [] }`, util.ToBase64([]byte(`pub fun main() {}`)))
+	validScript := fmt.Sprintf(`{ "script": "%s", "arguments": [] }`, util.ToBase64([]byte(`access(all) fun main() {}`)))
 	tests := []struct {
 		height string
 		id     string
@@ -36,7 +36,7 @@ func TestGetScript_InvalidParse(t *testing.T) {
 func TestGetScript_ValidParse(t *testing.T) {
 	var getScript GetScript
 
-	source := "pub fun main() {}"
+	source := "access(all) fun main() {}"
 	validScript := strings.NewReader(fmt.Sprintf(`{ "script": "%s", "arguments": [] }`, util.ToBase64([]byte(source))))
 
 	err := getScript.Parse("1", "", validScript)

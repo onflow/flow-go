@@ -32,8 +32,11 @@ func extractExecutionState(
 	dir string,
 	targetHash flow.StateCommitment,
 	outputDir string,
-	nWorker int, // number of concurrent worker to migation payloads
+	nWorker int, // number of concurrent worker to migration payloads
 	runMigrations bool,
+	chainID flow.ChainID,
+	evmContractChange migrators.EVMContractChange,
+	stagedContractsFile string,
 ) error {
 
 	log.Info().Msg("init WAL")
@@ -70,7 +73,7 @@ func extractExecutionState(
 
 	log.Info().Msg("init compactor")
 
-	compactor, err := complete.NewCompactor(led, diskWal, log, complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	compactor, err := complete.NewCompactor(led, diskWal, log, complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), &metrics.NoopCollector{})
 	if err != nil {
 		return fmt.Errorf("cannot create compactor: %w", err)
 	}
@@ -86,27 +89,22 @@ func extractExecutionState(
 
 	var migrations []ledger.Migration
 
+	stagedContracts, err := migrators.StagedContractsFromCSV(stagedContractsFile)
+	if err != nil {
+		return err
+	}
+
 	if runMigrations {
 		rwf := reporters.NewReportFileWriterFactory(dir, log)
 
-		migrations = []ledger.Migration{
-			migrators.CreateAccountBasedMigration(
-				log,
-				nWorker,
-				[]migrators.AccountBasedMigration{
-					migrators.NewAtreeRegisterMigrator(
-						rwf,
-						flagValidateMigration,
-						flagLogVerboseValidationError,
-					),
-
-					&migrators.DeduplicateContractNamesMigration{},
-
-					// This will fix storage used discrepancies caused by the
-					// DeduplicateContractNamesMigration.
-					&migrators.AccountUsageMigrator{},
-				}),
-		}
+		migrations = migrators.NewCadence1Migrations(
+			log,
+			rwf,
+			nWorker,
+			chainID,
+			evmContractChange,
+			stagedContracts,
+		)
 	}
 
 	newState := ledger.State(targetHash)
@@ -159,9 +157,9 @@ func createCheckpoint(
 	outputDir,
 	outputFile string,
 ) (ledger.State, error) {
-	statecommitment := ledger.State(newTrie.RootHash())
+	stateCommitment := ledger.State(newTrie.RootHash())
 
-	log.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", statecommitment.String())
+	log.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", stateCommitment.String())
 
 	err := os.MkdirAll(outputDir, os.ModePerm)
 	if err != nil {
@@ -182,7 +180,7 @@ func createCheckpoint(
 	}
 
 	log.Info().Msgf("checkpoint file successfully stored at: %v %v", outputDir, outputFile)
-	return statecommitment, nil
+	return stateCommitment, nil
 }
 
 func writeStatusFile(fileName string, e error) error {

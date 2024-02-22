@@ -79,6 +79,13 @@ func ContractRegisterID(address Address, contractName string) RegisterID {
 	}
 }
 
+func RegisterIDContractName(registerID RegisterID) string {
+	if !strings.HasPrefix(registerID.Key, CodeKeyPrefix) {
+		return ""
+	}
+	return registerID.Key[len(CodeKeyPrefix):]
+}
+
 func CadenceRegisterID(owner []byte, key []byte) RegisterID {
 	return RegisterID{
 		Owner: addressToOwner(BytesToAddress(owner)),

@@ -89,7 +89,7 @@ func NewAddressFromString(str string) Address {
 	return NewAddressFromBytes([]byte(str))
 }
 
-var AddressBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.TheUInt8Type)
+var AddressBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.UInt8Type)
 var AddressBytesSemaType = sema.ByteArrayType
 
 func (a Address) ToCadenceValue() cadence.Array {

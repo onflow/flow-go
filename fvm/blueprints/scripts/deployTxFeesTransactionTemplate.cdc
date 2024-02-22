@@ -1,5 +1,5 @@
 transaction(code: String) {
-  prepare(flowFeesAccount: AuthAccount, serviceAccount: AuthAccount) {
+  prepare(flowFeesAccount: auth(AddContract) &Account, serviceAccount: auth(SaveValue) &Account) {
     let adminAccount = serviceAccount
     flowFeesAccount.contracts.add(name: "FlowFees", code: code.decodeHex(), adminAccount: adminAccount)
   }

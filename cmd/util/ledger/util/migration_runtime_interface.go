@@ -18,11 +18,9 @@ import (
 
 // MigrationRuntimeInterface is a runtime interface that can be used in migrations.
 type MigrationRuntimeInterface struct {
+	RuntimeInterfaceConfig
 	Accounts environment.Accounts
 	Programs *environment.Programs
-
-	// GetOrLoadProgramFunc allows for injecting extra logic
-	GetOrLoadProgramFunc func(location runtime.Location, load func() (*interpreter.Program, error)) (*interpreter.Program, error)
 }
 
 func (m MigrationRuntimeInterface) ResolveLocation(
@@ -101,12 +99,25 @@ func (m MigrationRuntimeInterface) GetCode(location runtime.Location) ([]byte, e
 }
 
 func (m MigrationRuntimeInterface) GetAccountContractCode(
-	l common.AddressLocation,
+	location common.AddressLocation,
 ) (code []byte, err error) {
-	return m.Accounts.GetContract(l.Name, flow.Address(l.Address))
+	// First look for staged contracts.
+	// If not found, then fall back to getting the code from storage.
+	if m.GetContractCodeFunc != nil {
+		code, err := m.GetContractCodeFunc(location)
+		if err != nil || code != nil {
+			// If the code was found, or if an error occurred, then return.
+			return code, err
+		}
+	}
+
+	return m.Accounts.GetContract(location.Name, flow.Address(location.Address))
 }
 
-func (m MigrationRuntimeInterface) GetOrLoadProgram(location runtime.Location, load func() (*interpreter.Program, error)) (*interpreter.Program, error) {
+func (m MigrationRuntimeInterface) GetOrLoadProgram(
+	location runtime.Location,
+	load func() (*interpreter.Program, error),
+) (*interpreter.Program, error) {
 	if m.GetOrLoadProgramFunc != nil {
 		return m.GetOrLoadProgramFunc(location, load)
 	}
@@ -292,4 +303,12 @@ func (m MigrationRuntimeInterface) GenerateAccountID(_ common.Address) (uint64, 
 
 func (m MigrationRuntimeInterface) RecordTrace(_ string, _ runtime.Location, _ time.Duration, _ []attribute.KeyValue) {
 	panic("unexpected RecordTrace call")
+}
+
+type RuntimeInterfaceConfig struct {
+	// GetOrLoadProgramFunc allows for injecting extra logic
+	GetOrLoadProgramFunc func(location runtime.Location, load func() (*interpreter.Program, error)) (*interpreter.Program, error)
+
+	// GetContractCodeFunc allows for injecting extra logic for code lookup
+	GetContractCodeFunc func(location runtime.Location) ([]byte, error)
 }

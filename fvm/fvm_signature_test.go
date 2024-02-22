@@ -86,7 +86,8 @@ func TestKeyListSignature(t *testing.T) {
 				`
                       import Crypto
 
-                      pub fun main(
+                      access(all)
+                      fun main(
                           rawPublicKeys: [[UInt8]],
                           message: [UInt8],
                           signatures: [[UInt8]],
@@ -121,11 +122,13 @@ func TestKeyListSignature(t *testing.T) {
                           return keyList.verify(
                               signatureSet: signatureSet,
                               signedData: message,
+                              domainSeparationTag: "%s"
                           )
                       }
                     `,
 				signatureAlgorithm.name,
 				hashAlgorithm.name,
+				tag,
 			),
 		)
 
@@ -403,7 +406,8 @@ func TestBLSMultiSignature(t *testing.T) {
 							`
 								import Crypto
 		
-								pub fun main(
+								access(all)
+								fun main(
 									publicKey: [UInt8],
 									proof: [UInt8]
 								): Bool {
@@ -512,7 +516,7 @@ func TestBLSMultiSignature(t *testing.T) {
 					`
 							import Crypto
 	
-							pub fun main(
+							access(all) fun main(
 							signatures: [[UInt8]],
 							): [UInt8]? {
 								return BLS.aggregateSignatures(signatures)!
@@ -551,7 +555,7 @@ func TestBLSMultiSignature(t *testing.T) {
 							Values: signatures,
 							ArrayType: &cadence.VariableSizedArrayType{
 								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type{},
+									ElementType: cadence.UInt8Type,
 								},
 							},
 						}),
@@ -583,7 +587,7 @@ func TestBLSMultiSignature(t *testing.T) {
 							Values: signatures,
 							ArrayType: &cadence.VariableSizedArrayType{
 								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type{},
+									ElementType: cadence.UInt8Type,
 								},
 							},
 						}),
@@ -606,7 +610,7 @@ func TestBLSMultiSignature(t *testing.T) {
 							Values: signatures,
 							ArrayType: &cadence.VariableSizedArrayType{
 								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type{},
+									ElementType: cadence.UInt8Type,
 								},
 							},
 						}),
@@ -637,7 +641,7 @@ func TestBLSMultiSignature(t *testing.T) {
 							`
 								import Crypto
 		
-								pub fun main(
+								access(all) fun main(
 									publicKeys: [[UInt8]]
 								): [UInt8]? {
 									let pks: [PublicKey] = []
@@ -676,7 +680,7 @@ func TestBLSMultiSignature(t *testing.T) {
 							Values: publicKeys,
 							ArrayType: &cadence.VariableSizedArrayType{
 								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type{},
+									ElementType: cadence.UInt8Type,
 								},
 							},
 						}),
@@ -710,7 +714,7 @@ func TestBLSMultiSignature(t *testing.T) {
 								Values: publicKeys,
 								ArrayType: &cadence.VariableSizedArrayType{
 									ElementType: &cadence.VariableSizedArrayType{
-										ElementType: cadence.UInt8Type{},
+										ElementType: cadence.UInt8Type,
 									},
 								},
 							}),
@@ -730,7 +734,7 @@ func TestBLSMultiSignature(t *testing.T) {
 							Values: publicKeys,
 							ArrayType: &cadence.VariableSizedArrayType{
 								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type{},
+									ElementType: cadence.UInt8Type,
 								},
 							},
 						}),
@@ -761,7 +765,7 @@ func TestBLSMultiSignature(t *testing.T) {
 				code := []byte(`
 							import Crypto
 
-							pub fun main(
+							access(all) fun main(
 								publicKeys: [[UInt8]],
 								signatures: [[UInt8]],
 								message:  [UInt8],
@@ -810,7 +814,7 @@ func TestBLSMultiSignature(t *testing.T) {
 						Values: publicKeys,
 						ArrayType: &cadence.VariableSizedArrayType{
 							ElementType: &cadence.VariableSizedArrayType{
-								ElementType: cadence.UInt8Type{},
+								ElementType: cadence.UInt8Type,
 							},
 						},
 					}),
@@ -818,7 +822,7 @@ func TestBLSMultiSignature(t *testing.T) {
 						Values: signatures,
 						ArrayType: &cadence.VariableSizedArrayType{
 							ElementType: &cadence.VariableSizedArrayType{
-								ElementType: cadence.UInt8Type{},
+								ElementType: cadence.UInt8Type,
 							},
 						},
 					}),

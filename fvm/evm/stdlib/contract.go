@@ -46,15 +46,18 @@ func ContractCode(flowTokenAddress flow.Address, evmAbiOnly bool) []byte {
 const ContractName = "EVM"
 const evmAddressTypeBytesFieldName = "bytes"
 const evmAddressTypeQualifiedIdentifier = "EVM.EVMAddress"
+const evmBalanceTypeQualifiedIdentifier = "EVM.Balance"
+const evmResultTypeQualifiedIdentifier = "EVM.Result"
+const evmStatusTypeQualifiedIdentifier = "EVM.Status"
 
 const abiEncodingByteSize = 32
 
-var EVMTransactionBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.TheUInt8Type)
+var EVMTransactionBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.UInt8Type)
 var evmTransactionBytesType = sema.NewVariableSizedType(nil, sema.UInt8Type)
 
 var evmAddressBytesType = sema.NewConstantSizedType(nil, sema.UInt8Type, types.AddressLength)
 var evmAddressBytesStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, evmAddressBytesType)
-var EVMAddressBytesCadenceType = cadence.NewConstantSizedArrayType(types.AddressLength, cadence.TheUInt8Type)
+var EVMAddressBytesCadenceType = cadence.NewConstantSizedArrayType(types.AddressLength, cadence.UInt8Type)
 
 // abiEncodingError
 type abiEncodingError struct {
@@ -310,14 +313,14 @@ func gethABIType(staticType interpreter.StaticType, evmAddressTypeID common.Type
 	}
 
 	switch staticType := staticType.(type) {
-	case interpreter.CompositeStaticType:
+	case *interpreter.CompositeStaticType:
 		if staticType.TypeID != evmAddressTypeID {
 			break
 		}
 
 		return gethTypeAddress, true
 
-	case interpreter.ConstantSizedStaticType:
+	case *interpreter.ConstantSizedStaticType:
 		elementGethABIType, ok := gethABIType(
 			staticType.ElementType(),
 			evmAddressTypeID,
@@ -332,7 +335,7 @@ func gethABIType(staticType interpreter.StaticType, evmAddressTypeID common.Type
 			Size: int(staticType.Size),
 		}, true
 
-	case interpreter.VariableSizedStaticType:
+	case *interpreter.VariableSizedStaticType:
 		elementGethABIType, ok := gethABIType(
 			staticType.ElementType(),
 			evmAddressTypeID,
@@ -389,7 +392,7 @@ func goType(
 	}
 
 	switch staticType := staticType.(type) {
-	case interpreter.ConstantSizedStaticType:
+	case *interpreter.ConstantSizedStaticType:
 		elementType, ok := goType(staticType.ElementType(), evmAddressTypeID)
 		if !ok {
 			break
@@ -397,7 +400,7 @@ func goType(
 
 		return reflect.ArrayOf(int(staticType.Size), elementType), true
 
-	case interpreter.VariableSizedStaticType:
+	case *interpreter.VariableSizedStaticType:
 		elementType, ok := goType(staticType.ElementType(), evmAddressTypeID)
 		if !ok {
 			break
@@ -529,11 +532,11 @@ func encodeABI(
 		var result reflect.Value
 
 		switch arrayStaticType := arrayStaticType.(type) {
-		case interpreter.ConstantSizedStaticType:
+		case *interpreter.ConstantSizedStaticType:
 			size := int(arrayStaticType.Size)
 			result = reflect.Indirect(reflect.New(reflect.ArrayOf(size, elementGoType)))
 
-		case interpreter.VariableSizedStaticType:
+		case *interpreter.VariableSizedStaticType:
 			size := value.Count()
 			result = reflect.MakeSlice(reflect.SliceOf(elementGoType), size, size)
 		}
@@ -866,7 +869,7 @@ func decodeABI(
 			},
 		), nil
 
-	case interpreter.CompositeStaticType:
+	case *interpreter.CompositeStaticType:
 		if staticType.TypeID != evmAddressTypeID {
 			break
 		}
@@ -926,7 +929,8 @@ var internalEVMTypeRunFunctionType = &sema.FunctionType{
 			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
 		},
 	},
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
+	// Actually EVM.Result, but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 
 func newInternalEVMTypeRunFunction(
@@ -967,10 +971,62 @@ func newInternalEVMTypeRunFunction(
 			// Run
 
 			cb := types.NewAddressFromBytes(coinbase)
-			handler.Run(transaction, cb)
+			result := handler.Run(transaction, cb)
 
-			return interpreter.Void
+			return NewResultValue(handler, gauge, inter, locationRange, result)
 		},
+	)
+}
+
+func NewResultValue(
+	handler types.ContractHandler,
+	gauge common.MemoryGauge,
+	inter *interpreter.Interpreter,
+	locationRange interpreter.LocationRange,
+	result *types.ResultSummary,
+) *interpreter.CompositeValue {
+	loc := common.NewAddressLocation(gauge, handler.EVMContractAddress(), ContractName)
+	return interpreter.NewCompositeValue(
+		inter,
+		locationRange,
+		loc,
+		evmResultTypeQualifiedIdentifier,
+		common.CompositeKindStructure,
+		[]interpreter.CompositeField{
+			{
+				Name: "status",
+				Value: interpreter.NewEnumCaseValue(
+					inter,
+					locationRange,
+					&sema.CompositeType{
+						Location:   loc,
+						Identifier: evmStatusTypeQualifiedIdentifier,
+						Kind:       common.CompositeKindEnum,
+					},
+					interpreter.NewUInt8Value(gauge, func() uint8 {
+						return uint8(result.Status)
+					}),
+					nil,
+				),
+			},
+			{
+				Name: "errorCode",
+				Value: interpreter.NewUInt64Value(gauge, func() uint64 {
+					return uint64(result.ErrorCode)
+				}),
+			},
+			{
+				Name: "gasUsed",
+				Value: interpreter.NewUInt64Value(gauge, func() uint64 {
+					return result.GasConsumed
+				}),
+			},
+			{
+				Name:  "data",
+				Value: interpreter.ByteSliceToByteArrayValue(inter, result.ReturnedValue),
+			},
+		},
+		common.ZeroAddress,
 	)
 }
 
@@ -1022,7 +1078,8 @@ var internalEVMTypeCallFunctionType = &sema.FunctionType{
 			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
 		},
 	},
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+	// Actually EVM.Result, but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 
 func AddressBytesArrayValueToEVMAddress(
@@ -1132,7 +1189,7 @@ func newInternalEVMTypeCallFunction(
 			account := handler.AccountByAddress(fromAddress, isAuthorized)
 			result := account.Call(toAddress, data, gasLimit, balance)
 
-			return interpreter.ByteSliceToByteArrayValue(inter, result)
+			return NewResultValue(handler, gauge, inter, locationRange, result)
 		},
 	)
 }
@@ -1683,13 +1740,61 @@ func NewEVMAddressCadenceType(address common.Address) *cadence.StructType {
 func NewBalanceCadenceType(address common.Address) *cadence.StructType {
 	return cadence.NewStructType(
 		common.NewAddressLocation(nil, address, ContractName),
-		"EVM.Balance",
+		evmBalanceTypeQualifiedIdentifier,
 		[]cadence.Field{
 			{
 				Identifier: "attoflow",
-				Type:       cadence.UIntType{},
+				Type:       cadence.UIntType,
 			},
 		},
 		nil,
 	)
+}
+
+func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, error) {
+	str, ok := val.(cadence.Struct)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected value type")
+	}
+	if len(str.Fields) != 4 {
+		return nil, fmt.Errorf("invalid input: field count mismatch")
+	}
+
+	statusEnum, ok := str.Fields[0].(cadence.Enum)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for status field")
+	}
+
+	status, ok := statusEnum.Fields[0].(cadence.UInt8)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for status field")
+	}
+
+	errorCode, ok := str.Fields[1].(cadence.UInt64)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for error code field")
+	}
+
+	gasUsed, ok := str.Fields[2].(cadence.UInt64)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for gas field")
+	}
+
+	data, ok := str.Fields[3].(cadence.Array)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for data field")
+	}
+
+	convertedData := make([]byte, len(data.Values))
+	for i, value := range data.Values {
+		convertedData[i] = value.(cadence.UInt8).ToGoValue().(uint8)
+	}
+
+	return &types.ResultSummary{
+		Status:        types.Status(status),
+		ErrorCode:     types.ErrorCode(errorCode),
+		GasConsumed:   uint64(gasUsed),
+		ReturnedValue: convertedData,
+	}, nil
+
 }

@@ -47,12 +47,12 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 							transaction(amount: UFix64, to: Address) {
 
 								// The Vault resource that holds the tokens that are being transferred
-								let sentVault: @FungibleToken.Vault
+								let sentVault: @{FungibleToken.Vault}
 
-								prepare(signer: AuthAccount) {
+								prepare(signer: auth(BorrowValue) &Account) {
 
 									// Get a reference to the signer's stored vault
-									let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
 
 									// Withdraw tokens from the signer's stored vault
@@ -65,8 +65,7 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 									let recipient = getAccount(to)
 
 									// Get a reference to the recipient's Receiver
-									let receiverRef = recipient.getCapability(/public/flowTokenReceiver)
-										.borrow<&{FungibleToken.Receiver}>()
+									let receiverRef = recipient.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 										?? panic("Could not borrow receiver reference to the recipient's Vault")
 
 									// Deposit the withdrawn tokens in the recipient's receiver
@@ -106,7 +105,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 		txBody := flow.NewTransactionBody().
 			SetScript([]byte(`
 	            transaction {
-	              prepare(signer: AuthAccount) {}
+	              prepare(signer: &Account) {}
 	            }
 	        `)).
 			AddAuthorizer(unittest.AddressFixture())
@@ -128,7 +127,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
                 transaction {
                   var x: Int
 
-                  prepare(signer: AuthAccount) {
+                  prepare(signer: &Account) {
                     self.x = 0
                   }
 
@@ -181,8 +180,8 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 		txBody := flow.NewTransactionBody().
 			SetScript([]byte(`
                 transaction {
-                  prepare(signer: AuthAccount) {
-                    AuthAccount(payer: signer)
+                  prepare(signer: auth(BorrowValue) &Account) {
+                    Account(payer: signer)
                   }
                 }
             `)).
@@ -292,9 +291,13 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		txBody = flow.NewTransactionBody().
 			SetScript([]byte(`
 				transaction {
-					prepare(signer: AuthAccount) {
+					prepare(signer: &Account) {
 						var s : String = ""
-						for name in signer.contracts.names {
+						let names = signer.contracts.names
+						var i = 0
+						while i < names.length {
+						    let name = names[i]
+						    i = i + 1
 							s = s.concat(name).concat(",")
 						}
 						if s != "Container," {
@@ -808,7 +811,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			label: "Parameters and authorizer",
 			script: `
                 transaction(x: Int, y: String) {
-                    prepare(acct: AuthAccount) { log(acct.address) }
+                    prepare(acct: &Account) { log(acct.address) }
                     execute { log(x); log(y) }
                 }`,
 			args:        [][]byte{arg1, arg2},
@@ -848,7 +851,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 }
 func gasLimitScript(depth int) string {
 	return fmt.Sprintf(`
-        pub fun foo(_ i: Int) {
+        access(all) fun foo(_ i: Int) {
             if i <= 0 {
                 return
             }
@@ -937,7 +940,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 	script := fmt.Sprintf(`
 			access(all) contract Container {
 				access(all) resource Counter {
-					pub var longString: String
+					access(all) var longString: String
 					init() {
 						self.longString = "%s"
 					}
@@ -1027,14 +1030,14 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 					import FlowToken from %s
 
 					transaction {
-						prepare(signer: AuthAccount, service: AuthAccount) {
+						prepare(signer: auth(AddContract) &Account, service: auth(BorrowValue) &Account) {
 							signer.contracts.add(name: "%s", code: "%s".decodeHex())
 
-							let vaultRef = service.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!
+							let vaultRef = service.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)!
 							// deposit additional flow
 							let payment <- vaultRef.withdraw(amount: 10.0) as! @FlowToken.Vault
 
-							let receiver = signer.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>()
+							let receiver = signer.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 								?? panic("Could not borrow receiver reference to the recipient's Vault")
 							receiver.deposit(from: <-payment)
 						}
@@ -1079,7 +1082,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 	script := fmt.Sprintf(`
 			access(all) contract Container {
 				access(all) resource Counter {
-					pub var longString: String
+					access(all) var longString: String
 					init() {
 						self.longString = "%s"
 					}
@@ -1268,8 +1271,8 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 
 var createAccountScript = []byte(`
     transaction {
-        prepare(signer: AuthAccount) {
-            let acct = AuthAccount(payer: signer)
+        prepare(signer: auth(BorrowValue) &Account) {
+            let acct = Account(payer: signer)
         }
     }
 `)
@@ -1287,7 +1290,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	t.Run("script success", func(t *testing.T) {
 		code := []byte(`
-            pub fun main(): Int {
+            access(all) fun main(): Int {
                 return 42
             }
         `)
@@ -1303,7 +1306,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	t.Run("script failure", func(t *testing.T) {
 		code := []byte(`
-            pub fun main(): Int {
+            access(all) fun main(): Int {
                 assert(1 == 2)
                 return 42
             }
@@ -1320,7 +1323,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	t.Run("script logs", func(t *testing.T) {
 		code := []byte(`
-            pub fun main(): Int {
+            access(all) fun main(): Int {
                 log("foo")
                 log("bar")
                 return 42
@@ -1356,17 +1359,17 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 		// Deploy the test contract
 
 		const contract = `
-			pub contract Test {
+			access(all) contract Test {
 
-				pub struct Foo {}
+				access(all) struct Foo {}
 
-                pub let foos: [Foo]
+                access(all) let foos: [Foo]
 
 				init() {
 					self.foos = []
 				}
 
-				pub fun add() {
+				access(all) fun add() {
 					self.foos.append(Foo())
 				}
 			}
@@ -1407,7 +1410,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 			`
 			  import Test from 0x%s
 
-			  pub fun main() {
+			  access(all) fun main() {
 			      Test.add()
 			  }
 			`,
@@ -1497,7 +1500,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 	t.Run("works as script", func(t *testing.T) {
 		code := []byte(`
-            pub fun main() {
+            access(all) fun main() {
                 let block = getCurrentBlock()
                 log(block)
 
@@ -1561,7 +1564,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 	t.Run("panics if external function panics in script", func(t *testing.T) {
 		script := []byte(`
-            pub fun main() {
+            access(all) fun main() {
                 let block = getCurrentBlock()
                 let nextBlock = getBlock(at: block.height + UInt64(2))
             }
@@ -1688,19 +1691,19 @@ func TestBlockContext_Random(t *testing.T) {
 		fvm.WithCadenceLogging(true),
 	)
 
-	tx_code := []byte(`
+	txCode := []byte(`
 	transaction {
 		execute {
-			let rand1 = unsafeRandom()
+			let rand1 = revertibleRandom<UInt64>()
 			log(rand1)
-			let rand2 = unsafeRandom()
+			let rand2 = revertibleRandom<UInt64>()
 			log(rand2)
 		}
 	}
 	`)
 
 	getTxRandoms := func(t *testing.T) [2]uint64 {
-		txBody := flow.NewTransactionBody().SetScript(tx_code)
+		txBody := flow.NewTransactionBody().SetScript(txCode)
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		require.NoError(t, err)
 
@@ -1734,19 +1737,19 @@ func TestBlockContext_Random(t *testing.T) {
 		require.NotEqual(t, randoms1[0], randoms2[0], "extremely unlikely to be equal")
 	})
 
-	script_string := `
-	pub fun main(a: Int8) {
-		let rand = unsafeRandom()
+	scriptCode := `
+	access(all)
+	fun main(a: Int8) {
+		let rand = revertibleRandom<UInt64>()
 		log(rand)
-		let rand%d = unsafeRandom()
-		log(rand%d)
+		let rand%[1]d = revertibleRandom<UInt64>()
+		log(rand%[1]d)
 	}
 	`
 
 	getScriptRandoms := func(t *testing.T, codeSalt int, arg int) [2]uint64 {
-		script_code := []byte(fmt.Sprintf(script_string, codeSalt, codeSalt))
-		script := fvm.Script(script_code).WithArguments(
-			jsoncdc.MustEncode(cadence.Int8(arg)))
+		script := fvm.Script([]byte(fmt.Sprintf(scriptCode, codeSalt))).
+			WithArguments(jsoncdc.MustEncode(cadence.Int8(arg)))
 
 		_, output, err := vm.Run(ctx, script, testutil.RootBootstrappedLedger(vm, ctx))
 		require.NoError(t, err)
@@ -1835,10 +1838,9 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
 
-					pub fun main(account: Address): UFix64 {
+					access(all) fun main(account: Address): UFix64 {
 						let acct = getAccount(account)
-						let vaultRef = acct.getCapability(/public/flowTokenBalance)
-							.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
+						let vaultRef = acct.capabilities.borrow<&FlowToken.Vault>(/public/flowTokenBalance)
 							?? panic("Could not borrow Balance reference to the Vault")
 
 						return vaultRef.balance

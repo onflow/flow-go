@@ -35,8 +35,8 @@ const (
 	ComputationKindRemoveAccountContractCode
 	ComputationKindResolveLocation
 	ComputationKindRevokeAccountKey
-	ComputationKindRevokeEncodedAccountKey
-	_
+	_ // removed, DO NOT REUSE
+	_ // removed, DO NOT REUSE
 	ComputationKindSetValue
 	ComputationKindUpdateAccountContractCode
 	ComputationKindValidatePublicKey
@@ -56,6 +56,17 @@ const (
 	ComputationKindEVMEncodeABI
 	ComputationKindEVMDecodeABI
 )
+
+// MainnetExecutionEffortWeights are the execution effort weights as they are
+// on mainnet from 18.8.2022
+var MainnetExecutionEffortWeights = meter.ExecutionEffortWeights{
+	common.ComputationKindStatement:          1569,
+	common.ComputationKindLoop:               1569,
+	common.ComputationKindFunctionInvocation: 1569,
+	ComputationKindGetValue:                  808,
+	ComputationKindCreateAccount:             2837670,
+	ComputationKindSetValue:                  765,
+}
 
 type Meter interface {
 	MeterComputation(common.ComputationKind, uint) error

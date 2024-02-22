@@ -100,6 +100,7 @@ func init() {
 type TransactionExecutedPayload struct {
 	BlockHeight uint64
 	TxEncoded   []byte
+	BlockHash   gethCommon.Hash
 	TxHash      gethCommon.Hash
 	Result      *Result
 }
@@ -119,21 +120,23 @@ func (p *TransactionExecutedPayload) CadenceEvent() (cadence.Event, error) {
 			EVMLocation{},
 			string(EventTypeTransactionExecuted),
 			[]cadence.Field{
-				cadence.NewField("blockHeight", cadence.UInt64Type{}),
-				cadence.NewField("transactionHash", cadence.StringType{}),
-				cadence.NewField("transaction", cadence.StringType{}),
-				cadence.NewField("failed", cadence.BoolType{}),
-				cadence.NewField("vmError", cadence.StringType{}),
-				cadence.NewField("transactionType", cadence.UInt8Type{}),
-				cadence.NewField("gasConsumed", cadence.UInt64Type{}),
-				cadence.NewField("deployedContractAddress", cadence.StringType{}),
-				cadence.NewField("returnedValue", cadence.StringType{}),
-				cadence.NewField("logs", cadence.StringType{}),
+				cadence.NewField("blockHeight", cadence.UInt64Type),
+				cadence.NewField("blockHash", cadence.StringType),
+				cadence.NewField("transactionHash", cadence.StringType),
+				cadence.NewField("transaction", cadence.StringType),
+				cadence.NewField("failed", cadence.BoolType),
+				cadence.NewField("vmError", cadence.StringType),
+				cadence.NewField("transactionType", cadence.UInt8Type),
+				cadence.NewField("gasConsumed", cadence.UInt64Type),
+				cadence.NewField("deployedContractAddress", cadence.StringType),
+				cadence.NewField("returnedValue", cadence.StringType),
+				cadence.NewField("logs", cadence.StringType),
 			},
 			nil,
 		),
 		Fields: []cadence.Value{
 			cadence.NewUInt64(p.BlockHeight),
+			cadence.String(p.BlockHash.String()),
 			cadence.String(p.TxHash.String()),
 			cadence.String(hex.EncodeToString(p.TxEncoded)),
 			cadence.Bool(p.Result.Failed()),
@@ -150,6 +153,7 @@ func (p *TransactionExecutedPayload) CadenceEvent() (cadence.Event, error) {
 func NewTransactionExecutedEvent(
 	height uint64,
 	txEncoded []byte,
+	blockHash gethCommon.Hash,
 	txHash gethCommon.Hash,
 	result *Result,
 ) *Event {
@@ -157,6 +161,7 @@ func NewTransactionExecutedEvent(
 		Etype: EventTypeTransactionExecuted,
 		Payload: &TransactionExecutedPayload{
 			BlockHeight: height,
+			BlockHash:   blockHash,
 			TxEncoded:   txEncoded,
 			TxHash:      txHash,
 			Result:      result,
@@ -168,14 +173,14 @@ var blockExecutedEventCadenceType = &cadence.EventType{
 	Location:            EVMLocation{},
 	QualifiedIdentifier: string(EventTypeBlockExecuted),
 	Fields: []cadence.Field{
-		cadence.NewField("height", cadence.UInt64Type{}),
-		cadence.NewField("hash", cadence.StringType{}),
-		cadence.NewField("totalSupply", cadence.IntType{}),
-		cadence.NewField("parentHash", cadence.StringType{}),
-		cadence.NewField("receiptRoot", cadence.StringType{}),
+		cadence.NewField("height", cadence.UInt64Type),
+		cadence.NewField("hash", cadence.StringType),
+		cadence.NewField("totalSupply", cadence.IntType),
+		cadence.NewField("parentHash", cadence.StringType),
+		cadence.NewField("receiptRoot", cadence.StringType),
 		cadence.NewField(
 			"transactionHashes",
-			cadence.NewVariableSizedArrayType(cadence.StringType{}),
+			cadence.NewVariableSizedArrayType(cadence.StringType),
 		),
 	},
 }
@@ -201,7 +206,7 @@ func (p *BlockExecutedEventPayload) CadenceEvent() (cadence.Event, error) {
 		cadence.NewIntFromBig(p.Block.TotalSupply),
 		cadence.String(p.Block.ParentBlockHash.String()),
 		cadence.String(p.Block.ReceiptRoot.String()),
-		cadence.NewArray(hashes).WithType(cadence.NewVariableSizedArrayType(cadence.StringType{})),
+		cadence.NewArray(hashes).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
 	}
 
 	return cadence.

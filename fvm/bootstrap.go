@@ -329,7 +329,9 @@ func (b *bootstrapExecutor) Preprocess() error {
 }
 
 func (b *bootstrapExecutor) Execute() error {
-	b.rootBlock = flow.Genesis(flow.ChainID(b.ctx.Chain.String())).Header
+	if b.rootBlock == nil {
+		b.rootBlock = flow.Genesis(b.ctx.Chain.ChainID()).Header
+	}
 
 	// initialize the account addressing state
 	b.accountCreator = environment.NewBootstrapAccountCreator(
@@ -339,9 +341,15 @@ func (b *bootstrapExecutor) Execute() error {
 
 	service := b.createServiceAccount()
 
-	fungibleToken := b.deployFungibleToken()
-	nonFungibleToken := b.deployNonFungibleToken(service)
-	b.deployMetadataViews(fungibleToken, nonFungibleToken)
+	b.deployViewResolver(service)
+	b.deployBurner(service)
+
+	fungibleToken := b.deployFungibleToken(service, service)
+	nonFungibleToken := b.deployNonFungibleToken(service, service)
+
+	b.deployMetadataViews(fungibleToken, nonFungibleToken, service)
+	b.deployFungibleTokenSwitchboard(fungibleToken)
+
 	flowToken := b.deployFlowToken(service, fungibleToken, nonFungibleToken)
 	storageFees := b.deployStorageFees(service, fungibleToken, flowToken)
 	feeContract := b.deployFlowFees(service, fungibleToken, flowToken, storageFees)
@@ -380,7 +388,7 @@ func (b *bootstrapExecutor) Execute() error {
 
 	b.deployQC(service)
 
-	b.deployIDTableStaking(service, fungibleToken, flowToken, feeContract)
+	b.deployIDTableStaking(service, fungibleToken, flowToken, feeContract, service)
 
 	b.deployEpoch(service, fungibleToken, flowToken, feeContract)
 
@@ -427,37 +435,59 @@ func (b *bootstrapExecutor) createServiceAccount() flow.Address {
 	return address
 }
 
-func (b *bootstrapExecutor) deployFungibleToken() flow.Address {
+func (b *bootstrapExecutor) deployFungibleToken(viewResolver, burner flow.Address) flow.Address {
 	fungibleToken := b.createAccount(b.accountKeys.FungibleTokenAccountPublicKeys)
 
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployFungibleTokenContractTransaction(fungibleToken),
+			blueprints.DeployFungibleTokenContractTransaction(fungibleToken, viewResolver, burner),
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy fungible token contract: %s", txError, err)
 	return fungibleToken
 }
 
-func (b *bootstrapExecutor) deployNonFungibleToken(deployTo flow.Address) flow.Address {
+func (b *bootstrapExecutor) deployNonFungibleToken(deployTo, viewResolver flow.Address) flow.Address {
 
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployNonFungibleTokenContractTransaction(deployTo),
+			blueprints.DeployNonFungibleTokenContractTransaction(deployTo, viewResolver),
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy non-fungible token contract: %s", txError, err)
 	return deployTo
 }
 
-func (b *bootstrapExecutor) deployMetadataViews(fungibleToken, nonFungibleToken flow.Address) {
+func (b *bootstrapExecutor) deployViewResolver(deployTo flow.Address) {
 
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployMetadataViewsContractTransaction(fungibleToken, nonFungibleToken),
+			blueprints.DeployViewResolverContractTransaction(deployTo),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy view resolver contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployBurner(deployTo flow.Address) {
+
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployBurnerContractTransaction(deployTo),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy burner contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployMetadataViews(fungibleToken, nonFungibleToken, viewResolver flow.Address) {
+
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployMetadataViewsContractTransaction(fungibleToken, nonFungibleToken, viewResolver),
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy metadata views contract: %s", txError, err)
@@ -465,18 +495,21 @@ func (b *bootstrapExecutor) deployMetadataViews(fungibleToken, nonFungibleToken 
 	txError, err = b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployViewResolverContractTransaction(nonFungibleToken),
-			0),
-	)
-	panicOnMetaInvokeErrf("failed to deploy view resolver contract: %s", txError, err)
-
-	txError, err = b.invokeMetaTransaction(
-		b.ctx,
-		Transaction(
-			blueprints.DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken, nonFungibleToken),
+			blueprints.DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken, nonFungibleToken, viewResolver),
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy fungible token metadata views contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployFungibleTokenSwitchboard(tokenStandardAccount flow.Address) {
+
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployFungibleTokenSwitchboardContractTransaction(tokenStandardAccount),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy fungible token switchboard contract: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) deployFlowToken(service, fungibleToken, metadataViews flow.Address) flow.Address {
@@ -569,12 +602,13 @@ func (b *bootstrapExecutor) deployQC(service flow.Address) {
 	panicOnMetaInvokeErrf("failed to deploy QC contract: %s", txError, err)
 }
 
-func (b *bootstrapExecutor) deployIDTableStaking(service, fungibleToken, flowToken, flowFees flow.Address) {
+func (b *bootstrapExecutor) deployIDTableStaking(service, fungibleToken, flowToken, flowFees, burner flow.Address) {
 
 	contract := contracts.FlowIDTableStaking(
 		fungibleToken.HexWithPrefix(),
 		flowToken.HexWithPrefix(),
 		flowFees.HexWithPrefix(),
+		burner.HexWithPrefix(),
 		true)
 
 	txError, err := b.invokeMetaTransaction(
@@ -876,6 +910,7 @@ func (b *bootstrapExecutor) registerNodes(service, fungibleToken, flowToken flow
 			b.ctx,
 			Transaction(blueprints.RegisterNodeTransaction(service,
 				flowToken,
+				fungibleToken,
 				nodeAddress,
 				id),
 				0),

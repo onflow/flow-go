@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -52,7 +53,11 @@ func TestValidateCadenceValues(t *testing.T) {
 				accountStatus.ToBytes(),
 			)
 
-			mr, err := newMigratorRuntime(address, []*ledger.Payload{accountStatusPayload})
+			mr, err := newMigratorRuntime(
+				address,
+				[]*ledger.Payload{accountStatusPayload},
+				util.RuntimeInterfaceConfig{},
+			)
 			require.NoError(t, err)
 
 			// Create new storage map
@@ -62,7 +67,7 @@ func TestValidateCadenceValues(t *testing.T) {
 			nestedArray := interpreter.NewArrayValue(
 				mr.Interpreter,
 				interpreter.EmptyLocationRange,
-				interpreter.VariableSizedStaticType{
+				&interpreter.VariableSizedStaticType{
 					Type: interpreter.PrimitiveStaticTypeUInt64,
 				},
 				address,
@@ -76,7 +81,7 @@ func TestValidateCadenceValues(t *testing.T) {
 				interpreter.NewArrayValue(
 					mr.Interpreter,
 					interpreter.EmptyLocationRange,
-					interpreter.VariableSizedStaticType{
+					&interpreter.VariableSizedStaticType{
 						Type: interpreter.PrimitiveStaticTypeAnyStruct,
 					},
 					address,
@@ -140,7 +145,11 @@ func createTestPayloads(t *testing.T, address common.Address, domain string) []*
 		accountStatus.ToBytes(),
 	)
 
-	mr, err := newMigratorRuntime(address, []*ledger.Payload{accountStatusPayload})
+	mr, err := newMigratorRuntime(
+		address,
+		[]*ledger.Payload{accountStatusPayload},
+		util.RuntimeInterfaceConfig{},
+	)
 	require.NoError(t, err)
 
 	// Create new storage map
@@ -168,7 +177,7 @@ func createTestPayloads(t *testing.T, address common.Address, domain string) []*
 		interpreter.StringStorageMapKey(strconv.FormatUint(storageMap.Count(), 10)),
 		interpreter.NewArrayValueWithIterator(
 			mr.Interpreter,
-			interpreter.VariableSizedStaticType{
+			&interpreter.VariableSizedStaticType{
 				Type: interpreter.PrimitiveStaticTypeAnyStruct,
 			},
 			address,
@@ -199,7 +208,7 @@ func createTestPayloads(t *testing.T, address common.Address, domain string) []*
 		interpreter.NewDictionaryValueWithAddress(
 			mr.Interpreter,
 			interpreter.EmptyLocationRange,
-			interpreter.DictionaryStaticType{
+			&interpreter.DictionaryStaticType{
 				KeyType:   interpreter.PrimitiveStaticTypeUInt64,
 				ValueType: interpreter.PrimitiveStaticTypeString,
 			},
@@ -230,7 +239,7 @@ func createTestPayloads(t *testing.T, address common.Address, domain string) []*
 	nestedArrayValue := interpreter.NewArrayValue(
 		mr.Interpreter,
 		interpreter.EmptyLocationRange,
-		interpreter.VariableSizedStaticType{
+		&interpreter.VariableSizedStaticType{
 			Type: interpreter.PrimitiveStaticTypeUInt64,
 		},
 		address,
@@ -243,7 +252,7 @@ func createTestPayloads(t *testing.T, address common.Address, domain string) []*
 		interpreter.NewArrayValue(
 			mr.Interpreter,
 			interpreter.EmptyLocationRange,
-			interpreter.VariableSizedStaticType{
+			&interpreter.VariableSizedStaticType{
 				Type: interpreter.PrimitiveStaticTypeAnyStruct,
 			},
 			address,

@@ -43,9 +43,9 @@ func TestEVMRun(t *testing.T) {
 					import EVM from %s
 
 					access(all)
-					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
+					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
 						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-						EVM.run(tx: tx, coinbase: coinbase)
+						return EVM.run(tx: tx, coinbase: coinbase)
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
@@ -79,6 +79,11 @@ func TestEVMRun(t *testing.T) {
 					snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
+
+				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+				require.Equal(t, types.StatusSuccessful, res.Status)
+				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 			})
 	})
 }
@@ -102,8 +107,8 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 				access(all)
 				fun main() {
-					let admin = getAuthAccount(%s)
-						.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+					let admin = getAuthAccount<auth(BorrowValue) &Account>(%s)
+						.storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
 					let minter <- admin.createNewMinter(allowedAmount: 1.23)
 					let vault <- minter.mintTokens(amount: 1.23)
 					destroy minter
@@ -152,8 +157,8 @@ func TestCOAWithdraw(t *testing.T) {
 
 				access(all)
 				fun main(): UFix64 {
-					let admin = getAuthAccount(%s)
-						.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+					let admin = getAuthAccount<auth(BorrowValue) &Account>(%s)
+						.storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
 					let minter <- admin.createNewMinter(allowedAmount: 2.34)
 					let vault <- minter.mintTokens(amount: 2.34)
 					destroy minter
@@ -161,7 +166,7 @@ func TestCOAWithdraw(t *testing.T) {
 					let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
 					cadenceOwnedAccount.deposit(from: <-vault)
 
-					let bal = EVM.Balance(0)
+					let bal = EVM.Balance(attoflow: 0)
 					bal.setFLOW(flow: 1.23)
 					let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
 					let balance = vault2.balance
@@ -209,8 +214,8 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 
 				access(all)
 				fun main(): [UInt8; 20] {
-					let admin = getAuthAccount(%s)
-						.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+					let admin = getAuthAccount<auth(BorrowValue) &Account>(%s)
+						.storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
 					let minter <- admin.createNewMinter(allowedAmount: 2.34)
 					let vault <- minter.mintTokens(amount: 2.34)
 					destroy minter
@@ -329,12 +334,17 @@ func TestCadenceArch(t *testing.T) {
 					import EVM from %s
 
 					transaction {
-						prepare(account: AuthAccount) {
-							let cadenceOwnedAccount1 <- EVM.createCadenceOwnedAccount()
-							account.save<@EVM.CadenceOwnedAccount>(<-cadenceOwnedAccount1,
-																to: /storage/coa)
-							account.link<&EVM.CadenceOwnedAccount{EVM.Addressable}>(/public/coa,
-																				target: /storage/coa)
+						prepare(account: auth(Capabilities, SaveValue) &Account) {
+							let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+
+							account.storage.save(
+                                <-cadenceOwnedAccount,
+								to: /storage/coa
+                            )
+
+							let cap = account.capabilities.storage
+							    .issue<&EVM.CadenceOwnedAccount>(/storage/coa)
+							account.capabilities.publish(cap, at: /public/coa)
 						}
 					}
                 `,

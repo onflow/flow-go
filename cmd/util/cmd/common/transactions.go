@@ -12,7 +12,7 @@ import (
 const (
 	getInfoForProposedNodesScript = `
 		import FlowIDTableStaking from 0xIDENTITYTABLEADDRESS
-		pub fun main(): [FlowIDTableStaking.NodeInfo] {
+		access(all) fun main(): [FlowIDTableStaking.NodeInfo] {
 			let nodeIDs = FlowIDTableStaking.getProposedNodeIDs()
 		
 			var infos: [FlowIDTableStaking.NodeInfo] = []
