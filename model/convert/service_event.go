@@ -16,6 +16,9 @@ import (
 // ServiceEvent converts a service event encoded as the generic flow.Event
 // type to a flow.ServiceEvent type for use within protocol software and protocol
 // state. This acts as the conversion from the Cadence type to the flow-go type.
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
 func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, error) {
 
 	events := systemcontracts.ServiceEventsForChain(chainID)

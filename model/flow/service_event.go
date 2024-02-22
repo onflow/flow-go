@@ -73,9 +73,11 @@ func (sel ServiceEventList) EqualTo(other ServiceEventList) (bool, error) {
 type ServiceEventMarshaller interface {
 	// UnmarshalWrapped unmarshals the service event and returns it as a wrapped ServiceEvent type.
 	// The input bytes must be encoded as a generic wrapped ServiceEvent type.
+	// Forwards errors from the underlying marshaller (treat errors as you would from eg. json.Unmarshal)
 	UnmarshalWrapped(b []byte) (ServiceEvent, error)
 	// UnmarshalWithType unmarshals the service event and returns it as a wrapped ServiceEvent type.
 	// The input bytes must be encoded as a specific event type (for example, EpochSetup).
+	// Forwards errors from the underlying marshaller (treat errors as you would from eg. json.Unmarshal)
 	UnmarshalWithType(b []byte, eventType ServiceEventType) (ServiceEvent, error)
 }
 
@@ -105,6 +107,7 @@ var (
 
 // UnmarshalWrapped unmarshals the service event and returns it as a wrapped ServiceEvent type.
 // The input bytes must be encoded as a generic wrapped ServiceEvent type.
+// Forwards errors from the underlying marshaller (treat errors as you would from eg. json.Unmarshal)
 func (marshaller marshallerImpl) UnmarshalWrapped(b []byte) (ServiceEvent, error) {
 	var eventTypeWrapper struct {
 		Type ServiceEventType
@@ -140,7 +143,7 @@ func (marshaller marshallerImpl) UnmarshalWrapped(b []byte) (ServiceEvent, error
 
 // unmarshalWrapped is a helper function for UnmarshalWrapped which unmarshals the
 // Event portion of a ServiceEvent into a specific typed structure.
-// No errors are expected during normal operation.
+// Forwards errors from the underlying marshaller (treat errors as you would from eg. json.Unmarshal)
 func unmarshalWrapped[E any](b []byte, marshaller marshallerImpl) (*E, error) {
 	eventWrapper := serviceEventUnmarshalWrapper[E]{}
 	err := marshaller.unmarshalFunc(b, &eventWrapper)
@@ -153,6 +156,7 @@ func unmarshalWrapped[E any](b []byte, marshaller marshallerImpl) (*E, error) {
 
 // UnmarshalWithType unmarshals the service event and returns it as a wrapped ServiceEvent type.
 // The input bytes must be encoded as a specific event type (for example, EpochSetup).
+// Forwards errors from the underlying marshaller (treat errors as you would from eg. json.Unmarshal)
 func (marshaller marshallerImpl) UnmarshalWithType(b []byte, eventType ServiceEventType) (ServiceEvent, error) {
 	var event interface{}
 	switch eventType {
@@ -211,6 +215,9 @@ func (se *ServiceEvent) UnmarshalCBOR(b []byte) error {
 	return nil
 }
 
+// EqualTo checks whether two service events are equal, as defined by the underlying Event type.
+// Inputs must have already been independently validated and well-formed.
+// No errors are expected during normal operation.
 func (se *ServiceEvent) EqualTo(other *ServiceEvent) (bool, error) {
 	if se.Type != other.Type {
 		return false, nil
