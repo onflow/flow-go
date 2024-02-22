@@ -1218,7 +1218,9 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 				fnb.Logger,
 				fnb.NetworkKey,
 				fnb.SporkID,
-				fnb.LibP2PNode,
+				func() p2p.LibP2PNode {
+					return fnb.LibP2PNode
+				},
 				idCache,
 			)
 			if err != nil {
