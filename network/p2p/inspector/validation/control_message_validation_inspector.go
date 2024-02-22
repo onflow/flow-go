@@ -62,8 +62,6 @@ type ControlMsgValidationInspector struct {
 	metrics module.GossipSubRpcValidationInspectorMetrics
 	// config control message validation configurations.
 	config *p2pconfig.RpcValidationInspector
-	// distributor used to disseminate invalid RPC message notifications.
-	distributor p2p.GossipSubInspectorNotifDistributor
 	// workerPool queue that stores *InspectRPCRequest that will be processed by component workers.
 	workerPool *worker.Pool[*InspectRPCRequest]
 	// tracker is a map that associates the hash of a peer's ID with the
@@ -81,6 +79,10 @@ type ControlMsgValidationInspector struct {
 	networkingType network.NetworkingType
 	// topicOracle callback used to retrieve the current subscribed topics of the libp2p node.
 	topicOracle func() p2p.TopicProvider
+	// notificationConsumer the consumer that will be notified when a misbehavior is detected upon inspection of an RPC.
+	// For each RPC, at most one notification is sent to the consumer.
+	// Each notification acts as a penalty to the peer's score.
+	notificationConsumer p2p.GossipSubInvCtrlMsgNotifConsumer
 }
 
 type InspectorParams struct {
@@ -90,8 +92,6 @@ type InspectorParams struct {
 	SporkID flow.Identifier `validate:"required"`
 	// Config inspector configuration.
 	Config *p2pconfig.RpcValidationInspector `validate:"required"`
-	// Distributor gossipsub inspector notification distributor.
-	Distributor p2p.GossipSubInspectorNotifDistributor `validate:"required"`
 	// HeroCacheMetricsFactory the metrics factory.
 	HeroCacheMetricsFactory metrics.HeroCacheMetricsFactory `validate:"required"`
 	// IdProvider identity provider is used to get the flow identifier for a peer.
@@ -105,10 +105,15 @@ type InspectorParams struct {
 	// TopicOracle callback used to retrieve the current subscribed topics of the libp2p node.
 	// It is set as a callback to avoid circular dependencies between the topic oracle and the inspector.
 	TopicOracle func() p2p.TopicProvider `validate:"required"`
+
+	// InvalidControlMessageNotificationConsumer the consumer that will be notified when a misbehavior is detected upon inspection of an RPC.
+	// For each RPC, at most one notification is sent to the consumer.
+	// Each notification acts as a penalty to the peer's score.
+	InvalidControlMessageNotificationConsumer p2p.GossipSubInvCtrlMsgNotifConsumer `validate:"required"`
 }
 
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
-var _ p2p.GossipSubMsgValidationRpcInspector = (*ControlMsgValidationInspector)(nil)
+var _ p2p.GossipSubRPCInspector = (*ControlMsgValidationInspector)(nil)
 var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 
 // NewControlMsgValidationInspector returns new ControlMsgValidationInspector
@@ -143,16 +148,16 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 	}
 
 	c := &ControlMsgValidationInspector{
-		logger:         lg,
-		sporkID:        params.SporkID,
-		config:         params.Config,
-		distributor:    params.Distributor,
-		tracker:        clusterPrefixedTracker,
-		rpcTracker:     params.RpcTracker,
-		idProvider:     params.IdProvider,
-		metrics:        params.InspectorMetrics,
-		networkingType: params.NetworkingType,
-		topicOracle:    params.TopicOracle,
+		logger:               lg,
+		sporkID:              params.SporkID,
+		config:               params.Config,
+		tracker:              clusterPrefixedTracker,
+		rpcTracker:           params.RpcTracker,
+		idProvider:           params.IdProvider,
+		metrics:              params.InspectorMetrics,
+		networkingType:       params.NetworkingType,
+		topicOracle:          params.TopicOracle,
+		notificationConsumer: params.InvalidControlMessageNotificationConsumer,
 	}
 
 	store := queue.NewHeroStore(params.Config.InspectionQueue.Size, params.Logger, inspectMsgQueueCacheCollector)
@@ -162,22 +167,6 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 	c.workerPool = pool
 
 	builder := component.NewComponentManagerBuilder()
-	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		c.logger.Debug().Msg("starting rpc inspector distributor")
-		c.ctx = ctx
-		c.distributor.Start(ctx)
-		select {
-		case <-ctx.Done():
-			c.logger.Debug().Msg("rpc inspector distributor startup aborted; context cancelled")
-		case <-c.distributor.Ready():
-			c.logger.Debug().Msg("rpc inspector distributor started")
-			ready()
-		}
-		<-ctx.Done()
-		c.logger.Debug().Msg("rpc inspector distributor stopped")
-		<-c.distributor.Done()
-		c.logger.Debug().Msg("rpc inspector distributor shutdown complete")
-	})
 	for i := 0; i < c.config.InspectionQueue.NumberOfWorkers; i++ {
 		builder.AddWorker(pool.WorkerLogic())
 	}
@@ -1081,14 +1070,8 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *In
 		c.metrics.OnUnstakedPeerInspectionFailed()
 		lg.Warn().Msg("control message received from unstaked peer")
 	default:
-		distErr := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, err, count, topicType))
-		if distErr != nil {
-			lg.Error().
-				Err(distErr).
-				Msg("failed to distribute invalid control message notification")
-			return
-		}
-		lg.Error().Msg("rpc control message async inspection failed")
+		c.notificationConsumer.OnInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, err, count, topicType))
+		lg.Error().Msg("rpc control message async inspection failed, notification sent")
 		c.metrics.OnInvalidControlMessageNotificationSent()
 	}
 }
