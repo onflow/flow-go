@@ -3,7 +3,6 @@ package access_test
 import (
 	"context"
 	"encoding/json"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"os"
 	"testing"
 
@@ -39,6 +38,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -688,7 +688,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 		// 3. Request engine is used to request missing collection
 		suite.request.On("EntityByID", collection.ID(), mock.Anything).Return()
 		// 4. Ingest engine receives the requested collection and all the execution receipts
-		indexer.HandleCollection(collection, collections, transactions, suite.log)
+		err = indexer.HandleCollection(collection, collections, transactions, suite.log)
+		require.NoError(suite.T(), err)
 
 		for _, r := range executionReceipts {
 			err = ingestEng.Process(channels.ReceiveReceipts, enNodeIDs[0], r)
@@ -827,7 +828,8 @@ func (suite *Suite) TestGetTransactionResult() {
 			ingestEng.OnFinalizedBlock(mb)
 
 			// Ingest engine receives the requested collection and all the execution receipts
-			indexer.HandleCollection(collection, collections, transactions, suite.log)
+			err = indexer.HandleCollection(collection, collections, transactions, suite.log)
+			require.NoError(suite.T(), err)
 
 			for _, r := range executionReceipts {
 				err = ingestEng.Process(channels.ReceiveReceipts, enNodeIDs[0], r)

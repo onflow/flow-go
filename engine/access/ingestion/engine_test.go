@@ -3,7 +3,6 @@ package ingestion
 import (
 	"context"
 	"errors"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"math/rand"
 	"os"
 	"sync"
@@ -25,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -231,7 +231,8 @@ func (s *Suite) TestOnCollection() {
 		},
 	)
 
-	indexer.HandleCollection(&collection, s.collections, s.transactions, s.log)
+	err := indexer.HandleCollection(&collection, s.collections, s.transactions, s.log)
+	require.NoError(s.T(), err)
 
 	// check that the collection was stored and indexed, and we stored all transactions
 	s.collections.AssertExpectations(s.T())
@@ -307,7 +308,8 @@ func (s *Suite) TestOnCollectionDuplicate() {
 		},
 	)
 
-	indexer.HandleCollection(&collection, s.collections, s.transactions, s.log)
+	err := indexer.HandleCollection(&collection, s.collections, s.transactions, s.log)
+	require.NoError(s.T(), err)
 
 	// check that the collection was stored and indexed, and we stored all transactions
 	s.collections.AssertExpectations(s.T())
