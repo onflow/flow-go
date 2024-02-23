@@ -187,11 +187,12 @@ func (s *BackendBlocksSuite) SetupTest() {
 
 	s.chainStateTracker.On(
 		"GetStartHeight",
+		mock.Anything,
 		mock.AnythingOfType("flow.Identifier"),
 		mock.AnythingOfType("uint64"),
 		mock.AnythingOfType("flow.BlockStatus"),
-	).Return(func(startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error) {
-		return s.chainStateTrackerReal.GetStartHeight(startBlockID, startHeight, blockStatus)
+	).Return(func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error) {
+		return s.chainStateTrackerReal.GetStartHeight(ctx, startBlockID, startHeight, blockStatus)
 	}, nil)
 
 	s.setupTestCases()

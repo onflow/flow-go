@@ -49,7 +49,7 @@ func (b *backendSubscribeBlocks) SubscribeBlockDigests(ctx context.Context, star
 
 // subscribe is common method of the backendSubscribeBlocks struct that allows clients to subscribe to different types of block data.
 func (b *backendSubscribeBlocks) subscribe(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus, getData subscription.GetDataByHeightFunc) subscription.Subscription {
-	nextHeight, err := b.getStartHeight(startBlockID, startHeight, blockStatus)
+	nextHeight, err := b.getStartHeight(ctx, startBlockID, startHeight, blockStatus)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")
 	}

@@ -252,8 +252,9 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
-	).Return(func(startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error) {
-		return s.chainStateTrackerReal.GetStartHeight(startBlockID, startHeight, blockStatus)
+		mock.Anything,
+	).Return(func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error) {
+		return s.chainStateTrackerReal.GetStartHeight(ctx, startBlockID, startHeight, blockStatus)
 	}, nil).Maybe()
 }
 

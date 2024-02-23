@@ -3,6 +3,8 @@
 package mock
 
 import (
+	context "context"
+
 	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -36,23 +38,23 @@ func (_m *ChainStateTracker) GetHighestHeight(blockStatus flow.BlockStatus) (uin
 	return r0, r1
 }
 
-// GetStartHeight provides a mock function with given fields: startBlockID, startHeight, blockStatus
-func (_m *ChainStateTracker) GetStartHeight(startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error) {
-	ret := _m.Called(startBlockID, startHeight, blockStatus)
+// GetStartHeight provides a mock function with given fields: ctx, startBlockID, startHeight, blockStatus
+func (_m *ChainStateTracker) GetStartHeight(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error) {
+	ret := _m.Called(ctx, startBlockID, startHeight, blockStatus)
 
 	var r0 uint64
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, uint64, flow.BlockStatus) (uint64, error)); ok {
-		return rf(startBlockID, startHeight, blockStatus)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64, flow.BlockStatus) (uint64, error)); ok {
+		return rf(ctx, startBlockID, startHeight, blockStatus)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier, uint64, flow.BlockStatus) uint64); ok {
-		r0 = rf(startBlockID, startHeight, blockStatus)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64, flow.BlockStatus) uint64); ok {
+		r0 = rf(ctx, startBlockID, startHeight, blockStatus)
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func(flow.Identifier, uint64, flow.BlockStatus) error); ok {
-		r1 = rf(startBlockID, startHeight, blockStatus)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, uint64, flow.BlockStatus) error); ok {
+		r1 = rf(ctx, startBlockID, startHeight, blockStatus)
 	} else {
 		r1 = ret.Error(1)
 	}

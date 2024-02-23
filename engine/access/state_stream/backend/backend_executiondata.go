@@ -56,7 +56,7 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(ctx context.Context, bl
 }
 
 func (b *ExecutionDataBackend) SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) subscription.Subscription {
-	nextHeight, err := b.getStartHeight(startBlockID, startHeight, flow.BlockStatusFinalized)
+	nextHeight, err := b.getStartHeight(ctx, startBlockID, startHeight, flow.BlockStatusFinalized)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")
 	}

@@ -235,13 +235,13 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 	})
 
 	// Unset GetStartHeight to mock new behavior instead of default one
-	s.chainStateTracker.On("GetStartHeight", mock.Anything, mock.Anything, mock.Anything).Unset()
+	s.chainStateTracker.On("GetStartHeight", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
 
 	s.Run("returns error for uninitialized index", func() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		s.chainStateTracker.On("GetStartHeight", flow.ZeroID, uint64(0), flow.BlockStatusFinalized).
+		s.chainStateTracker.On("GetStartHeight", subCtx, flow.ZeroID, uint64(0), flow.BlockStatusFinalized).
 			Return(uint64(0), status.Errorf(codes.FailedPrecondition, "failed to get lowest indexed height: %v", indexer.ErrIndexNotInitialized)).
 			Once()
 
@@ -254,7 +254,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		s.chainStateTracker.On("GetStartHeight", flow.ZeroID, s.blocks[0].Header.Height, flow.BlockStatusFinalized).
+		s.chainStateTracker.On("GetStartHeight", subCtx, flow.ZeroID, s.blocks[0].Header.Height, flow.BlockStatusFinalized).
 			Return(uint64(0), status.Errorf(codes.InvalidArgument, "start height %d is lower than lowest indexed height %d", s.blocks[0].Header.Height, 0)).
 			Once()
 
@@ -266,7 +266,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		s.chainStateTracker.On("GetStartHeight", flow.ZeroID, s.blocks[len(s.blocks)-1].Header.Height, flow.BlockStatusFinalized).
+		s.chainStateTracker.On("GetStartHeight", subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Header.Height, flow.BlockStatusFinalized).
 			Return(uint64(0), status.Errorf(codes.InvalidArgument, "start height %d is higher than highest indexed height %d", s.blocks[len(s.blocks)-1].Header.Height, s.blocks[0].Header.Height)).
 			Once()
 
