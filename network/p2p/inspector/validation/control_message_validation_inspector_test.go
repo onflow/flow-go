@@ -342,6 +342,50 @@ func TestControlMessageInspection_ValidRpc(t *testing.T) {
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
 
+// TestGraftInspection_InvalidTopic_BelowThreshold ensures inspector does not disseminate an invalid control message notification for
+// graft messages when the invalid topic id count does not exceed the configured threshold.
+func TestGraftInspection_InvalidTopic_BelowThreshold(t *testing.T) {
+	c, err := config.DefaultConfig()
+	require.NoError(t, err)
+	cfg := &c.NetworkConfig.GossipSub.RpcInspector.Validation
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+		params.Config = cfg
+	})
+
+	var unknownTopicGrafts []*pubsub_pb.ControlGraft
+	var malformedTopicGrafts []*pubsub_pb.ControlGraft
+	var invalidSporkIDTopicGrafts []*pubsub_pb.ControlGraft
+	var allTopics []string
+	for i := 0; i < cfg.GraftPrune.InvalidTopicIdThreshold; i++ {
+		// create unknown topic
+		unknownTopic, malformedTopic, invalidSporkIDTopic := invalidTopics(t, sporkID)
+		allTopics = append(allTopics, unknownTopic, malformedTopic, invalidSporkIDTopic)
+		unknownTopicGrafts = append(unknownTopicGrafts, unittest.P2PRPCGraftFixture(&unknownTopic))
+		malformedTopicGrafts = append(malformedTopicGrafts, unittest.P2PRPCGraftFixture(&malformedTopic))
+		invalidSporkIDTopicGrafts = append(invalidSporkIDTopicGrafts, unittest.P2PRPCGraftFixture(&invalidSporkIDTopic))
+	}
+	// avoid unknown topics errors
+	topicProviderOracle.UpdateTopics(allTopics)
+	unknownTopicReq := unittest.P2PRPCFixture(unittest.WithGrafts(unknownTopicGrafts...))
+	malformedTopicReq := unittest.P2PRPCFixture(unittest.WithGrafts(malformedTopicGrafts...))
+	invalidSporkIDTopicReq := unittest.P2PRPCFixture(unittest.WithGrafts(invalidSporkIDTopicGrafts...))
+
+	from := unittest.PeerIdFixture(t)
+	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
+	consumer.AssertNotCalled(t, "OnInvalidControlMessageNotification", mock.AnythingOfType("*p2p.InvCtrlMsgNotif"))
+	inspector.Start(signalerCtx)
+	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
+
+	require.NoError(t, inspector.Inspect(from, unknownTopicReq))
+	require.NoError(t, inspector.Inspect(from, malformedTopicReq))
+	require.NoError(t, inspector.Inspect(from, invalidSporkIDTopicReq))
+
+	// sleep for 1 second to ensure rpc's is processed
+	time.Sleep(3 * time.Second)
+	cancel()
+	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
+}
+
 // TestGraftInspection_InvalidTopic_AboveThreshold ensures inspector disseminates an invalid control message notification for
 // graft messages when the invalid topic id count exceeds the configured threshold.
 func TestGraftInspection_InvalidTopic_AboveThreshold(t *testing.T) {
@@ -608,6 +652,98 @@ func TestPruneInspection_DuplicateTopicIds_BelowThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, rpc))
 	// sleep for 1 second to ensure rpc's is processed
 	time.Sleep(time.Second)
+	cancel()
+	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
+}
+
+// TestIHaveInspection_InvalidTopic_AboveThreshold ensures inspector disseminates an invalid control message notification for
+// ihave messages when the invalid topic id count exceeds the configured threshold.
+func TestIHaveInspection_InvalidTopic_AboveThreshold(t *testing.T) {
+	c, err := config.DefaultConfig()
+	require.NoError(t, err)
+	cfg := &c.NetworkConfig.GossipSub.RpcInspector.Validation
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+		params.Config = cfg
+	})
+
+	var unknownTopicIHaves []*pubsub_pb.ControlIHave
+	var malformedTopicIHaves []*pubsub_pb.ControlIHave
+	var invalidSporkIDTopicIHaves []*pubsub_pb.ControlIHave
+	var allTopics []string
+	for i := 0; i < cfg.GraftPrune.InvalidTopicIdThreshold+1; i++ {
+		// create unknown topic
+		unknownTopic, malformedTopic, invalidSporkIDTopic := invalidTopics(t, sporkID)
+		allTopics = append(allTopics, unknownTopic, malformedTopic, invalidSporkIDTopic)
+		unknownTopicIHaves = append(unknownTopicIHaves, unittest.P2PRPCIHaveFixture(&unknownTopic, unittest.IdentifierListFixture(5).Strings()...))
+		malformedTopicIHaves = append(malformedTopicIHaves, unittest.P2PRPCIHaveFixture(&malformedTopic, unittest.IdentifierListFixture(5).Strings()...))
+		invalidSporkIDTopicIHaves = append(invalidSporkIDTopicIHaves, unittest.P2PRPCIHaveFixture(&invalidSporkIDTopic, unittest.IdentifierListFixture(5).Strings()...))
+	}
+
+	// avoid unknown topics errors
+	topicProviderOracle.UpdateTopics(allTopics)
+	unknownTopicReq := unittest.P2PRPCFixture(unittest.WithIHaves(unknownTopicIHaves...))
+	malformedTopicReq := unittest.P2PRPCFixture(unittest.WithIHaves(malformedTopicIHaves...))
+	invalidSporkIDTopicReq := unittest.P2PRPCFixture(unittest.WithIHaves(invalidSporkIDTopicIHaves...))
+
+	from := unittest.PeerIdFixture(t)
+	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
+	checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgIHave, validation.IsInvalidTopicIDThresholdExceeded, p2p.CtrlMsgNonClusterTopicType)
+	consumer.On("OnInvalidControlMessageNotification", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(checkNotification)
+	inspector.Start(signalerCtx)
+	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
+
+	require.NoError(t, inspector.Inspect(from, unknownTopicReq))
+	require.NoError(t, inspector.Inspect(from, malformedTopicReq))
+	require.NoError(t, inspector.Inspect(from, invalidSporkIDTopicReq))
+
+	// sleep for 1 second to ensure rpc's is processed
+	time.Sleep(2 * time.Second)
+	cancel()
+	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
+}
+
+// TestIHaveInspection_InvalidTopic_BelowThreshold ensures inspector does not disseminate an invalid control message notification for
+// ihave messages when the invalid topic id count does not exceed the configured threshold.
+func TestIHaveInspection_InvalidTopic_BelowThreshold(t *testing.T) {
+	c, err := config.DefaultConfig()
+	require.NoError(t, err)
+	cfg := &c.NetworkConfig.GossipSub.RpcInspector.Validation
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+		params.Config = cfg
+	})
+
+	var unknownTopicIHaves []*pubsub_pb.ControlIHave
+	var malformedTopicIHaves []*pubsub_pb.ControlIHave
+	var invalidSporkIDTopicIHaves []*pubsub_pb.ControlIHave
+	var allTopics []string
+	for i := 0; i < cfg.GraftPrune.InvalidTopicIdThreshold; i++ {
+		// create unknown topic
+		unknownTopic, malformedTopic, invalidSporkIDTopic := invalidTopics(t, sporkID)
+		allTopics = append(allTopics, unknownTopic, malformedTopic, invalidSporkIDTopic)
+		unknownTopicIHaves = append(unknownTopicIHaves, unittest.P2PRPCIHaveFixture(&unknownTopic, unittest.IdentifierListFixture(5).Strings()...))
+		malformedTopicIHaves = append(malformedTopicIHaves, unittest.P2PRPCIHaveFixture(&malformedTopic, unittest.IdentifierListFixture(5).Strings()...))
+		invalidSporkIDTopicIHaves = append(invalidSporkIDTopicIHaves, unittest.P2PRPCIHaveFixture(&invalidSporkIDTopic, unittest.IdentifierListFixture(5).Strings()...))
+	}
+
+	// avoid unknown topics errors
+	topicProviderOracle.UpdateTopics(allTopics)
+	unknownTopicReq := unittest.P2PRPCFixture(unittest.WithIHaves(unknownTopicIHaves...))
+	malformedTopicReq := unittest.P2PRPCFixture(unittest.WithIHaves(malformedTopicIHaves...))
+	invalidSporkIDTopicReq := unittest.P2PRPCFixture(unittest.WithIHaves(invalidSporkIDTopicIHaves...))
+
+	from := unittest.PeerIdFixture(t)
+	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
+	// no notification should be disseminated for valid messages as long as the number of invalid topic ids is below the threshold
+	consumer.AssertNotCalled(t, "OnInvalidControlMessageNotification", mock.AnythingOfType("*p2p.InvCtrlMsgNotif"))
+	inspector.Start(signalerCtx)
+	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
+
+	require.NoError(t, inspector.Inspect(from, unknownTopicReq))
+	require.NoError(t, inspector.Inspect(from, malformedTopicReq))
+	require.NoError(t, inspector.Inspect(from, invalidSporkIDTopicReq))
+
+	// sleep for 1 second to ensure rpc's is processed
+	time.Sleep(2 * time.Second)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }

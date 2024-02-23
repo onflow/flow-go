@@ -320,7 +320,7 @@ type GossipSubRpcValidationInspectorMetrics interface {
 	// OnIHaveInvalidTopicIdsExceedThreshold tracks the number of times that the async inspection of iHave messages of a single RPC failed due to the total number of invalid topic ids
 	// received by the node on the iHave messages of that RPC exceeding the threshold, which results in a misbehaviour report.
 	OnIHaveInvalidTopicIdsExceedThreshold()
-	
+
 	// OnIHaveDuplicateMessageIdsExceedThreshold tracks the number of times that the async inspection of iHave messages of a single RPC failed due to the total number of duplicate message ids
 	// received by the node on an iHave message exceeding the threshold, which results in a misbehaviour report.
 	OnIHaveDuplicateMessageIdsExceedThreshold()
