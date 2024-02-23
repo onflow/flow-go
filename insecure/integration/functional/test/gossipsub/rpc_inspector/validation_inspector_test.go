@@ -71,7 +71,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 		require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
-		require.True(t, channels.IsInvalidTopicErr(notification.Error))
+		require.True(t, validation.IsInvalidTopicIDThresholdExceeded(notification.Error))
 		switch notification.MsgType {
 		case p2pmsg.CtrlMsgGraft:
 			invGraftNotifCount.Inc()
