@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fmt"
 	"math/big"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -45,6 +46,15 @@ type DirectCall struct {
 	Value    *big.Int
 	GasLimit uint64
 	Nonce    uint64
+}
+
+// DirectCallFromEncoded constructs a DirectCall from encoded data
+func DirectCallFromEncoded(encoded []byte) (*DirectCall, error) {
+	if encoded[0] != DirectCallTxType {
+		return nil, fmt.Errorf("tx type mismatch")
+	}
+	dc := &DirectCall{}
+	return dc, rlp.DecodeBytes(encoded[1:], dc)
 }
 
 // Encode encodes the direct call it also adds the type
