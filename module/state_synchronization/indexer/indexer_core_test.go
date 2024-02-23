@@ -255,9 +255,6 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		testRegisterID, err := convert.LedgerKeyToRegisterID(key)
 		require.NoError(t, err)
 
-		// we should store the light collection and index its transactions
-		//t.collections.On("StoreLightAndIndexByTransaction", &light).Return(nil).Once()
-
 		ed := &execution_data.BlockExecutionData{
 			BlockID: block.ID(),
 			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{

@@ -1194,21 +1194,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 			builder.Storage.RegisterIndex = registers
 
-			//indexerCore, err := indexer.New(
-			//	builder.Logger,
-			//	metrics.NewExecutionStateIndexerCollector(),
-			//	builder.DB,
-			//	builder.Storage.RegisterIndex,
-			//	builder.Storage.Headers,
-			//	builder.Storage.Events,
-			//	builder.Storage.Collections,
-			//	builder.Storage.Transactions,
-			//	builder.Storage.LightTransactionResults,
-			//	builder.AccessMetrics,
-			//	builder.CollectionsToMarkFinalized,
-			//	builder.CollectionsToMarkExecuted,
-			//)
-
 			indexerCore, err := indexer.New(
 				builder.Logger,
 				metrics.NewExecutionStateIndexerCollector(),
@@ -1251,19 +1236,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 	return builder
 }
-
-//func (builder *ObserverServiceBuilder) onCollection(_ flow.Identifier, entity flow.Entity) {
-//	collections := builder.Storage.Collections
-//	transactions := builder.Storage.Transactions
-//	logger := builder.Logger
-//
-//	err := indexer.HandleCollection(entity, collections, transactions, logger)
-//
-//	if err != nil {
-//		logger.Error().Err(err).Msg("could not handle collection")
-//		return
-//	}
-//}
 
 // enqueuePublicNetworkInit enqueues the observer network component initialized for the observer
 func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
