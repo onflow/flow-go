@@ -3,7 +3,7 @@ package unittest
 import (
 	"crypto/rand"
 	"encoding/hex"
-	
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime/common"
