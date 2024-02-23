@@ -97,7 +97,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/pebble"
 	pStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
@@ -245,7 +244,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		scriptExecutorConfig:         query.NewDefaultConfig(),
 		scriptExecMinBlock:           0,
 		scriptExecMaxBlock:           math.MaxUint64,
-		registerCacheType:            pebble.CacheTypeLRU.String(),
+		registerCacheType:            pStorage.CacheTypeTwoQueue.String(),
 		registerCacheSize:            0,
 	}
 }
@@ -743,21 +742,24 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					}
 				}
 
-				opts := []pStorage.RegistersOption{}
-				cacheType, err := pebble.ParseCacheType(builder.registerCacheType)
-				if err != nil {
-					return nil, fmt.Errorf("could not parse register cache type: %w", err)
-				}
-				if builder.registerCacheSize > 0 {
-					opts = append(opts, pStorage.WithReadCache(cacheType, builder.registerCacheSize, builder.Metrics.Cache))
-				}
-
-				registers, err := pStorage.NewRegisters(pdb, opts...)
+				registers, err := pStorage.NewRegisters(pdb)
 				if err != nil {
 					return nil, fmt.Errorf("could not create registers storage: %w", err)
 				}
 
-				builder.Storage.RegisterIndex = registers
+				if builder.registerCacheSize > 0 {
+					cacheType, err := pStorage.ParseCacheType(builder.registerCacheType)
+					if err != nil {
+						return nil, fmt.Errorf("could not parse register cache type: %w", err)
+					}
+					registersCache, err := pStorage.NewRegistersCache(registers, cacheType, builder.registerCacheSize, builder.Metrics.Cache)
+					if err != nil {
+						return nil, fmt.Errorf("could not create registers cache: %w", err)
+					}
+					builder.Storage.RegisterIndex = registersCache
+				} else {
+					builder.Storage.RegisterIndex = registers
+				}
 
 				indexerCore, err := indexer.New(
 					builder.Logger,

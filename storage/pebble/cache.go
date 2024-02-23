@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-const DefaultCacheSize = uint(1000)
+const DefaultCacheSize = uint(10_000)
 
 type CacheType int
 
@@ -55,6 +55,9 @@ type CacheBackend interface {
 	Remove(key string)
 }
 
+// wrapped is a wrapper around lru.Cache to implement CacheBackend
+// this is needed because the standard lru cache implementation provides additional features that
+// the ARC and 2Q caches do not. This standardizes the interface to allow swapping between types.
 type wrapped struct {
 	cache *lru.Cache[string, flow.RegisterValue]
 }
