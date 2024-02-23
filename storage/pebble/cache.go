@@ -66,7 +66,7 @@ func (c *wrapped) Get(key string) (value flow.RegisterValue, ok bool) {
 	return c.cache.Get(key)
 }
 func (c *wrapped) Add(key string, value flow.RegisterValue) {
-	c.cache.Add(key, value)
+	_ = c.cache.Add(key, value)
 }
 func (c *wrapped) Contains(key string) bool {
 	return c.cache.Contains(key)
@@ -75,7 +75,7 @@ func (c *wrapped) Len() int {
 	return c.cache.Len()
 }
 func (c *wrapped) Remove(key string) {
-	c.cache.Remove(key)
+	_ = c.cache.Remove(key)
 }
 
 type ReadCache struct {
