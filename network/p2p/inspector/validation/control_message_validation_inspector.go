@@ -210,6 +210,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 	}
 
 	// check peer identity when running private network
+	// sanity check: rpc inspection should be disabled on public networks
 	if c.networkingType == network.PrivateNetwork {
 		err := c.checkSenderIdentity(from)
 		if err != nil {
