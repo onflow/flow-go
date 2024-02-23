@@ -27,8 +27,14 @@ transaction {
 
     // Capabilities and links
     acct.save(<- Test.createR(), to: /storage/r)
-    var cap = acct.link<&Test.R>(/public/linkR, target: /storage/r)
-    acct.save(cap, to: /storage/capability)
+
+    // Typed capability
+    var cap1: Capability<&Test.R>? = acct.link<&Test.R>(/public/linkR, target: /storage/r)
+    acct.save(cap1, to: /storage/capability)
+
+    // Untyped capability
+    var cap2: Capability = acct.getCapability(/public/linkR)
+    acct.save(cap2, to: /storage/untyped_capability)
 
     // account-typed keys in dictionary
     acct.save(
