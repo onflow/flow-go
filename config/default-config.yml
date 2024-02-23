@@ -544,12 +544,14 @@ network-config:
           # number of workers that asynchronously update the app specific score requests when they are expired.
           score-update-worker-num: 5
           # size of the queue used by the worker pool for the app specific score update requests. The queue is used to buffer the app specific score update requests
-          # before they are processed by the worker pool. The queue size must be larger than total number of peers in the network.
+          # before they are processed by the worker pool. The queue size must be larger than 10x total number of peers in the network.
           # The queue is deduplicated based on the peer ids ensuring that there is only one app specific score update request per peer in the queue.
           score-update-request-queue-size: 10_000
           # score ttl is the time to live for the app specific score. Once the score is expired; a new request will be sent to the app specific score provider to update the score.
           # until the score is updated, the previous score will be used.
           score-ttl: 1m
+          # size of the queue used by the score registry to buffer the invalid control message notifications before they are processed by the worker pool. The queue size must be larger than 10x total number of peers in the network.
+          invalid-control-message-notification-queue-size: 10_000
         spam-record-cache:
           # size of cache used to track spam records at gossipsub. Each peer id is mapped to a spam record that keeps track of the spam score for that peer.
           # cache should be big enough to keep track of the entire network's size. Otherwise, the local node's view of the network will be incomplete due to cache eviction.
