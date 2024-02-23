@@ -70,6 +70,7 @@ func TestExtractExecutionState(t *testing.T) {
 				flow.Emulator,
 				// TODO:
 				migrations.EVMContractChangeNone,
+				"",
 			)
 			require.Error(t, err)
 		})
@@ -94,7 +95,7 @@ func TestExtractExecutionState(t *testing.T) {
 			require.NoError(t, err)
 			f, err := complete.NewLedger(diskWal, size*10, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
 			require.NoError(t, err)
-			compactor, err := complete.NewCompactor(f, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+			compactor, err := complete.NewCompactor(f, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false), &metrics.NoopCollector{})
 			require.NoError(t, err)
 			<-compactor.Ready()
 
@@ -170,7 +171,7 @@ func TestExtractExecutionState(t *testing.T) {
 						checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
 						checkpointsToKeep  = 1
 					)
-					compactor, err := complete.NewCompactor(storage, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+					compactor, err := complete.NewCompactor(storage, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false), &metrics.NoopCollector{})
 					require.NoError(t, err)
 
 					<-compactor.Ready()
