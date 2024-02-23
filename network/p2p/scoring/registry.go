@@ -78,7 +78,6 @@ type GossipSubAppSpecificScoreRegistry struct {
 	silencePeriodStartTime time.Time
 	// silencePeriodElapsed atomic bool that stores a bool flag which indicates if the silence period is over or not.
 	silencePeriodElapsed *atomic.Bool
-	a                    *queue.HeroStore
 }
 
 // GossipSubAppSpecificScoreRegistryConfig is the configuration for the GossipSubAppSpecificScoreRegistry.
@@ -161,7 +160,6 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 	appSpecificScore := queue.NewHeroStore(config.Parameters.ScoreUpdateRequestQueueSize,
 		lg.With().Str("component", "app_specific_score_update").Logger(),
 		metrics.GossipSubAppSpecificScoreUpdateQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType))
-	reg.a = appSpecificScore
 	reg.appScoreUpdateWorkerPool = worker.NewWorkerPoolBuilder[peer.ID](lg.With().Str("component", "app_specific_score_update_worker_pool").Logger(), appSpecificScore,
 		reg.processAppSpecificScoreUpdateWork).Build()
 
