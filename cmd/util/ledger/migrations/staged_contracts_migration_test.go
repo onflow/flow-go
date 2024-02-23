@@ -65,7 +65,8 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContracts)
+		migration := NewStagedContractsMigration(flow.Emulator)
+		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -104,7 +105,9 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContracts)
+		migration := NewStagedContractsMigration(flow.Emulator).
+			WithContractUpdateValidation()
+		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -145,7 +148,9 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContracts)
+		migration := NewStagedContractsMigration(flow.Emulator).
+			WithContractUpdateValidation()
+		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -196,7 +201,9 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContracts)
+		migration := NewStagedContractsMigration(flow.Emulator).
+			WithContractUpdateValidation()
+		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -240,7 +247,8 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContracts)
+		migration := NewStagedContractsMigration(flow.Emulator)
+		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -301,12 +309,14 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContracts)
+		migration := NewStagedContractsMigration(flow.Emulator)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
+
+		migration.RegisterContractUpdates(stagedContracts)
 
 		payloads, err := migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
@@ -385,7 +395,8 @@ func TestStagedContractsWithImports(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContracts)
+		migration := NewStagedContractsMigration(flow.Emulator)
+		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -444,7 +455,9 @@ func TestStagedContractsWithImports(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContracts)
+		migration := NewStagedContractsMigration(flow.Emulator).
+			WithContractUpdateValidation()
+		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -520,7 +533,9 @@ func TestStagedContractsWithImports(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContracts)
+		migration := NewStagedContractsMigration(flow.Emulator).
+			WithContractUpdateValidation()
+		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
