@@ -181,6 +181,19 @@ func run(*cobra.Command, []string) {
 		if !flagAllowPartialStateFromPayloads && partialState {
 			log.Fatal().Msgf("payload input file %s contains partial state, please specify --allow-partial-state-from-payload-file", flagInputPayloadFileName)
 		}
+
+		msg := "input payloads represent "
+		if partialState {
+			msg += "partial state"
+		} else {
+			msg += "complete state"
+		}
+		if flagAllowPartialStateFromPayloads {
+			msg += ", and --allow-partial-state-from-payload-file is specified"
+		} else {
+			msg += ", and --allow-partial-state-from-payload-file is NOT specified"
+		}
+		log.Info().Msg(msg)
 	}
 
 	if len(flagOutputPayloadFileName) > 0 {

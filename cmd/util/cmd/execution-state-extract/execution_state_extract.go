@@ -120,9 +120,15 @@ func extractExecutionState(
 	if exportPayloads {
 		payloads := newTrie.AllPayloads()
 
+		log.Info().Msgf("sorting %d payloads", len(payloads))
+
 		// Sort payloads to produce deterministic payload file with
 		// same sequence of payloads inside.
 		payloads = util.SortPayloadsByAddress(payloads, nWorker)
+
+		log.Info().Msgf("sorted %d payloads", len(payloads))
+
+		log.Info().Msgf("creating payloads file %s", outputPayloadFile)
 
 		exportedPayloadCount, err := util.CreatePayloadFile(
 			log,
@@ -225,9 +231,16 @@ func extractExecutionStateFromPayloads(
 
 	exportPayloads := len(outputPayloadFile) > 0
 	if exportPayloads {
+
+		log.Info().Msgf("sorting %d payloads", len(payloads))
+
 		// Sort payloads to produce deterministic payload file with
 		// same sequence of payloads inside.
 		payloads = util.SortPayloadsByAddress(payloads, nWorker)
+
+		log.Info().Msgf("sorted %d payloads", len(payloads))
+
+		log.Info().Msgf("creating payloads file %s", outputPayloadFile)
 
 		exportedPayloadCount, err := util.CreatePayloadFile(
 			log,
