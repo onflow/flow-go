@@ -135,7 +135,8 @@ func CreatePublicIDTranslatorAndIdentifierProvider(
 ) (
 	p2p.IDTranslator,
 	func() module.IdentifierProvider,
-	error) {
+	error,
+) {
 	idTranslator := translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
 	peerID, err := peerIDFromNetworkKey(networkKey)

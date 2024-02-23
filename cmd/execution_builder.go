@@ -963,6 +963,8 @@ func (exeNode *ExecutionNode) LoadObserverCollectionIndexer(
 		return &module.NoopReadyDoneAware{}, nil
 	}
 
+	node.Logger.Info().Msg("observer-mode is enabled, creating execution data downloader")
+
 	execDataDistributor := edrequester.NewExecutionDataDistributor()
 
 	executionDataDownloader := execution_data.NewDownloader(exeNode.blobService)
@@ -970,9 +972,8 @@ func (exeNode *ExecutionNode) LoadObserverCollectionIndexer(
 	var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 	execDataCacheBackend := herocache.NewBlockExecutionData(10, node.Logger, heroCacheCollector)
 
-	// Execution Data cache that uses a blobstore as the backend (instead of a downloader)
-	// This ensures that it simply returns a not found error if the blob doesn't exist
-	// instead of attempting to download it from the network.
+	// Execution Data cache that a downloader as the backend
+	// If the execution data doesn't exist, it uses the downloader to fetch it
 	executionDataCache := execdatacache.NewExecutionDataCache(
 		executionDataDownloader,
 		node.Storage.Headers,
@@ -1014,10 +1015,6 @@ func (exeNode *ExecutionNode) LoadObserverCollectionIndexer(
 	exeNode.followerDistributor.AddOnBlockFinalizedConsumer(r.OnBlockFinalized)
 
 	execDataDistributor.AddOnExecutionDataReceivedConsumer(func(data *execution_data.BlockExecutionDataEntity) {
-		if len(data.BlockExecutionData.ChunkExecutionDatas) == 0 {
-			return
-		}
-
 		res := &messages.EntityResponse{}
 		for _, chunk := range data.BlockExecutionData.ChunkExecutionDatas {
 			col := chunk.Collection
