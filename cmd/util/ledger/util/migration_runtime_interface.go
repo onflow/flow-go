@@ -118,7 +118,17 @@ func (m *MigrationRuntimeInterface) GetAccountContractCode(
 func (m *MigrationRuntimeInterface) GetOrLoadProgram(
 	location runtime.Location,
 	load func() (*interpreter.Program, error),
-) (*interpreter.Program, error) {
+) (
+	program *interpreter.Program,
+	err error,
+) {
+
+	defer func() {
+		if m.GetOrLoadProgramListener != nil {
+			m.GetOrLoadProgramListener(location, program, err)
+		}
+	}()
+
 	return m.Programs.GetOrLoadProgram(
 		location,
 		func() (*interpreter.Program, error) {
@@ -339,6 +349,8 @@ func (m *MigrationRuntimeInterface) RecordTrace(_ string, _ runtime.Location, _ 
 }
 
 type RuntimeInterfaceConfig struct {
+	GetOrLoadProgramListener func(runtime.Location, *interpreter.Program, error)
+
 	// GetContractCodeFunc allows for injecting extra logic for code lookup
 	GetContractCodeFunc func(location runtime.Location) ([]byte, error)
 }

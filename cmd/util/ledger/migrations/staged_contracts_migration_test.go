@@ -11,6 +11,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -65,7 +66,8 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContracts)
+		migration := NewStagedContractsMigration(flow.Emulator)
+		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -104,7 +106,9 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContracts)
+		migration := NewStagedContractsMigration(flow.Emulator).
+			WithContractUpdateValidation()
+		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -145,7 +149,9 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContracts)
+		migration := NewStagedContractsMigration(flow.Emulator).
+			WithContractUpdateValidation()
+		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -196,7 +202,9 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContracts)
+		migration := NewStagedContractsMigration(flow.Emulator).
+			WithContractUpdateValidation()
+		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -240,7 +248,8 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContracts)
+		migration := NewStagedContractsMigration(flow.Emulator)
+		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -301,12 +310,14 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContracts)
+		migration := NewStagedContractsMigration(flow.Emulator)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
+
+		migration.RegisterContractUpdates(stagedContracts)
 
 		payloads, err := migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
@@ -344,12 +355,14 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContracts)
+		migration := NewStagedContractsMigration(flow.Emulator)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
+
+		migration.RegisterContractUpdates(stagedContracts)
 
 		// NOTE: no payloads
 		_, err = migration.MigrateAccount(ctx, address1, nil)
@@ -412,7 +425,8 @@ func TestStagedContractsWithImports(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContracts)
+		migration := NewStagedContractsMigration(flow.Emulator)
+		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -471,7 +485,9 @@ func TestStagedContractsWithImports(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContracts)
+		migration := NewStagedContractsMigration(flow.Emulator).
+			WithContractUpdateValidation()
+		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -547,7 +563,9 @@ func TestStagedContractsWithImports(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(stagedContracts)
+		migration := NewStagedContractsMigration(flow.Emulator).
+			WithContractUpdateValidation()
+		migration.RegisterContractUpdates(stagedContracts)
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -679,5 +697,163 @@ contract MultilineContract{
 		contracts, err := StagedContractsFromCSV(emptyPath)
 		require.NoError(t, err)
 		require.Empty(t, contracts)
+	})
+}
+
+func TestStagedContractsWithUpdateValidator(t *testing.T) {
+	t.Parallel()
+
+	chainID := flow.Emulator
+	systemContracts := systemcontracts.SystemContractsForChain(chainID)
+
+	address, err := common.HexToAddress("0x1")
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	t.Run("FungibleToken.Vault", func(t *testing.T) {
+		t.Parallel()
+
+		ftAddress := common.Address(systemContracts.FungibleToken.Address)
+
+		oldCodeA := fmt.Sprintf(`
+            import FungibleToken from %s
+
+            pub contract A {
+                pub var vault: @FungibleToken.Vault?
+                init() {
+                    self.vault <- nil
+                }
+            }
+        `,
+			ftAddress.HexWithPrefix(),
+		)
+
+		newCodeA := fmt.Sprintf(`
+            import FungibleToken from %s
+            access(all) contract A {
+                access(all) var vault: @{FungibleToken.Vault}?
+                init() {
+                    self.vault <- nil
+                }
+            }
+        `,
+			ftAddress.HexWithPrefix(),
+		)
+
+		ftContract := `
+            access(all) contract FungibleToken {
+                access(all) resource interface Vault {}
+		    }
+        `
+
+		stagedContracts := []StagedContract{
+			{
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(newCodeA),
+				},
+				Address: address,
+			},
+		}
+
+		migration := NewStagedContractsMigration(chainID)
+		migration.RegisterContractUpdates(stagedContracts)
+		migration.WithContractUpdateValidation()
+
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+		err = migration.InitMigration(log, nil, 0)
+		require.NoError(t, err)
+
+		payloads := []*ledger.Payload{
+			newContractPayload(address, "A", []byte(oldCodeA)),
+			newContractPayload(ftAddress, "FungibleToken", []byte(ftContract)),
+		}
+
+		payloads, err = migration.MigrateAccount(ctx, address, payloads)
+		require.NoError(t, err)
+
+		err = migration.Close()
+		require.NoError(t, err)
+
+		require.Empty(t, logWriter.logs)
+
+		require.Len(t, payloads, 2)
+		require.Equal(t, newCodeA, string(payloads[0].Value()))
+	})
+
+	t.Run("other type", func(t *testing.T) {
+		t.Parallel()
+
+		otherAddress, err := common.HexToAddress("0x2")
+		require.NoError(t, err)
+
+		oldCodeA := fmt.Sprintf(`
+            import FungibleToken from %s
+
+            pub contract A {
+                pub var vault: @FungibleToken.Vault?
+                init() {
+                    self.vault <- nil
+                }
+            }
+        `,
+			otherAddress.HexWithPrefix(), // Importing from some other address
+		)
+
+		newCodeA := fmt.Sprintf(`
+            import FungibleToken from %s
+            access(all) contract A {
+                access(all) var vault: @{FungibleToken.Vault}?
+                init() {
+                    self.vault <- nil
+                }
+            }
+        `,
+			otherAddress.HexWithPrefix(), // Importing from some other address
+		)
+
+		ftContract := `
+            access(all) contract FungibleToken {
+                access(all) resource interface Vault {}
+		    }
+        `
+
+		stagedContracts := []StagedContract{
+			{
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(newCodeA),
+				},
+				Address: address,
+			},
+		}
+
+		migration := NewStagedContractsMigration(chainID)
+		migration.RegisterContractUpdates(stagedContracts)
+		migration.WithContractUpdateValidation()
+
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+		err = migration.InitMigration(log, nil, 0)
+		require.NoError(t, err)
+
+		payloads := []*ledger.Payload{
+			newContractPayload(address, "A", []byte(oldCodeA)),
+			newContractPayload(otherAddress, "FungibleToken", []byte(ftContract)),
+		}
+
+		payloads, err = migration.MigrateAccount(ctx, address, payloads)
+		require.NoError(t, err)
+
+		err = migration.Close()
+		require.NoError(t, err)
+
+		require.Len(t, logWriter.logs, 1)
+		assert.Contains(t, logWriter.logs[0], "cannot update contract `A`")
+
+		require.Len(t, payloads, 2)
+		require.Equal(t, oldCodeA, string(payloads[0].Value()))
 	})
 }
