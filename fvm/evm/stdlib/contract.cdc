@@ -4,6 +4,13 @@ import "FlowToken"
 access(all)
 contract EVM {
 
+    // Entitlements enabling finer-graned access control on a CadenceOwnedAccount
+    access(all) entitlement Validate
+    access(all) entitlement Withdraw
+    access(all) entitlement Call
+    access(all) entitlement Deploy
+    access(all) entitlement Owner
+
     access(all)
     event CadenceOwnedAccountCreated(addressBytes: [UInt8; 20])
 
@@ -16,13 +23,13 @@ contract EVM {
         let bytes: [UInt8; 20]
 
         /// Constructs a new EVM address from the given byte representation
-        init(bytes: [UInt8; 20]) {
+        view init(bytes: [UInt8; 20]) {
             self.bytes = bytes
         }
 
         /// Balance of the address
         access(all)
-        fun balance(): Balance {
+        view fun balance(): Balance {
             let balance = InternalEVM.balance(
                 address: self.bytes
             )
@@ -42,7 +49,7 @@ contract EVM {
 
         /// Constructs a new balance
         access(all)
-        init(attoflow: UInt) {
+        view init(attoflow: UInt) {
             self.attoflow = attoflow
         }
 
@@ -58,13 +65,13 @@ contract EVM {
         /// (8 decimal points in compare to 18) might result in rounding down error.
         /// Use the toAttoFlow function if you care need more accuracy.
         access(all)
-        fun inFLOW(): UFix64 {
+        view fun inFLOW(): UFix64 {
             return InternalEVM.castToFLOW(balance: self.attoflow)
         }
 
         /// Returns the balance in Atto-FLOW
         access(all)
-        fun inAttoFLOW(): UInt {
+        view fun inAttoFLOW(): UInt {
             return self.attoflow
         }
     }
@@ -134,11 +141,11 @@ contract EVM {
     resource interface Addressable {
         /// The EVM address
         access(all)
-        fun address(): EVMAddress
+        view fun address(): EVMAddress
     }
 
     access(all)
-    resource CadenceOwnedAccount: Addressable  {
+    resource CadenceOwnedAccount: Addressable {
 
         access(self)
         var addressBytes: [UInt8; 20]
@@ -163,14 +170,14 @@ contract EVM {
 
         /// The EVM address of the cadence owned account
         access(all)
-        fun address(): EVMAddress {
+        view fun address(): EVMAddress {
             // Always create a new EVMAddress instance
             return EVMAddress(bytes: self.addressBytes)
         }
 
         /// Get balance of the cadence owned account
         access(all)
-        fun balance(): Balance {
+        view fun balance(): Balance {
             return self.address().balance()
         }
 
@@ -183,12 +190,18 @@ contract EVM {
             )
         }
 
+        /// The EVM address of the cadence owned account behind an entitlement, acting as proof of access
+        access(Owner | Validate)
+        view fun protectedAddress(): EVMAddress {
+            return self.address()
+        }
+
         /// Withdraws the balance from the cadence owned account's balance
         /// Note that amounts smaller than 10nF (10e-8) can't be withdrawn
         /// given that Flow Token Vaults use UFix64s to store balances.
         /// If the given balance conversion to UFix64 results in
         /// rounding error, this function would fail.
-        access(all)
+        access(Owner | Withdraw)
         fun withdraw(balance: Balance): @FlowToken.Vault {
             let vault <- InternalEVM.withdraw(
                 from: self.addressBytes,
@@ -199,7 +212,7 @@ contract EVM {
 
         /// Deploys a contract to the EVM environment.
         /// Returns the address of the newly deployed contract
-        access(all)
+        access(Owner | Deploy)
         fun deploy(
             code: [UInt8],
             gasLimit: UInt64,
@@ -216,7 +229,7 @@ contract EVM {
 
         /// Calls a function with the given data.
         /// The execution is limited by the given amount of gas
-        access(all)
+        access(Owner | Call)
         fun call(
             to: EVMAddress,
             data: [UInt8],
@@ -315,7 +328,7 @@ contract EVM {
     struct ValidationResult {
         access(all)
         let isValid: Bool
-        
+
         access(all)
         let problem: String?
 
@@ -377,12 +390,12 @@ contract EVM {
         if !isValid{
             return ValidationResult(
                 isValid: false,
-                problem: "the given signatures are not valid or provide enough weight" 
+                problem: "the given signatures are not valid or provide enough weight"
             )
         }
 
         let coaRef = acc.capabilities.borrow<&EVM.CadenceOwnedAccount>(path)
-        
+
         if coaRef == nil {
              return ValidationResult(
                  isValid: false,
@@ -400,7 +413,7 @@ contract EVM {
                 )
             }
         }
-        
+
         return ValidationResult(
         	isValid: true,
         	problem: nil

@@ -2,10 +2,14 @@ package migrations
 
 import (
 	"context"
+	"encoding/csv"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 	"sync"
 
+	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence/runtime"
@@ -238,12 +242,65 @@ func (m *StagedContractsMigration) checkUpdateValidity(
 		return err
 	}
 
-	validator := stdlib.NewLegacyContractUpdateValidator(
-		nil,
+	validator := stdlib.NewCadenceV042ToV1ContractUpdateValidator(
+		location,
 		contractName,
+		mr.ContractNamesProvider,
 		oldProgram,
 		newProgram.Program,
+		// TODO:
+		map[common.Location]*sema.Elaboration{},
 	)
 
 	return validator.Validate()
+}
+
+func StagedContractsFromCSV(path string) ([]StagedContract, error) {
+	if path == "" {
+		return nil, nil
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+
+	// Expect 3 fields: address, name, code
+	reader.FieldsPerRecord = 3
+
+	var contracts []StagedContract
+
+	for {
+		rec, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		addressHex := rec[0]
+		name := rec[1]
+		code := rec[2]
+
+		address, err := common.HexToAddress(addressHex)
+		if err != nil {
+			return nil, err
+		}
+
+		contracts = append(contracts, StagedContract{
+			Contract: Contract{
+				Name: name,
+				Code: []byte(code),
+			},
+			Address: address,
+		})
+	}
+
+	return contracts, nil
 }

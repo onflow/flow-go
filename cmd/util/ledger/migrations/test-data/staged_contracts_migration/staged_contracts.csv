@@ -1,0 +1,13 @@
+0x0000000000000001,Foo,access(all) contract Foo{}
+0x0000000000000001,Bar,access(all) contract Bar{}
+0x0000000000000002,MultilineContract,"
+import Foo from 0x01
+
+access(all)
+contract MultilineContract{
+  init() {
+      var a = ""hello""
+  }
+}
+"
+0x0000000000000002,Baz,import Foo from 0x01 access(all) contract Baz{}

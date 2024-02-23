@@ -70,6 +70,7 @@ func TestExtractExecutionState(t *testing.T) {
 				flow.Emulator,
 				// TODO:
 				migrations.EVMContractChangeNone,
+				"",
 			)
 			require.Error(t, err)
 		})

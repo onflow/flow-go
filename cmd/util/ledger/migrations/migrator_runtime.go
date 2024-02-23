@@ -101,6 +101,7 @@ func newMigratorRuntime(
 		AccountsLedger:          accountsAtreeLedger,
 		Accounts:                accounts,
 		ContractAdditionHandler: env,
+		ContractNamesProvider:   env,
 	}, nil
 }
 
@@ -114,6 +115,7 @@ type migratorRuntime struct {
 	AccountsLedger          *util.AccountsAtreeLedger
 	Accounts                environment.Accounts
 	ContractAdditionHandler stdlib.AccountContractAdditionHandler
+	ContractNamesProvider   stdlib.AccountContractNamesProvider
 }
 
 func (mr *migratorRuntime) GetReadOnlyStorage() *runtime.Storage {
