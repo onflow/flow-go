@@ -2,22 +2,18 @@ package types
 
 import (
 	"encoding/hex"
-	"encoding/json"
-	"fmt"
-	"strings"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime/common"
 
+	flowSdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 const (
 	EventTypeBlockExecuted       flow.EventType = "BlockExecuted"
 	EventTypeTransactionExecuted flow.EventType = "TransactionExecuted"
-	locationDivider                             = "."
 )
 
 type EventPayload interface {
@@ -28,72 +24,6 @@ type EventPayload interface {
 type Event struct {
 	Etype   flow.EventType
 	Payload EventPayload
-}
-
-var _ common.Location = EVMLocation{}
-
-type EVMLocation struct{}
-
-func (l EVMLocation) TypeID(memoryGauge common.MemoryGauge, qualifiedIdentifier string) common.TypeID {
-	id := fmt.Sprintf("%s%s%s", flow.EVMLocationPrefix, locationDivider, qualifiedIdentifier)
-	common.UseMemory(memoryGauge, common.NewRawStringMemoryUsage(len(id)))
-
-	return common.TypeID(id)
-}
-
-func (l EVMLocation) QualifiedIdentifier(typeID common.TypeID) string {
-	pieces := strings.SplitN(string(typeID), locationDivider, 2)
-
-	if len(pieces) < 2 {
-		return ""
-	}
-
-	return pieces[1]
-}
-
-func (l EVMLocation) String() string {
-	return flow.EVMLocationPrefix
-}
-
-func (l EVMLocation) Description() string {
-	return flow.EVMLocationPrefix
-}
-
-func (l EVMLocation) ID() string {
-	return flow.EVMLocationPrefix
-}
-
-func (l EVMLocation) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&struct {
-		Type string
-	}{
-		Type: "EVMLocation",
-	})
-}
-
-func init() {
-	common.RegisterTypeIDDecoder(
-		flow.EVMLocationPrefix,
-		func(_ common.MemoryGauge, typeID string) (common.Location, string, error) {
-			if typeID == "" {
-				return nil, "", fmt.Errorf("invalid EVM type location ID: missing type prefix")
-			}
-
-			parts := strings.SplitN(typeID, ".", 2)
-			prefix := parts[0]
-			if prefix != flow.EVMLocationPrefix {
-				return EVMLocation{}, "", fmt.Errorf("invalid EVM type location ID: invalid prefix")
-			}
-
-			var qualifiedIdentifier string
-			pieceCount := len(parts)
-			if pieceCount > 1 {
-				qualifiedIdentifier = parts[1]
-			}
-
-			return EVMLocation{}, qualifiedIdentifier, nil
-		},
-	)
 }
 
 // we might break this event into two (tx included /tx executed) if size becomes an issue
@@ -117,7 +47,7 @@ func (p *TransactionExecutedPayload) CadenceEvent() (cadence.Event, error) {
 
 	return cadence.Event{
 		EventType: cadence.NewEventType(
-			EVMLocation{},
+			flowSdk.EVMLocation{},
 			string(EventTypeTransactionExecuted),
 			[]cadence.Field{
 				cadence.NewField("blockHeight", cadence.UInt64Type),
@@ -170,7 +100,7 @@ func NewTransactionExecutedEvent(
 }
 
 var blockExecutedEventCadenceType = &cadence.EventType{
-	Location:            EVMLocation{},
+	Location:            flowSdk.EVMLocation{},
 	QualifiedIdentifier: string(EventTypeBlockExecuted),
 	Fields: []cadence.Field{
 		cadence.NewField("height", cadence.UInt64Type),
