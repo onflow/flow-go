@@ -78,6 +78,7 @@ type GossipSubAppSpecificScoreRegistry struct {
 	silencePeriodStartTime time.Time
 	// silencePeriodElapsed atomic bool that stores a bool flag which indicates if the silence period is over or not.
 	silencePeriodElapsed *atomic.Bool
+	a                    *queue.HeroStore
 }
 
 // GossipSubAppSpecificScoreRegistryConfig is the configuration for the GossipSubAppSpecificScoreRegistry.
@@ -160,12 +161,14 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 	appSpecificScore := queue.NewHeroStore(config.Parameters.ScoreUpdateRequestQueueSize,
 		lg.With().Str("component", "app_specific_score_update").Logger(),
 		metrics.GossipSubAppSpecificScoreUpdateQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType))
+	reg.a = appSpecificScore
 	reg.appScoreUpdateWorkerPool = worker.NewWorkerPoolBuilder[peer.ID](lg.With().Str("component", "app_specific_score_update_worker_pool").Logger(), appSpecificScore,
 		reg.processAppSpecificScoreUpdateWork).Build()
 
 	invalidCtrlMsgNotificationStore := queue.NewHeroStore(config.Parameters.InvalidControlMessageNotificationQueueSize,
 		lg.With().Str("component", "invalid_control_message_notification_queue").Logger(),
-		metrics.RpcInspectorNotificationQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType))
+		metrics.RpcInspectorNotificationQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType),
+		queue.WithMessageEntityFactory(queue.NewMessageEntityWithNonce))
 	reg.invCtrlMsgNotifWorkerPool = worker.NewWorkerPoolBuilder[*p2p.InvCtrlMsgNotif](lg, invalidCtrlMsgNotificationStore, reg.handleMisbehaviourReport).Build()
 
 	builder := component.NewComponentManagerBuilder()
