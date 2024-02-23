@@ -146,7 +146,14 @@ func (builder *LibP2PNodeBuilder) SetRoutingSystem(f func(context.Context, host.
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf p2p.GossipSubFactoryFunc, cf p2p.GossipSubAdapterConfigFunc) p2p.NodeBuilder {
+// OverrideGossipSubFactory overrides the default gossipsub factory for the GossipSub protocol.
+// The purpose of override is to allow the node to provide a custom gossipsub factory for sake of testing or experimentation.
+// Note: it is not recommended to override the default gossipsub factory in production unless you know what you are doing.
+// Args:
+// - factory: custom gossipsub factory
+// Returns:
+// - NodeBuilder: the node builder
+func (builder *LibP2PNodeBuilder) OverrideGossipSubFactory(gf p2p.GossipSubFactoryFunc, cf p2p.GossipSubAdapterConfigFunc) p2p.NodeBuilder {
 	builder.gossipSubBuilder.SetGossipSubFactory(gf)
 	builder.gossipSubBuilder.SetGossipSubConfigFunc(cf)
 	return builder
@@ -180,8 +187,15 @@ func (builder *LibP2PNodeBuilder) OverrideNodeConstructor(f p2p.NodeConstructor)
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) OverrideDefaultRpcInspectorSuiteFactory(factory p2p.GossipSubRpcInspectorSuiteFactoryFunc) p2p.NodeBuilder {
-	builder.gossipSubBuilder.OverrideDefaultRpcInspectorSuiteFactory(factory)
+// OverrideDefaultRpcInspectorFactory overrides the default rpc inspector factory for the GossipSub protocol.
+// The purpose of override is to allow the node to provide a custom rpc inspector factory for sake of testing or experimentation.
+// Note: it is not recommended to override the default rpc inspector factory in production unless you know what you are doing.
+// Args:
+// - factory: custom rpc inspector factory
+// Returns:
+// - NodeBuilder: the node builder
+func (builder *LibP2PNodeBuilder) OverrideDefaultRpcInspectorFactory(factory p2p.GossipSubRpcInspectorFactoryFunc) p2p.NodeBuilder {
+	builder.gossipSubBuilder.OverrideDefaultRpcInspectorFactory(factory)
 	return builder
 }
 
