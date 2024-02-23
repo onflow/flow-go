@@ -132,7 +132,7 @@ func (l *EVMTransferLoad) Setup(log zerolog.Logger, lc LoadContext) error {
 						data: [UInt8],
 						gasLimit: UInt64,
 						value: EVM.Balance
-					): [UInt8] {
+					): EVM.Result {
 						return self.acc.call(
 							to: to,
 							data: data,
