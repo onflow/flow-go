@@ -3,6 +3,7 @@ package access_test
 import (
 	"context"
 	"encoding/json"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"os"
 	"testing"
 
@@ -603,7 +604,6 @@ func (suite *Suite) TestGetSealedTransaction() {
 		block, collection := suite.createChain()
 
 		// setup mocks
-		originID := unittest.IdentifierFixture()
 		conduit := new(mocknetwork.Conduit)
 		suite.net.On("Register", channels.ReceiveReceipts, mock.Anything).Return(conduit, nil).
 			Once()
@@ -688,7 +688,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		// 3. Request engine is used to request missing collection
 		suite.request.On("EntityByID", collection.ID(), mock.Anything).Return()
 		// 4. Ingest engine receives the requested collection and all the execution receipts
-		ingestEng.OnCollection(originID, collection)
+		indexer.HandleCollection(collection, collections, transactions, suite.log)
 
 		for _, r := range executionReceipts {
 			err = ingestEng.Process(channels.ReceiveReceipts, enNodeIDs[0], r)
@@ -827,7 +827,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			ingestEng.OnFinalizedBlock(mb)
 
 			// Ingest engine receives the requested collection and all the execution receipts
-			ingestEng.OnCollection(originID, collection)
+			indexer.HandleCollection(collection, collections, transactions, suite.log)
 
 			for _, r := range executionReceipts {
 				err = ingestEng.Process(channels.ReceiveReceipts, enNodeIDs[0], r)

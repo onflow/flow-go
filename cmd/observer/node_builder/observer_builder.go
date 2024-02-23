@@ -36,7 +36,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
-	"github.com/onflow/flow-go/engine/access/ingestion"
 	"github.com/onflow/flow-go/engine/access/rest"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
@@ -65,6 +64,7 @@ import (
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool/herocache"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
@@ -232,8 +232,10 @@ type ObserverServiceBuilder struct {
 	// Public network
 	peerID peer.ID
 
-	RestMetrics   *metrics.RestCollector
-	AccessMetrics module.AccessMetrics
+	RestMetrics                *metrics.RestCollector
+	AccessMetrics              module.AccessMetrics
+	CollectionsToMarkFinalized *stdmap.Times
+	CollectionsToMarkExecuted  *stdmap.Times
 	// grpc servers
 	secureGrpcServer   *grpcserver.GrpcServer
 	unsecureGrpcServer *grpcserver.GrpcServer
@@ -1192,6 +1194,21 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 			builder.Storage.RegisterIndex = registers
 
+			//indexerCore, err := indexer.New(
+			//	builder.Logger,
+			//	metrics.NewExecutionStateIndexerCollector(),
+			//	builder.DB,
+			//	builder.Storage.RegisterIndex,
+			//	builder.Storage.Headers,
+			//	builder.Storage.Events,
+			//	builder.Storage.Collections,
+			//	builder.Storage.Transactions,
+			//	builder.Storage.LightTransactionResults,
+			//	builder.AccessMetrics,
+			//	builder.CollectionsToMarkFinalized,
+			//	builder.CollectionsToMarkExecuted,
+			//)
+
 			indexerCore, err := indexer.New(
 				builder.Logger,
 				metrics.NewExecutionStateIndexerCollector(),
@@ -1199,8 +1216,12 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Storage.RegisterIndex,
 				builder.Storage.Headers,
 				builder.Storage.Events,
+				builder.Storage.Collections,
+				builder.Storage.Transactions,
 				builder.Storage.LightTransactionResults,
-				builder.onCollection,
+				builder.AccessMetrics,
+				builder.CollectionsToMarkFinalized,
+				builder.CollectionsToMarkExecuted,
 			)
 			if err != nil {
 				return nil, err
@@ -1231,18 +1252,18 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	return builder
 }
 
-func (builder *ObserverServiceBuilder) onCollection(_ flow.Identifier, entity flow.Entity) {
-	collections := builder.Storage.Collections
-	transactions := builder.Storage.Transactions
-	logger := builder.Logger
-
-	err := ingestion.HandleCollection(entity, collections, transactions, logger, nil)
-
-	if err != nil {
-		logger.Error().Err(err).Msg("could not handle collection")
-		return
-	}
-}
+//func (builder *ObserverServiceBuilder) onCollection(_ flow.Identifier, entity flow.Entity) {
+//	collections := builder.Storage.Collections
+//	transactions := builder.Storage.Transactions
+//	logger := builder.Logger
+//
+//	err := indexer.HandleCollection(entity, collections, transactions, logger)
+//
+//	if err != nil {
+//		logger.Error().Err(err).Msg("could not handle collection")
+//		return
+//	}
+//}
 
 // enqueuePublicNetworkInit enqueues the observer network component initialized for the observer
 func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
@@ -1330,6 +1351,19 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return err
 		}
 		builder.RestMetrics = m
+		return nil
+	})
+	builder.Module("transaction timing mempools", func(node *cmd.NodeConfig) error {
+		var err error
+		builder.CollectionsToMarkFinalized, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
+		if err != nil {
+			return err
+		}
+
+		builder.CollectionsToMarkExecuted, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
+		if err != nil {
+			return err
+		}
 		return nil
 	})
 	builder.Module("access metrics", func(node *cmd.NodeConfig) error {

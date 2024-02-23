@@ -8,12 +8,12 @@ import (
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/logging"
@@ -24,13 +24,18 @@ type IndexerCore struct {
 	log     zerolog.Logger
 	metrics module.ExecutionStateIndexerMetrics
 
-	registers storage.RegisterIndex
-	headers   storage.Headers
-	events    storage.Events
-	results   storage.LightTransactionResults
-	batcher   bstorage.BatchBuilder
+	registers    storage.RegisterIndex
+	headers      storage.Headers
+	events       storage.Events
+	collections  storage.Collections
+	transactions storage.Transactions
+	results      storage.LightTransactionResults
+	batcher      bstorage.BatchBuilder
 
-	collectionHandler requester.HandleFunc
+	//access metrics
+	accessMetrics              module.AccessMetrics
+	collectionsToMarkFinalized *stdmap.Times
+	collectionsToMarkExecuted  *stdmap.Times
 }
 
 // New execution state indexer used to ingest block execution data and index it by height.
@@ -43,8 +48,12 @@ func New(
 	registers storage.RegisterIndex,
 	headers storage.Headers,
 	events storage.Events,
+	collections storage.Collections,
+	transactions storage.Transactions,
 	results storage.LightTransactionResults,
-	collectionHandler requester.HandleFunc,
+	accessMetrics module.AccessMetrics,
+	collectionsToMarkFinalized *stdmap.Times,
+	collectionsToMarkExecuted *stdmap.Times,
 ) (*IndexerCore, error) {
 	log = log.With().Str("component", "execution_indexer").Logger()
 	metrics.InitializeLatestHeight(registers.LatestHeight())
@@ -55,15 +64,18 @@ func New(
 		Msg("indexer initialized")
 
 	return &IndexerCore{
-		log:       log,
-		metrics:   metrics,
-		batcher:   batcher,
-		registers: registers,
-		headers:   headers,
-		events:    events,
-		results:   results,
-
-		collectionHandler: collectionHandler,
+		log:                        log,
+		metrics:                    metrics,
+		batcher:                    batcher,
+		registers:                  registers,
+		headers:                    headers,
+		events:                     events,
+		collections:                collections,
+		transactions:               transactions,
+		results:                    results,
+		accessMetrics:              accessMetrics,
+		collectionsToMarkFinalized: collectionsToMarkFinalized,
+		collectionsToMarkExecuted:  collectionsToMarkExecuted,
 	}, nil
 }
 
@@ -173,7 +185,11 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		indexedCount := 0
 		if len(data.ChunkExecutionDatas) > 0 {
 			for _, chunk := range data.ChunkExecutionDatas[0 : len(data.ChunkExecutionDatas)-1] {
-				c.collectionHandler(flow.ZeroID, chunk.Collection)
+				c.trackExecutedMetricForCollection(chunk.Collection.Light())
+				err := HandleCollection(chunk.Collection, c.collections, c.transactions, c.log)
+				if err != nil {
+					return fmt.Errorf("could not handle collection")
+				}
 				indexedCount++
 			}
 		}
@@ -259,4 +275,58 @@ func (c *IndexerCore) indexRegisters(registers map[ledger.Path]*ledger.Payload, 
 	}
 
 	return c.registers.Store(regEntries, height)
+}
+
+func (c *IndexerCore) trackExecutedMetricForCollection(light flow.LightCollection) {
+	if ti, found := c.collectionsToMarkFinalized.ByID(light.ID()); found {
+		for _, t := range light.Transactions {
+			c.accessMetrics.TransactionFinalized(t, ti)
+		}
+		c.collectionsToMarkFinalized.Remove(light.ID())
+	}
+
+	if ti, found := c.collectionsToMarkExecuted.ByID(light.ID()); found {
+		for _, t := range light.Transactions {
+			c.accessMetrics.TransactionExecuted(t, ti)
+		}
+		c.collectionsToMarkExecuted.Remove(light.ID())
+	}
+}
+
+// HandleCollection handles the response of the a collection request made earlier when a block was received
+func HandleCollection(
+	collection *flow.Collection,
+	collections storage.Collections,
+	transactions storage.Transactions,
+	logger zerolog.Logger,
+) error {
+
+	light := collection.Light()
+
+	// FIX: we can't index guarantees here, as we might have more than one block
+	// with the same collection as long as it is not finalized
+
+	// store the light collection (collection minus the transaction body - those are stored separately)
+	// and add transaction ids as index
+	err := collections.StoreLightAndIndexByTransaction(&light)
+	if err != nil {
+		// ignore collection if already seen
+		if errors.Is(err, storage.ErrAlreadyExists) {
+			logger.Debug().
+				Hex("collection_id", logging.Entity(light)).
+				Msg("collection is already seen")
+			return nil
+		}
+		return err
+	}
+
+	// now store each of the transaction body
+	for _, tx := range collection.Transactions {
+		err := transactions.Store(tx)
+		if err != nil {
+			return fmt.Errorf("could not store transaction (%x): %w", tx.ID(), err)
+		}
+	}
+
+	return nil
 }

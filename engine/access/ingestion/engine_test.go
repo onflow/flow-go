@@ -3,6 +3,7 @@ package ingestion
 import (
 	"context"
 	"errors"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"math/rand"
 	"os"
 	"sync"
@@ -55,6 +56,7 @@ type Suite struct {
 	downloader     *downloadermock.Downloader
 	sealedBlock    *flow.Header
 	finalizedBlock *flow.Header
+	log            zerolog.Logger
 
 	eng    *Engine
 	cancel context.CancelFunc
@@ -69,7 +71,7 @@ func (s *Suite) TearDownTest() {
 }
 
 func (s *Suite) SetupTest() {
-	log := zerolog.New(os.Stderr)
+	s.log = zerolog.New(os.Stderr)
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 
@@ -114,7 +116,7 @@ func (s *Suite) SetupTest() {
 	blocksToMarkExecuted, err := stdmap.NewTimes(100)
 	require.NoError(s.T(), err)
 
-	eng, err := New(log, net, s.proto.state, s.me, s.request, s.blocks, s.headers, s.collections,
+	eng, err := New(s.log, net, s.proto.state, s.me, s.request, s.blocks, s.headers, s.collections,
 		s.transactions, s.results, s.receipts, metrics.NewNoopCollector(), collectionsToMarkFinalized, collectionsToMarkExecuted,
 		blocksToMarkExecuted)
 	require.NoError(s.T(), err)
@@ -210,7 +212,6 @@ func (s *Suite) TestOnFinalizedBlock() {
 
 // TestOnCollection checks that when a Collection is received, it is persisted
 func (s *Suite) TestOnCollection() {
-	originID := unittest.IdentifierFixture()
 	collection := unittest.CollectionFixture(5)
 	light := collection.Light()
 
@@ -230,8 +231,7 @@ func (s *Suite) TestOnCollection() {
 		},
 	)
 
-	// process the block through the collection callback
-	s.eng.OnCollection(originID, &collection)
+	indexer.HandleCollection(&collection, s.collections, s.transactions, s.log)
 
 	// check that the collection was stored and indexed, and we stored all transactions
 	s.collections.AssertExpectations(s.T())
@@ -285,11 +285,9 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 	s.receipts.AssertExpectations(s.T())
 }
 
-// TestOnCollection checks that when a duplicate collection is received, the node doesn't
+// TestOnCollectionDuplicate checks that when a duplicate collection is received, the node doesn't
 // crash but just ignores its transactions.
 func (s *Suite) TestOnCollectionDuplicate() {
-
-	originID := unittest.IdentifierFixture()
 	collection := unittest.CollectionFixture(5)
 	light := collection.Light()
 
@@ -309,8 +307,7 @@ func (s *Suite) TestOnCollectionDuplicate() {
 		},
 	)
 
-	// process the block through the collection callback
-	s.eng.OnCollection(originID, &collection)
+	indexer.HandleCollection(&collection, s.collections, s.transactions, s.log)
 
 	// check that the collection was stored and indexed, and we stored all transactions
 	s.collections.AssertExpectations(s.T())

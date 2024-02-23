@@ -777,8 +777,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.Storage.RegisterIndex,
 					builder.Storage.Headers,
 					builder.Storage.Events,
+					builder.Storage.Collections,
+					builder.Storage.Transactions,
 					builder.Storage.LightTransactionResults,
-					builder.IngestEng.OnCollection,
+					builder.AccessMetrics,
+					builder.CollectionsToMarkFinalized,
+					builder.CollectionsToMarkExecuted,
 				)
 				if err != nil {
 					return nil, err
@@ -1631,7 +1635,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, err
 			}
 			ingestionDependable.Init(builder.IngestEng)
-			builder.RequestEng.WithHandle(builder.IngestEng.OnCollection)
+			//builder.RequestEng.WithHandle(builder.IngestEng.OnCollection)
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.IngestEng.OnFinalizedBlock)
 
 			return builder.IngestEng, nil

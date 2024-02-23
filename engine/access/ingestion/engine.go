@@ -23,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -528,80 +527,82 @@ func (e *Engine) trackExecutedMetricForBlock(block *flow.Block, ti time.Time) {
 	}
 }
 
-func (e *Engine) trackExecutedMetricForCollection(light *flow.LightCollection) {
-	if ti, found := e.collectionsToMarkFinalized.ByID(light.ID()); found {
-		for _, t := range light.Transactions {
-			e.metrics.TransactionFinalized(t, ti)
-		}
-		e.collectionsToMarkFinalized.Remove(light.ID())
-	}
+//func (e *Engine) trackExecutedMetricForCollection(light *flow.LightCollection) {
+//	if ti, found := e.collectionsToMarkFinalized.ByID(light.ID()); found {
+//		for _, t := range light.Transactions {
+//			e.metrics.TransactionFinalized(t, ti)
+//		}
+//		e.collectionsToMarkFinalized.Remove(light.ID())
+//	}
+//
+//	if ti, found := e.collectionsToMarkExecuted.ByID(light.ID()); found {
+//		for _, t := range light.Transactions {
+//			e.metrics.TransactionExecuted(t, ti)
+//		}
+//		e.collectionsToMarkExecuted.Remove(light.ID())
+//	}
+//}
 
-	if ti, found := e.collectionsToMarkExecuted.ByID(light.ID()); found {
-		for _, t := range light.Transactions {
-			e.metrics.TransactionExecuted(t, ti)
-		}
-		e.collectionsToMarkExecuted.Remove(light.ID())
-	}
-}
+//type ExecutionMetricForCollection func(light *flow.LightCollection)
+//
+//// HandleCollection handles the response of the a collection request made earlier when a block was received
+//func HandleCollection(
+//	entity flow.Entity,
+//	collections storage.Collections,
+//	transactions storage.Transactions,
+//	logger zerolog.Logger,
+//	metricForCollection ExecutionMetricForCollection,
+//) error {
+//
+//	// convert the entity to a strictly typed collection
+//	collection, ok := entity.(*flow.Collection)
+//	if !ok {
+//		return fmt.Errorf("invalid entity type (%T)", entity)
+//	}
+//
+//	light := collection.Light()
+//
+//	if metricForCollection != nil {
+//		metricForCollection(&light)
+//	}
 
-type ExecutionMetricForCollection func(light *flow.LightCollection)
+//trackExecutedMetricForCollection
+//
+//	// FIX: we can't index guarantees here, as we might have more than one block
+//	// with the same collection as long as it is not finalized
+//
+//	// store the light collection (collection minus the transaction body - those are stored separately)
+//	// and add transaction ids as index
+//	err := collections.StoreLightAndIndexByTransaction(&light)
+//	if err != nil {
+//		// ignore collection if already seen
+//		if errors.Is(err, storage.ErrAlreadyExists) {
+//			logger.Debug().
+//				Hex("collection_id", logging.Entity(light)).
+//				Msg("collection is already seen")
+//			return nil
+//		}
+//		return err
+//	}
+//
+//	// now store each of the transaction body
+//	for _, tx := range collection.Transactions {
+//		err := transactions.Store(tx)
+//		if err != nil {
+//			return fmt.Errorf("could not store transaction (%x): %w", tx.ID(), err)
+//		}
+//	}
+//
+//	return nil
+//}
 
-// HandleCollection handles the response of the a collection request made earlier when a block was received
-func HandleCollection(
-	entity flow.Entity,
-	collections storage.Collections,
-	transactions storage.Transactions,
-	logger zerolog.Logger,
-	metricForCollection ExecutionMetricForCollection,
-) error {
-
-	// convert the entity to a strictly typed collection
-	collection, ok := entity.(*flow.Collection)
-	if !ok {
-		return fmt.Errorf("invalid entity type (%T)", entity)
-	}
-
-	light := collection.Light()
-
-	if metricForCollection != nil {
-		metricForCollection(&light)
-	}
-
-	// FIX: we can't index guarantees here, as we might have more than one block
-	// with the same collection as long as it is not finalized
-
-	// store the light collection (collection minus the transaction body - those are stored separately)
-	// and add transaction ids as index
-	err := collections.StoreLightAndIndexByTransaction(&light)
-	if err != nil {
-		// ignore collection if already seen
-		if errors.Is(err, storage.ErrAlreadyExists) {
-			logger.Debug().
-				Hex("collection_id", logging.Entity(light)).
-				Msg("collection is already seen")
-			return nil
-		}
-		return err
-	}
-
-	// now store each of the transaction body
-	for _, tx := range collection.Transactions {
-		err := transactions.Store(tx)
-		if err != nil {
-			return fmt.Errorf("could not store transaction (%x): %w", tx.ID(), err)
-		}
-	}
-
-	return nil
-}
-
-func (e *Engine) OnCollection(_ flow.Identifier, entity flow.Entity) {
-	err := HandleCollection(entity, e.collections, e.transactions, e.log, e.trackExecutedMetricForCollection)
-	if err != nil {
-		e.log.Error().Err(err).Msg("could not handle collection")
-		return
-	}
-}
+//func (e *Engine) OnCollection(_ flow.Identifier, entity flow.Entity) {
+//	err := indexer.HandleCollection(entity, e.collections, e.transactions, e.log)
+//	if err != nil {
+//		e.log.Error().Err(err).Msg("could not handle collection")
+//		return
+//	}
+//}
 
 // requestMissingCollections requests missing collections for all blocks in the local db storage once at startup
 func (e *Engine) requestMissingCollections(ctx context.Context) error {
