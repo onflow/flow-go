@@ -68,6 +68,7 @@ func NewIndexer(
 		log:             log.With().Str("module", "execution_indexer").Logger(),
 		exeDataNotifier: engine.NewNotifier(),
 		indexer:         indexer,
+		registers:       registers,
 	}
 
 	r.exeDataReader = jobs.NewExecutionDataReader(executionCache, fetchTimeout, executionDataLatestHeight)
