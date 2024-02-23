@@ -26,8 +26,6 @@ const (
 )
 
 const (
-	MagicBytesPayloadHeader uint16 = 0x2138
-
 	PayloadFileVersionV1 uint16 = 0x01
 
 	encMagicBytesIndex       = 0
@@ -56,7 +54,7 @@ func newPayloadFileHeader(version uint16, partialState bool) []byte {
 	var header [headerSize]byte
 
 	// Write magic bytes.
-	binary.BigEndian.PutUint16(header[encMagicBytesIndex:], MagicBytesPayloadHeader)
+	binary.BigEndian.PutUint16(header[encMagicBytesIndex:], wal.MagicBytesPayloadHeader)
 
 	// Write version.
 	binary.BigEndian.PutUint16(header[encVersionIndex:], version)
@@ -77,8 +75,8 @@ func parsePayloadFileHeader(header []byte) (partialState bool, err error) {
 
 	// Read magic bytes.
 	gotMagicBytes := binary.BigEndian.Uint16(header[encMagicBytesIndex:])
-	if gotMagicBytes != MagicBytesPayloadHeader {
-		return false, fmt.Errorf("can't parse payload header: got magic bytes %d, expected %d", gotMagicBytes, MagicBytesPayloadHeader)
+	if gotMagicBytes != wal.MagicBytesPayloadHeader {
+		return false, fmt.Errorf("can't parse payload header: got magic bytes %d, expected %d", gotMagicBytes, wal.MagicBytesPayloadHeader)
 	}
 
 	// Read version.
