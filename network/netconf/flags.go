@@ -108,15 +108,31 @@ func AllFlagNames() []string {
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.EnableKey, p2pconfig.GraftKey),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.EnableKey, p2pconfig.PruneKey),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.EnableKey, p2pconfig.IHaveKey),
-		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.EnableKey, p2pconfig.IHaveKey, p2pconfig.MessageIDKey),
+		BuildFlagName(gossipsubKey,
+			p2pconfig.RpcInspectorKey,
+			p2pconfig.ValidationConfigKey,
+			p2pconfig.ProcessKey,
+			p2pconfig.TruncationKey,
+			p2pconfig.EnableKey,
+			p2pconfig.IHaveKey,
+			p2pconfig.MessageIDKey),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.EnableKey, p2pconfig.IWantConfigKey),
-		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.EnableKey, p2pconfig.IWantKey, p2pconfig.MessageIDKey),
+		BuildFlagName(gossipsubKey,
+			p2pconfig.RpcInspectorKey,
+			p2pconfig.ValidationConfigKey,
+			p2pconfig.ProcessKey,
+			p2pconfig.TruncationKey,
+			p2pconfig.EnableKey,
+			p2pconfig.IWantKey,
+			p2pconfig.MessageIDKey),
 
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IHaveConfigKey, p2pconfig.MessageCountThreshold),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IHaveConfigKey, p2pconfig.MessageIdCountThreshold),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IHaveConfigKey, p2pconfig.DuplicateTopicIdThresholdKey),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IHaveConfigKey, p2pconfig.DuplicateMessageIdThresholdKey),
+		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IHaveConfigKey, p2pconfig.InvalidTopicIdThresholdKey),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.GraftPruneKey, p2pconfig.DuplicateTopicIdThresholdKey),
+		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.GraftPruneKey, p2pconfig.InvalidTopicIdThresholdKey),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.GraftPruneKey, p2pconfig.MessageCountThreshold),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IWantConfigKey, p2pconfig.MessageCountThreshold),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IWantConfigKey, p2pconfig.MessageIdCountThreshold),
@@ -166,6 +182,7 @@ func AllFlagNames() []string {
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoringRegistryKey, p2pconfig.StartupSilenceDurationKey),
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoringRegistryKey, p2pconfig.AppSpecificScoreRegistryKey, p2pconfig.ScoreUpdateWorkerNumKey),
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoringRegistryKey, p2pconfig.AppSpecificScoreRegistryKey, p2pconfig.ScoreUpdateRequestQueueSizeKey),
+		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoringRegistryKey, p2pconfig.AppSpecificScoreRegistryKey, p2pconfig.InvalidControlMessageNotificationQueueSizeKey),
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoringRegistryKey, p2pconfig.AppSpecificScoreRegistryKey, p2pconfig.ScoreTTLKey),
 
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoringRegistryKey, p2pconfig.SpamRecordCacheKey, p2pconfig.CacheSizeKey),
@@ -332,13 +349,27 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.EnableKey, p2pconfig.IHaveKey),
 		config.GossipSub.RpcInspector.Validation.InspectionProcess.Truncate.EnableIHave,
 		"disable ihave control message truncation")
-	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.EnableKey, p2pconfig.IHaveKey, p2pconfig.MessageIDKey),
+	flags.Bool(BuildFlagName(gossipsubKey,
+		p2pconfig.RpcInspectorKey,
+		p2pconfig.ValidationConfigKey,
+		p2pconfig.ProcessKey,
+		p2pconfig.TruncationKey,
+		p2pconfig.EnableKey,
+		p2pconfig.IHaveKey,
+		p2pconfig.MessageIDKey),
 		config.GossipSub.RpcInspector.Validation.InspectionProcess.Truncate.EnableIHaveMessageIds,
 		"disable ihave message id truncation")
 	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.EnableKey, p2pconfig.IWantKey),
 		config.GossipSub.RpcInspector.Validation.InspectionProcess.Truncate.EnableIWant,
 		"disable iwant control message truncation")
-	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.EnableKey, p2pconfig.IWantKey, p2pconfig.MessageIDKey),
+	flags.Bool(BuildFlagName(gossipsubKey,
+		p2pconfig.RpcInspectorKey,
+		p2pconfig.ValidationConfigKey,
+		p2pconfig.ProcessKey,
+		p2pconfig.TruncationKey,
+		p2pconfig.EnableKey,
+		p2pconfig.IWantKey,
+		p2pconfig.MessageIDKey),
 		config.GossipSub.RpcInspector.Validation.InspectionProcess.Truncate.EnableIWantMessageIds,
 		"disable iwant message id truncation")
 
@@ -354,6 +385,11 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Int(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IHaveConfigKey, p2pconfig.DuplicateMessageIdThresholdKey),
 		config.GossipSub.RpcInspector.Validation.IHave.DuplicateMessageIdThreshold,
 		"the max allowed duplicate message IDs in a single ihave control message, if exceeded a misbehavior report will be created")
+	flags.Int(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IHaveConfigKey, p2pconfig.InvalidTopicIdThresholdKey),
+		config.GossipSub.RpcInspector.Validation.IHave.InvalidTopicIdThreshold,
+		"the max allowed invalid topics in a single ihave control message, if exceeded a misbehavior report will be created",
+	)
+
 	flags.Int(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.GraftPruneKey, p2pconfig.MessageCountThreshold),
 		config.GossipSub.RpcInspector.Validation.GraftPrune.MessageCountThreshold,
 		"threshold for the number of graft or prune control messages to accept on a single RPC message, if exceeded the RPC message will be sampled and truncated")
@@ -378,6 +414,9 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Int(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.GraftPruneKey, p2pconfig.DuplicateTopicIdThresholdKey),
 		config.GossipSub.RpcInspector.Validation.GraftPrune.DuplicateTopicIdThreshold,
 		"the max allowed duplicate topic IDs across all graft or prune control messages in a single RPC message, if exceeded a misbehavior report will be created")
+	flags.Int(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.GraftPruneKey, p2pconfig.InvalidTopicIdThresholdKey),
+		config.GossipSub.RpcInspector.Validation.GraftPrune.InvalidTopicIdThreshold,
+		"the max allowed invalid topic across all graft or prune control messages in a single RPC message, if exceeded a misbehavior report will be created")
 
 	flags.Duration(BuildFlagName(gossipsubKey, p2pconfig.SubscriptionProviderKey, p2pconfig.UpdateIntervalKey),
 		config.GossipSub.SubscriptionProvider.UpdateInterval,
@@ -486,7 +525,13 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PeerScoringKey, p2pconfig.ProtocolKey, p2pconfig.AppSpecificKey, p2pconfig.StakedIdentityKey, p2pconfig.RewardKey),
 		config.GossipSub.ScoringParameters.PeerScoring.Protocol.AppSpecificScore.StakedIdentityReward,
 		"the reward for staking peers")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PeerScoringKey, p2pconfig.ProtocolKey, p2pconfig.AppSpecificKey, p2pconfig.DuplicateMessageKey, p2pconfig.ThresholdKey),
+	flags.Float64(BuildFlagName(gossipsubKey,
+		p2pconfig.ScoreParamsKey,
+		p2pconfig.PeerScoringKey,
+		p2pconfig.ProtocolKey,
+		p2pconfig.AppSpecificKey,
+		p2pconfig.DuplicateMessageKey,
+		p2pconfig.ThresholdKey),
 		config.GossipSub.ScoringParameters.PeerScoring.Protocol.AppSpecificScore.DuplicateMessageThreshold,
 		"the peer's duplicate message count threshold above which the peer will be penalized")
 
@@ -499,6 +544,9 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Uint32(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoringRegistryKey, p2pconfig.AppSpecificScoreRegistryKey, p2pconfig.ScoreUpdateRequestQueueSizeKey),
 		config.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreUpdateRequestQueueSize,
 		"size of the app specific score update worker pool queue")
+	flags.Uint32(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoringRegistryKey, p2pconfig.AppSpecificScoreRegistryKey, p2pconfig.InvalidControlMessageNotificationQueueSizeKey),
+		config.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.InvalidControlMessageNotificationQueueSize,
+		"size of the queue for invalid control message notifications processing")
 	flags.Duration(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoringRegistryKey, p2pconfig.AppSpecificScoreRegistryKey, p2pconfig.ScoreTTLKey),
 		config.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL,
 		"time to live for app specific scores; when expired a new request will be sent to the score update worker pool; till then the expired score will be used")
