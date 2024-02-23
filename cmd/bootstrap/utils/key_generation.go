@@ -13,6 +13,7 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
@@ -173,7 +174,7 @@ func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeIn
 	//
 	// for the machine account key, we keep track of the address index to map
 	// the Flow address of the machine account to the key.
-	addressIndex := uint64(4)
+	addressIndex := uint64(systemcontracts.EVMStorageAccountIndex)
 	for _, nodeInfo := range nodeInfos {
 
 		// retrieve private representation of the node
@@ -188,7 +189,7 @@ func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeIn
 		// Accounts are generated in a known order during bootstrapping, and
 		// account addresses are deterministic based on order for a given chain
 		// configuration. During the bootstrapping we create 4 Flow accounts besides
-		// the service account (index 0) so node accounts will start at index 5.
+		// the service account (index 1) so node accounts will start at index 6.
 		//
 		// All nodes have a staking account created for them, only collection and
 		// consensus nodes have a second machine account created.
