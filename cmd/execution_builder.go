@@ -89,6 +89,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/blob"
+	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -1066,7 +1067,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 ) {
 	engineRegister := node.EngineRegistry
 	if node.ObserverMode {
-		engineRegister = &network.NoopEngineRegister{}
+		engineRegister = &underlay.NoopEngineRegister{}
 	}
 
 	var err error
@@ -1268,7 +1269,7 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 
 	engineRegister := node.EngineRegistry
 	if node.ObserverMode {
-		engineRegister = &network.NoopEngineRegister{}
+		engineRegister = &underlay.NoopEngineRegister{}
 	}
 	eng, err := provider.New(
 		node.Logger.With().Str("engine", "receipt_provider").Logger(),
