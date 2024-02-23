@@ -25,18 +25,23 @@ import (
 )
 
 type testContractHandler struct {
-	flowTokenAddress  common.Address
-	deployCOA         func(uint64) types.Address
-	accountByAddress  func(types.Address, bool) types.Account
-	lastExecutedBlock func() *types.Block
-	run               func(tx []byte, coinbase types.Address)
+	flowTokenAddress   common.Address
+	evmContractAddress common.Address
+	deployCOA          func(uint64) types.Address
+	accountByAddress   func(types.Address, bool) types.Account
+	lastExecutedBlock  func() *types.Block
+	run                func(tx []byte, coinbase types.Address) *types.ResultSummary
 }
+
+var _ types.ContractHandler = &testContractHandler{}
 
 func (t *testContractHandler) FlowTokenAddress() common.Address {
 	return t.flowTokenAddress
 }
 
-var _ types.ContractHandler = &testContractHandler{}
+func (t *testContractHandler) EVMContractAddress() common.Address {
+	return t.evmContractAddress
+}
 
 func (t *testContractHandler) DeployCOA(uuid uint64) types.Address {
 	if t.deployCOA == nil {
@@ -61,11 +66,11 @@ func (t *testContractHandler) LastExecutedBlock() *types.Block {
 	return t.lastExecutedBlock()
 }
 
-func (t *testContractHandler) Run(tx []byte, coinbase types.Address) {
+func (t *testContractHandler) Run(tx []byte, coinbase types.Address) *types.ResultSummary {
 	if t.run == nil {
 		panic("unexpected Run")
 	}
-	t.run(tx, coinbase)
+	return t.run(tx, coinbase)
 }
 
 type testFlowAccount struct {
@@ -73,11 +78,12 @@ type testFlowAccount struct {
 	balance  func() types.Balance
 	code     func() types.Code
 	codeHash func() []byte
+	nonce    func() uint64
 	transfer func(address types.Address, balance types.Balance)
 	deposit  func(vault *types.FLOWTokenVault)
 	withdraw func(balance types.Balance) *types.FLOWTokenVault
 	deploy   func(code types.Code, limit types.GasLimit, balance types.Balance) types.Address
-	call     func(address types.Address, data types.Data, limit types.GasLimit, balance types.Balance) types.Data
+	call     func(address types.Address, data types.Data, limit types.GasLimit, balance types.Balance) *types.ResultSummary
 }
 
 var _ types.Account = &testFlowAccount{}
@@ -105,6 +111,13 @@ func (t *testFlowAccount) CodeHash() []byte {
 		return nil
 	}
 	return t.codeHash()
+}
+
+func (t *testFlowAccount) Nonce() uint64 {
+	if t.nonce == nil {
+		return 0
+	}
+	return t.nonce()
 }
 
 func (t *testFlowAccount) Transfer(address types.Address, balance types.Balance) {
@@ -135,7 +148,7 @@ func (t *testFlowAccount) Deploy(code types.Code, limit types.GasLimit, balance 
 	return t.deploy(code, limit, balance)
 }
 
-func (t *testFlowAccount) Call(address types.Address, data types.Data, limit types.GasLimit, balance types.Balance) types.Data {
+func (t *testFlowAccount) Call(address types.Address, data types.Data, limit types.GasLimit, balance types.Balance) *types.ResultSummary {
 	if t.call == nil {
 		panic("unexpected Call")
 	}
@@ -2763,8 +2776,10 @@ func TestEVMRun(t *testing.T) {
 
 	runCalled := false
 
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
 	handler := &testContractHandler{
-		run: func(tx []byte, coinbase types.Address) {
+		evmContractAddress: common.Address(contractsAddress),
+		run: func(tx []byte, coinbase types.Address) *types.ResultSummary {
 			runCalled = true
 
 			assert.Equal(t, []byte{1, 2, 3}, tx)
@@ -2774,11 +2789,11 @@ func TestEVMRun(t *testing.T) {
 				},
 				coinbase,
 			)
-
+			return &types.ResultSummary{
+				Status: types.StatusSuccessful,
+			}
 		},
 	}
-
-	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
@@ -2789,9 +2804,11 @@ func TestEVMRun(t *testing.T) {
       import EVM from 0x1
 
       access(all)
-      fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
+      fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): UInt8 {
           let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-          EVM.run(tx: tx, coinbase: coinbase)
+          let res = EVM.run(tx: tx, coinbase: coinbase)
+		  let st = res.status
+		  return st.rawValue
       }
     `)
 
@@ -2838,7 +2855,7 @@ func TestEVMRun(t *testing.T) {
 
 	// Run script
 
-	_, err := rt.ExecuteScript(
+	val, err := rt.ExecuteScript(
 		runtime.Script{
 			Source:    script,
 			Arguments: EncodeArgs([]cadence.Value{evmTx, coinbase}),
@@ -2851,10 +2868,39 @@ func TestEVMRun(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	assert.Equal(t, types.StatusSuccessful, types.Status(val.(cadence.UInt8)))
+	assert.True(t, runCalled)
+
+	// test must run
+	script = []byte(`
+		import EVM from 0x1
+
+		access(all)
+		fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): UInt8 {
+			let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+			let res = EVM.mustRun(tx: tx, coinbase: coinbase)
+			let st = res.status
+			return st.rawValue
+		}
+  	`)
+	val, err = rt.ExecuteScript(
+		runtime.Script{
+			Source:    script,
+			Arguments: EncodeArgs([]cadence.Value{evmTx, coinbase}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	assert.Equal(t, types.StatusSuccessful, types.Status(val.(cadence.UInt8)))
 	assert.True(t, runCalled)
 }
 
-func TestEVMCreateBridgedAccount(t *testing.T) {
+func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 
 	t.Parallel()
 
@@ -2877,12 +2923,12 @@ func TestEVMCreateBridgedAccount(t *testing.T) {
 
       access(all)
       fun main(): [UInt8; 20] {
-          let bridgedAccount1 <- EVM.createBridgedAccount()
-          destroy bridgedAccount1
+          let cadenceOwnedAccount1 <- EVM.createCadenceOwnedAccount()
+          destroy cadenceOwnedAccount1
 
-          let bridgedAccount2 <- EVM.createBridgedAccount()
-          let bytes = bridgedAccount2.address().bytes
-          destroy bridgedAccount2
+          let cadenceOwnedAccount2 <- EVM.createCadenceOwnedAccount()
+          let bytes = cadenceOwnedAccount2.address().bytes
+          destroy cadenceOwnedAccount2
 
           return bytes
       }
@@ -2966,14 +3012,17 @@ func TestEVMCreateBridgedAccount(t *testing.T) {
 	require.Equal(t, expected, actual)
 }
 
-func TestBridgedAccountCall(t *testing.T) {
+func TestCadenceOwnedAccountCall(t *testing.T) {
 
 	t.Parallel()
 
 	expectedBalance, err := cadence.NewUFix64FromParts(1, 23000000)
 	require.NoError(t, err)
 
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
 	handler := &testContractHandler{
+		evmContractAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
 			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.True(t, isAuthorized)
@@ -2985,19 +3034,20 @@ func TestBridgedAccountCall(t *testing.T) {
 					data types.Data,
 					limit types.GasLimit,
 					balance types.Balance,
-				) types.Data {
+				) *types.ResultSummary {
 					assert.Equal(t, types.Address{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, toAddress)
 					assert.Equal(t, types.Data{4, 5, 6}, data)
 					assert.Equal(t, types.GasLimit(9999), limit)
 					assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
 
-					return types.Data{3, 1, 4}
+					return &types.ResultSummary{
+						Status:        types.StatusSuccessful,
+						ReturnedValue: types.Data{3, 1, 4},
+					}
 				},
 			}
 		},
 	}
-
-	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
@@ -3009,10 +3059,10 @@ func TestBridgedAccountCall(t *testing.T) {
 
       access(all)
       fun main(): [UInt8] {
-          let bridgedAccount <- EVM.createBridgedAccount()
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
 		  let bal = EVM.Balance(0)
 		  bal.setFLOW(flow: 1.23)
-          let response = bridgedAccount.call(
+          let response = cadenceOwnedAccount.call(
               to: EVM.EVMAddress(
                   bytes: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
               ),
@@ -3020,8 +3070,8 @@ func TestBridgedAccountCall(t *testing.T) {
               gasLimit: 9999,
               value: bal
           )
-          destroy bridgedAccount
-          return response
+          destroy cadenceOwnedAccount
+          return response.data
       }
    `)
 
@@ -3137,9 +3187,9 @@ func TestEVMAddressDeposit(t *testing.T) {
           let vault <- minter.mintTokens(amount: 1.23)
           destroy minter
 
-          let bridgedAccount <- EVM.createBridgedAccount()
-          bridgedAccount.deposit(from: <-vault)
-		  destroy bridgedAccount
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+          cadenceOwnedAccount.deposit(from: <-vault)
+		  destroy cadenceOwnedAccount
       }
    `)
 
@@ -3201,7 +3251,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 	require.True(t, deposited)
 }
 
-func TestBridgedAccountWithdraw(t *testing.T) {
+func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 
 	t.Parallel()
 
@@ -3260,12 +3310,12 @@ func TestBridgedAccountWithdraw(t *testing.T) {
           let vault <- minter.mintTokens(amount: 2.34)
           destroy minter
 
-          let bridgedAccount <- EVM.createBridgedAccount()
-          bridgedAccount.deposit(from: <-vault)
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+          cadenceOwnedAccount.deposit(from: <-vault)
 
-          let vault2 <- bridgedAccount.withdraw(balance: EVM.Balance(attoflow: 1230000000000000000))
+          let vault2 <- cadenceOwnedAccount.withdraw(balance: EVM.Balance(attoflow: 1230000000000000000))
           let balance = vault2.balance
-          destroy bridgedAccount
+          destroy cadenceOwnedAccount
           destroy vault2
 
           return balance
@@ -3332,7 +3382,7 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 	assert.Equal(t, expectedWithdrawBalance, result)
 }
 
-func TestBridgedAccountDeploy(t *testing.T) {
+func TestCadenceOwnedAccountDeploy(t *testing.T) {
 
 	t.Parallel()
 
@@ -3374,13 +3424,13 @@ func TestBridgedAccountDeploy(t *testing.T) {
 
       access(all)
       fun main(): [UInt8; 20] {
-          let bridgedAccount <- EVM.createBridgedAccount()
-          let address = bridgedAccount.deploy(
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+          let address = cadenceOwnedAccount.deploy(
               code: [4, 5, 6],
               gasLimit: 9999,
               value: EVM.Balance(flow: 1230000000000000000)
           )
-          destroy bridgedAccount
+          destroy cadenceOwnedAccount
           return address.bytes
       }
    `)
@@ -3497,9 +3547,9 @@ func TestEVMAccountBalance(t *testing.T) {
 
       access(all)
       fun main(): EVM.Balance {
-          let bridgedAccount <- EVM.createBridgedAccount()
-          let balance = bridgedAccount.balance()
-          destroy bridgedAccount
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+          let balance = cadenceOwnedAccount.balance()
+          destroy cadenceOwnedAccount
           return balance
       }
     `)
@@ -3597,9 +3647,9 @@ func TestEVMAccountBalanceForABIOnlyContract(t *testing.T) {
 
       access(all)
       fun main(): EVM.Balance {
-          let bridgedAccount <- EVM.createBridgedAccount()
-          let balance = bridgedAccount.balance()
-          destroy bridgedAccount
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+          let balance = cadenceOwnedAccount.balance()
+          destroy cadenceOwnedAccount
           return balance
       }
     `)
@@ -3667,12 +3717,11 @@ func TestEVMAccountBalanceForABIOnlyContract(t *testing.T) {
 	assert.ErrorContains(
 		t,
 		err,
-		"error: value of type `EVM` has no member `createBridgedAccount`",
+		"error: value of type `EVM` has no member `createCadenceOwnedAccount`",
 	)
 }
 
 func TestEVMValidateCOAOwnershipProof(t *testing.T) {
-
 	t.Parallel()
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
@@ -3680,7 +3729,7 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 	proof := &types.COAOwnershipProofInContext{
 		COAOwnershipProof: types.COAOwnershipProof{
 			Address:        types.FlowAddress(contractsAddress),
-			CapabilityPath: "bridgedAccount",
+			CapabilityPath: "coa",
 			Signatures:     []types.Signature{[]byte("signature")},
 			KeyIndices:     []uint64{0},
 		},
@@ -3764,11 +3813,11 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 
 		transaction {
 			prepare(account: AuthAccount) {
-				let bridgedAccount1 <- EVM.createBridgedAccount()
-				account.save<@EVM.BridgedAccount>(<-bridgedAccount1,
-					                              to: /storage/bridgedAccount)
-				account.link<&EVM.BridgedAccount{EVM.Addressable}>(/public/bridgedAccount,
-					                                               target: /storage/bridgedAccount)
+				let cadenceOwnedAccount1 <- EVM.createCadenceOwnedAccount()
+				account.save<@EVM.CadenceOwnedAccount>(<-cadenceOwnedAccount1,
+					                              to: /storage/coa)
+				account.link<&EVM.CadenceOwnedAccount{EVM.Addressable}>(/public/coa,
+					                                               target: /storage/coa)
 			}
 		}`)
 
