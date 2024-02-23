@@ -200,6 +200,28 @@ func TestContractInteraction(t *testing.T) {
 						require.Equal(t, blockNumber, ret)
 					})
 				})
+
+				RunWithNewEmulator(t, backend, rootAddr, func(em *emulator.Emulator) {
+					ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
+					ctx.ChainID = types.FlowEVMMainnetChainID
+					blk, err := em.NewBlockView(ctx)
+					require.NoError(t, err)
+					res, err := blk.DirectCall(
+						types.NewContractCall(
+							testAccount,
+							contractAddr,
+							testContract.MakeCallData(t, "chainID"),
+							1_000_000,
+							big.NewInt(0), // this should be zero because the contract doesn't have receiver
+							nonce,
+						),
+					)
+					require.NoError(t, err)
+					nonce += 1
+
+					ret := new(big.Int).SetBytes(res.ReturnedValue)
+					require.Equal(t, types.FlowEVMMainnetChainID, ret)
+				})
 			})
 
 			t.Run("test sending transactions (happy case)", func(t *testing.T) {
