@@ -1,5 +1,7 @@
 package kvstore
 
+import "github.com/onflow/flow-go/state/protocol/protocol_state"
+
 // This file contains the concrete types that define the structure of the
 // underlying key-value store for a particular Protocol State version.
 // Essentially enumerating the set of keys and values that are supported.
@@ -15,8 +17,8 @@ package kvstore
 // with multiple supported KV model versions from the beginning.
 type modelv0 struct{}
 
-var _ Reader = new(modelv0)
-var _ API = new(modelv0)
+var _ protocol_state.Reader = new(modelv0)
+var _ protocol_state.API = new(modelv0)
 
 // VersionedEncode encodes the key-value store, returning the version separately
 // from the encoded bytes.
@@ -53,8 +55,8 @@ type modelv1 struct {
 	InvalidEpochTransitionAttempted bool
 }
 
-var _ Reader = new(modelv1)
-var _ API = new(modelv1)
+var _ protocol_state.Reader = new(modelv1)
+var _ protocol_state.API = new(modelv1)
 
 // VersionedEncode encodes the key-value store, returning the version separately
 // from the encoded bytes.
