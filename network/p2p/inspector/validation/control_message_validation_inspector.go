@@ -209,6 +209,22 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 		return nil
 	}
 
+	// check peer identity when running private network
+	if c.networkingType == network.PrivateNetwork {
+		err := c.checkSenderIdentity(from)
+		if err != nil {
+			c.notificationConsumer.OnInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(from, p2pmsg.CtrlMsgGraft, err, 1, p2p.CtrlMsgNonClusterTopicType))
+			c.logger.
+				Error().
+				Err(err).
+				Str("peer_id", p2plogging.PeerId(from)).
+				Bool(logging.KeyNetworkingSecurity, true).
+				Msg("rpc received from unstaked peer")
+			c.metrics.OnInvalidControlMessageNotificationSent()
+			return err
+		}
+	}
+
 	// first truncate the rpc to the configured max sample size; if needed
 	c.truncateRPC(from, rpc)
 
@@ -223,7 +239,6 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 		return fmt.Errorf("failed to get inspect RPC request: %w", err)
 	}
 	c.workerPool.Submit(req)
-
 	return nil
 }
 
@@ -311,22 +326,18 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 	return nil
 }
 
-// checkPubsubMessageSender checks the sender of the sender of pubsub message to ensure they are not unstaked, or ejected.
+// checkSenderIdentity checks the identity of the peer with pid and ensures they are not unstaked, or ejected.
 // This check is only required on private networks.
 // Args:
-//   - message: the pubsub message.
+//   - pid : the peer ID.
 //
 // Returns:
-//   - error: if the peer ID cannot be created from bytes, sender is unknown or the identity is ejected.
+//   - error: sender is unknown or the identity is ejected.
 //
 // All errors returned from this function can be considered benign.
-func (c *ControlMsgValidationInspector) checkPubsubMessageSender(message *pubsub_pb.Message) error {
-	pid, err := peer.IDFromBytes(message.GetFrom())
-	if err != nil {
-		return fmt.Errorf("failed to get peer ID from bytes: %w", err)
-	}
+func (c *ControlMsgValidationInspector) checkSenderIdentity(pid peer.ID) error {
 	if id, ok := c.idProvider.ByPeerID(pid); !ok {
-		return fmt.Errorf("received rpc publish message from unstaked peer: %s", pid)
+		return NewUnstakedPeerErr(fmt.Errorf("received rpc publish message from unstaked peer: %s", pid))
 	} else if id.IsEjected() {
 		return fmt.Errorf("received rpc publish message from ejected peer: %s", pid)
 	}
@@ -617,11 +628,11 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 			Msg(PublishInspectionDisabledWarning)
 		return nil, 0
 	}
-
 	totalMessages := len(messages)
 	if totalMessages == 0 {
 		return nil, 0
 	}
+
 	sampleSize := c.config.PublishMessages.MaxSampleSize
 	if sampleSize > totalMessages {
 		sampleSize = totalMessages
@@ -651,9 +662,16 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		}
 		c.metrics.OnPublishMessageInspected(errCnt, invalidTopicIdsCount, invalidSubscriptionsCount, invalidSendersCount)
 	}()
+
 	for _, message := range messages[:sampleSize] {
 		if c.networkingType == network.PrivateNetwork {
-			err := c.checkPubsubMessageSender(message)
+			pid, err := peer.IDFromBytes(message.GetFrom())
+			if err != nil {
+				invalidSendersCount++
+				errs = multierror.Append(errs, fmt.Errorf("failed to get peer ID from bytes: %w", err))
+				continue
+			}
+			err = c.checkSenderIdentity(pid)
 			if err != nil {
 				invalidSendersCount++
 				errs = multierror.Append(errs, err)
@@ -978,23 +996,17 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 		Str("from", p2plogging.PeerId(from)).
 		Logger()
 
-	// only staked nodes are expected to participate on cluster prefixed topics
-	nodeID, err := c.getFlowIdentifier(from)
-	if err != nil {
-		return err
-	}
 	if len(activeClusterIds) == 0 {
 		// cluster IDs have not been updated yet
-		_, incErr := c.tracker.Inc(nodeID)
+		_, incErr := c.tracker.Inc(from)
 		if incErr != nil {
 			// irrecoverable error encountered
-			c.logAndThrowError(fmt.Errorf("error encountered while incrementing the cluster prefixed control message gauge %s: %w", nodeID, err))
+			c.logAndThrowError(fmt.Errorf("error encountered while incrementing the cluster prefixed control message gauge %s: %w", from, incErr))
 		}
 
 		// if the amount of messages received is below our hard threshold log the error and return nil.
-		if ok := c.checkClusterPrefixHardThreshold(nodeID); ok {
+		if ok := c.checkClusterPrefixHardThreshold(from); ok {
 			lg.Warn().
-				Err(err).
 				Str("topic", topic.String()).
 				Msg("failed to validate cluster prefixed control message with cluster pre-fixed topic active cluster ids not set")
 			return nil
@@ -1003,17 +1015,17 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 		return NewActiveClusterIdsNotSetErr(topic)
 	}
 
-	err = channels.IsValidFlowClusterTopic(topic, activeClusterIds)
+	err := channels.IsValidFlowClusterTopic(topic, activeClusterIds)
 	if err != nil {
 		if channels.IsUnknownClusterIDErr(err) {
 			// unknown cluster ID error could indicate that a node has fallen
 			// behind and needs to catchup increment to topics received cache.
-			_, incErr := c.tracker.Inc(nodeID)
+			_, incErr := c.tracker.Inc(from)
 			if incErr != nil {
-				c.logAndThrowError(fmt.Errorf("error encountered while incrementing the cluster prefixed control message gauge %s: %w", nodeID, err))
+				c.logAndThrowError(fmt.Errorf("error encountered while incrementing the cluster prefixed control message gauge %s: %w", from, err))
 			}
 			// if the amount of messages received is below our hard threshold log the error and return nil.
-			if c.checkClusterPrefixHardThreshold(nodeID) {
+			if c.checkClusterPrefixHardThreshold(from) {
 				lg.Warn().
 					Err(err).
 					Str("topic", topic.String()).
@@ -1027,28 +1039,15 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 	return nil
 }
 
-// getFlowIdentifier returns the flow identity identifier for a peer.
-// Args:
-//   - peerID: the peer id of the sender.
-//
-// The returned error indicates that the peer is un-staked.
-func (c *ControlMsgValidationInspector) getFlowIdentifier(peerID peer.ID) (flow.Identifier, error) {
-	id, ok := c.idProvider.ByPeerID(peerID)
-	if !ok {
-		return flow.ZeroID, NewUnstakedPeerErr(fmt.Errorf("failed to get flow identity for peer: %s", peerID))
-	}
-	return id.ID(), nil
-}
-
 // checkClusterPrefixHardThreshold returns true if the cluster prefix received tracker count is less than
 // the configured HardThreshold, false otherwise.
 // If any error is encountered while loading from the tracker this func will throw an error on the signaler context, these errors
 // are unexpected and irrecoverable indicating a bug.
-func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID flow.Identifier) bool {
-	gauge, err := c.tracker.Load(nodeID)
+func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(pid peer.ID) bool {
+	gauge, err := c.tracker.Load(pid)
 	if err != nil {
 		// irrecoverable error encountered
-		c.logAndThrowError(fmt.Errorf("cluster prefixed control message gauge during hard threshold check failed for node %s: %w", nodeID, err))
+		c.logAndThrowError(fmt.Errorf("cluster prefixed control message gauge during hard threshold check failed for peer %s: %w", pid, err))
 	}
 	return gauge <= c.config.ClusterPrefixedMessage.HardThreshold
 }
