@@ -6,11 +6,10 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -65,7 +64,7 @@ func (b *backendSubscribeBlocks) getBlockResponse(blockStatus flow.BlockStatus) 
 	return func(_ context.Context, height uint64) (interface{}, error) {
 		block, err := b.getBlock(height, blockStatus)
 		if err != nil {
-			return nil, fmt.Errorf("could not get block by height %d: %w", height, err)
+			return nil, err
 		}
 
 		b.log.Trace().
@@ -82,7 +81,7 @@ func (b *backendSubscribeBlocks) getBlockHeaderResponse(blockStatus flow.BlockSt
 	return func(_ context.Context, height uint64) (interface{}, error) {
 		header, err := b.getBlockHeader(height, blockStatus)
 		if err != nil {
-			return nil, fmt.Errorf("could not get block by height %d: %w", height, err)
+			return nil, err
 		}
 
 		b.log.Trace().
@@ -99,7 +98,7 @@ func (b *backendSubscribeBlocks) getBlockDigestResponse(blockStatus flow.BlockSt
 	return func(_ context.Context, height uint64) (interface{}, error) {
 		header, err := b.getBlockHeader(height, blockStatus)
 		if err != nil {
-			return nil, fmt.Errorf("could not get block by height %d: %w", height, err)
+			return nil, err
 		}
 
 		b.log.Trace().
@@ -127,7 +126,7 @@ func (b *backendSubscribeBlocks) getBlockHeader(height uint64, expectedBlockStat
 	// since we are querying a finalized or sealed block header, we can use the height index and save an ID computation
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not get block header by height: %v", err)
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	return header, nil
@@ -145,7 +144,7 @@ func (b *backendSubscribeBlocks) getBlock(height uint64, expectedBlockStatus flo
 	// since we are querying a finalized or sealed block, we can use the height index and save an ID computation
 	block, err := b.blocks.ByHeight(height)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not get block by height: %v", err)
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	return block, nil
