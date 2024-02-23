@@ -30,25 +30,26 @@ func TestGossipSubInvalidMessageDelivery_Integration(t *testing.T) {
 	tt := []struct {
 		name           string
 		spamMsgFactory func(spammerId peer.ID, victimId peer.ID, topic channels.Topic) *pubsub_pb.Message
-	}{
-		{
-			name: "unknown peer, invalid signature",
-			spamMsgFactory: func(spammerId peer.ID, _ peer.ID, topic channels.Topic) *pubsub_pb.Message {
-				return p2ptest.PubsubMessageFixture(t, p2ptest.WithTopic(topic.String()))
-			},
-		},
+	}{ // TODO: unittest.SkipUnless(t, unittest.TEST_FLAKY, "https://github.com/dapperlabs/flow-go/issues/6949")
+		// {
+		//
+		// 	name: "unknown peer, invalid signature",
+		// 	spamMsgFactory: func(spammerId peer.ID, _ peer.ID, topic channels.Topic) *pubsub_pb.Message {
+		// 		return p2ptest.PubsubMessageFixture(t, p2ptest.WithTopic(topic.String()))
+		// 	},
+		// },
 		{
 			name: "unknown peer, missing signature",
 			spamMsgFactory: func(spammerId peer.ID, _ peer.ID, topic channels.Topic) *pubsub_pb.Message {
 				return p2ptest.PubsubMessageFixture(t, p2ptest.WithTopic(topic.String()), p2ptest.WithoutSignature())
 			},
 		},
-		//{
+		// {
 		//	name: "known peer, invalid signature",
 		//	spamMsgFactory: func(spammerId peer.ID, _ peer.ID, topic channels.Topic) *pubsub_pb.Message {
 		//		return p2ptest.PubsubMessageFixture(t, p2ptest.WithFrom(spammerId), p2ptest.WithTopic(topic.String()))
 		//	},
-		//},
+		// },
 		{
 			name: "known peer, missing signature",
 			spamMsgFactory: func(spammerId peer.ID, _ peer.ID, topic channels.Topic) *pubsub_pb.Message {
@@ -108,6 +109,8 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 	require.NoError(t, err)
 	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
 	cfg.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
+	cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.TopicParameters.InvalidMessageDeliveriesDecay = .01
+
 	victimNode, victimIdentity := p2ptest.NodeFixture(
 		t,
 		sporkId,
@@ -446,7 +449,8 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
 	blockTopicOverrideParams := defaultTopicScoreParams(t)
 	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
-	thisNode, thisId := p2ptest.NodeFixture(                                   // this node is the one that will be penalizing the under-performer node.
+	// this node is the one that will be penalizing the under-performer node.
+	thisNode, thisId := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),

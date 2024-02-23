@@ -5,7 +5,7 @@ import (
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethCore "github.com/ethereum/go-ethereum/core"
-	gethCrypto "github.com/ethereum/go-ethereum/crypto"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -31,6 +31,11 @@ const (
 // DirectCall captures all the data related to a direct call to evm
 // direct calls are similar to transactions but they don't have
 // signatures and don't need sequence number checks
+// Note that eventhough we don't check the nonce, it impacts
+// hash calculation and also impacts the address of resulting contract
+// when deployed through direct calls.
+// Users don't have the worry about the nonce, and the emulator would set
+// it to the right value.
 type DirectCall struct {
 	Type     byte
 	SubType  byte
@@ -39,6 +44,7 @@ type DirectCall struct {
 	Data     []byte
 	Value    *big.Int
 	GasLimit uint64
+	Nonce    uint64
 }
 
 // Encode encodes the direct call it also adds the type
@@ -50,22 +56,19 @@ func (dc *DirectCall) Encode() ([]byte, error) {
 
 // Hash computes the hash of a direct call
 func (dc *DirectCall) Hash() (gethCommon.Hash, error) {
-	encoded, err := dc.Encode()
-	return gethCrypto.Keccak256Hash(encoded), err
+	// we use geth transaction hash calculation since direct call hash is included in the
+	// block transaction hashes, and thus observed as any other transaction
+	return dc.Transaction().Hash(), nil
 }
 
 // Message constructs a core.Message from the direct call
 func (dc *DirectCall) Message() *gethCore.Message {
-	var to *gethCommon.Address
-	if !dc.EmptyToField() {
-		ct := dc.To.ToCommon()
-		to = &ct
-	}
 	return &gethCore.Message{
 		From:      dc.From.ToCommon(),
-		To:        to,
+		To:        dc.to(),
 		Value:     dc.Value,
 		Data:      dc.Data,
+		Nonce:     dc.Nonce,
 		GasLimit:  dc.GasLimit,
 		GasPrice:  big.NewInt(0), // price is set to zero fo direct calls
 		GasTipCap: big.NewInt(1), // also known as maxPriorityFeePerGas (in GWei)
@@ -75,12 +78,37 @@ func (dc *DirectCall) Message() *gethCore.Message {
 	}
 }
 
+// Transaction constructs a geth.Transaction from the direct call
+func (dc *DirectCall) Transaction() *gethTypes.Transaction {
+	return gethTypes.NewTx(&gethTypes.LegacyTx{
+		GasPrice: big.NewInt(0),
+		Gas:      dc.GasLimit,
+		To:       dc.to(),
+		Value:    dc.Value,
+		Data:     dc.Data,
+		Nonce:    dc.Nonce,
+	})
+}
+
 // EmptyToField returns true if `to` field contains an empty address
 func (dc *DirectCall) EmptyToField() bool {
 	return dc.To == EmptyAddress
 }
 
-func NewDepositCall(address Address, amount *big.Int) *DirectCall {
+func (dc *DirectCall) to() *gethCommon.Address {
+	var to *gethCommon.Address
+	if !dc.EmptyToField() {
+		ct := dc.To.ToCommon()
+		to = &ct
+	}
+	return to
+}
+
+func NewDepositCall(
+	address Address,
+	amount *big.Int,
+	nonce uint64,
+) *DirectCall {
 	return &DirectCall{
 		Type:     DirectCallTxType,
 		SubType:  DepositCallSubType,
@@ -89,10 +117,15 @@ func NewDepositCall(address Address, amount *big.Int) *DirectCall {
 		Data:     nil,
 		Value:    amount,
 		GasLimit: DepositCallGasLimit,
+		Nonce:    nonce,
 	}
 }
 
-func NewWithdrawCall(address Address, amount *big.Int) *DirectCall {
+func NewWithdrawCall(
+	address Address,
+	amount *big.Int,
+	nonce uint64,
+) *DirectCall {
 	return &DirectCall{
 		Type:     DirectCallTxType,
 		SubType:  WithdrawCallSubType,
@@ -101,10 +134,16 @@ func NewWithdrawCall(address Address, amount *big.Int) *DirectCall {
 		Data:     nil,
 		Value:    amount,
 		GasLimit: WithdrawCallGasLimit,
+		Nonce:    nonce,
 	}
 }
 
-func NewTransferCall(from Address, to Address, amount *big.Int) *DirectCall {
+func NewTransferCall(
+	from Address,
+	to Address,
+	amount *big.Int,
+	nonce uint64,
+) *DirectCall {
 	return &DirectCall{
 		Type:     DirectCallTxType,
 		SubType:  TransferCallSubType,
@@ -113,6 +152,7 @@ func NewTransferCall(from Address, to Address, amount *big.Int) *DirectCall {
 		Data:     nil,
 		Value:    amount,
 		GasLimit: DefaultGasLimitForTokenTransfer,
+		Nonce:    nonce,
 	}
 }
 
@@ -121,6 +161,7 @@ func NewDeployCall(
 	code Code,
 	gasLimit uint64,
 	value *big.Int,
+	nonce uint64,
 ) *DirectCall {
 	return &DirectCall{
 		Type:     DirectCallTxType,
@@ -130,6 +171,7 @@ func NewDeployCall(
 		Data:     code,
 		Value:    value,
 		GasLimit: gasLimit,
+		Nonce:    nonce,
 	}
 }
 
@@ -142,6 +184,7 @@ func NewDeployCallWithTargetAddress(
 	code Code,
 	gasLimit uint64,
 	value *big.Int,
+	nonce uint64,
 ) *DirectCall {
 	return &DirectCall{
 		Type:     DirectCallTxType,
@@ -151,6 +194,7 @@ func NewDeployCallWithTargetAddress(
 		Data:     code,
 		Value:    value,
 		GasLimit: gasLimit,
+		Nonce:    nonce,
 	}
 }
 
@@ -160,6 +204,7 @@ func NewContractCall(
 	data Data,
 	gasLimit uint64,
 	value *big.Int,
+	nonce uint64,
 ) *DirectCall {
 	return &DirectCall{
 		Type:     DirectCallTxType,
@@ -169,6 +214,7 @@ func NewContractCall(
 		Data:     data,
 		Value:    value,
 		GasLimit: gasLimit,
+		Nonce:    nonce,
 	}
 }
 
