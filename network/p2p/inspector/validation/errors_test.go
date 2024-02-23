@@ -105,3 +105,27 @@ func TestInvalidRpcPublishMessagesErrRoundTrip(t *testing.T) {
 	dummyErr := fmt.Errorf("dummy error")
 	assert.False(t, IsInvalidRpcPublishMessagesErr(dummyErr), "IsInvalidRpcPublishMessagesErr should return false for non-InvalidRpcPublishMessagesErr error")
 }
+
+// TestErrDuplicateTopicIDThresholdExceededRoundTrip ensures correct error formatting for DuplicateTopicIDThresholdExceeded.
+func TestDuplicateTopicIDThresholdExceededRoundTrip(t *testing.T) {
+	expectedErrorMsg := "3/5 duplicate topic IDs exceed the allowed threshold: 2"
+	err := NewDuplicateTopicIDThresholdExceeded(3, 5, 2)
+	assert.Equal(t, expectedErrorMsg, err.Error(), "the error message should be correctly formatted")
+	// tests the IsDuplicateTopicIDThresholdExceeded function.
+	assert.True(t, IsDuplicateTopicIDThresholdExceeded(err), "IsDuplicateTopicIDThresholdExceeded should return true for DuplicateTopicIDThresholdExceeded error")
+	// test IsDuplicateTopicIDThresholdExceeded with a different error type.
+	dummyErr := fmt.Errorf("dummy error")
+	assert.False(t, IsDuplicateTopicIDThresholdExceeded(dummyErr), "IsDuplicateTopicIDThresholdExceeded should return false for non-DuplicateTopicIDThresholdExceeded error")
+}
+
+// TestErrInvalidTopicIDThresholdExceededRoundTrip ensures correct error formatting for InvalidTopicIDThresholdExceeded.
+func TestInvalidTopicIDThresholdExceededRoundTrip(t *testing.T) {
+	expectedErrorMsg := "8 invalid topic IDs exceed the allowed threshold: 5"
+	err := NewInvalidTopicIDThresholdExceeded(8, 5)
+	assert.Equal(t, expectedErrorMsg, err.Error(), "the error message should be correctly formatted")
+	// tests the IsInvalidTopicIDThresholdExceeded function.
+	assert.True(t, IsInvalidTopicIDThresholdExceeded(err), "IsInvalidTopicIDThresholdExceeded should return true for InvalidTopicIDThresholdExceeded error")
+	// test IsInvalidTopicIDThresholdExceeded with a different error type.
+	dummyErr := fmt.Errorf("dummy error")
+	assert.False(t, IsInvalidTopicIDThresholdExceeded(dummyErr), "IsInvalidTopicIDThresholdExceeded should return false for non-InvalidTopicIDThresholdExceeded error")
+}
