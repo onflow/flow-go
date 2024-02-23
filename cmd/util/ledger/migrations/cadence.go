@@ -165,7 +165,7 @@ func NewCadence1ValueMigrations(
 
 	// Populated by CadenceLinkValueMigrator,
 	// used by CadenceCapabilityValueMigrator
-	capabilityIDs := &capcons.CapabilityIDMapping{}
+	capabilityMapping := &capcons.CapabilityMapping{}
 
 	for _, accountBasedMigration := range []AccountBasedMigration{
 		NewCadence1ValueMigrator(
@@ -173,8 +173,8 @@ func NewCadence1ValueMigrations(
 			NewCadence1CompositeStaticTypeConverter(chainID),
 			NewCadence1InterfaceStaticTypeConverter(chainID),
 		),
-		NewCadence1LinkValueMigrator(rwf, capabilityIDs),
-		NewCadence1CapabilityValueMigrator(rwf, capabilityIDs),
+		NewCadence1LinkValueMigrator(rwf, capabilityMapping),
+		NewCadence1CapabilityValueMigrator(rwf, capabilityMapping),
 	} {
 		migrations = append(
 			migrations,

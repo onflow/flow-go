@@ -576,6 +576,101 @@ func TestStagedContractsWithImports(t *testing.T) {
 	})
 }
 
+func TestStagedContractsFromCSV(t *testing.T) {
+
+	t.Parallel()
+
+	t.Run("valid csv", func(t *testing.T) {
+
+		t.Parallel()
+
+		const path = "test-data/staged_contracts_migration/staged_contracts.csv"
+
+		contracts, err := StagedContractsFromCSV(path)
+		require.NoError(t, err)
+
+		require.Len(t, contracts, 4)
+		assert.Equal(
+			t,
+			contracts,
+			[]StagedContract{
+				{
+					Address: common.MustBytesToAddress([]byte{0x1}),
+					Contract: Contract{
+						Name: "Foo",
+						Code: []byte("access(all) contract Foo{}"),
+					},
+				},
+				{
+					Address: common.MustBytesToAddress([]byte{0x1}),
+					Contract: Contract{
+						Name: "Bar",
+						Code: []byte("access(all) contract Bar{}"),
+					},
+				},
+				{
+					Address: common.MustBytesToAddress([]byte{0x2}),
+					Contract: Contract{
+						Name: "MultilineContract",
+						Code: []byte(`
+import Foo from 0x01
+
+access(all)
+contract MultilineContract{
+  init() {
+      var a = "hello"
+  }
+}
+`),
+					},
+				},
+				{
+					Address: common.MustBytesToAddress([]byte{0x2}),
+					Contract: Contract{
+						Name: "Baz",
+						Code: []byte("import Foo from 0x01 access(all) contract Baz{}"),
+					},
+				},
+			},
+		)
+	})
+
+	t.Run("malformed csv", func(t *testing.T) {
+
+		t.Parallel()
+
+		const path = "test-data/staged_contracts_migration/staged_contracts_malformed.csv"
+
+		contracts, err := StagedContractsFromCSV(path)
+		require.Error(t, err)
+		assert.Equal(t, "record on line 2: wrong number of fields", err.Error())
+		require.Empty(t, contracts)
+	})
+
+	t.Run("too few fields", func(t *testing.T) {
+
+		t.Parallel()
+
+		const path = "test-data/staged_contracts_migration/too_few_fields.csv"
+
+		contracts, err := StagedContractsFromCSV(path)
+		require.Error(t, err)
+		assert.Equal(t, "record on line 1: wrong number of fields", err.Error())
+		require.Empty(t, contracts)
+	})
+
+	t.Run("empty path", func(t *testing.T) {
+
+		t.Parallel()
+
+		const emptyPath = ""
+
+		contracts, err := StagedContractsFromCSV(emptyPath)
+		require.NoError(t, err)
+		require.Empty(t, contracts)
+	})
+}
+
 func TestStagedContractsWithUpdateValidator(t *testing.T) {
 	t.Parallel()
 

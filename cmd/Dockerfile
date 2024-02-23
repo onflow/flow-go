@@ -37,7 +37,7 @@ WORKDIR /app
 
 ARG GOARCH=amd64
 # TAGS can be overriden to modify the go build tags (e.g. build without netgo)
-ARG TAGS="netgo"
+ARG TAGS="netgo,osusergo"
 # CC flag can be overwritten to specify a C compiler
 ARG CC=""
 # CGO_FLAG uses ADX instructions by default, flag can be overwritten to build without ADX

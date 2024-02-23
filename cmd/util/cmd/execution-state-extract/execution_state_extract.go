@@ -36,6 +36,7 @@ func extractExecutionState(
 	runMigrations bool,
 	chainID flow.ChainID,
 	evmContractChange migrators.EVMContractChange,
+	stagedContractsFile string,
 ) error {
 
 	log.Info().Msg("init WAL")
@@ -72,15 +73,7 @@ func extractExecutionState(
 
 	log.Info().Msg("init compactor")
 
-	compactor, err := complete.NewCompactor(
-		led,
-		diskWal,
-		log,
-		complete.DefaultCacheSize,
-		checkpointDistance,
-		checkpointsToKeep,
-		atomic.NewBool(false),
-	)
+	compactor, err := complete.NewCompactor(led, diskWal, log, complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), &metrics.NoopCollector{})
 	if err != nil {
 		return fmt.Errorf("cannot create compactor: %w", err)
 	}
@@ -96,8 +89,10 @@ func extractExecutionState(
 
 	var migrations []ledger.Migration
 
-	// TODO:
-	var stagedContracts []migrators.StagedContract
+	stagedContracts, err := migrators.StagedContractsFromCSV(stagedContractsFile)
+	if err != nil {
+		return err
+	}
 
 	if runMigrations {
 		rwf := reporters.NewReportFileWriterFactory(dir, log)
