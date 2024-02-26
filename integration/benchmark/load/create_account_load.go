@@ -4,9 +4,7 @@ import (
 	"github.com/rs/zerolog"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/integration/benchmark/account"
-	"github.com/onflow/flow-go/integration/benchmark/scripts"
 )
 
 type CreateAccountLoad struct {
@@ -35,12 +33,16 @@ func (c CreateAccountLoad) Load(log zerolog.Logger, lc LoadContext) error {
 			lc LoadContext,
 			acc *account.FlowAccount,
 		) (*flowsdk.Transaction, error) {
-			sc := systemcontracts.SystemContractsForChain(lc.ChainID)
-
 			tx := flowsdk.NewTransaction().
-				SetScript(scripts.CreateAccountsTransaction(
-					flowsdk.Address(sc.FungibleToken.Address),
-					flowsdk.Address(sc.FlowToken.Address)))
+				SetScript(
+					[]byte(`
+						transaction() {
+							prepare(signer: AuthAccount) {
+								AuthAccount(payer: signer)
+							}
+						}`,
+					),
+				)
 
 			return tx, nil
 
