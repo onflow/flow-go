@@ -100,7 +100,7 @@ func (t *testFlowAccount) Balance() types.Balance {
 }
 
 func (t *testFlowAccount) Code() types.Code {
-	if t.balance == nil {
+	if t.code == nil {
 		return types.Code{}
 	}
 	return t.code()
@@ -3511,19 +3511,89 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 	require.True(t, deployed)
 }
 
-func TestEVMAccountBalance(t *testing.T) {
+func RunEVMScript(
+	t *testing.T,
+	handler *testContractHandler,
+	script []byte,
+	expectedValue cadence.Value,
+) {
+	contractsAddress := flow.Address(handler.evmContractAddress)
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: LocationResolver,
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+		false,
+	)
+
+	// Run script
+
+	actual, err := rt.ExecuteScript(
+		runtime.Script{
+			Source: script,
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, err)
+	require.Equal(t, expectedValue.ToGoValue(), actual.ToGoValue())
+}
+
+func TestEVMAccountBalance(t *testing.T) {
 	t.Parallel()
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
-
 	expectedBalanceValue := cadence.NewUInt(1013370000000000000)
 	expectedBalance := cadence.
 		NewStruct([]cadence.Value{expectedBalanceValue}).
 		WithType(stdlib.NewBalanceCadenceType(common.Address(contractsAddress)))
 
 	handler := &testContractHandler{
-		flowTokenAddress: common.Address(contractsAddress),
+		flowTokenAddress:   common.Address(contractsAddress),
+		evmContractAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
 			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.False(t, isAuthorized)
@@ -3537,91 +3607,28 @@ func TestEVMAccountBalance(t *testing.T) {
 		},
 	}
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
-	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
-
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
-
 	script := []byte(`
-      import EVM from 0x1
+	import EVM from 0x1
 
-      access(all)
-      fun main(): EVM.Balance {
-          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
-          let balance = cadenceOwnedAccount.balance()
-          destroy cadenceOwnedAccount
-          return balance
-      }
-    `)
-
-	accountCodes := map[common.Location][]byte{}
-	var events []cadence.Event
-
-	runtimeInterface := &TestRuntimeInterface{
-		Storage: NewTestLedger(nil, nil),
-		OnGetSigningAccounts: func() ([]runtime.Address, error) {
-			return []runtime.Address{runtime.Address(contractsAddress)}, nil
-		},
-		OnResolveLocation: LocationResolver,
-		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
-			accountCodes[location] = code
-			return nil
-		},
-		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
-			code = accountCodes[location]
-			return code, nil
-		},
-		OnEmitEvent: func(event cadence.Event) error {
-			events = append(events, event)
-			return nil
-		},
-		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
-			return json.Decode(nil, b)
-		},
-	}
-
-	nextTransactionLocation := NewTransactionLocationGenerator()
-	nextScriptLocation := NewScriptLocationGenerator()
-
-	// Deploy contracts
-
-	deployContracts(
-		t,
-		rt,
-		contractsAddress,
-		runtimeInterface,
-		transactionEnvironment,
-		nextTransactionLocation,
-		false,
-	)
-
-	// Run script
-
-	actual, err := rt.ExecuteScript(
-		runtime.Script{
-			Source: script,
-		},
-		runtime.Context{
-			Interface:   runtimeInterface,
-			Environment: scriptEnvironment,
-			Location:    nextScriptLocation(),
-		},
-	)
-	require.NoError(t, err)
-
-	require.NoError(t, err)
-	require.Equal(t, expectedBalance.ToGoValue(), actual.ToGoValue())
+	access(all)
+	fun main(): EVM.Balance {
+			let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+			let balance = cadenceOwnedAccount.balance()
+			destroy cadenceOwnedAccount
+			return balance
+		}
+	`)
+	RunEVMScript(t, handler, script, expectedBalance)
 }
 
 func TestEVMAccountNonce(t *testing.T) {
-
 	t.Parallel()
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
-
 	expectedNonceValue := cadence.NewUInt64(2000)
 	handler := &testContractHandler{
-		flowTokenAddress: common.Address(contractsAddress),
+		flowTokenAddress:   common.Address(contractsAddress),
+		evmContractAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
 			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.False(t, isAuthorized)
@@ -3635,11 +3642,6 @@ func TestEVMAccountNonce(t *testing.T) {
 		},
 	}
 
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
-	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
-
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
-
 	script := []byte(`
       import EVM from 0x1
 
@@ -3652,63 +3654,87 @@ func TestEVMAccountNonce(t *testing.T) {
       }
     `)
 
-	accountCodes := map[common.Location][]byte{}
-	var events []cadence.Event
+	RunEVMScript(t, handler, script, expectedNonceValue)
+}
 
-	runtimeInterface := &TestRuntimeInterface{
-		Storage: NewTestLedger(nil, nil),
-		OnGetSigningAccounts: func() ([]runtime.Address, error) {
-			return []runtime.Address{runtime.Address(contractsAddress)}, nil
-		},
-		OnResolveLocation: LocationResolver,
-		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
-			accountCodes[location] = code
-			return nil
-		},
-		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
-			code = accountCodes[location]
-			return code, nil
-		},
-		OnEmitEvent: func(event cadence.Event) error {
-			events = append(events, event)
-			return nil
-		},
-		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
-			return json.Decode(nil, b)
+func TestEVMAccountCode(t *testing.T) {
+	t.Parallel()
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+	expectedCodeRaw := []byte{1, 2, 3}
+	expectedCodeValue := cadence.NewArray(
+		[]cadence.Value{cadence.UInt8(1), cadence.UInt8(2), cadence.UInt8(3)},
+	).WithType(cadence.NewVariableSizedArrayType(cadence.TheUInt8Type))
+
+	handler := &testContractHandler{
+		flowTokenAddress:   common.Address(contractsAddress),
+		evmContractAddress: common.Address(contractsAddress),
+		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
+			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.False(t, isAuthorized)
+
+			return &testFlowAccount{
+				address: fromAddress,
+				code: func() types.Code {
+					return expectedCodeRaw
+				},
+			}
 		},
 	}
 
-	nextTransactionLocation := NewTransactionLocationGenerator()
-	nextScriptLocation := NewScriptLocationGenerator()
+	script := []byte(`
+      import EVM from 0x1
 
-	// Deploy contracts
+      access(all)
+      fun main(): [UInt8] {
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+          let code = cadenceOwnedAccount.address().code()
+          destroy cadenceOwnedAccount
+          return code
+      }
+    `)
 
-	deployContracts(
-		t,
-		rt,
-		contractsAddress,
-		runtimeInterface,
-		transactionEnvironment,
-		nextTransactionLocation,
-		false,
-	)
+	RunEVMScript(t, handler, script, expectedCodeValue)
+}
 
-	// Run script
+func TestEVMAccountCodeHash(t *testing.T) {
+	t.Parallel()
 
-	actual, err := rt.ExecuteScript(
-		runtime.Script{
-			Source: script,
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+	expectedCodeHashRaw := []byte{1, 2, 3}
+	expectedCodeHashValue := cadence.NewArray(
+		[]cadence.Value{cadence.UInt8(1), cadence.UInt8(2), cadence.UInt8(3)},
+	).WithType(cadence.NewVariableSizedArrayType(cadence.TheUInt8Type))
+
+	handler := &testContractHandler{
+		flowTokenAddress:   common.Address(contractsAddress),
+		evmContractAddress: common.Address(contractsAddress),
+		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
+			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.False(t, isAuthorized)
+
+			return &testFlowAccount{
+				address: fromAddress,
+				codeHash: func() []byte {
+					return expectedCodeHashRaw
+				},
+			}
 		},
-		runtime.Context{
-			Interface:   runtimeInterface,
-			Environment: scriptEnvironment,
-			Location:    nextScriptLocation(),
-		},
-	)
-	require.NoError(t, err)
+	}
 
-	require.NoError(t, err)
-	require.Equal(t, expectedNonceValue.ToGoValue(), actual.ToGoValue())
+	script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): [UInt8] {
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+          let codeHash = cadenceOwnedAccount.address().codeHash()
+          destroy cadenceOwnedAccount
+          return codeHash
+      }
+    `)
+
+	RunEVMScript(t, handler, script, expectedCodeHashValue)
 }
 
 func TestEVMAccountBalanceForABIOnlyContract(t *testing.T) {
