@@ -687,7 +687,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// 3. Request engine is used to request missing collection
 		suite.request.On("EntityByID", collection.ID(), mock.Anything).Return()
-		// 4. Ingest engine receives the requested collection and all the execution receipts
+		// 4. Indexer HandleCollection receives the requested collection and all the execution receipts
 		err = indexer.HandleCollection(collection, collections, transactions, suite.log)
 		require.NoError(suite.T(), err)
 
@@ -827,7 +827,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			}
 			ingestEng.OnFinalizedBlock(mb)
 
-			// Ingest engine receives the requested collection and all the execution receipts
+			// Indexer HandleCollection receives the requested collection and all the execution receipts
 			err = indexer.HandleCollection(collection, collections, transactions, suite.log)
 			require.NoError(suite.T(), err)
 
