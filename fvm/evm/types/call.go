@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fmt"
 	"math/big"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -21,6 +22,10 @@ const (
 	DeployCallSubType   = byte(4)
 	ContractCallSubType = byte(5)
 
+	// Note that these gas values might need to change if we
+	// change the transaction (e.g. add accesslist),
+	// then it has to be updated to use Intrinsic function
+	// to calculate the minimum gas needed to run the transaction.
 	DepositCallGasLimit  = gethParams.TxGas
 	WithdrawCallGasLimit = gethParams.TxGas
 
@@ -47,6 +52,15 @@ type DirectCall struct {
 	Nonce    uint64
 }
 
+// DirectCallFromEncoded constructs a DirectCall from encoded data
+func DirectCallFromEncoded(encoded []byte) (*DirectCall, error) {
+	if encoded[0] != DirectCallTxType {
+		return nil, fmt.Errorf("tx type mismatch")
+	}
+	dc := &DirectCall{}
+	return dc, rlp.DecodeBytes(encoded[1:], dc)
+}
+
 // Encode encodes the direct call it also adds the type
 // as the very first byte, similar to how evm encodes types.
 func (dc *DirectCall) Encode() ([]byte, error) {
@@ -71,8 +85,8 @@ func (dc *DirectCall) Message() *gethCore.Message {
 		Nonce:     dc.Nonce,
 		GasLimit:  dc.GasLimit,
 		GasPrice:  big.NewInt(0), // price is set to zero fo direct calls
-		GasTipCap: big.NewInt(1), // also known as maxPriorityFeePerGas (in GWei)
-		GasFeeCap: big.NewInt(2), // also known as maxFeePerGas (in GWei)
+		GasTipCap: big.NewInt(0), // also known as maxPriorityFeePerGas (in GWei)
+		GasFeeCap: big.NewInt(0), // also known as maxFeePerGas (in GWei)
 		// AccessList:        tx.AccessList(), // TODO revisit this value, the cost matter but performance might
 		SkipAccountChecks: true, // this would let us not set the nonce
 	}
