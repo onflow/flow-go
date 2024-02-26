@@ -80,19 +80,22 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 		env.StakingCollectionAddress = "0x8d0e87b65159ae63"
 		env.StakingProxyAddress = "0x62430cf28c26d095"
 		env.ViewResolverAddress = "0x1d7e57aa55817448"
-		env.FungibleTokenMetadataViewsAddress = "0xf233dcee88fe0abe"
+		env.NonFungibleTokenAddress = "0x1d7e57aa55817448"
+		env.MetadataViewsAddress = "0x1d7e57aa55817448"
 
 	case flow.Testnet:
 		env.StakingCollectionAddress = "0x95e019a17d0e23d7"
 		env.StakingProxyAddress = "0x7aad92e5a0715d21"
 		env.ViewResolverAddress = "0x631e88ae7f1d7c20"
-		env.FungibleTokenMetadataViewsAddress = "0x9a0766d93b6608b7"
+		env.NonFungibleTokenAddress = "0x631e88ae7f1d7c20"
+		env.MetadataViewsAddress = "0x631e88ae7f1d7c20"
 
 	case flow.Emulator, flow.Localnet:
 		env.StakingCollectionAddress = env.ServiceAccountAddress
 		env.StakingProxyAddress = env.ServiceAccountAddress
 		env.ViewResolverAddress = env.ServiceAccountAddress
-		env.FungibleTokenMetadataViewsAddress = env.ServiceAccountAddress
+		env.NonFungibleTokenAddress = env.ServiceAccountAddress
+		env.MetadataViewsAddress = env.ServiceAccountAddress
 
 	default:
 		panic(fmt.Errorf("unsupported chain ID: %s", chainID))
