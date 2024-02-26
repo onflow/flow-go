@@ -143,7 +143,7 @@ func (p *TransactionExecutedPayload) CadenceEvent() (cadence.Event, error) {
 			cadence.String(p.Result.VMErrorString()),
 			cadence.NewUInt8(p.Result.TxType),
 			cadence.NewUInt64(p.Result.GasConsumed),
-			cadence.String(hex.EncodeToString(p.Result.DeployedContractAddress.Bytes())),
+			cadence.String(p.Result.DeployedContractAddress.ToCommon().Hex()),
 			cadence.String(hex.EncodeToString(p.Result.ReturnedValue)),
 			cadence.String(hex.EncodeToString(encodedLogs)),
 		},
