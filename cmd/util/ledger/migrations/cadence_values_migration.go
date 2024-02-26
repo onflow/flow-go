@@ -264,7 +264,6 @@ type errorMessageHandler struct {
 }
 
 func (t *errorMessageHandler) FormatError(err error) string {
-	var message string
 
 	// Only report program loading errors once,
 	// omit full error message for subsequent occurrences
@@ -274,15 +273,11 @@ func (t *errorMessageHandler) FormatError(err error) string {
 		location := programLoadingError.Location
 		_, ok := t.reportedProgramLoadingErrors.LoadOrStore(location, struct{}{})
 		if ok {
-			message = "error getting program"
+			return "error getting program"
 		}
 	}
 
-	if message == "" {
-		message = err.Error()
-	}
-
-	return message
+	return err.Error()
 }
 
 // cadenceValueMigrationReporter is the reporter for cadence value migrations
