@@ -3613,6 +3613,104 @@ func TestEVMAccountBalance(t *testing.T) {
 	require.Equal(t, expectedBalance.ToGoValue(), actual.ToGoValue())
 }
 
+func TestEVMAccountNonce(t *testing.T) {
+
+	t.Parallel()
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	expectedNonceValue := cadence.NewUInt64(2000)
+	handler := &testContractHandler{
+		flowTokenAddress: common.Address(contractsAddress),
+		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
+			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.False(t, isAuthorized)
+
+			return &testFlowAccount{
+				address: fromAddress,
+				nonce: func() uint64 {
+					return uint64(expectedNonceValue)
+				},
+			}
+		},
+	}
+
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): UInt64 {
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+          let nonce = cadenceOwnedAccount.address().nonce()
+          destroy cadenceOwnedAccount
+          return nonce
+      }
+    `)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: LocationResolver,
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+		false,
+	)
+
+	// Run script
+
+	actual, err := rt.ExecuteScript(
+		runtime.Script{
+			Source: script,
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, err)
+	require.Equal(t, expectedNonceValue.ToGoValue(), actual.ToGoValue())
+}
+
 func TestEVMAccountBalanceForABIOnlyContract(t *testing.T) {
 
 	t.Parallel()
