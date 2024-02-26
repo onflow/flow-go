@@ -2,7 +2,6 @@ package types
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -64,7 +63,7 @@ func (fa Address) String() string {
 	if fa == EmptyAddress {
 		return ""
 	}
-	return hex.EncodeToString(fa[:])
+	return fa.ToCommon().Hex()
 }
 
 // ToCommon returns the geth address
