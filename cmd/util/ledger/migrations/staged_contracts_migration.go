@@ -180,6 +180,7 @@ func (m *StagedContractsMigration) MigrateAccount(
 
 	config := util.RuntimeInterfaceConfig{
 		GetContractCodeFunc: func(location runtime.Location) ([]byte, error) {
+			// TODO: also consider updated system contracts
 			return m.contractsByLocation[location], nil
 		},
 		GetOrLoadProgramListener: func(location runtime.Location, program *interpreter.Program, err error) {
