@@ -131,7 +131,7 @@ func TestEventConversion(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, event)
 
-		// cast event type to version beacon
+		// cast event type to version upgrade
 		actual, ok := event.Event.(*flow.ProtocolStateVersionUpgrade)
 		require.True(t, ok)
 

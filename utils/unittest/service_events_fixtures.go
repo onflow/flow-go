@@ -1058,6 +1058,10 @@ func NewProtocolStateVersionUpgradeEventType() *cadence.EventType {
 				Identifier: "newProtocolVersion",
 				Type:       cadence.UInt64Type{},
 			},
+			{
+				Identifier: "activeView",
+				Type:       cadence.UInt64Type{},
+			},
 		},
 	}
 }
