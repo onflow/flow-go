@@ -969,6 +969,8 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 				return nil, fmt.Errorf("could not create public libp2p node: %w", err)
 			}
 
+			builder.LibP2PNode = publicLibp2pNode
+
 			return publicLibp2pNode, nil
 		}).
 		Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
