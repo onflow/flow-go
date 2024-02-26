@@ -68,6 +68,7 @@ func newMigratorRuntime(
 			accounts,
 		),
 		RuntimeInterfaceConfig: config,
+		ProgramErrors:          map[common.Location]error{},
 	}
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{
@@ -118,6 +119,12 @@ type migratorRuntime struct {
 	ContractNamesProvider   stdlib.AccountContractNamesProvider
 }
 
+var _ stdlib.AccountContractNamesProvider = &migratorRuntime{}
+
 func (mr *migratorRuntime) GetReadOnlyStorage() *runtime.Storage {
 	return runtime.NewStorage(util.NewPayloadsReadonlyLedger(mr.Snapshot), util.NopMemoryGauge{})
+}
+
+func (mr *migratorRuntime) GetAccountContractNames(address common.Address) ([]string, error) {
+	return mr.Accounts.GetContractNames(flow.Address(address))
 }

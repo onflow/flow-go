@@ -15,30 +15,35 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func NewCadence1InterfaceStaticTypeConverter(chainID flow.ChainID) statictypes.InterfaceTypeConverterFunc {
+func NewInterfaceTypeConversionRules(chainID flow.ChainID) StaticTypeMigrationRules {
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
 	oldFungibleTokenResolverType, newFungibleTokenResolverType := fungibleTokenResolverRule(systemContracts)
 
-	rules := StaticTypeMigrationRules{
+	return StaticTypeMigrationRules{
 		oldFungibleTokenResolverType.ID(): newFungibleTokenResolverType,
 	}
-
-	return NewStaticTypeMigrator[*interpreter.InterfaceStaticType](rules)
 }
 
-func NewCadence1CompositeStaticTypeConverter(chainID flow.ChainID) statictypes.CompositeTypeConverterFunc {
-
+func NewCompositeTypeConversionRules(chainID flow.ChainID) StaticTypeMigrationRules {
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
 	oldFungibleTokenVaultCompositeType, newFungibleTokenVaultType := fungibleTokenVaultRule(systemContracts)
 	oldNonFungibleTokenNFTCompositeType, newNonFungibleTokenNFTType := nonFungibleTokenNFTRule(systemContracts)
 
-	rules := StaticTypeMigrationRules{
+	return StaticTypeMigrationRules{
 		oldFungibleTokenVaultCompositeType.ID():  newFungibleTokenVaultType,
 		oldNonFungibleTokenNFTCompositeType.ID(): newNonFungibleTokenNFTType,
 	}
+}
 
+func NewCadence1InterfaceStaticTypeConverter(chainID flow.ChainID) statictypes.InterfaceTypeConverterFunc {
+	rules := NewInterfaceTypeConversionRules(chainID)
+	return NewStaticTypeMigrator[*interpreter.InterfaceStaticType](rules)
+}
+
+func NewCadence1CompositeStaticTypeConverter(chainID flow.ChainID) statictypes.CompositeTypeConverterFunc {
+	rules := NewCompositeTypeConversionRules(chainID)
 	return NewStaticTypeMigrator[*interpreter.CompositeStaticType](rules)
 }
 
@@ -162,14 +167,25 @@ func NewCadence1ValueMigrations(
 	// used by CadenceCapabilityValueMigrator
 	capabilityMapping := &capcons.CapabilityMapping{}
 
+	errorMessageHandler := &errorMessageHandler{}
+
 	for _, accountBasedMigration := range []AccountBasedMigration{
 		NewCadence1ValueMigrator(
 			rwf,
+			errorMessageHandler,
 			NewCadence1CompositeStaticTypeConverter(chainID),
 			NewCadence1InterfaceStaticTypeConverter(chainID),
 		),
-		NewCadence1LinkValueMigrator(rwf, capabilityMapping),
-		NewCadence1CapabilityValueMigrator(rwf, capabilityMapping),
+		NewCadence1LinkValueMigrator(
+			rwf,
+			errorMessageHandler,
+			capabilityMapping,
+		),
+		NewCadence1CapabilityValueMigrator(
+			rwf,
+			errorMessageHandler,
+			capabilityMapping,
+		),
 	} {
 		migrations = append(
 			migrations,
@@ -193,6 +209,11 @@ func NewCadence1ContractsMigrations(
 	stagedContracts []StagedContract,
 ) []ledger.Migration {
 
+	stagedContractsMigration := NewStagedContractsMigration(chainID).
+		WithContractUpdateValidation()
+
+	stagedContractsMigration.RegisterContractUpdates(stagedContracts)
+
 	return []ledger.Migration{
 		NewAccountBasedMigration(
 			log,
@@ -211,7 +232,7 @@ func NewCadence1ContractsMigrations(
 			log,
 			nWorker,
 			[]AccountBasedMigration{
-				NewStagedContractsMigration(stagedContracts),
+				stagedContractsMigration,
 			},
 		),
 	}
@@ -226,7 +247,18 @@ func NewCadence1Migrations(
 	stagedContracts []StagedContract,
 ) []ledger.Migration {
 	return common.Concat(
-		NewCadence1ContractsMigrations(log, nWorker, chainID, evmContractChange, stagedContracts),
-		NewCadence1ValueMigrations(log, rwf, nWorker, chainID),
+		NewCadence1ContractsMigrations(
+			log,
+			nWorker,
+			chainID,
+			evmContractChange,
+			stagedContracts,
+		),
+		NewCadence1ValueMigrations(
+			log,
+			rwf,
+			nWorker,
+			chainID,
+		),
 	)
 }

@@ -7,8 +7,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/onflow/flow-go/fvm/environment"
-
 	"github.com/rs/zerolog"
 
 	_ "github.com/glebarez/go-sqlite"
@@ -22,6 +20,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -89,7 +88,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 
 	for _, migration := range migrations {
 		payloads, err = migration(payloads)
-		require.NoError(t, err)
+		require.NoError(t, err, "migration failed, logs: %v", logWriter.logs)
 	}
 
 	// Assert the migrated payloads
@@ -99,11 +98,16 @@ func TestCadenceValuesMigration(t *testing.T) {
 	checkReporters(t, rwf, address)
 
 	// Check error logs.
-	require.Nil(t, logWriter.logs)
+	require.Empty(t, logWriter.logs)
 }
 
 // TODO:
 //func TestCadenceValuesMigrationWithSwappedOrder(t *testing.T) {
+
+var flowTokenAddress = func() common.Address {
+	address, _ := common.HexToAddress("0ae53cb6e3f42a79")
+	return address
+}()
 
 func checkMigratedPayloads(
 	t *testing.T,
@@ -119,7 +123,7 @@ func checkMigratedPayloads(
 
 	storageMap := mr.Storage.GetStorageMap(address, common.PathDomainStorage.Identifier(), false)
 	require.NotNil(t, storageMap)
-	require.Equal(t, 11, int(storageMap.Count()))
+	require.Equal(t, 12, int(storageMap.Count()))
 
 	iterator := storageMap.Iterator(mr.Interpreter)
 
@@ -131,10 +135,6 @@ func checkMigratedPayloads(
 
 	var values []interpreter.Value
 	for key, value := iterator.Next(); key != nil; key, value = iterator.Next() {
-		identifier := string(key.(interpreter.StringAtreeValue))
-		if identifier == "flowTokenVault" || identifier == "flowTokenReceiver" {
-			continue
-		}
 		values = append(values, value)
 	}
 
@@ -142,6 +142,12 @@ func checkMigratedPayloads(
 		nil,
 		address,
 		"Test",
+	)
+
+	flowTokenLocation := common.NewAddressLocation(
+		nil,
+		flowTokenAddress,
+		"FlowToken",
 	)
 
 	fooInterfaceType := interpreter.NewInterfaceStaticTypeComputeTypeID(
@@ -241,7 +247,7 @@ func checkMigratedPayloads(
 			common.CompositeKindResource,
 			[]interpreter.CompositeField{
 				{
-					Value: interpreter.NewUnmeteredUInt64Value(1369094286720630784),
+					Value: interpreter.NewUnmeteredUInt64Value(360287970189639680),
 					Name:  "uuid",
 				},
 			},
@@ -254,6 +260,12 @@ func checkMigratedPayloads(
 				interpreter.NewAddressValue(nil, address),
 				interpreter.NewReferenceStaticType(nil, entitlementAuthorization(), rResourceType),
 			),
+		),
+
+		interpreter.NewUnmeteredCapabilityValue(
+			interpreter.NewUnmeteredUInt64Value(2),
+			interpreter.NewAddressValue(nil, address),
+			interpreter.NewReferenceStaticType(nil, entitlementAuthorization(), rResourceType),
 		),
 
 		interpreter.NewDictionaryValue(
@@ -317,6 +329,25 @@ func checkMigratedPayloads(
 				),
 			),
 			interpreter.NewUnmeteredStringValue("auth_ref"),
+		),
+
+		interpreter.NewCompositeValue(
+			mr.Interpreter,
+			interpreter.EmptyLocationRange,
+			flowTokenLocation,
+			"FlowToken.Vault",
+			common.CompositeKindResource,
+			[]interpreter.CompositeField{
+				{
+					Value: interpreter.NewUnmeteredUFix64Value(0.001 * sema.Fix64Factor),
+					Name:  "balance",
+				},
+				{
+					Value: interpreter.NewUnmeteredUInt64Value(11240984669916758018),
+					Name:  "uuid",
+				},
+			},
+			address,
 		),
 	}
 
@@ -498,6 +529,28 @@ func checkReporters(
 				"EntitlementsMigration",
 				"linkR",
 				common.PathDomainPublic,
+			),
+
+			// untyped capability
+			capConsPathCapabilityMigrationEntry{
+				AccountAddress: address,
+				AddressPath: interpreter.AddressPath{
+					Address: address,
+					Path: interpreter.NewUnmeteredPathValue(
+						common.PathDomainPublic,
+						"linkR",
+					),
+				},
+				BorrowType: interpreter.NewReferenceStaticType(
+					nil,
+					entitlementAuthorization(),
+					rResourceType,
+				),
+			},
+			newCadenceValueMigrationReportEntry(
+				"CapabilityValueMigration",
+				"untyped_capability",
+				common.PathDomainStorage,
 			),
 
 			// Account-typed keys in dictionary

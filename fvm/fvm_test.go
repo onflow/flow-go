@@ -20,6 +20,7 @@ import (
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	flowSdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
@@ -2993,7 +2994,7 @@ func TestEVM(t *testing.T) {
 			require.NoError(t, output.Err)
 			require.Len(t, output.Events, 7)
 
-			evmLocation := types.EVMLocation{}
+			evmLocation := flowSdk.EVMLocation{}
 
 			// convert events to type ids
 			eventTypeIDs := make([]common.TypeID, 0, len(output.Events))

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	flowSdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
@@ -48,7 +49,7 @@ func TestEVMEventsCCFEncodingDecoding(t *testing.T) {
 		location, qualifiedIdentifier, err := cdcCommon.DecodeTypeID(nil, "evm.BlockExecuted")
 		require.NoError(t, err)
 
-		assert.Equal(t, types.EVMLocation{}, location)
+		assert.Equal(t, flowSdk.EVMLocation{}, location)
 		assert.Equal(t, "BlockExecuted", qualifiedIdentifier)
 	})
 
@@ -104,7 +105,7 @@ func TestEVMEventsCCFEncodingDecoding(t *testing.T) {
 		location, qualifiedIdentifier, err := cdcCommon.DecodeTypeID(nil, "evm.TransactionExecuted")
 		require.NoError(t, err)
 
-		assert.Equal(t, types.EVMLocation{}, location)
+		assert.Equal(t, flowSdk.EVMLocation{}, location)
 		assert.Equal(t, "TransactionExecuted", qualifiedIdentifier)
 	})
 }
