@@ -586,8 +586,6 @@ func generateEmptyExecutionState(
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithEpochConfig(epochConfig),
 		fvm.WithIdentities(identities),
-		// TODO (JanezP): set this as a default during bootstrapping
-		fvm.WithSetupEVMEnabled(true),
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate execution state")
