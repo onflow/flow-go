@@ -302,8 +302,8 @@ func (o *ObserverLocalDataService) LookupErrorMessageByIndex(ctx context.Context
 	return "", nil
 }
 
-// LookupErrorMessageByTransactionId implements TransactionErrorMessage.
-func (o *ObserverLocalDataService) LookupErrorMessageByTransactionId(ctx context.Context, blockID flow.Identifier, transactionID flow.Identifier) (string, error) {
+// LookupErrorMessageByTransactionID implements TransactionErrorMessage.
+func (o *ObserverLocalDataService) LookupErrorMessageByTransactionID(ctx context.Context, blockID flow.Identifier, transactionID flow.Identifier) (string, error) {
 	return "", nil
 }
 

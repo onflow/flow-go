@@ -56,6 +56,7 @@ gen-bootstrap: clone-flow
 		--collection-clusters 1 \
 		--protocol-version=0 \
 		--epoch-commit-safety-threshold=500 \
+		--use-default-epoch-timing \
 		--config ../../../bootstrap/conf/node-config.json \
 		-o ../../../bootstrap/ \
 		--partner-dir ../../../bootstrap/partner-nodes \

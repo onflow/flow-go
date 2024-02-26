@@ -284,7 +284,7 @@ func (b *backendTransactions) GetTransactionResult(
 	if block != nil {
 		txResult, err = b.lookupTransactionResult(ctx, txID, block, requiredEventEncodingVersion)
 		if err != nil {
-			return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
+			return nil, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
 		}
 
 		// an additional check to ensure the correctness of the collection ID.
@@ -643,46 +643,35 @@ func (b *backendTransactions) lookupTransactionResult(
 	block *flow.Block,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*access.TransactionResult, error) {
+	var txResult *access.TransactionResult
+	var err error
 	switch b.txResultQueryMode {
 	case IndexQueryModeExecutionNodesOnly:
-		txResult, err := b.getTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
-		if err != nil {
-			// if either the execution node reported no results or there were not enough execution results
-			if status.Code(err) == codes.NotFound {
-				// No result yet, indicate that it has not been executed
-				return nil, nil
-			}
-			// Other Error trying to retrieve the result, return with err
-			return nil, err
-		}
-
-		// considered executed as long as some result is returned, even if it's an error message
-		return txResult, nil
-	case IndexQueryModeLocalOnly:
-		return b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion)
-	case IndexQueryModeFailover:
-		txResult, err := b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion)
-		if err == nil {
-			return txResult, nil
-		}
-
-		// If any error occurs with local storage - request transaction result from EN
 		txResult, err = b.getTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
+	case IndexQueryModeLocalOnly:
+		txResult, err = b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion)
+	case IndexQueryModeFailover:
+		txResult, err = b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion)
 		if err != nil {
-			// if either the execution node reported no results or the execution node could not be chosen
-			if status.Code(err) == codes.NotFound {
-				// No result yet, indicate that it has not been executed
-				return nil, nil
-			}
-			// Other Error trying to retrieve the result, return with err
-			return nil, err
+			// If any error occurs with local storage - request transaction result from EN
+			txResult, err = b.getTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
 		}
-
-		// considered executed as long as some result is returned, even if it's an error message
-		return txResult, nil
 	default:
 		return nil, status.Errorf(codes.Internal, "unknown transaction result query mode: %v", b.txResultQueryMode)
 	}
+
+	if err != nil {
+		// if either the storage or execution node reported no results or there were not enough execution results
+		if status.Code(err) == codes.NotFound {
+			// No result yet, indicate that it has not been executed
+			return nil, nil
+		}
+		// Other Error trying to retrieve the result, return with err
+		return nil, err
+	}
+
+	// considered executed as long as some result is returned, even if it's an error message
+	return txResult, nil
 }
 
 func (b *backendTransactions) getHistoricalTransaction(
@@ -980,13 +969,13 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 	return resp, nil
 }
 
-// LookupErrorMessageByTransactionId returns transaction error message for specified transaction.
+// LookupErrorMessageByTransactionID returns transaction error message for specified transaction.
 // If an error message for transaction can be found in the cache then it will be used to serve the request, otherwise
 // an RPC call will be made to the EN to fetch that error message, fetched value will be cached in the LRU cache.
 // Expected errors during normal operation:
 //   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 //   - status.Error - remote GRPC call to EN has failed.
-func (b *backendTransactions) LookupErrorMessageByTransactionId(
+func (b *backendTransactions) LookupErrorMessageByTransactionID(
 	ctx context.Context,
 	blockID flow.Identifier,
 	transactionID flow.Identifier,
@@ -1040,7 +1029,7 @@ func (b *backendTransactions) LookupErrorMessageByIndex(
 	height uint64,
 	index uint32,
 ) (string, error) {
-	txResult, err := b.txResultsIndex.GetResultsByBlockIDTransactionIndex(blockID, height, index)
+	txResult, err := b.txResultsIndex.ByBlockIDTransactionIndex(blockID, height, index)
 	if err != nil {
 		return "", rpc.ConvertStorageError(err)
 	}
@@ -1092,7 +1081,7 @@ func (b *backendTransactions) LookupErrorMessagesByBlockID(
 	blockID flow.Identifier,
 	height uint64,
 ) (map[flow.Identifier]string, error) {
-	txResults, err := b.txResultsIndex.GetResultsByBlockID(blockID, height)
+	txResults, err := b.txResultsIndex.ByBlockID(blockID, height)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}

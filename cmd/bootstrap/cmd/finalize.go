@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/onflow/cadence"
 
@@ -121,7 +122,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	internalNodes := readInternalNodeInfos()
 	log.Info().Msg("")
 
-	log.Info().Msg("checking constraints on consensus/cluster nodes")
+	log.Info().Msg("checking constraints on consensus nodes")
 	checkConstraints(partnerNodes, internalNodes)
 	log.Info().Msg("")
 
@@ -162,7 +163,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	// if no root commit is specified, bootstrap an empty execution state
 	if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
 		commit := generateEmptyExecutionState(
-			block.Header.ChainID,
+			block.Header,
 			intermediaryData.ExecutionStateConfig,
 			participants,
 		)
@@ -557,7 +558,7 @@ func readIntermediaryBootstrappingData() (*IntermediaryBootstrappingData, *flow.
 // generateEmptyExecutionState generates a new empty execution state with the
 // given configuration. Sets the flagRootCommit variable for future reads.
 func generateEmptyExecutionState(
-	chainID flow.ChainID,
+	rootBlock *flow.Header,
 	epochConfig epochs.EpochConfig,
 	identities flow.IdentityList,
 ) (commit flow.StateCommitment) {
@@ -577,7 +578,8 @@ func generateEmptyExecutionState(
 	commit, err = run.GenerateExecutionState(
 		filepath.Join(flagOutdir, model.DirnameExecutionState),
 		serviceAccountPublicKey,
-		chainID.Chain(),
+		rootBlock.ChainID.Chain(),
+		fvm.WithRootBlock(rootBlock),
 		fvm.WithInitialTokenSupply(cdcInitialTokenSupply),
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
@@ -590,4 +592,45 @@ func generateEmptyExecutionState(
 	}
 	log.Info().Msg("")
 	return commit
+}
+
+// validateOrPopulateEpochTimingConfig validates the epoch timing config flags. In case the
+// `flagUseDefaultEpochTargetEndTime` value has been set, the function derives the values for
+// `flagEpochTimingRefCounter`, `flagEpochTimingDuration`, and `flagEpochTimingRefTimestamp`
+// from the configuration. Otherwise, it enforces that compatible values for the respective parameters have been
+// specified (and errors otherwise). Therefore, after `validateOrPopulateEpochTimingConfig` ran,
+// the targeted end time for the epoch can be computed via `rootEpochTargetEndTime()`.
+// You can either let the tool choose default values, or specify a value for each config.
+func validateOrPopulateEpochTimingConfig() error {
+	// Default timing is intended for Benchnet, Localnet, etc.
+	// Manually specified timings for Mainnet, Testnet, Canary.
+	if flagUseDefaultEpochTargetEndTime {
+		// No other flags may be set
+		if !(flagEpochTimingRefTimestamp == 0 && flagEpochTimingDuration == 0 && flagEpochTimingRefCounter == 0) {
+			return fmt.Errorf("invalid epoch timing config: cannot specify ANY of --epoch-timing-ref-counter, --epoch-timing-ref-timestamp, or --epoch-timing-duration if using default timing config")
+		}
+		flagEpochTimingRefCounter = flagEpochCounter
+		flagEpochTimingDuration = flagNumViewsInEpoch
+		flagEpochTimingRefTimestamp = uint64(time.Now().Unix()) + flagNumViewsInEpoch
+
+		// compute target end time for initial (root) epoch from flags: `TargetEndTime = RefTimestamp + (RootEpochCounter - RefEpochCounter) * Duration`
+		rootEpochTargetEndTimeUNIX := rootEpochTargetEndTime()
+		rootEpochTargetEndTime := time.Unix(int64(rootEpochTargetEndTimeUNIX), 0)
+		log.Info().Msgf("using default epoch timing config with root epoch target end time %s, which is in %s", rootEpochTargetEndTime, time.Until(rootEpochTargetEndTime))
+	} else {
+		// All other flags must be set
+		// NOTE: it is valid for flagEpochTimingRefCounter to be set to 0
+		if flagEpochTimingRefTimestamp == 0 || flagEpochTimingDuration == 0 {
+			return fmt.Errorf("invalid epoch timing config: must specify ALL of --epoch-timing-ref-counter, --epoch-timing-ref-timestamp, and --epoch-timing-duration")
+		}
+		if flagEpochCounter < flagEpochTimingRefCounter {
+			return fmt.Errorf("invalid epoch timing config: reference epoch counter must be less than or equal to root epoch counter")
+		}
+
+		// compute target end time for initial (root) epoch from flags: `TargetEndTime = RefTimestamp + (RootEpochCounter - RefEpochCounter) * Duration`
+		rootEpochTargetEndTimeUNIX := rootEpochTargetEndTime()
+		rootEpochTargetEndTime := time.Unix(int64(rootEpochTargetEndTimeUNIX), 0)
+		log.Info().Msgf("using user-specified epoch timing config with root epoch target end time %s, which is in %s", rootEpochTargetEndTime, time.Until(rootEpochTargetEndTime))
+	}
+	return nil
 }

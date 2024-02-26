@@ -65,7 +65,8 @@ type GossipSubAppSpecificScoreRegistry struct {
 	appScoreCache p2p.GossipSubApplicationSpecificScoreCache
 
 	// appScoreUpdateWorkerPool is the worker pool for handling the application specific score update of peers in a non-blocking way.
-	appScoreUpdateWorkerPool *worker.Pool[peer.ID]
+	appScoreUpdateWorkerPool  *worker.Pool[peer.ID]
+	invCtrlMsgNotifWorkerPool *worker.Pool[*p2p.InvCtrlMsgNotif]
 
 	appSpecificScoreParams    p2pconfig.ApplicationSpecificScoreParameters
 	duplicateMessageThreshold float64
@@ -139,9 +140,6 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 	}
 
 	lg := config.Logger.With().Str("module", "app_score_registry").Logger()
-	store := queue.NewHeroStore(config.Parameters.ScoreUpdateRequestQueueSize,
-		lg.With().Str("component", "app_specific_score_update").Logger(),
-		metrics.GossipSubAppSpecificScoreUpdateQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType))
 
 	reg := &GossipSubAppSpecificScoreRegistry{
 		logger:                    config.Logger.With().Str("module", "app_score_registry").Logger(),
@@ -159,9 +157,16 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		collector:                 config.Collector,
 	}
 
-	reg.appScoreUpdateWorkerPool = worker.NewWorkerPoolBuilder[peer.ID](lg.With().Str("component", "app_specific_score_update_worker_pool").Logger(),
-		store,
+	appSpecificScore := queue.NewHeroStore(config.Parameters.ScoreUpdateRequestQueueSize,
+		lg.With().Str("component", "app_specific_score_update").Logger(),
+		metrics.GossipSubAppSpecificScoreUpdateQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType))
+	reg.appScoreUpdateWorkerPool = worker.NewWorkerPoolBuilder[peer.ID](lg.With().Str("component", "app_specific_score_update_worker_pool").Logger(), appSpecificScore,
 		reg.processAppSpecificScoreUpdateWork).Build()
+
+	invalidCtrlMsgNotificationStore := queue.NewHeroStore(config.Parameters.InvalidControlMessageNotificationQueueSize,
+		lg.With().Str("component", "invalid_control_message_notification_queue").Logger(),
+		metrics.RpcInspectorNotificationQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType))
+	reg.invCtrlMsgNotifWorkerPool = worker.NewWorkerPoolBuilder[*p2p.InvCtrlMsgNotif](lg, invalidCtrlMsgNotificationStore, reg.handleMisbehaviourReport).Build()
 
 	builder := component.NewComponentManagerBuilder()
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -185,7 +190,7 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		}
 		reg.silencePeriodStartTime = time.Now()
 		ready()
-	})
+	}).AddWorker(reg.invCtrlMsgNotifWorkerPool.WorkerLogic()) // we must NOT have more than one worker for processing notifications; handling notifications are NOT idempotent.
 
 	for i := 0; i < config.Parameters.ScoreUpdateWorkerNum; i++ {
 		builder.AddWorker(reg.appScoreUpdateWorkerPool.WorkerLogic())
@@ -403,17 +408,34 @@ func (r *GossipSubAppSpecificScoreRegistry) duplicateMessagesPenalty(pid peer.ID
 // OnInvalidControlMessageNotification is called when a new invalid control message notification is distributed.
 // Any error on consuming event must handle internally.
 // The implementation must be concurrency safe, but can be blocking.
+// Note: there is no real-time guarantee on processing the notification.
 func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(notification *p2p.InvCtrlMsgNotif) {
+	lg := r.logger.With().Str("peer_id", p2plogging.PeerId(notification.PeerID)).Logger()
+	if ok := r.invCtrlMsgNotifWorkerPool.Submit(notification); !ok {
+		// we use a queue with a fixed size, so this can happen when queue is full or when the notification is duplicate.
+		// TODO: we have to add a metric for this case.
+		// TODO: we should not have deduplication for this case, as we need to penalize the peer for each misbehaviour, we need to add a nonce to the notification.
+		lg.Warn().Msg("gossipsub rpc inspector notification queue is full or notification is duplicate, discarding notification")
+	}
+	lg.Trace().Msg("gossipsub rpc inspector notification submitted to the queue")
+}
+
+// handleMisbehaviourReport is the worker function that is called by the worker pool to handle the misbehaviour report of a peer.
+// The function is called in a non-blocking way, and the worker pool is used to limit the number of concurrent executions of the function.
+// Args:
+// - notification: the notification of the misbehaviour report of a peer.
+// Returns:
+// - error: an error if the update failed; any returned error is an irrecoverable error and indicates a bug or misconfiguration.
+func (r *GossipSubAppSpecificScoreRegistry) handleMisbehaviourReport(notification *p2p.InvCtrlMsgNotif) error {
 	// we use mutex to ensure the method is concurrency safe.
 	lg := r.logger.With().
 		Err(notification.Error).
-		Str("peer_id", p2plogging.PeerId(notification.PeerID)).
 		Str("misbehavior_type", notification.MsgType.String()).Logger()
 
 	// during startup silence period avoid penalizing nodes, ignore all notifications
 	if !r.afterSilencePeriod() {
 		lg.Trace().Msg("ignoring invalid control message notification for peer during silence period")
-		return
+		return nil
 	}
 
 	record, err := r.spamScoreCache.Adjust(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
@@ -451,6 +473,8 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	lg.Debug().
 		Float64("spam_record_penalty", record.Penalty).
 		Msg("applied misbehaviour penalty and updated application specific penalty")
+
+	return nil
 }
 
 // afterSilencePeriod returns true if registry silence period is over, false otherwise.

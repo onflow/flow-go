@@ -2,6 +2,7 @@ package backend
 
 import (
 	"fmt"
+	"sort"
 
 	"go.uber.org/atomic"
 
@@ -25,6 +26,9 @@ func NewEventsIndex(events storage.Events) *EventsIndex {
 	}
 }
 
+// Initialize replaces nil value with actual reporter instance
+// Expected errors:
+// - If the reporter was already initialized, return error
 func (e *EventsIndex) Initialize(indexReporter state_synchronization.IndexReporter) error {
 	if e.reporter.CompareAndSwap(nil, &indexReporter) {
 		return nil
@@ -32,15 +36,39 @@ func (e *EventsIndex) Initialize(indexReporter state_synchronization.IndexReport
 	return fmt.Errorf("index reporter already initialized")
 }
 
-func (e *EventsIndex) GetEvents(blockID flow.Identifier, height uint64) ([]flow.Event, error) {
+// ByBlockID checks data availability and returns events for a block
+// Expected errors:
+//   - indexer.ErrIndexNotInitialized: if the EventsIndex has not been initialized
+//   - storage.ErrHeightNotIndexed: returned, when data is unavailable
+//   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
+func (e *EventsIndex) ByBlockID(blockID flow.Identifier, height uint64) ([]flow.Event, error) {
 	if err := e.checkDataAvailable(height); err != nil {
 		return nil, err
 	}
 
-	return e.events.ByBlockID(blockID)
+	events, err := e.events.ByBlockID(blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	// events are keyed/sorted by [blockID, txID, txIndex, eventIndex]
+	// we need to resort them by tx index then event index so the output is in execution order
+	sort.Slice(events, func(i, j int) bool {
+		if events[i].TransactionIndex == events[j].TransactionIndex {
+			return events[i].EventIndex < events[j].EventIndex
+		}
+		return events[i].TransactionIndex < events[j].TransactionIndex
+	})
+
+	return events, nil
 }
 
-func (e *EventsIndex) GetEventsByTransactionID(blockID flow.Identifier, height uint64, transactionID flow.Identifier) ([]flow.Event, error) {
+// ByBlockIDTransactionID checks data availability and return events for the given block ID and transaction ID
+// Expected errors:
+//   - indexer.ErrIndexNotInitialized: if the EventsIndex has not been initialized
+//   - storage.ErrHeightNotIndexed: returned, when data is unavailable
+//   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
+func (e *EventsIndex) ByBlockIDTransactionID(blockID flow.Identifier, height uint64, transactionID flow.Identifier) ([]flow.Event, error) {
 	if err := e.checkDataAvailable(height); err != nil {
 		return nil, err
 	}
@@ -48,7 +76,12 @@ func (e *EventsIndex) GetEventsByTransactionID(blockID flow.Identifier, height u
 	return e.events.ByBlockIDTransactionID(blockID, transactionID)
 }
 
-func (e *EventsIndex) GetEventsByTransactionIndex(blockID flow.Identifier, height uint64, txIndex uint32) ([]flow.Event, error) {
+// ByBlockIDTransactionIndex checks data availability and return events for the transaction at given index in a given block
+// Expected errors:
+//   - indexer.ErrIndexNotInitialized: if the EventsIndex has not been initialized
+//   - storage.ErrHeightNotIndexed: returned, when data is unavailable
+//   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
+func (e *EventsIndex) ByBlockIDTransactionIndex(blockID flow.Identifier, height uint64, txIndex uint32) ([]flow.Event, error) {
 	if err := e.checkDataAvailable(height); err != nil {
 		return nil, err
 	}

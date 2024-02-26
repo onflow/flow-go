@@ -247,26 +247,6 @@ func New(params Params) (*Backend, error) {
 	return b, nil
 }
 
-// NewCache constructs cache for storing connections to other nodes.
-// No errors are expected during normal operations.
-func NewCache(
-	log zerolog.Logger,
-	metrics module.AccessMetrics,
-	connectionPoolSize int,
-) (*lru.Cache[string, *connection.CachedClient], error) {
-	cache, err := lru.NewWithEvict(connectionPoolSize, func(_ string, client *connection.CachedClient) {
-		go client.Close() // close is blocking, so run in a goroutine
-
-		log.Debug().Str("grpc_conn_evicted", client.Address).Msg("closing grpc connection evicted from pool")
-		metrics.ConnectionFromPoolEvicted()
-	})
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
-	}
-
-	return cache, nil
-}
-
 func identifierList(ids []string) (flow.IdentifierList, error) {
 	idList := make(flow.IdentifierList, len(ids))
 	for i, idStr := range ids {
