@@ -51,7 +51,7 @@ func TestExtractPayloads(t *testing.T) {
 				}
 			}
 
-			numOfPayloadWritten, err := util.CreatePayloadFile(zerolog.Nop(), inputFile, payloads, nil)
+			numOfPayloadWritten, err := util.CreatePayloadFile(zerolog.Nop(), inputFile, payloads, nil, false)
 			require.NoError(t, err)
 			require.Equal(t, len(payloads), numOfPayloadWritten)
 
@@ -92,9 +92,10 @@ func TestExtractPayloads(t *testing.T) {
 			require.NoError(t, err)
 
 			// Verify exported payloads.
-			payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputFile)
+			partialState, payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputFile)
 			require.NoError(t, err)
 			require.Equal(t, len(selectedKeysValues), len(payloadsFromFile))
+			require.True(t, partialState)
 
 			for _, payloadFromFile := range payloadsFromFile {
 				k, err := payloadFromFile.Key()
@@ -138,7 +139,7 @@ func TestExtractPayloads(t *testing.T) {
 				}
 			}
 
-			numOfPayloadWritten, err := util.CreatePayloadFile(zerolog.Nop(), inputFile, payloads, nil)
+			numOfPayloadWritten, err := util.CreatePayloadFile(zerolog.Nop(), inputFile, payloads, nil, false)
 			require.NoError(t, err)
 			require.Equal(t, len(payloads), numOfPayloadWritten)
 
@@ -153,9 +154,10 @@ func TestExtractPayloads(t *testing.T) {
 			require.NoError(t, err)
 
 			// Verify exported payloads.
-			payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputFile)
+			partialState, payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputFile)
 			require.NoError(t, err)
 			require.Equal(t, 0, len(payloadsFromFile))
+			require.True(t, partialState)
 		})
 	})
 }
