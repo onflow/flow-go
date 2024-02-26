@@ -255,14 +255,6 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 	return contractChanges
 }
 
-func mustHexAddress(hexAddress string) common.Address {
-	address, err := common.HexToAddress(hexAddress)
-	if err != nil {
-		panic(err)
-	}
-	return address
-}
-
 func NewSystemContactsMigration(
 	chainID flow.ChainID,
 	options SystemContractChangesOptions,
