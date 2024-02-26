@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	FlowEVMTestnetChainID = big.NewInt(666)
-	FlowEVMMainnetChainID = big.NewInt(777)
+	FlowEVMTestnetChainID = big.NewInt(646)
+	FlowEVMMainnetChainID = big.NewInt(747)
 	BlockLevelGasLimit    = uint64(math.MaxUint64)
 	zero                  = uint64(0)
 )
@@ -73,10 +73,15 @@ var DefaultChainConfig = &gethParams.ChainConfig{
 	PragueTime:   &zero, // already on Prague
 }
 
+// Default config supports the dynamic fee structure (EIP-1559)
+// so it accepts both legacy transactions with a fixed gas price
+// and dynamic transactions with tip and cap.
+// Yet default config keeps the base fee to zero (no automatic adjustment)
 func defaultConfig() *Config {
 	return &Config{
 		ChainConfig: DefaultChainConfig,
 		EVMConfig: gethVM.Config{
+			// setting this flag let us we force the base fee to zero (coinbase will collect)
 			NoBaseFee: true,
 		},
 		TxContext: &gethVM.TxContext{

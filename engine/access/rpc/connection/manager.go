@@ -11,7 +11,6 @@ import (
 	"github.com/sony/gobreaker"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	_ "google.golang.org/grpc/encoding/gzip" //required for gRPC compression
@@ -24,16 +23,8 @@ import (
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
-// DefaultClientTimeout is used when making a GRPC request to a collection node or an execution node.
+// DefaultClientTimeout is used when making a GRPC request to a collection or execution node.
 const DefaultClientTimeout = 3 * time.Second
-
-// clientType is an enumeration type used to differentiate between different types of gRPC clients.
-type clientType int
-
-const (
-	AccessClient clientType = iota
-	ExecutionClient
-)
 
 type noopCloser struct{}
 
@@ -43,9 +34,9 @@ func (c *noopCloser) Close() error {
 
 // Manager provides methods for getting and managing gRPC client connections.
 type Manager struct {
-	cache                *Cache
 	logger               zerolog.Logger
 	metrics              module.AccessMetrics
+	cache                *Cache
 	maxMsgSize           uint
 	circuitBreakerConfig CircuitBreakerConfig
 	compressorName       string
@@ -67,9 +58,9 @@ type CircuitBreakerConfig struct {
 
 // NewManager creates a new Manager with the specified parameters.
 func NewManager(
-	cache *Cache,
 	logger zerolog.Logger,
 	metrics module.AccessMetrics,
+	cache *Cache,
 	maxMsgSize uint,
 	circuitBreakerConfig CircuitBreakerConfig,
 	compressorName string,
@@ -91,97 +82,23 @@ func NewManager(
 func (m *Manager) GetConnection(
 	grpcAddress string,
 	timeout time.Duration,
-	clientType clientType,
 	networkPubKey crypto.PublicKey,
 ) (*grpc.ClientConn, io.Closer, error) {
 	if m.cache != nil {
-		conn, err := m.retrieveConnection(grpcAddress, timeout, clientType, networkPubKey)
+		client, err := m.cache.GetConnected(grpcAddress, timeout, networkPubKey, m.createConnection)
 		if err != nil {
 			return nil, nil, err
 		}
-		return conn, &noopCloser{}, nil
+
+		return client.ClientConn(), &noopCloser{}, nil
 	}
 
-	conn, err := m.createConnection(grpcAddress, timeout, nil, clientType, networkPubKey)
+	conn, err := m.createConnection(grpcAddress, timeout, networkPubKey, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	return conn, io.Closer(conn), nil
-}
-
-// Remove removes the gRPC client connection associated with the given grpcAddress from the cache.
-// It returns true if the connection was removed successfully, false otherwise.
-func (m *Manager) Remove(grpcAddress string) bool {
-	if m.cache == nil {
-		return false
-	}
-
-	client, ok := m.cache.Get(grpcAddress)
-	if !ok {
-		return false
-	}
-
-	// First, remove the client from the cache to ensure other callers create a new entry
-	// Remove is done atomically, so only the first caller will succeed
-	if !m.cache.Remove(grpcAddress) {
-		return false
-	}
-
-	// Close the connection asynchronously to avoid blocking requests
-	go client.Close()
-
-	return true
-}
-
-// HasCache returns true if the Manager has a cache, false otherwise.
-func (m *Manager) HasCache() bool {
-	return m.cache != nil
-}
-
-// retrieveConnection retrieves the CachedClient for the given grpcAddress from the cache or adds a new one if not present.
-// If the connection is already cached, it waits for the lock and returns the connection from the cache.
-// Otherwise, it creates a new connection and caches it.
-// The networkPubKey is the public key used for retrieving secure gRPC connection. Can be nil for an unsecured connection.
-func (m *Manager) retrieveConnection(
-	grpcAddress string,
-	timeout time.Duration,
-	clientType clientType,
-	networkPubKey crypto.PublicKey,
-) (*grpc.ClientConn, error) {
-	client, ok := m.cache.GetOrAdd(grpcAddress, timeout)
-	if ok {
-		// The client was retrieved from the cache, wait for the lock
-		client.mu.Lock()
-		if m.metrics != nil {
-			m.metrics.ConnectionFromPoolReused()
-		}
-	} else {
-		// The client is new, lock is already held
-		if m.metrics != nil {
-			m.metrics.ConnectionAddedToPool()
-		}
-	}
-	defer client.mu.Unlock()
-
-	if client.ClientConn != nil && client.ClientConn.GetState() != connectivity.Shutdown {
-		// Return the client connection from the cache
-		return client.ClientConn, nil
-	}
-
-	// The connection is not cached or is closed, create a new connection and cache it
-	conn, err := m.createConnection(grpcAddress, timeout, client, clientType, networkPubKey)
-	if err != nil {
-		return nil, err
-	}
-
-	client.ClientConn = conn
-	if m.metrics != nil {
-		m.metrics.NewConnectionEstablished()
-		m.metrics.TotalConnectionsInPool(uint(m.cache.Len()), uint(m.cache.MaxSize()))
-	}
-
-	return client.ClientConn, nil
 }
 
 // createConnection creates a new gRPC connection to the remote node at the given address with the specified timeout.
@@ -192,9 +109,8 @@ func (m *Manager) retrieveConnection(
 func (m *Manager) createConnection(
 	address string,
 	timeout time.Duration,
-	cachedClient *CachedClient,
-	clientType clientType,
 	networkPubKey crypto.PublicKey,
+	cachedClient *CachedClient,
 ) (*grpc.ClientConn, error) {
 	if timeout == 0 {
 		timeout = DefaultClientTimeout
@@ -210,8 +126,8 @@ func (m *Manager) createConnection(
 	// https://grpc.io/blog/grpc-web-interceptor/#binding-interceptors
 	var connInterceptors []grpc.UnaryClientInterceptor
 
-	if !m.circuitBreakerConfig.Enabled {
-		connInterceptors = append(connInterceptors, m.createClientInvalidationInterceptor(address, clientType))
+	if !m.circuitBreakerConfig.Enabled && cachedClient != nil {
+		connInterceptors = append(connInterceptors, m.createClientInvalidationInterceptor(cachedClient))
 	}
 
 	connInterceptors = append(connInterceptors, createClientTimeoutInterceptor(timeout))
@@ -272,13 +188,13 @@ func createRequestWatcherInterceptor(cachedClient *CachedClient) grpc.UnaryClien
 		opts ...grpc.CallOption,
 	) error {
 		// Prevent new requests from being sent if the connection is marked for closure.
-		if cachedClient.closeRequested.Load() {
-			return status.Errorf(codes.Unavailable, "the connection to %s was closed", cachedClient.Address)
+		if cachedClient.CloseRequested() {
+			return status.Errorf(codes.Unavailable, "the connection to %s was closed", cachedClient.Address())
 		}
 
 		// Increment the request counter to track ongoing requests, then decrement the request counter before returning.
-		cachedClient.wg.Add(1)
-		defer cachedClient.wg.Done()
+		done := cachedClient.AddRequest()
+		defer done()
 
 		// Invoke the actual RPC method.
 		return invoker(ctx, method, req, reply, cc, opts...)
@@ -320,49 +236,23 @@ func createClientTimeoutInterceptor(timeout time.Duration) grpc.UnaryClientInter
 // createClientInvalidationInterceptor creates a client interceptor for client invalidation. It should only be created
 // if the circuit breaker is disabled. If the response from the server indicates an unavailable status, it invalidates
 // the corresponding client.
-func (m *Manager) createClientInvalidationInterceptor(
-	address string,
-	clientType clientType,
-) grpc.UnaryClientInterceptor {
-	if !m.circuitBreakerConfig.Enabled {
-		clientInvalidationInterceptor := func(
-			ctx context.Context,
-			method string,
-			req interface{},
-			reply interface{},
-			cc *grpc.ClientConn,
-			invoker grpc.UnaryInvoker,
-			opts ...grpc.CallOption,
-		) error {
-			err := invoker(ctx, method, req, reply, cc, opts...)
-			if status.Code(err) == codes.Unavailable {
-				switch clientType {
-				case AccessClient:
-					if m.Remove(address) {
-						m.logger.Debug().Str("cached_access_client_invalidated", address).Msg("invalidating cached access client")
-						if m.metrics != nil {
-							m.metrics.ConnectionFromPoolInvalidated()
-						}
-					}
-				case ExecutionClient:
-					if m.Remove(address) {
-						m.logger.Debug().Str("cached_execution_client_invalidated", address).Msg("invalidating cached execution client")
-						if m.metrics != nil {
-							m.metrics.ConnectionFromPoolInvalidated()
-						}
-					}
-				default:
-					m.logger.Info().Str("client_invalidation_interceptor", address).Msg(fmt.Sprintf("unexpected client type: %d", clientType))
-				}
-			}
-
-			return err
+func (m *Manager) createClientInvalidationInterceptor(cachedClient *CachedClient) grpc.UnaryClientInterceptor {
+	return func(
+		ctx context.Context,
+		method string,
+		req interface{},
+		reply interface{},
+		cc *grpc.ClientConn,
+		invoker grpc.UnaryInvoker,
+		opts ...grpc.CallOption,
+	) error {
+		err := invoker(ctx, method, req, reply, cc, opts...)
+		if status.Code(err) == codes.Unavailable {
+			cachedClient.Invalidate()
 		}
 
-		return clientInvalidationInterceptor
+		return err
 	}
-
-	return nil
 }
 
 // The simplified representation and description of circuit breaker pattern, that used to handle node connectivity:

@@ -2,14 +2,20 @@ package extract
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"math"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
+	runtimeCommon "github.com/onflow/cadence/runtime/common"
+
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -66,6 +72,8 @@ func TestExtractExecutionState(t *testing.T) {
 				outdir,
 				10,
 				false,
+				"",
+				nil,
 			)
 			require.Error(t, err)
 		})
@@ -90,13 +98,13 @@ func TestExtractExecutionState(t *testing.T) {
 			require.NoError(t, err)
 			f, err := complete.NewLedger(diskWal, size*10, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
 			require.NoError(t, err)
-			compactor, err := complete.NewCompactor(f, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+			compactor, err := complete.NewCompactor(f, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false), &metrics.NoopCollector{})
 			require.NoError(t, err)
 			<-compactor.Ready()
 
 			var stateCommitment = f.InitialState()
 
-			//saved data after updates
+			// saved data after updates
 			keysValuesByCommit := make(map[string]map[string]keyPair)
 			commitsByBlocks := make(map[flow.Identifier]ledger.State)
 			blocksInOrder := make([]flow.Identifier, size)
@@ -108,7 +116,7 @@ func TestExtractExecutionState(t *testing.T) {
 				require.NoError(t, err)
 
 				stateCommitment, _, err = f.Set(update)
-				//stateCommitment, err = f.UpdateRegisters(keys, values, stateCommitment)
+				// stateCommitment, err = f.UpdateRegisters(keys, values, stateCommitment)
 				require.NoError(t, err)
 
 				// generate random block and map it to state commitment
@@ -135,13 +143,13 @@ func TestExtractExecutionState(t *testing.T) {
 			err = db.Close()
 			require.NoError(t, err)
 
-			//for blockID, stateCommitment := range commitsByBlocks {
+			// for blockID, stateCommitment := range commitsByBlocks {
 
 			for i, blockID := range blocksInOrder {
 
 				stateCommitment := commitsByBlocks[blockID]
 
-				//we need fresh output dir to prevent contamination
+				// we need fresh output dir to prevent contamination
 				unittest.RunWithTempDir(t, func(outdir string) {
 
 					Cmd.SetArgs([]string{
@@ -166,7 +174,7 @@ func TestExtractExecutionState(t *testing.T) {
 						checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
 						checkpointsToKeep  = 1
 					)
-					compactor, err := complete.NewCompactor(storage, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+					compactor, err := complete.NewCompactor(storage, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false), &metrics.NoopCollector{})
 					require.NoError(t, err)
 
 					<-compactor.Ready()
@@ -182,7 +190,7 @@ func TestExtractExecutionState(t *testing.T) {
 					require.NoError(t, err)
 
 					registerValues, err := storage.Get(query)
-					//registerValues, err := mForest.Read([]byte(stateCommitment), keys)
+					// registerValues, err := mForest.Read([]byte(stateCommitment), keys)
 					require.NoError(t, err)
 
 					for i, key := range keys {
@@ -190,7 +198,7 @@ func TestExtractExecutionState(t *testing.T) {
 						require.Equal(t, data[key.String()].value, registerValue)
 					}
 
-					//make sure blocks after this one are not in checkpoint
+					// make sure blocks after this one are not in checkpoint
 					// ie - extraction stops after hitting right hash
 					for j := i + 1; j < len(blocksInOrder); j++ {
 
@@ -202,6 +210,339 @@ func TestExtractExecutionState(t *testing.T) {
 					<-storage.Done()
 					<-compactor.Done()
 				})
+			}
+		})
+	})
+}
+
+// TestExtractPayloadsFromExecutionState tests state extraction with checkpoint as input and payload as output.
+func TestExtractPayloadsFromExecutionState(t *testing.T) {
+	metr := &metrics.NoopCollector{}
+
+	const payloadFileName = "root.payload"
+
+	t.Run("all payloads", func(t *testing.T) {
+		withDirs(t, func(_, execdir, outdir string) {
+
+			const (
+				checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+				checkpointsToKeep  = 1
+			)
+
+			outputPayloadFileName := filepath.Join(outdir, payloadFileName)
+
+			size := 10
+
+			diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), execdir, size, pathfinder.PathByteSize, wal.SegmentSize)
+			require.NoError(t, err)
+			f, err := complete.NewLedger(diskWal, size*10, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
+			require.NoError(t, err)
+			compactor, err := complete.NewCompactor(f, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false), &metrics.NoopCollector{})
+			require.NoError(t, err)
+			<-compactor.Ready()
+
+			var stateCommitment = f.InitialState()
+
+			// Save generated data after updates
+			keysValues := make(map[string]keyPair)
+
+			for i := 0; i < size; i++ {
+				keys, values := getSampleKeyValues(i)
+
+				update, err := ledger.NewUpdate(stateCommitment, keys, values)
+				require.NoError(t, err)
+
+				stateCommitment, _, err = f.Set(update)
+				require.NoError(t, err)
+
+				for j, key := range keys {
+					keysValues[key.String()] = keyPair{
+						key:   key,
+						value: values[j],
+					}
+				}
+			}
+
+			<-f.Done()
+			<-compactor.Done()
+
+			tries, err := f.Tries()
+			require.NoError(t, err)
+
+			err = wal.StoreCheckpointV6SingleThread(tries, execdir, "checkpoint.00000001", zerolog.Nop())
+			require.NoError(t, err)
+
+			// Export all payloads
+			Cmd.SetArgs([]string{
+				"--execution-state-dir", execdir,
+				"--output-dir", outdir,
+				"--state-commitment", hex.EncodeToString(stateCommitment[:]),
+				"--no-migration",
+				"--no-report",
+				"--output-payload-filename", outputPayloadFileName,
+				"--chain", flow.Emulator.Chain().String()})
+
+			err = Cmd.Execute()
+			require.NoError(t, err)
+
+			// Verify exported payloads.
+			payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputPayloadFileName)
+			require.NoError(t, err)
+			require.Equal(t, len(keysValues), len(payloadsFromFile))
+
+			for _, payloadFromFile := range payloadsFromFile {
+				k, err := payloadFromFile.Key()
+				require.NoError(t, err)
+
+				kv, exist := keysValues[k.String()]
+				require.True(t, exist)
+				require.Equal(t, kv.value, payloadFromFile.Value())
+			}
+		})
+	})
+
+	t.Run("some payloads", func(t *testing.T) {
+		withDirs(t, func(_, execdir, outdir string) {
+			const (
+				checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+				checkpointsToKeep  = 1
+			)
+
+			outputPayloadFileName := filepath.Join(outdir, payloadFileName)
+
+			size := 10
+
+			diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), execdir, size, pathfinder.PathByteSize, wal.SegmentSize)
+			require.NoError(t, err)
+			f, err := complete.NewLedger(diskWal, size*10, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
+			require.NoError(t, err)
+			compactor, err := complete.NewCompactor(f, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, atomic.NewBool(false), &metrics.NoopCollector{})
+			require.NoError(t, err)
+			<-compactor.Ready()
+
+			var stateCommitment = f.InitialState()
+
+			// Save generated data after updates
+			keysValues := make(map[string]keyPair)
+
+			for i := 0; i < size; i++ {
+				keys, values := getSampleKeyValues(i)
+
+				update, err := ledger.NewUpdate(stateCommitment, keys, values)
+				require.NoError(t, err)
+
+				stateCommitment, _, err = f.Set(update)
+				require.NoError(t, err)
+
+				for j, key := range keys {
+					keysValues[key.String()] = keyPair{
+						key:   key,
+						value: values[j],
+					}
+				}
+			}
+
+			<-f.Done()
+			<-compactor.Done()
+
+			tries, err := f.Tries()
+			require.NoError(t, err)
+
+			err = wal.StoreCheckpointV6SingleThread(tries, execdir, "checkpoint.00000001", zerolog.Nop())
+			require.NoError(t, err)
+
+			const selectedAddressCount = 10
+			selectedAddresses := make(map[string]struct{})
+			selectedKeysValues := make(map[string]keyPair)
+			for k, kv := range keysValues {
+				owner := kv.key.KeyParts[0].Value
+				if len(owner) != runtimeCommon.AddressLength {
+					continue
+				}
+
+				address, err := runtimeCommon.BytesToAddress(owner)
+				require.NoError(t, err)
+
+				if len(selectedAddresses) < selectedAddressCount {
+					selectedAddresses[address.Hex()] = struct{}{}
+				}
+
+				if _, exist := selectedAddresses[address.Hex()]; exist {
+					selectedKeysValues[k] = kv
+				}
+			}
+
+			addresses := make([]string, 0, len(selectedAddresses))
+			for address := range selectedAddresses {
+				addresses = append(addresses, address)
+			}
+
+			// Export selected payloads
+			Cmd.SetArgs([]string{
+				"--execution-state-dir", execdir,
+				"--output-dir", outdir,
+				"--state-commitment", hex.EncodeToString(stateCommitment[:]),
+				"--no-migration",
+				"--no-report",
+				"--output-payload-filename", outputPayloadFileName,
+				"--extract-payloads-by-address", strings.Join(addresses, ","),
+				"--chain", flow.Emulator.Chain().String()})
+
+			err = Cmd.Execute()
+			require.NoError(t, err)
+
+			// Verify exported payloads.
+			payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputPayloadFileName)
+			require.NoError(t, err)
+			require.Equal(t, len(selectedKeysValues), len(payloadsFromFile))
+
+			for _, payloadFromFile := range payloadsFromFile {
+				k, err := payloadFromFile.Key()
+				require.NoError(t, err)
+
+				kv, exist := selectedKeysValues[k.String()]
+				require.True(t, exist)
+				require.Equal(t, kv.value, payloadFromFile.Value())
+			}
+		})
+	})
+}
+
+// TestExtractStateFromPayloads tests state extraction with payload as input.
+func TestExtractStateFromPayloads(t *testing.T) {
+
+	const payloadFileName = "root.payload"
+
+	t.Run("create checkpoint", func(t *testing.T) {
+		withDirs(t, func(_, execdir, outdir string) {
+			size := 10
+
+			inputPayloadFileName := filepath.Join(execdir, payloadFileName)
+
+			// Generate some data
+			keysValues := make(map[string]keyPair)
+			var payloads []*ledger.Payload
+
+			for i := 0; i < size; i++ {
+				keys, values := getSampleKeyValues(i)
+
+				for j, key := range keys {
+					keysValues[key.String()] = keyPair{
+						key:   key,
+						value: values[j],
+					}
+
+					payloads = append(payloads, ledger.NewPayload(key, values[j]))
+				}
+			}
+
+			numOfPayloadWritten, err := util.CreatePayloadFile(
+				zerolog.Nop(),
+				inputPayloadFileName,
+				payloads,
+				nil,
+			)
+			require.NoError(t, err)
+			require.Equal(t, len(payloads), numOfPayloadWritten)
+
+			// Export checkpoint file
+			Cmd.SetArgs([]string{
+				"--execution-state-dir", execdir,
+				"--output-dir", outdir,
+				"--no-migration",
+				"--no-report",
+				"--state-commitment", "",
+				"--input-payload-filename", inputPayloadFileName,
+				"--output-payload-filename", "",
+				"--extract-payloads-by-address", "",
+				"--chain", flow.Emulator.Chain().String()})
+
+			err = Cmd.Execute()
+			require.NoError(t, err)
+
+			tries, err := wal.OpenAndReadCheckpointV6(outdir, "root.checkpoint", zerolog.Nop())
+			require.NoError(t, err)
+			require.Equal(t, 1, len(tries))
+
+			// Verify exported checkpoint
+			payloadsFromFile := tries[0].AllPayloads()
+			require.NoError(t, err)
+			require.Equal(t, len(keysValues), len(payloadsFromFile))
+
+			for _, payloadFromFile := range payloadsFromFile {
+				k, err := payloadFromFile.Key()
+				require.NoError(t, err)
+
+				kv, exist := keysValues[k.String()]
+				require.True(t, exist)
+
+				require.Equal(t, kv.value, payloadFromFile.Value())
+			}
+		})
+
+	})
+
+	t.Run("create payloads", func(t *testing.T) {
+		withDirs(t, func(_, execdir, outdir string) {
+			inputPayloadFileName := filepath.Join(execdir, payloadFileName)
+			outputPayloadFileName := filepath.Join(outdir, "selected.payload")
+
+			size := 10
+
+			// Generate some data
+			keysValues := make(map[string]keyPair)
+			var payloads []*ledger.Payload
+
+			for i := 0; i < size; i++ {
+				keys, values := getSampleKeyValues(i)
+
+				for j, key := range keys {
+					keysValues[key.String()] = keyPair{
+						key:   key,
+						value: values[j],
+					}
+
+					payloads = append(payloads, ledger.NewPayload(key, values[j]))
+				}
+			}
+
+			numOfPayloadWritten, err := util.CreatePayloadFile(
+				zerolog.Nop(),
+				inputPayloadFileName,
+				payloads,
+				nil,
+			)
+			require.NoError(t, err)
+			require.Equal(t, len(payloads), numOfPayloadWritten)
+
+			// Export all payloads
+			Cmd.SetArgs([]string{
+				"--execution-state-dir", execdir,
+				"--output-dir", outdir,
+				"--no-migration",
+				"--no-report",
+				"--state-commitment", "",
+				"--input-payload-filename", inputPayloadFileName,
+				"--output-payload-filename", outputPayloadFileName,
+				"--extract-payloads-by-address", "",
+				"--chain", flow.Emulator.Chain().String()})
+
+			err = Cmd.Execute()
+			require.NoError(t, err)
+
+			// Verify exported payloads.
+			payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputPayloadFileName)
+			require.NoError(t, err)
+			require.Equal(t, len(keysValues), len(payloadsFromFile))
+
+			for _, payloadFromFile := range payloadsFromFile {
+				k, err := payloadFromFile.Key()
+				require.NoError(t, err)
+
+				kv, exist := keysValues[k.String()]
+				require.True(t, exist)
+
+				require.Equal(t, kv.value, payloadFromFile.Value())
 			}
 		})
 	})
@@ -226,7 +567,8 @@ func getSampleKeyValues(i int) ([]ledger.Key, []ledger.Value) {
 		keys := make([]ledger.Key, 0)
 		values := make([]ledger.Value, 0)
 		for j := 0; j < 10; j++ {
-			address := make([]byte, 32)
+			// address := make([]byte, 32)
+			address := make([]byte, 8)
 			_, err := rand.Read(address)
 			if err != nil {
 				panic(err)
