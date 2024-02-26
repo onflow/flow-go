@@ -39,6 +39,7 @@ type BlockContext struct {
 // NewDefaultBlockContext returns a new default block context
 func NewDefaultBlockContext(BlockNumber uint64) BlockContext {
 	return BlockContext{
+		ChainID:                FlowEVMTestnetChainID,
 		BlockNumber:            BlockNumber,
 		DirectCallBaseGasUsage: DefaultDirectCallBaseGasUsage,
 		DirectCallGasPrice:     DefaultDirectCallGasPrice,

@@ -213,7 +213,6 @@ func TestContractInteraction(t *testing.T) {
 
 				RunWithNewEmulator(t, backend, rootAddr, func(em *emulator.Emulator) {
 					ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
-					ctx.ChainID = types.FlowEVMMainnetChainID
 					blk, err := em.NewBlockView(ctx)
 					require.NoError(t, err)
 					res, err := blk.DirectCall(
@@ -230,7 +229,7 @@ func TestContractInteraction(t *testing.T) {
 					nonce += 1
 
 					ret := new(big.Int).SetBytes(res.ReturnedValue)
-					require.Equal(t, types.FlowEVMMainnetChainID, ret)
+					require.Equal(t, types.FlowEVMTestnetChainID, ret)
 				})
 			})
 
@@ -310,6 +309,7 @@ func TestContractInteraction(t *testing.T) {
 					tx := account.SignTx(
 						t,
 						gethTypes.NewTx(&gethTypes.DynamicFeeTx{
+							ChainID:   types.FlowEVMTestnetChainID,
 							Nonce:     account.Nonce(),
 							GasTipCap: big.NewInt(2),
 							GasFeeCap: big.NewInt(3),
