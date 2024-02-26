@@ -2,7 +2,10 @@ package migrations
 
 import (
 	"context"
+	"encoding/csv"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 	"sync"
 
@@ -10,21 +13,28 @@ import (
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/old_parser"
+	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
+
+	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 )
 
 type StagedContractsMigration struct {
-	log                 zerolog.Logger
-	mutex               sync.RWMutex
-	contracts           map[common.Address]map[flow.RegisterID]Contract
-	contractsByLocation map[common.Location][]byte
-	stagedContracts     []StagedContract
+	name                           string
+	chainID                        flow.ChainID
+	log                            zerolog.Logger
+	mutex                          sync.RWMutex
+	stagedContracts                map[common.Address]map[flow.RegisterID]Contract
+	contractsByLocation            map[common.Location][]byte
+	enableUpdateValidation         bool
+	userDefinedTypeChangeCheckFunc func(oldTypeID common.TypeID, newTypeID common.TypeID) (checked bool, valid bool)
 }
 
 type StagedContract struct {
@@ -39,22 +49,34 @@ type Contract struct {
 
 var _ AccountBasedMigration = &StagedContractsMigration{}
 
-func NewStagedContractsMigration(stagedContracts []StagedContract) *StagedContractsMigration {
+func NewStagedContractsMigration(chainID flow.ChainID) *StagedContractsMigration {
 	return &StagedContractsMigration{
-		stagedContracts:     stagedContracts,
-		contracts:           map[common.Address]map[flow.RegisterID]Contract{},
+		name:                "StagedContractsMigration",
+		chainID:             chainID,
+		stagedContracts:     map[common.Address]map[flow.RegisterID]Contract{},
 		contractsByLocation: map[common.Location][]byte{},
 	}
+}
+
+func (m *StagedContractsMigration) WithContractUpdateValidation() *StagedContractsMigration {
+	m.enableUpdateValidation = true
+	m.userDefinedTypeChangeCheckFunc = newUserDefinedTypeChangeCheckerFunc(m.chainID)
+	return m
+}
+
+func (m *StagedContractsMigration) WithName(name string) *StagedContractsMigration {
+	m.name = name
+	return m
 }
 
 func (m *StagedContractsMigration) Close() error {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	if len(m.contracts) > 0 {
+	if len(m.stagedContracts) > 0 {
 		var sb strings.Builder
 		sb.WriteString("failed to find all contract registers that need to be changed:\n")
-		for address, contracts := range m.contracts {
+		for address, contracts := range m.stagedContracts {
 			_, _ = fmt.Fprintf(&sb, "- address: %s\n", address)
 			for registerID := range contracts {
 				_, _ = fmt.Fprintf(&sb, "  - %s\n", flow.RegisterIDContractName(registerID))
@@ -74,47 +96,57 @@ func (m *StagedContractsMigration) InitMigration(
 ) error {
 	m.log = log.
 		With().
-		Str("migration", "StagedContractsMigration").
+		Str("migration", m.name).
 		Logger()
 
-	m.registerContractUpdates()
+	// Manually register burner contract
+	burnerLocation := common.AddressLocation{
+		Name:    "Burner",
+		Address: common.Address(m.chainID.Chain().ServiceAddress()),
+	}
+	m.contractsByLocation[burnerLocation] = coreContracts.Burner()
 
 	return nil
 }
 
-// registerContractUpdates prepares the contract updates as a map for easy lookup.
-func (m *StagedContractsMigration) registerContractUpdates() {
-	for _, contractChange := range m.stagedContracts {
-		m.registerContractChange(contractChange)
+// RegisterContractUpdates prepares the contract updates as a map for easy lookup.
+func (m *StagedContractsMigration) RegisterContractUpdates(stagedContracts []StagedContract) {
+	for _, contractChange := range stagedContracts {
+		m.RegisterContractChange(contractChange)
 	}
 }
 
-func (m *StagedContractsMigration) registerContractChange(change StagedContract) {
+func (m *StagedContractsMigration) RegisterContractChange(change StagedContract) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
 	address := change.Address
-	if _, ok := m.contracts[address]; !ok {
-		m.contracts[address] = map[flow.RegisterID]Contract{}
+	if _, ok := m.stagedContracts[address]; !ok {
+		m.stagedContracts[address] = map[flow.RegisterID]Contract{}
 	}
 
-	registerID := flow.ContractRegisterID(flow.ConvertAddress(address), change.Name)
+	name := change.Name
 
-	_, exist := m.contracts[address][registerID]
+	registerID := flow.ContractRegisterID(flow.ConvertAddress(address), name)
+
+	_, exist := m.stagedContracts[address][registerID]
 	if exist {
 		// Staged multiple updates for the same contract.
 		// Overwrite the previous update.
 		m.log.Warn().Msgf(
 			"existing staged update found for contract %s.%s. Previous update will be overwritten.",
 			address.HexWithPrefix(),
-			change.Name,
+			name,
 		)
 	}
 
-	m.contracts[address][registerID] = change.Contract
+	m.stagedContracts[address][registerID] = change.Contract
 
 	location := common.AddressLocation{
-		Name:    change.Name,
+		Name:    name,
 		Address: address,
 	}
-	m.contractsByLocation[location] = change.Contract.Code
+	m.contractsByLocation[location] = change.Code
 }
 
 func (m *StagedContractsMigration) contractUpdatesForAccount(
@@ -123,11 +155,11 @@ func (m *StagedContractsMigration) contractUpdatesForAccount(
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	contracts, ok := m.contracts[address]
+	contracts, ok := m.stagedContracts[address]
 
 	// remove address from set of addresses
 	// to keep track of which addresses are left to change
-	delete(m.contracts, address)
+	delete(m.stagedContracts, address)
 
 	return contracts, ok
 }
@@ -144,10 +176,17 @@ func (m *StagedContractsMigration) MigrateAccount(
 		return payloads, nil
 	}
 
+	elaborations := map[common.Location]*sema.Elaboration{}
+
 	config := util.RuntimeInterfaceConfig{
 		GetContractCodeFunc: func(location runtime.Location) ([]byte, error) {
 			// TODO: also consider updated system contracts
 			return m.contractsByLocation[location], nil
+		},
+		GetOrLoadProgramListener: func(location runtime.Location, program *interpreter.Program, err error) {
+			if err == nil {
+				elaborations[location] = program.Elaboration
+			}
 		},
 	}
 
@@ -178,7 +217,17 @@ func (m *StagedContractsMigration) MigrateAccount(
 		newCode := updatedContract.Code
 		oldCode := payload.Value()
 
-		err = m.checkUpdateValidity(mr, address, name, newCode, oldCode)
+		if m.enableUpdateValidation {
+			err = m.checkContractUpdateValidity(
+				mr,
+				address,
+				name,
+				newCode,
+				oldCode,
+				elaborations,
+			)
+		}
+
 		if err != nil {
 			m.log.Error().Err(err).
 				Msgf(
@@ -211,12 +260,13 @@ func (m *StagedContractsMigration) MigrateAccount(
 	return payloads, nil
 }
 
-func (m *StagedContractsMigration) checkUpdateValidity(
+func (m *StagedContractsMigration) checkContractUpdateValidity(
 	mr *migratorRuntime,
 	address common.Address,
 	contractName string,
 	newCode []byte,
 	oldCode ledger.Value,
+	elaborations map[common.Location]*sema.Elaboration,
 ) error {
 	location := common.AddressLocation{
 		Name:    contractName,
@@ -239,12 +289,93 @@ func (m *StagedContractsMigration) checkUpdateValidity(
 		return err
 	}
 
-	validator := stdlib.NewLegacyContractUpdateValidator(
-		nil,
+	validator := stdlib.NewCadenceV042ToV1ContractUpdateValidator(
+		location,
 		contractName,
+		mr.ContractNamesProvider,
 		oldProgram,
 		newProgram.Program,
+		elaborations,
+	)
+
+	validator.WithUserDefinedTypeChangeChecker(
+		m.userDefinedTypeChangeCheckFunc,
 	)
 
 	return validator.Validate()
+}
+
+func StagedContractsFromCSV(path string) ([]StagedContract, error) {
+	if path == "" {
+		return nil, nil
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+
+	// Expect 3 fields: address, name, code
+	reader.FieldsPerRecord = 3
+
+	var contracts []StagedContract
+
+	for {
+		rec, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		addressHex := rec[0]
+		name := rec[1]
+		code := rec[2]
+
+		address, err := common.HexToAddress(addressHex)
+		if err != nil {
+			return nil, err
+		}
+
+		contracts = append(contracts, StagedContract{
+			Contract: Contract{
+				Name: name,
+				Code: []byte(code),
+			},
+			Address: address,
+		})
+	}
+
+	return contracts, nil
+}
+
+func newUserDefinedTypeChangeCheckerFunc(
+	chainID flow.ChainID,
+) func(oldTypeID common.TypeID, newTypeID common.TypeID) (checked, valid bool) {
+
+	typeChangeRules := map[common.TypeID]common.TypeID{}
+
+	compositeTypeRules := NewCompositeTypeConversionRules(chainID)
+	for typeID, newStaticType := range compositeTypeRules {
+		typeChangeRules[typeID] = newStaticType.ID()
+	}
+
+	interfaceTypeRules := NewInterfaceTypeConversionRules(chainID)
+	for typeID, newStaticType := range interfaceTypeRules {
+		typeChangeRules[typeID] = newStaticType.ID()
+	}
+
+	return func(oldTypeID common.TypeID, newTypeID common.TypeID) (checked, valid bool) {
+		expectedNewTypeID, found := typeChangeRules[oldTypeID]
+		if found {
+			return true, expectedNewTypeID == newTypeID
+		}
+		return false, false
+	}
 }

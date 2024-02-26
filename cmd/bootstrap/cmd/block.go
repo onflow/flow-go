@@ -54,6 +54,8 @@ func constructRootEpochEvents(
 		Participants:       participants.Sort(flow.Canonical[flow.Identity]).ToSkeleton(),
 		Assignments:        assignments,
 		RandomSource:       GenerateRandomSeed(flow.EpochSetupRandomSourceLength),
+		TargetDuration:     flagEpochTimingDuration,
+		TargetEndTime:      rootEpochTargetEndTime(),
 	}
 
 	qcsWithSignerIDs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(clusterQCs))
@@ -86,6 +88,8 @@ func parseChainID(chainID string) flow.ChainID {
 		return flow.Mainnet
 	case "test":
 		return flow.Testnet
+	case "preview":
+		return flow.Previewnet
 	case "sandbox":
 		return flow.Sandboxnet
 	case "bench":

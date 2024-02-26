@@ -104,9 +104,9 @@ func TestEncodeFail(t *testing.T) {
 func Test_EncodeSignerToIndicesAndSigType(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		// select total committee size, number of random beacon signers and number of staking signers
-		committeeSize := rapid.IntRange(1, 272).Draw(t, "committeeSize").(int)
-		numStakingSigners := rapid.IntRange(0, committeeSize).Draw(t, "numStakingSigners").(int)
-		numRandomBeaconSigners := rapid.IntRange(0, committeeSize-numStakingSigners).Draw(t, "numRandomBeaconSigners").(int)
+		committeeSize := rapid.IntRange(1, 272).Draw(t, "committeeSize")
+		numStakingSigners := rapid.IntRange(0, committeeSize).Draw(t, "numStakingSigners")
+		numRandomBeaconSigners := rapid.IntRange(0, committeeSize-numStakingSigners).Draw(t, "numRandomBeaconSigners")
 
 		// create committee
 		committeeIdentities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical[flow.Identity])
@@ -142,9 +142,9 @@ func Test_EncodeSignerToIndicesAndSigType(t *testing.T) {
 func Test_DecodeSigTypeToStakingAndBeaconSigners(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		// select total committee size, number of random beacon signers and number of staking signers
-		committeeSize := rapid.IntRange(1, 272).Draw(t, "committeeSize").(int)
-		numStakingSigners := rapid.IntRange(0, committeeSize).Draw(t, "numStakingSigners").(int)
-		numRandomBeaconSigners := rapid.IntRange(0, committeeSize-numStakingSigners).Draw(t, "numRandomBeaconSigners").(int)
+		committeeSize := rapid.IntRange(1, 272).Draw(t, "committeeSize")
+		numStakingSigners := rapid.IntRange(0, committeeSize).Draw(t, "numStakingSigners")
+		numRandomBeaconSigners := rapid.IntRange(0, committeeSize-numStakingSigners).Draw(t, "numRandomBeaconSigners")
 
 		// create committee
 		committeeIdentities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).
@@ -270,8 +270,8 @@ func TestValidPaddingErrIllegallyPaddedBitVector(t *testing.T) {
 func Test_EncodeSignersToIndices(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		// select total committee size, number of random beacon signers and number of staking signers
-		committeeSize := rapid.IntRange(1, 272).Draw(t, "committeeSize").(int)
-		numSigners := rapid.IntRange(0, committeeSize).Draw(t, "numSigners").(int)
+		committeeSize := rapid.IntRange(1, 272).Draw(t, "committeeSize")
+		numSigners := rapid.IntRange(0, committeeSize).Draw(t, "numSigners")
 
 		// create committee
 		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical[flow.Identity])
@@ -300,8 +300,8 @@ func Test_EncodeSignersToIndices(t *testing.T) {
 func Test_DecodeSignerIndicesToIdentifiers(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		// select total committee size, number of random beacon signers and number of staking signers
-		committeeSize := rapid.IntRange(1, 272).Draw(t, "committeeSize").(int)
-		numSigners := rapid.IntRange(0, committeeSize).Draw(t, "numSigners").(int)
+		committeeSize := rapid.IntRange(1, 272).Draw(t, "committeeSize")
+		numSigners := rapid.IntRange(0, committeeSize).Draw(t, "numSigners")
 
 		// create committee
 		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical[flow.Identity])
@@ -336,8 +336,8 @@ const UpperBoundCommitteeSize = 272
 func Test_DecodeSignerIndicesToIdentities(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		// select total committee size, number of random beacon signers and number of staking signers
-		committeeSize := rapid.IntRange(1, UpperBoundCommitteeSize).Draw(t, "committeeSize").(int)
-		numSigners := rapid.IntRange(0, committeeSize).Draw(t, "numSigners").(int)
+		committeeSize := rapid.IntRange(1, UpperBoundCommitteeSize).Draw(t, "committeeSize")
+		numSigners := rapid.IntRange(0, committeeSize).Draw(t, "numSigners")
 
 		// create committee
 		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical[flow.Identity])

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	flowSdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -32,7 +33,7 @@ func ParseEvent(eventType flow.EventType) (*ParsedEvent, error) {
 	parts := strings.Split(string(eventType), ".")
 
 	switch parts[0] {
-	case "flow", flow.EVMLocationPrefix:
+	case "flow", flowSdk.EVMLocationPrefix:
 		if len(parts) == 2 {
 			return &ParsedEvent{
 				Type:         ProtocolEventType,

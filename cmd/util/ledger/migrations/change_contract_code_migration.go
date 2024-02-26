@@ -1,171 +1,41 @@
 package migrations
 
 import (
-	"context"
 	"fmt"
-	"strings"
-	"sync"
-
-	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence/runtime/common"
+	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 
 	evm "github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 type ChangeContractCodeMigration struct {
-	log       zerolog.Logger
-	mutex     sync.RWMutex
-	contracts map[common.Address]map[flow.RegisterID]string
+	*StagedContractsMigration
 }
 
 var _ AccountBasedMigration = (*ChangeContractCodeMigration)(nil)
 
-func (d *ChangeContractCodeMigration) Close() error {
-	d.mutex.RLock()
-	defer d.mutex.RUnlock()
-
-	if len(d.contracts) > 0 {
-		var sb strings.Builder
-		sb.WriteString("failed to find all contract registers that need to be changed:\n")
-		for address, contracts := range d.contracts {
-			_, _ = fmt.Fprintf(&sb, "- address: %s\n", address)
-			for registerID := range contracts {
-				_, _ = fmt.Fprintf(&sb, "  - %s\n", flow.RegisterIDContractName(registerID))
-			}
-		}
-		return fmt.Errorf(sb.String())
+func NewChangeContractCodeMigration(chainID flow.ChainID) *ChangeContractCodeMigration {
+	return &ChangeContractCodeMigration{
+		StagedContractsMigration: NewStagedContractsMigration(chainID).
+			// TODO:
+			//WithContractUpdateValidation().
+			WithName("ChangeContractCodeMigration"),
 	}
-
-	return nil
-}
-
-func (d *ChangeContractCodeMigration) InitMigration(
-	log zerolog.Logger,
-	_ []*ledger.Payload,
-	_ int,
-) error {
-	d.log = log.
-		With().
-		Str("migration", "ChangeContractCodeMigration").
-		Logger()
-
-	return nil
-}
-
-func (d *ChangeContractCodeMigration) MigrateAccount(
-	_ context.Context,
-	address common.Address,
-	payloads []*ledger.Payload,
-) ([]*ledger.Payload, error) {
-
-	contracts, ok := (func() (map[flow.RegisterID]string, bool) {
-		d.mutex.Lock()
-		defer d.mutex.Unlock()
-
-		contracts, ok := d.contracts[address]
-
-		// remove address from set of addresses
-		// to keep track of which addresses are left to change
-		delete(d.contracts, address)
-
-		return contracts, ok
-	})()
-
-	if !ok {
-		// no contracts to change on this address
-		return payloads, nil
-	}
-
-	for payloadIndex, payload := range payloads {
-		key, err := payload.Key()
-		if err != nil {
-			return nil, err
-		}
-
-		registerID, err := convert.LedgerKeyToRegisterID(key)
-		if err != nil {
-			return nil, err
-		}
-
-		newContract, ok := contracts[registerID]
-		if !ok {
-			// not a contract register, or
-			// not interested in this contract
-			continue
-		}
-
-		// change contract code
-		payloads[payloadIndex] = ledger.NewPayload(
-			key,
-			[]byte(newContract),
-		)
-
-		// TODO: maybe log diff between old and new
-
-		// remove contract from list of contracts to change
-		// to keep track of which contracts are left to change
-		delete(contracts, registerID)
-	}
-
-	if len(contracts) > 0 {
-		var sb strings.Builder
-		_, _ = fmt.Fprintf(&sb, "failed to find all contract registers that need to be changed for address %s:\n", address)
-		for registerID := range contracts {
-			_, _ = fmt.Fprintf(&sb, "- %s\n", flow.RegisterIDContractName(registerID))
-		}
-		return nil, fmt.Errorf(sb.String())
-	}
-
-	return payloads, nil
-}
-
-func (d *ChangeContractCodeMigration) RegisterContractChange(
-	address common.Address,
-	contractName string,
-	newContractCode string,
-) (
-	previousNewContractCode string,
-) {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
-	if d.contracts == nil {
-		d.contracts = map[common.Address]map[flow.RegisterID]string{}
-	}
-
-	if _, ok := d.contracts[address]; !ok {
-		d.contracts[address] = map[flow.RegisterID]string{}
-	}
-
-	registerID := flow.ContractRegisterID(flow.ConvertAddress(address), contractName)
-
-	previousNewContractCode = d.contracts[address][registerID]
-
-	d.contracts[address][registerID] = newContractCode
-
-	return
-}
-
-type SystemContractChange struct {
-	Address         common.Address
-	ContractName    string
-	NewContractCode string
 }
 
 func NewSystemContractChange(
 	systemContract systemcontracts.SystemContract,
 	newContractCode []byte,
-) SystemContractChange {
-	return SystemContractChange{
-		Address:         common.Address(systemContract.Address),
-		ContractName:    systemContract.Name,
-		NewContractCode: string(newContractCode),
+) StagedContract {
+	return StagedContract{
+		Address: common.Address(systemContract.Address),
+		Contract: Contract{
+			Name: systemContract.Name,
+			Code: newContractCode,
+		},
 	}
 }
 
@@ -199,7 +69,7 @@ func BurnerAddressForChain(chainID flow.ChainID) flow.Address {
 	}
 }
 
-func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOptions) []SystemContractChange {
+func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOptions) []StagedContract {
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
 	env := systemContracts.AsTemplateEnv()
@@ -224,7 +94,7 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 
 	env.LockedTokensAddress = env.StakingCollectionAddress
 
-	contractChanges := []SystemContractChange{
+	contractChanges := []StagedContract{
 		// epoch related contracts
 		NewSystemContractChange(
 			systemContracts.Epoch,
@@ -269,23 +139,25 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 			),
 		),
 		{
-			Address:      common.Address(flow.HexToAddress(env.StakingCollectionAddress)),
-			ContractName: "FlowStakingCollection",
-			NewContractCode: string(coreContracts.FlowStakingCollection(
-				env,
-			)),
+			Address: common.Address(flow.HexToAddress(env.StakingCollectionAddress)),
+			Contract: Contract{
+				Name: "FlowStakingCollection",
+				Code: coreContracts.FlowStakingCollection(env),
+			},
 		},
 		{
-			Address:         common.Address(flow.HexToAddress(env.StakingProxyAddress)),
-			ContractName:    "StakingProxy",
-			NewContractCode: string(coreContracts.FlowStakingProxy()),
+			Address: common.Address(flow.HexToAddress(env.StakingProxyAddress)),
+			Contract: Contract{
+				Name: "StakingProxy",
+				Code: coreContracts.FlowStakingProxy(),
+			},
 		},
 		{
-			Address:      common.Address(flow.HexToAddress(env.LockedTokensAddress)),
-			ContractName: "LockedTokens",
-			NewContractCode: string(coreContracts.FlowLockedTokens(
-				env,
-			)),
+			Address: common.Address(flow.HexToAddress(env.LockedTokensAddress)),
+			Contract: Contract{
+				Name: "LockedTokens",
+				Code: coreContracts.FlowLockedTokens(env),
+			},
 		},
 
 		// token related contracts
@@ -308,11 +180,11 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 			),
 		),
 		{
-			Address:      common.Address(flow.HexToAddress(env.FungibleTokenMetadataViewsAddress)),
-			ContractName: "FungibleTokenMetadataViews",
-			NewContractCode: string(coreContracts.FungibleTokenMetadataViews(
-				env,
-			)),
+			Address: common.Address(flow.HexToAddress(env.FungibleTokenMetadataViewsAddress)),
+			Contract: Contract{
+				Name: "FungibleTokenMetadataViews",
+				Code: coreContracts.FungibleTokenMetadataViews(env),
+			},
 		},
 
 		// NFT related contracts
@@ -341,12 +213,12 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 	default:
 		contractChanges = append(
 			contractChanges,
-			SystemContractChange{
-				Address:      common.Address(flow.HexToAddress(env.FungibleTokenSwitchboardAddress)),
-				ContractName: "FungibleTokenSwitchboard",
-				NewContractCode: string(coreContracts.FungibleTokenSwitchboard(
-					env,
-				)),
+			StagedContract{
+				Address: common.Address(flow.HexToAddress(env.FungibleTokenSwitchboardAddress)),
+				Contract: Contract{
+					Name: "FungibleTokenSwitchboard",
+					Code: coreContracts.FungibleTokenSwitchboard(env),
+				},
 			},
 		)
 	}
@@ -386,13 +258,9 @@ func NewSystemContactsMigration(
 	chainID flow.ChainID,
 	options SystemContractChangesOptions,
 ) *ChangeContractCodeMigration {
-	migration := &ChangeContractCodeMigration{}
+	migration := NewChangeContractCodeMigration(chainID)
 	for _, change := range SystemContractChanges(chainID, options) {
-		migration.RegisterContractChange(
-			change.Address,
-			change.ContractName,
-			change.NewContractCode,
-		)
+		migration.RegisterContractChange(change)
 	}
 	return migration
 }

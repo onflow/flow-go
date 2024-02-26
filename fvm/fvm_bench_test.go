@@ -35,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
+	"github.com/onflow/flow-go/fvm/evm/types"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -476,7 +477,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		tc := testutils.GetStorageTestContract(b)
 		var evmTestAccount *testutils.EOATestAccount
 		blockExecutor.RunWithLedger(b, func(ledger atree.Ledger) {
-			testutils.DeployContract(b, tc, ledger, chain.ServiceAddress())
+			testutils.DeployContract(b, types.EmptyAddress, tc, ledger, chain.ServiceAddress())
 			evmTestAccount = testutils.FundAndGetEOATestAccount(b, ledger, chain.ServiceAddress())
 		})
 
