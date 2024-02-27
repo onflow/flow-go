@@ -69,13 +69,14 @@ func (b *AccountStatusesBackend) getAccountStatusResponseFactory(messageIndex *c
 			Uint64("height", height).
 			Msgf("sending %d account events", len(events))
 
+		index := messageIndex.Value()
 		response := &AccountStatusesResponse{
 			BlockID:      executionData.BlockID,
 			Events:       events,
-			MessageIndex: messageIndex.Value(),
+			MessageIndex: index,
 		}
 
-		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
+		if ok := messageIndex.Set(index + 1); !ok {
 			b.log.Debug().Msg("message index already incremented")
 		}
 
