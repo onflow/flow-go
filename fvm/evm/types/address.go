@@ -25,7 +25,7 @@ import (
 // leaves a variable part of 8 bytes (64 bits).
 const FlowEVMSpecialAddressPrefixLen = 12
 
-const COAAddressTemplate = "A.%v.EVM.BridgedAccountCreated"
+const COAAddressTemplate = "A.%v.EVM.CadenceOwnedAccountCreated"
 
 var (
 	// Using leading zeros for prefix helps with the storage compactness.
@@ -55,6 +55,15 @@ var EmptyAddress = Address(gethCommon.Address{})
 // Bytes returns a byte slice for the address
 func (fa Address) Bytes() []byte {
 	return fa[:]
+}
+
+// String returns the hex encoding of the address
+// it returns empty string if address is empty
+func (fa Address) String() string {
+	if fa == EmptyAddress {
+		return ""
+	}
+	return fa.ToCommon().Hex()
 }
 
 // ToCommon returns the geth address

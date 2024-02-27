@@ -164,5 +164,5 @@ func CorruptGossipSubConfigFactoryWithInspector(inspector func(peer.ID, *corrupt
 
 func overrideWithCorruptGossipSub(builder p2p.NodeBuilder, opts ...CorruptPubSubAdapterConfigOption) {
 	factory := CorruptGossipSubFactory()
-	builder.SetGossipSubFactory(factory, CorruptGossipSubConfigFactory(opts...))
+	builder.OverrideGossipSubFactory(factory, CorruptGossipSubConfigFactory(opts...))
 }
