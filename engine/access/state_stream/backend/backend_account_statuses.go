@@ -31,7 +31,7 @@ type AccountStatusesBackend struct {
 	getStartHeight   GetStartHeightFunc
 }
 
-func (b AccountStatusesBackend) SubscribeAccountStatuses(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.StatusFilter) state_stream.Subscription {
+func (b *AccountStatusesBackend) SubscribeAccountStatuses(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.StatusFilter) state_stream.Subscription {
 	nextHeight, err := b.getStartHeight(startBlockID, startHeight)
 	if err != nil {
 		return NewFailedSubscription(err, "could not get start height")
@@ -44,8 +44,8 @@ func (b AccountStatusesBackend) SubscribeAccountStatuses(ctx context.Context, st
 	return sub
 }
 
-// getAccountStatusResponseFactory returns a function function that returns the account statuses response for a given height.
-func (b AccountStatusesBackend) getAccountStatusResponseFactory(messageIndex *counters.StrictMonotonousCounter, filter state_stream.StatusFilter) GetDataByHeightFunc {
+// getAccountStatusResponseFactory returns a function that returns the account statuses response for a given height.
+func (b *AccountStatusesBackend) getAccountStatusResponseFactory(messageIndex *counters.StrictMonotonousCounter, filter state_stream.StatusFilter) GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
 		executionData, err := b.getExecutionData(ctx, height)
 		if err != nil {
@@ -60,7 +60,7 @@ func (b AccountStatusesBackend) getAccountStatusResponseFactory(messageIndex *co
 		b.log.Trace().
 			Hex("block_id", logging.ID(executionData.BlockID)).
 			Uint64("height", height).
-			Msgf("sending %d events", len(events))
+			Msgf("sending %d account events", len(events))
 
 		response := &AccountStatusesResponse{
 			BlockID:      executionData.BlockID,
