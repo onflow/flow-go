@@ -69,8 +69,6 @@ type API interface {
 	//
 	// Each block header are filtered by the provided block status, and only
 	// those block headers that match the status are returned.
-	//
-	// This is a lighter version of `SubscribeBlocks` as it will never include the heavy `BlockPayload`.
 	SubscribeBlockHeaders(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription
 	// SubscribeBlockDigests streams finalized or sealed lightweight block starting at the requested
 	// start block, up until the latest available block. Once the latest is

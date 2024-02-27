@@ -34,7 +34,8 @@ type HandlerOption func(*Handler)
 
 var _ access.AccessAPIServer = (*Handler)(nil)
 
-func NewHandler(api API,
+func NewHandler(
+	api API,
 	chain flow.Chain,
 	finalizedHeader module.FinalizedHeaderCache,
 	me module.Local,
@@ -795,12 +796,12 @@ func (h *Handler) SubscribeBlockHeaders(request *access.SubscribeBlockHeadersReq
 
 		signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(header)
 		if err != nil {
-			return err // the block was retrieved from local storage - so no errors are expected
+			return rpc.ConvertError(err, "could not decode the signer indices from the given block header", codes.Internal) // the block was retrieved from local storage - so no errors are expected
 		}
 
 		msgHeader, err := convert.BlockHeaderToMessage(header, signerIDs)
 		if err != nil {
-			return err
+			return rpc.ConvertError(err, "could not convert block header to message", codes.Internal)
 		}
 
 		err = stream.Send(&access.SubscribeBlockHeadersResponse{
@@ -872,13 +873,13 @@ func (h *Handler) SubscribeBlockDigests(request *access.SubscribeBlockDigestsReq
 func (h *Handler) getStartData(msgStartBlockID []byte, msgBlockStatus entities.BlockStatus) (flow.Identifier, flow.BlockStatus, error) {
 	startBlockID, err := h.getStartBlockID(msgStartBlockID)
 	if err != nil {
-		return flow.ZeroID, flow.BlockStatusUnknown, status.Errorf(codes.InvalidArgument, "invalid start block ID argument: %v", err)
+		return flow.ZeroID, flow.BlockStatusUnknown, fmt.Errorf("invalid start block ID argument: %w", err)
 	}
 
 	blockStatus := convert.MessageToBlockStatus(msgBlockStatus)
 	err = checkBlockStatus(blockStatus)
 	if err != nil {
-		return flow.ZeroID, flow.BlockStatusUnknown, status.Errorf(codes.InvalidArgument, "invalid block status argument: %v", err)
+		return flow.ZeroID, flow.BlockStatusUnknown, fmt.Errorf("invalid block status argument: %w", err)
 	}
 	return startBlockID, blockStatus, nil
 }
@@ -888,16 +889,10 @@ func (h *Handler) getStartData(msgStartBlockID []byte, msgBlockStatus entities.B
 // Errors:
 // - codes.InvalidArgument: If startBlockID could not convert to flow.Identifier.
 func (h *Handler) getStartBlockID(blockID []byte) (flow.Identifier, error) {
-	startBlockID := flow.ZeroID
-	if blockID != nil {
-		id, err := convert.BlockID(blockID)
-		if err != nil {
-			return startBlockID, status.Errorf(codes.InvalidArgument, "could not convert start block ID: %v", err)
-		}
-		startBlockID = id
+	if len(blockID) == 0 {
+		return flow.ZeroID, nil
 	}
-
-	return startBlockID, nil
+	return convert.BlockID(blockID)
 }
 
 func (h *Handler) SendAndSubscribeTransactionStatuses(_ *access.SendAndSubscribeTransactionStatusesRequest, _ access.AccessAPI_SendAndSubscribeTransactionStatusesServer) error {
@@ -917,7 +912,7 @@ func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flo
 	if fullResponse {
 		msg, err = convert.BlockToMessage(block, signerIDs)
 		if err != nil {
-			return nil, err
+			return nil, rpc.ConvertError(err, "could not convert block to message", codes.Internal)
 		}
 	} else {
 		msg = convert.BlockToMessageLight(block)
@@ -940,7 +935,7 @@ func (h *Handler) blockHeaderResponse(header *flow.Header, status flow.BlockStat
 
 	msg, err := convert.BlockHeaderToMessage(header, signerIDs)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ConvertError(err, "could not convert block header to message", codes.Internal)
 	}
 
 	return &access.BlockHeaderResponse{
@@ -983,7 +978,7 @@ func WithBlockSignerDecoder(signerIndicesDecoder hotstuff.BlockSignerDecoder) fu
 }
 
 func checkBlockStatus(blockStatus flow.BlockStatus) error {
-	if blockStatus == flow.BlockStatusUnknown {
+	if blockStatus != flow.BlockStatusFinalized && blockStatus != flow.BlockStatusSealed {
 		return fmt.Errorf("block status is unknown. Possible variants: BLOCK_FINALIZED, BLOCK_SEALED")
 	}
 	return nil
