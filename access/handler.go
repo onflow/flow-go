@@ -842,15 +842,15 @@ func (h *Handler) SubscribeBlockDigests(request *access.SubscribeBlockDigestsReq
 			return nil
 		}
 
-		lightweightBlock, ok := v.(*flow.LightweightBlock)
+		blockDigest, ok := v.(*flow.BlockDigest)
 		if !ok {
 			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
 		}
 
 		err = stream.Send(&access.SubscribeBlockDigestsResponse{
-			BlockId:        convert.IdentifierToMessage(lightweightBlock.ID),
-			BlockHeight:    lightweightBlock.Height,
-			BlockTimestamp: timestamppb.New(lightweightBlock.Timestamp),
+			BlockId:        convert.IdentifierToMessage(blockDigest.ID),
+			BlockHeight:    blockDigest.Height,
+			BlockTimestamp: timestamppb.New(blockDigest.Timestamp),
 		})
 		if err != nil {
 			return rpc.ConvertError(err, "could not send response", codes.Internal)

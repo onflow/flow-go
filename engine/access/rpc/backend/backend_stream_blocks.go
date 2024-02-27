@@ -106,7 +106,7 @@ func (b *backendSubscribeBlocks) getBlockDigestResponse(blockStatus flow.BlockSt
 			Uint64("height", height).
 			Msgf("sending lightweight block info")
 
-		return &flow.LightweightBlock{
+		return &flow.BlockDigest{
 			ID:        header.ID(),
 			Height:    header.Height,
 			Timestamp: header.Timestamp,

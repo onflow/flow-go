@@ -91,7 +91,7 @@ func (s *BackendBlockDigestSuite) TestSubscribeBlockDigests() {
 					v, ok := <-sub.Channel()
 					require.True(s.T(), ok, "channel closed while waiting for exec data for block %x %v: err: %v", b.Header.Height, b.ID(), sub.Err())
 
-					actualBlock, ok := v.(*flow.LightweightBlock)
+					actualBlock, ok := v.(*flow.BlockDigest)
 					require.True(s.T(), ok, "unexpected response type: %T", v)
 
 					s.Require().Equal(b.Header.ID(), actualBlock.ID)
