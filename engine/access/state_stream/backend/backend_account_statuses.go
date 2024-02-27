@@ -38,9 +38,7 @@ func (b AccountStatusesBackend) SubscribeAccountStatuses(ctx context.Context, st
 	}
 
 	messageIndex := counters.NewMonotonousCounter(0)
-
 	sub := NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getAccountStatusResponseFactory(&messageIndex, filter))
-
 	go NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
 
 	return sub
