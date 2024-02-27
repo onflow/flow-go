@@ -136,7 +136,7 @@ func FundAndGetEOATestAccount(t testing.TB, led atree.Ledger, flowEVMRootAddress
 
 	_, err = blk.DirectCall(
 		types.NewDepositCall(
-			types.EmptyAddress,
+			RandomAddress(t), // any random non-empty address works here
 			account.Address(),
 			new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)),
 			account.nonce,
