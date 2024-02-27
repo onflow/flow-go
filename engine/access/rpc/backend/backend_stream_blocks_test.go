@@ -35,10 +35,10 @@ type BackendBlocksSuite struct {
 	snapshot *protocol.Snapshot
 	log      zerolog.Logger
 
-	blocks                *storagemock.Blocks
-	headers               *storagemock.Headers
-	chainStateTracker     *subscriptionmock.ChainStateTracker
-	chainStateTrackerReal subscription.ChainStateTracker
+	blocks           *storagemock.Blocks
+	headers          *storagemock.Headers
+	blockTracker     *subscriptionmock.BlockTracker
+	blockTrackerReal subscription.BlockTracker
 
 	connectionFactory *connectionmock.ConnectionFactory
 
@@ -94,7 +94,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 	s.headers = new(storagemock.Headers)
 	s.chainID = flow.Testnet
 	s.connectionFactory = connectionmock.NewConnectionFactory(s.T())
-	s.chainStateTracker = subscriptionmock.NewChainStateTracker(s.T())
+	s.blockTracker = subscriptionmock.NewBlockTracker(s.T())
 
 	s.broadcaster = engine.NewBroadcaster()
 
@@ -173,8 +173,8 @@ func (s *BackendBlocksSuite) SetupTest() {
 	s.backend, err = New(s.backendParams())
 	require.NoError(s.T(), err)
 
-	// create real chain state tracker to use GetStartHeight from it, instead of mocking
-	s.chainStateTrackerReal, err = subscription.NewChainStateTracker(
+	// create real block tracker to use GetStartHeight from it, instead of mocking
+	s.blockTrackerReal, err = subscription.NewBlockTracker(
 		s.state,
 		s.rootBlock.Header.Height,
 		s.headers,
@@ -185,14 +185,13 @@ func (s *BackendBlocksSuite) SetupTest() {
 	)
 	require.NoError(s.T(), err)
 
-	s.chainStateTracker.On(
+	s.blockTracker.On(
 		"GetStartHeight",
 		mock.Anything,
 		mock.AnythingOfType("flow.Identifier"),
 		mock.AnythingOfType("uint64"),
-		mock.AnythingOfType("flow.BlockStatus"),
-	).Return(func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error) {
-		return s.chainStateTrackerReal.GetStartHeight(ctx, startBlockID, startHeight, blockStatus)
+	).Return(func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
+		return s.blockTrackerReal.GetStartHeight(ctx, startBlockID, startHeight)
 	}, nil)
 
 	s.setupTestCases()
@@ -217,7 +216,7 @@ func (s *BackendBlocksSuite) backendParams() Params {
 			ResponseLimit:  subscription.DefaultResponseLimit,
 			Broadcaster:    s.broadcaster,
 		},
-		ChainStateTracker: s.chainStateTracker,
+		BlockTracker: s.blockTracker,
 	}
 }
 
@@ -311,8 +310,8 @@ func (s *BackendBlocksSuite) setupErrorTestCases() {
 }
 
 func (s *BackendBlocksSuite) setupChainStateMock(blockStatus flow.BlockStatus, highestHeader *flow.Header) {
-	s.chainStateTracker.On("GetHighestHeight", mock.Anything).Unset()
-	s.chainStateTracker.On("GetHighestHeight", blockStatus).Return(highestHeader.Height, nil)
+	s.blockTracker.On("GetHighestHeight", mock.Anything).Unset()
+	s.blockTracker.On("GetHighestHeight", blockStatus).Return(highestHeader.Height, nil)
 
 	if blockStatus == flow.BlockStatusSealed {
 		s.snapshot.On("Head").Unset()

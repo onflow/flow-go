@@ -157,7 +157,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 		Log:                  suite.log,
 		SnapshotHistoryLimit: 0,
 		Communicator:         backend.NewNodeCommunicator(false),
-		ChainStateTracker:    nil,
+		BlockTracker:         nil,
 	})
 	suite.Require().NoError(err)
 

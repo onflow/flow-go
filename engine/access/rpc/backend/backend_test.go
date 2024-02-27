@@ -2146,6 +2146,6 @@ func (suite *Suite) defaultBackendParams() Params {
 		AccessMetrics:            metrics.NewNoopCollector(),
 		Log:                      suite.log,
 		TxErrorMessagesCacheSize: 1000,
-		ChainStateTracker:        nil,
+		BlockTracker:             nil,
 	}
 }

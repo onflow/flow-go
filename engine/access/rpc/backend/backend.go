@@ -72,7 +72,7 @@ type Backend struct {
 	backendExecutionResults
 	backendNetwork
 
-	subscription.ChainStateTracker
+	subscription.BlockTracker
 	backendSubscribeBlocks
 
 	state             protocol.State
@@ -111,7 +111,7 @@ type Params struct {
 	ScriptExecutor            execution.ScriptExecutor
 	ScriptExecutionMode       IndexQueryMode
 	EventQueryMode            IndexQueryMode
-	ChainStateTracker         subscription.ChainStateTracker
+	BlockTracker              subscription.BlockTracker
 	SubscriptionParams        SubscriptionParams
 
 	EventsIndex *index.EventsIndex
@@ -161,8 +161,8 @@ func New(params Params) (*Backend, error) {
 	nodeInfo := getNodeVersionInfo(params.State.Params())
 
 	b := &Backend{
-		state:             params.State,
-		ChainStateTracker: params.ChainStateTracker,
+		state:        params.State,
+		BlockTracker: params.BlockTracker,
 		// create the sub-backends
 		backendScripts: backendScripts{
 			log:               params.Log,
@@ -239,7 +239,7 @@ func New(params Params) (*Backend, error) {
 			state:          params.State,
 			headers:        params.Headers,
 			blocks:         params.Blocks,
-			Broadcaster:    params.SubscriptionParams.Broadcaster,
+			broadcaster:    params.SubscriptionParams.Broadcaster,
 			sendTimeout:    params.SubscriptionParams.SendTimeout,
 			responseLimit:  params.SubscriptionParams.ResponseLimit,
 			sendBufferSize: params.SubscriptionParams.SendBufferSize,
@@ -251,8 +251,8 @@ func New(params Params) (*Backend, error) {
 		nodeInfo:          nodeInfo,
 	}
 
-	// NOTE: The ChainStateTracker is currently only used by the access node and not by the observer node.
-	if params.ChainStateTracker != nil {
+	// NOTE: The BlockTracker is currently only used by the access node and not by the observer node.
+	if params.BlockTracker != nil {
 		b.backendSubscribeBlocks.getStartHeight = b.GetStartHeight
 		b.backendSubscribeBlocks.getHighestHeight = b.GetHighestHeight
 	}

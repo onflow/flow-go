@@ -77,9 +77,10 @@ func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionDat
 
 	lg.Trace().Msg("received execution data")
 
-	err := e.backend.ProcessOnFinalizedBlock()
+	err := e.backend.OnExecutionData(executionData)
 	if err != nil {
-		lg.Debug().Msg("execution data for block already received")
+		// if the execution data is available, the block must be locally finalized
+		lg.Fatal().Err(err).Msg("failed to get header for execution data")
 		return
 	}
 

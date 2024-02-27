@@ -304,8 +304,6 @@ type FlowAccessNodeBuilder struct {
 	unsecureGrpcServer    *grpcserver.GrpcServer
 	stateStreamGrpcServer *grpcserver.GrpcServer
 
-	broadcaster        *engine.Broadcaster
-	chainStateTracker  subscription.ChainStateTracker
 	stateStreamBackend *statestreambackend.StateStreamBackend
 }
 
@@ -869,7 +867,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			if err != nil {
 				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
 			}
-			builder.broadcaster = engine.NewBroadcaster()
+			broadcaster := engine.NewBroadcaster()
 
 			eventQueryMode, err := backend.ParseIndexQueryMode(builder.rpcConf.BackendConfig.EventQueryMode)
 			if err != nil {
@@ -881,19 +879,16 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			useIndex := builder.executionDataIndexingEnabled &&
 				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
 
-			// create ChainStateTracker that will track for new blocks (finalized and sealed) and
-			// handles block-related operations.
-			builder.chainStateTracker, err = subscription.NewChainStateTracker(
+			executionDataTracker, err := subscription.NewExecutionDataTracker(
 				node.State,
 				builder.executionDataConfig.InitialBlockHeight,
 				node.Storage.Headers,
 				highestAvailableHeight,
-				builder.broadcaster,
 				builder.EventsIndex,
 				useIndex,
 			)
 			if err != nil {
-				return nil, fmt.Errorf("failed to initialize subscribtion handlear: %w", err)
+				return nil, fmt.Errorf("failed to initialize execution data tracker: %w", err)
 			}
 
 			builder.stateStreamBackend, err = statestreambackend.New(
@@ -905,11 +900,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				node.Storage.Results,
 				builder.ExecutionDataStore,
 				executionDataStoreCache,
-				builder.broadcaster,
+				broadcaster,
 				builder.RegistersAsyncStore,
 				builder.EventsIndex,
 				useIndex,
-				builder.chainStateTracker,
+				executionDataTracker,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
@@ -923,7 +918,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				node.RootChainID,
 				builder.stateStreamGrpcServer,
 				builder.stateStreamBackend,
-				builder.broadcaster,
+				broadcaster,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream engine: %w", err)
@@ -1564,6 +1559,26 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			useIndex := builder.executionDataIndexingEnabled &&
 				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
 
+			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
+			if err != nil {
+				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
+			}
+			broadcaster := engine.NewBroadcaster()
+			// create BlockTracker that will track for new blocks (finalized and sealed) and
+			// handles block-related operations.
+			blockTracker, err := subscription.NewBlockTracker(
+				node.State,
+				builder.executionDataConfig.InitialBlockHeight,
+				node.Storage.Headers,
+				highestAvailableHeight,
+				broadcaster,
+				builder.EventsIndex,
+				useIndex,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to initialize block tracker: %w", err)
+			}
+
 			nodeBackend, err := backend.New(backend.Params{
 				State:                     node.State,
 				CollectionRPC:             builder.CollectionRPC,
@@ -1589,9 +1604,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ScriptExecutor:            builder.ScriptExecutor,
 				ScriptExecutionMode:       scriptExecMode,
 				EventQueryMode:            eventQueryMode,
-				ChainStateTracker:         builder.chainStateTracker,
+				BlockTracker:              blockTracker,
 				SubscriptionParams: backend.SubscriptionParams{
-					Broadcaster:    builder.broadcaster,
+					Broadcaster:    broadcaster,
 					SendTimeout:    builder.stateStreamConf.ClientSendTimeout,
 					ResponseLimit:  builder.stateStreamConf.ResponseLimit,
 					SendBufferSize: int(builder.stateStreamConf.ClientSendBufferSize),

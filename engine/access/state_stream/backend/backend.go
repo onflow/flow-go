@@ -63,7 +63,7 @@ type Config struct {
 type GetExecutionDataFunc func(context.Context, uint64) (*execution_data.BlockExecutionDataEntity, error)
 
 type StateStreamBackend struct {
-	subscription.ChainStateTracker
+	subscription.ExecutionDataTracker
 
 	ExecutionDataBackend
 	EventsBackend
@@ -93,12 +93,12 @@ func New(
 	registers *execution.RegistersAsyncStore,
 	eventsIndex *index.EventsIndex,
 	useEventsIndex bool,
-	chainStateTracker subscription.ChainStateTracker,
+	executionDataTracker subscription.ExecutionDataTracker,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
 	b := &StateStreamBackend{
-		ChainStateTracker:    chainStateTracker,
+		ExecutionDataTracker: executionDataTracker,
 		log:                  logger,
 		state:                state,
 		headers:              headers,
@@ -142,11 +142,7 @@ func New(
 // Expected errors during normal operation:
 // - storage.ErrNotFound or execution_data.BlobNotFoundError: execution data for the given block height is not available.
 func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64) (*execution_data.BlockExecutionDataEntity, error) {
-	highestHeight, err := b.ChainStateTracker.GetHighestHeight(flow.BlockStatusFinalized)
-	if err != nil {
-		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
-	}
-
+	highestHeight := b.ExecutionDataTracker.GetHighestHeight()
 	// fail early if no notification has been received for the given block height.
 	// note: it's possible for the data to exist in the data store before the notification is
 	// received. this ensures a consistent view is available to all streams.
