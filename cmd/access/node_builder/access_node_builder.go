@@ -752,7 +752,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					if err != nil {
 						return nil, fmt.Errorf("could not parse register cache type: %w", err)
 					}
-					registersCache, err := pStorage.NewRegistersCache(registers, cacheType, builder.registerCacheSize, builder.Metrics.Cache)
+					cacheMetrics := metrics.NewCacheCollector(builder.RootChainID)
+					registersCache, err := pStorage.NewRegistersCache(registers, cacheType, builder.registerCacheSize, cacheMetrics)
 					if err != nil {
 						return nil, fmt.Errorf("could not create registers cache: %w", err)
 					}
