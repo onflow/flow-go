@@ -31,9 +31,12 @@ import (
 
 const checkpointFilenamePrefix = "checkpoint."
 
-const MagicBytesCheckpointHeader uint16 = 0x2137
-const MagicBytesCheckpointSubtrie uint16 = 0x2136
-const MagicBytesCheckpointToptrie uint16 = 0x2135
+const (
+	MagicBytesCheckpointHeader  uint16 = 0x2137
+	MagicBytesCheckpointSubtrie uint16 = 0x2136
+	MagicBytesCheckpointToptrie uint16 = 0x2135
+	MagicBytesPayloadHeader     uint16 = 0x2138
+)
 
 const VersionV1 uint16 = 0x01
 
