@@ -133,6 +133,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 				snapshot)
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
+
 		})
 }
 
@@ -440,39 +441,16 @@ func TestCadenceArch(t *testing.T) {
 					[]flow.AccountPrivateKey{privateKey},
 					chain)
 				require.NoError(t, err)
-				account := accounts[0]
+				flowAccount := accounts[0]
 
-				// create a COA and store it under flow account
-				script := []byte(fmt.Sprintf(
-					`
-					import EVM from %s
-
-					transaction {
-						prepare(account: AuthAccount) {
-							let cadenceOwnedAccount1 <- EVM.createCadenceOwnedAccount()
-							account.save<@EVM.CadenceOwnedAccount>(<-cadenceOwnedAccount1,
-																to: /storage/coa)
-							account.link<&EVM.CadenceOwnedAccount{EVM.Addressable}>(/public/coa,
-																				target: /storage/coa)
-						}
-					}
-                `,
-					sc.EVMContract.Address.HexWithPrefix(),
-				))
-
-				tx := fvm.Transaction(
-					flow.NewTransactionBody().
-						SetScript(script).
-						AddAuthorizer(account),
-					0)
-				es, output, err := vm.Run(ctx, tx, snapshot)
-				require.NoError(t, err)
-				require.NoError(t, output.Err)
-				snapshot = snapshot.Append(es)
-
-				// 3rd event is the cadence owned account created event
-				coaAddress, err := types.COAAddressFromFlowEvent(sc.EVMContract.Address, output.Events[2])
-				require.NoError(t, err)
+				// create/store/link coa
+				coaAddress, snapshot := setupCOA(
+					t,
+					ctx,
+					vm,
+					snapshot,
+					flowAccount,
+				)
 
 				data := RandomCommonHash(t)
 
@@ -484,7 +462,7 @@ func TestCadenceArch(t *testing.T) {
 
 				proof := types.COAOwnershipProof{
 					KeyIndices:     []uint64{0},
-					Address:        types.FlowAddress(account),
+					Address:        types.FlowAddress(flowAccount),
 					CapabilityPath: "coa",
 					Signatures:     []types.Signature{types.Signature(sig)},
 				}
@@ -534,7 +512,7 @@ func TestCadenceArch(t *testing.T) {
 					),
 				)
 				// run proof transaction
-				_, output, err = vm.Run(
+				_, output, err := vm.Run(
 					ctx,
 					verifyScript,
 					snapshot)
@@ -542,6 +520,339 @@ func TestCadenceArch(t *testing.T) {
 				require.NoError(t, output.Err)
 			})
 	})
+}
+
+func TestSequenceOfActions(t *testing.T) {
+	t.Parallel()
+	chain := flow.Emulator.Chain()
+
+	RunWithNewEnvironment(t,
+		chain, func(
+			ctx fvm.Context,
+			vm fvm.VM,
+			snapshot snapshot.SnapshotTree,
+			testContract *TestContract,
+			testAccount *EOATestAccount,
+		) {
+			// create a flow account
+			flowAccount, _, snapshot := createAndFundFlowAccount(
+				t,
+				ctx,
+				vm,
+				snapshot,
+			)
+
+			var coaAddress types.Address
+			var initBalance *big.Int
+			var initNonce uint64
+
+			t.Run("setup coa", func(t *testing.T) {
+				coaAddress, snapshot = setupCOA(
+					t,
+					ctx,
+					vm,
+					snapshot,
+					flowAccount)
+
+				initBalance = getEVMAccountBalance(
+					t,
+					ctx,
+					vm,
+					snapshot,
+					coaAddress)
+				require.Equal(t, big.NewInt(0), initBalance)
+
+				initNonce = getEVMAccountNonce(
+					t,
+					ctx,
+					vm,
+					snapshot,
+					coaAddress)
+				require.Equal(t, uint64(1), initNonce)
+			})
+
+			t.Run("deposit token into coa", func(t *testing.T) {
+				amount := uint64(1_000_000_000) // 10 Flow in Ufix
+				snapshot = bridgeFlowTokenToCOA(
+					t,
+					ctx,
+					vm,
+					snapshot,
+					flowAccount,
+					coaAddress,
+					amount,
+				)
+			})
+
+		})
+}
+
+func bridgeFlowTokenToCOA(
+	t *testing.T,
+	ctx fvm.Context,
+	vm fvm.VM,
+	snapshot snapshot.SnapshotTree,
+	flowAddress flow.Address,
+	coaAddress types.Address,
+	amount uint64,
+) snapshot.SnapshotTree {
+	sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
+	code := []byte(fmt.Sprintf(
+		`
+		import EVM from 0x%s
+		import FungibleToken from 0x%s
+		import FlowToken from 0x%s
+
+		transaction(addr: [UInt8; 20], amount: UFix64) {
+			prepare(signer: AuthAccount) {
+				let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+					?? panic("Could not borrow reference to the owner's Vault!")
+
+				let sentVault <- vaultRef.withdraw(amount: amount)
+				EVM.EVMAddress(bytes: addr).deposit(from: <-vault) // 
+			}
+		}`,
+		sc.EVMContract.Address.Hex(),
+		sc.FungibleToken.Address.Hex(),
+		sc.FlowToken.Address.Hex(),
+	))
+
+	tx := fvm.Transaction(
+		flow.NewTransactionBody().
+			SetScript(code).
+			AddAuthorizer(flowAddress).
+			AddArgument(json.MustEncode(cadence.UFix64(amount))).
+			AddArgument(
+				json.MustEncode(
+					cadence.NewArray(
+						ConvertToCadence(coaAddress.Bytes()),
+					).WithType(stdlib.EVMAddressBytesCadenceType),
+				),
+			),
+		0)
+
+	es, output, err := vm.Run(ctx, tx, snapshot)
+	require.NoError(t, err)
+	require.NoError(t, output.Err)
+	snapshot = snapshot.Append(es)
+
+	return snapshot
+}
+
+func createAndFundFlowAccount(
+	t *testing.T,
+	ctx fvm.Context,
+	vm fvm.VM,
+	snapshot snapshot.SnapshotTree,
+) (flow.Address, flow.AccountPrivateKey, snapshot.SnapshotTree) {
+
+	privateKey, err := testutil.GenerateAccountPrivateKey()
+	require.NoError(t, err)
+
+	snapshot, accounts, err := testutil.CreateAccounts(
+		vm,
+		snapshot,
+		[]flow.AccountPrivateKey{privateKey},
+		ctx.Chain)
+	require.NoError(t, err)
+	flowAccount := accounts[0]
+
+	// fund the account with 100 tokens
+	sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
+	code := []byte(fmt.Sprintf(
+		`
+		import FlowToken from %s
+		import FungibleToken from %s 
+
+		transaction {
+			prepare(account: AuthAccount) {
+			let admin = account.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+			let minter <- admin.createNewMinter(allowedAmount: 100.0)
+			let vault <- minter.mintTokens(amount: 100.0)
+
+			let receiverRef = getAccount(%s).getCapability(/public/flowTokenReceiver)
+				.borrow<&{FungibleToken.Receiver}>()
+				?? panic("Could not borrow receiver reference to the recipient's Vault")
+			receiverRef.deposit(from: <-vault)
+
+			destroy minter
+			}
+		}
+		`,
+		sc.FlowToken.Address.HexWithPrefix(),
+		sc.FungibleToken.Address.HexWithPrefix(),
+		flowAccount.HexWithPrefix(),
+	))
+
+	tx := fvm.Transaction(
+		flow.NewTransactionBody().
+			SetScript(code).
+			AddAuthorizer(sc.FlowServiceAccount.Address),
+		0)
+
+	es, output, err := vm.Run(ctx, tx, snapshot)
+	require.NoError(t, err)
+	require.NoError(t, output.Err)
+	snapshot = snapshot.Append(es)
+
+	bal := getFlowAccountBalance(
+		t,
+		ctx,
+		vm,
+		snapshot,
+		flowAccount)
+	// 100 flow in ufix64
+	require.Equal(t, uint64(10_000_000_000), bal)
+
+	return flowAccount, privateKey, snapshot
+}
+
+func setupCOA(
+	t *testing.T,
+	ctx fvm.Context,
+	vm fvm.VM,
+	snap snapshot.SnapshotTree,
+	coaOwner flow.Address,
+) (types.Address, snapshot.SnapshotTree) {
+
+	sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
+	// create a COA and store it under flow account
+	script := []byte(fmt.Sprintf(
+		`
+	import EVM from %s
+	transaction {
+		prepare(account: AuthAccount) {
+			let cadenceOwnedAccount1 <- EVM.createCadenceOwnedAccount()
+			
+			account.save<@EVM.CadenceOwnedAccount>(<-cadenceOwnedAccount1,
+												to: /storage/coa)
+			account.link<&EVM.CadenceOwnedAccount{EVM.Addressable}>(/public/coa,
+																target: /storage/coa)
+		}
+	}
+	`,
+		sc.EVMContract.Address.HexWithPrefix(),
+	))
+
+	tx := fvm.Transaction(
+		flow.NewTransactionBody().
+			SetScript(script).
+			AddAuthorizer(coaOwner),
+		0)
+	es, output, err := vm.Run(ctx, tx, snap)
+	require.NoError(t, err)
+	require.NoError(t, output.Err)
+	snap = snap.Append(es)
+
+	// 3rd event is the cadence owned account created event
+	coaAddress, err := types.COAAddressFromFlowEvent(sc.EVMContract.Address, output.Events[2])
+	require.NoError(t, err)
+
+	return coaAddress, snap
+}
+
+func getFlowAccountBalance(
+	t *testing.T,
+	ctx fvm.Context,
+	vm fvm.VM,
+	snap snapshot.SnapshotTree,
+	address flow.Address,
+) uint64 {
+	code := []byte(fmt.Sprintf(
+		`
+		pub fun main(): UFix64 {
+			return getAccount(%s).balance
+		}
+		`,
+		address.HexWithPrefix(),
+	))
+
+	script := fvm.Script(code)
+	_, output, err := vm.Run(
+		ctx,
+		script,
+		snap)
+	require.NoError(t, err)
+	require.NoError(t, output.Err)
+	val, ok := output.Value.(cadence.UFix64)
+	require.True(t, ok)
+	return uint64(val)
+}
+
+func getEVMAccountBalance(
+	t *testing.T,
+	ctx fvm.Context,
+	vm fvm.VM,
+	snap snapshot.SnapshotTree,
+	address types.Address,
+) *big.Int {
+	code := []byte(fmt.Sprintf(
+		`
+		import EVM from %s
+		access(all)
+		fun main(addr: [UInt8; 20]): UInt {
+			return EVM.EVMAddress(bytes: addr).balance().inAttoFLOW()
+		}
+		`,
+		systemcontracts.SystemContractsForChain(
+			ctx.Chain.ChainID(),
+		).EVMContract.Address.HexWithPrefix(),
+	))
+
+	script := fvm.Script(code).WithArguments(
+		json.MustEncode(
+			cadence.NewArray(
+				ConvertToCadence(address.Bytes()),
+			).WithType(stdlib.EVMAddressBytesCadenceType),
+		),
+	)
+	_, output, err := vm.Run(
+		ctx,
+		script,
+		snap)
+	require.NoError(t, err)
+	require.NoError(t, output.Err)
+	val, ok := output.Value.(cadence.UInt)
+	require.True(t, ok)
+	return val.Big()
+}
+
+func getEVMAccountNonce(
+	t *testing.T,
+	ctx fvm.Context,
+	vm fvm.VM,
+	snap snapshot.SnapshotTree,
+	address types.Address,
+) uint64 {
+	code := []byte(fmt.Sprintf(
+		`
+		import EVM from %s
+		access(all)
+		fun main(addr: [UInt8; 20]): UInt64 {
+			return EVM.EVMAddress(bytes: addr).nonce()
+		}
+		`,
+		systemcontracts.SystemContractsForChain(
+			ctx.Chain.ChainID(),
+		).EVMContract.Address.HexWithPrefix(),
+	))
+
+	script := fvm.Script(code).WithArguments(
+		json.MustEncode(
+			cadence.NewArray(
+				ConvertToCadence(address.Bytes()),
+			).WithType(stdlib.EVMAddressBytesCadenceType),
+		),
+	)
+	_, output, err := vm.Run(
+		ctx,
+		script,
+		snap)
+	require.NoError(t, err)
+	require.NoError(t, output.Err)
+	val, ok := output.Value.(cadence.UInt64)
+	require.True(t, ok)
+	return uint64(val)
 }
 
 func RunWithNewEnvironment(
