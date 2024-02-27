@@ -61,6 +61,7 @@ func (c *scriptResultComparison) compare(execResult, localResult *scriptResult) 
 	if execResult.err != nil {
 		if compareErrors(execResult.err, localResult.err) {
 			c.metrics.ScriptExecutionErrorMatch()
+			c.logDurationDifference(execResult, localResult)
 			return true
 		}
 
@@ -72,6 +73,7 @@ func (c *scriptResultComparison) compare(execResult, localResult *scriptResult) 
 
 	if bytes.Equal(execResult.result, localResult.result) {
 		c.metrics.ScriptExecutionResultMatch()
+		c.logDurationDifference(execResult, localResult)
 		return true
 	}
 
@@ -79,6 +81,28 @@ func (c *scriptResultComparison) compare(execResult, localResult *scriptResult) 
 	c.logComparison(execResult, localResult,
 		"script execution results from local execution do not match EN", true)
 	return false
+}
+
+// logDurationDifference logs the script execution details for local execution and execution node if the difference is
+// more than 2x
+func (c *scriptResultComparison) logDurationDifference(execResult *scriptResult, localResult *scriptResult) {
+
+	if execResult.duration.Milliseconds() == 0 || localResult.duration.Milliseconds() == 0 {
+		return
+	}
+
+	speedup := float64(localResult.duration.Milliseconds()) / float64(execResult.duration.Milliseconds())
+	// if the script execution on execution node was more than 2x faster
+	if speedup > 2.0 {
+		c.logComparison(execResult, localResult,
+			"access node script execution was slower", true)
+	} else {
+		// if the script execution on the access node was more than 2x faster
+		if speedup < 0.5 {
+			c.logComparison(execResult, localResult,
+				"access node script execution was faster", true)
+		}
+	}
 }
 
 // logScriptExecutionComparison logs the script execution comparison between local execution and execution node
