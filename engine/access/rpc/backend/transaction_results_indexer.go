@@ -11,6 +11,11 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// TransactionResultsIndex When the index is initially bootstrapped, the indexer needs to load an execution state
+// checkpoint from disk and index all the data. This process can take more than 1 hour on some systems. Consequently,
+// the Initialize pattern is implemented to enable the Access API to start up and serve queries before the index is
+// fully ready. During the initialization phase, all calls to retrieve data from this struct should return
+// indexer.ErrIndexNotInitialized. The caller is responsible for handling this error appropriately for the method.
 type TransactionResultsIndex struct {
 	results  storage.LightTransactionResults
 	reporter *atomic.Pointer[state_synchronization.IndexReporter]
