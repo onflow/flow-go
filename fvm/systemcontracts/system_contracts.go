@@ -169,14 +169,9 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 		FungibleTokenAddress:              c.FungibleToken.Address.Hex(),
 		FungibleTokenMetadataViewsAddress: c.FungibleToken.Address.Hex(),
 
-		// The following contracts dont exist on the template env yet
-		// that is not a problem, but they are still listed here for completeness.
-
 		NonFungibleTokenAddress: c.NonFungibleToken.Address.Hex(),
 		MetadataViewsAddress:    c.MetadataViews.Address.Hex(),
 		ViewResolverAddress:     c.ViewResolver.Address.Hex(),
-
-		// EVMAddress: c.EVM.Address.Hex(),
 	}
 }
 
