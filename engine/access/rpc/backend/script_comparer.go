@@ -87,7 +87,7 @@ func (c *scriptResultComparison) compare(execResult, localResult *scriptResult) 
 // more than 2x
 func (c *scriptResultComparison) logDurationDifference(execResult *scriptResult, localResult *scriptResult) {
 
-	// don't care to log if the script execution took less than a second to execution on the AN
+	// don't log if the script execution took less than a second on the AN
 	if localResult.duration.Milliseconds() < 1000 || execResult.duration.Milliseconds() == 0 {
 		return
 	}
