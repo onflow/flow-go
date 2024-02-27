@@ -1,6 +1,7 @@
-import FlowClusterQC from 0xQCADDRESS
+import FlowClusterQC from "FlowClusterQC"
 
 transaction(
+    name: String,
     code: String,
     currentEpochCounter: UInt64,
     numViewsInEpoch: UInt64,
@@ -21,7 +22,7 @@ transaction(
     }
 
 	serviceAccount.contracts.add(
-		name: "FlowEpoch",
+		name: name,
 		code: code.decodeHex(),
         currentEpochCounter: currentEpochCounter,
         numViewsInEpoch: numViewsInEpoch,

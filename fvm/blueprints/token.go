@@ -14,8 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func DeployFungibleTokenContractTransaction(fungibleToken, viewResolver, burner flow.Address) *flow.TransactionBody {
-	contract := contracts.FungibleToken(viewResolver.Hex(), burner.Hex())
+func DeployFungibleTokenContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBody {
 	contractName := "FungibleToken"
 	return DeployContractTransaction(
 		fungibleToken,
@@ -24,8 +23,7 @@ func DeployFungibleTokenContractTransaction(fungibleToken, viewResolver, burner 
 	)
 }
 
-func DeployNonFungibleTokenContractTransaction(nonFungibleToken, viewResolver flow.Address) *flow.TransactionBody {
-	contract := contracts.NonFungibleToken(viewResolver.HexWithPrefix())
+func DeployNonFungibleTokenContractTransaction(nonFungibleToken flow.Address, contract []byte) *flow.TransactionBody {
 	contractName := "NonFungibleToken"
 	return DeployContractTransaction(
 		nonFungibleToken,
@@ -34,8 +32,7 @@ func DeployNonFungibleTokenContractTransaction(nonFungibleToken, viewResolver fl
 	)
 }
 
-func DeployMetadataViewsContractTransaction(fungibleToken, nonFungibleToken, viewResolver flow.Address) *flow.TransactionBody {
-	contract := contracts.MetadataViews(fungibleToken.HexWithPrefix(), nonFungibleToken.HexWithPrefix(), viewResolver.HexWithPrefix())
+func DeployMetadataViewsContractTransaction(nonFungibleToken flow.Address, contract []byte) *flow.TransactionBody {
 	contractName := "MetadataViews"
 	return DeployContractTransaction(
 		nonFungibleToken,
@@ -64,8 +61,8 @@ func DeployBurnerContractTransaction(fungibleToken flow.Address) *flow.Transacti
 	)
 }
 
-func DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken, nonFungibleToken, viewResolver flow.Address) *flow.TransactionBody {
-	contract := contracts.FungibleTokenMetadataViews(fungibleToken.Hex(), nonFungibleToken.Hex(), viewResolver.Hex())
+func DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+
 	contractName := "FungibleTokenMetadataViews"
 	return DeployContractTransaction(
 		fungibleToken,
@@ -74,8 +71,8 @@ func DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken, nonFungi
 	)
 }
 
-func DeployFungibleTokenSwitchboardContractTransaction(fungibleToken flow.Address) *flow.TransactionBody {
-	contract := contracts.FungibleTokenSwitchboard(fungibleToken.Hex())
+func DeployFungibleTokenSwitchboardContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+
 	contractName := "FungibleTokenSwitchboard"
 	return DeployContractTransaction(
 		fungibleToken,
@@ -93,8 +90,7 @@ var createFlowTokenMinterTransactionTemplate string
 //go:embed scripts/mintFlowTokenTransactionTemplate.cdc
 var mintFlowTokenTransactionTemplate string
 
-func DeployFlowTokenContractTransaction(service, fungibleToken, metadataViews, flowToken flow.Address) *flow.TransactionBody {
-	contract := contracts.FlowToken(fungibleToken.HexWithPrefix(), fungibleToken.HexWithPrefix(), metadataViews.HexWithPrefix(), metadataViews.HexWithPrefix())
+func DeployFlowTokenContractTransaction(service, flowToken flow.Address, contract []byte) *flow.TransactionBody {
 
 	return flow.NewTransactionBody().
 		SetScript([]byte(deployFlowTokenTransactionTemplate)).
