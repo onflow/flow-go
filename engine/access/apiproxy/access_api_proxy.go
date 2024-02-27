@@ -234,6 +234,14 @@ func (h *FlowAccessAPIRouter) SubscribeBlocks(req *access.SubscribeBlocksRequest
 	panic("not implemented")
 }
 
+func (h *FlowAccessAPIRouter) SubscribeBlockHeaders(req *access.SubscribeBlockHeadersRequest, server access.AccessAPI_SubscribeBlockHeadersServer) error {
+	panic("not implemented")
+}
+
+func (h *FlowAccessAPIRouter) SubscribeBlockDigests(req *access.SubscribeBlockDigestsRequest, server access.AccessAPI_SubscribeBlockDigestsServer) error {
+	panic("not implemented")
+}
+
 func (h *FlowAccessAPIRouter) SendAndSubscribeTransactionStatuses(req *access.SendAndSubscribeTransactionStatusesRequest, server access.AccessAPI_SendAndSubscribeTransactionStatusesServer) error {
 	panic("not implemented")
 }

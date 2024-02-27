@@ -19,7 +19,7 @@ type viewsMachine struct {
 	expectedCalls int            // expected value of calls at any given time
 }
 
-func (m *viewsMachine) Init(_ *rapid.T) {
+func (m *viewsMachine) init(_ *rapid.T) {
 	m.views = NewViews()
 	m.callbacks = make(map[uint64]int)
 	m.calls = 0
@@ -27,7 +27,7 @@ func (m *viewsMachine) Init(_ *rapid.T) {
 }
 
 func (m *viewsMachine) OnView(t *rapid.T) {
-	view := rapid.Uint64().Draw(t, "view").(uint64)
+	view := rapid.Uint64().Draw(t, "view")
 	m.views.OnView(view, func(_ *flow.Header) {
 		m.calls++ // count actual number of calls invoked by Views
 	})
@@ -37,7 +37,7 @@ func (m *viewsMachine) OnView(t *rapid.T) {
 }
 
 func (m *viewsMachine) BlockFinalized(t *rapid.T) {
-	view := rapid.Uint64().Draw(t, "view").(uint64)
+	view := rapid.Uint64().Draw(t, "view")
 
 	block := unittest.BlockHeaderFixture()
 	block.View = view
@@ -58,5 +58,9 @@ func (m *viewsMachine) Check(t *rapid.T) {
 }
 
 func TestViewsRapid(t *testing.T) {
-	rapid.Check(t, rapid.Run(new(viewsMachine)))
+	rapid.Check(t, func(t *rapid.T) {
+		sm := new(viewsMachine)
+		sm.init(t)
+		t.Repeat(rapid.StateMachineActions(sm))
+	})
 }

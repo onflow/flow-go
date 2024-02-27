@@ -16,9 +16,9 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
-	"github.com/onflow/flow-go/engine/access/subscription/index"
 	subscriptionmock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
@@ -131,7 +131,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 		seal := unittest.BlockSealsFixture(1)[0]
 		result := unittest.ExecutionResultFixture()
-		blockEvents := unittest.BlockEventsFixture(block.Header, (i%len(testEventTypes))*3+1, testEventTypes...)
+		blockEvents := generateMockEvents(block.Header, (i%len(testEventTypes))*3+1)
 
 		numChunks := 5
 		chunkDatas := make([]*execution_data.ChunkExecutionData, 0, numChunks)
@@ -237,7 +237,6 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 	// create real chain state tracker to use GetStartHeight from it, instead of mocking
 	s.chainStateTrackerReal, err = subscription.NewChainStateTracker(
-		logger,
 		s.state,
 		s.rootBlock.Header.Height,
 		s.headers,
@@ -253,9 +252,38 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
-	).Return(func(startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error) {
-		return s.chainStateTrackerReal.GetStartHeight(startBlockID, startHeight, blockStatus)
+		mock.Anything,
+	).Return(func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error) {
+		return s.chainStateTrackerReal.GetStartHeight(ctx, startBlockID, startHeight, blockStatus)
 	}, nil).Maybe()
+}
+
+// generateMockEvents generates a set of mock events for a block split into multiple tx with
+// appropriate indexes set
+func generateMockEvents(header *flow.Header, eventCount int) flow.BlockEvents {
+	txCount := eventCount / 3
+
+	txID := unittest.IdentifierFixture()
+	txIndex := uint32(0)
+	eventIndex := uint32(0)
+
+	events := make([]flow.Event, eventCount)
+	for i := 0; i < eventCount; i++ {
+		if i > 0 && i%txCount == 0 {
+			txIndex++
+			txID = unittest.IdentifierFixture()
+			eventIndex = 0
+		}
+
+		events[i] = unittest.EventFixture(testEventTypes[i%len(testEventTypes)], txIndex, eventIndex, txID, 0)
+	}
+
+	return flow.BlockEvents{
+		BlockID:        header.ID(),
+		BlockHeight:    header.Height,
+		BlockTimestamp: header.Timestamp,
+		Events:         events,
+	}
 }
 
 func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {

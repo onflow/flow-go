@@ -1073,6 +1073,72 @@ func (_m *AccessAPIClient) SendTransaction(ctx context.Context, in *access.SendT
 	return r0, r1
 }
 
+// SubscribeBlockDigests provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) SubscribeBlockDigests(ctx context.Context, in *access.SubscribeBlockDigestsRequest, opts ...grpc.CallOption) (access.AccessAPI_SubscribeBlockDigestsClient, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 access.AccessAPI_SubscribeBlockDigestsClient
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlockDigestsRequest, ...grpc.CallOption) (access.AccessAPI_SubscribeBlockDigestsClient, error)); ok {
+		return rf(ctx, in, opts...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlockDigestsRequest, ...grpc.CallOption) access.AccessAPI_SubscribeBlockDigestsClient); ok {
+		r0 = rf(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(access.AccessAPI_SubscribeBlockDigestsClient)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.SubscribeBlockDigestsRequest, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// SubscribeBlockHeaders provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) SubscribeBlockHeaders(ctx context.Context, in *access.SubscribeBlockHeadersRequest, opts ...grpc.CallOption) (access.AccessAPI_SubscribeBlockHeadersClient, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 access.AccessAPI_SubscribeBlockHeadersClient
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlockHeadersRequest, ...grpc.CallOption) (access.AccessAPI_SubscribeBlockHeadersClient, error)); ok {
+		return rf(ctx, in, opts...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlockHeadersRequest, ...grpc.CallOption) access.AccessAPI_SubscribeBlockHeadersClient); ok {
+		r0 = rf(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(access.AccessAPI_SubscribeBlockHeadersClient)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.SubscribeBlockHeadersRequest, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // SubscribeBlocks provides a mock function with given fields: ctx, in, opts
 func (_m *AccessAPIClient) SubscribeBlocks(ctx context.Context, in *access.SubscribeBlocksRequest, opts ...grpc.CallOption) (access.AccessAPI_SubscribeBlocksClient, error) {
 	_va := make([]interface{}, len(opts))

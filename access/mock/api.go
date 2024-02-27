@@ -849,6 +849,38 @@ func (_m *API) SendTransaction(ctx context.Context, tx *flow.TransactionBody) er
 	return r0
 }
 
+// SubscribeBlockDigests provides a mock function with given fields: ctx, startBlockID, startHeight, blockStatus
+func (_m *API) SubscribeBlockDigests(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
+	ret := _m.Called(ctx, startBlockID, startHeight, blockStatus)
+
+	var r0 subscription.Subscription
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64, flow.BlockStatus) subscription.Subscription); ok {
+		r0 = rf(ctx, startBlockID, startHeight, blockStatus)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(subscription.Subscription)
+		}
+	}
+
+	return r0
+}
+
+// SubscribeBlockHeaders provides a mock function with given fields: ctx, startBlockID, startHeight, blockStatus
+func (_m *API) SubscribeBlockHeaders(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
+	ret := _m.Called(ctx, startBlockID, startHeight, blockStatus)
+
+	var r0 subscription.Subscription
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64, flow.BlockStatus) subscription.Subscription); ok {
+		r0 = rf(ctx, startBlockID, startHeight, blockStatus)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(subscription.Subscription)
+		}
+	}
+
+	return r0
+}
+
 // SubscribeBlocks provides a mock function with given fields: ctx, startBlockID, startHeight, blockStatus
 func (_m *API) SubscribeBlocks(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
 	ret := _m.Called(ctx, startBlockID, startHeight, blockStatus)

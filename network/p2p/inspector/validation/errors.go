@@ -173,3 +173,46 @@ func IsInvalidRpcPublishMessagesErr(err error) bool {
 	var e InvalidRpcPublishMessagesErr
 	return errors.As(err, &e)
 }
+
+// DuplicateTopicIDThresholdExceeded indicates that the number of duplicate topic IDs exceeds the allowed threshold.
+type DuplicateTopicIDThresholdExceeded struct {
+	duplicates int
+	sampleSize int
+	threshold  int
+}
+
+func (e DuplicateTopicIDThresholdExceeded) Error() string {
+	return fmt.Sprintf("%d/%d duplicate topic IDs exceed the allowed threshold: %d", e.duplicates, e.sampleSize, e.threshold)
+}
+
+// NewDuplicateTopicIDThresholdExceeded returns a new DuplicateTopicIDThresholdExceeded error.
+func NewDuplicateTopicIDThresholdExceeded(duplicates int, sampleSize int, threshold int) DuplicateTopicIDThresholdExceeded {
+	return DuplicateTopicIDThresholdExceeded{duplicates, sampleSize, threshold}
+}
+
+// IsDuplicateTopicIDThresholdExceeded returns true if an error is DuplicateTopicIDThresholdExceeded
+func IsDuplicateTopicIDThresholdExceeded(err error) bool {
+	var e DuplicateTopicIDThresholdExceeded
+	return errors.As(err, &e)
+}
+
+// InvalidTopicIDThresholdExceeded indicates that the number of invalid topic IDs exceeds the allowed threshold.
+type InvalidTopicIDThresholdExceeded struct {
+	invalidCount int
+	threshold    int
+}
+
+func (e InvalidTopicIDThresholdExceeded) Error() string {
+	return fmt.Sprintf("%d invalid topic IDs exceed the allowed threshold: %d", e.invalidCount, e.threshold)
+}
+
+// NewInvalidTopicIDThresholdExceeded returns a new InvalidTopicIDThresholdExceeded error.
+func NewInvalidTopicIDThresholdExceeded(invalidCount, threshold int) InvalidTopicIDThresholdExceeded {
+	return InvalidTopicIDThresholdExceeded{invalidCount, threshold}
+}
+
+// IsInvalidTopicIDThresholdExceeded returns true if an error is InvalidTopicIDThresholdExceeded.
+func IsInvalidTopicIDThresholdExceeded(err error) bool {
+	var e InvalidTopicIDThresholdExceeded
+	return errors.As(err, &e)
+}

@@ -8,9 +8,9 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
-	"github.com/onflow/flow-go/engine/access/subscription/index"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -38,7 +38,7 @@ type EventsBackend struct {
 }
 
 func (b EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
-	nextHeight, err := b.getStartHeight(startBlockID, startHeight, flow.BlockStatusFinalized)
+	nextHeight, err := b.getStartHeight(ctx, startBlockID, startHeight, flow.BlockStatusFinalized)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")
 	}

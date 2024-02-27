@@ -835,6 +835,34 @@ func (_m *AccessAPIServer) SendTransaction(_a0 context.Context, _a1 *access.Send
 	return r0, r1
 }
 
+// SubscribeBlockDigests provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) SubscribeBlockDigests(_a0 *access.SubscribeBlockDigestsRequest, _a1 access.AccessAPI_SubscribeBlockDigestsServer) error {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*access.SubscribeBlockDigestsRequest, access.AccessAPI_SubscribeBlockDigestsServer) error); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SubscribeBlockHeaders provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) SubscribeBlockHeaders(_a0 *access.SubscribeBlockHeadersRequest, _a1 access.AccessAPI_SubscribeBlockHeadersServer) error {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*access.SubscribeBlockHeadersRequest, access.AccessAPI_SubscribeBlockHeadersServer) error); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SubscribeBlocks provides a mock function with given fields: _a0, _a1
 func (_m *AccessAPIServer) SubscribeBlocks(_a0 *access.SubscribeBlocksRequest, _a1 access.AccessAPI_SubscribeBlocksServer) error {
 	ret := _m.Called(_a0, _a1)

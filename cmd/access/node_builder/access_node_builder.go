@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ipfs/boxo/bitswap"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/onflow/crypto"
 	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/go-bitswap"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
@@ -37,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rest"
@@ -47,7 +48,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
-	"github.com/onflow/flow-go/engine/access/subscription/index"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
@@ -884,7 +884,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			// create ChainStateTracker that will track for new blocks (finalized and sealed) and
 			// handles block-related operations.
 			builder.chainStateTracker, err = subscription.NewChainStateTracker(
-				node.Logger,
 				node.State,
 				builder.executionDataConfig.InitialBlockHeight,
 				node.Storage.Headers,
@@ -1522,12 +1521,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			cacheSize := int(backendConfig.ConnectionPoolSize)
 
 			var connBackendCache *rpcConnection.Cache
+			var err error
 			if cacheSize > 0 {
-				backendCache, err := backend.NewCache(node.Logger, accessMetrics, cacheSize)
+				connBackendCache, err = rpcConnection.NewCache(node.Logger, accessMetrics, cacheSize)
 				if err != nil {
-					return nil, fmt.Errorf("could not initialize backend cache: %w", err)
+					return nil, fmt.Errorf("could not initialize connection cache: %w", err)
 				}
-				connBackendCache = rpcConnection.NewCache(backendCache, cacheSize)
 			}
 
 			connFactory := &rpcConnection.ConnectionFactoryImpl{
@@ -1538,9 +1537,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				AccessMetrics:             accessMetrics,
 				Log:                       node.Logger,
 				Manager: rpcConnection.NewManager(
-					connBackendCache,
 					node.Logger,
 					accessMetrics,
+					connBackendCache,
 					config.MaxMsgSize,
 					backendConfig.CircuitBreakerConfig,
 					config.CompressorName,

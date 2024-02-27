@@ -2,7 +2,10 @@
 
 package flow
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 func Genesis(chainID ChainID) *Block {
 
@@ -110,4 +113,11 @@ func (b *CertifiedBlock) View() uint64 {
 // Height returns height of the block.
 func (b *CertifiedBlock) Height() uint64 {
 	return b.Block.Header.Height
+}
+
+// BlockDigest holds lightweight block information which includes only block id, block height and block timestamp
+type BlockDigest struct {
+	ID        Identifier
+	Height    uint64
+	Timestamp time.Time
 }

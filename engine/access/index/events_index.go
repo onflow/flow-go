@@ -2,6 +2,7 @@ package index
 
 import (
 	"fmt"
+	"sort"
 
 	"go.uber.org/atomic"
 
@@ -37,7 +38,21 @@ func (e *EventsIndex) GetEvents(blockID flow.Identifier, height uint64) ([]flow.
 		return nil, err
 	}
 
-	return e.events.ByBlockID(blockID)
+	events, err := e.events.ByBlockID(blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	// events are keyed/sorted by [blockID, txID, txIndex, eventIndex]
+	// we need to resort them by tx index then event index so the output is in execution order
+	sort.Slice(events, func(i, j int) bool {
+		if events[i].TransactionIndex == events[j].TransactionIndex {
+			return events[i].EventIndex < events[j].EventIndex
+		}
+		return events[i].TransactionIndex < events[j].TransactionIndex
+	})
+
+	return events, nil
 }
 
 // LowestIndexedHeight returns the lowest height indexed by the execution state indexer.

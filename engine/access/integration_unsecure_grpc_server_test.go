@@ -19,12 +19,12 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
-	"github.com/onflow/flow-go/engine/access/subscription/index"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/execution"
@@ -243,7 +243,6 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	eventIndexer := index.NewEventsIndex(suite.events)
 
 	suite.chainStateTracker, err = subscription.NewChainStateTracker(
-		suite.log,
 		suite.state,
 		rootBlock.Header.Height,
 		suite.headers,

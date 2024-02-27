@@ -19,7 +19,6 @@ import (
 	discoveryBackoff "github.com/libp2p/go-libp2p/p2p/discovery/backoff"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
-	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
 
@@ -37,7 +36,6 @@ import (
 	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
-	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
@@ -161,8 +159,8 @@ func NodeFixture(t *testing.T,
 		})
 	}
 
-	if parameters.GossipSubRpcInspectorSuiteFactory != nil {
-		builder.OverrideDefaultRpcInspectorSuiteFactory(parameters.GossipSubRpcInspectorSuiteFactory)
+	if parameters.GossipSubRpcInspectorFactory != nil {
+		builder.OverrideDefaultRpcInspectorFactory(parameters.GossipSubRpcInspectorFactory)
 	}
 
 	if parameters.ResourceManager != nil {
@@ -178,7 +176,7 @@ func NodeFixture(t *testing.T,
 	}
 
 	if parameters.GossipSubFactory != nil && parameters.GossipSubConfig != nil {
-		builder.SetGossipSubFactory(parameters.GossipSubFactory, parameters.GossipSubConfig)
+		builder.OverrideGossipSubFactory(parameters.GossipSubFactory, parameters.GossipSubConfig)
 	}
 
 	if parameters.ConnManager != nil {
@@ -228,28 +226,28 @@ func RegisterPeerProviders(_ *testing.T, nodes []p2p.LibP2PNode) {
 type NodeFixtureParameterOption func(*NodeFixtureParameters)
 
 type NodeFixtureParameters struct {
-	HandlerFunc                       network.StreamHandler
-	NetworkingType                    flownet.NetworkingType
-	Unicasts                          []protocols.ProtocolName
-	Key                               crypto.PrivateKey
-	Address                           string
-	DhtOptions                        []dht.Option
-	Role                              flow.Role
-	Logger                            zerolog.Logger
-	PeerScoringEnabled                bool
-	IdProvider                        module.IdentityProvider
-	PeerScoringConfigOverride         *p2p.PeerScoringConfigOverride
-	PeerManagerConfig                 *p2pbuilderconfig.PeerManagerConfig
-	PeerProvider                      p2p.PeersProvider // peer manager parameter
-	ConnGater                         p2p.ConnectionGater
-	ConnManager                       connmgr.ConnManager
-	GossipSubFactory                  p2p.GossipSubFactoryFunc
-	GossipSubConfig                   p2p.GossipSubAdapterConfigFunc
-	MetricsCfg                        *p2pbuilderconfig.MetricsConfig
-	ResourceManager                   network.ResourceManager
-	GossipSubRpcInspectorSuiteFactory p2p.GossipSubRpcInspectorSuiteFactoryFunc
-	FlowConfig                        *config.FlowConfig
-	UnicastRateLimiterDistributor     p2p.UnicastRateLimiterDistributor
+	HandlerFunc                   network.StreamHandler
+	NetworkingType                flownet.NetworkingType
+	Unicasts                      []protocols.ProtocolName
+	Key                           crypto.PrivateKey
+	Address                       string
+	DhtOptions                    []dht.Option
+	Role                          flow.Role
+	Logger                        zerolog.Logger
+	PeerScoringEnabled            bool
+	IdProvider                    module.IdentityProvider
+	PeerScoringConfigOverride     *p2p.PeerScoringConfigOverride
+	PeerManagerConfig             *p2pbuilderconfig.PeerManagerConfig
+	PeerProvider                  p2p.PeersProvider // peer manager parameter
+	ConnGater                     p2p.ConnectionGater
+	ConnManager                   connmgr.ConnManager
+	GossipSubFactory              p2p.GossipSubFactoryFunc
+	GossipSubConfig               p2p.GossipSubAdapterConfigFunc
+	MetricsCfg                    *p2pbuilderconfig.MetricsConfig
+	ResourceManager               network.ResourceManager
+	GossipSubRpcInspectorFactory  p2p.GossipSubRpcInspectorFactoryFunc
+	FlowConfig                    *config.FlowConfig
+	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
 }
 
 func WithUnicastRateLimitDistributor(distributor p2p.UnicastRateLimiterDistributor) NodeFixtureParameterOption {
@@ -258,9 +256,9 @@ func WithUnicastRateLimitDistributor(distributor p2p.UnicastRateLimiterDistribut
 	}
 }
 
-func OverrideGossipSubRpcInspectorSuiteFactory(factory p2p.GossipSubRpcInspectorSuiteFactoryFunc) NodeFixtureParameterOption {
+func OverrideGossipSubRpcInspectorFactory(factory p2p.GossipSubRpcInspectorFactoryFunc) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
-		p.GossipSubRpcInspectorSuiteFactory = factory
+		p.GossipSubRpcInspectorFactory = factory
 	}
 }
 
@@ -807,38 +805,6 @@ func PeerIdSliceFixture(t *testing.T, n int) peer.IDSlice {
 func NewConnectionGater(idProvider module.IdentityProvider, allowListFilter p2p.PeerFilter) p2p.ConnectionGater {
 	filters := []p2p.PeerFilter{allowListFilter}
 	return connection.NewConnGater(unittest.Logger(), idProvider, connection.WithOnInterceptPeerDialFilters(filters), connection.WithOnInterceptSecuredFilters(filters))
-}
-
-// MockInspectorNotificationDistributorReadyDoneAware mocks the Ready and Done methods of the distributor to return a channel that is already closed,
-// so that the distributor is considered ready and done when the test needs.
-func MockInspectorNotificationDistributorReadyDoneAware(d *mockp2p.GossipSubInspectorNotificationDistributor) {
-	d.On("Start", mockery.Anything).Return().Maybe()
-	d.On("Ready").Return(func() <-chan struct{} {
-		ch := make(chan struct{})
-		close(ch)
-		return ch
-	}()).Maybe()
-	d.On("Done").Return(func() <-chan struct{} {
-		ch := make(chan struct{})
-		close(ch)
-		return ch
-	}()).Maybe()
-}
-
-// MockScoringRegistrySubscriptionValidatorReadyDoneAware mocks the Ready and Done methods of the subscription validator to return a channel that is already closed,
-// so that the distributor is considered ready and done when the test needs.
-func MockScoringRegistrySubscriptionValidatorReadyDoneAware(s *mockp2p.SubscriptionValidator) {
-	s.On("Start", mockery.Anything).Return().Maybe()
-	s.On("Ready").Return(func() <-chan struct{} {
-		ch := make(chan struct{})
-		close(ch)
-		return ch
-	}()).Maybe()
-	s.On("Done").Return(func() <-chan struct{} {
-		ch := make(chan struct{})
-		close(ch)
-		return ch
-	}()).Maybe()
 }
 
 // GossipSubRpcFixtures returns a slice of random message IDs for testing.
