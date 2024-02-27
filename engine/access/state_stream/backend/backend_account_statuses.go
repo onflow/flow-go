@@ -20,6 +20,7 @@ type AccountStatusesResponse struct {
 	MessageIndex uint64
 }
 
+// AccountStatusesBackend is a struct representing a backend implementation for subscribing to account statuses changes.
 type AccountStatusesBackend struct {
 	log            zerolog.Logger
 	broadcaster    *engine.Broadcaster
@@ -31,6 +32,12 @@ type AccountStatusesBackend struct {
 	getStartHeight   GetStartHeightFunc
 }
 
+// SubscribeAccountStatuses subscribes to account status changes starting from a specific block ID
+// and block height, with an optional status filter.
+// Errors:
+// - codes.InvalidArgument: If start height before root height, or both startBlockID and startHeight are provided.
+// - codes.ErrNotFound`: For unindexed start blockID or for unindexed start height.
+// - codes.Internal: If there is an internal error.
 func (b *AccountStatusesBackend) SubscribeAccountStatuses(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.StatusFilter) state_stream.Subscription {
 	nextHeight, err := b.getStartHeight(startBlockID, startHeight)
 	if err != nil {
