@@ -48,9 +48,13 @@ func TestNativeTokenBridging(t *testing.T) {
 			t.Run("mint tokens to the first account", func(t *testing.T) {
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						res, err := blk.DirectCall(types.NewDepositCall(testAccount, originalBalance, nonce))
+						call := types.NewDepositCall(testAccount, originalBalance, nonce)
+						res, err := blk.DirectCall(call)
 						require.NoError(t, err)
 						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
+						expectedHash, err := call.Hash()
+						require.NoError(t, err)
+						require.Equal(t, expectedHash, res.TxHash)
 						nonce += 1
 					})
 				})
@@ -66,9 +70,13 @@ func TestNativeTokenBridging(t *testing.T) {
 				})
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						res, err := blk.DirectCall(types.NewWithdrawCall(testAccount, amount, nonce))
+						call := types.NewWithdrawCall(testAccount, amount, nonce)
+						res, err := blk.DirectCall(call)
 						require.NoError(t, err)
 						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
+						expectedHash, err := call.Hash()
+						require.NoError(t, err)
+						require.Equal(t, expectedHash, res.TxHash)
 						nonce += 1
 					})
 				})
@@ -111,16 +119,18 @@ func TestContractInteraction(t *testing.T) {
 			t.Run("deploy contract", func(t *testing.T) {
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						res, err := blk.DirectCall(
-							types.NewDeployCall(
-								testAccount,
-								testContract.ByteCode,
-								math.MaxUint64,
-								amountToBeTransfered,
-								nonce),
-						)
+						call := types.NewDeployCall(
+							testAccount,
+							testContract.ByteCode,
+							math.MaxUint64,
+							amountToBeTransfered,
+							nonce)
+						res, err := blk.DirectCall(call)
 						require.NoError(t, err)
 						contractAddr = res.DeployedContractAddress
+						expectedHash, err := call.Hash()
+						require.NoError(t, err)
+						require.Equal(t, expectedHash, res.TxHash)
 						nonce += 1
 					})
 					RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {

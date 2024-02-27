@@ -113,12 +113,12 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 	}
 	switch call.SubType {
 	case types.DepositCallSubType:
-		return proc.mintTo(call.To, call.Value)
+		return proc.mintTo(call.To, call.Value, txHash)
 	case types.WithdrawCallSubType:
-		return proc.withdrawFrom(call.From, call.Value)
+		return proc.withdrawFrom(call.From, call.Value, txHash)
 	case types.DeployCallSubType:
 		if !call.EmptyToField() {
-			return proc.deployAt(call.From, call.To, call.Data, call.GasLimit, call.Value)
+			return proc.deployAt(call.From, call.To, call.Data, call.GasLimit, call.Value, txHash)
 		}
 		fallthrough
 	default:
@@ -199,11 +199,16 @@ func (proc *procedure) commit() error {
 	return nil
 }
 
-func (proc *procedure) mintTo(address types.Address, amount *big.Int) (*types.Result, error) {
+func (proc *procedure) mintTo(
+	address types.Address,
+	amount *big.Int,
+	txHash gethCommon.Hash,
+) (*types.Result, error) {
 	addr := address.ToCommon()
 	res := &types.Result{
 		GasConsumed: proc.config.DirectCallBaseGasUsage,
 		TxType:      types.DirectCallTxType,
+		TxHash:      txHash,
 	}
 
 	// create account if not exist
@@ -218,12 +223,17 @@ func (proc *procedure) mintTo(address types.Address, amount *big.Int) (*types.Re
 	return res, proc.commit()
 }
 
-func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*types.Result, error) {
+func (proc *procedure) withdrawFrom(
+	address types.Address,
+	amount *big.Int,
+	txHash gethCommon.Hash,
+) (*types.Result, error) {
 
 	addr := address.ToCommon()
 	res := &types.Result{
 		GasConsumed: proc.config.DirectCallBaseGasUsage,
 		TxType:      types.DirectCallTxType,
+		TxHash:      txHash,
 	}
 
 	// check if account exists
@@ -264,6 +274,7 @@ func (proc *procedure) deployAt(
 	data types.Code,
 	gasLimit uint64,
 	value *big.Int,
+	txHash gethCommon.Hash,
 ) (*types.Result, error) {
 	if value.Sign() < 0 {
 		return nil, types.ErrInvalidBalance
@@ -271,6 +282,7 @@ func (proc *procedure) deployAt(
 
 	res := &types.Result{
 		TxType: types.DirectCallTxType,
+		TxHash: txHash,
 	}
 	addr := to.ToCommon()
 
