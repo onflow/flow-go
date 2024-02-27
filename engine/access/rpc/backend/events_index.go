@@ -47,7 +47,7 @@ func (e *EventsIndex) Initialize(indexReporter state_synchronization.IndexReport
 //   - storage.ErrHeightNotIndexed when data is unavailable
 //   - codes.NotFound if result cannot be provided by storage due to the absence of data.
 func (e *EventsIndex) ByBlockID(blockID flow.Identifier, height uint64) ([]flow.Event, error) {
-	if err := e.checkDataAvailable(height); err != nil {
+	if err := e.checkDataAvailability(height); err != nil {
 		return nil, err
 	}
 
@@ -74,7 +74,7 @@ func (e *EventsIndex) ByBlockID(blockID flow.Identifier, height uint64) ([]flow.
 //   - storage.ErrHeightNotIndexed when data is unavailable
 //   - codes.NotFound if result cannot be provided by storage due to the absence of data.
 func (e *EventsIndex) ByBlockIDTransactionID(blockID flow.Identifier, height uint64, transactionID flow.Identifier) ([]flow.Event, error) {
-	if err := e.checkDataAvailable(height); err != nil {
+	if err := e.checkDataAvailability(height); err != nil {
 		return nil, err
 	}
 
@@ -87,7 +87,7 @@ func (e *EventsIndex) ByBlockIDTransactionID(blockID flow.Identifier, height uin
 //   - storage.ErrHeightNotIndexed when data is unavailable
 //   - codes.NotFound if result cannot be provided by storage due to the absence of data.
 func (e *EventsIndex) ByBlockIDTransactionIndex(blockID flow.Identifier, height uint64, txIndex uint32) ([]flow.Event, error) {
-	if err := e.checkDataAvailable(height); err != nil {
+	if err := e.checkDataAvailability(height); err != nil {
 		return nil, err
 	}
 
@@ -96,7 +96,7 @@ func (e *EventsIndex) ByBlockIDTransactionIndex(blockID flow.Identifier, height 
 
 // LowestIndexedHeight returns the lowest height indexed by the execution state indexer.
 // Expected errors:
-// - indexer.ErrIndexNotInitialized: if the EventsIndex has not been initialized
+// - indexer.ErrIndexNotInitialized if the EventsIndex has not been initialized
 func (e *EventsIndex) LowestIndexedHeight() (uint64, error) {
 	reporter, err := e.getReporter()
 	if err != nil {
@@ -108,7 +108,7 @@ func (e *EventsIndex) LowestIndexedHeight() (uint64, error) {
 
 // HighestIndexedHeight returns the highest height indexed by the execution state indexer.
 // Expected errors:
-// - indexer.ErrIndexNotInitialized: if the EventsIndex has not been initialized
+// - indexer.ErrIndexNotInitialized if the EventsIndex has not been initialized
 func (e *EventsIndex) HighestIndexedHeight() (uint64, error) {
 	reporter, err := e.getReporter()
 	if err != nil {
@@ -118,7 +118,7 @@ func (e *EventsIndex) HighestIndexedHeight() (uint64, error) {
 	return reporter.HighestIndexedHeight()
 }
 
-func (e *EventsIndex) checkDataAvailable(height uint64) error {
+func (e *EventsIndex) checkDataAvailability(height uint64) error {
 	reporter, err := e.getReporter()
 	if err != nil {
 		return err

@@ -20,14 +20,26 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// TransactionErrorMessage declares the lookup transaction error methods by different input parameters.
 type TransactionErrorMessage interface {
-	// LookupErrorMessageByTransactionID is a function type for getting transaction error message.
+	// LookupErrorMessageByTransactionID is a function type for getting transaction error message by block ID and transaction ID.
+	// Expected errors during normal operation:
+	//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
+	//   - status.Error - remote GRPC call to EN has failed.
 	LookupErrorMessageByTransactionID(ctx context.Context, blockID flow.Identifier, transactionID flow.Identifier) (string, error)
 
 	// LookupErrorMessageByIndex is a function type for getting transaction error message by index.
+	// Expected errors during normal operation:
+	//   - status.Error[codes.NotFound] - transaction result for given block ID and tx index is not available.
+	//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
+	//   - status.Error - remote GRPC call to EN has failed.
 	LookupErrorMessageByIndex(ctx context.Context, blockID flow.Identifier, height uint64, index uint32) (string, error)
 
 	// LookupErrorMessagesByBlockID is a function type for getting transaction error messages by block ID.
+	// Expected errors during normal operation:
+	//   - status.Error[codes.NotFound] - transaction results for given block ID are not available.
+	//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
+	//   - status.Error - remote GRPC call to EN has failed.
 	LookupErrorMessagesByBlockID(ctx context.Context, blockID flow.Identifier, height uint64) (map[flow.Identifier]string, error)
 }
 
@@ -47,6 +59,7 @@ type TransactionsLocalDataProvider struct {
 //   - codes.Internal if event payload conversion failed.
 //   - indexer.ErrIndexNotInitialized when txResultsIndex not initialized
 //   - storage.ErrHeightNotIndexed when data is unavailable
+//
 // All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
 // getter or when deriving transaction status.
 func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
@@ -118,6 +131,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 //   - codes.Internal when event payload conversion failed.
 //   - indexer.ErrIndexNotInitialized when txResultsIndex not initialized
 //   - storage.ErrHeightNotIndexed when data is unavailable
+//
 // All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
 // getter or when deriving transaction status.
 func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorage(
@@ -199,12 +213,13 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 
 // GetTransactionResultByIndexFromStorage retrieves a transaction result by index from storage.
 // Expected errors during normal operation:
-//   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
-//   - codes.Internal: Event payload conversion failed.
-//   - indexer.ErrIndexNotInitialized: txResultsIndex not initialized
-//   - storage.ErrHeightNotIndexed: txResultsIndex return it when data is unavailable
-//   - All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
-//     getter or when deriving transaction status.
+//   - codes.NotFound if result cannot be provided by storage due to the absence of data.
+//   - codes.Internal when event payload conversion failed.
+//   - indexer.ErrIndexNotInitialized when txResultsIndex not initialized
+//   - storage.ErrHeightNotIndexed when data is unavailable
+//
+// All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
+// getter or when deriving transaction status.
 func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 	ctx context.Context,
 	block *flow.Block,
