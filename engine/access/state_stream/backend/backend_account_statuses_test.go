@@ -23,6 +23,7 @@ var testCoreEventTypes = []flow.EventType{
 	"flow.AccountKeyRemoved",
 }
 
+// BackendAccountStatusesSuite is the test suite for AccountStatusesBackend.
 type BackendAccountStatusesSuite struct {
 	BackendExecutionDataSuite
 }
@@ -173,6 +174,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatuses() {
 	}
 }
 
+// TestSubscribeAccountStatusesHandlesErrors tests handling of expected errors in the SubscribeAccountStatuses.
 func (s *BackendExecutionDataSuite) TestSubscribeAccountStatusesHandlesErrors() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

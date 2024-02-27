@@ -216,6 +216,7 @@ func (h *Handler) GetRegisterValues(_ context.Context, request *executiondata.Ge
 	return &executiondata.GetRegisterValuesResponse{Values: values}, nil
 }
 
+// SubscribeAccountStatuses subscribes to account status changes.
 func (h *Handler) SubscribeAccountStatuses(request *executiondata.SubscribeAccountStatusesRequest, stream executiondata.ExecutionDataAPI_SubscribeAccountStatusesServer) error {
 	// check if the maximum number of streams is reached
 	if h.streamCount.Load() >= h.maxStreams {
