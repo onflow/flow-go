@@ -75,6 +75,7 @@ func DeployContract(t testing.TB, caller types.Address, tc *TestContract, led at
 
 	_, err = blk.DirectCall(
 		types.NewDepositCall(
+			types.EmptyAddress,
 			caller,
 			new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)),
 			nonce,

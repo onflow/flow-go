@@ -26,11 +26,15 @@ const (
 	// change the transaction (e.g. add accesslist),
 	// then it has to be updated to use Intrinsic function
 	// to calculate the minimum gas needed to run the transaction.
-	DepositCallGasLimit  = gethParams.TxGas
-	WithdrawCallGasLimit = gethParams.TxGas
+	IntrinsicFeeForTokenTransfer = gethParams.TxGas
 
 	// 21_000 is the minimum for a transaction + max gas allowed for receive/fallback methods
-	DefaultGasLimitForTokenTransfer = 21_000 + 2_300
+	DefaultGasLimitForTokenTransfer = IntrinsicFeeForTokenTransfer + 2_300
+
+	// the value is set to the gas limit for transfer to facilitate transfers
+	// to smart contract addresses.
+	DepositCallGasLimit  = DefaultGasLimitForTokenTransfer
+	WithdrawCallGasLimit = DefaultGasLimitForTokenTransfer
 )
 
 // DirectCall captures all the data related to a direct call to evm
@@ -119,6 +123,7 @@ func (dc *DirectCall) to() *gethCommon.Address {
 }
 
 func NewDepositCall(
+	bridge Address,
 	address Address,
 	amount *big.Int,
 	nonce uint64,
@@ -126,7 +131,7 @@ func NewDepositCall(
 	return &DirectCall{
 		Type:     DirectCallTxType,
 		SubType:  DepositCallSubType,
-		From:     EmptyAddress,
+		From:     bridge,
 		To:       address,
 		Data:     nil,
 		Value:    amount,
@@ -136,6 +141,7 @@ func NewDepositCall(
 }
 
 func NewWithdrawCall(
+	bridge Address,
 	address Address,
 	amount *big.Int,
 	nonce uint64,
@@ -144,7 +150,7 @@ func NewWithdrawCall(
 		Type:     DirectCallTxType,
 		SubType:  WithdrawCallSubType,
 		From:     address,
-		To:       EmptyAddress,
+		To:       bridge,
 		Data:     nil,
 		Value:    amount,
 		GasLimit: WithdrawCallGasLimit,
