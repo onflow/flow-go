@@ -318,14 +318,3 @@ func mustHexAddress(hexAddress string) common.Address {
 	}
 	return address
 }
-
-func NewSystemContactsMigration(
-	chainID flow.ChainID,
-	options SystemContractChangesOptions,
-) *ChangeContractCodeMigration {
-	migration := NewChangeContractCodeMigration(chainID)
-	for _, change := range SystemContractChanges(chainID, options) {
-		migration.RegisterContractChange(change)
-	}
-	return migration
-}

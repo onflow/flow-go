@@ -209,8 +209,26 @@ func NewCadence1ContractsMigrations(
 	stagedContracts []StagedContract,
 ) []ledger.Migration {
 
+	systemContractsMigration := NewChangeContractCodeMigration(chainID)
 	stagedContractsMigration := NewStagedContractsMigration(chainID).
 		WithContractUpdateValidation()
+
+	systemContractChanges := SystemContractChanges(
+		chainID,
+		SystemContractChangesOptions{
+			EVM: evmContractChange,
+		},
+	)
+
+	for _, change := range systemContractChanges {
+		systemContractsMigration.RegisterContractChange(change)
+
+		// Make sure the staged contracts migration is aware of the new system contract code
+		stagedContractsMigration.RegisterContract(
+			change.Address,
+			change.Contract,
+		)
+	}
 
 	stagedContractsMigration.RegisterContractUpdates(stagedContracts)
 
@@ -219,12 +237,7 @@ func NewCadence1ContractsMigrations(
 			log,
 			nWorker,
 			[]AccountBasedMigration{
-				NewSystemContactsMigration(
-					chainID,
-					SystemContractChangesOptions{
-						EVM: evmContractChange,
-					},
-				),
+				systemContractsMigration,
 			},
 		),
 		NewBurnerDeploymentMigration(chainID, log),

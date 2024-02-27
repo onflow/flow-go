@@ -142,11 +142,15 @@ func (m *StagedContractsMigration) RegisterContractChange(change StagedContract)
 
 	m.stagedContracts[address][registerID] = change.Contract
 
+	m.RegisterContract(address, change.Contract)
+}
+
+func (m *StagedContractsMigration) RegisterContract(address common.Address, contract Contract) {
 	location := common.AddressLocation{
-		Name:    name,
+		Name:    contract.Name,
 		Address: address,
 	}
-	m.contractsByLocation[location] = change.Code
+	m.contractsByLocation[location] = contract.Code
 }
 
 func (m *StagedContractsMigration) contractUpdatesForAccount(
