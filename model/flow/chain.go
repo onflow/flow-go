@@ -59,7 +59,7 @@ func AllChainIDs() ChainIDList {
 
 // Transient returns whether the chain ID is for a transient network.
 func (c ChainID) Transient() bool {
-	return c == Emulator || c == Localnet || c == Benchnet || c == BftTestnet
+	return c == Emulator || c == Localnet || c == Benchnet || c == BftTestnet || c == Previewnet
 }
 
 // getChainCodeWord derives the network type used for address generation from the globally
