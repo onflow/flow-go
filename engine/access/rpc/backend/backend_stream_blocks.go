@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/subscription"
-	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -126,7 +125,7 @@ func (b *backendSubscribeBlocks) getBlockHeader(height uint64, expectedBlockStat
 	// since we are querying a finalized or sealed block header, we can use the height index and save an ID computation
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, err
 	}
 
 	return header, nil
@@ -144,7 +143,7 @@ func (b *backendSubscribeBlocks) getBlock(height uint64, expectedBlockStatus flo
 	// since we are querying a finalized or sealed block, we can use the height index and save an ID computation
 	block, err := b.blocks.ByHeight(height)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, err
 	}
 
 	return block, nil
@@ -153,7 +152,7 @@ func (b *backendSubscribeBlocks) getBlock(height uint64, expectedBlockStatus flo
 func (b *backendSubscribeBlocks) validateHeight(height uint64, expectedBlockStatus flow.BlockStatus) error {
 	highestHeight, err := b.getHighestHeight(expectedBlockStatus)
 	if err != nil {
-		return fmt.Errorf("could not get highest available height: %v", err)
+		return fmt.Errorf("could not get highest available height: %w", err)
 	}
 
 	// fail early if no notification has been received for the given block height.
