@@ -25,6 +25,59 @@ func TestPayloadFile(t *testing.T) {
 
 	const fileName = "root.payload"
 
+	t.Run("without filter, input payloads represent partial state", func(t *testing.T) {
+		unittest.RunWithTempDir(t, func(datadir string) {
+			size := 10
+
+			payloadFileName := filepath.Join(datadir, fileName)
+
+			// Generate some data
+			keysValues := make(map[string]keyPair)
+			var payloads []*ledger.Payload
+
+			for i := 0; i < size; i++ {
+				keys, values := getSampleKeyValues(i)
+
+				for j, key := range keys {
+					keysValues[key.String()] = keyPair{
+						key:   key,
+						value: values[j],
+					}
+
+					payloads = append(payloads, ledger.NewPayload(key, values[j]))
+				}
+			}
+
+			numOfPayloadWritten, err := util.CreatePayloadFile(
+				zerolog.Nop(),
+				payloadFileName,
+				payloads,
+				nil,
+				true, // input payloads represent partial state
+			)
+			require.NoError(t, err)
+			require.Equal(t, len(payloads), numOfPayloadWritten)
+
+			partialState, err := util.IsPayloadFilePartialState(payloadFileName)
+			require.NoError(t, err)
+			require.True(t, partialState)
+
+			partialState, payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), payloadFileName)
+			require.NoError(t, err)
+			require.Equal(t, len(payloads), len(payloadsFromFile))
+			require.True(t, partialState)
+
+			for _, payloadFromFile := range payloadsFromFile {
+				k, err := payloadFromFile.Key()
+				require.NoError(t, err)
+
+				kv, exist := keysValues[k.String()]
+				require.True(t, exist)
+
+				require.Equal(t, kv.value, payloadFromFile.Value())
+			}
+		})
+	})
 	t.Run("without filter", func(t *testing.T) {
 		unittest.RunWithTempDir(t, func(datadir string) {
 			size := 10
@@ -53,13 +106,19 @@ func TestPayloadFile(t *testing.T) {
 				payloadFileName,
 				payloads,
 				nil,
+				false, // input payloads represent entire state
 			)
 			require.NoError(t, err)
 			require.Equal(t, len(payloads), numOfPayloadWritten)
 
-			payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), payloadFileName)
+			partialState, err := util.IsPayloadFilePartialState(payloadFileName)
+			require.NoError(t, err)
+			require.False(t, partialState)
+
+			partialState, payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), payloadFileName)
 			require.NoError(t, err)
 			require.Equal(t, len(payloads), len(payloadsFromFile))
+			require.False(t, partialState)
 
 			for _, payloadFromFile := range payloadsFromFile {
 				k, err := payloadFromFile.Key()
@@ -127,13 +186,19 @@ func TestPayloadFile(t *testing.T) {
 				payloadFileName,
 				payloads,
 				addresses,
+				false, // input payloads represent entire state
 			)
 			require.NoError(t, err)
 			require.Equal(t, len(selectedKeysValues), numOfPayloadWritten)
 
-			payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), payloadFileName)
+			partialState, err := util.IsPayloadFilePartialState(payloadFileName)
+			require.NoError(t, err)
+			require.True(t, partialState)
+
+			partialState, payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), payloadFileName)
 			require.NoError(t, err)
 			require.Equal(t, len(selectedKeysValues), len(payloadsFromFile))
+			require.True(t, partialState)
 
 			for _, payloadFromFile := range payloadsFromFile {
 				k, err := payloadFromFile.Key()
@@ -180,13 +245,19 @@ func TestPayloadFile(t *testing.T) {
 				payloadFileName,
 				payloads,
 				[]common.Address{emptyAddress},
+				false,
 			)
 			require.NoError(t, err)
 			require.Equal(t, 0, numOfPayloadWritten)
 
-			payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), payloadFileName)
+			partialState, err := util.IsPayloadFilePartialState(payloadFileName)
+			require.NoError(t, err)
+			require.True(t, partialState)
+
+			partialState, payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), payloadFileName)
 			require.NoError(t, err)
 			require.Equal(t, 0, len(payloadsFromFile))
+			require.True(t, partialState)
 		})
 	})
 }
