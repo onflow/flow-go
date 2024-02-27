@@ -2,7 +2,7 @@ import Crypto
 import FungibleToken from "FungibleToken"
 import FlowToken from "FlowToken"
 import FlowIDTableStaking from "FlowIDTableStaking"
-import FlowStakingCollection from 0xSTAKINGCOLLECTIONADDRESS
+import FlowStakingCollection from "FlowStakingCollection"
 
 transaction(
     stakingAcctKey: Crypto.KeyListEntry,
