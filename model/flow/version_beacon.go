@@ -161,21 +161,28 @@ func (v *VersionBeacon) String() string {
 // to signal an upgrade to the Protocol State version. `NewProtocolStateVersion`
 // must be strictly greater than the currently active Protocol State Version,
 // otherwise the service event is ignored.
-// If the node software supports `NewProtocolStateVersion`, then it immediately
-// begins using this Protocol State Version, beginning with the block which
-// seals the `ProtocolStateVersionUpgrade` service event. Otherwise, the node
-// software stops processing blocks, until it is manually updated to a compatible
-// software version.
+// If the node software supports `NewProtocolStateVersion`, then it begins using
+// this Protocol State Version, beginning with the first block B where BOTH:
+//  1. The `ProtocolStateVersionUpgrade` service event has been sealed in B's ancestry
+//  2. B.view >= `ActiveView`
+//
+// NOTE: The above implies that, if the `ProtocolStateVersionUpgrade` event is sealed in a
+// block with view >= `ActiveView`, then `NewProtocolStateVersion` takes effect immediately.
+//
+// Otherwise, the node software stops processing blocks, until it is manually updated
+// to a compatible software version.
 // The Protocol State version must be incremented when:
 //   - a change is made to the Protocol State Machine
 //   - a new key is added or removed from the Protocol State Key-Value Store
 type ProtocolStateVersionUpgrade struct {
 	NewProtocolStateVersion uint64
+	ActiveView              uint64
 }
 
 // EqualTo returns true if the two events are equivalent.
 func (u *ProtocolStateVersionUpgrade) EqualTo(other *ProtocolStateVersionUpgrade) bool {
-	return u.NewProtocolStateVersion == other.NewProtocolStateVersion
+	return u.NewProtocolStateVersion == other.NewProtocolStateVersion &&
+		u.ActiveView == other.ActiveView
 }
 
 // ServiceEvent returns the event as a generic ServiceEvent type.

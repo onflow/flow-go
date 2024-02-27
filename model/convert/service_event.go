@@ -907,7 +907,7 @@ func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.Ser
 
 	versionUpgrade, err := DecodeCadenceValue("ProtocolStateVersionUpgrade payload", payload,
 		func(cdcEvent cadence.Event) (flow.ProtocolStateVersionUpgrade, error) {
-			const expectedFieldCount = 1
+			const expectedFieldCount = 2
 			if len(cdcEvent.Fields) < expectedFieldCount {
 				return flow.ProtocolStateVersionUpgrade{}, fmt.Errorf("unexpected number of fields in ProtocolStateVersionUpgrade (%d < %d)",
 					len(cdcEvent.Fields), expectedFieldCount)
@@ -918,6 +918,7 @@ func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.Ser
 			}
 
 			var newProtocolVersionValue cadence.Value
+			var activeViewValue cadence.Value
 			var foundFieldCount int
 
 			evt := cdcEvent.Type().(*cadence.EventType)
@@ -927,6 +928,9 @@ func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.Ser
 				case "newProtocolVersion":
 					foundFieldCount++
 					newProtocolVersionValue = cdcEvent.Fields[i]
+				case "activeView":
+					foundFieldCount++
+					activeViewValue = cdcEvent.Fields[i]
 				}
 			}
 
@@ -946,9 +950,18 @@ func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.Ser
 			if err != nil {
 				return flow.ProtocolStateVersionUpgrade{}, err
 			}
+			activeView, err := DecodeCadenceValue(
+				".activeView", activeViewValue, func(cadenceVal cadence.UInt64) (uint64, error) {
+					return uint64(cadenceVal), err
+				},
+			)
+			if err != nil {
+				return flow.ProtocolStateVersionUpgrade{}, err
+			}
 
 			return flow.ProtocolStateVersionUpgrade{
 				NewProtocolStateVersion: newProtocolVersion,
+				ActiveView:              activeView,
 			}, err
 		})
 
