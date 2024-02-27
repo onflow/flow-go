@@ -545,11 +545,12 @@ func TestSequenceOfActions(t *testing.T) {
 
 			var coaAddress types.Address
 
-			initNonce := uint64(1)
-			// 10 Flow in UFix64
-			initBalanceInUFix64 := uint64(1_000_000_000)
-			initBalance := types.NewBalanceFromUFix64(cadence.UFix64(initBalanceInUFix64))
 			t.Run("setup coa", func(t *testing.T) {
+				initNonce := uint64(1)
+				// 10 Flow in UFix64
+				initBalanceInUFix64 := uint64(1_000_000_000)
+				initBalance := types.NewBalanceFromUFix64(cadence.UFix64(initBalanceInUFix64))
+
 				coaAddress, snapshot = setupCOA(
 					t,
 					ctx,
@@ -574,6 +575,7 @@ func TestSequenceOfActions(t *testing.T) {
 					coaAddress)
 				require.Equal(t, initNonce, nonce)
 			})
+
 		})
 }
 
