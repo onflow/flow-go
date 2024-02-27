@@ -150,12 +150,7 @@ func (h *ChainStateTrackerImpl) GetStartHeight(ctx context.Context, startBlockID
 	header, err := h.state.Sealed().Head()
 	if err != nil {
 		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
-		// we should halt processing requests, but do throw an exception which might cause a crash:
-		// - It is unsafe to process requests if we have an internally bad State.
-		// - We would like to avoid throwing an exception as a result of an Access API request by policy
-		//   because this can cause DOS potential
-		// - Since the protocol state is widely shared, we assume that in practice another component will
-		//   observe the protocol state error and throw an exception.
+		// we should halt processing requests
 		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		irrecoverable.Throw(ctx, err)
 		return 0, err
