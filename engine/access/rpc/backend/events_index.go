@@ -14,7 +14,9 @@ import (
 
 var _ state_synchronization.IndexReporter = (*EventsIndex)(nil)
 
-// EventsIndex When the index is initially bootstrapped, the indexer needs to load an execution state checkpoint from
+// EventsIndex implements a wrapper around `storage.Events` ensuring that needed data has been synced and is available to the client. 
+// Note: `EventsIndex` is created with empty report due to the next reasoning: 
+// When the index is initially bootstrapped, the indexer needs to load an execution state checkpoint from
 // disk and index all the data. This process can take more than 1 hour on some systems. Consequently, the Initialize
 // pattern is implemented to enable the Access API to start up and serve queries before the index is fully ready. During
 // the initialization phase, all calls to retrieve data from this struct should return indexer.ErrIndexNotInitialized.
@@ -31,9 +33,8 @@ func NewEventsIndex(events storage.Events) *EventsIndex {
 	}
 }
 
-// Initialize replaces a nil value with the actual reporter instance.
+// Initialize replaces a previously non-initialized reporter. Can be called once.
 // No errors are expected during normal operations.
-// - If the reporter was already initialized, return error
 func (e *EventsIndex) Initialize(indexReporter state_synchronization.IndexReporter) error {
 	if e.reporter.CompareAndSwap(nil, &indexReporter) {
 		return nil

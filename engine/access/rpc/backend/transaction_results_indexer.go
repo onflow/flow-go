@@ -11,11 +11,13 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// TransactionResultsIndex When the index is initially bootstrapped, the indexer needs to load an execution state
-// checkpoint from disk and index all the data. This process can take more than 1 hour on some systems. Consequently,
-// the Initialize pattern is implemented to enable the Access API to start up and serve queries before the index is
-// fully ready. During the initialization phase, all calls to retrieve data from this struct should return
-// indexer.ErrIndexNotInitialized. The caller is responsible for handling this error appropriately for the method.
+// TransactionResultsIndex implements a wrapper around `storage.LightTransactionResult` ensuring that needed data has been synced and is available to the client. 
+// Note: `TransactionResultsIndex` is created with empty report due to the next reasoning: 
+// When the index is initially bootstrapped, the indexer needs to load an execution state checkpoint from
+// disk and index all the data. This process can take more than 1 hour on some systems. Consequently, the Initialize
+// pattern is implemented to enable the Access API to start up and serve queries before the index is fully ready. During
+// the initialization phase, all calls to retrieve data from this struct should return indexer.ErrIndexNotInitialized.
+// The caller is responsible for handling this error appropriately for the method.
 type TransactionResultsIndex struct {
 	results  storage.LightTransactionResults
 	reporter *atomic.Pointer[state_synchronization.IndexReporter]
@@ -30,9 +32,8 @@ func NewTransactionResultsIndex(results storage.LightTransactionResults) *Transa
 	}
 }
 
-// Initialize replaces nil value with actual reporter instance
-// Expected errors:
-// - If the reporter was already initialized, return error
+// Initialize replaces a previously non-initialized reporter. Can be called once.
+// No errors are expected during normal operations.
 func (t *TransactionResultsIndex) Initialize(indexReporter state_synchronization.IndexReporter) error {
 	if t.reporter.CompareAndSwap(nil, &indexReporter) {
 		return nil
