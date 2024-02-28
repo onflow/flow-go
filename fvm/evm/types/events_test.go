@@ -177,7 +177,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, flowSdk.EVMLocation{}, location)
-		assert.Equal(t, "BlockExecuted", qualifiedIdentifier)
+		assert.Equal(t, "TransactionExecuted", qualifiedIdentifier)
 	})
 
 	t.Run("evm.TransactionExecuted with non-failed status", func(t *testing.T) {
