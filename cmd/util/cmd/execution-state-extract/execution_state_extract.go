@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"time"
 
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
 	migrators "github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -34,6 +37,8 @@ func extractExecutionState(
 	outputDir string,
 	nWorker int, // number of concurrent worker to migation payloads
 	runMigrations bool,
+	outputPayloadFile string,
+	exportPayloadsByAddresses []common.Address,
 ) error {
 
 	log.Info().Msg("init WAL")
@@ -70,7 +75,7 @@ func extractExecutionState(
 
 	log.Info().Msg("init compactor")
 
-	compactor, err := complete.NewCompactor(led, diskWal, log, complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	compactor, err := complete.NewCompactor(led, diskWal, log, complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), &metrics.NoopCollector{})
 	if err != nil {
 		return fmt.Errorf("cannot create compactor: %w", err)
 	}
@@ -84,30 +89,7 @@ func extractExecutionState(
 		<-compactor.Done()
 	}()
 
-	var migrations []ledger.Migration
-
-	if runMigrations {
-		rwf := reporters.NewReportFileWriterFactory(dir, log)
-
-		migrations = []ledger.Migration{
-			migrators.CreateAccountBasedMigration(
-				log,
-				nWorker,
-				[]migrators.AccountBasedMigration{
-					migrators.NewAtreeRegisterMigrator(
-						rwf,
-						flagValidateMigration,
-						flagLogVerboseValidationError,
-					),
-
-					&migrators.DeduplicateContractNamesMigration{},
-
-					// This will fix storage used discrepancies caused by the
-					// DeduplicateContractNamesMigration.
-					&migrators.AccountUsageMigrator{},
-				}),
-		}
-	}
+	migrations := newMigrations(log, dir, nWorker, runMigrations)
 
 	newState := ledger.State(targetHash)
 
@@ -132,6 +114,36 @@ func extractExecutionState(
 	err = reporter.Report(nil, newMigratedState)
 	if err != nil {
 		log.Error().Err(err).Msgf("can not generate report for migrated state: %v", newMigratedState)
+	}
+
+	exportPayloads := len(outputPayloadFile) > 0
+	if exportPayloads {
+		payloads := newTrie.AllPayloads()
+
+		log.Info().Msgf("sorting %d payloads", len(payloads))
+
+		// Sort payloads to produce deterministic payload file with
+		// same sequence of payloads inside.
+		payloads = util.SortPayloadsByAddress(payloads, nWorker)
+
+		log.Info().Msgf("sorted %d payloads", len(payloads))
+
+		log.Info().Msgf("creating payloads file %s", outputPayloadFile)
+
+		exportedPayloadCount, err := util.CreatePayloadFile(
+			log,
+			outputPayloadFile,
+			payloads,
+			exportPayloadsByAddresses,
+			false, // payloads represents entire state.
+		)
+		if err != nil {
+			return fmt.Errorf("cannot generate payloads file: %w", err)
+		}
+
+		log.Info().Msgf("Exported %d payloads out of %d payloads", exportedPayloadCount, len(payloads))
+
+		return nil
 	}
 
 	migratedState, err := createCheckpoint(
@@ -190,4 +202,180 @@ func writeStatusFile(fileName string, e error) error {
 	checkpointStatusJson, _ := json.MarshalIndent(checkpointStatus, "", " ")
 	err := os.WriteFile(fileName, checkpointStatusJson, 0644)
 	return err
+}
+
+func extractExecutionStateFromPayloads(
+	log zerolog.Logger,
+	dir string,
+	outputDir string,
+	nWorker int, // number of concurrent worker to migation payloads
+	runMigrations bool,
+	inputPayloadFile string,
+	outputPayloadFile string,
+	exportPayloadsByAddresses []common.Address,
+) error {
+
+	inputPayloadsFromPartialState, payloads, err := util.ReadPayloadFile(log, inputPayloadFile)
+	if err != nil {
+		return err
+	}
+
+	log.Info().Msgf("read %d payloads", len(payloads))
+
+	migrations := newMigrations(log, dir, nWorker, runMigrations)
+
+	payloads, err = migratePayloads(log, payloads, migrations)
+	if err != nil {
+		return err
+	}
+
+	exportPayloads := len(outputPayloadFile) > 0
+	if exportPayloads {
+
+		log.Info().Msgf("sorting %d payloads", len(payloads))
+
+		// Sort payloads to produce deterministic payload file with
+		// same sequence of payloads inside.
+		payloads = util.SortPayloadsByAddress(payloads, nWorker)
+
+		log.Info().Msgf("sorted %d payloads", len(payloads))
+
+		log.Info().Msgf("creating payloads file %s", outputPayloadFile)
+
+		exportedPayloadCount, err := util.CreatePayloadFile(
+			log,
+			outputPayloadFile,
+			payloads,
+			exportPayloadsByAddresses,
+			inputPayloadsFromPartialState,
+		)
+		if err != nil {
+			return fmt.Errorf("cannot generate payloads file: %w", err)
+		}
+
+		log.Info().Msgf("Exported %d payloads out of %d payloads", exportedPayloadCount, len(payloads))
+
+		return nil
+	}
+
+	newTrie, err := createTrieFromPayloads(log, payloads)
+	if err != nil {
+		return err
+	}
+
+	migratedState, err := createCheckpoint(
+		newTrie,
+		log,
+		outputDir,
+		bootstrap.FilenameWALRootCheckpoint,
+	)
+	if err != nil {
+		return fmt.Errorf("cannot generate the output checkpoint: %w", err)
+	}
+
+	log.Info().Msgf(
+		"New state commitment for the exported state is: %s (base64: %s)",
+		migratedState.String(),
+		migratedState.Base64(),
+	)
+
+	return nil
+}
+
+func migratePayloads(logger zerolog.Logger, payloads []*ledger.Payload, migrations []ledger.Migration) ([]*ledger.Payload, error) {
+
+	if len(migrations) == 0 {
+		return payloads, nil
+	}
+
+	var err error
+	payloadCount := len(payloads)
+
+	// migrate payloads
+	for i, migrate := range migrations {
+		logger.Info().Msgf("migration %d/%d is underway", i, len(migrations))
+
+		start := time.Now()
+		payloads, err = migrate(payloads)
+		elapsed := time.Since(start)
+
+		if err != nil {
+			return nil, fmt.Errorf("error applying migration (%d): %w", i, err)
+		}
+
+		newPayloadCount := len(payloads)
+
+		if payloadCount != newPayloadCount {
+			logger.Warn().
+				Int("migration_step", i).
+				Int("expected_size", payloadCount).
+				Int("outcome_size", newPayloadCount).
+				Msg("payload counts has changed during migration, make sure this is expected.")
+		}
+		logger.Info().Str("timeTaken", elapsed.String()).Msgf("migration %d is done", i)
+
+		payloadCount = newPayloadCount
+	}
+
+	return payloads, nil
+}
+
+func createTrieFromPayloads(logger zerolog.Logger, payloads []*ledger.Payload) (*trie.MTrie, error) {
+	// get paths
+	paths, err := pathfinder.PathsFromPayloads(payloads, complete.DefaultPathFinderVersion)
+	if err != nil {
+		return nil, fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
+	}
+
+	logger.Info().Msgf("constructing a new trie with migrated payloads (count: %d)...", len(payloads))
+
+	emptyTrie := trie.NewEmptyMTrie()
+
+	derefPayloads := make([]ledger.Payload, len(payloads))
+	for i, p := range payloads {
+		derefPayloads[i] = *p
+	}
+
+	// no need to prune the data since it has already been prunned through migrations
+	applyPruning := false
+	newTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, derefPayloads, applyPruning)
+	if err != nil {
+		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
+	}
+
+	return newTrie, nil
+}
+
+func newMigrations(
+	log zerolog.Logger,
+	dir string,
+	nWorker int, // number of concurrent worker to migation payloads
+	runMigrations bool,
+) []ledger.Migration {
+	if runMigrations {
+		rwf := reporters.NewReportFileWriterFactory(dir, log)
+
+		migrations := []ledger.Migration{
+			migrators.CreateAccountBasedMigration(
+				log,
+				nWorker,
+				[]migrators.AccountBasedMigration{
+					migrators.NewAtreeRegisterMigrator(
+						rwf,
+						flagValidateMigration,
+						flagLogVerboseValidationError,
+					),
+
+					&migrators.DeduplicateContractNamesMigration{},
+
+					// This will fix storage used discrepancies caused by the
+					// DeduplicateContractNamesMigration.
+					&migrators.AccountUsageMigrator{},
+				}),
+		}
+
+		return migrations
+	}
+
+	return nil
 }

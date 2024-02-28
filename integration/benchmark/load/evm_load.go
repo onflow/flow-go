@@ -19,6 +19,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
@@ -114,36 +115,41 @@ func (l *EVMTransferLoad) Setup(log zerolog.Logger, lc LoadContext) error {
 			contractName := "BridgedAccountContract"
 
 			contract := fmt.Sprintf(`
-import EVM from %s
-import FlowToken from %s
+				import EVM from %s
+				import FlowToken from %s
 
-access(all) contract BridgedAccountContract {
-	access(self) var acc : @EVM.BridgedAccount
+				access(all) contract BridgedAccountContract {
+					access(self) var acc: @EVM.CadenceOwnedAccount
 
-    access(all)
-	fun address() : EVM.EVMAddress {
-		return self.acc.address()
-    }
+					access(all)
+					fun address() : EVM.EVMAddress {
+						return self.acc.address()
+					}
 
-	access(all) 
-	fun call(
-			to: EVM.EVMAddress,
-            data: [UInt8],
-            gasLimit: UInt64,
-            value: EVM.Balance
-        ): [UInt8] { 
-		return self.acc.call(to: to, data: data, gasLimit: gasLimit, value: value)
-	}
+					access(all)
+					fun call(
+						to: EVM.EVMAddress,
+						data: [UInt8],
+						gasLimit: UInt64,
+						value: EVM.Balance
+					): EVM.Result {
+						return self.acc.call(
+							to: to,
+							data: data,
+							gasLimit: gasLimit,
+							value: value
+						)
+					}
 
-	access(all)
-	fun deposit(from: @FlowToken.Vault) {
-		self.acc.deposit(from: <-from)
-	}
+					access(all)
+					fun deposit(from: @FlowToken.Vault) {
+						self.acc.deposit(from: <-from)
+					}
 
-	init() {
-		self.acc <- EVM.createBridgedAccount()
-	}
-}
+					init() {
+						self.acc <- EVM.createCadenceOwnedAccount()
+					}
+				}
 			`,
 				sc.EVMContract.Address.HexWithPrefix(),
 				sc.FlowToken.Address.HexWithPrefix())
