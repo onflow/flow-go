@@ -8,9 +8,9 @@ import (
 )
 
 var (
-	flagChain          string
-	flagCount          int
-	flagCommaSeparated bool
+	flagChain     string
+	flagCount     int
+	flagSeparator string
 )
 
 var Cmd = &cobra.Command{
@@ -26,7 +26,7 @@ func init() {
 	Cmd.Flags().IntVar(&flagCount, "count", 1, "Count")
 	_ = Cmd.MarkFlagRequired("count")
 
-	Cmd.Flags().BoolVar(&flagCommaSeparated, "commas", false, "Separate using commas instead of newlines")
+	Cmd.Flags().StringVar(&flagSeparator, "separator", ",", "Separator to use between addresses")
 }
 
 func run(*cobra.Command, []string) {
@@ -42,13 +42,9 @@ func run(*cobra.Command, []string) {
 
 		str := address.Hex()
 
-		if flagCommaSeparated {
-			if i > 0 {
-				print(",")
-			}
-			print(str)
-		} else {
-			println(str)
+		if i > 0 {
+			print(flagSeparator)
 		}
+		print(str)
 	}
 }
