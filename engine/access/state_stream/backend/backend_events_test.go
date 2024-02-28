@@ -156,8 +156,8 @@ func (s *BackendEventsSuite) runTestSubscribeEvents() {
 			// this simulates a subscription on a past block
 			for i := 0; i <= test.highestBackfill; i++ {
 				s.T().Logf("backfilling block %d", i)
-				s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).
-					Return(s.blocks[i].Header.Height, nil).Maybe()
+				s.executionDataTracker.On("GetHighestHeight").
+					Return(s.blocks[i].Header.Height).Maybe()
 			}
 
 			subCtx, subCancel := context.WithCancel(ctx)
@@ -172,9 +172,9 @@ func (s *BackendEventsSuite) runTestSubscribeEvents() {
 				if i > test.highestBackfill {
 					s.T().Logf("checking block %d %v", i, b.ID())
 
-					s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).Unset()
-					s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).
-						Return(b.Header.Height, nil).Maybe()
+					s.executionDataTracker.On("GetHighestHeight").Unset()
+					s.executionDataTracker.On("GetHighestHeight").
+						Return(b.Header.Height).Maybe()
 
 					s.broadcaster.Publish()
 				}
@@ -259,13 +259,13 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 	})
 
 	// Unset GetStartHeight to mock new behavior instead of default one
-	s.chainStateTracker.On("GetStartHeight", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
+	s.executionDataTracker.On("GetStartHeight", mock.Anything, mock.Anything).Unset()
 
 	s.Run("returns error for uninitialized index", func() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		s.chainStateTracker.On("GetStartHeight", subCtx, flow.ZeroID, uint64(0), flow.BlockStatusFinalized).
+		s.executionDataTracker.On("GetStartHeight", subCtx, flow.ZeroID, uint64(0)).
 			Return(uint64(0), status.Errorf(codes.FailedPrecondition, "failed to get lowest indexed height: %v", indexer.ErrIndexNotInitialized)).
 			Once()
 
@@ -278,7 +278,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		s.chainStateTracker.On("GetStartHeight", subCtx, flow.ZeroID, s.blocks[0].Header.Height, flow.BlockStatusFinalized).
+		s.executionDataTracker.On("GetStartHeight", subCtx, flow.ZeroID, s.blocks[0].Header.Height).
 			Return(uint64(0), status.Errorf(codes.InvalidArgument, "start height %d is lower than lowest indexed height %d", s.blocks[0].Header.Height, 0)).
 			Once()
 
@@ -290,7 +290,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		s.chainStateTracker.On("GetStartHeight", subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Header.Height, flow.BlockStatusFinalized).
+		s.executionDataTracker.On("GetStartHeight", subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Header.Height).
 			Return(uint64(0), status.Errorf(codes.InvalidArgument, "start height %d is higher than highest indexed height %d", s.blocks[len(s.blocks)-1].Header.Height, s.blocks[0].Header.Height)).
 			Once()
 

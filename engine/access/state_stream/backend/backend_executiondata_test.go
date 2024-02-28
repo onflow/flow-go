@@ -57,14 +57,14 @@ type BackendExecutionDataSuite struct {
 	registersAsync *execution.RegistersAsyncStore
 	eventsIndex    *index.EventsIndex
 
-	bs                    blobs.Blobstore
-	eds                   execution_data.ExecutionDataStore
-	broadcaster           *engine.Broadcaster
-	execDataCache         *cache.ExecutionDataCache
-	execDataHeroCache     *herocache.BlockExecutionData
-	chainStateTracker     *subscriptionmock.ChainStateTracker
-	backend               *StateStreamBackend
-	chainStateTrackerReal subscription.ChainStateTracker
+	bs                       blobs.Blobstore
+	eds                      execution_data.ExecutionDataStore
+	broadcaster              *engine.Broadcaster
+	execDataCache            *cache.ExecutionDataCache
+	execDataHeroCache        *herocache.BlockExecutionData
+	executionDataTracker     *subscriptionmock.ExecutionDataTracker
+	backend                  *StateStreamBackend
+	executionDataTrackerReal subscription.ExecutionDataTracker
 
 	blocks      []*flow.Block
 	blockEvents map[flow.Identifier][]flow.Event
@@ -99,7 +99,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 	s.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metrics.NewNoopCollector())
 	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
-	s.chainStateTracker = subscriptionmock.NewChainStateTracker(s.T())
+	s.executionDataTracker = subscriptionmock.NewExecutionDataTracker(s.T())
 
 	conf := Config{
 		ClientSendTimeout:       subscription.DefaultSendTimeout,
@@ -231,30 +231,28 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		s.registersAsync,
 		s.eventsIndex,
 		false,
-		s.chainStateTracker,
+		s.executionDataTracker,
 	)
 	require.NoError(s.T(), err)
 
-	// create real chain state tracker to use GetStartHeight from it, instead of mocking
-	s.chainStateTrackerReal, err = subscription.NewChainStateTracker(
+	// create real execution data tracker to use GetStartHeight from it, instead of mocking
+	s.executionDataTrackerReal, err = subscription.NewExecutionDataTracker(
 		s.state,
 		s.rootBlock.Header.Height,
 		s.headers,
 		s.rootBlock.Header.Height,
-		s.broadcaster,
 		s.eventsIndex,
 		false,
 	)
 	require.NoError(s.T(), err)
 
-	s.chainStateTracker.On(
+	s.executionDataTracker.On(
 		"GetStartHeight",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
-		mock.Anything,
-	).Return(func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error) {
-		return s.chainStateTrackerReal.GetStartHeight(ctx, startBlockID, startHeight, blockStatus)
+	).Return(func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
+		return s.executionDataTrackerReal.GetStartHeight(ctx, startBlockID, startHeight)
 	}, nil).Maybe()
 }
 
@@ -296,8 +294,8 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 	execData := s.execDataMap[block.ID()]
 
 	// notify backend block is available
-	s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).
-		Return(block.Header.Height, nil)
+	s.executionDataTracker.On("GetHighestHeight").
+		Return(block.Header.Height)
 
 	var err error
 	s.Run("happy path TestGetExecutionDataByBlockID success", func() {
@@ -373,8 +371,8 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 			// this simulates a subscription on a past block
 			for i := 0; i <= test.highestBackfill; i++ {
 				s.T().Logf("backfilling block %d", i)
-				s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).
-					Return(s.blocks[i].Header.Height, nil)
+				s.executionDataTracker.On("GetHighestHeight").
+					Return(s.blocks[i].Header.Height)
 			}
 
 			subCtx, subCancel := context.WithCancel(ctx)
@@ -388,9 +386,9 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 				// simulate new exec data received.
 				// exec data for all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
-					s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).Unset()
-					s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).
-						Return(b.Header.Height, nil)
+					s.executionDataTracker.On("GetHighestHeight").Unset()
+					s.executionDataTracker.On("GetHighestHeight").
+						Return(b.Header.Height)
 					s.broadcaster.Publish()
 				}
 

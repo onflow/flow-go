@@ -47,20 +47,20 @@ import (
 // on the same port
 type SameGRPCPortTestSuite struct {
 	suite.Suite
-	state             *protocol.State
-	snapshot          *protocol.Snapshot
-	epochQuery        *protocol.EpochQuery
-	log               zerolog.Logger
-	net               *network.EngineRegistry
-	request           *module.Requester
-	collClient        *accessmock.AccessAPIClient
-	execClient        *accessmock.ExecutionAPIClient
-	me                *module.Local
-	chainID           flow.ChainID
-	metrics           *metrics.NoopCollector
-	rpcEng            *rpc.Engine
-	stateStreamEng    *statestreambackend.Engine
-	chainStateTracker subscription.ChainStateTracker
+	state                *protocol.State
+	snapshot             *protocol.Snapshot
+	epochQuery           *protocol.EpochQuery
+	log                  zerolog.Logger
+	net                  *network.EngineRegistry
+	request              *module.Requester
+	collClient           *accessmock.AccessAPIClient
+	execClient           *accessmock.ExecutionAPIClient
+	me                   *module.Local
+	chainID              flow.ChainID
+	metrics              *metrics.NoopCollector
+	rpcEng               *rpc.Engine
+	stateStreamEng       *statestreambackend.Engine
+	executionDataTracker subscription.ExecutionDataTracker
 
 	// storage
 	blocks       *storagemock.Blocks
@@ -242,12 +242,11 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 
 	eventIndexer := index.NewEventsIndex(suite.events)
 
-	suite.chainStateTracker, err = subscription.NewChainStateTracker(
+	suite.executionDataTracker, err = subscription.NewExecutionDataTracker(
 		suite.state,
 		rootBlock.Header.Height,
 		suite.headers,
 		rootBlock.Header.Height,
-		suite.broadcaster,
 		eventIndexer,
 		false,
 	)
@@ -266,7 +265,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		suite.registers,
 		eventIndexer,
 		false,
-		suite.chainStateTracker,
+		suite.executionDataTracker,
 	)
 	assert.NoError(suite.T(), err)
 
