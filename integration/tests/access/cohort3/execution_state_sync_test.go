@@ -205,12 +205,5 @@ func (s *ExecutionStateSyncSuite) nodeExecutionDataStore(node *testnet.Container
 	ds, err := badgerds.NewDatastore(filepath.Join(node.ExecutionDataDBPath(), "blobstore"), &badgerds.DefaultOptions)
 	require.NoError(s.T(), err, "could not get execution datastore")
 
-	go func() {
-		<-s.ctx.Done()
-		if err := ds.Close(); err != nil {
-			s.T().Logf("could not close execution data datastore: %v", err)
-		}
-	}()
-
 	return execution_data.NewExecutionDataStore(blobs.NewBlobstore(ds), execution_data.DefaultSerializer)
 }
