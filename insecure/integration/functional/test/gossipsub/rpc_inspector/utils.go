@@ -44,7 +44,7 @@ func randomClusterPrefixedTopic() channels.Topic {
 func randomClusterPrefixedTopics(n int) []string {
 	topics := make([]string, n)
 	for i := 0; i < n; i++ {
-		topics[i] = channels.Topic(channels.SyncCluster(flow.ChainID(fmt.Sprintf("%d", rand.Uint64())))).String()
+		topics[i] = randomClusterPrefixedTopic().String()
 	}
 	return topics
 }
