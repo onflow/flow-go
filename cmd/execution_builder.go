@@ -209,7 +209,8 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("stop control", exeNode.LoadStopControl).
 		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
 		// disable execution data pruner for now, since storehouse is going to need the execution data
-		// for recovery, will re-visit this once storehouse has implemented new WAL for checkpoint file of
+		// for recovery,
+		// TODO: will re-visit this once storehouse has implemented new WAL for checkpoint file of
 		// payloadless trie.
 		// Component("execution data pruner", exeNode.LoadExecutionDataPruner).
 		Component("blob service", exeNode.LoadBlobService).
