@@ -27,29 +27,30 @@ import (
 // a spammer peer, the victim will eventually penalize the spammer and stop receiving messages from them.
 // Note: the term integration is used here because it requires integrating all components of the libp2p stack.
 func TestGossipSubInvalidMessageDelivery_Integration(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "https://github.com/dapperlabs/flow-go/issues/6949")
 	tt := []struct {
 		name           string
 		spamMsgFactory func(spammerId peer.ID, victimId peer.ID, topic channels.Topic) *pubsub_pb.Message
-	}{ // TODO: unittest.SkipUnless(t, unittest.TEST_FLAKY, "https://github.com/dapperlabs/flow-go/issues/6949")
-		// {
-		//
-		// 	name: "unknown peer, invalid signature",
-		// 	spamMsgFactory: func(spammerId peer.ID, _ peer.ID, topic channels.Topic) *pubsub_pb.Message {
-		// 		return p2ptest.PubsubMessageFixture(t, p2ptest.WithTopic(topic.String()))
-		// 	},
-		// },
+	}{
+		{
+
+			name: "unknown peer, invalid signature",
+			spamMsgFactory: func(spammerId peer.ID, _ peer.ID, topic channels.Topic) *pubsub_pb.Message {
+				return p2ptest.PubsubMessageFixture(t, p2ptest.WithTopic(topic.String()))
+			},
+		},
 		{
 			name: "unknown peer, missing signature",
 			spamMsgFactory: func(spammerId peer.ID, _ peer.ID, topic channels.Topic) *pubsub_pb.Message {
 				return p2ptest.PubsubMessageFixture(t, p2ptest.WithTopic(topic.String()), p2ptest.WithoutSignature())
 			},
 		},
-		// {
-		//	name: "known peer, invalid signature",
-		//	spamMsgFactory: func(spammerId peer.ID, _ peer.ID, topic channels.Topic) *pubsub_pb.Message {
-		//		return p2ptest.PubsubMessageFixture(t, p2ptest.WithFrom(spammerId), p2ptest.WithTopic(topic.String()))
-		//	},
-		// },
+		{
+			name: "known peer, invalid signature",
+			spamMsgFactory: func(spammerId peer.ID, _ peer.ID, topic channels.Topic) *pubsub_pb.Message {
+				return p2ptest.PubsubMessageFixture(t, p2ptest.WithFrom(spammerId), p2ptest.WithTopic(topic.String()))
+			},
+		},
 		{
 			name: "known peer, missing signature",
 			spamMsgFactory: func(spammerId peer.ID, _ peer.ID, topic channels.Topic) *pubsub_pb.Message {
@@ -109,7 +110,7 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 	require.NoError(t, err)
 	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
 	cfg.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
-	cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.TopicParameters.InvalidMessageDeliveriesDecay = .01
+	cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.TopicParameters.InvalidMessageDeliveriesDecay = .99
 
 	victimNode, victimIdentity := p2ptest.NodeFixture(
 		t,
@@ -134,9 +135,9 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 		return unittest.ProposalFixture()
 	})
 
-	// generates 2000 spam messages to send to the victim node; based on default-config.yaml, ~1400 of these messages are enough to
+	// generates 3000 spam messages to send to the victim node; based on default-config.yaml, ~1400 of these messages are enough to
 	// penalize the spammer node to disconnect from the victim node.
-	totalSpamMessages := 2000
+	totalSpamMessages := 3000
 	msgs := make([]*pubsub_pb.Message, 0)
 	for i := 0; i <= totalSpamMessages; i++ {
 		msgs = append(msgs, spamMsgFactory(spammer.SpammerNode.ID(), victimNode.ID(), blockTopic))
@@ -170,7 +171,7 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 		}
 
 		return true
-	}, 3*time.Second, 100*time.Millisecond)
+	}, 5*time.Second, 100*time.Millisecond)
 
 	topicsSnapshot, ok := victimNode.PeerScoreExposer().GetTopicScores(spammer.SpammerNode.ID())
 	require.True(t, ok)

@@ -25,6 +25,7 @@ const (
 	TokenTransferLoadType LoadType = "token-transfer"
 	AddKeysLoadType       LoadType = "add-keys"
 	EVMTransferLoadType   LoadType = "evm-transfer"
+	CreateAccount         LoadType = "create-account"
 )
 
 type LoadContext struct {
@@ -88,6 +89,8 @@ func CreateLoadType(log zerolog.Logger, t LoadType) Load {
 		return NewAddKeysLoad()
 	case EVMTransferLoadType:
 		return NewEVMTransferLoad(log)
+	case CreateAccount:
+		return NewCreateAccountLoad()
 	default:
 		panic("unknown load type")
 	}
