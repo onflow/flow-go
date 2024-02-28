@@ -25,7 +25,7 @@ require (
 	github.com/onflow/flow-emulator v0.59.0
 	github.com/onflow/flow-go v0.32.7
 	github.com/onflow/flow-go-sdk v0.41.18
-	github.com/onflow/flow-go/crypto v0.25.0
+	github.com/onflow/flow-go/crypto v0.24.10-0.20240228014058-3a6273445612
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231213135419-ae911cc351a2
 	github.com/plus3it/gorecurcopy v0.0.1
