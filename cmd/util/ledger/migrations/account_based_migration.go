@@ -73,51 +73,71 @@ func MigrateByAccount(
 		return allPayloads, nil
 	}
 
-	for i, migrator := range migrations {
-		if err := migrator.InitMigration(
-			log.With().
-				Int("migration_index", i).
-				Logger(),
-			allPayloads,
-			nWorker,
-		); err != nil {
-			return nil, fmt.Errorf("could not init migration: %w", err)
-		}
-	}
-
 	log.Info().
 		Int("inner_migrations", len(migrations)).
 		Int("nWorker", nWorker).
 		Msgf("created account migrations")
 
-	defer func() {
-		for i, migrator := range migrations {
-			log.Info().
-				Int("migration_index", i).
-				Type("migration", migrator).
-				Msg("closing migration")
-			if err := migrator.Close(); err != nil {
-				log.Error().Err(err).Msg("error closing migration")
-			}
-		}
-	}()
-
 	// group the Payloads by account
 	accountGroups := util.GroupPayloadsByAccount(log, allPayloads, nWorker)
 
-	// migrate the Payloads under accounts
-	migrated, err := MigrateGroupConcurrently(log, migrations, accountGroups, nWorker)
-
-	if err != nil {
-		return nil, fmt.Errorf("could not migrate accounts: %w", err)
+	for i, migrator := range migrations {
+		err := migrator.InitMigration(
+			log.With().
+				Int("migration_index", i).
+				Logger(),
+			allPayloads,
+			nWorker,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not init migration: %w", err)
+		}
 	}
+
+	var migrated []*ledger.Payload
+	err := withMigrations(log, migrations, func() error {
+		var err error
+		// migrate the Payloads under accounts
+		migrated, err = MigrateGroupConcurrently(log, migrations, accountGroups, nWorker)
+		return err
+	})
 
 	log.Info().
 		Int("account_count", accountGroups.Len()).
 		Int("payload_count", len(allPayloads)).
 		Msgf("finished migrating Payloads")
 
+	if err != nil {
+		return nil, fmt.Errorf("could not migrate accounts: %w", err)
+	}
+
 	return migrated, nil
+}
+
+// withMigrations calls the given function and then closes the given migrations.
+func withMigrations(
+	log zerolog.Logger,
+	migrations []AccountBasedMigration,
+	f func() error,
+) (err error) {
+	defer func() {
+		for i, migrator := range migrations {
+			log.Info().
+				Int("migration_index", i).
+				Type("migration", migrator).
+				Msg("closing migration")
+			if cerr := migrator.Close(); cerr != nil {
+				log.Error().Err(cerr).Msg("error closing migration")
+				if err == nil {
+					// only set the error if it's not already set
+					// so that we don't overwrite the original error
+					err = cerr
+				}
+			}
+		}
+	}()
+
+	return f()
 }
 
 // MigrateGroupConcurrently migrate the Payloads in the given account groups.
@@ -284,6 +304,11 @@ func MigrateGroupConcurrently(
 
 	err := ctx.Err()
 	if err != nil {
+		cause := context.Cause(ctx)
+		if cause != nil {
+			err = cause
+		}
+
 		return nil, fmt.Errorf("failed to migrate payload: %w", err)
 	}
 

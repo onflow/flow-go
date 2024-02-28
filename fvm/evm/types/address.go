@@ -57,6 +57,15 @@ func (fa Address) Bytes() []byte {
 	return fa[:]
 }
 
+// String returns the hex encoding of the address
+// it returns empty string if address is empty
+func (fa Address) String() string {
+	if fa == EmptyAddress {
+		return ""
+	}
+	return fa.ToCommon().Hex()
+}
+
 // ToCommon returns the geth address
 func (fa Address) ToCommon() gethCommon.Address {
 	return gethCommon.Address(fa)
