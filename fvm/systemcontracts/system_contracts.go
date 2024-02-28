@@ -169,9 +169,10 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 		FungibleTokenAddress:              c.FungibleToken.Address.Hex(),
 		FungibleTokenMetadataViewsAddress: c.FungibleToken.Address.Hex(),
 
-		NonFungibleTokenAddress: c.NonFungibleToken.Address.Hex(),
-		MetadataViewsAddress:    c.MetadataViews.Address.Hex(),
-		ViewResolverAddress:     c.ViewResolver.Address.Hex(),
+		NonFungibleTokenAddress:         c.NonFungibleToken.Address.Hex(),
+		MetadataViewsAddress:            c.MetadataViews.Address.Hex(),
+		ViewResolverAddress:             c.ViewResolver.Address.Hex(),
+		FungibleTokenSwitchboardAddress: c.FungibleToken.Address.Hex(),
 	}
 }
 
