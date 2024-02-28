@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -45,12 +44,7 @@ var setupFeesTransactionTemplate string
 //go:embed scripts/setExecutionMemoryLimit.cdc
 var setExecutionMemoryLimit string
 
-func DeployTxFeesContractTransaction(service, fungibleToken, flowToken, storageFees, flowFees flow.Address) *flow.TransactionBody {
-	contract := contracts.FlowFees(
-		fungibleToken.HexWithPrefix(),
-		flowToken.HexWithPrefix(),
-		storageFees.HexWithPrefix(),
-	)
+func DeployTxFeesContractTransaction(flowFees, service flow.Address, contract []byte) *flow.TransactionBody {
 
 	return flow.NewTransactionBody().
 		SetScript([]byte(deployTxFeesTransactionTemplate)).

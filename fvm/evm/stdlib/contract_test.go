@@ -13,6 +13,7 @@ import (
 	cadenceStdlib "github.com/onflow/cadence/runtime/stdlib"
 	"github.com/onflow/cadence/runtime/tests/utils"
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
+	coreContractstemplates "github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -167,6 +168,16 @@ func deployContracts(
 
 	contractsAddressHex := contractsAddress.Hex()
 
+	env := coreContractstemplates.Environment{
+		ServiceAccountAddress:             contractsAddressHex,
+		ViewResolverAddress:               contractsAddressHex,
+		BurnerAddress:                     contractsAddressHex,
+		FungibleTokenAddress:              contractsAddressHex,
+		NonFungibleTokenAddress:           contractsAddressHex,
+		MetadataViewsAddress:              contractsAddressHex,
+		FungibleTokenMetadataViewsAddress: contractsAddressHex,
+	}
+
 	contracts := []struct {
 		name     string
 		code     []byte
@@ -183,39 +194,31 @@ func deployContracts(
 		{
 			name: "FungibleToken",
 			code: coreContracts.FungibleToken(
-				contractsAddressHex,
-				contractsAddressHex,
+				env,
 			),
 		},
 		{
 			name: "NonFungibleToken",
 			code: coreContracts.NonFungibleToken(
-				contractsAddressHex,
+				env,
 			),
 		},
 		{
 			name: "MetadataViews",
 			code: coreContracts.MetadataViews(
-				contractsAddressHex,
-				contractsAddressHex,
-				contractsAddressHex,
+				env,
 			),
 		},
 		{
 			name: "FungibleTokenMetadataViews",
 			code: coreContracts.FungibleTokenMetadataViews(
-				contractsAddressHex,
-				contractsAddressHex,
-				contractsAddressHex,
+				env,
 			),
 		},
 		{
 			name: "FlowToken",
 			code: coreContracts.FlowToken(
-				contractsAddressHex,
-				contractsAddressHex,
-				contractsAddressHex,
-				contractsAddressHex,
+				env,
 			),
 			deployTx: []byte(`
               transaction(name: String, code: String) {

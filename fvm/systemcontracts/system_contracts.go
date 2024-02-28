@@ -135,9 +135,10 @@ type SystemContracts struct {
 	FlowStorageFees     SystemContract
 
 	// token related contracts
-	FlowFees      SystemContract
-	FlowToken     SystemContract
-	FungibleToken SystemContract
+	FlowFees                   SystemContract
+	FlowToken                  SystemContract
+	FungibleToken              SystemContract
+	FungibleTokenMetadataViews SystemContract
 
 	// NFT related contracts
 	NonFungibleToken SystemContract
@@ -163,18 +164,14 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 		RandomBeaconHistoryAddress: c.RandomBeaconHistory.Address.Hex(),
 		StorageFeesAddress:         c.FlowStorageFees.Address.Hex(),
 
-		FlowFeesAddress:      c.FlowFees.Address.Hex(),
-		FlowTokenAddress:     c.FlowToken.Address.Hex(),
-		FungibleTokenAddress: c.FungibleToken.Address.Hex(),
+		FlowFeesAddress:                   c.FlowFees.Address.Hex(),
+		FlowTokenAddress:                  c.FlowToken.Address.Hex(),
+		FungibleTokenAddress:              c.FungibleToken.Address.Hex(),
+		FungibleTokenMetadataViewsAddress: c.FungibleToken.Address.Hex(),
 
-		// The following contracts dont exist on the template env yet
-		// that is not a problem, but they are still listed here for completeness.
-
-		// NonFungibleToken: c.NonFungibleToken.Address.Hex(),
-		// MetadataViews : c.MetadataViews.Address.Hex(),
-		// ViewResolver : c.ViewResolver.Address.Hex(),
-
-		// EVMAddress: c.EVM.Address.Hex(),
+		NonFungibleTokenAddress: c.NonFungibleToken.Address.Hex(),
+		MetadataViewsAddress:    c.MetadataViews.Address.Hex(),
+		ViewResolverAddress:     c.ViewResolver.Address.Hex(),
 	}
 }
 
