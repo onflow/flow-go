@@ -6,7 +6,7 @@
 FROM golang:1.20-bullseye AS build-setup
 
 RUN apt-get update
-RUN apt-get -y install zip apt-utils gcc-aarch64-linux-gnu
+RUN apt-get -y install zip cmake
 
 ## (2) Setup crypto dependencies
 FROM build-setup AS build-env
@@ -34,6 +34,11 @@ RUN ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
 ## (3) Build the production app binary
 FROM build-env as build-production
 WORKDIR /app
+
+RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=secret,id=git_creds,dst=/root/.netrc \
+    make crypto_setup_gopath
 
 ARG GOARCH=amd64
 # TAGS can be overriden to modify the go build tags (e.g. build without netgo)
