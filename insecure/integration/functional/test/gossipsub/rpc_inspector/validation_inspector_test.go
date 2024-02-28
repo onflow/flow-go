@@ -671,7 +671,7 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 		require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType)
 		require.Equal(t, unstakedPeerID, notification.PeerID)
 		require.True(t, validation.IsErrUnstakedPeer(notification.Error))
-		require.Equal(t, notification.MsgType, p2pmsg.CtrlMsgGraft)
+		require.Equal(t, notification.MsgType, p2pmsg.CtrlMsgRPC)
 
 		if count.Load() == 2 {
 			close(done)

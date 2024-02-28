@@ -214,7 +214,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 	if c.networkingType == network.PrivateNetwork && c.config.InspectionProcess.Inspect.RejectUnstakedPeers {
 		err := c.checkSenderIdentity(from)
 		if err != nil {
-			c.notificationConsumer.OnInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(from, p2pmsg.CtrlMsgGraft, err, 1, p2p.CtrlMsgNonClusterTopicType))
+			c.notificationConsumer.OnInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(from, p2pmsg.CtrlMsgRPC, err, 1, p2p.CtrlMsgNonClusterTopicType))
 			c.logger.
 				Error().
 				Err(err).

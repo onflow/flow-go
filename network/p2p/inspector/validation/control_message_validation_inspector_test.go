@@ -1291,7 +1291,7 @@ func TestInspection_Unstaked_Peer(t *testing.T) {
 	topic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
 	topicProviderOracle.UpdateTopics([]string{topic})
 	idProvider.On("ByPeerID", unstakedPeer).Return(nil, false).Once()
-	checkNotification := checkNotificationFunc(t, unstakedPeer, p2pmsg.CtrlMsgGraft, validation.IsErrUnstakedPeer, p2p.CtrlMsgNonClusterTopicType)
+	checkNotification := checkNotificationFunc(t, unstakedPeer, p2pmsg.CtrlMsgRPC, validation.IsErrUnstakedPeer, p2p.CtrlMsgNonClusterTopicType)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 	consumer.On("OnInvalidControlMessageNotification", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 	inspector.Start(signalerCtx)
