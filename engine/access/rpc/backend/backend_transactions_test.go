@@ -1024,7 +1024,7 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 	})
 }
 
-func (suite *Suite) checkTransactionResultResponse(
+func (suite *Suite) assertTransactionResultResponse(
 	err error,
 	response *acc.TransactionResult,
 	block flow.Block,
@@ -1142,7 +1142,7 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 	suite.execClient.On("GetTransactionErrorMessage", mock.Anything, exeEventReq).Return(exeEventResp, nil).Once()
 
 	response, err := backend.GetTransactionResult(context.Background(), txId, blockId, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0)
-	suite.checkTransactionResultResponse(err, response, block, txId, true, eventsForTx)
+	suite.assertTransactionResultResponse(err, response, block, txId, true, eventsForTx)
 }
 
 // TestTransactionByIndexFromStorage tests the retrieval of a transaction result (flow.TransactionResult) by index
@@ -1233,7 +1233,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	suite.execClient.On("GetTransactionErrorMessageByIndex", mock.Anything, exeEventReq).Return(exeEventResp, nil).Once()
 
 	response, err := backend.GetTransactionResultByIndex(context.Background(), blockId, txIndex, entities.EventEncodingVersion_JSON_CDC_V0)
-	suite.checkTransactionResultResponse(err, response, block, txId, true, eventsForTx)
+	suite.assertTransactionResultResponse(err, response, block, txId, true, eventsForTx)
 }
 
 // TestTransactionResultsByBlockIDFromStorage tests the retrieval of transaction results ([]flow.TransactionResult)
@@ -1337,6 +1337,6 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	// Assertions for each transaction result in the response
 	for i, responseResult := range response {
 		lightTx := lightTxResults[i]
-		suite.checkTransactionResultResponse(err, responseResult, block, lightTx.TransactionID, lightTx.Failed, eventsForTx)
+		suite.assertTransactionResultResponse(err, responseResult, block, lightTx.TransactionID, lightTx.Failed, eventsForTx)
 	}
 }

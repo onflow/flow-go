@@ -14,8 +14,8 @@ import (
 
 var _ state_synchronization.IndexReporter = (*EventsIndex)(nil)
 
-// EventsIndex implements a wrapper around `storage.Events` ensuring that needed data has been synced and is available to the client. 
-// Note: `EventsIndex` is created with empty report due to the next reasoning: 
+// EventsIndex implements a wrapper around `storage.Events` ensuring that needed data has been synced and is available to the client.
+// Note: `EventsIndex` is created with empty report due to the next reasoning:
 // When the index is initially bootstrapped, the indexer needs to load an execution state checkpoint from
 // disk and index all the data. This process can take more than 1 hour on some systems. Consequently, the Initialize
 // pattern is implemented to enable the Access API to start up and serve queries before the index is fully ready. During
@@ -119,6 +119,12 @@ func (e *EventsIndex) HighestIndexedHeight() (uint64, error) {
 	return reporter.HighestIndexedHeight()
 }
 
+// checkDataAvailability checks the availability of data at the given height by comparing it with the highest and lowest
+// indexed heights. If the height is beyond the indexed range, an error is returned.
+// Expected errors:
+//   - indexer.ErrIndexNotInitialized if the `TransactionResultsIndex` has not been initialized
+//   - storage.ErrHeightNotIndexed if the block at the provided height is not indexed yet
+//   - fmt.Errorf with custom message if the highest or lowest indexed heights cannot be retrieved from the reporter
 func (e *EventsIndex) checkDataAvailability(height uint64) error {
 	reporter, err := e.getReporter()
 	if err != nil {
@@ -144,6 +150,9 @@ func (e *EventsIndex) checkDataAvailability(height uint64) error {
 	return nil
 }
 
+// getReporter retrieves the current index reporter instance from the atomic pointer.
+// Expected errors:
+//   - indexer.ErrIndexNotInitialized if the reporter is not initialized
 func (e *EventsIndex) getReporter() (state_synchronization.IndexReporter, error) {
 	reporter := e.reporter.Load()
 	if reporter == nil {

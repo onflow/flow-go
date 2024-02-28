@@ -11,8 +11,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// TransactionResultsIndex implements a wrapper around `storage.LightTransactionResult` ensuring that needed data has been synced and is available to the client. 
-// Note: `TransactionResultsIndex` is created with empty report due to the next reasoning: 
+// TransactionResultsIndex implements a wrapper around `storage.LightTransactionResult` ensuring that needed data has been synced and is available to the client.
+// Note: `TransactionResultsIndex` is created with empty report due to the next reasoning:
 // When the index is initially bootstrapped, the indexer needs to load an execution state checkpoint from
 // disk and index all the data. This process can take more than 1 hour on some systems. Consequently, the Initialize
 // pattern is implemented to enable the Access API to start up and serve queries before the index is fully ready. During
@@ -104,6 +104,12 @@ func (t *TransactionResultsIndex) HighestIndexedHeight() (uint64, error) {
 	return reporter.HighestIndexedHeight()
 }
 
+// checkDataAvailability checks the availability of data at the given height by comparing it with the highest and lowest
+// indexed heights. If the height is beyond the indexed range, an error is returned.
+// Expected errors:
+//   - indexer.ErrIndexNotInitialized if the `TransactionResultsIndex` has not been initialized
+//   - storage.ErrHeightNotIndexed if the block at the provided height is not indexed yet
+//   - fmt.Errorf if the highest or lowest indexed heights cannot be retrieved from the reporter
 func (t *TransactionResultsIndex) checkDataAvailability(height uint64) error {
 	reporter, err := t.getReporter()
 	if err != nil {
@@ -129,6 +135,9 @@ func (t *TransactionResultsIndex) checkDataAvailability(height uint64) error {
 	return nil
 }
 
+// getReporter retrieves the current index reporter instance from the atomic pointer.
+// Expected errors:
+//   - indexer.ErrIndexNotInitialized if the reporter is not initialized
 func (t *TransactionResultsIndex) getReporter() (state_synchronization.IndexReporter, error) {
 	reporter := t.reporter.Load()
 	if reporter == nil {
