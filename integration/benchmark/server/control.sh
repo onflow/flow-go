@@ -18,7 +18,7 @@ commits_file="/opt/commits.recent"
 : > $commits_file
 
 # the load_types array stores the different types of loads that will be run on the commits
-load_types=("token-transfer" "evm-transfer")
+load_types=("token-transfer" "create-account" "ledger-heavy" "evm-transfer")
 
 # get the merge commits from the last week from master ordered by author date
 for commit in $(git log  --merges --first-parent  --format="%S:%H" origin/master --since '1 week' --author-date-order )
