@@ -983,6 +983,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 // The victim node is configured to use the GossipSubInspector to detect spam and the scoring system to mitigate spam.
 // The test ensures that the victim node is disconnected from the spammer node on the GossipSub mesh after the spam detection is triggered.
 func TestGossipSubSpamMitigationIntegration(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "https://github.com/dapperlabs/flow-go/issues/6949")
 	t.Run("gossipsub spam mitigation invalid grafts", func(t *testing.T) {
 		testGossipSubSpamMitigationIntegration(t, p2pmsg.CtrlMsgGraft)
 	})
@@ -1041,7 +1042,7 @@ func testGossipSubSpamMitigationIntegration(t *testing.T, msgType p2pmsg.Control
 		}
 	})
 
-	spamRpcCount := 10000           // total number of individual rpc messages to send
+	spamRpcCount := 50000           // total number of individual rpc messages to send
 	spamCtrlMsgCount := int64(1000) // total number of control messages to send on each RPC
 
 	// unknownTopic is an unknown topic to the victim node but shaped like a valid topic (i.e., it has the correct prefix and spork ID).
