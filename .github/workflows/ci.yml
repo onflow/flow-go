@@ -282,7 +282,7 @@ jobs:
         go-version: ${{ env.GO_VERSION }}
         cache: true
     - name: Build relic
-        run: make crypto_setup_gopath
+      run: make crypto_setup_gopath
     - name: Load cached Docker images
       uses: actions/cache@v3
       with:
