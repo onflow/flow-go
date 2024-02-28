@@ -211,7 +211,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 
 	// check peer identity when running private network
 	// sanity check: rpc inspection should be disabled on public networks
-	if c.networkingType == network.PrivateNetwork {
+	if c.networkingType == network.PrivateNetwork && c.config.InspectionProcess.Inspect.RejectUnstakedPeers {
 		err := c.checkSenderIdentity(from)
 		if err != nil {
 			c.notificationConsumer.OnInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(from, p2pmsg.CtrlMsgGraft, err, 1, p2p.CtrlMsgNonClusterTopicType))

@@ -1506,6 +1506,56 @@ func TestControlMessageValidationInspector_InspectionConfigToggle(t *testing.T) 
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
 
+	t.Run("should not check identity when reject-unstaked-peers is false", func(t *testing.T) {
+		inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+			// disable inspector for all control message types
+			params.Config.InspectionProcess.Inspect.RejectUnstakedPeers = false
+		})
+
+		// notification consumer should never be called when inspection is disabled
+		defer consumer.AssertNotCalled(t, "OnInvalidControlMessageNotification")
+		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
+		rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(true).Maybe()
+
+		from := unittest.PeerIdFixture(t)
+
+		defer idProvider.AssertNotCalled(t, "ByPeerID", from)
+		inspector.Start(signalerCtx)
+
+		require.NoError(t, inspector.Inspect(from, unittest.P2PRPCFixture()))
+
+		time.Sleep(time.Second)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
+	})
+
+	t.Run("should check identity when reject-unstaked-peers is true", func(t *testing.T) {
+		inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+			// disable inspector for all control message types
+			params.Config.InspectionProcess.Inspect.RejectUnstakedPeers = true
+		})
+
+		// notification consumer should never be called when inspection is disabled
+		consumer.On("OnInvalidControlMessageNotification", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(func(args mock.Arguments) {
+			notification, ok := args.Get(0).(*p2p.InvCtrlMsgNotif)
+			require.True(t, ok)
+			require.True(t, validation.IsErrUnstakedPeer(notification.Error))
+		})
+		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
+		rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(true).Maybe()
+
+		from := unittest.PeerIdFixture(t)
+
+		idProvider.On("ByPeerID", from).Return(nil, false).Once()
+		inspector.Start(signalerCtx)
+
+		require.Error(t, inspector.Inspect(from, unittest.P2PRPCFixture()))
+
+		time.Sleep(time.Second)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
+	})
+
 	t.Run("should not perform inspection when disabled for each individual control message type directly", func(t *testing.T) {
 		numOfMsgs := 5000
 
