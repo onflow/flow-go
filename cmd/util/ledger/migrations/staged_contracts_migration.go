@@ -123,9 +123,12 @@ func (m *StagedContractsMigration) RegisterContractChange(change StagedContract)
 
 	address := change.Address
 
-	if address == common.ZeroAddress {
+	chain := m.chainID.Chain()
+
+	if _, err := chain.IndexFromAddress(flow.Address(address)); err != nil {
 		m.log.Fatal().Msgf(
-			"invalid zero address for contract update: %s.%s",
+			"invalid contract update: invalid address for chain %s: %s (%s)",
+			m.chainID,
 			address.HexWithPrefix(),
 			change.Name,
 		)
