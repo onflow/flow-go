@@ -2,22 +2,21 @@ package upgrades
 
 import (
 	"context"
-	"github.com/coreos/go-semver/semver"
-	"github.com/onflow/flow-go/model/flow"
 	"testing"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
-
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type ProtocolVersionUpgradeSuite struct {
 	Suite
 }
 
-func (s *ProtocolVersionUpgradeSuite) TestEmittingVersionBeaconServiceEvent() {
+func (s *ProtocolVersionUpgradeSuite) TestProtocolStateVersionUpgradeServiceEvent() {
 
 	ctx := context.Background()
 
@@ -26,11 +25,10 @@ func (s *ProtocolVersionUpgradeSuite) TestEmittingVersionBeaconServiceEvent() {
 		NodeVersionBeaconAddress: serviceAddress.String(),
 	}
 
-
 	newProtocolVersion := uint64(2) // TODO doesn't matter for now
 	activeView := uint64(0)         // active immediately
 
-	txResult := s.sendUpgradeProtocolVersionTx( ctx, env, newProtocolVersion, activeView)
+	txResult := s.sendUpgradeProtocolVersionTx(ctx, env, newProtocolVersion, activeView)
 	s.Require().NoError(txResult.Error)
 
 	sealed := s.ReceiptState.WaitForReceiptFromAny(
@@ -47,12 +45,11 @@ func (s *ProtocolVersionUpgradeSuite) TestEmittingVersionBeaconServiceEvent() {
 func (s *ProtocolVersionUpgradeSuite) sendUpgradeProtocolVersionTx(
 	ctx context.Context,
 	env templates.Environment,
-	newProtocolVersion, activeView uint64
+	newProtocolVersion, activeView uint64,
 ) *sdk.TransactionResult {
 	serviceAddress := s.net.Root().Header.ChainID.Chain().ServiceAddress()
 
 	script := templates.GenerateSetProtocolStateVersionScript(env)
-
 
 	latestBlockId, err := s.AccessClient().GetLatestBlockID(ctx)
 	s.Require().NoError(err)
