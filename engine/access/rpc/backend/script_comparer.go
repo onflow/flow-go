@@ -87,8 +87,6 @@ func (c *scriptResultComparison) compare(execResult, localResult *scriptResult) 
 // more than 2x
 func (c *scriptResultComparison) logDurationDifference(execResult *scriptResult, localResult *scriptResult) {
 
-	c.logComparison(execResult, localResult, "dump", true)
-
 	// don't log if the script execution took less than a second on the AN
 	if localResult.duration.Milliseconds() < 1000 || execResult.duration.Milliseconds() == 0 {
 		return
@@ -96,12 +94,12 @@ func (c *scriptResultComparison) logDurationDifference(execResult *scriptResult,
 
 	speedup := float64(localResult.duration.Milliseconds()) / float64(execResult.duration.Milliseconds())
 	// if the script execution on execution node was more than 2x faster
-	if speedup > 2.0 {
+	if speedup > 1.0 {
 		c.logComparison(execResult, localResult,
 			"access node script execution was slower", true)
 	} else {
 		// if the script execution on the access node was more than 2x faster
-		if speedup < 0.5 {
+		if speedup < 0.99 {
 			c.logComparison(execResult, localResult,
 				"access node script execution was faster", true)
 		}
