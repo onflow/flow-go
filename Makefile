@@ -49,6 +49,11 @@ include crypto_adx_flag.mk
 noop:
 	@echo "This is a no-op target"
 
+# setup the crypto package under the GOPATH: needed to test packages importing flow-go/crypto
+.PHONY: crypto_setup_gopath
+crypto_setup_gopath:
+	bash crypto_setup.sh
+
 cmd/collection/collection:
 	CGO_CFLAGS=$(CRYPTO_FLAG) go build -o cmd/collection/collection cmd/collection/main.go
 
