@@ -15,7 +15,7 @@ var (
 
 var Cmd = &cobra.Command{
 	Use:   "addresses",
-	Short: "Prints the version of the utils tool",
+	Short: "generate addresses for a chain",
 	Run:   run,
 }
 
