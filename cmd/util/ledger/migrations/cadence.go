@@ -209,7 +209,7 @@ func NewCadence1ContractsMigrations(
 	stagedContracts []StagedContract,
 ) []ledger.Migration {
 
-	stagedContractsMigration := NewStagedContractsMigration(chainID).
+	stagedContractsMigration := NewStagedContractsMigration(chainID, log).
 		WithContractUpdateValidation()
 
 	stagedContractsMigration.RegisterContractUpdates(stagedContracts)
@@ -221,6 +221,7 @@ func NewCadence1ContractsMigrations(
 			[]AccountBasedMigration{
 				NewSystemContactsMigration(
 					chainID,
+					log,
 					SystemContractChangesOptions{
 						EVM: evmContractChange,
 					},

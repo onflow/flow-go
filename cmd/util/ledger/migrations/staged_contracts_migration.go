@@ -49,9 +49,10 @@ type Contract struct {
 
 var _ AccountBasedMigration = &StagedContractsMigration{}
 
-func NewStagedContractsMigration(chainID flow.ChainID) *StagedContractsMigration {
+func NewStagedContractsMigration(chainID flow.ChainID, log zerolog.Logger) *StagedContractsMigration {
 	return &StagedContractsMigration{
 		name:                "StagedContractsMigration",
+		log:                 log,
 		chainID:             chainID,
 		stagedContracts:     map[common.Address]map[flow.RegisterID]Contract{},
 		contractsByLocation: map[common.Location][]byte{},
@@ -77,7 +78,7 @@ func (m *StagedContractsMigration) Close() error {
 		var sb strings.Builder
 		sb.WriteString("failed to find all contract registers that need to be changed:\n")
 		for address, contracts := range m.stagedContracts {
-			_, _ = fmt.Fprintf(&sb, "- address: %s\n", address)
+			_, _ = fmt.Fprintf(&sb, "- address: %s\n", address.HexWithPrefix())
 			for registerID := range contracts {
 				_, _ = fmt.Fprintf(&sb, "  - %s\n", flow.RegisterIDContractName(registerID))
 			}
