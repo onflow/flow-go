@@ -122,6 +122,15 @@ func (m *StagedContractsMigration) RegisterContractChange(change StagedContract)
 	defer m.mutex.Unlock()
 
 	address := change.Address
+
+	if address == common.ZeroAddress {
+		m.log.Fatal().Msgf(
+			"invalid zero address for contract update: %s.%s",
+			address.HexWithPrefix(),
+			change.Name,
+		)
+	}
+
 	if _, ok := m.stagedContracts[address]; !ok {
 		m.stagedContracts[address] = map[flow.RegisterID]Contract{}
 	}
