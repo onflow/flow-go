@@ -112,8 +112,8 @@ github.com/Shopify/toxiproxy v2.1.4+incompatible/go.mod h1:OXgGpZ6Cli1/URJOF1DMx
 github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6/go.mod h1:3eOhrUMpNV+6aFIbp5/iudMxNCF27Vw2OZgy4xEx0Fg=
 github.com/StackExchange/wmi v1.2.1 h1:VIkavFPXSjcnS+O8yTq7NI32k0R5Aj+v39y29VYDOSA=
 github.com/StackExchange/wmi v1.2.1/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9SBzvHz7e8=
-github.com/UlyanaAndrukhiv/flow-emulator v0.0.0-20240207154113-bc5ae380bb18 h1:bLRZKAZmVUsKKZB9/68Eb9RcLGqCUzGu0Q0ZAYj/PKE=
-github.com/UlyanaAndrukhiv/flow-emulator v0.0.0-20240207154113-bc5ae380bb18/go.mod h1:AUYfq/b0rQ+TEW8YCU+OtXARUimvkTeT32+0Mjmn/+k=
+github.com/UlyanaAndrukhiv/flow-emulator v0.0.0-20240228124502-ba4dc69fc437 h1:CuYIQ3oYmoo452Zq6rkXg9RAB4LJEgpUfUWVV72MKQQ=
+github.com/UlyanaAndrukhiv/flow-emulator v0.0.0-20240228124502-ba4dc69fc437/go.mod h1:cjs9H46Cii1J+4FPusBHNwhApxWjBinTvmjMdcL6cFU=
 github.com/UlyanaAndrukhiv/flow/protobuf/go/flow v0.0.0-20240228104423-1cfc3adda41e h1:uZBDx/MCt8wTSrNup/8F9hBezrN7+RK75+JbWr7PDjw=
 github.com/UlyanaAndrukhiv/flow/protobuf/go/flow v0.0.0-20240228104423-1cfc3adda41e/go.mod h1:NA2pX2nw8zuaxfKphhKsk00kWLwfd+tv8mS23YXO4Sk=
 github.com/VictoriaMetrics/fastcache v1.5.3/go.mod h1:+jv9Ckb+za/P1ZRg/sulP5Ni1v49daAVERr0H3CuscE=
