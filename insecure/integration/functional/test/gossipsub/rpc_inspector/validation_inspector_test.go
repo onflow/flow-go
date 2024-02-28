@@ -672,7 +672,6 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	consumer.On("OnInvalidControlMessageNotification", mockery.Anything).Run(func(args mockery.Arguments) {
 		count.Inc()
 		notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
-		fmt.Println(notification.Error)
 		require.True(t, ok)
 		require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType)
 		require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
