@@ -781,6 +781,15 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 				builder.Storage.RegisterIndex = registers
 
+				collectionExecutedMetric, err := indexer.NewCollectionExecutedMetric(
+					builder.AccessMetrics,
+					builder.CollectionsToMarkFinalized,
+					builder.CollectionsToMarkExecuted,
+				)
+				if err != nil {
+					return nil, err
+				}
+
 				indexerCore, err := indexer.New(
 					builder.Logger,
 					metrics.NewExecutionStateIndexerCollector(),
@@ -791,9 +800,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.Storage.Collections,
 					builder.Storage.Transactions,
 					builder.Storage.LightTransactionResults,
-					builder.AccessMetrics,
-					builder.CollectionsToMarkFinalized,
-					builder.CollectionsToMarkExecuted,
+					collectionExecutedMetric,
 				)
 				if err != nil {
 					return nil, err

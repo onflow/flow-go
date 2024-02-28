@@ -167,8 +167,7 @@ func (s *scriptTestSuite) SetupTest() {
 		nil,
 		nil,
 		nil,
-		nil,
-		nil)
+	)
 	s.Require().NoError(err)
 
 	scripts, err := NewScripts(

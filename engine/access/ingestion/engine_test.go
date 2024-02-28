@@ -58,6 +58,8 @@ type Suite struct {
 	finalizedBlock *flow.Header
 	log            zerolog.Logger
 
+	collectionExecutedMetric *indexer.CollectionExecutedMetric
+
 	eng    *Engine
 	cancel context.CancelFunc
 }
@@ -114,6 +116,13 @@ func (s *Suite) SetupTest() {
 	collectionsToMarkExecuted, err := stdmap.NewTimes(100)
 	require.NoError(s.T(), err)
 	blocksToMarkExecuted, err := stdmap.NewTimes(100)
+	require.NoError(s.T(), err)
+
+	s.collectionExecutedMetric, err = indexer.NewCollectionExecutedMetric(
+		metrics.NewNoopCollector(),
+		collectionsToMarkFinalized,
+		collectionsToMarkExecuted,
+	)
 	require.NoError(s.T(), err)
 
 	eng, err := New(s.log, net, s.proto.state, s.me, s.request, s.blocks, s.headers, s.collections,
@@ -231,7 +240,7 @@ func (s *Suite) TestOnCollection() {
 		},
 	)
 
-	err := indexer.HandleCollection(&collection, s.collections, s.transactions, s.log)
+	err := indexer.HandleCollection(&collection, s.collections, s.transactions, s.log, s.collectionExecutedMetric)
 	require.NoError(s.T(), err)
 
 	// check that the collection was stored and indexed, and we stored all transactions
@@ -308,7 +317,7 @@ func (s *Suite) TestOnCollectionDuplicate() {
 		},
 	)
 
-	err := indexer.HandleCollection(&collection, s.collections, s.transactions, s.log)
+	err := indexer.HandleCollection(&collection, s.collections, s.transactions, s.log, s.collectionExecutedMetric)
 	require.NoError(s.T(), err)
 
 	// check that the collection was stored and indexed, and we stored all transactions

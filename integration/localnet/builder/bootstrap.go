@@ -459,6 +459,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		fmt.Sprintf("--upstream-node-addresses=%s:%s", testnet.PrimaryAN, testnet.GRPCSecurePort),
 		fmt.Sprintf("--upstream-node-public-keys=%s", agPublicKey),
 		"--execution-data-indexing-enabled=true",
+		"--execution-state-dir=/data/execution-state",
 		fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),
 		"--bind=0.0.0.0:0",
 		fmt.Sprintf("--rpc-addr=%s:%s", observerName, testnet.GRPCPort),

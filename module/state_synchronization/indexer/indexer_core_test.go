@@ -184,9 +184,15 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 	collectionsToMarkExecuted, err := stdmap.NewTimes(100)
 	require.NoError(i.t, err)
 
+	collectionExecutedMetric, err := NewCollectionExecutedMetric(
+		metrics.NewNoopCollector(),
+		collectionsToMarkFinalized,
+		collectionsToMarkExecuted,
+	)
+	require.NoError(i.t, err)
+
 	indexer, err := New(zerolog.New(os.Stdout), metrics.NewNoopCollector(), db, i.registers, i.headers, i.events,
-		i.collections, i.transactions, i.results, metrics.NewNoopCollector(),
-		collectionsToMarkFinalized, collectionsToMarkExecuted)
+		i.collections, i.transactions, i.results, collectionExecutedMetric)
 	require.NoError(i.t, err)
 	i.indexer = indexer
 	return i
@@ -649,8 +655,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	t.Run("Single Index Value Changes", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(logger, metrics, db, registers,
-				nil, nil, nil, nil, nil, metrics,
-				nil, nil)
+				nil, nil, nil, nil, nil, nil)
 			require.NoError(t, err)
 
 			values := [][]byte{[]byte("1"), []byte("1"), []byte("2"), []byte("3"), []byte("4")}
@@ -672,8 +677,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	t.Run("Missing Register", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(logger, metrics, db, registers,
-				nil, nil, nil, nil, nil, metrics,
-				nil, nil)
+				nil, nil, nil, nil, nil, nil)
 			require.NoError(t, err)
 
 			value, err := index.RegisterValue(registerID, 0)
@@ -688,8 +692,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	t.Run("Single Index Value At Later Heights", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(logger, metrics, db, registers,
-				nil, nil, nil, nil, nil, metrics,
-				nil, nil)
+				nil, nil, nil, nil, nil, nil)
 			require.NoError(t, err)
 
 			storeValues := [][]byte{[]byte("1"), []byte("2")}
@@ -721,8 +724,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	t.Run("Empty and Nil Payloads", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(logger, metrics, db, registers,
-				nil, nil, nil, nil, nil, metrics,
-				nil, nil)
+				nil, nil, nil, nil, nil, nil)
 			require.NoError(t, err)
 
 			require.NoError(t, index.indexRegisters(map[ledger.Path]*ledger.Payload{}, 1))

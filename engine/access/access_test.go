@@ -685,10 +685,17 @@ func (suite *Suite) TestGetSealedTransaction() {
 		}
 		ingestEng.OnFinalizedBlock(mb)
 
+		collectionExecutedMetric, err := indexer.NewCollectionExecutedMetric(
+			metrics,
+			collectionsToMarkFinalized,
+			collectionsToMarkExecuted,
+		)
+		require.NoError(suite.T(), err)
+
 		// 3. Request engine is used to request missing collection
 		suite.request.On("EntityByID", collection.ID(), mock.Anything).Return()
 		// 4. Indexer HandleCollection receives the requested collection and all the execution receipts
-		err = indexer.HandleCollection(collection, collections, transactions, suite.log)
+		err = indexer.HandleCollection(collection, collections, transactions, suite.log, collectionExecutedMetric)
 		require.NoError(suite.T(), err)
 
 		for _, r := range executionReceipts {
@@ -827,8 +834,15 @@ func (suite *Suite) TestGetTransactionResult() {
 			}
 			ingestEng.OnFinalizedBlock(mb)
 
+			collectionExecutedMetric, err := indexer.NewCollectionExecutedMetric(
+				metrics,
+				collectionsToMarkFinalized,
+				collectionsToMarkExecuted,
+			)
+			require.NoError(suite.T(), err)
+
 			// Indexer HandleCollection receives the requested collection and all the execution receipts
-			err = indexer.HandleCollection(collection, collections, transactions, suite.log)
+			err = indexer.HandleCollection(collection, collections, transactions, suite.log, collectionExecutedMetric)
 			require.NoError(suite.T(), err)
 
 			for _, r := range executionReceipts {
