@@ -40,6 +40,7 @@ type backendSubscribeTransactions struct {
 	deriveTransactionStatus DeriveTransactionStatus
 }
 
+// TransactionSubscriptionMetadata holds data representing the status state for each transaction subscription
 type TransactionSubscriptionMetadata struct {
 	txID         flow.Identifier
 	txBody       *flow.TransactionBody
@@ -47,8 +48,12 @@ type TransactionSubscriptionMetadata struct {
 	blockWithTx  *flow.Block
 }
 
+// SendAndSubscribeTransactionStatuses subscribes to transaction status changes starting from the transaction reference block ID.
+// Expected errors:
+//   - subscription.NewFailedSubscription if any error returned by `b.getStartHeight` function, including context deadline
+//     exceeded or if `deriveTransactionStatus` function is not initialized.
 func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody) subscription.Subscription {
-	nextHeight, err := b.getStartHeight(tx.ReferenceBlockID, 0, flow.BlockStatusFinalized)
+	nextHeight, err := b.getStartHeight(ctx, tx.ReferenceBlockID, 0)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")
 	}
@@ -78,6 +83,8 @@ func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(ctx c
 	return sub
 }
 
+// backendSubscribeTransactions creates a function for handling transaction status subscriptions based on new block and
+// previous status state metadata.
 func (b *backendSubscribeTransactions) backendSubscribeTransactions(txInfo *TransactionSubscriptionMetadata) func(context.Context, uint64) (interface{}, error) {
 	return func(_ context.Context, height uint64) (interface{}, error) {
 		executed := txInfo.blockWithTx != nil
