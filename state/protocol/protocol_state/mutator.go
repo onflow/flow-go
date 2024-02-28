@@ -249,7 +249,14 @@ func (m *stateMutator) applyServiceEventsFromOrderedResults(results []*flow.Exec
 					dbUpdates = append(dbUpdates, m.commits.StoreTx(ev))
 				}
 			case *flow.VersionBeacon:
-				// do nothing for now
+			// do nothing for now
+			case *flow.ProtocolStateVersionUpgrade:
+				// for now, we will crash when we observe the event
+				// once the state machine is in place, we will need to validate that:
+				//   - upgrades to a version we are compatible with are completed
+				//   - upgrades to a version we are incompatible with cause a crash
+				fmt.Println("TODO DEBUG: found ProtocolStateVersionUpgrade, exiting")
+				return nil, irrecoverable.NewExceptionf("found ProtocolStateVersionUpgrade, exiting")
 			default:
 				return nil, fmt.Errorf("invalid service event type (type_name=%s, go_type=%T)", event.Type, ev)
 			}
