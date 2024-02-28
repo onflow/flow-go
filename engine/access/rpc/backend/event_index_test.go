@@ -48,7 +48,7 @@ func TestGetEvents(t *testing.T) {
 	err := eventsIndex.Initialize(&mockIndexReporter{})
 	require.NoError(t, err)
 
-	actualEvents, err := eventsIndex.GetEvents(header.ID(), header.Height)
+	actualEvents, err := eventsIndex.ByBlockID(header.ID(), header.Height)
 	require.NoError(t, err)
 
 	// output events should be in the same order as the expected events
