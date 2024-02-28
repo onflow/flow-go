@@ -300,11 +300,6 @@ func (h *ContractHandler) executeAndHandleCall(
 	bp.AppendTxHash(res.TxHash)
 	// TODO: in the future we might update the receipt hash here
 
-	blockHash, err := bp.Hash()
-	if err != nil {
-		return res, err
-	}
-
 	if totalSupplyDiff != nil {
 		if deductSupplyDiff {
 			bp.TotalSupply = new(big.Int).Sub(bp.TotalSupply, totalSupplyDiff)
@@ -314,6 +309,11 @@ func (h *ContractHandler) executeAndHandleCall(
 		} else {
 			bp.TotalSupply = new(big.Int).Add(bp.TotalSupply, totalSupplyDiff)
 		}
+	}
+
+	blockHash, err := bp.Hash()
+	if err != nil {
+		return res, err
 	}
 
 	// emit events
@@ -366,25 +366,32 @@ func (a *Account) Address() types.Address {
 
 // Nonce returns the nonce of this account
 //
-// TODO: we might need to meter computation for read only operations as well
-// currently the storage limits is enforced
+// Note: we don't meter any extra computation given reading data
+// from the storage already transalates into computation
 func (a *Account) Nonce() uint64 {
-	ctx, err := a.fch.getBlockContext()
+	nonce, err := a.nonce()
 	panicOnAnyError(err)
+	return nonce
+}
+
+func (a *Account) nonce() (uint64, error) {
+	ctx, err := a.fch.getBlockContext()
+	if err != nil {
+		return 0, err
+	}
 
 	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
-	panicOnAnyError(err)
+	if err != nil {
+		return 0, err
+	}
 
-	nonce, err := blk.NonceOf(a.address)
-	panicOnAnyError(err)
-
-	return nonce
+	return blk.NonceOf(a.address)
 }
 
 // Balance returns the balance of this account
 //
-// TODO: we might need to meter computation for read only operations as well
-// currently the storage limits is enforced
+// Note: we don't meter any extra computation given reading data
+// from the storage already transalates into computation
 func (a *Account) Balance() types.Balance {
 	bal, err := a.balance()
 	panicOnAnyError(err)
@@ -407,6 +414,9 @@ func (a *Account) balance() (types.Balance, error) {
 }
 
 // Code returns the code of this account
+//
+// Note: we don't meter any extra computation given reading data
+// from the storage already transalates into computation
 func (a *Account) Code() types.Code {
 	code, err := a.code()
 	panicOnAnyError(err)
@@ -427,13 +437,15 @@ func (a *Account) code() (types.Code, error) {
 }
 
 // CodeHash returns the code hash of this account
+//
+// Note: we don't meter any extra computation given reading data
+// from the storage already transalates into computation
 func (a *Account) CodeHash() []byte {
 	codeHash, err := a.codeHash()
 	panicOnAnyError(err)
 	return codeHash
 }
 
-// CodeHash returns the code hash of this account
 func (a *Account) codeHash() ([]byte, error) {
 	ctx, err := a.fch.getBlockContext()
 	if err != nil {
