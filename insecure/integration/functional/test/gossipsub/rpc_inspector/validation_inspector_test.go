@@ -1041,7 +1041,7 @@ func testGossipSubSpamMitigationIntegration(t *testing.T, msgType p2pmsg.Control
 		}
 	})
 
-	spamRpcCount := 1000            // total number of individual rpc messages to send
+	spamRpcCount := 10000           // total number of individual rpc messages to send
 	spamCtrlMsgCount := int64(1000) // total number of control messages to send on each RPC
 
 	// unknownTopic is an unknown topic to the victim node but shaped like a valid topic (i.e., it has the correct prefix and spork ID).
@@ -1075,7 +1075,6 @@ func testGossipSubSpamMitigationIntegration(t *testing.T, msgType p2pmsg.Control
 	var malformedTopicSpam []pubsub_pb.ControlMessage
 	var invalidSporkIDTopicSpam []pubsub_pb.ControlMessage
 	var duplicateTopicSpam []pubsub_pb.ControlMessage
-
 	switch msgType {
 	case p2pmsg.CtrlMsgGraft:
 		unknownTopicSpam = spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithGraft(spamRpcCount, unknownTopic.String()))
