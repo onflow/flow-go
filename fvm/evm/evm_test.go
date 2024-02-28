@@ -27,9 +27,10 @@ import (
 func TestEVMRun(t *testing.T) {
 	t.Parallel()
 
+	chain := flow.Emulator.Chain()
 	t.Run("testing EVM.run (happy case)", func(t *testing.T) {
+
 		t.Parallel()
-		chain := flow.Emulator.Chain()
 		RunWithNewEnvironment(t,
 			chain, func(
 				ctx fvm.Context,
@@ -43,6 +44,59 @@ func TestEVMRun(t *testing.T) {
 					`
 					import EVM from %s
 
+					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: AuthAccount) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let res = EVM.run(tx: tx, coinbase: coinbase)
+
+							assert(res.status == EVM.Status.successful, message: "unexpected status")
+							assert(res.errorCode == 0, message: "unexpected error code")
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				num := int64(12)
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "store", big.NewInt(num)),
+					big.NewInt(0),
+					uint64(100_000),
+					big.NewInt(0),
+				)
+
+				innerTx := cadence.NewArray(
+					ConvertToCadence(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					ConvertToCadence(testAccount.Address().Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				tx := fvm.Transaction(
+					flow.NewTransactionBody().
+						SetScript(code).
+						AddAuthorizer(sc.FlowServiceAccount.Address).
+						AddArgument(json.MustEncode(innerTx)).
+						AddArgument(json.MustEncode(coinbase)),
+					0)
+
+				state, output, err := vm.Run(
+					ctx,
+					tx,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				require.NotEmpty(t, state.WriteSet)
+
+				// append the state
+				snapshot = snapshot.Append(state)
+
+				// query the value
+				code = []byte(fmt.Sprintf(
+					`
+					import EVM from %s
 					access(all)
 					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
 						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
@@ -52,29 +106,24 @@ func TestEVMRun(t *testing.T) {
 					sc.EVMContract.Address.HexWithPrefix(),
 				))
 
-				num := int64(12)
-				txBytes := testAccount.PrepareSignAndEncodeTx(t,
+				innerTxBytes = testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
-					testContract.MakeCallData(t, "store", big.NewInt(num)),
+					testContract.MakeCallData(t, "retrieve"),
 					big.NewInt(0),
 					uint64(100_000),
 					big.NewInt(0),
 				)
 
-				tx := cadence.NewArray(
-					ConvertToCadence(txBytes),
+				innerTx = cadence.NewArray(
+					ConvertToCadence(innerTxBytes),
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
-				coinbase := cadence.NewArray(
-					ConvertToCadence(testAccount.Address().Bytes()),
-				).WithType(stdlib.EVMAddressBytesCadenceType)
-
 				script := fvm.Script(code).WithArguments(
-					json.MustEncode(tx),
+					json.MustEncode(innerTx),
 					json.MustEncode(coinbase),
 				)
 
-				_, output, err := vm.Run(
+				_, output, err = vm.Run(
 					ctx,
 					script,
 					snapshot)
@@ -85,6 +134,116 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue).Int64())
+			})
+	})
+
+	t.Run("testing EVM.run (failed)", func(t *testing.T) {
+		t.Parallel()
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: AuthAccount) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let res = EVM.run(tx: tx, coinbase: coinbase)
+
+							assert(res.status == EVM.Status.failed, message: "unexpected status")
+							// ExecutionErrCodeExecutionReverted
+							assert(res.errorCode == 306, message: "unexpected error code")
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				num := int64(12)
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "storeButRevert", big.NewInt(num)),
+					big.NewInt(0),
+					uint64(100_000),
+					big.NewInt(0),
+				)
+
+				innerTx := cadence.NewArray(
+					ConvertToCadence(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					ConvertToCadence(testAccount.Address().Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				tx := fvm.Transaction(
+					flow.NewTransactionBody().
+						SetScript(code).
+						AddAuthorizer(sc.FlowServiceAccount.Address).
+						AddArgument(json.MustEncode(innerTx)).
+						AddArgument(json.MustEncode(coinbase)),
+					0)
+
+				state, output, err := vm.Run(
+					ctx,
+					tx,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				require.NotEmpty(t, state.WriteSet)
+
+				snapshot = snapshot.Append(state)
+
+				// query the value
+				code = []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+					access(all)
+					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
+						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+						return EVM.run(tx: tx, coinbase: coinbase)
+					}
+				`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				innerTxBytes = testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "retrieve"),
+					big.NewInt(0),
+					uint64(100_000),
+					big.NewInt(0),
+				)
+
+				innerTx = cadence.NewArray(
+					ConvertToCadence(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				script := fvm.Script(code).WithArguments(
+					json.MustEncode(innerTx),
+					json.MustEncode(coinbase),
+				)
+
+				_, output, err = vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+				require.Equal(t, types.StatusSuccessful, res.Status)
+				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				require.Equal(t, int64(0), new(big.Int).SetBytes(res.ReturnedValue).Int64())
 			})
 	})
 }
