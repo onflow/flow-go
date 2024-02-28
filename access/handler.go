@@ -725,12 +725,12 @@ func (h *Handler) SubscribeBlocks(request *access.SubscribeBlocksRequest, stream
 	h.StreamCount.Add(1)
 	defer h.StreamCount.Add(-1)
 
-	startBlockID, blockStatus, err := h.getStartData(request.StartBlockId, request.BlockStatus)
+	startBlockID, startBlockHeight, blockStatus, err := h.getStartData(request.GetStartBlock(), request.GetBlockStatus())
 	if err != nil {
 		return status.Errorf(codes.InvalidArgument, "invalid argument: %v", err)
 	}
 
-	sub := h.api.SubscribeBlocks(stream.Context(), startBlockID, request.GetStartBlockHeight(), blockStatus)
+	sub := h.api.SubscribeBlocks(stream.Context(), startBlockID, startBlockHeight, blockStatus)
 	for {
 		v, ok := <-sub.Channel()
 		if !ok {
@@ -774,12 +774,12 @@ func (h *Handler) SubscribeBlockHeaders(request *access.SubscribeBlockHeadersReq
 	h.StreamCount.Add(1)
 	defer h.StreamCount.Add(-1)
 
-	startBlockID, blockStatus, err := h.getStartData(request.StartBlockId, request.BlockStatus)
+	startBlockID, startBlockHeight, blockStatus, err := h.getStartData(request.GetStartBlockHeader(), request.GetBlockStatus())
 	if err != nil {
 		return status.Errorf(codes.InvalidArgument, "invalid argument: %v", err)
 	}
 
-	sub := h.api.SubscribeBlockHeaders(stream.Context(), startBlockID, request.GetStartBlockHeight(), blockStatus)
+	sub := h.api.SubscribeBlockHeaders(stream.Context(), startBlockID, startBlockHeight, blockStatus)
 	for {
 		v, ok := <-sub.Channel()
 		if !ok {
@@ -828,12 +828,12 @@ func (h *Handler) SubscribeBlockDigests(request *access.SubscribeBlockDigestsReq
 	h.StreamCount.Add(1)
 	defer h.StreamCount.Add(-1)
 
-	startBlockID, blockStatus, err := h.getStartData(request.StartBlockId, request.BlockStatus)
+	startBlockID, startBlockHeight, blockStatus, err := h.getStartData(request.GetStartBlock(), request.GetBlockStatus())
 	if err != nil {
 		return status.Errorf(codes.InvalidArgument, "invalid argument: %v", err)
 	}
 
-	sub := h.api.SubscribeBlockDigests(stream.Context(), startBlockID, request.GetStartBlockHeight(), blockStatus)
+	sub := h.api.SubscribeBlockDigests(stream.Context(), startBlockID, startBlockHeight, blockStatus)
 	for {
 		v, ok := <-sub.Channel()
 		if !ok {
@@ -866,33 +866,32 @@ func (h *Handler) SubscribeBlockDigests(request *access.SubscribeBlockDigestsReq
 //
 // Returns:
 // - flow.Identifier: The start block id for searching.
+// - uint64: The start block height for searching.
 // - flow.BlockStatus: Block status.
 // - error: An error indicating the result of the operation, if any.
 // Errors:
 // - codes.InvalidArgument: If blockStatus is flow.BlockStatusUnknown, or startBlockID could not convert to flow.Identifier.
-func (h *Handler) getStartData(msgStartBlockID []byte, msgBlockStatus entities.BlockStatus) (flow.Identifier, flow.BlockStatus, error) {
-	startBlockID, err := h.getStartBlockID(msgStartBlockID)
-	if err != nil {
-		return flow.ZeroID, flow.BlockStatusUnknown, fmt.Errorf("invalid start block ID argument: %w", err)
+func (h *Handler) getStartData(msg *access.StartBlock, msgBlockStatus entities.BlockStatus) (flow.Identifier, uint64, flow.BlockStatus, error) {
+	var err error
+	var startBlockID = flow.ZeroID
+	var startBlockHeight uint64 = 0
+
+	switch s := msg.StartBlock.(type) {
+	case *access.StartBlock_BlockId:
+		startBlockID, err = convert.BlockID(s.BlockId)
+		if err != nil {
+			return flow.ZeroID, 0, flow.BlockStatusUnknown, fmt.Errorf("invalid start block ID argument: %w", err)
+		}
+	case *access.StartBlock_BlockHeight:
+		startBlockHeight = s.BlockHeight
 	}
 
 	blockStatus := convert.MessageToBlockStatus(msgBlockStatus)
 	err = checkBlockStatus(blockStatus)
 	if err != nil {
-		return flow.ZeroID, flow.BlockStatusUnknown, fmt.Errorf("invalid block status argument: %w", err)
+		return flow.ZeroID, 0, flow.BlockStatusUnknown, fmt.Errorf("invalid block status argument: %w", err)
 	}
-	return startBlockID, blockStatus, nil
-}
-
-// getStartBlockID converts a byte slice to a flow.Identifier.
-// It takes a byte slice representing a block ID and returns a flow.Identifier representing the processed block ID.
-// Errors:
-// - codes.InvalidArgument: If startBlockID could not convert to flow.Identifier.
-func (h *Handler) getStartBlockID(blockID []byte) (flow.Identifier, error) {
-	if len(blockID) == 0 {
-		return flow.ZeroID, nil
-	}
-	return convert.BlockID(blockID)
+	return startBlockID, startBlockHeight, blockStatus, nil
 }
 
 func (h *Handler) SendAndSubscribeTransactionStatuses(_ *access.SendAndSubscribeTransactionStatusesRequest, _ access.AccessAPI_SendAndSubscribeTransactionStatusesServer) error {

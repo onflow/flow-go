@@ -363,7 +363,7 @@ replace github.com/onflow/flow-go => ../
 replace github.com/onflow/flow-go/insecure => ../insecure
 
 //TODO: Remove when onflow/flow branch will be merged
-replace github.com/onflow/flow/protobuf/go/flow v0.3.7 => github.com/UlyanaAndrukhiv/flow/protobuf/go/flow v0.0.0-20240222111702-16e920d4210e
+replace github.com/onflow/flow/protobuf/go/flow v0.3.7 => github.com/UlyanaAndrukhiv/flow/protobuf/go/flow v0.0.0-20240228104423-1cfc3adda41e
 
 //TODO: Remove when it will be merged
 replace github.com/onflow/flow-emulator v0.58.1-0.20240130123529-733cc9417abc => github.com/UlyanaAndrukhiv/flow-emulator v0.0.0-20240207154113-bc5ae380bb18
