@@ -95,7 +95,6 @@ type Params struct {
 	Transactions              storage.Transactions
 	ExecutionReceipts         storage.ExecutionReceipts
 	ExecutionResults          storage.ExecutionResults
-	LightTransactionResults   storage.LightTransactionResults
 	ChainID                   flow.ChainID
 	AccessMetrics             module.AccessMetrics
 	ConnFactory               connection.ConnectionFactory
@@ -114,8 +113,10 @@ type Params struct {
 	BlockTracker              subscription.BlockTracker
 	SubscriptionParams        SubscriptionParams
 
-	EventsIndex *index.EventsIndex
-	UseIndex    bool
+	EventsIndex       *index.EventsIndex
+	UseIndex          bool
+	TxResultQueryMode IndexQueryMode
+	TxResultsIndex    *index.TransactionResultsIndex
 }
 
 type SubscriptionParams struct {
@@ -124,6 +125,8 @@ type SubscriptionParams struct {
 	ResponseLimit  float64
 	SendBufferSize int
 }
+
+var _ TransactionErrorMessage = (*Backend)(nil)
 
 // New creates backend instance
 func New(params Params) (*Backend, error) {
@@ -177,14 +180,17 @@ func New(params Params) (*Backend, error) {
 			scriptExecMode:    params.ScriptExecutionMode,
 		},
 		backendTransactions: backendTransactions{
+			TransactionsLocalDataProvider: TransactionsLocalDataProvider{
+				state:          params.State,
+				collections:    params.Collections,
+				blocks:         params.Blocks,
+				eventsIndex:    params.EventsIndex,
+				txResultsIndex: params.TxResultsIndex,
+			},
 			log:                  params.Log,
 			staticCollectionRPC:  params.CollectionRPC,
-			state:                params.State,
 			chainID:              params.ChainID,
-			collections:          params.Collections,
-			blocks:               params.Blocks,
 			transactions:         params.Transactions,
-			results:              params.LightTransactionResults,
 			executionReceipts:    params.ExecutionReceipts,
 			transactionValidator: configureTransactionValidator(params.State, params.ChainID),
 			transactionMetrics:   params.AccessMetrics,
@@ -194,6 +200,7 @@ func New(params Params) (*Backend, error) {
 			nodeCommunicator:     params.Communicator,
 			txResultCache:        txResCache,
 			txErrorMessagesCache: txErrorMessagesCache,
+			txResultQueryMode:    params.TxResultQueryMode,
 		},
 		backendEvents: backendEvents{
 			log:               params.Log,
@@ -256,6 +263,8 @@ func New(params Params) (*Backend, error) {
 		b.backendSubscribeBlocks.getStartHeight = b.GetStartHeight
 		b.backendSubscribeBlocks.getHighestHeight = b.GetHighestHeight
 	}
+
+	b.backendTransactions.txErrorMessages = b
 
 	retry.SetBackend(b)
 
