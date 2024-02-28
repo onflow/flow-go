@@ -33,12 +33,6 @@ func TestDeduplicateContractNamesMigration(t *testing.T) {
 
 	accountStatus := environment.NewAccountStatus()
 	accountStatus.SetStorageUsed(1000)
-	accountStatusPayload := ledger.NewPayload(
-		convert.RegisterIDToLedgerKey(
-			flow.AccountStatusRegisterID(flow.ConvertAddress(address)),
-		),
-		accountStatus.ToBytes(),
-	)
 
 	contractNamesPayload := func(contractNames []byte) *ledger.Payload {
 		return ledger.NewPayload(
@@ -75,7 +69,7 @@ func TestDeduplicateContractNamesMigration(t *testing.T) {
 	t.Run("no contract names", func(t *testing.T) {
 		payloads, err := migration.MigrateAccount(ctx, address,
 			[]*ledger.Payload{
-				accountStatusPayload,
+				accountStatusPayload(address),
 			},
 		)
 
@@ -90,7 +84,7 @@ func TestDeduplicateContractNamesMigration(t *testing.T) {
 
 		payloads, err := migration.MigrateAccount(ctx, address,
 			[]*ledger.Payload{
-				accountStatusPayload,
+				accountStatusPayload(address),
 				contractNamesPayload(newContractNames),
 			},
 		)
@@ -111,7 +105,7 @@ func TestDeduplicateContractNamesMigration(t *testing.T) {
 
 		payloads, err := migration.MigrateAccount(ctx, address,
 			[]*ledger.Payload{
-				accountStatusPayload,
+				accountStatusPayload(address),
 				contractNamesPayload(newContractNames),
 			},
 		)
@@ -133,7 +127,7 @@ func TestDeduplicateContractNamesMigration(t *testing.T) {
 
 		payloads, err := migration.MigrateAccount(ctx, address,
 			[]*ledger.Payload{
-				accountStatusPayload,
+				accountStatusPayload(address),
 				contractNamesPayload(newContractNames),
 			},
 		)
@@ -154,7 +148,7 @@ func TestDeduplicateContractNamesMigration(t *testing.T) {
 
 		_, err = migration.MigrateAccount(ctx, address,
 			[]*ledger.Payload{
-				accountStatusPayload,
+				accountStatusPayload(address),
 				contractNamesPayload(newContractNames),
 			},
 		)
@@ -169,7 +163,7 @@ func TestDeduplicateContractNamesMigration(t *testing.T) {
 
 		payloads, err := migration.MigrateAccount(ctx, address,
 			[]*ledger.Payload{
-				accountStatusPayload,
+				accountStatusPayload(address),
 				contractNamesPayload(newContractNames),
 			},
 		)
@@ -206,7 +200,7 @@ func TestDeduplicateContractNamesMigration(t *testing.T) {
 
 		payloads, err := migration.MigrateAccount(ctx, address,
 			[]*ledger.Payload{
-				accountStatusPayload,
+				accountStatusPayload(address),
 				contractNamesPayload(newContractNames),
 			},
 		)
@@ -218,4 +212,15 @@ func TestDeduplicateContractNamesMigration(t *testing.T) {
 			require.Equal(t, uniqueContracts, len(contracts))
 		})
 	})
+}
+
+func accountStatusPayload(address common.Address) *ledger.Payload {
+	accountStatus := environment.NewAccountStatus()
+
+	return ledger.NewPayload(
+		convert.RegisterIDToLedgerKey(
+			flow.AccountStatusRegisterID(flow.ConvertAddress(address)),
+		),
+		accountStatus.ToBytes(),
+	)
 }
