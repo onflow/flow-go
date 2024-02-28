@@ -42,8 +42,10 @@ const DefaultLoggedScriptsCacheSize = 1_000_000
 // DefaultConnectionPoolSize is the default size for the connection pool to collection and execution nodes
 const DefaultConnectionPoolSize = 250
 
-var preferredENIdentifiers flow.IdentifierList
-var fixedENIdentifiers flow.IdentifierList
+var (
+	preferredENIdentifiers flow.IdentifierList
+	fixedENIdentifiers     flow.IdentifierList
+)
 
 // Backend implements the Access API.
 //
@@ -87,7 +89,6 @@ type Params struct {
 	Transactions              storage.Transactions
 	ExecutionReceipts         storage.ExecutionReceipts
 	ExecutionResults          storage.ExecutionResults
-	LightTransactionResults   storage.LightTransactionResults
 	ChainID                   flow.ChainID
 	AccessMetrics             module.AccessMetrics
 	ConnFactory               connection.ConnectionFactory
@@ -104,7 +105,11 @@ type Params struct {
 	ScriptExecutionMode       IndexQueryMode
 	EventQueryMode            IndexQueryMode
 	EventsIndex               *EventsIndex
+	TxResultQueryMode         IndexQueryMode
+	TxResultsIndex            *TransactionResultsIndex
 }
+
+var _ TransactionErrorMessage = (*Backend)(nil)
 
 // New creates backend instance
 func New(params Params) (*Backend, error) {
@@ -160,14 +165,17 @@ func New(params Params) (*Backend, error) {
 			scriptExecMode:    params.ScriptExecutionMode,
 		},
 		backendTransactions: backendTransactions{
+			TransactionsLocalDataProvider: TransactionsLocalDataProvider{
+				state:          params.State,
+				collections:    params.Collections,
+				blocks:         params.Blocks,
+				eventsIndex:    params.EventsIndex,
+				txResultsIndex: params.TxResultsIndex,
+			},
 			log:                  params.Log,
 			staticCollectionRPC:  params.CollectionRPC,
-			state:                params.State,
 			chainID:              params.ChainID,
-			collections:          params.Collections,
-			blocks:               params.Blocks,
 			transactions:         params.Transactions,
-			results:              params.LightTransactionResults,
 			executionReceipts:    params.ExecutionReceipts,
 			transactionValidator: configureTransactionValidator(params.State, params.ChainID),
 			transactionMetrics:   params.AccessMetrics,
@@ -177,6 +185,7 @@ func New(params Params) (*Backend, error) {
 			nodeCommunicator:     params.Communicator,
 			txResultCache:        txResCache,
 			txErrorMessagesCache: txErrorMessagesCache,
+			txResultQueryMode:    params.TxResultQueryMode,
 		},
 		backendEvents: backendEvents{
 			log:               params.Log,
@@ -224,6 +233,8 @@ func New(params Params) (*Backend, error) {
 		nodeInfo:          nodeInfo,
 	}
 
+	b.backendTransactions.txErrorMessages = b
+
 	retry.SetBackend(b)
 
 	preferredENIdentifiers, err = identifierList(params.PreferredExecutionNodeIDs)
@@ -270,7 +281,6 @@ func configureTransactionValidator(state protocol.State, chainID flow.ChainID) *
 
 // Ping responds to requests when the server is up.
 func (b *Backend) Ping(ctx context.Context) error {
-
 	// staticCollectionRPC is only set if a collection node address was provided at startup
 	if b.staticCollectionRPC != nil {
 		_, err := b.staticCollectionRPC.Ping(ctx, &accessproto.PingRequest{})
@@ -394,7 +404,7 @@ func executionNodesForBlockID(
 			case <-ctx.Done():
 				return nil, ctx.Err()
 			case <-time.After(100 * time.Millisecond << time.Duration(attempt)):
-				//retry after an exponential backoff
+				// retry after an exponential backoff
 			}
 		}
 
@@ -429,7 +439,6 @@ func findAllExecutionNodes(
 	executionReceipts storage.ExecutionReceipts,
 	log zerolog.Logger,
 ) (flow.IdentifierList, error) {
-
 	// lookup the receipt's storage with the block ID
 	allReceipts, err := executionReceipts.ByBlockID(blockID)
 	if err != nil {

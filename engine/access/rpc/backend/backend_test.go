@@ -62,6 +62,7 @@ type Suite struct {
 	receipts           *storagemock.ExecutionReceipts
 	results            *storagemock.ExecutionResults
 	transactionResults *storagemock.LightTransactionResults
+	events             *storagemock.Events
 
 	colClient              *access.AccessAPIClient
 	execClient             *access.ExecutionAPIClient
@@ -99,6 +100,7 @@ func (suite *Suite) SetupTest() {
 	suite.colClient = new(access.AccessAPIClient)
 	suite.execClient = new(access.ExecutionAPIClient)
 	suite.transactionResults = storagemock.NewLightTransactionResults(suite.T())
+	suite.events = storagemock.NewEvents(suite.T())
 	suite.chainID = flow.Testnet
 	suite.historicalAccessClient = new(access.AccessAPIClient)
 	suite.connectionFactory = connectionmock.NewConnectionFactory(suite.T())
@@ -2184,7 +2186,6 @@ func (suite *Suite) defaultBackendParams() Params {
 		Transactions:             suite.transactions,
 		ExecutionReceipts:        suite.receipts,
 		ExecutionResults:         suite.results,
-		LightTransactionResults:  suite.transactionResults,
 		ChainID:                  suite.chainID,
 		CollectionRPC:            suite.colClient,
 		MaxHeightRange:           DefaultMaxHeightRange,
@@ -2193,5 +2194,6 @@ func (suite *Suite) defaultBackendParams() Params {
 		AccessMetrics:            metrics.NewNoopCollector(),
 		Log:                      suite.log,
 		TxErrorMessagesCacheSize: 1000,
+		TxResultQueryMode:        IndexQueryModeExecutionNodesOnly,
 	}
 }
