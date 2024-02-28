@@ -301,6 +301,58 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 	chain := flow.Emulator.Chain()
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
+	t.Run("test coa setup", func(t *testing.T) {
+		t.Parallel()
+
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				// create a flow account
+				flowAccount, _, snapshot := createAndFundFlowAccount(
+					t,
+					ctx,
+					vm,
+					snapshot,
+				)
+
+				var coaAddress types.Address
+
+				initNonce := uint64(1)
+				// 10 Flow in UFix64
+				initBalanceInUFix64 := uint64(1_000_000_000)
+				initBalance := types.NewBalanceFromUFix64(cadence.UFix64(initBalanceInUFix64))
+
+				coaAddress, snapshot = setupCOA(
+					t,
+					ctx,
+					vm,
+					snapshot,
+					flowAccount,
+					initBalanceInUFix64)
+
+				bal := getEVMAccountBalance(
+					t,
+					ctx,
+					vm,
+					snapshot,
+					coaAddress)
+				require.Equal(t, initBalance, bal)
+
+				nonce := getEVMAccountNonce(
+					t,
+					ctx,
+					vm,
+					snapshot,
+					coaAddress)
+				require.Equal(t, initNonce, nonce)
+			})
+	})
+
 	t.Run("test coa withdraw", func(t *testing.T) {
 		t.Parallel()
 
@@ -423,7 +475,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 			})
 	})
 
-	t.Run("test coa deploy", func(t *testing.T) {
+	t.Run("test coa deposit and withdraw in a single transaction", func(t *testing.T) {
 		RunWithNewEnvironment(t,
 			chain, func(
 				ctx fvm.Context,
@@ -680,62 +732,6 @@ func TestCadenceArch(t *testing.T) {
 				require.NoError(t, output.Err)
 			})
 	})
-}
-
-func TestSequenceOfActions(t *testing.T) {
-	t.Parallel()
-	chain := flow.Emulator.Chain()
-
-	RunWithNewEnvironment(t,
-		chain, func(
-			ctx fvm.Context,
-			vm fvm.VM,
-			snapshot snapshot.SnapshotTree,
-			testContract *TestContract,
-			testAccount *EOATestAccount,
-		) {
-			// create a flow account
-			flowAccount, _, snapshot := createAndFundFlowAccount(
-				t,
-				ctx,
-				vm,
-				snapshot,
-			)
-
-			var coaAddress types.Address
-
-			t.Run("setup coa", func(t *testing.T) {
-				initNonce := uint64(1)
-				// 10 Flow in UFix64
-				initBalanceInUFix64 := uint64(1_000_000_000)
-				initBalance := types.NewBalanceFromUFix64(cadence.UFix64(initBalanceInUFix64))
-
-				coaAddress, snapshot = setupCOA(
-					t,
-					ctx,
-					vm,
-					snapshot,
-					flowAccount,
-					initBalanceInUFix64)
-
-				bal := getEVMAccountBalance(
-					t,
-					ctx,
-					vm,
-					snapshot,
-					coaAddress)
-				require.Equal(t, initBalance, bal)
-
-				nonce := getEVMAccountNonce(
-					t,
-					ctx,
-					vm,
-					snapshot,
-					coaAddress)
-				require.Equal(t, initNonce, nonce)
-			})
-
-		})
 }
 
 func createAndFundFlowAccount(
