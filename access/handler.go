@@ -895,6 +895,9 @@ func (h *Handler) getStartBlockID(blockID []byte) (flow.Identifier, error) {
 	return convert.BlockID(blockID)
 }
 
+// SendAndSubscribeTransactionStatuses streams transaction statuses starting from the reference block saved in the
+// transaction itself until the block containing the transaction becomes sealed or expired. When the transaction
+// status becomes TransactionStatusSealed or TransactionStatusExpired, the subscription will automatically shut down.
 func (h *Handler) SendAndSubscribeTransactionStatuses(
 	request *access.SendAndSubscribeTransactionStatusesRequest,
 	stream access.AccessAPI_SendAndSubscribeTransactionStatusesServer,
