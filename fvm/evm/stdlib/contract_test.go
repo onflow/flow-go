@@ -3679,7 +3679,7 @@ func TestEVMAccountCode(t *testing.T) {
 	expectedCodeRaw := []byte{1, 2, 3}
 	expectedCodeValue := cadence.NewArray(
 		[]cadence.Value{cadence.UInt8(1), cadence.UInt8(2), cadence.UInt8(3)},
-	).WithType(cadence.NewVariableSizedArrayType(cadence.TheUInt8Type))
+	).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
 	handler := &testContractHandler{
 		flowTokenAddress:   common.Address(contractsAddress),
@@ -3719,7 +3719,7 @@ func TestEVMAccountCodeHash(t *testing.T) {
 	expectedCodeHashRaw := []byte{1, 2, 3}
 	expectedCodeHashValue := cadence.NewArray(
 		[]cadence.Value{cadence.UInt8(1), cadence.UInt8(2), cadence.UInt8(3)},
-	).WithType(cadence.NewVariableSizedArrayType(cadence.TheUInt8Type))
+	).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
 	handler := &testContractHandler{
 		flowTokenAddress:   common.Address(contractsAddress),
