@@ -28,6 +28,30 @@ contract EVM {
             )
             return Balance(attoflow: balance)
         }
+
+        /// Nonce of the address
+        access(all)
+        fun nonce(): UInt64 {
+            return InternalEVM.nonce(
+                address: self.bytes
+            )
+        }
+
+        /// Code of the address
+        access(all)
+        fun code(): [UInt8] {
+            return InternalEVM.code(
+                address: self.bytes
+            )
+        }
+
+        /// CodeHash of the address
+        access(all)
+        fun codeHash(): [UInt8] {
+            return InternalEVM.codeHash(
+                address: self.bytes
+            )
+        }
     }
 
     access(all)
