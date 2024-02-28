@@ -29,6 +29,7 @@ endif
 # assumes there is a checked out version of flow-go in a "flow-go" sub-folder at this level so that the bootstrap executable
 # for the checked out version will be run in the sub folder but the bootstrap folder will be created here (outside of the checked out flow-go in the sub folder)
 gen-bootstrap: clone-flow
+	cd flow-go && make crypto_setup_gopath
 	cd flow-go/cmd/bootstrap && go run . genconfig --address-format "%s%d-${NETWORK_ID}.${NAMESPACE}:3569" --access $(ACCESS) --collection $(COLLECTION) --consensus $(CONSENSUS) --execution $(EXECUTION) --verification $(VERIFICATION) --weight 100 -o ./ --config ../../../bootstrap/conf/node-config.json
 	cd flow-go/cmd/bootstrap && go run . keygen --machine-account --config ../../../bootstrap/conf/node-config.json -o ../../../bootstrap/keys
 	echo {} > ./bootstrap/conf/partner-stakes.json
