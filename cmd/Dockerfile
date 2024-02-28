@@ -23,6 +23,11 @@ ENV GOPRIVATE=
 
 COPY . .
 
+RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=secret,id=git_creds,dst=/root/.netrc \
+    make crypto_setup_gopath
+
 # Update the git config to use SSH rather than HTTPS for clones
 RUN git config --global url.git@github.com:.insteadOf https://github.com/
 RUN mkdir ~/.ssh
@@ -34,11 +39,6 @@ RUN ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
 ## (3) Build the production app binary
 FROM build-env as build-production
 WORKDIR /app
-
-RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=secret,id=git_creds,dst=/root/.netrc \
-    make crypto_setup_gopath
 
 ARG GOARCH=amd64
 # TAGS can be overriden to modify the go build tags (e.g. build without netgo)
