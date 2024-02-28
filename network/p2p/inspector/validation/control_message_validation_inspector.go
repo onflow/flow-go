@@ -338,9 +338,9 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 // All errors returned from this function can be considered benign.
 func (c *ControlMsgValidationInspector) checkSenderIdentity(pid peer.ID) error {
 	if id, ok := c.idProvider.ByPeerID(pid); !ok {
-		return NewUnstakedPeerErr(fmt.Errorf("received rpc publish message from unstaked peer: %s", pid))
+		return NewUnstakedPeerErr(fmt.Errorf("unstaked peer: %s", pid))
 	} else if id.IsEjected() {
-		return fmt.Errorf("received rpc publish message from ejected peer: %s", pid)
+		return fmt.Errorf("ejected peer: %s", pid)
 	}
 
 	return nil
