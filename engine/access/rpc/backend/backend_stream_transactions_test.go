@@ -52,7 +52,7 @@ type TransactionStatusSuite struct {
 
 	connectionFactory *connectionmock.ConnectionFactory
 	communicator      *backendmock.Communicator
-	chainStateTracker *subscriptionmock.ChainStateTracker
+	blockTracker      *subscriptionmock.BlockTracker
 
 	chainID flow.ChainID
 
@@ -104,7 +104,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.connectionFactory = connectionmock.NewConnectionFactory(s.T())
 	s.communicator = new(backendmock.Communicator)
 	s.broadcaster = engine.NewBroadcaster()
-	s.chainStateTracker = subscriptionmock.NewChainStateTracker(s.T())
+	s.blockTracker = subscriptionmock.NewBlockTracker(s.T())
 
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	s.rootBlock = unittest.BlockFixture()
@@ -203,11 +203,11 @@ func (s *TransactionStatusSuite) SetupTest() {
 		return s.finalizedBlock.Header
 	}, nil).Maybe()
 
-	s.chainStateTracker.On("GetStartHeight", mock.Anything, mock.Anything, mock.Anything).Return(func(id flow.Identifier, _ uint64, _ flow.BlockStatus) (uint64, error) {
+	s.blockTracker.On("GetStartHeight", mock.Anything, mock.Anything, mock.Anything).Return(func(id flow.Identifier, _ uint64, _ flow.BlockStatus) (uint64, error) {
 		finalizedHeader := s.finalizedBlock.Header
 		return finalizedHeader.Height, nil
 	}, nil).Once()
-	s.chainStateTracker.On("GetHighestHeight", flow.BlockStatusFinalized).Return(func(_ flow.BlockStatus) (uint64, error) {
+	s.blockTracker.On("GetHighestHeight", flow.BlockStatusFinalized).Return(func(_ flow.BlockStatus) (uint64, error) {
 		finalizedHeader := s.finalizedBlock.Header
 		return finalizedHeader.Height, nil
 	}, nil)
@@ -236,7 +236,7 @@ func (s *TransactionStatusSuite) backendParams() Params {
 		AccessMetrics:            metrics.NewNoopCollector(),
 		Log:                      s.log,
 		TxErrorMessagesCacheSize: 1000,
-		ChainStateTracker:        s.chainStateTracker,
+		BlockTracker:             s.blockTracker,
 		SubscriptionParams: SubscriptionParams{
 			SendTimeout:    subscription.DefaultSendTimeout,
 			SendBufferSize: subscription.DefaultSendBufferSize,
