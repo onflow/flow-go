@@ -161,6 +161,7 @@ func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)  
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                 {}
 func (nc *NoopCollector) ExecutionComputationUsedPerBlock(computation uint64)                   {}
 func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)                           {}
+func (nc *NoopCollector) ExecutionCheckpointSize(bytes uint64)                                  {}
 func (nc *NoopCollector) ExecutionLastExecutedBlockHeight(height uint64)                        {}
 func (nc *NoopCollector) ExecutionLastFinalizedExecutedBlockHeight(height uint64)               {}
 func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _ module.ExecutionResultStats) {}
@@ -322,24 +323,28 @@ func (nc *NoopCollector) OnControlMessagesTruncated(messageType p2pmsg.ControlMe
 }
 func (nc *NoopCollector) OnIncomingRpcReceived(iHaveCount, iWantCount, graftCount, pruneCount, msgCount int) {
 }
-func (nc *NoopCollector) AsyncProcessingStarted()                                                 {}
-func (nc *NoopCollector) AsyncProcessingFinished(time.Duration)                                   {}
-func (nc *NoopCollector) OnIWantMessagesInspected(duplicateCount int, cacheMissCount int)         {}
-func (nc *NoopCollector) OnIWantDuplicateMessageIdsExceedThreshold()                              {}
-func (nc *NoopCollector) OnIWantCacheMissMessageIdsExceedThreshold()                              {}
-func (nc *NoopCollector) OnIHaveMessagesInspected(duplicateTopicIds int, duplicateMessageIds int) {}
-func (nc *NoopCollector) OnIHaveDuplicateTopicIdsExceedThreshold()                                {}
-func (nc *NoopCollector) OnIHaveDuplicateMessageIdsExceedThreshold()                              {}
+func (nc *NoopCollector) AsyncProcessingStarted()                                         {}
+func (nc *NoopCollector) AsyncProcessingFinished(time.Duration)                           {}
+func (nc *NoopCollector) OnIWantMessagesInspected(duplicateCount int, cacheMissCount int) {}
+func (nc *NoopCollector) OnIWantDuplicateMessageIdsExceedThreshold()                      {}
+func (nc *NoopCollector) OnIWantCacheMissMessageIdsExceedThreshold()                      {}
+func (nc *NoopCollector) OnIHaveMessagesInspected(duplicateTopicIds int, duplicateMessageIds, invalidTopicIds int) {
+}
+func (nc *NoopCollector) OnIHaveDuplicateTopicIdsExceedThreshold()   {}
+func (nc *NoopCollector) OnIHaveInvalidTopicIdsExceedThreshold()     {}
+func (nc *NoopCollector) OnIHaveDuplicateMessageIdsExceedThreshold() {}
 func (nc *NoopCollector) OnInvalidTopicIdDetectedForControlMessage(messageType p2pmsg.ControlMessageType) {
 }
-func (nc *NoopCollector) OnActiveClusterIDsNotSetErr()                      {}
-func (nc *NoopCollector) OnUnstakedPeerInspectionFailed()                   {}
-func (nc *NoopCollector) OnInvalidControlMessageNotificationSent()          {}
-func (nc *NoopCollector) OnPublishMessagesInspectionErrorExceedsThreshold() {}
-func (nc *NoopCollector) OnPruneDuplicateTopicIdsExceedThreshold()          {}
-func (nc *NoopCollector) OnPruneMessageInspected(duplicateTopicIds int)     {}
-func (nc *NoopCollector) OnGraftDuplicateTopicIdsExceedThreshold()          {}
-func (nc *NoopCollector) OnGraftMessageInspected(duplicateTopicIds int)     {}
+func (nc *NoopCollector) OnActiveClusterIDsNotSetErr()                                   {}
+func (nc *NoopCollector) OnUnstakedPeerInspectionFailed()                                {}
+func (nc *NoopCollector) OnInvalidControlMessageNotificationSent()                       {}
+func (nc *NoopCollector) OnPublishMessagesInspectionErrorExceedsThreshold()              {}
+func (nc *NoopCollector) OnPruneDuplicateTopicIdsExceedThreshold()                       {}
+func (nc *NoopCollector) OnPruneInvalidTopicIdsExceedThreshold()                         {}
+func (nc *NoopCollector) OnPruneMessageInspected(duplicateTopicIds, invalidTopicIds int) {}
+func (nc *NoopCollector) OnGraftDuplicateTopicIdsExceedThreshold()                       {}
+func (nc *NoopCollector) OnGraftInvalidTopicIdsExceedThreshold()                         {}
+func (nc *NoopCollector) OnGraftMessageInspected(duplicateTopicIds, invalidTopicIds int) {}
 func (nc *NoopCollector) OnPublishMessageInspected(totalErrCount int, invalidTopicIdsCount int, invalidSubscriptionsCount int, invalidSendersCount int) {
 }
 
