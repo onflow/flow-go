@@ -383,6 +383,8 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	// we force the inspector to return an error
 	inspectorConfig.ClusterPrefixedMessage.HardThreshold = 0
 	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
+	// set invalid topic id threshold to 0 so that inspector returns error early
+	inspectorConfig.GraftPrune.InvalidTopicIdThreshold = 0
 
 	// ensure we send a number of message with unknown cluster ids higher than the invalid topic ids threshold
 	// restricting the message count to 1 allows us to only aggregate a single error when the error is logged in the inspector.
@@ -507,7 +509,6 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 		require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 		require.True(t, validation.IsInvalidTopicIDThresholdExceeded(notification.Error))
 		require.Equal(t, notification.MsgType, p2pmsg.CtrlMsgGraft)
-
 		if count.Load() == 1 {
 			close(done)
 		}
@@ -540,10 +541,9 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(), corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)))
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true)
-	clusterPrefixedTopic := randomClusterPrefixedTopic()
-
+	topics := randomClusterPrefixedTopics(int(inspectorConfig.ClusterPrefixedMessage.HardThreshold) + 1)
 	// set topic oracle to return list with all topics to avoid hasSubscription failures and force topic validation
-	topicProvider.UpdateTopics([]string{clusterPrefixedTopic.String()})
+	topicProvider.UpdateTopics(topics)
 
 	// we deliberately avoid setting the cluster IDs so that we eventually receive errors after we have exceeded the allowed cluster
 	// prefixed hard threshold
@@ -552,12 +552,9 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
 	spammer.Start(t)
 	defer stopComponents(t, cancel, nodes, validationInspector)
-	// override the topic ID for each GRAFT to avoid duplicate topic ID errors
-	ctlMsgs := spammer.GenerateCtlMessages(1, p2ptest.WithGraft(10, clusterPrefixedTopic.String()))
-	for _, g := range ctlMsgs[0].GetGraft() {
-		s := randomClusterPrefixedTopic().String()
-		g.TopicID = &s
-	}
+	// generate multiple control messages with GRAFT's for randomly generated
+	// cluster prefixed channels, this ensures we do not encounter duplicate topic ID errors
+	ctlMsgs := spammer.GenerateCtlMessages(1, p2ptest.WithGrafts(topics...))
 	// start spamming the victim peer
 	spammer.SpamControlMessage(t, victimNode, ctlMsgs)
 
@@ -593,7 +590,6 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 		require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 		require.True(t, validation.IsInvalidTopicIDThresholdExceeded(notification.Error))
 		require.Equal(t, notification.MsgType, p2pmsg.CtrlMsgPrune)
-
 		if count.Load() == 1 {
 			close(done)
 		}
@@ -615,6 +611,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 		},
 	})
 	require.NoError(t, err)
+
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(t,
 		sporkID,
@@ -624,10 +621,9 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(), corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)))
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true)
-
-	clusterPrefixedTopic := randomClusterPrefixedTopic()
+	topics := randomClusterPrefixedTopics(int(inspectorConfig.ClusterPrefixedMessage.HardThreshold) + 1)
 	// set topic oracle to return list with all topics to avoid hasSubscription failures and force topic validation
-	topicProvider.UpdateTopics([]string{clusterPrefixedTopic.String()})
+	topicProvider.UpdateTopics(topics)
 
 	// we deliberately avoid setting the cluster IDs so that we eventually receive errors after we have exceeded the allowed cluster
 	// prefixed hard threshold
@@ -636,12 +632,9 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
 	spammer.Start(t)
 	defer stopComponents(t, cancel, nodes, validationInspector)
-	// override the topic ID for each PRUNE to avoid duplicate topic ID errors
-	ctlMsgs := spammer.GenerateCtlMessages(1, p2ptest.WithPrune(10, clusterPrefixedTopic.String()))
-	for _, g := range ctlMsgs[0].GetPrune() {
-		s := randomClusterPrefixedTopic().String()
-		g.TopicID = &s
-	}
+	// generate multiple control messages with prunes for randomly generated
+	// cluster prefixed channels, this ensures we do not encounter duplicate topic ID errors
+	ctlMsgs := spammer.GenerateCtlMessages(1, p2ptest.WithPrunes(topics...))
 	// start spamming the victim peer
 	spammer.SpamControlMessage(t, victimNode, ctlMsgs)
 
@@ -967,6 +960,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 // The victim node is configured to use the GossipSubInspector to detect spam and the scoring system to mitigate spam.
 // The test ensures that the victim node is disconnected from the spammer node on the GossipSub mesh after the spam detection is triggered.
 func TestGossipSubSpamMitigationIntegration(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "https://github.com/dapperlabs/flow-go/issues/6949")
 	t.Run("gossipsub spam mitigation invalid grafts", func(t *testing.T) {
 		testGossipSubSpamMitigationIntegration(t, p2pmsg.CtrlMsgGraft)
 	})
@@ -1025,7 +1019,7 @@ func testGossipSubSpamMitigationIntegration(t *testing.T, msgType p2pmsg.Control
 		}
 	})
 
-	spamRpcCount := 1000            // total number of individual rpc messages to send
+	spamRpcCount := 50000           // total number of individual rpc messages to send
 	spamCtrlMsgCount := int64(1000) // total number of control messages to send on each RPC
 
 	// unknownTopic is an unknown topic to the victim node but shaped like a valid topic (i.e., it has the correct prefix and spork ID).
@@ -1059,7 +1053,6 @@ func testGossipSubSpamMitigationIntegration(t *testing.T, msgType p2pmsg.Control
 	var malformedTopicSpam []pubsub_pb.ControlMessage
 	var invalidSporkIDTopicSpam []pubsub_pb.ControlMessage
 	var duplicateTopicSpam []pubsub_pb.ControlMessage
-
 	switch msgType {
 	case p2pmsg.CtrlMsgGraft:
 		unknownTopicSpam = spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithGraft(spamRpcCount, unknownTopic.String()))

@@ -18,6 +18,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/config"
+	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -33,7 +34,6 @@ import (
 )
 
 func TestNewControlMsgValidationInspector(t *testing.T) {
-
 	t.Run("should create validation inspector without error", func(t *testing.T) {
 		sporkID := unittest.IdentifierFixture()
 		flowConfig, err := config.DefaultConfig()
@@ -300,7 +300,11 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 
 // TestControlMessageInspection_ValidRpc ensures inspector does not disseminate invalid control message notifications for a valid RPC.
 func TestControlMessageInspection_ValidRpc(t *testing.T) {
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t)
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+		params.Logger = logger
+	})
 	defer consumer.AssertNotCalled(t, "OnInvalidControlMessageNotification")
 
 	topics := []string{
@@ -343,8 +347,9 @@ func TestControlMessageInspection_ValidRpc(t *testing.T) {
 	from := unittest.PeerIdFixture(t)
 	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Once()
 	require.NoError(t, inspector.Inspect(from, rpc))
-	// sleep for 1 second to ensure rpc is processed
-	time.Sleep(time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 1
+	}, time.Second, 500*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -355,8 +360,10 @@ func TestGraftInspection_InvalidTopic_BelowThreshold(t *testing.T) {
 	c, err := config.DefaultConfig()
 	require.NoError(t, err)
 	cfg := &c.NetworkConfig.GossipSub.RpcInspector.Validation
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
 	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
-		params.Config = cfg
+		params.Logger = logger
 	})
 
 	var unknownTopicGrafts []*pubsub_pb.ControlGraft
@@ -387,9 +394,9 @@ func TestGraftInspection_InvalidTopic_BelowThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, unknownTopicReq))
 	require.NoError(t, inspector.Inspect(from, malformedTopicReq))
 	require.NoError(t, inspector.Inspect(from, invalidSporkIDTopicReq))
-
-	// sleep for 1 second to ensure rpc's is processed
-	time.Sleep(3 * time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 3
+	}, time.Second, 500*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -400,8 +407,11 @@ func TestGraftInspection_InvalidTopic_AboveThreshold(t *testing.T) {
 	c, err := config.DefaultConfig()
 	require.NoError(t, err)
 	cfg := &c.NetworkConfig.GossipSub.RpcInspector.Validation
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
 	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Config = cfg
+		params.Logger = logger
 	})
 
 	var unknownTopicGrafts []*pubsub_pb.ControlGraft
@@ -435,9 +445,9 @@ func TestGraftInspection_InvalidTopic_AboveThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, unknownTopicReq))
 	require.NoError(t, inspector.Inspect(from, malformedTopicReq))
 	require.NoError(t, inspector.Inspect(from, invalidSporkIDTopicReq))
-
-	// sleep for 1 second to ensure rpc's is processed
-	time.Sleep(time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 3
+	}, time.Second, 500*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -445,7 +455,11 @@ func TestGraftInspection_InvalidTopic_AboveThreshold(t *testing.T) {
 // TestGraftInspection_DuplicateTopicIds_BelowThreshold ensures inspector does not disseminate invalid control message notifications
 // for a valid RPC with duplicate graft topic ids below the threshold.
 func TestGraftInspection_DuplicateTopicIds_BelowThreshold(t *testing.T) {
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t)
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+		params.Logger = logger
+	})
 	duplicateTopic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
 	// avoid unknown topics errors
 	topicProviderOracle.UpdateTopics([]string{duplicateTopic})
@@ -466,14 +480,19 @@ func TestGraftInspection_DuplicateTopicIds_BelowThreshold(t *testing.T) {
 	unittest.RequireComponentsReadyBefore(t, 100*time.Millisecond, inspector)
 
 	require.NoError(t, inspector.Inspect(from, rpc))
-	// sleep for 1 second to ensure rpc's is processed
-	time.Sleep(time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 1
+	}, time.Second, 500*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
 
 func TestGraftInspection_DuplicateTopicIds_AboveThreshold(t *testing.T) {
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t)
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+		params.Logger = logger
+	})
 	duplicateTopic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
 	// avoid unknown topics errors
 	topicProviderOracle.UpdateTopics([]string{duplicateTopic})
@@ -501,8 +520,9 @@ func TestGraftInspection_DuplicateTopicIds_AboveThreshold(t *testing.T) {
 	unittest.RequireComponentsReadyBefore(t, 100*time.Millisecond, inspector)
 
 	require.NoError(t, inspector.Inspect(from, rpc))
-	// sleep for 1 second to ensure rpc's is processed
-	time.Sleep(time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 1
+	}, time.Second, 500*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -605,7 +625,11 @@ func TestPruneInspection_InvalidTopic_AboveThreshold(t *testing.T) {
 // TestPruneInspection_DuplicateTopicIds_AboveThreshold ensures inspector disseminates an invalid control message notification for
 // prune messages when the number of duplicate topic ids is above the threshold.
 func TestPruneInspection_DuplicateTopicIds_AboveThreshold(t *testing.T) {
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t)
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+		params.Logger = logger
+	})
 	duplicateTopic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
 	// avoid unknown topics errors
 	topicProviderOracle.UpdateTopics([]string{duplicateTopic})
@@ -634,16 +658,21 @@ func TestPruneInspection_DuplicateTopicIds_AboveThreshold(t *testing.T) {
 	unittest.RequireComponentsReadyBefore(t, 100*time.Millisecond, inspector)
 
 	require.NoError(t, inspector.Inspect(from, rpc))
-	// sleep for 1 second to ensure rpc's is processed
-	time.Sleep(time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 1
+	}, time.Second, 500*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
 
 // TestPruneInspection_DuplicateTopicIds_BelowThreshold ensures inspector does not disseminate invalid control message notifications
 // for a valid RPC with duplicate prune topic ids below the threshold.
-func TestPruneInspection_DuplicateTopicIds_BelowThreshold(t *testing.T) {
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t)
+func TestPrueInspection_DuplicateTopicIds_BelowThreshold(t *testing.T) {
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+		params.Logger = logger
+	})
 	duplicateTopic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
 	// avoid unknown topics errors
 	topicProviderOracle.UpdateTopics([]string{duplicateTopic})
@@ -665,8 +694,9 @@ func TestPruneInspection_DuplicateTopicIds_BelowThreshold(t *testing.T) {
 	unittest.RequireComponentsReadyBefore(t, 100*time.Millisecond, inspector)
 
 	require.NoError(t, inspector.Inspect(from, rpc))
-	// sleep for 1 second to ensure rpc's is processed
-	time.Sleep(time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 1
+	}, time.Second, 500*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -677,8 +707,11 @@ func TestIHaveInspection_InvalidTopic_AboveThreshold(t *testing.T) {
 	c, err := config.DefaultConfig()
 	require.NoError(t, err)
 	cfg := &c.NetworkConfig.GossipSub.RpcInspector.Validation
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
 	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Config = cfg
+		params.Logger = logger
 	})
 
 	var unknownTopicIHaves []*pubsub_pb.ControlIHave
@@ -711,9 +744,9 @@ func TestIHaveInspection_InvalidTopic_AboveThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, unknownTopicReq))
 	require.NoError(t, inspector.Inspect(from, malformedTopicReq))
 	require.NoError(t, inspector.Inspect(from, invalidSporkIDTopicReq))
-
-	// sleep for 1 second to ensure rpc's is processed
-	time.Sleep(2 * time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 3
+	}, time.Second, 500*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -724,8 +757,11 @@ func TestIHaveInspection_InvalidTopic_BelowThreshold(t *testing.T) {
 	c, err := config.DefaultConfig()
 	require.NoError(t, err)
 	cfg := &c.NetworkConfig.GossipSub.RpcInspector.Validation
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
 	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Config = cfg
+		params.Logger = logger
 	})
 
 	var unknownTopicIHaves []*pubsub_pb.ControlIHave
@@ -758,9 +794,10 @@ func TestIHaveInspection_InvalidTopic_BelowThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, unknownTopicReq))
 	require.NoError(t, inspector.Inspect(from, malformedTopicReq))
 	require.NoError(t, inspector.Inspect(from, invalidSporkIDTopicReq))
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 3
+	}, time.Second, 500*time.Millisecond)
 
-	// sleep for 1 second to ensure rpc's is processed
-	time.Sleep(2 * time.Second)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -768,7 +805,11 @@ func TestIHaveInspection_InvalidTopic_BelowThreshold(t *testing.T) {
 // TestIHaveInspection_DuplicateTopicIds_BelowThreshold ensures inspector does not disseminate an invalid control message notification for
 // iHave messages when duplicate topic ids are below allowed threshold.
 func TestIHaveInspection_DuplicateTopicIds_BelowThreshold(t *testing.T) {
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t)
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+		params.Logger = logger
+	})
 	validTopic := fmt.Sprintf("%s/%s", channels.PushBlocks.String(), sporkID)
 	// avoid unknown topics errors
 	topicProviderOracle.UpdateTopics([]string{validTopic})
@@ -793,8 +834,9 @@ func TestIHaveInspection_DuplicateTopicIds_BelowThreshold(t *testing.T) {
 	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
 
 	require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
-	// TODO: this sleeps should be replaced with a queue size checker.
-	time.Sleep(time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 1
+	}, time.Second, 500*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -802,7 +844,11 @@ func TestIHaveInspection_DuplicateTopicIds_BelowThreshold(t *testing.T) {
 // TestIHaveInspection_DuplicateTopicIds_AboveThreshold ensures inspector disseminate an invalid control message notification for
 // iHave messages when duplicate topic ids are above allowed threshold.
 func TestIHaveInspection_DuplicateTopicIds_AboveThreshold(t *testing.T) {
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t)
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+		params.Logger = logger
+	})
 	validTopic := fmt.Sprintf("%s/%s", channels.PushBlocks.String(), sporkID)
 	// avoid unknown topics errors
 	topicProviderOracle.UpdateTopics([]string{validTopic})
@@ -829,8 +875,9 @@ func TestIHaveInspection_DuplicateTopicIds_AboveThreshold(t *testing.T) {
 	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
 
 	require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
-	// TODO: this sleeps should be replaced with a queue size checker.
-	time.Sleep(time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 1
+	}, time.Second, 500*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -838,7 +885,11 @@ func TestIHaveInspection_DuplicateTopicIds_AboveThreshold(t *testing.T) {
 // TestIHaveInspection_DuplicateMessageIds_BelowThreshold ensures inspector does not disseminate an invalid control message notification for
 // iHave messages when duplicate message ids are below allowed threshold.
 func TestIHaveInspection_DuplicateMessageIds_BelowThreshold(t *testing.T) {
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t)
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+		params.Logger = logger
+	})
 	validTopic := fmt.Sprintf("%s/%s", channels.PushBlocks.String(), sporkID)
 	// avoid unknown topics errors
 	topicProviderOracle.UpdateTopics([]string{validTopic})
@@ -863,8 +914,9 @@ func TestIHaveInspection_DuplicateMessageIds_BelowThreshold(t *testing.T) {
 	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
 
 	require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
-	// TODO: this sleeps should be replaced with a queue size checker.
-	time.Sleep(time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 1
+	}, time.Second, 500*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -872,7 +924,11 @@ func TestIHaveInspection_DuplicateMessageIds_BelowThreshold(t *testing.T) {
 // TestIHaveInspection_DuplicateMessageIds_AboveThreshold ensures inspector disseminates an invalid control message notification for
 // iHave messages when duplicate message ids are above allowed threshold.
 func TestIHaveInspection_DuplicateMessageIds_AboveThreshold(t *testing.T) {
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t)
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+		params.Logger = logger
+	})
 	validTopic := fmt.Sprintf("%s/%s", channels.PushBlocks.String(), sporkID)
 	// avoid unknown topics errors
 	topicProviderOracle.UpdateTopics([]string{validTopic})
@@ -898,8 +954,9 @@ func TestIHaveInspection_DuplicateMessageIds_AboveThreshold(t *testing.T) {
 	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
 
 	require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
-	// TODO: this sleeps should be replaced with a queue size checker.
-	time.Sleep(time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 1
+	}, time.Second, 500*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -907,7 +964,11 @@ func TestIHaveInspection_DuplicateMessageIds_AboveThreshold(t *testing.T) {
 // TestIWantInspection_DuplicateMessageIds_BelowThreshold ensures inspector does not disseminate an invalid control message notification for
 // iWant messages when duplicate message ids are below allowed threshold.
 func TestIWantInspection_DuplicateMessageIds_BelowThreshold(t *testing.T) {
-	inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t)
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
+	inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+		params.Logger = logger
+	})
 	// oracle must be set even though iWant messages do not have topic IDs
 	duplicateMsgID := unittest.IdentifierFixture()
 	duplicates := flow.IdentifierList{}
@@ -937,15 +998,20 @@ func TestIWantInspection_DuplicateMessageIds_BelowThreshold(t *testing.T) {
 	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
 
 	require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
-	// sleep for 1 second to ensure rpc's is processed
-	time.Sleep(time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 1
+	}, time.Second, 500*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
 
 // TestIWantInspection_DuplicateMessageIds_AboveThreshold ensures inspector disseminates invalid control message notifications for iWant messages when duplicate message ids exceeds allowed threshold.
 func TestIWantInspection_DuplicateMessageIds_AboveThreshold(t *testing.T) {
-	inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t)
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
+	inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+		params.Logger = logger
+	})
 	// oracle must be set even though iWant messages do not have topic IDs
 	duplicateMsgID := unittest.IdentifierFixture()
 	duplicates := flow.IdentifierList{}
@@ -975,17 +1041,21 @@ func TestIWantInspection_DuplicateMessageIds_AboveThreshold(t *testing.T) {
 	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
 
 	require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
-	// sleep for 1 second to ensure rpc's is processed
-	time.Sleep(time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 1
+	}, time.Second, 500*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
 
 // TestIWantInspection_CacheMiss_AboveThreshold ensures inspector disseminates invalid control message notifications for iWant messages when cache misses exceeds allowed threshold.
 func TestIWantInspection_CacheMiss_AboveThreshold(t *testing.T) {
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
 	inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 		// set high cache miss threshold to ensure we only disseminate notification when it is exceeded
 		params.Config.IWant.CacheMissThreshold = 900
+		params.Logger = logger
 	})
 	// 10 iwant messages, each with 100 message ids; total of 1000 message ids, which when imitated as cache misses should trigger notification dissemination.
 	inspectMsgRpc := unittest.P2PRPCFixture(unittest.WithIWants(unittest.P2PRPCIWantFixtures(10, 100)...))
@@ -1020,16 +1090,20 @@ func TestIWantInspection_CacheMiss_AboveThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
 	unittest.RequireReturnsBefore(t, allIwantsChecked.Wait, 1*time.Second, "all iwant messages should be checked for cache misses")
 
-	// sleep for 1 second to ensure rpc's is processed
-	time.Sleep(time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 1
+	}, time.Second, 500*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
 
 func TestIWantInspection_CacheMiss_BelowThreshold(t *testing.T) {
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
 	inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 		// set high cache miss threshold to ensure that we do not disseminate notification in this test
 		params.Config.IWant.CacheMissThreshold = 99
+		params.Logger = logger
 	})
 	// oracle must be set even though iWant messages do not have topic IDs
 	defer consumer.AssertNotCalled(t, "OnInvalidControlMessageNotification")
@@ -1056,17 +1130,21 @@ func TestIWantInspection_CacheMiss_BelowThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
 	unittest.RequireReturnsBefore(t, allIwantsChecked.Wait, 1*time.Second, "all iwant messages should be checked for cache misses")
 
-	// waits one more second to ensure no notification is disseminated
-	time.Sleep(1 * time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 1
+	}, time.Second, 500*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
 
 // TestControlMessageInspection_ExceedingErrThreshold ensures inspector disseminates invalid control message notifications for RPCs that exceed the configured error threshold.
 func TestPublishMessageInspection_ExceedingErrThreshold(t *testing.T) {
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
 	errThreshold := 500
 	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Config.PublishMessages.ErrorThreshold = errThreshold
+		params.Logger = logger
 	})
 	// create unknown topic
 	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", unittest.IdentifierFixture(), sporkID)).String()
@@ -1107,17 +1185,21 @@ func TestPublishMessageInspection_ExceedingErrThreshold(t *testing.T) {
 	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
 
 	require.NoError(t, inspector.Inspect(from, rpc))
-	// sleep for 1 second to ensure rpc's is processed
-	time.Sleep(time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 1
+	}, time.Second, 500*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
 
 // TestControlMessageInspection_MissingSubscription ensures inspector disseminates invalid control message notifications for RPCs that the peer is not subscribed to.
 func TestPublishMessageInspection_MissingSubscription(t *testing.T) {
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
 	errThreshold := 500
 	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Config.PublishMessages.ErrorThreshold = errThreshold
+		params.Logger = logger
 	})
 	publisher := unittest.PeerIdFixture(t)
 	publisherId := unittest.IdentityFixture()
@@ -1133,18 +1215,22 @@ func TestPublishMessageInspection_MissingSubscription(t *testing.T) {
 	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
 
 	require.NoError(t, inspector.Inspect(from, rpc))
-	// sleep for 1 second to ensure rpc's is processed
-	time.Sleep(time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 1
+	}, time.Second, 500*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
 
 // TestPublishMessageInspection_MissingTopic ensures inspector disseminates invalid control message notifications for published messages with missing topics.
 func TestPublishMessageInspection_MissingTopic(t *testing.T) {
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
 	errThreshold := 500
 	inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 		// 5 invalid pubsub messages will force notification dissemination
 		params.Config.PublishMessages.ErrorThreshold = errThreshold
+		params.Logger = logger
 	})
 	publisher := unittest.PeerIdFixture(t)
 	publisherId := unittest.IdentityFixture()
@@ -1163,15 +1249,19 @@ func TestPublishMessageInspection_MissingTopic(t *testing.T) {
 	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
 
 	require.NoError(t, inspector.Inspect(from, rpc))
-	// sleep for 1 second to ensure rpc's is processed
-	time.Sleep(time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 1
+	}, time.Second, 500*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
 
 // TestRpcInspectionDeactivatedOnPublicNetwork ensures inspector does not inspect RPCs on public networks.
 func TestRpcInspectionDeactivatedOnPublicNetwork(t *testing.T) {
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
 	inspector, signalerCtx, cancel, _, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+		params.Logger = logger
 		params.NetworkingType = network.PublicNetwork
 	})
 	from := unittest.PeerIdFixture(t)
@@ -1184,17 +1274,42 @@ func TestRpcInspectionDeactivatedOnPublicNetwork(t *testing.T) {
 	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 	require.NoError(t, inspector.Inspect(from, rpc))
-	// sleep for 1 second to ensure rpc's is processed
-	time.Sleep(time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 1
+	}, time.Second, 500*time.Millisecond)
+	cancel()
+	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
+}
+
+// TestInspection_Unstaked_Peer ensures inspector disseminates invalid control message notifications for rpc's from unstaked peers when running private network.
+func TestInspection_Unstaked_Peer(t *testing.T) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+		// override the inspector and params, run the inspector in private mode
+		params.NetworkingType = network.PrivateNetwork
+	})
+	unstakedPeer := unittest.PeerIdFixture(t)
+	topic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
+	topicProviderOracle.UpdateTopics([]string{topic})
+	idProvider.On("ByPeerID", unstakedPeer).Return(nil, false).Once()
+	checkNotification := checkNotificationFunc(t, unstakedPeer, p2pmsg.CtrlMsgGraft, validation.IsErrUnstakedPeer, p2p.CtrlMsgNonClusterTopicType)
+	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
+	consumer.On("OnInvalidControlMessageNotification", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
+	inspector.Start(signalerCtx)
+	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
+
+	require.Error(t, inspector.Inspect(unstakedPeer, unittest.P2PRPCFixture()))
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
 
 // TestControlMessageInspection_Unstaked_From ensures inspector disseminates invalid control message notifications for published messages from unstaked peers.
 func TestPublishMessageInspection_Unstaked_From(t *testing.T) {
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
 	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		// override the inspector and params, run the inspector in private mode
 		params.NetworkingType = network.PrivateNetwork
+		params.Logger = logger
 	})
 	from := unittest.PeerIdFixture(t)
 	unstakedPeer := unittest.PeerIdFixture(t)
@@ -1212,17 +1327,21 @@ func TestPublishMessageInspection_Unstaked_From(t *testing.T) {
 	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
 
 	require.NoError(t, inspector.Inspect(from, rpc))
-	// sleep for 1 second to ensure rpc's is processed
-	time.Sleep(time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 1
+	}, time.Second, 500*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
 
 // TestControlMessageInspection_Ejected_From ensures inspector disseminates invalid control message notifications for published messages from ejected peers.
 func TestPublishMessageInspection_Ejected_From(t *testing.T) {
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
 	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		// override the inspector and params, run the inspector in private mode
 		params.NetworkingType = network.PrivateNetwork
+		params.Logger = logger
 	})
 
 	from := unittest.PeerIdFixture(t)
@@ -1246,8 +1365,9 @@ func TestPublishMessageInspection_Ejected_From(t *testing.T) {
 	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
 
 	require.NoError(t, inspector.Inspect(from, rpc))
-	// sleep for 1 second to ensure rpc's is processed
-	time.Sleep(time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 1
+	}, time.Second, 500*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -1255,7 +1375,12 @@ func TestPublishMessageInspection_Ejected_From(t *testing.T) {
 // TestNewControlMsgValidationInspector_validateClusterPrefixedTopic ensures cluster prefixed topics are validated as expected.
 func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testing.T) {
 	t.Run("validateClusterPrefixedTopic should not return an error for valid cluster prefixed topics", func(t *testing.T) {
-		inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t)
+		logCounter := atomic.NewInt64(0)
+		logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
+
+		inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+			params.Logger = logger
+		})
 		defer consumer.AssertNotCalled(t, "OnInvalidControlMessageNotification")
 		clusterID := flow.ChainID(unittest.IdentifierFixture().String())
 		clusterPrefixedTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.SyncCluster(clusterID), sporkID)).String()
@@ -1269,16 +1394,20 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
 
 		require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
+		require.Eventually(t, func() bool {
+			return logCounter.Load() == 1
+		}, time.Second, 500*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
 
 	t.Run("validateClusterPrefixedTopic should not return error if cluster prefixed hard threshold not exceeded for unknown cluster ids", func(t *testing.T) {
+		logCounter := atomic.NewInt64(0)
+		logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
 		inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			// set hard threshold to small number , ensure that a single unknown cluster prefix id does not cause a notification to be disseminated
 			params.Config.ClusterPrefixedMessage.HardThreshold = 2
+			params.Logger = logger
 		})
 		defer consumer.AssertNotCalled(t, "OnInvalidControlMessageNotification")
 		clusterID := flow.ChainID(unittest.IdentifierFixture().String())
@@ -1292,18 +1421,21 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
 
 		require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
+		require.Eventually(t, func() bool {
+			return logCounter.Load() == 1
+		}, time.Second, 500*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
 
 	t.Run("validateClusterPrefixedTopic should return error if cluster prefixed hard threshold exceeded for unknown cluster ids", func(t *testing.T) {
+		logCounter := atomic.NewInt64(0)
+		logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
 		inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 			// the 11th unknown cluster ID error should cause an error
 			params.Config.ClusterPrefixedMessage.HardThreshold = 10
-			// disable invalid topic threshold return an error always
 			params.Config.GraftPrune.InvalidTopicIdThreshold = 0
+			params.Logger = logger
 		})
 		clusterID := flow.ChainID(unittest.IdentifierFixture().String())
 		clusterPrefixedTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.SyncCluster(clusterID), sporkID)).String()
@@ -1322,8 +1454,9 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		for i := 0; i < 11; i++ {
 			require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
 		}
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
+		require.Eventually(t, func() bool {
+			return logCounter.Load() == 11
+		}, time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
@@ -1331,7 +1464,12 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 
 // TestControlMessageValidationInspector_ActiveClustersChanged validates the expected update of the active cluster IDs list.
 func TestControlMessageValidationInspector_ActiveClustersChanged(t *testing.T) {
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, _ := inspectorFixture(t)
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
+
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+		params.Logger = logger
+	})
 	defer consumer.AssertNotCalled(t, "OnInvalidControlMessageNotification")
 	identity := unittest.IdentityFixture()
 	idProvider.On("ByPeerID", mock.AnythingOfType("peer.ID")).Return(identity, true).Times(5)
@@ -1350,7 +1488,10 @@ func TestControlMessageValidationInspector_ActiveClustersChanged(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, rpc))
 	}
 	// sleep for 1 second to ensure rpc's is processed
-	time.Sleep(time.Second)
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == int64(len(activeClusterIds))
+	}, time.Second, 500*time.Millisecond)
+
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -1359,12 +1500,8 @@ func TestControlMessageValidationInspector_ActiveClustersChanged(t *testing.T) {
 func TestControlMessageValidationInspector_TruncationConfigToggle(t *testing.T) {
 	t.Run("should not perform truncation when disabled is set to true", func(t *testing.T) {
 		numOfMsgs := 5000
-
-		// we expected a single warning for the entire RPC
-		expectedWarningLogs := int64(1)
-		expectedLogStrs := map[string]struct{}{validation.RPCTruncationDisabledWarning: {}}
 		logCounter := atomic.NewInt64(0)
-		logger := hookedLogger(logCounter, zerolog.TraceLevel, expectedLogStrs)
+		logger := hookedLogger(logCounter, zerolog.TraceLevel, validation.RPCTruncationDisabledWarning, worker.QueuedItemProcessedLog)
 		inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Config.GraftPrune.MessageCountThreshold = numOfMsgs
 			params.Logger = logger
@@ -1390,7 +1527,7 @@ func TestControlMessageValidationInspector_TruncationConfigToggle(t *testing.T) 
 		require.NoError(t, inspector.Inspect(from, rpc))
 
 		require.Eventually(t, func() bool {
-			return logCounter.Load() == expectedWarningLogs
+			return logCounter.Load() == 2
 		}, time.Second, 500*time.Millisecond)
 
 		// ensure truncation not performed
@@ -1401,24 +1538,23 @@ func TestControlMessageValidationInspector_TruncationConfigToggle(t *testing.T) 
 		require.Len(t, rpc.GetControl().GetIwant(), numOfMsgs)
 		ensureMessageIdsLen(t, p2pmsg.CtrlMsgIWant, rpc, numOfMsgs)
 
-		time.Sleep(time.Second)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
 
 	t.Run("should not perform truncation when disabled for each individual control message type directly", func(t *testing.T) {
 		numOfMsgs := 5000
-
-		expectedLogStrs := map[string]struct{}{
-			validation.GraftTruncationDisabledWarning:          {},
-			validation.PruneTruncationDisabledWarning:          {},
-			validation.IHaveTruncationDisabledWarning:          {},
-			validation.IHaveMessageIDTruncationDisabledWarning: {},
-			validation.IWantTruncationDisabledWarning:          {},
-			validation.IWantMessageIDTruncationDisabledWarning: {},
+		expectedLogStrs := []string{
+			validation.GraftTruncationDisabledWarning,
+			validation.PruneTruncationDisabledWarning,
+			validation.IHaveTruncationDisabledWarning,
+			validation.IHaveMessageIDTruncationDisabledWarning,
+			validation.IWantTruncationDisabledWarning,
+			validation.IWantMessageIDTruncationDisabledWarning,
+			worker.QueuedItemProcessedLog,
 		}
 		logCounter := atomic.NewInt64(0)
-		logger := hookedLogger(logCounter, zerolog.TraceLevel, expectedLogStrs)
+		logger := hookedLogger(logCounter, zerolog.TraceLevel, expectedLogStrs...)
 		inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Config.GraftPrune.MessageCountThreshold = numOfMsgs
 			params.Logger = logger
@@ -1460,7 +1596,6 @@ func TestControlMessageValidationInspector_TruncationConfigToggle(t *testing.T) 
 		require.Len(t, rpc.GetControl().GetIwant(), numOfMsgs)
 		ensureMessageIdsLen(t, p2pmsg.CtrlMsgIWant, rpc, numOfMsgs)
 
-		time.Sleep(time.Second)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
@@ -1470,12 +1605,8 @@ func TestControlMessageValidationInspector_TruncationConfigToggle(t *testing.T) 
 func TestControlMessageValidationInspector_InspectionConfigToggle(t *testing.T) {
 	t.Run("should not perform inspection when disabled is set to true", func(t *testing.T) {
 		numOfMsgs := 5000
-
-		// we expected a single warning for the entire RPC
-		expectedWarningLogs := int64(1)
-		expectedLogStrs := map[string]struct{}{validation.RPCInspectionDisabledWarning: {}}
 		logCounter := atomic.NewInt64(0)
-		logger := hookedLogger(logCounter, zerolog.TraceLevel, expectedLogStrs)
+		logger := hookedLogger(logCounter, zerolog.TraceLevel, validation.RPCInspectionDisabledWarning)
 		inspector, signalerCtx, cancel, consumer, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Logger = logger
 			// disable inspector for all control message types
@@ -1499,9 +1630,9 @@ func TestControlMessageValidationInspector_InspectionConfigToggle(t *testing.T) 
 		require.NoError(t, inspector.Inspect(from, rpc))
 
 		require.Eventually(t, func() bool {
-			return logCounter.Load() == expectedWarningLogs
+			return logCounter.Load() == 1
 		}, time.Second, 500*time.Millisecond)
-		time.Sleep(time.Second)
+
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
@@ -1558,16 +1689,16 @@ func TestControlMessageValidationInspector_InspectionConfigToggle(t *testing.T) 
 
 	t.Run("should not perform inspection when disabled for each individual control message type directly", func(t *testing.T) {
 		numOfMsgs := 5000
-
-		expectedLogStrs := map[string]struct{}{
-			validation.GraftInspectionDisabledWarning:   {},
-			validation.PruneInspectionDisabledWarning:   {},
-			validation.IHaveInspectionDisabledWarning:   {},
-			validation.IWantInspectionDisabledWarning:   {},
-			validation.PublishInspectionDisabledWarning: {},
+		expectedLogStrs := []string{
+			validation.GraftInspectionDisabledWarning,
+			validation.PruneInspectionDisabledWarning,
+			validation.IHaveInspectionDisabledWarning,
+			validation.IWantInspectionDisabledWarning,
+			validation.PublishInspectionDisabledWarning,
+			worker.QueuedItemProcessedLog,
 		}
 		logCounter := atomic.NewInt64(0)
-		logger := hookedLogger(logCounter, zerolog.TraceLevel, expectedLogStrs)
+		logger := hookedLogger(logCounter, zerolog.TraceLevel, expectedLogStrs...)
 		inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Config.GraftPrune.MessageCountThreshold = numOfMsgs
 			params.Logger = logger
@@ -1601,7 +1732,6 @@ func TestControlMessageValidationInspector_InspectionConfigToggle(t *testing.T) 
 			return logCounter.Load() == int64(len(expectedLogStrs))
 		}, time.Second, 500*time.Millisecond)
 
-		time.Sleep(time.Second)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
@@ -1677,11 +1807,15 @@ func inspectorFixture(t *testing.T, opts ...func(params *validation.InspectorPar
 	return validationInspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle
 }
 
-// utility function to track the number of logs expected logs for the expected log level.
-func hookedLogger(counter *atomic.Int64, expectedLogLevel zerolog.Level, expectedLogs map[string]struct{}) zerolog.Logger {
+// utility function to track the number of expected logs for the expected log level.
+func hookedLogger(counter *atomic.Int64, expectedLogLevel zerolog.Level, expectedLogs ...string) zerolog.Logger {
 	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if _, ok := expectedLogs[message]; ok && level == expectedLogLevel {
-			counter.Inc()
+		if level == expectedLogLevel {
+			for _, s := range expectedLogs {
+				if message == s {
+					counter.Inc()
+				}
+			}
 		}
 	})
 	return zerolog.New(os.Stdout).Level(expectedLogLevel).Hook(hook)
