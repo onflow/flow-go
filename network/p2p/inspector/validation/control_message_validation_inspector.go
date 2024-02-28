@@ -222,6 +222,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 				Bool(logging.KeyNetworkingSecurity, true).
 				Msg("rpc received from unstaked peer")
 			c.metrics.OnInvalidControlMessageNotificationSent()
+			c.metrics.OnRpcRejectedFromUnknownSender()
 			return err
 		}
 	}

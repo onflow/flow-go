@@ -13,6 +13,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/config"
@@ -661,13 +662,14 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
+	unstakedPeerID := unittest.PeerIdFixture(t)
 	consumer := mockp2p.NewGossipSubInvalidControlMessageNotificationConsumer(t)
 	consumer.On("OnInvalidControlMessageNotification", mockery.Anything).Run(func(args mockery.Arguments) {
 		count.Inc()
 		notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 		require.True(t, ok)
 		require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType)
-		require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
+		require.Equal(t, unstakedPeerID, notification.PeerID)
 		require.True(t, validation.IsErrUnstakedPeer(notification.Error))
 		require.Equal(t, notification.MsgType, p2pmsg.CtrlMsgGraft)
 
@@ -694,22 +696,29 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
+	// we need to wait until nodes are connected before we can start returning unstaked identity.
+	nodesConnected := atomic.NewBool(false)
 	victimNode, victimIdentity := p2ptest.NodeFixture(t,
 		sporkID,
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(), corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)))
+		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(), corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
+			if nodesConnected.Load() {
+				// after nodes are connected invoke corrupt callback with an unstaked peer ID
+				return corruptInspectorFunc(unstakedPeerID, rpc)
+			}
+			return corruptInspectorFunc(id, rpc)
+		})))
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 	inspectorIDProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true)
+	inspectorIDProvider.On("ByPeerID", unstakedPeerID).Return(nil, false)
 
 	validationInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
-
-	inspectorIDProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(nil, false)
-
+	nodesConnected.Store(true)
 	spammer.Start(t)
 	defer stopComponents(t, cancel, nodes, validationInspector)
 
@@ -882,8 +891,8 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 			notification.Error.Error(),
 			fmt.Sprintf("%d error(s) encountered", len(invalidPublishMsgs)),
 			fmt.Sprintf("expected %d errors, an error for each invalid pubsub message", len(invalidPublishMsgs)))
-		require.Contains(t, notification.Error.Error(), fmt.Sprintf("received rpc publish message from unstaked peer: %s", unknownPeerID))
-		require.Contains(t, notification.Error.Error(), fmt.Sprintf("received rpc publish message from ejected peer: %s", ejectedIdentityPeerID))
+		require.Contains(t, notification.Error.Error(), fmt.Sprintf("unstaked peer: %s", unknownPeerID))
+		require.Contains(t, notification.Error.Error(), fmt.Sprintf("ejected peer: %s", ejectedIdentityPeerID))
 		notificationCount.Inc()
 		if notificationCount.Load() == 1 {
 			close(done)
