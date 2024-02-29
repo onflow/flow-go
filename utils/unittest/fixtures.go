@@ -2144,6 +2144,7 @@ func VersionBeaconFixture(options ...func(*flow.VersionBeacon)) *flow.VersionBea
 func ProtocolStateVersionUpgradeFixture() *flow.ProtocolStateVersionUpgrade {
 	return &flow.ProtocolStateVersionUpgrade{
 		NewProtocolStateVersion: rand.Uint64(),
+		ActiveView:              rand.Uint64(),
 	}
 }
 

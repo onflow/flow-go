@@ -2,7 +2,6 @@ package flow_test
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
@@ -115,14 +114,11 @@ func TestEncodeDecode(t *testing.T) {
 			// ProtocolStateVersionUpgrade
 			b, err = json.Marshal(protocolVersionUpgrade.ServiceEvent())
 			require.NoError(t, err)
-			fmt.Println(">> ", string(b))
 
 			outer = new(flow.ServiceEvent)
 			err = json.Unmarshal(b, outer)
 			require.NoError(t, err)
-			fmt.Println(outer.Event.(*flow.ProtocolStateVersionUpgrade).NewProtocolStateVersion)
 			gotProtocolVersionUpgrade, ok := outer.Event.(*flow.ProtocolStateVersionUpgrade)
-			fmt.Println(gotProtocolVersionUpgrade.NewProtocolStateVersion)
 			require.True(t, ok)
 			assert.DeepEqual(t, protocolVersionUpgrade, gotProtocolVersionUpgrade)
 		})

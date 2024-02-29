@@ -180,6 +180,7 @@ func ProtocolStateVersionUpgradeFixtureByChainID(chain flow.ChainID) (flow.Event
 
 	expected := &flow.ProtocolStateVersionUpgrade{
 		NewProtocolStateVersion: 1,
+		ActiveView:              1000,
 	}
 
 	return event, expected
@@ -707,9 +708,11 @@ func createVersionBeaconEvent() cadence.Event {
 
 func createProtocolStateVersionUpgradeEvent() cadence.Event {
 	newVersion := cadence.NewUInt64(1)
+	activeView := cadence.NewUInt64(1000)
 
 	return cadence.NewEvent([]cadence.Value{
 		newVersion,
+		activeView,
 	}).WithType(NewProtocolStateVersionUpgradeEventType())
 }
 
@@ -1053,6 +1056,10 @@ func NewProtocolStateVersionUpgradeEventType() *cadence.EventType {
 		Fields: []cadence.Field{
 			{
 				Identifier: "newProtocolVersion",
+				Type:       cadence.UInt64Type{},
+			},
+			{
+				Identifier: "activeView",
 				Type:       cadence.UInt64Type{},
 			},
 		},
