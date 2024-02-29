@@ -203,7 +203,7 @@ func (m *StagedContractsMigration) MigrateAccount(
 		},
 	}
 
-	mr, err := newMigratorRuntime(address, payloads, config)
+	mr, err := NewMigratorRuntime(address, payloads, config)
 	if err != nil {
 		return nil, err
 	}
