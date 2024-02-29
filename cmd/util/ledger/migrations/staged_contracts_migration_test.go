@@ -66,11 +66,12 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(flow.Emulator)
-		migration.RegisterContractUpdates(stagedContracts)
-
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(flow.Emulator, log)
+		migration.RegisterContractUpdates(stagedContracts)
+
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
@@ -106,12 +107,13 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(flow.Emulator).
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(flow.Emulator, log).
 			WithContractUpdateValidation()
 		migration.RegisterContractUpdates(stagedContracts)
 
-		logWriter := &logWriter{}
-		log := zerolog.New(logWriter)
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
@@ -149,12 +151,13 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(flow.Emulator).
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(flow.Emulator, log).
 			WithContractUpdateValidation()
 		migration.RegisterContractUpdates(stagedContracts)
 
-		logWriter := &logWriter{}
-		log := zerolog.New(logWriter)
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
@@ -202,12 +205,13 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(flow.Emulator).
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(flow.Emulator, log).
 			WithContractUpdateValidation()
 		migration.RegisterContractUpdates(stagedContracts)
 
-		logWriter := &logWriter{}
-		log := zerolog.New(logWriter)
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
@@ -248,11 +252,12 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(flow.Emulator)
-		migration.RegisterContractUpdates(stagedContracts)
-
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(flow.Emulator, log)
+		migration.RegisterContractUpdates(stagedContracts)
+
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
@@ -310,10 +315,11 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(flow.Emulator)
-
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(flow.Emulator, log)
+
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
@@ -355,10 +361,11 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(flow.Emulator)
-
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(flow.Emulator, log)
+
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
@@ -425,11 +432,12 @@ func TestStagedContractsWithImports(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(flow.Emulator)
-		migration.RegisterContractUpdates(stagedContracts)
-
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(flow.Emulator, log)
+		migration.RegisterContractUpdates(stagedContracts)
+
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
@@ -485,12 +493,13 @@ func TestStagedContractsWithImports(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(flow.Emulator).
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(flow.Emulator, log).
 			WithContractUpdateValidation()
 		migration.RegisterContractUpdates(stagedContracts)
 
-		logWriter := &logWriter{}
-		log := zerolog.New(logWriter)
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
@@ -563,12 +572,13 @@ func TestStagedContractsWithImports(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(flow.Emulator).
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(flow.Emulator, log).
 			WithContractUpdateValidation()
 		migration.RegisterContractUpdates(stagedContracts)
 
-		logWriter := &logWriter{}
-		log := zerolog.New(logWriter)
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
@@ -757,12 +767,13 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(chainID)
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(chainID, log)
 		migration.RegisterContractUpdates(stagedContracts)
 		migration.WithContractUpdateValidation()
 
-		logWriter := &logWriter{}
-		log := zerolog.New(logWriter)
 		err = migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
@@ -830,12 +841,13 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 			},
 		}
 
-		migration := NewStagedContractsMigration(chainID)
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(chainID, log)
 		migration.RegisterContractUpdates(stagedContracts)
 		migration.WithContractUpdateValidation()
 
-		logWriter := &logWriter{}
-		log := zerolog.New(logWriter)
 		err = migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
