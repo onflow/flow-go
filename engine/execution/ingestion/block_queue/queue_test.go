@@ -29,7 +29,7 @@ func TestSingleBlockBecomeReady(t *testing.T) {
 	requireExecutableHas(t, executables)
 
 	// verify receving a block (A) will return missing collection (C1)
-	missing, executables, err := q.OnBlock(blockA, commitFor("R"))
+	missing, executables, err := q.HandleBlock(blockA, commitFor("R"))
 	require.NoError(t, err)
 	require.Empty(t, executables)
 	requireCollectionHas(t, missing, c1)
@@ -66,34 +66,34 @@ func TestMultipleBlockBecomesReady(t *testing.T) {
 	q := NewBlockQueue(unittest.Logger())
 
 	// verify receiving blocks without collections will return missing collections and no executables
-	missing, executables, err := q.OnBlock(blockA, commitFor("R"))
+	missing, executables, err := q.HandleBlock(blockA, commitFor("R"))
 	require.NoError(t, err)
 	require.Empty(t, executables)
 	requireCollectionHas(t, missing, c1)
 
-	missing, executables, err = q.OnBlock(blockB, nil)
+	missing, executables, err = q.HandleBlock(blockB, nil)
 	require.NoError(t, err)
 	require.Empty(t, executables) // because A is not executed
 	requireCollectionHas(t, missing, c2, c3)
 
 	// creating forks
-	missing, executables, err = q.OnBlock(blockE, nil)
+	missing, executables, err = q.HandleBlock(blockE, nil)
 	require.NoError(t, err)
 	require.Empty(t, executables) // because A is not executed
 	requireCollectionHas(t, missing, c4, c5)
 
 	// creating forks with empty block
-	missing, executables, err = q.OnBlock(blockG, nil)
+	missing, executables, err = q.HandleBlock(blockG, nil)
 	require.NoError(t, err)
 	require.Empty(t, executables) // because E is not executed
 	requireCollectionHas(t, missing)
 
-	missing, executables, err = q.OnBlock(blockF, nil)
+	missing, executables, err = q.HandleBlock(blockF, nil)
 	require.NoError(t, err)
 	require.Empty(t, executables) // because E is not executed
 	requireCollectionHas(t, missing, c6)
 
-	missing, executables, err = q.OnBlock(blockC, nil)
+	missing, executables, err = q.HandleBlock(blockC, nil)
 	require.NoError(t, err)
 	require.Empty(t, executables) // because B is not executed
 	require.Empty(t, missing)
@@ -147,7 +147,7 @@ func TestMultipleBlockBecomesReady(t *testing.T) {
 	requireExecutableHas(t, executables)
 
 	// verify receiving a block whose parent was executed before
-	missing, executables, err = q.OnBlock(blockD, commitFor("C"))
+	missing, executables, err = q.HandleBlock(blockD, commitFor("C"))
 	require.NoError(t, err)
 	require.Empty(t, missing)
 	requireExecutableHas(t, executables, blockD)
@@ -181,26 +181,26 @@ func TestOnForksWithSameCollections(t *testing.T) {
 
 	q := NewBlockQueue(unittest.Logger())
 
-	missing, executables, err := q.OnBlock(blockA, commitFor("R"))
+	missing, executables, err := q.HandleBlock(blockA, commitFor("R"))
 	require.NoError(t, err)
 	requireExecutableHas(t, executables, blockA)
 	requireCollectionHas(t, missing)
 
 	// receiving block B and D which have the same collections (C1, C2)
-	missing, executables, err = q.OnBlock(blockB, nil)
+	missing, executables, err = q.HandleBlock(blockB, nil)
 	require.NoError(t, err)
 	require.Empty(t, executables)
 	requireCollectionHas(t, missing, c1, c2)
 
 	// receiving block F (C1, C2, C3)
-	missing, executables, err = q.OnBlock(blockF, nil)
+	missing, executables, err = q.HandleBlock(blockF, nil)
 	require.NoError(t, err)
 	require.Empty(t, executables)
 	requireCollectionHas(t, missing, c3) // c1 and c2 are requested before, only c3 is missing
 
 	// verify receiving D will not return any missing collections because
 	// missing collections were returned when receiving B
-	missing, executables, err = q.OnBlock(blockD, nil)
+	missing, executables, err = q.HandleBlock(blockD, nil)
 	require.NoError(t, err)
 	require.Empty(t, executables)
 	requireCollectionHas(t, missing)
@@ -223,12 +223,12 @@ func TestOnForksWithSameCollections(t *testing.T) {
 	// but only one block (C) whose parent (B) is executed, then only that block (C) becomes executable
 	// the other block (E) is not executable
 
-	missing, executables, err = q.OnBlock(blockC, nil)
+	missing, executables, err = q.HandleBlock(blockC, nil)
 	require.NoError(t, err)
 	require.Empty(t, executables)
 	requireCollectionHas(t, missing) // because C3 is requested when F is received
 
-	missing, executables, err = q.OnBlock(blockE, nil)
+	missing, executables, err = q.HandleBlock(blockE, nil)
 	require.NoError(t, err)
 	require.Empty(t, executables)
 	requireCollectionHas(t, missing)
@@ -277,7 +277,7 @@ func TestOnBlockWithMissingParentCommit(t *testing.T) {
 
 	q := NewBlockQueue(unittest.Logger())
 
-	missing, executables, err := q.OnBlock(blockA, commitFor("R"))
+	missing, executables, err := q.HandleBlock(blockA, commitFor("R"))
 	require.NoError(t, err)
 	require.Empty(t, executables)
 	requireCollectionHas(t, missing, c1)
@@ -296,11 +296,11 @@ func TestOnBlockWithMissingParentCommit(t *testing.T) {
 	requireQueueIsEmpty(t, q)
 
 	// verify when race condition happens, ErrMissingParent will be returned
-	_, _, err = q.OnBlock(blockB, nil)
+	_, _, err = q.HandleBlock(blockB, nil)
 	require.True(t, errors.Is(err, ErrMissingParent), err)
 
 	// verify if called again with parent commit, it will be successful
-	missing, executables, err = q.OnBlock(blockB, commitFor("A"))
+	missing, executables, err = q.HandleBlock(blockB, commitFor("A"))
 	require.NoError(t, err)
 	require.Empty(t, executables)
 	requireCollectionHas(t, missing, c2, c3)

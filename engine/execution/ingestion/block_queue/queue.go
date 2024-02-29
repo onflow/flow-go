@@ -71,14 +71,14 @@ func NewBlockQueue(logger zerolog.Logger) *BlockQueue {
 	}
 }
 
-// OnBlock is called when a new block is received, the parentFinalState indicates
+// HandleBlock is called when a new block is received, the parentFinalState indicates
 // whether its parent block has been executed.
 // Caller must ensure:
 // 1. blocks are passsed in order, i.e. parent block is passed in before its child block
 // 2. if a block's parent is not executed, then the parent block must be passed in first
 // 3. if a block's parent is executed, then the parent's finalState must be passed in
 // It returns (nil, nil, nil) if this block is a duplication
-func (q *BlockQueue) OnBlock(block *flow.Block, parentFinalState *flow.StateCommitment) (
+func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.StateCommitment) (
 	[]*MissingCollection, // missing collections
 	[]*entity.ExecutableBlock, // blocks ready to execute
 	error, // exceptions
@@ -112,7 +112,10 @@ func (q *BlockQueue) OnBlock(block *flow.Block, parentFinalState *flow.StateComm
 			return nil, executables, nil
 		}
 
-		// this is an edge case could be ignored
+		// this means the caller think it's parent has not been executed, but the queue's internal state
+		// shows the parent has been executed, then it's probably a race condition where the call to
+		// inform the parent block has been executed arrives earlier than this call, which is an edge case
+		// and we can simply ignore this call.
 		if executable.StartState != nil && parentFinalState == nil {
 			q.log.Warn().
 				Str("blockID", blockID.String()).
@@ -229,7 +232,7 @@ func (q *BlockQueue) OnCollection(collection *flow.Collection) ([]*entity.Execut
 	// update collection
 	colInfo.Collection.Transactions = collection.Transactions
 
-	// check if any block, which includes this collection, become executable
+	// check if any block, which includes this collection, became executable
 	executables := make([]*entity.ExecutableBlock, 0, len(colInfo.IncludedIn))
 	for _, block := range colInfo.IncludedIn {
 		if !block.IsComplete() {
