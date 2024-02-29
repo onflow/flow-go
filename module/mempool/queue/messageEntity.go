@@ -3,6 +3,7 @@ package queue
 import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"strconv"
 	"time"
 )
 
@@ -30,7 +31,7 @@ func NewMessageEntityWithNonce(msg *engine.Message) MessageEntity {
 		Nonce string
 	}{
 		msg,
-		time.Now().String(),
+		strconv.FormatInt(time.Now().UnixNano(), 10),
 	})
 	return MessageEntity{
 		Msg: *msg,
