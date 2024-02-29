@@ -51,7 +51,6 @@ type BlockTrackerImpl struct {
 // - state: The protocol state used for retrieving block information.
 // - rootHeight: The root block height, serving as the baseline for calculating the start height.
 // - headers: The storage headers for accessing block headers.
-// - highestAvailableFinalizedHeight: The highest available finalized block height.
 // - broadcaster: The engine broadcaster for publishing notifications.
 // - indexReporter: The index reporter for checking indexed block heights.
 // - useIndex: A flag indicating whether to use indexed block heights for validation.
@@ -63,11 +62,15 @@ func NewBlockTracker(
 	state protocol.State,
 	rootHeight uint64,
 	headers storage.Headers,
-	highestAvailableFinalizedHeight uint64,
 	broadcaster *engine.Broadcaster,
 	indexReporter state_synchronization.IndexReporter,
 	useIndex bool,
 ) (*BlockTrackerImpl, error) {
+	lastFinalized, err := state.Final().Head()
+	if err != nil {
+		return nil, irrecoverable.NewExceptionf("could not retrieve last finalized block: %w", err)
+	}
+
 	lastSealed, err := state.Sealed().Head()
 	if err != nil {
 		return nil, irrecoverable.NewExceptionf("could not retrieve last sealed block: %w", err)
@@ -76,7 +79,7 @@ func NewBlockTracker(
 	return &BlockTrackerImpl{
 		BaseTrackerImpl:        NewBaseTrackerImpl(rootHeight, state, headers, indexReporter, useIndex),
 		state:                  state,
-		finalizedHighestHeight: counters.NewMonotonousCounter(highestAvailableFinalizedHeight),
+		finalizedHighestHeight: counters.NewMonotonousCounter(lastFinalized.Height),
 		sealedHighestHeight:    counters.NewMonotonousCounter(lastSealed.Height),
 		broadcaster:            broadcaster,
 	}, nil

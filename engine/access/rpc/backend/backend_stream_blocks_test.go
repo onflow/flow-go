@@ -165,7 +165,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 		},
 	).Maybe()
 
-	s.snapshot.On("Head").Return(s.rootBlock.Header, nil).Once()
+	s.snapshot.On("Head").Return(s.rootBlock.Header, nil).Twice()
 	s.state.On("Final").Return(s.snapshot, nil).Maybe()
 	s.state.On("Sealed").Return(s.snapshot, nil).Maybe()
 
@@ -178,7 +178,6 @@ func (s *BackendBlocksSuite) SetupTest() {
 		s.state,
 		s.rootBlock.Header.Height,
 		s.headers,
-		s.rootBlock.Header.Height,
 		s.broadcaster,
 		nil,
 		false,
@@ -302,7 +301,7 @@ func (s *BackendBlocksSuite) setupErrorTestCases() {
 	}
 }
 
-func (s *BackendBlocksSuite) setupChainStateMock(blockStatus flow.BlockStatus, highestHeader *flow.Header) {
+func (s *BackendBlocksSuite) setupBlockTrackerMock(blockStatus flow.BlockStatus, highestHeader *flow.Header) {
 	s.blockTracker.On("GetHighestHeight", mock.Anything).Unset()
 	s.blockTracker.On("GetHighestHeight", blockStatus).Return(highestHeader.Height, nil)
 
@@ -352,7 +351,7 @@ func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 			// add "backfill" block - blocks that are already in the database before the test starts
 			// this simulates a subscription on a past block
 			if test.highestBackfill > 0 {
-				s.setupChainStateMock(test.blockStatus, s.blocksArray[test.highestBackfill].Header)
+				s.setupBlockTrackerMock(test.blockStatus, s.blocksArray[test.highestBackfill].Header)
 			}
 
 			subCtx, subCancel := context.WithCancel(ctx)
@@ -365,7 +364,7 @@ func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 				// simulate new block received.
 				// all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
-					s.setupChainStateMock(test.blockStatus, b.Header)
+					s.setupBlockTrackerMock(test.blockStatus, b.Header)
 
 					s.broadcaster.Publish()
 				}
