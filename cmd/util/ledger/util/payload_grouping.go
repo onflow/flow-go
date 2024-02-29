@@ -273,3 +273,12 @@ func mergeInto(source, buffer sortablePayloads, i int, mid int, j int) {
 	// Copy merged buffer back to source.
 	copy(source[i:j], buffer[i:j])
 }
+
+func SortPayloadsByAddress(payloads []*ledger.Payload, nWorkers int) []*ledger.Payload {
+	p := sortablePayloads(payloads)
+
+	// Sort the payloads by address
+	sortPayloads(0, len(p), p, make(sortablePayloads, len(p)), nWorkers)
+
+	return p
+}
