@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 
@@ -20,9 +21,8 @@ import (
 type BlockTracker interface {
 	BaseTracker
 	// GetHighestHeight returns the highest height based on the specified block status.
-	// Only flow.BlockStatusFinalized and flow.BlockStatusSealed are allowed.
 	//
-	// Returns expected errors:
+	// Expected errors during normal operation:
 	// - codes.InvalidArgument: If the specified block status is unsupported.
 	GetHighestHeight(flow.BlockStatus) (uint64, error)
 	// ProcessOnFinalizedBlock drives the subscription logic when a block is finalized.
@@ -70,7 +70,7 @@ func NewBlockTracker(
 ) (*BlockTrackerImpl, error) {
 	lastSealed, err := state.Sealed().Head()
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve last sealed block: %w", err)
+		return nil, irrecoverable.NewExceptionf("could not retrieve last sealed block: %w", err)
 	}
 
 	return &BlockTrackerImpl{
@@ -96,16 +96,15 @@ func NewBlockTracker(
 // - uint64: The start height for searching.
 // - error: An error indicating the result of the operation, if any.
 //
-// Returns expected errors:
-// - codes.InvalidArgument: If blockStatus is flow.BlockStatusUnknown, or both startBlockID and startHeight are provided.
+// Expected errors during normal operation:
+// - codes.InvalidArgument: If both startBlockID and startHeight are provided.
 // - storage.ErrNotFound`: If a block is provided and does not exist.
 // - codes.Internal: If there is an internal error.
 func (b *BlockTrackerImpl) GetStartHeight(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) (height uint64, err error) {
 	return b.BaseTrackerImpl.GetStartHeight(ctx, startBlockID, startHeight)
 }
 
-// GetHighestHeight returns the highest height based on the specified block status. Only flow.BlockStatusFinalized
-// and flow.BlockStatusSealed allowed.
+// GetHighestHeight returns the highest height based on the specified block status.
 //
 // Returns expected errors:
 // - codes.InvalidArgument: If the specified block status is unsupported.

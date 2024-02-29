@@ -717,7 +717,7 @@ func (h *Handler) GetExecutionResultByID(ctx context.Context, req *access.GetExe
 // The handler manages the subscription to block updates and sends the subscribed block information
 // to the client via the provided stream.
 //
-// Expected errors:
+// Expected errors during normal operation:
 // - codes.InvalidArgument - if invalid startBlockID provided or unknown block status provided,
 // - codes.ResourceExhausted - if the maximum number of streams is reached.
 // - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
@@ -771,7 +771,7 @@ func (h *Handler) SubscribeBlocks(request *access.SubscribeBlocksRequest, stream
 // Each block header are filtered by the provided block status, and only
 // those block headers that match the status are returned.
 //
-// Expected errors:
+// Expected errors during normal operation:
 // - codes.InvalidArgument - if invalid startBlockID provided or unknown block status provided,
 // - codes.ResourceExhausted - if the maximum number of streams is reached.
 // - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block header to message or could not send response.
@@ -830,7 +830,7 @@ func (h *Handler) SubscribeBlockHeaders(request *access.SubscribeBlockHeadersReq
 // Each lightweight block are filtered by the provided block status, and only
 // those blocks that match the status are returned.
 //
-// Expected errors:
+// Expected errors during normal operation:
 // - codes.InvalidArgument - if invalid startBlockID provided or unknown block status provided,
 // - codes.ResourceExhausted - if the maximum number of streams is reached.
 // - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
@@ -882,7 +882,8 @@ func (h *Handler) SubscribeBlockDigests(request *access.SubscribeBlockDigestsReq
 // - uint64: The start block height for searching.
 // - flow.BlockStatus: Block status.
 // - error: An error indicating the result of the operation, if any.
-// Errors:
+//
+// Expected errors during normal operation:
 // - codes.InvalidArgument: If blockStatus is flow.BlockStatusUnknown, or startBlockID could not convert to flow.Identifier.
 func (h *Handler) getStartData(msg *access.StartBlock, msgBlockStatus entities.BlockStatus) (flow.Identifier, uint64, flow.BlockStatus, error) {
 	var err error
@@ -991,7 +992,7 @@ func WithBlockSignerDecoder(signerIndicesDecoder hotstuff.BlockSignerDecoder) fu
 
 // checkBlockStatus checks the validity of the provided block status.
 //
-// Errors:
+// Expected errors during normal operation:
 // - codes.InvalidArgument - if blockStatus is flow.BlockStatusUnknown
 func checkBlockStatus(blockStatus flow.BlockStatus) error {
 	if blockStatus != flow.BlockStatusFinalized && blockStatus != flow.BlockStatusSealed {

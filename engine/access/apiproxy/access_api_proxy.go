@@ -3,6 +3,7 @@ package apiproxy
 import (
 	"context"
 
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/rs/zerolog"
@@ -231,19 +232,23 @@ func (h *FlowAccessAPIRouter) GetExecutionResultByID(context context.Context, re
 }
 
 func (h *FlowAccessAPIRouter) SubscribeBlocks(req *access.SubscribeBlocksRequest, server access.AccessAPI_SubscribeBlocksServer) error {
-	panic("not implemented")
+	// SubscribeBlocks is not implemented for observer yet
+	return status.Errorf(codes.Unimplemented, "method SubscribeBlocks not implemented")
 }
 
 func (h *FlowAccessAPIRouter) SubscribeBlockHeaders(req *access.SubscribeBlockHeadersRequest, server access.AccessAPI_SubscribeBlockHeadersServer) error {
-	panic("not implemented")
+	// SubscribeBlockHeaders is not implemented for observer yet
+	return status.Errorf(codes.Unimplemented, "method SubscribeBlockHeaders not implemented")
 }
 
 func (h *FlowAccessAPIRouter) SubscribeBlockDigests(req *access.SubscribeBlockDigestsRequest, server access.AccessAPI_SubscribeBlockDigestsServer) error {
-	panic("not implemented")
+	// SubscribeBlockDigests is not implemented for observer yet
+	return status.Errorf(codes.Unimplemented, "method SubscribeBlockDigests not implemented")
 }
 
 func (h *FlowAccessAPIRouter) SendAndSubscribeTransactionStatuses(req *access.SendAndSubscribeTransactionStatusesRequest, server access.AccessAPI_SendAndSubscribeTransactionStatusesServer) error {
-	panic("not implemented")
+	//SendAndSubscribeTransactionStatuses is not implemented for observer yet
+	return status.Errorf(codes.Unimplemented, "method SendAndSubscribeTransactionStatuses not implemented")
 }
 
 // FlowAccessAPIForwarder forwards all requests to a set of upstream access nodes or observers

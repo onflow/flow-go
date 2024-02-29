@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -49,10 +47,6 @@ func (b *backendSubscribeBlocks) SubscribeBlockDigests(ctx context.Context, star
 
 // subscribe is common method of the backendSubscribeBlocks struct that allows clients to subscribe to different types of block data.
 func (b *backendSubscribeBlocks) subscribe(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus, getData subscription.GetDataByHeightFunc) subscription.Subscription {
-	// block status could be only sealed and finalized
-	if blockStatus != flow.BlockStatusSealed && blockStatus != flow.BlockStatusFinalized {
-		return subscription.NewFailedSubscription(status.Errorf(codes.InvalidArgument, "invalid block status"), "block status must be either sealed or finalized")
-	}
 	nextHeight, err := b.getStartHeight(ctx, startBlockID, startHeight)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")

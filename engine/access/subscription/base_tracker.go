@@ -44,8 +44,8 @@ type BaseTracker interface {
 	// If a block is provided and does not exist, a NotFound error is returned.
 	// If neither startBlockID nor startHeight is provided, the latest sealed block is used.
 	//
-	// Returns expected errors:
-	// - codes.InvalidArgument: If blockStatus is flow.BlockStatusUnknown, or both startBlockID and startHeight are provided.
+	// Expected errors during normal operation:
+	// - codes.InvalidArgument: If both startBlockID and startHeight are provided.
 	// - storage.ErrNotFound`: If a block is provided and does not exist.
 	// - codes.Internal: If there is an internal error.
 	GetStartHeight(context.Context, flow.Identifier, uint64) (uint64, error)
@@ -60,6 +60,8 @@ type BaseTrackerImpl struct {
 	indexReporter state_synchronization.IndexReporter
 	useIndex      bool
 }
+
+var _ BaseTracker = (*BaseTrackerImpl)(nil)
 
 // NewBaseTrackerImpl creates a new instance of BaseTrackerImpl.
 //
@@ -101,7 +103,7 @@ func NewBaseTrackerImpl(
 // - uint64: The start height for searching.
 // - error: An error indicating the result of the operation, if any.
 //
-// Returns expected errors::
+// Expected errors during normal operation:
 // - codes.InvalidArgument: If blockStatus is flow.BlockStatusUnknown, or both startBlockID and startHeight are provided.
 // - storage.ErrNotFound`: If a block is provided and does not exist.
 // - codes.Internal: If there is an internal error.
@@ -140,6 +142,17 @@ func (b *BaseTrackerImpl) GetStartHeight(ctx context.Context, startBlockID flow.
 	return header.Height, nil
 }
 
+// startHeightFromBlockID returns the start height based on the provided starting block ID.
+//
+// Parameters:
+// - startBlockID: The identifier of the starting block
+//
+// Returns:
+// - uint64: The start height associated with the provided block ID.
+// - error: An error indicating any issues with retrieving the start height.
+//
+// Expected errors during normal operation:
+// - rpc.ConvertStorageError: If there is an issue retrieving the header from the storage.
 func (b *BaseTrackerImpl) startHeightFromBlockID(startBlockID flow.Identifier) (uint64, error) {
 	header, err := b.headers.ByBlockID(startBlockID)
 	if err != nil {
@@ -148,6 +161,18 @@ func (b *BaseTrackerImpl) startHeightFromBlockID(startBlockID flow.Identifier) (
 	return header.Height, nil
 }
 
+// startHeightFromHeight returns the start height based on the provided starting block height.
+//
+// Parameters:
+// - startHeight: The height of the starting block.
+//
+// Returns:
+// - uint64: The start height associated with the provided block height.
+// - error: An error indicating any issues with retrieving the start height.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument: If the start height is less than the root block height.
+// - rpc.ConvertStorageError: If there is an issue retrieving the header from the storage.
 func (b *BaseTrackerImpl) startHeightFromHeight(startHeight uint64) (uint64, error) {
 	if startHeight < b.rootBlockHeight {
 		return 0, status.Errorf(codes.InvalidArgument, "start height must be greater than or equal to the root height %d", b.rootBlockHeight)
@@ -160,6 +185,29 @@ func (b *BaseTrackerImpl) startHeightFromHeight(startHeight uint64) (uint64, err
 	return header.Height, nil
 }
 
+// checkStartHeight validates the provided start height and adjusts it if necessary based on the tracker's configuration.
+//
+// Parameters:
+// - height: The start height to be checked.
+//
+// Returns:
+// - uint64: The adjusted start height, if validation passes.
+// - error: An error indicating any issues with the provided start height.
+//
+// Validation Steps:
+// 1. If the start block is the root block, there won't be execution data. Skip it and begin from the next block.
+// 2. If index usage is disabled, return the original height without further checks.
+// 3. Retrieve the lowest and highest indexed block heights.
+// 4. Check if the provided height is within the bounds of indexed heights.
+//   - If below the lowest indexed height, return codes.InvalidArgument error.
+//   - If above the highest indexed height, return codes.InvalidArgument error.
+//
+// 5. If validation passes, return the adjusted start height.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if the start height is out of bounds based on indexed heights.
+// - codes.FailedPrecondition - if the index reporter is not ready yet.
+// - codes.Internal - for any other error during validation.
 func (b *BaseTrackerImpl) checkStartHeight(height uint64) (uint64, error) {
 	// if the start block is the root block, there will not be an execution data. skip it and
 	// begin from the next block.
@@ -171,7 +219,7 @@ func (b *BaseTrackerImpl) checkStartHeight(height uint64) (uint64, error) {
 		return height, nil
 	}
 
-	lowestHeight, highestHeight, err := b.getIndexerHeights()
+	lowestHeight, highestHeight, err := b.getIndexedHeightBound()
 	if err != nil {
 		return 0, err
 	}
@@ -187,11 +235,11 @@ func (b *BaseTrackerImpl) checkStartHeight(height uint64) (uint64, error) {
 	return height, nil
 }
 
-// getIndexerHeights returns the lowest and highest indexed block heights
+// getIndexedHeightBound returns the lowest and highest indexed block heights
 // Expected errors during normal operation:
 // - codes.FailedPrecondition: if the index reporter is not ready yet.
 // - codes.Internal: if there was any other error getting the heights.
-func (b *BaseTrackerImpl) getIndexerHeights() (uint64, uint64, error) {
+func (b *BaseTrackerImpl) getIndexedHeightBound() (uint64, uint64, error) {
 	lowestHeight, err := b.indexReporter.LowestIndexedHeight()
 	if err != nil {
 		if errors.Is(err, storage.ErrHeightNotIndexed) || errors.Is(err, indexer.ErrIndexNotInitialized) {

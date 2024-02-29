@@ -75,8 +75,8 @@ func NewExecutionDataTracker(
 // - uint64: The start height for searching.
 // - error: An error indicating the result of the operation, if any.
 //
-// Returns expected errors::
-// - codes.InvalidArgument: If blockStatus is flow.BlockStatusUnknown, or both startBlockID and startHeight are provided.
+// Expected errors during normal operation:
+// - codes.InvalidArgument: If both startBlockID and startHeight are provided.
 // - storage.ErrNotFound`: If a block is provided and does not exist.
 // - codes.Internal: If there is an internal error.
 func (e *ExecutionDataTrackerImpl) GetStartHeight(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) (height uint64, err error) {
@@ -85,7 +85,7 @@ func (e *ExecutionDataTrackerImpl) GetStartHeight(ctx context.Context, startBloc
 
 // OnExecutionData is used to notify the tracker when a new execution data is received.
 //
-// Returns expected errors:
+// Expected errors during normal operation:
 // - storage.ErrNotFound if no block header with the given ID exists
 func (e *ExecutionDataTrackerImpl) OnExecutionData(executionData *execution_data.BlockExecutionDataEntity) error {
 	header, err := e.headers.ByBlockID(executionData.BlockID)

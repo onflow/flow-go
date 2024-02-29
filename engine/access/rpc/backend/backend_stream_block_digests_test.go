@@ -124,19 +124,16 @@ func (s *BackendBlockDigestSuite) TestSubscribeBlockDigests() {
 //
 // Test Cases:
 //
-// 1. Returns error for unknown block status:
-//   - Verifies that attempting to subscribe to lightweight blocks with an unknown block status results in an InvalidArgument error.
-//
-// 2. Returns error if both start blockID and start height are provided:
+// 1. Returns error if both start blockID and start height are provided:
 //   - Ensures that providing both start block ID and start height results in an InvalidArgument error.
 //
-// 3. Returns error for start height before root height:
+// 2. Returns error for start height before root height:
 //   - Validates that attempting to subscribe to lightweight blocks with a start height before the root height results in an InvalidArgument error.
 //
-// 4. Returns error for unindexed start blockID:
+// 3. Returns error for unindexed start blockID:
 //   - Tests that subscribing to lightweight blocks with an unindexed start block ID results in a NotFound error.
 //
-// 5. Returns error for unindexed start height:
+// 4. Returns error for unindexed start height:
 //   - Tests that subscribing to lightweight blocks with an unindexed start height results in a NotFound error.
 //
 // Each test case checks for specific error conditions and ensures that the SubscribeBlockDigests method responds appropriately.
