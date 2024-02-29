@@ -2,6 +2,14 @@ package kvstore
 
 import "github.com/onflow/flow-go/state/protocol/protocol_state"
 
+type upgradableModel struct {
+	VersionUpgrade protocol_state.ViewBasedActivator[uint64]
+}
+
+func (model *upgradableModel) SetProtocolStateVersion(activator protocol_state.ViewBasedActivator[uint64]) {
+	model.VersionUpgrade = activator
+}
+
 // This file contains the concrete types that define the structure of the
 // underlying key-value store for a particular Protocol State version.
 // Essentially enumerating the set of keys and values that are supported.
@@ -15,7 +23,9 @@ import "github.com/onflow/flow-go/state/protocol/protocol_state"
 // any software version. Since it is important that the store support managing
 // different model version, this is here so that we can test the implementation
 // with multiple supported KV model versions from the beginning.
-type modelv0 struct{}
+type modelv0 struct {
+	upgradableModel
+}
 
 var _ protocol_state.Reader = new(modelv0)
 var _ protocol_state.API = new(modelv0)
@@ -46,6 +56,8 @@ func (model *modelv0) SetInvalidEpochTransitionAttempted(_ bool) error {
 // This represents the first model version which will be considered "latest" by any
 // deployed software version.
 type modelv1 struct {
+	upgradableModel
+
 	// InvalidEpochTransitionAttempted encodes whether an invalid epoch transition
 	// has been detected in this fork. Under normal operations, this value is false.
 	// Node-internally, the EpochFallback notification is emitted when a block is

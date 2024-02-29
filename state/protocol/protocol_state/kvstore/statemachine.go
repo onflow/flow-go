@@ -9,6 +9,7 @@ import (
 type ProcessingStateMachine struct {
 	view        uint64
 	parentState protocol_state.Reader
+	state       protocol_state.API
 }
 
 var _ protocol_state.KeyValueStoreStateMachine = (*ProcessingStateMachine)(nil)
@@ -37,7 +38,11 @@ func (m *ProcessingStateMachine) ProcessUpdate(update *flow.ServiceEvent) error 
 				m.parentState.GetProtocolStateVersion(), versionUpgrade.NewProtocolStateVersion)
 		}
 
-		// set new protocol version and activation view.
+		activator := protocol_state.ViewBasedActivator[uint64]{
+			Data:           versionUpgrade.NewProtocolStateVersion,
+			ActivationView: versionUpgrade.ActiveView,
+		}
+		m.state.SetProtocolStateVersion(activator)
 
 	default:
 		return nil

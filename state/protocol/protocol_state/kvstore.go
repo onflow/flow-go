@@ -2,6 +2,12 @@ package protocol_state
 
 import "github.com/onflow/flow-go/model/flow"
 
+// ViewBasedActivator allows setting value that will be active from specific view.
+type ViewBasedActivator[T any] struct {
+	Data           T
+	ActivationView uint64 // view at which data will be active
+}
+
 // VersionedEncodable defines the interface for a versioned key-value store independent
 // of the set of keys which are supported. This allows the storage layer to support
 // storing different key-value model versions within the same software version.
@@ -50,6 +56,12 @@ type Reader interface {
 // for this software version.
 type API interface {
 	Reader
+
+	// v0
+
+	// SetProtocolStateVersion sets the Protocol State version. This method is used
+	// to update the Protocol State version when a flow.ProtocolStateVersionUpgrade is processed.
+	SetProtocolStateVersion(version ViewBasedActivator[uint64])
 
 	// v1
 
