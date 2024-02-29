@@ -163,6 +163,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 	return MergeRegisterChanges(
 		migrationRuntime.Snapshot.Payloads,
 		result.WriteSet,
+		flow.ConvertAddress(address),
 		m.log,
 	)
 }

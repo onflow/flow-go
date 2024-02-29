@@ -53,6 +53,8 @@ func NewTransactionBasedMigration(
 		return MergeRegisterChanges(
 			snapshot.Payloads,
 			executionSnapshot.WriteSet,
+			// we expect more  than one address to change here
+			flow.EmptyAddress,
 			logger,
 		)
 	}
