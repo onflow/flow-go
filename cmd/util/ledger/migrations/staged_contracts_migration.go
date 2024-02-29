@@ -126,7 +126,7 @@ func (m *StagedContractsMigration) RegisterContractChange(change StagedContract)
 	chain := m.chainID.Chain()
 
 	if _, err := chain.IndexFromAddress(flow.Address(address)); err != nil {
-		m.log.Fatal().Msgf(
+		m.log.Error().Msgf(
 			"invalid contract update: invalid address for chain %s: %s (%s)",
 			m.chainID,
 			address.HexWithPrefix(),
