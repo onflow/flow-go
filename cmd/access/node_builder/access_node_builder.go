@@ -1583,8 +1583,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.executionDataConfig.InitialBlockHeight,
 				node.Storage.Headers,
 				broadcaster,
-				builder.EventsIndex,
-				useIndex,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("failed to initialize block tracker: %w", err)

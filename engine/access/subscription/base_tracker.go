@@ -9,11 +9,9 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/common/rpc"
-	"github.com/onflow/flow-go/fvm/errors"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/state_synchronization"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -56,9 +54,6 @@ type BaseTrackerImpl struct {
 	rootBlockHeight uint64
 	state           protocol.State
 	headers         storage.Headers
-
-	indexReporter state_synchronization.IndexReporter
-	useIndex      bool
 }
 
 var _ BaseTracker = (*BaseTrackerImpl)(nil)
@@ -77,15 +72,11 @@ var _ BaseTracker = (*BaseTrackerImpl)(nil)
 func NewBaseTrackerImpl(
 	rootBlockHeight uint64,
 	state protocol.State,
-	headers storage.Headers,
-	indexReporter state_synchronization.IndexReporter,
-	useIndex bool) *BaseTrackerImpl {
+	headers storage.Headers) *BaseTrackerImpl {
 	return &BaseTrackerImpl{
 		rootBlockHeight: rootBlockHeight,
 		state:           state,
 		headers:         headers,
-		indexReporter:   indexReporter,
-		useIndex:        useIndex,
 	}
 }
 
@@ -107,19 +98,11 @@ func NewBaseTrackerImpl(
 // - codes.InvalidArgument: If blockStatus is flow.BlockStatusUnknown, or both startBlockID and startHeight are provided.
 // - storage.ErrNotFound`: If a block is provided and does not exist.
 // - codes.Internal: If there is an internal error.
-func (b *BaseTrackerImpl) GetStartHeight(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) (height uint64, err error) {
-
+func (b *BaseTrackerImpl) GetStartHeight(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
 	// make sure only one of start block ID and start height is provided
 	if startBlockID != flow.ZeroID && startHeight > 0 {
 		return 0, status.Errorf(codes.InvalidArgument, "only one of start block ID and start height may be provided")
 	}
-
-	// ensure that the resolved start height is available
-	defer func() {
-		if err == nil {
-			height, err = b.checkStartHeight(height)
-		}
-	}()
 
 	if startBlockID != flow.ZeroID {
 		return b.startHeightFromBlockID(startBlockID)
@@ -183,80 +166,4 @@ func (b *BaseTrackerImpl) startHeightFromHeight(startHeight uint64) (uint64, err
 		return 0, rpc.ConvertStorageError(fmt.Errorf("could not get header for height %d: %w", startHeight, err))
 	}
 	return header.Height, nil
-}
-
-// checkStartHeight validates the provided start height and adjusts it if necessary based on the tracker's configuration.
-//
-// Parameters:
-// - height: The start height to be checked.
-//
-// Returns:
-// - uint64: The adjusted start height, if validation passes.
-// - error: An error indicating any issues with the provided start height.
-//
-// Validation Steps:
-// 1. If the start block is the root block, there won't be execution data. Skip it and begin from the next block.
-// 2. If index usage is disabled, return the original height without further checks.
-// 3. Retrieve the lowest and highest indexed block heights.
-// 4. Check if the provided height is within the bounds of indexed heights.
-//   - If below the lowest indexed height, return codes.InvalidArgument error.
-//   - If above the highest indexed height, return codes.InvalidArgument error.
-//
-// 5. If validation passes, return the adjusted start height.
-//
-// Expected errors during normal operation:
-// - codes.InvalidArgument - if the start height is out of bounds based on indexed heights.
-// - codes.FailedPrecondition - if the index reporter is not ready yet.
-// - codes.Internal - for any other error during validation.
-func (b *BaseTrackerImpl) checkStartHeight(height uint64) (uint64, error) {
-	// if the start block is the root block, there will not be an execution data. skip it and
-	// begin from the next block.
-	if height == b.rootBlockHeight {
-		height = b.rootBlockHeight + 1
-	}
-
-	if !b.useIndex {
-		return height, nil
-	}
-
-	lowestHeight, highestHeight, err := b.getIndexedHeightBound()
-	if err != nil {
-		return 0, err
-	}
-
-	if height < lowestHeight {
-		return 0, status.Errorf(codes.InvalidArgument, "start height %d is lower than lowest indexed height %d", height, lowestHeight)
-	}
-
-	if height > highestHeight {
-		return 0, status.Errorf(codes.InvalidArgument, "start height %d is higher than highest indexed height %d", height, highestHeight)
-	}
-
-	return height, nil
-}
-
-// getIndexedHeightBound returns the lowest and highest indexed block heights
-// Expected errors during normal operation:
-// - codes.FailedPrecondition: if the index reporter is not ready yet.
-// - codes.Internal: if there was any other error getting the heights.
-func (b *BaseTrackerImpl) getIndexedHeightBound() (uint64, uint64, error) {
-	lowestHeight, err := b.indexReporter.LowestIndexedHeight()
-	if err != nil {
-		if errors.Is(err, storage.ErrHeightNotIndexed) || errors.Is(err, indexer.ErrIndexNotInitialized) {
-			// the index is not ready yet, but likely will be eventually
-			return 0, 0, status.Errorf(codes.FailedPrecondition, "failed to get lowest indexed height: %v", err)
-		}
-		return 0, 0, rpc.ConvertError(err, "failed to get lowest indexed height", codes.Internal)
-	}
-
-	highestHeight, err := b.indexReporter.HighestIndexedHeight()
-	if err != nil {
-		if errors.Is(err, storage.ErrHeightNotIndexed) || errors.Is(err, indexer.ErrIndexNotInitialized) {
-			// the index is not ready yet, but likely will be eventually
-			return 0, 0, status.Errorf(codes.FailedPrecondition, "failed to get highest indexed height: %v", err)
-		}
-		return 0, 0, rpc.ConvertError(err, "failed to get highest indexed height", codes.Internal)
-	}
-
-	return lowestHeight, highestHeight, nil
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 
 	"github.com/onflow/flow-go/storage"
@@ -63,8 +62,6 @@ func NewBlockTracker(
 	rootHeight uint64,
 	headers storage.Headers,
 	broadcaster *engine.Broadcaster,
-	indexReporter state_synchronization.IndexReporter,
-	useIndex bool,
 ) (*BlockTrackerImpl, error) {
 	lastFinalized, err := state.Final().Head()
 	if err != nil {
@@ -77,7 +74,7 @@ func NewBlockTracker(
 	}
 
 	return &BlockTrackerImpl{
-		BaseTrackerImpl:        NewBaseTrackerImpl(rootHeight, state, headers, indexReporter, useIndex),
+		BaseTrackerImpl:        NewBaseTrackerImpl(rootHeight, state, headers),
 		state:                  state,
 		finalizedHighestHeight: counters.NewMonotonousCounter(lastFinalized.Height),
 		sealedHighestHeight:    counters.NewMonotonousCounter(lastSealed.Height),
@@ -103,7 +100,7 @@ func NewBlockTracker(
 // - codes.InvalidArgument: If both startBlockID and startHeight are provided.
 // - storage.ErrNotFound`: If a block is provided and does not exist.
 // - codes.Internal: If there is an internal error.
-func (b *BlockTrackerImpl) GetStartHeight(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) (height uint64, err error) {
+func (b *BlockTrackerImpl) GetStartHeight(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
 	return b.BaseTrackerImpl.GetStartHeight(ctx, startBlockID, startHeight)
 }
 
