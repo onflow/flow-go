@@ -8,16 +8,15 @@ import (
 
 	"errors"
 
-	"github.com/onflow/cadence/migrations/statictypes"
-	"github.com/onflow/cadence/runtime"
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/cadence/migrations"
 	"github.com/onflow/cadence/migrations/capcons"
 	"github.com/onflow/cadence/migrations/entitlements"
+	"github.com/onflow/cadence/migrations/statictypes"
 	"github.com/onflow/cadence/migrations/string_normalization"
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
@@ -118,6 +117,8 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 	oldPayloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
 
+	checkPayloadsOwnership(oldPayloads, address, m.log)
+
 	// Create all the runtime components we need for the migration
 
 	migrationRuntime, err := NewMigratorRuntime(
@@ -170,6 +171,38 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		expectedOriginalAddress,
 		m.log,
 	)
+}
+
+func checkPayloadsOwnership(payloads []*ledger.Payload, address common.Address, log zerolog.Logger) {
+	for _, payload := range payloads {
+		checkPayloadOwnership(payload, address, log)
+	}
+}
+
+func checkPayloadOwnership(payload *ledger.Payload, address common.Address, log zerolog.Logger) {
+	registerID, _, err := convert.PayloadToRegister(payload)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to convert payload to register")
+		return
+	}
+
+	owner := registerID.Owner
+
+	if len(owner) > 0 {
+		payloadAddress, err := common.BytesToAddress([]byte(owner))
+		if err != nil {
+			log.Error().Err(err).Msgf("failed to convert register owner to address: %x", owner)
+			return
+		}
+
+		if payloadAddress != address {
+			log.Error().Msgf(
+				"payload address %s does not match expected address %s",
+				payloadAddress,
+				address,
+			)
+		}
+	}
 }
 
 // NewCadence1ValueMigrator creates a new CadenceBaseMigrator

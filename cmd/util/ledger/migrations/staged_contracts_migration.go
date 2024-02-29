@@ -180,13 +180,15 @@ func (m *StagedContractsMigration) contractUpdatesForAccount(
 func (m *StagedContractsMigration) MigrateAccount(
 	_ context.Context,
 	address common.Address,
-	payloads []*ledger.Payload,
+	oldPayloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
+
+	checkPayloadsOwnership(oldPayloads, address, m.log)
 
 	contractUpdates, ok := m.contractUpdatesForAccount(address)
 	if !ok {
 		// no contracts to change on this address
-		return payloads, nil
+		return oldPayloads, nil
 	}
 
 	elaborations := map[common.Location]*sema.Elaboration{}
@@ -203,12 +205,12 @@ func (m *StagedContractsMigration) MigrateAccount(
 		},
 	}
 
-	mr, err := NewMigratorRuntime(address, payloads, config)
+	mr, err := NewMigratorRuntime(address, oldPayloads, config)
 	if err != nil {
 		return nil, err
 	}
 
-	for payloadIndex, payload := range payloads {
+	for payloadIndex, payload := range oldPayloads {
 		key, err := payload.Key()
 		if err != nil {
 			return nil, err
@@ -250,7 +252,7 @@ func (m *StagedContractsMigration) MigrateAccount(
 				)
 		} else {
 			// change contract code
-			payloads[payloadIndex] = ledger.NewPayload(
+			oldPayloads[payloadIndex] = ledger.NewPayload(
 				key,
 				newCode,
 			)
@@ -270,7 +272,7 @@ func (m *StagedContractsMigration) MigrateAccount(
 		return nil, fmt.Errorf(sb.String())
 	}
 
-	return payloads, nil
+	return oldPayloads, nil
 }
 
 func (m *StagedContractsMigration) checkContractUpdateValidity(
