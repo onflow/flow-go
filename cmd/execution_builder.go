@@ -961,6 +961,7 @@ func (exeNode *ExecutionNode) LoadObserverCollectionIndexer(
 	error,
 ) {
 	if !node.ObserverMode {
+		node.Logger.Info().Msg("execution data downloader is disabled")
 		return &module.NoopReadyDoneAware{}, nil
 	}
 
