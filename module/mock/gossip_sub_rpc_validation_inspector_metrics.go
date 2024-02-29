@@ -145,6 +145,11 @@ func (_m *GossipSubRpcValidationInspectorMetrics) OnPublishMessagesInspectionErr
 	_m.Called()
 }
 
+// OnRpcRejectedFromUnknownSender provides a mock function with given fields:
+func (_m *GossipSubRpcValidationInspectorMetrics) OnRpcRejectedFromUnknownSender() {
+	_m.Called()
+}
+
 // OnUnstakedPeerInspectionFailed provides a mock function with given fields:
 func (_m *GossipSubRpcValidationInspectorMetrics) OnUnstakedPeerInspectionFailed() {
 	_m.Called()
