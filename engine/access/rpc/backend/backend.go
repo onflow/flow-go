@@ -114,7 +114,6 @@ type Params struct {
 	SubscriptionParams        SubscriptionParams
 
 	EventsIndex       *index.EventsIndex
-	UseIndex          bool
 	TxResultQueryMode IndexQueryMode
 	TxResultsIndex    *index.TransactionResultsIndex
 }

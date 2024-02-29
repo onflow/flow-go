@@ -1570,11 +1570,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("event query mode 'compare' is not supported")
 			}
 
-			// use the events index for events if enabled and the node is configured to use it for
-			// regular event queries
-			useIndex := builder.executionDataIndexingEnabled &&
-				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
-
 			broadcaster := engine.NewBroadcaster()
 			// create BlockTracker that will track for new blocks (finalized and sealed) and
 			// handles block-related operations.
@@ -1627,7 +1622,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					ResponseLimit:  builder.stateStreamConf.ResponseLimit,
 					SendBufferSize: int(builder.stateStreamConf.ClientSendBufferSize),
 				},
-				UseIndex:          useIndex,
 				EventsIndex:       builder.EventsIndex,
 				TxResultQueryMode: txResultQueryMode,
 				TxResultsIndex:    builder.TxResultsIndex,
