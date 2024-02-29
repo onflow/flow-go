@@ -136,7 +136,6 @@ func bootstrapVM(t *testing.T, chain flow.Chain) (*fvm.VirtualMachine, fvm.Conte
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
-		fvm.WithSetupEVMEnabled(true),
 	}
 
 	executionSnapshot, _, err := vm.Run(

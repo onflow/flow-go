@@ -65,6 +65,8 @@ const (
 	FlowTokenAccountIndex     = 3
 	FlowFeesAccountIndex      = 4
 	EVMStorageAccountIndex    = 5
+
+	LastSystemAccountIndex = EVMStorageAccountIndex
 )
 
 // Well-known addresses for system contracts on long-running networks.

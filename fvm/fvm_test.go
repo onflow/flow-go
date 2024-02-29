@@ -2726,7 +2726,6 @@ func TestTransientNetworkCoreContractAddresses(t *testing.T) {
 
 func TestEVM(t *testing.T) {
 	t.Run("successful transaction", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
 		withContextOptions(
 			fvm.WithEVMEnabled(true),
 			fvm.WithCadenceLogging(true),
@@ -2787,7 +2786,6 @@ func TestEVM(t *testing.T) {
 	// available through the EVM contract, when bootstraped with `WithEVMABIOnly`
 	t.Run("with ABI only EVM", newVMTest().
 		withBootstrapProcedureOptions(
-			fvm.WithSetupEVMEnabled(true),
 			fvm.WithEVMABIOnly(true),
 		).
 		withContextOptions(
@@ -2838,7 +2836,6 @@ func TestEVM(t *testing.T) {
 
 	// this test makes sure the execution error is correctly handled and returned as a correct type
 	t.Run("execution reverted", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
 		withContextOptions(
 			fvm.WithChain(flow.Emulator.Chain()),
 			fvm.WithEVMEnabled(true),
@@ -2879,7 +2876,6 @@ func TestEVM(t *testing.T) {
 	// this test makes sure the EVM error is correctly returned as an error and has a correct type
 	// we have implemented a snapshot wrapper to return an error from the EVM
 	t.Run("internal evm error handling", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
 		withContextOptions(
 			fvm.WithChain(flow.Emulator.Chain()),
 			fvm.WithEVMEnabled(true),
@@ -2937,9 +2933,6 @@ func TestEVM(t *testing.T) {
 	)
 
 	t.Run("deploy contract code", newVMTest().
-		withBootstrapProcedureOptions(
-			fvm.WithSetupEVMEnabled(true),
-		).
 		withContextOptions(
 			// default is testnet, but testnet has a special EVM storage contract location
 			// so we have to use emulator here so that the EVM storage contract is deployed

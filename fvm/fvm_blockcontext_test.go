@@ -951,9 +951,6 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
-		// The evm account has a storage exception, and if we don't bootstrap with evm,
-		// the first created account will have that address.
-		fvm.WithSetupEVMEnabled(true),
 	}
 
 	t.Run("Storing too much data fails", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
@@ -1641,7 +1638,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	addressGen := chain.NewAddressGenerator()
 	// skip the addresses of 4 reserved accounts
-	for i := 0; i < 4; i++ {
+	for i := 0; i < systemcontracts.LastSystemAccountIndex; i++ {
 		_, err := addressGen.NextAddress()
 		require.NoError(t, err)
 	}
@@ -1820,7 +1817,9 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	address := flow.ConvertAddress(
 		data.(cadence.Event).Fields[0].(cadence.Address))
 
-	require.Equal(t, flow.HexToAddress("05"), address)
+	// convert LastSystemAccountIndex + 1 to a flow.Address
+	expected := flow.HexToAddress(fmt.Sprintf("0x%02x", systemcontracts.LastSystemAccountIndex+1))
+	require.Equal(t, expected, address)
 }
 
 func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
@@ -1866,7 +1865,6 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithExecutionMemoryLimit(math.MaxUint64),
 		// The evm account has a storage exception, and if we don't bootstrap with evm,
 		// the first created account will have that address.
-		fvm.WithSetupEVMEnabled(true),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
