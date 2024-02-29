@@ -205,9 +205,9 @@ func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.State
 	return missingCollections, executables, nil
 }
 
-// OnCollection is called when a new collection is received
+// HandleCollection is called when a new collection is received
 // It returns a list of executable blocks that contains the collection
-func (q *BlockQueue) OnCollection(collection *flow.Collection) ([]*entity.ExecutableBlock, error) {
+func (q *BlockQueue) HandleCollection(collection *flow.Collection) ([]*entity.ExecutableBlock, error) {
 	q.Lock()
 	defer q.Unlock()
 	// when a collection is received, we find the blocks the collection is included in,

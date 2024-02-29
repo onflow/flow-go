@@ -24,7 +24,7 @@ func TestSingleBlockBecomeReady(t *testing.T) {
 	q := NewBlockQueue(unittest.Logger())
 
 	// verify receving a collection (C1) before its block (A) will be ignored
-	executables, err := q.OnCollection(c1)
+	executables, err := q.HandleCollection(c1)
 	require.NoError(t, err)
 	requireExecutableHas(t, executables)
 
@@ -35,12 +35,12 @@ func TestSingleBlockBecomeReady(t *testing.T) {
 	requireCollectionHas(t, missing, c1)
 
 	// verify receving a collection (C2) that is not for the block (A) will be ignored
-	executables, err = q.OnCollection(c2)
+	executables, err = q.HandleCollection(c2)
 	require.NoError(t, err)
 	requireExecutableHas(t, executables)
 
 	// verify after receiving all collections (C1), block (A) becomes executable
-	executables, err = q.OnCollection(c1)
+	executables, err = q.HandleCollection(c1)
 	require.NoError(t, err)
 	requireExecutableHas(t, executables, blockA)
 
@@ -99,12 +99,12 @@ func TestMultipleBlockBecomesReady(t *testing.T) {
 	require.Empty(t, missing)
 
 	// verify receiving all collections makes block executable
-	executables, err = q.OnCollection(c1)
+	executables, err = q.HandleCollection(c1)
 	require.NoError(t, err)
 	requireExecutableHas(t, executables, blockA)
 
 	// verify receiving partial collections won't make block executable
-	executables, err = q.OnCollection(c2)
+	executables, err = q.HandleCollection(c2)
 	require.NoError(t, err)
 	requireExecutableHas(t, executables) // because A is not executed and C3 is not received for B to be executable
 
@@ -116,19 +116,19 @@ func TestMultipleBlockBecomesReady(t *testing.T) {
 
 	// verify when parent block (A) has been executed, the child block (B) has all the collections
 	// it will become executable
-	executables, err = q.OnCollection(c3)
+	executables, err = q.HandleCollection(c3)
 	require.NoError(t, err)
 	requireExecutableHas(t, executables, blockB) // c2, c3 are received, blockB is executable
 
-	executables, err = q.OnCollection(c5)
+	executables, err = q.HandleCollection(c5)
 	require.NoError(t, err)
 	requireExecutableHas(t, executables) // c2, c3 are received, blockB is executable
 
-	executables, err = q.OnCollection(c6)
+	executables, err = q.HandleCollection(c6)
 	require.NoError(t, err)
 	requireExecutableHas(t, executables) // c2, c3 are received, blockB is executable
 
-	executables, err = q.OnCollection(c4)
+	executables, err = q.HandleCollection(c4)
 	require.NoError(t, err)
 	requireExecutableHas(t, executables, blockE) // c2, c3 are received, blockB is executable
 
@@ -206,7 +206,7 @@ func TestOnForksWithSameCollections(t *testing.T) {
 	requireCollectionHas(t, missing)
 
 	// verify receiving all collections makes all blocks executable
-	executables, err = q.OnCollection(c1)
+	executables, err = q.HandleCollection(c1)
 	require.NoError(t, err)
 	requireExecutableHas(t, executables)
 
@@ -215,7 +215,7 @@ func TestOnForksWithSameCollections(t *testing.T) {
 	require.NoError(t, err)
 	requireExecutableHas(t, executables) // because C2 is not received
 
-	executables, err = q.OnCollection(c2)
+	executables, err = q.HandleCollection(c2)
 	require.NoError(t, err)
 	requireExecutableHas(t, executables, blockB, blockD)
 
@@ -239,7 +239,7 @@ func TestOnForksWithSameCollections(t *testing.T) {
 
 	// verify C and F are executable, because their parent have been executed
 	// E is not executable, because E's parent (D) is not executed yet.
-	executables, err = q.OnCollection(c3)
+	executables, err = q.HandleCollection(c3)
 	require.NoError(t, err)
 	requireExecutableHas(t, executables, blockC, blockF)
 
@@ -283,7 +283,7 @@ func TestOnBlockWithMissingParentCommit(t *testing.T) {
 	requireCollectionHas(t, missing, c1)
 
 	// block A has all the collections and become executable
-	executables, err = q.OnCollection(c1)
+	executables, err = q.HandleCollection(c1)
 	require.NoError(t, err)
 	requireExecutableHas(t, executables, blockA)
 
@@ -306,11 +306,11 @@ func TestOnBlockWithMissingParentCommit(t *testing.T) {
 	requireCollectionHas(t, missing, c2, c3)
 
 	// verify after receiving all collections, B becomes executable
-	executables, err = q.OnCollection(c2)
+	executables, err = q.HandleCollection(c2)
 	require.NoError(t, err)
 	require.Empty(t, executables)
 
-	executables, err = q.OnCollection(c3)
+	executables, err = q.HandleCollection(c3)
 	require.NoError(t, err)
 	requireExecutableHas(t, executables, blockB)
 
