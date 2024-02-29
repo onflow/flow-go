@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"pgregory.net/rapid"
 
 	"github.com/onflow/flow-go/engine"
 	access "github.com/onflow/flow-go/engine/access/mock"
@@ -203,10 +204,10 @@ func (s *TransactionStatusSuite) SetupTest() {
 		return s.finalizedBlock.Header
 	}, nil).Maybe()
 
-	s.blockTracker.On("GetStartHeight", mock.Anything, mock.Anything, mock.Anything).Return(func(id flow.Identifier, _ uint64, _ flow.BlockStatus) (uint64, error) {
+	s.blockTracker.On("GetStartHeight", mock.Anything, mock.Anything, mock.Anything).Return(func(_ context.Context, id flow.Identifier, _ uint64) (uint64, error) {
 		finalizedHeader := s.finalizedBlock.Header
 		return finalizedHeader.Height, nil
-	}, nil).Once()
+	}, nil)
 	s.blockTracker.On("GetHighestHeight", flow.BlockStatusFinalized).Return(func(_ flow.BlockStatus) (uint64, error) {
 		finalizedHeader := s.finalizedBlock.Header
 		return finalizedHeader.Height, nil
@@ -264,74 +265,78 @@ func (s *TransactionStatusSuite) addNewFinalizedBlock(parent *flow.Header, optio
 // TestSubscribeTransactionStatus tests the functionality of the SendAndSubscribeTransactionStatuses method in the Backend.
 // It covers the emulation of transaction stages from pending to sealed, and receiving status updates.
 func (s *TransactionStatusSuite) TestSubscribeTransactionStatus() {
-	// Create subscription context with closer
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	// Add rapid test, to check graceful close on different number of requests
+	rapid.Check(s.T(), func(tt *rapid.T) {
+		// Create subscription context with closer
 
-	// Generate sent transaction with ref block of the current finalized block
-	transaction := unittest.TransactionFixture()
-	transaction.SetReferenceBlockID(s.finalizedBlock.ID())
-	txId := transaction.ID()
-	expectedMsgIndexCounter := counters.NewMonotonousCounter(0)
+		// Generate sent transaction with ref block of the current finalized block
+		transaction := unittest.TransactionFixture()
+		transaction.SetReferenceBlockID(s.finalizedBlock.ID())
+		txId := transaction.ID()
+		expectedMsgIndexCounter := counters.NewMonotonousCounter(0)
 
-	// Create a special common function to read subscription messages from the channel and check converting it to transaction info
-	// and check results for correctness
-	checkNewSubscriptionMessage := func(sub subscription.Subscription, expectedTxStatus flow.TransactionStatus) {
-		s.log.Debug().Msg(fmt.Sprintf("!!! checkNewSubscriptionMessage: %s", expectedTxStatus.String()))
+		// Create a special common function to read subscription messages from the channel and check converting it to transaction info
+		// and check results for correctness
+		checkNewSubscriptionMessage := func(sub subscription.Subscription, expectedTxStatus flow.TransactionStatus) {
+			unittest.RequireReturnsBefore(s.T(), func() {
+				v, ok := <-sub.Channel()
+				require.True(s.T(), ok,
+					"channel closed while waiting for transaction info:\n\t- txID %x\n\t- blockID: %x \n\t- err: %v",
+					txId, s.finalizedBlock.ID(), sub.Err())
+
+				txInfo, ok := v.(*convert.TransactionSubscribeInfo)
+				require.True(s.T(), ok, "unexpected response type: %T", v)
+
+				assert.Equal(s.T(), txId, txInfo.ID)
+				assert.Equal(s.T(), expectedTxStatus, txInfo.Status)
+
+				expectedMsgIndex := expectedMsgIndexCounter.Value()
+				assert.Equal(s.T(), expectedMsgIndex, txInfo.MessageIndex)
+				wasSet := expectedMsgIndexCounter.Set(expectedMsgIndex + 1)
+				require.True(s.T(), wasSet)
+			}, time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
+		}
+
+		// 1. Subscribe to transaction status and receive the first message with pending status
+		subCtx, subCancel := context.WithCancel(ctx)
+		sub := s.backend.SendAndSubscribeTransactionStatuses(subCtx, &transaction.TransactionBody)
+		checkNewSubscriptionMessage(sub, flow.TransactionStatusPending)
+
+		// 2. Make transaction reference block sealed, and add a new finalized block that includes the transaction
+		s.sealedBlock = s.finalizedBlock
+		s.addNewFinalizedBlock(s.sealedBlock.Header, func(block *flow.Block) {
+			col := flow.CollectionFromTransactions([]*flow.Transaction{&transaction})
+			guarantee := col.Guarantee()
+			block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
+
+			s.txResultMap[block.ID()] = &flow.LightTransactionResult{
+				TransactionID:   transaction.ID(),
+				Failed:          false,
+				ComputationUsed: 0,
+			}
+		})
+		checkNewSubscriptionMessage(sub, flow.TransactionStatusFinalized)
+
+		// 3. Add one more finalized block on top of the transaction block
+		s.addNewFinalizedBlock(s.finalizedBlock.Header)
+		checkNewSubscriptionMessage(sub, flow.TransactionStatusExecuted)
+
+		// 4. Make the transaction block sealed, and add a new finalized block
+		s.sealedBlock = s.finalizedBlock
+		s.addNewFinalizedBlock(s.sealedBlock.Header)
+		checkNewSubscriptionMessage(sub, flow.TransactionStatusSealed)
+
+		// 5. Stop subscription
+		subCancel()
+
+		// Ensure subscription shuts down gracefully
 		unittest.RequireReturnsBefore(s.T(), func() {
 			v, ok := <-sub.Channel()
-			require.True(s.T(), ok,
-				"channel closed while waiting for transaction info:\n\t- txID %x\n\t- blockID: %x \n\t- err: %v",
-				txId, s.finalizedBlock.ID(), sub.Err())
-
-			txInfo, ok := v.(*convert.TransactionSubscribeInfo)
-			require.True(s.T(), ok, "unexpected response type: %T", v)
-
-			assert.Equal(s.T(), txId, txInfo.ID)
-			assert.Equal(s.T(), expectedTxStatus, txInfo.Status)
-
-			expectedMsgIndex := expectedMsgIndexCounter.Value()
-			assert.Equal(s.T(), expectedMsgIndex, txInfo.MessageIndex)
-			wasSet := expectedMsgIndexCounter.Set(expectedMsgIndex + 1)
-			require.True(s.T(), wasSet)
-		}, time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
-	}
-
-	// 1. Subscribe to transaction status and receive the first message with pending status
-	sub := s.backend.SendAndSubscribeTransactionStatuses(ctx, &transaction.TransactionBody)
-	checkNewSubscriptionMessage(sub, flow.TransactionStatusPending)
-
-	// 2. Make transaction reference block sealed, and add a new finalized block that includes the transaction
-	s.sealedBlock = s.finalizedBlock
-	s.addNewFinalizedBlock(s.sealedBlock.Header, func(block *flow.Block) {
-		col := flow.CollectionFromTransactions([]*flow.Transaction{&transaction})
-		guarantee := col.Guarantee()
-		block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
-
-		s.txResultMap[block.ID()] = &flow.LightTransactionResult{
-			TransactionID:   transaction.ID(),
-			Failed:          false,
-			ComputationUsed: 0,
-		}
+			assert.Nil(s.T(), v)
+			assert.False(s.T(), ok)
+			assert.ErrorIs(s.T(), sub.Err(), context.Canceled)
+		}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
 	})
-	checkNewSubscriptionMessage(sub, flow.TransactionStatusFinalized)
-
-	// 3. Add one more finalized block on top of the transaction block
-	s.addNewFinalizedBlock(s.finalizedBlock.Header)
-	checkNewSubscriptionMessage(sub, flow.TransactionStatusExecuted)
-
-	// 4. Make the transaction block sealed, and add a new finalized block
-	s.sealedBlock = s.finalizedBlock
-	s.addNewFinalizedBlock(s.sealedBlock.Header)
-	checkNewSubscriptionMessage(sub, flow.TransactionStatusSealed)
-
-	// 5. Stop subscription
-	cancel()
-
-	// Ensure subscription shuts down gracefully
-	unittest.RequireReturnsBefore(s.T(), func() {
-		v, ok := <-sub.Channel()
-		assert.Nil(s.T(), v)
-		assert.False(s.T(), ok)
-		assert.ErrorIs(s.T(), sub.Err(), context.Canceled)
-	}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
 }

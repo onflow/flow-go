@@ -87,20 +87,19 @@ func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(ctx c
 // previous status state metadata.
 func (b *backendSubscribeTransactions) backendSubscribeTransactions(txInfo *TransactionSubscriptionMetadata) func(context.Context, uint64) (interface{}, error) {
 	return func(_ context.Context, height uint64) (interface{}, error) {
-		executed := txInfo.blockWithTx != nil
-		if !executed {
-			highestHeight, err := b.getHighestHeight(flow.BlockStatusFinalized)
+		highestHeight, err := b.getHighestHeight(flow.BlockStatusFinalized)
 
+		// fail early if no notification has been received for the given block height.
+		if height > highestHeight {
+			return nil, fmt.Errorf("block %d is not available yet: %w", height, storage.ErrNotFound)
+		}
+
+		blockWithTxAvailable := txInfo.blockWithTx != nil
+		if !blockWithTxAvailable {
 			if err != nil {
 				return nil, fmt.Errorf("could not get highest height for block %d: %w", height, err)
 			}
 
-			// fail early if no notification has been received for the given block height.
-			if height > highestHeight {
-				return nil, fmt.Errorf("block %d is not available yet: %w", height, storage.ErrNotFound)
-			}
-
-			// since we are querying a finalized or sealed block, we can use the height index and save an ID computation
 			block, err := b.blocks.ByHeight(height)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "could not get block by height: %v", err)
@@ -119,7 +118,7 @@ func (b *backendSubscribeTransactions) backendSubscribeTransactions(txInfo *Tran
 			}
 		}
 
-		txStatus, err := b.deriveTransactionStatus(txInfo.txBody, executed, txInfo.blockWithTx)
+		txStatus, err := b.deriveTransactionStatus(txInfo.txBody, blockWithTxAvailable, txInfo.blockWithTx)
 		if err != nil {
 			return nil, rpc.ConvertStorageError(err)
 		}
