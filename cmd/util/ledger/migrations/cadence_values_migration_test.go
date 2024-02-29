@@ -114,7 +114,7 @@ func checkMigratedPayloads(
 	address common.Address,
 	newPayloads []*ledger.Payload,
 ) {
-	mr, err := newMigratorRuntime(
+	mr, err := NewMigratorRuntime(
 		address,
 		newPayloads,
 		util.RuntimeInterfaceConfig{},

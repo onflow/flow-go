@@ -42,13 +42,14 @@ func (l *logWriter) Write(bytes []byte) (int, error) {
 func TestStagedContractsMigration(t *testing.T) {
 	t.Parallel()
 
-	address1, err := common.HexToAddress("0x1")
+	chainID := flow.Emulator
+	addressGenerator := chainID.Chain().NewAddressGenerator()
+
+	address1, err := addressGenerator.NextAddress()
 	require.NoError(t, err)
 
-	address2, err := common.HexToAddress("0x2")
+	address2, err := addressGenerator.NextAddress()
 	require.NoError(t, err)
-
-	ctx := context.Background()
 
 	t.Run("one contract", func(t *testing.T) {
 		t.Parallel()
@@ -62,21 +63,24 @@ func TestStagedContractsMigration(t *testing.T) {
 					Name: "A",
 					Code: []byte(newCode),
 				},
-				Address: address1,
+				Address: common.Address(address1),
 			},
 		}
 
-		migration := NewStagedContractsMigration(flow.Emulator)
-		migration.RegisterContractUpdates(stagedContracts)
-
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(chainID, log)
+		migration.RegisterContractUpdates(stagedContracts)
+
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
-		payloads, err := migration.MigrateAccount(ctx, address1,
+		payloads, err := migration.MigrateAccount(
+			context.Background(),
+			common.Address(address1),
 			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte(oldCode)),
+				newContractPayload(common.Address(address1), "A", []byte(oldCode)),
 			},
 		)
 		require.NoError(t, err)
@@ -102,22 +106,25 @@ func TestStagedContractsMigration(t *testing.T) {
 					Name: "A",
 					Code: []byte(newCode),
 				},
-				Address: address1,
+				Address: common.Address(address1),
 			},
 		}
 
-		migration := NewStagedContractsMigration(flow.Emulator).
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(chainID, log).
 			WithContractUpdateValidation()
 		migration.RegisterContractUpdates(stagedContracts)
 
-		logWriter := &logWriter{}
-		log := zerolog.New(logWriter)
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
-		payloads, err := migration.MigrateAccount(ctx, address1,
+		payloads, err := migration.MigrateAccount(
+			context.Background(),
+			common.Address(address1),
 			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte(oldCode)),
+				newContractPayload(common.Address(address1), "A", []byte(oldCode)),
 			},
 		)
 		require.NoError(t, err)
@@ -145,22 +152,25 @@ func TestStagedContractsMigration(t *testing.T) {
 					Name: "A",
 					Code: []byte(newCode),
 				},
-				Address: address1,
+				Address: common.Address(address1),
 			},
 		}
 
-		migration := NewStagedContractsMigration(flow.Emulator).
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(chainID, log).
 			WithContractUpdateValidation()
 		migration.RegisterContractUpdates(stagedContracts)
 
-		logWriter := &logWriter{}
-		log := zerolog.New(logWriter)
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
-		payloads, err := migration.MigrateAccount(ctx, address1,
+		payloads, err := migration.MigrateAccount(
+			context.Background(),
+			common.Address(address1),
 			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte(oldCode)),
+				newContractPayload(common.Address(address1), "A", []byte(oldCode)),
 			},
 		)
 		require.NoError(t, err)
@@ -191,30 +201,33 @@ func TestStagedContractsMigration(t *testing.T) {
 					Name: "A",
 					Code: []byte(newCode1),
 				},
-				Address: address1,
+				Address: common.Address(address1),
 			},
 			{
 				Contract: Contract{
 					Name: "B",
 					Code: []byte(newCode2),
 				},
-				Address: address1,
+				Address: common.Address(address1),
 			},
 		}
 
-		migration := NewStagedContractsMigration(flow.Emulator).
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(chainID, log).
 			WithContractUpdateValidation()
 		migration.RegisterContractUpdates(stagedContracts)
 
-		logWriter := &logWriter{}
-		log := zerolog.New(logWriter)
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
-		payloads, err := migration.MigrateAccount(ctx, address1,
+		payloads, err := migration.MigrateAccount(
+			context.Background(),
+			common.Address(address1),
 			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte(oldCode1)),
-				newContractPayload(address1, "B", []byte(oldCode2)),
+				newContractPayload(common.Address(address1), "A", []byte(oldCode1)),
+				newContractPayload(common.Address(address1), "B", []byte(oldCode2)),
 			},
 		)
 		require.NoError(t, err)
@@ -244,27 +257,32 @@ func TestStagedContractsMigration(t *testing.T) {
 					Name: "A",
 					Code: []byte(newCode),
 				},
-				Address: address2,
+				Address: common.Address(address2),
 			},
 		}
 
-		migration := NewStagedContractsMigration(flow.Emulator)
-		migration.RegisterContractUpdates(stagedContracts)
-
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(chainID, log)
+		migration.RegisterContractUpdates(stagedContracts)
+
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
 		payloads := []*ledger.Payload{
-			newContractPayload(address1, "A", []byte(oldCode)),
-			newContractPayload(address2, "A", []byte(oldCode)),
+			newContractPayload(common.Address(address1), "A", []byte(oldCode)),
+			newContractPayload(common.Address(address2), "A", []byte(oldCode)),
 		}
 
 		// Run migration for account 1,
 		// There are no staged updates for contracts in account 1.
 		// So codes should not have been updated.
-		payloads, err = migration.MigrateAccount(ctx, address1, payloads)
+		payloads, err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(address1),
+			payloads,
+		)
 		require.NoError(t, err)
 		require.Len(t, payloads, 2)
 		require.Equal(t, oldCode, string(payloads[0].Value()))
@@ -273,7 +291,11 @@ func TestStagedContractsMigration(t *testing.T) {
 		// Run migration for account 2
 		// There is one staged update for contracts in account 2.
 		// So one payload/contract-code should be updated, and the other should remain the same.
-		payloads, err = migration.MigrateAccount(ctx, address2, payloads)
+		payloads, err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(address2),
+			payloads,
+		)
 		require.NoError(t, err)
 		require.Len(t, payloads, 2)
 		require.Equal(t, oldCode, string(payloads[0].Value()))
@@ -299,29 +321,32 @@ func TestStagedContractsMigration(t *testing.T) {
 					Name: "A",
 					Code: []byte(update1),
 				},
-				Address: address1,
+				Address: common.Address(address1),
 			},
 			{
 				Contract: Contract{
 					Name: "A",
 					Code: []byte(update2),
 				},
-				Address: address1,
+				Address: common.Address(address1),
 			},
 		}
 
-		migration := NewStagedContractsMigration(flow.Emulator)
-
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(chainID, log)
+
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
 		migration.RegisterContractUpdates(stagedContracts)
 
-		payloads, err := migration.MigrateAccount(ctx, address1,
+		payloads, err := migration.MigrateAccount(
+			context.Background(),
+			common.Address(address1),
 			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte(oldCode)),
+				newContractPayload(common.Address(address1), "A", []byte(oldCode)),
 			},
 		)
 		require.NoError(t, err)
@@ -333,7 +358,7 @@ func TestStagedContractsMigration(t *testing.T) {
 		require.Contains(
 			t,
 			logWriter.logs[0],
-			`existing staged update found for contract 0x0000000000000001.A. Previous update will be overwritten.`,
+			`existing staged update found`,
 		)
 
 		require.Len(t, payloads, 1)
@@ -351,21 +376,26 @@ func TestStagedContractsMigration(t *testing.T) {
 					Name: "A",
 					Code: []byte(newCode),
 				},
-				Address: address1,
+				Address: common.Address(address1),
 			},
 		}
 
-		migration := NewStagedContractsMigration(flow.Emulator)
-
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(chainID, log)
+
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
 		migration.RegisterContractUpdates(stagedContracts)
 
 		// NOTE: no payloads
-		_, err = migration.MigrateAccount(ctx, address1, nil)
+		_, err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(address1),
+			nil,
+		)
 		require.ErrorContains(t, err, "failed to find all contract registers that need to be changed")
 	})
 }
@@ -373,13 +403,15 @@ func TestStagedContractsMigration(t *testing.T) {
 func TestStagedContractsWithImports(t *testing.T) {
 	t.Parallel()
 
-	address1, err := common.HexToAddress("0x1")
+	chainID := flow.Emulator
+
+	addressGenerator := chainID.Chain().NewAddressGenerator()
+
+	address1, err := addressGenerator.NextAddress()
 	require.NoError(t, err)
 
-	address2, err := common.HexToAddress("0x2")
+	address2, err := addressGenerator.NextAddress()
 	require.NoError(t, err)
-
-	ctx := context.Background()
 
 	t.Run("valid import", func(t *testing.T) {
 		t.Parallel()
@@ -414,34 +446,43 @@ func TestStagedContractsWithImports(t *testing.T) {
 					Name: "A",
 					Code: []byte(newCodeA),
 				},
-				Address: address1,
+				Address: common.Address(address1),
 			},
 			{
 				Contract: Contract{
 					Name: "B",
 					Code: []byte(newCodeB),
 				},
-				Address: address2,
+				Address: common.Address(address2),
 			},
 		}
 
-		migration := NewStagedContractsMigration(flow.Emulator)
-		migration.RegisterContractUpdates(stagedContracts)
-
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(chainID, log)
+		migration.RegisterContractUpdates(stagedContracts)
+
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
 		payloads := []*ledger.Payload{
-			newContractPayload(address1, "A", []byte(oldCodeA)),
-			newContractPayload(address2, "B", []byte(oldCodeB)),
+			newContractPayload(common.Address(address1), "A", []byte(oldCodeA)),
+			newContractPayload(common.Address(address2), "B", []byte(oldCodeB)),
 		}
 
-		payloads, err = migration.MigrateAccount(ctx, address1, payloads)
+		payloads, err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(address1),
+			payloads,
+		)
 		require.NoError(t, err)
 
-		payloads, err = migration.MigrateAccount(ctx, address2, payloads)
+		payloads, err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(address2),
+			payloads,
+		)
 		require.NoError(t, err)
 
 		err = migration.Close()
@@ -481,28 +522,37 @@ func TestStagedContractsWithImports(t *testing.T) {
 					Name: "A",
 					Code: []byte(newCodeA),
 				},
-				Address: address1,
+				Address: common.Address(address1),
 			},
 		}
 
-		migration := NewStagedContractsMigration(flow.Emulator).
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(chainID, log).
 			WithContractUpdateValidation()
 		migration.RegisterContractUpdates(stagedContracts)
 
-		logWriter := &logWriter{}
-		log := zerolog.New(logWriter)
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
 		payloads := []*ledger.Payload{
-			newContractPayload(address1, "A", []byte(oldCodeA)),
-			newContractPayload(address2, "B", []byte(oldCodeB)),
+			newContractPayload(common.Address(address1), "A", []byte(oldCodeA)),
+			newContractPayload(common.Address(address2), "B", []byte(oldCodeB)),
 		}
 
-		payloads, err = migration.MigrateAccount(ctx, address1, payloads)
+		payloads, err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(address1),
+			payloads,
+		)
 		require.NoError(t, err)
 
-		payloads, err = migration.MigrateAccount(ctx, address2, payloads)
+		payloads, err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(address2),
+			payloads,
+		)
 		require.NoError(t, err)
 
 		err = migration.Close()
@@ -552,36 +602,45 @@ func TestStagedContractsWithImports(t *testing.T) {
 					Name: "A",
 					Code: []byte(newCodeA),
 				},
-				Address: address1,
+				Address: common.Address(address1),
 			},
 			{
 				Contract: Contract{
 					Name: "C",
 					Code: []byte(newCodeC),
 				},
-				Address: address1,
+				Address: common.Address(address1),
 			},
 		}
 
-		migration := NewStagedContractsMigration(flow.Emulator).
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(chainID, log).
 			WithContractUpdateValidation()
 		migration.RegisterContractUpdates(stagedContracts)
 
-		logWriter := &logWriter{}
-		log := zerolog.New(logWriter)
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
 		payloads := []*ledger.Payload{
-			newContractPayload(address1, "A", []byte(oldCodeA)),
-			newContractPayload(address2, "B", []byte(oldCodeB)),
-			newContractPayload(address1, "C", []byte(oldCodeC)),
+			newContractPayload(common.Address(address1), "A", []byte(oldCodeA)),
+			newContractPayload(common.Address(address2), "B", []byte(oldCodeB)),
+			newContractPayload(common.Address(address1), "C", []byte(oldCodeC)),
 		}
 
-		payloads, err = migration.MigrateAccount(ctx, address1, payloads)
+		payloads, err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(address1),
+			payloads,
+		)
 		require.NoError(t, err)
 
-		payloads, err = migration.MigrateAccount(ctx, address2, payloads)
+		payloads, err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(address2),
+			payloads,
+		)
 		require.NoError(t, err)
 
 		err = migration.Close()
@@ -706,10 +765,10 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 	chainID := flow.Emulator
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
-	address, err := common.HexToAddress("0x1")
-	require.NoError(t, err)
+	addressGenerator := chainID.Chain().NewAddressGenerator()
 
-	ctx := context.Background()
+	address, err := addressGenerator.NextAddress()
+	require.NoError(t, err)
 
 	t.Run("FungibleToken.Vault", func(t *testing.T) {
 		t.Parallel()
@@ -753,25 +812,30 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 					Name: "A",
 					Code: []byte(newCodeA),
 				},
-				Address: address,
+				Address: common.Address(address),
 			},
 		}
 
-		migration := NewStagedContractsMigration(chainID)
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(chainID, log)
 		migration.RegisterContractUpdates(stagedContracts)
 		migration.WithContractUpdateValidation()
 
-		logWriter := &logWriter{}
-		log := zerolog.New(logWriter)
 		err = migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
 		payloads := []*ledger.Payload{
-			newContractPayload(address, "A", []byte(oldCodeA)),
+			newContractPayload(common.Address(address), "A", []byte(oldCodeA)),
 			newContractPayload(ftAddress, "FungibleToken", []byte(ftContract)),
 		}
 
-		payloads, err = migration.MigrateAccount(ctx, address, payloads)
+		payloads, err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(address),
+			payloads,
+		)
 		require.NoError(t, err)
 
 		err = migration.Close()
@@ -826,25 +890,30 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 					Name: "A",
 					Code: []byte(newCodeA),
 				},
-				Address: address,
+				Address: common.Address(address),
 			},
 		}
 
-		migration := NewStagedContractsMigration(chainID)
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(chainID, log)
 		migration.RegisterContractUpdates(stagedContracts)
 		migration.WithContractUpdateValidation()
 
-		logWriter := &logWriter{}
-		log := zerolog.New(logWriter)
 		err = migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
 		payloads := []*ledger.Payload{
-			newContractPayload(address, "A", []byte(oldCodeA)),
+			newContractPayload(common.Address(address), "A", []byte(oldCodeA)),
 			newContractPayload(otherAddress, "FungibleToken", []byte(ftContract)),
 		}
 
-		payloads, err = migration.MigrateAccount(ctx, address, payloads)
+		payloads, err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(address),
+			payloads,
+		)
 		require.NoError(t, err)
 
 		err = migration.Close()

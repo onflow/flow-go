@@ -127,34 +127,17 @@ func extractExecutionState(
 		log.Error().Err(err).Msgf("can not generate report for migrated state: %v", newMigratedState)
 	}
 
-	exportPayloads := len(outputPayloadFile) > 0
-	if exportPayloads {
+	if len(outputPayloadFile) > 0 {
 		payloads := newTrie.AllPayloads()
 
-		log.Info().Msgf("sorting %d payloads", len(payloads))
-
-		// Sort payloads to produce deterministic payload file with
-		// same sequence of payloads inside.
-		payloads = util.SortPayloadsByAddress(payloads, nWorker)
-
-		log.Info().Msgf("sorted %d payloads", len(payloads))
-
-		log.Info().Msgf("creating payloads file %s", outputPayloadFile)
-
-		exportedPayloadCount, err := util.CreatePayloadFile(
+		return exportPayloads(
 			log,
-			outputPayloadFile,
 			payloads,
+			nWorker,
+			outputPayloadFile,
 			exportPayloadsByAddresses,
 			false, // payloads represents entire state.
 		)
-		if err != nil {
-			return fmt.Errorf("cannot generate payloads file: %w", err)
-		}
-
-		log.Info().Msgf("Exported %d payloads out of %d payloads", exportedPayloadCount, len(payloads))
-
-		return nil
 	}
 
 	migratedState, err := createCheckpoint(
@@ -251,33 +234,15 @@ func extractExecutionStateFromPayloads(
 		return err
 	}
 
-	exportPayloads := len(outputPayloadFile) > 0
-	if exportPayloads {
-
-		log.Info().Msgf("sorting %d payloads", len(payloads))
-
-		// Sort payloads to produce deterministic payload file with
-		// same sequence of payloads inside.
-		payloads = util.SortPayloadsByAddress(payloads, nWorker)
-
-		log.Info().Msgf("sorted %d payloads", len(payloads))
-
-		log.Info().Msgf("creating payloads file %s", outputPayloadFile)
-
-		exportedPayloadCount, err := util.CreatePayloadFile(
+	if len(outputPayloadFile) > 0 {
+		return exportPayloads(
 			log,
-			outputPayloadFile,
 			payloads,
+			nWorker,
+			outputPayloadFile,
 			exportPayloadsByAddresses,
 			inputPayloadsFromPartialState,
 		)
-		if err != nil {
-			return fmt.Errorf("cannot generate payloads file: %w", err)
-		}
-
-		log.Info().Msgf("Exported %d payloads out of %d payloads", exportedPayloadCount, len(payloads))
-
-		return nil
 	}
 
 	newTrie, err := createTrieFromPayloads(log, payloads)
@@ -300,6 +265,40 @@ func extractExecutionStateFromPayloads(
 		migratedState.String(),
 		migratedState.Base64(),
 	)
+
+	return nil
+}
+
+func exportPayloads(
+	log zerolog.Logger,
+	payloads []*ledger.Payload,
+	nWorker int,
+	outputPayloadFile string,
+	exportPayloadsByAddresses []common.Address,
+	inputPayloadsFromPartialState bool,
+) error {
+	log.Info().Msgf("sorting %d payloads", len(payloads))
+
+	// Sort payloads to produce deterministic payload file with
+	// same sequence of payloads inside.
+	payloads = util.SortPayloadsByAddress(payloads, nWorker)
+
+	log.Info().Msgf("sorted %d payloads", len(payloads))
+
+	log.Info().Msgf("creating payloads file %s", outputPayloadFile)
+
+	exportedPayloadCount, err := util.CreatePayloadFile(
+		log,
+		outputPayloadFile,
+		payloads,
+		exportPayloadsByAddresses,
+		inputPayloadsFromPartialState,
+	)
+	if err != nil {
+		return fmt.Errorf("cannot generate payloads file: %w", err)
+	}
+
+	log.Info().Msgf("exported %d payloads out of %d payloads", exportedPayloadCount, len(payloads))
 
 	return nil
 }
