@@ -11,7 +11,8 @@ import (
 func MergeRegisterChanges(
 	originalPayloads map[flow.RegisterID]*ledger.Payload,
 	changes map[flow.RegisterID]flow.RegisterValue,
-	expectedAddress flow.Address,
+	expectedChangeAddress flow.Address,
+	expectedOriginalAddress flow.Address,
 	logger zerolog.Logger,
 ) ([]*ledger.Payload, error) {
 
@@ -24,15 +25,15 @@ func MergeRegisterChanges(
 			continue
 		}
 
-		if expectedAddress != flow.EmptyAddress {
+		if expectedChangeAddress != flow.EmptyAddress {
 			ownerAddress := flow.BytesToAddress([]byte(id.Owner))
 
-			if ownerAddress != expectedAddress {
+			if ownerAddress != expectedChangeAddress {
 				// something was changed that does not belong to this account. Log it.
 				logger.Error().
 					Str("key", id.String()).
-					Str("owner_address", ownerAddress.Hex()).
-					Str("account", expectedAddress.Hex()).
+					Str("actual_address", ownerAddress.Hex()).
+					Str("expected_address", expectedChangeAddress.Hex()).
 					Hex("value", value).
 					Msg("key is part of the change set, but is for a different account")
 			}
@@ -50,15 +51,15 @@ func MergeRegisterChanges(
 			continue
 		}
 
-		if expectedAddress != flow.EmptyAddress {
+		if expectedOriginalAddress != flow.EmptyAddress {
 			ownerAddress := flow.BytesToAddress([]byte(id.Owner))
 
-			if ownerAddress != expectedAddress {
+			if ownerAddress != expectedOriginalAddress {
 				// something was changed that does not belong to this account. Log it.
 				logger.Error().
 					Str("key", id.String()).
-					Str("owner_address", ownerAddress.Hex()).
-					Str("account", expectedAddress.Hex()).
+					Str("actual_address", ownerAddress.Hex()).
+					Str("expected_address", expectedOriginalAddress.Hex()).
 					Hex("value", value.Value()).
 					Msg("key is part of the original set, but is for a different account")
 			}
