@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
