@@ -391,7 +391,7 @@ func newMigrations(
 		stagedContracts,
 	)
 
-	migrations := make([]ledger.Migration, len(namedMigrations))
+	migrations := make([]ledger.Migration, 0, len(namedMigrations))
 	for _, migration := range namedMigrations {
 		migrations = append(migrations, migration.Migrate)
 	}
