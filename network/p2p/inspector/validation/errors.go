@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/onflow/flow-go/network/channels"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
@@ -148,6 +150,26 @@ func NewUnstakedPeerErr(err error) ErrUnstakedPeer {
 // IsErrUnstakedPeer returns true if an error is ErrUnstakedPeer.
 func IsErrUnstakedPeer(err error) bool {
 	var e ErrUnstakedPeer
+	return errors.As(err, &e)
+}
+
+// ErrEjectedPeer error that indicates a cluster prefixed control message has been received from an ejected peer.
+type ErrEjectedPeer struct {
+	pid peer.ID
+}
+
+func (e ErrEjectedPeer) Error() string {
+	return fmt.Sprintf("peer is ejected: %s", e.pid)
+}
+
+// NewEjectedPeerErr returns a new ErrEjectedPeer.
+func NewEjectedPeerErr(pid peer.ID) ErrEjectedPeer {
+	return ErrEjectedPeer{pid: pid}
+}
+
+// IsErrEjectedPeer returns true if an error is ErrEjectedPeer.
+func IsErrEjectedPeer(err error) bool {
+	var e ErrEjectedPeer
 	return errors.As(err, &e)
 }
 

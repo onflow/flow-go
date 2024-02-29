@@ -212,7 +212,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 	// check peer identity when running private network
 	// sanity check: rpc inspection should be disabled on public networks
 	if c.networkingType == network.PrivateNetwork && c.config.InspectionProcess.Inspect.RejectUnstakedPeers {
-		err := c.checkSenderIdentity(from)
+		_, err := c.checkSenderIdentity(from)
 		if err != nil {
 			c.notificationConsumer.OnInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(from, p2pmsg.CtrlMsgRPC, err, 1, p2p.CtrlMsgNonClusterTopicType))
 			c.logger.
@@ -337,14 +337,17 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 //   - error: sender is unknown or the identity is ejected.
 //
 // All errors returned from this function can be considered benign.
-func (c *ControlMsgValidationInspector) checkSenderIdentity(pid peer.ID) error {
-	if id, ok := c.idProvider.ByPeerID(pid); !ok {
-		return NewUnstakedPeerErr(fmt.Errorf("unstaked peer: %s", pid))
-	} else if id.IsEjected() {
-		return fmt.Errorf("ejected peer: %s", pid)
+func (c *ControlMsgValidationInspector) checkSenderIdentity(pid peer.ID) (*flow.Identity, error) {
+	id, ok := c.idProvider.ByPeerID(pid)
+	if !ok {
+		return nil, NewUnstakedPeerErr(fmt.Errorf("unstaked peer: %s", pid))
 	}
 
-	return nil
+	if id.IsEjected() {
+		return nil, NewEjectedPeerErr(pid)
+	}
+
+	return id, nil
 }
 
 // inspectGraftMessages performs topic validation on all grafts in the control message using the provided validateTopic func while tracking duplicates.
@@ -665,6 +668,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		c.metrics.OnPublishMessageInspected(errCnt, invalidTopicIdsCount, invalidSubscriptionsCount, invalidSendersCount)
 	}()
 
+	idCache := make(map[peer.ID]*flow.Identity)
 	for _, message := range messages[:sampleSize] {
 		if c.networkingType == network.PrivateNetwork {
 			pid, err := peer.IDFromBytes(message.GetFrom())
@@ -673,12 +677,20 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 				errs = multierror.Append(errs, fmt.Errorf("failed to get peer ID from bytes: %w", err))
 				continue
 			}
-			err = c.checkSenderIdentity(pid)
-			if err != nil {
+
+			if id, ok := idCache[pid]; ok && id.IsEjected() {
 				invalidSendersCount++
-				errs = multierror.Append(errs, err)
+				errs = multierror.Append(errs, NewEjectedPeerErr(pid))
 				continue
 			}
+
+			id, idErr := c.checkSenderIdentity(pid)
+			if err != nil {
+				invalidSendersCount++
+				errs = multierror.Append(errs, idErr)
+				continue
+			}
+			idCache[pid] = id
 		}
 		topic := channels.Topic(message.GetTopic())
 		// The boolean value returned when validating a topic, indicating whether the topic is cluster-prefixed or not, is intentionally ignored.
