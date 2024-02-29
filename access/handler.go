@@ -774,7 +774,7 @@ func (h *Handler) SubscribeBlockHeaders(request *access.SubscribeBlockHeadersReq
 	h.StreamCount.Add(1)
 	defer h.StreamCount.Add(-1)
 
-	startBlockID, startBlockHeight, blockStatus, err := h.getStartData(request.GetStartBlockHeader(), request.GetBlockStatus())
+	startBlockID, startBlockHeight, blockStatus, err := h.getStartData(request.GetStartBlock(), request.GetBlockStatus())
 	if err != nil {
 		return status.Errorf(codes.InvalidArgument, "invalid argument: %v", err)
 	}
