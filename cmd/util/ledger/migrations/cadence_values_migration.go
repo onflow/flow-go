@@ -130,9 +130,11 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
 	}
 
+	storage := migrationRuntime.Storage
+
 	migration := migrations.NewStorageMigration(
 		migrationRuntime.Interpreter,
-		migrationRuntime.Storage,
+		storage,
 	)
 
 	reporter := newValueMigrationReporter(m.reporter, m.log, m.errorMessageHandler)
