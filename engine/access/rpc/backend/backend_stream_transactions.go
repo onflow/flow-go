@@ -23,7 +23,8 @@ import (
 )
 
 // DeriveTransactionStatus is a function to derives the transaction status based on current protocol state
-type DeriveTransactionStatus func(tx *flow.TransactionBody, executed bool, block *flow.Block) (flow.TransactionStatus, error)
+type DeriveUnknownTransactionStatus func(refBlockID flow.Identifier) (flow.TransactionStatus, error)
+type DeriveTransactionStatus func(blockID flow.Identifier, blockHeight uint64, executed bool) (flow.TransactionStatus, error)
 
 type backendSubscribeTransactions struct {
 	log            zerolog.Logger
@@ -35,9 +36,10 @@ type backendSubscribeTransactions struct {
 	responseLimit  float64
 	sendBufferSize int
 
-	getStartHeight          subscription.GetStartHeightFunc
-	getHighestHeight        subscription.GetHighestHeight
-	deriveTransactionStatus DeriveTransactionStatus
+	getStartHeight                 subscription.GetStartHeightFunc
+	getHighestHeight               subscription.GetHighestHeight
+	deriveUnknownTransactionStatus DeriveUnknownTransactionStatus
+	deriveTransactionStatus        DeriveTransactionStatus
 }
 
 // TransactionSubscriptionMetadata holds data representing the status state for each transaction subscription
@@ -51,17 +53,17 @@ type TransactionSubscriptionMetadata struct {
 // SendAndSubscribeTransactionStatuses subscribes to transaction status changes starting from the transaction reference block ID.
 // Expected errors:
 //   - subscription.NewFailedSubscription if any error returned by `b.getStartHeight` function, including context deadline
-//     exceeded or if `deriveTransactionStatus` function is not initialized.
+//     exceeded or if `DeriveTransactionStatus` function is not initialized.
 func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody) subscription.Subscription {
 	nextHeight, err := b.getStartHeight(ctx, tx.ReferenceBlockID, 0)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")
 	}
 
-	if b.deriveTransactionStatus == nil {
+	if b.deriveTransactionStatus == nil || b.deriveUnknownTransactionStatus == nil {
 		return subscription.NewFailedSubscription(
 			status.Errorf(codes.Internal, "failed to create transaction statuses subscription"),
-			"DeriveTransactionStatus function must be initialized",
+			"deriveTransactionStatus and deriveUnknownTransactionStatus functions must be initialized",
 		)
 	}
 
@@ -118,7 +120,13 @@ func (b *backendSubscribeTransactions) backendSubscribeTransactions(txInfo *Tran
 			}
 		}
 
-		txStatus, err := b.deriveTransactionStatus(txInfo.txBody, blockWithTxAvailable, txInfo.blockWithTx)
+		// find the transaction status
+		var txStatus flow.TransactionStatus
+		if txInfo.blockWithTx == nil {
+			txStatus, err = b.deriveUnknownTransactionStatus(txInfo.txBody.ReferenceBlockID)
+		} else {
+			txStatus, err = b.deriveTransactionStatus(txInfo.blockWithTx.ID(), txInfo.blockWithTx.Header.Height, blockWithTxAvailable)
+		}
 		if err != nil {
 			return nil, rpc.ConvertStorageError(err)
 		}

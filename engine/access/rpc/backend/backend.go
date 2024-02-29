@@ -112,11 +112,13 @@ type Params struct {
 	ScriptExecutor            execution.ScriptExecutor
 	ScriptExecutionMode       IndexQueryMode
 	EventQueryMode            IndexQueryMode
+	TxResultQueryMode         IndexQueryMode
+	EventsIndex               *index.EventsIndex
+	TxResultsIndex            *TransactionResultsIndex
 	BlockTracker              subscription.BlockTracker
 	SubscriptionParams        SubscriptionParams
 
-	EventsIndex *index.EventsIndex
-	UseIndex    bool
+	UseIndex bool
 }
 
 type SubscriptionParams struct {
@@ -125,6 +127,8 @@ type SubscriptionParams struct {
 	ResponseLimit  float64
 	SendBufferSize int
 }
+
+var _ TransactionErrorMessage = (*Backend)(nil)
 
 // New creates backend instance
 func New(params Params) (*Backend, error) {
@@ -178,14 +182,17 @@ func New(params Params) (*Backend, error) {
 			scriptExecMode:    params.ScriptExecutionMode,
 		},
 		backendTransactions: backendTransactions{
+			TransactionsLocalDataProvider: TransactionsLocalDataProvider{
+				state:          params.State,
+				collections:    params.Collections,
+				blocks:         params.Blocks,
+				eventsIndex:    params.EventsIndex,
+				txResultsIndex: params.TxResultsIndex,
+			},
 			log:                  params.Log,
 			staticCollectionRPC:  params.CollectionRPC,
-			state:                params.State,
 			chainID:              params.ChainID,
-			collections:          params.Collections,
-			blocks:               params.Blocks,
 			transactions:         params.Transactions,
-			results:              params.LightTransactionResults,
 			executionReceipts:    params.ExecutionReceipts,
 			transactionValidator: configureTransactionValidator(params.State, params.ChainID),
 			transactionMetrics:   params.AccessMetrics,
@@ -195,6 +202,7 @@ func New(params Params) (*Backend, error) {
 			nodeCommunicator:     params.Communicator,
 			txResultCache:        txResCache,
 			txErrorMessagesCache: txErrorMessagesCache,
+			txResultQueryMode:    params.TxResultQueryMode,
 		},
 		backendEvents: backendEvents{
 			log:               params.Log,
@@ -262,15 +270,18 @@ func New(params Params) (*Backend, error) {
 		nodeInfo:          nodeInfo,
 	}
 
+	b.backendTransactions.txErrorMessages = b
+
 	// NOTE: The BlockTracker is currently only used by the access node and not by the observer node.
 	if params.BlockTracker != nil {
 		b.backendSubscribeBlocks.getStartHeight = b.GetStartHeight
 		b.backendSubscribeBlocks.getHighestHeight = b.GetHighestHeight
-	}
 
-	b.backendSubscribeTransactions.getStartHeight = b.GetStartHeight
-	b.backendSubscribeTransactions.getHighestHeight = b.GetHighestHeight
-	b.backendSubscribeTransactions.deriveTransactionStatus = b.DeriveTransactionStatus
+		b.backendSubscribeTransactions.getStartHeight = b.GetStartHeight
+		b.backendSubscribeTransactions.getHighestHeight = b.GetHighestHeight
+		b.backendSubscribeTransactions.deriveUnknownTransactionStatus = b.DeriveUnknownTransactionStatus
+		b.backendSubscribeTransactions.deriveTransactionStatus = b.DeriveTransactionStatus
+	}
 
 	retry.SetBackend(b)
 

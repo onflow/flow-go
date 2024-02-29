@@ -121,7 +121,13 @@ func (r *Retry) retryTxsAtHeight(heightToRetry uint64) error {
 		}
 
 		// find the transaction status
-		status, err := r.backend.DeriveTransactionStatus(tx, false, block)
+		var status flow.TransactionStatus
+		if block == nil {
+			status, err = r.backend.DeriveUnknownTransactionStatus(tx.ReferenceBlockID)
+		} else {
+			status, err = r.backend.deriveTransactionStatus(block.ID(), block.Header.Height, false)
+		}
+
 		if err != nil {
 			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 				return err

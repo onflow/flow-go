@@ -234,7 +234,7 @@ func (b *backendEvents) getBlockEventsFromStorage(
 			return nil, nil, rpc.ConvertError(ctx.Err(), "failed to get events from storage", codes.Canceled)
 		}
 
-		events, err := b.eventsIndex.GetEvents(blockInfo.ID, blockInfo.Height)
+		events, err := b.eventsIndex.ByBlockID(blockInfo.ID, blockInfo.Height)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) ||
 				errors.Is(err, storage.ErrHeightNotIndexed) ||
