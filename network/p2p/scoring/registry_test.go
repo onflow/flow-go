@@ -1243,7 +1243,6 @@ func TestScoringRegistrySilencePeriod(t *testing.T) {
 	assert.True(t, ok)
 	assert.NoError(t, err)
 	expectedPenalty := penaltyValueFixtures().GraftMisbehaviour
-	fmt.Println(record.Penalty, expectedPenalty)
 	unittest.RequireNumericallyClose(t, expectedPenalty, record.Penalty, 10e-3)
 	assert.Equal(t, scoring.InitAppScoreRecordStateFunc(maximumSpamPenaltyDecayFactor)().Decay, record.Decay) // decay should be initialized to the initial state.
 }
