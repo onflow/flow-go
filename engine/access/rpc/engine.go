@@ -189,7 +189,7 @@ func (e *Engine) processOnFinalizedBlock(_ *model.Block) error {
 
 	err = e.backend.ProcessFinalizedBlockHeight(finalizedHeader.Height)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not process finalized block height %d: %w", finalizedHeader.Height, err)
 	}
 
 	return nil

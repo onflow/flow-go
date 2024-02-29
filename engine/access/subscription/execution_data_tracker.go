@@ -78,9 +78,9 @@ func NewExecutionDataTracker(
 // If neither startBlockID nor startHeight is provided, the latest sealed block is used.
 //
 // Parameters:
+// - ctx: Context for the operation.
 // - startBlockID: The identifier of the starting block. If provided, startHeight should be 0.
 // - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
-// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
 //
 // Returns:
 // - uint64: The start height for searching.
@@ -88,8 +88,8 @@ func NewExecutionDataTracker(
 //
 // Expected errors during normal operation:
 // - codes.InvalidArgument - if both startBlockID and startHeight are provided, if the start height is out of bounds based on indexed heights (when index used).
-// - storage.ErrNotFound- if a block is provided and does not exist.
-// - codes.Internal - if there is an internal error.
+// - storage.ErrNotFound   - if a block is provided and does not exist.
+// - codes.Internal        - if there is an internal error.
 func (e *ExecutionDataTrackerImpl) GetStartHeight(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
 	height, err := e.BaseTrackerImpl.GetStartHeight(ctx, startBlockID, startHeight)
 	if err != nil {
@@ -108,7 +108,7 @@ func (e *ExecutionDataTrackerImpl) GetStartHeight(ctx context.Context, startBloc
 // OnExecutionData is used to notify the tracker when a new execution data is received.
 //
 // Expected errors during normal operation:
-// - storage.ErrNotFound if no block header with the given ID exists
+// - storage.ErrNotFound - if no block header with the given ID exists
 func (e *ExecutionDataTrackerImpl) OnExecutionData(executionData *execution_data.BlockExecutionDataEntity) error {
 	header, err := e.headers.ByBlockID(executionData.BlockID)
 	if err != nil {
@@ -147,9 +147,9 @@ func (e *ExecutionDataTrackerImpl) GetHighestHeight() uint64 {
 // 5. If validation passes, return the adjusted start height.
 //
 // Expected errors during normal operation:
-// - codes.InvalidArgument - if the start height is out of bounds based on indexed heights.
+// - codes.InvalidArgument    - if the start height is out of bounds based on indexed heights.
 // - codes.FailedPrecondition - if the index reporter is not ready yet.
-// - codes.Internal - for any other error during validation.
+// - codes.Internal           - for any other error during validation.
 func (e *ExecutionDataTrackerImpl) checkStartHeight(height uint64) (uint64, error) {
 	// if the start block is the root block, there will not be an execution data. skip it and
 	// begin from the next block.
@@ -179,8 +179,8 @@ func (e *ExecutionDataTrackerImpl) checkStartHeight(height uint64) (uint64, erro
 
 // getIndexedHeightBound returns the lowest and highest indexed block heights
 // Expected errors during normal operation:
-// - codes.FailedPrecondition: if the index reporter is not ready yet.
-// - codes.Internal: if there was any other error getting the heights.
+// - codes.FailedPrecondition - if the index reporter is not ready yet.
+// - codes.Internal           - if there was any other error getting the heights.
 func (e *ExecutionDataTrackerImpl) getIndexedHeightBound() (uint64, uint64, error) {
 	lowestHeight, err := e.indexReporter.LowestIndexedHeight()
 	if err != nil {
