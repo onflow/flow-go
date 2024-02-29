@@ -40,7 +40,7 @@ type BaseTracker interface {
 	// If neither startBlockID nor startHeight is provided, the latest sealed block is used.
 	//
 	// Expected errors during normal operation:
-	// - codes.InvalidArgument - if both startBlockID and startHeight are provided.
+	// - codes.InvalidArgument - if both startBlockID and startHeight are provided, if the start height is less than the root block height.
 	// - storage.ErrNotFound   - if a block is provided and does not exist.
 	// - codes.Internal        - if there is an internal error.
 	GetStartHeight(context.Context, flow.Identifier, uint64) (uint64, error)
@@ -61,8 +61,6 @@ var _ BaseTracker = (*BaseTrackerImpl)(nil)
 // - rootBlockHeight: The root block height, which serves as the baseline for calculating the start height.
 // - state: The protocol state used for retrieving block information.
 // - headers: The storage headers for accessing block headers.
-// - indexReporter: The index reporter for checking indexed block heights.
-// - useIndex: A flag indicating whether to use indexed block heights for validation.
 //
 // Returns:
 // - *BaseTrackerImpl: A new instance of BaseTrackerImpl.

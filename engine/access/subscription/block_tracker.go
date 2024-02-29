@@ -19,7 +19,8 @@ type GetHighestHeight func(flow.BlockStatus) (uint64, error)
 // BlockTracker is an interface for tracking blocks and handling block-related operations.
 type BlockTracker interface {
 	BaseTracker
-	// GetHighestHeight returns the highest height based on the specified block status which could be only BlockStatusSealed or BlockStatusFinalized.
+	// GetHighestHeight returns the highest height based on the specified block status which could be only BlockStatusSealed
+	// or BlockStatusFinalized.
 	// No errors are expected during normal operation.
 	GetHighestHeight(flow.BlockStatus) (uint64, error)
 	// ProcessOnFinalizedBlock drives the subscription logic when a block is finalized.

@@ -33,8 +33,7 @@ var _ ExecutionDataTracker = (*ExecutionDataTrackerImpl)(nil)
 // ExecutionDataTrackerImpl is an implementation of the ExecutionDataTracker interface.
 type ExecutionDataTrackerImpl struct {
 	*BaseTrackerImpl
-	headers storage.Headers
-
+	headers       storage.Headers
 	indexReporter state_synchronization.IndexReporter
 	useIndex      bool
 
@@ -87,7 +86,8 @@ func NewExecutionDataTracker(
 // - error: An error indicating the result of the operation, if any.
 //
 // Expected errors during normal operation:
-// - codes.InvalidArgument - if both startBlockID and startHeight are provided, if the start height is out of bounds based on indexed heights (when index used).
+// - codes.InvalidArgument - if both startBlockID and startHeight are provided, if the start height is less than the root block height,
+// if the start height is out of bounds based on indexed heights (when index is used).
 // - storage.ErrNotFound   - if a block is provided and does not exist.
 // - codes.Internal        - if there is an internal error.
 func (e *ExecutionDataTrackerImpl) GetStartHeight(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
@@ -147,7 +147,8 @@ func (e *ExecutionDataTrackerImpl) GetHighestHeight() uint64 {
 // 5. If validation passes, return the adjusted start height.
 //
 // Expected errors during normal operation:
-// - codes.InvalidArgument    - if the start height is out of bounds based on indexed heights.
+// - codes.InvalidArgument    - if both startBlockID and startHeight are provided, if the start height is less than the
+// root block height, if the start height is out of bounds based on indexed heights.
 // - codes.FailedPrecondition - if the index reporter is not ready yet.
 // - codes.Internal           - for any other error during validation.
 func (e *ExecutionDataTrackerImpl) checkStartHeight(height uint64) (uint64, error) {
