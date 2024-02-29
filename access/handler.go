@@ -2,7 +2,6 @@ package access
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -717,6 +716,11 @@ func (h *Handler) GetExecutionResultByID(ctx context.Context, req *access.GetExe
 // It takes a SubscribeBlocksRequest and an AccessAPI_SubscribeBlocksServer stream as input.
 // The handler manages the subscription to block updates and sends the subscribed block information
 // to the client via the provided stream.
+//
+// Expected errors:
+// - codes.InvalidArgument - if invalid startBlockID provided or unknown block status provided,
+// - codes.ResourceExhausted - if the maximum number of streams is reached.
+// - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
 func (h *Handler) SubscribeBlocks(request *access.SubscribeBlocksRequest, stream access.AccessAPI_SubscribeBlocksServer) error {
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {
@@ -727,7 +731,7 @@ func (h *Handler) SubscribeBlocks(request *access.SubscribeBlocksRequest, stream
 
 	startBlockID, startBlockHeight, blockStatus, err := h.getStartData(request.GetStartBlock(), request.GetBlockStatus())
 	if err != nil {
-		return status.Errorf(codes.InvalidArgument, "invalid argument: %v", err)
+		return err
 	}
 
 	sub := h.api.SubscribeBlocks(stream.Context(), startBlockID, startBlockHeight, blockStatus)
@@ -766,6 +770,11 @@ func (h *Handler) SubscribeBlocks(request *access.SubscribeBlocksRequest, stream
 //
 // Each block header are filtered by the provided block status, and only
 // those block headers that match the status are returned.
+//
+// Expected errors:
+// - codes.InvalidArgument - if invalid startBlockID provided or unknown block status provided,
+// - codes.ResourceExhausted - if the maximum number of streams is reached.
+// - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block header to message or could not send response.
 func (h *Handler) SubscribeBlockHeaders(request *access.SubscribeBlockHeadersRequest, stream access.AccessAPI_SubscribeBlockHeadersServer) error {
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {
@@ -776,7 +785,7 @@ func (h *Handler) SubscribeBlockHeaders(request *access.SubscribeBlockHeadersReq
 
 	startBlockID, startBlockHeight, blockStatus, err := h.getStartData(request.GetStartBlock(), request.GetBlockStatus())
 	if err != nil {
-		return status.Errorf(codes.InvalidArgument, "invalid argument: %v", err)
+		return err
 	}
 
 	sub := h.api.SubscribeBlockHeaders(stream.Context(), startBlockID, startBlockHeight, blockStatus)
@@ -820,6 +829,11 @@ func (h *Handler) SubscribeBlockHeaders(request *access.SubscribeBlockHeadersReq
 //
 // Each lightweight block are filtered by the provided block status, and only
 // those blocks that match the status are returned.
+//
+// Expected errors:
+// - codes.InvalidArgument - if invalid startBlockID provided or unknown block status provided,
+// - codes.ResourceExhausted - if the maximum number of streams is reached.
+// - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
 func (h *Handler) SubscribeBlockDigests(request *access.SubscribeBlockDigestsRequest, stream access.AccessAPI_SubscribeBlockDigestsServer) error {
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {
@@ -830,7 +844,7 @@ func (h *Handler) SubscribeBlockDigests(request *access.SubscribeBlockDigestsReq
 
 	startBlockID, startBlockHeight, blockStatus, err := h.getStartData(request.GetStartBlock(), request.GetBlockStatus())
 	if err != nil {
-		return status.Errorf(codes.InvalidArgument, "invalid argument: %v", err)
+		return err
 	}
 
 	sub := h.api.SubscribeBlockDigests(stream.Context(), startBlockID, startBlockHeight, blockStatus)
@@ -860,9 +874,8 @@ func (h *Handler) SubscribeBlockDigests(request *access.SubscribeBlockDigestsReq
 }
 
 // getStartData processes subscription start data.
-// It takes a byte slice representing the start block ID and a BlockStatus from the entities package.
-// The method returns a flow.Identifier representing the start block ID, a flow.BlockStatus representing the block status,
-// and an error if any issues are encountered during the processing.
+// It takes a union representing the start block and a BlockStatus from the entities package.
+// Performs validation of input data and returns it in expected format for further processing.
 //
 // Returns:
 // - flow.Identifier: The start block id for searching.
@@ -880,7 +893,7 @@ func (h *Handler) getStartData(msg *access.StartBlock, msgBlockStatus entities.B
 	case *access.StartBlock_BlockId:
 		startBlockID, err = convert.BlockID(s.BlockId)
 		if err != nil {
-			return flow.ZeroID, 0, flow.BlockStatusUnknown, fmt.Errorf("invalid start block ID argument: %w", err)
+			return flow.ZeroID, 0, flow.BlockStatusUnknown, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 		}
 	case *access.StartBlock_BlockHeight:
 		startBlockHeight = s.BlockHeight
@@ -889,7 +902,7 @@ func (h *Handler) getStartData(msg *access.StartBlock, msgBlockStatus entities.B
 	blockStatus := convert.MessageToBlockStatus(msgBlockStatus)
 	err = checkBlockStatus(blockStatus)
 	if err != nil {
-		return flow.ZeroID, 0, flow.BlockStatusUnknown, fmt.Errorf("invalid block status argument: %w", err)
+		return flow.ZeroID, 0, flow.BlockStatusUnknown, err
 	}
 	return startBlockID, startBlockHeight, blockStatus, nil
 }
@@ -976,9 +989,13 @@ func WithBlockSignerDecoder(signerIndicesDecoder hotstuff.BlockSignerDecoder) fu
 	}
 }
 
+// checkBlockStatus checks the validity of the provided block status.
+//
+// Errors:
+// - codes.InvalidArgument - if blockStatus is flow.BlockStatusUnknown
 func checkBlockStatus(blockStatus flow.BlockStatus) error {
 	if blockStatus != flow.BlockStatusFinalized && blockStatus != flow.BlockStatusSealed {
-		return fmt.Errorf("block status is unknown. Possible variants: BLOCK_FINALIZED, BLOCK_SEALED")
+		return status.Errorf(codes.InvalidArgument, "block status is unknown. Possible variants: BLOCK_FINALIZED, BLOCK_SEALED")
 	}
 	return nil
 }

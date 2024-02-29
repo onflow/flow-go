@@ -61,6 +61,16 @@ type API interface {
 	//
 	// Each block is filtered by the provided block status, and only
 	// those blocks that match the status are returned.
+	//
+	// Only one of startBlockID or startHeight may be provided, Otherwise, an InvalidArgument error is returned.
+	// If neither startBlockID nor startHeight is provided, the latest sealed block is used.
+	//
+	// Parameters:
+	// - startBlockID: The identifier of the starting block. If provided, startHeight should be 0.
+	// - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
+	// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
+	//
+	// If invalid parameters will be supplied SubscribeBlocks will return a failed subscription.
 	SubscribeBlocks(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription
 	// SubscribeBlockHeaders streams finalized or sealed block headers starting at the requested
 	// start block, up until the latest available block header. Once the latest is
@@ -69,6 +79,16 @@ type API interface {
 	//
 	// Each block header are filtered by the provided block status, and only
 	// those block headers that match the status are returned.
+	//
+	// Only one of startBlockID or startHeight may be provided, Otherwise, an InvalidArgument error is returned.
+	// If neither startBlockID nor startHeight is provided, the latest sealed block is used.
+	//
+	// Parameters:
+	// - startBlockID: The identifier of the starting block. If provided, startHeight should be 0.
+	// - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
+	// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
+	//
+	// If invalid parameters will be supplied SubscribeBlockHeaders will return a failed subscription.
 	SubscribeBlockHeaders(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription
 	// SubscribeBlockDigests streams finalized or sealed lightweight block starting at the requested
 	// start block, up until the latest available block. Once the latest is
@@ -77,6 +97,16 @@ type API interface {
 	//
 	// Each lightweight block are filtered by the provided block status, and only
 	// those blocks that match the status are returned.
+	//
+	// Only one of startBlockID or startHeight may be provided, Otherwise, an InvalidArgument error is returned.
+	// If neither startBlockID nor startHeight is provided, the latest sealed block is used.
+	//
+	// Parameters:
+	// - startBlockID: The identifier of the starting block. If provided, startHeight should be 0.
+	// - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
+	// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
+	//
+	// If invalid parameters will be supplied SubscribeBlockDigests will return a failed subscription.
 	SubscribeBlockDigests(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription
 }
 
