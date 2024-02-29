@@ -120,7 +120,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 
 	// Create all the runtime components we need for the migration
 
-	migrationRuntime, err := newMigratorRuntime(
+	migrationRuntime, err := NewMigratorRuntime(
 		address,
 		oldPayloads,
 		m.runtimeInterfaceConfig,
