@@ -48,7 +48,9 @@ func TestAPI(t *testing.T) {
 		model := modelv0{}
 
 		// v0
-		version := model.GetVersionUpgrade()
+		assertModelIsUpgradable(t, &model)
+
+		version := model.GetProtocolStateVersion()
 		assert.Equal(t, uint64(0), version)
 
 		// v1
@@ -63,7 +65,9 @@ func TestAPI(t *testing.T) {
 		model := modelv1{}
 
 		// v0
-		version := model.GetVersionUpgrade()
+		assertModelIsUpgradable(t, &model)
+
+		version := model.GetProtocolStateVersion()
 		assert.Equal(t, uint64(1), version)
 
 		// v1
@@ -76,12 +80,25 @@ func TestAPI(t *testing.T) {
 	})
 }
 
-func assertModelIsUpgradable(api protocol_state.API) {
-	oldVersion := api.GetVersionUpgrade()
+// assertModelIsUpgradable tests that the model satisfies the version upgrade interface.
+//   - should be able to set and get the upgrade version
+//   - setting nil version upgrade should work
+//
+// This has to be tested for every model version since version upgrade should be supported by all models.
+func assertModelIsUpgradable(t *testing.T, api protocol_state.API) {
+	oldVersion := api.GetProtocolStateVersion()
 	activationView := uint64(1000)
-	api.SetVersionUpgrade(protocol_state.ViewBasedActivator[uint64]{
+	expected := &protocol_state.ViewBasedActivator[uint64]{
 		Data:           oldVersion + 1,
 		ActivationView: activationView,
-	})
+	}
 
+	// check if setting version upgrade works
+	api.SetVersionUpgrade(expected)
+	actual := api.GetVersionUpgrade()
+	assert.Equal(t, expected, actual, "version upgrade should be set")
+
+	// check if setting nil version upgrade works
+	api.SetVersionUpgrade(nil)
+	assert.Nil(t, api.GetVersionUpgrade(), "version upgrade should be nil")
 }
