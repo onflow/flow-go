@@ -26,10 +26,10 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/inspector/internal"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -40,7 +40,7 @@ func TestNewControlMsgValidationInspector(t *testing.T) {
 		require.NoError(t, err, "failed to get default flow config")
 		consumer := mockp2p.NewGossipSubInvalidControlMessageNotificationConsumer(t)
 		idProvider := mockmodule.NewIdentityProvider(t)
-		topicProvider := internal.NewMockUpdatableTopicProvider()
+		topicProvider := p2ptest.NewUpdatableTopicProviderFixture()
 		inspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 			Logger:                  unittest.Logger(),
 			SporkID:                 sporkID,
@@ -90,7 +90,7 @@ func TestNewControlMsgValidationInspector(t *testing.T) {
 func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 	t.Run("graft truncation", func(t *testing.T) {
 		graftPruneMessageMaxSampleSize := 1000
-		inspector, signalerCtx, cancel, consumer, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+		inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Config.GraftPrune.MessageCountThreshold = graftPruneMessageMaxSampleSize
 		})
 		// topic validation is ignored set any topic oracle
@@ -107,6 +107,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		require.Less(t, len(graftsLessThanMaxSampleSize.GetControl().GetGraft()), graftPruneMessageMaxSampleSize)
 
 		from := unittest.PeerIdFixture(t)
+		idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Twice()
 		require.NoError(t, inspector.Inspect(from, graftsGreaterThanMaxSampleSize))
 		require.NoError(t, inspector.Inspect(from, graftsLessThanMaxSampleSize))
 		require.Eventually(t, func() bool {
@@ -122,7 +123,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 
 	t.Run("prune truncation", func(t *testing.T) {
 		graftPruneMessageMaxSampleSize := 1000
-		inspector, signalerCtx, cancel, consumer, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+		inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Config.GraftPrune.MessageCountThreshold = graftPruneMessageMaxSampleSize
 		})
 		// topic validation is ignored set any topic oracle
@@ -139,6 +140,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		prunesLessThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithPrunes(unittest.P2PRPCPruneFixtures(unittest.IdentifierListFixture(50).Strings()...)...))
 		require.Less(t, len(prunesLessThanMaxSampleSize.GetControl().GetPrune()), graftPruneMessageMaxSampleSize)
 		from := unittest.PeerIdFixture(t)
+		idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Twice()
 		require.NoError(t, inspector.Inspect(from, prunesGreaterThanMaxSampleSize))
 		require.NoError(t, inspector.Inspect(from, prunesLessThanMaxSampleSize))
 		require.Eventually(t, func() bool {
@@ -154,7 +156,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 
 	t.Run("ihave message id truncation", func(t *testing.T) {
 		maxSampleSize := 1000
-		inspector, signalerCtx, cancel, consumer, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+		inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Config.IHave.MessageCountThreshold = maxSampleSize
 		})
 		// topic validation is ignored set any topic oracle
@@ -172,6 +174,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		require.Less(t, len(iHavesLessThanMaxSampleSize.GetControl().GetIhave()), maxSampleSize)
 
 		from := unittest.PeerIdFixture(t)
+		idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Twice()
 		require.NoError(t, inspector.Inspect(from, iHavesGreaterThanMaxSampleSize))
 		require.NoError(t, inspector.Inspect(from, iHavesLessThanMaxSampleSize))
 		require.Eventually(t, func() bool {
@@ -187,7 +190,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 
 	t.Run("ihave message ids truncation", func(t *testing.T) {
 		maxMessageIDSampleSize := 1000
-		inspector, signalerCtx, cancel, consumer, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+		inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Config.IHave.MessageIdCountThreshold = maxMessageIDSampleSize
 		})
 		// topic validation is ignored set any topic oracle
@@ -202,6 +205,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		iHavesLessThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithIHaves(unittest.P2PRPCIHaveFixtures(50, unittest.IdentifierListFixture(10).Strings()...)...))
 
 		from := unittest.PeerIdFixture(t)
+		idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Twice()
 		require.NoError(t, inspector.Inspect(from, iHavesGreaterThanMaxSampleSize))
 		require.NoError(t, inspector.Inspect(from, iHavesLessThanMaxSampleSize))
 		require.Eventually(t, func() bool {
@@ -225,7 +229,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 
 	t.Run("iwant message truncation", func(t *testing.T) {
 		maxSampleSize := uint(100)
-		inspector, signalerCtx, cancel, consumer, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+		inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Config.IWant.MessageCountThreshold = maxSampleSize
 		})
 		// topic validation is ignored set any topic oracle
@@ -241,6 +245,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		require.Less(t, uint(len(iWantsLessThanMaxSampleSize.GetControl().GetIwant())), maxSampleSize)
 
 		from := unittest.PeerIdFixture(t)
+		idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Twice()
 		require.NoError(t, inspector.Inspect(from, iWantsGreaterThanMaxSampleSize))
 		require.NoError(t, inspector.Inspect(from, iWantsLessThanMaxSampleSize))
 		require.Eventually(t, func() bool {
@@ -256,7 +261,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 
 	t.Run("iwant message id truncation", func(t *testing.T) {
 		maxMessageIDSampleSize := 1000
-		inspector, signalerCtx, cancel, consumer, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+		inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Config.IWant.MessageIdCountThreshold = maxMessageIDSampleSize
 		})
 		// topic validation is ignored set any topic oracle
@@ -270,6 +275,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		iWantsLessThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithIWants(unittest.P2PRPCIWantFixtures(10, 50)...))
 
 		from := unittest.PeerIdFixture(t)
+		idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Twice()
 		require.NoError(t, inspector.Inspect(from, iWantsGreaterThanMaxSampleSize))
 		require.NoError(t, inspector.Inspect(from, iWantsLessThanMaxSampleSize))
 		require.Eventually(t, func() bool {
@@ -296,7 +302,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 func TestControlMessageInspection_ValidRpc(t *testing.T) {
 	logCounter := atomic.NewInt64(0)
 	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Logger = logger
 	})
 	defer consumer.AssertNotCalled(t, "OnInvalidControlMessageNotification")
@@ -339,6 +345,7 @@ func TestControlMessageInspection_ValidRpc(t *testing.T) {
 	})
 
 	from := unittest.PeerIdFixture(t)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Once()
 	require.NoError(t, inspector.Inspect(from, rpc))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 1
@@ -355,7 +362,7 @@ func TestGraftInspection_InvalidTopic_BelowThreshold(t *testing.T) {
 	cfg := &c.NetworkConfig.GossipSub.RpcInspector.Validation
 	logCounter := atomic.NewInt64(0)
 	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Logger = logger
 	})
 
@@ -378,6 +385,7 @@ func TestGraftInspection_InvalidTopic_BelowThreshold(t *testing.T) {
 	invalidSporkIDTopicReq := unittest.P2PRPCFixture(unittest.WithGrafts(invalidSporkIDTopicGrafts...))
 
 	from := unittest.PeerIdFixture(t)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Times(3)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 	consumer.AssertNotCalled(t, "OnInvalidControlMessageNotification", mock.AnythingOfType("*p2p.InvCtrlMsgNotif"))
 	inspector.Start(signalerCtx)
@@ -401,7 +409,7 @@ func TestGraftInspection_InvalidTopic_AboveThreshold(t *testing.T) {
 	cfg := &c.NetworkConfig.GossipSub.RpcInspector.Validation
 	logCounter := atomic.NewInt64(0)
 	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Config = cfg
 		params.Logger = logger
 	})
@@ -426,6 +434,7 @@ func TestGraftInspection_InvalidTopic_AboveThreshold(t *testing.T) {
 	invalidSporkIDTopicReq := unittest.P2PRPCFixture(unittest.WithGrafts(invalidSporkIDTopicGrafts...))
 
 	from := unittest.PeerIdFixture(t)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Times(3)
 	checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgGraft, validation.IsInvalidTopicIDThresholdExceeded, p2p.CtrlMsgNonClusterTopicType)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 	consumer.On("OnInvalidControlMessageNotification", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(checkNotification)
@@ -448,7 +457,7 @@ func TestGraftInspection_InvalidTopic_AboveThreshold(t *testing.T) {
 func TestGraftInspection_DuplicateTopicIds_BelowThreshold(t *testing.T) {
 	logCounter := atomic.NewInt64(0)
 	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Logger = logger
 	})
 	duplicateTopic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
@@ -461,6 +470,7 @@ func TestGraftInspection_DuplicateTopicIds_BelowThreshold(t *testing.T) {
 		grafts = append(grafts, unittest.P2PRPCGraftFixture(&duplicateTopic))
 	}
 	from := unittest.PeerIdFixture(t)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Once()
 	rpc := unittest.P2PRPCFixture(unittest.WithGrafts(grafts...))
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 	// no notification should be disseminated for valid messages as long as the number of duplicates is below the threshold
@@ -480,7 +490,7 @@ func TestGraftInspection_DuplicateTopicIds_BelowThreshold(t *testing.T) {
 func TestGraftInspection_DuplicateTopicIds_AboveThreshold(t *testing.T) {
 	logCounter := atomic.NewInt64(0)
 	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Logger = logger
 	})
 	duplicateTopic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
@@ -493,6 +503,7 @@ func TestGraftInspection_DuplicateTopicIds_AboveThreshold(t *testing.T) {
 		grafts = append(grafts, unittest.P2PRPCGraftFixture(&duplicateTopic))
 	}
 	from := unittest.PeerIdFixture(t)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Once()
 	rpc := unittest.P2PRPCFixture(unittest.WithGrafts(grafts...))
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 
@@ -522,7 +533,7 @@ func TestPruneInspection_InvalidTopic_BelowThreshold(t *testing.T) {
 	c, err := config.DefaultConfig()
 	require.NoError(t, err)
 	cfg := &c.NetworkConfig.GossipSub.RpcInspector.Validation
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Config = cfg
 	})
 
@@ -546,6 +557,7 @@ func TestPruneInspection_InvalidTopic_BelowThreshold(t *testing.T) {
 	invalidSporkIDTopicReq := unittest.P2PRPCFixture(unittest.WithPrunes(invalidSporkIDTopicPrunes...))
 
 	from := unittest.PeerIdFixture(t)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Times(3)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 	// no notification should be disseminated for valid messages as long as the number of invalid topic ids is below the threshold
 	consumer.AssertNotCalled(t, "OnInvalidControlMessageNotification", mock.AnythingOfType("*p2p.InvCtrlMsgNotif"))
@@ -568,7 +580,7 @@ func TestPruneInspection_InvalidTopic_AboveThreshold(t *testing.T) {
 	c, err := config.DefaultConfig()
 	require.NoError(t, err)
 	cfg := &c.NetworkConfig.GossipSub.RpcInspector.Validation
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Config = cfg
 	})
 
@@ -592,6 +604,7 @@ func TestPruneInspection_InvalidTopic_AboveThreshold(t *testing.T) {
 	invalidSporkIDTopicReq := unittest.P2PRPCFixture(unittest.WithPrunes(invalidSporkIDTopicPrunes...))
 
 	from := unittest.PeerIdFixture(t)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Times(3)
 	checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgPrune, validation.IsInvalidTopicIDThresholdExceeded, p2p.CtrlMsgNonClusterTopicType)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 	consumer.On("OnInvalidControlMessageNotification", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(checkNotification)
@@ -614,7 +627,7 @@ func TestPruneInspection_InvalidTopic_AboveThreshold(t *testing.T) {
 func TestPruneInspection_DuplicateTopicIds_AboveThreshold(t *testing.T) {
 	logCounter := atomic.NewInt64(0)
 	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Logger = logger
 	})
 	duplicateTopic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
@@ -628,6 +641,7 @@ func TestPruneInspection_DuplicateTopicIds_AboveThreshold(t *testing.T) {
 		prunes = append(prunes, unittest.P2PRPCPruneFixture(&duplicateTopic))
 	}
 	from := unittest.PeerIdFixture(t)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Once()
 	rpc := unittest.P2PRPCFixture(unittest.WithPrunes(prunes...))
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 
@@ -656,7 +670,7 @@ func TestPruneInspection_DuplicateTopicIds_AboveThreshold(t *testing.T) {
 func TestPrueInspection_DuplicateTopicIds_BelowThreshold(t *testing.T) {
 	logCounter := atomic.NewInt64(0)
 	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Logger = logger
 	})
 	duplicateTopic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
@@ -669,6 +683,7 @@ func TestPrueInspection_DuplicateTopicIds_BelowThreshold(t *testing.T) {
 		prunes = append(prunes, unittest.P2PRPCPruneFixture(&duplicateTopic))
 	}
 	from := unittest.PeerIdFixture(t)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Once()
 	rpc := unittest.P2PRPCFixture(unittest.WithPrunes(prunes...))
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 
@@ -694,7 +709,7 @@ func TestIHaveInspection_InvalidTopic_AboveThreshold(t *testing.T) {
 	cfg := &c.NetworkConfig.GossipSub.RpcInspector.Validation
 	logCounter := atomic.NewInt64(0)
 	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Config = cfg
 		params.Logger = logger
 	})
@@ -719,6 +734,7 @@ func TestIHaveInspection_InvalidTopic_AboveThreshold(t *testing.T) {
 	invalidSporkIDTopicReq := unittest.P2PRPCFixture(unittest.WithIHaves(invalidSporkIDTopicIHaves...))
 
 	from := unittest.PeerIdFixture(t)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Times(3)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 	checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgIHave, validation.IsInvalidTopicIDThresholdExceeded, p2p.CtrlMsgNonClusterTopicType)
 	consumer.On("OnInvalidControlMessageNotification", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(checkNotification)
@@ -743,7 +759,7 @@ func TestIHaveInspection_InvalidTopic_BelowThreshold(t *testing.T) {
 	cfg := &c.NetworkConfig.GossipSub.RpcInspector.Validation
 	logCounter := atomic.NewInt64(0)
 	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Config = cfg
 		params.Logger = logger
 	})
@@ -768,6 +784,7 @@ func TestIHaveInspection_InvalidTopic_BelowThreshold(t *testing.T) {
 	invalidSporkIDTopicReq := unittest.P2PRPCFixture(unittest.WithIHaves(invalidSporkIDTopicIHaves...))
 
 	from := unittest.PeerIdFixture(t)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Times(3)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 	// no notification should be disseminated for valid messages as long as the number of invalid topic ids is below the threshold
 	consumer.AssertNotCalled(t, "OnInvalidControlMessageNotification", mock.AnythingOfType("*p2p.InvCtrlMsgNotif"))
@@ -790,7 +807,7 @@ func TestIHaveInspection_InvalidTopic_BelowThreshold(t *testing.T) {
 func TestIHaveInspection_DuplicateTopicIds_BelowThreshold(t *testing.T) {
 	logCounter := atomic.NewInt64(0)
 	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Logger = logger
 	})
 	validTopic := fmt.Sprintf("%s/%s", channels.PushBlocks.String(), sporkID)
@@ -808,7 +825,7 @@ func TestIHaveInspection_DuplicateTopicIds_BelowThreshold(t *testing.T) {
 	// creates an RPC with duplicate topic ids but different message ids
 	duplicateMsgIDRpc := unittest.P2PRPCFixture(unittest.WithIHaves(ihaves...))
 	from := unittest.PeerIdFixture(t)
-
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Once()
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 
 	// no notification should be disseminated for valid messages as long as the number of duplicates is below the threshold
@@ -829,7 +846,7 @@ func TestIHaveInspection_DuplicateTopicIds_BelowThreshold(t *testing.T) {
 func TestIHaveInspection_DuplicateTopicIds_AboveThreshold(t *testing.T) {
 	logCounter := atomic.NewInt64(0)
 	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Logger = logger
 	})
 	validTopic := fmt.Sprintf("%s/%s", channels.PushBlocks.String(), sporkID)
@@ -847,6 +864,7 @@ func TestIHaveInspection_DuplicateTopicIds_AboveThreshold(t *testing.T) {
 	// creates an RPC with duplicate topic ids but different message ids
 	duplicateMsgIDRpc := unittest.P2PRPCFixture(unittest.WithIHaves(ihaves...))
 	from := unittest.PeerIdFixture(t)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Once()
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 
 	// one notification should be disseminated for invalid messages when the number of duplicates exceeds the threshold
@@ -869,7 +887,7 @@ func TestIHaveInspection_DuplicateTopicIds_AboveThreshold(t *testing.T) {
 func TestIHaveInspection_DuplicateMessageIds_BelowThreshold(t *testing.T) {
 	logCounter := atomic.NewInt64(0)
 	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Logger = logger
 	})
 	validTopic := fmt.Sprintf("%s/%s", channels.PushBlocks.String(), sporkID)
@@ -887,6 +905,7 @@ func TestIHaveInspection_DuplicateMessageIds_BelowThreshold(t *testing.T) {
 	duplicateMsgIDIHave := unittest.P2PRPCIHaveFixture(&validTopic, append(msgIds, unittest.IdentifierListFixture(5)...).Strings()...)
 	duplicateMsgIDRpc := unittest.P2PRPCFixture(unittest.WithIHaves(duplicateMsgIDIHave))
 	from := unittest.PeerIdFixture(t)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Once()
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 
 	// no notification should be disseminated for valid messages as long as the number of duplicates is below the threshold
@@ -907,7 +926,7 @@ func TestIHaveInspection_DuplicateMessageIds_BelowThreshold(t *testing.T) {
 func TestIHaveInspection_DuplicateMessageIds_AboveThreshold(t *testing.T) {
 	logCounter := atomic.NewInt64(0)
 	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Logger = logger
 	})
 	validTopic := fmt.Sprintf("%s/%s", channels.PushBlocks.String(), sporkID)
@@ -925,6 +944,7 @@ func TestIHaveInspection_DuplicateMessageIds_AboveThreshold(t *testing.T) {
 	duplicateMsgIDIHave := unittest.P2PRPCIHaveFixture(&validTopic, append(msgIds, unittest.IdentifierListFixture(5)...).Strings()...)
 	duplicateMsgIDRpc := unittest.P2PRPCFixture(unittest.WithIHaves(duplicateMsgIDIHave))
 	from := unittest.PeerIdFixture(t)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Once()
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 
 	// one notification should be disseminated for invalid messages when the number of duplicates exceeds the threshold
@@ -946,7 +966,7 @@ func TestIHaveInspection_DuplicateMessageIds_AboveThreshold(t *testing.T) {
 func TestIWantInspection_DuplicateMessageIds_BelowThreshold(t *testing.T) {
 	logCounter := atomic.NewInt64(0)
 	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
-	inspector, signalerCtx, cancel, consumer, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Logger = logger
 	})
 	// oracle must be set even though iWant messages do not have topic IDs
@@ -964,6 +984,7 @@ func TestIWantInspection_DuplicateMessageIds_BelowThreshold(t *testing.T) {
 	duplicateMsgIDRpc := unittest.P2PRPCFixture(unittest.WithIWants(duplicateMsgIDIWant))
 
 	from := unittest.PeerIdFixture(t)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Once()
 	// no notification should be disseminated for valid messages as long as the number of duplicates is below the threshold
 	consumer.AssertNotCalled(t, "OnInvalidControlMessageNotification", mock.AnythingOfType("*p2p.InvCtrlMsgNotif"))
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
@@ -988,7 +1009,7 @@ func TestIWantInspection_DuplicateMessageIds_BelowThreshold(t *testing.T) {
 func TestIWantInspection_DuplicateMessageIds_AboveThreshold(t *testing.T) {
 	logCounter := atomic.NewInt64(0)
 	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
-	inspector, signalerCtx, cancel, consumer, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Logger = logger
 	})
 	// oracle must be set even though iWant messages do not have topic IDs
@@ -1006,6 +1027,7 @@ func TestIWantInspection_DuplicateMessageIds_AboveThreshold(t *testing.T) {
 	duplicateMsgIDRpc := unittest.P2PRPCFixture(unittest.WithIWants(duplicateMsgIDIWant))
 
 	from := unittest.PeerIdFixture(t)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Once()
 	checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgIWant, validation.IsIWantDuplicateMsgIDThresholdErr, p2p.CtrlMsgNonClusterTopicType)
 	consumer.On("OnInvalidControlMessageNotification", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
@@ -1030,7 +1052,7 @@ func TestIWantInspection_DuplicateMessageIds_AboveThreshold(t *testing.T) {
 func TestIWantInspection_CacheMiss_AboveThreshold(t *testing.T) {
 	logCounter := atomic.NewInt64(0)
 	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
-	inspector, signalerCtx, cancel, consumer, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 		// set high cache miss threshold to ensure we only disseminate notification when it is exceeded
 		params.Config.IWant.CacheMissThreshold = 900
 		params.Logger = logger
@@ -1039,6 +1061,7 @@ func TestIWantInspection_CacheMiss_AboveThreshold(t *testing.T) {
 	inspectMsgRpc := unittest.P2PRPCFixture(unittest.WithIWants(unittest.P2PRPCIWantFixtures(10, 100)...))
 
 	from := unittest.PeerIdFixture(t)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Once()
 	checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgIWant, validation.IsIWantCacheMissThresholdErr, p2p.CtrlMsgNonClusterTopicType)
 	consumer.On("OnInvalidControlMessageNotification", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
@@ -1077,7 +1100,7 @@ func TestIWantInspection_CacheMiss_AboveThreshold(t *testing.T) {
 func TestIWantInspection_CacheMiss_BelowThreshold(t *testing.T) {
 	logCounter := atomic.NewInt64(0)
 	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
-	inspector, signalerCtx, cancel, consumer, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 		// set high cache miss threshold to ensure that we do not disseminate notification in this test
 		params.Config.IWant.CacheMissThreshold = 99
 		params.Logger = logger
@@ -1100,6 +1123,7 @@ func TestIWantInspection_CacheMiss_BelowThreshold(t *testing.T) {
 	})
 
 	from := unittest.PeerIdFixture(t)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Once()
 	inspector.Start(signalerCtx)
 	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
 
@@ -1118,7 +1142,7 @@ func TestPublishMessageInspection_ExceedingErrThreshold(t *testing.T) {
 	logCounter := atomic.NewInt64(0)
 	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
 	errThreshold := 500
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Config.PublishMessages.ErrorThreshold = errThreshold
 		params.Logger = logger
 	})
@@ -1128,13 +1152,14 @@ func TestPublishMessageInspection_ExceedingErrThreshold(t *testing.T) {
 	malformedTopic := channels.Topic("!@#$%^&**((").String()
 	// a topics spork ID is considered invalid if it does not match the current spork ID
 	invalidSporkIDTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, unittest.IdentifierFixture())).String()
+	publisher := unittest.PeerIdFixture(t)
 	// create 10 normal messages
-	pubsubMsgs := unittest.GossipSubMessageFixtures(50, fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID))
+	pubsubMsgs := unittest.GossipSubMessageFixtures(50, fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID), p2ptest.WithFrom(publisher))
 	// add 550 invalid messages to force notification dissemination
 	invalidMessageFixtures := []*pubsub_pb.Message{
-		{Topic: &unknownTopic},
-		{Topic: &malformedTopic},
-		{Topic: &invalidSporkIDTopic},
+		{Topic: &unknownTopic, From: []byte(publisher)},
+		{Topic: &malformedTopic, From: []byte(publisher)},
+		{Topic: &invalidSporkIDTopic, From: []byte(publisher)},
 	}
 	for i := 0; i < errThreshold+1; i++ {
 		pubsubMsgs = append(pubsubMsgs, invalidMessageFixtures[rand.Intn(len(invalidMessageFixtures))])
@@ -1144,9 +1169,12 @@ func TestPublishMessageInspection_ExceedingErrThreshold(t *testing.T) {
 	for i, msg := range pubsubMsgs {
 		topics[i] = *msg.Topic
 	}
+
 	// set topic oracle to return list of topics to avoid hasSubscription errors and force topic validation
 	topicProviderOracle.UpdateTopics(topics)
 	from := unittest.PeerIdFixture(t)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true)
+	idProvider.On("ByPeerID", publisher).Return(nil, false)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 
 	checkNotification := checkNotificationFunc(t, from, p2pmsg.RpcPublishMessage, validation.IsInvalidRpcPublishMessagesErr, p2p.CtrlMsgNonClusterTopicType)
@@ -1168,12 +1196,14 @@ func TestPublishMessageInspection_MissingSubscription(t *testing.T) {
 	logCounter := atomic.NewInt64(0)
 	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
 	errThreshold := 500
-	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Config.PublishMessages.ErrorThreshold = errThreshold
 		params.Logger = logger
 	})
-	pubsubMsgs := unittest.GossipSubMessageFixtures(errThreshold+1, fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID))
+	publisher := unittest.PeerIdFixture(t)
+	pubsubMsgs := unittest.GossipSubMessageFixtures(errThreshold+1, fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID), p2ptest.WithFrom(publisher))
 	from := unittest.PeerIdFixture(t)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true)
 	rpc := unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...))
 	checkNotification := checkNotificationFunc(t, from, p2pmsg.RpcPublishMessage, validation.IsInvalidRpcPublishMessagesErr, p2p.CtrlMsgNonClusterTopicType)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
@@ -1194,17 +1224,19 @@ func TestPublishMessageInspection_MissingTopic(t *testing.T) {
 	logCounter := atomic.NewInt64(0)
 	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
 	errThreshold := 500
-	inspector, signalerCtx, cancel, consumer, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 		// 5 invalid pubsub messages will force notification dissemination
 		params.Config.PublishMessages.ErrorThreshold = errThreshold
 		params.Logger = logger
 	})
-	pubsubMsgs := unittest.GossipSubMessageFixtures(errThreshold+1, "")
+	publisher := unittest.PeerIdFixture(t)
+	pubsubMsgs := unittest.GossipSubMessageFixtures(errThreshold+1, "", p2ptest.WithFrom(publisher))
 	rpc := unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...))
 	for _, msg := range pubsubMsgs {
 		msg.Topic = nil
 	}
 	from := unittest.PeerIdFixture(t)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true)
 	checkNotification := checkNotificationFunc(t, from, p2pmsg.RpcPublishMessage, validation.IsInvalidRpcPublishMessagesErr, p2p.CtrlMsgNonClusterTopicType)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 	consumer.On("OnInvalidControlMessageNotification", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
@@ -1225,6 +1257,7 @@ func TestRpcInspectionDeactivatedOnPublicNetwork(t *testing.T) {
 	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
 	inspector, signalerCtx, cancel, _, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Logger = logger
+		params.NetworkingType = network.PublicNetwork
 	})
 	from := unittest.PeerIdFixture(t)
 	defer idProvider.AssertNotCalled(t, "ByPeerID", from)
@@ -1243,6 +1276,27 @@ func TestRpcInspectionDeactivatedOnPublicNetwork(t *testing.T) {
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
 
+// TestInspection_Unstaked_Peer ensures inspector disseminates invalid control message notifications for rpc's from unstaked peers when running private network.
+func TestInspection_Unstaked_Peer(t *testing.T) {
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+		// override the inspector and params, run the inspector in private mode
+		params.NetworkingType = network.PrivateNetwork
+	})
+	unstakedPeer := unittest.PeerIdFixture(t)
+	topic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
+	topicProviderOracle.UpdateTopics([]string{topic})
+	idProvider.On("ByPeerID", unstakedPeer).Return(nil, false).Once()
+	checkNotification := checkNotificationFunc(t, unstakedPeer, p2pmsg.CtrlMsgRPC, validation.IsErrUnstakedPeer, p2p.CtrlMsgNonClusterTopicType)
+	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
+	consumer.On("OnInvalidControlMessageNotification", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
+	inspector.Start(signalerCtx)
+	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
+
+	require.Error(t, inspector.Inspect(unstakedPeer, unittest.P2PRPCFixture()))
+	cancel()
+	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
+}
+
 // TestControlMessageInspection_Unstaked_From ensures inspector disseminates invalid control message notifications for published messages from unstaked peers.
 func TestPublishMessageInspection_Unstaked_From(t *testing.T) {
 	logCounter := atomic.NewInt64(0)
@@ -1253,11 +1307,13 @@ func TestPublishMessageInspection_Unstaked_From(t *testing.T) {
 		params.Logger = logger
 	})
 	from := unittest.PeerIdFixture(t)
+	unstakedPeer := unittest.PeerIdFixture(t)
 	topic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
 	topicProviderOracle.UpdateTopics([]string{topic})
 	// default RpcMessageErrorThreshold is 500, 501 messages should trigger a notification
-	pubsubMsgs := unittest.GossipSubMessageFixtures(501, topic, unittest.WithFrom(from))
-	idProvider.On("ByPeerID", from).Return(nil, false).Times(501)
+	pubsubMsgs := unittest.GossipSubMessageFixtures(501, topic, unittest.WithFrom(unstakedPeer))
+	idProvider.On("ByPeerID", unstakedPeer).Return(nil, false)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true)
 	rpc := unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...))
 	checkNotification := checkNotificationFunc(t, from, p2pmsg.RpcPublishMessage, validation.IsInvalidRpcPublishMessagesErr, p2p.CtrlMsgNonClusterTopicType)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
@@ -1282,13 +1338,20 @@ func TestPublishMessageInspection_Ejected_From(t *testing.T) {
 		params.NetworkingType = network.PrivateNetwork
 		params.Logger = logger
 	})
+
 	from := unittest.PeerIdFixture(t)
 	id := unittest.IdentityFixture()
-	id.EpochParticipationStatus = flow.EpochParticipationStatusEjected
+
+	ejectedNode := unittest.PeerIdFixture(t)
+	ejectedId := unittest.IdentityFixture()
+	ejectedId.EpochParticipationStatus = flow.EpochParticipationStatusEjected
+
 	topic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
 	topicProviderOracle.UpdateTopics([]string{topic})
-	pubsubMsgs := unittest.GossipSubMessageFixtures(501, topic, unittest.WithFrom(from))
-	idProvider.On("ByPeerID", from).Return(id, true).Times(501)
+	pubsubMsgs := unittest.GossipSubMessageFixtures(501, topic, unittest.WithFrom(ejectedNode))
+	idProvider.On("ByPeerID", ejectedNode).Return(ejectedId, true)
+	idProvider.On("ByPeerID", from).Return(id, true)
+
 	rpc := unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...))
 	checkNotification := checkNotificationFunc(t, from, p2pmsg.RpcPublishMessage, validation.IsInvalidRpcPublishMessagesErr, p2p.CtrlMsgNonClusterTopicType)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
@@ -1313,7 +1376,7 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Logger = logger
 		})
-		defer consumer.AssertNotCalled(t, "Distribute")
+		defer consumer.AssertNotCalled(t, "OnInvalidControlMessageNotification")
 		clusterID := flow.ChainID(unittest.IdentifierFixture().String())
 		clusterPrefixedTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.SyncCluster(clusterID), sporkID)).String()
 		topicProviderOracle.UpdateTopics([]string{clusterPrefixedTopic})
@@ -1352,32 +1415,6 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		inspector.Start(signalerCtx)
 		unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
 
-		require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
-		require.Eventually(t, func() bool {
-			return logCounter.Load() == 1
-		}, time.Second, 500*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
-	})
-
-	t.Run("validateClusterPrefixedTopic should return an error when sender is unstaked", func(t *testing.T) {
-		logCounter := atomic.NewInt64(0)
-		logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
-
-		inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
-			params.Logger = logger
-		})
-		defer consumer.AssertNotCalled(t, "Distribute")
-		clusterID := flow.ChainID(unittest.IdentifierFixture().String())
-		clusterPrefixedTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.SyncCluster(clusterID), sporkID)).String()
-		topicProviderOracle.UpdateTopics([]string{clusterPrefixedTopic})
-		from := unittest.PeerIdFixture(t)
-		idProvider.On("ByPeerID", from).Return(nil, false).Once()
-		inspectMsgRpc := unittest.P2PRPCFixture(unittest.WithGrafts(unittest.P2PRPCGraftFixture(&clusterPrefixedTopic)))
-		inspector.ActiveClustersChanged(flow.ChainIDList{flow.ChainID(unittest.IdentifierFixture().String())})
-		inspector.Start(signalerCtx)
-		unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
-		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 		require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
 		require.Eventually(t, func() bool {
 			return logCounter.Load() == 1
@@ -1428,7 +1465,7 @@ func TestControlMessageValidationInspector_ActiveClustersChanged(t *testing.T) {
 	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 		params.Logger = logger
 	})
-	defer consumer.AssertNotCalled(t, "Distribute")
+	defer consumer.AssertNotCalled(t, "OnInvalidControlMessageNotification")
 	identity := unittest.IdentityFixture()
 	idProvider.On("ByPeerID", mock.AnythingOfType("peer.ID")).Return(identity, true).Times(5)
 	activeClusterIds := make(flow.ChainIDList, 0)
@@ -1460,7 +1497,7 @@ func TestControlMessageValidationInspector_TruncationConfigToggle(t *testing.T) 
 		numOfMsgs := 5000
 		logCounter := atomic.NewInt64(0)
 		logger := hookedLogger(logCounter, zerolog.TraceLevel, validation.RPCTruncationDisabledWarning, worker.QueuedItemProcessedLog)
-		inspector, signalerCtx, cancel, consumer, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+		inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Config.GraftPrune.MessageCountThreshold = numOfMsgs
 			params.Logger = logger
 			// disable truncation for all control message types
@@ -1481,6 +1518,7 @@ func TestControlMessageValidationInspector_TruncationConfigToggle(t *testing.T) 
 		)
 
 		from := unittest.PeerIdFixture(t)
+		idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Once()
 		require.NoError(t, inspector.Inspect(from, rpc))
 
 		require.Eventually(t, func() bool {
@@ -1512,7 +1550,7 @@ func TestControlMessageValidationInspector_TruncationConfigToggle(t *testing.T) 
 		}
 		logCounter := atomic.NewInt64(0)
 		logger := hookedLogger(logCounter, zerolog.TraceLevel, expectedLogStrs...)
-		inspector, signalerCtx, cancel, consumer, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+		inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Config.GraftPrune.MessageCountThreshold = numOfMsgs
 			params.Logger = logger
 			// disable truncation for all control message types individually
@@ -1538,6 +1576,7 @@ func TestControlMessageValidationInspector_TruncationConfigToggle(t *testing.T) 
 		)
 
 		from := unittest.PeerIdFixture(t)
+		idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Once()
 		require.NoError(t, inspector.Inspect(from, rpc))
 
 		require.Eventually(t, func() bool {
@@ -1593,6 +1632,56 @@ func TestControlMessageValidationInspector_InspectionConfigToggle(t *testing.T) 
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
 
+	t.Run("should not check identity when reject-unstaked-peers is false", func(t *testing.T) {
+		inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+			// disable inspector for all control message types
+			params.Config.InspectionProcess.Inspect.RejectUnstakedPeers = false
+		})
+
+		// notification consumer should never be called when inspection is disabled
+		defer consumer.AssertNotCalled(t, "OnInvalidControlMessageNotification")
+		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
+		rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(true).Maybe()
+
+		from := unittest.PeerIdFixture(t)
+
+		defer idProvider.AssertNotCalled(t, "ByPeerID", from)
+		inspector.Start(signalerCtx)
+
+		require.NoError(t, inspector.Inspect(from, unittest.P2PRPCFixture()))
+
+		time.Sleep(time.Second)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
+	})
+
+	t.Run("should check identity when reject-unstaked-peers is true", func(t *testing.T) {
+		inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+			// disable inspector for all control message types
+			params.Config.InspectionProcess.Inspect.RejectUnstakedPeers = true
+		})
+
+		// notification consumer should never be called when inspection is disabled
+		consumer.On("OnInvalidControlMessageNotification", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(func(args mock.Arguments) {
+			notification, ok := args.Get(0).(*p2p.InvCtrlMsgNotif)
+			require.True(t, ok)
+			require.True(t, validation.IsErrUnstakedPeer(notification.Error))
+		})
+		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
+		rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(true).Maybe()
+
+		from := unittest.PeerIdFixture(t)
+
+		idProvider.On("ByPeerID", from).Return(nil, false).Once()
+		inspector.Start(signalerCtx)
+
+		require.Error(t, inspector.Inspect(from, unittest.P2PRPCFixture()))
+
+		time.Sleep(time.Second)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
+	})
+
 	t.Run("should not perform inspection when disabled for each individual control message type directly", func(t *testing.T) {
 		numOfMsgs := 5000
 		expectedLogStrs := []string{
@@ -1605,7 +1694,7 @@ func TestControlMessageValidationInspector_InspectionConfigToggle(t *testing.T) 
 		}
 		logCounter := atomic.NewInt64(0)
 		logger := hookedLogger(logCounter, zerolog.TraceLevel, expectedLogStrs...)
-		inspector, signalerCtx, cancel, consumer, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+		inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Config.GraftPrune.MessageCountThreshold = numOfMsgs
 			params.Logger = logger
 			// disable inspection for all control message types individually
@@ -1631,6 +1720,7 @@ func TestControlMessageValidationInspector_InspectionConfigToggle(t *testing.T) 
 		)
 
 		from := unittest.PeerIdFixture(t)
+		idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Once()
 		require.NoError(t, inspector.Inspect(from, rpc))
 
 		require.Eventually(t, func() bool {
@@ -1678,7 +1768,7 @@ func inspectorFixture(t *testing.T, opts ...func(params *validation.InspectorPar
 	*mockp2p.RpcControlTracking,
 	flow.Identifier,
 	*mockmodule.IdentityProvider,
-	*internal.MockUpdatableTopicProvider) {
+	*p2ptest.UpdatableTopicProviderFixture) {
 
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
@@ -1687,7 +1777,7 @@ func inspectorFixture(t *testing.T, opts ...func(params *validation.InspectorPar
 	consumer := mockp2p.NewGossipSubInvalidControlMessageNotificationConsumer(t)
 	idProvider := mockmodule.NewIdentityProvider(t)
 	rpcTracker := mockp2p.NewRpcControlTracking(t)
-	topicProviderOracle := internal.NewMockUpdatableTopicProvider()
+	topicProviderOracle := p2ptest.NewUpdatableTopicProviderFixture()
 	params := &validation.InspectorParams{
 		Logger:                  unittest.Logger(),
 		SporkID:                 sporkID,
@@ -1697,7 +1787,7 @@ func inspectorFixture(t *testing.T, opts ...func(params *validation.InspectorPar
 		InspectorMetrics:        metrics.NewNoopCollector(),
 		RpcTracker:              rpcTracker,
 		InvalidControlMessageNotificationConsumer: consumer,
-		NetworkingType: network.PublicNetwork,
+		NetworkingType: network.PrivateNetwork,
 		TopicOracle: func() p2p.TopicProvider {
 			return topicProviderOracle
 		},

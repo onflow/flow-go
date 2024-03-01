@@ -275,7 +275,7 @@ func (builder *ObserverServiceBuilder) deriveBootstrapPeerIdentities() error {
 		return nil
 	}
 
-	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
+	ids, err := cmd.BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
 	if err != nil {
 		return fmt.Errorf("failed to derive bootstrap peer identities: %w", err)
 	}
@@ -763,37 +763,6 @@ func publicNetworkMsgValidators(log zerolog.Logger, idProvider module.IdentityPr
 			validator.ValidateTarget(log, selfID),
 		),
 	}
-}
-
-// BootstrapIdentities converts the bootstrap node addresses and keys to a Flow Identity list where
-// each Flow Identity is initialized with the passed address, the networking key
-// and the Node ID set to ZeroID, role set to Access, 0 stake and no staking key.
-func BootstrapIdentities(addresses []string, keys []string) (flow.IdentitySkeletonList, error) {
-	if len(addresses) != len(keys) {
-		return nil, fmt.Errorf("number of addresses and keys provided for the boostrap nodes don't match")
-	}
-
-	ids := make(flow.IdentitySkeletonList, len(addresses))
-	for i, address := range addresses {
-		bytes, err := hex.DecodeString(keys[i])
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode secured GRPC server public key hex %w", err)
-		}
-
-		publicFlowNetworkingKey, err := crypto.DecodePublicKey(crypto.ECDSAP256, bytes)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get public flow networking key could not decode public key bytes %w", err)
-		}
-
-		// create the identity of the peer by setting only the relevant fields
-		ids[i] = &flow.IdentitySkeleton{
-			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the public network it does not apply
-			Address:       address,
-			Role:          flow.RoleAccess, // the upstream node has to be an access node
-			NetworkPubKey: publicFlowNetworkingKey,
-		}
-	}
-	return ids, nil
 }
 
 func (builder *ObserverServiceBuilder) initNodeInfo() error {
