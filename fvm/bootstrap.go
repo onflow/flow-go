@@ -460,11 +460,6 @@ func (b *bootstrapExecutor) Execute() error {
 	// set the list of nodes which are allowed to stake in this network
 	b.setStakingAllowlist(service, b.identities.NodeIDs())
 
-	err = expectAccounts(uint64(systemcontracts.LastSystemAccountIndex + len(b.identities)))
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
