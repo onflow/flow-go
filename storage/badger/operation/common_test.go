@@ -10,6 +10,7 @@ import (
 	"github.com/golang/snappy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -743,4 +744,22 @@ func TestDecodeCompressed(t *testing.T) {
 
 	// Ensure the decoded entity matches the original entity
 	require.Equal(t, entity, decodedEntity, "decoded entity should match the original entity")
+}
+
+func BenchmarkEncodeAndCompress(b *testing.B) {
+	r := unittest.ExecutionResultFixture()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, _ = encodeAndCompress(r)
+	}
+}
+
+func BenchmarkEncodeWithoutCompress(b *testing.B) {
+	r := unittest.ExecutionResultFixture()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, _ = msgpack.Marshal(r)
+	}
 }
