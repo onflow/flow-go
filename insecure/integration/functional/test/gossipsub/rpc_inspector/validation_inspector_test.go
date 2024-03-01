@@ -921,12 +921,10 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	for i := 0; i < len(publishMsgs); i++ {
 		topics[i] = publishMsgs[i].GetTopic()
 	}
-	topicProvider.UpdateTopics(topics)
 
+	topicProvider.UpdateTopics(topics)
 	// after 7 errors encountered disseminate a notification
 	inspectorConfig.PublishMessages.ErrorThreshold = 6
-
-	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(t,
 		sporkID,
@@ -941,9 +939,6 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	idProvider.On("ByPeerID", unknownPeerID).Return(nil, false).Once()
 	// return ejected identity for peer ID will force message validation failure
 	idProvider.On("ByPeerID", ejectedIdentityPeerID).Return(ejectedIdentity, true).Once()
-
-	// set topic oracle to return list with all topics to avoid hasSubscription failures and force topic validation
-	topicProvider.UpdateTopics([]string{topic.String(), unknownTopic, malformedTopic, invalidSporkIDTopic})
 
 	validationInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}

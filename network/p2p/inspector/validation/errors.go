@@ -135,16 +135,16 @@ func IsErrActiveClusterIDsNotSet(err error) bool {
 
 // ErrUnstakedPeer error that indicates a cluster prefixed control message has been from an unstaked peer.
 type ErrUnstakedPeer struct {
-	err error
+	pid peer.ID
 }
 
 func (e ErrUnstakedPeer) Error() string {
-	return e.err.Error()
+	return fmt.Sprintf("unstaked peer: %s", e.pid)
 }
 
 // NewUnstakedPeerErr returns a new ErrUnstakedPeer.
-func NewUnstakedPeerErr(err error) ErrUnstakedPeer {
-	return ErrUnstakedPeer{err: err}
+func NewUnstakedPeerErr(pid peer.ID) ErrUnstakedPeer {
+	return ErrUnstakedPeer{pid: pid}
 }
 
 // IsErrUnstakedPeer returns true if an error is ErrUnstakedPeer.
@@ -159,7 +159,7 @@ type ErrEjectedPeer struct {
 }
 
 func (e ErrEjectedPeer) Error() string {
-	return fmt.Sprintf("peer is ejected: %s", e.pid)
+	return fmt.Sprintf("ejected peer: %s", e.pid)
 }
 
 // NewEjectedPeerErr returns a new ErrEjectedPeer.

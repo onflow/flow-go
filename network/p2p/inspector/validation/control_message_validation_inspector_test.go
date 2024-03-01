@@ -1153,7 +1153,6 @@ func TestPublishMessageInspection_ExceedingErrThreshold(t *testing.T) {
 	// a topics spork ID is considered invalid if it does not match the current spork ID
 	invalidSporkIDTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, unittest.IdentifierFixture())).String()
 	publisher := unittest.PeerIdFixture(t)
-	publisherId := unittest.IdentityFixture()
 	// create 10 normal messages
 	pubsubMsgs := unittest.GossipSubMessageFixtures(50, fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID), p2ptest.WithFrom(publisher))
 	// add 550 invalid messages to force notification dissemination
@@ -1174,8 +1173,8 @@ func TestPublishMessageInspection_ExceedingErrThreshold(t *testing.T) {
 	// set topic oracle to return list of topics to avoid hasSubscription errors and force topic validation
 	topicProviderOracle.UpdateTopics(topics)
 	from := unittest.PeerIdFixture(t)
-	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Once()
-	idProvider.On("ByPeerID", publisher).Return(publisherId, true).Times(len(rpc.Publish))
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true)
+	idProvider.On("ByPeerID", publisher).Return(nil, false)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 
 	checkNotification := checkNotificationFunc(t, from, p2pmsg.RpcPublishMessage, validation.IsInvalidRpcPublishMessagesErr, p2p.CtrlMsgNonClusterTopicType)
@@ -1205,8 +1204,8 @@ func TestPublishMessageInspection_MissingSubscription(t *testing.T) {
 	publisherId := unittest.IdentityFixture()
 	pubsubMsgs := unittest.GossipSubMessageFixtures(errThreshold+1, fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID), p2ptest.WithFrom(publisher))
 	from := unittest.PeerIdFixture(t)
-	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Once()
-	idProvider.On("ByPeerID", publisher).Return(publisherId, true).Times(len(pubsubMsgs))
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true)
+	idProvider.On("ByPeerID", publisher).Return(publisherId, true)
 	rpc := unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...))
 	checkNotification := checkNotificationFunc(t, from, p2pmsg.RpcPublishMessage, validation.IsInvalidRpcPublishMessagesErr, p2p.CtrlMsgNonClusterTopicType)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
@@ -1233,15 +1232,13 @@ func TestPublishMessageInspection_MissingTopic(t *testing.T) {
 		params.Logger = logger
 	})
 	publisher := unittest.PeerIdFixture(t)
-	publisherId := unittest.IdentityFixture()
 	pubsubMsgs := unittest.GossipSubMessageFixtures(errThreshold+1, "", p2ptest.WithFrom(publisher))
 	rpc := unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...))
 	for _, msg := range pubsubMsgs {
 		msg.Topic = nil
 	}
 	from := unittest.PeerIdFixture(t)
-	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Once()
-	idProvider.On("ByPeerID", publisher).Return(publisherId, true).Times(len(pubsubMsgs))
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true)
 	checkNotification := checkNotificationFunc(t, from, p2pmsg.RpcPublishMessage, validation.IsInvalidRpcPublishMessagesErr, p2p.CtrlMsgNonClusterTopicType)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 	consumer.On("OnInvalidControlMessageNotification", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
@@ -1309,7 +1306,6 @@ func TestPublishMessageInspection_Unstaked_From(t *testing.T) {
 	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		// override the inspector and params, run the inspector in private mode
 		params.NetworkingType = network.PrivateNetwork
-		params.Config.GraftPrune.InvalidTopicIdThreshold = 0
 		params.Logger = logger
 	})
 	from := unittest.PeerIdFixture(t)
@@ -1318,8 +1314,8 @@ func TestPublishMessageInspection_Unstaked_From(t *testing.T) {
 	topicProviderOracle.UpdateTopics([]string{topic})
 	// default RpcMessageErrorThreshold is 500, 501 messages should trigger a notification
 	pubsubMsgs := unittest.GossipSubMessageFixtures(501, topic, unittest.WithFrom(unstakedPeer))
-	idProvider.On("ByPeerID", unstakedPeer).Return(nil, false).Times(501)
-	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Times(1)
+	idProvider.On("ByPeerID", unstakedPeer).Return(nil, false)
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true)
 	rpc := unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...))
 	checkNotification := checkNotificationFunc(t, from, p2pmsg.RpcPublishMessage, validation.IsInvalidRpcPublishMessagesErr, p2p.CtrlMsgNonClusterTopicType)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
@@ -1342,7 +1338,6 @@ func TestPublishMessageInspection_Ejected_From(t *testing.T) {
 	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		// override the inspector and params, run the inspector in private mode
 		params.NetworkingType = network.PrivateNetwork
-		params.Config.GraftPrune.InvalidTopicIdThreshold = 0
 		params.Logger = logger
 	})
 
@@ -1356,8 +1351,8 @@ func TestPublishMessageInspection_Ejected_From(t *testing.T) {
 	topic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
 	topicProviderOracle.UpdateTopics([]string{topic})
 	pubsubMsgs := unittest.GossipSubMessageFixtures(501, topic, unittest.WithFrom(ejectedNode))
-	idProvider.On("ByPeerID", ejectedNode).Return(ejectedId, true).Times(501)
-	idProvider.On("ByPeerID", from).Return(id, true).Once()
+	idProvider.On("ByPeerID", ejectedNode).Return(ejectedId, true)
+	idProvider.On("ByPeerID", from).Return(id, true)
 
 	rpc := unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...))
 	checkNotification := checkNotificationFunc(t, from, p2pmsg.RpcPublishMessage, validation.IsInvalidRpcPublishMessagesErr, p2p.CtrlMsgNonClusterTopicType)

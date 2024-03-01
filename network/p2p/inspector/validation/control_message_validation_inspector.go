@@ -340,7 +340,7 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 func (c *ControlMsgValidationInspector) checkSenderIdentity(pid peer.ID) (*flow.Identity, error) {
 	id, ok := c.idProvider.ByPeerID(pid)
 	if !ok {
-		return nil, NewUnstakedPeerErr(fmt.Errorf("unstaked peer: %s", pid))
+		return nil, NewUnstakedPeerErr(pid)
 	}
 
 	if id.IsEjected() {
@@ -668,30 +668,8 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		c.metrics.OnPublishMessageInspected(errCnt, invalidTopicIdsCount, invalidSubscriptionsCount, invalidSendersCount)
 	}()
 
-	idCache := make(map[peer.ID]*flow.Identity)
+	idCheckCache := make(map[peer.ID]error)
 	for _, message := range messages[:sampleSize] {
-		if c.networkingType == network.PrivateNetwork {
-			pid, err := peer.IDFromBytes(message.GetFrom())
-			if err != nil {
-				invalidSendersCount++
-				errs = multierror.Append(errs, fmt.Errorf("failed to get peer ID from bytes: %w", err))
-				continue
-			}
-
-			if id, ok := idCache[pid]; ok && id.IsEjected() {
-				invalidSendersCount++
-				errs = multierror.Append(errs, NewEjectedPeerErr(pid))
-				continue
-			}
-
-			id, idErr := c.checkSenderIdentity(pid)
-			if err != nil {
-				invalidSendersCount++
-				errs = multierror.Append(errs, idErr)
-				continue
-			}
-			idCache[pid] = id
-		}
 		topic := channels.Topic(message.GetTopic())
 		// The boolean value returned when validating a topic, indicating whether the topic is cluster-prefixed or not, is intentionally ignored.
 		// This is because we have already set a threshold for errors allowed on publish messages. Reducing the penalty further based on
@@ -707,9 +685,35 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		if !hasSubscription(topic.String()) {
 			invalidSubscriptionsCount++
 			errs = multierror.Append(errs, fmt.Errorf("subscription for topic %s not found", topic))
+			continue
+		}
+
+		if c.networkingType == network.PrivateNetwork {
+			pid, err := peer.IDFromBytes(message.GetFrom())
+			if err != nil {
+				invalidSendersCount++
+				errs = multierror.Append(errs, fmt.Errorf("failed to get peer ID from bytes: %w", err))
+				continue
+			}
+
+			if idCheckErr, ok := idCheckCache[pid]; ok {
+				if idCheckErr != nil {
+					errs = multierror.Append(errs, idCheckErr)
+					continue
+				}
+			}
+
+			_, idErr := c.checkSenderIdentity(pid)
+			if idErr != nil {
+				invalidSendersCount++
+				errs = multierror.Append(errs, idErr)
+				idCheckCache[pid] = idErr
+				continue
+			}
+
+			idCheckCache[pid] = nil
 		}
 	}
-
 	// return an error when we exceed the error threshold
 	if errs != nil && errs.Len() > c.config.PublishMessages.ErrorThreshold {
 		c.metrics.OnPublishMessagesInspectionErrorExceedsThreshold()
