@@ -135,3 +135,36 @@ func TestResultStoreForceIndexOverridesMapping(t *testing.T) {
 		require.NoError(t, err)
 	})
 }
+
+func BenchmarkSaveResult(b *testing.B) {
+	unittest.RunWithBadgerDB(b, func(db *badger.DB) {
+		b.ResetTimer()
+		b.StopTimer()
+		metrics := metrics.NewNoopCollector()
+		store := bstorage.NewExecutionResults(metrics, db)
+		for i := 0; i < b.N; i++ {
+			result := unittest.ExecutionResultFixture()
+			b.StartTimer()
+			_ = store.Store(result)
+			b.StopTimer()
+		}
+	})
+}
+
+func BenchmarkReadResult(b *testing.B) {
+	unittest.RunWithBadgerDB(b, func(db *badger.DB) {
+		b.ResetTimer()
+		b.StopTimer()
+		metrics := metrics.NewNoopCollector()
+		store := bstorage.NewExecutionResults(metrics, db)
+		for i := 0; i < b.N; i++ {
+			result := unittest.ExecutionResultFixture()
+			resultID := result.ID()
+			_ = store.Store(result)
+
+			b.StartTimer()
+			_, _ = store.ByID(resultID)
+			b.StopTimer()
+		}
+	})
+}
