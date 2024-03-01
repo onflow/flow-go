@@ -163,14 +163,15 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 	}
 
 	// Merge the changes to the original payloads.
-	expectedWriteAddress := flow.ConvertAddress(address)
-	expectedOriginalAddress := flow.ConvertAddress(address)
+	expectedAddresses := map[flow.Address]struct{}{
+		flow.ConvertAddress(address): {},
+	}
 
 	return MergeRegisterChanges(
 		migrationRuntime.Snapshot.Payloads,
 		result.WriteSet,
-		expectedWriteAddress,
-		expectedOriginalAddress,
+		expectedAddresses,
+		expectedAddresses,
 		m.log,
 	)
 }
