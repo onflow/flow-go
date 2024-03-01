@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/onflow/flow-go/fvm/systemcontracts"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -327,14 +330,58 @@ func (b *bootstrapExecutor) Execute() error {
 		b.ctx.Chain,
 		environment.NewAccounts(b.txnState))
 
+	expectAccounts := func(n uint64) error {
+		ag := environment.NewAddressGenerator(b.txnState, b.ctx.Chain)
+		currentAddresses := ag.AddressCount()
+		if currentAddresses != n {
+			return fmt.Errorf("expected %d accounts, got %d", n, currentAddresses)
+		}
+		return nil
+	}
+
 	service := b.createServiceAccount()
 
-	fungibleToken := b.deployFungibleToken()
-	nonFungibleToken := b.deployNonFungibleToken(service)
-	b.deployMetadataViews(fungibleToken, nonFungibleToken)
-	flowToken := b.deployFlowToken(service, fungibleToken, nonFungibleToken)
-	storageFees := b.deployStorageFees(service, fungibleToken, flowToken)
-	feeContract := b.deployFlowFees(service, fungibleToken, flowToken, storageFees)
+	err := expectAccounts(1)
+	if err != nil {
+		return err
+	}
+
+	env := templates.Environment{
+		ServiceAccountAddress: service.String(),
+	}
+
+	b.deployViewResolver(service, &env)
+	b.deployBurner(service, &env)
+
+	err = expectAccounts(1)
+	if err != nil {
+		return err
+	}
+
+	fungibleToken := b.deployFungibleToken(&env)
+
+	err = expectAccounts(systemcontracts.FungibleTokenAccountIndex)
+	if err != nil {
+		return err
+	}
+
+	nonFungibleToken := b.deployNonFungibleToken(service, &env)
+
+	b.deployMetadataViews(fungibleToken, nonFungibleToken, &env)
+	b.deployFungibleTokenSwitchboard(fungibleToken, &env)
+
+	flowToken := b.deployFlowToken(service, &env)
+	err = expectAccounts(systemcontracts.FlowTokenAccountIndex)
+	if err != nil {
+		return err
+	}
+
+	b.deployStorageFees(service, &env)
+	feeContract := b.deployFlowFees(service, &env)
+	err = expectAccounts(systemcontracts.FlowFeesAccountIndex)
+	if err != nil {
+		return err
+	}
 
 	if b.initialTokenSupply > 0 {
 		b.mintInitialTokens(service, fungibleToken, flowToken, b.initialTokenSupply)
@@ -387,13 +434,23 @@ func (b *bootstrapExecutor) Execute() error {
 	// deploy staking collection contract to the service account
 	b.deployStakingCollection(service, fungibleToken, flowToken)
 
+	// sets up the EVM environment
+	b.setupEVM(service, nonFungibleToken, fungibleToken, flowToken)
+
+	err = expectAccounts(systemcontracts.EVMStorageAccountIndex)
+	if err != nil {
+		return err
+	}
+
 	b.registerNodes(service, fungibleToken, flowToken)
 
 	// set the list of nodes which are allowed to stake in this network
 	b.setStakingAllowlist(service, b.identities.NodeIDs())
 
-	// sets up the EVM environment
-	b.setupEVM(service, nonFungibleToken, fungibleToken, flowToken)
+	err = expectAccounts(uint64(systemcontracts.LastSystemAccountIndex + len(b.identities)))
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -851,7 +908,8 @@ func (b *bootstrapExecutor) registerNodes(service, fungibleToken, flowToken flow
 		// fund the staking account
 		txError, err = b.invokeMetaTransaction(
 			b.ctx,
-			Transaction(blueprints.FundAccountTransaction(service,
+			Transaction(blueprints.FundAccountTransaction(
+				service,
 				fungibleToken,
 				flowToken,
 				nodeAddress),
@@ -864,7 +922,8 @@ func (b *bootstrapExecutor) registerNodes(service, fungibleToken, flowToken flow
 		// and set it up with the QC/DKG participant resource
 		txError, err = b.invokeMetaTransaction(
 			b.ctx,
-			Transaction(blueprints.RegisterNodeTransaction(service,
+			Transaction(blueprints.RegisterNodeTransaction(
+				service,
 				flowToken,
 				nodeAddress,
 				id),
