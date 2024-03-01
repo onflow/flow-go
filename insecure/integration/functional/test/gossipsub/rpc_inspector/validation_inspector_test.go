@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"os"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/rs/zerolog"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
@@ -964,7 +966,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 // The victim node is configured to use the GossipSubInspector to detect spam and the scoring system to mitigate spam.
 // The test ensures that the victim node is disconnected from the spammer node on the GossipSub mesh after the spam detection is triggered.
 func TestGossipSubSpamMitigationIntegration(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "https://github.com/dapperlabs/flow-go/issues/6949")
+	//unittest.SkipUnless(t, unittest.TEST_FLAKY, "https://github.com/dapperlabs/flow-go/issues/6949")
 	t.Run("gossipsub spam mitigation invalid grafts", func(t *testing.T) {
 		testGossipSubSpamMitigationIntegration(t, p2pmsg.CtrlMsgGraft)
 	})
@@ -983,6 +985,8 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 // The victim node is configured to use the GossipSubInspector to detect spam and the scoring system to mitigate spam.
 // The test ensures that the victim node is disconnected from the spammer node on the GossipSub mesh after the spam detection is triggered.
 func testGossipSubSpamMitigationIntegration(t *testing.T, msgType p2pmsg.ControlMessageType) {
+	logger := zerolog.New(os.Stdout).Level(zerolog.TraceLevel)
+	logger.Trace().Msg(fmt.Sprintf("STARTING GOSSIPSUB SPAM MITIGATION: %s", msgType.String()))
 	idProvider := mock.NewIdentityProvider(t)
 	sporkID := unittest.IdentifierFixture()
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, flow.RoleConsensus, idProvider)
@@ -994,12 +998,15 @@ func testGossipSubSpamMitigationIntegration(t *testing.T, msgType p2pmsg.Control
 	// set the scoring parameters to be more aggressive to speed up the test
 	cfg.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 100 * time.Millisecond
 	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 100 * time.Millisecond
+	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.SpamRecordCache.Decay.MaximumSpamPenaltyDecayFactor = .99
+
 	victimNode, victimId := p2ptest.NodeFixture(t,
 		sporkID,
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
-		p2ptest.OverrideFlowConfig(cfg))
+		p2ptest.OverrideFlowConfig(cfg),
+		p2ptest.WithLogger(logger))
 
 	ids := flow.IdentityList{&victimId, &spammer.SpammerId}
 	idProvider.On("ByPeerID", mockery.Anything).Return(func(peerId peer.ID) *flow.Identity {
@@ -1105,4 +1112,5 @@ func testGossipSubSpamMitigationIntegration(t *testing.T, msgType p2pmsg.Control
 		func() interface{} {
 			return unittest.ProposalFixture()
 		})
+	logger.Trace().Msg(fmt.Sprintf("FINISHED GOSSIPSUB SPAM MITIGATION: %s", msgType.String()))
 }
