@@ -765,3 +765,24 @@ func BenchmarkEncodeWithoutCompress(b *testing.B) {
 		_, _ = msgpack.Marshal(r)
 	}
 }
+
+func BenchmarkDecodeUncompressed(b *testing.B) {
+	r := unittest.ExecutionResultFixture()
+
+	val, _ := encodeAndCompress(r)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var result flow.ExecutionResult
+		_ = decodeCompressed(val, result)
+	}
+}
+
+func BenchmarkDecodeWithoutUncompress(b *testing.B) {
+	r := unittest.ExecutionResultFixture()
+	val, _ := msgpack.Marshal(r)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var result flow.ExecutionResult
+		_ = msgpack.Unmarshal(val, result)
+	}
+}
