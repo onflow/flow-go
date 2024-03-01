@@ -71,8 +71,6 @@ type Backend struct {
 	backendAccounts
 	backendExecutionResults
 	backendNetwork
-
-	subscription.BlockTracker
 	backendSubscribeBlocks
 
 	state             protocol.State
@@ -82,7 +80,8 @@ type Backend struct {
 	connFactory       connection.ConnectionFactory
 
 	// cache the response to GetNodeVersionInfo since it doesn't change
-	nodeInfo *access.NodeVersionInfo
+	nodeInfo     *access.NodeVersionInfo
+	BlockTracker subscription.BlockTracker
 }
 
 type Params struct {
@@ -259,8 +258,8 @@ func New(params Params) (*Backend, error) {
 
 	// NOTE: The BlockTracker is currently only used by the access node and not by the observer node.
 	if params.BlockTracker != nil {
-		b.backendSubscribeBlocks.getStartHeight = b.GetStartHeight
-		b.backendSubscribeBlocks.getHighestHeight = b.GetHighestHeight
+		b.backendSubscribeBlocks.getStartHeight = b.BlockTracker.GetStartHeight
+		b.backendSubscribeBlocks.getHighestHeight = b.BlockTracker.GetHighestHeight
 	}
 
 	b.backendTransactions.txErrorMessages = b

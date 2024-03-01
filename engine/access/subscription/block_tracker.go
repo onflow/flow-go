@@ -104,7 +104,7 @@ func (b *BlockTrackerImpl) ProcessOnFinalizedBlock() error {
 	// get the finalized header from state
 	finalizedHeader, err := b.state.Final().Head()
 	if err != nil {
-		return fmt.Errorf("unable to get latest finalized header: %w", err)
+		return irrecoverable.NewExceptionf("unable to get latest finalized header: %w", err)
 	}
 
 	if !b.finalizedHighestHeight.Set(finalizedHeader.Height) {
@@ -114,12 +114,10 @@ func (b *BlockTrackerImpl) ProcessOnFinalizedBlock() error {
 	// get the latest seal header from state
 	sealedHeader, err := b.state.Sealed().Head()
 	if err != nil {
-		return fmt.Errorf("unable to get latest sealed header: %w", err)
+		return irrecoverable.NewExceptionf("unable to get latest sealed header: %w", err)
 	}
 
-	if !b.sealedHighestHeight.Set(sealedHeader.Height) {
-		return nil
-	}
+	b.sealedHighestHeight.Set(sealedHeader.Height)
 
 	b.broadcaster.Publish()
 
