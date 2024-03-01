@@ -203,7 +203,6 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
-		fvm.WithSetupEVMEnabled(true),
 	)
 	require.NoError(tb, err)
 
@@ -425,7 +424,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 	}
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-	testContractAddress, err := chain.AddressAtIndex(systemcontracts.EVMStorageAccountIndex + 1)
+	testContractAddress, err := chain.AddressAtIndex(systemcontracts.LastSystemAccountIndex + 1)
 	require.NoError(b, err)
 
 	benchTransaction := func(
