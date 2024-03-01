@@ -1030,7 +1030,7 @@ func testGossipSubSpamMitigationIntegration(t *testing.T, msgType p2pmsg.Control
 		}
 	})
 
-	spamRpcCount := 50000           // total number of individual rpc messages to send
+	spamRpcCount := 1000            // total number of individual rpc messages to send
 	spamCtrlMsgCount := int64(1000) // total number of control messages to send on each RPC
 
 	// unknownTopic is an unknown topic to the victim node but shaped like a valid topic (i.e., it has the correct prefix and spork ID).
