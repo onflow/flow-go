@@ -45,7 +45,7 @@ func (cc *CachedClient) CloseRequested() bool {
 }
 
 // AddRequest increments the in-flight request counter for the CachedClient.
-// It returns a function that should be called when the request completes to decrement the counter
+// It returns a function that should be called when the request completes to decrement the counter.
 func (cc *CachedClient) AddRequest() func() {
 	cc.wg.Add(1)
 	return cc.wg.Done
