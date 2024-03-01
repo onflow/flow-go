@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/state"
+
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 
@@ -38,11 +41,11 @@ type backendSubscribeTransactions struct {
 
 // TransactionSubscriptionMetadata holds data representing the status state for each transaction subscription.
 type TransactionSubscriptionMetadata struct {
-	txID         flow.Identifier
-	txBody       *flow.TransactionBody
-	messageIndex counters.StrictMonotonousCounter
-	blockWithTx  *flow.Header
-	txExecuted   bool
+	txID               flow.Identifier
+	txReferenceBlockID flow.Identifier
+	messageIndex       counters.StrictMonotonousCounter
+	blockWithTx        *flow.Header
+	txExecuted         bool
 }
 
 // SendAndSubscribeTransactionStatuses subscribes to transaction status changes starting from the transaction reference block ID.
@@ -55,10 +58,10 @@ func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(ctx c
 	}
 
 	txInfo := TransactionSubscriptionMetadata{
-		txID:         tx.ID(),
-		txBody:       tx,
-		messageIndex: counters.NewMonotonousCounter(0),
-		blockWithTx:  nil,
+		txID:               tx.ID(),
+		txReferenceBlockID: tx.ReferenceBlockID,
+		messageIndex:       counters.NewMonotonousCounter(0),
+		blockWithTx:        nil,
 	}
 
 	sub := subscription.NewHeightBasedSubscription(
@@ -75,7 +78,7 @@ func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(ctx c
 // getTransactionStatusResponse creates a function for handling transaction status subscriptions based on new block and
 // previous status state metadata.
 func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *TransactionSubscriptionMetadata) func(context.Context, uint64) (interface{}, error) {
-	return func(_ context.Context, height uint64) (interface{}, error) {
+	return func(ctx context.Context, height uint64) (interface{}, error) {
 		highestHeight, err := b.getHighestHeight(flow.BlockStatusFinalized)
 		if err != nil {
 			return nil, fmt.Errorf("could not get highest height for block %d: %w", height, err)
@@ -99,7 +102,7 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *Tran
 		// Find the transaction status.
 		var txStatus flow.TransactionStatus
 		if txInfo.blockWithTx == nil {
-			txStatus, err = b.txLocalDataProvider.DeriveUnknownTransactionStatus(txInfo.txBody.ReferenceBlockID)
+			txStatus, err = b.txLocalDataProvider.DeriveUnknownTransactionStatus(txInfo.txReferenceBlockID)
 		} else {
 			blockID := txInfo.blockWithTx.ID()
 
@@ -114,12 +117,15 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *Tran
 			txStatus, err = b.txLocalDataProvider.DeriveTransactionStatus(blockID, txInfo.blockWithTx.Height, txInfo.txExecuted)
 		}
 		if err != nil {
+			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
+				irrecoverable.Throw(ctx, err)
+			}
 			return nil, rpc.ConvertStorageError(err)
 		}
 
 		messageIndex := txInfo.messageIndex.Value()
 		if ok := txInfo.messageIndex.Set(messageIndex + 1); !ok {
-			b.log.Debug().Msg("message index already incremented")
+			return nil, status.Errorf(codes.Internal, "the message index has already been incremented to %d", txInfo.messageIndex.Value())
 		}
 
 		return &convert.TransactionSubscribeInfo{

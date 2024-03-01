@@ -3,9 +3,10 @@ package backend
 import (
 	"context"
 	"fmt"
-	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"testing"
 	"time"
+
+	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
