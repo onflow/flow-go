@@ -52,7 +52,7 @@ func (t *PublicNetworkIDTranslator) GetPeerID(flowID flow.Identifier) (peer.ID, 
 func (t *PublicNetworkIDTranslator) GetFlowID(peerID peer.ID) (flow.Identifier, error) {
 	pk, err := peerID.ExtractPublicKey()
 	if err != nil {
-		return flow.ZeroID, fmt.Errorf("cannot generate an unstaked FlowID for peerID %v: corresponding libp2p key is not extractible from PeerID", peerID)
+		return flow.ZeroID, fmt.Errorf("cannot generate an unstaked FlowID for peerID %v: corresponding libp2p key is not extractible from PeerID: %w", peerID, err)
 	}
 
 	if pk.Type() != crypto_pb.KeyType_Secp256k1 {

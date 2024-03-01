@@ -61,6 +61,7 @@ type GossipSubRpcValidationInspectorMetrics struct {
 	errActiveClusterIdsNotSetCount             prometheus.Counter
 	errUnstakedPeerInspectionFailedCount       prometheus.Counter
 	invalidControlMessageNotificationSentCount prometheus.Counter
+	unstakedNodeRPCRejectedCount               prometheus.Counter
 
 	// publish messages
 	publishMessageInspectionErrExceedThresholdCount prometheus.Counter
@@ -258,6 +259,13 @@ func NewGossipSubRPCValidationInspectorMetrics(prefix string) *GossipSubRpcValid
 		Subsystem: subsystemGossip,
 		Name:      gc.prefix + "invalid_control_message_notification_sent_total",
 		Help:      "number of invalid control message notifications (i.e., misbehavior report) sent due to async inspection of rpcs failure",
+	})
+
+	gc.unstakedNodeRPCRejectedCount = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceNetwork,
+		Subsystem: subsystemGossip,
+		Name:      gc.prefix + "unstaked_node_rejection_total",
+		Help:      "number of rpcs rejected from unstaked node",
 	})
 
 	gc.graftDuplicateTopicIdsHistogram = promauto.NewHistogram(prometheus.HistogramOpts{
@@ -506,6 +514,11 @@ func (c *GossipSubRpcValidationInspectorMetrics) OnUnstakedPeerInspectionFailed(
 // misbehavior report).
 func (c *GossipSubRpcValidationInspectorMetrics) OnInvalidControlMessageNotificationSent() {
 	c.invalidControlMessageNotificationSentCount.Inc()
+}
+
+// OnRpcRejectedFromUnknownSender tracks the number of rpc's rejected from unstaked nodes.
+func (c *GossipSubRpcValidationInspectorMetrics) OnRpcRejectedFromUnknownSender() {
+	c.unstakedNodeRPCRejectedCount.Inc()
 }
 
 // OnPruneDuplicateTopicIdsExceedThreshold tracks the number of times that the async inspection of prune messages for an RPC failed due to the number of duplicate topic ids
