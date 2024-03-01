@@ -9,9 +9,9 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/golang/snappy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -47,7 +47,7 @@ func TestInsertValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
-		val, _ := msgpack.Marshal(e)
+		val, _ := encodeAndCompress(e)
 
 		err := db.Update(insert(key, e))
 		require.NoError(t, err)
@@ -69,7 +69,7 @@ func TestInsertDuplicate(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
-		val, _ := msgpack.Marshal(e)
+		val, _ := encodeAndCompress(e)
 
 		// persist first time
 		err := db.Update(insert(key, e))
@@ -111,7 +111,7 @@ func TestUpdateValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
-		val, _ := msgpack.Marshal(e)
+		val, _ := encodeAndCompress(e)
 
 		_ = db.Update(func(tx *badger.Txn) error {
 			err := tx.Set(key, []byte{})
@@ -156,7 +156,7 @@ func TestUpdateEncodingError(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
-		val, _ := msgpack.Marshal(e)
+		val, _ := encodeAndCompress(e)
 
 		_ = db.Update(func(tx *badger.Txn) error {
 			err := tx.Set(key, val)
@@ -186,7 +186,7 @@ func TestUpsertEntry(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
-		val, _ := msgpack.Marshal(e)
+		val, _ := encodeAndCompress(e)
 
 		// first upsert an non-existed entry
 		err := db.Update(insert(key, e))
@@ -205,7 +205,7 @@ func TestUpsertEntry(t *testing.T) {
 
 		// next upsert the value with the same key
 		newEntity := Entity{ID: 1338}
-		newVal, _ := msgpack.Marshal(newEntity)
+		newVal, _ := encodeAndCompress(newEntity)
 		err = db.Update(upsert(key, newEntity))
 		require.NoError(t, err)
 
@@ -225,7 +225,7 @@ func TestRetrieveValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
-		val, _ := msgpack.Marshal(e)
+		val, _ := encodeAndCompress(e)
 
 		_ = db.Update(func(tx *badger.Txn) error {
 			err := tx.Set(key, val)
@@ -255,7 +255,7 @@ func TestRetrieveUnencodeable(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
-		val, _ := msgpack.Marshal(e)
+		val, _ := encodeAndCompress(e)
 
 		_ = db.Update(func(tx *badger.Txn) error {
 			err := tx.Set(key, val)
@@ -342,7 +342,7 @@ func TestIterate(t *testing.T) {
 
 		_ = db.Update(func(tx *badger.Txn) error {
 			for i, key := range keys {
-				enc, err := msgpack.Marshal(vals[i])
+				enc, err := encodeAndCompress(vals[i])
 				require.NoError(t, err)
 				err = tx.Set(key, enc)
 				require.NoError(t, err)
@@ -381,7 +381,7 @@ func TestTraverse(t *testing.T) {
 
 		_ = db.Update(func(tx *badger.Txn) error {
 			for i, key := range keys {
-				enc, err := msgpack.Marshal(vals[i])
+				enc, err := encodeAndCompress(vals[i])
 				require.NoError(t, err)
 				err = tx.Set(key, enc)
 				require.NoError(t, err)
@@ -416,7 +416,7 @@ func TestRemove(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
-		val, _ := msgpack.Marshal(e)
+		val, _ := encodeAndCompress(e)
 
 		_ = db.Update(func(tx *badger.Txn) error {
 			err := tx.Set(key, val)
@@ -453,7 +453,7 @@ func TestRemoveByPrefix(t *testing.T) {
 		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 			e := Entity{ID: 1337}
 			key := []byte{0x01, 0x02, 0x03}
-			val, _ := msgpack.Marshal(e)
+			val, _ := encodeAndCompress(e)
 
 			_ = db.Update(func(tx *badger.Txn) error {
 				err := tx.Set(key, val)
@@ -477,7 +477,7 @@ func TestRemoveByPrefix(t *testing.T) {
 		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 			e := Entity{ID: 1337}
 			key := []byte{0x01, 0x02, 0x03}
-			val, _ := msgpack.Marshal(e)
+			val, _ := encodeAndCompress(e)
 
 			_ = db.Update(func(tx *badger.Txn) error {
 				err := tx.Set(key, val)
@@ -503,7 +503,7 @@ func TestRemoveByPrefix(t *testing.T) {
 		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 			e := Entity{ID: 1337}
 			key := []byte{0x01, 0x02, 0x03}
-			val, _ := msgpack.Marshal(e)
+			val, _ := encodeAndCompress(e)
 
 			_ = db.Update(func(tx *badger.Txn) error {
 				err := tx.Set(key, val)
@@ -623,7 +623,7 @@ func TestFindHighestAtOrBelow(t *testing.T) {
 
 		err := db.Update(func(tx *badger.Txn) error {
 			key := append(prefix, b(uint64(15))...)
-			val, err := msgpack.Marshal(entity3)
+			val, err := encodeAndCompress(entity3)
 			if err != nil {
 				return err
 			}
@@ -633,7 +633,7 @@ func TestFindHighestAtOrBelow(t *testing.T) {
 			}
 
 			key = append(prefix, b(uint64(5))...)
-			val, err = msgpack.Marshal(entity1)
+			val, err = encodeAndCompress(entity1)
 			if err != nil {
 				return err
 			}
@@ -643,7 +643,7 @@ func TestFindHighestAtOrBelow(t *testing.T) {
 			}
 
 			key = append(prefix, b(uint64(10))...)
-			val, err = msgpack.Marshal(entity2)
+			val, err = encodeAndCompress(entity2)
 			if err != nil {
 				return err
 			}
@@ -701,4 +701,48 @@ func TestFindHighestAtOrBelow(t *testing.T) {
 			require.Contains(t, err.Error(), "prefix must not be empty")
 		})
 	})
+}
+
+type TestEntity struct {
+	Name  string
+	Value int
+}
+
+func TestEncodeAndCompress(t *testing.T) {
+	// Test data
+	entity := TestEntity{
+		Name:  "TestName",
+		Value: 42,
+	}
+
+	// Call the function
+	compressedVal, err := encodeAndCompress(entity)
+	require.NoError(t, err, "encodeAndCompress should not return an error")
+
+	// Ensure the compressed value is not empty
+	require.NotEmpty(t, compressedVal, "compressed value should not be empty")
+
+	// Ensure the compressed value is compressed using Snappy
+	_, err = snappy.Decode(nil, compressedVal)
+	require.NoError(t, err, "should be able to decode the compressed value using Snappy")
+}
+
+func TestDecodeCompressed(t *testing.T) {
+	// Test data
+	entity := TestEntity{
+		Name:  "TestName",
+		Value: 42,
+	}
+
+	// Serialize and compress the test entity
+	val, err := encodeAndCompress(entity)
+	require.NoError(t, err, "encodeAndCompress should not return an error")
+
+	// Call the function
+	var decodedEntity TestEntity
+	err = decodeCompressed(val, &decodedEntity)
+	require.NoError(t, err, "decodeCompressed should not return an error")
+
+	// Ensure the decoded entity matches the original entity
+	require.Equal(t, entity, decodedEntity, "decoded entity should match the original entity")
 }
