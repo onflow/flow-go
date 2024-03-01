@@ -371,7 +371,10 @@ func (q *BlockQueue) checkIfChildBlockBecomeExecutable(
 // Useful for debugging what is missing for the next unexecuted block to become executable.
 // It returns an error if the block is not found
 func (q *BlockQueue) GetMissingCollections(blockID flow.Identifier) (
-	[]*MissingCollection, *flow.StateCommitment, error) {
+	[]*MissingCollection,
+	*flow.StateCommitment,
+	error,
+) {
 	q.Lock()
 	defer q.Unlock()
 	block, ok := q.blocks[blockID]
