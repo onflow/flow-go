@@ -3,11 +3,15 @@ package kvstore
 import "github.com/onflow/flow-go/state/protocol/protocol_state"
 
 type upgradableModel struct {
-	VersionUpgrade protocol_state.ViewBasedActivator[uint64]
+	VersionUpgrade *protocol_state.ViewBasedActivator[uint64]
 }
 
-func (model *upgradableModel) SetProtocolStateVersion(activator protocol_state.ViewBasedActivator[uint64]) {
+func (model *upgradableModel) SetVersionUpgrade(activator *protocol_state.ViewBasedActivator[uint64]) {
 	model.VersionUpgrade = activator
+}
+
+func (model *upgradableModel) GetVersionUpgrade() *protocol_state.ViewBasedActivator[uint64] {
+	return model.VersionUpgrade
 }
 
 // This file contains the concrete types that define the structure of the

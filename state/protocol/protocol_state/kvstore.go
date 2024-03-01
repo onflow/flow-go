@@ -42,6 +42,12 @@ type Reader interface {
 	// It can be updated by an UpdateKVStoreVersion service event.
 	GetProtocolStateVersion() uint64
 
+	// GetVersionUpgrade returns the upgrade version of protocol.
+	// VersionUpgrade is a view-based activator that specifies the version which has to be applied
+	// and the view at which it has to be applied. It may contain an old value if the upgrade has already applied.
+	// It can be updated by an flow.ProtocolStateVersionUpgrade service event.
+	GetVersionUpgrade() *ViewBasedActivator[uint64]
+
 	// v1
 
 	// GetInvalidEpochTransitionAttempted returns a flag indicating whether epoch
@@ -59,9 +65,10 @@ type API interface {
 
 	// v0
 
-	// SetProtocolStateVersion sets the Protocol State version. This method is used
+	// SetVersionUpgrade sets the protocol upgrade version. This method is used
 	// to update the Protocol State version when a flow.ProtocolStateVersionUpgrade is processed.
-	SetProtocolStateVersion(version ViewBasedActivator[uint64])
+	// It contains the new version and the view at which it has to be applied.
+	SetVersionUpgrade(version *ViewBasedActivator[uint64])
 
 	// v1
 

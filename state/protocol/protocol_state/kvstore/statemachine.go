@@ -35,7 +35,7 @@ func (m *ProcessingStateMachine) ProcessUpdate(update *flow.ServiceEvent) error 
 
 		if m.parentState.GetProtocolStateVersion() >= versionUpgrade.NewProtocolStateVersion {
 			return fmt.Errorf("invalid protocol state version upgrade: %d -> %d",
-				m.parentState.GetProtocolStateVersion(), versionUpgrade.NewProtocolStateVersion)
+				m.parentState.GetVersionUpgrade(), versionUpgrade.NewProtocolStateVersion)
 		}
 
 		if m.view >= versionUpgrade.ActiveView {
@@ -43,11 +43,11 @@ func (m *ProcessingStateMachine) ProcessUpdate(update *flow.ServiceEvent) error 
 				m.view, versionUpgrade.ActiveView)
 		}
 
-		activator := protocol_state.ViewBasedActivator[uint64]{
+		activator := &protocol_state.ViewBasedActivator[uint64]{
 			Data:           versionUpgrade.NewProtocolStateVersion,
 			ActivationView: versionUpgrade.ActiveView,
 		}
-		m.state.SetProtocolStateVersion(activator)
+		m.state.SetVersionUpgrade(activator)
 
 	default:
 		return nil

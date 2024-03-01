@@ -1,6 +1,7 @@
 package kvstore
 
 import (
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"math/rand"
 	"testing"
 
@@ -47,7 +48,7 @@ func TestAPI(t *testing.T) {
 		model := modelv0{}
 
 		// v0
-		version := model.GetProtocolStateVersion()
+		version := model.GetVersionUpgrade()
 		assert.Equal(t, uint64(0), version)
 
 		// v1
@@ -62,7 +63,7 @@ func TestAPI(t *testing.T) {
 		model := modelv1{}
 
 		// v0
-		version := model.GetProtocolStateVersion()
+		version := model.GetVersionUpgrade()
 		assert.Equal(t, uint64(1), version)
 
 		// v1
@@ -73,4 +74,14 @@ func TestAPI(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, true, invalidEpochTransitionAttempted)
 	})
+}
+
+func assertModelIsUpgradable(api protocol_state.API) {
+	oldVersion := api.GetVersionUpgrade()
+	activationView := uint64(1000)
+	api.SetVersionUpgrade(protocol_state.ViewBasedActivator[uint64]{
+		Data:           oldVersion + 1,
+		ActivationView: activationView,
+	})
+
 }

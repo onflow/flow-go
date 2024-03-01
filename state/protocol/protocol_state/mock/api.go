@@ -50,6 +50,22 @@ func (_m *API) GetProtocolStateVersion() uint64 {
 	return r0
 }
 
+// GetVersionUpgrade provides a mock function with given fields:
+func (_m *API) GetVersionUpgrade() *protocol_state.ViewBasedActivator[uint64] {
+	ret := _m.Called()
+
+	var r0 *protocol_state.ViewBasedActivator[uint64]
+	if rf, ok := ret.Get(0).(func() *protocol_state.ViewBasedActivator[uint64]); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*protocol_state.ViewBasedActivator[uint64])
+		}
+	}
+
+	return r0
+}
+
 // SetInvalidEpochTransitionAttempted provides a mock function with given fields: attempted
 func (_m *API) SetInvalidEpochTransitionAttempted(attempted bool) error {
 	ret := _m.Called(attempted)
@@ -64,8 +80,8 @@ func (_m *API) SetInvalidEpochTransitionAttempted(attempted bool) error {
 	return r0
 }
 
-// SetProtocolStateVersion provides a mock function with given fields: version
-func (_m *API) SetProtocolStateVersion(version protocol_state.ViewBasedActivator[uint64]) {
+// SetVersionUpgrade provides a mock function with given fields: version
+func (_m *API) SetVersionUpgrade(version *protocol_state.ViewBasedActivator[uint64]) {
 	_m.Called(version)
 }
 
