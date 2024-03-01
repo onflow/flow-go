@@ -318,8 +318,11 @@ func (l *EVMTransferLoad) setupTransaction(
 						transaction(address: [UInt8; 20], amount: UFix64) {
 							let fundVault: @FlowToken.Vault
 
-							prepare(signer: AuthAccount) {
-								let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+							prepare(signer: auth(Storage) &Account) {
+								let vaultRef = signer.storage
+									.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
+										from: /storage/flowTokenVault
+									)
 									?? panic("Could not borrow reference to the owner's Vault!")
 						
 								// 1.0 Flow for the EVM gass fees
@@ -408,7 +411,7 @@ import FungibleToken from %s
 import FlowToken from %s
 
 transaction(encodedTx: [UInt8], address: [UInt8; 20]) {
-	prepare(signer: AuthAccount){}
+	prepare(signer: &Account){}
 	execute {
 		EVM.run(tx: encodedTx, coinbase: EVM.EVMAddress(bytes: address))
 	}

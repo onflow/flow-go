@@ -43,7 +43,8 @@ func TestLoadTypes(t *testing.T) {
 		load.ExecDataHeavyLoad,
 		load.NewTokenTransferLoad(),
 		load.NewAddKeysLoad(),
-		// evmLoad,
+		evmLoad,
+		load.NewCreateAccountLoad(),
 	}
 
 	for _, l := range loads {
