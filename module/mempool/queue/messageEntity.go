@@ -32,7 +32,7 @@ func NewMessageEntityWithNonce(msg *engine.Message) MessageEntity {
 		Nonce string
 	}{
 		msg,
-		strconv.FormatInt(time.Now().UnixNano(), 10),
+		uint64(time.Now().UnixNano()),
 	})
 	return MessageEntity{
 		Msg: *msg,
