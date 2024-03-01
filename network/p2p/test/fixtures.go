@@ -946,6 +946,19 @@ func WithGraft(msgCount int, topicId string) GossipSubCtrlOption {
 	}
 }
 
+// WithGrafts adds a GRAFT control message with each given topicID to the control message.
+func WithGrafts(topicIds ...string) GossipSubCtrlOption {
+	return func(msg *pb.ControlMessage) {
+		grafts := make([]*pb.ControlGraft, len(topicIds))
+		for i, topic := range topicIds {
+			grafts[i] = &pb.ControlGraft{
+				TopicID: &topic,
+			}
+		}
+		msg.Graft = grafts
+	}
+}
+
 // WithPrune adds PRUNE control messages with given topicID to the control message.
 func WithPrune(msgCount int, topicId string) GossipSubCtrlOption {
 	return func(msg *pb.ControlMessage) {
@@ -953,6 +966,19 @@ func WithPrune(msgCount int, topicId string) GossipSubCtrlOption {
 		for i := 0; i < msgCount; i++ {
 			prunes[i] = &pb.ControlPrune{
 				TopicID: &topicId,
+			}
+		}
+		msg.Prune = prunes
+	}
+}
+
+// WithPrunes adds a PRUNE control message with each given topicID to the control message.
+func WithPrunes(topicIds ...string) GossipSubCtrlOption {
+	return func(msg *pb.ControlMessage) {
+		prunes := make([]*pb.ControlPrune, len(topicIds))
+		for i, topic := range topicIds {
+			prunes[i] = &pb.ControlPrune{
+				TopicID: &topic,
 			}
 		}
 		msg.Prune = prunes
@@ -998,4 +1024,33 @@ func GossipSubMessageFixture(t *testing.T) *pb.Message {
 		Signature: unittest.RandomBytes(byteSize),
 		Key:       unittest.RandomBytes(byteSize),
 	}
+}
+
+// UpdatableTopicProviderFixture is a mock implementation of the TopicProvider interface.
+type UpdatableTopicProviderFixture struct {
+	topics        []string
+	subscriptions map[string][]peer.ID
+}
+
+func NewUpdatableTopicProviderFixture() *UpdatableTopicProviderFixture {
+	return &UpdatableTopicProviderFixture{
+		topics:        []string{},
+		subscriptions: map[string][]peer.ID{},
+	}
+}
+
+func (m *UpdatableTopicProviderFixture) GetTopics() []string {
+	return m.topics
+}
+
+func (m *UpdatableTopicProviderFixture) ListPeers(topic string) []peer.ID {
+	return m.subscriptions[topic]
+}
+
+func (m *UpdatableTopicProviderFixture) UpdateTopics(topics []string) {
+	m.topics = topics
+}
+
+func (m *UpdatableTopicProviderFixture) UpdateSubscriptions(topic string, peers []peer.ID) {
+	m.subscriptions[topic] = peers
 }
