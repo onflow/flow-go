@@ -7,6 +7,8 @@ import (
 	gohash "hash"
 	"io"
 
+	"github.com/onflow/flow-go/fvm/systemcontracts"
+
 	"github.com/onflow/crypto"
 	"golang.org/x/crypto/hkdf"
 
@@ -173,7 +175,7 @@ func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeIn
 	//
 	// for the machine account key, we keep track of the address index to map
 	// the Flow address of the machine account to the key.
-	addressIndex := uint64(4)
+	addressIndex := uint64(systemcontracts.LastSystemAccountIndex)
 	for _, nodeInfo := range nodeInfos {
 
 		// retrieve private representation of the node
