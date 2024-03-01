@@ -45,11 +45,12 @@ type InspectionProcess struct {
 }
 
 const (
-	InspectionKey = "inspection"
-	TruncationKey = "truncation"
-	EnableKey     = "enable"
-	DisabledKey   = "disabled"
-	MessageIDKey  = "message-id"
+	InspectionKey       = "inspection"
+	TruncationKey       = "truncation"
+	EnableKey           = "enable"
+	DisabledKey         = "disabled"
+	MessageIDKey        = "message-id"
+	RejectUnstakedPeers = "reject-unstaked-peers"
 )
 
 // Inspect configuration to enable/disable RPC inspection for a particular control message type.
@@ -70,6 +71,8 @@ type Inspect struct {
 	EnableIWant bool `mapstructure:"enable-iwant"`
 	// EnablePublish enable publish message inspection.
 	EnablePublish bool `mapstructure:"enable-publish"`
+	// RejectUnstakedPeers when set to true RPC's will be rejected from unstaked peers.
+	RejectUnstakedPeers bool `mapstructure:"reject-unstaked-peers"`
 }
 
 // Truncate configuration to enable/disable RPC truncation for a particular control message type.
