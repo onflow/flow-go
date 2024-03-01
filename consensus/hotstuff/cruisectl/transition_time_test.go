@@ -80,9 +80,9 @@ func TestParseTransition_Invalid(t *testing.T) {
 
 // drawTransitionTime draws a random EpochTransitionTime.
 func drawTransitionTime(t *rapid.T) EpochTransitionTime {
-	day := time.Weekday(rapid.IntRange(0, 6).Draw(t, "wd").(int))
-	hour := rapid.Uint8Range(0, 23).Draw(t, "h").(uint8)
-	minute := rapid.Uint8Range(0, 59).Draw(t, "m").(uint8)
+	day := time.Weekday(rapid.IntRange(0, 6).Draw(t, "wd"))
+	hour := rapid.Uint8Range(0, 23).Draw(t, "h")
+	minute := rapid.Uint8Range(0, 59).Draw(t, "m")
 	return EpochTransitionTime{day, hour, minute}
 }
 
@@ -111,8 +111,8 @@ func TestInferTargetEndTime_Fixture(t *testing.T) {
 func TestInferTargetEndTime_Rapid(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		ett := drawTransitionTime(t)
-		curTime := time.Unix(rapid.Int64().Draw(t, "ref_unix").(int64), 0).UTC()
-		epochFractionComplete := rapid.Float64Range(0, 1).Draw(t, "pct_complete").(float64)
+		curTime := time.Unix(rapid.Int64().Draw(t, "ref_unix"), 0).UTC()
+		epochFractionComplete := rapid.Float64Range(0, 1).Draw(t, "pct_complete")
 		epochFractionRemaining := 1.0 - epochFractionComplete
 
 		target := ett.inferTargetEndTime(curTime, epochFractionComplete)
@@ -131,7 +131,7 @@ func TestInferTargetEndTime_Rapid(t *testing.T) {
 func TestFindNearestTargetTime(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		ett := drawTransitionTime(t)
-		ref := time.Unix(rapid.Int64().Draw(t, "ref_unix").(int64), 0).UTC()
+		ref := time.Unix(rapid.Int64().Draw(t, "ref_unix"), 0).UTC()
 
 		nearest := ett.findNearestTargetTime(ref)
 		distance := nearest.Sub(ref).Abs()
