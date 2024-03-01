@@ -1309,6 +1309,7 @@ func TestPublishMessageInspection_Unstaked_From(t *testing.T) {
 	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		// override the inspector and params, run the inspector in private mode
 		params.NetworkingType = network.PrivateNetwork
+		params.Config.GraftPrune.InvalidTopicIdThreshold = 0
 		params.Logger = logger
 	})
 	from := unittest.PeerIdFixture(t)
@@ -1341,6 +1342,7 @@ func TestPublishMessageInspection_Ejected_From(t *testing.T) {
 	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
 		// override the inspector and params, run the inspector in private mode
 		params.NetworkingType = network.PrivateNetwork
+		params.Config.GraftPrune.InvalidTopicIdThreshold = 0
 		params.Logger = logger
 	})
 

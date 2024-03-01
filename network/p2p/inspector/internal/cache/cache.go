@@ -79,7 +79,7 @@ func (r *RecordCache) ReceivedClusterPrefixedMessage(pid peer.ID) (float64, erro
 		}
 		return r.incrementAdjustment(entity) // then increment the record
 	}
-	entityID := makeId(pid)
+	entityID := r.MakeId(pid)
 	adjustedEntity, adjusted := r.c.AdjustWithInit(entityID, adjustFunc, func() flow.Entity {
 		return r.recordEntityFactory(entityID)
 	})
@@ -113,7 +113,7 @@ func (r *RecordCache) GetWithInit(pid peer.ID) (float64, bool, error) {
 		entity, err = r.decayAdjustment(entity)
 		return entity
 	}
-	entityID := makeId(pid)
+	entityID := r.MakeId(pid)
 	adjustedEntity, adjusted := r.c.AdjustWithInit(entityID, adjustLogic, func() flow.Entity {
 		return r.recordEntityFactory(entityID)
 	})
@@ -136,7 +136,7 @@ func (r *RecordCache) GetWithInit(pid peer.ID) (float64, bool, error) {
 // Returns:
 // - true if the record is removed, false otherwise (i.e., the record does not exist).
 func (r *RecordCache) Remove(pid peer.ID) bool {
-	return r.c.Remove(makeId(pid))
+	return r.c.Remove(r.MakeId(pid))
 }
 
 // NodeIDs returns the list of identities of the nodes that have a spam record in the cache.
@@ -147,6 +147,13 @@ func (r *RecordCache) NodeIDs() []flow.Identifier {
 // Size returns the number of records in the cache.
 func (r *RecordCache) Size() uint {
 	return r.c.Size()
+}
+
+// MakeId is a helper function for creating the id field of the duplicateMessagesCounterEntity by hashing the peerID.
+// Returns:
+// - the hash of the peerID as a flow.Identifier.
+func (r *RecordCache) MakeId(peerID peer.ID) flow.Identifier {
+	return flow.MakeID([]byte(peerID))
 }
 
 func (r *RecordCache) incrementAdjustment(entity flow.Entity) flow.Entity {
@@ -216,11 +223,4 @@ func mustBeClusterPrefixedMessageReceivedRecordEntity(entity flow.Entity) Cluste
 		panic(fmt.Sprintf("invalid entity type, expected ClusterPrefixedMessagesReceivedRecord type, got: %T", entity))
 	}
 	return c
-}
-
-// makeId is a helper function for creating the id field of the duplicateMessagesCounterEntity by hashing the peerID.
-// Returns:
-// - the hash of the peerID as a flow.Identifier.
-func makeId(peerID peer.ID) flow.Identifier {
-	return flow.MakeID([]byte(peerID))
 }

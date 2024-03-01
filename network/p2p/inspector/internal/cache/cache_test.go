@@ -196,7 +196,7 @@ func TestRecordCache_Identities(t *testing.T) {
 	// check if the NodeIDs method returns the correct set of node IDs
 	identities := cache.NodeIDs()
 	require.Equal(t, 3, len(identities))
-	require.ElementsMatch(t, identities, []peer.ID{peerID1, peerID2, peerID3})
+	require.ElementsMatch(t, identities, []flow.Identifier{cache.MakeId(peerID1), cache.MakeId(peerID2), cache.MakeId(peerID3)})
 }
 
 // TestRecordCache_Remove tests the Remove method of the RecordCache.
@@ -366,7 +366,11 @@ func TestRecordCache_ConcurrentInitAndRemove(t *testing.T) {
 
 	// ensure that the initialized records are correctly added to the cache
 	// and removed records are correctly removed from the cache
-	require.ElementsMatch(t, peerIdsToAdd, cache.NodeIDs())
+	expectedIds := make([]flow.Identifier, len(peerIdsToAdd))
+	for i, pid := range peerIdsToAdd {
+		expectedIds[i] = cache.MakeId(pid)
+	}
+	require.ElementsMatch(t, expectedIds, cache.NodeIDs())
 }
 
 // TestRecordCache_ConcurrentInitRemoveUpdate tests the concurrent initialization, removal, and adjustment of
@@ -418,8 +422,13 @@ func TestRecordCache_ConcurrentInitRemoveUpdate(t *testing.T) {
 		}(pid)
 	}
 
+	expectedPeerIds := append(peerIdsToAdd, peerIdsToAdjust...)
+	expectedIds := make([]flow.Identifier, len(expectedPeerIds))
+	for i, pid := range expectedPeerIds {
+		expectedIds[i] = cache.MakeId(pid)
+	}
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
-	require.ElementsMatch(t, append(peerIdsToAdd, peerIdsToAdjust...), cache.NodeIDs())
+	require.ElementsMatch(t, expectedIds, cache.NodeIDs())
 }
 
 // TestRecordCache_EdgeCasesAndInvalidInputs tests the edge cases and invalid inputs for RecordCache methods.
@@ -459,10 +468,14 @@ func TestRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 		go func(id peer.ID) {
 			defer wg.Done()
 			require.True(t, cache.Remove(id))
-			require.NotContains(t, id, cache.NodeIDs())
+			require.NotContains(t, cache.MakeId(id), cache.NodeIDs())
 		}(pid)
 	}
 
+	expectedIds := make([]flow.Identifier, len(peerIds))
+	for i, pid := range peerIds {
+		expectedIds[i] = cache.MakeId(pid)
+	}
 	// call NodeIDs method concurrently
 	for i := 0; i < 10; i++ {
 		go func() {
@@ -472,7 +485,7 @@ func TestRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 			require.True(t, len(ids) <= len(peerIds))
 			// the returned IDs should be a subset of the node IDs
 			for _, id := range ids {
-				require.Contains(t, peerIds, id)
+				require.Contains(t, expectedIds, id)
 			}
 		}()
 	}
