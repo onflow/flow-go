@@ -232,6 +232,8 @@ network-config:
             enable-iwant: true
             # Enables publish message inspection.
             enable-publish: true
+            # When set to true RPC's will be rejected from unstaked peers
+            reject-unstaked-peers: true
           truncation:
             # Serves as a fail-safe mechanism to globally deactivate truncation logic. When this fail-safe is activated it disables all
             # aspects of the truncation logic, irrespective of individual configurations like truncation.enable-graft, truncation.enable-prune, etc.

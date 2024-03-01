@@ -29,7 +29,7 @@ var config = map[string]*portConfig{
 		portCount: 10,
 	},
 	"observer": {
-		start:     5000, // 5000-6000 => 100 nodes
+		start:     5001, // 5001-6000 => 100 nodes
 		end:       6000,
 		portCount: 10,
 	},

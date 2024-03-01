@@ -251,6 +251,11 @@ func (_m *GossipSubMetrics) OnRpcReceived(msgCount int, iHaveCount int, iWantCou
 	_m.Called(msgCount, iHaveCount, iWantCount, graftCount, pruneCount)
 }
 
+// OnRpcRejectedFromUnknownSender provides a mock function with given fields:
+func (_m *GossipSubMetrics) OnRpcRejectedFromUnknownSender() {
+	_m.Called()
+}
+
 // OnRpcSent provides a mock function with given fields: msgCount, iHaveCount, iWantCount, graftCount, pruneCount
 func (_m *GossipSubMetrics) OnRpcSent(msgCount int, iHaveCount int, iWantCount int, graftCount int, pruneCount int) {
 	_m.Called(msgCount, iHaveCount, iWantCount, graftCount, pruneCount)
