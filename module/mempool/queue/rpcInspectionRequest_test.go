@@ -1,13 +1,13 @@
 package queue_test
 
 import (
-	"github.com/onflow/flow-go/module/mempool/queue"
 	"testing"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"

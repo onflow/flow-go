@@ -1,9 +1,10 @@
 package queue
 
 import (
+	"time"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"time"
 )
 
 // MessageEntity is a data structure for storing messages in HeroQueue.
@@ -24,7 +25,7 @@ func NewMessageEntity(msg *engine.Message) MessageEntity {
 }
 
 // NewMessageEntityWithNonce creates a new message entity adding a nonce to the id calculation.
-// This prevents de-duplication of otherwise identical messages stored in the queue. 
+// This prevents de-duplication of otherwise identical messages stored in the queue.
 func NewMessageEntityWithNonce(msg *engine.Message) MessageEntity {
 	id := identifierOfMessage(struct {
 		*engine.Message
