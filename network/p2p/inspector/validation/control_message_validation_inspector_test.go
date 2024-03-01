@@ -1201,11 +1201,9 @@ func TestPublishMessageInspection_MissingSubscription(t *testing.T) {
 		params.Logger = logger
 	})
 	publisher := unittest.PeerIdFixture(t)
-	publisherId := unittest.IdentityFixture()
 	pubsubMsgs := unittest.GossipSubMessageFixtures(errThreshold+1, fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID), p2ptest.WithFrom(publisher))
 	from := unittest.PeerIdFixture(t)
 	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true)
-	idProvider.On("ByPeerID", publisher).Return(publisherId, true)
 	rpc := unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...))
 	checkNotification := checkNotificationFunc(t, from, p2pmsg.RpcPublishMessage, validation.IsInvalidRpcPublishMessagesErr, p2p.CtrlMsgNonClusterTopicType)
 	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
