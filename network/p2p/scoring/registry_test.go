@@ -1171,7 +1171,7 @@ func TestScoringRegistrySilencePeriod(t *testing.T) {
 
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
-	// refresh cached app-specific score every 100 milliseconds to speed up the test.
+	// refresh cached app-specific score every 10 milliseconds to speed up the test.
 	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond
 	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.SpamRecordCache.Decay.MaximumSpamPenaltyDecayFactor = .99
 	maximumSpamPenaltyDecayFactor := cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.SpamRecordCache.Decay.MaximumSpamPenaltyDecayFactor
