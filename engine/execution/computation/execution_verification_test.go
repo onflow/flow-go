@@ -194,7 +194,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		accountPrivKey, createAccountTx := testutil.CreateAccountCreationTransaction(t, chain)
 
 		// this should return the address of newly created account
-		accountAddress, err := chain.AddressAtIndex(5)
+		accountAddress, err := chain.AddressAtIndex(systemcontracts.LastSystemAccountIndex + 1)
 		require.NoError(t, err)
 
 		err = testutil.SignTransactionAsServiceAccount(createAccountTx, 0, chain)
@@ -236,7 +236,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 	t.Run("with failed transaction fee deduction", func(t *testing.T) {
 		accountPrivKey, createAccountTx := testutil.CreateAccountCreationTransaction(t, chain)
 		// this should return the address of newly created account
-		accountAddress, err := chain.AddressAtIndex(5)
+		accountAddress, err := chain.AddressAtIndex(systemcontracts.LastSystemAccountIndex + 1)
 		require.NoError(t, err)
 
 		err = testutil.SignTransactionAsServiceAccount(createAccountTx, 0, chain)
@@ -628,7 +628,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			privateKey, createAccountTx := testutil.CreateAccountCreationTransaction(t, chain)
 
 			// this should return the address of newly created account
-			address, err := chain.AddressAtIndex(5)
+			address, err := chain.AddressAtIndex(systemcontracts.LastSystemAccountIndex + 1)
 			require.NoError(t, err)
 
 			err = testutil.SignTransactionAsServiceAccount(createAccountTx, 0, chain)
