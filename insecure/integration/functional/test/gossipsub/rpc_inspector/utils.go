@@ -41,6 +41,14 @@ func randomClusterPrefixedTopic() channels.Topic {
 	return channels.Topic(channels.SyncCluster(flow.ChainID(fmt.Sprintf("%d", rand.Uint64()))))
 }
 
+func randomClusterPrefixedTopics(n int) []string {
+	topics := make([]string, n)
+	for i := 0; i < n; i++ {
+		topics[i] = randomClusterPrefixedTopic().String()
+	}
+	return topics
+}
+
 func meshTracerFixture(flowConfig *config.FlowConfig, idProvider module.IdentityProvider) *tracer.GossipSubMeshTracer {
 	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
 		Logger:                  unittest.Logger(),

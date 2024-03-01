@@ -48,9 +48,13 @@ func TestNativeTokenBridging(t *testing.T) {
 			t.Run("mint tokens to the first account", func(t *testing.T) {
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						res, err := blk.DirectCall(types.NewDepositCall(testAccount, originalBalance, nonce))
+						call := types.NewDepositCall(testAccount, originalBalance, nonce)
+						res, err := blk.DirectCall(call)
 						require.NoError(t, err)
 						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
+						expectedHash, err := call.Hash()
+						require.NoError(t, err)
+						require.Equal(t, expectedHash, res.TxHash)
 						nonce += 1
 					})
 				})
@@ -66,9 +70,13 @@ func TestNativeTokenBridging(t *testing.T) {
 				})
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						res, err := blk.DirectCall(types.NewWithdrawCall(testAccount, amount, nonce))
+						call := types.NewWithdrawCall(testAccount, amount, nonce)
+						res, err := blk.DirectCall(call)
 						require.NoError(t, err)
 						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
+						expectedHash, err := call.Hash()
+						require.NoError(t, err)
+						require.Equal(t, expectedHash, res.TxHash)
 						nonce += 1
 					})
 				})
@@ -111,16 +119,18 @@ func TestContractInteraction(t *testing.T) {
 			t.Run("deploy contract", func(t *testing.T) {
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						res, err := blk.DirectCall(
-							types.NewDeployCall(
-								testAccount,
-								testContract.ByteCode,
-								math.MaxUint64,
-								amountToBeTransfered,
-								nonce),
-						)
+						call := types.NewDeployCall(
+							testAccount,
+							testContract.ByteCode,
+							math.MaxUint64,
+							amountToBeTransfered,
+							nonce)
+						res, err := blk.DirectCall(call)
 						require.NoError(t, err)
 						contractAddr = res.DeployedContractAddress
+						expectedHash, err := call.Hash()
+						require.NoError(t, err)
+						require.Equal(t, expectedHash, res.TxHash)
 						nonce += 1
 					})
 					RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
@@ -233,8 +243,10 @@ func TestContractInteraction(t *testing.T) {
 						gethCommon.Big1,        // gas fee
 
 					)
-					_, err = blk.RunTransaction(tx)
+					res, err := blk.RunTransaction(tx)
 					require.NoError(t, err)
+					require.NoError(t, res.VMError)
+					require.Greater(t, res.GasConsumed, uint64(0))
 
 					// check the balance of coinbase
 					RunWithNewReadOnlyBlockView(t, env, func(blk2 types.ReadOnlyBlockView) {
@@ -249,6 +261,50 @@ func TestContractInteraction(t *testing.T) {
 					})
 				})
 			})
+
+			t.Run("test runing transactions with dynamic fees (happy case)", func(t *testing.T) {
+				account := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
+				fAddr := account.Address()
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						_, err := blk.DirectCall(types.NewDepositCall(fAddr, amount, account.Nonce()))
+						require.NoError(t, err)
+					})
+				})
+				account.SetNonce(account.Nonce() + 1)
+
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
+					ctx.GasFeeCollector = types.NewAddressFromString("coinbase")
+					coinbaseOrgBalance := gethCommon.Big1
+					// small amount of money to create account
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						_, err := blk.DirectCall(types.NewDepositCall(ctx.GasFeeCollector, coinbaseOrgBalance, 1))
+						require.NoError(t, err)
+					})
+
+					blk, err := env.NewBlockView(ctx)
+					require.NoError(t, err)
+					tx := account.SignTx(
+						t,
+						gethTypes.NewTx(&gethTypes.DynamicFeeTx{
+							Nonce:     account.Nonce(),
+							GasTipCap: big.NewInt(2),
+							GasFeeCap: big.NewInt(3),
+							Gas:       gethParams.TxGas,
+							To:        &gethCommon.Address{},
+							Value:     big.NewInt(1),
+						}),
+					)
+					account.SetNonce(account.Nonce() + 1)
+
+					res, err := blk.RunTransaction(tx)
+					require.NoError(t, err)
+					require.NoError(t, res.VMError)
+					require.Greater(t, res.GasConsumed, uint64(0))
+				})
+			})
+
 			t.Run("test sending transactions (invalid nonce)", func(t *testing.T) {
 				account := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
 				fAddr := account.Address()

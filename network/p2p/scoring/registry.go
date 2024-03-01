@@ -452,6 +452,8 @@ func (r *GossipSubAppSpecificScoreRegistry) handleMisbehaviourReport(notificatio
 			penalty += r.penalty.IWantMisbehaviour
 		case p2pmsg.RpcPublishMessage:
 			penalty += r.penalty.PublishMisbehaviour
+		case p2pmsg.CtrlMsgRPC:
+			penalty += r.penalty.PublishMisbehaviour
 		default:
 			// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
 			lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("unknown misbehaviour type")

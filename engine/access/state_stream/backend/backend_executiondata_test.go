@@ -122,7 +122,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 		seal := unittest.BlockSealsFixture(1)[0]
 		result := unittest.ExecutionResultFixture()
-		blockEvents := unittest.BlockEventsFixture(block.Header, (i%len(testEventTypes))*3+1, testEventTypes...)
+		blockEvents := generateMockEvents(block.Header, (i%len(testEventTypes))*3+1)
 
 		numChunks := 5
 		chunkDatas := make([]*execution_data.ChunkExecutionData, 0, numChunks)
@@ -226,6 +226,34 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		false,
 	)
 	require.NoError(s.T(), err)
+}
+
+// generateMockEvents generates a set of mock events for a block split into multiple tx with
+// appropriate indexes set
+func generateMockEvents(header *flow.Header, eventCount int) flow.BlockEvents {
+	txCount := eventCount / 3
+
+	txID := unittest.IdentifierFixture()
+	txIndex := uint32(0)
+	eventIndex := uint32(0)
+
+	events := make([]flow.Event, eventCount)
+	for i := 0; i < eventCount; i++ {
+		if i > 0 && i%txCount == 0 {
+			txIndex++
+			txID = unittest.IdentifierFixture()
+			eventIndex = 0
+		}
+
+		events[i] = unittest.EventFixture(testEventTypes[i%len(testEventTypes)], txIndex, eventIndex, txID, 0)
+	}
+
+	return flow.BlockEvents{
+		BlockID:        header.ID(),
+		BlockHeight:    header.Height,
+		BlockTimestamp: header.Timestamp,
+		Events:         events,
+	}
 }
 
 func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
