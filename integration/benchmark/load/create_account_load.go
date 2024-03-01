@@ -4,6 +4,7 @@ import (
 	"github.com/rs/zerolog"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/onflow/flow-go/integration/benchmark/account"
 )
 
@@ -37,8 +38,8 @@ func (c CreateAccountLoad) Load(log zerolog.Logger, lc LoadContext) error {
 				SetScript(
 					[]byte(`
 						transaction() {
-							prepare(signer: AuthAccount) {
-								AuthAccount(payer: signer)
+							prepare(signer: auth(BorrowValue) &Account) {
+								Account(payer: signer)
 							}
 						}`,
 					),
