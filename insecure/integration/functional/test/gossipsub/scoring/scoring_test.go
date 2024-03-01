@@ -2,12 +2,14 @@ package scoring
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/config"
@@ -27,7 +29,7 @@ import (
 // a spammer peer, the victim will eventually penalize the spammer and stop receiving messages from them.
 // Note: the term integration is used here because it requires integrating all components of the libp2p stack.
 func TestGossipSubInvalidMessageDelivery_Integration(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "https://github.com/dapperlabs/flow-go/issues/6949")
+	//unittest.SkipUnless(t, unittest.TEST_FLAKY, "https://github.com/dapperlabs/flow-go/issues/6949")
 	tt := []struct {
 		name           string
 		spamMsgFactory func(spammerId peer.ID, victimId peer.ID, topic channels.Topic) *pubsub_pb.Message
@@ -96,6 +98,7 @@ func TestGossipSubInvalidMessageDelivery_Integration(t *testing.T) {
 // - t: the test instance.
 // - spamMsgFactory: a function that creates unique invalid messages to spam the victim with.
 func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory func(peer.ID, peer.ID, channels.Topic) *pubsub_pb.Message) {
+	logger := zerolog.New(os.Stdout).Level(zerolog.TraceLevel)
 
 	role := flow.RoleConsensus
 	sporkId := unittest.IdentifierFixture()
@@ -118,7 +121,8 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		p2ptest.OverrideFlowConfig(cfg))
+		p2ptest.OverrideFlowConfig(cfg),
+		p2ptest.WithLogger(logger))
 
 	ids := flow.IdentityList{&spammer.SpammerId, &victimIdentity}
 	idProvider.SetIdentities(ids)
@@ -143,7 +147,7 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 		msgs = append(msgs, spamMsgFactory(spammer.SpammerNode.ID(), victimNode.ID(), blockTopic))
 	}
 
-	// sends all 2000 spam messages to the victim node over 1 RPC.
+	// sends all 3000 spam messages to the victim node over 1 RPC.
 	spammer.SpamControlMessage(t, victimNode,
 		spammer.GenerateCtlMessages(1), msgs...)
 

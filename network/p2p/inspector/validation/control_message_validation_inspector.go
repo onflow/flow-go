@@ -1098,6 +1098,7 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *In
 	default:
 		c.notificationConsumer.OnInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, err, count, topicType))
 		lg.Error().Msg("rpc control message async inspection failed, notification sent")
+		lg.Trace().Msg("rpc control message async inspection failed, notification sent")
 		c.metrics.OnInvalidControlMessageNotificationSent()
 	}
 }
