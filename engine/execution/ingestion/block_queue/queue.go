@@ -89,50 +89,12 @@ func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.State
 	// check if the block already exists
 	blockID := block.ID()
 	executable, ok := q.blocks[blockID]
-	// handle the case where the block has seen before
 	if ok {
-		// we have already received this block, and its parent still has not been executed yet
-		if executable.StartState == nil && parentFinalState == nil {
-			return nil, nil, nil
-		}
-
-		// this is an edge case where parentFinalState is provided, and its parent block exists
-		// in the queue but has not been marked as executed yet (OnBlockExecuted(parent) is not called),
-		// in this case, we will internally call OnBlockExecuted(parentBlockID, parentFinalState).
-		// there is no need to create the executable block again, since it's already created.
-		if executable.StartState == nil && parentFinalState != nil {
-			executables, err := q.onBlockExecuted(block.Header.ParentID, *parentFinalState)
-			if err != nil {
-				return nil, nil, fmt.Errorf("receiving block %v with parent commitment %v, but parent block %v already exists with no commitment, fail to call mark parent as executed: %w",
-					blockID, *parentFinalState, block.Header.ParentID, err)
-			}
-
-			// we already have this block, its collection must have been fetched, so we only return the
-			// executables from marking its parent as executed.
-			return nil, executables, nil
-		}
-
-		// this means the caller think it's parent has not been executed, but the queue's internal state
-		// shows the parent has been executed, then it's probably a race condition where the call to
-		// inform the parent block has been executed arrives earlier than this call, which is an edge case
-		// and we can simply ignore this call.
-		if executable.StartState != nil && parentFinalState == nil {
-			q.log.Warn().
-				Str("blockID", blockID.String()).
-				Hex("parentID", block.Header.ParentID[:]).
-				Msg("edge case: receiving block with no parent commitment, but its parent block actually has been executed")
-			return nil, nil, nil
-		}
-
-		// this is an exception that should not happen
-		if *executable.StartState != *parentFinalState {
-			return nil, nil,
-				fmt.Errorf("block %s has already been executed with a different parent final state, %v != %v",
-					blockID, *executable.StartState, parentFinalState)
-		}
-
-		return nil, nil, nil
+		// handle the case where the block has seen before
+		return q.handleKnownBlock(executable, parentFinalState)
 	}
+
+	// handling a new block
 
 	// if parentFinalState is not provided, then its parent block must exists in the queue
 	// otherwise it's an exception
@@ -260,6 +222,59 @@ func (q *BlockQueue) OnBlockExecuted(
 	defer q.Unlock()
 
 	return q.onBlockExecuted(blockID, commit)
+}
+
+func (q *BlockQueue) handleKnownBlock(executable *entity.ExecutableBlock, parentFinalState *flow.StateCommitment) (
+	[]*MissingCollection, // missing collections
+	[]*entity.ExecutableBlock, // blocks ready to execute
+	error, // exceptions
+) {
+	// we have already received this block, and its parent still has not been executed yet
+	if executable.StartState == nil && parentFinalState == nil {
+		return nil, nil, nil
+	}
+
+	// this is an edge case where parentFinalState is provided, and its parent block exists
+	// in the queue but has not been marked as executed yet (OnBlockExecuted(parent) is not called),
+	// in this case, we will internally call OnBlockExecuted(parentBlockID, parentFinalState).
+	// there is no need to create the executable block again, since it's already created.
+	if executable.StartState == nil && parentFinalState != nil {
+		executables, err := q.onBlockExecuted(executable.Block.Header.ParentID, *parentFinalState)
+		if err != nil {
+			return nil, nil, fmt.Errorf("receiving block %v with parent commitment %v, but parent block %v already exists with no commitment, fail to call mark parent as executed: %w",
+				executable.ID(), *parentFinalState, executable.Block.Header.ParentID, err)
+		}
+
+		// we already have this block, its collection must have been fetched, so we only return the
+		// executables from marking its parent as executed.
+		return nil, executables, nil
+	}
+
+	// this means the caller think it's parent has not been executed, but the queue's internal state
+	// shows the parent has been executed, then it's probably a race condition where the call to
+	// inform the parent block has been executed arrives earlier than this call, which is an edge case
+	// and we can simply ignore this call.
+	if executable.StartState != nil && parentFinalState == nil {
+		q.log.Warn().
+			Str("blockID", executable.ID().String()).
+			Uint64("height", executable.Block.Header.Height).
+			Hex("parentID", executable.Block.Header.ParentID[:]).
+			Msg("edge case: receiving block with no parent commitment, but its parent block actually has been executed")
+		return nil, nil, nil
+	}
+
+	// this is an exception that should not happen
+	if *executable.StartState != *parentFinalState {
+		return nil, nil,
+			fmt.Errorf("block %s has already been executed with a different parent final state, %v != %v",
+				executable.ID(), *executable.StartState, parentFinalState)
+	}
+
+	q.log.Warn().
+		Str("blockID", executable.ID().String()).
+		Uint64("height", executable.Block.Header.Height).
+		Msg("edge case: OnBlockExecuted is called with the same arguments again")
+	return nil, nil, nil
 }
 
 func (q *BlockQueue) onBlockExecuted(
