@@ -959,23 +959,19 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	require.Equal(t, uint64(1), notificationCount.Load())
 }
 
-// TestGossipSubSpamMitigationIntegration tests that the spam mitigation feature of GossipSub is working as expected.
-// The test puts toghether the spam detection (through the GossipSubInspector) and the spam mitigation (through the
-// scoring system) and ensures that the mitigation is triggered when the spam detection detects spam.
-// The test scenario involves a spammer node that sends a large number of control messages to a victim node.
-// The victim node is configured to use the GossipSubInspector to detect spam and the scoring system to mitigate spam.
-// The test ensures that the victim node is disconnected from the spammer node on the GossipSub mesh after the spam detection is triggered.
-func TestGossipSubSpamMitigationIntegration(t *testing.T) {
-	//unittest.SkipUnless(t, unittest.TEST_FLAKY, "https://github.com/dapperlabs/flow-go/issues/6949")
-	t.Run("gossipsub spam mitigation invalid grafts", func(t *testing.T) {
-		testGossipSubSpamMitigationIntegration(t, p2pmsg.CtrlMsgGraft)
-	})
-	t.Run("gossipsub spam mitigation invalid prunes", func(t *testing.T) {
-		testGossipSubSpamMitigationIntegration(t, p2pmsg.CtrlMsgPrune)
-	})
-	t.Run("gossipsub spam mitigation invalid ihaves", func(t *testing.T) {
-		testGossipSubSpamMitigationIntegration(t, p2pmsg.CtrlMsgIHave)
-	})
+// TestGossipSubSpamMitigationIntegration_Grafts tests that the spam mitigation feature of GossipSub is working as expected for Graft control messages.
+func TestGossipSubSpamMitigationIntegration_Grafts(t *testing.T) {
+	testGossipSubSpamMitigationIntegration(t, p2pmsg.CtrlMsgGraft)
+}
+
+// TestGossipSubSpamMitigationIntegration_Prunes tests that the spam mitigation feature of GossipSub is working as expected for Prune control messages.
+func TestGossipSubSpamMitigationIntegration_Prunes(t *testing.T) {
+	testGossipSubSpamMitigationIntegration(t, p2pmsg.CtrlMsgPrune)
+}
+
+// TestGossipSubSpamMitigationIntegration_IHaves tests that the spam mitigation feature of GossipSub is working as expected for IHaves control messages.
+func TestGossipSubSpamMitigationIntegration_IHaves(t *testing.T) {
+	testGossipSubSpamMitigationIntegration(t, p2pmsg.CtrlMsgIHave)
 }
 
 // testGossipSubSpamMitigationIntegration tests that the spam mitigation feature of GossipSub is working as expected.
