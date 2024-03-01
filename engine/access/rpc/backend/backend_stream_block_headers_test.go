@@ -29,12 +29,12 @@ func (s *BackendBlockHeadersSuite) SetupTest() {
 }
 
 // TestSubscribeBlockHeaders tests the functionality of the SubscribeBlockHeaders method in the Backend.
-// It covers various scenarios for subscribing to block headers, handling backfill, and receiving block header updates.
-// The test cases include scenarios for both finalized and sealed block headers.
+// It covers various scenarios for subscribing to block blocks, handling backfill, and receiving block header updates.
+// The test cases include scenarios for both finalized and sealed block blocks.
 //
 // Test Cases:
 //
-// 1. Happy path - all new block headers:
+// 1. Happy path - all new block blocks:
 //   - No backfill is performed, and the subscription starts from the current root block header.
 //
 // 2. Happy path - partial backfill:
@@ -49,13 +49,13 @@ func (s *BackendBlockHeadersSuite) SetupTest() {
 // 5. Happy path - start from root block by ID:
 //   - The subscription starts from the root block header, specified by block ID.
 //
-// Each test case simulates the reception of new block headers during the subscription, ensuring that the SubscribeBlockHeaders
+// Each test case simulates the reception of new block blocks during the subscription, ensuring that the SubscribeBlockHeaders
 // method correctly handles updates and delivers the expected block header information to the subscriber.
 //
 // Test Steps:
 // - Initialize the test environment, including the Backend instance, mock components, and test data.
 // - For each test case, set up the backfill, if applicable.
-// - Subscribe to block headers using the SubscribeBlockHeaders method.
+// - Subscribe to block blocks using the SubscribeBlockHeaders method.
 // - Simulate the reception of new blocks during the subscription.
 // - Validate that the received block header information matches the expected data.
 // - Ensure the subscription shuts down gracefully when canceled.
@@ -125,19 +125,19 @@ func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeaders() {
 // Test Cases:
 //
 // 1. Returns error for unknown block status:
-//   - Verifies that attempting to subscribe to block headers with an unknown block status results in an InvalidArgument error.
+//   - Verifies that attempting to subscribe to block blocks with an unknown block status results in an InvalidArgument error.
 //
 // 2. Returns error if both start blockID and start height are provided:
 //   - Ensures that providing both start block ID and start height results in an InvalidArgument error.
 //
 // 3. Returns error for start height before root height:
-//   - Validates that attempting to subscribe to block headers with a start height before the root height results in an InvalidArgument error.
+//   - Validates that attempting to subscribe to block blocks with a start height before the root height results in an InvalidArgument error.
 //
 // 4. Returns error for unindexed start blockID:
-//   - Tests that subscribing to block headers with an unindexed start block ID results in a NotFound error.
+//   - Tests that subscribing to block blocks with an unindexed start block ID results in a NotFound error.
 //
 // 5. Returns error for unindexed start height:
-//   - Tests that subscribing to block headers with an unindexed start height results in a NotFound error.
+//   - Tests that subscribing to block blocks with an unindexed start height results in a NotFound error.
 //
 // Each test case checks for specific error conditions and ensures that the SubscribeBlockHeaders method responds appropriately.
 func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersHandlesErrors() {

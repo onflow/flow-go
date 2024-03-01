@@ -185,8 +185,8 @@ func (b *backendNetwork) isEpochOrPhaseDifferent(counter1, counter2 uint64, phas
 }
 
 // getValidSnapshot will return a valid snapshot that has a sealing segment which
-// 1. does not contain any blocks that span an epoch transition
-// 2. does not contain any blocks that span an epoch phase transition
+// 1. does not contain any headers that span an epoch transition
+// 2. does not contain any headers that span an epoch phase transition
 // If a snapshot does contain an invalid sealing segment query the state
 // by height of each block in the segment and return a snapshot at the point
 // where the transition happens.

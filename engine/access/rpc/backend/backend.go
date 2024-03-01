@@ -165,6 +165,14 @@ func New(params Params) (*Backend, error) {
 	// initialize node version info
 	nodeInfo := getNodeVersionInfo(params.State.Params())
 
+	transactionsLocalDataProvider := TransactionsLocalDataProvider{
+		state:          params.State,
+		collections:    params.Collections,
+		blocks:         params.Blocks,
+		eventsIndex:    params.EventsIndex,
+		txResultsIndex: params.TxResultsIndex,
+	}
+
 	b := &Backend{
 		state:        params.State,
 		BlockTracker: params.BlockTracker,
@@ -182,27 +190,21 @@ func New(params Params) (*Backend, error) {
 			scriptExecMode:    params.ScriptExecutionMode,
 		},
 		backendTransactions: backendTransactions{
-			TransactionsLocalDataProvider: TransactionsLocalDataProvider{
-				state:          params.State,
-				collections:    params.Collections,
-				blocks:         params.Blocks,
-				eventsIndex:    params.EventsIndex,
-				txResultsIndex: params.TxResultsIndex,
-			},
-			log:                  params.Log,
-			staticCollectionRPC:  params.CollectionRPC,
-			chainID:              params.ChainID,
-			transactions:         params.Transactions,
-			executionReceipts:    params.ExecutionReceipts,
-			transactionValidator: configureTransactionValidator(params.State, params.ChainID),
-			transactionMetrics:   params.AccessMetrics,
-			retry:                retry,
-			connFactory:          params.ConnFactory,
-			previousAccessNodes:  params.HistoricalAccessNodes,
-			nodeCommunicator:     params.Communicator,
-			txResultCache:        txResCache,
-			txErrorMessagesCache: txErrorMessagesCache,
-			txResultQueryMode:    params.TxResultQueryMode,
+			TransactionsLocalDataProvider: transactionsLocalDataProvider,
+			log:                           params.Log,
+			staticCollectionRPC:           params.CollectionRPC,
+			chainID:                       params.ChainID,
+			transactions:                  params.Transactions,
+			executionReceipts:             params.ExecutionReceipts,
+			transactionValidator:          configureTransactionValidator(params.State, params.ChainID),
+			transactionMetrics:            params.AccessMetrics,
+			retry:                         retry,
+			connFactory:                   params.ConnFactory,
+			previousAccessNodes:           params.HistoricalAccessNodes,
+			nodeCommunicator:              params.Communicator,
+			txResultCache:                 txResCache,
+			txErrorMessagesCache:          txErrorMessagesCache,
+			txResultQueryMode:             params.TxResultQueryMode,
 		},
 		backendEvents: backendEvents{
 			log:               params.Log,
@@ -254,14 +256,12 @@ func New(params Params) (*Backend, error) {
 			sendBufferSize: params.SubscriptionParams.SendBufferSize,
 		},
 		backendSubscribeTransactions: backendSubscribeTransactions{
-			log:            params.Log,
-			state:          params.State,
-			blocks:         params.Blocks,
-			results:        params.LightTransactionResults,
-			Broadcaster:    params.SubscriptionParams.Broadcaster,
-			sendTimeout:    params.SubscriptionParams.SendTimeout,
-			responseLimit:  params.SubscriptionParams.ResponseLimit,
-			sendBufferSize: params.SubscriptionParams.SendBufferSize,
+			txLocalDataProvider: transactionsLocalDataProvider,
+			log:                 params.Log,
+			broadcaster:         params.SubscriptionParams.Broadcaster,
+			sendTimeout:         params.SubscriptionParams.SendTimeout,
+			responseLimit:       params.SubscriptionParams.ResponseLimit,
+			sendBufferSize:      params.SubscriptionParams.SendBufferSize,
 		},
 		collections:       params.Collections,
 		executionReceipts: params.ExecutionReceipts,
@@ -279,8 +279,6 @@ func New(params Params) (*Backend, error) {
 
 		b.backendSubscribeTransactions.getStartHeight = b.GetStartHeight
 		b.backendSubscribeTransactions.getHighestHeight = b.GetHighestHeight
-		b.backendSubscribeTransactions.deriveUnknownTransactionStatus = b.DeriveUnknownTransactionStatus
-		b.backendSubscribeTransactions.deriveTransactionStatus = b.DeriveTransactionStatus
 	}
 
 	retry.SetBackend(b)

@@ -192,7 +192,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 			}
 		}
 
-		collectionID, err := t.lookupCollectionIDInBlock(block, txID)
+		collectionID, err := t.LookupCollectionIDInBlock(block, txID)
 		if err != nil {
 			return nil, err
 		}
@@ -273,7 +273,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 		}
 	}
 
-	collectionID, err := t.lookupCollectionIDInBlock(block, txResult.TransactionID)
+	collectionID, err := t.LookupCollectionIDInBlock(block, txResult.TransactionID)
 	if err != nil {
 		return nil, err
 	}
@@ -369,9 +369,9 @@ func isExpired(refHeight, compareToHeight uint64) bool {
 	return compareToHeight-refHeight > flow.DefaultTransactionExpiry
 }
 
-// lookupCollectionIDInBlock returns the collection ID based on the transaction ID. The lookup is performed in block
+// LookupCollectionIDInBlock returns the collection ID based on the transaction ID. The lookup is performed in block
 // collections.
-func (t *TransactionsLocalDataProvider) lookupCollectionIDInBlock(
+func (t *TransactionsLocalDataProvider) LookupCollectionIDInBlock(
 	block *flow.Block,
 	txID flow.Identifier,
 ) (flow.Identifier, error) {

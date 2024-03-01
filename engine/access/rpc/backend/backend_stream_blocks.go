@@ -37,7 +37,7 @@ func (b *backendSubscribeBlocks) SubscribeBlocks(ctx context.Context, startBlock
 	return b.subscribe(ctx, startBlockID, startHeight, blockStatus, b.getBlockResponse(blockStatus))
 }
 
-// SubscribeBlockHeaders subscribes to block headers starting from a specified block ID or height and with a given block status.
+// SubscribeBlockHeaders subscribes to block blocks starting from a specified block ID or height and with a given block status.
 func (b *backendSubscribeBlocks) SubscribeBlockHeaders(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
 	return b.subscribe(ctx, startBlockID, startHeight, blockStatus, b.getBlockHeaderResponse(blockStatus))
 }

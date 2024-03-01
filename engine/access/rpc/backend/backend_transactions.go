@@ -288,7 +288,7 @@ func (b *backendTransactions) GetTransactionResult(
 		}
 
 		// an additional check to ensure the correctness of the collection ID.
-		expectedCollectionID, err := b.lookupCollectionIDInBlock(block, txID)
+		expectedCollectionID, err := b.LookupCollectionIDInBlock(block, txID)
 		if err != nil {
 			// if the collection has not been indexed yet, the lookup will return a not found error.
 			// if the request included a blockID or collectionID in its the search criteria, not found
