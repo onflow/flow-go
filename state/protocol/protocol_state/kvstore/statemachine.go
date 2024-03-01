@@ -14,15 +14,19 @@ type ProcessingStateMachine struct {
 
 var _ protocol_state.KeyValueStoreStateMachine = (*ProcessingStateMachine)(nil)
 
-func NewProcessingStateMachine(view uint64) *ProcessingStateMachine {
+func NewProcessingStateMachine(view uint64, parentState protocol_state.Reader, mutator protocol_state.API) *ProcessingStateMachine {
 	return &ProcessingStateMachine{
-		view: view,
+		view:        view,
+		parentState: parentState,
+		state:       mutator,
 	}
 }
 
 func (m *ProcessingStateMachine) Build() (updatedState protocol_state.Reader, stateID flow.Identifier, hasChanges bool) {
-	//TODO implement me
-	panic("implement me")
+	updatedState = m.state // TODO: deep copy
+	stateID = updatedState.ID()
+	hasChanges = stateID != m.parentState.ID()
+	return
 }
 
 func (m *ProcessingStateMachine) ProcessUpdate(update *flow.ServiceEvent) error {

@@ -1,6 +1,9 @@
 package kvstore
 
-import "github.com/onflow/flow-go/state/protocol/protocol_state"
+import (
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
+)
 
 type upgradableModel struct {
 	VersionUpgrade *protocol_state.ViewBasedActivator[uint64]
@@ -33,6 +36,8 @@ type modelv0 struct {
 
 var _ protocol_state.Reader = new(modelv0)
 var _ protocol_state.API = new(modelv0)
+
+func (model *modelv0) ID() flow.Identifier { return flow.MakeID(model) }
 
 // VersionedEncode encodes the key-value store, returning the version separately
 // from the encoded bytes.
@@ -73,6 +78,8 @@ type modelv1 struct {
 
 var _ protocol_state.Reader = new(modelv1)
 var _ protocol_state.API = new(modelv1)
+
+func (model *modelv1) ID() flow.Identifier { return flow.MakeID(model) }
 
 // VersionedEncode encodes the key-value store, returning the version separately
 // from the encoded bytes.

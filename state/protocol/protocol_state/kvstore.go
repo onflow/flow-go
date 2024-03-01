@@ -30,6 +30,8 @@ type VersionedEncodable interface {
 // It is backward-compatible with all versioned model types defined in the models.go
 // for this software version.
 type Reader interface {
+	ID() flow.Identifier
+
 	// v0
 
 	VersionedEncodable
