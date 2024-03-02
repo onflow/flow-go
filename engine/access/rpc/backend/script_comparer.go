@@ -93,7 +93,7 @@ func (c *scriptResultComparison) logDurationDifference(execResult *scriptResult,
 	}
 
 	speedup := float64(localResult.duration.Milliseconds()) / float64(execResult.duration.Milliseconds())
-	// if the script execution on execution node was more than 2x faster
+	// if the script execution on execution node was more than 1.5x faster
 	if speedup > 1.5 {
 		c.logComparison(execResult, localResult,
 			"access node script execution was slower", true)
