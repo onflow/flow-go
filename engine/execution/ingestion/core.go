@@ -208,7 +208,7 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 
 	if err == nil {
 		// the parent block is an executed block.
-		missingColls, executables, err := e.blockQueue.OnBlock(block, &parentCommitment)
+		missingColls, executables, err := e.blockQueue.HandleBlock(block, &parentCommitment)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unexpected error while adding block to block queue: %w", err)
 		}
@@ -230,14 +230,14 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 	// Note: the fact that its parent block is unexecuted might be outdated since OnBlockExecuted
 	// might be called concurrently in a different thread, it's necessary to check again
 	// whether the parent block is executed after the call.
-	missingColls, executables, err := e.blockQueue.OnBlock(block, nil)
+	missingColls, executables, err := e.blockQueue.HandleBlock(block, nil)
 	if err != nil {
 		if !errors.Is(err, block_queue.ErrMissingParent) {
 			return nil, nil, fmt.Errorf("unexpected error while adding block to block queue: %w", err)
 		}
 
 		// if the error is ErrMissingParent, it means OnBlockExecuted is called after us getting
-		// the parent commit and before OnBlock was called, therefore, we should re-enqueue the block
+		// the parent commit and before HandleBlock was called, therefore, we should re-enqueue the block
 		// with the parent commit.
 		e.log.Warn().Msgf(
 			"block %v is missing parent block %v, re-enqueueing",
@@ -252,7 +252,7 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 		}
 
 		// now re-enqueue the block with parent commit
-		missing, execs, err := e.blockQueue.OnBlock(block, &parentCommitment)
+		missing, execs, err := e.blockQueue.HandleBlock(block, &parentCommitment)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unexpected error while reenqueue block to block queue: %w", err)
 		}
@@ -329,7 +329,7 @@ func (e *Core) onCollection(col *flow.Collection) error {
 	// adding it to the queue ensures we don't miss any collection.
 	// since the queue's state is in memory, processing a duplicated collection should be
 	// a fast no-op, and won't return any executable blocks.
-	executables, err := e.blockQueue.OnCollection(col)
+	executables, err := e.blockQueue.HandleCollection(col)
 	if err != nil {
 		return fmt.Errorf("unexpected error while adding collection to block queue")
 	}
