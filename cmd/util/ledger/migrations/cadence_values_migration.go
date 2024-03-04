@@ -31,6 +31,8 @@ type CadenceBaseMigrator struct {
 	name            string
 	log             zerolog.Logger
 	reporter        reporters.ReportWriter
+	diffReporter    reporters.ReportWriter
+	logVerboseDiff  bool
 	valueMigrations func(
 		inter *interpreter.Interpreter,
 		accounts environment.Accounts,
@@ -46,6 +48,11 @@ var _ io.Closer = (*CadenceBaseMigrator)(nil)
 func (m *CadenceBaseMigrator) Close() error {
 	// Close the report writer so it flushes to file.
 	m.reporter.Close()
+
+	if m.diffReporter != nil {
+		m.diffReporter.Close()
+	}
+
 	return nil
 }
 
@@ -164,13 +171,29 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 	expectedWriteAddress := flow.ConvertAddress(address)
 	expectedOriginalAddress := flow.ConvertAddress(address)
 
-	return MergeRegisterChanges(
+	newPayloads, err := MergeRegisterChanges(
 		migrationRuntime.Snapshot.Payloads,
 		result.WriteSet,
 		expectedWriteAddress,
 		expectedOriginalAddress,
 		m.log,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to merge register changes: %w", err)
+	}
+
+	if m.diffReporter != nil {
+
+		accountDiffReporter := NewCadenceValueDiffReporter(address, m.diffReporter, m.logVerboseDiff)
+
+		err = accountDiffReporter.DiffStates(oldPayloads, newPayloads, domains)
+		if err != nil {
+			// Log error returned from diff without returning error.
+			m.log.Err(err)
+		}
+	}
+
+	return newPayloads, nil
 }
 
 func checkPayloadsOwnership(payloads []*ledger.Payload, address common.Address, log zerolog.Logger) {
@@ -209,13 +232,23 @@ func checkPayloadOwnership(payload *ledger.Payload, address common.Address, log 
 // which runs some of the Cadence value migrations (static types, entitlements, strings)
 func NewCadence1ValueMigrator(
 	rwf reporters.ReportWriterFactory,
+	diffMigrations bool,
+	logVerboseDiff bool,
 	errorMessageHandler *errorMessageHandler,
 	compositeTypeConverter statictypes.CompositeTypeConverterFunc,
 	interfaceTypeConverter statictypes.InterfaceTypeConverterFunc,
 ) *CadenceBaseMigrator {
+
+	var diffReporter reporters.ReportWriter
+	if diffMigrations {
+		diffReporter = rwf.ReportWriter("cadence-value-migration-diff")
+	}
+
 	return &CadenceBaseMigrator{
-		name:     "cadence-value-migration",
-		reporter: rwf.ReportWriter("cadence-value-migrator"),
+		name:           "cadence-value-migration",
+		reporter:       rwf.ReportWriter("cadence-value-migrator"),
+		diffReporter:   diffReporter,
+		logVerboseDiff: logVerboseDiff,
 		valueMigrations: func(
 			inter *interpreter.Interpreter,
 			_ environment.Accounts,

@@ -34,6 +34,8 @@ var (
 	flagValidateMigration             bool
 	flagAllowPartialStateFromPayloads bool
 	flagLogVerboseValidationError     bool
+	flagDiffMigration                 bool
+	flagLogVerboseDiff                bool
 	flagStagedContractsFile           string
 	flagInputPayloadFileName          string
 	flagOutputPayloadFileName         string
@@ -80,6 +82,12 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagLogVerboseValidationError, "log-verbose-validation-error", false,
 		"log entire Cadence values on validation error (atree migration)")
+
+	Cmd.Flags().BoolVar(&flagDiffMigration, "diff", false,
+		"compare Cadence values and log diff (migration)")
+
+	Cmd.Flags().BoolVar(&flagLogVerboseDiff, "log-verbose-diff", false,
+		"log entire Cadence values on diff (requires --diff flag)")
 
 	Cmd.Flags().StringVar(&flagStagedContractsFile, "staged-contracts", "",
 		"Staged contracts CSV file")
@@ -137,6 +145,10 @@ func run(*cobra.Command, []string) {
 	// When flagOutputPayloadByAddresses is specified, flagOutputPayloadFileName is required.
 	if len(flagOutputPayloadFileName) == 0 && len(flagOutputPayloadByAddresses) > 0 {
 		log.Fatal().Msg("--extract-payloads-by-address requires --output-payload-filename to be specified")
+	}
+
+	if flagValidateMigration && flagDiffMigration {
+		log.Fatal().Msg("Both --validate and --diff are enabled, please specify only one (or none) of these")
 	}
 
 	if len(flagBlockHash) > 0 {
@@ -241,11 +253,19 @@ func run(*cobra.Command, []string) {
 	}
 
 	if flagValidateMigration {
-		log.Warn().Msgf("atree migration validation flag is enabled and will increase duration of migration")
+		log.Warn().Msgf("--validate flag is enabled and will increase duration of migration")
 	}
 
 	if flagLogVerboseValidationError {
-		log.Warn().Msgf("atree migration has verbose validation error logging enabled which may increase size of log")
+		log.Warn().Msgf("--log-verbose-validation-error flag is enabled which may increase size of log")
+	}
+
+	if flagDiffMigration {
+		log.Warn().Msgf("--diff flag is enabled and will increase duration of migration")
+	}
+
+	if flagLogVerboseDiff {
+		log.Warn().Msgf("--log-verbose-diff flag is enabled which may increase size of log")
 	}
 
 	var inputMsg string
@@ -299,6 +319,8 @@ func run(*cobra.Command, []string) {
 			flagOutputDir,
 			flagNWorker,
 			!flagNoMigration,
+			flagDiffMigration,
+			flagLogVerboseDiff,
 			chainID,
 			evmContractChange,
 			stagedContracts,
@@ -314,6 +336,8 @@ func run(*cobra.Command, []string) {
 			flagOutputDir,
 			flagNWorker,
 			!flagNoMigration,
+			flagDiffMigration,
+			flagLogVerboseDiff,
 			chainID,
 			evmContractChange,
 			stagedContracts,
