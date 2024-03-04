@@ -1,6 +1,7 @@
 package kvstore
 
 import (
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/require"
@@ -45,6 +46,42 @@ func (s *StateMachineSuite) TestInitialInvariants() {
 	require.Equal(s.T(), s.parentState.ID(), id, "initial state should not have changes")
 }
 
-func (s *StateMachineSuite) TestProcessUpdate() {
+func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
+	s.Run("happy-path", func() {
+		oldVersion := uint64(0)
+		s.parentState.On("GetProtocolStateVersion").Return(oldVersion)
 
+		upgrade := unittest.ProtocolStateVersionUpgradeFixture()
+		upgrade.ActiveView = s.view + 1
+		upgrade.NewProtocolStateVersion = oldVersion + 1
+
+		s.mutator.On("SetVersionUpgrade", &protocol_state.ViewBasedActivator[uint64]{
+			Data:           upgrade.NewProtocolStateVersion,
+			ActivationView: upgrade.ActiveView,
+		}).Return()
+
+		se := upgrade.ServiceEvent()
+		err := s.stateMachine.ProcessUpdate(&se)
+		require.NoError(s.T(), err)
+	})
+	s.Run("invalid-protocol-state-version", func() {
+		oldVersion := uint64(0)
+		s.parentState.On("GetProtocolStateVersion").Return(oldVersion)
+
+		upgrade := unittest.ProtocolStateVersionUpgradeFixture()
+		upgrade.ActiveView = s.view + 1
+		upgrade.NewProtocolStateVersion = oldVersion
+
+		se := upgrade.ServiceEvent()
+		err := s.stateMachine.ProcessUpdate(&se)
+		require.Error(s.T(), err)
+	})
+	s.Run("invalid-activation-view", func() {
+		upgrade := unittest.ProtocolStateVersionUpgradeFixture()
+		upgrade.ActiveView = s.view
+
+		se := upgrade.ServiceEvent()
+		err := s.stateMachine.ProcessUpdate(&se)
+		require.Error(s.T(), err)
+	})
 }
