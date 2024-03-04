@@ -1404,7 +1404,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			// Use the maximum amount of computation so that the transaction still passes.
-			loops := uint64(997)
+			loops := uint64(996)
+			executionEffortNeededToCheckStorage := uint64(1)
 			maxExecutionEffort := uint64(997)
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(fmt.Sprintf(`
@@ -1427,8 +1428,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 
 			snapshotTree = snapshotTree.Append(executionSnapshot)
 
-			// expected used is number of loops.
-			require.Equal(t, loops, output.ComputationUsed)
+			// expected computation used is number of loops + 1 (from the storage limit check).
+			require.Equal(t, loops+executionEffortNeededToCheckStorage, output.ComputationUsed)
 
 			// increasing the number of loops should fail the transaction.
 			loops = loops + 1
@@ -1451,8 +1452,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 
 			require.ErrorContains(t, output.Err, "computation exceeds limit (997)")
-			// computation used should the actual computation used.
-			require.Equal(t, loops, output.ComputationUsed)
+			// expected computation used is still number of loops + 1 (from the storage limit check).
+			require.Equal(t, loops+executionEffortNeededToCheckStorage, output.ComputationUsed)
 
 			for _, event := range output.Events {
 				// the fee deduction event should only contain the max gas worth of execution effort.
