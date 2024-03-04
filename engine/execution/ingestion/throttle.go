@@ -20,6 +20,10 @@ import (
 // blocks until the execution has caught up
 const CatchUpThreshold = 500
 
+type BlockHandler interface {
+	OnBlock(block *flow.Header) error
+}
+
 // BlockThrottle is a helper struct that throttles the unexecuted blocks to be sent
 func NewThrottleEngine(
 	log zerolog.Logger,
