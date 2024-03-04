@@ -153,6 +153,7 @@ func (e *Core) forwardProcessableToHandler(
 			return fmt.Errorf("could not process block: %w", err)
 		}
 	}
+
 	return nil
 }
 
