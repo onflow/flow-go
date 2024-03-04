@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
@@ -75,6 +74,7 @@ func NewCore(
 ) *Core {
 	return &Core{
 		log:               logger.With().Str("engine", "ingestion_core").Logger(),
+		unit:              engine.NewUnit(),
 		throttle:          throttle,
 		execState:         execState,
 		blockQueue:        block_queue.NewBlockQueue(logger),
@@ -103,7 +103,7 @@ func (e *Core) Done() <-chan struct{} {
 }
 
 func (e *Core) OnBlock(header *flow.Header, qc *flow.QuorumCertificate) {
-	// qc.Block == header.ID()
+	// qc.Block is equivalent to header.ID()
 	err := e.throttle.OnBlock(qc.BlockID)
 	if err != nil {
 		e.log.Fatal().Err(err).Msgf("error processing block %v (%v)", header.Height, header.ID())
@@ -131,30 +131,27 @@ func (e *Core) launchWorkerToConsumeThrottledBlocks() {
 		}
 	})
 
-	log.Info().Msg("initializing throttle engine")
+	e.log.Info().Msg("initializing throttle engine")
 
 	err := e.throttle.Init(processables)
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("fail to initialize throttle engine")
 	}
 
-	log.Info().Msgf("throttle engine initialized")
+	e.log.Info().Msgf("throttle engine initialized")
 }
 
 func (e *Core) forwardProcessableToHandler(
 	processables <-chan flow.Identifier,
 ) error {
-	for {
-		select {
-		case <-e.unit.Quit():
-			return nil
-		case blockID := <-processables:
-			err := e.onProcessableBlock(blockID)
-			if err != nil {
-				return fmt.Errorf("could not process block: %w", err)
-			}
+	for blockID := range processables {
+		err := e.onProcessableBlock(blockID)
+		if err != nil {
+			return fmt.Errorf("could not process block: %w", err)
 		}
 	}
+
+	return nil
 }
 
 func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
@@ -360,6 +357,7 @@ func (e *Core) executeConcurrently(executables []*entity.ExecutableBlock) {
 	for _, executable := range executables {
 		func(executable *entity.ExecutableBlock) {
 			e.unit.Launch(func() {
+				e.log.Info().Msgf("starting worker to consume throttled blocks")
 				err := e.execute(executable)
 				if err != nil {
 					e.log.Error().Err(err).Msgf("failed to execute block %v", executable.Block.ID())
