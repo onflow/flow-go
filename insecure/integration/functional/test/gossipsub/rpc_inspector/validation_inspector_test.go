@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"os"
 	"testing"
 	"time"
 
@@ -12,9 +11,9 @@ import (
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/rs/zerolog"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/config"
@@ -88,7 +87,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	}).Return().Times(expectedNumOfTotalNotif)
 
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	topicProvider := newMockUpdatableTopicProvider()
+	topicProvider := p2ptest.NewUpdatableTopicProviderFixture()
 	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 		Logger:                  unittest.Logger(),
 		SporkID:                 sporkID,
@@ -221,7 +220,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 	}).Return().Times(expectedNumOfTotalNotif)
 
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	topicProvider := newMockUpdatableTopicProvider()
+	topicProvider := p2ptest.NewUpdatableTopicProviderFixture()
 	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 		Logger:                  unittest.Logger(),
 		SporkID:                 sporkID,
@@ -312,7 +311,7 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 	}).Return().Times(expectedNumOfTotalNotif)
 
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	topicProvider := newMockUpdatableTopicProvider()
+	topicProvider := p2ptest.NewUpdatableTopicProviderFixture()
 	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 		Logger:                  unittest.Logger(),
 		SporkID:                 sporkID,
@@ -388,9 +387,9 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	// set invalid topic id threshold to 0 so that inspector returns error early
 	inspectorConfig.GraftPrune.InvalidTopicIdThreshold = 0
 
-	// SafetyThreshold < messageCount < HardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
+	// ensure we send a number of message with unknown cluster ids higher than the invalid topic ids threshold
 	// restricting the message count to 1 allows us to only aggregate a single error when the error is logged in the inspector.
-	messageCount := 10
+	messageCount := 60
 	controlMessageCount := int64(1)
 
 	count := atomic.NewInt64(0)
@@ -427,7 +426,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	}).Return().Times(expectedNumOfTotalNotif)
 
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	topicProvider := newMockUpdatableTopicProvider()
+	topicProvider := p2ptest.NewUpdatableTopicProviderFixture()
 	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 		Logger:                  unittest.Logger(),
 		SporkID:                 sporkID,
@@ -491,10 +490,9 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
+	inspectorConfig.GraftPrune.InvalidTopicIdThreshold = 0
 	inspectorConfig.ClusterPrefixedMessage.HardThreshold = 5
 	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
-	// set invalid topic id threshold to 0 so that inspector returns error early
-	inspectorConfig.GraftPrune.InvalidTopicIdThreshold = 0
 
 	count := atomic.NewInt64(0)
 	done := make(chan struct{})
@@ -518,7 +516,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 	}).Return().Once()
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 
-	topicProvider := newMockUpdatableTopicProvider()
+	topicProvider := p2ptest.NewUpdatableTopicProviderFixture()
 	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 		Logger:                  unittest.Logger(),
 		SporkID:                 sporkID,
@@ -573,10 +571,9 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
+	inspectorConfig.GraftPrune.InvalidTopicIdThreshold = 0
 	inspectorConfig.ClusterPrefixedMessage.HardThreshold = 5
 	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
-	// set invalid topic id threshold to 0 so that inspector returns error early
-	inspectorConfig.GraftPrune.InvalidTopicIdThreshold = 0
 
 	count := atomic.NewInt64(0)
 	done := make(chan struct{})
@@ -599,8 +596,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 		}
 	}).Return().Once()
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-
-	topicProvider := newMockUpdatableTopicProvider()
+	topicProvider := p2ptest.NewUpdatableTopicProviderFixture()
 	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 		Logger:                  unittest.Logger(),
 		SporkID:                 sporkID,
@@ -647,58 +643,48 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 }
 
 // TestValidationInspector_Unstaked_Node_Detection ensures that RPC control message inspector disseminates an invalid control message notification when an unstaked peer
-// sends a control message for a cluster prefixed topic.
+// sends an RPC.
 func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
-	// TODO: we must implement checking rpcs for unstaked peers right at the beginning of the inspection process.
-	unittest.SkipUnless(t, unittest.TEST_TODO, "the feature this test is testing is not yet implemented")
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
-	// set hard threshold to 0 so that in the case of invalid cluster ID
-	// we force the inspector to return an error
-	inspectorConfig.ClusterPrefixedMessage.HardThreshold = 0
 	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
-
-	// SafetyThreshold < messageCount < HardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
-	// restricting the message count to 1 allows us to only aggregate a single error when the error is logged in the inspector.
-	messageCount := 10
 	controlMessageCount := int64(1)
 
 	count := atomic.NewInt64(0)
 	done := make(chan struct{})
-	expectedNumOfLogs := 2
-	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.WarnLevel {
-			if message == "control message received from unstaked peer" {
-				count.Inc()
-			}
-		}
-		if count.Load() == int64(expectedNumOfLogs) {
-			close(done)
-		}
-	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
 
 	idProvider := mock.NewIdentityProvider(t)
+	inspectorIDProvider := mock.NewIdentityProvider(t)
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, idProvider)
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
+	unstakedPeerID := unittest.PeerIdFixture(t)
 	consumer := mockp2p.NewGossipSubInvalidControlMessageNotificationConsumer(t)
 	consumer.On("OnInvalidControlMessageNotification", mockery.Anything).Run(func(args mockery.Arguments) {
-		// TODO: here we should assert the notification received
-	}).Return().Once()
+		count.Inc()
+		notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
+		require.True(t, ok)
+		require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType)
+		require.Equal(t, unstakedPeerID, notification.PeerID)
+		require.True(t, validation.IsErrUnstakedPeer(notification.Error))
+		require.Equal(t, notification.MsgType, p2pmsg.CtrlMsgRPC)
+
+		if count.Load() == 2 {
+			close(done)
+		}
+	}).Return()
 
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	topicProvider := newMockUpdatableTopicProvider()
-	inspectorIdProvider := mock.NewIdentityProvider(t)
+	topicProvider := p2ptest.NewUpdatableTopicProviderFixture()
 	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
-		Logger:                  logger,
+		Logger:                  unittest.Logger(),
 		SporkID:                 sporkID,
 		Config:                  &inspectorConfig,
-		IdProvider:              inspectorIdProvider,
+		IdProvider:              inspectorIDProvider,
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		InspectorMetrics:        metrics.NewNoopCollector(),
 		RpcTracker:              meshTracer,
@@ -710,35 +696,35 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
+	// we need to wait until nodes are connected before we can start returning unstaked identity.
+	nodesConnected := atomic.NewBool(false)
 	victimNode, victimIdentity := p2ptest.NodeFixture(t,
 		sporkID,
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(), corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)))
+		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(), corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
+			if nodesConnected.Load() {
+				// after nodes are connected invoke corrupt callback with an unstaked peer ID
+				return corruptInspectorFunc(unstakedPeerID, rpc)
+			}
+			return corruptInspectorFunc(id, rpc)
+		})))
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
-	// we expect 2 calls from notification inspection plus 1 extra call, this is due to messages that are exchanged when the nodes startup
-	inspectorIdProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(nil, false).Times(3)
-
-	// setup cluster prefixed topic with an invalid cluster ID
-	clusterID := flow.ChainID("known-cluster-id")
-	clusterIDTopic := channels.Topic(channels.SyncCluster(clusterID))
-	// consume cluster ID update so that active cluster IDs set
-	validationInspector.ActiveClustersChanged(flow.ChainIDList{clusterID})
-
-	// set topic oracle to return list with all topics to avoid hasSubscription failures and force topic validation
-	topicProvider.UpdateTopics([]string{clusterIDTopic.String()})
+	inspectorIDProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true)
+	inspectorIDProvider.On("ByPeerID", unstakedPeerID).Return(nil, false)
 
 	validationInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
+	nodesConnected.Store(true)
 	spammer.Start(t)
 	defer stopComponents(t, cancel, nodes, validationInspector)
 
-	// prepare to spam - generate control messages
-	graftCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(controlMessageCount), p2ptest.WithGraft(messageCount, clusterIDTopic.String()))
-	pruneCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(controlMessageCount), p2ptest.WithPrune(messageCount, clusterIDTopic.String()))
+	// prepare to spam - generate control messages each of which will be immediately rejected because the sender is unstaked
+	graftCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(controlMessageCount), p2ptest.WithGraft(10, ""))
+	pruneCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(controlMessageCount), p2ptest.WithPrune(10, ""))
 
 	// start spamming the victim peer
 	spammer.SpamControlMessage(t, victimNode, graftCtlMsgsDuplicateTopic)
@@ -785,7 +771,7 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 	}).Return().Once()
 
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	topicProvider := newMockUpdatableTopicProvider()
+	topicProvider := p2ptest.NewUpdatableTopicProviderFixture()
 	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 		Logger:                  unittest.Logger(),
 		SporkID:                 sporkID,
@@ -905,8 +891,8 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 			notification.Error.Error(),
 			fmt.Sprintf("%d error(s) encountered", len(invalidPublishMsgs)),
 			fmt.Sprintf("expected %d errors, an error for each invalid pubsub message", len(invalidPublishMsgs)))
-		require.Contains(t, notification.Error.Error(), fmt.Sprintf("received rpc publish message from unstaked peer: %s", unknownPeerID))
-		require.Contains(t, notification.Error.Error(), fmt.Sprintf("received rpc publish message from ejected peer: %s", ejectedIdentityPeerID))
+		require.Contains(t, notification.Error.Error(), fmt.Sprintf("unstaked peer: %s", unknownPeerID))
+		require.Contains(t, notification.Error.Error(), fmt.Sprintf("ejected peer: %s", ejectedIdentityPeerID))
 		notificationCount.Inc()
 		if notificationCount.Load() == 1 {
 			close(done)
@@ -914,7 +900,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	}).Return().Once()
 
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	topicProvider := newMockUpdatableTopicProvider()
+	topicProvider := p2ptest.NewUpdatableTopicProviderFixture()
 	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 		Logger:                  unittest.Logger(),
 		SporkID:                 sporkID,
@@ -935,12 +921,10 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	for i := 0; i < len(publishMsgs); i++ {
 		topics[i] = publishMsgs[i].GetTopic()
 	}
-	topicProvider.UpdateTopics(topics)
 
+	topicProvider.UpdateTopics(topics)
 	// after 7 errors encountered disseminate a notification
 	inspectorConfig.PublishMessages.ErrorThreshold = 6
-
-	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(t,
 		sporkID,
@@ -955,9 +939,6 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	idProvider.On("ByPeerID", unknownPeerID).Return(nil, false).Once()
 	// return ejected identity for peer ID will force message validation failure
 	idProvider.On("ByPeerID", ejectedIdentityPeerID).Return(ejectedIdentity, true).Once()
-
-	// set topic oracle to return list with all topics to avoid hasSubscription failures and force topic validation
-	topicProvider.UpdateTopics([]string{topic.String(), unknownTopic, malformedTopic, invalidSporkIDTopic})
 
 	validationInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
@@ -1124,37 +1105,4 @@ func testGossipSubSpamMitigationIntegration(t *testing.T, msgType p2pmsg.Control
 		func() interface{} {
 			return unittest.ProposalFixture()
 		})
-}
-
-// mockUpdatableTopicProvider is a mock implementation of the TopicProvider interface.
-// TODO: there is a duplicate implementation of this in the test package, we should consolidate them.
-// The duplicate exists in network/p2p/inspector/internal/mockTopicProvider.go. The reason for duplication is that
-// the inspector/validation package does not have a separate test package. Hence, sharing the mock implementation
-// will cause a cyclic dependency.
-type mockUpdatableTopicProvider struct {
-	topics        []string
-	subscriptions map[string][]peer.ID
-}
-
-func newMockUpdatableTopicProvider() *mockUpdatableTopicProvider {
-	return &mockUpdatableTopicProvider{
-		topics:        []string{},
-		subscriptions: map[string][]peer.ID{},
-	}
-}
-
-func (m *mockUpdatableTopicProvider) GetTopics() []string {
-	return m.topics
-}
-
-func (m *mockUpdatableTopicProvider) ListPeers(topic string) []peer.ID {
-	return m.subscriptions[topic]
-}
-
-func (m *mockUpdatableTopicProvider) UpdateTopics(topics []string) {
-	m.topics = topics
-}
-
-func (m *mockUpdatableTopicProvider) UpdateSubscriptions(topic string, peers []peer.ID) {
-	m.subscriptions[topic] = peers
 }

@@ -432,6 +432,11 @@ func (_m *NetworkMetrics) OnRpcReceived(msgCount int, iHaveCount int, iWantCount
 	_m.Called(msgCount, iHaveCount, iWantCount, graftCount, pruneCount)
 }
 
+// OnRpcRejectedFromUnknownSender provides a mock function with given fields:
+func (_m *NetworkMetrics) OnRpcRejectedFromUnknownSender() {
+	_m.Called()
+}
+
 // OnRpcSent provides a mock function with given fields: msgCount, iHaveCount, iWantCount, graftCount, pruneCount
 func (_m *NetworkMetrics) OnRpcSent(msgCount int, iHaveCount int, iWantCount int, graftCount int, pruneCount int) {
 	_m.Called(msgCount, iHaveCount, iWantCount, graftCount, pruneCount)
