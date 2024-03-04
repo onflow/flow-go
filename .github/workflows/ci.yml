@@ -146,7 +146,7 @@ jobs:
         name: codecov-umbrella
 
   unit-test-insecure:
-    name: Unit Tests (${{ matrix.targets.name }})
+    name: Unit Tests Insecure (${{ matrix.targets.name }})
     needs: create-dynamic-test-matrix
     strategy:
       fail-fast: false
