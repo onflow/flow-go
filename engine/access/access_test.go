@@ -656,6 +656,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
 			Communicator:              backend.NewNodeCommunicator(false),
 			TxErrorMessagesCacheSize:  1000,
+			TxResultQueryMode:         backend.IndexQueryModeExecutionNodesOnly,
 		})
 		require.NoError(suite.T(), err)
 
@@ -804,6 +805,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
 			Communicator:              backend.NewNodeCommunicator(false),
 			TxErrorMessagesCacheSize:  1000,
+			TxResultQueryMode:         backend.IndexQueryModeExecutionNodesOnly,
 		})
 		require.NoError(suite.T(), err)
 
@@ -1007,6 +1009,7 @@ func (suite *Suite) TestExecuteScript() {
 			Communicator:             backend.NewNodeCommunicator(false),
 			ScriptExecutionMode:      backend.IndexQueryModeExecutionNodesOnly,
 			TxErrorMessagesCacheSize: 1000,
+			TxResultQueryMode:        backend.IndexQueryModeExecutionNodesOnly,
 		})
 		require.NoError(suite.T(), err)
 

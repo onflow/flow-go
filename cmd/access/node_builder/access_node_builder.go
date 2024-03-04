@@ -188,6 +188,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 				},
 				ScriptExecutionMode: backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
 				EventQueryMode:      backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				TxResultQueryMode:   backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
 			},
 			RestConfig: rest.Config{
 				ListenAddress: "",
@@ -283,6 +284,7 @@ type FlowAccessNodeBuilder struct {
 	ScriptExecutor             *backend.ScriptExecutor
 	RegistersAsyncStore        *execution.RegistersAsyncStore
 	EventsIndex                *backend.EventsIndex
+	TxResultsIndex             *backend.TransactionResultsIndex
 	IndexerDependencies        *cmd.DependencyList
 	collectionExecutedMetric   module.CollectionExecutedMetric
 
@@ -841,6 +843,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, err
 				}
 
+				err = builder.TxResultsIndex.Initialize(builder.ExecutionIndexer)
+				if err != nil {
+					return nil, err
+				}
+
 				err = builder.RegistersAsyncStore.Initialize(registers)
 				if err != nil {
 					return nil, err
@@ -936,7 +943,6 @@ func FlowAccessNode(nodeBuilder *cmd.FlowNodeBuilder) *FlowAccessNodeBuilder {
 }
 
 func (builder *FlowAccessNodeBuilder) ParseFlags() error {
-
 	builder.BaseFlags()
 
 	builder.extraFlags()
@@ -1143,6 +1149,11 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			defaultConfig.rpcConf.BackendConfig.EventQueryMode,
 			"mode to use when querying events. one of [local-only, execution-nodes-only(default), failover]")
 
+		flags.StringVar(&builder.rpcConf.BackendConfig.TxResultQueryMode,
+			"tx-result-query-mode",
+			defaultConfig.rpcConf.BackendConfig.TxResultQueryMode,
+			"mode to use when querying transaction results. one of [local-only, execution-nodes-only(default), failover]")
+
 		// Script Execution
 		flags.StringVar(&builder.rpcConf.BackendConfig.ScriptExecutionMode,
 			"script-execution-mode",
@@ -1172,7 +1183,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"script-execution-max-height",
 			defaultConfig.scriptExecMaxBlock,
 			"highest block height to allow for script execution. default: no limit")
-
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -1517,6 +1527,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.EventsIndex = backend.NewEventsIndex(builder.Storage.Events)
 			return nil
 		}).
+		Module("transaction result index", func(node *cmd.NodeConfig) error {
+			builder.TxResultsIndex = backend.NewTransactionResultsIndex(builder.Storage.LightTransactionResults)
+			return nil
+		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			config := builder.rpcConf
 			backendConfig := config.BackendConfig
@@ -1556,10 +1570,18 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			eventQueryMode, err := backend.ParseIndexQueryMode(config.BackendConfig.EventQueryMode)
 			if err != nil {
-				return nil, fmt.Errorf("could not parse script execution mode: %w", err)
+				return nil, fmt.Errorf("could not parse event query mode: %w", err)
 			}
 			if eventQueryMode == backend.IndexQueryModeCompare {
 				return nil, fmt.Errorf("event query mode 'compare' is not supported")
+			}
+
+			txResultQueryMode, err := backend.ParseIndexQueryMode(config.BackendConfig.TxResultQueryMode)
+			if err != nil {
+				return nil, fmt.Errorf("could not parse transaction result query mode: %w", err)
+			}
+			if txResultQueryMode == backend.IndexQueryModeCompare {
+				return nil, fmt.Errorf("transaction result query mode 'compare' is not supported")
 			}
 
 			nodeBackend, err := backend.New(backend.Params{
@@ -1588,6 +1610,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ScriptExecutionMode:       scriptExecMode,
 				EventQueryMode:            eventQueryMode,
 				EventsIndex:               builder.EventsIndex,
+				TxResultQueryMode:         txResultQueryMode,
+				TxResultsIndex:            builder.TxResultsIndex,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
@@ -1716,7 +1740,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.nodeInfoFile,
 			node.PingService,
 		)
-
 		if err != nil {
 			return nil, fmt.Errorf("could not create ping engine: %w", err)
 		}
@@ -1818,7 +1841,8 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 // - The libp2p node instance for the public network.
 // - Any error encountered during initialization. Any error should be considered fatal.
 func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.PrivateKey, bindAddress string, networkMetrics module.LibP2PMetrics) (p2p.LibP2PNode,
-	error) {
+	error,
+) {
 	connManager, err := connection.NewConnManager(builder.Logger, networkMetrics, &builder.FlowConfig.NetworkConfig.ConnectionManager)
 	if err != nil {
 		return nil, fmt.Errorf("could not create connection manager: %w", err)
@@ -1854,7 +1878,6 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 			return dht.NewDHT(ctx, h, protocols.FlowPublicDHTProtocolID(builder.SporkID), builder.Logger, networkMetrics, dht.AsServer())
 		}).
 		Build()
-
 	if err != nil {
 		return nil, fmt.Errorf("could not build libp2p node for staked access node: %w", err)
 	}
