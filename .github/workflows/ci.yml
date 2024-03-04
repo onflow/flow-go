@@ -145,13 +145,15 @@ jobs:
         flags: unittests
         name: codecov-umbrella
 
-  unit-test-module-insecure:
-    name: Unit Tests (Insecure)
+  unit-test-insecure:
+    name: Unit Tests (${{ matrix.targets.name }})
+    needs: create-dynamic-test-matrix
     strategy:
       fail-fast: false
       matrix:
         targets: ${{ fromJSON(needs.create-insecure-dynamic-test-matrix.outputs.dynamic-matrix)}}
-    runs-on: ${{ matrix.runner }}
+    ## need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
+    runs-on: ${{ matrix.targets.runner }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -161,18 +163,17 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-      - name: Setup tests (${{ matrix.name }})
-        run: make ${{ matrix.setup }}
-      - name: Run tests (${{ matrix.name }})
-        # TODO(rbtz): re-enable when we fix exisiting races.
-        #env:
-        #  RACE_DETECTOR: 1
+      - name: Setup tests (${{ matrix.targets.name }})
+        run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
+      - name: Run tests (${{ matrix.targets.name }})
         uses: nick-fields/retry@v2
         with:
           timeout_minutes: 35
-          max_attempts: ${{ matrix.retries }}
-          # run test target inside each module's root
-          command: VERBOSE=1 make -C ${{ matrix.name }} test
+          max_attempts: 5
+          command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
+        # TODO(rbtz): re-enable when we fix exisiting races.
+        #env:
+        #  RACE_DETECTOR: 1
       - name: Upload coverage report
         uses: codecov/codecov-action@v3
         with:
