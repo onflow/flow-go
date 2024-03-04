@@ -58,7 +58,7 @@ type Suite struct {
 	finalizedBlock *flow.Header
 	log            zerolog.Logger
 
-	collectionExecutedMetric *indexer.CollectionExecutedMetric
+	collectionExecutedMetric *indexer.CollectionExecutedMetricImpl
 
 	eng    *Engine
 	cancel context.CancelFunc
@@ -118,16 +118,17 @@ func (s *Suite) SetupTest() {
 	blocksToMarkExecuted, err := stdmap.NewTimes(100)
 	require.NoError(s.T(), err)
 
-	s.collectionExecutedMetric, err = indexer.NewCollectionExecutedMetric(
+	s.collectionExecutedMetric, err = indexer.NewCollectionExecutedMetricImpl(
+		s.log,
 		metrics.NewNoopCollector(),
 		collectionsToMarkFinalized,
 		collectionsToMarkExecuted,
+		blocksToMarkExecuted,
 	)
 	require.NoError(s.T(), err)
 
 	eng, err := New(s.log, net, s.proto.state, s.me, s.request, s.blocks, s.headers, s.collections,
-		s.transactions, s.results, s.receipts, metrics.NewNoopCollector(), collectionsToMarkFinalized, collectionsToMarkExecuted,
-		blocksToMarkExecuted)
+		s.transactions, s.results, s.receipts, s.collectionExecutedMetric)
 	require.NoError(s.T(), err)
 
 	s.blocks.On("GetLastFullBlockHeight").Once().Return(uint64(0), errors.New("do nothing"))

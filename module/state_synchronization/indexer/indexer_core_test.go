@@ -183,15 +183,21 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 	require.NoError(i.t, err)
 	collectionsToMarkExecuted, err := stdmap.NewTimes(100)
 	require.NoError(i.t, err)
+	blocksToMarkExecuted, err := stdmap.NewTimes(100)
+	require.NoError(i.t, err)
 
-	collectionExecutedMetric, err := NewCollectionExecutedMetric(
+	log := zerolog.New(os.Stdout)
+
+	collectionExecutedMetric, err := NewCollectionExecutedMetricImpl(
+		log,
 		metrics.NewNoopCollector(),
 		collectionsToMarkFinalized,
 		collectionsToMarkExecuted,
+		blocksToMarkExecuted,
 	)
 	require.NoError(i.t, err)
 
-	indexer, err := New(zerolog.New(os.Stdout), metrics.NewNoopCollector(), db, i.registers, i.headers, i.events,
+	indexer, err := New(log, metrics.NewNoopCollector(), db, i.registers, i.headers, i.events,
 		i.collections, i.transactions, i.results, collectionExecutedMetric)
 	require.NoError(i.t, err)
 	i.indexer = indexer

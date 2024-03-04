@@ -13,30 +13,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/logging"
 )
-
-// CollectionExecutedMetric  tracks metrics to measure how long it takes for tx to reach each step in their lifecycle
-type CollectionExecutedMetric struct {
-	accessMetrics              module.AccessMetrics
-	collectionsToMarkFinalized *stdmap.Times
-	collectionsToMarkExecuted  *stdmap.Times
-}
-
-func NewCollectionExecutedMetric(
-	accessMetrics module.AccessMetrics,
-	collectionsToMarkFinalized *stdmap.Times,
-	collectionsToMarkExecuted *stdmap.Times,
-) (*CollectionExecutedMetric, error) {
-	return &CollectionExecutedMetric{
-		accessMetrics:              accessMetrics,
-		collectionsToMarkFinalized: collectionsToMarkFinalized,
-		collectionsToMarkExecuted:  collectionsToMarkExecuted,
-	}, nil
-}
 
 // IndexerCore indexes the execution state.
 type IndexerCore struct {
@@ -51,7 +31,7 @@ type IndexerCore struct {
 	results      storage.LightTransactionResults
 	batcher      bstorage.BatchBuilder
 
-	collectionExecutedMetric *CollectionExecutedMetric
+	collectionExecutedMetric module.CollectionExecutedMetric
 }
 
 // New execution state indexer used to ingest block execution data and index it by height.
@@ -67,7 +47,7 @@ func New(
 	collections storage.Collections,
 	transactions storage.Transactions,
 	results storage.LightTransactionResults,
-	collectionExecutedMetric *CollectionExecutedMetric,
+	collectionExecutedMetric module.CollectionExecutedMetric,
 ) (*IndexerCore, error) {
 	log = log.With().Str("component", "execution_indexer").Logger()
 	metrics.InitializeLatestHeight(registers.LatestHeight())
@@ -288,37 +268,20 @@ func (c *IndexerCore) indexRegisters(registers map[ledger.Path]*ledger.Payload, 
 	return c.registers.Store(regEntries, height)
 }
 
-func (c *CollectionExecutedMetric) trackCollectionsToMarkFinalized(light flow.LightCollection) {
-	if ti, found := c.collectionsToMarkFinalized.ByID(light.ID()); found {
-		for _, t := range light.Transactions {
-			c.accessMetrics.TransactionFinalized(t, ti)
-		}
-		c.collectionsToMarkFinalized.Remove(light.ID())
-	}
-}
-
-func (c *CollectionExecutedMetric) trackCollectionsToMarkExecuted(light flow.LightCollection) {
-	if ti, found := c.collectionsToMarkExecuted.ByID(light.ID()); found {
-		for _, t := range light.Transactions {
-			c.accessMetrics.TransactionExecuted(t, ti)
-		}
-		c.collectionsToMarkExecuted.Remove(light.ID())
-	}
-}
-
-// HandleCollection handles the response of the a collection request made earlier when a block was received
+// HandleCollection handles the response of the a collection request made earlier when a block was received.
+// No errors expected during normal operations.
 func HandleCollection(
 	collection *flow.Collection,
 	collections storage.Collections,
 	transactions storage.Transactions,
 	logger zerolog.Logger,
-	collectionExecutedMetric *CollectionExecutedMetric,
+	collectionExecutedMetric module.CollectionExecutedMetric,
 ) error {
 
 	light := collection.Light()
 
-	collectionExecutedMetric.trackCollectionsToMarkFinalized(light)
-	collectionExecutedMetric.trackCollectionsToMarkExecuted(light)
+	collectionExecutedMetric.TrackFinalized(light)
+	collectionExecutedMetric.TrackExecuted(light)
 
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized

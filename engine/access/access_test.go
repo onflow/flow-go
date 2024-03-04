@@ -661,9 +661,18 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		handler := access.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
 
+		collectionExecutedMetric, err := indexer.NewCollectionExecutedMetricImpl(
+			suite.log,
+			metrics,
+			collectionsToMarkFinalized,
+			collectionsToMarkExecuted,
+			blocksToMarkExecuted,
+		)
+		require.NoError(suite.T(), err)
+
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
-			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted)
+			transactions, results, receipts, collectionExecutedMetric)
 		require.NoError(suite.T(), err)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
@@ -684,13 +693,6 @@ func (suite *Suite) TestGetSealedTransaction() {
 			BlockID: block.ID(),
 		}
 		ingestEng.OnFinalizedBlock(mb)
-
-		collectionExecutedMetric, err := indexer.NewCollectionExecutedMetric(
-			metrics,
-			collectionsToMarkFinalized,
-			collectionsToMarkExecuted,
-		)
-		require.NoError(suite.T(), err)
 
 		// 3. Request engine is used to request missing collection
 		suite.request.On("EntityByID", collection.ID(), mock.Anything).Return()
@@ -807,9 +809,18 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		handler := access.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
 
+		collectionExecutedMetric, err := indexer.NewCollectionExecutedMetricImpl(
+			suite.log,
+			metrics,
+			collectionsToMarkFinalized,
+			collectionsToMarkExecuted,
+			blocksToMarkExecuted,
+		)
+		require.NoError(suite.T(), err)
+
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
-			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted)
+			transactions, results, receipts, collectionExecutedMetric)
 		require.NoError(suite.T(), err)
 
 		background, cancel := context.WithCancel(context.Background())
@@ -833,13 +844,6 @@ func (suite *Suite) TestGetTransactionResult() {
 				BlockID: block.ID(),
 			}
 			ingestEng.OnFinalizedBlock(mb)
-
-			collectionExecutedMetric, err := indexer.NewCollectionExecutedMetric(
-				metrics,
-				collectionsToMarkFinalized,
-				collectionsToMarkExecuted,
-			)
-			require.NoError(suite.T(), err)
 
 			// Indexer HandleCollection receives the requested collection and all the execution receipts
 			err = indexer.HandleCollection(collection, collections, transactions, suite.log, collectionExecutedMetric)
@@ -1017,12 +1021,21 @@ func (suite *Suite) TestExecuteScript() {
 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
 
+		collectionExecutedMetric, err := indexer.NewCollectionExecutedMetricImpl(
+			suite.log,
+			metrics,
+			collectionsToMarkFinalized,
+			collectionsToMarkExecuted,
+			blocksToMarkExecuted,
+		)
+		require.NoError(suite.T(), err)
+
 		conduit := new(mocknetwork.Conduit)
 		suite.net.On("Register", channels.ReceiveReceipts, mock.Anything).Return(conduit, nil).
 			Once()
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
-			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted)
+			transactions, results, receipts, collectionExecutedMetric)
 		require.NoError(suite.T(), err)
 
 		// create another block as a predecessor of the block created earlier
