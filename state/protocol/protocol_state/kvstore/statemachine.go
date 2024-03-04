@@ -3,6 +3,7 @@ package kvstore
 import (
 	"fmt"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 )
 
@@ -37,14 +38,14 @@ func (m *ProcessingStateMachine) ProcessUpdate(update *flow.ServiceEvent) error 
 			return fmt.Errorf("internal invalid type for ProtocolStateVersionUpgrade: %T", update.Event)
 		}
 
-		if m.parentState.GetProtocolStateVersion() >= versionUpgrade.NewProtocolStateVersion {
-			return fmt.Errorf("invalid protocol state version upgrade: %d -> %d",
-				m.parentState.GetVersionUpgrade(), versionUpgrade.NewProtocolStateVersion)
+		if m.view >= versionUpgrade.ActiveView {
+			return protocol.NewInvalidServiceEventErrorf("invalid protocol state version upgrade view %d -> %d: %w",
+				m.view, versionUpgrade.ActiveView, ErrInvalidActivationView)
 		}
 
-		if m.view >= versionUpgrade.ActiveView {
-			return fmt.Errorf("invalid protocol state version upgrade: view %d -> %d",
-				m.view, versionUpgrade.ActiveView)
+		if m.parentState.GetProtocolStateVersion() >= versionUpgrade.NewProtocolStateVersion {
+			return protocol.NewInvalidServiceEventErrorf("invalid protocol state version upgrade %d -> %d: %w",
+				m.parentState.GetProtocolStateVersion(), versionUpgrade.NewProtocolStateVersion, ErrInvalidUpgradeVersion)
 		}
 
 		activator := &protocol_state.ViewBasedActivator[uint64]{

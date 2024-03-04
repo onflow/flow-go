@@ -1,6 +1,7 @@
 package kvstore
 
 import (
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -74,7 +75,8 @@ func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
 
 		se := upgrade.ServiceEvent()
 		err := s.stateMachine.ProcessUpdate(&se)
-		require.Error(s.T(), err)
+		require.ErrorIs(s.T(), err, ErrInvalidUpgradeVersion)
+		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("invalid-activation-view", func() {
 		upgrade := unittest.ProtocolStateVersionUpgradeFixture()
@@ -82,6 +84,7 @@ func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
 
 		se := upgrade.ServiceEvent()
 		err := s.stateMachine.ProcessUpdate(&se)
-		require.Error(s.T(), err)
+		require.ErrorIs(s.T(), err, ErrInvalidActivationView)
+		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 }
