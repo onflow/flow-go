@@ -62,9 +62,9 @@ func (ch *Chunk) Checksum() Identifier {
 //
 // Note that we have to include merkle paths as storage proof for all registers touched (read or written) for
 // the _starting_ state of the chunk (i.e. before the chunk computation updates the registers).
-// For instance, if an execution state contains three registers: { A: 1, B: 2, C: 3}, and a certain 
-// chunk has a tx to execute A = A + B, then its chunk data pack should include the merkle 
-// paths for { A: 1, B: 2 } as storage proof. 
+// For instance, if an execution state contains three registers: { A: 1, B: 2, C: 3}, and a certain
+// chunk has a tx that assigns A = A + B, then its chunk data pack should include the merkle
+// paths for { A: 1, B: 2 } as storage proof.
 // C is not included because it's neither read or written by the chunk.
 // B is included because it's read by the chunk.
 // A is included because it's updated by the chunk, and its value 1 is included because it's
