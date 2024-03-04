@@ -94,10 +94,32 @@ func TestDeploy(t *testing.T) {
 		zerolog.New(zerolog.NewTestWriter(t)),
 	)
 
-	payloads, err := newBootstrapPayloads(chainID)
+	bootstrapPayloads, err := newBootstrapPayloads(chainID)
 	require.NoError(t, err)
 
-	newPayloads, err := migration(payloads)
+	filteredPayloads := make([]*ledger.Payload, 0, len(bootstrapPayloads))
+
+	// TODO: move to NewTransactionBasedMigration
+
+	// Filter the bootstrapped payloads to only include the target account (service account)
+	// and the account where the fungible token is deployed
+
+	for _, payload := range bootstrapPayloads {
+		registerID, _, err := convert.PayloadToRegister(payload)
+		require.NoError(t, err)
+
+		if len(registerID.Owner) > 0 {
+			registerAddress := flow.Address([]byte(registerID.Owner))
+			switch registerAddress {
+			case targetAddress, fungibleTokenAddress:
+				filteredPayloads = append(filteredPayloads, payload)
+			}
+		} else {
+			filteredPayloads = append(filteredPayloads, payload)
+		}
+	}
+
+	newPayloads, err := migration(filteredPayloads)
 	require.NoError(t, err)
 
 	txBody := flow.NewTransactionBody().
