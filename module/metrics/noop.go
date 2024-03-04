@@ -338,6 +338,7 @@ func (nc *NoopCollector) OnInvalidTopicIdDetectedForControlMessage(messageType p
 func (nc *NoopCollector) OnActiveClusterIDsNotSetErr()                                   {}
 func (nc *NoopCollector) OnUnstakedPeerInspectionFailed()                                {}
 func (nc *NoopCollector) OnInvalidControlMessageNotificationSent()                       {}
+func (nc *NoopCollector) OnRpcRejectedFromUnknownSender()                                {}
 func (nc *NoopCollector) OnPublishMessagesInspectionErrorExceedsThreshold()              {}
 func (nc *NoopCollector) OnPruneDuplicateTopicIdsExceedThreshold()                       {}
 func (nc *NoopCollector) OnPruneInvalidTopicIdsExceedThreshold()                         {}
