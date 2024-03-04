@@ -190,6 +190,9 @@ func (dr *CadenceValueDiffReporter) diffStorageDomain(oldRuntime, newRuntime *re
 		case interpreter.StringAtreeValue:
 			mapKey = interpreter.StringStorageMapKey(key)
 
+		case interpreter.Uint64AtreeValue:
+			mapKey = interpreter.Uint64StorageMapKey(key)
+
 		case interpreter.StringStorageMapKey:
 			mapKey = key
 
