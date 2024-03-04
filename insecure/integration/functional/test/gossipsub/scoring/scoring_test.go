@@ -2,14 +2,12 @@ package scoring
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/config"
@@ -96,8 +94,6 @@ func TestGossipSubInvalidMessageDelivery_Integration(t *testing.T) {
 // - t: the test instance.
 // - spamMsgFactory: a function that creates unique invalid messages to spam the victim with.
 func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory func(peer.ID, peer.ID, channels.Topic) *pubsub_pb.Message) {
-	logger := zerolog.New(os.Stdout).Level(zerolog.TraceLevel)
-
 	role := flow.RoleConsensus
 	sporkId := unittest.IdentifierFixture()
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
@@ -119,8 +115,7 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		p2ptest.OverrideFlowConfig(cfg),
-		p2ptest.WithLogger(logger))
+		p2ptest.OverrideFlowConfig(cfg))
 
 	ids := flow.IdentityList{&spammer.SpammerId, &victimIdentity}
 	idProvider.SetIdentities(ids)

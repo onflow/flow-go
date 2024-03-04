@@ -19,7 +19,7 @@
       {"name": "engine/verification"},
       {"name": "engine/execution/ingestion", "runner":  "buildjet-8vcpu-ubuntu-2004"}
     ]},
-    {"name":  "module", "runner":  "buildjet-4vcpu-ubuntu-2204" ,"subpackages": [{"name": "module/dkg"}]},
+    {"name":  "module", "runner":  "buildjet-4vcpu-ubuntu-2004" ,"subpackages": [{"name": "module/dkg"}]},
     {"name":  "network", "subpackages": [
       {"name": "network/alsp"},
       {"name": "network/p2p/connection"},

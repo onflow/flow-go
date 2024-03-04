@@ -199,45 +199,6 @@ jobs:
           flags: unittests
           name: codecov-umbrella
 
-  unit-test-modules:
-    name: Unit Tests (Modules)
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: integration
-            setup: install-tools
-            retries: 5
-            race: 0
-            runner: buildjet-4vcpu-ubuntu-2204
-    runs-on: ${{ matrix.runner }}
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-      - name: Setup tests (${{ matrix.name }})
-        run: make ${{ matrix.setup }}
-      - name: Run tests (${{ matrix.name }})
-        env:
-          RACE_DETECTOR: ${{ matrix.race }}
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 35
-          max_attempts: ${{ matrix.retries }}
-          # run test target inside each module's root
-          command: VERBOSE=1 make -C ${{ matrix.name }} test
-      - name: Upload coverage report
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage.txt
-          flags: unittests
-          name: codecov-umbrella
-
   docker-build:
     name: Docker Build
     runs-on: buildjet-16vcpu-ubuntu-2204
@@ -280,7 +241,7 @@ jobs:
           key: flow-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}
 
   integration-test-others:
-    name: Integration Test Others (${{ matrix.targets.name }})
+    name: Integration Tests Others (${{ matrix.targets.name }})
     needs: create-integration-dynamic-test-matrix
     strategy:
       fail-fast: false

@@ -24,6 +24,12 @@ var (
 	matrixConfigFile string
 )
 
+const (
+	flowPackagePrefix = "github.com/onflow/flow-go/"
+	ciMatrixName      = "dynamicMatrix"
+	defaultCIRunner   = "ubuntu-20.04"
+)
+
 // flowGoPackage configuration for a package to be tested.
 type flowGoPackage struct {
 	// Name the name of the package where test are located.
@@ -74,13 +80,8 @@ func newTestMatrix(name, runner string) *testMatrix {
 	return t
 }
 
-const flowPackagePrefix = "github.com/onflow/flow-go/"
-const ciMatrixName = "dynamicMatrix"
-const defaultCIRunner = "ubuntu-20.04"
-
 // Generates a list of packages to test that will be passed to GitHub Actions
 func main() {
-	// Parse command-line arguments
 	pflag.Parse()
 
 	var configFile string

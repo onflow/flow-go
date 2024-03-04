@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"os"
 	"testing"
 	"time"
 
@@ -12,7 +11,6 @@ import (
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/rs/zerolog"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
@@ -981,8 +979,6 @@ func TestGossipSubSpamMitigationIntegration_IHaves(t *testing.T) {
 // The victim node is configured to use the GossipSubInspector to detect spam and the scoring system to mitigate spam.
 // The test ensures that the victim node is disconnected from the spammer node on the GossipSub mesh after the spam detection is triggered.
 func testGossipSubSpamMitigationIntegration(t *testing.T, msgType p2pmsg.ControlMessageType) {
-	logger := zerolog.New(os.Stdout).Level(zerolog.TraceLevel)
-	logger.Trace().Msg(fmt.Sprintf("STARTING GOSSIPSUB SPAM MITIGATION: %s", msgType.String()))
 	idProvider := mock.NewIdentityProvider(t)
 	sporkID := unittest.IdentifierFixture()
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, flow.RoleConsensus, idProvider)
@@ -1001,8 +997,7 @@ func testGossipSubSpamMitigationIntegration(t *testing.T, msgType p2pmsg.Control
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
-		p2ptest.OverrideFlowConfig(cfg),
-		p2ptest.WithLogger(logger))
+		p2ptest.OverrideFlowConfig(cfg))
 
 	ids := flow.IdentityList{&victimId, &spammer.SpammerId}
 	idProvider.On("ByPeerID", mockery.Anything).Return(func(peerId peer.ID) *flow.Identity {
@@ -1108,5 +1103,4 @@ func testGossipSubSpamMitigationIntegration(t *testing.T, msgType p2pmsg.Control
 		func() interface{} {
 			return unittest.ProposalFixture()
 		})
-	logger.Trace().Msg(fmt.Sprintf("FINISHED GOSSIPSUB SPAM MITIGATION: %s", msgType.String()))
 }
