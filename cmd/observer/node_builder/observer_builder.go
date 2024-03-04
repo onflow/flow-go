@@ -206,20 +206,19 @@ type ObserverServiceBuilder struct {
 	*ObserverServiceConfig
 
 	// components
-	LibP2PNode               p2p.LibP2PNode
-	FollowerState            stateprotocol.FollowerState
-	SyncCore                 *chainsync.Core
-	RpcEng                   *rpc.Engine
-	FollowerDistributor      *pubsub.FollowerDistributor
-	Committee                hotstuff.DynamicCommittee
-	Finalized                *flow.Header
-	Pending                  []*flow.Header
-	FollowerCore             module.HotStuffFollower
-	ExecutionDataRequester   state_synchronization.ExecutionDataRequester
-	ExecutionIndexer         *indexer.Indexer
-	ExecutionIndexerCore     *indexer.IndexerCore
-	IndexerDependencies      *cmd.DependencyList
-	collectionExecutedMetric module.CollectionExecutedMetric
+	LibP2PNode             p2p.LibP2PNode
+	FollowerState          stateprotocol.FollowerState
+	SyncCore               *chainsync.Core
+	RpcEng                 *rpc.Engine
+	FollowerDistributor    *pubsub.FollowerDistributor
+	Committee              hotstuff.DynamicCommittee
+	Finalized              *flow.Header
+	Pending                []*flow.Header
+	FollowerCore           module.HotStuffFollower
+	ExecutionDataRequester state_synchronization.ExecutionDataRequester
+	ExecutionIndexer       *indexer.Indexer
+	ExecutionIndexerCore   *indexer.IndexerCore
+	IndexerDependencies    *cmd.DependencyList
 
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
@@ -1192,6 +1191,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 			builder.Storage.RegisterIndex = registers
 
+			var collectionExecutedMetric module.CollectionExecutedMetric = metrics.NewNoopCollector()
 			indexerCore, err := indexer.New(
 				builder.Logger,
 				metrics.NewExecutionStateIndexerCollector(),
@@ -1202,7 +1202,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Storage.Collections,
 				builder.Storage.Transactions,
 				builder.Storage.LightTransactionResults,
-				builder.collectionExecutedMetric,
+				collectionExecutedMetric,
 			)
 			if err != nil {
 				return nil, err
@@ -1319,11 +1319,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return err
 		}
 		builder.RestMetrics = m
-		return nil
-	})
-	builder.Module("transaction timing mempools", func(node *cmd.NodeConfig) error {
-		var collectionExecutedMetric module.CollectionExecutedMetric = metrics.NewNoopCollector()
-		builder.collectionExecutedMetric = collectionExecutedMetric
 		return nil
 	})
 	builder.Module("access metrics", func(node *cmd.NodeConfig) error {
