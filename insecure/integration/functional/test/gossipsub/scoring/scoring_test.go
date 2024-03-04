@@ -35,7 +35,6 @@ func TestGossipSubInvalidMessageDelivery_Integration(t *testing.T) {
 		spamMsgFactory func(spammerId peer.ID, victimId peer.ID, topic channels.Topic) *pubsub_pb.Message
 	}{
 		{
-
 			name: "unknown peer, invalid signature",
 			spamMsgFactory: func(spammerId peer.ID, _ peer.ID, topic channels.Topic) *pubsub_pb.Message {
 				return p2ptest.PubsubMessageFixture(t, p2ptest.WithTopic(topic.String()))
