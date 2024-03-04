@@ -76,7 +76,7 @@ func newTestMatrix(name, runner string) *testMatrix {
 
 const flowPackagePrefix = "github.com/onflow/flow-go/"
 const ciMatrixName = "dynamicMatrix"
-const defaultCIRunner = "ubuntu-latest"
+const defaultCIRunner = "ubuntu-20.04"
 
 // Generates a list of packages to test that will be passed to GitHub Actions
 func main() {

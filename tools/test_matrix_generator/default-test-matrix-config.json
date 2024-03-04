@@ -27,7 +27,7 @@
       {"name": "network/p2p"},
       {"name": "network/test/cohort1", "runner":  "buildjet-16vcpu-ubuntu-2204"},
       {"name": "network/test/cohort2", "runner":  "buildjet-4vcpu-ubuntu-2204"},
-      {"name": "network/p2p/node", "runner":  "buildjet-4vcpu-ubuntu-2204"}
+      {"name": "network/p2p/node", "runner":  "buildjet-4vcpu-ubuntu-2004"}
     ]}
   ]
 }

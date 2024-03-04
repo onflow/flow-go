@@ -147,7 +147,7 @@ jobs:
 
   unit-test-insecure:
     name: Unit Tests Insecure (${{ matrix.targets.name }})
-    needs: create-dynamic-test-matrix
+    needs: create-insecure-dynamic-test-matrix
     strategy:
       fail-fast: false
       matrix:
