@@ -29,6 +29,20 @@ func TestGroupPayloadsByAccount(t *testing.T) {
 	require.Greater(t, groups.Len(), 1)
 }
 
+func TestGroupPayloadsByAccountForDataRace(t *testing.T) {
+	log := zerolog.New(zerolog.NewTestWriter(t))
+
+	const accountSize = 4
+	var payloads []*ledger.Payload
+	for i := 0; i < accountSize; i++ {
+		payloads = append(payloads, generateRandomPayloadsWithAddress(generateRandomAddress(), 100_000)...)
+	}
+
+	const nWorkers = 8
+	groups := util.GroupPayloadsByAccount(log, payloads, nWorkers)
+	require.Equal(t, accountSize, groups.Len())
+}
+
 func TestGroupPayloadsByAccountCompareResults(t *testing.T) {
 	log := zerolog.Nop()
 	payloads := generateRandomPayloads(1000000)
@@ -117,6 +131,36 @@ func generateRandomPayloads(n int) []*ledger.Payload {
 		i += registersForAccount
 
 		accountKey := generateRandomAccountKey()
+		for j := 0; j < registersForAccount; j++ {
+			payloads = append(payloads,
+				ledger.NewPayload(
+					accountKey,
+					[]byte(generateRandomString(10)),
+				))
+		}
+	}
+
+	return payloads
+}
+
+func generateRandomPayloadsWithAddress(address string, n int) []*ledger.Payload {
+	const meanPayloadsPerAccount = 100
+	const minPayloadsPerAccount = 1
+
+	payloads := make([]*ledger.Payload, 0, n)
+
+	for i := 0; i < n; {
+
+		registersForAccount := minPayloadsPerAccount + int(rand2.ExpFloat64()*(meanPayloadsPerAccount-minPayloadsPerAccount))
+		if registersForAccount > n-i {
+			registersForAccount = n - i
+		}
+		i += registersForAccount
+
+		accountKey := convert.RegisterIDToLedgerKey(flow.RegisterID{
+			Owner: address,
+			Key:   generateRandomString(10),
+		})
 		for j := 0; j < registersForAccount; j++ {
 			payloads = append(payloads,
 				ledger.NewPayload(
