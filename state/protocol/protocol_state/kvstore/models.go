@@ -39,6 +39,11 @@ var _ protocol_state.API = new(modelv0)
 
 func (model *modelv0) ID() flow.Identifier { return flow.MakeID(model) }
 
+func (model *modelv0) Clone() protocol_state.API {
+	cpy := *model
+	return &cpy
+}
+
 // VersionedEncode encodes the key-value store, returning the version separately
 // from the encoded bytes.
 // No errors are expected during normal operation.
@@ -80,6 +85,11 @@ var _ protocol_state.Reader = new(modelv1)
 var _ protocol_state.API = new(modelv1)
 
 func (model *modelv1) ID() flow.Identifier { return flow.MakeID(model) }
+
+func (model *modelv1) Clone() protocol_state.API {
+	cpy := *model
+	return &cpy
+}
 
 // VersionedEncode encodes the key-value store, returning the version separately
 // from the encoded bytes.

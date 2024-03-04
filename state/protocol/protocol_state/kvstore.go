@@ -65,6 +65,10 @@ type Reader interface {
 type API interface {
 	Reader
 
+	// Clone returns a deep copy of the API.
+	// This is used to create a new instance of the API to avoid mutating the original.
+	Clone() API
+
 	// v0
 
 	// SetVersionUpgrade sets the protocol upgrade version. This method is used

@@ -14,6 +14,22 @@ type API struct {
 	mock.Mock
 }
 
+// Clone provides a mock function with given fields:
+func (_m *API) Clone() protocol_state.API {
+	ret := _m.Called()
+
+	var r0 protocol_state.API
+	if rf, ok := ret.Get(0).(func() protocol_state.API); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(protocol_state.API)
+		}
+	}
+
+	return r0
+}
+
 // GetInvalidEpochTransitionAttempted provides a mock function with given fields:
 func (_m *API) GetInvalidEpochTransitionAttempted() (bool, error) {
 	ret := _m.Called()

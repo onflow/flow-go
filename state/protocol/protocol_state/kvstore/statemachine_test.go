@@ -75,8 +75,8 @@ func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
 
 		se := upgrade.ServiceEvent()
 		err := s.stateMachine.ProcessUpdate(&se)
-		require.ErrorIs(s.T(), err, ErrInvalidUpgradeVersion)
-		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
+		require.ErrorIs(s.T(), err, ErrInvalidUpgradeVersion, "has to be expected sentinel")
+		require.True(s.T(), protocol.IsInvalidServiceEventError(err), "has to be expected sentinel")
 	})
 	s.Run("invalid-activation-view", func() {
 		upgrade := unittest.ProtocolStateVersionUpgradeFixture()
@@ -84,7 +84,7 @@ func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
 
 		se := upgrade.ServiceEvent()
 		err := s.stateMachine.ProcessUpdate(&se)
-		require.ErrorIs(s.T(), err, ErrInvalidActivationView)
-		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
+		require.ErrorIs(s.T(), err, ErrInvalidActivationView, "has to be expected sentinel")
+		require.True(s.T(), protocol.IsInvalidServiceEventError(err), "has to be expected sentinel")
 	})
 }

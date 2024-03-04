@@ -19,12 +19,12 @@ func NewProcessingStateMachine(view uint64, parentState protocol_state.Reader, m
 	return &ProcessingStateMachine{
 		view:        view,
 		parentState: parentState,
-		state:       mutator,
+		state:       mutator.Clone(),
 	}
 }
 
 func (m *ProcessingStateMachine) Build() (updatedState protocol_state.Reader, stateID flow.Identifier, hasChanges bool) {
-	updatedState = m.state // TODO: deep copy
+	updatedState = m.state.Clone()
 	stateID = updatedState.ID()
 	hasChanges = stateID != m.parentState.ID()
 	return
