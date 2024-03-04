@@ -2,9 +2,9 @@
   "packagesPath": "./insecure",
   "includeOthers": false,
   "packages": [
-      {"name":  "insecure", "runner":  "buildjet-4vcpu-ubuntu-2204" ,"subpackages": [
-      {"name": "insecure/integration/functional/test/gossipsub/rpc_inspector", "runner":  "buildjet-8vcpu-ubuntu-2204"},
-      {"name": "insecure/integration/functional/test/gossipsub/scoring", "runner":  "buildjet-8vcpu-ubuntu-2204"}
+      {"name":  "insecure", "runner":  "buildjet-4vcpu-ubuntu-2004" ,"subpackages": [
+      {"name": "insecure/integration/functional/test/gossipsub/rpc_inspector", "runner":  "buildjet-8vcpu-ubuntu-2004"},
+      {"name": "insecure/integration/functional/test/gossipsub/scoring", "runner":  "buildjet-8vcpu-ubuntu-2004"}
     ]}
   ]
 }

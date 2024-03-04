@@ -170,7 +170,7 @@ jobs:
         with:
           timeout_minutes: 35
           max_attempts: 5
-          command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
+          command: VERBOSE=1 make -C ${{ matrix.name }} -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
         # TODO(rbtz): re-enable when we fix exisiting races.
         #env:
         #  RACE_DETECTOR: 1
