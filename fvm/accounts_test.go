@@ -297,8 +297,7 @@ transaction {
 const getAccountKeyTransaction = `
 transaction(keyIndex: Int) {
   prepare(signer: &Account) {
-    var key :AccountKey? = signer.keys.get(keyIndex: keyIndex)
-    log(key)
+    log(signer.keys.get(keyIndex: keyIndex))
   }
 }
 `
@@ -307,8 +306,7 @@ const getMultipleAccountKeysTransaction = `
 transaction(keyIndex1: Int, keyIndex2: Int) {
   prepare(signer: &Account) {
     for keyIndex in [keyIndex1, keyIndex2] {
-      var key :AccountKey? = signer.keys.get(keyIndex: keyIndex)
-      log(key)
+      log(signer.keys.get(keyIndex: keyIndex))
     }
   }
 }
@@ -1369,7 +1367,7 @@ func TestGetAccountKey(t *testing.T) {
 					expected := fmt.Sprintf(
 						"AccountKey("+
 							"keyIndex: %d, "+
-							"publicKey: PublicKey(signatureAlgorithm: SignatureAlgorithm(rawValue: 1), publicKey: %s), "+
+							"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1)), "+
 							"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 							"weight: 1000.00000000, "+
 							"isRevoked: false)",
