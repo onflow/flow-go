@@ -26,7 +26,7 @@ type migrationTransactionPreparer struct {
 var _ storage.TransactionPreparer = migrationTransactionPreparer{}
 
 // migratorRuntime is a runtime that can be used to run a migration on a single account
-func newMigratorRuntime(
+func NewMigratorRuntime(
 	address common.Address,
 	payloads []*ledger.Payload,
 	config util.RuntimeInterfaceConfig,
@@ -80,7 +80,7 @@ func newMigratorRuntime(
 		ri,
 		runtime.NewCodesAndPrograms(),
 		runtimeStorage,
-		runtime.NewCoverageReport(),
+		nil,
 	)
 
 	inter, err := interpreter.NewInterpreter(

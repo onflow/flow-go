@@ -43,7 +43,8 @@ func TestLoadTypes(t *testing.T) {
 		load.ExecDataHeavyLoad,
 		load.NewTokenTransferLoad(),
 		load.NewAddKeysLoad(),
-		// evmLoad,
+		evmLoad,
+		load.NewCreateAccountLoad(),
 	}
 
 	for _, l := range loads {
@@ -136,7 +137,6 @@ func bootstrapVM(t *testing.T, chain flow.Chain) (*fvm.VirtualMachine, fvm.Conte
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
-		fvm.WithSetupEVMEnabled(true),
 	}
 
 	executionSnapshot, _, err := vm.Run(

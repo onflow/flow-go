@@ -59,12 +59,18 @@ const (
 	ContractStorageFeesFunction_getAccountsCapacityForTransactionStorageCheck = "getAccountsCapacityForTransactionStorageCheck"
 	ContractStorageFeesFunction_defaultTokenAvailableBalance                  = "defaultTokenAvailableBalance"
 
-	// Indexes of the system contracts that are deployed to an address at a specific index
+	// These are the account indexes of system contracts as deployed by the default bootstrapping.
+	// On long-running networks some of these contracts might have been deployed after bootstrapping,
+	// and therefore might not be at these indexes.
 
 	FungibleTokenAccountIndex = 2
 	FlowTokenAccountIndex     = 3
 	FlowFeesAccountIndex      = 4
 	EVMStorageAccountIndex    = 5
+
+	// LastSystemAccountIndex is the last index of a system accounts.
+	// Other addresses will be created  after this one.
+	LastSystemAccountIndex = EVMStorageAccountIndex
 )
 
 // Well-known addresses for system contracts on long-running networks.
@@ -169,9 +175,10 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 		FungibleTokenAddress:              c.FungibleToken.Address.Hex(),
 		FungibleTokenMetadataViewsAddress: c.FungibleToken.Address.Hex(),
 
-		NonFungibleTokenAddress: c.NonFungibleToken.Address.Hex(),
-		MetadataViewsAddress:    c.MetadataViews.Address.Hex(),
-		ViewResolverAddress:     c.ViewResolver.Address.Hex(),
+		NonFungibleTokenAddress:         c.NonFungibleToken.Address.Hex(),
+		MetadataViewsAddress:            c.MetadataViews.Address.Hex(),
+		ViewResolverAddress:             c.ViewResolver.Address.Hex(),
+		FungibleTokenSwitchboardAddress: c.FungibleToken.Address.Hex(),
 	}
 }
 

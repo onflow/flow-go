@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -21,21 +22,22 @@ import (
 )
 
 var (
-	flagExecutionStateDir         string
-	flagOutputDir                 string
-	flagBlockHash                 string
-	flagStateCommitment           string
-	flagDatadir                   string
-	flagChain                     string
-	flagNWorker                   int
-	flagNoMigration               bool
-	flagNoReport                  bool
-	flagValidateMigration         bool
-	flagLogVerboseValidationError bool
-	flagStagedContractsFile       string
-	flagInputPayloadFileName      string
-	flagOutputPayloadFileName     string
-	flagOutputPayloadByAddresses  string
+	flagExecutionStateDir             string
+	flagOutputDir                     string
+	flagBlockHash                     string
+	flagStateCommitment               string
+	flagDatadir                       string
+	flagChain                         string
+	flagNWorker                       int
+	flagNoMigration                   bool
+	flagNoReport                      bool
+	flagValidateMigration             bool
+	flagAllowPartialStateFromPayloads bool
+	flagLogVerboseValidationError     bool
+	flagStagedContractsFile           string
+	flagInputPayloadFileName          string
+	flagOutputPayloadFileName         string
+	flagOutputPayloadByAddresses      string
 )
 
 var Cmd = &cobra.Command{
@@ -81,6 +83,9 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagStagedContractsFile, "staged-contracts", "",
 		"Staged contracts CSV file")
+
+	Cmd.Flags().BoolVar(&flagAllowPartialStateFromPayloads, "allow-partial-state-from-payload-file", false,
+		"allow input payload file containing partial state (e.g. not all accounts)")
 
 	// If specified, the state will consist of payloads from the given input payload file.
 	// If not specified, then the state will be extracted from the latest checkpoint file.
@@ -172,6 +177,29 @@ func run(*cobra.Command, []string) {
 		if _, err := os.Stat(flagInputPayloadFileName); os.IsNotExist(err) {
 			log.Fatal().Msgf("payload input file %s doesn't exist", flagInputPayloadFileName)
 		}
+
+		partialState, err := util.IsPayloadFilePartialState(flagInputPayloadFileName)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("cannot get flag from payload input file %s", flagInputPayloadFileName)
+		}
+
+		// Check if payload file contains partial state and is allowed by --allow-partial-state-from-payload-file.
+		if !flagAllowPartialStateFromPayloads && partialState {
+			log.Fatal().Msgf("payload input file %s contains partial state, please specify --allow-partial-state-from-payload-file", flagInputPayloadFileName)
+		}
+
+		msg := "input payloads represent "
+		if partialState {
+			msg += "partial state"
+		} else {
+			msg += "complete state"
+		}
+		if flagAllowPartialStateFromPayloads {
+			msg += ", and --allow-partial-state-from-payload-file is specified"
+		} else {
+			msg += ", and --allow-partial-state-from-payload-file is NOT specified"
+		}
+		log.Info().Msg(msg)
 	}
 
 	if len(flagOutputPayloadFileName) > 0 {

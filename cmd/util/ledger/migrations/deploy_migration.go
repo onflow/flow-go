@@ -17,6 +17,7 @@ func NewTransactionBasedMigration(
 	tx *flow.TransactionBody,
 	chainID flow.ChainID,
 	logger zerolog.Logger,
+	expectedWriteAddresses map[flow.Address]struct{},
 ) ledger.Migration {
 	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
 
@@ -53,6 +54,8 @@ func NewTransactionBasedMigration(
 		return MergeRegisterChanges(
 			snapshot.Payloads,
 			executionSnapshot.WriteSet,
+			expectedWriteAddresses,
+			nil,
 			logger,
 		)
 	}
@@ -62,6 +65,7 @@ func NewDeploymentMigration(
 	chainID flow.ChainID,
 	contract Contract,
 	authorizer flow.Address,
+	expectedWriteAddresses map[flow.Address]struct{},
 	logger zerolog.Logger,
 ) ledger.Migration {
 
@@ -79,21 +83,29 @@ func NewDeploymentMigration(
 		AddArgument(jsoncdc.MustEncode(cadence.String(contract.Code))).
 		AddAuthorizer(authorizer)
 
-	return NewTransactionBasedMigration(tx, chainID, logger)
+	return NewTransactionBasedMigration(
+		tx,
+		chainID,
+		logger,
+		expectedWriteAddresses,
+	)
 }
 
 func NewBurnerDeploymentMigration(
 	chainID flow.ChainID,
 	logger zerolog.Logger,
 ) ledger.Migration {
-
+	address := BurnerAddressForChain(chainID)
 	return NewDeploymentMigration(
 		chainID,
 		Contract{
 			Name: "Burner",
 			Code: coreContracts.Burner(),
 		},
-		BurnerAddressForChain(chainID),
+		address,
+		map[flow.Address]struct{}{
+			address: {},
+		},
 		logger,
 	)
 }

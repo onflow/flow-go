@@ -88,7 +88,10 @@ func TestDeploy(t *testing.T) {
 			)),
 		},
 		targetAddress,
-		zerolog.Nop(),
+		map[flow.Address]struct{}{
+			targetAddress: {},
+		},
+		zerolog.New(zerolog.NewTestWriter(t)),
 	)
 
 	bootstrapPayloads, err := newBootstrapPayloads(chainID)

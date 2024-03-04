@@ -74,6 +74,8 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	defaultConfig.NetworkConfig.GossipSub.RpcTracer.LocalMeshLogInterval = 1 * time.Second
 	// disables peer scoring for sake of testing; so that unknown peers are not penalized and could be detected by the meshTracer.
 	defaultConfig.NetworkConfig.GossipSub.PeerScoringEnabled = false
+	// disables rejection of RPC's from unstaked peer so that unknown peers could be detected bu the meshTracer
+	defaultConfig.NetworkConfig.GossipSub.RpcInspector.Validation.InspectionProcess.Inspect.RejectUnstakedPeers = false
 	tracerNode, tracerId := p2ptest.NodeFixture(
 		t,
 		sporkId,

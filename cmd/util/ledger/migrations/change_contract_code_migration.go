@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/cadence/runtime/common"
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
+	"github.com/rs/zerolog"
 
 	evm "github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -17,9 +18,9 @@ type ChangeContractCodeMigration struct {
 
 var _ AccountBasedMigration = (*ChangeContractCodeMigration)(nil)
 
-func NewChangeContractCodeMigration(chainID flow.ChainID) *ChangeContractCodeMigration {
+func NewChangeContractCodeMigration(chainID flow.ChainID, log zerolog.Logger) *ChangeContractCodeMigration {
 	return &ChangeContractCodeMigration{
-		StagedContractsMigration: NewStagedContractsMigration(chainID).
+		StagedContractsMigration: NewStagedContractsMigration(chainID, log).
 			// TODO:
 			//WithContractUpdateValidation().
 			WithName("ChangeContractCodeMigration"),
@@ -246,11 +247,12 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 	return contractChanges
 }
 
-func NewSystemContactsMigration(
+func NewSystemContractsMigration(
 	chainID flow.ChainID,
+	log zerolog.Logger,
 	options SystemContractChangesOptions,
 ) *ChangeContractCodeMigration {
-	migration := NewChangeContractCodeMigration(chainID)
+	migration := NewChangeContractCodeMigration(chainID, log)
 	for _, change := range SystemContractChanges(chainID, options) {
 		migration.RegisterContractChange(change)
 	}
