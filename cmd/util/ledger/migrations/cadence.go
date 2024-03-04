@@ -187,11 +187,15 @@ func NewCadence1ValueMigrations(
 		),
 		NewCadence1LinkValueMigrator(
 			rwf,
+			diffMigrations,
+			logVerboseDiff,
 			errorMessageHandler,
 			capabilityMapping,
 		),
 		NewCadence1CapabilityValueMigrator(
 			rwf,
+			diffMigrations,
+			logVerboseDiff,
 			errorMessageHandler,
 			capabilityMapping,
 		),
