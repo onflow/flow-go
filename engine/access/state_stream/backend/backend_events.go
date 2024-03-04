@@ -96,7 +96,7 @@ func (b *EventsBackend) getEventsFromStorage(height uint64, filter state_stream.
 		return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
 	}
 
-	events, err := b.eventsIndex.GetEvents(blockID, height)
+	events, err := b.eventsIndex.ByBlockID(blockID, height)
 	if err != nil {
 		return nil, fmt.Errorf("could not get events for block %d: %w", height, err)
 	}

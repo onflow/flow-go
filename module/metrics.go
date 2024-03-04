@@ -341,6 +341,9 @@ type GossipSubRpcValidationInspectorMetrics interface {
 	// OnInvalidControlMessageNotificationSent tracks the number of times that the async inspection of a control message failed and resulted in dissemination of an invalid control message was sent.
 	OnInvalidControlMessageNotificationSent()
 
+	// OnRpcRejectedFromUnknownSender tracks the number of rpc's rejected from unstaked nodes.
+	OnRpcRejectedFromUnknownSender()
+
 	// OnPublishMessagesInspectionErrorExceedsThreshold tracks the number of times that async inspection of publish messages failed due to the number of errors.
 	OnPublishMessagesInspectionErrorExceedsThreshold()
 

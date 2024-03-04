@@ -8,6 +8,7 @@ func (c ControlMessageType) String() string {
 }
 
 const (
+	CtrlMsgRPC        ControlMessageType = "RPC"
 	CtrlMsgIHave      ControlMessageType = "IHAVE"
 	CtrlMsgIWant      ControlMessageType = "IWANT"
 	CtrlMsgGraft      ControlMessageType = "GRAFT"

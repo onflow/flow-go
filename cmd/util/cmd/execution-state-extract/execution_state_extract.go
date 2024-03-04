@@ -392,7 +392,7 @@ func newMigrations(
 
 	rwf := reporters.NewReportFileWriterFactory(dir, log)
 
-	return migrators.NewCadence1Migrations(
+	namedMigrations := migrators.NewCadence1Migrations(
 		log,
 		rwf,
 		nWorker,
@@ -402,4 +402,10 @@ func newMigrations(
 		evmContractChange,
 		stagedContracts,
 	)
+
+	migrations := make([]ledger.Migration, 0, len(namedMigrations))
+	for _, migration := range namedMigrations {
+		migrations = append(migrations, migration.Migrate)
+	}
+	return migrations
 }

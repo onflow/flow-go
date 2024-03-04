@@ -474,7 +474,6 @@ func RunWithNewEnvironment(
 
 				baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 					fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
-					fvm.WithSetupEVMEnabled(true),
 				}
 
 				executionSnapshot, _, err := vm.Run(

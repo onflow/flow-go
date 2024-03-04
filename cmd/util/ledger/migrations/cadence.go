@@ -156,6 +156,11 @@ func fungibleTokenResolverRule(
 	return oldType, newType
 }
 
+type NamedMigration struct {
+	Name    string
+	Migrate ledger.Migration
+}
+
 func NewCadence1ValueMigrations(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
@@ -163,7 +168,7 @@ func NewCadence1ValueMigrations(
 	chainID flow.ChainID,
 	diffMigrations bool,
 	logVerboseDiff bool,
-) (migrations []ledger.Migration) {
+) (migrations []NamedMigration) {
 
 	// Populated by CadenceLinkValueMigrator,
 	// used by CadenceCapabilityValueMigrator
@@ -171,7 +176,7 @@ func NewCadence1ValueMigrations(
 
 	errorMessageHandler := &errorMessageHandler{}
 
-	for _, accountBasedMigration := range []AccountBasedMigration{
+	for _, accountBasedMigration := range []*CadenceBaseMigrator{
 		NewCadence1ValueMigrator(
 			rwf,
 			diffMigrations,
@@ -193,12 +198,15 @@ func NewCadence1ValueMigrations(
 	} {
 		migrations = append(
 			migrations,
-			NewAccountBasedMigration(
-				log,
-				nWorker, []AccountBasedMigration{
-					accountBasedMigration,
-				},
-			),
+			NamedMigration{
+				Name: accountBasedMigration.name,
+				Migrate: NewAccountBasedMigration(
+					log,
+					nWorker, []AccountBasedMigration{
+						accountBasedMigration,
+					},
+				),
+			},
 		)
 	}
 
@@ -211,35 +219,44 @@ func NewCadence1ContractsMigrations(
 	chainID flow.ChainID,
 	evmContractChange EVMContractChange,
 	stagedContracts []StagedContract,
-) []ledger.Migration {
+) []NamedMigration {
+
+	systemContractsMigration := NewSystemContractsMigration(
+		chainID,
+		log,
+		SystemContractChangesOptions{
+			EVM: evmContractChange,
+		},
+	)
 
 	stagedContractsMigration := NewStagedContractsMigration(chainID, log).
 		WithContractUpdateValidation()
 
 	stagedContractsMigration.RegisterContractUpdates(stagedContracts)
 
-	return []ledger.Migration{
-		NewAccountBasedMigration(
+	toAccountBasedMigration := func(migration AccountBasedMigration) ledger.Migration {
+		return NewAccountBasedMigration(
 			log,
 			nWorker,
 			[]AccountBasedMigration{
-				NewSystemContactsMigration(
-					chainID,
-					log,
-					SystemContractChangesOptions{
-						EVM: evmContractChange,
-					},
-				),
+				migration,
 			},
-		),
-		NewBurnerDeploymentMigration(chainID, log),
-		NewAccountBasedMigration(
-			log,
-			nWorker,
-			[]AccountBasedMigration{
-				stagedContractsMigration,
-			},
-		),
+		)
+	}
+
+	return []NamedMigration{
+		{
+			Name:    "system-contracts-update-migration",
+			Migrate: toAccountBasedMigration(systemContractsMigration),
+		},
+		{
+			Name:    "burner-deployment-migration",
+			Migrate: NewBurnerDeploymentMigration(chainID, log),
+		},
+		{
+			Name:    "staged-contracts-update-migration",
+			Migrate: toAccountBasedMigration(stagedContractsMigration),
+		},
 	}
 }
 
@@ -252,7 +269,7 @@ func NewCadence1Migrations(
 	logVerboseDiff bool,
 	evmContractChange EVMContractChange,
 	stagedContracts []StagedContract,
-) []ledger.Migration {
+) []NamedMigration {
 	return common.Concat(
 		NewCadence1ContractsMigrations(
 			log,

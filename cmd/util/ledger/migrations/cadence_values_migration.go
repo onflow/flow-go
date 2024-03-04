@@ -137,9 +137,11 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
 	}
 
+	storage := migrationRuntime.Storage
+
 	migration := migrations.NewStorageMigration(
 		migrationRuntime.Interpreter,
-		migrationRuntime.Storage,
+		storage,
 	)
 
 	reporter := newValueMigrationReporter(m.reporter, m.log, m.errorMessageHandler)
@@ -168,14 +170,15 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 	}
 
 	// Merge the changes to the original payloads.
-	expectedWriteAddress := flow.ConvertAddress(address)
-	expectedOriginalAddress := flow.ConvertAddress(address)
+	expectedAddresses := map[flow.Address]struct{}{
+		flow.ConvertAddress(address): {},
+	}
 
 	newPayloads, err := MergeRegisterChanges(
 		migrationRuntime.Snapshot.Payloads,
 		result.WriteSet,
-		expectedWriteAddress,
-		expectedOriginalAddress,
+		expectedAddresses,
+		expectedAddresses,
 		m.log,
 	)
 	if err != nil {

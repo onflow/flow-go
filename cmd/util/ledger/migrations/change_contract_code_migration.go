@@ -247,7 +247,7 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 	return contractChanges
 }
 
-func NewSystemContactsMigration(
+func NewSystemContractsMigration(
 	chainID flow.ChainID,
 	log zerolog.Logger,
 	options SystemContractChangesOptions,
