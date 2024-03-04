@@ -14,7 +14,7 @@ import (
 
 var _ module.CollectionExecutedMetric = (*CollectionExecutedMetricImpl)(nil)
 
-// CollectionExecutedMetricImpl  tracks metrics to measure how long it takes for tx to reach each step in their lifecycle
+// CollectionExecutedMetricImpl tracks metrics to measure how long it takes for tx to reach each step in their lifecycle
 type CollectionExecutedMetricImpl struct {
 	log zerolog.Logger // used to log relevant actions with context
 
@@ -40,6 +40,7 @@ func NewCollectionExecutedMetricImpl(
 	}, nil
 }
 
+// TrackFinalized tracks collections to mark finalized
 func (c *CollectionExecutedMetricImpl) TrackFinalized(light flow.LightCollection) {
 	if ti, found := c.collectionsToMarkFinalized.ByID(light.ID()); found {
 		for _, t := range light.Transactions {
@@ -49,6 +50,7 @@ func (c *CollectionExecutedMetricImpl) TrackFinalized(light flow.LightCollection
 	}
 }
 
+// TrackExecuted tracks collections to mark executed
 func (c *CollectionExecutedMetricImpl) TrackExecuted(light flow.LightCollection) {
 	if ti, found := c.collectionsToMarkExecuted.ByID(light.ID()); found {
 		for _, t := range light.Transactions {
@@ -58,6 +60,7 @@ func (c *CollectionExecutedMetricImpl) TrackExecuted(light flow.LightCollection)
 	}
 }
 
+// TrackFinalizedMetricForBlock tracks finalized metric for block
 func (c *CollectionExecutedMetricImpl) TrackFinalizedMetricForBlock(block *flow.Block, collections storage.Collections) {
 	// TODO: lookup actual finalization time by looking at the block finalizing `b`
 	now := time.Now().UTC()
@@ -88,6 +91,7 @@ func (c *CollectionExecutedMetricImpl) TrackFinalizedMetricForBlock(block *flow.
 	}
 }
 
+// TrackExecutionReceiptMetrics tracks execution receipt metrics
 func (c *CollectionExecutedMetricImpl) TrackExecutionReceiptMetrics(
 	r *flow.ExecutionReceipt,
 	collections storage.Collections,
@@ -119,6 +123,7 @@ func (c *CollectionExecutedMetricImpl) UpdateLastFullBlockHeight(height uint64) 
 	c.accessMetrics.UpdateLastFullBlockHeight(height)
 }
 
+// trackExecutedMetricForBlock tracks executed metric for block
 func (c *CollectionExecutedMetricImpl) trackExecutedMetricForBlock(block *flow.Block, ti time.Time, collections storage.Collections) {
 	// mark all transactions as executed
 	// TODO: sample to reduce performance overhead
