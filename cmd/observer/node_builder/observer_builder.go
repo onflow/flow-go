@@ -48,7 +48,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
-	"github.com/onflow/flow-go/engine/protocol"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -1447,46 +1446,28 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
-		var localData *apiproxy.ObserverLocalDataService
-		if builder.executionDataIndexingEnabled {
-			localData = apiproxy.NewObserverLocalDataService(apiproxy.Params{
-				State:             node.State,
-				Collections:       node.Storage.Collections,
-				Blocks:            node.Storage.Blocks,
-				Results:           node.Storage.LightTransactionResults,
-				Headers:           node.Storage.Headers,
-				ExecutionReceipts: node.Storage.Receipts,
-				Chain:             node.RootChainID.Chain(),
-				ConnFactory:       connFactory,
-				Log:               builder.Logger,
-				MaxHeightRange:    backendConfig.MaxHeightRange,
-				NodeCommunicator:  backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-				NodeId:            builder.Me.NodeID(),
-				EventsIndex:       builder.EventsIndex,
-				TxResultsIndex:    builder.TxResultsIndex},
-			)
-		}
-
 		// use the events index for events if enabled
 		useIndex := builder.executionDataIndexingEnabled
 
-		rpcHandler := &apiproxy.FlowAccessAPIRouter{
-			Logger:   builder.Logger,
-			Metrics:  observerCollector,
-			Upstream: forwarder,
-			Observer: protocol.NewHandler(protocol.New(
-				node.State,
-				node.Storage.Blocks,
-				node.Storage.Headers,
-				backend.NewNetworkAPI(
-					node.State,
-					node.RootChainID,
-					node.Storage.Headers,
-					backend.DefaultSnapshotHistoryLimit,
-				),
-			)),
-			UseIndex: useIndex,
-		}
+		rpcHandler := apiproxy.NewFlowAccessAPIRouter(apiproxy.Params{
+			Log:               builder.Logger,
+			State:             node.State,
+			Collections:       node.Storage.Collections,
+			Blocks:            node.Storage.Blocks,
+			Results:           node.Storage.LightTransactionResults,
+			Headers:           node.Storage.Headers,
+			ExecutionReceipts: node.Storage.Receipts,
+			RootChainID:       node.RootChainID,
+			NodeId:            builder.Me.NodeID(),
+			ConnFactory:       connFactory,
+			MaxHeightRange:    backendConfig.MaxHeightRange,
+			UseIndex:          useIndex,
+			NodeCommunicator:  backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+			EventsIndex:       builder.EventsIndex,
+			TxResultsIndex:    builder.TxResultsIndex,
+			Metrics:           observerCollector,
+			Upstream:          forwarder},
+		)
 
 		// build the rpc engine
 		builder.RpcEng, err = engineBuilder.

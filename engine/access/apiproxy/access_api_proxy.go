@@ -2,35 +2,113 @@ package apiproxy
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access/legacy/convert"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/grpc/forwarder"
+	"github.com/onflow/flow-go/engine/common/rpc"
+	rpcConvert "github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/engine/protocol"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	stateProtocol "github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 )
 
 // FlowAccessAPIRouter is a structure that represents the routing proxy algorithm.
 // It splits requests between a local and a remote API service.
 type FlowAccessAPIRouter struct {
-	Logger   zerolog.Logger
-	Metrics  *metrics.ObserverCollector
-	Upstream *FlowAccessAPIForwarder
-	Observer *protocol.Handler
-	UseIndex bool
-	//LocalData *ObserverLocalDataService
+	logger                        zerolog.Logger
+	metrics                       *metrics.ObserverCollector
+	upstream                      *FlowAccessAPIForwarder
+	observer                      *protocol.Handler
+	transactionsLocalDataProvider *backend.TransactionsLocalDataProvider
+	backendEvents                 *backend.BackendEvents
+	nodeId                        flow.Identifier
+	useIndex                      bool
+	state                         stateProtocol.State
+}
+
+var _ backend.TransactionErrorMessage = (*FlowAccessAPIRouter)(nil)
+
+type Params struct {
+	Log               zerolog.Logger
+	State             stateProtocol.State
+	Collections       storage.Collections
+	Blocks            storage.Blocks
+	Results           storage.LightTransactionResults
+	Headers           storage.Headers
+	ExecutionReceipts storage.ExecutionReceipts
+	RootChainID       flow.ChainID
+	NodeId            flow.Identifier
+	ConnFactory       connection.ConnectionFactory
+	MaxHeightRange    uint
+	UseIndex          bool
+	NodeCommunicator  backend.Communicator
+	EventsIndex       *backend.EventsIndex
+	TxResultsIndex    *backend.TransactionResultsIndex
+	Metrics           *metrics.ObserverCollector
+	Upstream          *FlowAccessAPIForwarder
+}
+
+// NewFlowAccessAPIRouter creates FlowAccessAPIRouter instance
+func NewFlowAccessAPIRouter(params Params) *FlowAccessAPIRouter {
+	h := &FlowAccessAPIRouter{
+		logger:   params.Log,
+		metrics:  params.Metrics,
+		upstream: params.Upstream,
+		observer: protocol.NewHandler(protocol.New(
+			params.State,
+			params.Blocks,
+			params.Headers,
+			backend.NewNetworkAPI(
+				params.State,
+				params.RootChainID,
+				params.Headers,
+				backend.DefaultSnapshotHistoryLimit,
+			),
+		)),
+		transactionsLocalDataProvider: backend.NewTransactionsLocalDataProvider(
+			params.State,
+			params.Collections,
+			params.Blocks,
+			params.EventsIndex,
+			params.TxResultsIndex,
+			nil),
+		backendEvents: backend.NewBackendEvents(
+			params.Headers,
+			params.ExecutionReceipts,
+			params.State,
+			params.RootChainID.Chain(),
+			params.ConnFactory,
+			params.Log,
+			params.MaxHeightRange,
+			params.NodeCommunicator,
+			backend.IndexQueryModeLocalOnly,
+			params.EventsIndex),
+		nodeId:   params.NodeId,
+		state:    params.State,
+		useIndex: params.UseIndex,
+	}
+
+	h.transactionsLocalDataProvider.TxErrorMessages = h
+
+	return h
 }
 
 func (h *FlowAccessAPIRouter) log(handler, rpc string, err error) {
 	code := status.Code(err)
-	h.Metrics.RecordRPC(handler, rpc, code)
+	h.metrics.RecordRPC(handler, rpc, code)
 
-	logger := h.Logger.With().
+	logger := h.logger.With().
 		Str("handler", handler).
 		Str("grpc_method", rpc).
 		Str("grpc_code", code.String()).
@@ -52,234 +130,476 @@ func (h *FlowAccessAPIRouter) Ping(context context.Context, req *access.PingRequ
 }
 
 func (h *FlowAccessAPIRouter) GetNodeVersionInfo(ctx context.Context, request *access.GetNodeVersionInfoRequest) (*access.GetNodeVersionInfoResponse, error) {
-	res, err := h.Observer.GetNodeVersionInfo(ctx, request)
+	res, err := h.observer.GetNodeVersionInfo(ctx, request)
 	h.log("observer", "GetNodeVersionInfo", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetLatestBlockHeader(context context.Context, req *access.GetLatestBlockHeaderRequest) (*access.BlockHeaderResponse, error) {
-	res, err := h.Observer.GetLatestBlockHeader(context, req)
+	res, err := h.observer.GetLatestBlockHeader(context, req)
 	h.log("observer", "GetLatestBlockHeader", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetBlockHeaderByID(context context.Context, req *access.GetBlockHeaderByIDRequest) (*access.BlockHeaderResponse, error) {
-	res, err := h.Observer.GetBlockHeaderByID(context, req)
+	res, err := h.observer.GetBlockHeaderByID(context, req)
 	h.log("observer", "GetBlockHeaderByID", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetBlockHeaderByHeight(context context.Context, req *access.GetBlockHeaderByHeightRequest) (*access.BlockHeaderResponse, error) {
-	res, err := h.Observer.GetBlockHeaderByHeight(context, req)
+	res, err := h.observer.GetBlockHeaderByHeight(context, req)
 	h.log("observer", "GetBlockHeaderByHeight", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetLatestBlock(context context.Context, req *access.GetLatestBlockRequest) (*access.BlockResponse, error) {
-	res, err := h.Observer.GetLatestBlock(context, req)
+	res, err := h.observer.GetLatestBlock(context, req)
 	h.log("observer", "GetLatestBlock", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetBlockByID(context context.Context, req *access.GetBlockByIDRequest) (*access.BlockResponse, error) {
-	res, err := h.Observer.GetBlockByID(context, req)
+	res, err := h.observer.GetBlockByID(context, req)
 	h.log("observer", "GetBlockByID", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetBlockByHeight(context context.Context, req *access.GetBlockByHeightRequest) (*access.BlockResponse, error) {
-	res, err := h.Observer.GetBlockByHeight(context, req)
+	res, err := h.observer.GetBlockByHeight(context, req)
 	h.log("observer", "GetBlockByHeight", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetCollectionByID(context context.Context, req *access.GetCollectionByIDRequest) (*access.CollectionResponse, error) {
-	res, err := h.Upstream.GetCollectionByID(context, req)
+	res, err := h.upstream.GetCollectionByID(context, req)
 	h.log("upstream", "GetCollectionByID", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) SendTransaction(context context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
-	res, err := h.Upstream.SendTransaction(context, req)
+	res, err := h.upstream.SendTransaction(context, req)
 	h.log("upstream", "SendTransaction", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetTransaction(context context.Context, req *access.GetTransactionRequest) (*access.TransactionResponse, error) {
-	res, err := h.Upstream.GetTransaction(context, req)
+	res, err := h.upstream.GetTransaction(context, req)
 	h.log("upstream", "GetTransaction", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResult(context context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
-	if h.UseIndex {
+	if h.useIndex {
 		txId := req.GetId()
 		blockId := req.GetBlockId()
 		collectionID := req.GetCollectionId()
 		requiredEventEncodingVersion := req.GetEventEncodingVersion()
 
-		res, err := h.LocalData.GetTransactionResultFromStorageData(context, txId, blockId, collectionID, requiredEventEncodingVersion)
+		res, err := h.getTransactionResultFromStorageData(context, txId, blockId, collectionID, requiredEventEncodingVersion)
 		h.log("observerStorage", "GetTransactionResult", err)
 		return res, err
 	}
 
-	res, err := h.Upstream.GetTransactionResult(context, req)
+	res, err := h.upstream.GetTransactionResult(context, req)
 	h.log("upstream", "GetTransactionResult", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResultsByBlockID(context context.Context, req *access.GetTransactionsByBlockIDRequest) (*access.TransactionResultsResponse, error) {
-	if h.UseIndex {
+	if h.useIndex {
 		blockId := req.GetBlockId()
 		requiredEventEncodingVersion := req.GetEventEncodingVersion()
 
-		res, err := h.LocalData.GetTransactionResultsByBlockIDFromStorageData(context, blockId, requiredEventEncodingVersion)
+		res, err := h.getTransactionResultsByBlockIDFromStorageData(context, blockId, requiredEventEncodingVersion)
 		h.log("observerStorage", "GetTransactionResultsByBlockID", err)
 		return res, err
 	}
 
-	res, err := h.Upstream.GetTransactionResultsByBlockID(context, req)
+	res, err := h.upstream.GetTransactionResultsByBlockID(context, req)
 	h.log("upstream", "GetTransactionResultsByBlockID", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionsByBlockID(context context.Context, req *access.GetTransactionsByBlockIDRequest) (*access.TransactionsResponse, error) {
-	res, err := h.Upstream.GetTransactionsByBlockID(context, req)
+	res, err := h.upstream.GetTransactionsByBlockID(context, req)
 	h.log("upstream", "GetTransactionsByBlockID", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResultByIndex(context context.Context, req *access.GetTransactionByIndexRequest) (*access.TransactionResultResponse, error) {
-	if h.UseIndex {
+	if h.useIndex {
 		blockId := req.GetBlockId()
 		index := req.GetIndex()
 		requiredEventEncodingVersion := req.GetEventEncodingVersion()
 
-		res, err := h.LocalData.GetTransactionResultByIndexFromStorageData(context, blockId, index, requiredEventEncodingVersion)
+		res, err := h.getTransactionResultByIndexFromStorageData(context, blockId, index, requiredEventEncodingVersion)
 		h.log("observerStorage", "GetTransactionResultByIndex", err)
 		return res, err
 	}
 
-	res, err := h.Upstream.GetTransactionResultByIndex(context, req)
+	res, err := h.upstream.GetTransactionResultByIndex(context, req)
 	h.log("upstream", "GetTransactionResultByIndex", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetSystemTransaction(context context.Context, req *access.GetSystemTransactionRequest) (*access.TransactionResponse, error) {
-	res, err := h.Upstream.GetSystemTransaction(context, req)
+	res, err := h.upstream.GetSystemTransaction(context, req)
 	h.log("upstream", "GetSystemTransaction", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetSystemTransactionResult(context context.Context, req *access.GetSystemTransactionResultRequest) (*access.TransactionResultResponse, error) {
-	res, err := h.Upstream.GetSystemTransactionResult(context, req)
+	res, err := h.upstream.GetSystemTransactionResult(context, req)
 	h.log("upstream", "GetSystemTransactionResult", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetAccount(context context.Context, req *access.GetAccountRequest) (*access.GetAccountResponse, error) {
-	res, err := h.Upstream.GetAccount(context, req)
+	res, err := h.upstream.GetAccount(context, req)
 	h.log("upstream", "GetAccount", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetAccountAtLatestBlock(context context.Context, req *access.GetAccountAtLatestBlockRequest) (*access.AccountResponse, error) {
-	res, err := h.Upstream.GetAccountAtLatestBlock(context, req)
+	res, err := h.upstream.GetAccountAtLatestBlock(context, req)
 	h.log("upstream", "GetAccountAtLatestBlock", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetAccountAtBlockHeight(context context.Context, req *access.GetAccountAtBlockHeightRequest) (*access.AccountResponse, error) {
-	res, err := h.Upstream.GetAccountAtBlockHeight(context, req)
+	res, err := h.upstream.GetAccountAtBlockHeight(context, req)
 	h.log("upstream", "GetAccountAtBlockHeight", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) ExecuteScriptAtLatestBlock(context context.Context, req *access.ExecuteScriptAtLatestBlockRequest) (*access.ExecuteScriptResponse, error) {
-	res, err := h.Upstream.ExecuteScriptAtLatestBlock(context, req)
+	res, err := h.upstream.ExecuteScriptAtLatestBlock(context, req)
 	h.log("upstream", "ExecuteScriptAtLatestBlock", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) ExecuteScriptAtBlockID(context context.Context, req *access.ExecuteScriptAtBlockIDRequest) (*access.ExecuteScriptResponse, error) {
-	res, err := h.Upstream.ExecuteScriptAtBlockID(context, req)
+	res, err := h.upstream.ExecuteScriptAtBlockID(context, req)
 	h.log("upstream", "ExecuteScriptAtBlockID", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) ExecuteScriptAtBlockHeight(context context.Context, req *access.ExecuteScriptAtBlockHeightRequest) (*access.ExecuteScriptResponse, error) {
-	res, err := h.Upstream.ExecuteScriptAtBlockHeight(context, req)
+	res, err := h.upstream.ExecuteScriptAtBlockHeight(context, req)
 	h.log("upstream", "ExecuteScriptAtBlockHeight", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetEventsForHeightRange(context context.Context, req *access.GetEventsForHeightRangeRequest) (*access.EventsResponse, error) {
-	if h.UseIndex {
+	if h.useIndex {
 		eventType := req.GetType()
 		startHeight := req.GetStartHeight()
 		endHeight := req.GetEndHeight()
 		requiredEventEncodingVersion := req.GetEventEncodingVersion()
 
-		res, err := h.LocalData.GetEventsForHeightRangeFromStorageData(context, eventType, startHeight, endHeight, requiredEventEncodingVersion)
+		res, err := h.getEventsForHeightRangeFromStorageData(context, eventType, startHeight, endHeight, requiredEventEncodingVersion)
 		h.log("observerStorage", "GetEventsForHeightRange", err)
 		return res, err
 	}
 
-	res, err := h.Upstream.GetEventsForHeightRange(context, req)
+	res, err := h.upstream.GetEventsForHeightRange(context, req)
 	h.log("upstream", "GetEventsForHeightRange", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetEventsForBlockIDs(context context.Context, req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
-	if h.UseIndex {
+	if h.useIndex {
 		eventType := req.GetType()
 		blockIDs := convert.MessagesToIdentifiers(req.GetBlockIds())
 		requiredEventEncodingVersion := req.GetEventEncodingVersion()
 
-		res, err := h.LocalData.GetEventsForBlockIDsFromStorage(context, blockIDs, eventType, requiredEventEncodingVersion)
+		res, err := h.getEventsForBlockIDsFromStorage(context, blockIDs, eventType, requiredEventEncodingVersion)
 		h.log("observerStorage", "GetEventsForBlockIDs", err)
 		return res, err
 	}
 
-	res, err := h.Upstream.GetEventsForBlockIDs(context, req)
+	res, err := h.upstream.GetEventsForBlockIDs(context, req)
 	h.log("upstream", "GetEventsForBlockIDs", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetNetworkParameters(context context.Context, req *access.GetNetworkParametersRequest) (*access.GetNetworkParametersResponse, error) {
-	res, err := h.Observer.GetNetworkParameters(context, req)
+	res, err := h.observer.GetNetworkParameters(context, req)
 	h.log("observer", "GetNetworkParameters", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetLatestProtocolStateSnapshot(context context.Context, req *access.GetLatestProtocolStateSnapshotRequest) (*access.ProtocolStateSnapshotResponse, error) {
-	res, err := h.Observer.GetLatestProtocolStateSnapshot(context, req)
+	res, err := h.observer.GetLatestProtocolStateSnapshot(context, req)
 	h.log("observer", "GetLatestProtocolStateSnapshot", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetProtocolStateSnapshotByBlockID(context context.Context, req *access.GetProtocolStateSnapshotByBlockIDRequest) (*access.ProtocolStateSnapshotResponse, error) {
-	res, err := h.Observer.GetProtocolStateSnapshotByBlockID(context, req)
+	res, err := h.observer.GetProtocolStateSnapshotByBlockID(context, req)
 	h.log("observer", "GetProtocolStateSnapshotByBlockID", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetProtocolStateSnapshotByHeight(context context.Context, req *access.GetProtocolStateSnapshotByHeightRequest) (*access.ProtocolStateSnapshotResponse, error) {
-	res, err := h.Observer.GetProtocolStateSnapshotByHeight(context, req)
+	res, err := h.observer.GetProtocolStateSnapshotByHeight(context, req)
 	h.log("observer", "GetProtocolStateSnapshotByHeight", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetExecutionResultForBlockID(context context.Context, req *access.GetExecutionResultForBlockIDRequest) (*access.ExecutionResultForBlockIDResponse, error) {
-	res, err := h.Upstream.GetExecutionResultForBlockID(context, req)
+	res, err := h.upstream.GetExecutionResultForBlockID(context, req)
 	h.log("upstream", "GetExecutionResultForBlockID", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetExecutionResultByID(context context.Context, req *access.GetExecutionResultByIDRequest) (*access.ExecutionResultByIDResponse, error) {
-	res, err := h.Upstream.GetExecutionResultByID(context, req)
+	res, err := h.upstream.GetExecutionResultByID(context, req)
 	h.log("upstream", "GetExecutionResultByID", err)
 	return res, err
+}
+
+// getEventsForBlockIDsFromStorage retrieves events for all the specified block IDs that have the given type from storage.
+func (h *FlowAccessAPIRouter) getEventsForBlockIDsFromStorage(ctx context.Context,
+	blockIDs []flow.Identifier,
+	eventType string,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+) (*access.EventsResponse, error) {
+	events, err := h.backendEvents.GetEventsForBlockIDs(ctx, eventType, blockIDs, requiredEventEncodingVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	resultEvents, err := rpcConvert.BlockEventsToMessages(events)
+	if err != nil {
+		return nil, err
+	}
+
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.EventsResponse{
+		Results:  resultEvents,
+		Metadata: metadata,
+	}, nil
+}
+
+// getEventsForHeightRangeFromStorageData retrieves events for all sealed blocks between the start block height and
+// the end block height (inclusive) that have the given type from storage.
+func (h *FlowAccessAPIRouter) getEventsForHeightRangeFromStorageData(
+	ctx context.Context,
+	eventType string,
+	startHeight, endHeight uint64,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+) (*access.EventsResponse, error) {
+	events, err := h.backendEvents.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight, requiredEventEncodingVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	resultEvents, err := rpcConvert.BlockEventsToMessages(events)
+	if err != nil {
+		return nil, err
+	}
+
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.EventsResponse{
+		Results:  resultEvents,
+		Metadata: metadata,
+	}, nil
+}
+
+// getTransactionResultFromStorageData retrieves a transaction result from storage by block ID and transaction ID.
+func (h *FlowAccessAPIRouter) getTransactionResultFromStorageData(
+	ctx context.Context,
+	txID []byte,
+	blockID []byte,
+	collectionID []byte,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+) (*access.TransactionResultResponse, error) {
+	transactionID, err := rpcConvert.TransactionID(txID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid transaction id: %v", err)
+	}
+
+	blockId := flow.ZeroID
+	requestBlockId := blockID
+	if requestBlockId != nil {
+		blockId, err = rpcConvert.BlockID(requestBlockId)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
+		}
+	}
+
+	collectionId := flow.ZeroID
+	requestCollectionId := collectionID
+	if requestCollectionId != nil {
+		collectionId, err = rpcConvert.CollectionID(requestCollectionId)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid collection id: %v", err)
+		}
+	}
+
+	block, err := h.transactionsLocalDataProvider.RetrieveBlock(blockId, collectionId, transactionID)
+	// an error occurred looking up the block or the requested block or collection was not found.
+	// If looking up the block based solely on the txID returns not found, then no error is
+	// returned since the block may not be finalized yet.
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
+	result, err := h.transactionsLocalDataProvider.GetTransactionResultFromStorage(ctx, block, transactionID, requiredEventEncodingVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.TransactionResultResponse{
+		Status:        entities.TransactionStatus(result.Status),
+		StatusCode:    uint32(result.StatusCode),
+		ErrorMessage:  result.ErrorMessage,
+		Events:        rpcConvert.EventsToMessages(result.Events),
+		BlockId:       result.BlockID[:],
+		TransactionId: result.TransactionID[:],
+		CollectionId:  result.CollectionID[:],
+		BlockHeight:   result.BlockHeight,
+		Metadata:      metadata,
+	}, nil
+}
+
+func (h *FlowAccessAPIRouter) getTransactionResultsByBlockIDFromStorageData(
+	ctx context.Context,
+	blockID []byte,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+) (*access.TransactionResultsResponse, error) {
+	blockId, err := rpcConvert.BlockID(blockID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
+	}
+
+	block, err := h.transactionsLocalDataProvider.Blocks.ByID(blockId)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
+	results, err := h.transactionsLocalDataProvider.GetTransactionResultsByBlockIDFromStorage(ctx, block, requiredEventEncodingVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
+
+	var txResultsResponse []*access.TransactionResultResponse
+	for _, result := range results {
+		resultResponse := &access.TransactionResultResponse{
+			Status:        entities.TransactionStatus(result.Status),
+			StatusCode:    uint32(result.StatusCode),
+			ErrorMessage:  result.ErrorMessage,
+			Events:        rpcConvert.EventsToMessages(result.Events),
+			BlockId:       result.BlockID[:],
+			TransactionId: result.TransactionID[:],
+			CollectionId:  result.CollectionID[:],
+			BlockHeight:   result.BlockHeight,
+		}
+
+		txResultsResponse = append(txResultsResponse, resultResponse)
+	}
+
+	return &access.TransactionResultsResponse{
+		TransactionResults: txResultsResponse,
+		Metadata:           metadata,
+	}, nil
+}
+
+func (h *FlowAccessAPIRouter) getTransactionResultByIndexFromStorageData(
+	ctx context.Context,
+	blockID []byte,
+	index uint32,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+) (*access.TransactionResultResponse, error) {
+	blockId, err := rpcConvert.BlockID(blockID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
+	}
+
+	block, err := h.transactionsLocalDataProvider.Blocks.ByID(blockId)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
+	result, err := h.transactionsLocalDataProvider.GetTransactionResultByIndexFromStorage(
+		ctx,
+		block,
+		index,
+		requiredEventEncodingVersion,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.TransactionResultResponse{
+		Status:        entities.TransactionStatus(result.Status),
+		StatusCode:    uint32(result.StatusCode),
+		ErrorMessage:  result.ErrorMessage,
+		Events:        rpcConvert.EventsToMessages(result.Events),
+		BlockId:       result.BlockID[:],
+		TransactionId: result.TransactionID[:],
+		CollectionId:  result.CollectionID[:],
+		BlockHeight:   result.BlockHeight,
+		Metadata:      metadata,
+	}, nil
+}
+
+// buildMetadataResponse builds and returns the metadata response object.
+func (h *FlowAccessAPIRouter) buildMetadataResponse() (*entities.Metadata, error) {
+	lastFinalizedHeader, err := h.state.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get finalized, %w", err)
+	}
+	finalizedBlockId := lastFinalizedHeader.ID()
+	nodeId := h.nodeId
+
+	return &entities.Metadata{
+		LatestFinalizedBlockId: finalizedBlockId[:],
+		LatestFinalizedHeight:  lastFinalizedHeader.Height,
+		NodeId:                 nodeId[:],
+	}, nil
+}
+
+// TODO: implementation of those methods should be done as separate task as it's big scope of work
+
+// LookupErrorMessageByIndex implements TransactionErrorMessage.
+func (h *FlowAccessAPIRouter) LookupErrorMessageByIndex(ctx context.Context, blockID flow.Identifier, height uint64, index uint32) (string, error) {
+	return "", nil
+}
+
+// LookupErrorMessageByTransactionID implements TransactionErrorMessage.
+func (h *FlowAccessAPIRouter) LookupErrorMessageByTransactionID(ctx context.Context, blockID flow.Identifier, transactionID flow.Identifier) (string, error) {
+	return "", nil
+}
+
+// LookupErrorMessagesByBlockID implements TransactionErrorMessage.
+func (h *FlowAccessAPIRouter) LookupErrorMessagesByBlockID(ctx context.Context, blockID flow.Identifier, height uint64) (map[flow.Identifier]string, error) {
+	return map[flow.Identifier]string{}, nil
 }
 
 // FlowAccessAPIForwarder forwards all requests to a set of upstream access nodes or observers
