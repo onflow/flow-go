@@ -376,7 +376,7 @@ func (proc *procedure) runDirect(
 	proc.evm.TxContext.Origin = msg.From
 	res, err := proc.run(msg, txHash, txIndex, types.DirectCallTxType)
 	if err != nil {
-		return res, err
+		return nil, err
 	}
 	// all commmit errors (StateDB errors) has to be returned
 	return res, proc.commit()

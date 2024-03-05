@@ -471,7 +471,7 @@ func (a *Account) deposit(v *types.FLOWTokenVault) error {
 	bridgeAccount := a.fch.AccountByAddress(bridge, false)
 
 	call := types.NewDepositCall(
-		a.fch.addressAllocator.NativeTokenBridgeAddress(),
+		bridge,
 		a.address,
 		v.Balance(),
 		bridgeAccount.Nonce(),
