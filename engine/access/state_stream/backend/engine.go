@@ -80,7 +80,7 @@ func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionDat
 	err := e.backend.OnExecutionData(executionData)
 	if err != nil {
 		// if the execution data is available, the block must be locally finalized
-		lg.Fatal().Err(err).Msg("failed to get header for execution data")
+		lg.Fatal().Err(err).Msg("failed to notify of new execution data")
 		return
 	}
 

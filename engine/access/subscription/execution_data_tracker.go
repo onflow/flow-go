@@ -32,7 +32,7 @@ var _ ExecutionDataTracker = (*ExecutionDataTrackerImpl)(nil)
 
 // ExecutionDataTrackerImpl is an implementation of the ExecutionDataTracker interface.
 type ExecutionDataTrackerImpl struct {
-	*BaseTrackerImpl
+	BaseTracker
 	headers       storage.Headers
 	indexReporter state_synchronization.IndexReporter
 	useIndex      bool
@@ -61,20 +61,21 @@ func NewExecutionDataTracker(
 	highestAvailableFinalizedHeight uint64,
 	indexReporter state_synchronization.IndexReporter,
 	useIndex bool,
-) (*ExecutionDataTrackerImpl, error) {
+) *ExecutionDataTrackerImpl {
 	return &ExecutionDataTrackerImpl{
-		BaseTrackerImpl: NewBaseTrackerImpl(rootHeight, state, headers),
-		headers:         headers,
-		highestHeight:   counters.NewMonotonousCounter(highestAvailableFinalizedHeight),
-		indexReporter:   indexReporter,
-		useIndex:        useIndex,
-	}, nil
+		BaseTracker:   NewBaseTrackerImpl(rootHeight, state, headers),
+		headers:       headers,
+		highestHeight: counters.NewMonotonousCounter(highestAvailableFinalizedHeight),
+		indexReporter: indexReporter,
+		useIndex:      useIndex,
+	}
 }
 
 // GetStartHeight returns the start height to use when searching.
 // Only one of startBlockID and startHeight may be set. Otherwise, an InvalidArgument error is returned.
 // If a block is provided and does not exist, a NotFound error is returned.
 // If neither startBlockID nor startHeight is provided, the latest sealed block is used.
+// If the start block is the root block, skip it and begin from the next block.
 //
 // Parameters:
 // - ctx: Context for the operation.
@@ -91,40 +92,33 @@ func NewExecutionDataTracker(
 // - storage.ErrNotFound   - if a block is provided and does not exist.
 // - codes.Internal        - if there is an internal error.
 func (e *ExecutionDataTrackerImpl) GetStartHeight(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
-	height, err := e.BaseTrackerImpl.GetStartHeight(ctx, startBlockID, startHeight)
+	height, err := e.BaseTracker.GetStartHeight(ctx, startBlockID, startHeight)
 	if err != nil {
 		return 0, err
 	}
 
 	// ensure that the resolved start height is available
-	height, err = e.checkStartHeight(height)
-	if err != nil {
-		return 0, err
-	}
+	return e.checkStartHeight(height)
+}
 
-	return height, nil
+// GetHighestHeight returns the highest height that we have consecutive execution data for.
+func (e *ExecutionDataTrackerImpl) GetHighestHeight() uint64 {
+	return e.highestHeight.Value()
 }
 
 // OnExecutionData is used to notify the tracker when a new execution data is received.
 //
-// Expected errors during normal operation:
-// - storage.ErrNotFound - if no block header with the given ID exists
+// No errors expected during normal operations.
 func (e *ExecutionDataTrackerImpl) OnExecutionData(executionData *execution_data.BlockExecutionDataEntity) error {
 	header, err := e.headers.ByBlockID(executionData.BlockID)
 	if err != nil {
 		// if the execution data is available, the block must be locally finalized
-		return err
+		return rpc.ConvertError(err, "failed to get header for block", codes.Internal)
 	}
 
 	// sets the highest height for which execution data is available.
-	e.highestHeight.Set(header.Height)
+	_ = e.highestHeight.Set(header.Height)
 	return nil
-}
-
-// GetHighestHeight returns the highest height that we have consecutive execution data for.
-// No errors expected during normal operations.
-func (e *ExecutionDataTrackerImpl) GetHighestHeight() uint64 {
-	return e.highestHeight.Value()
 }
 
 // checkStartHeight validates the provided start height and adjusts it if necessary based on the tracker's configuration.
@@ -137,14 +131,13 @@ func (e *ExecutionDataTrackerImpl) GetHighestHeight() uint64 {
 // - error: An error indicating any issues with the provided start height.
 //
 // Validation Steps:
-// 1. If the start block is the root block, there won't be execution data. Skip it and begin from the next block.
-// 2. If index usage is disabled, return the original height without further checks.
-// 3. Retrieve the lowest and highest indexed block heights.
-// 4. Check if the provided height is within the bounds of indexed heights.
+// 1. If index usage is disabled, return the original height without further checks.
+// 2. Retrieve the lowest and highest indexed block heights.
+// 3. Check if the provided height is within the bounds of indexed heights.
 //   - If below the lowest indexed height, return codes.InvalidArgument error.
 //   - If above the highest indexed height, return codes.InvalidArgument error.
 //
-// 5. If validation passes, return the adjusted start height.
+// 4. If validation passes, return the adjusted start height.
 //
 // Expected errors during normal operation:
 // - codes.InvalidArgument    - if both startBlockID and startHeight are provided, if the start height is less than the
@@ -152,12 +145,6 @@ func (e *ExecutionDataTrackerImpl) GetHighestHeight() uint64 {
 // - codes.FailedPrecondition - if the index reporter is not ready yet.
 // - codes.Internal           - for any other error during validation.
 func (e *ExecutionDataTrackerImpl) checkStartHeight(height uint64) (uint64, error) {
-	// if the start block is the root block, there will not be an execution data. skip it and
-	// begin from the next block.
-	if height == e.rootBlockHeight {
-		height = e.rootBlockHeight + 1
-	}
-
 	if !e.useIndex {
 		return height, nil
 	}

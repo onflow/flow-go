@@ -106,7 +106,6 @@ func (s *BackendBlocksSuite) SetupTest() {
 	s.rootBlock = unittest.BlockFixture()
 	parent := s.rootBlock.Header
 	s.blockMap[s.rootBlock.Header.Height] = &s.rootBlock
-	s.blocksArray = append(s.blocksArray, &s.rootBlock)
 
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)

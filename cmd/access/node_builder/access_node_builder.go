@@ -886,7 +886,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			useIndex := builder.executionDataIndexingEnabled &&
 				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
 
-			executionDataTracker, err := subscription.NewExecutionDataTracker(
+			executionDataTracker := subscription.NewExecutionDataTracker(
 				node.State,
 				builder.executionDataConfig.InitialBlockHeight,
 				node.Storage.Headers,
@@ -894,9 +894,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.EventsIndex,
 				useIndex,
 			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to initialize execution data tracker: %w", err)
-			}
 
 			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,

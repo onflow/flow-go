@@ -39,7 +39,8 @@ func NewHandler(
 	finalizedHeader module.FinalizedHeaderCache,
 	me module.Local,
 	maxStreams uint32,
-	options ...HandlerOption) *Handler {
+	options ...HandlerOption,
+) *Handler {
 	h := &Handler{
 		StreamingData:        subscription.NewStreamingData(maxStreams),
 		api:                  api,

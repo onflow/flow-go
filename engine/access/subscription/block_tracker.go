@@ -33,7 +33,7 @@ var _ BlockTracker = (*BlockTrackerImpl)(nil)
 
 // BlockTrackerImpl is an implementation of the BlockTracker interface.
 type BlockTrackerImpl struct {
-	*BaseTrackerImpl
+	BaseTracker
 	state       protocol.State
 	broadcaster *engine.Broadcaster
 
@@ -73,7 +73,7 @@ func NewBlockTracker(
 	}
 
 	return &BlockTrackerImpl{
-		BaseTrackerImpl:        NewBaseTrackerImpl(rootHeight, state, headers),
+		BaseTracker:            NewBaseTrackerImpl(rootHeight, state, headers),
 		state:                  state,
 		finalizedHighestHeight: counters.NewMonotonousCounter(lastFinalized.Height),
 		sealedHighestHeight:    counters.NewMonotonousCounter(lastSealed.Height),
@@ -100,6 +100,8 @@ func (b *BlockTrackerImpl) GetHighestHeight(blockStatus flow.BlockStatus) (uint6
 // ProcessOnFinalizedBlock drives the subscription logic when a block is finalized.
 // The input to this callback is treated as trusted. This method should be executed on
 // `OnFinalizedBlock` notifications from the node-internal consensus instance.
+// No errors are expected during normal operation. Any errors encountered should be
+// treated as an exception.
 func (b *BlockTrackerImpl) ProcessOnFinalizedBlock() error {
 	// get the finalized header from state
 	finalizedHeader, err := b.state.Final().Head()
@@ -117,7 +119,8 @@ func (b *BlockTrackerImpl) ProcessOnFinalizedBlock() error {
 		return irrecoverable.NewExceptionf("unable to get latest sealed header: %w", err)
 	}
 
-	b.sealedHighestHeight.Set(sealedHeader.Height)
+	// always publish since there is also a new finalized block.
+	_ = b.sealedHighestHeight.Set(sealedHeader.Height)
 
 	b.broadcaster.Publish()
 
