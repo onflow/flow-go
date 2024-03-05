@@ -8,6 +8,12 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 )
 
+// ProcessingStateMachine is a dedicated structure that encapsulates all logic for evolving KV store, based on the content
+// of a new block.
+// ProcessingStateMachine processes a subset of service events that are relevant for the KV store, and ignores all other events.
+// Each relevant event is validated before it is applied to the KV store.
+// All updates are applied to a copy of parent KV store, so parent KV store is not modified.
+// A separate instance should be created for each block to process the updates therein.
 type ProcessingStateMachine struct {
 	view        uint64
 	parentState protocol_state.Reader
@@ -17,6 +23,8 @@ type ProcessingStateMachine struct {
 
 var _ protocol_state.KeyValueStoreStateMachine = (*ProcessingStateMachine)(nil)
 
+// NewProcessingStateMachine creates a new key-value store state machine.
+// The underlying state is a clone of the parent state to ensure that the parent state is not modified.
 func NewProcessingStateMachine(
 	view uint64,
 	params protocol.GlobalParams,
@@ -31,6 +39,7 @@ func NewProcessingStateMachine(
 	}
 }
 
+// Build returns updated key-value store model, state ID and a flag indicating if there were any changes.
 func (m *ProcessingStateMachine) Build() (updatedState protocol_state.Reader, stateID flow.Identifier, hasChanges bool) {
 	updatedState = m.state.Clone()
 	stateID = updatedState.ID()
@@ -38,6 +47,11 @@ func (m *ProcessingStateMachine) Build() (updatedState protocol_state.Reader, st
 	return
 }
 
+// ProcessUpdate updates the current state of key-value store.
+// KeyValueStoreStateMachine captures only a subset of all service events, those that are relevant for the KV store. All other events are ignored.
+// Implementors MUST ensure KeyValueStoreStateMachine is left in functional state if an invalid service event has been supplied.
+// Expected errors indicating that we have observed and invalid service event from protocol's point of view.
+//   - `protocol.InvalidServiceEventError` - if the service event is invalid for the current protocol state.
 func (m *ProcessingStateMachine) ProcessUpdate(update *flow.ServiceEvent) error {
 	switch update.Type {
 	case flow.ServiceEventProtocolStateVersionUpgrade:
@@ -69,10 +83,13 @@ func (m *ProcessingStateMachine) ProcessUpdate(update *flow.ServiceEvent) error 
 	return nil
 }
 
+// View returns the view that is associated with this KeyValueStoreStateMachine.
+// The view of the KeyValueStoreStateMachine equals the view of the block carrying the respective updates.
 func (m *ProcessingStateMachine) View() uint64 {
 	return m.view
 }
 
+// ParentState returns parent state that is associated with this state machine.
 func (m *ProcessingStateMachine) ParentState() protocol_state.Reader {
 	return m.parentState
 }

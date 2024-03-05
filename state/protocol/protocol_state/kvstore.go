@@ -92,11 +92,11 @@ type KeyValueStoreStateMachine interface {
 	// Build returns updated key-value store model, state ID and a flag indicating if there were any changes.
 	Build() (updatedState Reader, stateID flow.Identifier, hasChanges bool)
 
-	// ProcessUpdate updates current state of key-value store.
+	// ProcessUpdate updates the current state of key-value store.
+	// KeyValueStoreStateMachine captures only a subset of all service events, those that are relevant for the KV store. All other events are ignored.
+	// Implementors MUST ensure KeyValueStoreStateMachine is left in functional state if an invalid service event has been supplied.
 	// Expected errors indicating that we have observed and invalid service event from protocol's point of view.
-	//   - `protocol.InvalidServiceEventError` - if the service event is invalid for the current protocol state.
-	//     CAUTION: the KeyValueStoreStateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
-	//     after such error and discard the protocolStateMachine!
+	// 	- `protocol.InvalidServiceEventError` - if the service event is invalid for the current protocol state.
 	ProcessUpdate(update *flow.ServiceEvent) error
 
 	// View returns the view that is associated with this KeyValueStoreStateMachine.
