@@ -60,6 +60,15 @@ func (m *ProcessingStateMachine) ProcessUpdate(update *flow.ServiceEvent) error 
 			return fmt.Errorf("internal invalid type for ProtocolStateVersionUpgrade: %T", update.Event)
 		}
 
+		// To switch the protocol version, replica needs to process a block with a view >= activation view.
+		// But we cannot activate a new version till the block containing the seal is finalized because we cannot switch between chain forks.
+		// The problem is that finality is local to each node due to the nature of the consensus algorithm itself.
+		// We would like to guarantee that all nodes switch the protocol version at exactly the same block.
+		// To guarantee that all nodes switch the protocol version at exactly the same block, we require that the
+		// activation view is higher than the sealing view + Δ when accepting the event. Δ represents the finalization lag
+		// to give time for replicas to finalize the block containing the seal for the version upgrade event.
+		// When replica reaches activation view and the latest finalized protocol state knows about the version upgrade,
+		// then it's safe to switch the protocol version.
 		if m.view+m.params.EpochCommitSafetyThreshold() >= versionUpgrade.ActiveView {
 			return protocol.NewInvalidServiceEventErrorf("invalid protocol state version upgrade view %d -> %d: %w",
 				m.view+m.params.EpochCommitSafetyThreshold(), versionUpgrade.ActiveView, ErrInvalidActivationView)
