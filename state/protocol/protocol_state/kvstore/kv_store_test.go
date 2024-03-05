@@ -1,12 +1,13 @@
 package kvstore
 
 import (
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 )
 
 // TestEncodeDecode tests encoding and decoding all supported model versions.

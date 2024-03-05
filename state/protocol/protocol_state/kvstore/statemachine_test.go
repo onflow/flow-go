@@ -1,14 +1,16 @@
 package kvstore
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/onflow/flow-go/state/protocol"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"testing"
 )
 
 func TestStateMachine(t *testing.T) {

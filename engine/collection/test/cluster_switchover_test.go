@@ -24,6 +24,7 @@ import (
 	bcluster "github.com/onflow/flow-go/state/cluster/badger"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
