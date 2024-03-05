@@ -17,8 +17,7 @@ func TestStateMachine(t *testing.T) {
 	suite.Run(t, new(StateMachineSuite))
 }
 
-// BaseProtocolStateMachineSuite is a base test suite that holds common functionality for testing protocol state machines.
-// It reflects the portion of data which is present in baseProtocolStateMachine.
+// StateMachineSuite is a dedicated test suite for testing KV store state machine.
 type StateMachineSuite struct {
 	suite.Suite
 
@@ -43,18 +42,18 @@ func (s *StateMachineSuite) SetupTest() {
 	require.NotNil(s.T(), s.stateMachine)
 }
 
+// TestInitialInvariants ensures that initial state machine invariants are met.
+// It checks that state machine has correct view and parent state.
 func (s *StateMachineSuite) TestInitialInvariants() {
-	stateID := unittest.IdentifierFixture()
-	s.parentState.On("ID").Return(stateID)
-	s.mutator.On("ID").Return(stateID)
-
 	require.Equal(s.T(), s.view, s.stateMachine.View())
 	require.Equal(s.T(), s.parentState, s.stateMachine.ParentState())
-	_, id, hasChanges := s.stateMachine.Build()
-	require.False(s.T(), hasChanges, "initial state should not have changes")
-	require.Equal(s.T(), s.parentState.ID(), id, "initial state should not have changes")
 }
 
+// TestProcessUpdate_ProtocolStateVersionUpgrade ensures that state machine can process protocol state version upgrade event.
+// It checks several cases including
+// * happy path - valid upgrade version and activation view
+// * invalid upgrade version - has to return sentinel error since version is invalid
+// * invalid activation view - has to return sentinel error since activation view doesn't meet threshold.
 func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
 	s.Run("happy-path", func() {
 		oldVersion := uint64(0)
@@ -95,4 +94,35 @@ func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
 		require.ErrorIs(s.T(), err, ErrInvalidActivationView, "has to be expected sentinel")
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err), "has to be expected sentinel")
 	})
+}
+
+// TestBuild_NoChanges ensures that state machine can build state when changes weren't applied.
+// In this case, state machine should return parent state and `hasChanges = false` flag.
+func (s *StateMachineSuite) TestBuild_NoChanges() {
+	stateID := unittest.IdentifierFixture()
+	s.parentState.On("ID").Return(stateID)
+
+	s.mutator.On("ID").Return(stateID)
+	s.mutator.On("Clone").Return(s.mutator).Once()
+
+	updatedState, id, hasChanges := s.stateMachine.Build()
+	require.False(s.T(), hasChanges, "initial state should not have changes")
+	require.Equal(s.T(), s.parentState.ID(), id, "initial state should not have changes")
+	require.Equal(s.T(), s.parentState.ID(), updatedState.ID())
+}
+
+// TestBuild_HasChanges ensures that state machine can build state when changes were applied.
+// In this case, state machine should return an updated state and `hasChanges = true` flag.
+func (s *StateMachineSuite) TestBuild_HasChanges() {
+	stateID := unittest.IdentifierFixture()
+	s.parentState.On("ID").Return(stateID)
+
+	updatedStateID := unittest.IdentifierFixture()
+	s.mutator.On("ID").Return(updatedStateID)
+	s.mutator.On("Clone").Return(s.mutator).Once()
+
+	updatedState, id, hasChanges := s.stateMachine.Build()
+	require.True(s.T(), hasChanges, "initial state should have changes")
+	require.Equal(s.T(), updatedState.ID(), id)
+	require.Equal(s.T(), updatedState.ID(), updatedStateID)
 }
