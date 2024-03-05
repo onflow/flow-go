@@ -64,6 +64,9 @@ func EnsureSecretDB(db *badger.DB) error {
 // insertDBTypeMarker inserts a database type marker if none exists. If a marker
 // already exists in the database, this function will return an error if the
 // marker does not match the argument, or return nil if it matches.
+// possible error:
+// errUncompressedValue if the value is uncompressed
+// other errors are exceptions
 func insertDBTypeMarker(marker dbTypeMarker) func(*badger.Txn) error {
 	return func(txn *badger.Txn) error {
 		var storedMarker dbTypeMarker
