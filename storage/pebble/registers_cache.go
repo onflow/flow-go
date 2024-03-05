@@ -15,8 +15,8 @@ const (
 )
 
 type RegistersCache struct {
-	registers *Registers
-	cache     *ReadCache
+	*Registers
+	cache *ReadCache
 }
 
 var _ storage.RegisterIndex = (*RegistersCache)(nil)
@@ -41,7 +41,7 @@ func NewRegistersCache(registers *Registers, cacheType CacheType, size uint, met
 	}
 
 	return &RegistersCache{
-		registers: registers,
+		Registers: registers,
 		cache:     cache,
 	}, nil
 }
@@ -59,25 +59,4 @@ func (c *RegistersCache) Get(
 	height uint64,
 ) (flow.RegisterValue, error) {
 	return c.cache.Get(newLookupKey(height, reg).String())
-}
-
-// Store sets the given entries in a batch.
-// This function is expected to be called at one batch per height, sequentially. Under normal conditions,
-// it should be called wth the value of height set to LatestHeight + 1
-// CAUTION: This function is not safe for concurrent use.
-func (c *RegistersCache) Store(
-	entries flow.RegisterEntries,
-	height uint64,
-) error {
-	return c.registers.Store(entries, height)
-}
-
-// LatestHeight Gets the latest height of complete registers available
-func (c *RegistersCache) LatestHeight() uint64 {
-	return c.registers.LatestHeight()
-}
-
-// FirstHeight first indexed height found in the store, typically root block for the spork
-func (c *RegistersCache) FirstHeight() uint64 {
-	return c.registers.FirstHeight()
 }

@@ -138,6 +138,9 @@ func (c *ReadCache) Get(key string) (flow.RegisterValue, error) {
 	resource, cached := c.cache.Get(key)
 	if cached {
 		c.metrics.CacheHit(c.resource)
+		if resource == nil {
+			return nil, storage.ErrNotFound
+		}
 		return resource, nil
 	}
 
@@ -145,6 +148,8 @@ func (c *ReadCache) Get(key string) (flow.RegisterValue, error) {
 	resource, err := c.retrieve(key)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
+			c.cache.Add(key, nil)
+			c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
 			c.metrics.CacheNotFound(c.resource)
 		}
 		return nil, fmt.Errorf("could not retrieve resource: %w", err)
