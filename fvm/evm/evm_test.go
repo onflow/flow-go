@@ -160,11 +160,12 @@ func TestEVMRun(t *testing.T) {
 
 							assert(res.status == EVM.Status.failed, message: "unexpected status")
 							// ExecutionErrCodeExecutionReverted
-							assert(res.errorCode == 306, message: "unexpected error code")
+							assert(res.errorCode == %d, message: "unexpected error code")
 						}
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
+					types.ExecutionErrCodeExecutionReverted,
 				))
 
 				num := int64(12)
@@ -441,7 +442,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
 					cadenceOwnedAccount.deposit(from: <-vault)
 
-					let bal = EVM.Balance(0)
+					let bal = EVM.Balance(attoflow: 0)
 					bal.setFLOW(flow: 1.23)
 					let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
 					let balance = vault2.balance
@@ -494,7 +495,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
 					cadenceOwnedAccount.deposit(from: <-vault)
 
-					let bal = EVM.Balance(0)
+					let bal = EVM.Balance(attoflow: 0)
 					bal.setFLOW(flow: 1.23)
 
 					let recipientEVMAddress = EVM.EVMAddress(bytes: address)
@@ -561,7 +562,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
 					cadenceOwnedAccount.deposit(from: <-vault)
 
-					let bal = EVM.Balance(0)
+					let bal = EVM.Balance(attoflow: 0)
 					bal.setFLOW(flow: 1.23)
 					let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
 					let balance = vault2.balance
@@ -929,7 +930,7 @@ func getFlowAccountBalance(
 ) uint64 {
 	code := []byte(fmt.Sprintf(
 		`
-		pub fun main(): UFix64 {
+		access(all) fun main(): UFix64 {
 			return getAccount(%s).balance
 		}
 		`,
