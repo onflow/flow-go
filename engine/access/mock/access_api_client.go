@@ -1073,8 +1073,8 @@ func (_m *AccessAPIClient) SendTransaction(ctx context.Context, in *access.SendT
 	return r0, r1
 }
 
-// SubscribeBlockDigests provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) SubscribeBlockDigests(ctx context.Context, in *access.SubscribeBlockDigestsRequest, opts ...grpc.CallOption) (access.AccessAPI_SubscribeBlockDigestsClient, error) {
+// SubscribeBlockDigestsFromLatest provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) SubscribeBlockDigestsFromLatest(ctx context.Context, in *access.SubscribeBlockDigestsFromLatestRequest, opts ...grpc.CallOption) (access.AccessAPI_SubscribeBlockDigestsFromLatestClient, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -1084,20 +1084,20 @@ func (_m *AccessAPIClient) SubscribeBlockDigests(ctx context.Context, in *access
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 access.AccessAPI_SubscribeBlockDigestsClient
+	var r0 access.AccessAPI_SubscribeBlockDigestsFromLatestClient
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlockDigestsRequest, ...grpc.CallOption) (access.AccessAPI_SubscribeBlockDigestsClient, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlockDigestsFromLatestRequest, ...grpc.CallOption) (access.AccessAPI_SubscribeBlockDigestsFromLatestClient, error)); ok {
 		return rf(ctx, in, opts...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlockDigestsRequest, ...grpc.CallOption) access.AccessAPI_SubscribeBlockDigestsClient); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlockDigestsFromLatestRequest, ...grpc.CallOption) access.AccessAPI_SubscribeBlockDigestsFromLatestClient); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(access.AccessAPI_SubscribeBlockDigestsClient)
+			r0 = ret.Get(0).(access.AccessAPI_SubscribeBlockDigestsFromLatestClient)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *access.SubscribeBlockDigestsRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *access.SubscribeBlockDigestsFromLatestRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)
@@ -1106,8 +1106,8 @@ func (_m *AccessAPIClient) SubscribeBlockDigests(ctx context.Context, in *access
 	return r0, r1
 }
 
-// SubscribeBlockHeaders provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) SubscribeBlockHeaders(ctx context.Context, in *access.SubscribeBlockHeadersRequest, opts ...grpc.CallOption) (access.AccessAPI_SubscribeBlockHeadersClient, error) {
+// SubscribeBlockDigestsFromStartBlockID provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) SubscribeBlockDigestsFromStartBlockID(ctx context.Context, in *access.SubscribeBlockDigestsFromStartBlockIDRequest, opts ...grpc.CallOption) (access.AccessAPI_SubscribeBlockDigestsFromStartBlockIDClient, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -1117,20 +1117,20 @@ func (_m *AccessAPIClient) SubscribeBlockHeaders(ctx context.Context, in *access
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 access.AccessAPI_SubscribeBlockHeadersClient
+	var r0 access.AccessAPI_SubscribeBlockDigestsFromStartBlockIDClient
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlockHeadersRequest, ...grpc.CallOption) (access.AccessAPI_SubscribeBlockHeadersClient, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlockDigestsFromStartBlockIDRequest, ...grpc.CallOption) (access.AccessAPI_SubscribeBlockDigestsFromStartBlockIDClient, error)); ok {
 		return rf(ctx, in, opts...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlockHeadersRequest, ...grpc.CallOption) access.AccessAPI_SubscribeBlockHeadersClient); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlockDigestsFromStartBlockIDRequest, ...grpc.CallOption) access.AccessAPI_SubscribeBlockDigestsFromStartBlockIDClient); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(access.AccessAPI_SubscribeBlockHeadersClient)
+			r0 = ret.Get(0).(access.AccessAPI_SubscribeBlockDigestsFromStartBlockIDClient)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *access.SubscribeBlockHeadersRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *access.SubscribeBlockDigestsFromStartBlockIDRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)
@@ -1139,8 +1139,8 @@ func (_m *AccessAPIClient) SubscribeBlockHeaders(ctx context.Context, in *access
 	return r0, r1
 }
 
-// SubscribeBlocks provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) SubscribeBlocks(ctx context.Context, in *access.SubscribeBlocksRequest, opts ...grpc.CallOption) (access.AccessAPI_SubscribeBlocksClient, error) {
+// SubscribeBlockDigestsFromStartHeight provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) SubscribeBlockDigestsFromStartHeight(ctx context.Context, in *access.SubscribeBlockDigestsFromStartHeightRequest, opts ...grpc.CallOption) (access.AccessAPI_SubscribeBlockDigestsFromStartHeightClient, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -1150,20 +1150,218 @@ func (_m *AccessAPIClient) SubscribeBlocks(ctx context.Context, in *access.Subsc
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 access.AccessAPI_SubscribeBlocksClient
+	var r0 access.AccessAPI_SubscribeBlockDigestsFromStartHeightClient
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlocksRequest, ...grpc.CallOption) (access.AccessAPI_SubscribeBlocksClient, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlockDigestsFromStartHeightRequest, ...grpc.CallOption) (access.AccessAPI_SubscribeBlockDigestsFromStartHeightClient, error)); ok {
 		return rf(ctx, in, opts...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlocksRequest, ...grpc.CallOption) access.AccessAPI_SubscribeBlocksClient); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlockDigestsFromStartHeightRequest, ...grpc.CallOption) access.AccessAPI_SubscribeBlockDigestsFromStartHeightClient); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(access.AccessAPI_SubscribeBlocksClient)
+			r0 = ret.Get(0).(access.AccessAPI_SubscribeBlockDigestsFromStartHeightClient)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *access.SubscribeBlocksRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *access.SubscribeBlockDigestsFromStartHeightRequest, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// SubscribeBlockHeadersFromLatest provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) SubscribeBlockHeadersFromLatest(ctx context.Context, in *access.SubscribeBlockHeadersFromLatestRequest, opts ...grpc.CallOption) (access.AccessAPI_SubscribeBlockHeadersFromLatestClient, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 access.AccessAPI_SubscribeBlockHeadersFromLatestClient
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlockHeadersFromLatestRequest, ...grpc.CallOption) (access.AccessAPI_SubscribeBlockHeadersFromLatestClient, error)); ok {
+		return rf(ctx, in, opts...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlockHeadersFromLatestRequest, ...grpc.CallOption) access.AccessAPI_SubscribeBlockHeadersFromLatestClient); ok {
+		r0 = rf(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(access.AccessAPI_SubscribeBlockHeadersFromLatestClient)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.SubscribeBlockHeadersFromLatestRequest, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// SubscribeBlockHeadersFromStartBlockID provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) SubscribeBlockHeadersFromStartBlockID(ctx context.Context, in *access.SubscribeBlockHeadersFromStartBlockIDRequest, opts ...grpc.CallOption) (access.AccessAPI_SubscribeBlockHeadersFromStartBlockIDClient, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 access.AccessAPI_SubscribeBlockHeadersFromStartBlockIDClient
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlockHeadersFromStartBlockIDRequest, ...grpc.CallOption) (access.AccessAPI_SubscribeBlockHeadersFromStartBlockIDClient, error)); ok {
+		return rf(ctx, in, opts...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlockHeadersFromStartBlockIDRequest, ...grpc.CallOption) access.AccessAPI_SubscribeBlockHeadersFromStartBlockIDClient); ok {
+		r0 = rf(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(access.AccessAPI_SubscribeBlockHeadersFromStartBlockIDClient)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.SubscribeBlockHeadersFromStartBlockIDRequest, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// SubscribeBlockHeadersFromStartHeight provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) SubscribeBlockHeadersFromStartHeight(ctx context.Context, in *access.SubscribeBlockHeadersFromStartHeightRequest, opts ...grpc.CallOption) (access.AccessAPI_SubscribeBlockHeadersFromStartHeightClient, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 access.AccessAPI_SubscribeBlockHeadersFromStartHeightClient
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlockHeadersFromStartHeightRequest, ...grpc.CallOption) (access.AccessAPI_SubscribeBlockHeadersFromStartHeightClient, error)); ok {
+		return rf(ctx, in, opts...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlockHeadersFromStartHeightRequest, ...grpc.CallOption) access.AccessAPI_SubscribeBlockHeadersFromStartHeightClient); ok {
+		r0 = rf(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(access.AccessAPI_SubscribeBlockHeadersFromStartHeightClient)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.SubscribeBlockHeadersFromStartHeightRequest, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// SubscribeBlocksFromLatest provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) SubscribeBlocksFromLatest(ctx context.Context, in *access.SubscribeBlocksFromLatestRequest, opts ...grpc.CallOption) (access.AccessAPI_SubscribeBlocksFromLatestClient, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 access.AccessAPI_SubscribeBlocksFromLatestClient
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlocksFromLatestRequest, ...grpc.CallOption) (access.AccessAPI_SubscribeBlocksFromLatestClient, error)); ok {
+		return rf(ctx, in, opts...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlocksFromLatestRequest, ...grpc.CallOption) access.AccessAPI_SubscribeBlocksFromLatestClient); ok {
+		r0 = rf(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(access.AccessAPI_SubscribeBlocksFromLatestClient)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.SubscribeBlocksFromLatestRequest, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// SubscribeBlocksFromStartBlockID provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) SubscribeBlocksFromStartBlockID(ctx context.Context, in *access.SubscribeBlocksFromStartBlockIDRequest, opts ...grpc.CallOption) (access.AccessAPI_SubscribeBlocksFromStartBlockIDClient, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 access.AccessAPI_SubscribeBlocksFromStartBlockIDClient
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlocksFromStartBlockIDRequest, ...grpc.CallOption) (access.AccessAPI_SubscribeBlocksFromStartBlockIDClient, error)); ok {
+		return rf(ctx, in, opts...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlocksFromStartBlockIDRequest, ...grpc.CallOption) access.AccessAPI_SubscribeBlocksFromStartBlockIDClient); ok {
+		r0 = rf(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(access.AccessAPI_SubscribeBlocksFromStartBlockIDClient)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.SubscribeBlocksFromStartBlockIDRequest, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// SubscribeBlocksFromStartHeight provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) SubscribeBlocksFromStartHeight(ctx context.Context, in *access.SubscribeBlocksFromStartHeightRequest, opts ...grpc.CallOption) (access.AccessAPI_SubscribeBlocksFromStartHeightClient, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 access.AccessAPI_SubscribeBlocksFromStartHeightClient
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlocksFromStartHeightRequest, ...grpc.CallOption) (access.AccessAPI_SubscribeBlocksFromStartHeightClient, error)); ok {
+		return rf(ctx, in, opts...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SubscribeBlocksFromStartHeightRequest, ...grpc.CallOption) access.AccessAPI_SubscribeBlocksFromStartHeightClient); ok {
+		r0 = rf(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(access.AccessAPI_SubscribeBlocksFromStartHeightClient)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.SubscribeBlocksFromStartHeightRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)

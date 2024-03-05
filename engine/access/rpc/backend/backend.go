@@ -248,18 +248,13 @@ func New(params Params) (*Backend, error) {
 			sendTimeout:    params.SubscriptionParams.SendTimeout,
 			responseLimit:  params.SubscriptionParams.ResponseLimit,
 			sendBufferSize: params.SubscriptionParams.SendBufferSize,
+			blockTracker:   params.BlockTracker,
 		},
 		collections:       params.Collections,
 		executionReceipts: params.ExecutionReceipts,
 		connFactory:       params.ConnFactory,
 		chainID:           params.ChainID,
 		nodeInfo:          nodeInfo,
-	}
-
-	// NOTE: The BlockTracker is currently only used by the access node and not by the observer node.
-	if params.BlockTracker != nil {
-		b.backendSubscribeBlocks.getStartHeight = b.BlockTracker.GetStartHeight
-		b.backendSubscribeBlocks.getHighestHeight = b.BlockTracker.GetHighestHeight
 	}
 
 	b.backendTransactions.txErrorMessages = b

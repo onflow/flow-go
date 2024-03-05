@@ -26,28 +26,88 @@ type backendSubscribeBlocks struct {
 	responseLimit  float64
 	sendBufferSize int
 
-	getStartHeight   subscription.GetStartHeightFunc
-	getHighestHeight subscription.GetHighestHeight
+	blockTracker subscription.BlockTracker
 }
 
-// SubscribeBlocks subscribes to blocks starting from a specified block ID or height and with a given block status.
+// SubscribeBlocks subscribes to the finalized or sealed blocks starting at the requested
+// start block, up until the latest available block. Once the latest is
+// reached, the stream will remain open and responses are sent for each new
+// block as it becomes available.
+//
+// Each block is filtered by the provided block status, and only
+// those blocks that match the status are returned.
+//
+// Only one of startBlockID or startHeight may be provided, Otherwise, an InvalidArgument error is returned.
+// If neither startBlockID nor startHeight is provided, the latest sealed block is used.
+//
+// Parameters:
+// - ctx: Context for the operation.
+// - startBlockID: The identifier of the starting block. If provided, startHeight should be 0.
+// - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
+// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
+//
+// If invalid parameters will be supplied SubscribeBlocks will return a failed subscription.
 func (b *backendSubscribeBlocks) SubscribeBlocks(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
-	return b.subscribe(ctx, startBlockID, startHeight, blockStatus, b.getBlockResponse(blockStatus))
+	return b.subscribe(ctx, startBlockID, startHeight, b.getBlockResponse(blockStatus))
 }
 
-// SubscribeBlockHeaders subscribes to block headers starting from a specified block ID or height and with a given block status.
+// SubscribeBlockHeaders streams finalized or sealed block headers starting at the requested
+// start block, up until the latest available block header. Once the latest is
+// reached, the stream will remain open and responses are sent for each new
+// block header as it becomes available.
+//
+// Each block header are filtered by the provided block status, and only
+// those block headers that match the status are returned.
+//
+// Only one of startBlockID or startHeight may be provided, Otherwise, an InvalidArgument error is returned.
+// If neither startBlockID nor startHeight is provided, the latest sealed block is used.
+//
+// Parameters:
+// - ctx: Context for the operation.
+// - startBlockID: The identifier of the starting block. If provided, startHeight should be 0.
+// - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
+// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
+//
+// If invalid parameters will be supplied SubscribeBlockHeaders will return a failed subscription.
 func (b *backendSubscribeBlocks) SubscribeBlockHeaders(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
-	return b.subscribe(ctx, startBlockID, startHeight, blockStatus, b.getBlockHeaderResponse(blockStatus))
+	return b.subscribe(ctx, startBlockID, startHeight, b.getBlockHeaderResponse(blockStatus))
 }
 
-// SubscribeBlockDigests subscribes to lightweight blocks starting from a specified block ID or height and with a given block status.
+// SubscribeBlockDigests streams finalized or sealed lightweight block starting at the requested
+// start block, up until the latest available block. Once the latest is
+// reached, the stream will remain open and responses are sent for each new
+// block as it becomes available.
+//
+// Each lightweight block are filtered by the provided block status, and only
+// those blocks that match the status are returned.
+//
+// Only one of startBlockID or startHeight may be provided, Otherwise, an InvalidArgument error is returned.
+// If neither startBlockID nor startHeight is provided, the latest sealed block is used.
+//
+// Parameters:
+// - ctx: Context for the operation.
+// - startBlockID: The identifier of the starting block. If provided, startHeight should be 0.
+// - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
+// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
+//
+// If invalid parameters will be supplied SubscribeBlockDigests will return a failed subscription.
 func (b *backendSubscribeBlocks) SubscribeBlockDigests(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
-	return b.subscribe(ctx, startBlockID, startHeight, blockStatus, b.getBlockDigestResponse(blockStatus))
+	return b.subscribe(ctx, startBlockID, startHeight, b.getBlockDigestResponse(blockStatus))
 }
 
-// subscribe is common method of the backendSubscribeBlocks struct that allows clients to subscribe to different types of block data.
-func (b *backendSubscribeBlocks) subscribe(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus, getData subscription.GetDataByHeightFunc) subscription.Subscription {
-	nextHeight, err := b.getStartHeight(ctx, startBlockID, startHeight)
+// subscribe is common method that allows clients to subscribe to different types of data.
+// Only one of startBlockID or startHeight may be provided, Otherwise, subscribe will return a failed subscription.
+// If neither startBlockID nor startHeight is provided, the latest sealed block is used.
+//
+// Parameters:
+// - ctx: The context for the subscription.
+// - startBlockID: The identifier of the starting block. If provided, startHeight should be 0.
+// - startBlockHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
+// - getData: The callback used by subscriptions to retrieve data information for the specified height and block status.
+//
+// If invalid parameters are supplied, subscribe will return a failed subscription.
+func (b *backendSubscribeBlocks) subscribe(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, getData subscription.GetDataByHeightFunc) subscription.Subscription {
+	nextHeight, err := b.blockTracker.GetStartHeight(ctx, startBlockID, startHeight)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")
 	}
@@ -149,8 +209,11 @@ func (b *backendSubscribeBlocks) getBlock(height uint64, expectedBlockStatus flo
 	return block, nil
 }
 
+// validateHeight checks if the given block height is valid and available based on the expected block status.
+// Expected errors during normal operation:
+// - storage.ErrNotFound: block for the given block height is not available.
 func (b *backendSubscribeBlocks) validateHeight(height uint64, expectedBlockStatus flow.BlockStatus) error {
-	highestHeight, err := b.getHighestHeight(expectedBlockStatus)
+	highestHeight, err := b.blockTracker.GetHighestHeight(expectedBlockStatus)
 	if err != nil {
 		return fmt.Errorf("could not get highest available height: %w", err)
 	}

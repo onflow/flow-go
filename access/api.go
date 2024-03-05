@@ -66,6 +66,7 @@ type API interface {
 	// If neither startBlockID nor startHeight is provided, the latest sealed block is used.
 	//
 	// Parameters:
+	// - ctx: Context for the operation.
 	// - startBlockID: The identifier of the starting block. If provided, startHeight should be 0.
 	// - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
 	// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
@@ -84,6 +85,7 @@ type API interface {
 	// If neither startBlockID nor startHeight is provided, the latest sealed block is used.
 	//
 	// Parameters:
+	// - ctx: Context for the operation.
 	// - startBlockID: The identifier of the starting block. If provided, startHeight should be 0.
 	// - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
 	// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
@@ -102,6 +104,7 @@ type API interface {
 	// If neither startBlockID nor startHeight is provided, the latest sealed block is used.
 	//
 	// Parameters:
+	// - ctx: Context for the operation.
 	// - startBlockID: The identifier of the starting block. If provided, startHeight should be 0.
 	// - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
 	// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
