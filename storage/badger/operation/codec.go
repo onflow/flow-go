@@ -1,11 +1,16 @@
 package operation
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/golang/snappy"
 	"github.com/vmihailenco/msgpack"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
+
+var errUncompressedValue = errors.New("could not uncompress data")
 
 var compressEnabled = true
 
@@ -59,7 +64,7 @@ func decodeCompressed(val []byte, entity interface{}) error {
 	// uncompress the value using Snappy
 	uncompressedVal, err := snappy.Decode(nil, val)
 	if err != nil {
-		return irrecoverable.NewExceptionf("could not uncompress data: %w", err)
+		return irrecoverable.NewException(fmt.Errorf("%v: %w", err, errUncompressedValue))
 	}
 
 	return decodeValRaw(uncompressedVal, entity)
