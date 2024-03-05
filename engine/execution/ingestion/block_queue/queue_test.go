@@ -195,7 +195,7 @@ func TestOneReadyAndMultiplePending(t *testing.T) {
 	require.NoError(t, err)
 
 	// received C when B is not executed
-	missing, executables, err = q.HandleBlock(blockB, nil)
+	missing, executables, err = q.HandleBlock(blockC, nil)
 	require.NoError(t, err)
 
 	executables, err = q.HandleCollection(c3)
