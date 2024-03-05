@@ -2,8 +2,9 @@ package operation
 
 import (
 	"github.com/golang/snappy"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/vmihailenco/msgpack"
+
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 var compressEnabled = true

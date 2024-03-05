@@ -4,10 +4,11 @@ import (
 	"testing"
 
 	"github.com/golang/snappy"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack"
+
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type TestEntity struct {
