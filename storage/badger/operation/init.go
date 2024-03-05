@@ -3,9 +3,9 @@ package operation
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/storage"
 )
@@ -30,11 +30,18 @@ const (
 func InsertPublicDBMarker(txn *badger.Txn) error {
 	err := insertDBTypeMarker(dbMarkerPublic)(txn)
 	if err != nil {
-		// check err has "could not uncompress data"
-		if strings.Contains(err.Error(), "could not uncompress data") {
+		if errors.Is(err, errUncompressedValue) {
+			log.Warn().Msgf("fail to read protocol database as compressed, checking if the value is uncompressed")
+
+			// retry by setting the global flag as uncompressed
 			setCompressDisabled()
-			// retry
-			return insertDBTypeMarker(dbMarkerPublic)(txn)
+			err = insertDBTypeMarker(dbMarkerPublic)(txn)
+			if err != nil {
+				return err
+			}
+
+			log.Warn().Msgf("warning: operating on protocol database that is not compressed, better to migrate all key-values")
+			return nil
 		}
 		return err
 	}
