@@ -8,6 +8,12 @@ import (
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
+	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -32,6 +38,9 @@ type IndexerCore struct {
 	batcher      bstorage.BatchBuilder
 
 	collectionExecutedMetric module.CollectionExecutedMetric
+
+	chain            flow.Chain
+	derivedChainData *derived.DerivedChainData
 }
 
 // New execution state indexer used to ingest block execution data and index it by height.
@@ -203,7 +212,12 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		// second chunk updates: { X: 2 }
 		// then we should persist only {X: 2: Y: 2}
 		payloads := make(map[ledger.Path]*ledger.Payload)
+		events := make([]flow.Event, 0)
+		collections := make([]*flow.Collection, 0)
 		for _, chunk := range data.ChunkExecutionDatas {
+			events = append(events, chunk.Events...)
+			collections = append(collections, chunk.Collection)
+
 			update := chunk.TrieUpdate
 			if update != nil {
 				// this should never happen but we check anyway
@@ -220,6 +234,11 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		err = c.indexRegisters(payloads, block.Height)
 		if err != nil {
 			return fmt.Errorf("could not index register payloads at height %d: %w", block.Height, err)
+		}
+
+		err = c.updateProgramCache(block.Height, events, collections)
+		if err != nil {
+			return fmt.Errorf("could not update program cache at height %d: %w", block.Height, err)
 		}
 
 		registerCount = len(payloads)
@@ -309,4 +328,158 @@ func HandleCollection(
 	}
 
 	return nil
+}
+
+func (c *IndexerCore) updateProgramCache(height uint64, events []flow.Event, collections []*flow.Collection) error {
+	header, err := c.headers.ByHeight(height)
+	if err != nil {
+		return fmt.Errorf("could not get the header by height %d: %w", height, err)
+	}
+
+	derivedBlockData := c.derivedChainData.GetOrCreateDerivedBlockData(
+		header.ID(),
+		header.ParentID,
+	)
+
+	// step 1:
+	// NewSnapshotReadTableTransaction()
+	// need to add special mode to allow bypassing the isScript check on line 290
+	derivedBlockData.AllowWritesInReadonlyTransaction()
+
+	// step 2:
+	// invalidate data:
+	// cycle through events and grab AccountContractUpdated, Deployed
+	invalidatedPrograms, err := findContractUpdates(events)
+	if err != nil {
+		return fmt.Errorf("could not find contract updates for block %d: %w", height, err)
+	}
+
+	tx, err := derivedBlockData.NewDerivedTransactionData(0, 0)
+	if err != nil {
+		return fmt.Errorf("could not create derived transaction data for block %d: %w", height, err)
+	}
+
+	tx.AddInvalidator(&accessInvalidator{
+		programs: &programInvalidator{
+			invalidated: invalidatedPrograms,
+		},
+		meterParamOverrides: &meterParamOverridesInvalidator{
+			invalidateAll: hasAuthorizedTransaction(collections, c.chain.ServiceAddress()),
+		},
+	})
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("could not commit derived transaction data for block %d: %w", height, err)
+	}
+
+	// invalidator:
+	// program => invalidate programs that had changes
+	// meter => service account was authorizer
+
+	// scripts code payloads
+
+	// concurrency may be an issue
+
+	// see derived chain data tests for examples
+
+	return nil
+
+}
+
+// hasAuthorizedTransaction checks if the provided account was an authorizer in any of the transactions.
+func hasAuthorizedTransaction(collections []*flow.Collection, address flow.Address) bool {
+	for _, collection := range collections {
+		for _, tx := range collection.Transactions {
+			for _, authorizer := range tx.Authorizers {
+				if authorizer == address {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+// findContractUpdates returns a map of common.AddressLocation for all contracts updated within the
+// given events.
+func findContractUpdates(events []flow.Event) (map[common.AddressLocation]struct{}, error) {
+	accountContractUpdated := flow.EventType(stdlib.AccountContractUpdatedEventType.ID())
+
+	invalidatedPrograms := make(map[common.AddressLocation]struct{})
+	for _, event := range events {
+		if event.Type == accountContractUpdated {
+			location, err := parseAccountContractUpdated(event)
+			if err != nil {
+				return nil, fmt.Errorf("could not parse account contract updated event: %w", err)
+			}
+			invalidatedPrograms[location] = struct{}{}
+		}
+	}
+	return invalidatedPrograms, nil
+}
+
+// parseAccountContractUpdated parses an account contract updated event and returns the address location.
+func parseAccountContractUpdated(event *flow.Event) (common.AddressLocation, error) {
+	payload, err := ccf.Decode(nil, event.Payload)
+	if err != nil {
+		return common.AddressLocation{}, fmt.Errorf("could not unmarshal event payload: %w", err)
+	}
+
+	cdcEvent, ok := payload.(cadence.Event)
+	if !ok {
+		return common.AddressLocation{}, fmt.Errorf("invalid event payload type: %T", payload)
+	}
+
+	address, ok := cdcEvent.Fields[0].(cadence.Address)
+	if !ok {
+		return common.AddressLocation{}, fmt.Errorf("invalid cadence type for address: %T", cdcEvent.Fields[0])
+	}
+
+	contractName, ok := cdcEvent.Fields[2].(cadence.String)
+	if !ok {
+		return common.AddressLocation{}, fmt.Errorf("invalid cadence type for contract name: %T", cdcEvent.Fields[2])
+	}
+
+	return common.NewAddressLocation(nil, common.Address(address), contractName.String()), nil
+}
+
+type accessInvalidator struct {
+	programs            *programInvalidator
+	meterParamOverrides *meterParamOverridesInvalidator
+}
+
+func (inv *accessInvalidator) ProgramInvalidator() derived.ProgramInvalidator {
+	return inv.programs
+}
+
+func (inv *accessInvalidator) MeterParamOverridesInvalidator() derived.MeterParamOverridesInvalidator {
+	return inv.meterParamOverrides
+}
+
+type programInvalidator struct {
+	invalidateAll bool
+	invalidated   map[common.AddressLocation]struct{}
+}
+
+func (inv *programInvalidator) ShouldInvalidateEntries() bool {
+	return inv.invalidateAll
+}
+
+func (inv *programInvalidator) ShouldInvalidateEntry(location common.AddressLocation, _ *derived.Program, _ *snapshot.ExecutionSnapshot) bool {
+	_, ok := inv.invalidated[location]
+	return inv.invalidateAll || ok
+}
+
+type meterParamOverridesInvalidator struct {
+	invalidateAll bool
+}
+
+func (inv *meterParamOverridesInvalidator) ShouldInvalidateEntries() bool {
+	return inv.invalidateAll
+}
+
+func (inv *meterParamOverridesInvalidator) ShouldInvalidateEntry(_ struct{}, _ derived.MeterParamOverrides, _ *snapshot.ExecutionSnapshot) bool {
+	return inv.invalidateAll
 }

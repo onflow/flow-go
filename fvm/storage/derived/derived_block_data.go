@@ -74,6 +74,11 @@ func NewEmptyDerivedBlockData(
 	}
 }
 
+func (block *DerivedBlockData) AllowWritesInReadonlyTransaction() {
+	block.programs.allowWritesInReadonlyTransaction = true
+	block.meterParamOverrides.allowWritesInReadonlyTransaction = true
+}
+
 func (block *DerivedBlockData) NewChildDerivedBlockData() *DerivedBlockData {
 	return &DerivedBlockData{
 		programs:            block.programs.NewChildTable(),
