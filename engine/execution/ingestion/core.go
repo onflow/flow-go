@@ -182,10 +182,6 @@ func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
 		return fmt.Errorf("failed to get block %s: %w", blockID, err)
 	}
 
-	e.log.Info().Hex("block_id", blockID[:]).
-		Uint64("height", header.Height).
-		Msg("handling new block")
-
 	missingColls, executables, err := e.enqueuBlock(block, blockID)
 	if err != nil {
 		return fmt.Errorf("failed to enqueue block %v: %w", blockID, err)
@@ -203,6 +199,13 @@ func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
 
 func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 	[]*block_queue.MissingCollection, []*entity.ExecutableBlock, error) {
+	lg := e.log.With().
+		Hex("block_id", blockID[:]).
+		Uint64("height", block.Header.Height).
+		Logger()
+
+	lg.Info().Msg("handling new block")
+
 	parentCommitment, err := e.execState.StateCommitmentByBlockID(block.Header.ParentID)
 
 	if err == nil {
@@ -212,10 +215,10 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 			return nil, nil, fmt.Errorf("unexpected error while adding block to block queue: %w", err)
 		}
 
-		e.log.Info().Bool("parent_is_executed", true).
+		lg.Info().Bool("parent_is_executed", true).
 			Int("missing_col", len(missingColls)).
 			Int("executables", len(executables)).
-			Msgf("block %v is enqueued", blockID)
+			Msgf("block is enqueued")
 
 		return missingColls, executables, nil
 	}
@@ -238,9 +241,8 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 		// if the error is ErrMissingParent, it means OnBlockExecuted is called after us getting
 		// the parent commit and before HandleBlock was called, therefore, we should re-enqueue the block
 		// with the parent commit.
-		e.log.Warn().Msgf(
-			"block %v is missing parent block %v, re-enqueueing",
-			blockID,
+		lg.Warn().Msgf(
+			"block is missing parent block %v, re-enqueueing",
 			block.Header.ParentID,
 		)
 
@@ -258,14 +260,12 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 
 		missingColls = deduplicate(append(missingColls, missing...))
 		executables = deduplicate(append(executables, execs...))
-
-		e.log.Info().Msgf("successfully reenqueued block %v", blockID)
 	}
 
-	e.log.Info().Bool("parent_is_executed", false).
+	lg.Info().Bool("parent_is_executed", false).
 		Int("missing_col", len(missingColls)).
 		Int("executables", len(executables)).
-		Msgf("block %v is enqueued", blockID)
+		Msgf("block is enqueued")
 
 	return missingColls, executables, nil
 }
@@ -320,7 +320,8 @@ func (e *Core) onBlockExecuted(
 		Bool("state_changed", commit != *block.StartState).
 		Uint64("num_txs", nonSystemTransactionCount(receipt.ExecutionResult)).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
-		Str("logs", logs).Msgf("block executed")
+		Str("logs", logs). // broadcasted
+		Msgf("block executed")
 
 	// we ensures that the child blocks are only executed after the execution result of
 	// its parent block has been successfully saved to storage.
