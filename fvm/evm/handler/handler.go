@@ -300,11 +300,6 @@ func (h *ContractHandler) executeAndHandleCall(
 	bp.AppendTxHash(res.TxHash)
 	// TODO: in the future we might update the receipt hash here
 
-	blockHash, err := bp.Hash()
-	if err != nil {
-		return res, err
-	}
-
 	if totalSupplyDiff != nil {
 		if deductSupplyDiff {
 			bp.TotalSupply = new(big.Int).Sub(bp.TotalSupply, totalSupplyDiff)
@@ -314,6 +309,11 @@ func (h *ContractHandler) executeAndHandleCall(
 		} else {
 			bp.TotalSupply = new(big.Int).Add(bp.TotalSupply, totalSupplyDiff)
 		}
+	}
+
+	blockHash, err := bp.Hash()
+	if err != nil {
+		return res, err
 	}
 
 	// emit events
@@ -471,7 +471,7 @@ func (a *Account) deposit(v *types.FLOWTokenVault) error {
 	bridgeAccount := a.fch.AccountByAddress(bridge, false)
 
 	call := types.NewDepositCall(
-		a.fch.addressAllocator.NativeTokenBridgeAddress(),
+		bridge,
 		a.address,
 		v.Balance(),
 		bridgeAccount.Nonce(),

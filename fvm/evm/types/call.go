@@ -43,7 +43,7 @@ const (
 // Note that eventhough we don't check the nonce, it impacts
 // hash calculation and also impacts the address of resulting contract
 // when deployed through direct calls.
-// Users don't have the worry about the nonce, and the emulator would set
+// Users don't have the worry about the nonce, handler sets
 // it to the right value.
 type DirectCall struct {
 	Type     byte
