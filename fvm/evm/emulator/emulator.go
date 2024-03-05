@@ -2,6 +2,7 @@ package emulator
 
 import (
 	"math/big"
+	"sync"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethCore "github.com/ethereum/go-ethereum/core"
@@ -15,6 +16,8 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+var pcUpdater = &precompileUpdater{}
 
 // Emulator handles operations against evm runtime
 type Emulator struct {
@@ -37,6 +40,7 @@ func NewEmulator(
 
 func newConfig(ctx types.BlockContext) *Config {
 	return NewConfig(
+		WithChainID(ctx.ChainID),
 		WithBlockNumber(new(big.Int).SetUint64(ctx.BlockNumber)),
 		WithCoinbase(ctx.GasFeeCollector.ToCommon()),
 		WithDirectCallBaseGasUsage(ctx.DirectCallBaseGasUsage),
@@ -57,7 +61,7 @@ func (em *Emulator) NewReadOnlyBlockView(ctx types.BlockContext) (types.ReadOnly
 // NewBlockView constructs a new block view (mutable)
 func (em *Emulator) NewBlockView(ctx types.BlockContext) (types.BlockView, error) {
 	cfg := newConfig(ctx)
-	SetupPrecompile(cfg)
+	pcUpdater.SetupPrecompile(cfg)
 	return &BlockView{
 		config:   cfg,
 		rootAddr: em.rootAddr,
@@ -443,7 +447,14 @@ func (proc *procedure) run(
 	return &res, proc.commit()
 }
 
-func SetupPrecompile(cfg *Config) {
+type precompileUpdater struct {
+	updateLock sync.Mutex
+}
+
+func (pu *precompileUpdater) SetupPrecompile(cfg *Config) {
+	pu.updateLock.Lock()
+	defer pu.updateLock.Unlock()
+
 	rules := cfg.ChainRules()
 	// captures the pointer to the map that has to be augmented
 	var precompiles map[gethCommon.Address]gethVM.PrecompiledContract

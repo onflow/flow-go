@@ -3060,7 +3060,7 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
       access(all)
       fun main(): [UInt8] {
           let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
-		  let bal = EVM.Balance(0)
+		  let bal = EVM.Balance(attoflow: 0)
 		  bal.setFLOW(flow: 1.23)
           let response = cadenceOwnedAccount.call(
               to: EVM.EVMAddress(
