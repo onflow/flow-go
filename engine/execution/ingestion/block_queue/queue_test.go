@@ -168,6 +168,50 @@ func TestMultipleBlockBecomesReady(t *testing.T) {
 	requireQueueIsEmpty(t, q)
 }
 
+func TestOneReadyAndMultiplePending(t *testing.T) {
+	t.Parallel()
+	// Given a chain
+	// R() <- A() <- B(C1, C2) <- C(C3)
+	// -      ^----- D(C1, C2) <- E(C3)
+	// -      ^----- F(C1, C2, C3)
+	block, coll, commitFor := makeChainABCDEF()
+	blockA, blockB, blockC := block("A"), block("B"), block("C")
+	c1, c2, c3 := coll(1), coll(2), coll(3)
+
+	q := NewBlockQueue(unittest.Logger())
+	_, _, err := q.HandleBlock(blockA, commitFor("R"))
+	require.NoError(t, err)
+
+	// received B when A is not execured
+	missing, executables, err := q.HandleBlock(blockB, nil)
+	require.NoError(t, err)
+	require.Empty(t, executables)
+	requireCollectionHas(t, missing, c1, c2)
+
+	executables, err = q.HandleCollection(c1)
+	require.NoError(t, err)
+
+	executables, err = q.HandleCollection(c2)
+	require.NoError(t, err)
+
+	// received C when B is not executed
+	missing, executables, err = q.HandleBlock(blockB, nil)
+	require.NoError(t, err)
+
+	executables, err = q.HandleCollection(c3)
+	require.NoError(t, err)
+
+	// A is executed
+	executables, err = q.OnBlockExecuted(blockA.ID(), *commitFor("A"))
+	require.NoError(t, err)
+	requireExecutableHas(t, executables, blockB) // B is executable
+
+	// B is executed
+	executables, err = q.OnBlockExecuted(blockB.ID(), *commitFor("B"))
+	require.NoError(t, err)
+	requireExecutableHas(t, executables, blockC) // C is executable
+}
+
 func TestOnForksWithSameCollections(t *testing.T) {
 	t.Parallel()
 	// Given a chain
