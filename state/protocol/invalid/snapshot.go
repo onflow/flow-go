@@ -32,6 +32,10 @@ func NewSnapshotf(msg string, args ...interface{}) *Snapshot {
 	return NewSnapshot(fmt.Errorf(msg, args...))
 }
 
+func (u *Snapshot) BlockID() (flow.Identifier, error) {
+	return flow.ZeroID, u.err
+}
+
 func (u *Snapshot) Head() (*flow.Header, error) {
 	return nil, u.err
 }
