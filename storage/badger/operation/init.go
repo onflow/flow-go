@@ -27,9 +27,17 @@ const (
 	dbMarkerSecret
 )
 
+// InitDB initializes the given database with the given database type marker.
+// from this version, values of key-value pairs stored in database will be compressed.
+// In order to be backward-compactiable, it checks if the database is storing compressed values.
+// If the database is storing uncompressed values, it will update the internal global flag, so
+// that it can parse the uncompressed values.
 func InsertPublicDBMarker(txn *badger.Txn) error {
+	// attempt to read and insert the database type marker
+	// it also checks if the database is storing compressed values
 	err := insertDBTypeMarker(dbMarkerPublic)(txn)
 	if err != nil {
+		// if the error is due to uncompressed value, we will set the global flag as uncompressed
 		if isErrUncompressedValue(err) {
 			log.Warn().Msgf("fail to read protocol database as compressed, checking if the value is uncompressed")
 

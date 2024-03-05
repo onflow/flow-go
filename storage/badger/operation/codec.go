@@ -18,6 +18,9 @@ func setCompressDisabled() {
 	compressEnabled = false
 }
 
+// encodeEntity encodes the given entity using msgpack and then compress the
+// value depending on the global flag.
+// possible error to return is irrecoverable.exception
 func encodeEntity(entity interface{}) ([]byte, error) {
 	if compressEnabled {
 		return encodeAndCompress(entity)
@@ -25,6 +28,8 @@ func encodeEntity(entity interface{}) ([]byte, error) {
 	return encodeEntityRaw(entity)
 }
 
+// decodeValue decodes the given value into the given entity using msgpack.
+// possible error to return is irrecoverable.exception
 func decodeValue(val []byte, entity interface{}) error {
 	if compressEnabled {
 		return decodeCompressed(val, entity)
