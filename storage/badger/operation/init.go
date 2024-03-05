@@ -3,6 +3,7 @@ package operation
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -27,7 +28,18 @@ const (
 )
 
 func InsertPublicDBMarker(txn *badger.Txn) error {
-	return insertDBTypeMarker(dbMarkerPublic)(txn)
+	err := insertDBTypeMarker(dbMarkerPublic)(txn)
+	if err != nil {
+		// check err has "could not uncompress data"
+		if strings.Contains(err.Error(), "could not uncompress data") {
+			setCompressDisabled()
+			// retry
+			return insertDBTypeMarker(dbMarkerPublic)(txn)
+		}
+		return err
+	}
+
+	return nil
 }
 
 func InsertSecretDBMarker(txn *badger.Txn) error {
