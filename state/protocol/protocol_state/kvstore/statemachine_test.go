@@ -2,6 +2,7 @@ package kvstore
 
 import (
 	"github.com/onflow/flow-go/state/protocol"
+	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -22,6 +23,7 @@ type StateMachineSuite struct {
 	view        uint64
 	parentState *mock.Reader
 	mutator     *mock.API
+	params      *mockprotocol.GlobalParams
 
 	stateMachine *ProcessingStateMachine
 }
@@ -29,9 +31,13 @@ type StateMachineSuite struct {
 func (s *StateMachineSuite) SetupTest() {
 	s.parentState = mock.NewReader(s.T())
 	s.mutator = mock.NewAPI(s.T())
+	s.params = mockprotocol.NewGlobalParams(s.T())
 	s.view = 1000
 
-	s.stateMachine = NewProcessingStateMachine(s.view, s.parentState, s.mutator)
+	s.mutator.On("Clone").Return(s.mutator).Once()
+	s.params.On("EpochCommitSafetyThreshold").Return(uint64(100)).Maybe()
+
+	s.stateMachine = NewProcessingStateMachine(s.view, s.params, s.parentState, s.mutator)
 	require.NotNil(s.T(), s.stateMachine)
 }
 
@@ -53,7 +59,7 @@ func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
 		s.parentState.On("GetProtocolStateVersion").Return(oldVersion)
 
 		upgrade := unittest.ProtocolStateVersionUpgradeFixture()
-		upgrade.ActiveView = s.view + 1
+		upgrade.ActiveView = s.view + s.params.EpochCommitSafetyThreshold() + 1
 		upgrade.NewProtocolStateVersion = oldVersion + 1
 
 		s.mutator.On("SetVersionUpgrade", &protocol_state.ViewBasedActivator[uint64]{
@@ -70,7 +76,7 @@ func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
 		s.parentState.On("GetProtocolStateVersion").Return(oldVersion)
 
 		upgrade := unittest.ProtocolStateVersionUpgradeFixture()
-		upgrade.ActiveView = s.view + 1
+		upgrade.ActiveView = s.view + s.params.EpochCommitSafetyThreshold() + 1
 		upgrade.NewProtocolStateVersion = oldVersion
 
 		se := upgrade.ServiceEvent()
@@ -80,7 +86,7 @@ func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
 	})
 	s.Run("invalid-activation-view", func() {
 		upgrade := unittest.ProtocolStateVersionUpgradeFixture()
-		upgrade.ActiveView = s.view
+		upgrade.ActiveView = s.view + s.params.EpochCommitSafetyThreshold()
 
 		se := upgrade.ServiceEvent()
 		err := s.stateMachine.ProcessUpdate(&se)

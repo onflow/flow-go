@@ -11,15 +11,22 @@ type ProcessingStateMachine struct {
 	view        uint64
 	parentState protocol_state.Reader
 	state       protocol_state.API
+	params      protocol.GlobalParams
 }
 
 var _ protocol_state.KeyValueStoreStateMachine = (*ProcessingStateMachine)(nil)
 
-func NewProcessingStateMachine(view uint64, parentState protocol_state.Reader, mutator protocol_state.API) *ProcessingStateMachine {
+func NewProcessingStateMachine(
+	view uint64,
+	params protocol.GlobalParams,
+	parentState protocol_state.Reader,
+	mutator protocol_state.API,
+) *ProcessingStateMachine {
 	return &ProcessingStateMachine{
 		view:        view,
 		parentState: parentState,
 		state:       mutator.Clone(),
+		params:      params,
 	}
 }
 
@@ -38,9 +45,9 @@ func (m *ProcessingStateMachine) ProcessUpdate(update *flow.ServiceEvent) error 
 			return fmt.Errorf("internal invalid type for ProtocolStateVersionUpgrade: %T", update.Event)
 		}
 
-		if m.view >= versionUpgrade.ActiveView {
+		if m.view+m.params.EpochCommitSafetyThreshold() >= versionUpgrade.ActiveView {
 			return protocol.NewInvalidServiceEventErrorf("invalid protocol state version upgrade view %d -> %d: %w",
-				m.view, versionUpgrade.ActiveView, ErrInvalidActivationView)
+				m.view+m.params.EpochCommitSafetyThreshold(), versionUpgrade.ActiveView, ErrInvalidActivationView)
 		}
 
 		if m.parentState.GetProtocolStateVersion() >= versionUpgrade.NewProtocolStateVersion {
