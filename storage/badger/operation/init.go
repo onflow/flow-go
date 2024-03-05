@@ -30,7 +30,7 @@ const (
 func InsertPublicDBMarker(txn *badger.Txn) error {
 	err := insertDBTypeMarker(dbMarkerPublic)(txn)
 	if err != nil {
-		if errors.Is(err, errUncompressedValue) {
+		if isErrUncompressedValue(err) {
 			log.Warn().Msgf("fail to read protocol database as compressed, checking if the value is uncompressed")
 
 			// retry by setting the global flag as uncompressed
