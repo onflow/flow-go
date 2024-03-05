@@ -1,4 +1,4 @@
-package protocol_state
+package state
 
 import (
 	"errors"

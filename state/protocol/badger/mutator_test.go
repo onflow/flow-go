@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	stoerr "github.com/onflow/flow-go/storage"

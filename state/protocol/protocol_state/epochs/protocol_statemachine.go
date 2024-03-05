@@ -1,8 +1,7 @@
-package protocol_state
+package epochs
 
 import (
 	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
@@ -26,10 +25,10 @@ type protocolStateMachine struct {
 
 var _ ProtocolStateMachine = (*protocolStateMachine)(nil)
 
-// newStateMachine creates a new protocol state protocolStateMachine.
+// NewStateMachine creates a new protocol state protocolStateMachine.
 // An exception is returned in case the `InvalidEpochTransitionAttempted` flag is set in the `parentState`. This means that
 // the protocol state evolution has reached an undefined state from the perspective of the happy path state machine.
-func newStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*protocolStateMachine, error) {
+func NewStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*protocolStateMachine, error) {
 	if parentState.InvalidEpochTransitionAttempted {
 		return nil, irrecoverable.NewExceptionf("cannot create happy path protocol state machine at view (%d) for a parent state"+
 			"which is in Epoch Fallback Mode", view)
