@@ -164,6 +164,7 @@ type TestBackend struct {
 	*TestBlockInfo
 	*TestRandomGenerator
 	*TestContractFunctionInvoker
+	*testUUIDGenerator
 }
 
 var _ types.Backend = &TestBackend{}
@@ -462,4 +463,17 @@ func (t *TestContractFunctionInvoker) Invoke(
 		panic("InvokeFunc method is not set")
 	}
 	return t.InvokeFunc(spec, arguments)
+}
+
+type testUUIDGenerator struct {
+	generateUUID func() (uint64, error)
+}
+
+var _ environment.UUIDGenerator = &testUUIDGenerator{}
+
+func (t *testUUIDGenerator) GenerateUUID() (uint64, error) {
+	if t.generateUUID == nil {
+		panic("generateUUID method is not set")
+	}
+	return t.generateUUID()
 }
