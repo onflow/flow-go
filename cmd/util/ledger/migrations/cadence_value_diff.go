@@ -33,13 +33,21 @@ var diffKindString = map[diffKind]string{
 type diffErrorKind int
 
 const (
-	storageMapKeyNotImplementingStorageMapKeyDiffErrorKind diffErrorKind = iota
+	abortErrorKind diffErrorKind = iota
+	storageMapKeyNotImplementingStorageMapKeyDiffErrorKind
 	cadenceValueNotImplementEquatableValueDiffErrorKind
 )
 
 var diffErrorKindString = map[diffErrorKind]string{
+	abortErrorKind: "error_diff_failed",
 	storageMapKeyNotImplementingStorageMapKeyDiffErrorKind: "error_storage_map_key_not_implemeting_StorageMapKey",
 	cadenceValueNotImplementEquatableValueDiffErrorKind:    "error_cadence_value_not_implementing_EquatableValue",
+}
+
+type diffError struct {
+	Address string
+	Kind    string
+	Msg     string
 }
 
 type diffProblem struct {
@@ -80,30 +88,37 @@ func NewCadenceValueDiffReporter(
 	}
 }
 
-func (dr *CadenceValueDiffReporter) DiffStates(oldPayloads, newPayloads []*ledger.Payload, domains []string) error {
+func (dr *CadenceValueDiffReporter) DiffStates(oldPayloads, newPayloads []*ledger.Payload, domains []string) {
 	// Create all the runtime components we need for comparing Cadence values.
 	oldRuntime, err := newReadonlyStorageRuntime(oldPayloads)
 	if err != nil {
-		return fmt.Errorf("failed to create runtime with old state payloads: %w", err)
+		dr.reportWriter.Write(
+			diffError{
+				Address: dr.address.Hex(),
+				Kind:    diffErrorKindString[abortErrorKind],
+				Msg:     fmt.Sprintf("failed to create runtime with old state payloads: %s", err),
+			})
+		return
 	}
 
 	newRuntime, err := newReadonlyStorageRuntime(newPayloads)
 	if err != nil {
-		return fmt.Errorf("failed to create runtime with new state payloads: %w", err)
+		dr.reportWriter.Write(
+			diffError{
+				Address: dr.address.Hex(),
+				Kind:    diffErrorKindString[abortErrorKind],
+				Msg:     fmt.Sprintf("failed to create runtime with new state payloads: %s", err),
+			})
+		return
 	}
 
 	// Iterate through all domains and compare cadence values.
 	for _, domain := range domains {
-		err := dr.diffStorageDomain(oldRuntime, newRuntime, domain)
-		if err != nil {
-			return err
-		}
+		dr.diffStorageDomain(oldRuntime, newRuntime, domain)
 	}
-
-	return nil
 }
 
-func (dr *CadenceValueDiffReporter) diffStorageDomain(oldRuntime, newRuntime *readonlyStorageRuntime, domain string) error {
+func (dr *CadenceValueDiffReporter) diffStorageDomain(oldRuntime, newRuntime *readonlyStorageRuntime, domain string) {
 
 	oldStorageMap := oldRuntime.Storage.GetStorageMap(dr.address, domain, false)
 
@@ -111,7 +126,7 @@ func (dr *CadenceValueDiffReporter) diffStorageDomain(oldRuntime, newRuntime *re
 
 	if oldStorageMap == nil && newStorageMap == nil {
 		// No storage maps for this domain.
-		return nil
+		return
 	}
 
 	if oldStorageMap == nil && newStorageMap != nil {
@@ -127,7 +142,7 @@ func (dr *CadenceValueDiffReporter) diffStorageDomain(oldRuntime, newRuntime *re
 				),
 			})
 
-		return nil
+		return
 	}
 
 	if oldStorageMap != nil && newStorageMap == nil {
@@ -143,7 +158,7 @@ func (dr *CadenceValueDiffReporter) diffStorageDomain(oldRuntime, newRuntime *re
 				),
 			})
 
-		return nil
+		return
 	}
 
 	oldKeys := getStorageMapKeys(oldStorageMap)
@@ -248,8 +263,6 @@ func (dr *CadenceValueDiffReporter) diffStorageDomain(oldRuntime, newRuntime *re
 		}
 
 	}
-
-	return nil
 }
 
 func (dr *CadenceValueDiffReporter) diffValues(

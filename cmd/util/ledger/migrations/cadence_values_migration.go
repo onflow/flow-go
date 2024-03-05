@@ -189,11 +189,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 
 		accountDiffReporter := NewCadenceValueDiffReporter(address, m.diffReporter, m.logVerboseDiff)
 
-		err = accountDiffReporter.DiffStates(oldPayloads, newPayloads, domains)
-		if err != nil {
-			// Log error returned from diff without returning error.
-			m.log.Err(err)
-		}
+		accountDiffReporter.DiffStates(oldPayloads, newPayloads, domains)
 	}
 
 	return newPayloads, nil

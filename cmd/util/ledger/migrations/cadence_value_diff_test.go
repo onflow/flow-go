@@ -27,7 +27,7 @@ func TestDiffCadenceValues(t *testing.T) {
 
 		diffReporter := NewCadenceValueDiffReporter(address, writer, true)
 
-		err := diffReporter.DiffStates(
+		diffReporter.DiffStates(
 			createTestPayloads(t, address, domain),
 			createTestPayloads(t, address, domain),
 			[]string{domain},
@@ -41,7 +41,7 @@ func TestDiffCadenceValues(t *testing.T) {
 
 		diffReporter := NewCadenceValueDiffReporter(address, writer, true)
 
-		err := diffReporter.DiffStates(
+		diffReporter.DiffStates(
 			createTestPayloads(t, address, domain),
 			nil,
 			[]string{domain},
@@ -60,7 +60,7 @@ func TestDiffCadenceValues(t *testing.T) {
 
 		diffReporter := NewCadenceValueDiffReporter(address, writer, true)
 
-		err := diffReporter.DiffStates(
+		diffReporter.DiffStates(
 			createTestPayloads(t, address, domain),
 			createStorageMapPayloads(t, address, domain, []string{"unique_key"}, []interpreter.Value{interpreter.UInt64Value(0)}),
 			[]string{domain},
@@ -85,7 +85,7 @@ func TestDiffCadenceValues(t *testing.T) {
 
 		diffReporter := NewCadenceValueDiffReporter(address, writer, true)
 
-		err := diffReporter.DiffStates(
+		diffReporter.DiffStates(
 			createStorageMapPayloads(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(0), interpreter.UInt64Value(0)}),
 			createStorageMapPayloads(t, address, domain, []string{"2", "0"}, []interpreter.Value{interpreter.UInt64Value(0), interpreter.UInt64Value(0)}),
 			[]string{domain},
@@ -110,7 +110,7 @@ func TestDiffCadenceValues(t *testing.T) {
 
 		diffReporter := NewCadenceValueDiffReporter(address, writer, false)
 
-		err := diffReporter.DiffStates(
+		diffReporter.DiffStates(
 			createStorageMapPayloads(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(100), interpreter.UInt64Value(101)}),
 			createStorageMapPayloads(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(111), interpreter.UInt64Value(101)}),
 			[]string{domain},
@@ -135,7 +135,7 @@ func TestDiffCadenceValues(t *testing.T) {
 
 		diffReporter := NewCadenceValueDiffReporter(address, writer, false)
 
-		err := diffReporter.DiffStates(
+		diffReporter.DiffStates(
 			createStorageMapPayloads(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(100), interpreter.UInt64Value(101)}),
 			createStorageMapPayloads(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(111), interpreter.UInt64Value(102)}),
 			[]string{domain},
@@ -220,7 +220,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			return payloads
 		}
 
-		err := diffReporter.DiffStates(
+		diffReporter.DiffStates(
 			createPayloads([]interpreter.Value{interpreter.UInt64Value(0), interpreter.UInt64Value(2), interpreter.UInt64Value(4)}),
 			createPayloads([]interpreter.Value{interpreter.UInt64Value(1), interpreter.UInt64Value(3), interpreter.UInt64Value(5)}),
 			[]string{domain},
@@ -321,7 +321,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			return payloads
 		}
 
-		err := diffReporter.DiffStates(
+		diffReporter.DiffStates(
 			createPayloads(
 				[]interpreter.Value{interpreter.NewUnmeteredStringValue("dict_key_0"),
 					interpreter.UInt64Value(0),
@@ -433,7 +433,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			return payloads
 		}
 
-		err := diffReporter.DiffStates(
+		diffReporter.DiffStates(
 			createPayloads(
 				[]string{
 					"Field_0",
@@ -551,7 +551,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			return payloads
 		}
 
-		err := diffReporter.DiffStates(
+		diffReporter.DiffStates(
 			createPayloads(
 				[]string{
 					"Field_0",
