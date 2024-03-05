@@ -9,6 +9,10 @@ import (
 
 var compressEnabled = true
 
+func setCompressDisabled() {
+	compressEnabled = false
+}
+
 func encodeEntity(entity interface{}) ([]byte, error) {
 	if compressEnabled {
 		return encodeAndCompress(entity)
