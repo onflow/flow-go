@@ -55,6 +55,12 @@ func TestDecodeCompressed(t *testing.T) {
 	require.Equal(t, entity, decodedEntity, "decoded entity should match the original entity")
 }
 
+func TestDecodeError(t *testing.T) {
+	var entity TestEntity
+	err := decodeCompressed([]byte{1, 2, 3}, &entity)
+	require.True(t, isErrUncompressedValue(err), err)
+}
+
 func BenchmarkEncodeAndCompress(b *testing.B) {
 	r := unittest.ExecutionResultFixture()
 	b.ResetTimer()

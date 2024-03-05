@@ -64,8 +64,12 @@ func decodeCompressed(val []byte, entity interface{}) error {
 	// uncompress the value using Snappy
 	uncompressedVal, err := snappy.Decode(nil, val)
 	if err != nil {
-		return irrecoverable.NewException(fmt.Errorf("%v: %w", err, errUncompressedValue))
+		return fmt.Errorf("%v: %w", err, errUncompressedValue)
 	}
 
 	return decodeValRaw(uncompressedVal, entity)
+}
+
+func isErrUncompressedValue(err error) bool {
+	return errors.Is(err, errUncompressedValue)
 }
