@@ -260,7 +260,7 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 			return err
 		})
 		if err != nil {
-			return irrecoverable.NewExceptionf("could not decode entity: %w", err)
+			return fmt.Errorf("could not decode entity: %w", err)
 		}
 
 		return nil
