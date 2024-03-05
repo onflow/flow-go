@@ -166,6 +166,8 @@ func NewCadence1ValueMigrations(
 	rwf reporters.ReportWriterFactory,
 	nWorker int,
 	chainID flow.ChainID,
+	diffMigrations bool,
+	logVerboseDiff bool,
 ) (migrations []NamedMigration) {
 
 	// Populated by CadenceLinkValueMigrator,
@@ -177,17 +179,23 @@ func NewCadence1ValueMigrations(
 	for _, accountBasedMigration := range []*CadenceBaseMigrator{
 		NewCadence1ValueMigrator(
 			rwf,
+			diffMigrations,
+			logVerboseDiff,
 			errorMessageHandler,
 			NewCadence1CompositeStaticTypeConverter(chainID),
 			NewCadence1InterfaceStaticTypeConverter(chainID),
 		),
 		NewCadence1LinkValueMigrator(
 			rwf,
+			diffMigrations,
+			logVerboseDiff,
 			errorMessageHandler,
 			capabilityMapping,
 		),
 		NewCadence1CapabilityValueMigrator(
 			rwf,
+			diffMigrations,
+			logVerboseDiff,
 			errorMessageHandler,
 			capabilityMapping,
 		),
@@ -261,6 +269,8 @@ func NewCadence1Migrations(
 	rwf reporters.ReportWriterFactory,
 	nWorker int,
 	chainID flow.ChainID,
+	diffMigrations bool,
+	logVerboseDiff bool,
 	evmContractChange EVMContractChange,
 	stagedContracts []StagedContract,
 ) []NamedMigration {
@@ -277,6 +287,8 @@ func NewCadence1Migrations(
 			rwf,
 			nWorker,
 			chainID,
+			diffMigrations,
+			logVerboseDiff,
 		),
 	)
 }

@@ -73,6 +73,8 @@ func TestExtractExecutionState(t *testing.T) {
 				outdir,
 				10,
 				false,
+				false,
+				false,
 				flow.Emulator,
 				// TODO:
 				migrations.EVMContractChangeNone,

@@ -82,6 +82,8 @@ func TestCadenceValuesMigration(t *testing.T) {
 		rwf,
 		nWorker,
 		chainID,
+		false,
+		false,
 		evmContractChange,
 		stagedContracts,
 	)
