@@ -112,7 +112,7 @@ func GroupPayloadsByAccount(
 	indexes := make([]int, 0, estimatedNumOfAccount)
 	for i := 0; i < len(p); {
 		indexes = append(indexes, i)
-		i = p.FindNextKeyIndex(i)
+		i = p.FindNextKeyIndexUntil(i, len(p))
 	}
 	end = time.Now()
 
@@ -177,17 +177,17 @@ func (s sortablePayloads) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func (s sortablePayloads) FindNextKeyIndex(i int) int {
+func (s sortablePayloads) FindNextKeyIndexUntil(i int, upperBound int) int {
 	low := i
 	step := 1
-	for low+step < len(s) && s.Compare(low+step, i) == 0 {
+	for low+step < upperBound && s.Compare(low+step, i) == 0 {
 		low += step
 		step *= 2
 	}
 
 	high := low + step
-	if high > len(s) {
-		high = len(s)
+	if high > upperBound {
+		high = upperBound
 	}
 
 	for low < high {
@@ -248,13 +248,13 @@ func mergeInto(source, buffer sortablePayloads, i int, mid int, j int) {
 		// More elements in the both partitions to process.
 		if source.Compare(left, right) <= 0 {
 			// Move left partition elements with the same address to buffer.
-			nextLeft := source.FindNextKeyIndex(left)
+			nextLeft := source.FindNextKeyIndexUntil(left, mid)
 			n := copy(buffer[k:], source[left:nextLeft])
 			left = nextLeft
 			k += n
 		} else {
 			// Move right partition elements with the same address to buffer.
-			nextRight := source.FindNextKeyIndex(right)
+			nextRight := source.FindNextKeyIndexUntil(right, j)
 			n := copy(buffer[k:], source[right:nextRight])
 			right = nextRight
 			k += n

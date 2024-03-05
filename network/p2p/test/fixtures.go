@@ -1025,3 +1025,32 @@ func GossipSubMessageFixture(t *testing.T) *pb.Message {
 		Key:       unittest.RandomBytes(byteSize),
 	}
 }
+
+// UpdatableTopicProviderFixture is a mock implementation of the TopicProvider interface.
+type UpdatableTopicProviderFixture struct {
+	topics        []string
+	subscriptions map[string][]peer.ID
+}
+
+func NewUpdatableTopicProviderFixture() *UpdatableTopicProviderFixture {
+	return &UpdatableTopicProviderFixture{
+		topics:        []string{},
+		subscriptions: map[string][]peer.ID{},
+	}
+}
+
+func (m *UpdatableTopicProviderFixture) GetTopics() []string {
+	return m.topics
+}
+
+func (m *UpdatableTopicProviderFixture) ListPeers(topic string) []peer.ID {
+	return m.subscriptions[topic]
+}
+
+func (m *UpdatableTopicProviderFixture) UpdateTopics(topics []string) {
+	m.topics = topics
+}
+
+func (m *UpdatableTopicProviderFixture) UpdateSubscriptions(topic string, peers []peer.ID) {
+	m.subscriptions[topic] = peers
+}

@@ -15,6 +15,11 @@ contract Storage {
         number = num;
     }
 
+    function storeButRevert(uint256 num) public {
+        number = num;
+        revert();
+    }
+
     function retrieve() public view returns (uint256){
         return number;
     }
