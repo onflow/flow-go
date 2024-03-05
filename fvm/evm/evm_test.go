@@ -250,6 +250,67 @@ func TestEVMRun(t *testing.T) {
 }
 
 func TestEVMAddressDeposit(t *testing.T) {
+
+	t.Parallel()
+	chain := flow.Emulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	RunWithNewEnvironment(t,
+		chain, func(
+			ctx fvm.Context,
+			vm fvm.VM,
+			snapshot snapshot.SnapshotTree,
+			testContract *TestContract,
+			testAccount *EOATestAccount,
+		) {
+
+			code := []byte(fmt.Sprintf(
+				`
+				import EVM from %s
+				import FlowToken from %s
+
+				transaction(addr: [UInt8; 20]) {
+					prepare(account: AuthAccount) {
+						let admin = account.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+						let minter <- admin.createNewMinter(allowedAmount: 1.0)
+						let vault <- minter.mintTokens(amount: 1.0)
+						destroy minter
+
+						let address = EVM.EVMAddress(addr)
+						address.deposit(from: <-vault)
+					}
+				}
+			`,
+				sc.EVMContract.Address.HexWithPrefix(),
+				sc.FlowToken.Address.HexWithPrefix(),
+			))
+
+			addr := RandomAddress(t)
+
+			tx := fvm.Transaction(
+				flow.NewTransactionBody().
+					SetScript(code).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(cadence.NewArray(
+						ConvertToCadence(addr.Bytes()),
+					).WithType(stdlib.EVMAddressBytesCadenceType))),
+				0)
+
+			execSnap, output, err := vm.Run(
+				ctx,
+				tx,
+				snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			snapshot = snapshot.Append(execSnap)
+
+			expectedBalance := types.OneFlowBalance
+			bal := getEVMAccountBalance(t, ctx, vm, snapshot, addr)
+			require.Equal(t, expectedBalance, bal)
+		})
+}
+
+func TestCOAAddressDeposit(t *testing.T) {
 	t.Parallel()
 
 	chain := flow.Emulator.Chain()
