@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
@@ -34,6 +35,7 @@ var _ ExecutionDataTracker = (*ExecutionDataTrackerImpl)(nil)
 type ExecutionDataTrackerImpl struct {
 	BaseTracker
 	headers       storage.Headers
+	broadcaster   *engine.Broadcaster
 	indexReporter state_synchronization.IndexReporter
 	useIndex      bool
 
@@ -47,6 +49,7 @@ type ExecutionDataTrackerImpl struct {
 // - state: The protocol state used for retrieving block information.
 // - rootHeight: The root block height, serving as the baseline for calculating the start height.
 // - headers: The storage headers for accessing block headers.
+// - broadcaster: The engine broadcaster for publishing notifications.
 // - highestAvailableFinalizedHeight: The highest available finalized block height.
 // - indexReporter: The index reporter for checking indexed block heights.
 // - useIndex: A flag indicating whether to use indexed block heights for validation.
@@ -58,6 +61,7 @@ func NewExecutionDataTracker(
 	state protocol.State,
 	rootHeight uint64,
 	headers storage.Headers,
+	broadcaster *engine.Broadcaster,
 	highestAvailableFinalizedHeight uint64,
 	indexReporter state_synchronization.IndexReporter,
 	useIndex bool,
@@ -65,6 +69,7 @@ func NewExecutionDataTracker(
 	return &ExecutionDataTrackerImpl{
 		BaseTracker:   NewBaseTrackerImpl(rootHeight, state, headers),
 		headers:       headers,
+		broadcaster:   broadcaster,
 		highestHeight: counters.NewMonotonousCounter(highestAvailableFinalizedHeight),
 		indexReporter: indexReporter,
 		useIndex:      useIndex,
@@ -118,6 +123,8 @@ func (e *ExecutionDataTrackerImpl) OnExecutionData(executionData *execution_data
 
 	// sets the highest height for which execution data is available.
 	_ = e.highestHeight.Set(header.Height)
+
+	e.broadcaster.Publish()
 	return nil
 }
 

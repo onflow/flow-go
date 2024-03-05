@@ -890,6 +890,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				node.State,
 				builder.executionDataConfig.InitialBlockHeight,
 				node.Storage.Headers,
+				broadcaster,
 				highestAvailableHeight,
 				builder.EventsIndex,
 				useIndex,
@@ -922,7 +923,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				node.RootChainID,
 				builder.stateStreamGrpcServer,
 				builder.stateStreamBackend,
-				broadcaster,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream engine: %w", err)

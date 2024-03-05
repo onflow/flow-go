@@ -5,7 +5,6 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -27,9 +26,8 @@ type Engine struct {
 	chain   flow.Chain
 	handler *Handler
 
-	execDataBroadcaster *engine.Broadcaster
-	execDataCache       *cache.ExecutionDataCache
-	headers             storage.Headers
+	execDataCache *cache.ExecutionDataCache
+	headers       storage.Headers
 }
 
 // NewEng returns a new ingress server.
@@ -41,19 +39,17 @@ func NewEng(
 	chainID flow.ChainID,
 	server *grpcserver.GrpcServer,
 	backend *StateStreamBackend,
-	broadcaster *engine.Broadcaster,
 ) (*Engine, error) {
 	logger := log.With().Str("engine", "state_stream_rpc").Logger()
 
 	e := &Engine{
-		log:                 logger,
-		backend:             backend,
-		headers:             headers,
-		chain:               chainID.Chain(),
-		config:              config,
-		handler:             NewHandler(backend, chainID.Chain(), config),
-		execDataBroadcaster: broadcaster,
-		execDataCache:       execDataCache,
+		log:           logger,
+		backend:       backend,
+		headers:       headers,
+		chain:         chainID.Chain(),
+		config:        config,
+		handler:       NewHandler(backend, chainID.Chain(), config),
+		execDataCache: execDataCache,
 	}
 
 	e.ComponentManager = component.NewComponentManagerBuilder().
@@ -83,6 +79,4 @@ func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionDat
 		lg.Fatal().Err(err).Msg("failed to notify of new execution data")
 		return
 	}
-
-	e.execDataBroadcaster.Publish()
 }

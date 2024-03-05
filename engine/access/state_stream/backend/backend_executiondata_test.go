@@ -240,6 +240,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		s.state,
 		s.rootBlock.Header.Height,
 		s.headers,
+		s.broadcaster,
 		s.rootBlock.Header.Height,
 		s.eventsIndex,
 		false,
