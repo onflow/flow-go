@@ -20,14 +20,26 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// TransactionErrorMessage declares the lookup transaction error methods by different input parameters.
 type TransactionErrorMessage interface {
-	// LookupErrorMessageByTransactionID is a function type for getting transaction error message.
+	// LookupErrorMessageByTransactionID is a function type for getting transaction error message by block ID and transaction ID.
+	// Expected errors during normal operation:
+	//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
+	//   - status.Error - remote GRPC call to EN has failed.
 	LookupErrorMessageByTransactionID(ctx context.Context, blockID flow.Identifier, transactionID flow.Identifier) (string, error)
 
 	// LookupErrorMessageByIndex is a function type for getting transaction error message by index.
+	// Expected errors during normal operation:
+	//   - status.Error[codes.NotFound] - transaction result for given block ID and tx index is not available.
+	//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
+	//   - status.Error - remote GRPC call to EN has failed.
 	LookupErrorMessageByIndex(ctx context.Context, blockID flow.Identifier, height uint64, index uint32) (string, error)
 
 	// LookupErrorMessagesByBlockID is a function type for getting transaction error messages by block ID.
+	// Expected errors during normal operation:
+	//   - status.Error[codes.NotFound] - transaction results for given block ID are not available.
+	//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
+	//   - status.Error - remote GRPC call to EN has failed.
 	LookupErrorMessagesByBlockID(ctx context.Context, blockID flow.Identifier, height uint64) (map[flow.Identifier]string, error)
 }
 
@@ -61,12 +73,13 @@ func NewTransactionsLocalDataProvider(
 
 // GetTransactionResultFromStorage retrieves a transaction result from storage by block ID and transaction ID.
 // Expected errors during normal operation:
-//   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
-//   - codes.Internal: Event payload conversion failed.
-//   - indexer.ErrIndexNotInitialized: txResultsIndex not initialized
-//   - storage.ErrHeightNotIndexed: txResultsIndex return it when data is unavailable
-//   - All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
-//     getter or when deriving transaction status.
+//   - codes.NotFound when result cannot be provided by storage due to the absence of data.
+//   - codes.Internal if event payload conversion failed.
+//   - indexer.ErrIndexNotInitialized when txResultsIndex not initialized
+//   - storage.ErrHeightNotIndexed when data is unavailable
+//
+// All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
+// getter or when deriving transaction status.
 func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 	ctx context.Context,
 	block *flow.Block,
@@ -132,12 +145,13 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 
 // GetTransactionResultsByBlockIDFromStorage retrieves transaction results by block ID from storage
 // Expected errors during normal operation:
-//   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
-//   - codes.Internal: Event payload conversion failed.
-//   - indexer.ErrIndexNotInitialized: txResultsIndex not initialized
-//   - storage.ErrHeightNotIndexed: txResultsIndex return it when data is unavailable
-//   - All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
-//     getter or when deriving transaction status.
+//   - codes.NotFound if result cannot be provided by storage due to the absence of data.
+//   - codes.Internal when event payload conversion failed.
+//   - indexer.ErrIndexNotInitialized when txResultsIndex not initialized
+//   - storage.ErrHeightNotIndexed when data is unavailable
+//
+// All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
+// getter or when deriving transaction status.
 func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorage(
 	ctx context.Context,
 	block *flow.Block,
@@ -186,7 +200,6 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 		// events are encoded in CCF format in storage. convert to JSON-CDC if requested
 		if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
 			for _, e := range events {
-
 				payload, err := convert.CcfPayloadToJsonPayload(e.Payload)
 				if err != nil {
 					err = fmt.Errorf("failed to convert event payload for block %s: %w", blockID, err)
@@ -218,12 +231,13 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 
 // GetTransactionResultByIndexFromStorage retrieves a transaction result by index from storage.
 // Expected errors during normal operation:
-//   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
-//   - codes.Internal: Event payload conversion failed.
-//   - indexer.ErrIndexNotInitialized: txResultsIndex not initialized
-//   - storage.ErrHeightNotIndexed: txResultsIndex return it when data is unavailable
-//   - All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
-//     getter or when deriving transaction status.
+//   - codes.NotFound if result cannot be provided by storage due to the absence of data.
+//   - codes.Internal when event payload conversion failed.
+//   - indexer.ErrIndexNotInitialized when txResultsIndex not initialized
+//   - storage.ErrHeightNotIndexed when data is unavailable
+//
+// All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
+// getter or when deriving transaction status.
 func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 	ctx context.Context,
 	block *flow.Block,
@@ -339,6 +353,7 @@ func (t *TransactionsLocalDataProvider) deriveUnknownTransactionStatus(refBlockI
 }
 
 // deriveTransactionStatus is used to determine the status of a transaction based on the provided block ID, block height, and execution status.
+// No errors expected during normal operations.
 func (t *TransactionsLocalDataProvider) deriveTransactionStatus(blockID flow.Identifier, blockHeight uint64, executed bool) (flow.TransactionStatus, error) {
 	if !executed {
 		// If we've gotten here, but the block has not yet been executed, report it as only been finalized

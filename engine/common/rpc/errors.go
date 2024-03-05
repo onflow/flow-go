@@ -67,7 +67,9 @@ func ConvertStorageError(err error) error {
 	return status.Errorf(codes.Internal, "failed to find: %v", err)
 }
 
-// convertIndexError converts errors related to index to a gRPC error
+// ConvertIndexError converts errors related to index and storage to appropriate gRPC status errors.
+// If the error is nil, it returns nil. If the error is not recognized, it falls back to ConvertError
+// with the provided default message and Internal gRPC code.
 func ConvertIndexError(err error, height uint64, defaultMsg string) error {
 	if err == nil {
 		return nil

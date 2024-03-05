@@ -14,6 +14,13 @@ import (
 
 var _ state_synchronization.IndexReporter = (*EventsIndex)(nil)
 
+// EventsIndex implements a wrapper around `storage.Events` ensuring that needed data has been synced and is available to the client.
+// Note: `EventsIndex` is created with empty report due to the next reasoning:
+// When the index is initially bootstrapped, the indexer needs to load an execution state checkpoint from
+// disk and index all the data. This process can take more than 1 hour on some systems. Consequently, the Initialize
+// pattern is implemented to enable the Access API to start up and serve queries before the index is fully ready. During
+// the initialization phase, all calls to retrieve data from this struct should return indexer.ErrIndexNotInitialized.
+// The caller is responsible for handling this error appropriately for the method.
 type EventsIndex struct {
 	events   storage.Events
 	reporter *atomic.Pointer[state_synchronization.IndexReporter]
@@ -26,9 +33,8 @@ func NewEventsIndex(events storage.Events) *EventsIndex {
 	}
 }
 
-// Initialize replaces nil value with actual reporter instance
-// Expected errors:
-// - If the reporter was already initialized, return error
+// Initialize replaces a previously non-initialized reporter. Can be called once.
+// No errors are expected during normal operations.
 func (e *EventsIndex) Initialize(indexReporter state_synchronization.IndexReporter) error {
 	if e.reporter.CompareAndSwap(nil, &indexReporter) {
 		return nil
@@ -38,11 +44,11 @@ func (e *EventsIndex) Initialize(indexReporter state_synchronization.IndexReport
 
 // ByBlockID checks data availability and returns events for a block
 // Expected errors:
-//   - indexer.ErrIndexNotInitialized: if the EventsIndex has not been initialized
-//   - storage.ErrHeightNotIndexed: returned, when data is unavailable
-//   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
+//   - indexer.ErrIndexNotInitialized if the `EventsIndex` has not been initialized
+//   - storage.ErrHeightNotIndexed when data is unavailable
+//   - codes.NotFound if result cannot be provided by storage due to the absence of data.
 func (e *EventsIndex) ByBlockID(blockID flow.Identifier, height uint64) ([]flow.Event, error) {
-	if err := e.checkDataAvailable(height); err != nil {
+	if err := e.checkDataAvailability(height); err != nil {
 		return nil, err
 	}
 
@@ -65,11 +71,11 @@ func (e *EventsIndex) ByBlockID(blockID flow.Identifier, height uint64) ([]flow.
 
 // ByBlockIDTransactionID checks data availability and return events for the given block ID and transaction ID
 // Expected errors:
-//   - indexer.ErrIndexNotInitialized: if the EventsIndex has not been initialized
-//   - storage.ErrHeightNotIndexed: returned, when data is unavailable
-//   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
+//   - indexer.ErrIndexNotInitialized if the `EventsIndex` has not been initialized
+//   - storage.ErrHeightNotIndexed when data is unavailable
+//   - codes.NotFound if result cannot be provided by storage due to the absence of data.
 func (e *EventsIndex) ByBlockIDTransactionID(blockID flow.Identifier, height uint64, transactionID flow.Identifier) ([]flow.Event, error) {
-	if err := e.checkDataAvailable(height); err != nil {
+	if err := e.checkDataAvailability(height); err != nil {
 		return nil, err
 	}
 
@@ -78,11 +84,11 @@ func (e *EventsIndex) ByBlockIDTransactionID(blockID flow.Identifier, height uin
 
 // ByBlockIDTransactionIndex checks data availability and return events for the transaction at given index in a given block
 // Expected errors:
-//   - indexer.ErrIndexNotInitialized: if the EventsIndex has not been initialized
-//   - storage.ErrHeightNotIndexed: returned, when data is unavailable
-//   - codes.NotFound: Result cannot be provided by storage due to the absence of data.
+//   - indexer.ErrIndexNotInitialized if the `EventsIndex` has not been initialized
+//   - storage.ErrHeightNotIndexed when data is unavailable
+//   - codes.NotFound if result cannot be provided by storage due to the absence of data.
 func (e *EventsIndex) ByBlockIDTransactionIndex(blockID flow.Identifier, height uint64, txIndex uint32) ([]flow.Event, error) {
-	if err := e.checkDataAvailable(height); err != nil {
+	if err := e.checkDataAvailability(height); err != nil {
 		return nil, err
 	}
 
@@ -91,7 +97,7 @@ func (e *EventsIndex) ByBlockIDTransactionIndex(blockID flow.Identifier, height 
 
 // LowestIndexedHeight returns the lowest height indexed by the execution state indexer.
 // Expected errors:
-// - indexer.ErrIndexNotInitialized: if the EventsIndex has not been initialized
+// - indexer.ErrIndexNotInitialized if the EventsIndex has not been initialized
 func (e *EventsIndex) LowestIndexedHeight() (uint64, error) {
 	reporter, err := e.getReporter()
 	if err != nil {
@@ -103,7 +109,7 @@ func (e *EventsIndex) LowestIndexedHeight() (uint64, error) {
 
 // HighestIndexedHeight returns the highest height indexed by the execution state indexer.
 // Expected errors:
-// - indexer.ErrIndexNotInitialized: if the EventsIndex has not been initialized
+// - indexer.ErrIndexNotInitialized if the EventsIndex has not been initialized
 func (e *EventsIndex) HighestIndexedHeight() (uint64, error) {
 	reporter, err := e.getReporter()
 	if err != nil {
@@ -113,7 +119,13 @@ func (e *EventsIndex) HighestIndexedHeight() (uint64, error) {
 	return reporter.HighestIndexedHeight()
 }
 
-func (e *EventsIndex) checkDataAvailable(height uint64) error {
+// checkDataAvailability checks the availability of data at the given height by comparing it with the highest and lowest
+// indexed heights. If the height is beyond the indexed range, an error is returned.
+// Expected errors:
+//   - indexer.ErrIndexNotInitialized if the `TransactionResultsIndex` has not been initialized
+//   - storage.ErrHeightNotIndexed if the block at the provided height is not indexed yet
+//   - fmt.Errorf with custom message if the highest or lowest indexed heights cannot be retrieved from the reporter
+func (e *EventsIndex) checkDataAvailability(height uint64) error {
 	reporter, err := e.getReporter()
 	if err != nil {
 		return err
@@ -138,6 +150,9 @@ func (e *EventsIndex) checkDataAvailable(height uint64) error {
 	return nil
 }
 
+// getReporter retrieves the current index reporter instance from the atomic pointer.
+// Expected errors:
+//   - indexer.ErrIndexNotInitialized if the reporter is not initialized
 func (e *EventsIndex) getReporter() (state_synchronization.IndexReporter, error) {
 	reporter := e.reporter.Load()
 	if reporter == nil {

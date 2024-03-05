@@ -30,6 +30,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
+const expectedErrorMsg = "expected test error"
+
 func (suite *Suite) withPreConfiguredState(f func(snap protocol.Snapshot)) {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
@@ -1022,6 +1024,32 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 	})
 }
 
+func (suite *Suite) assertTransactionResultResponse(
+	err error,
+	response *acc.TransactionResult,
+	block flow.Block,
+	txId flow.Identifier,
+	txFailed bool,
+	eventsForTx []flow.Event,
+) {
+
+	suite.Require().NoError(err)
+	suite.Assert().Equal(block.ID(), response.BlockID)
+	suite.Assert().Equal(block.Header.Height, response.BlockHeight)
+	suite.Assert().Equal(txId, response.TransactionID)
+	suite.Assert().Equal(block.Payload.Guarantees[0].CollectionID, response.CollectionID)
+	suite.Assert().Equal(len(eventsForTx), len(response.Events))
+	// When there are error messages occurred in the transaction, the status should be 1
+	if txFailed {
+		suite.Assert().Equal(uint(1), response.StatusCode)
+		suite.Assert().Equal(expectedErrorMsg, response.ErrorMessage)
+	} else {
+		suite.Assert().Equal(uint(0), response.StatusCode)
+		suite.Assert().Equal("", response.ErrorMessage)
+	}
+	suite.Assert().Equal(flow.TransactionStatusSealed, response.Status)
+}
+
 // TestTransactionResultFromStorage tests the retrieval of a transaction result (flow.TransactionResult) from storage
 // instead of requesting it from the Execution Node.
 func (suite *Suite) TestTransactionResultFromStorage() {
@@ -1056,12 +1084,10 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 
 	// Set up the events storage mock
 	totalEvents := 5
-	eventsForTx := make([]flow.Event, totalEvents)
+	eventsForTx := unittest.EventsFixture(totalEvents, flow.EventAccountCreated)
 	eventMessages := make([]*entities.Event, totalEvents)
-	for j := range eventsForTx {
-		e := unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture(), 0)
-		eventsForTx[j] = e
-		eventMessages[j] = convert.EventToMessage(e)
+	for j, event := range eventsForTx {
+		eventMessages[j] = convert.EventToMessage(event)
 	}
 
 	// expect a call to lookup events by block ID and transaction ID
@@ -1102,7 +1128,7 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 	suite.Require().NoError(err)
 
 	// Set up the expected error message for the execution node response
-	expectedErrorMsg := "expected test error"
+
 	exeEventReq := &execproto.GetTransactionErrorMessageRequest{
 		BlockId:       blockId[:],
 		TransactionId: txId[:],
@@ -1116,16 +1142,7 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 	suite.execClient.On("GetTransactionErrorMessage", mock.Anything, exeEventReq).Return(exeEventResp, nil).Once()
 
 	response, err := backend.GetTransactionResult(context.Background(), txId, blockId, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0)
-	suite.Require().NoError(err)
-	suite.Assert().Equal(blockId, response.BlockID)
-	suite.Assert().Equal(block.Header.Height, response.BlockHeight)
-	suite.Assert().Equal(txId, response.TransactionID)
-	suite.Assert().Equal(col.ID(), response.CollectionID)
-	suite.Assert().Equal(len(eventsForTx), len(response.Events))
-	suite.Assert().Equal(expectedErrorMsg, response.ErrorMessage)
-	// When there are error messages occurred in the transaction, the status should be 1
-	suite.Assert().Equal(uint(1), response.StatusCode)
-	suite.Assert().Equal(flow.TransactionStatusSealed, response.Status)
+	suite.assertTransactionResultResponse(err, response, block, txId, true, eventsForTx)
 }
 
 // TestTransactionByIndexFromStorage tests the retrieval of a transaction result (flow.TransactionResult) by index
@@ -1159,12 +1176,10 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 
 	// Set up the events storage mock
 	totalEvents := 5
-	eventsForTx := make([]flow.Event, totalEvents)
+	eventsForTx := unittest.EventsFixture(totalEvents, flow.EventAccountCreated)
 	eventMessages := make([]*entities.Event, totalEvents)
-	for j := range eventsForTx {
-		e := unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture(), 0)
-		eventsForTx[j] = e
-		eventMessages[j] = convert.EventToMessage(e)
+	for j, event := range eventsForTx {
+		eventMessages[j] = convert.EventToMessage(event)
 	}
 
 	// expect a call to lookup events by block ID and transaction ID
@@ -1205,7 +1220,6 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	suite.Require().NoError(err)
 
 	// Set up the expected error message for the execution node response
-	expectedErrorMsg := "expected test error"
 	exeEventReq := &execproto.GetTransactionErrorMessageByIndexRequest{
 		BlockId: blockId[:],
 		Index:   txIndex,
@@ -1219,15 +1233,7 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	suite.execClient.On("GetTransactionErrorMessageByIndex", mock.Anything, exeEventReq).Return(exeEventResp, nil).Once()
 
 	response, err := backend.GetTransactionResultByIndex(context.Background(), blockId, txIndex, entities.EventEncodingVersion_JSON_CDC_V0)
-	suite.Require().NoError(err)
-	suite.Assert().Equal(blockId, response.BlockID)
-	suite.Assert().Equal(block.Header.Height, response.BlockHeight)
-	suite.Assert().Equal(txId, response.TransactionID)
-	suite.Assert().Equal(col.ID(), response.CollectionID)
-	suite.Assert().Equal(len(eventsForTx), len(response.Events))
-	suite.Assert().Equal(expectedErrorMsg, response.ErrorMessage)
-	suite.Assert().Equal(uint(1), response.StatusCode) // When there are error message occurred in transaction, the status should be 1
-	suite.Assert().Equal(flow.TransactionStatusSealed, response.Status)
+	suite.assertTransactionResultResponse(err, response, block, txId, true, eventsForTx)
 }
 
 // TestTransactionResultsByBlockIDFromStorage tests the retrieval of transaction results ([]flow.TransactionResult)
@@ -1262,12 +1268,10 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 
 	// Set up the events storage mock
 	totalEvents := 5
-	eventsForTx := make([]flow.Event, totalEvents)
+	eventsForTx := unittest.EventsFixture(totalEvents, flow.EventAccountCreated)
 	eventMessages := make([]*entities.Event, totalEvents)
-	for j := range eventsForTx {
-		e := unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture(), 0)
-		eventsForTx[j] = e
-		eventMessages[j] = convert.EventToMessage(e)
+	for j, event := range eventsForTx {
+		eventMessages[j] = convert.EventToMessage(event)
 	}
 
 	// expect a call to lookup events by block ID and transaction ID
@@ -1313,8 +1317,6 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 		BlockId: blockId[:],
 	}
 
-	expectedErrorMsg := "expected test error"
-
 	res := &execproto.GetTransactionErrorMessagesResponse_Result{
 		TransactionId: lightTxResults[0].TransactionID[:],
 		ErrorMessage:  expectedErrorMsg,
@@ -1335,21 +1337,6 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	// Assertions for each transaction result in the response
 	for i, responseResult := range response {
 		lightTx := lightTxResults[i]
-		suite.Assert().Equal(blockId, responseResult.BlockID)
-		suite.Assert().Equal(block.Header.Height, responseResult.BlockHeight)
-		suite.Assert().Equal(lightTx.TransactionID, responseResult.TransactionID)
-		suite.Assert().Equal(col.ID(), responseResult.CollectionID)
-		suite.Assert().Equal(len(eventsForTx), len(responseResult.Events))
-
-		// When there are error message occurred in transaction, the status should be 1
-		if lightTx.Failed {
-			suite.Assert().Equal(uint(1), responseResult.StatusCode)
-			suite.Assert().Equal(expectedErrorMsg, responseResult.ErrorMessage)
-		} else {
-			suite.Assert().Equal(uint(0), responseResult.StatusCode)
-			suite.Assert().Equal("", responseResult.ErrorMessage)
-		}
-
-		suite.Assert().Equal(flow.TransactionStatusSealed, responseResult.Status)
+		suite.assertTransactionResultResponse(err, responseResult, block, lightTx.TransactionID, lightTx.Failed, eventsForTx)
 	}
 }
