@@ -17,7 +17,7 @@ func TestSkipDuplicates(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
-		val, _ := encodeAndCompress(e)
+		val, _ := encodeEntity(e)
 
 		// persist first time
 		err := db.Update(insert(key, e))
