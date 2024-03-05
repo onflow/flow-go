@@ -1498,6 +1498,9 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			)
 		}
 
+		// use the events index for events if enabled
+		useIndex := builder.executionDataIndexingEnabled
+
 		rpcHandler := &apiproxy.FlowAccessAPIRouter{
 			Logger:   builder.Logger,
 			Metrics:  observerCollector,
@@ -1513,7 +1516,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 					backend.DefaultSnapshotHistoryLimit,
 				),
 			)),
-			LocalData: localData,
+			UseIndex: useIndex,
 		}
 
 		// build the rpc engine

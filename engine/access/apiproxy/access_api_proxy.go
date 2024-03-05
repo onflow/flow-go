@@ -18,11 +18,12 @@ import (
 // FlowAccessAPIRouter is a structure that represents the routing proxy algorithm.
 // It splits requests between a local and a remote API service.
 type FlowAccessAPIRouter struct {
-	Logger    zerolog.Logger
-	Metrics   *metrics.ObserverCollector
-	Upstream  *FlowAccessAPIForwarder
-	Observer  *protocol.Handler
-	LocalData *ObserverLocalDataService
+	Logger   zerolog.Logger
+	Metrics  *metrics.ObserverCollector
+	Upstream *FlowAccessAPIForwarder
+	Observer *protocol.Handler
+	UseIndex bool
+	//LocalData *ObserverLocalDataService
 }
 
 func (h *FlowAccessAPIRouter) log(handler, rpc string, err error) {
@@ -111,7 +112,7 @@ func (h *FlowAccessAPIRouter) GetTransaction(context context.Context, req *acces
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResult(context context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
-	if h.LocalData != nil {
+	if h.UseIndex {
 		txId := req.GetId()
 		blockId := req.GetBlockId()
 		collectionID := req.GetCollectionId()
@@ -128,7 +129,7 @@ func (h *FlowAccessAPIRouter) GetTransactionResult(context context.Context, req 
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResultsByBlockID(context context.Context, req *access.GetTransactionsByBlockIDRequest) (*access.TransactionResultsResponse, error) {
-	if h.LocalData != nil {
+	if h.UseIndex {
 		blockId := req.GetBlockId()
 		requiredEventEncodingVersion := req.GetEventEncodingVersion()
 
@@ -149,7 +150,7 @@ func (h *FlowAccessAPIRouter) GetTransactionsByBlockID(context context.Context, 
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResultByIndex(context context.Context, req *access.GetTransactionByIndexRequest) (*access.TransactionResultResponse, error) {
-	if h.LocalData != nil {
+	if h.UseIndex {
 		blockId := req.GetBlockId()
 		index := req.GetIndex()
 		requiredEventEncodingVersion := req.GetEventEncodingVersion()
@@ -213,7 +214,7 @@ func (h *FlowAccessAPIRouter) ExecuteScriptAtBlockHeight(context context.Context
 }
 
 func (h *FlowAccessAPIRouter) GetEventsForHeightRange(context context.Context, req *access.GetEventsForHeightRangeRequest) (*access.EventsResponse, error) {
-	if h.LocalData != nil {
+	if h.UseIndex {
 		eventType := req.GetType()
 		startHeight := req.GetStartHeight()
 		endHeight := req.GetEndHeight()
@@ -230,7 +231,7 @@ func (h *FlowAccessAPIRouter) GetEventsForHeightRange(context context.Context, r
 }
 
 func (h *FlowAccessAPIRouter) GetEventsForBlockIDs(context context.Context, req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
-	if h.LocalData != nil {
+	if h.UseIndex {
 		eventType := req.GetType()
 		blockIDs := convert.MessagesToIdentifiers(req.GetBlockIds())
 		requiredEventEncodingVersion := req.GetEventEncodingVersion()
