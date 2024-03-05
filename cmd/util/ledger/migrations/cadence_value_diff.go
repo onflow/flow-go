@@ -51,13 +51,15 @@ type diffProblem struct {
 }
 
 type difference struct {
-	Address  string
-	Domain   string
-	Kind     string
-	Msg      string
-	Trace    string `json:",omitempty"`
-	OldValue string `json:",omitempty"`
-	NewValue string `json:",omitempty"`
+	Address            string
+	Domain             string
+	Kind               string
+	Msg                string
+	Trace              string `json:",omitempty"`
+	OldValue           string `json:",omitempty"`
+	NewValue           string `json:",omitempty"`
+	OldValueStaticType string `json:",omitempty"`
+	NewValueStaticType string `json:",omitempty"`
 }
 
 type CadenceValueDiffReporter struct {
@@ -232,13 +234,15 @@ func (dr *CadenceValueDiffReporter) diffStorageDomain(oldRuntime, newRuntime *re
 				// Log potentially large values at top level only when verbose logging is enabled.
 				dr.reportWriter.Write(
 					difference{
-						Address:  dr.address.Hex(),
-						Domain:   domain,
-						Kind:     diffKindString[storageMapValueDiffKind],
-						Msg:      "storage map elements are different",
-						Trace:    trace,
-						OldValue: oldValue.String(),
-						NewValue: newValue.String(),
+						Address:            dr.address.Hex(),
+						Domain:             domain,
+						Kind:               diffKindString[storageMapValueDiffKind],
+						Msg:                "storage map elements are different",
+						Trace:              trace,
+						OldValue:           oldValue.String(),
+						NewValue:           newValue.String(),
+						OldValueStaticType: oldValue.StaticType(oldRuntime.Interpreter).String(),
+						NewValueStaticType: newValue.StaticType(newRuntime.Interpreter).String(),
 					})
 			}
 		}
@@ -286,13 +290,15 @@ func (dr *CadenceValueDiffReporter) diffValues(
 		if !oldValue.Equal(nil, interpreter.EmptyLocationRange, other) {
 			dr.reportWriter.Write(
 				difference{
-					Address:  dr.address.Hex(),
-					Domain:   domain,
-					Kind:     diffKindString[cadenceValueDiffKind],
-					Msg:      fmt.Sprintf("values differ: %T vs %T", oldValue, other),
-					Trace:    trace,
-					OldValue: oldValue.String(),
-					NewValue: other.String(),
+					Address:            dr.address.Hex(),
+					Domain:             domain,
+					Kind:               diffKindString[cadenceValueDiffKind],
+					Msg:                fmt.Sprintf("values differ: %T vs %T", oldValue, other),
+					Trace:              trace,
+					OldValue:           v.String(),
+					NewValue:           other.String(),
+					OldValueStaticType: v.StaticType(vInterpreter).String(),
+					NewValueStaticType: other.StaticType(otherInterpreter).String(),
 				})
 			return true
 		}
