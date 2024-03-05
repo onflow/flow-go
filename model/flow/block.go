@@ -117,7 +117,25 @@ func (b *CertifiedBlock) Height() uint64 {
 
 // BlockDigest holds lightweight block information which includes only block id, block height and block timestamp
 type BlockDigest struct {
-	ID        Identifier
+	id        Identifier
 	Height    uint64
 	Timestamp time.Time
+}
+
+// NewBlockDigest constructs a new block digest.
+func NewBlockDigest(
+	id Identifier,
+	height uint64,
+	timestamp time.Time,
+) *BlockDigest {
+	return &BlockDigest{
+		id:        id,
+		Height:    height,
+		Timestamp: timestamp,
+	}
+}
+
+// ID returns the id of the BlockDigest.
+func (b BlockDigest) ID() Identifier {
+	return b.id
 }
