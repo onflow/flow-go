@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // Core connects the execution components
@@ -268,7 +270,11 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 	return missingColls, executables, nil
 }
 
-func (e *Core) onBlockExecuted(block *entity.ExecutableBlock, computationResult *execution.ComputationResult) error {
+func (e *Core) onBlockExecuted(
+	block *entity.ExecutableBlock,
+	computationResult *execution.ComputationResult,
+	startedAt time.Time,
+) error {
 	commit := computationResult.CurrentEndState()
 
 	// block queue decides when a block becomes executed, it doesn't care if the execution
@@ -299,8 +305,22 @@ func (e *Core) onBlockExecuted(block *entity.ExecutableBlock, computationResult 
 	// such as broadcasting or uploading the result
 	logs := e.eventConsumer.OnComputationResultSaved(e.unit.Ctx(), computationResult)
 
-	// TODO add more feilds to log
-	e.log.Info().Str("logs", logs).Msgf("block executed")
+	receipt := computationResult.ExecutionReceipt
+	e.log.Info().
+		Hex("block_id", logging.Entity(block)).
+		Uint64("height", block.Block.Header.Height).
+		Int("collections", len(block.CompleteCollections)).
+		Hex("parent_block", block.Block.Header.ParentID[:]).
+		Int("collections", len(block.Block.Payload.Guarantees)).
+		Hex("start_state", block.StartState[:]).
+		Hex("final_state", commit[:]).
+		Hex("receipt_id", logging.Entity(receipt)).
+		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+		Hex("execution_data_id", receipt.ExecutionResult.ExecutionDataID[:]).
+		Bool("state_changed", commit != *block.StartState).
+		Uint64("num_txs", nonSystemTransactionCount(receipt.ExecutionResult)).
+		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
+		Str("logs", logs).Msgf("block executed")
 
 	// we ensures that the child blocks are only executed after the execution result of
 	// its parent block has been successfully saved to storage.
@@ -372,15 +392,20 @@ func (e *Core) execute(executable *entity.ExecutableBlock) error {
 		return nil
 	}
 
-	// TODO: add fields
-	e.log.Info().Msgf("executing block")
+	e.log.Info().
+		Hex("block_id", logging.Entity(executable)).
+		Uint64("height", executable.Block.Header.Height).
+		Int("collections", len(executable.CompleteCollections)).
+		Msgf("executing block")
+
+	startedAt := time.Now()
 
 	result, err := e.executor.ExecuteBlock(e.unit.Ctx(), executable)
 	if err != nil {
 		return fmt.Errorf("failed to execute block %v: %w", executable.Block.ID(), err)
 	}
 
-	err = e.onBlockExecuted(executable, result)
+	err = e.onBlockExecuted(executable, result, startedAt)
 	if err != nil {
 		return fmt.Errorf("failed to handle execution result of block %v: %w", executable.Block.ID(), err)
 	}
