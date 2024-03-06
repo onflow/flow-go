@@ -24,8 +24,6 @@ import (
 	"golang.org/x/time/rate"
 	"google.golang.org/api/option"
 
-	"github.com/onflow/crypto"
-
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/admin/commands/common"
@@ -33,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/model/flow"

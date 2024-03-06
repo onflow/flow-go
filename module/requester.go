@@ -29,10 +29,10 @@ type Requester interface {
 
 type NoopRequester struct{}
 
-func (n NoopRequester) EntityByID(entityID flow.Identifier, selector flow.IdentityFilter[flow.Identity]) {
+func (n NoopRequester) EntityByID(entityID flow.Identifier, selector flow.IdentityFilter) {
 }
 
-func (n NoopRequester) Query(key flow.Identifier, selector flow.IdentityFilter[flow.Identity]) {}
+func (n NoopRequester) Query(key flow.Identifier, selector flow.IdentityFilter) {}
 
 func (n NoopRequester) Force() {}
 

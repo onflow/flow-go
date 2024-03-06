@@ -10,8 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/crypto"
-
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -98,12 +97,12 @@ func rateLimiterPeerFilter(rateLimiter p2p.RateLimiter) p2p.PeerFilter {
 // BootstrapIdentities converts the bootstrap node addresses and keys to a Flow Identity list where
 // each Flow Identity is initialized with the passed address, the networking key
 // and the Node ID set to ZeroID, role set to Access, 0 stake and no staking key.
-func BootstrapIdentities(addresses []string, keys []string) (flow.IdentitySkeletonList, error) {
+func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, error) {
 	if len(addresses) != len(keys) {
 		return nil, fmt.Errorf("number of addresses and keys provided for the boostrap nodes don't match")
 	}
 
-	ids := make(flow.IdentitySkeletonList, len(addresses))
+	ids := make(flow.IdentityList, len(addresses))
 	for i, address := range addresses {
 		bytes, err := hex.DecodeString(keys[i])
 		if err != nil {
@@ -116,7 +115,7 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentitySkelet
 		}
 
 		// create the identity of the peer by setting only the relevant fields
-		ids[i] = &flow.IdentitySkeleton{
+		ids[i] = &flow.Identity{
 			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the public network it does not apply
 			Address:       address,
 			Role:          flow.RoleAccess, // the upstream node has to be an access node
