@@ -52,7 +52,6 @@ func TestBuildMatrices(t *testing.T) {
 		require.Equal(t, name, matrices[0].Name)
 		require.Equal(t, runner, matrices[0].Runner)
 		require.Equal(t, fmt.Sprintf("%s %s %s ", allPackges[0].PkgPath, allPackges[1].PkgPath, allPackges[2].PkgPath), matrices[0].Packages)
-		fmt.Println(matrices[0].Name, matrices[0].Runner, matrices[0].Packages)
 	})
 	t.Run("top level package with sub packages include others", func(t *testing.T) {
 		topLevelPkgName := "network"
