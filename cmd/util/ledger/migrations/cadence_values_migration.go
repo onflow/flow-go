@@ -158,7 +158,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 
 	err = storage.CheckHealth()
 	if err != nil {
-		return nil, fmt.Errorf("storage health check failed: %w", err)
+		m.log.Err(err).Msg("storage health check failed")
 	}
 
 	// finalize the transaction
