@@ -353,6 +353,12 @@ func (h *ContractHandler) executeAndHandleCall(
 	return res, h.blockStore.CommitBlockProposal()
 }
 
+func (h *ContractHandler) GenerateResourceUUID() uint64 {
+	uuid, err := h.backend.GenerateUUID()
+	panicOnAnyError(err)
+	return uuid
+}
+
 type Account struct {
 	isAuthorized bool
 	address      types.Address
