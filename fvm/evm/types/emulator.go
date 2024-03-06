@@ -24,6 +24,7 @@ type Precompile interface {
 
 // BlockContext holds the context needed for the emulator operations
 type BlockContext struct {
+	ChainID                *big.Int
 	BlockNumber            uint64
 	DirectCallBaseGasUsage uint64
 	DirectCallGasPrice     uint64
@@ -38,6 +39,7 @@ type BlockContext struct {
 // NewDefaultBlockContext returns a new default block context
 func NewDefaultBlockContext(BlockNumber uint64) BlockContext {
 	return BlockContext{
+		ChainID:                FlowEVMTestnetChainID,
 		BlockNumber:            BlockNumber,
 		DirectCallBaseGasUsage: DefaultDirectCallBaseGasUsage,
 		DirectCallGasPrice:     DefaultDirectCallGasPrice,
