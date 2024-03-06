@@ -4,9 +4,12 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack"
 
+	"github.com/onflow/flow-go/model/flow"
 	storagemodel "github.com/onflow/flow-go/storage/badger/model"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -47,4 +50,13 @@ func TestChunkDataPack(t *testing.T) {
 			assert.Error(t, err)
 		})
 	})
+}
+
+func TestBlockExecutionDataRootEncoding(t *testing.T) {
+	entity := flow.IdToCid(unittest.IdentifierFixture())
+	val, err := msgpack.Marshal(entity)
+	require.NoError(t, err)
+	var decoded cid.Cid
+	require.NoError(t, msgpack.Unmarshal(val, &decoded))
+	require.Equal(t, entity, decoded)
 }
