@@ -1385,7 +1385,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			),
 		}
 
-		accessBackend, err := backend.New(backend.Params{
+		backendParams := backend.Params{
 			State:                     node.State,
 			Blocks:                    node.Storage.Blocks,
 			Headers:                   node.Storage.Headers,
@@ -1403,7 +1403,20 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			Log:                       node.Logger,
 			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
 			Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-		})
+		}
+
+		// use the events index for events if enabled
+		useIndex := builder.executionDataIndexingEnabled
+
+		if useIndex {
+			backendParams.ScriptExecutionMode = backend.IndexQueryModeLocalOnly
+			backendParams.EventQueryMode = backend.IndexQueryModeLocalOnly
+			backendParams.TxResultQueryMode = backend.IndexQueryModeLocalOnly
+			backendParams.TxResultsIndex = builder.TxResultsIndex
+			backendParams.EventsIndex = builder.EventsIndex
+		}
+
+		accessBackend, err := backend.New(backendParams)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize backend: %w", err)
 		}
@@ -1440,34 +1453,39 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
-		// upstream access node forwarder
-		forwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, connFactory)
-		if err != nil {
-			return nil, err
+		accessAPIRouterParams := apiproxy.Params{
+			Log:         builder.Logger,
+			State:       node.State,
+			Blocks:      node.Storage.Blocks,
+			Headers:     node.Storage.Headers,
+			RootChainID: node.RootChainID,
+			Metrics:     observerCollector,
 		}
 
-		// use the events index for events if enabled
-		useIndex := builder.executionDataIndexingEnabled
+		if useIndex {
+			// backend access node forwarder
+			localForwarder, err := apiproxy.NewFlowAccessAPILocalForwarder(
+				accessBackend,
+				builder.NodeID,
+				builder.State,
+				builder.upstreamIdentities,
+				connFactory)
+			if err != nil {
+				return nil, err
+			}
 
-		rpcHandler := apiproxy.NewFlowAccessAPIRouter(apiproxy.Params{
-			Log:               builder.Logger,
-			State:             node.State,
-			Collections:       node.Storage.Collections,
-			Blocks:            node.Storage.Blocks,
-			Results:           node.Storage.LightTransactionResults,
-			Headers:           node.Storage.Headers,
-			ExecutionReceipts: node.Storage.Receipts,
-			RootChainID:       node.RootChainID,
-			NodeId:            builder.Me.NodeID(),
-			ConnFactory:       connFactory,
-			MaxHeightRange:    backendConfig.MaxHeightRange,
-			UseIndex:          useIndex,
-			NodeCommunicator:  backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-			EventsIndex:       builder.EventsIndex,
-			TxResultsIndex:    builder.TxResultsIndex,
-			Metrics:           observerCollector,
-			Upstream:          forwarder},
-		)
+			accessAPIRouterParams.Upstream = localForwarder
+		} else {
+			// upstream access node forwarder
+			forwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, connFactory)
+			if err != nil {
+				return nil, err
+			}
+
+			accessAPIRouterParams.Upstream = forwarder
+		}
+
+		rpcHandler := apiproxy.NewFlowAccessAPIRouter(accessAPIRouterParams)
 
 		// build the rpc engine
 		builder.RpcEng, err = engineBuilder.
