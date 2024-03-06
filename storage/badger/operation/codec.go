@@ -12,8 +12,12 @@ import (
 
 var errUncompressedValue = errors.New("could not uncompress data")
 
+// global flag to indicate whether the database value is compressed.
+// default is compressed.
 var compressEnabled = true
 
+// setCompressDisabled set the global flag to disable compression.
+// should only be used during database initialization on startup.
 func setCompressDisabled() {
 	compressEnabled = false
 }

@@ -31,7 +31,7 @@ func batchWrite(key []byte, entity interface{}) func(writeBatch *badger.WriteBat
 		// serialize the entity data
 		val, err := encodeEntity(entity)
 		if err != nil {
-			return irrecoverable.NewExceptionf("could not encode entity: %w", err)
+			return err
 		}
 
 		// persist the entity data into the DB
@@ -75,7 +75,7 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 		// serialize the entity data
 		val, err := encodeEntity(entity)
 		if err != nil {
-			return irrecoverable.NewExceptionf("could not encode entity: %w", err)
+			return err
 		}
 
 		// persist the entity data into the DB
@@ -108,7 +108,7 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 		// serialize the entity data
 		val, err := encodeEntity(entity)
 		if err != nil {
-			return irrecoverable.NewExceptionf("could not encode entity: %w", err)
+			return err
 		}
 
 		// persist the entity data into the DB
@@ -137,7 +137,7 @@ func upsert(key []byte, entity interface{}) func(*badger.Txn) error {
 		// serialize the entity data
 		val, err := encodeEntity(entity)
 		if err != nil {
-			return irrecoverable.NewExceptionf("could not encode entity: %w", err)
+			return err
 		}
 
 		// persist the entity data into the DB
@@ -254,8 +254,7 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 
 		// get the value from the item
 		err = item.Value(func(val []byte) error {
-			err := decodeValue(val, entity)
-			return err
+			return decodeValue(val, entity)
 		})
 		if err != nil {
 			return fmt.Errorf("could not decode entity: %w", err)
