@@ -66,10 +66,10 @@ type testMatrix struct {
 }
 
 // newTestMatrix returns a new testMatrix, if runner is empty "" set the runner to the defaultCIRunner.
-func newTestMatrix(name, runner string) *testMatrix {
+func newTestMatrix(name, runner, pkgs string) *testMatrix {
 	t := &testMatrix{
 		Name:     name,
-		Packages: "",
+		Packages: pkgs,
 		Runner:   runner,
 	}
 
@@ -152,7 +152,6 @@ func processSubpackages(subPkgs []*subpackage, allPkgs []*packages.Package, seen
 	testMatrices := make([]*testMatrix, 0)
 	for _, subPkg := range subPkgs {
 		pkgPath := fullGoPackagePath(subPkg.Name)
-		subPkgTestMatrix := newTestMatrix(subPkg.Name, subPkg.Runner)
 		// this is the list of allPackages that used with the go test command
 		var testPkgStrBuilder strings.Builder
 		for _, p := range allPkgs {
@@ -161,15 +160,13 @@ func processSubpackages(subPkgs []*subpackage, allPkgs []*packages.Package, seen
 				seenPath(p.PkgPath)
 			}
 		}
-		subPkgTestMatrix.Packages = testPkgStrBuilder.String()
-		testMatrices = append(testMatrices, subPkgTestMatrix)
+		testMatrices = append(testMatrices, newTestMatrix(subPkg.Name, subPkg.Runner, testPkgStrBuilder.String()))
 	}
 	return testMatrices
 }
 
 // processTopLevelPackages creates test matrix for the top level package excluding any packages from the exclude list.
 func processTopLevelPackage(pkg *flowGoPackage, allPkgs []*packages.Package, seenPath func(p string), seen func(p string) bool) *testMatrix {
-	topLevelTestMatrix := newTestMatrix(pkg.Name, pkg.Runner)
 	var topLevelTestPkgStrBuilder strings.Builder
 	for _, p := range allPkgs {
 		if !seen(p.PkgPath) {
@@ -186,13 +183,11 @@ func processTopLevelPackage(pkg *flowGoPackage, allPkgs []*packages.Package, see
 			}
 		}
 	}
-	topLevelTestMatrix.Packages = topLevelTestPkgStrBuilder.String()
-	return topLevelTestMatrix
+	return newTestMatrix(pkg.Name, pkg.Runner, topLevelTestPkgStrBuilder.String())
 }
 
 // buildOthersTestMatrix builds an others test matrix that includes all packages in a path not explicitly set in the packages list of a config.
 func buildOthersTestMatrix(allPkgs []*packages.Package, seen func(p string) bool) *testMatrix {
-	othersTestMatrix := newTestMatrix("others", "")
 	var othersTestPkgStrBuilder strings.Builder
 	for _, otherPkg := range allPkgs {
 		if !seen(otherPkg.PkgPath) {
@@ -201,8 +196,7 @@ func buildOthersTestMatrix(allPkgs []*packages.Package, seen func(p string) bool
 	}
 
 	if othersTestPkgStrBuilder.Len() > 0 {
-		othersTestMatrix.Packages = othersTestPkgStrBuilder.String()
-		return othersTestMatrix
+		return newTestMatrix("others", "", othersTestPkgStrBuilder.String())
 	}
 
 	return nil
