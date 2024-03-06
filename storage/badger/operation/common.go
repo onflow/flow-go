@@ -255,14 +255,9 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 		}
 
 		// get the value from the item
-		err = item.Value(func(val []byte) error {
+		return item.Value(func(val []byte) error {
 			return decodeValue(val, entity)
 		})
-		if err != nil {
-			return fmt.Errorf("could not decode entity: %w", err)
-		}
-
-		return nil
 	}
 }
 
