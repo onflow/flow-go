@@ -20,7 +20,6 @@ import (
 // Execution or Verification Node; it is not resilient to malicious inputs.
 // No errors are expected during normal operation.
 func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, error) {
-
 	events := systemcontracts.ServiceEventsForChain(chainID)
 
 	// depending on type of service event construct Go type
@@ -962,7 +961,7 @@ func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.Ser
 			return flow.ProtocolStateVersionUpgrade{
 				NewProtocolStateVersion: newProtocolVersion,
 				ActiveView:              activeView,
-			}, err
+			}, nil
 		})
 
 	// create the service event
@@ -970,7 +969,6 @@ func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.Ser
 		Type:  flow.ServiceEventProtocolStateVersionUpgrade,
 		Event: &versionUpgrade,
 	}
-
 	return serviceEvent, nil
 }
 

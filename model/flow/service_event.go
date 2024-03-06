@@ -21,8 +21,8 @@ func (set ServiceEventType) String() string {
 const (
 	ServiceEventSetup                       ServiceEventType = "setup"
 	ServiceEventCommit                      ServiceEventType = "commit"
-	ServiceEventVersionBeacon               ServiceEventType = "version-beacon"
-	ServiceEventProtocolStateVersionUpgrade ServiceEventType = "protocol-state-version-upgrade"
+	ServiceEventVersionBeacon               ServiceEventType = "version-beacon"                 // VersionBeacon only controls version of ENs, describing software compatability via semantic versioning
+	ServiceEventProtocolStateVersionUpgrade ServiceEventType = "protocol-state-version-upgrade" // Protocol State version applies to all nodes and uses an _integer version_ of the _protocol_
 )
 
 // ServiceEvent represents a service event, which is a special event that when
@@ -105,7 +105,7 @@ var (
 	}
 )
 
-// UnmarshalWrapped unmarshals the service event and returns it as a wrapped ServiceEvent type.
+// UnmarshalWrapped unmarshals the service event `b` and returns it as a wrapped ServiceEvent type.
 // The input bytes must be encoded as a generic wrapped ServiceEvent type.
 // Forwards errors from the underlying marshaller (treat errors as you would from eg. json.Unmarshal)
 func (marshaller marshallerImpl) UnmarshalWrapped(b []byte) (ServiceEvent, error) {
@@ -131,7 +131,6 @@ func (marshaller marshallerImpl) UnmarshalWrapped(b []byte) (ServiceEvent, error
 	default:
 		return ServiceEvent{}, fmt.Errorf("invalid type: %s", eventType)
 	}
-
 	if err != nil {
 		return ServiceEvent{}, fmt.Errorf("failed to unmarshal to service event to type %s: %w", eventType, err)
 	}
