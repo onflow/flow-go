@@ -37,7 +37,7 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v3
     - name: Setup Go
-      uses: buildjet/setup-go@v4
+      uses: actions/setup-go@v4
       timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
       with:
         go-version: ${{ env.GO_VERSION }}
@@ -63,7 +63,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: buildjet/setup-go@v4
+        uses: actions/setup-go@v4
         timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -82,7 +82,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: buildjet/setup-go@v4
+        uses: actions/setup-go@v4
         timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -100,7 +100,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: buildjet/setup-go@v4
+        uses: actions/setup-go@v4
         timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -118,7 +118,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: buildjet/setup-go@v4
+        uses: actions/setup-go@v4
         timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -140,7 +140,7 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v3
     - name: Setup Go
-      uses: buildjet/setup-go@v4
+      uses: actions/setup-go@v4
       timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
       with:
         go-version: ${{ env.GO_VERSION }}
@@ -176,7 +176,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: buildjet/setup-go@v4
+        uses: actions/setup-go@v4
         timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -211,7 +211,7 @@ jobs:
           # all tags are needed for integration tests
           fetch-depth: 0
       - name: Setup Go
-        uses: buildjet/setup-go@v4
+        uses: actions/setup-go@v4
         timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -253,7 +253,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: buildjet/setup-go@v4
+        uses: actions/setup-go@v4
         timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -340,7 +340,7 @@ jobs:
           # all tags are needed for integration tests
           fetch-depth: 0
     - name: Setup Go
-      uses: buildjet/setup-go@v4
+      uses: actions/setup-go@v4
       timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
       with:
         go-version: ${{ env.GO_VERSION }}
