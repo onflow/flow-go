@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/addresses"
+	bootstrap_execution_state_payloads "github.com/onflow/flow-go/cmd/util/cmd/bootstrap-execution-state-payloads"
 	checkpoint_collect_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-collect-stats"
 	checkpoint_list_tries "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-list-tries"
 	checkpoint_trie_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-trie-stats"
@@ -82,6 +83,7 @@ func addCommands() {
 	rootCmd.AddCommand(export_json_transactions.Cmd)
 	rootCmd.AddCommand(read_hotstuff.RootCmd)
 	rootCmd.AddCommand(addresses.Cmd)
+	rootCmd.AddCommand(bootstrap_execution_state_payloads.Cmd)
 }
 
 func initConfig() {

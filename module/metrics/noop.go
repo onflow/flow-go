@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/channels"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
+	"github.com/onflow/flow-go/storage"
 )
 
 type NoopCollector struct{}
@@ -338,6 +339,7 @@ func (nc *NoopCollector) OnInvalidTopicIdDetectedForControlMessage(messageType p
 func (nc *NoopCollector) OnActiveClusterIDsNotSetErr()                                   {}
 func (nc *NoopCollector) OnUnstakedPeerInspectionFailed()                                {}
 func (nc *NoopCollector) OnInvalidControlMessageNotificationSent()                       {}
+func (nc *NoopCollector) OnRpcRejectedFromUnknownSender()                                {}
 func (nc *NoopCollector) OnPublishMessagesInspectionErrorExceedsThreshold()              {}
 func (nc *NoopCollector) OnPruneDuplicateTopicIdsExceedThreshold()                       {}
 func (nc *NoopCollector) OnPruneInvalidTopicIdsExceedThreshold()                         {}
@@ -366,3 +368,12 @@ var _ module.GossipSubScoringRegistryMetrics = (*NoopCollector)(nil)
 func (nc *NoopCollector) DuplicateMessagePenalties(penalty float64) {}
 
 func (nc *NoopCollector) DuplicateMessagesCounts(count float64) {}
+
+var _ module.CollectionExecutedMetric = (*NoopCollector)(nil)
+
+func (nc *NoopCollector) TrackFinalized(light flow.LightCollection) {}
+func (nc *NoopCollector) TrackExecuted(light flow.LightCollection)  {}
+func (nc *NoopCollector) TrackFinalizedMetricForBlock(block *flow.Block, collections storage.Collections) {
+}
+func (nc *NoopCollector) TrackExecutionReceiptMetrics(r *flow.ExecutionReceipt, collections storage.Collections, blocks storage.Blocks) {
+}

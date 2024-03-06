@@ -42,7 +42,6 @@ import (
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
-	"github.com/onflow/flow-go/engine/access/ingestion"
 	"github.com/onflow/flow-go/engine/access/rest"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
@@ -275,7 +274,7 @@ func (builder *ObserverServiceBuilder) deriveBootstrapPeerIdentities() error {
 		return nil
 	}
 
-	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
+	ids, err := cmd.BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
 	if err != nil {
 		return fmt.Errorf("failed to derive bootstrap peer identities: %w", err)
 	}
@@ -619,6 +618,8 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"execution-data-indexing-enabled",
 			defaultConfig.executionDataIndexingEnabled,
 			"whether to enable the execution data indexing")
+		flags.StringVar(&builder.registersDBPath, "execution-state-dir", defaultConfig.registersDBPath, "directory to use for execution-state database")
+		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "execution-state checkpoint file")
 
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
@@ -763,37 +764,6 @@ func publicNetworkMsgValidators(log zerolog.Logger, idProvider module.IdentityPr
 			validator.ValidateTarget(log, selfID),
 		),
 	}
-}
-
-// BootstrapIdentities converts the bootstrap node addresses and keys to a Flow Identity list where
-// each Flow Identity is initialized with the passed address, the networking key
-// and the Node ID set to ZeroID, role set to Access, 0 stake and no staking key.
-func BootstrapIdentities(addresses []string, keys []string) (flow.IdentitySkeletonList, error) {
-	if len(addresses) != len(keys) {
-		return nil, fmt.Errorf("number of addresses and keys provided for the boostrap nodes don't match")
-	}
-
-	ids := make(flow.IdentitySkeletonList, len(addresses))
-	for i, address := range addresses {
-		bytes, err := hex.DecodeString(keys[i])
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode secured GRPC server public key hex %w", err)
-		}
-
-		publicFlowNetworkingKey, err := crypto.DecodePublicKey(crypto.ECDSAP256, bytes)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get public flow networking key could not decode public key bytes %w", err)
-		}
-
-		// create the identity of the peer by setting only the relevant fields
-		ids[i] = &flow.IdentitySkeleton{
-			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the public network it does not apply
-			Address:       address,
-			Role:          flow.RoleAccess, // the upstream node has to be an access node
-			NetworkPubKey: publicFlowNetworkingKey,
-		}
-	}
-	return ids, nil
 }
 
 func (builder *ObserverServiceBuilder) initNodeInfo() error {
@@ -1282,6 +1252,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 			builder.Storage.RegisterIndex = registers
 
+			var collectionExecutedMetric module.CollectionExecutedMetric = metrics.NewNoopCollector()
 			indexerCore, err := indexer.New(
 				builder.Logger,
 				metrics.NewExecutionStateIndexerCollector(),
@@ -1289,8 +1260,10 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Storage.RegisterIndex,
 				builder.Storage.Headers,
 				builder.Storage.Events,
+				builder.Storage.Collections,
+				builder.Storage.Transactions,
 				builder.Storage.LightTransactionResults,
-				builder.onCollection,
+				collectionExecutedMetric,
 			)
 			if err != nil {
 				return nil, err
@@ -1398,19 +1371,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 		})
 	}
 	return builder
-}
-
-func (builder *ObserverServiceBuilder) onCollection(_ flow.Identifier, entity flow.Entity) {
-	collections := builder.Storage.Collections
-	transactions := builder.Storage.Transactions
-	logger := builder.Logger
-
-	err := ingestion.HandleCollection(entity, collections, transactions, logger, nil)
-
-	if err != nil {
-		logger.Error().Err(err).Msg("could not handle collection")
-		return
-	}
 }
 
 // enqueuePublicNetworkInit enqueues the observer network component initialized for the observer
