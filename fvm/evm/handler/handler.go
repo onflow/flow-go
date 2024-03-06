@@ -21,6 +21,7 @@ const InvalidTransactionComputationCost = 1_000
 // ContractHandler is responsible for triggering calls to emulator, metering,
 // event emission and updating the block
 type ContractHandler struct {
+	flowChainID        flow.ChainID
 	evmContractAddress flow.Address
 	flowTokenAddress   common.Address
 	blockStore         types.BlockStore
@@ -41,6 +42,7 @@ func (h *ContractHandler) EVMContractAddress() common.Address {
 var _ types.ContractHandler = &ContractHandler{}
 
 func NewContractHandler(
+	flowChainID flow.ChainID,
 	evmContractAddress flow.Address,
 	flowTokenAddress common.Address,
 	blockStore types.BlockStore,
@@ -49,6 +51,7 @@ func NewContractHandler(
 	emulator types.Emulator,
 ) *ContractHandler {
 	return &ContractHandler{
+		flowChainID:        flowChainID,
 		evmContractAddress: evmContractAddress,
 		flowTokenAddress:   flowTokenAddress,
 		blockStore:         blockStore,
@@ -249,7 +252,9 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 	if err != nil {
 		return types.BlockContext{}, err
 	}
+
 	return types.BlockContext{
+		ChainID:                types.EVMChainIDFromFlowChainID(h.flowChainID),
 		BlockNumber:            bp.Height,
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
 		GetHashFunc: func(n uint64) gethCommon.Hash {
@@ -471,6 +476,7 @@ func (a *Account) deposit(v *types.FLOWTokenVault) error {
 	bridgeAccount := a.fch.AccountByAddress(bridge, false)
 
 	call := types.NewDepositCall(
+		bridge,
 		a.address,
 		v.Balance(),
 		bridgeAccount.Nonce(),
@@ -493,6 +499,7 @@ func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 
 func (a *Account) withdraw(b types.Balance) (*types.FLOWTokenVault, error) {
 	call := types.NewWithdrawCall(
+		a.fch.addressAllocator.NativeTokenBridgeAddress(),
 		a.address,
 		b,
 		a.Nonce(),

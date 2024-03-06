@@ -3060,7 +3060,7 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
       access(all)
       fun main(): [UInt8] {
           let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
-		  let bal = EVM.Balance(0)
+		  let bal = EVM.Balance(attoflow: 0)
 		  bal.setFLOW(flow: 1.23)
           let response = cadenceOwnedAccount.call(
               to: EVM.EVMAddress(
@@ -3140,6 +3140,120 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
 }
 
 func TestEVMAddressDeposit(t *testing.T) {
+
+	t.Parallel()
+
+	expectedBalanceInUFix64, err := cadence.NewUFix64FromParts(1, 23000000)
+	require.NoError(t, err)
+	expectedBalance := types.NewBalanceFromUFix64(expectedBalanceInUFix64)
+
+	var deposited bool
+
+	handler := &testContractHandler{
+
+		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
+			assert.Equal(t, types.Address{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.False(t, isAuthorized)
+
+			return &testFlowAccount{
+				address: fromAddress,
+				deposit: func(vault *types.FLOWTokenVault) {
+					deposited = true
+					assert.Equal(
+						t,
+						types.Balance(expectedBalance),
+						vault.Balance(),
+					)
+				},
+			}
+		},
+	}
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	script := []byte(`
+      import EVM from 0x1
+      import FlowToken from 0x1
+
+      access(all)
+      fun main() {
+          let admin = getAuthAccount(0x1)
+              .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+          let minter <- admin.createNewMinter(allowedAmount: 1.23)
+          let vault <- minter.mintTokens(amount: 1.23)
+          destroy minter
+
+          let address = EVM.EVMAddress(
+              bytes: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          )
+          address.deposit(from: <-vault)
+      }
+   `)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: LocationResolver,
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+		false,
+	)
+
+	// Run script
+
+	_, err = rt.ExecuteScript(
+		runtime.Script{
+			Source: script,
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	require.True(t, deposited)
+}
+
+func TestCOADeposit(t *testing.T) {
 
 	t.Parallel()
 
