@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/golang/snappy"
-	"github.com/vmihailenco/msgpack"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
