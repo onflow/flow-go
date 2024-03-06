@@ -7,7 +7,7 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/vmihailenco/msgpack"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/model/flow"
 	storagemodel "github.com/onflow/flow-go/storage/badger/model"
