@@ -116,6 +116,11 @@ func (h lookupKey) Bytes() []byte {
 	return h.encoded
 }
 
+// String returns the encoded lookup key as a string.
+func (h lookupKey) String() string {
+	return string(h.encoded)
+}
+
 // encodedUint64 encodes uint64 for storing as a pebble payload
 func encodedUint64(height uint64) []byte {
 	payload := make([]byte, 0, 8)

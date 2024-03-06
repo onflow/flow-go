@@ -150,6 +150,8 @@ type AccessNodeConfig struct {
 	scriptExecutorConfig         query.QueryConfig
 	scriptExecMinBlock           uint64
 	scriptExecMaxBlock           uint64
+	registerCacheType            string
+	registerCacheSize            uint
 }
 
 type PublicNetworkConfig struct {
@@ -242,6 +244,8 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		scriptExecutorConfig:         query.NewDefaultConfig(),
 		scriptExecMinBlock:           0,
 		scriptExecMaxBlock:           math.MaxUint64,
+		registerCacheType:            pStorage.CacheTypeTwoQueue.String(),
+		registerCacheSize:            0,
 	}
 }
 
@@ -743,7 +747,20 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, fmt.Errorf("could not create registers storage: %w", err)
 				}
 
-				builder.Storage.RegisterIndex = registers
+				if builder.registerCacheSize > 0 {
+					cacheType, err := pStorage.ParseCacheType(builder.registerCacheType)
+					if err != nil {
+						return nil, fmt.Errorf("could not parse register cache type: %w", err)
+					}
+					cacheMetrics := metrics.NewCacheCollector(builder.RootChainID)
+					registersCache, err := pStorage.NewRegistersCache(registers, cacheType, builder.registerCacheSize, cacheMetrics)
+					if err != nil {
+						return nil, fmt.Errorf("could not create registers cache: %w", err)
+					}
+					builder.Storage.RegisterIndex = registersCache
+				} else {
+					builder.Storage.RegisterIndex = registers
+				}
 
 				indexerCore, err := indexer.New(
 					builder.Logger,
@@ -1129,6 +1146,15 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"script-execution-max-height",
 			defaultConfig.scriptExecMaxBlock,
 			"highest block height to allow for script execution. default: no limit")
+
+		flags.StringVar(&builder.registerCacheType,
+			"register-cache-type",
+			defaultConfig.registerCacheType,
+			"type of backend cache to use for registers (lru, arc, 2q)")
+		flags.UintVar(&builder.registerCacheSize,
+			"register-cache-size",
+			defaultConfig.registerCacheSize,
+			"number of registers to cache for script execution. default: 0 (no cache)")
 
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {

@@ -32,7 +32,8 @@ func NewRegisters(db *pebble.DB) (*Registers, error) {
 		// first height is found, but latest height is not found, this means that the DB is in a corrupted state
 		return nil, fmt.Errorf("unable to initialize register storage, latest height unavailable in db: %w", err)
 	}
-	/// All registers between firstHeight and lastHeight have been indexed
+
+	// All registers between firstHeight and lastHeight have been indexed
 	return &Registers{
 		db:           db,
 		firstHeight:  firstHeight,
@@ -59,6 +60,11 @@ func (s *Registers) Get(
 			fmt.Sprintf("height %d not indexed, indexed range is [%d-%d]", height, s.firstHeight, latestHeight),
 		)
 	}
+	key := newLookupKey(height, reg)
+	return s.lookupRegister(key.Bytes())
+}
+
+func (s *Registers) lookupRegister(key []byte) (flow.RegisterValue, error) {
 	iter, err := s.db.NewIter(&pebble.IterOptions{
 		UseL6Filters: true,
 	})
@@ -68,8 +74,7 @@ func (s *Registers) Get(
 
 	defer iter.Close()
 
-	encoded := newLookupKey(height, reg).Bytes()
-	ok := iter.SeekPrefixGE(encoded)
+	ok := iter.SeekPrefixGE(key)
 	if !ok {
 		// no such register found
 		return nil, storage.ErrNotFound
