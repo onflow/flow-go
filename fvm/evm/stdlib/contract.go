@@ -1544,6 +1544,12 @@ func newInternalEVMTypeWithdrawFunction(
 							return uint64(ufix)
 						}),
 					},
+					{
+						Name: sema.ResourceUUIDFieldName,
+						Value: interpreter.NewUInt64Value(gauge, func() uint64 {
+							return handler.GenerateResourceUUID()
+						}),
+					},
 				},
 				common.ZeroAddress,
 			)
