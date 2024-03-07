@@ -89,6 +89,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 		evmContractChange,
 		burnerContractChange,
 		stagedContracts,
+		false,
 	)
 
 	for _, migration := range migrations {

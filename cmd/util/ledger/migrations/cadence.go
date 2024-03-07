@@ -287,8 +287,26 @@ func NewCadence1Migrations(
 	evmContractChange EVMContractChange,
 	burnerContractChange BurnerContractChange,
 	stagedContracts []StagedContract,
+	prune bool,
 ) []NamedMigration {
-	return common.Concat(
+
+	var migrations []NamedMigration
+
+	if prune {
+		migration := NewCadence1PruneMigration(chainID, log)
+		if migration != nil {
+			migrations = append(
+				migrations,
+				NamedMigration{
+					Name:    "prune-migration",
+					Migrate: migration,
+				},
+			)
+		}
+	}
+
+	migrations = append(
+		migrations,
 		NewCadence1ContractsMigrations(
 			log,
 			nWorker,
@@ -296,7 +314,11 @@ func NewCadence1Migrations(
 			evmContractChange,
 			burnerContractChange,
 			stagedContracts,
-		),
+		)...,
+	)
+
+	migrations = append(
+		migrations,
 		NewCadence1ValueMigrations(
 			log,
 			rwf,
@@ -304,6 +326,8 @@ func NewCadence1Migrations(
 			chainID,
 			diffMigrations,
 			logVerboseDiff,
-		),
+		)...,
 	)
+
+	return migrations
 }

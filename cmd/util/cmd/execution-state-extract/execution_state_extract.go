@@ -47,6 +47,7 @@ func extractExecutionState(
 	outputPayloadFile string,
 	exportPayloadsByAddresses []common.Address,
 	sortPayloads bool,
+	prune bool,
 ) error {
 
 	log.Info().Msg("init WAL")
@@ -117,6 +118,7 @@ func extractExecutionState(
 		evmContractChange,
 		burnerContractChange,
 		stagedContracts,
+		prune,
 	)
 
 	newState := ledger.State(targetHash)
@@ -248,6 +250,7 @@ func extractExecutionStateFromPayloads(
 	outputPayloadFile string,
 	exportPayloadsByAddresses []common.Address,
 	sortPayloads bool,
+	prune bool,
 ) error {
 
 	inputPayloadsFromPartialState, payloads, err := util.ReadPayloadFile(log, inputPayloadFile)
@@ -295,6 +298,7 @@ func extractExecutionStateFromPayloads(
 		evmContractChange,
 		burnerContractChange,
 		stagedContracts,
+		prune,
 	)
 
 	payloads, err = migratePayloads(log, payloads, migrations)
@@ -450,6 +454,7 @@ func newMigrations(
 	evmContractChange migrators.EVMContractChange,
 	burnerContractChange migrators.BurnerContractChange,
 	stagedContracts []migrators.StagedContract,
+	prune bool,
 ) []ledger.Migration {
 	if !runMigrations {
 		return nil
@@ -467,6 +472,7 @@ func newMigrations(
 		evmContractChange,
 		burnerContractChange,
 		stagedContracts,
+		prune,
 	)
 
 	migrations := make([]ledger.Migration, 0, len(namedMigrations))

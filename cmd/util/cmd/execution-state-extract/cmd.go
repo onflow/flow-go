@@ -34,6 +34,7 @@ var (
 	flagValidateMigration             bool
 	flagAllowPartialStateFromPayloads bool
 	flagSortPayloads                  bool
+	flagPrune                         bool
 	flagLogVerboseValidationError     bool
 	flagDiffMigration                 bool
 	flagLogVerboseDiff                bool
@@ -97,7 +98,10 @@ func init() {
 		"allow input payload file containing partial state (e.g. not all accounts)")
 
 	Cmd.Flags().BoolVar(&flagSortPayloads, "sort-payloads", true,
-		"sort payloads (generate deterministic output)")
+		"sort payloads (generate deterministic output; disable only for development purposes)")
+
+	Cmd.Flags().BoolVar(&flagPrune, "prune", false,
+		"prune the state (for development purposes)")
 
 	// If specified, the state will consist of payloads from the given input payload file.
 	// If not specified, then the state will be extracted from the latest checkpoint file.
@@ -341,6 +345,7 @@ func run(*cobra.Command, []string) {
 			flagOutputPayloadFileName,
 			exportedAddresses,
 			flagSortPayloads,
+			flagPrune,
 		)
 	} else {
 		err = extractExecutionState(
@@ -359,6 +364,7 @@ func run(*cobra.Command, []string) {
 			flagOutputPayloadFileName,
 			exportedAddresses,
 			flagSortPayloads,
+			flagPrune,
 		)
 	}
 

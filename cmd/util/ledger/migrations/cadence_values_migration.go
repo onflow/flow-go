@@ -169,6 +169,11 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		return nil, fmt.Errorf("failed to commit changes: %w", err)
 	}
 
+	err = storage.CheckHealth()
+	if err != nil {
+		m.log.Err(err).Msg("storage health check failed")
+	}
+
 	// finalize the transaction
 	result, err := migrationRuntime.TransactionState.FinalizeMainTransaction()
 	if err != nil {
@@ -177,7 +182,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 
 	// Merge the changes to the original payloads.
 	expectedAddresses := map[flow.Address]struct{}{
-		flow.ConvertAddress(address): {},
+		flow.Address(address): {},
 	}
 
 	newPayloads, err := MergeRegisterChanges(
@@ -409,22 +414,27 @@ func (t *cadenceValueMigrationReporter) Migrated(
 	})
 }
 
-func (t *cadenceValueMigrationReporter) Error(
-	storageKey interpreter.StorageKey,
-	storageMapKey interpreter.StorageMapKey,
-	migration string,
-	err error,
-) {
+func (t *cadenceValueMigrationReporter) Error(err error) {
 	message := t.errorMessageHandler.FormatError(err)
 
-	t.log.Error().Msgf(
-		"failed to run %s in account %s, domain %s, key %s: %s",
-		migration,
-		storageKey.Address,
-		storageKey.Key,
-		storageMapKey,
-		message,
-	)
+	var migrationErr migrations.StorageMigrationError
+
+	if errors.As(err, &migrationErr) {
+		storageKey := migrationErr.StorageKey
+		storageMapKey := migrationErr.StorageMapKey
+		migration := migrationErr.Migration
+
+		t.log.Error().Msgf(
+			"failed to run %s in account %s, domain %s, key %s: %s",
+			migration,
+			storageKey.Address,
+			storageKey.Key,
+			storageMapKey,
+			message,
+		)
+	} else {
+		t.log.Error().Msgf("failed to run migration: %s", message)
+	}
 }
 
 func (t *cadenceValueMigrationReporter) MigratedPathCapability(
