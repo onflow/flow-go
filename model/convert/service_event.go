@@ -905,15 +905,15 @@ func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.Ser
 	}
 
 	versionUpgrade, err := DecodeCadenceValue("ProtocolStateVersionUpgrade payload", payload,
-		func(cdcEvent cadence.Event) (flow.ProtocolStateVersionUpgrade, error) {
+		func(cdcEvent cadence.Event) (*flow.ProtocolStateVersionUpgrade, error) {
 			const expectedFieldCount = 2
 			if len(cdcEvent.Fields) < expectedFieldCount {
-				return flow.ProtocolStateVersionUpgrade{}, fmt.Errorf("unexpected number of fields in ProtocolStateVersionUpgrade (%d < %d)",
+				return nil, fmt.Errorf("unexpected number of fields in ProtocolStateVersionUpgrade (%d < %d)",
 					len(cdcEvent.Fields), expectedFieldCount)
 			}
 
 			if cdcEvent.Type() == nil {
-				return flow.ProtocolStateVersionUpgrade{}, fmt.Errorf("ProtocolStateVersionUpgrade event doesn't have type")
+				return nil, fmt.Errorf("ProtocolStateVersionUpgrade event doesn't have type")
 			}
 
 			var newProtocolVersionValue cadence.Value
@@ -933,7 +933,7 @@ func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.Ser
 			}
 
 			if foundFieldCount != expectedFieldCount {
-				return flow.ProtocolStateVersionUpgrade{}, fmt.Errorf(
+				return nil, fmt.Errorf(
 					"ProtocolStateVersionUpgrade event required fields not found (%d != %d)",
 					foundFieldCount,
 					expectedFieldCount,
@@ -946,7 +946,7 @@ func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.Ser
 				},
 			)
 			if err != nil {
-				return flow.ProtocolStateVersionUpgrade{}, err
+				return nil, err
 			}
 			activeView, err := DecodeCadenceValue(
 				".activeView", activeViewValue, func(cadenceVal cadence.UInt64) (uint64, error) {
@@ -954,10 +954,10 @@ func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.Ser
 				},
 			)
 			if err != nil {
-				return flow.ProtocolStateVersionUpgrade{}, err
+				return nil, err
 			}
 
-			return flow.ProtocolStateVersionUpgrade{
+			return &flow.ProtocolStateVersionUpgrade{
 				NewProtocolStateVersion: newProtocolVersion,
 				ActiveView:              activeView,
 			}, nil
@@ -969,7 +969,7 @@ func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.Ser
 	// create the service event
 	serviceEvent := &flow.ServiceEvent{
 		Type:  flow.ServiceEventProtocolStateVersionUpgrade,
-		Event: &versionUpgrade,
+		Event: versionUpgrade,
 	}
 	return serviceEvent, nil
 }
@@ -986,13 +986,10 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 	}
 
 	versionBeacon, err := DecodeCadenceValue(
-		"VersionBeacon payload", payload, func(cdcEvent cadence.Event) (
-			flow.VersionBeacon,
-			error,
-		) {
+		"VersionBeacon payload", payload, func(cdcEvent cadence.Event) (*flow.VersionBeacon, error) {
 			const expectedFieldCount = 2
 			if len(cdcEvent.Fields) != expectedFieldCount {
-				return flow.VersionBeacon{}, fmt.Errorf(
+				return nil, fmt.Errorf(
 					"unexpected number of fields in VersionBeacon event (%d != %d)",
 					len(cdcEvent.Fields),
 					expectedFieldCount,
@@ -1000,7 +997,7 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 			}
 
 			if cdcEvent.Type() == nil {
-				return flow.VersionBeacon{}, fmt.Errorf("VersionBeacon event doesn't have type")
+				return nil, fmt.Errorf("VersionBeacon event doesn't have type")
 			}
 
 			var versionBoundariesValue, sequenceValue cadence.Value
@@ -1021,7 +1018,7 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 			}
 
 			if foundFieldCount != expectedFieldCount {
-				return flow.VersionBeacon{}, fmt.Errorf(
+				return nil, fmt.Errorf(
 					"VersionBeacon event required fields not found (%d != %d)",
 					foundFieldCount,
 					expectedFieldCount,
@@ -1032,7 +1029,7 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 				".versionBoundaries", versionBoundariesValue, convertVersionBoundaries,
 			)
 			if err != nil {
-				return flow.VersionBeacon{}, err
+				return nil, err
 			}
 
 			sequence, err := DecodeCadenceValue(
@@ -1044,10 +1041,10 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 				},
 			)
 			if err != nil {
-				return flow.VersionBeacon{}, err
+				return nil, err
 			}
 
-			return flow.VersionBeacon{
+			return &flow.VersionBeacon{
 				VersionBoundaries: versionBoundaries,
 				Sequence:          sequence,
 			}, err
@@ -1065,7 +1062,7 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 	// create the service event
 	serviceEvent := &flow.ServiceEvent{
 		Type:  flow.ServiceEventVersionBeacon,
-		Event: &versionBeacon,
+		Event: versionBeacon,
 	}
 
 	return serviceEvent, nil
