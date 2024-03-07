@@ -222,6 +222,7 @@ func NewCadence1ContractsMigrations(
 	nWorker int,
 	chainID flow.ChainID,
 	evmContractChange EVMContractChange,
+	burnerContractChange BurnerContractChange,
 	stagedContracts []StagedContract,
 ) []NamedMigration {
 
@@ -229,7 +230,8 @@ func NewCadence1ContractsMigrations(
 		chainID,
 		log,
 		SystemContractChangesOptions{
-			EVM: evmContractChange,
+			EVM:    evmContractChange,
+			Burner: burnerContractChange,
 		},
 	)
 
@@ -248,20 +250,31 @@ func NewCadence1ContractsMigrations(
 		)
 	}
 
-	return []NamedMigration{
-		{
+	var migrations []NamedMigration
+
+	if burnerContractChange == BurnerContractChangeDeploy {
+		migrations = append(
+			migrations,
+			NamedMigration{
+				Name:    "burner-deployment-migration",
+				Migrate: NewBurnerDeploymentMigration(chainID, log),
+			},
+		)
+	}
+
+	migrations = append(
+		migrations,
+		NamedMigration{
 			Name:    "system-contracts-update-migration",
 			Migrate: toAccountBasedMigration(systemContractsMigration),
 		},
-		{
-			Name:    "burner-deployment-migration",
-			Migrate: NewBurnerDeploymentMigration(chainID, log),
-		},
-		{
+		NamedMigration{
 			Name:    "staged-contracts-update-migration",
 			Migrate: toAccountBasedMigration(stagedContractsMigration),
 		},
-	}
+	)
+
+	return migrations
 }
 
 func NewCadence1Migrations(
@@ -272,6 +285,7 @@ func NewCadence1Migrations(
 	diffMigrations bool,
 	logVerboseDiff bool,
 	evmContractChange EVMContractChange,
+	burnerContractChange BurnerContractChange,
 	stagedContracts []StagedContract,
 ) []NamedMigration {
 	return common.Concat(
@@ -280,6 +294,7 @@ func NewCadence1Migrations(
 			nWorker,
 			chainID,
 			evmContractChange,
+			burnerContractChange,
 			stagedContracts,
 		),
 		NewCadence1ValueMigrations(

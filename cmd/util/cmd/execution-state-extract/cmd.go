@@ -311,6 +311,14 @@ func run(*cobra.Command, []string) {
 	// TODO:
 	evmContractChange := migrations.EVMContractChangeNone
 
+	var burnerContractChange migrations.BurnerContractChange
+	switch chainID {
+	case flow.Emulator:
+		burnerContractChange = migrations.BurnerContractChangeDeploy
+	case flow.Testnet, flow.Mainnet:
+		burnerContractChange = migrations.BurnerContractChangeUpdate
+	}
+
 	stagedContracts, err := migrations.StagedContractsFromCSV(flagStagedContractsFile)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("error loading staged contracts: %s", err.Error())
@@ -327,6 +335,7 @@ func run(*cobra.Command, []string) {
 			flagLogVerboseDiff,
 			chainID,
 			evmContractChange,
+			burnerContractChange,
 			stagedContracts,
 			flagInputPayloadFileName,
 			flagOutputPayloadFileName,
@@ -345,6 +354,7 @@ func run(*cobra.Command, []string) {
 			flagLogVerboseDiff,
 			chainID,
 			evmContractChange,
+			burnerContractChange,
 			stagedContracts,
 			flagOutputPayloadFileName,
 			exportedAddresses,

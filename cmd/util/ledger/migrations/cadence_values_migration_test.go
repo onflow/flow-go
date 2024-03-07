@@ -67,6 +67,8 @@ func TestCadenceValuesMigration(t *testing.T) {
 	// TODO: EVM contract is not deployed in snapshot yet, so can't update it
 	const evmContractChange = EVMContractChangeNone
 
+	const burnerContractChange = BurnerContractChangeDeploy
+
 	stagedContracts := []StagedContract{
 		{
 			Contract: Contract{
@@ -85,6 +87,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 		false,
 		false,
 		evmContractChange,
+		burnerContractChange,
 		stagedContracts,
 	)
 

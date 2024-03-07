@@ -48,8 +48,17 @@ const (
 	EVMContractChangeFull
 )
 
+type BurnerContractChange uint8
+
+const (
+	BurnerContractChangeNone BurnerContractChange = iota
+	BurnerContractChangeDeploy
+	BurnerContractChangeUpdate
+)
+
 type SystemContractChangesOptions struct {
-	EVM EVMContractChange
+	EVM    EVMContractChange
+	Burner BurnerContractChange
 }
 
 func BurnerAddressForChain(chainID flow.ChainID) flow.Address {
@@ -242,6 +251,20 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 		)
 	default:
 		panic(fmt.Errorf("unsupported EVM contract change option: %d", options.EVM))
+	}
+
+	// Burner contract
+	if options.Burner == BurnerContractChangeUpdate {
+		contractChanges = append(
+			contractChanges,
+			StagedContract{
+				Address: common.Address(flow.HexToAddress(env.BurnerAddress)),
+				Contract: Contract{
+					Name: "Burner",
+					Code: coreContracts.Burner(),
+				},
+			},
+		)
 	}
 
 	return contractChanges

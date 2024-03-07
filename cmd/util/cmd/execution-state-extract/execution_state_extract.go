@@ -41,6 +41,7 @@ func extractExecutionState(
 	logVerboseDiff bool,
 	chainID flow.ChainID,
 	evmContractChange migrators.EVMContractChange,
+	burnerContractChange migrators.BurnerContractChange,
 	stagedContracts []migrators.StagedContract,
 	outputPayloadFile string,
 	exportPayloadsByAddresses []common.Address,
@@ -104,6 +105,7 @@ func extractExecutionState(
 		logVerboseDiff,
 		chainID,
 		evmContractChange,
+		burnerContractChange,
 		stagedContracts,
 	)
 
@@ -214,6 +216,7 @@ func extractExecutionStateFromPayloads(
 	logVerboseDiff bool,
 	chainID flow.ChainID,
 	evmContractChange migrators.EVMContractChange,
+	burnerContractChange migrators.BurnerContractChange,
 	stagedContracts []migrators.StagedContract,
 	inputPayloadFile string,
 	outputPayloadFile string,
@@ -237,6 +240,7 @@ func extractExecutionStateFromPayloads(
 		logVerboseDiff,
 		chainID,
 		evmContractChange,
+		burnerContractChange,
 		stagedContracts,
 	)
 
@@ -391,6 +395,7 @@ func newMigrations(
 	logVerboseDiff bool,
 	chainID flow.ChainID,
 	evmContractChange migrators.EVMContractChange,
+	burnerContractChange migrators.BurnerContractChange,
 	stagedContracts []migrators.StagedContract,
 ) []ledger.Migration {
 	if !runMigrations {
@@ -407,6 +412,7 @@ func newMigrations(
 		diffMigrations,
 		logVerboseDiff,
 		evmContractChange,
+		burnerContractChange,
 		stagedContracts,
 	)
 

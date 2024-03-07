@@ -76,8 +76,8 @@ func TestExtractExecutionState(t *testing.T) {
 				false,
 				false,
 				flow.Emulator,
-				// TODO:
 				migrations.EVMContractChangeNone,
+				migrations.BurnerContractChangeDeploy,
 				nil,
 				"",
 				nil,
