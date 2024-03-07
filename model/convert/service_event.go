@@ -963,6 +963,9 @@ func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.Ser
 				ActiveView:              activeView,
 			}, nil
 		})
+	if err != nil {
+		return nil, fmt.Errorf("could not decode cadence value: %w", err)
+	}
 
 	// create the service event
 	serviceEvent := &flow.ServiceEvent{
