@@ -96,6 +96,10 @@ func (h *ContractHandler) deployCOA(uuid uint64) (types.Address, error) {
 	if err != nil {
 		return types.Address{}, err
 	}
+	if res == nil || res.Failed() {
+		return types.Address{}, types.ErrDirectCallExecutionFailed
+	}
+
 	return res.DeployedContractAddress, nil
 }
 
@@ -491,8 +495,17 @@ func (a *Account) deposit(v *types.FLOWTokenVault) error {
 	if err != nil {
 		return err
 	}
-	_, err = a.fch.executeAndHandleCall(ctx, call, v.Balance(), false)
-	return err
+
+	res, err := a.fch.executeAndHandleCall(ctx, call, v.Balance(), false)
+	if err != nil {
+		return err
+	}
+
+	if res == nil || res.Failed() {
+		return types.ErrDirectCallExecutionFailed
+	}
+
+	return nil
 }
 
 // Withdraw deducts the balance from the account and
@@ -521,9 +534,13 @@ func (a *Account) withdraw(b types.Balance) (*types.FLOWTokenVault, error) {
 		return nil, types.ErrWithdrawBalanceRounding
 	}
 
-	_, err = a.fch.executeAndHandleCall(ctx, call, b, true)
+	res, err := a.fch.executeAndHandleCall(ctx, call, b, true)
 	if err != nil {
 		return nil, err
+	}
+
+	if res == nil || res.Failed() {
+		return nil, types.ErrDirectCallExecutionFailed
 	}
 
 	return types.NewFlowTokenVault(b), nil
@@ -546,8 +563,16 @@ func (a *Account) transfer(to types.Address, balance types.Balance) error {
 	if err != nil {
 		return err
 	}
-	_, err = a.fch.executeAndHandleCall(ctx, call, nil, false)
-	return err
+	res, err := a.fch.executeAndHandleCall(ctx, call, nil, false)
+	if err != nil {
+		return err
+	}
+
+	if res == nil || res.Failed() {
+		return types.ErrDirectCallExecutionFailed
+	}
+
+	return nil
 }
 
 // Deploy deploys a contract to the EVM environment
@@ -576,6 +601,11 @@ func (a *Account) deploy(code types.Code, gaslimit types.GasLimit, balance types
 	if err != nil {
 		return types.Address{}, err
 	}
+
+	if res == nil || res.Failed() {
+		return types.Address{}, types.ErrDirectCallExecutionFailed
+	}
+
 	return types.Address(res.DeployedContractAddress), nil
 }
 
