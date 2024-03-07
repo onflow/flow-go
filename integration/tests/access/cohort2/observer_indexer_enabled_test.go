@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"net/http"
 	"testing"
 
