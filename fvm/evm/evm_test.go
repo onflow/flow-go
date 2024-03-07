@@ -160,11 +160,12 @@ func TestEVMRun(t *testing.T) {
 
 							assert(res.status == EVM.Status.failed, message: "unexpected status")
 							// ExecutionErrCodeExecutionReverted
-							assert(res.errorCode == 306, message: "unexpected error code")
+							assert(res.errorCode == %d, message: "unexpected error code")
 						}
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
+					types.ExecutionErrCodeExecutionReverted,
 				))
 
 				num := int64(12)
@@ -249,6 +250,67 @@ func TestEVMRun(t *testing.T) {
 }
 
 func TestEVMAddressDeposit(t *testing.T) {
+
+	t.Parallel()
+	chain := flow.Emulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	RunWithNewEnvironment(t,
+		chain, func(
+			ctx fvm.Context,
+			vm fvm.VM,
+			snapshot snapshot.SnapshotTree,
+			testContract *TestContract,
+			testAccount *EOATestAccount,
+		) {
+
+			code := []byte(fmt.Sprintf(
+				`
+				import EVM from %s
+				import FlowToken from %s
+
+				transaction(addr: [UInt8; 20]) {
+					prepare(account: AuthAccount) {
+						let admin = account.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+						let minter <- admin.createNewMinter(allowedAmount: 1.0)
+						let vault <- minter.mintTokens(amount: 1.0)
+						destroy minter
+
+						let address = EVM.EVMAddress(addr)
+						address.deposit(from: <-vault)
+					}
+				}
+			`,
+				sc.EVMContract.Address.HexWithPrefix(),
+				sc.FlowToken.Address.HexWithPrefix(),
+			))
+
+			addr := RandomAddress(t)
+
+			tx := fvm.Transaction(
+				flow.NewTransactionBody().
+					SetScript(code).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(cadence.NewArray(
+						ConvertToCadence(addr.Bytes()),
+					).WithType(stdlib.EVMAddressBytesCadenceType))),
+				0)
+
+			execSnap, output, err := vm.Run(
+				ctx,
+				tx,
+				snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			snapshot = snapshot.Append(execSnap)
+
+			expectedBalance := types.OneFlowBalance
+			bal := getEVMAccountBalance(t, ctx, vm, snapshot, addr)
+			require.Equal(t, expectedBalance, bal)
+		})
+}
+
+func TestCOAAddressDeposit(t *testing.T) {
 	t.Parallel()
 
 	chain := flow.Emulator.Chain()
@@ -380,7 +442,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
 					cadenceOwnedAccount.deposit(from: <-vault)
 
-					let bal = EVM.Balance(0)
+					let bal = EVM.Balance(attoflow: 0)
 					bal.setFLOW(flow: 1.23)
 					let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
 					let balance = vault2.balance
@@ -433,7 +495,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
 					cadenceOwnedAccount.deposit(from: <-vault)
 
-					let bal = EVM.Balance(0)
+					let bal = EVM.Balance(attoflow: 0)
 					bal.setFLOW(flow: 1.23)
 
 					let recipientEVMAddress = EVM.EVMAddress(bytes: address)
@@ -500,7 +562,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
 					cadenceOwnedAccount.deposit(from: <-vault)
 
-					let bal = EVM.Balance(0)
+					let bal = EVM.Balance(attoflow: 0)
 					bal.setFLOW(flow: 1.23)
 					let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
 					let balance = vault2.balance
@@ -868,7 +930,7 @@ func getFlowAccountBalance(
 ) uint64 {
 	code := []byte(fmt.Sprintf(
 		`
-		pub fun main(): UFix64 {
+		access(all) fun main(): UFix64 {
 			return getAccount(%s).balance
 		}
 		`,

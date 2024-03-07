@@ -14,4 +14,5 @@ type Backend interface {
 	environment.BlockInfo
 	environment.RandomGenerator
 	environment.ContractFunctionInvoker
+	environment.UUIDGenerator
 }
