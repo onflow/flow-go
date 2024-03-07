@@ -2,55 +2,35 @@ package cohort2
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest/util"
-	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"net/http"
+	"testing"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
+
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
-	"net/http"
+
+	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
 
-package cohort2
-
-import (
-"bytes"
-"context"
-"encoding/json"
-"fmt"
-"net/http"
-"testing"
-
-"google.golang.org/grpc"
-"google.golang.org/grpc/codes"
-"google.golang.org/grpc/credentials/insecure"
-"google.golang.org/grpc/status"
-
-"github.com/rs/zerolog"
-"github.com/stretchr/testify/assert"
-"github.com/stretchr/testify/require"
-"github.com/stretchr/testify/suite"
-
-"github.com/onflow/flow-go/engine/access/rest/util"
-"github.com/onflow/flow-go/integration/testnet"
-"github.com/onflow/flow-go/model/flow"
-"github.com/onflow/flow-go/utils/unittest"
-
-accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-)
-
-func TestObserver(t *testing.T) {
-	suite.Run(t, new(ObserverSuite))
+func TestObserverIndexerEnabled(t *testing.T) {
+	suite.Run(t, new(ObserverIndexerEnabled))
 }
 
-type ObserverSuite struct {
+type ObserverIndexerEnabled struct {
 	suite.Suite
 	net       *testnet.FlowNetwork
 	teardown  func()
@@ -60,7 +40,7 @@ type ObserverSuite struct {
 	cancel context.CancelFunc
 }
 
-func (s *ObserverSuite) TearDownTest() {
+func (s *ObserverIndexerEnabled) TearDownTest() {
 	if s.net != nil {
 		s.net.Remove()
 		s.net = nil
@@ -71,7 +51,7 @@ func (s *ObserverSuite) TearDownTest() {
 	}
 }
 
-func (s *ObserverSuite) SetupTest() {
+func (s *ObserverIndexerEnabled) SetupTest() {
 	s.localRpc = map[string]struct{}{
 		"Ping":                           {},
 		"GetLatestBlockHeader":           {},
@@ -115,10 +95,19 @@ func (s *ObserverSuite) SetupTest() {
 
 	observers := []testnet.ObserverConfig{{
 		LogLevel: zerolog.InfoLevel,
+		AdditionalFlags: []string{
+			fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
+			fmt.Sprintf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
+			"--execution-data-sync-enabled=true",
+			"--event-query-mode=local-only",
+			"--script-execution-mode=local-only",
+			"--tx-result-query-mode=local-only",
+			"--execution-data-indexing-enabled=true",
+		},
 	}}
 
 	// prepare the network
-	conf := testnet.NewNetworkConfig("observer_api_test", nodeConfigs, testnet.WithObservers(observers...))
+	conf := testnet.NewNetworkConfig("observer_indexing_enabled_test", nodeConfigs, testnet.WithObservers(observers...))
 	s.net = testnet.PrepareFlowNetwork(s.T(), conf, flow.Localnet)
 
 	// start the network
@@ -132,7 +121,7 @@ func (s *ObserverSuite) SetupTest() {
 // 1. CompareRPCs: verifies that the observer client returns the same errors as the access client for rpcs proxied to the upstream AN
 // 2. HandledByUpstream: stops the upstream AN and verifies that the observer client returns errors for all rpcs handled by the upstream
 // 3. HandledByObserver: stops the upstream AN and verifies that the observer client handles all other queries
-func (s *ObserverSuite) TestObserverRPC() {
+func (s *ObserverIndexerEnabled) TestObserverRPC() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -198,7 +187,7 @@ func (s *ObserverSuite) TestObserverRPC() {
 // 1. CompareEndpoints: verifies that the observer client returns the same errors as the access client for rests proxied to the upstream AN
 // 2. HandledByUpstream: stops the upstream AN and verifies that the observer client returns errors for all rests handled by the upstream
 // 3. HandledByObserver: stops the upstream AN and verifies that the observer client handles all other queries
-func (s *ObserverSuite) TestObserverRest() {
+func (s *ObserverIndexerEnabled) TestObserverRest() {
 	t := s.T()
 
 	accessAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
@@ -278,15 +267,15 @@ func (s *ObserverSuite) TestObserverRest() {
 	})
 }
 
-func (s *ObserverSuite) getAccessClient() (accessproto.AccessAPIClient, error) {
+func (s *ObserverIndexerEnabled) getAccessClient() (accessproto.AccessAPIClient, error) {
 	return s.getClient(s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCPort))
 }
 
-func (s *ObserverSuite) getObserverClient() (accessproto.AccessAPIClient, error) {
+func (s *ObserverIndexerEnabled) getObserverClient() (accessproto.AccessAPIClient, error) {
 	return s.getClient(s.net.ContainerByName("observer_1").Addr(testnet.GRPCPort))
 }
 
-func (s *ObserverSuite) getClient(address string) (accessproto.AccessAPIClient, error) {
+func (s *ObserverIndexerEnabled) getClient(address string) (accessproto.AccessAPIClient, error) {
 	// helper func to create an access client
 	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -297,12 +286,7 @@ func (s *ObserverSuite) getClient(address string) (accessproto.AccessAPIClient, 
 	return client, nil
 }
 
-type RPCTest struct {
-	name string
-	call func(ctx context.Context, client accessproto.AccessAPIClient) error
-}
-
-func (s *ObserverSuite) getRPCs() []RPCTest {
+func (s *ObserverIndexerEnabled) getRPCs() []RPCTest {
 	return []RPCTest{
 		{name: "Ping", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
 			_, err := client.Ping(ctx, &accessproto.PingRequest{})
@@ -409,14 +393,7 @@ func (s *ObserverSuite) getRPCs() []RPCTest {
 	}
 }
 
-type RestEndpointTest struct {
-	name   string
-	method string
-	path   string
-	body   interface{}
-}
-
-func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
+func (s *ObserverIndexerEnabled) getRestEndpoints() []RestEndpointTest {
 	transactionId := unittest.IdentifierFixture().String()
 	account := flow.Localnet.Chain().ServiceAddress().String()
 	block := unittest.BlockFixture()
@@ -498,36 +475,4 @@ func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
 			path:   "/node_version_info",
 		},
 	}
-}
-
-func createTx(net *testnet.FlowNetwork) interface{} {
-	flowAddr := flow.Localnet.Chain().ServiceAddress()
-	payloadSignature := unittest.TransactionSignatureFixture()
-	envelopeSignature := unittest.TransactionSignatureFixture()
-
-	payloadSignature.Address = flowAddr
-
-	envelopeSignature.Address = flowAddr
-	envelopeSignature.KeyIndex = 2
-
-	tx := flow.NewTransactionBody().
-		AddAuthorizer(flowAddr).
-		SetPayer(flowAddr).
-		SetScript(unittest.NoopTxScript()).
-		SetReferenceBlockID(net.Root().ID()).
-		SetProposalKey(flowAddr, 1, 0)
-	tx.PayloadSignatures = []flow.TransactionSignature{payloadSignature}
-	tx.EnvelopeSignatures = []flow.TransactionSignature{envelopeSignature}
-
-	return unittest.CreateSendTxHttpPayload(*tx)
-}
-
-func createScript() interface{} {
-	validCode := []byte(`pub fun main(foo: String): String { return foo }`)
-	validArgs := []byte(`{ "type": "String", "value": "hello world" }`)
-	body := map[string]interface{}{
-		"script":    util.ToBase64(validCode),
-		"arguments": []string{util.ToBase64(validArgs)},
-	}
-	return body
 }
