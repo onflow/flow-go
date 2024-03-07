@@ -31,8 +31,6 @@ type Config struct {
 	TxContext *gethVM.TxContext
 	// base unit of gas for direct calls
 	DirectCallBaseGasUsage uint64
-	// a set of extra precompiles to be injected
-	ExtraPrecompiles map[gethCommon.Address]gethVM.PrecompiledContract
 }
 
 func (c *Config) ChainRules() gethParams.Rules {
@@ -96,6 +94,7 @@ func defaultConfig() *Config {
 			GetHash: func(n uint64) gethCommon.Hash {
 				return gethCommon.Hash{}
 			},
+			GetPrecompile: gethCore.GetPrecompile,
 		},
 	}
 }
@@ -186,11 +185,16 @@ func WithDirectCallBaseGasUsage(gas uint64) Option {
 // WithExtraPrecompiles appends precompile list with extra precompiles
 func WithExtraPrecompiles(precompiles []types.Precompile) Option {
 	return func(c *Config) *Config {
+		extraPreCompMap := make(map[gethCommon.Address]gethVM.PrecompiledContract)
 		for _, pc := range precompiles {
-			if c.ExtraPrecompiles == nil {
-				c.ExtraPrecompiles = make(map[gethCommon.Address]gethVM.PrecompiledContract)
+			extraPreCompMap[pc.Address().ToCommon()] = pc
+		}
+		c.BlockContext.GetPrecompile = func(rules gethParams.Rules, addr gethCommon.Address) (gethVM.PrecompiledContract, bool) {
+			prec, found := extraPreCompMap[addr]
+			if found {
+				return prec, true
 			}
-			c.ExtraPrecompiles[pc.Address().ToCommon()] = pc
+			return gethCore.GetPrecompile(rules, addr)
 		}
 		return c
 	}
