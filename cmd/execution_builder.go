@@ -23,7 +23,7 @@ import (
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
-	"github.com/vmihailenco/msgpack"
+	"github.com/vmihailenco/msgpack/v4"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/admin/commands"
@@ -220,7 +220,6 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		// TODO: will re-visit this once storehouse has implemented new WAL for checkpoint file of
 		// payloadless trie.
 		// Component("execution data pruner", exeNode.LoadExecutionDataPruner).
-		Component("observer collection indexer", exeNode.LoadObserverCollectionIndexer).
 		Component("blob service", exeNode.LoadBlobService).
 		Component("block data upload manager", exeNode.LoadBlockUploaderManager).
 		Component("GCP block data uploader", exeNode.LoadGCPBlockDataUploader).
