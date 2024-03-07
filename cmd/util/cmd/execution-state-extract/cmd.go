@@ -33,6 +33,7 @@ var (
 	flagNoReport                      bool
 	flagValidateMigration             bool
 	flagAllowPartialStateFromPayloads bool
+	flagSortPayloads                  bool
 	flagLogVerboseValidationError     bool
 	flagDiffMigration                 bool
 	flagLogVerboseDiff                bool
@@ -94,6 +95,9 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagAllowPartialStateFromPayloads, "allow-partial-state-from-payload-file", false,
 		"allow input payload file containing partial state (e.g. not all accounts)")
+
+	Cmd.Flags().BoolVar(&flagSortPayloads, "sort-payloads", true,
+		"sort payloads (generate deterministic output)")
 
 	// If specified, the state will consist of payloads from the given input payload file.
 	// If not specified, then the state will be extracted from the latest checkpoint file.
@@ -327,6 +331,7 @@ func run(*cobra.Command, []string) {
 			flagInputPayloadFileName,
 			flagOutputPayloadFileName,
 			exportedAddresses,
+			flagSortPayloads,
 		)
 	} else {
 		err = extractExecutionState(
@@ -343,6 +348,7 @@ func run(*cobra.Command, []string) {
 			stagedContracts,
 			flagOutputPayloadFileName,
 			exportedAddresses,
+			flagSortPayloads,
 		)
 	}
 

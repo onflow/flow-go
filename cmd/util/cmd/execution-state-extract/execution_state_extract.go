@@ -44,6 +44,7 @@ func extractExecutionState(
 	stagedContracts []migrators.StagedContract,
 	outputPayloadFile string,
 	exportPayloadsByAddresses []common.Address,
+	sortPayloads bool,
 ) error {
 
 	log.Info().Msg("init WAL")
@@ -141,6 +142,7 @@ func extractExecutionState(
 			outputPayloadFile,
 			exportPayloadsByAddresses,
 			false, // payloads represents entire state.
+			sortPayloads,
 		)
 	}
 
@@ -216,6 +218,7 @@ func extractExecutionStateFromPayloads(
 	inputPayloadFile string,
 	outputPayloadFile string,
 	exportPayloadsByAddresses []common.Address,
+	sortPayloads bool,
 ) error {
 
 	inputPayloadsFromPartialState, payloads, err := util.ReadPayloadFile(log, inputPayloadFile)
@@ -250,6 +253,7 @@ func extractExecutionStateFromPayloads(
 			outputPayloadFile,
 			exportPayloadsByAddresses,
 			inputPayloadsFromPartialState,
+			sortPayloads,
 		)
 	}
 
@@ -284,14 +288,17 @@ func exportPayloads(
 	outputPayloadFile string,
 	exportPayloadsByAddresses []common.Address,
 	inputPayloadsFromPartialState bool,
+	sortPayloads bool,
 ) error {
-	log.Info().Msgf("sorting %d payloads", len(payloads))
+	if sortPayloads {
+		log.Info().Msgf("sorting %d payloads", len(payloads))
 
-	// Sort payloads to produce deterministic payload file with
-	// same sequence of payloads inside.
-	payloads = util.SortPayloadsByAddress(payloads, nWorker)
+		// Sort payloads to produce deterministic payload file with
+		// same sequence of payloads inside.
+		payloads = util.SortPayloadsByAddress(payloads, nWorker)
 
-	log.Info().Msgf("sorted %d payloads", len(payloads))
+		log.Info().Msgf("sorted %d payloads", len(payloads))
+	}
 
 	log.Info().Msgf("creating payloads file %s", outputPayloadFile)
 
