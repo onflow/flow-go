@@ -36,7 +36,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
-	"github.com/onflow/flow-go/engine/access/ingestion"
 	"github.com/onflow/flow-go/engine/access/rest"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
@@ -595,6 +594,8 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"execution-data-indexing-enabled",
 			defaultConfig.executionDataIndexingEnabled,
 			"whether to enable the execution data indexing")
+		flags.StringVar(&builder.registersDBPath, "execution-state-dir", defaultConfig.registersDBPath, "directory to use for execution-state database")
+		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "execution-state checkpoint file")
 
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
@@ -1158,6 +1159,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 			builder.Storage.RegisterIndex = registers
 
+			var collectionExecutedMetric module.CollectionExecutedMetric = metrics.NewNoopCollector()
 			indexerCore, err := indexer.New(
 				builder.Logger,
 				metrics.NewExecutionStateIndexerCollector(),
@@ -1165,8 +1167,10 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Storage.RegisterIndex,
 				builder.Storage.Headers,
 				builder.Storage.Events,
+				builder.Storage.Collections,
+				builder.Storage.Transactions,
 				builder.Storage.LightTransactionResults,
-				builder.onCollection,
+				collectionExecutedMetric,
 			)
 			if err != nil {
 				return nil, err
@@ -1205,18 +1209,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	}
 
 	return builder
-}
-
-func (builder *ObserverServiceBuilder) onCollection(_ flow.Identifier, entity flow.Entity) {
-	collections := builder.Storage.Collections
-	transactions := builder.Storage.Transactions
-	logger := builder.Logger
-
-	err := ingestion.HandleCollection(entity, collections, transactions, logger, nil)
-	if err != nil {
-		logger.Error().Err(err).Msg("could not handle collection")
-		return
-	}
 }
 
 // enqueuePublicNetworkInit enqueues the observer network component initialized for the observer

@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/channels"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
+	"github.com/onflow/flow-go/storage"
 )
 
 type EntriesFunc func() uint
@@ -1101,4 +1102,12 @@ type ChainSyncMetrics interface {
 type DHTMetrics interface {
 	RoutingTablePeerAdded()
 	RoutingTablePeerRemoved()
+}
+
+type CollectionExecutedMetric interface {
+	TrackFinalized(light flow.LightCollection)
+	TrackExecuted(light flow.LightCollection)
+	TrackFinalizedMetricForBlock(block *flow.Block, collections storage.Collections)
+	TrackExecutionReceiptMetrics(r *flow.ExecutionReceipt, collections storage.Collections, blocks storage.Blocks)
+	UpdateLastFullBlockHeight(height uint64)
 }
