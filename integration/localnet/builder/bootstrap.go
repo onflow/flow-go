@@ -53,26 +53,25 @@ const (
 )
 
 var (
-	collectionCount            int
-	consensusCount             int
-	executionCount             int
-	verificationCount          int
-	accessCount                int
-	observerCount              int
-	testExecutionCount         int
-	nClusters                  uint
-	numViewsInStakingPhase     uint64
-	numViewsInDKGPhase         uint64
-	numViewsEpoch              uint64
-	epochCommitSafetyThreshold uint64
-	profiler                   bool
-	profileUploader            bool
-	tracing                    bool
-	cadenceTracing             bool
-	extesiveTracing            bool
-	consensusDelay             time.Duration
-	collectionDelay            time.Duration
-	logLevel                   string
+	collectionCount        int
+	consensusCount         int
+	executionCount         int
+	verificationCount      int
+	accessCount            int
+	observerCount          int
+	testExecutionCount     int
+	nClusters              uint
+	numViewsInStakingPhase uint64
+	numViewsInDKGPhase     uint64
+	numViewsEpoch          uint64
+	profiler               bool
+	profileUploader        bool
+	tracing                bool
+	cadenceTracing         bool
+	extesiveTracing        bool
+	consensusDelay         time.Duration
+	collectionDelay        time.Duration
+	logLevel               string
 
 	ports *PortAllocator
 )
