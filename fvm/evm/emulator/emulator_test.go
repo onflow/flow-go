@@ -19,6 +19,7 @@ import (
 )
 
 var blockNumber = big.NewInt(10)
+
 var defaultCtx = types.NewDefaultBlockContext(blockNumber.Uint64())
 
 func RunWithNewEmulator(t testing.TB, backend *testutils.TestBackend, rootAddr flow.Address, f func(*emulator.Emulator)) {
@@ -53,9 +54,7 @@ func TestNativeTokenBridging(t *testing.T) {
 						res, err := blk.DirectCall(call)
 						require.NoError(t, err)
 						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
-						expectedHash, err := call.Hash()
-						require.NoError(t, err)
-						require.Equal(t, expectedHash, res.TxHash)
+						require.Equal(t, call.Hash(), res.TxHash)
 						nonce += 1
 					})
 				})
@@ -87,9 +86,7 @@ func TestNativeTokenBridging(t *testing.T) {
 						res, err := blk.DirectCall(call)
 						require.NoError(t, err)
 						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
-						expectedHash, err := call.Hash()
-						require.NoError(t, err)
-						require.Equal(t, expectedHash, res.TxHash)
+						require.Equal(t, call.Hash(), res.TxHash)
 						nonce += 1
 					})
 				})
@@ -147,9 +144,7 @@ func TestContractInteraction(t *testing.T) {
 						res, err := blk.DirectCall(call)
 						require.NoError(t, err)
 						contractAddr = res.DeployedContractAddress
-						expectedHash, err := call.Hash()
-						require.NoError(t, err)
-						require.Equal(t, expectedHash, res.TxHash)
+						require.Equal(t, call.Hash(), res.TxHash)
 						nonce += 1
 					})
 					RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {

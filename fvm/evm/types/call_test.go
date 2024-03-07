@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestDirectCall(t *testing.T) {
@@ -20,18 +19,14 @@ func TestDirectCall(t *testing.T) {
 	}
 
 	t.Run("calculate hash", func(t *testing.T) {
-		h, err := dc.Hash()
-		require.NoError(t, err)
-		assert.Equal(t, "0xe28ff08eca95608646d765e3007b3710f7f2a8ac5e297431da1962c33487e7b6", h.Hex())
+		assert.Equal(t, "0xe28ff08eca95608646d765e3007b3710f7f2a8ac5e297431da1962c33487e7b6", dc.Hash().Hex())
 	})
 
 	t.Run("construct transaction", func(t *testing.T) {
 		tx := dc.Transaction()
-		h, err := dc.Hash()
-		require.NoError(t, err)
 		assert.Equal(t, dc.Value, tx.Value())
 		assert.Equal(t, dc.To.ToCommon(), *tx.To())
-		assert.Equal(t, h, tx.Hash())
+		assert.Equal(t, dc.Hash(), tx.Hash())
 		assert.Equal(t, dc.GasLimit, tx.Gas())
 		assert.Equal(t, dc.Data, tx.Data())
 		assert.Equal(t, uint64(0), tx.Nonce()) // no nonce exists for direct call
