@@ -82,7 +82,16 @@ func extractExecutionState(
 
 	log.Info().Msg("init compactor")
 
-	compactor, err := complete.NewCompactor(led, diskWal, log, complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), &metrics.NoopCollector{})
+	compactor, err := complete.NewCompactor(
+		led,
+		diskWal,
+		log,
+		complete.DefaultCacheSize,
+		checkpointDistance,
+		checkpointsToKeep,
+		atomic.NewBool(false),
+		&metrics.NoopCollector{},
+	)
 	if err != nil {
 		return fmt.Errorf("cannot create compactor: %w", err)
 	}
@@ -125,13 +134,15 @@ func extractExecutionState(
 	// create reporter
 	reporter := reporters.NewExportReporter(
 		log,
-		func() flow.StateCommitment { return targetHash },
+		func() flow.StateCommitment {
+			return targetHash
+		},
 	)
 
 	newMigratedState := ledger.State(newTrie.RootHash())
 	err = reporter.Report(nil, newMigratedState)
 	if err != nil {
-		log.Error().Err(err).Msgf("can not generate report for migrated state: %v", newMigratedState)
+		log.Err(err).Msgf("can not generate report for migrated state: %v", newMigratedState)
 	}
 
 	if len(outputPayloadFile) > 0 {

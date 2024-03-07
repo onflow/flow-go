@@ -146,6 +146,12 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 
 	reporter := newValueMigrationReporter(m.reporter, m.log, m.errorMessageHandler)
 
+	valueMigrations := m.valueMigrations(
+		migrationRuntime.Interpreter,
+		migrationRuntime.Accounts,
+		reporter,
+	)
+
 	migration.Migrate(
 		&migrations.AddressSliceIterator{
 			Addresses: []common.Address{
@@ -154,7 +160,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		},
 		migration.NewValueMigrationsPathMigrator(
 			reporter,
-			m.valueMigrations(migrationRuntime.Interpreter, migrationRuntime.Accounts, reporter)...,
+			valueMigrations...,
 		),
 	)
 

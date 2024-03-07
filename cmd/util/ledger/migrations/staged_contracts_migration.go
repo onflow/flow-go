@@ -246,7 +246,7 @@ func (m *StagedContractsMigration) MigrateAccount(
 		if err != nil {
 			m.log.Error().Err(err).
 				Msgf(
-					"fail to update contract %s in account %s",
+					"failed to update contract %s in account %s",
 					name,
 					address.HexWithPrefix(),
 				)
@@ -265,7 +265,11 @@ func (m *StagedContractsMigration) MigrateAccount(
 
 	if len(contractUpdates) > 0 {
 		var sb strings.Builder
-		_, _ = fmt.Fprintf(&sb, "failed to find all contract registers that need to be changed for address %s:\n", address)
+		_, _ = fmt.Fprintf(
+			&sb,
+			"failed to find all contract registers that need to be changed for address %s:\n",
+			address.HexWithPrefix(),
+		)
 		for registerID := range contractUpdates {
 			_, _ = fmt.Fprintf(&sb, "  - %s\n", flow.RegisterIDContractName(registerID))
 		}
