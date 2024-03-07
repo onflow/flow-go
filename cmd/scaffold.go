@@ -1448,15 +1448,16 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 			return fmt.Errorf("observer mode is only available for execution nodes")
 		}
 
-		id := flow.IdentitySkeleton{
+		id := &flow.Identity{
 			// observer mode uses the node id derived from the network key,
 			// rather than the node id from the node info file
 			NodeID:        myID,
 			Address:       info.Address,
 			Role:          info.Role,
-			InitialWeight: 0,
-			NetworkPubKey: fnb.NetworkKey.PublicKey(),
+			Weight:        0,
+			Ejected:       false,
 			StakingPubKey: fnb.StakingKey.PublicKey(),
+			NetworkPubKey: fnb.NetworkKey.PublicKey(),
 		}
 		fnb.Me, err = local.New(id, fnb.StakingKey)
 		if err != nil {
