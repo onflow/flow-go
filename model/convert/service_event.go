@@ -921,7 +921,6 @@ func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.Ser
 			var foundFieldCount int
 
 			evt := cdcEvent.Type().(*cadence.EventType)
-
 			for i, f := range evt.Fields {
 				switch f.Identifier {
 				case "newProtocolVersion":
@@ -935,7 +934,7 @@ func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.Ser
 
 			if foundFieldCount != expectedFieldCount {
 				return flow.ProtocolStateVersionUpgrade{}, fmt.Errorf(
-					"VersionBeacon event required fields not found (%d != %d)",
+					"ProtocolStateVersionUpgrade event required fields not found (%d != %d)",
 					foundFieldCount,
 					expectedFieldCount,
 				)
