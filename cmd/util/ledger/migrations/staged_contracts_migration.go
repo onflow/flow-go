@@ -103,7 +103,7 @@ func (m *StagedContractsMigration) InitMigration(
 	// Manually register burner contract
 	burnerLocation := common.AddressLocation{
 		Name:    "Burner",
-		Address: common.Address(m.chainID.Chain().ServiceAddress()),
+		Address: common.Address(BurnerAddressForChain(m.chainID)),
 	}
 	m.contractsByLocation[burnerLocation] = coreContracts.Burner()
 
