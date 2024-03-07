@@ -76,6 +76,7 @@ func (s *ObserverIndexerEnabled) SetupTest() {
 		// access node with unstaked nodes supported
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel),
 			testnet.WithAdditionalFlag("--supports-observer=true"),
+			testnet.WithAdditionalFlagf("--public-network-execution-data-sync-enabled=true"),
 		),
 
 		// need one dummy execution node
