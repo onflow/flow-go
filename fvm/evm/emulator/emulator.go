@@ -2,7 +2,6 @@ package emulator
 
 import (
 	"math/big"
-	"sync"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethCore "github.com/ethereum/go-ethereum/core"
@@ -16,8 +15,6 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-var pcUpdater = &precompileUpdater{}
 
 // Emulator handles operations against evm runtime
 type Emulator struct {
@@ -436,33 +433,4 @@ func (proc *procedure) run(
 		}
 	}
 	return &res, nil
-}
-
-type precompileUpdater struct {
-	updateLock sync.Mutex
-}
-
-func (pu *precompileUpdater) SetupPrecompile(cfg *Config) {
-	pu.updateLock.Lock()
-	defer pu.updateLock.Unlock()
-
-	rules := cfg.ChainRules()
-	// captures the pointer to the map that has to be augmented
-	var precompiles map[gethCommon.Address]gethVM.PrecompiledContract
-	switch {
-	case rules.IsCancun:
-		precompiles = gethVM.PrecompiledContractsCancun
-	case rules.IsBerlin:
-		precompiles = gethVM.PrecompiledContractsBerlin
-	case rules.IsIstanbul:
-		precompiles = gethVM.PrecompiledContractsIstanbul
-	case rules.IsByzantium:
-		precompiles = gethVM.PrecompiledContractsByzantium
-	default:
-		precompiles = gethVM.PrecompiledContractsHomestead
-	}
-	for addr, contract := range cfg.ExtraPrecompiles {
-		// we override if exist since we call this method on every block
-		precompiles[addr] = contract
-	}
 }
