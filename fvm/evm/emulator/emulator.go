@@ -111,24 +111,21 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	txHash, err := call.Hash()
-	if err != nil {
-		return nil, err
-	}
+
 	switch call.SubType {
 	case types.DepositCallSubType:
-		return proc.mintTo(call, txHash)
+		return proc.mintTo(call)
 	case types.WithdrawCallSubType:
-		return proc.withdrawFrom(call, txHash)
+		return proc.withdrawFrom(call)
 	case types.DeployCallSubType:
 		if !call.EmptyToField() {
-			return proc.deployAt(call.From, call.To, call.Data, call.GasLimit, call.Value, txHash)
+			return proc.deployAt(call.From, call.To, call.Data, call.GasLimit, call.Value, call.Hash())
 		}
 		fallthrough
 	default:
 		// TODO: when we support mutiple calls per block, we need
 		// to update the value zero here for tx index
-		return proc.runDirect(call.Message(), txHash, 0)
+		return proc.runDirect(call.Message(), call.Hash(), 0)
 	}
 }
 
@@ -203,10 +200,7 @@ func (proc *procedure) commit() error {
 	return nil
 }
 
-func (proc *procedure) mintTo(
-	call *types.DirectCall,
-	txHash gethCommon.Hash,
-) (*types.Result, error) {
+func (proc *procedure) mintTo(call *types.DirectCall) (*types.Result, error) {
 	bridge := call.From.ToCommon()
 
 	// create bridge account if not exist
@@ -220,7 +214,7 @@ func (proc *procedure) mintTo(
 	msg := call.Message()
 	proc.evm.TxContext.Origin = msg.From
 	// withdraw the amount and move it to the bridge account
-	res, err := proc.run(msg, txHash, 0, types.DirectCallTxType)
+	res, err := proc.run(msg, call.Hash(), 0, types.DirectCallTxType)
 	if err != nil {
 		return res, err
 	}
@@ -228,10 +222,7 @@ func (proc *procedure) mintTo(
 	return res, proc.commit()
 }
 
-func (proc *procedure) withdrawFrom(
-	call *types.DirectCall,
-	txHash gethCommon.Hash,
-) (*types.Result, error) {
+func (proc *procedure) withdrawFrom(call *types.DirectCall) (*types.Result, error) {
 
 	bridge := call.To.ToCommon()
 
@@ -243,7 +234,7 @@ func (proc *procedure) withdrawFrom(
 	// withdraw the amount and move it to the bridge account
 	msg := call.Message()
 	proc.evm.TxContext.Origin = msg.From
-	res, err := proc.run(msg, txHash, 0, types.DirectCallTxType)
+	res, err := proc.run(msg, call.Hash(), 0, types.DirectCallTxType)
 	if err != nil {
 		return res, err
 	}
