@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -217,6 +218,20 @@ func writeStatusFile(fileName string, e error) error {
 	return err
 }
 
+func ByteCountIEC(b int64) string {
+	const unit = 1024
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %ciB",
+		float64(b)/float64(div), "KMGTPE"[exp])
+}
+
 func extractExecutionStateFromPayloads(
 	log zerolog.Logger,
 	dir string,
@@ -241,6 +256,33 @@ func extractExecutionStateFromPayloads(
 	}
 
 	log.Info().Msgf("read %d payloads", len(payloads))
+
+	type accountInfo struct {
+		count int
+		size  uint64
+	}
+	payloadCountByAddress := make(map[string]accountInfo)
+
+	for _, payload := range payloads {
+		registerID, payloadValue, err := convert.PayloadToRegister(payload)
+		if err != nil {
+			return fmt.Errorf("cannot convert payload to register: %w", err)
+		}
+		owner := registerID.Owner
+		accountInfo := payloadCountByAddress[owner]
+		accountInfo.count++
+		accountInfo.size += uint64(len(payloadValue))
+		payloadCountByAddress[owner] = accountInfo
+	}
+
+	for address, info := range payloadCountByAddress {
+		log.Debug().Msgf(
+			"address %x has %d payloads and a total size of %s",
+			address,
+			info.count,
+			ByteCountIEC(int64(info.size)),
+		)
+	}
 
 	migrations := newMigrations(
 		log,
