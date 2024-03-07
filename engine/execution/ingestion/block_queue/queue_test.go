@@ -188,17 +188,17 @@ func TestOneReadyAndMultiplePending(t *testing.T) {
 	require.Empty(t, executables)
 	requireCollectionHas(t, missing, c1, c2)
 
-	executables, err = q.HandleCollection(c1)
+	_, err = q.HandleCollection(c1)
 	require.NoError(t, err)
 
-	executables, err = q.HandleCollection(c2)
+	_, err = q.HandleCollection(c2)
 	require.NoError(t, err)
 
 	// received C when B is not executed
-	missing, executables, err = q.HandleBlock(blockC, nil)
+	_, _, err = q.HandleBlock(blockC, nil)
 	require.NoError(t, err)
 
-	executables, err = q.HandleCollection(c3)
+	_, err = q.HandleCollection(c3)
 	require.NoError(t, err)
 
 	// A is executed
