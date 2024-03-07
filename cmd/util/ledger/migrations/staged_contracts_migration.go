@@ -107,6 +107,18 @@ func (m *StagedContractsMigration) InitMigration(
 	}
 	m.contractsByLocation[burnerLocation] = coreContracts.Burner()
 
+	addresses := make([]string, 0, len(m.stagedContracts))
+
+	for address := range m.stagedContracts {
+		addresses = append(addresses, address.String())
+	}
+
+	m.log.Debug().Msgf(
+		"initialized staged contracts migration for chain %s for addresses %s",
+		m.chainID,
+		strings.Join(addresses, ","),
+	)
+
 	return nil
 }
 
