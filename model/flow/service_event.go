@@ -37,13 +37,6 @@ type ServiceEvent struct {
 	Event interface{}
 }
 
-// serviceEventUnmarshalWrapper is a version of ServiceEvent used to unmarshal
-// into a wrapper with a specific event type.
-type serviceEventUnmarshalWrapper[E any] struct {
-	Type  ServiceEventType
-	Event E
-}
-
 // ServiceEventList is a handy container to enable comparisons
 type ServiceEventList []ServiceEvent
 
@@ -144,13 +137,16 @@ func (marshaller marshallerImpl) UnmarshalWrapped(b []byte) (ServiceEvent, error
 // Event portion of a ServiceEvent into a specific typed structure.
 // Forwards errors from the underlying marshaller (treat errors as you would from eg. json.Unmarshal)
 func unmarshalWrapped[E any](b []byte, marshaller marshallerImpl) (*E, error) {
-	eventWrapper := serviceEventUnmarshalWrapper[E]{}
-	err := marshaller.unmarshalFunc(b, &eventWrapper)
+	wrapper := struct {
+		Type  ServiceEventType
+		Event E
+	}{}
+	err := marshaller.unmarshalFunc(b, &wrapper)
 	if err != nil {
 		return nil, err
 	}
 
-	return &eventWrapper.Event, nil
+	return &wrapper.Event, nil
 }
 
 // UnmarshalWithType unmarshals the service event and returns it as a wrapped ServiceEvent type.
