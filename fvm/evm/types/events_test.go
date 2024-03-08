@@ -86,13 +86,13 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 	evt, err := ccf.Decode(nil, v)
 	require.NoError(t, err)
 
-	assert.Equal(t, evt.Type().ID(), "evm.BlockExecuted")
+	assert.Equal(t, evt.Type().ID(), "evm.blockExecuted")
 
-	location, qualifiedIdentifier, err := cdcCommon.DecodeTypeID(nil, "evm.BlockExecuted")
+	location, qualifiedIdentifier, err := cdcCommon.DecodeTypeID(nil, "evm.blockExecuted")
 	require.NoError(t, err)
 
 	assert.Equal(t, types.EVMLocation{}, location)
-	assert.Equal(t, "BlockExecuted", qualifiedIdentifier)
+	assert.Equal(t, "blockExecuted", qualifiedIdentifier)
 }
 
 func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {

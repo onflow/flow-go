@@ -45,13 +45,13 @@ func TestParseEvent(t *testing.T) {
 		},
 		{
 			name:      "evm event",
-			eventType: "evm.BlockExecuted",
+			eventType: "evm.blockExecuted",
 			expected: events.ParsedEvent{
 				Type:         events.ProtocolEventType,
-				EventType:    "evm.BlockExecuted",
+				EventType:    "evm.blockExecuted",
 				Contract:     "evm",
 				ContractName: "evm",
-				Name:         "BlockExecuted",
+				Name:         "blockExecuted",
 			},
 		},
 	}
@@ -126,13 +126,13 @@ func TestValidateEvent(t *testing.T) {
 		},
 		{
 			name:      "evm event",
-			eventType: "evm.BlockExecuted",
+			eventType: "evm.blockExecuted",
 			expected: events.ParsedEvent{
 				Type:         events.ProtocolEventType,
-				EventType:    "evm.BlockExecuted",
+				EventType:    "evm.blockExecuted",
 				Contract:     "evm",
 				ContractName: "evm",
-				Name:         "BlockExecuted",
+				Name:         "blockExecuted",
 			},
 		},
 	}

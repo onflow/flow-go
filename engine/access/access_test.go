@@ -668,6 +668,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 			collectionsToMarkFinalized,
 			collectionsToMarkExecuted,
 			blocksToMarkExecuted,
+			collections,
+			all.Blocks,
 		)
 		require.NoError(suite.T(), err)
 
@@ -817,6 +819,8 @@ func (suite *Suite) TestGetTransactionResult() {
 			collectionsToMarkFinalized,
 			collectionsToMarkExecuted,
 			blocksToMarkExecuted,
+			collections,
+			all.Blocks,
 		)
 		require.NoError(suite.T(), err)
 
@@ -1030,6 +1034,8 @@ func (suite *Suite) TestExecuteScript() {
 			collectionsToMarkFinalized,
 			collectionsToMarkExecuted,
 			blocksToMarkExecuted,
+			collections,
+			all.Blocks,
 		)
 		require.NoError(suite.T(), err)
 

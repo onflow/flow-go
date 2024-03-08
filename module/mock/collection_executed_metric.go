@@ -15,7 +15,7 @@ type CollectionExecutedMetric struct {
 }
 
 // TrackExecuted provides a mock function with given fields: light
-func (_m *CollectionExecutedMetric) TrackExecuted(light flow.LightCollection) {
+func (_m *CollectionExecutedMetric) CollectionExecuted(light flow.LightCollection) {
 	_m.Called(light)
 }
 
@@ -25,7 +25,7 @@ func (_m *CollectionExecutedMetric) TrackExecutionReceiptMetrics(r *flow.Executi
 }
 
 // TrackFinalized provides a mock function with given fields: light
-func (_m *CollectionExecutedMetric) TrackFinalized(light flow.LightCollection) {
+func (_m *CollectionExecutedMetric) CollectionFinalized(light flow.LightCollection) {
 	_m.Called(light)
 }
 
