@@ -56,7 +56,7 @@ func pruneRandomBeaconHistory(
 	serviceAccountAddress common.Address,
 ) error {
 
-	log.Info().Msgf("pruning RandomBeaconHistory from service account %s", serviceAccountAddress)
+	log.Info().Msgf("pruning RandomBeaconHistory in service account %s", serviceAccountAddress)
 
 	contracts := storage.GetStorageMap(serviceAccountAddress, runtime.StorageDomainContract, false)
 	if contracts == nil {
@@ -99,7 +99,7 @@ func pruneRandomBeaconHistory(
 	}
 
 	log.Info().Msgf(
-		"pruned %d entried from RandomBeaconHistory in service account %s",
+		"pruned %d entries in RandomBeaconHistory in service account %s",
 		removalCount,
 		serviceAccountAddress,
 	)
