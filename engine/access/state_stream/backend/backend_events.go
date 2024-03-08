@@ -50,7 +50,7 @@ func (b *EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.I
 	return sub
 }
 
-// getResponseFactory returns a function function that returns the event response for a given height.
+// getResponseFactory returns a function that returns the event response for a given height.
 func (b *EventsBackend) getResponseFactory(filter state_stream.EventFilter) subscription.GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (response interface{}, err error) {
 		if b.useIndex {
