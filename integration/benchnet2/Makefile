@@ -37,7 +37,7 @@ gen-bootstrap: clone-flow
 	cd flow-go/cmd/bootstrap && go run . finalize --root-commit 0000000000000000000000000000000000000000000000000000000000000000 --service-account-public-key-json "{\"PublicKey\":\"R7MTEDdLclRLrj2MI1hcp4ucgRTpR15PCHAWLM5nks6Y3H7+PGkfZTP2di2jbITooWO4DD1yqaBSAVK8iQ6i0A==\",\"SignAlgo\":2,\"HashAlgo\":1,\"SeqNumber\":0,\"Weight\":1000}" --config ../../../bootstrap/conf/node-config.json -o ../../../bootstrap/ --partner-dir ../../../bootstrap/partner-nodes --partner-weights ../../../bootstrap/conf/partner-stakes.json --collection-clusters 1 --epoch-counter 0 --epoch-length 30000 --epoch-staking-phase-length 20000 --epoch-dkg-phase-length 2000 --genesis-token-supply="1000000000.0" --protocol-version=0 --internal-priv-dir ../../../bootstrap/keys/private-root-information --dkg-data ../../../bootstrap/private-root-information/root-dkg-data.priv.json --root-block ../../../bootstrap/public-root-information/root-block.json --root-block-votes-dir ../../../bootstrap/public-root-information/root-block-votes/ --epoch-commit-safety-threshold=1000
 
 gen-helm-l1:
-	go run automate/cmd/level1/bootstrap.go --data bootstrap/public-root-information/root-protocol-state-snapshot.json --dockerTag $(NETWORK_ID) --dockerRegistry $(DOCKER_REGISTRY)
+	go run automate/cmd/level1/bootstrap.go --data bootstrap/public-root-information/root-protocol-state-snapshot.json --dockerTag $(DOCKER_TAG) --dockerRegistry $(DOCKER_REGISTRY)
 
 gen-helm-l2:
 	go run automate/cmd/level2/template.go --data template-data.json --template automate/templates/helm-values-all-nodes.yml --outPath="./values.yml"
