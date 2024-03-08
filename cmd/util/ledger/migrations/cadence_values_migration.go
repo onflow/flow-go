@@ -315,22 +315,28 @@ func (t *cadenceValueMigrationReporter) Migrated(
 	})
 }
 
-func (t *cadenceValueMigrationReporter) Error(
-	storageKey interpreter.StorageKey,
-	storageMapKey interpreter.StorageMapKey,
-	migration string,
-	err error,
-) {
+func (t *cadenceValueMigrationReporter) Error(err error) {
+
 	message := t.errorMessageHandler.FormatError(err)
 
-	t.log.Error().Msgf(
-		"failed to run %s in account %s, domain %s, key %s: %s",
-		migration,
-		storageKey.Address,
-		storageKey.Key,
-		storageMapKey,
-		message,
-	)
+	var migrationErr migrations.StorageMigrationError
+
+	if errors.As(err, &migrationErr) {
+		storageKey := migrationErr.StorageKey
+		storageMapKey := migrationErr.StorageMapKey
+		migration := migrationErr.Migration
+
+		t.log.Error().Msgf(
+			"failed to run %s in account %s, domain %s, key %s: %s",
+			migration,
+			storageKey.Address,
+			storageKey.Key,
+			storageMapKey,
+			message,
+		)
+	} else {
+		t.log.Error().Msgf("failed to run migration: %s", message)
+	}
 }
 
 func (t *cadenceValueMigrationReporter) MigratedPathCapability(
