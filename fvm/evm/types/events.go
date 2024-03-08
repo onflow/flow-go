@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	EventTypeBlockExecuted       flow.EventType = "blockExecuted"
+	EventTypeBlockExecuted       flow.EventType = "BlockExecuted"
 	EventTypeTransactionExecuted flow.EventType = "TransactionExecuted"
 	locationDivider                             = "."
 )
