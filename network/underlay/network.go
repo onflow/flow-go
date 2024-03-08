@@ -677,7 +677,7 @@ func (n *Network) PublishOnChannel(channel channels.Channel, message interface{}
 	filteredIDs := flow.IdentifierList(targetIDs).Filter(n.removeSelfFilter())
 
 	if len(filteredIDs) == 0 {
-		return network.EmptyTargetList
+		return fmt.Errorf("targetIDs %v: %w", len(targetIDs), network.EmptyTargetList)
 	}
 
 	err := n.sendOnChannel(channel, message, filteredIDs)
@@ -698,7 +698,7 @@ func (n *Network) MulticastOnChannel(channel channels.Channel, message interface
 	}
 
 	if len(selectedIDs) == 0 {
-		return network.EmptyTargetList
+		return fmt.Errorf("targetIDs %v: %w", len(targetIDs), network.EmptyTargetList)
 	}
 
 	err = n.sendOnChannel(channel, message, selectedIDs)

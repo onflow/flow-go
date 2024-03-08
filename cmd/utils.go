@@ -156,10 +156,14 @@ func CreatePublicIDTranslatorAndIdentifierProvider(
 
 				if flowID, err := idTranslator.GetFlowID(pid); err != nil {
 					// TODO: this is an instance of "log error and continue with best effort" anti-pattern
-					logger.Err(err).Str("peer", p2plogging.PeerId(pid)).Msg("failed to translate to Flow ID")
+					logger.Fatal().Err(err).Str("peer", p2plogging.PeerId(pid)).Msg("failed to translate to Flow ID")
 				} else {
 					result = append(result, flowID)
 				}
+			}
+
+			if len(result) == 0 {
+				logger.Error().Msgf("empty identifier list, pids: %v", pids)
 			}
 
 			return result

@@ -515,6 +515,8 @@ func (fnb *FlowNodeBuilder) BuildPublicLibp2pNode(address string) (p2p.LibP2PNod
 		}
 
 		pis = append(pis, pi)
+
+		fnb.Logger.Info().Msgf("bootstrap peer address info %v: %v", b, pi)
 	}
 
 	for _, b := range ids {
@@ -1241,12 +1243,6 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 			fnb.IDTranslator = idTranslator
 			fnb.SyncEngineIdentifierProvider = factory()
-			ids := fnb.SyncEngineIdentifierProvider.Identifiers()
-			if len(ids) == 0 {
-				return fmt.Errorf("empty sync engine identifier provider")
-			}
-
-			node.Logger.Info().Msgf("sync engine identifier providers: %v", ids.Strings())
 
 			return nil
 		}
