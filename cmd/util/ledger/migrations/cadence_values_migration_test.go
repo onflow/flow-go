@@ -7,10 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/rs/zerolog"
-
 	_ "github.com/glebarez/go-sqlite"
-
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -743,4 +741,123 @@ func TestBootstrappedStateMigration(t *testing.T) {
 
 	// Check error logs.
 	require.Empty(t, logWriter.logs)
+}
+
+func TestProgramLoadingError(t *testing.T) {
+	t.Parallel()
+
+	rwf := &testReportWriterFactory{}
+
+	logWriter := &writer{}
+	logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
+
+	const nWorker = 2
+
+	const chainID = flow.Emulator
+	chain := chainID.Chain()
+
+	testAddress := common.Address(chain.ServiceAddress())
+
+	// TODO: EVM contract is not deployed in snapshot yet, so can't update it
+	const evmContractChange = EVMContractChangeNone
+
+	const burnerContractChange = BurnerContractChangeUpdate
+
+	payloads, err := newBootstrapPayloads(chainID)
+	require.NoError(t, err)
+
+	runtime, err := NewMigratorRuntime(
+		testAddress,
+		payloads,
+		util.RuntimeInterfaceConfig{},
+	)
+	require.NoError(t, err)
+
+	storage := runtime.Storage
+
+	storageMap := storage.GetStorageMap(
+		testAddress,
+		common.PathDomainStorage.Identifier(),
+		true,
+	)
+
+	const nonExistingContractName = "NonExistingContract"
+	nonExistingContractLocation := common.NewAddressLocation(nil, testAddress, nonExistingContractName)
+
+	const nonExistingStructQualifiedIdentifier = nonExistingContractName + ".NonExistingStruct"
+
+	capabilityValue := interpreter.NewUnmeteredCapabilityValue(
+		0,
+		interpreter.AddressValue(testAddress),
+		interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.UnauthorizedAccess,
+			interpreter.NewCompositeStaticType(
+				nil,
+				nonExistingContractLocation,
+				nonExistingStructQualifiedIdentifier,
+				nonExistingContractLocation.TypeID(nil, nonExistingStructQualifiedIdentifier),
+			),
+		),
+	)
+
+	storageMap.WriteValue(
+		runtime.Interpreter,
+		interpreter.StringStorageMapKey("test"),
+		capabilityValue,
+	)
+
+	err = storage.Commit(runtime.Interpreter, false)
+	require.NoError(t, err)
+
+	// finalize the transaction
+	result, err := runtime.TransactionState.FinalizeMainTransaction()
+	require.NoError(t, err)
+
+	// Merge the changes to the original payloads.
+
+	expectedAddresses := map[flow.Address]struct{}{
+		flow.Address(testAddress): {},
+	}
+
+	payloads, err = MergeRegisterChanges(
+		runtime.Snapshot.Payloads,
+		result.WriteSet,
+		expectedAddresses,
+		nil,
+		logger,
+	)
+	require.NoError(t, err)
+
+	// Migrate
+
+	migrations := NewCadence1Migrations(
+		logger,
+		rwf,
+		nWorker,
+		chainID,
+		false,
+		false,
+		evmContractChange,
+		burnerContractChange,
+		nil,
+		false,
+	)
+
+	for _, migration := range migrations {
+		payloads, err = migration.Migrate(payloads)
+		require.NoError(
+			t,
+			err,
+			"migration `%s` failed, logs: %v",
+			migration.Name,
+			logWriter.logs,
+		)
+	}
+
+	// Check error logs
+	require.Len(t, logWriter.logs, 1)
+
+	log := logWriter.logs[0]
+	require.Contains(t, log, "error getting program")
 }
