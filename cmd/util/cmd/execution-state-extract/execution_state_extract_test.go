@@ -82,6 +82,7 @@ func TestExtractExecutionState(t *testing.T) {
 				"",
 				nil,
 				false,
+				false,
 			)
 			require.Error(t, err)
 		})
