@@ -526,6 +526,10 @@ func (fnb *FlowNodeBuilder) BuildPublicLibp2pNode(address string) (p2p.LibP2PNod
 		pis = append(pis, pi)
 	}
 
+	if len(pis) == 0 {
+		return nil, errors.New("no bootstrap peers provided")
+	}
+
 	node, err := p2pbuilder.NewNodeBuilder(
 		fnb.Logger,
 		&fnb.FlowConfig.NetworkConfig.GossipSub,
@@ -1237,6 +1241,12 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 			fnb.IDTranslator = idTranslator
 			fnb.SyncEngineIdentifierProvider = factory()
+			ids := fnb.SyncEngineIdentifierProvider.Identifiers()
+			if len(ids) == 0 {
+				return fmt.Errorf("empty sync engine identifier provider")
+			}
+
+			node.Logger.Info().Msgf("sync engine identifier providers: %v", ids.Strings())
 
 			return nil
 		}
