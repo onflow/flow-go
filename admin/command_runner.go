@@ -236,7 +236,7 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 
 	// This adds an ability to use standard go tooling for performance troubleshooting e.g.:
 	//  go tool pprof http://localhost:9002/debug/pprof/goroutine
-	for _, name := range []string{"allocs", "block", "goroutine", "heap", "mutex", "threadcreate"} {
+	for _, name := range []string{"allocs", "block", "goroutine", "heap", "mutex", "threadcreate", "profile"} {
 		mux.HandleFunc(fmt.Sprintf("/debug/pprof/%s", name), pprof.Handler(name).ServeHTTP)
 	}
 	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
