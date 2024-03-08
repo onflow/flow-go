@@ -107,12 +107,6 @@ func (m *StagedContractsMigration) InitMigration(
 	}
 	m.contractsByLocation[burnerLocation] = coreContracts.Burner()
 
-	addresses := make([]string, 0, len(m.stagedContracts))
-
-	for address := range m.stagedContracts {
-		addresses = append(addresses, address.String())
-	}
-
 	return nil
 }
 
