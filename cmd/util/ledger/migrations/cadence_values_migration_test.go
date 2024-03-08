@@ -2,6 +2,7 @@ package migrations
 
 import (
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"io"
 	"sync"
@@ -743,7 +744,7 @@ func TestBootstrappedStateMigration(t *testing.T) {
 	require.Empty(t, logWriter.logs)
 }
 
-func TestProgramLoadingError(t *testing.T) {
+func TestProgramParsingError(t *testing.T) {
 	t.Parallel()
 
 	rwf := &testReportWriterFactory{}
@@ -781,10 +782,10 @@ func TestProgramLoadingError(t *testing.T) {
 		true,
 	)
 
-	const nonExistingContractName = "NonExistingContract"
-	nonExistingContractLocation := common.NewAddressLocation(nil, testAddress, nonExistingContractName)
+	const contractName = "C"
+	contractLocation := common.NewAddressLocation(nil, testAddress, contractName)
 
-	const nonExistingStructQualifiedIdentifier = nonExistingContractName + ".NonExistingStruct"
+	const nonExistingStructQualifiedIdentifier = contractName + ".NonExistingStruct"
 
 	capabilityValue := interpreter.NewUnmeteredCapabilityValue(
 		0,
@@ -794,9 +795,9 @@ func TestProgramLoadingError(t *testing.T) {
 			interpreter.UnauthorizedAccess,
 			interpreter.NewCompositeStaticType(
 				nil,
-				nonExistingContractLocation,
+				contractLocation,
 				nonExistingStructQualifiedIdentifier,
-				nonExistingContractLocation.TypeID(nil, nonExistingStructQualifiedIdentifier),
+				contractLocation.TypeID(nil, nonExistingStructQualifiedIdentifier),
 			),
 		),
 	)
@@ -829,6 +830,17 @@ func TestProgramLoadingError(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	// Set the code for the old program
+
+	payloads = append(
+		payloads,
+		newContractPayload(
+			testAddress,
+			contractName,
+			[]byte(`pub contract C {}`),
+		),
+	)
+
 	// Migrate
 
 	migrations := NewCadence1Migrations(
@@ -859,5 +871,14 @@ func TestProgramLoadingError(t *testing.T) {
 	require.Len(t, logWriter.logs, 1)
 
 	log := logWriter.logs[0]
-	require.Contains(t, log, "error getting program")
+
+	var entry struct {
+		Message string `json:"message"`
+	}
+
+	err = json.Unmarshal([]byte(log), &entry)
+	require.NoError(t, err)
+
+	assert.Contains(t, entry.Message, "`pub` is no longer a valid access keyword")
+	assert.NotContains(t, entry.Message, "runtime/debug.Stack()")
 }

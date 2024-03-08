@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/cadence/migrations/string_normalization"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	cadenceErrors "github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 
@@ -362,7 +363,7 @@ type errorMessageHandler struct {
 	reportedProgramLoadingErrors sync.Map
 }
 
-func (t *errorMessageHandler) FormatError(err error) string {
+func (t *errorMessageHandler) FormatError(err error) (message string, showStack bool) {
 
 	// Only report program loading errors once,
 	// omit full error message for subsequent occurrences
@@ -372,11 +373,13 @@ func (t *errorMessageHandler) FormatError(err error) string {
 		location := programLoadingError.Location
 		_, ok := t.reportedProgramLoadingErrors.LoadOrStore(location, struct{}{})
 		if ok {
-			return "error getting program"
+			return "error getting program", false
 		}
+
+		return err.Error(), false
 	}
 
-	return err.Error()
+	return err.Error(), true
 }
 
 // cadenceValueMigrationReporter is the reporter for cadence value migrations
@@ -415,26 +418,31 @@ func (t *cadenceValueMigrationReporter) Migrated(
 }
 
 func (t *cadenceValueMigrationReporter) Error(err error) {
-	message := t.errorMessageHandler.FormatError(err)
 
 	var migrationErr migrations.StorageMigrationError
 
-	if errors.As(err, &migrationErr) {
-		storageKey := migrationErr.StorageKey
-		storageMapKey := migrationErr.StorageMapKey
-		migration := migrationErr.Migration
-
-		t.log.Error().Msgf(
-			"failed to run %s in account %s, domain %s, key %s: %s",
-			migration,
-			storageKey.Address,
-			storageKey.Key,
-			storageMapKey,
-			message,
-		)
-	} else {
-		t.log.Error().Msgf("failed to run migration: %s", message)
+	if !errors.As(err, &migrationErr) {
+		panic(cadenceErrors.NewUnreachableError())
 	}
+
+	message, showStack := t.errorMessageHandler.FormatError(migrationErr.Err)
+
+	storageKey := migrationErr.StorageKey
+	storageMapKey := migrationErr.StorageMapKey
+	migration := migrationErr.Migration
+
+	if showStack && len(migrationErr.Stack) > 0 {
+		message = fmt.Sprintf("%s\n%s", message, migrationErr.Stack)
+	}
+
+	t.log.Error().Msgf(
+		"failed to run %s in account %s, domain %s, key %s: %s",
+		migration,
+		storageKey.Address,
+		storageKey.Key,
+		storageMapKey,
+		message,
+	)
 }
 
 func (t *cadenceValueMigrationReporter) MigratedPathCapability(
