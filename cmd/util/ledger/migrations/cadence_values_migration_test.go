@@ -59,9 +59,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 	logWriter := &writer{}
 	logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
 
-	// TODO: >1 breaks atree storage map iteration
-	//   and requires LinkValueMigration.LinkValueMigration to be thread-safe
-	const nWorker = 1
+	const nWorker = 2
 
 	const chainID = flow.Emulator
 	// TODO: EVM contract is not deployed in snapshot yet, so can't update it
