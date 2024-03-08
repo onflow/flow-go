@@ -179,10 +179,6 @@ func (e *Manager) ComputeBlock(
 		snapshot,
 		derivedBlockData)
 	if err != nil {
-		e.log.Error().
-			Hex("block_id", logging.Entity(block.Block)).
-			Msg("failed to compute block result")
-
 		return nil, fmt.Errorf("failed to execute block: %w", err)
 	}
 

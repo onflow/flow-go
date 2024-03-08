@@ -29,10 +29,23 @@ import (
 
 type ProviderEngine interface {
 	network.MessageProcessor
+	module.ReadyDoneAware
 	// BroadcastExecutionReceipt broadcasts an execution receipt to all nodes in the network.
 	// It skips broadcasting the receipt if the block is sealed, or the node is not authorized at the block.
 	// It returns true if the receipt is broadcasted, false otherwise.
 	BroadcastExecutionReceipt(context.Context, uint64, *flow.ExecutionReceipt) (bool, error)
+}
+
+type NoopEngine struct {
+	module.NoopReadyDoneAware
+}
+
+func (*NoopEngine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
+	return nil
+}
+
+func (*NoopEngine) BroadcastExecutionReceipt(context.Context, uint64, *flow.ExecutionReceipt) (bool, error) {
+	return false, nil
 }
 
 const (
@@ -45,6 +58,8 @@ const (
 	// node.
 	DefaultChunkDataPackDeliveryTimeout = 10 * time.Second
 )
+
+var _ ProviderEngine = (*Engine)(nil)
 
 // An Engine provides means of accessing data about execution state and broadcasts execution receipts to nodes in the network.
 // Also generates and saves execution receipts
