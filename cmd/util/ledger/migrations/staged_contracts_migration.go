@@ -113,12 +113,6 @@ func (m *StagedContractsMigration) InitMigration(
 		addresses = append(addresses, address.String())
 	}
 
-	m.log.Debug().Msgf(
-		"initialized staged contracts migration for chain %s for addresses %s",
-		m.chainID,
-		strings.Join(addresses, ","),
-	)
-
 	return nil
 }
 
