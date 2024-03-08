@@ -697,3 +697,50 @@ func (r *testReportWriter) Write(entry any) {
 }
 
 func (r *testReportWriter) Close() {}
+
+func TestBootstrappedStateMigration(t *testing.T) {
+	t.Parallel()
+
+	rwf := &testReportWriterFactory{}
+
+	logWriter := &writer{}
+	logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
+
+	const nWorker = 2
+
+	const chainID = flow.Emulator
+	// TODO: EVM contract is not deployed in snapshot yet, so can't update it
+	const evmContractChange = EVMContractChangeNone
+
+	const burnerContractChange = BurnerContractChangeUpdate
+
+	payloads, err := newBootstrapPayloads(chainID)
+	require.NoError(t, err)
+
+	migrations := NewCadence1Migrations(
+		logger,
+		rwf,
+		nWorker,
+		chainID,
+		false,
+		false,
+		evmContractChange,
+		burnerContractChange,
+		nil,
+		false,
+	)
+
+	for _, migration := range migrations {
+		payloads, err = migration.Migrate(payloads)
+		require.NoError(
+			t,
+			err,
+			"migration `%s` failed, logs: %v",
+			migration.Name,
+			logWriter.logs,
+		)
+	}
+
+	// Check error logs.
+	require.Empty(t, logWriter.logs)
+}
