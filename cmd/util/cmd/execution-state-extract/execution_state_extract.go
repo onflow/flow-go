@@ -260,31 +260,34 @@ func extractExecutionStateFromPayloads(
 
 	log.Info().Msgf("read %d payloads", len(payloads))
 
-	type accountInfo struct {
-		count int
-		size  uint64
-	}
-	payloadCountByAddress := make(map[string]accountInfo)
+	if log.Debug().Enabled() {
 
-	for _, payload := range payloads {
-		registerID, payloadValue, err := convert.PayloadToRegister(payload)
-		if err != nil {
-			return fmt.Errorf("cannot convert payload to register: %w", err)
+		type accountInfo struct {
+			count int
+			size  uint64
 		}
-		owner := registerID.Owner
-		accountInfo := payloadCountByAddress[owner]
-		accountInfo.count++
-		accountInfo.size += uint64(len(payloadValue))
-		payloadCountByAddress[owner] = accountInfo
-	}
+		payloadCountByAddress := make(map[string]accountInfo)
 
-	for address, info := range payloadCountByAddress {
-		log.Debug().Msgf(
-			"address %x has %d payloads and a total size of %s",
-			address,
-			info.count,
-			ByteCountIEC(int64(info.size)),
-		)
+		for _, payload := range payloads {
+			registerID, payloadValue, err := convert.PayloadToRegister(payload)
+			if err != nil {
+				return fmt.Errorf("cannot convert payload to register: %w", err)
+			}
+			owner := registerID.Owner
+			accountInfo := payloadCountByAddress[owner]
+			accountInfo.count++
+			accountInfo.size += uint64(len(payloadValue))
+			payloadCountByAddress[owner] = accountInfo
+		}
+
+		for address, info := range payloadCountByAddress {
+			log.Debug().Msgf(
+				"address %x has %d payloads and a total size of %s",
+				address,
+				info.count,
+				ByteCountIEC(int64(info.size)),
+			)
+		}
 	}
 
 	migrations := newMigrations(
@@ -460,6 +463,8 @@ func newMigrations(
 		return nil
 	}
 
+	log.Info().Msgf("initializing migrations")
+
 	rwf := reporters.NewReportFileWriterFactory(dir, log)
 
 	namedMigrations := migrators.NewCadence1Migrations(
@@ -479,5 +484,8 @@ func newMigrations(
 	for _, migration := range namedMigrations {
 		migrations = append(migrations, migration.Migrate)
 	}
+
+	log.Info().Msgf("initialized migrations")
+
 	return migrations
 }
