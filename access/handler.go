@@ -768,7 +768,8 @@ func (h *Handler) SubscribeBlocksFromStartHeight(request *access.SubscribeBlocks
 	h.StreamCount.Add(1)
 	defer h.StreamCount.Add(-1)
 
-	blockStatus, err := h.getBlockStatus(request.GetBlockStatus())
+	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
+	err := checkBlockStatus(blockStatus)
 	if err != nil {
 		return err
 	}
@@ -794,7 +795,8 @@ func (h *Handler) SubscribeBlocksFromLatest(request *access.SubscribeBlocksFromL
 	h.StreamCount.Add(1)
 	defer h.StreamCount.Add(-1)
 
-	blockStatus, err := h.getBlockStatus(request.GetBlockStatus())
+	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
+	err := checkBlockStatus(blockStatus)
 	if err != nil {
 		return err
 	}
@@ -881,7 +883,8 @@ func (h *Handler) SubscribeBlockHeadersFromStartHeight(request *access.Subscribe
 	h.StreamCount.Add(1)
 	defer h.StreamCount.Add(-1)
 
-	blockStatus, err := h.getBlockStatus(request.GetBlockStatus())
+	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
+	err := checkBlockStatus(blockStatus)
 	if err != nil {
 		return err
 	}
@@ -907,7 +910,8 @@ func (h *Handler) SubscribeBlockHeadersFromLatest(request *access.SubscribeBlock
 	h.StreamCount.Add(1)
 	defer h.StreamCount.Add(-1)
 
-	blockStatus, err := h.getBlockStatus(request.GetBlockStatus())
+	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
+	err := checkBlockStatus(blockStatus)
 	if err != nil {
 		return err
 	}
@@ -997,7 +1001,8 @@ func (h *Handler) SubscribeBlockDigestsFromStartHeight(request *access.Subscribe
 	h.StreamCount.Add(1)
 	defer h.StreamCount.Add(-1)
 
-	blockStatus, err := h.getBlockStatus(request.GetBlockStatus())
+	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
+	err := checkBlockStatus(blockStatus)
 	if err != nil {
 		return err
 	}
@@ -1023,7 +1028,8 @@ func (h *Handler) SubscribeBlockDigestsFromLatest(request *access.SubscribeBlock
 	h.StreamCount.Add(1)
 	defer h.StreamCount.Add(-1)
 
-	blockStatus, err := h.getBlockStatus(request.GetBlockStatus())
+	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
+	err := checkBlockStatus(blockStatus)
 	if err != nil {
 		return err
 	}
@@ -1081,29 +1087,13 @@ func (h *Handler) getSubscriptionDataFromStartBlockID(msgBlockId []byte, msgBloc
 		return flow.ZeroID, flow.BlockStatusUnknown, err
 	}
 
-	blockStatus, err := h.getBlockStatus(msgBlockStatus)
+	blockStatus := convert.MessageToBlockStatus(msgBlockStatus)
+	err = checkBlockStatus(blockStatus)
 	if err != nil {
 		return flow.ZeroID, flow.BlockStatusUnknown, err
 	}
 
 	return startBlockID, blockStatus, nil
-}
-
-// getBlockStatus return a block status from the entities package to a flow.BlockStatus and verify block status.
-//
-// Returns:
-// - flow.BlockStatus: Converted block status.
-// - error: An error indicating the result of the conversion, if any.
-//
-// Expected errors during normal operation:
-// - codes.InvalidArgument: If the provided block status is unknown.
-func (h *Handler) getBlockStatus(msgBlockStatus entities.BlockStatus) (flow.BlockStatus, error) {
-	blockStatus := convert.MessageToBlockStatus(msgBlockStatus)
-	err := checkBlockStatus(blockStatus)
-	if err != nil {
-		return flow.BlockStatusUnknown, err
-	}
-	return blockStatus, nil
 }
 
 func (h *Handler) SendAndSubscribeTransactionStatuses(_ *access.SendAndSubscribeTransactionStatusesRequest, _ access.AccessAPI_SendAndSubscribeTransactionStatusesServer) error {

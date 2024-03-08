@@ -37,7 +37,7 @@ type EventsBackend struct {
 	eventsIndex *index.EventsIndex
 }
 
-func (b EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
+func (b *EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
 	nextHeight, err := b.getStartHeight(ctx, startBlockID, startHeight)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")
@@ -51,7 +51,7 @@ func (b EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Id
 }
 
 // getResponseFactory returns a function function that returns the event response for a given height.
-func (b EventsBackend) getResponseFactory(filter state_stream.EventFilter) subscription.GetDataByHeightFunc {
+func (b *EventsBackend) getResponseFactory(filter state_stream.EventFilter) subscription.GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (response interface{}, err error) {
 		if b.useIndex {
 			response, err = b.getEventsFromStorage(height, filter)
