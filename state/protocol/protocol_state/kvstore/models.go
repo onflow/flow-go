@@ -1,6 +1,8 @@
 package kvstore
 
 import (
+	"github.com/huandu/go-clone/generic"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 )
@@ -40,8 +42,7 @@ var _ protocol_state.KVStoreAPI = new(modelv0)
 func (model *modelv0) ID() flow.Identifier { return flow.MakeID(model) }
 
 func (model *modelv0) Clone() protocol_state.KVStoreAPI {
-	cpy := *model
-	return &cpy
+	return clone.Clone(model)
 }
 
 // VersionedEncode encodes the key-value store, returning the version separately
@@ -87,8 +88,7 @@ var _ protocol_state.KVStoreAPI = new(modelv1)
 func (model *modelv1) ID() flow.Identifier { return flow.MakeID(model) }
 
 func (model *modelv1) Clone() protocol_state.KVStoreAPI {
-	cpy := *model
-	return &cpy
+	return clone.Clone(model)
 }
 
 // VersionedEncode encodes the key-value store, returning the version separately

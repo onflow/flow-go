@@ -2,6 +2,7 @@ package kvstore
 
 import (
 	"math/rand"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -41,15 +42,17 @@ func TestEncodeDecode(t *testing.T) {
 	})
 }
 
-// TestAPI tests that all supported model versions satisfy the public interfaces.
+// TestKVStoreAPI tests that all supported model versions satisfy the public interfaces.
 //   - should be able to read/write supported keys
 //   - should return the appropriate sentinel for unsupported keys
-func TestAPI(t *testing.T) {
+func TestKVStoreAPI(t *testing.T) {
 	t.Run("v0", func(t *testing.T) {
-		model := modelv0{}
+		model := &modelv0{}
+
+		assert.True(t, reflect.DeepEqual(model, model.Clone()))
 
 		// v0
-		assertModelIsUpgradable(t, &model)
+		assertModelIsUpgradable(t, model)
 
 		version := model.GetProtocolStateVersion()
 		assert.Equal(t, uint64(0), version)
@@ -63,10 +66,12 @@ func TestAPI(t *testing.T) {
 	})
 
 	t.Run("v1", func(t *testing.T) {
-		model := modelv1{}
+		model := &modelv1{}
+
+		assert.True(t, reflect.DeepEqual(model, model.Clone()))
 
 		// v0
-		assertModelIsUpgradable(t, &model)
+		assertModelIsUpgradable(t, model)
 
 		version := model.GetProtocolStateVersion()
 		assert.Equal(t, uint64(1), version)
@@ -78,6 +83,41 @@ func TestAPI(t *testing.T) {
 		invalidEpochTransitionAttempted, err := model.GetInvalidEpochTransitionAttempted()
 		assert.NoError(t, err)
 		assert.Equal(t, true, invalidEpochTransitionAttempted)
+	})
+}
+
+// TestKVStoreAPI_Clone tests that cloning of KV store correctly works. All versions need to be support this.
+func TestKVStoreAPI_Clone(t *testing.T) {
+	t.Run("v0", func(t *testing.T) {
+		model := &modelv0{
+			upgradableModel: upgradableModel{
+				VersionUpgrade: &protocol_state.ViewBasedActivator[uint64]{
+					Data:           13,
+					ActivationView: 1000,
+				},
+			},
+		}
+		cpy := model.Clone()
+		require.True(t, reflect.DeepEqual(model, cpy))
+
+		model.VersionUpgrade.ActivationView++ // change
+		require.False(t, reflect.DeepEqual(model, cpy))
+	})
+	t.Run("v1", func(t *testing.T) {
+		model := &modelv1{
+			upgradableModel: upgradableModel{
+				VersionUpgrade: &protocol_state.ViewBasedActivator[uint64]{
+					Data:           13,
+					ActivationView: 1000,
+				},
+			},
+			InvalidEpochTransitionAttempted: false,
+		}
+		cpy := model.Clone()
+		require.True(t, reflect.DeepEqual(model, cpy))
+
+		model.VersionUpgrade.ActivationView++ // change
+		require.False(t, reflect.DeepEqual(model, cpy))
 	})
 }
 
