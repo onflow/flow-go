@@ -95,7 +95,7 @@ type KeyValueStoreStateMachine interface {
 	// ProcessUpdate updates the current state of key-value store.
 	// KeyValueStoreStateMachine captures only a subset of all service events, those that are relevant for the KV store. All other events are ignored.
 	// Implementors MUST ensure KeyValueStoreStateMachine is left in functional state if an invalid service event has been supplied.
-	// Expected errors indicating that we have observed and invalid service event from protocol's point of view.
+	// Expected errors indicating that we have observed an invalid service event from protocol's point of view.
 	// 	- `protocol.InvalidServiceEventError` - if the service event is invalid for the current protocol state.
 	ProcessUpdate(update *flow.ServiceEvent) error
 
