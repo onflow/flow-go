@@ -26,7 +26,7 @@ type StateMachineSuite struct {
 	mutator     *mock.KVStoreAPI
 	params      *mockprotocol.GlobalParams
 
-	stateMachine *ProcessingStateMachine
+	stateMachine *StateMachine
 }
 
 func (s *StateMachineSuite) SetupTest() {

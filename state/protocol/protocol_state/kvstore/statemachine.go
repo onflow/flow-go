@@ -8,20 +8,20 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 )
 
-// ProcessingStateMachine is a dedicated structure that encapsulates all logic for evolving KV store, based on the content
+// StateMachine is a dedicated structure that encapsulates all logic for evolving KV store, based on the content
 // of a new block.
-// ProcessingStateMachine processes a subset of service events that are relevant for the KV store, and ignores all other events.
+// StateMachine processes a subset of service events that are relevant for the KV store, and ignores all other events.
 // Each relevant event is validated before it is applied to the KV store.
 // All updates are applied to a copy of parent KV store, so parent KV store is not modified.
 // A separate instance should be created for each block to process the updates therein.
-type ProcessingStateMachine struct {
+type StateMachine struct {
 	view        uint64
 	parentState protocol_state.KVStoreReader
 	state       protocol_state.KVStoreAPI
 	params      protocol.GlobalParams
 }
 
-var _ protocol_state.KeyValueStoreStateMachine = (*ProcessingStateMachine)(nil)
+var _ protocol_state.KeyValueStoreStateMachine = (*StateMachine)(nil)
 
 // NewProcessingStateMachine creates a new key-value store state machine.
 // The underlying state is a clone of the parent state to ensure that the parent state is not modified.
@@ -30,8 +30,8 @@ func NewProcessingStateMachine(
 	params protocol.GlobalParams,
 	parentState protocol_state.KVStoreReader,
 	mutator protocol_state.KVStoreAPI,
-) *ProcessingStateMachine {
-	return &ProcessingStateMachine{
+) *StateMachine {
+	return &StateMachine{
 		view:        view,
 		parentState: parentState,
 		state:       mutator.Clone(),
@@ -40,7 +40,7 @@ func NewProcessingStateMachine(
 }
 
 // Build returns updated key-value store model, state ID and a flag indicating if there were any changes.
-func (m *ProcessingStateMachine) Build() (updatedState protocol_state.KVStoreReader, stateID flow.Identifier, hasChanges bool) {
+func (m *StateMachine) Build() (updatedState protocol_state.KVStoreReader, stateID flow.Identifier, hasChanges bool) {
 	updatedState = m.state.Clone()
 	stateID = updatedState.ID()
 	hasChanges = stateID != m.parentState.ID()
@@ -52,7 +52,7 @@ func (m *ProcessingStateMachine) Build() (updatedState protocol_state.KVStoreRea
 // Implementors MUST ensure KeyValueStoreStateMachine is left in functional state if an invalid service event has been supplied.
 // Expected errors indicating that we have observed and invalid service event from protocol's point of view.
 //   - `protocol.InvalidServiceEventError` - if the service event is invalid for the current protocol state.
-func (m *ProcessingStateMachine) ProcessUpdate(update *flow.ServiceEvent) error {
+func (m *StateMachine) ProcessUpdate(update *flow.ServiceEvent) error {
 	switch update.Type {
 	case flow.ServiceEventProtocolStateVersionUpgrade:
 		versionUpgrade, ok := update.Event.(*flow.ProtocolStateVersionUpgrade)
@@ -95,11 +95,11 @@ func (m *ProcessingStateMachine) ProcessUpdate(update *flow.ServiceEvent) error 
 
 // View returns the view that is associated with this KeyValueStoreStateMachine.
 // The view of the KeyValueStoreStateMachine equals the view of the block carrying the respective updates.
-func (m *ProcessingStateMachine) View() uint64 {
+func (m *StateMachine) View() uint64 {
 	return m.view
 }
 
 // ParentState returns parent state that is associated with this state machine.
-func (m *ProcessingStateMachine) ParentState() protocol_state.KVStoreReader {
+func (m *StateMachine) ParentState() protocol_state.KVStoreReader {
 	return m.parentState
 }
