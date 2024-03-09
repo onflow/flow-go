@@ -84,6 +84,7 @@ type StateStreamBackend struct {
 	registers            *execution.RegistersAsyncStore
 	indexReporter        state_synchronization.IndexReporter
 	registerRequestLimit int
+	useIndex             bool
 
 	// highestHeight contains the highest consecutive block height for which we have received a
 	// new Execution Data notification.
@@ -129,6 +130,7 @@ func New(
 		indexReporter:        eventsIndex,
 		registerRequestLimit: int(config.RegisterIDsRequestLimit),
 		highestHeight:        counters.NewMonotonousCounter(highestAvailableHeight),
+		useIndex:             useEventsIndex,
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
@@ -142,27 +144,32 @@ func New(
 		getStartHeight:   b.getStartHeight,
 	}
 
-	b.EventsBackend = EventsBackend{
+	eventsRetriever := EventsRetriever{
 		log:              logger,
 		headers:          headers,
-		broadcaster:      broadcaster,
-		sendTimeout:      config.ClientSendTimeout,
-		responseLimit:    config.ResponseLimit,
-		sendBufferSize:   int(config.ClientSendBufferSize),
 		getExecutionData: b.getExecutionData,
-		getStartHeight:   b.getStartHeight,
-		useIndex:         useEventsIndex,
+		useEventsIndex:   useEventsIndex,
 		eventsIndex:      eventsIndex,
 	}
 
+	b.EventsBackend = EventsBackend{
+		log:             logger,
+		broadcaster:     broadcaster,
+		sendTimeout:     config.ClientSendTimeout,
+		responseLimit:   config.ResponseLimit,
+		sendBufferSize:  int(config.ClientSendBufferSize),
+		getStartHeight:  b.getStartHeight,
+		eventsRetriever: eventsRetriever,
+	}
+
 	b.AccountStatusesBackend = AccountStatusesBackend{
-		log:              logger,
-		broadcaster:      broadcaster,
-		sendTimeout:      config.ClientSendTimeout,
-		responseLimit:    config.ResponseLimit,
-		sendBufferSize:   int(config.ClientSendBufferSize),
-		getExecutionData: b.getExecutionData,
-		getStartHeight:   b.getStartHeight,
+		log:             logger,
+		broadcaster:     broadcaster,
+		sendTimeout:     config.ClientSendTimeout,
+		responseLimit:   config.ResponseLimit,
+		sendBufferSize:  int(config.ClientSendBufferSize),
+		getStartHeight:  b.getStartHeight,
+		eventsRetriever: eventsRetriever,
 	}
 
 	return b, nil

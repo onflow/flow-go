@@ -35,16 +35,16 @@ var DefaultEventFilterConfig = EventFilterConfig{
 
 // EventFilter represents a filter applied to events for a given subscription
 type EventFilter struct {
-	hasFilters bool
-	EventTypes map[flow.EventType]struct{}
-	Addresses  map[string]struct{}
-	Contracts  map[string]struct{}
+	hasFilters        bool
+	EventTypes        map[flow.EventType]struct{}
+	Addresses         map[string]struct{}
+	Contracts         map[string]struct{}
+	EventFieldFilters map[flow.EventType][]FieldFilter
 }
 
-// StatusFilter represents a filter applied to events
-type StatusFilter struct {
-	hasFilters bool
-	Statuses   map[flow.EventType]struct{}
+type FieldFilter struct {
+	FieldName   string
+	TargetValue string
 }
 
 func NewEventFilter(
@@ -104,48 +104,8 @@ func NewEventFilter(
 	return f, nil
 }
 
-func NewStatusFilter(
-	eventTypes []string,
-	chain flow.Chain,
-) (StatusFilter, error) {
-	// put some reasonable limits on the number of filters. Lookups use a map so they are fast,
-	// this just puts a cap on the memory consumed per filter.
-	if len(eventTypes) > DefaultMaxEventTypes {
-		return StatusFilter{}, fmt.Errorf("too many event types in filter (%d). use %d or fewer", len(eventTypes), DefaultMaxEventTypes)
-	}
-
-	f := StatusFilter{
-		Statuses: make(map[flow.EventType]struct{}, len(eventTypes)),
-	}
-
-	// Check all of the filters to ensure they are correctly formatted. This helps avoid searching
-	// with criteria that will never match.
-	for _, event := range eventTypes {
-		eventType := flow.EventType(event)
-		if err := validateEventType(eventType, chain); err != nil {
-			return StatusFilter{}, err
-		}
-		f.Statuses[eventType] = struct{}{}
-	}
-	f.hasFilters = len(f.Statuses) > 0
-	return f, nil
-}
-
-// Filter applies the all filters on the provided list of events, and returns a list of events that
-// match
+// Filter applies the all filters on the provided list of events, and returns a list of events that match
 func (f *EventFilter) Filter(events flow.EventsList) flow.EventsList {
-	var filteredEvents flow.EventsList
-	for _, event := range events {
-		if f.Match(event) {
-			filteredEvents = append(filteredEvents, event)
-		}
-	}
-	return filteredEvents
-}
-
-// Filter applies the all filters on the provided list of events, and returns a list of events that
-// match
-func (f *StatusFilter) Filter(events flow.EventsList) flow.EventsList {
 	var filteredEvents flow.EventsList
 	for _, event := range events {
 		if f.Match(event) {
@@ -179,30 +139,6 @@ func (f *EventFilter) Match(event flow.Event) bool {
 	if parsed.Type == events.AccountEventType {
 		_, ok := f.Addresses[parsed.Address]
 		return ok
-	}
-
-	return false
-}
-
-// Match applies all filters to a specific event, and returns true if the event matches
-func (f *StatusFilter) Match(event flow.Event) bool {
-	// No filters means all events match
-	if !f.hasFilters {
-		return true
-	}
-
-	if _, ok := f.Statuses[event.Type]; ok {
-		return true
-	}
-
-	parsed, err := events.ParseEvent(event.Type)
-	if err != nil {
-		// TODO: log this error
-		return false
-	}
-
-	if parsed.Type == events.ProtocolEventType {
-		return true
 	}
 
 	return false

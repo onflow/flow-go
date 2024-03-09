@@ -27,6 +27,8 @@ type Handler struct {
 	defaultHeartbeatInterval uint64
 }
 
+var _ executiondata.ExecutionDataAPIServer = (*Handler)(nil)
+
 func NewHandler(api state_stream.API, chain flow.Chain, config Config) *Handler {
 	h := &Handler{
 		api:                      api,
@@ -216,12 +218,62 @@ func (h *Handler) GetRegisterValues(_ context.Context, request *executiondata.Ge
 	return &executiondata.GetRegisterValuesResponse{Values: values}, nil
 }
 
-// SubscribeAccountStatuses subscribes to account status changes.
-func (h *Handler) SubscribeAccountStatuses(request *executiondata.SubscribeAccountStatusesRequest, stream executiondata.ExecutionDataAPI_SubscribeAccountStatusesServer) error {
+func (h *Handler) createAccountStatusesFilter(statusFilter *executiondata.StatusFilter) (state_stream.EventFilter, error) {
+	filter := state_stream.EventFilter{}
+	if statusFilter != nil {
+		var err error
+		filter, err = state_stream.NewEventFilter(
+			h.eventFilterConfig,
+			h.chain,
+			statusFilter.GetEventType(),
+			[]string{},
+			[]string{},
+		)
+		if err != nil {
+			return filter, status.Errorf(codes.InvalidArgument, "invalid event filter: %v", err)
+		}
+
+		addresses := statusFilter.GetAddress()
+		if len(addresses) > 0 {
+			var fieldFilters []state_stream.FieldFilter
+			for _, address := range addresses {
+				fieldFilters = append(fieldFilters, state_stream.FieldFilter{
+					FieldName:   "address",
+					TargetValue: address,
+				})
+			}
+
+			for eventType := range filter.EventTypes {
+				filter.EventFieldFilters[eventType] = fieldFilters
+			}
+		}
+	}
+
+	return filter, nil
+}
+
+func convertAccountsStatusesResults(eventVersion entities.EventEncodingVersion, resp *AccountStatusesResponse) ([]*executiondata.SubscribeAccountStatusesResponse_Result, error) {
+	var results []*executiondata.SubscribeAccountStatusesResponse_Result
+	for address, events := range resp.AccountEvents {
+		convertedEvent, err := convert.EventsToMessagesWithEncodingConversion(events, entities.EventEncodingVersion_CCF_V0, eventVersion)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "could not convert events to entity: %v", err)
+		}
+
+		results = append(results, &executiondata.SubscribeAccountStatusesResponse_Result{
+			Address: []byte(address),
+			Events:  convertedEvent,
+		})
+	}
+	return results, nil
+}
+
+func (h *Handler) SubscribeAccountStatusesFromStartBlockID(request *executiondata.SubscribeAccountStatusesFromStartBlockIDRequest, stream executiondata.ExecutionDataAPI_SubscribeAccountStatusesFromStartBlockIDServer) error {
 	// check if the maximum number of streams is reached
 	if h.streamCount.Load() >= h.maxStreams {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
+
 	h.streamCount.Add(1)
 	defer h.streamCount.Add(-1)
 
@@ -234,21 +286,12 @@ func (h *Handler) SubscribeAccountStatuses(request *executiondata.SubscribeAccou
 		startBlockID = blockID
 	}
 
-	filter := state_stream.StatusFilter{}
-	if request.GetFilter() != nil {
-		var err error
-		reqFilter := request.GetFilter()
-
-		filter, err = state_stream.NewStatusFilter(
-			reqFilter.GetEventType(),
-			h.chain,
-		)
-		if err != nil {
-			return status.Errorf(codes.InvalidArgument, "invalid event filter: %v", err)
-		}
+	filter, err := h.createAccountStatusesFilter(request.GetFilter())
+	if err != nil {
+		return err
 	}
 
-	sub := h.api.SubscribeAccountStatuses(stream.Context(), startBlockID, request.GetStartBlockHeight(), filter)
+	sub := h.api.SubscribeAccountStatuses(stream.Context(), startBlockID, 0, filter)
 
 	heartbeatInterval := request.HeartbeatInterval
 	if heartbeatInterval == 0 {
@@ -272,7 +315,7 @@ func (h *Handler) SubscribeAccountStatuses(request *executiondata.SubscribeAccou
 
 		// check if there are any events in the response. if not, do not send a message unless the last
 		// response was more than HeartbeatInterval blocks ago
-		if len(resp.Events) == 0 {
+		if len(resp.AccountEvents) == 0 {
 			blocksSinceLastMessage++
 			if blocksSinceLastMessage < heartbeatInterval {
 				continue
@@ -283,20 +326,147 @@ func (h *Handler) SubscribeAccountStatuses(request *executiondata.SubscribeAccou
 		// BlockExecutionData contains CCF encoded events, and the Access API returns JSON-CDC events.
 		// convert event payload formats.
 		// This is a temporary solution until the Access API supports specifying the encoding in the request
-		events, err := convert.EventsToMessagesWithEncodingConversion(resp.Events, entities.EventEncodingVersion_CCF_V0, request.GetEventEncodingVersion())
+		results, err := convertAccountsStatusesResults(request.GetEventEncodingVersion(), resp)
 		if err != nil {
-			return status.Errorf(codes.Internal, "could not convert events to entity: %v", err)
-		}
-
-		// REMOVE
-		if len(events) != 0 {
-			blocksSinceLastMessage = 0
+			return err
 		}
 
 		err = stream.Send(&executiondata.SubscribeAccountStatusesResponse{
 			BlockId:      convert.IdentifierToMessage(resp.BlockID),
-			Address:      request.GetAddress(),
-			Events:       events,
+			BlockHeight:  resp.Height,
+			Results:      results,
+			MessageIndex: resp.MessageIndex,
+		})
+		if err != nil {
+			return rpc.ConvertError(err, "could not send response", codes.Internal)
+		}
+	}
+}
+
+func (h *Handler) SubscribeAccountStatusesFromStartHeight(request *executiondata.SubscribeAccountStatusesFromStartHeightRequest, stream executiondata.ExecutionDataAPI_SubscribeAccountStatusesFromStartHeightServer) error {
+	// check if the maximum number of streams is reached
+	if h.streamCount.Load() >= h.maxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+
+	h.streamCount.Add(1)
+	defer h.streamCount.Add(-1)
+
+	filter, err := h.createAccountStatusesFilter(request.GetFilter())
+	if err != nil {
+		return err
+	}
+
+	sub := h.api.SubscribeAccountStatuses(stream.Context(), flow.ZeroID, request.GetStartBlockHeight(), filter)
+
+	heartbeatInterval := request.HeartbeatInterval
+	if heartbeatInterval == 0 {
+		heartbeatInterval = h.defaultHeartbeatInterval
+	}
+
+	blocksSinceLastMessage := uint64(0)
+	for {
+		v, ok := <-sub.Channel()
+		if !ok {
+			if sub.Err() != nil {
+				return rpc.ConvertError(sub.Err(), "stream encountered an error", codes.Internal)
+			}
+			return nil
+		}
+
+		resp, ok := v.(*AccountStatusesResponse)
+		if !ok {
+			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
+		}
+
+		// check if there are any events in the response. if not, do not send a message unless the last
+		// response was more than HeartbeatInterval blocks ago
+		if len(resp.AccountEvents) == 0 {
+			blocksSinceLastMessage++
+			if blocksSinceLastMessage < heartbeatInterval {
+				continue
+			}
+			blocksSinceLastMessage = 0
+		}
+
+		// BlockExecutionData contains CCF encoded events, and the Access API returns JSON-CDC events.
+		// convert event payload formats.
+		// This is a temporary solution until the Access API supports specifying the encoding in the request
+		results, err := convertAccountsStatusesResults(request.GetEventEncodingVersion(), resp)
+		if err != nil {
+			return err
+		}
+
+		err = stream.Send(&executiondata.SubscribeAccountStatusesResponse{
+			BlockId:      convert.IdentifierToMessage(resp.BlockID),
+			BlockHeight:  resp.Height,
+			Results:      results,
+			MessageIndex: resp.MessageIndex,
+		})
+		if err != nil {
+			return rpc.ConvertError(err, "could not send response", codes.Internal)
+		}
+	}
+}
+
+func (h *Handler) SubscribeAccountStatusesFromLatestBlock(request *executiondata.SubscribeAccountStatusesFromLatestBlockRequest, stream executiondata.ExecutionDataAPI_SubscribeAccountStatusesFromLatestBlockServer) error {
+	// check if the maximum number of streams is reached
+	if h.streamCount.Load() >= h.maxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+
+	h.streamCount.Add(1)
+	defer h.streamCount.Add(-1)
+
+	filter, err := h.createAccountStatusesFilter(request.GetFilter())
+	if err != nil {
+		return err
+	}
+
+	sub := h.api.SubscribeAccountStatuses(stream.Context(), flow.ZeroID, 0, filter)
+
+	heartbeatInterval := request.HeartbeatInterval
+	if heartbeatInterval == 0 {
+		heartbeatInterval = h.defaultHeartbeatInterval
+	}
+
+	blocksSinceLastMessage := uint64(0)
+	for {
+		v, ok := <-sub.Channel()
+		if !ok {
+			if sub.Err() != nil {
+				return rpc.ConvertError(sub.Err(), "stream encountered an error", codes.Internal)
+			}
+			return nil
+		}
+
+		resp, ok := v.(*AccountStatusesResponse)
+		if !ok {
+			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
+		}
+
+		// check if there are any events in the response. if not, do not send a message unless the last
+		// response was more than HeartbeatInterval blocks ago
+		if len(resp.AccountEvents) == 0 {
+			blocksSinceLastMessage++
+			if blocksSinceLastMessage < heartbeatInterval {
+				continue
+			}
+			blocksSinceLastMessage = 0
+		}
+
+		// BlockExecutionData contains CCF encoded events, and the Access API returns JSON-CDC events.
+		// convert event payload formats.
+		// This is a temporary solution until the Access API supports specifying the encoding in the request
+		results, err := convertAccountsStatusesResults(request.GetEventEncodingVersion(), resp)
+		if err != nil {
+			return err
+		}
+
+		err = stream.Send(&executiondata.SubscribeAccountStatusesResponse{
+			BlockId:      convert.IdentifierToMessage(resp.BlockID),
+			BlockHeight:  resp.Height,
+			Results:      results,
 			MessageIndex: resp.MessageIndex,
 		})
 		if err != nil {

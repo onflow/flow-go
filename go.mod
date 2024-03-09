@@ -318,7 +318,7 @@ require (
 )
 
 // Using custom protobuf until https://github.com/onflow/flow/pull/1433 will me berged
-replace github.com/onflow/flow/protobuf/go/flow v0.3.7 => github.com/AndriiDiachuk/flow/protobuf/go/flow v0.0.0-20240216100013-13b14085de00
+replace github.com/onflow/flow/protobuf/go/flow v0.3.7 => github.com/AndriiDiachuk/flow/protobuf/go/flow v0.0.0-20240305122016-d0ee0148839b
 
 // Using custom fork until https://github.com/onflow/flow-go/issues/5338 is resolved
 replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483

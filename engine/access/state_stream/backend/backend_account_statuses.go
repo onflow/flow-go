@@ -2,8 +2,10 @@ package backend
 
 import (
 	"context"
-	"fmt"
 	"time"
+
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 
 	"github.com/rs/zerolog"
 
@@ -11,13 +13,13 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 type AccountStatusesResponse struct {
-	BlockID      flow.Identifier
-	Events       flow.EventsList
-	MessageIndex uint64
+	BlockID       flow.Identifier
+	Height        uint64
+	AccountEvents map[string]flow.EventsList
+	MessageIndex  uint64
 }
 
 // AccountStatusesBackend is a struct representing a backend implementation for subscribing to account statuses changes.
@@ -28,8 +30,8 @@ type AccountStatusesBackend struct {
 	responseLimit  float64
 	sendBufferSize int
 
-	getExecutionData GetExecutionDataFunc
-	getStartHeight   GetStartHeightFunc
+	getStartHeight  GetStartHeightFunc
+	eventsRetriever EventsRetriever
 }
 
 // SubscribeAccountStatuses subscribes to account status changes starting from a specific block ID
@@ -38,7 +40,7 @@ type AccountStatusesBackend struct {
 // - codes.InvalidArgument: If start height before root height, or both startBlockID and startHeight are provided.
 // - codes.ErrNotFound`: For unindexed start blockID or for unindexed start height.
 // - codes.Internal: If there is an internal error.
-func (b *AccountStatusesBackend) SubscribeAccountStatuses(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.StatusFilter) state_stream.Subscription {
+func (b *AccountStatusesBackend) SubscribeAccountStatuses(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) state_stream.Subscription {
 	nextHeight, err := b.getStartHeight(startBlockID, startHeight)
 	if err != nil {
 		return NewFailedSubscription(err, "could not get start height")
@@ -52,28 +54,48 @@ func (b *AccountStatusesBackend) SubscribeAccountStatuses(ctx context.Context, s
 }
 
 // getAccountStatusResponseFactory returns a function that returns the account statuses response for a given height.
-func (b *AccountStatusesBackend) getAccountStatusResponseFactory(messageIndex *counters.StrictMonotonousCounter, filter state_stream.StatusFilter) GetDataByHeightFunc {
+func (b *AccountStatusesBackend) getAccountStatusResponseFactory(messageIndex *counters.StrictMonotonousCounter, filter state_stream.EventFilter) GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
-		executionData, err := b.getExecutionData(ctx, height)
+		var err error
+		eventsResponse, err := b.eventsRetriever.GetAllEventsResponse(ctx, height)
 		if err != nil {
-			return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
+			return nil, err
 		}
+		allProtocolEvents := filter.Filter(eventsResponse.Events)
+		allAccountProtocolEvents := map[string]flow.EventsList{}
 
-		events := []flow.Event{}
-		for _, chunkExecutionData := range executionData.ChunkExecutionDatas {
-			events = append(events, filter.Filter(chunkExecutionData.Events)...)
+		for _, event := range allProtocolEvents {
+			data, err := ccf.Decode(nil, event.Payload)
+			if err != nil {
+				continue
+			}
+
+			cdcEvent, ok := data.(cadence.Event)
+			if !ok {
+				continue
+			}
+
+			fieldValues := cdcEvent.GetFieldValues()
+			fields := cdcEvent.GetFields()
+			if fieldValues == nil || fields == nil {
+				continue
+			}
+
+			for _, filter := range filter.EventFieldFilters[event.Type] {
+				for i, field := range fields {
+					if field.Identifier == filter.FieldName && fieldValues[i].String() == filter.TargetValue {
+						allAccountProtocolEvents[filter.TargetValue] = append(allAccountProtocolEvents[filter.TargetValue], event)
+					}
+				}
+			}
 		}
-
-		b.log.Trace().
-			Hex("block_id", logging.ID(executionData.BlockID)).
-			Uint64("height", height).
-			Msgf("sending %d account events", len(events))
 
 		index := messageIndex.Value()
 		response := &AccountStatusesResponse{
-			BlockID:      executionData.BlockID,
-			Events:       events,
-			MessageIndex: index,
+			BlockID:       eventsResponse.BlockID,
+			Height:        eventsResponse.Height,
+			AccountEvents: allAccountProtocolEvents,
+			MessageIndex:  index,
 		}
 
 		if ok := messageIndex.Set(index + 1); !ok {
