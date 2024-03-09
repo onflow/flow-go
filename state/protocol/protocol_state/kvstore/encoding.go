@@ -2,11 +2,11 @@ package kvstore
 
 import (
 	"bytes"
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
-
-	"github.com/onflow/flow-go/module/irrecoverable"
 
 	"github.com/vmihailenco/msgpack/v4"
+
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 )
 
 // versionedEncode is a helper function for implementing VersionedEncodable.

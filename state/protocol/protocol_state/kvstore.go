@@ -2,6 +2,12 @@ package protocol_state
 
 import "github.com/onflow/flow-go/model/flow"
 
+// ViewBasedActivator allows setting value that will be active from specific view.
+type ViewBasedActivator[T any] struct {
+	Data           T
+	ActivationView uint64 // view at which data will be active
+}
+
 // VersionedEncodable defines the interface for a versioned key-value store independent
 // of the set of keys which are supported. This allows the storage layer to support
 // storing different key-value model versions within the same software version.
@@ -24,6 +30,8 @@ type VersionedEncodable interface {
 // It is backward-compatible with all versioned model types defined in the models.go
 // for this software version.
 type Reader interface {
+	ID() flow.Identifier
+
 	// v0
 
 	VersionedEncodable
@@ -35,6 +43,12 @@ type Reader interface {
 	// and which model is used for serialization.
 	// It can be updated by an UpdateKVStoreVersion service event.
 	GetProtocolStateVersion() uint64
+
+	// GetVersionUpgrade returns the upgrade version of protocol.
+	// VersionUpgrade is a view-based activator that specifies the version which has to be applied
+	// and the view at which it has to be applied. It may contain an old value if the upgrade has already applied.
+	// It can be updated by an flow.ProtocolStateVersionUpgrade service event.
+	GetVersionUpgrade() *ViewBasedActivator[uint64]
 
 	// v1
 
@@ -50,6 +64,17 @@ type Reader interface {
 // for this software version.
 type API interface {
 	Reader
+
+	// Clone returns a deep copy of the API.
+	// This is used to create a new instance of the API to avoid mutating the original.
+	Clone() API
+
+	// v0
+
+	// SetVersionUpgrade sets the protocol upgrade version. This method is used
+	// to update the Protocol State version when a flow.ProtocolStateVersionUpgrade is processed.
+	// It contains the new version and the view at which it has to be applied.
+	SetVersionUpgrade(version *ViewBasedActivator[uint64])
 
 	// v1
 
@@ -67,11 +92,11 @@ type KeyValueStoreStateMachine interface {
 	// Build returns updated key-value store model, state ID and a flag indicating if there were any changes.
 	Build() (updatedState Reader, stateID flow.Identifier, hasChanges bool)
 
-	// ProcessUpdate updates current state of key-value store.
+	// ProcessUpdate updates the current state of key-value store.
+	// KeyValueStoreStateMachine captures only a subset of all service events, those that are relevant for the KV store. All other events are ignored.
+	// Implementors MUST ensure KeyValueStoreStateMachine is left in functional state if an invalid service event has been supplied.
 	// Expected errors indicating that we have observed and invalid service event from protocol's point of view.
-	//   - `protocol.InvalidServiceEventError` - if the service event is invalid for the current protocol state.
-	//     CAUTION: the KeyValueStoreStateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
-	//     after such error and discard the protocolStateMachine!
+	// 	- `protocol.InvalidServiceEventError` - if the service event is invalid for the current protocol state.
 	ProcessUpdate(update *flow.ServiceEvent) error
 
 	// View returns the view that is associated with this KeyValueStoreStateMachine.

@@ -21,3 +21,13 @@ var ErrKeyNotSupported = errors.New("kvstore: key is not supported in current st
 // an already-encoded key-value store instance from an external source (should be
 // avoided in general) or if the node software version is downgraded.
 var ErrUnsupportedVersion = errors.New("kvstore: unsupported version")
+
+// ErrInvalidUpgradeVersion is a sentinel returned when we attempt to set a new kvstore version
+// via a ProtocolStateVersionUpgrade event, but the new version is not strictly greater than
+// the current version. This error happens when smart contract has different understanding of
+// the protocol state version than the node software.
+var ErrInvalidUpgradeVersion = errors.New("kvstore: invalid upgrade version")
+
+// ErrInvalidActivationView is a sentinel returned when we attempt to process a KV store update
+// which has an activation view that is not strictly greater than the current view.
+var ErrInvalidActivationView = errors.New("kvstore: invalid activation view")

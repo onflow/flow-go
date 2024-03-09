@@ -1,6 +1,21 @@
 package kvstore
 
-import "github.com/onflow/flow-go/state/protocol/protocol_state"
+import (
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
+)
+
+type upgradableModel struct {
+	VersionUpgrade *protocol_state.ViewBasedActivator[uint64]
+}
+
+func (model *upgradableModel) SetVersionUpgrade(activator *protocol_state.ViewBasedActivator[uint64]) {
+	model.VersionUpgrade = activator
+}
+
+func (model *upgradableModel) GetVersionUpgrade() *protocol_state.ViewBasedActivator[uint64] {
+	return model.VersionUpgrade
+}
 
 // This file contains the concrete types that define the structure of the
 // underlying key-value store for a particular Protocol State version.
@@ -15,10 +30,19 @@ import "github.com/onflow/flow-go/state/protocol/protocol_state"
 // any software version. Since it is important that the store support managing
 // different model version, this is here so that we can test the implementation
 // with multiple supported KV model versions from the beginning.
-type modelv0 struct{}
+type modelv0 struct {
+	upgradableModel
+}
 
 var _ protocol_state.Reader = new(modelv0)
 var _ protocol_state.API = new(modelv0)
+
+func (model *modelv0) ID() flow.Identifier { return flow.MakeID(model) }
+
+func (model *modelv0) Clone() protocol_state.API {
+	cpy := *model
+	return &cpy
+}
 
 // VersionedEncode encodes the key-value store, returning the version separately
 // from the encoded bytes.
@@ -46,6 +70,8 @@ func (model *modelv0) SetInvalidEpochTransitionAttempted(_ bool) error {
 // This represents the first model version which will be considered "latest" by any
 // deployed software version.
 type modelv1 struct {
+	upgradableModel
+
 	// InvalidEpochTransitionAttempted encodes whether an invalid epoch transition
 	// has been detected in this fork. Under normal operations, this value is false.
 	// Node-internally, the EpochFallback notification is emitted when a block is
@@ -57,6 +83,13 @@ type modelv1 struct {
 
 var _ protocol_state.Reader = new(modelv1)
 var _ protocol_state.API = new(modelv1)
+
+func (model *modelv1) ID() flow.Identifier { return flow.MakeID(model) }
+
+func (model *modelv1) Clone() protocol_state.API {
+	cpy := *model
+	return &cpy
+}
 
 // VersionedEncode encodes the key-value store, returning the version separately
 // from the encoded bytes.
