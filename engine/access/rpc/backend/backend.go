@@ -164,6 +164,7 @@ func New(params Params) (*Backend, error) {
 		backendTransactions: backendTransactions{
 			TransactionsLocalDataProvider: TransactionsLocalDataProvider{
 				state:          params.State,
+				chainID:        params.ChainID,
 				collections:    params.Collections,
 				blocks:         params.Blocks,
 				eventsIndex:    params.EventsIndex,

@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state"
@@ -51,6 +52,7 @@ type TransactionsLocalDataProvider struct {
 	eventsIndex     *EventsIndex
 	txResultsIndex  *TransactionResultsIndex
 	txErrorMessages TransactionErrorMessage
+	chainID         flow.ChainID
 }
 
 // GetTransactionResultFromStorage retrieves a transaction result from storage by block ID and transaction ID.
@@ -153,6 +155,12 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 	numberOfTxResults := len(txResults)
 	results := make([]*access.TransactionResult, 0, numberOfTxResults)
 
+	// cache the tx to collectionID mapping to avoid repeated lookups
+	txToCollectionID, err := t.buildTxIDToCollectionIDMapping(block)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to map tx to collection ID: %v", err)
+	}
+
 	for _, txResult := range txResults {
 		txID := txResult.TransactionID
 
@@ -191,9 +199,9 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 			}
 		}
 
-		collectionID, err := t.lookupCollectionIDInBlock(block, txID)
-		if err != nil {
-			return nil, err
+		collectionID, ok := txToCollectionID[txID]
+		if !ok {
+			return nil, status.Errorf(codes.Internal, "transaction %s not found in block %s", txID, blockID)
 		}
 
 		results = append(results, &access.TransactionResult{
@@ -382,9 +390,31 @@ func (t *TransactionsLocalDataProvider) lookupCollectionIDInBlock(
 
 		for _, collectionTxID := range collection.Transactions {
 			if collectionTxID == txID {
-				return collection.ID(), nil
+				return guarantee.ID(), nil
 			}
 		}
 	}
 	return flow.ZeroID, status.Error(codes.NotFound, "transaction not found in block")
+}
+
+// buildTxIDToCollectionIDMapping returns a map of transaction ID to collection ID based on the provided block.
+func (t *TransactionsLocalDataProvider) buildTxIDToCollectionIDMapping(block *flow.Block) (map[flow.Identifier]flow.Identifier, error) {
+	txToCollectionID := make(map[flow.Identifier]flow.Identifier)
+	for _, guarantee := range block.Payload.Guarantees {
+		collection, err := t.collections.LightByID(guarantee.ID())
+		if err != nil {
+			return nil, err
+		}
+		for _, txID := range collection.Transactions {
+			txToCollectionID[txID] = guarantee.ID()
+		}
+	}
+
+	systemTx, err := blueprints.SystemChunkTransaction(t.chainID.Chain())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not get system chunk transaction: %v", err)
+	}
+	txToCollectionID[systemTx.ID()] = flow.ZeroID
+
+	return txToCollectionID, nil
 }
