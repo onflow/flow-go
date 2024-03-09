@@ -109,6 +109,9 @@ const (
 	// PrimaryAN is the container name for the primary access node to use for API requests
 	PrimaryAN = "access_1"
 
+	// PrimaryON is the container name for the primary observer node to use for API requests
+	PrimaryON = "observer_1"
+
 	DefaultViewsInStakingAuction uint64 = 5
 	DefaultViewsInDKGPhase       uint64 = 50
 	DefaultViewsInEpoch          uint64 = 180
