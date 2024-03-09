@@ -23,7 +23,7 @@ func (model *upgradableModel) GetVersionUpgrade() *protocol_state.ViewBasedActiv
 //
 // When a key is added or removed, this requires a new protocol state version:
 //  - Create a new versioned model in models.go (eg. modelv3 if latest model is modelv2)
-//  - Update the Reader and API interfaces to include any new keys
+//  - Update the KVStoreReader and KVStoreAPI interfaces to include any new keys
 
 // modelv0 is v0 of the Protocol State key-value store.
 // This model version is not intended to ever be the latest version supported by
@@ -34,12 +34,12 @@ type modelv0 struct {
 	upgradableModel
 }
 
-var _ protocol_state.Reader = new(modelv0)
-var _ protocol_state.API = new(modelv0)
+var _ protocol_state.KVStoreReader = new(modelv0)
+var _ protocol_state.KVStoreAPI = new(modelv0)
 
 func (model *modelv0) ID() flow.Identifier { return flow.MakeID(model) }
 
-func (model *modelv0) Clone() protocol_state.API {
+func (model *modelv0) Clone() protocol_state.KVStoreAPI {
 	cpy := *model
 	return &cpy
 }
@@ -81,12 +81,12 @@ type modelv1 struct {
 	InvalidEpochTransitionAttempted bool
 }
 
-var _ protocol_state.Reader = new(modelv1)
-var _ protocol_state.API = new(modelv1)
+var _ protocol_state.KVStoreReader = new(modelv1)
+var _ protocol_state.KVStoreAPI = new(modelv1)
 
 func (model *modelv1) ID() flow.Identifier { return flow.MakeID(model) }
 
-func (model *modelv1) Clone() protocol_state.API {
+func (model *modelv1) Clone() protocol_state.KVStoreAPI {
 	cpy := *model
 	return &cpy
 }

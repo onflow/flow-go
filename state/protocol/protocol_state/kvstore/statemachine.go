@@ -16,8 +16,8 @@ import (
 // A separate instance should be created for each block to process the updates therein.
 type ProcessingStateMachine struct {
 	view        uint64
-	parentState protocol_state.Reader
-	state       protocol_state.API
+	parentState protocol_state.KVStoreReader
+	state       protocol_state.KVStoreAPI
 	params      protocol.GlobalParams
 }
 
@@ -28,8 +28,8 @@ var _ protocol_state.KeyValueStoreStateMachine = (*ProcessingStateMachine)(nil)
 func NewProcessingStateMachine(
 	view uint64,
 	params protocol.GlobalParams,
-	parentState protocol_state.Reader,
-	mutator protocol_state.API,
+	parentState protocol_state.KVStoreReader,
+	mutator protocol_state.KVStoreAPI,
 ) *ProcessingStateMachine {
 	return &ProcessingStateMachine{
 		view:        view,
@@ -40,7 +40,7 @@ func NewProcessingStateMachine(
 }
 
 // Build returns updated key-value store model, state ID and a flag indicating if there were any changes.
-func (m *ProcessingStateMachine) Build() (updatedState protocol_state.Reader, stateID flow.Identifier, hasChanges bool) {
+func (m *ProcessingStateMachine) Build() (updatedState protocol_state.KVStoreReader, stateID flow.Identifier, hasChanges bool) {
 	updatedState = m.state.Clone()
 	stateID = updatedState.ID()
 	hasChanges = stateID != m.parentState.ID()
@@ -99,6 +99,6 @@ func (m *ProcessingStateMachine) View() uint64 {
 }
 
 // ParentState returns parent state that is associated with this state machine.
-func (m *ProcessingStateMachine) ParentState() protocol_state.Reader {
+func (m *ProcessingStateMachine) ParentState() protocol_state.KVStoreReader {
 	return m.parentState
 }

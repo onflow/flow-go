@@ -15,20 +15,20 @@ type KeyValueStoreStateMachine struct {
 }
 
 // Build provides a mock function with given fields:
-func (_m *KeyValueStoreStateMachine) Build() (protocol_state.Reader, flow.Identifier, bool) {
+func (_m *KeyValueStoreStateMachine) Build() (protocol_state.KVStoreReader, flow.Identifier, bool) {
 	ret := _m.Called()
 
-	var r0 protocol_state.Reader
+	var r0 protocol_state.KVStoreReader
 	var r1 flow.Identifier
 	var r2 bool
-	if rf, ok := ret.Get(0).(func() (protocol_state.Reader, flow.Identifier, bool)); ok {
+	if rf, ok := ret.Get(0).(func() (protocol_state.KVStoreReader, flow.Identifier, bool)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() protocol_state.Reader); ok {
+	if rf, ok := ret.Get(0).(func() protocol_state.KVStoreReader); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(protocol_state.Reader)
+			r0 = ret.Get(0).(protocol_state.KVStoreReader)
 		}
 	}
 
@@ -50,15 +50,15 @@ func (_m *KeyValueStoreStateMachine) Build() (protocol_state.Reader, flow.Identi
 }
 
 // ParentState provides a mock function with given fields:
-func (_m *KeyValueStoreStateMachine) ParentState() protocol_state.Reader {
+func (_m *KeyValueStoreStateMachine) ParentState() protocol_state.KVStoreReader {
 	ret := _m.Called()
 
-	var r0 protocol_state.Reader
-	if rf, ok := ret.Get(0).(func() protocol_state.Reader); ok {
+	var r0 protocol_state.KVStoreReader
+	if rf, ok := ret.Get(0).(func() protocol_state.KVStoreReader); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(protocol_state.Reader)
+			r0 = ret.Get(0).(protocol_state.KVStoreReader)
 		}
 	}
 

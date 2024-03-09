@@ -86,7 +86,7 @@ func TestAPI(t *testing.T) {
 //   - setting nil version upgrade should work
 //
 // This has to be tested for every model version since version upgrade should be supported by all models.
-func assertModelIsUpgradable(t *testing.T, api protocol_state.API) {
+func assertModelIsUpgradable(t *testing.T, api protocol_state.KVStoreAPI) {
 	oldVersion := api.GetProtocolStateVersion()
 	activationView := uint64(1000)
 	expected := &protocol_state.ViewBasedActivator[uint64]{

@@ -22,16 +22,16 @@ type StateMachineSuite struct {
 	suite.Suite
 
 	view        uint64
-	parentState *mock.Reader
-	mutator     *mock.API
+	parentState *mock.KVStoreReader
+	mutator     *mock.KVStoreAPI
 	params      *mockprotocol.GlobalParams
 
 	stateMachine *ProcessingStateMachine
 }
 
 func (s *StateMachineSuite) SetupTest() {
-	s.parentState = mock.NewReader(s.T())
-	s.mutator = mock.NewAPI(s.T())
+	s.parentState = mock.NewKVStoreReader(s.T())
+	s.mutator = mock.NewKVStoreAPI(s.T())
 	s.params = mockprotocol.NewGlobalParams(s.T())
 	s.view = 1000
 

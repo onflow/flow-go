@@ -23,13 +23,13 @@ type VersionedEncodable interface {
 //
 // When a key is added or removed, this requires a new protocol state version:
 //  - Create a new versioned model in models.go (eg. modelv3 if latest model is modelv2)
-//  - Update the Reader and API interfaces to include any new keys
+//  - Update the KVStoreReader and KVStoreAPI interfaces to include any new keys
 
-// Reader is the latest read-only interface to the Protocol State key-value store
+// KVStoreReader is the latest read-only interface to the Protocol State key-value store
 // at a particular block.
 // It is backward-compatible with all versioned model types defined in the models.go
 // for this software version.
-type Reader interface {
+type KVStoreReader interface {
 	ID() flow.Identifier
 
 	// v0
@@ -59,15 +59,15 @@ type Reader interface {
 	GetInvalidEpochTransitionAttempted() (bool, error)
 }
 
-// API is the latest read-writer interface to the Protocol State key-value store.
+// KVStoreAPI is the latest read-writer interface to the Protocol State key-value store.
 // It is backward-compatible with all versioned model types defined in the models.go
 // for this software version.
-type API interface {
-	Reader
+type KVStoreAPI interface {
+	KVStoreReader
 
-	// Clone returns a deep copy of the API.
-	// This is used to create a new instance of the API to avoid mutating the original.
-	Clone() API
+	// Clone returns a deep copy of the KVStoreAPI.
+	// This is used to create a new instance of the KVStoreAPI to avoid mutating the original.
+	Clone() KVStoreAPI
 
 	// v0
 
@@ -90,7 +90,7 @@ type API interface {
 // each block that is being processed.
 type KeyValueStoreStateMachine interface {
 	// Build returns updated key-value store model, state ID and a flag indicating if there were any changes.
-	Build() (updatedState Reader, stateID flow.Identifier, hasChanges bool)
+	Build() (updatedState KVStoreReader, stateID flow.Identifier, hasChanges bool)
 
 	// ProcessUpdate updates the current state of key-value store.
 	// KeyValueStoreStateMachine captures only a subset of all service events, those that are relevant for the KV store. All other events are ignored.
@@ -104,5 +104,5 @@ type KeyValueStoreStateMachine interface {
 	View() uint64
 
 	// ParentState returns parent state that is associated with this state machine.
-	ParentState() Reader
+	ParentState() KVStoreReader
 }
