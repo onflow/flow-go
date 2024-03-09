@@ -85,6 +85,7 @@ func (m *ProcessingStateMachine) ProcessUpdate(update *flow.ServiceEvent) error 
 		}
 		m.state.SetVersionUpgrade(activator)
 
+	// Service events not explicitly expected are ignored
 	default:
 		return nil
 	}

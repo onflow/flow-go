@@ -22,7 +22,7 @@ type VersionedEncodable interface {
 // key-value store and are used by the Protocol State Machine.
 //
 // When a key is added or removed, this requires a new protocol state version:
-//  - Create a new versioned model in models.go (eg. modelv3 if latest model is modelv2)
+//  - Create a new versioned model in ./kvstore/models.go (eg. modelv3 if latest model is modelv2)
 //  - Update the KVStoreReader and KVStoreAPI interfaces to include any new keys
 
 // KVStoreReader is the latest read-only interface to the Protocol State key-value store
@@ -86,8 +86,8 @@ type KVStoreAPI interface {
 
 // KeyValueStoreStateMachine implements a low-level interface for state-changing operations on the key-value store.
 // It is used by higher level logic to evolve the protocol state when certain events that are stored in blocks are observed.
-// The KeyValueStoreStateMachine is stateful and internally tracks the current state of key-value store. A separate instance is created for
-// each block that is being processed.
+// The KeyValueStoreStateMachine is stateful and internally tracks the current state of key-value store.
+// A separate instance is created for each block that is being processed.
 type KeyValueStoreStateMachine interface {
 	// Build returns updated key-value store model, state ID and a flag indicating if there were any changes.
 	Build() (updatedState KVStoreReader, stateID flow.Identifier, hasChanges bool)

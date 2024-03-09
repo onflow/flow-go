@@ -29,5 +29,5 @@ var ErrUnsupportedVersion = errors.New("kvstore: unsupported version")
 var ErrInvalidUpgradeVersion = errors.New("kvstore: invalid upgrade version")
 
 // ErrInvalidActivationView is a sentinel returned when we attempt to process a KV store update
-// which has an activation view that is not strictly greater than the current view.
+// which has an activation view `V` so that `CurrentView + SafetyBuffer < V` does NOT hold.
 var ErrInvalidActivationView = errors.New("kvstore: invalid activation view")
