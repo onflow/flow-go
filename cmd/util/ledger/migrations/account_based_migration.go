@@ -127,7 +127,7 @@ func withMigrations(
 				Type("migration", migrator).
 				Msg("closing migration")
 			if cerr := migrator.Close(); cerr != nil {
-				log.Error().Err(cerr).Msg("error closing migration")
+				log.Err(cerr).Msg("error closing migration")
 				if err == nil {
 					// only set the error if it's not already set
 					// so that we don't overwrite the original error

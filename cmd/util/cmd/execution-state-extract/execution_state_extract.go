@@ -393,7 +393,7 @@ func migratePayloads(logger zerolog.Logger, payloads []*ledger.Payload, migratio
 
 	// migrate payloads
 	for i, migrate := range migrations {
-		logger.Info().Msgf("migration %d/%d is underway", i, len(migrations))
+		logger.Info().Msgf("migration %d/%d is underway", i+1, len(migrations))
 
 		start := time.Now()
 		payloads, err = migrate(payloads)

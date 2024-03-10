@@ -216,7 +216,7 @@ func checkPayloadsOwnership(payloads []*ledger.Payload, address common.Address, 
 func checkPayloadOwnership(payload *ledger.Payload, address common.Address, log zerolog.Logger) {
 	registerID, _, err := convert.PayloadToRegister(payload)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to convert payload to register")
+		log.Err(err).Msg("failed to convert payload to register")
 		return
 	}
 
@@ -225,7 +225,7 @@ func checkPayloadOwnership(payload *ledger.Payload, address common.Address, log 
 	if len(owner) > 0 {
 		payloadAddress, err := common.BytesToAddress([]byte(owner))
 		if err != nil {
-			log.Error().Err(err).Msgf("failed to convert register owner to address: %x", owner)
+			log.Err(err).Msgf("failed to convert register owner to address: %x", owner)
 			return
 		}
 
