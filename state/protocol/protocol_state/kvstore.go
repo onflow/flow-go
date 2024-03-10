@@ -5,7 +5,7 @@ import "github.com/onflow/flow-go/model/flow"
 // ViewBasedActivator allows setting value that will be active from specific view.
 type ViewBasedActivator[T any] struct {
 	Data           T
-	ActivationView uint64 // view at which data will be active
+	ActivationView uint64 // first view at which Data will take effect
 }
 
 // VersionedEncodable defines the interface for a versioned key-value store independent
