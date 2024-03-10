@@ -30,6 +30,7 @@ type VersionedEncodable interface {
 // It is backward-compatible with all versioned model types defined in the models.go
 // for this software version.
 type KVStoreReader interface {
+	// ID returns an identifier for this key-value store snapshot by hashing internal fields.
 	ID() flow.Identifier
 
 	// v0

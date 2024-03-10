@@ -39,11 +39,12 @@ type modelv0 struct {
 var _ protocol_state.KVStoreReader = new(modelv0)
 var _ protocol_state.KVStoreAPI = new(modelv0)
 
+// ID returns an identifier for this key-value store snapshot by hashing internal fields.
 func (model *modelv0) ID() flow.Identifier { return flow.MakeID(model) }
 
-func (model *modelv0) Clone() protocol_state.KVStoreAPI {
-	return clone.Clone(model)
-}
+// Clone returns a deep copy of the KVStoreAPI.
+// This is used to create a new instance of the KVStoreAPI to avoid mutating the original.
+func (model *modelv0) Clone() protocol_state.KVStoreAPI { return clone.Clone(model) }
 
 // VersionedEncode encodes the key-value store, returning the version separately
 // from the encoded bytes.
@@ -85,11 +86,12 @@ type modelv1 struct {
 var _ protocol_state.KVStoreReader = new(modelv1)
 var _ protocol_state.KVStoreAPI = new(modelv1)
 
+// ID returns an identifier for this key-value store snapshot by hashing internal fields.
 func (model *modelv1) ID() flow.Identifier { return flow.MakeID(model) }
 
-func (model *modelv1) Clone() protocol_state.KVStoreAPI {
-	return clone.Clone(model)
-}
+// Clone returns a deep copy of the KVStoreAPI.
+// This is used to create a new instance of the KVStoreAPI to avoid mutating the original.
+func (model *modelv1) Clone() protocol_state.KVStoreAPI { return clone.Clone(model) }
 
 // VersionedEncode encodes the key-value store, returning the version separately
 // from the encoded bytes.
