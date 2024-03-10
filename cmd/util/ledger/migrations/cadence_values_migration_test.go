@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -109,9 +110,6 @@ func TestCadenceValuesMigration(t *testing.T) {
 	// Check error logs.
 	require.Empty(t, logWriter.logs)
 }
-
-// TODO:
-//func TestCadenceValuesMigrationWithSwappedOrder(t *testing.T) {
 
 var flowTokenAddress = func() common.Address {
 	address, _ := common.HexToAddress("0ae53cb6e3f42a79")
@@ -759,11 +757,6 @@ func TestProgramParsingError(t *testing.T) {
 
 	testAddress := common.Address(chain.ServiceAddress())
 
-	// TODO: EVM contract is not deployed in snapshot yet, so can't update it
-	const evmContractChange = EVMContractChangeNone
-
-	const burnerContractChange = BurnerContractChangeUpdate
-
 	payloads, err := newBootstrapPayloads(chainID)
 	require.NoError(t, err)
 
@@ -843,6 +836,11 @@ func TestProgramParsingError(t *testing.T) {
 
 	// Migrate
 
+	// TODO: EVM contract is not deployed in snapshot yet, so can't update it
+	const evmContractChange = EVMContractChangeNone
+
+	const burnerContractChange = BurnerContractChangeUpdate
+
 	migrations := NewCadence1Migrations(
 		logger,
 		rwf,
@@ -881,4 +879,137 @@ func TestProgramParsingError(t *testing.T) {
 
 	assert.Contains(t, entry.Message, "`pub` is no longer a valid access keyword")
 	assert.NotContains(t, entry.Message, "runtime/debug.Stack()")
+}
+
+func TestCoreContractUsage(t *testing.T) {
+	t.Parallel()
+
+	rwf := &testReportWriterFactory{}
+
+	logWriter := &writer{}
+	logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
+
+	const nWorker = 2
+
+	const chainID = flow.Emulator
+	chain := chainID.Chain()
+
+	testFlowAddress, err := chain.AddressAtIndex(1_000_000)
+	require.NoError(t, err)
+
+	testAddress := common.Address(testFlowAddress)
+
+	payloads, err := newBootstrapPayloads(chainID)
+	require.NoError(t, err)
+
+	runtime, err := NewMigratorRuntime(
+		testAddress,
+		payloads,
+		util.RuntimeInterfaceConfig{},
+	)
+	require.NoError(t, err)
+
+	err = runtime.Accounts.Create(nil, testFlowAddress)
+	require.NoError(t, err)
+
+	storage := runtime.Storage
+
+	storageMap := storage.GetStorageMap(
+		testAddress,
+		common.PathDomainStorage.Identifier(),
+		true,
+	)
+
+	systemContracts := systemcontracts.SystemContractsForChain(chainID)
+
+	const fungibleTokenContractName = "FungibleToken"
+	fungibleTokenContractLocation := common.NewAddressLocation(
+		nil,
+		common.Address(systemContracts.FungibleToken.Address),
+		fungibleTokenContractName,
+	)
+
+	const fungibleTokenVaultTypeQualifiedIdentifier = fungibleTokenContractName + ".Vault"
+
+	capabilityValue := interpreter.NewUnmeteredCapabilityValue(
+		0,
+		interpreter.AddressValue(testAddress),
+		interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.UnauthorizedAccess,
+			interpreter.NewIntersectionStaticType(
+				nil,
+				[]*interpreter.InterfaceStaticType{
+					interpreter.NewInterfaceStaticType(
+						nil,
+						fungibleTokenContractLocation,
+						fungibleTokenVaultTypeQualifiedIdentifier,
+						fungibleTokenContractLocation.TypeID(nil, fungibleTokenVaultTypeQualifiedIdentifier),
+					),
+				},
+			),
+		),
+	)
+
+	storageMap.WriteValue(
+		runtime.Interpreter,
+		interpreter.StringStorageMapKey("test"),
+		capabilityValue,
+	)
+
+	err = storage.Commit(runtime.Interpreter, false)
+	require.NoError(t, err)
+
+	// finalize the transaction
+	result, err := runtime.TransactionState.FinalizeMainTransaction()
+	require.NoError(t, err)
+
+	// Merge the changes to the original payloads.
+
+	expectedAddresses := map[flow.Address]struct{}{
+		flow.Address(testAddress): {},
+	}
+
+	payloads, err = MergeRegisterChanges(
+		runtime.Snapshot.Payloads,
+		result.WriteSet,
+		expectedAddresses,
+		nil,
+		logger,
+	)
+	require.NoError(t, err)
+
+	// Migrate
+
+	// TODO: EVM contract is not deployed in snapshot yet, so can't update it
+	const evmContractChange = EVMContractChangeNone
+
+	const burnerContractChange = BurnerContractChangeUpdate
+
+	migrations := NewCadence1Migrations(
+		logger,
+		rwf,
+		nWorker,
+		chainID,
+		false,
+		false,
+		evmContractChange,
+		burnerContractChange,
+		nil,
+		false,
+	)
+
+	for _, migration := range migrations {
+		payloads, err = migration.Migrate(payloads)
+		require.NoError(
+			t,
+			err,
+			"migration `%s` failed, logs: %v",
+			migration.Name,
+			logWriter.logs,
+		)
+	}
+
+	// Check error logs
+	require.Len(t, logWriter.logs, 0)
 }
