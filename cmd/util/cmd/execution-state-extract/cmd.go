@@ -42,6 +42,7 @@ var (
 	flagInputPayloadFileName          string
 	flagOutputPayloadFileName         string
 	flagOutputPayloadByAddresses      string
+	flagMaxAccountSize                uint64
 )
 
 var Cmd = &cobra.Command{
@@ -132,6 +133,9 @@ func init() {
 		"",
 		"extract payloads of addresses (comma separated hex-encoded addresses) to file specified by output-payload-filename",
 	)
+
+	Cmd.Flags().Uint64Var(&flagMaxAccountSize, "max-account-size", 0,
+		"max account size")
 }
 
 func run(*cobra.Command, []string) {
@@ -346,6 +350,7 @@ func run(*cobra.Command, []string) {
 			exportedAddresses,
 			flagSortPayloads,
 			flagPrune,
+			flagMaxAccountSize,
 		)
 	} else {
 		err = extractExecutionState(
@@ -365,6 +370,7 @@ func run(*cobra.Command, []string) {
 			exportedAddresses,
 			flagSortPayloads,
 			flagPrune,
+			flagMaxAccountSize,
 		)
 	}
 

@@ -88,6 +88,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 		burnerContractChange,
 		stagedContracts,
 		false,
+		0,
 	)
 
 	for _, migration := range migrations {
@@ -725,6 +726,7 @@ func TestBootstrappedStateMigration(t *testing.T) {
 		burnerContractChange,
 		nil,
 		false,
+		0,
 	)
 
 	for _, migration := range migrations {
@@ -852,6 +854,7 @@ func TestProgramParsingError(t *testing.T) {
 		burnerContractChange,
 		nil,
 		false,
+		0,
 	)
 
 	for _, migration := range migrations {
@@ -997,6 +1000,7 @@ func TestCoreContractUsage(t *testing.T) {
 		burnerContractChange,
 		nil,
 		false,
+		0,
 	)
 
 	for _, migration := range migrations {

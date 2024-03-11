@@ -307,9 +307,28 @@ func NewCadence1Migrations(
 	burnerContractChange BurnerContractChange,
 	stagedContracts []StagedContract,
 	prune bool,
+	maxAccountSize uint64,
 ) []NamedMigration {
 
 	var migrations []NamedMigration
+
+	if maxAccountSize > 0 {
+
+		maxSizeExceptions := map[string]struct{}{}
+
+		systemContracts := systemcontracts.SystemContractsForChain(chainID)
+		for _, systemContract := range systemContracts.All() {
+			maxSizeExceptions[string(systemContract.Address.Bytes())] = struct{}{}
+		}
+
+		migrations = append(
+			migrations,
+			NamedMigration{
+				Name:    "account-size-filter-migration",
+				Migrate: NewAccountSizeFilterMigration(maxAccountSize, maxSizeExceptions, log),
+			},
+		)
+	}
 
 	if prune {
 		migration := NewCadence1PruneMigration(chainID, log)
