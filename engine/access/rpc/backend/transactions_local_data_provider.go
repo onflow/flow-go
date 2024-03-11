@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state"
@@ -52,7 +51,7 @@ type TransactionsLocalDataProvider struct {
 	eventsIndex     *EventsIndex
 	txResultsIndex  *TransactionResultsIndex
 	txErrorMessages TransactionErrorMessage
-	chainID         flow.ChainID
+	systemTxID      flow.Identifier
 }
 
 // GetTransactionResultFromStorage retrieves a transaction result from storage by block ID and transaction ID.
@@ -158,6 +157,11 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 	// cache the tx to collectionID mapping to avoid repeated lookups
 	txToCollectionID, err := t.buildTxIDToCollectionIDMapping(block)
 	if err != nil {
+		// this indicates that one or more of the collections for the block are not indexed. Since
+		// lookups are gated on the indexer signaling it has finished processing all data for the
+		// block, all data must be available in storage, otherwise there is an inconsistency in the
+		// state.
+		irrecoverable.Throw(ctx, fmt.Errorf("inconsistent index state: %w", err))
 		return nil, status.Errorf(codes.Internal, "failed to map tx to collection ID: %v", err)
 	}
 
@@ -398,23 +402,21 @@ func (t *TransactionsLocalDataProvider) lookupCollectionIDInBlock(
 }
 
 // buildTxIDToCollectionIDMapping returns a map of transaction ID to collection ID based on the provided block.
+// No errors expected during normal operations.
 func (t *TransactionsLocalDataProvider) buildTxIDToCollectionIDMapping(block *flow.Block) (map[flow.Identifier]flow.Identifier, error) {
 	txToCollectionID := make(map[flow.Identifier]flow.Identifier)
 	for _, guarantee := range block.Payload.Guarantees {
 		collection, err := t.collections.LightByID(guarantee.ID())
 		if err != nil {
-			return nil, err
+			// if the tx result is in storage, the collection must be too.
+			return nil, fmt.Errorf("failed to get collection %s in indexed block: %w", guarantee.ID(), err)
 		}
 		for _, txID := range collection.Transactions {
 			txToCollectionID[txID] = guarantee.ID()
 		}
 	}
 
-	systemTx, err := blueprints.SystemChunkTransaction(t.chainID.Chain())
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not get system chunk transaction: %v", err)
-	}
-	txToCollectionID[systemTx.ID()] = flow.ZeroID
+	txToCollectionID[t.systemTxID] = flow.ZeroID
 
 	return txToCollectionID, nil
 }
