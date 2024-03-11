@@ -112,8 +112,8 @@ github.com/Shopify/toxiproxy v2.1.4+incompatible/go.mod h1:OXgGpZ6Cli1/URJOF1DMx
 github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6/go.mod h1:3eOhrUMpNV+6aFIbp5/iudMxNCF27Vw2OZgy4xEx0Fg=
 github.com/StackExchange/wmi v1.2.1 h1:VIkavFPXSjcnS+O8yTq7NI32k0R5Aj+v39y29VYDOSA=
 github.com/StackExchange/wmi v1.2.1/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9SBzvHz7e8=
-github.com/UlyanaAndrukhiv/flow-emulator v0.0.0-20240307115038-e75079b5bf25 h1:3cSS/MEjUj0xD93a9L3As5KXfgUCnU73dgdw86utGgo=
-github.com/UlyanaAndrukhiv/flow-emulator v0.0.0-20240307115038-e75079b5bf25/go.mod h1:I6wZGTy//2WFSP6SCxu6Ii5j6lweetuHCVUacgjekEU=
+github.com/UlyanaAndrukhiv/flow-emulator v0.0.0-20240311164830-372ff222d9fe h1:0NuVFYcOyfEFWWnt0NR+EELogwv0eGhppXKfImnmtik=
+github.com/UlyanaAndrukhiv/flow-emulator v0.0.0-20240311164830-372ff222d9fe/go.mod h1:LBsdfmAe52sJ6ekPh80OdkljdWSboCRZh5oi426DvTk=
 github.com/VictoriaMetrics/fastcache v1.5.3/go.mod h1:+jv9Ckb+za/P1ZRg/sulP5Ni1v49daAVERr0H3CuscE=
 github.com/VictoriaMetrics/fastcache v1.12.1 h1:i0mICQuojGDL3KblA7wUNlY5lOK6a4bwt3uRKnkZU40=
 github.com/VictoriaMetrics/fastcache v1.12.1/go.mod h1:tX04vaqcNoQeGLD+ra5pU5sWkuxnzWhEzLwhP9w653o=

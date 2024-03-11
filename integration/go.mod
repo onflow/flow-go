@@ -362,4 +362,4 @@ replace github.com/onflow/flow-go => ../
 replace github.com/onflow/flow-go/insecure => ../insecure
 
 //TODO: Remove when it will be merged
-replace github.com/onflow/flow-emulator v0.58.1-0.20240130123529-733cc9417abc => github.com/UlyanaAndrukhiv/flow-emulator v0.0.0-20240307115038-e75079b5bf25
+replace github.com/onflow/flow-emulator v0.58.1-0.20240130123529-733cc9417abc => github.com/UlyanaAndrukhiv/flow-emulator v0.0.0-20240311164830-372ff222d9fe
