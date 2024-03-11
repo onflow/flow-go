@@ -22,6 +22,9 @@ type CollectionExecutedMetricImpl struct {
 	collectionsToMarkFinalized *stdmap.Times
 	collectionsToMarkExecuted  *stdmap.Times
 	blocksToMarkExecuted       *stdmap.Times
+
+	collections storage.Collections
+	blocks      storage.Blocks
 }
 
 func NewCollectionExecutedMetricImpl(
@@ -30,6 +33,8 @@ func NewCollectionExecutedMetricImpl(
 	collectionsToMarkFinalized *stdmap.Times,
 	collectionsToMarkExecuted *stdmap.Times,
 	blocksToMarkExecuted *stdmap.Times,
+	collections storage.Collections,
+	blocks storage.Blocks,
 ) (*CollectionExecutedMetricImpl, error) {
 	return &CollectionExecutedMetricImpl{
 		log:                        log,
@@ -37,11 +42,13 @@ func NewCollectionExecutedMetricImpl(
 		collectionsToMarkFinalized: collectionsToMarkFinalized,
 		collectionsToMarkExecuted:  collectionsToMarkExecuted,
 		blocksToMarkExecuted:       blocksToMarkExecuted,
+		collections:                collections,
+		blocks:                     blocks,
 	}, nil
 }
 
-// TrackFinalized tracks collections to mark finalized
-func (c *CollectionExecutedMetricImpl) TrackFinalized(light flow.LightCollection) {
+// CollectionFinalized tracks collections to mark finalized
+func (c *CollectionExecutedMetricImpl) CollectionFinalized(light flow.LightCollection) {
 	if ti, found := c.collectionsToMarkFinalized.ByID(light.ID()); found {
 		for _, t := range light.Transactions {
 			c.accessMetrics.TransactionFinalized(t, ti)
@@ -50,8 +57,8 @@ func (c *CollectionExecutedMetricImpl) TrackFinalized(light flow.LightCollection
 	}
 }
 
-// TrackExecuted tracks collections to mark executed
-func (c *CollectionExecutedMetricImpl) TrackExecuted(light flow.LightCollection) {
+// CollectionExecuted tracks collections to mark executed
+func (c *CollectionExecutedMetricImpl) CollectionExecuted(light flow.LightCollection) {
 	if ti, found := c.collectionsToMarkExecuted.ByID(light.ID()); found {
 		for _, t := range light.Transactions {
 			c.accessMetrics.TransactionExecuted(t, ti)
@@ -60,8 +67,8 @@ func (c *CollectionExecutedMetricImpl) TrackExecuted(light flow.LightCollection)
 	}
 }
 
-// TrackFinalizedMetricForBlock tracks finalized metric for block
-func (c *CollectionExecutedMetricImpl) TrackFinalizedMetricForBlock(block *flow.Block, collections storage.Collections) {
+// BlockFinalized tracks finalized metric for block
+func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 	// TODO: lookup actual finalization time by looking at the block finalizing `b`
 	now := time.Now().UTC()
 	blockID := block.ID()
@@ -69,7 +76,7 @@ func (c *CollectionExecutedMetricImpl) TrackFinalizedMetricForBlock(block *flow.
 	// mark all transactions as finalized
 	// TODO: sample to reduce performance overhead
 	for _, g := range block.Payload.Guarantees {
-		l, err := collections.LightByID(g.CollectionID)
+		l, err := c.collections.LightByID(g.CollectionID)
 		if errors.Is(err, storage.ErrNotFound) {
 			c.collectionsToMarkFinalized.Add(g.CollectionID, now)
 			continue
@@ -85,24 +92,20 @@ func (c *CollectionExecutedMetricImpl) TrackFinalizedMetricForBlock(block *flow.
 	}
 
 	if ti, found := c.blocksToMarkExecuted.ByID(blockID); found {
-		c.trackExecutedMetricForBlock(block, ti, collections)
+		c.blockExecuted(block, ti)
 		c.accessMetrics.UpdateExecutionReceiptMaxHeight(block.Header.Height)
 		c.blocksToMarkExecuted.Remove(blockID)
 	}
 }
 
-// TrackExecutionReceiptMetrics tracks execution receipt metrics
-func (c *CollectionExecutedMetricImpl) TrackExecutionReceiptMetrics(
-	r *flow.ExecutionReceipt,
-	collections storage.Collections,
-	blocks storage.Blocks,
-) {
+// ExecutionReceiptReceived tracks execution receipt metrics
+func (c *CollectionExecutedMetricImpl) ExecutionReceiptReceived(r *flow.ExecutionReceipt) {
 	// TODO add actual execution time to execution receipt?
 	now := time.Now().UTC()
 
 	// retrieve the block
 	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
-	b, err := blocks.ByID(r.ExecutionResult.BlockID)
+	b, err := c.blocks.ByID(r.ExecutionResult.BlockID)
 
 	if errors.Is(err, storage.ErrNotFound) {
 		c.blocksToMarkExecuted.Add(r.ExecutionResult.BlockID, now)
@@ -116,19 +119,19 @@ func (c *CollectionExecutedMetricImpl) TrackExecutionReceiptMetrics(
 
 	c.accessMetrics.UpdateExecutionReceiptMaxHeight(b.Header.Height)
 
-	c.trackExecutedMetricForBlock(b, now, collections)
+	c.blockExecuted(b, now)
 }
 
 func (c *CollectionExecutedMetricImpl) UpdateLastFullBlockHeight(height uint64) {
 	c.accessMetrics.UpdateLastFullBlockHeight(height)
 }
 
-// trackExecutedMetricForBlock tracks executed metric for block
-func (c *CollectionExecutedMetricImpl) trackExecutedMetricForBlock(block *flow.Block, ti time.Time, collections storage.Collections) {
+// blockExecuted tracks executed metric for block
+func (c *CollectionExecutedMetricImpl) blockExecuted(block *flow.Block, ti time.Time) {
 	// mark all transactions as executed
 	// TODO: sample to reduce performance overhead
 	for _, g := range block.Payload.Guarantees {
-		l, err := collections.LightByID(g.CollectionID)
+		l, err := c.collections.LightByID(g.CollectionID)
 		if errors.Is(err, storage.ErrNotFound) {
 			c.collectionsToMarkExecuted.Add(g.CollectionID, ti)
 			continue

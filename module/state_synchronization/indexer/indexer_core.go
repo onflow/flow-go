@@ -280,8 +280,8 @@ func HandleCollection(
 
 	light := collection.Light()
 
-	collectionExecutedMetric.TrackFinalized(light)
-	collectionExecutedMetric.TrackExecuted(light)
+	collectionExecutedMetric.CollectionFinalized(light)
+	collectionExecutedMetric.CollectionExecuted(light)
 
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized

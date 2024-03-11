@@ -124,6 +124,8 @@ func (s *Suite) SetupTest() {
 		collectionsToMarkFinalized,
 		collectionsToMarkExecuted,
 		blocksToMarkExecuted,
+		s.collections,
+		s.blocks,
 	)
 	require.NoError(s.T(), err)
 
