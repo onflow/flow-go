@@ -10,23 +10,38 @@ contract Storage {
 
     constructor() payable {
     }
+
     function store(uint256 num) public {
         number = num;
     }
+
+    function storeButRevert(uint256 num) public {
+        number = num;
+        revert();
+    }
+
     function retrieve() public view returns (uint256){
         return number;
     }
+
     function blockNumber() public view returns (uint256) {
         return block.number;
     }
+
     function blockTime() public view returns (uint) {
         return block.timestamp;
     }
+
     function blockHash(uint num)  public view returns (bytes32) {
         return blockhash(num);
     }
+
     function random() public view returns (uint256) {
         return block.prevrandao;
+    }
+
+    function chainID() public view returns (uint256) {
+        return block.chainid;
     }
 
     function destroy() public {
