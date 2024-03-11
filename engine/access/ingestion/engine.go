@@ -429,7 +429,7 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 	// queue requesting each of the collections from the collection node
 	e.requestCollectionsInFinalizedBlock(block.Payload.Guarantees)
 
-	e.collectionExecutedMetric.TrackFinalizedMetricForBlock(block, e.collections)
+	e.collectionExecutedMetric.BlockFinalized(block)
 
 	return nil
 }
@@ -441,7 +441,7 @@ func (e *Engine) handleExecutionReceipt(_ flow.Identifier, r *flow.ExecutionRece
 		return fmt.Errorf("failed to store execution receipt: %w", err)
 	}
 
-	e.collectionExecutedMetric.TrackExecutionReceiptMetrics(r, e.collections, e.blocks)
+	e.collectionExecutedMetric.ExecutionReceiptReceived(r)
 	return nil
 }
 

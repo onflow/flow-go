@@ -187,6 +187,7 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 	require.NoError(i.t, err)
 
 	log := zerolog.New(os.Stdout)
+	blocks := storagemock.NewBlocks(i.t)
 
 	collectionExecutedMetric, err := NewCollectionExecutedMetricImpl(
 		log,
@@ -194,6 +195,8 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 		collectionsToMarkFinalized,
 		collectionsToMarkExecuted,
 		blocksToMarkExecuted,
+		i.collections,
+		blocks,
 	)
 	require.NoError(i.t, err)
 
