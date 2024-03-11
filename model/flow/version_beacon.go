@@ -162,14 +162,15 @@ func (v *VersionBeacon) String() string {
 // must be strictly greater than the currently active Protocol State Version,
 // otherwise the service event is ignored.
 // If the node software supports `NewProtocolStateVersion`, then it uses the
-// specified Protocol State Version, beginning with the first block B where BOTH:
-//  1. The `ProtocolStateVersionUpgrade` service event has been sealed in B's ancestry
-//  2. B.view >= `ActiveView`
+// specified Protocol State Version, beginning with the first block `X` where BOTH:
+//  1. The `ProtocolStateVersionUpgrade` service event has been sealed in X's ancestry
+//  2. X.view >= `ActiveView`
 //
-// NOTE: A ProtocolStateVersionUpgrade event `E` is only accepted while processing block `B`
-// which seals `E` if E.ActiveView < B.View + SafetyThreshold.
+// NOTE: A ProtocolStateVersionUpgrade event `E` is accepted while processing block `B`
+// which seals `E` if and only if E.ActiveView > B.View + SafetyThreshold.
 // SafetyThreshold is a protocol parameter set so that it is overwhelmingly likely that
-// at least block is finalized within any stretch of SafetyThreshold-many blocks.
+// block `B` is finalized (ergo the protocol version switch at the specified view `E.ActiveView`)
+// within any stretch of SafetyThreshold-many views.
 // TODO: This concept mirrors `EpochCommitSafetyThreshold` and `versionBoundaryFreezePeriod`
 // These parameters should be consolidated.
 //

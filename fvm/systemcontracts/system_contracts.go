@@ -402,7 +402,6 @@ func init() {
 			VersionBeacon:               event(ContractNameNodeVersionBeacon, EventNameVersionBeacon),
 			ProtocolStateVersionUpgrade: event(ContractNameNodeVersionBeacon, EventNameProtocolStateVersionUpgrade),
 		}
-
 		return events
 	}
 
