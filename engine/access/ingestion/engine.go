@@ -18,12 +18,11 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -86,10 +85,7 @@ type Engine struct {
 	executionResults  storage.ExecutionResults
 
 	// metrics
-	metrics                    module.AccessMetrics
-	collectionsToMarkFinalized *stdmap.Times
-	collectionsToMarkExecuted  *stdmap.Times
-	blocksToMarkExecuted       *stdmap.Times
+	collectionExecutedMetric module.CollectionExecutedMetric
 }
 
 // New creates a new access ingestion engine
@@ -105,10 +101,7 @@ func New(
 	transactions storage.Transactions,
 	executionResults storage.ExecutionResults,
 	executionReceipts storage.ExecutionReceipts,
-	accessMetrics module.AccessMetrics,
-	collectionsToMarkFinalized *stdmap.Times,
-	collectionsToMarkExecuted *stdmap.Times,
-	blocksToMarkExecuted *stdmap.Times,
+	collectionExecutedMetric module.CollectionExecutedMetric,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
@@ -145,21 +138,18 @@ func New(
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		log:                        log.With().Str("engine", "ingestion").Logger(),
-		state:                      state,
-		me:                         me,
-		request:                    request,
-		blocks:                     blocks,
-		headers:                    headers,
-		collections:                collections,
-		transactions:               transactions,
-		executionResults:           executionResults,
-		executionReceipts:          executionReceipts,
-		maxReceiptHeight:           0,
-		metrics:                    accessMetrics,
-		collectionsToMarkFinalized: collectionsToMarkFinalized,
-		collectionsToMarkExecuted:  collectionsToMarkExecuted,
-		blocksToMarkExecuted:       blocksToMarkExecuted,
+		log:                      log.With().Str("engine", "ingestion").Logger(),
+		state:                    state,
+		me:                       me,
+		request:                  request,
+		blocks:                   blocks,
+		headers:                  headers,
+		collections:              collections,
+		transactions:             transactions,
+		executionResults:         executionResults,
+		executionReceipts:        executionReceipts,
+		maxReceiptHeight:         0,
+		collectionExecutedMetric: collectionExecutedMetric,
 
 		// queue / notifier for execution receipts
 		executionReceiptsNotifier: engine.NewNotifier(),
@@ -220,7 +210,7 @@ func (e *Engine) initLastFullBlockHeightIndex() error {
 		return fmt.Errorf("failed to get last full block height during ingestion engine startup: %w", err)
 	}
 
-	e.metrics.UpdateLastFullBlockHeight(lastFullHeight)
+	e.collectionExecutedMetric.UpdateLastFullBlockHeight(lastFullHeight)
 
 	return nil
 }
@@ -444,39 +434,9 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 	// queue requesting each of the collections from the collection node
 	e.requestCollectionsInFinalizedBlock(block.Payload.Guarantees)
 
-	e.trackFinalizedMetricForBlock(block)
+	e.collectionExecutedMetric.BlockFinalized(block)
 
 	return nil
-}
-
-func (e *Engine) trackFinalizedMetricForBlock(block *flow.Block) {
-	// TODO: lookup actual finalization time by looking at the block finalizing `b`
-	now := time.Now().UTC()
-	blockID := block.ID()
-
-	// mark all transactions as finalized
-	// TODO: sample to reduce performance overhead
-	for _, g := range block.Payload.Guarantees {
-		l, err := e.collections.LightByID(g.CollectionID)
-		if errors.Is(err, storage.ErrNotFound) {
-			e.collectionsToMarkFinalized.Add(g.CollectionID, now)
-			continue
-		} else if err != nil {
-			e.log.Warn().Err(err).Str("collection_id", g.CollectionID.String()).
-				Msg("could not track tx finalized metric: finalized collection not found locally")
-			continue
-		}
-
-		for _, t := range l.Transactions {
-			e.metrics.TransactionFinalized(t, now)
-		}
-	}
-
-	if ti, found := e.blocksToMarkExecuted.ByID(blockID); found {
-		e.trackExecutedMetricForBlock(block, ti)
-		e.metrics.UpdateExecutionReceiptMaxHeight(block.Header.Height)
-		e.blocksToMarkExecuted.Remove(blockID)
-	}
 }
 
 func (e *Engine) handleExecutionReceipt(_ flow.Identifier, r *flow.ExecutionReceipt) error {
@@ -486,112 +446,20 @@ func (e *Engine) handleExecutionReceipt(_ flow.Identifier, r *flow.ExecutionRece
 		return fmt.Errorf("failed to store execution receipt: %w", err)
 	}
 
-	e.trackExecutionReceiptMetrics(r)
+	e.collectionExecutedMetric.ExecutionReceiptReceived(r)
 	return nil
 }
 
-func (e *Engine) trackExecutionReceiptMetrics(r *flow.ExecutionReceipt) {
-	// TODO add actual execution time to execution receipt?
-	now := time.Now().UTC()
-
-	// retrieve the block
-	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
-	b, err := e.blocks.ByID(r.ExecutionResult.BlockID)
-
-	if errors.Is(err, storage.ErrNotFound) {
-		e.blocksToMarkExecuted.Add(r.ExecutionResult.BlockID, now)
-		return
-	}
-
-	if err != nil {
-		e.log.Warn().Err(err).Msg("could not track tx executed metric: executed block not found locally")
-		return
-	}
-
-	e.metrics.UpdateExecutionReceiptMaxHeight(b.Header.Height)
-
-	e.trackExecutedMetricForBlock(b, now)
-}
-
-func (e *Engine) trackExecutedMetricForBlock(block *flow.Block, ti time.Time) {
-	// mark all transactions as executed
-	// TODO: sample to reduce performance overhead
-	for _, g := range block.Payload.Guarantees {
-		l, err := e.collections.LightByID(g.CollectionID)
-		if errors.Is(err, storage.ErrNotFound) {
-			e.collectionsToMarkExecuted.Add(g.CollectionID, ti)
-			continue
-		} else if err != nil {
-			e.log.Warn().Err(err).Str("collection_id", g.CollectionID.String()).
-				Msg("could not track tx executed metric: executed collection not found locally")
-			continue
-		}
-
-		for _, t := range l.Transactions {
-			e.metrics.TransactionExecuted(t, ti)
-		}
-	}
-}
-
-func (e *Engine) trackExecutedMetricForCollection(light *flow.LightCollection) {
-	if ti, found := e.collectionsToMarkFinalized.ByID(light.ID()); found {
-		for _, t := range light.Transactions {
-			e.metrics.TransactionFinalized(t, ti)
-		}
-		e.collectionsToMarkFinalized.Remove(light.ID())
-	}
-
-	if ti, found := e.collectionsToMarkExecuted.ByID(light.ID()); found {
-		for _, t := range light.Transactions {
-			e.metrics.TransactionExecuted(t, ti)
-		}
-		e.collectionsToMarkExecuted.Remove(light.ID())
-	}
-}
-
-// handleCollection handles the response of the a collection request made earlier when a block was received
-func (e *Engine) handleCollection(_ flow.Identifier, entity flow.Entity) error {
-
-	// convert the entity to a strictly typed collection
+// OnCollection handles the response of the a collection request made earlier when a block was received.
+// No errors expected during normal operations.
+func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 	collection, ok := entity.(*flow.Collection)
 	if !ok {
-		return fmt.Errorf("invalid entity type (%T)", entity)
+		e.log.Error().Msgf("invalid entity type (%T)", entity)
+		return
 	}
 
-	light := collection.Light()
-
-	e.trackExecutedMetricForCollection(&light)
-
-	// FIX: we can't index guarantees here, as we might have more than one block
-	// with the same collection as long as it is not finalized
-
-	// store the light collection (collection minus the transaction body - those are stored separately)
-	// and add transaction ids as index
-	err := e.collections.StoreLightAndIndexByTransaction(&light)
-	if err != nil {
-		// ignore collection if already seen
-		if errors.Is(err, storage.ErrAlreadyExists) {
-			e.log.Debug().
-				Hex("collection_id", logging.Entity(light)).
-				Msg("collection is already seen")
-			return nil
-		}
-		return err
-	}
-
-	// now store each of the transaction body
-	for _, tx := range collection.Transactions {
-		err := e.transactions.Store(tx)
-		if err != nil {
-			return fmt.Errorf("could not store transaction (%x): %w", tx.ID(), err)
-		}
-	}
-
-	return nil
-}
-
-func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
-	err := e.handleCollection(originID, entity)
+	err := indexer.HandleCollection(collection, e.collections, e.transactions, e.log, e.collectionExecutedMetric)
 	if err != nil {
 		e.log.Error().Err(err).Msg("could not handle collection")
 		return
@@ -727,7 +595,7 @@ func (e *Engine) updateLastFullBlockReceivedIndex() error {
 			return fmt.Errorf("failed to update last full block height")
 		}
 
-		e.metrics.UpdateLastFullBlockHeight(newLastFullHeight)
+		e.collectionExecutedMetric.UpdateLastFullBlockHeight(newLastFullHeight)
 
 		e.log.Debug().
 			Uint64("last_full_block_height", newLastFullHeight).

@@ -288,6 +288,7 @@ type FlowAccessNodeBuilder struct {
 	RegistersAsyncStore        *execution.RegistersAsyncStore
 	EventsIndex                *backend.EventsIndex
 	IndexerDependencies        *cmd.DependencyList
+	collectionExecutedMetric   module.CollectionExecutedMetric
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -805,8 +806,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.Storage.RegisterIndex,
 					builder.Storage.Headers,
 					builder.Storage.Events,
+					builder.Storage.Collections,
+					builder.Storage.Transactions,
 					builder.Storage.LightTransactionResults,
-					builder.IngestEng.OnCollection,
+					builder.collectionExecutedMetric,
 				)
 				if err != nil {
 					return nil, err
@@ -1434,6 +1437,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			}
 
 			builder.BlocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
+
 			return err
 		}).
 		Module("transaction metrics", func(node *cmd.NodeConfig) error {
@@ -1460,6 +1464,23 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				metrics.WithBackendScriptsMetrics(builder.TransactionMetrics),
 				metrics.WithRestMetrics(builder.RestMetrics),
 			)
+			return nil
+		}).
+		Module("collection metrics", func(node *cmd.NodeConfig) error {
+			var err error
+			builder.collectionExecutedMetric, err = indexer.NewCollectionExecutedMetricImpl(
+				builder.Logger,
+				builder.AccessMetrics,
+				builder.CollectionsToMarkFinalized,
+				builder.CollectionsToMarkExecuted,
+				builder.BlocksToMarkExecuted,
+				builder.Storage.Collections,
+				builder.Storage.Blocks,
+			)
+			if err != nil {
+				return err
+			}
+
 			return nil
 		}).
 		Module("ping metrics", func(node *cmd.NodeConfig) error {
@@ -1659,10 +1680,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Transactions,
 				node.Storage.Results,
 				node.Storage.Receipts,
-				builder.AccessMetrics,
-				builder.CollectionsToMarkFinalized,
-				builder.CollectionsToMarkExecuted,
-				builder.BlocksToMarkExecuted,
+				builder.collectionExecutedMetric,
 			)
 			if err != nil {
 				return nil, err
