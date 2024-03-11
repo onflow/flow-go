@@ -833,13 +833,13 @@ func (_m *API) SendTransaction(ctx context.Context, tx *flow.TransactionBody) er
 	return r0
 }
 
-// SubscribeBlockDigests provides a mock function with given fields: ctx, startBlockID, startHeight, blockStatus
-func (_m *API) SubscribeBlockDigests(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
-	ret := _m.Called(ctx, startBlockID, startHeight, blockStatus)
+// SubscribeBlockDigestsFromLatest provides a mock function with given fields: ctx, blockStatus
+func (_m *API) SubscribeBlockDigestsFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription {
+	ret := _m.Called(ctx, blockStatus)
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64, flow.BlockStatus) subscription.Subscription); ok {
-		r0 = rf(ctx, startBlockID, startHeight, blockStatus)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.BlockStatus) subscription.Subscription); ok {
+		r0 = rf(ctx, blockStatus)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)
@@ -849,13 +849,13 @@ func (_m *API) SubscribeBlockDigests(ctx context.Context, startBlockID flow.Iden
 	return r0
 }
 
-// SubscribeBlockHeaders provides a mock function with given fields: ctx, startBlockID, startHeight, blockStatus
-func (_m *API) SubscribeBlockHeaders(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
-	ret := _m.Called(ctx, startBlockID, startHeight, blockStatus)
+// SubscribeBlockDigestsFromStartBlockID provides a mock function with given fields: ctx, startBlockID, blockStatus
+func (_m *API) SubscribeBlockDigestsFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription.Subscription {
+	ret := _m.Called(ctx, startBlockID, blockStatus)
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64, flow.BlockStatus) subscription.Subscription); ok {
-		r0 = rf(ctx, startBlockID, startHeight, blockStatus)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.BlockStatus) subscription.Subscription); ok {
+		r0 = rf(ctx, startBlockID, blockStatus)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)
@@ -865,13 +865,109 @@ func (_m *API) SubscribeBlockHeaders(ctx context.Context, startBlockID flow.Iden
 	return r0
 }
 
-// SubscribeBlocks provides a mock function with given fields: ctx, startBlockID, startHeight, blockStatus
-func (_m *API) SubscribeBlocks(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
-	ret := _m.Called(ctx, startBlockID, startHeight, blockStatus)
+// SubscribeBlockDigestsFromStartHeight provides a mock function with given fields: ctx, startHeight, blockStatus
+func (_m *API) SubscribeBlockDigestsFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
+	ret := _m.Called(ctx, startHeight, blockStatus)
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64, flow.BlockStatus) subscription.Subscription); ok {
-		r0 = rf(ctx, startBlockID, startHeight, blockStatus)
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, flow.BlockStatus) subscription.Subscription); ok {
+		r0 = rf(ctx, startHeight, blockStatus)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(subscription.Subscription)
+		}
+	}
+
+	return r0
+}
+
+// SubscribeBlockHeadersFromLatest provides a mock function with given fields: ctx, blockStatus
+func (_m *API) SubscribeBlockHeadersFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription {
+	ret := _m.Called(ctx, blockStatus)
+
+	var r0 subscription.Subscription
+	if rf, ok := ret.Get(0).(func(context.Context, flow.BlockStatus) subscription.Subscription); ok {
+		r0 = rf(ctx, blockStatus)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(subscription.Subscription)
+		}
+	}
+
+	return r0
+}
+
+// SubscribeBlockHeadersFromStartBlockID provides a mock function with given fields: ctx, startBlockID, blockStatus
+func (_m *API) SubscribeBlockHeadersFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription.Subscription {
+	ret := _m.Called(ctx, startBlockID, blockStatus)
+
+	var r0 subscription.Subscription
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.BlockStatus) subscription.Subscription); ok {
+		r0 = rf(ctx, startBlockID, blockStatus)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(subscription.Subscription)
+		}
+	}
+
+	return r0
+}
+
+// SubscribeBlockHeadersFromStartHeight provides a mock function with given fields: ctx, startHeight, blockStatus
+func (_m *API) SubscribeBlockHeadersFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
+	ret := _m.Called(ctx, startHeight, blockStatus)
+
+	var r0 subscription.Subscription
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, flow.BlockStatus) subscription.Subscription); ok {
+		r0 = rf(ctx, startHeight, blockStatus)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(subscription.Subscription)
+		}
+	}
+
+	return r0
+}
+
+// SubscribeBlocksFromLatest provides a mock function with given fields: ctx, blockStatus
+func (_m *API) SubscribeBlocksFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription {
+	ret := _m.Called(ctx, blockStatus)
+
+	var r0 subscription.Subscription
+	if rf, ok := ret.Get(0).(func(context.Context, flow.BlockStatus) subscription.Subscription); ok {
+		r0 = rf(ctx, blockStatus)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(subscription.Subscription)
+		}
+	}
+
+	return r0
+}
+
+// SubscribeBlocksFromStartBlockID provides a mock function with given fields: ctx, startBlockID, blockStatus
+func (_m *API) SubscribeBlocksFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription.Subscription {
+	ret := _m.Called(ctx, startBlockID, blockStatus)
+
+	var r0 subscription.Subscription
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.BlockStatus) subscription.Subscription); ok {
+		r0 = rf(ctx, startBlockID, blockStatus)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(subscription.Subscription)
+		}
+	}
+
+	return r0
+}
+
+// SubscribeBlocksFromStartHeight provides a mock function with given fields: ctx, startHeight, blockStatus
+func (_m *API) SubscribeBlocksFromStartHeight(ctx context.Context, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
+	ret := _m.Called(ctx, startHeight, blockStatus)
+
+	var r0 subscription.Subscription
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, flow.BlockStatus) subscription.Subscription); ok {
+		r0 = rf(ctx, startHeight, blockStatus)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)

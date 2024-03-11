@@ -747,8 +747,8 @@ func (h *Handler) SubscribeBlocksFromStartBlockID(request *access.SubscribeBlock
 		return err
 	}
 
-	sub := h.api.SubscribeBlocks(stream.Context(), startBlockID, 0, blockStatus)
-	return handleSubscription[*flow.Block](sub, h.handleBlocksResponse(stream.Send, request.GetFullBlockResponse(), blockStatus))
+	sub := h.api.SubscribeBlocksFromStartBlockID(stream.Context(), startBlockID, blockStatus)
+	return subscription.HandleSubscription[*flow.Block](sub, h.handleBlocksResponse(stream.Send, request.GetFullBlockResponse(), blockStatus))
 }
 
 // SubscribeBlocksFromStartHeight handles subscription requests for blocks started from block height.
@@ -774,8 +774,8 @@ func (h *Handler) SubscribeBlocksFromStartHeight(request *access.SubscribeBlocks
 		return err
 	}
 
-	sub := h.api.SubscribeBlocks(stream.Context(), flow.ZeroID, request.GetStartBlockHeight(), blockStatus)
-	return handleSubscription[*flow.Block](sub, h.handleBlocksResponse(stream.Send, request.GetFullBlockResponse(), blockStatus))
+	sub := h.api.SubscribeBlocksFromStartHeight(stream.Context(), request.GetStartBlockHeight(), blockStatus)
+	return subscription.HandleSubscription[*flow.Block](sub, h.handleBlocksResponse(stream.Send, request.GetFullBlockResponse(), blockStatus))
 }
 
 // SubscribeBlocksFromLatest handles subscription requests for blocks started from latest sealed block.
@@ -801,8 +801,8 @@ func (h *Handler) SubscribeBlocksFromLatest(request *access.SubscribeBlocksFromL
 		return err
 	}
 
-	sub := h.api.SubscribeBlocks(stream.Context(), flow.ZeroID, 0, blockStatus)
-	return handleSubscription[*flow.Block](sub, h.handleBlocksResponse(stream.Send, request.GetFullBlockResponse(), blockStatus))
+	sub := h.api.SubscribeBlocksFromLatest(stream.Context(), blockStatus)
+	return subscription.HandleSubscription[*flow.Block](sub, h.handleBlocksResponse(stream.Send, request.GetFullBlockResponse(), blockStatus))
 }
 
 // handleBlocksResponse handles the subscription to block updates and sends
@@ -860,8 +860,8 @@ func (h *Handler) SubscribeBlockHeadersFromStartBlockID(request *access.Subscrib
 		return err
 	}
 
-	sub := h.api.SubscribeBlockHeaders(stream.Context(), startBlockID, 0, blockStatus)
-	return handleSubscription[*flow.Header](sub, h.handleBlockHeadersResponse(stream.Send))
+	sub := h.api.SubscribeBlockHeadersFromStartBlockID(stream.Context(), startBlockID, blockStatus)
+	return subscription.HandleSubscription[*flow.Header](sub, h.handleBlockHeadersResponse(stream.Send))
 }
 
 // SubscribeBlockHeadersFromStartHeight handles subscription requests for block headers started from block height.
@@ -887,8 +887,8 @@ func (h *Handler) SubscribeBlockHeadersFromStartHeight(request *access.Subscribe
 		return err
 	}
 
-	sub := h.api.SubscribeBlockHeaders(stream.Context(), flow.ZeroID, request.GetStartBlockHeight(), blockStatus)
-	return handleSubscription[*flow.Header](sub, h.handleBlockHeadersResponse(stream.Send))
+	sub := h.api.SubscribeBlockHeadersFromStartHeight(stream.Context(), request.GetStartBlockHeight(), blockStatus)
+	return subscription.HandleSubscription[*flow.Header](sub, h.handleBlockHeadersResponse(stream.Send))
 }
 
 // SubscribeBlockHeadersFromLatest handles subscription requests for block headers started from latest sealed block.
@@ -914,8 +914,8 @@ func (h *Handler) SubscribeBlockHeadersFromLatest(request *access.SubscribeBlock
 		return err
 	}
 
-	sub := h.api.SubscribeBlockHeaders(stream.Context(), flow.ZeroID, 0, blockStatus)
-	return handleSubscription[*flow.Header](sub, h.handleBlockHeadersResponse(stream.Send))
+	sub := h.api.SubscribeBlockHeadersFromLatest(stream.Context(), blockStatus)
+	return subscription.HandleSubscription[*flow.Header](sub, h.handleBlockHeadersResponse(stream.Send))
 }
 
 // handleBlockHeadersResponse handles the subscription to block updates and sends
@@ -974,8 +974,8 @@ func (h *Handler) SubscribeBlockDigestsFromStartBlockID(request *access.Subscrib
 		return err
 	}
 
-	sub := h.api.SubscribeBlockDigests(stream.Context(), startBlockID, 0, blockStatus)
-	return handleSubscription[*flow.BlockDigest](sub, h.handleBlockDigestsResponse(stream.Send))
+	sub := h.api.SubscribeBlockDigestsFromStartBlockID(stream.Context(), startBlockID, blockStatus)
+	return subscription.HandleSubscription[*flow.BlockDigest](sub, h.handleBlockDigestsResponse(stream.Send))
 }
 
 // SubscribeBlockDigestsFromStartHeight handles subscription requests for lightweight blocks started from block height.
@@ -1001,8 +1001,8 @@ func (h *Handler) SubscribeBlockDigestsFromStartHeight(request *access.Subscribe
 		return err
 	}
 
-	sub := h.api.SubscribeBlockDigests(stream.Context(), flow.ZeroID, request.GetStartBlockHeight(), blockStatus)
-	return handleSubscription[*flow.BlockDigest](sub, h.handleBlockDigestsResponse(stream.Send))
+	sub := h.api.SubscribeBlockDigestsFromStartHeight(stream.Context(), request.GetStartBlockHeight(), blockStatus)
+	return subscription.HandleSubscription[*flow.BlockDigest](sub, h.handleBlockDigestsResponse(stream.Send))
 }
 
 // SubscribeBlockDigestsFromLatest handles subscription requests for lightweight block started from latest sealed block.
@@ -1028,8 +1028,8 @@ func (h *Handler) SubscribeBlockDigestsFromLatest(request *access.SubscribeBlock
 		return err
 	}
 
-	sub := h.api.SubscribeBlockDigests(stream.Context(), flow.ZeroID, 0, blockStatus)
-	return handleSubscription[*flow.BlockDigest](sub, h.handleBlockDigestsResponse(stream.Send))
+	sub := h.api.SubscribeBlockDigestsFromLatest(stream.Context(), blockStatus)
+	return subscription.HandleSubscription[*flow.BlockDigest](sub, h.handleBlockDigestsResponse(stream.Send))
 }
 
 // handleBlockDigestsResponse handles the subscription to block updates and sends
@@ -1057,37 +1057,6 @@ func (h *Handler) handleBlockDigestsResponse(send sendSubscribeBlockDigestsRespo
 		}
 
 		return nil
-	}
-}
-
-// handleSubscription is a generic handler for subscriptions to a specific type. It continuously listens to the subscription channel,
-// handles the received responses, and sends the processed information to the client via the provided stream using handleResponse.
-//
-// Parameters:
-// - sub: The subscription.
-// - handleResponse: The function responsible for handling the response of the subscribed type.
-//
-// Expected errors during normal operation:
-//   - codes.Internal: If the subscription encounters an error or gets an unexpected response.
-func handleSubscription[T any](sub subscription.Subscription, handleResponse func(resp T) error) error {
-	for {
-		v, ok := <-sub.Channel()
-		if !ok {
-			if sub.Err() != nil {
-				return rpc.ConvertError(sub.Err(), "stream encountered an error", codes.Internal)
-			}
-			return nil
-		}
-
-		resp, ok := v.(T)
-		if !ok {
-			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
-		}
-
-		err := handleResponse(resp)
-		if err != nil {
-			return err
-		}
 	}
 }
 
