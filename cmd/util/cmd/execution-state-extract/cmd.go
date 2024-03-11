@@ -33,7 +33,11 @@ var (
 	flagNoReport                      bool
 	flagValidateMigration             bool
 	flagAllowPartialStateFromPayloads bool
+	flagSortPayloads                  bool
+	flagPrune                         bool
 	flagLogVerboseValidationError     bool
+	flagDiffMigration                 bool
+	flagLogVerboseDiff                bool
 	flagStagedContractsFile           string
 	flagInputPayloadFileName          string
 	flagOutputPayloadFileName         string
@@ -81,11 +85,23 @@ func init() {
 	Cmd.Flags().BoolVar(&flagLogVerboseValidationError, "log-verbose-validation-error", false,
 		"log entire Cadence values on validation error (atree migration)")
 
+	Cmd.Flags().BoolVar(&flagDiffMigration, "diff", false,
+		"compare Cadence values and log diff (migration)")
+
+	Cmd.Flags().BoolVar(&flagLogVerboseDiff, "log-verbose-diff", false,
+		"log entire Cadence values on diff (requires --diff flag)")
+
 	Cmd.Flags().StringVar(&flagStagedContractsFile, "staged-contracts", "",
 		"Staged contracts CSV file")
 
 	Cmd.Flags().BoolVar(&flagAllowPartialStateFromPayloads, "allow-partial-state-from-payload-file", false,
 		"allow input payload file containing partial state (e.g. not all accounts)")
+
+	Cmd.Flags().BoolVar(&flagSortPayloads, "sort-payloads", true,
+		"sort payloads (generate deterministic output; disable only for development purposes)")
+
+	Cmd.Flags().BoolVar(&flagPrune, "prune", false,
+		"prune the state (for development purposes)")
 
 	// If specified, the state will consist of payloads from the given input payload file.
 	// If not specified, then the state will be extracted from the latest checkpoint file.
@@ -137,6 +153,10 @@ func run(*cobra.Command, []string) {
 	// When flagOutputPayloadByAddresses is specified, flagOutputPayloadFileName is required.
 	if len(flagOutputPayloadFileName) == 0 && len(flagOutputPayloadByAddresses) > 0 {
 		log.Fatal().Msg("--extract-payloads-by-address requires --output-payload-filename to be specified")
+	}
+
+	if flagValidateMigration && flagDiffMigration {
+		log.Fatal().Msg("Both --validate and --diff are enabled, please specify only one (or none) of these")
 	}
 
 	if len(flagBlockHash) > 0 {
@@ -241,11 +261,19 @@ func run(*cobra.Command, []string) {
 	}
 
 	if flagValidateMigration {
-		log.Warn().Msgf("atree migration validation flag is enabled and will increase duration of migration")
+		log.Warn().Msgf("--validate flag is enabled and will increase duration of migration")
 	}
 
 	if flagLogVerboseValidationError {
-		log.Warn().Msgf("atree migration has verbose validation error logging enabled which may increase size of log")
+		log.Warn().Msgf("--log-verbose-validation-error flag is enabled which may increase size of log")
+	}
+
+	if flagDiffMigration {
+		log.Warn().Msgf("--diff flag is enabled and will increase duration of migration")
+	}
+
+	if flagLogVerboseDiff {
+		log.Warn().Msgf("--log-verbose-diff flag is enabled which may increase size of log")
 	}
 
 	var inputMsg string
@@ -287,6 +315,14 @@ func run(*cobra.Command, []string) {
 	// TODO:
 	evmContractChange := migrations.EVMContractChangeNone
 
+	var burnerContractChange migrations.BurnerContractChange
+	switch chainID {
+	case flow.Emulator:
+		burnerContractChange = migrations.BurnerContractChangeDeploy
+	case flow.Testnet, flow.Mainnet:
+		burnerContractChange = migrations.BurnerContractChangeUpdate
+	}
+
 	stagedContracts, err := migrations.StagedContractsFromCSV(flagStagedContractsFile)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("error loading staged contracts: %s", err.Error())
@@ -299,12 +335,17 @@ func run(*cobra.Command, []string) {
 			flagOutputDir,
 			flagNWorker,
 			!flagNoMigration,
+			flagDiffMigration,
+			flagLogVerboseDiff,
 			chainID,
 			evmContractChange,
+			burnerContractChange,
 			stagedContracts,
 			flagInputPayloadFileName,
 			flagOutputPayloadFileName,
 			exportedAddresses,
+			flagSortPayloads,
+			flagPrune,
 		)
 	} else {
 		err = extractExecutionState(
@@ -314,11 +355,16 @@ func run(*cobra.Command, []string) {
 			flagOutputDir,
 			flagNWorker,
 			!flagNoMigration,
+			flagDiffMigration,
+			flagLogVerboseDiff,
 			chainID,
 			evmContractChange,
+			burnerContractChange,
 			stagedContracts,
 			flagOutputPayloadFileName,
 			exportedAddresses,
+			flagSortPayloads,
+			flagPrune,
 		)
 	}
 

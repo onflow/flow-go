@@ -314,7 +314,7 @@ func ReadPayloadFile(logger zerolog.Logger, payloadFile string) (bool, []*ledger
 			return false, nil, fmt.Errorf("can't decode payload in CBOR: %w", err)
 		}
 
-		payload, err := ledger.DecodePayloadWithoutPrefix(rawPayload, false, payloadEncodingVersion)
+		payload, err := ledger.DecodePayloadWithoutPrefix(rawPayload, true, payloadEncodingVersion)
 		if err != nil {
 			return false, nil, fmt.Errorf("can't decode payload 0x%x: %w", rawPayload, err)
 		}

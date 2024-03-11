@@ -80,7 +80,7 @@ func NewMigratorRuntime(
 		ri,
 		runtime.NewCodesAndPrograms(),
 		runtimeStorage,
-		runtime.NewCoverageReport(),
+		nil,
 	)
 
 	inter, err := interpreter.NewInterpreter(

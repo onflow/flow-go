@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -37,11 +38,16 @@ func extractExecutionState(
 	outputDir string,
 	nWorker int, // number of concurrent worker to migration payloads
 	runMigrations bool,
+	diffMigrations bool,
+	logVerboseDiff bool,
 	chainID flow.ChainID,
 	evmContractChange migrators.EVMContractChange,
+	burnerContractChange migrators.BurnerContractChange,
 	stagedContracts []migrators.StagedContract,
 	outputPayloadFile string,
 	exportPayloadsByAddresses []common.Address,
+	sortPayloads bool,
+	prune bool,
 ) error {
 
 	log.Info().Msg("init WAL")
@@ -78,7 +84,16 @@ func extractExecutionState(
 
 	log.Info().Msg("init compactor")
 
-	compactor, err := complete.NewCompactor(led, diskWal, log, complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), &metrics.NoopCollector{})
+	compactor, err := complete.NewCompactor(
+		led,
+		diskWal,
+		log,
+		complete.DefaultCacheSize,
+		checkpointDistance,
+		checkpointsToKeep,
+		atomic.NewBool(false),
+		&metrics.NoopCollector{},
+	)
 	if err != nil {
 		return fmt.Errorf("cannot create compactor: %w", err)
 	}
@@ -97,9 +112,13 @@ func extractExecutionState(
 		dir,
 		nWorker,
 		runMigrations,
+		diffMigrations,
+		logVerboseDiff,
 		chainID,
 		evmContractChange,
+		burnerContractChange,
 		stagedContracts,
+		prune,
 	)
 
 	newState := ledger.State(targetHash)
@@ -118,43 +137,29 @@ func extractExecutionState(
 	// create reporter
 	reporter := reporters.NewExportReporter(
 		log,
-		func() flow.StateCommitment { return targetHash },
+		func() flow.StateCommitment {
+			return targetHash
+		},
 	)
 
 	newMigratedState := ledger.State(newTrie.RootHash())
 	err = reporter.Report(nil, newMigratedState)
 	if err != nil {
-		log.Error().Err(err).Msgf("can not generate report for migrated state: %v", newMigratedState)
+		log.Err(err).Msgf("can not generate report for migrated state: %v", newMigratedState)
 	}
 
-	exportPayloads := len(outputPayloadFile) > 0
-	if exportPayloads {
+	if len(outputPayloadFile) > 0 {
 		payloads := newTrie.AllPayloads()
 
-		log.Info().Msgf("sorting %d payloads", len(payloads))
-
-		// Sort payloads to produce deterministic payload file with
-		// same sequence of payloads inside.
-		payloads = util.SortPayloadsByAddress(payloads, nWorker)
-
-		log.Info().Msgf("sorted %d payloads", len(payloads))
-
-		log.Info().Msgf("creating payloads file %s", outputPayloadFile)
-
-		exportedPayloadCount, err := util.CreatePayloadFile(
+		return exportPayloads(
 			log,
-			outputPayloadFile,
 			payloads,
+			nWorker,
+			outputPayloadFile,
 			exportPayloadsByAddresses,
 			false, // payloads represents entire state.
+			sortPayloads,
 		)
-		if err != nil {
-			return fmt.Errorf("cannot generate payloads file: %w", err)
-		}
-
-		log.Info().Msgf("Exported %d payloads out of %d payloads", exportedPayloadCount, len(payloads))
-
-		return nil
 	}
 
 	migratedState, err := createCheckpoint(
@@ -215,18 +220,37 @@ func writeStatusFile(fileName string, e error) error {
 	return err
 }
 
+func ByteCountIEC(b int64) string {
+	const unit = 1024
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %ciB",
+		float64(b)/float64(div), "KMGTPE"[exp])
+}
+
 func extractExecutionStateFromPayloads(
 	log zerolog.Logger,
 	dir string,
 	outputDir string,
 	nWorker int, // number of concurrent worker to migation payloads
 	runMigrations bool,
+	diffMigrations bool,
+	logVerboseDiff bool,
 	chainID flow.ChainID,
 	evmContractChange migrators.EVMContractChange,
+	burnerContractChange migrators.BurnerContractChange,
 	stagedContracts []migrators.StagedContract,
 	inputPayloadFile string,
 	outputPayloadFile string,
 	exportPayloadsByAddresses []common.Address,
+	sortPayloads bool,
+	prune bool,
 ) error {
 
 	inputPayloadsFromPartialState, payloads, err := util.ReadPayloadFile(log, inputPayloadFile)
@@ -236,14 +260,48 @@ func extractExecutionStateFromPayloads(
 
 	log.Info().Msgf("read %d payloads", len(payloads))
 
+	if log.Debug().Enabled() {
+
+		type accountInfo struct {
+			count int
+			size  uint64
+		}
+		payloadCountByAddress := make(map[string]accountInfo)
+
+		for _, payload := range payloads {
+			registerID, payloadValue, err := convert.PayloadToRegister(payload)
+			if err != nil {
+				return fmt.Errorf("cannot convert payload to register: %w", err)
+			}
+			owner := registerID.Owner
+			accountInfo := payloadCountByAddress[owner]
+			accountInfo.count++
+			accountInfo.size += uint64(len(payloadValue))
+			payloadCountByAddress[owner] = accountInfo
+		}
+
+		for address, info := range payloadCountByAddress {
+			log.Debug().Msgf(
+				"address %x has %d payloads and a total size of %s",
+				address,
+				info.count,
+				ByteCountIEC(int64(info.size)),
+			)
+		}
+	}
+
 	migrations := newMigrations(
 		log,
 		dir,
 		nWorker,
 		runMigrations,
+		diffMigrations,
+		logVerboseDiff,
 		chainID,
 		evmContractChange,
+		burnerContractChange,
 		stagedContracts,
+		prune,
 	)
 
 	payloads, err = migratePayloads(log, payloads, migrations)
@@ -251,33 +309,16 @@ func extractExecutionStateFromPayloads(
 		return err
 	}
 
-	exportPayloads := len(outputPayloadFile) > 0
-	if exportPayloads {
-
-		log.Info().Msgf("sorting %d payloads", len(payloads))
-
-		// Sort payloads to produce deterministic payload file with
-		// same sequence of payloads inside.
-		payloads = util.SortPayloadsByAddress(payloads, nWorker)
-
-		log.Info().Msgf("sorted %d payloads", len(payloads))
-
-		log.Info().Msgf("creating payloads file %s", outputPayloadFile)
-
-		exportedPayloadCount, err := util.CreatePayloadFile(
+	if len(outputPayloadFile) > 0 {
+		return exportPayloads(
 			log,
-			outputPayloadFile,
 			payloads,
+			nWorker,
+			outputPayloadFile,
 			exportPayloadsByAddresses,
 			inputPayloadsFromPartialState,
+			sortPayloads,
 		)
-		if err != nil {
-			return fmt.Errorf("cannot generate payloads file: %w", err)
-		}
-
-		log.Info().Msgf("Exported %d payloads out of %d payloads", exportedPayloadCount, len(payloads))
-
-		return nil
 	}
 
 	newTrie, err := createTrieFromPayloads(log, payloads)
@@ -300,6 +341,43 @@ func extractExecutionStateFromPayloads(
 		migratedState.String(),
 		migratedState.Base64(),
 	)
+
+	return nil
+}
+
+func exportPayloads(
+	log zerolog.Logger,
+	payloads []*ledger.Payload,
+	nWorker int,
+	outputPayloadFile string,
+	exportPayloadsByAddresses []common.Address,
+	inputPayloadsFromPartialState bool,
+	sortPayloads bool,
+) error {
+	if sortPayloads {
+		log.Info().Msgf("sorting %d payloads", len(payloads))
+
+		// Sort payloads to produce deterministic payload file with
+		// same sequence of payloads inside.
+		payloads = util.SortPayloadsByAddress(payloads, nWorker)
+
+		log.Info().Msgf("sorted %d payloads", len(payloads))
+	}
+
+	log.Info().Msgf("creating payloads file %s", outputPayloadFile)
+
+	exportedPayloadCount, err := util.CreatePayloadFile(
+		log,
+		outputPayloadFile,
+		payloads,
+		exportPayloadsByAddresses,
+		inputPayloadsFromPartialState,
+	)
+	if err != nil {
+		return fmt.Errorf("cannot generate payloads file: %w", err)
+	}
+
+	log.Info().Msgf("exported %d payloads out of %d payloads", exportedPayloadCount, len(payloads))
 
 	return nil
 }
@@ -373,22 +451,41 @@ func newMigrations(
 	dir string,
 	nWorker int,
 	runMigrations bool,
+	diffMigrations bool,
+	logVerboseDiff bool,
 	chainID flow.ChainID,
 	evmContractChange migrators.EVMContractChange,
+	burnerContractChange migrators.BurnerContractChange,
 	stagedContracts []migrators.StagedContract,
+	prune bool,
 ) []ledger.Migration {
 	if !runMigrations {
 		return nil
 	}
 
+	log.Info().Msgf("initializing migrations")
+
 	rwf := reporters.NewReportFileWriterFactory(dir, log)
 
-	return migrators.NewCadence1Migrations(
+	namedMigrations := migrators.NewCadence1Migrations(
 		log,
 		rwf,
 		nWorker,
 		chainID,
+		diffMigrations,
+		logVerboseDiff,
 		evmContractChange,
+		burnerContractChange,
 		stagedContracts,
+		prune,
 	)
+
+	migrations := make([]ledger.Migration, 0, len(namedMigrations))
+	for _, migration := range namedMigrations {
+		migrations = append(migrations, migration.Migrate)
+	}
+
+	log.Info().Msgf("initialized migrations")
+
+	return migrations
 }

@@ -6,62 +6,15 @@ import (
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
-	"github.com/onflow/flow-go/engine/execution/computation"
-	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-func NewTransactionBasedMigration(
-	tx *flow.TransactionBody,
-	chainID flow.ChainID,
-	logger zerolog.Logger,
-) ledger.Migration {
-	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
-
-		options := computation.DefaultFVMOptions(chainID, false, false)
-		options = append(options,
-			fvm.WithContractDeploymentRestricted(false),
-			fvm.WithContractRemovalRestricted(false),
-			fvm.WithAuthorizationChecksEnabled(false),
-			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-			fvm.WithTransactionFeesEnabled(false))
-		ctx := fvm.NewContext(options...)
-
-		snapshot, err := util.NewPayloadSnapshot(payloads)
-		if err != nil {
-			return nil, err
-		}
-
-		vm := fvm.NewVirtualMachine()
-
-		executionSnapshot, res, err := vm.Run(
-			ctx,
-			fvm.Transaction(tx, 0),
-			snapshot,
-		)
-
-		if err != nil {
-			return nil, err
-		}
-
-		if res.Err != nil {
-			return nil, res.Err
-		}
-
-		return MergeRegisterChanges(
-			snapshot.Payloads,
-			executionSnapshot.WriteSet,
-			logger,
-		)
-	}
-}
 
 func NewDeploymentMigration(
 	chainID flow.ChainID,
 	contract Contract,
 	authorizer flow.Address,
+	expectedWriteAddresses map[flow.Address]struct{},
 	logger zerolog.Logger,
 ) ledger.Migration {
 
@@ -79,21 +32,29 @@ func NewDeploymentMigration(
 		AddArgument(jsoncdc.MustEncode(cadence.String(contract.Code))).
 		AddAuthorizer(authorizer)
 
-	return NewTransactionBasedMigration(tx, chainID, logger)
+	return NewTransactionBasedMigration(
+		tx,
+		chainID,
+		logger,
+		expectedWriteAddresses,
+	)
 }
 
 func NewBurnerDeploymentMigration(
 	chainID flow.ChainID,
 	logger zerolog.Logger,
 ) ledger.Migration {
-
+	address := BurnerAddressForChain(chainID)
 	return NewDeploymentMigration(
 		chainID,
 		Contract{
 			Name: "Burner",
 			Code: coreContracts.Burner(),
 		},
-		BurnerAddressForChain(chainID),
+		address,
+		map[flow.Address]struct{}{
+			address: {},
+		},
 		logger,
 	)
 }

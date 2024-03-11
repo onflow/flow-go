@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/cadence/runtime/common"
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
+	"github.com/rs/zerolog"
 
 	evm "github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -17,9 +18,9 @@ type ChangeContractCodeMigration struct {
 
 var _ AccountBasedMigration = (*ChangeContractCodeMigration)(nil)
 
-func NewChangeContractCodeMigration(chainID flow.ChainID) *ChangeContractCodeMigration {
+func NewChangeContractCodeMigration(chainID flow.ChainID, log zerolog.Logger) *ChangeContractCodeMigration {
 	return &ChangeContractCodeMigration{
-		StagedContractsMigration: NewStagedContractsMigration(chainID).
+		StagedContractsMigration: NewStagedContractsMigration(chainID, log).
 			// TODO:
 			//WithContractUpdateValidation().
 			WithName("ChangeContractCodeMigration"),
@@ -47,8 +48,17 @@ const (
 	EVMContractChangeFull
 )
 
+type BurnerContractChange uint8
+
+const (
+	BurnerContractChangeNone BurnerContractChange = iota
+	BurnerContractChangeDeploy
+	BurnerContractChangeUpdate
+)
+
 type SystemContractChangesOptions struct {
-	EVM EVMContractChange
+	EVM    EVMContractChange
+	Burner BurnerContractChange
 }
 
 func BurnerAddressForChain(chainID flow.ChainID) flow.Address {
@@ -243,14 +253,29 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 		panic(fmt.Errorf("unsupported EVM contract change option: %d", options.EVM))
 	}
 
+	// Burner contract
+	if options.Burner == BurnerContractChangeUpdate {
+		contractChanges = append(
+			contractChanges,
+			StagedContract{
+				Address: common.Address(flow.HexToAddress(env.BurnerAddress)),
+				Contract: Contract{
+					Name: "Burner",
+					Code: coreContracts.Burner(),
+				},
+			},
+		)
+	}
+
 	return contractChanges
 }
 
-func NewSystemContactsMigration(
+func NewSystemContractsMigration(
 	chainID flow.ChainID,
+	log zerolog.Logger,
 	options SystemContractChangesOptions,
 ) *ChangeContractCodeMigration {
-	migration := NewChangeContractCodeMigration(chainID)
+	migration := NewChangeContractCodeMigration(chainID, log)
 	for _, change := range SystemContractChanges(chainID, options) {
 		migration.RegisterContractChange(change)
 	}
