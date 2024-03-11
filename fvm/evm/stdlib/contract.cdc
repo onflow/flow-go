@@ -7,6 +7,18 @@ contract EVM {
     access(all)
     event CadenceOwnedAccountCreated(addressBytes: [UInt8; 20])
 
+    /// FLOWTokenDeposit is emitted when FLOW tokens is bridged 
+    /// into the EVM environment. Note that this event is not emitted 
+    /// for transfer of flow tokens between two EVM addresses.
+    access(all)
+    event FLOWTokenDeposit(addressBytes: [UInt8; 20], amount: UFix64)
+
+    /// FLOWTokenWithdraw is emitted when FLOW tokens are bridged 
+    /// out of the EVM environment. Note that this event is not emitted 
+    /// for transfer of flow tokens between two EVM addresses.
+    access(all)
+    event FLOWTokenWithdraw(addressBytes: [UInt8; 20], amount: UFix64)
+
     /// EVMAddress is an EVM-compatible address
     access(all)
     struct EVMAddress {
@@ -56,10 +68,12 @@ contract EVM {
         /// Deposits the given vault into the EVM account with the given address
         access(all)
         fun deposit(from: @FlowToken.Vault) {
+            let amount = from.balance
             InternalEVM.deposit(
                 from: <-from,
                 to: self.bytes
             )
+            emit FLOWTokenDeposit(addressBytes: self.bytes, amount: amount)
         }
     }
 
@@ -224,6 +238,7 @@ contract EVM {
                 from: self.addressBytes,
                 amount: balance.attoflow
             ) as! @FlowToken.Vault
+            emit FLOWTokenWithdraw(addressBytes: self.addressBytes, amount: balance.inFLOW)
             return <-vault
         }
 
