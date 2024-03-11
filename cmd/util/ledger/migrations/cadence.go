@@ -2,6 +2,7 @@ package migrations
 
 import (
 	_ "embed"
+	"fmt"
 
 	"github.com/onflow/cadence/migrations/capcons"
 	"github.com/onflow/cadence/migrations/statictypes"
@@ -18,10 +19,15 @@ import (
 func NewInterfaceTypeConversionRules(chainID flow.ChainID) StaticTypeMigrationRules {
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
-	oldFungibleTokenResolverType, newFungibleTokenResolverType := fungibleTokenResolverRule(systemContracts)
+	oldFungibleTokenResolverType, newFungibleTokenResolverType :=
+		newFungibleTokenMetadataViewsToViewResolverRule(systemContracts, "Resolver")
+
+	oldFungibleTokenResolverCollectionType, newFungibleTokenResolverCollectionType :=
+		newFungibleTokenMetadataViewsToViewResolverRule(systemContracts, "ResolverCollection")
 
 	return StaticTypeMigrationRules{
-		oldFungibleTokenResolverType.ID(): newFungibleTokenResolverType,
+		oldFungibleTokenResolverType.ID():           newFungibleTokenResolverType,
+		oldFungibleTokenResolverCollectionType.ID(): newFungibleTokenResolverCollectionType,
 	}
 }
 
@@ -119,8 +125,9 @@ func fungibleTokenVaultRule(
 	return oldType, newType
 }
 
-func fungibleTokenResolverRule(
+func newFungibleTokenMetadataViewsToViewResolverRule(
 	systemContracts *systemcontracts.SystemContracts,
+	typeName string,
 ) (
 	*interpreter.InterfaceStaticType,
 	*interpreter.InterfaceStaticType,
@@ -138,8 +145,8 @@ func fungibleTokenResolverRule(
 		Name:    newContract.Name,
 	}
 
-	oldQualifiedIdentifier := oldContract.Name + ".Resolver"
-	newQualifiedIdentifier := newContract.Name + ".Resolver"
+	oldQualifiedIdentifier := fmt.Sprintf("%s.%s", oldContract.Name, typeName)
+	newQualifiedIdentifier := fmt.Sprintf("%s.%s", newContract.Name, typeName)
 
 	oldType := &interpreter.InterfaceStaticType{
 		Location:            oldLocation,
