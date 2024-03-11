@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
@@ -30,6 +31,13 @@ func (s *BackendBlockHeadersSuite) SetupTest() {
 
 // TestSubscribeBlockHeadersFromStartBlockID tests the SubscribeBlockHeadersFromStartBlockID method.
 func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromStartBlockID() {
+	s.blockTracker.On(
+		"GetStartHeightFromBlockID",
+		mock.AnythingOfType("flow.Identifier"),
+	).Return(func(startBlockID flow.Identifier) (uint64, error) {
+		return s.blockTrackerReal.GetStartHeightFromBlockID(startBlockID)
+	}, nil)
+
 	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
 		return s.backend.SubscribeBlockHeadersFromStartBlockID(ctx, startValue.(flow.Identifier), blockStatus)
 	}
@@ -39,6 +47,13 @@ func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromStartBlockID() {
 
 // TestSubscribeBlockHeadersFromStartHeight tests the SubscribeBlockHeadersFromStartHeight method.
 func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromStartHeight() {
+	s.blockTracker.On(
+		"GetStartHeightFromHeight",
+		mock.AnythingOfType("uint64"),
+	).Return(func(startHeight uint64) (uint64, error) {
+		return s.blockTrackerReal.GetStartHeightFromHeight(startHeight)
+	}, nil)
+
 	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
 		return s.backend.SubscribeBlockHeadersFromStartHeight(ctx, startValue.(uint64), blockStatus)
 	}
@@ -48,6 +63,13 @@ func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromStartHeight() {
 
 // TestSubscribeBlockHeadersFromLatest tests the SubscribeBlockHeadersFromLatest method.
 func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromLatest() {
+	s.blockTracker.On(
+		"GetStartHeightFromLatest",
+		mock.Anything,
+	).Return(func(ctx context.Context) (uint64, error) {
+		return s.blockTrackerReal.GetStartHeightFromLatest(ctx)
+	}, nil)
+
 	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
 		return s.backend.SubscribeBlockHeadersFromLatest(ctx, blockStatus)
 	}
@@ -84,6 +106,14 @@ func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersHandlesErrors() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// mock block tracker for GetStartHeightFromBlockID
+	s.blockTracker.On(
+		"GetStartHeightFromBlockID",
+		mock.AnythingOfType("flow.Identifier"),
+	).Return(func(startBlockID flow.Identifier) (uint64, error) {
+		return s.blockTrackerReal.GetStartHeightFromBlockID(startBlockID)
+	}, nil)
+
 	s.Run("returns error for unknown start block id is provided", func() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
@@ -91,6 +121,14 @@ func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersHandlesErrors() {
 		sub := s.backend.SubscribeBlockHeadersFromStartBlockID(subCtx, unittest.IdentifierFixture(), flow.BlockStatusFinalized)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected %s, got %v: %v", codes.NotFound, status.Code(sub.Err()).String(), sub.Err())
 	})
+
+	// mock block tracker for GetStartHeightFromHeight
+	s.blockTracker.On(
+		"GetStartHeightFromHeight",
+		mock.AnythingOfType("uint64"),
+	).Return(func(startHeight uint64) (uint64, error) {
+		return s.blockTrackerReal.GetStartHeightFromHeight(startHeight)
+	}, nil)
 
 	s.Run("returns error if start height before root height", func() {
 		subCtx, subCancel := context.WithCancel(ctx)

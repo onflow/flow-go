@@ -22,6 +22,7 @@ import (
 // new Execution Data notification
 type ExecutionDataTracker interface {
 	BaseTracker
+	GetStartHeight(context.Context, flow.Identifier, uint64) (uint64, error)
 	// GetHighestHeight returns the highest height that we have consecutive execution data for.
 	GetHighestHeight() uint64
 	// OnExecutionData is used to notify the tracker when a new execution data is received.
@@ -97,7 +98,28 @@ func NewExecutionDataTracker(
 // - storage.ErrNotFound   - if a block is provided and does not exist.
 // - codes.Internal        - if there is an internal error.
 func (e *ExecutionDataTrackerImpl) GetStartHeight(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
-	height, err := e.BaseTracker.GetStartHeight(ctx, startBlockID, startHeight)
+	var height uint64 = 0
+	var err error
+
+	if startBlockID != flow.ZeroID && startHeight > 0 {
+		return 0, status.Errorf(codes.InvalidArgument, "only one of start block ID and start height may be provided")
+	}
+
+	// get the start height based on the provided starting block ID
+	if startBlockID != flow.ZeroID {
+		height, err = e.GetStartHeightFromBlockID(startBlockID)
+	}
+
+	// get start height based on the provided starting block height
+	if startHeight > 0 {
+		height, err = e.GetStartHeightFromHeight(startHeight)
+	}
+
+	// get start height based latest sealed block when neither startBlockID nor startHeight is provided
+	if startBlockID == flow.ZeroID && startHeight == 0 {
+		height, err = e.GetStartHeightFromLatest(ctx)
+	}
+
 	if err != nil {
 		return 0, err
 	}

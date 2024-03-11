@@ -30,23 +30,71 @@ func (_m *ExecutionDataTracker) GetHighestHeight() uint64 {
 	return r0
 }
 
-// GetStartHeight provides a mock function with given fields: _a0, _a1, _a2
-func (_m *ExecutionDataTracker) GetStartHeight(_a0 context.Context, _a1 flow.Identifier, _a2 uint64) (uint64, error) {
-	ret := _m.Called(_a0, _a1, _a2)
+// GetStartHeightFromBlockID provides a mock function with given fields: _a0
+func (_m *ExecutionDataTracker) GetStartHeightFromBlockID(_a0 flow.Identifier) (uint64, error) {
+	ret := _m.Called(_a0)
 
 	var r0 uint64
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64) (uint64, error)); ok {
-		return rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (uint64, error)); ok {
+		return rf(_a0)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64) uint64); ok {
-		r0 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) uint64); ok {
+		r0 = rf(_a0)
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, uint64) error); ok {
-		r1 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(_a0)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetStartHeightFromHeight provides a mock function with given fields: _a0
+func (_m *ExecutionDataTracker) GetStartHeightFromHeight(_a0 uint64) (uint64, error) {
+	ret := _m.Called(_a0)
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(uint64) (uint64, error)); ok {
+		return rf(_a0)
+	}
+	if rf, ok := ret.Get(0).(func(uint64) uint64); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func(uint64) error); ok {
+		r1 = rf(_a0)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetStartHeightFromLatest provides a mock function with given fields: _a0
+func (_m *ExecutionDataTracker) GetStartHeightFromLatest(_a0 context.Context) (uint64, error) {
+	ret := _m.Called(_a0)
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (uint64, error)); ok {
+		return rf(_a0)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) uint64); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)
 	}

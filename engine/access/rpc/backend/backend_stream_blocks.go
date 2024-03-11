@@ -192,24 +192,32 @@ func (b *backendSubscribeBlocks) SubscribeBlockDigestsFromLatest(ctx context.Con
 //
 // Parameters:
 // - ctx: Context for the operation.
-// - startHeight: The height of the starting block.
+// - startBlockID: The identifier of the starting block.
 // - getData: The callback used by subscriptions to retrieve data information for the specified height and block status.
 //
-// If invalid parameters are supplied, subscribe will return a failed subscription.
+// If invalid parameters are supplied, subscribeFromStartBlockID will return a failed subscription.
 func (b *backendSubscribeBlocks) subscribeFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, getData subscription.GetDataByHeightFunc) subscription.Subscription {
-	return b.subscribe(ctx, startBlockID, 0, getData)
+	nextHeight, err := b.blockTracker.GetStartHeightFromBlockID(startBlockID)
+	if err != nil {
+		return subscription.NewFailedSubscription(err, "could not get start height from block id")
+	}
+	return b.subscribe(ctx, nextHeight, getData)
 }
 
 // subscribeFromStartHeight is common method that allows clients to subscribe starting at the requested start block height.
 //
 // Parameters:
 // - ctx: Context for the operation.
-// - startBlockID: The identifier of the starting block.
+// - startHeight: The height of the starting block.
 // - getData: The callback used by subscriptions to retrieve data information for the specified height and block status.
 //
-// If invalid parameters are supplied, subscribe will return a failed subscription.
+// If invalid parameters are supplied, subscribeFromStartHeight will return a failed subscription.
 func (b *backendSubscribeBlocks) subscribeFromStartHeight(ctx context.Context, startHeight uint64, getData subscription.GetDataByHeightFunc) subscription.Subscription {
-	return b.subscribe(ctx, flow.ZeroID, startHeight, getData)
+	nextHeight, err := b.blockTracker.GetStartHeightFromHeight(startHeight)
+	if err != nil {
+		return subscription.NewFailedSubscription(err, "could not get start height from block height")
+	}
+	return b.subscribe(ctx, nextHeight, getData)
 }
 
 // subscribeFromLatest is common method that allows clients to subscribe starting at the latest sealed block.
@@ -218,28 +226,24 @@ func (b *backendSubscribeBlocks) subscribeFromStartHeight(ctx context.Context, s
 // - ctx: Context for the operation.
 // - getData: The callback used by subscriptions to retrieve data information for the specified height and block status.
 //
-// If invalid parameters are supplied, subscribe will return a failed subscription.
+// No errors are expected during normal operation.
 func (b *backendSubscribeBlocks) subscribeFromLatest(ctx context.Context, getData subscription.GetDataByHeightFunc) subscription.Subscription {
-	return b.subscribe(ctx, flow.ZeroID, 0, getData)
+	nextHeight, err := b.blockTracker.GetStartHeightFromLatest(ctx)
+	if err != nil {
+		return subscription.NewFailedSubscription(err, "could not get start height from latest")
+	}
+	return b.subscribe(ctx, nextHeight, getData)
 }
 
 // subscribe is common method that allows clients to subscribe to different types of data.
-// Only one of startBlockID or startHeight may be provided, Otherwise, subscribe will return a failed subscription.
-// If neither startBlockID nor startHeight is provided, the latest sealed block is used.
 //
 // Parameters:
 // - ctx: The context for the subscription.
-// - startBlockID: The identifier of the starting block. If provided, startHeight should be 0.
-// - startBlockHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
+// - nextHeight: The height of the starting block.
 // - getData: The callback used by subscriptions to retrieve data information for the specified height and block status.
 //
-// If invalid parameters are supplied, subscribe will return a failed subscription.
-func (b *backendSubscribeBlocks) subscribe(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, getData subscription.GetDataByHeightFunc) subscription.Subscription {
-	nextHeight, err := b.blockTracker.GetStartHeight(ctx, startBlockID, startHeight)
-	if err != nil {
-		return subscription.NewFailedSubscription(err, "could not get start height")
-	}
-
+// No errors are expected during normal operation.
+func (b *backendSubscribeBlocks) subscribe(ctx context.Context, nextHeight uint64, getData subscription.GetDataByHeightFunc) subscription.Subscription {
 	sub := subscription.NewHeightBasedSubscription(b.sendBufferSize, nextHeight, getData)
 	go subscription.NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
 
