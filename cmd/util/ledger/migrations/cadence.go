@@ -176,12 +176,29 @@ func NewCadence1ValueMigrations(
 
 	errorMessageHandler := &errorMessageHandler{}
 
+	// The value migrations are run as account-based migrations,
+	// i.e. the migrations are only given the payloads for the account to be migrated.
+	// However, the migrations need to be able to get the code for contracts of any account.
+	//
+	// To achieve this, the contracts are extracted from the payloads once,
+	// before the value migrations are run.
+
+	contracts := make(map[common.AddressLocation][]byte, 1000)
+
+	migrations = []NamedMigration{
+		{
+			Name:    "contracts",
+			Migrate: NewContractsExtractionMigration(contracts, log),
+		},
+	}
+
 	for _, accountBasedMigration := range []*CadenceBaseMigrator{
 		NewCadence1ValueMigrator(
 			rwf,
 			diffMigrations,
 			logVerboseDiff,
 			errorMessageHandler,
+			contracts,
 			NewCadence1CompositeStaticTypeConverter(chainID),
 			NewCadence1InterfaceStaticTypeConverter(chainID),
 		),
@@ -190,6 +207,7 @@ func NewCadence1ValueMigrations(
 			diffMigrations,
 			logVerboseDiff,
 			errorMessageHandler,
+			contracts,
 			capabilityMapping,
 		),
 		NewCadence1CapabilityValueMigrator(
@@ -197,6 +215,7 @@ func NewCadence1ValueMigrations(
 			diffMigrations,
 			logVerboseDiff,
 			errorMessageHandler,
+			contracts,
 			capabilityMapping,
 		),
 	} {
