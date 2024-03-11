@@ -238,7 +238,7 @@ contract EVM {
                 from: self.addressBytes,
                 amount: balance.attoflow
             ) as! @FlowToken.Vault
-            emit FLOWTokenWithdraw(addressBytes: self.addressBytes, amount: balance.inFLOW)
+            emit FLOWTokenWithdraw(addressBytes: self.addressBytes, amount: balance.inFLOW())
             return <-vault
         }
 
