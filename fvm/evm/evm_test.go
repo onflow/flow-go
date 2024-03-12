@@ -45,7 +45,7 @@ func TestEVMRun(t *testing.T) {
 					import EVM from %s
 
 					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
-						prepare(account: AuthAccount) {
+						prepare(account: &Account) {
 							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
 							let res = EVM.run(tx: tx, coinbase: coinbase)
 
@@ -154,7 +154,7 @@ func TestEVMRun(t *testing.T) {
 					import EVM from %s
 
 					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
-						prepare(account: AuthAccount) {
+						prepare(account: &Account) {
 							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
 							let res = EVM.run(tx: tx, coinbase: coinbase)
 
@@ -269,13 +269,15 @@ func TestEVMAddressDeposit(t *testing.T) {
 				import FlowToken from %s
 
 				transaction(addr: [UInt8; 20]) {
-					prepare(account: AuthAccount) {
-						let admin = account.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+					prepare(account: auth(BorrowValue) &Account) {
+						let admin = account.storage
+							.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+
 						let minter <- admin.createNewMinter(allowedAmount: 1.0)
 						let vault <- minter.mintTokens(amount: 1.0)
 						destroy minter
 
-						let address = EVM.EVMAddress(addr)
+						let address = EVM.EVMAddress(bytes: addr)
 						address.deposit(from: <-vault)
 					}
 				}
@@ -554,8 +556,9 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				access(all)
 				fun main(): UFix64 {
-					let admin = getAuthAccount(%s)
-						.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+					let admin = getAuthAccount<auth(Storage) &Account>(%s)
+						.storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+
 					let minter <- admin.createNewMinter(allowedAmount: 2.34)
 					let vault <- minter.mintTokens(amount: 2.34)
 					destroy minter
@@ -605,8 +608,9 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 	
 					access(all)
 					fun main(): [UInt8; 20] {
-						let admin = getAuthAccount(%s)
-							.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+						let admin = getAuthAccount<auth(Storage) &Account>(%s)
+							.storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+
 						let minter <- admin.createNewMinter(allowedAmount: 2.34)
 						let vault <- minter.mintTokens(amount: 2.34)
 						destroy minter
@@ -823,13 +827,15 @@ func createAndFundFlowAccount(
 		import FungibleToken from %s 
 
 		transaction {
-			prepare(account: AuthAccount) {
-			let admin = account.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+			prepare(account: auth(BorrowValue) &Account) {
+			let admin = account.storage
+				.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+
 			let minter <- admin.createNewMinter(allowedAmount: 100.0)
 			let vault <- minter.mintTokens(amount: 100.0)
 
-			let receiverRef = getAccount(%s).getCapability(/public/flowTokenReceiver)
-				.borrow<&{FungibleToken.Receiver}>()
+			let receiverRef = getAccount(%s).capabilities
+				.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 				?? panic("Could not borrow receiver reference to the recipient's Vault")
 			receiverRef.deposit(from: <-vault)
 

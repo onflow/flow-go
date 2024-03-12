@@ -3205,8 +3205,8 @@ func TestEVMAddressDeposit(t *testing.T) {
 
       access(all)
       fun main() {
-          let admin = getAuthAccount(0x1)
-              .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+          let admin = getAuthAccount<auth(Storage) &Account>(0x1)
+              .storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
           let minter <- admin.createNewMinter(allowedAmount: 1.23)
           let vault <- minter.mintTokens(amount: 1.23)
           destroy minter
