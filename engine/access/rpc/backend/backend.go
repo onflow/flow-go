@@ -258,6 +258,7 @@ func New(params Params) (*Backend, error) {
 		backendSubscribeTransactions: backendSubscribeTransactions{
 			txLocalDataProvider: transactionsLocalDataProvider,
 			log:                 params.Log,
+			executionResults:    params.ExecutionResults,
 			broadcaster:         params.SubscriptionParams.Broadcaster,
 			sendTimeout:         params.SubscriptionParams.SendTimeout,
 			responseLimit:       params.SubscriptionParams.ResponseLimit,

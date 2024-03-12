@@ -9,10 +9,8 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state"
 
-	"github.com/onflow/flow-go/module/counters"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
-
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/module/counters"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -29,6 +27,7 @@ import (
 // backendSubscribeTransactions handles transaction subscriptions.
 type backendSubscribeTransactions struct {
 	txLocalDataProvider TransactionsLocalDataProvider
+	executionResults    storage.ExecutionResults
 	log                 zerolog.Logger
 	broadcaster         *engine.Broadcaster
 	sendTimeout         time.Duration
@@ -109,7 +108,7 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *Tran
 
 			if !txInfo.txExecuted {
 				// Check if transaction was executed.
-				txInfo.txExecuted, err = b.searchForTransactionResult(blockID, txInfo)
+				txInfo.txExecuted, err = b.searchForExecutionResult(blockID)
 				if err != nil {
 					return nil, err
 				}
@@ -138,7 +137,7 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *Tran
 }
 
 // searchForTransactionBlock searches for the block containing transaction information at the given height.
-// It updates the TransactionSubscriptionMetadata with the found block if the transaction is present.
+// It returns the header where the transaction is present.
 func (b *backendSubscribeTransactions) searchForTransactionBlock(
 	height uint64,
 	txInfo *TransactionSubscriptionMetadata,
@@ -162,18 +161,14 @@ func (b *backendSubscribeTransactions) searchForTransactionBlock(
 	return nil, nil
 }
 
-// searchForTransactionResult searches for the transaction result by block ID and transaction ID.
-// It updates the TransactionSubscriptionMetadata with the execution status of the transaction.
-func (b *backendSubscribeTransactions) searchForTransactionResult(
+// searchForExecutionResult searches for the execution result by block ID. It returns true if the  execution result was found.
+func (b *backendSubscribeTransactions) searchForExecutionResult(
 	blockID flow.Identifier,
-	txInfo *TransactionSubscriptionMetadata,
 ) (bool, error) {
-	result, err := b.txLocalDataProvider.txResultsIndex.ByBlockIDTransactionID(blockID, txInfo.blockWithTx.Height, txInfo.txID)
+	result, err := b.executionResults.ByBlockID(blockID)
 	if err != nil {
-		if !errors.Is(err, storage.ErrNotFound) &&
-			!errors.Is(err, storage.ErrHeightNotIndexed) &&
-			!errors.Is(err, indexer.ErrIndexNotInitialized) {
-			return false, rpc.ConvertError(err, fmt.Sprintf("failed to get transaction result for block %s", blockID), codes.Internal)
+		if !errors.Is(err, storage.ErrNotFound) {
+			return false, rpc.ConvertError(err, fmt.Sprintf("failed to get execution result for block %s", blockID), codes.Internal)
 		}
 	}
 

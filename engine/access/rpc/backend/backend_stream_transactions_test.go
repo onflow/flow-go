@@ -66,7 +66,7 @@ type TransactionStatusSuite struct {
 
 	blocksArray []*flow.Block
 	blockMap    map[uint64]*flow.Block
-	txResultMap map[flow.Identifier]*flow.LightTransactionResult
+	resultsMap  map[flow.Identifier]*flow.ExecutionResult
 
 	backend *Backend
 }
@@ -108,11 +108,17 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.communicator = new(backendmock.Communicator)
 	s.broadcaster = engine.NewBroadcaster()
 	s.blockTracker = subscriptionmock.NewBlockTracker(s.T())
+	s.resultsMap = map[flow.Identifier]*flow.ExecutionResult{}
 
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	s.rootBlock = unittest.BlockFixture()
+	rootResult := unittest.ExecutionResultFixture(unittest.WithBlock(&s.rootBlock))
+	s.resultsMap[s.rootBlock.ID()] = rootResult
+
 	s.sealedBlock = &s.rootBlock
 	s.finalizedBlock = unittest.BlockWithParentFixture(s.sealedBlock.Header)
+	finalizedResult := unittest.ExecutionResultFixture(unittest.WithBlock(s.finalizedBlock))
+	s.resultsMap[s.finalizedBlock.ID()] = finalizedResult
 	s.blocksArray = []*flow.Block{
 		s.sealedBlock,
 		s.finalizedBlock,
@@ -123,34 +129,25 @@ func (s *TransactionStatusSuite) SetupTest() {
 		s.finalizedBlock.Header.Height: s.finalizedBlock,
 	}
 
-	s.txResultMap = map[flow.Identifier]*flow.LightTransactionResult{}
-
 	s.reporter = syncmock.NewIndexReporter(s.T())
-	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Header.Height, nil)
-	s.reporter.On("HighestIndexedHeight").Return(func() uint64 {
-		return s.finalizedBlock.Header.Height
-	}, nil)
 
-	s.transactionResults.On("ByBlockIDTransactionID",
-		mock.AnythingOfType("flow.Identifier"),
-		mock.AnythingOfType("flow.Identifier")).
-		Return(func(blockID flow.Identifier, transactionID flow.Identifier) *flow.LightTransactionResult {
-			if txResult, ok := s.txResultMap[blockID]; ok {
-				return txResult
+	s.results.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(func(blockID flow.Identifier) (*flow.ExecutionResult, error) {
+		if result, ok := s.resultsMap[blockID]; ok {
+			return result, nil
+		}
+		return nil, nil
+	},
+		func(blockID flow.Identifier) (*flow.ExecutionResult, error) {
+			if _, ok := s.resultsMap[blockID]; ok {
+				return nil, nil
 			}
-			return nil
-		},
-			func(blockID flow.Identifier, transactionID flow.Identifier) error {
-				if _, ok := s.txResultMap[blockID]; ok {
-					return nil
-				}
-				return storage.ErrNotFound
-			}).Maybe()
+			return nil, storage.ErrNotFound
+		})
 
 	s.seals.On("HighestInFork", mock.AnythingOfType("flow.Identifier")).Return(
 		func(_ flow.Identifier) (*flow.Seal, error) {
 			return unittest.Seal.Fixture(unittest.Seal.WithBlock(s.sealedBlock.Header)), nil
-		}, nil).Maybe()
+		}, nil)
 
 	s.headers.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(
 		func(height uint64) flow.Identifier {
@@ -165,7 +162,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 			}
 			return storage.ErrNotFound
 		},
-	).Maybe()
+	)
 
 	s.headers.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
 		func(blockID flow.Identifier) *flow.Header {
@@ -184,7 +181,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 			}
 			return storage.ErrNotFound
 		},
-	).Maybe()
+	)
 
 	s.headers.On("ByHeight", mock.AnythingOfType("uint64")).Return(
 		func(height uint64) *flow.Header {
@@ -199,7 +196,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 			}
 			return storage.ErrNotFound
 		},
-	).Maybe()
+	)
 
 	s.blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(
 		func(height uint64) *flow.Block {
@@ -214,18 +211,18 @@ func (s *TransactionStatusSuite) SetupTest() {
 			}
 			return storage.ErrNotFound
 		},
-	).Maybe()
+	)
 
-	s.state.On("Sealed").Return(s.sealedSnapshot, nil).Maybe()
-	s.state.On("Final").Return(s.finalSnapshot, nil).Maybe()
+	s.state.On("Sealed").Return(s.sealedSnapshot, nil)
+	s.state.On("Final").Return(s.finalSnapshot, nil)
 	s.state.On("AtBlockID", mock.Anything).Return(s.finalSnapshot, nil)
 
 	s.sealedSnapshot.On("Head").Return(func() *flow.Header {
 		return s.sealedBlock.Header
-	}, nil).Maybe()
+	}, nil)
 	s.finalSnapshot.On("Head").Return(func() *flow.Header {
 		return s.finalizedBlock.Header
-	}, nil).Maybe()
+	}, nil)
 
 	s.blockTracker.On("GetStartHeight", mock.Anything, mock.Anything, mock.Anything).Return(func(_ context.Context, id flow.Identifier, _ uint64) (uint64, error) {
 		finalizedHeader := s.finalizedBlock.Header
@@ -343,11 +340,9 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatus() {
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusFinalized)
 
 	// 3. Add one more finalized block on top of the transaction block and add execution results to storage
-	s.txResultMap[s.finalizedBlock.ID()] = &flow.LightTransactionResult{
-		TransactionID:   transaction.ID(),
-		Failed:          false,
-		ComputationUsed: 0,
-	}
+	finalizedResult := unittest.ExecutionResultFixture(unittest.WithBlock(s.finalizedBlock))
+	s.resultsMap[s.finalizedBlock.ID()] = finalizedResult
+
 	s.addNewFinalizedBlock(s.finalizedBlock.Header)
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusExecuted)
 
