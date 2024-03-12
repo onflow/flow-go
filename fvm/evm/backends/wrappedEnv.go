@@ -139,6 +139,11 @@ func (we *WrappedEnvironment) Invoke(
 	return val, handleEnvironmentError(err)
 }
 
+func (we *WrappedEnvironment) GenerateUUID() (uint64, error) {
+	uuid, err := we.env.GenerateUUID()
+	return uuid, handleEnvironmentError(err)
+}
+
 func handleEnvironmentError(err error) error {
 	if err == nil {
 		return nil

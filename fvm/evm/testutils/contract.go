@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	gethABI "github.com/ethereum/go-ethereum/accounts/abi"
-	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/atree"
 	"github.com/stretchr/testify/require"
 
@@ -54,7 +53,7 @@ func GetDummyKittyTestContract(t testing.TB) *TestContract {
 }
 
 func RunWithDeployedContract(t testing.TB, tc *TestContract, led atree.Ledger, flowEVMRootAddress flow.Address, f func(*TestContract)) {
-	DeployContract(t, types.NewAddress(gethCommon.Address{}), tc, led, flowEVMRootAddress)
+	DeployContract(t, RandomAddress(t), tc, led, flowEVMRootAddress)
 	f(tc)
 }
 
@@ -75,6 +74,7 @@ func DeployContract(t testing.TB, caller types.Address, tc *TestContract, led at
 
 	_, err = blk.DirectCall(
 		types.NewDepositCall(
+			RandomAddress(t), // any random non-empty address works here
 			caller,
 			new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)),
 			nonce,

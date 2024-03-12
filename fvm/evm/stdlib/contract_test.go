@@ -26,12 +26,13 @@ import (
 )
 
 type testContractHandler struct {
-	flowTokenAddress   common.Address
-	evmContractAddress common.Address
-	deployCOA          func(uint64) types.Address
-	accountByAddress   func(types.Address, bool) types.Account
-	lastExecutedBlock  func() *types.Block
-	run                func(tx []byte, coinbase types.Address) *types.ResultSummary
+	flowTokenAddress     common.Address
+	evmContractAddress   common.Address
+	deployCOA            func(uint64) types.Address
+	accountByAddress     func(types.Address, bool) types.Account
+	lastExecutedBlock    func() *types.Block
+	run                  func(tx []byte, coinbase types.Address) *types.ResultSummary
+	generateResourceUUID func() uint64
 }
 
 var _ types.ContractHandler = &testContractHandler{}
@@ -72,6 +73,13 @@ func (t *testContractHandler) Run(tx []byte, coinbase types.Address) *types.Resu
 		panic("unexpected Run")
 	}
 	return t.run(tx, coinbase)
+}
+
+func (t *testContractHandler) GenerateResourceUUID() uint64 {
+	if t.generateResourceUUID == nil {
+		panic("unexpected GenerateResourceUUID")
+	}
+	return t.generateResourceUUID()
 }
 
 type testFlowAccount struct {
@@ -3158,6 +3166,120 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 	t.Parallel()
 
+	expectedBalanceInUFix64, err := cadence.NewUFix64FromParts(1, 23000000)
+	require.NoError(t, err)
+	expectedBalance := types.NewBalanceFromUFix64(expectedBalanceInUFix64)
+
+	var deposited bool
+
+	handler := &testContractHandler{
+
+		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
+			assert.Equal(t, types.Address{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.False(t, isAuthorized)
+
+			return &testFlowAccount{
+				address: fromAddress,
+				deposit: func(vault *types.FLOWTokenVault) {
+					deposited = true
+					assert.Equal(
+						t,
+						types.Balance(expectedBalance),
+						vault.Balance(),
+					)
+				},
+			}
+		},
+	}
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	script := []byte(`
+      import EVM from 0x1
+      import FlowToken from 0x1
+
+      access(all)
+      fun main() {
+          let admin = getAuthAccount<auth(Storage) &Account>(0x1)
+              .storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+          let minter <- admin.createNewMinter(allowedAmount: 1.23)
+          let vault <- minter.mintTokens(amount: 1.23)
+          destroy minter
+
+          let address = EVM.EVMAddress(
+              bytes: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          )
+          address.deposit(from: <-vault)
+      }
+   `)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: LocationResolver,
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+		false,
+	)
+
+	// Run script
+
+	_, err = rt.ExecuteScript(
+		runtime.Script{
+			Source: script,
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	require.True(t, deposited)
+}
+
+func TestCOADeposit(t *testing.T) {
+
+	t.Parallel()
+
 	expectedBalance, err := cadence.NewUFix64FromParts(1, 23000000)
 	require.NoError(t, err)
 
@@ -3281,6 +3403,8 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
+	var nextUUID uint64 = 1
+
 	handler := &testContractHandler{
 		flowTokenAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
@@ -3306,6 +3430,11 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 				},
 			}
 		},
+		generateResourceUUID: func() uint64 {
+			uuid := nextUUID
+			nextUUID++
+			return uuid
+		},
 	}
 
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
@@ -3330,6 +3459,8 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 
           let vault2 <- cadenceOwnedAccount.withdraw(balance: EVM.Balance(attoflow: 1230000000000000000))
           let balance = vault2.balance
+          log(vault2.uuid)
+
           destroy cadenceOwnedAccount
           destroy vault2
 
@@ -3339,6 +3470,7 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
+	var logs []string
 
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
@@ -3360,6 +3492,9 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 		},
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
+		},
+		OnProgramLog: func(s string) {
+			logs = append(logs, s)
 		},
 	}
 
@@ -3395,6 +3530,8 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 	assert.True(t, deposited)
 	assert.True(t, withdrew)
 	assert.Equal(t, expectedWithdrawBalance, result)
+
+	assert.Equal(t, []string{"1"}, logs)
 }
 
 func TestCadenceOwnedAccountDeploy(t *testing.T) {
@@ -4014,4 +4151,78 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
+}
+
+func TestInternalEVMAccess(t *testing.T) {
+
+	t.Parallel()
+
+	handler := &testContractHandler{}
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main() {
+          let a = InternalEVM.createBridgedAccount()
+      }
+    `)
+
+	accountCodes := map[common.Location][]byte{}
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: LocationResolver,
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+		false,
+	)
+
+	// Run script
+
+	_, err := rt.ExecuteScript(
+		runtime.Script{
+			Source: script,
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.Error(t, err)
 }
