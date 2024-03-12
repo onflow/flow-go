@@ -34,12 +34,17 @@ func NewInterfaceTypeConversionRules(chainID flow.ChainID) StaticTypeMigrationRu
 func NewCompositeTypeConversionRules(chainID flow.ChainID) StaticTypeMigrationRules {
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
-	oldFungibleTokenVaultCompositeType, newFungibleTokenVaultType := fungibleTokenVaultRule(systemContracts)
-	oldNonFungibleTokenNFTCompositeType, newNonFungibleTokenNFTType := nonFungibleTokenNFTRule(systemContracts)
+	oldFungibleTokenVaultCompositeType, newFungibleTokenVaultType :=
+		fungibleTokenRule(systemContracts, "Vault")
+	oldNonFungibleTokenNFTCompositeType, newNonFungibleTokenNFTType :=
+		nonFungibleTokenRule(systemContracts, "NFT")
+	oldNonFungibleTokenCollectionCompositeType, newNonFungibleTokenCollectionType :=
+		nonFungibleTokenRule(systemContracts, "Collection")
 
 	return StaticTypeMigrationRules{
-		oldFungibleTokenVaultCompositeType.ID():  newFungibleTokenVaultType,
-		oldNonFungibleTokenNFTCompositeType.ID(): newNonFungibleTokenNFTType,
+		oldFungibleTokenVaultCompositeType.ID():         newFungibleTokenVaultType,
+		oldNonFungibleTokenNFTCompositeType.ID():        newNonFungibleTokenNFTType,
+		oldNonFungibleTokenCollectionCompositeType.ID(): newNonFungibleTokenCollectionType,
 	}
 }
 
@@ -53,15 +58,16 @@ func NewCadence1CompositeStaticTypeConverter(chainID flow.ChainID) statictypes.C
 	return NewStaticTypeMigrator[*interpreter.CompositeStaticType](rules)
 }
 
-func nonFungibleTokenNFTRule(
+func nonFungibleTokenRule(
 	systemContracts *systemcontracts.SystemContracts,
+	identifier string,
 ) (
 	*interpreter.CompositeStaticType,
 	*interpreter.IntersectionStaticType,
 ) {
 	contract := systemContracts.NonFungibleToken
 
-	qualifiedIdentifier := contract.Name + ".NFT"
+	qualifiedIdentifier := fmt.Sprintf("%s.%s", contract.Name, identifier)
 
 	location := common.AddressLocation{
 		Address: common.Address(contract.Address),
@@ -89,15 +95,16 @@ func nonFungibleTokenNFTRule(
 	return oldType, newType
 }
 
-func fungibleTokenVaultRule(
+func fungibleTokenRule(
 	systemContracts *systemcontracts.SystemContracts,
+	identifier string,
 ) (
 	*interpreter.CompositeStaticType,
 	*interpreter.IntersectionStaticType,
 ) {
 	contract := systemContracts.FungibleToken
 
-	qualifiedIdentifier := contract.Name + ".Vault"
+	qualifiedIdentifier := fmt.Sprintf("%s.%s", contract.Name, identifier)
 
 	location := common.AddressLocation{
 		Address: common.Address(contract.Address),
