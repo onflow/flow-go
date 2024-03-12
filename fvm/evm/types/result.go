@@ -42,7 +42,7 @@ func (res *Result) VMErrorString() string {
 
 // Receipt constructs an EVM-style receipt
 // can be used by json-rpc and other integration to be returned.
-func (res *Result) Receipt() *gethTypes.ReceiptForStorage {
+func (res *Result) Receipt() *gethTypes.Receipt {
 	receipt := &gethTypes.Receipt{
 		Type:              res.TxType,
 		CumulativeGasUsed: res.GasConsumed, // TODO: update to capture cumulative
@@ -56,7 +56,7 @@ func (res *Result) Receipt() *gethTypes.ReceiptForStorage {
 	}
 
 	receipt.Bloom = gethTypes.CreateBloom(gethTypes.Receipts{receipt})
-	return (*gethTypes.ReceiptForStorage)(receipt)
+	return receipt
 }
 
 // Status captures the status of an interaction to the emulator
