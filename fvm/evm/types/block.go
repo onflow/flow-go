@@ -23,6 +23,9 @@ type Block struct {
 	TotalSupply *big.Int
 
 	// ReceiptRoot returns the root hash of the receipts emitted in this block
+	// Note that this value won't be unique to each block, for example for the
+	// case of empty trie of receipts or a single receipt with no logs and failed state
+	// the same receipt root would be reported for block.
 	ReceiptRoot gethCommon.Hash
 
 	// transaction hashes
