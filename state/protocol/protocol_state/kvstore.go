@@ -11,8 +11,12 @@ import "github.com/onflow/flow-go/model/flow"
 
 // KVStoreReader is the latest read-only interface to the Protocol State key-value store
 // at a particular block.
-// It is backward-compatible with all versioned model types defined in the models.go
-// for this software version.
+//
+// Caution:
+// Engineers evolving this interface must ensure that it is backwards-compatible
+// with all versions of Protocol State Snapshots that can be retrieved from the local
+// database, which should exactly correspond to the versioned model types defined in
+// ./kvstore/models.go
 type KVStoreReader interface {
 	// ID returns an identifier for this key-value store snapshot by hashing internal fields.
 	ID() flow.Identifier
@@ -32,8 +36,8 @@ type KVStoreReader interface {
 
 	// GetVersionUpgrade returns the upgrade version of protocol.
 	// VersionUpgrade is a view-based activator that specifies the version which has to be applied
-	// and the view at which it has to be applied. It may contain an old value if the upgrade has already applied.
-	// It can be updated by an flow.ProtocolStateVersionUpgrade service event.
+	// and the view from which on it has to be applied. It may return the current protocol version
+	// with a past view if the upgrade has already been activated.
 	GetVersionUpgrade() *ViewBasedActivator[uint64]
 
 	// v1
@@ -41,13 +45,18 @@ type KVStoreReader interface {
 	// GetInvalidEpochTransitionAttempted returns a flag indicating whether epoch
 	// fallback mode has been tentatively triggered on this fork.
 	// Errors:
-	//  - ErrKeyNotSupported if the key does not exist in the current model version.
+	//  - ErrKeyNotSupported if the respective entry does not exist in the
+	//    Protocol State Snapshot that is backing the `Reader` interface.
 	GetInvalidEpochTransitionAttempted() (bool, error)
 }
 
 // KVStoreAPI is the latest read-writer interface to the Protocol State key-value store.
-// It is backward-compatible with all versioned model types defined in the models.go
-// for this software version.
+//
+// Caution:
+// Engineers evolving this interface must ensure that it is backwards-compatible
+// with all versions of Protocol State Snapshots that can be retrieved from the local
+// database, which should exactly correspond to the versioned model types defined in
+// ./kvstore/models.go
 type KVStoreAPI interface {
 	KVStoreReader
 

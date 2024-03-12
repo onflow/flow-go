@@ -8,8 +8,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// protocolStateMachine is a dedicated structure that encapsulates all logic for evolving protocol state, based on the content
-// of a new block. It guarantees protocol-compliant evolution of the protocol state by implementing the
+// protocolStateMachine is a dedicated structure for evolving the Epoch-related portion of the overall Protocol State.
+// Based on the content of a new block, it updates epoch data, including the identity table, on the happy path.
+// The protocolStateMachine guarantees protocol-compliant evolution of Epoch-related sub-state via the
 // following state transitions:
 //   - epoch setup: transitions current epoch from staking to setup phase, creates next epoch protocol state when processed.
 //   - epoch commit: transitions current epoch from setup to commit phase, commits next epoch protocol state when processed.
