@@ -42,6 +42,12 @@ func (res *Result) VMErrorString() string {
 
 // Receipt constructs an EVM-style receipt
 // can be used by json-rpc and other integration to be returned.
+//
+// This is method is also used to construct block receipt root hash
+// which requires the return receipt satisfy RLP encoding and cover these feilds
+// Type (txType), PostState or Status, CumulativeGasUsed, Logs and Logs Bloom
+// and for each log, Address, Topics, Data (consensus fields)
+// During execution we also do fill in BlockNumber, TxIndex, Index (event index)
 func (res *Result) Receipt() *gethTypes.Receipt {
 	receipt := &gethTypes.Receipt{
 		Type:              res.TxType,

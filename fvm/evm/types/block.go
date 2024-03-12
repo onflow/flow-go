@@ -43,6 +43,7 @@ func (b *Block) Hash() (gethCommon.Hash, error) {
 	return gethCrypto.Keccak256Hash(data), err
 }
 
+// PopulateReceiptRoot populates receipt root with the given results
 func (b *Block) PopulateReceiptRoot(results []Result) {
 	if len(results) == 0 {
 		b.ReceiptRoot = gethTypes.EmptyReceiptsHash
