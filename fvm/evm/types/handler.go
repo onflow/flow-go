@@ -42,6 +42,9 @@ type ContractHandler interface {
 
 	// EVMContractAddress returns the address where EVM is deployed
 	EVMContractAddress() common.Address
+
+	// GenerateResourceUUID generates a new UUID for a resource
+	GenerateResourceUUID() uint64
 }
 
 // AddressAllocator allocates addresses, used by the handler
