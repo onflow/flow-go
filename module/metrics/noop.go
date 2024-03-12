@@ -367,3 +367,10 @@ var _ module.GossipSubScoringRegistryMetrics = (*NoopCollector)(nil)
 func (nc *NoopCollector) DuplicateMessagePenalties(penalty float64) {}
 
 func (nc *NoopCollector) DuplicateMessagesCounts(count float64) {}
+
+var _ module.CollectionExecutedMetric = (*NoopCollector)(nil)
+
+func (nc *NoopCollector) CollectionFinalized(light flow.LightCollection) {}
+func (nc *NoopCollector) CollectionExecuted(light flow.LightCollection)  {}
+func (nc *NoopCollector) ExecutionReceiptReceived(r *flow.ExecutionReceipt) {
+}
