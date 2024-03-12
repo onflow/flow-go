@@ -89,7 +89,43 @@ jobs:
           cache: true
       - name: Set Test Matrix
         id: set-test-matrix
-        run: go run utils/test_matrix/test_matrix.go admin cmd consensus engine/access engine/collection engine/common engine/consensus engine/execution/ingestion:buildjet-8vcpu-ubuntu-2204 engine/execution/computation engine/execution engine/verification engine:buildjet-4vcpu-ubuntu-2204 fvm ledger module/dkg module:buildjet-4vcpu-ubuntu-2204 network/alsp network/test/cohort1:buildjet-16vcpu-ubuntu-2204 network/test/cohort2:buildjet-4vcpu-ubuntu-2204 network/p2p/connection network/p2p/node:buildjet-4vcpu-ubuntu-2204 network/p2p/scoring network/p2p network state storage utils
+        run: go run tools/test_matrix_generator/matrix.go
+
+  create-insecure-dynamic-test-matrix:
+    name: Create Dynamic Unit Test Insecure Package Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      dynamic-matrix: ${{ steps.set-test-matrix.outputs.dynamicMatrix }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Set Test Matrix
+        id: set-test-matrix
+        run: go run tools/test_matrix_generator/matrix.go -c insecure
+
+  create-integration-dynamic-test-matrix:
+    name: Create Dynamic Integration Test Package Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      dynamic-matrix: ${{ steps.set-test-matrix.outputs.dynamicMatrix }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Set Test Matrix
+        id: set-test-matrix
+        run: go run tools/test_matrix_generator/matrix.go -c integration
 
   unit-test:
     name: Unit Tests (${{ matrix.targets.name }})
@@ -127,23 +163,15 @@ jobs:
         flags: unittests
         name: codecov-umbrella
 
-  unit-test-modules:
-    name: Unit Tests (Modules)
+  unit-test-insecure:
+    name: Unit Tests Insecure (${{ matrix.targets.name }})
+    needs: create-insecure-dynamic-test-matrix
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: insecure
-            setup: install-tools
-            retries: 5
-            race: 0
-            runner: buildjet-4vcpu-ubuntu-2204
-          - name: integration
-            setup: install-tools
-            retries: 5
-            race: 0
-            runner: buildjet-4vcpu-ubuntu-2204
-    runs-on: ${{ matrix.runner }}
+        targets: ${{ fromJSON(needs.create-insecure-dynamic-test-matrix.outputs.dynamic-matrix)}}
+    ## need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
+    runs-on: ${{ matrix.targets.runner }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -153,17 +181,17 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-      - name: Setup tests (${{ matrix.name }})
-        run: make ${{ matrix.setup }}
-      - name: Run tests (${{ matrix.name }})
-        env:
-          RACE_DETECTOR: ${{ matrix.race }}
+      - name: Setup tests (${{ matrix.targets.name }})
+        run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
+      - name: Run tests (${{ matrix.targets.name }})
         uses: nick-fields/retry@v2
         with:
           timeout_minutes: 35
-          max_attempts: ${{ matrix.retries }}
-          # run test target inside each module's root
-          command: VERBOSE=1 make -C ${{ matrix.name }} test
+          max_attempts: 5
+          command: VERBOSE=1 make -C ./insecure -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
+        # TODO(rbtz): re-enable when we fix exisiting races.
+        #env:
+        #  RACE_DETECTOR: 1
       - name: Upload coverage report
         uses: codecov/codecov-action@v3
         with:
@@ -211,6 +239,42 @@ jobs:
           path: flow-docker-images.tar
           # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
           key: flow-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}
+
+  integration-test-others:
+    name: Integration Tests Others (${{ matrix.targets.name }})
+    needs: create-integration-dynamic-test-matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        targets: ${{ fromJSON(needs.create-integration-dynamic-test-matrix.outputs.dynamic-matrix)}}
+    ## need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
+    runs-on: ${{ matrix.targets.runner }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Setup tests (${{ matrix.targets.name }})
+        run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
+      - name: Run tests (${{ matrix.targets.name }})
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 35
+          max_attempts: 5
+          command: VERBOSE=1 make -C ./integration -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
+        # TODO(rbtz): re-enable when we fix exisiting races.
+        #env:
+        #  RACE_DETECTOR: 1
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.txt
+          flags: unittests
+          name: codecov-umbrella
 
   integration-test:
     name: Integration Tests
