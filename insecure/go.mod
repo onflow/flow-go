@@ -304,4 +304,4 @@ require (
 
 replace github.com/onflow/flow-go => ../
 
-replace github.com/ethereum/go-ethereum v1.13.5 => github.com/onflow/go-ethereum v0.0.2
+replace github.com/ethereum/go-ethereum v1.13.5 => github.com/onflow/go-ethereum v1.13.5-withprecompile
