@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -71,7 +72,8 @@ type Suite struct {
 	connectionFactory *connectionmock.ConnectionFactory
 	communicator      *backendmock.Communicator
 
-	chainID flow.ChainID
+	chainID  flow.ChainID
+	systemTx *flow.TransactionBody
 }
 
 func TestHandler(t *testing.T) {
@@ -106,6 +108,10 @@ func (suite *Suite) SetupTest() {
 	suite.connectionFactory = connectionmock.NewConnectionFactory(suite.T())
 
 	suite.communicator = new(backendmock.Communicator)
+
+	var err error
+	suite.systemTx, err = blueprints.SystemChunkTransaction(flow.Testnet.Chain())
+	suite.Require().NoError(err)
 }
 
 func (suite *Suite) TestPing() {
