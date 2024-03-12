@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -48,6 +47,7 @@ func extractExecutionState(
 	exportPayloadsByAddresses []common.Address,
 	sortPayloads bool,
 	prune bool,
+	maxAccountSize uint64,
 ) error {
 
 	log.Info().Msg("init WAL")
@@ -119,6 +119,7 @@ func extractExecutionState(
 		burnerContractChange,
 		stagedContracts,
 		prune,
+		maxAccountSize,
 	)
 
 	newState := ledger.State(targetHash)
@@ -220,20 +221,6 @@ func writeStatusFile(fileName string, e error) error {
 	return err
 }
 
-func ByteCountIEC(b int64) string {
-	const unit = 1024
-	if b < unit {
-		return fmt.Sprintf("%d B", b)
-	}
-	div, exp := int64(unit), 0
-	for n := b / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %ciB",
-		float64(b)/float64(div), "KMGTPE"[exp])
-}
-
 func extractExecutionStateFromPayloads(
 	log zerolog.Logger,
 	dir string,
@@ -251,6 +238,7 @@ func extractExecutionStateFromPayloads(
 	exportPayloadsByAddresses []common.Address,
 	sortPayloads bool,
 	prune bool,
+	maxAccountSize uint64,
 ) error {
 
 	inputPayloadsFromPartialState, payloads, err := util.ReadPayloadFile(log, inputPayloadFile)
@@ -259,36 +247,6 @@ func extractExecutionStateFromPayloads(
 	}
 
 	log.Info().Msgf("read %d payloads", len(payloads))
-
-	if log.Debug().Enabled() {
-
-		type accountInfo struct {
-			count int
-			size  uint64
-		}
-		payloadCountByAddress := make(map[string]accountInfo)
-
-		for _, payload := range payloads {
-			registerID, payloadValue, err := convert.PayloadToRegister(payload)
-			if err != nil {
-				return fmt.Errorf("cannot convert payload to register: %w", err)
-			}
-			owner := registerID.Owner
-			accountInfo := payloadCountByAddress[owner]
-			accountInfo.count++
-			accountInfo.size += uint64(len(payloadValue))
-			payloadCountByAddress[owner] = accountInfo
-		}
-
-		for address, info := range payloadCountByAddress {
-			log.Debug().Msgf(
-				"address %x has %d payloads and a total size of %s",
-				address,
-				info.count,
-				ByteCountIEC(int64(info.size)),
-			)
-		}
-	}
 
 	migrations := newMigrations(
 		log,
@@ -302,6 +260,7 @@ func extractExecutionStateFromPayloads(
 		burnerContractChange,
 		stagedContracts,
 		prune,
+		maxAccountSize,
 	)
 
 	payloads, err = migratePayloads(log, payloads, migrations)
@@ -393,7 +352,7 @@ func migratePayloads(logger zerolog.Logger, payloads []*ledger.Payload, migratio
 
 	// migrate payloads
 	for i, migrate := range migrations {
-		logger.Info().Msgf("migration %d/%d is underway", i, len(migrations))
+		logger.Info().Msgf("migration %d/%d is underway", i+1, len(migrations))
 
 		start := time.Now()
 		payloads, err = migrate(payloads)
@@ -458,6 +417,7 @@ func newMigrations(
 	burnerContractChange migrators.BurnerContractChange,
 	stagedContracts []migrators.StagedContract,
 	prune bool,
+	maxAccountSize uint64,
 ) []ledger.Migration {
 	if !runMigrations {
 		return nil
@@ -478,6 +438,7 @@ func newMigrations(
 		burnerContractChange,
 		stagedContracts,
 		prune,
+		maxAccountSize,
 	)
 
 	migrations := make([]ledger.Migration, 0, len(namedMigrations))

@@ -127,7 +127,7 @@ func withMigrations(
 				Type("migration", migrator).
 				Msg("closing migration")
 			if cerr := migrator.Close(); cerr != nil {
-				log.Error().Err(cerr).Msg("error closing migration")
+				log.Err(cerr).Msg("error closing migration")
 				if err == nil {
 					// only set the error if it's not already set
 					// so that we don't overwrite the original error
@@ -315,27 +315,7 @@ func MigrateGroupConcurrently(
 	return migrated, nil
 }
 
-var knownProblematicAccounts = map[common.Address]string{
-	// Testnet accounts with broken contracts
-	mustHexToAddress("434a1f199a7ae3ba"): "Broken contract FanTopPermission",
-	mustHexToAddress("454c9991c2b8d947"): "Broken contract Test",
-	mustHexToAddress("48602d8056ff9d93"): "Broken contract FanTopPermission",
-	mustHexToAddress("5d63c34d7f05e5a4"): "Broken contract FanTopPermission",
-	mustHexToAddress("5e3448b3cffb97f2"): "Broken contract FanTopPermission",
-	mustHexToAddress("7d8c7e050c694eaa"): "Broken contract Test",
-	mustHexToAddress("ba53f16ede01972d"): "Broken contract FanTopPermission",
-	mustHexToAddress("c843c1f5a4805c3a"): "Broken contract FanTopPermission",
-	mustHexToAddress("48d3be92e6e4a973"): "Broken contract FanTopPermission",
-	// Mainnet account
-}
-
-func mustHexToAddress(hex string) common.Address {
-	address, err := common.HexToAddress(hex)
-	if err != nil {
-		panic(err)
-	}
-	return address
-}
+var knownProblematicAccounts = map[common.Address]string{}
 
 type jobMigrateAccountGroup struct {
 	Address  common.Address

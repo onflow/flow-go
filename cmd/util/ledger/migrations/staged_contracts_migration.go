@@ -244,7 +244,7 @@ func (m *StagedContractsMigration) MigrateAccount(
 		}
 
 		if err != nil {
-			m.log.Error().Err(err).
+			m.log.Err(err).
 				Msgf(
 					"failed to update contract %s in account %s",
 					name,

@@ -2,6 +2,7 @@ package migrations
 
 import (
 	_ "embed"
+	"fmt"
 
 	"github.com/onflow/cadence/migrations/capcons"
 	"github.com/onflow/cadence/migrations/statictypes"
@@ -18,10 +19,15 @@ import (
 func NewInterfaceTypeConversionRules(chainID flow.ChainID) StaticTypeMigrationRules {
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
-	oldFungibleTokenResolverType, newFungibleTokenResolverType := fungibleTokenResolverRule(systemContracts)
+	oldFungibleTokenResolverType, newFungibleTokenResolverType :=
+		newFungibleTokenMetadataViewsToViewResolverRule(systemContracts, "Resolver")
+
+	oldFungibleTokenResolverCollectionType, newFungibleTokenResolverCollectionType :=
+		newFungibleTokenMetadataViewsToViewResolverRule(systemContracts, "ResolverCollection")
 
 	return StaticTypeMigrationRules{
-		oldFungibleTokenResolverType.ID(): newFungibleTokenResolverType,
+		oldFungibleTokenResolverType.ID():           newFungibleTokenResolverType,
+		oldFungibleTokenResolverCollectionType.ID(): newFungibleTokenResolverCollectionType,
 	}
 }
 
@@ -119,8 +125,9 @@ func fungibleTokenVaultRule(
 	return oldType, newType
 }
 
-func fungibleTokenResolverRule(
+func newFungibleTokenMetadataViewsToViewResolverRule(
 	systemContracts *systemcontracts.SystemContracts,
+	typeName string,
 ) (
 	*interpreter.InterfaceStaticType,
 	*interpreter.InterfaceStaticType,
@@ -138,8 +145,8 @@ func fungibleTokenResolverRule(
 		Name:    newContract.Name,
 	}
 
-	oldQualifiedIdentifier := oldContract.Name + ".Resolver"
-	newQualifiedIdentifier := newContract.Name + ".Resolver"
+	oldQualifiedIdentifier := fmt.Sprintf("%s.%s", oldContract.Name, typeName)
+	newQualifiedIdentifier := fmt.Sprintf("%s.%s", newContract.Name, typeName)
 
 	oldType := &interpreter.InterfaceStaticType{
 		Location:            oldLocation,
@@ -176,12 +183,29 @@ func NewCadence1ValueMigrations(
 
 	errorMessageHandler := &errorMessageHandler{}
 
+	// The value migrations are run as account-based migrations,
+	// i.e. the migrations are only given the payloads for the account to be migrated.
+	// However, the migrations need to be able to get the code for contracts of any account.
+	//
+	// To achieve this, the contracts are extracted from the payloads once,
+	// before the value migrations are run.
+
+	contracts := make(map[common.AddressLocation][]byte, 1000)
+
+	migrations = []NamedMigration{
+		{
+			Name:    "contracts",
+			Migrate: NewContractsExtractionMigration(contracts, log),
+		},
+	}
+
 	for _, accountBasedMigration := range []*CadenceBaseMigrator{
 		NewCadence1ValueMigrator(
 			rwf,
 			diffMigrations,
 			logVerboseDiff,
 			errorMessageHandler,
+			contracts,
 			NewCadence1CompositeStaticTypeConverter(chainID),
 			NewCadence1InterfaceStaticTypeConverter(chainID),
 		),
@@ -190,6 +214,7 @@ func NewCadence1ValueMigrations(
 			diffMigrations,
 			logVerboseDiff,
 			errorMessageHandler,
+			contracts,
 			capabilityMapping,
 		),
 		NewCadence1CapabilityValueMigrator(
@@ -197,6 +222,7 @@ func NewCadence1ValueMigrations(
 			diffMigrations,
 			logVerboseDiff,
 			errorMessageHandler,
+			contracts,
 			capabilityMapping,
 		),
 	} {
@@ -288,9 +314,28 @@ func NewCadence1Migrations(
 	burnerContractChange BurnerContractChange,
 	stagedContracts []StagedContract,
 	prune bool,
+	maxAccountSize uint64,
 ) []NamedMigration {
 
 	var migrations []NamedMigration
+
+	if maxAccountSize > 0 {
+
+		maxSizeExceptions := map[string]struct{}{}
+
+		systemContracts := systemcontracts.SystemContractsForChain(chainID)
+		for _, systemContract := range systemContracts.All() {
+			maxSizeExceptions[string(systemContract.Address.Bytes())] = struct{}{}
+		}
+
+		migrations = append(
+			migrations,
+			NamedMigration{
+				Name:    "account-size-filter-migration",
+				Migrate: NewAccountSizeFilterMigration(maxAccountSize, maxSizeExceptions, log),
+			},
+		)
+	}
 
 	if prune {
 		migration := NewCadence1PruneMigration(chainID, log)
