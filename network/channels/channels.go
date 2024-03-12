@@ -102,6 +102,7 @@ func PublicChannels() ChannelList {
 	return ChannelList{
 		PublicSyncCommittee,
 		PublicReceiveBlocks,
+		PublicExecutionDataService,
 	}
 }
 
