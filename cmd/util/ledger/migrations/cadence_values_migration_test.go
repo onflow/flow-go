@@ -1184,6 +1184,124 @@ func TestCoreContractUsage(t *testing.T) {
 		require.Equal(t, expected, actual)
 	})
 
+	t.Run("&NonFungibleToken.Collection => auth(Withdraw, Owner) &{NonFungibleToken.Collection}", func(t *testing.T) {
+		t.Parallel()
+
+		systemContracts := systemcontracts.SystemContractsForChain(chainID)
+
+		const nonFungibleTokenContractName = "NonFungibleToken"
+		nonFungibleTokenContractLocation := common.NewAddressLocation(
+			nil,
+			common.Address(systemContracts.NonFungibleToken.Address),
+			nonFungibleTokenContractName,
+		)
+
+		const nonFungibleTokenCollectionTypeQualifiedIdentifier = nonFungibleTokenContractName + ".Collection"
+
+		input := interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.UnauthorizedAccess,
+			interpreter.NewCompositeStaticType(
+				nil,
+				nonFungibleTokenContractLocation,
+				nonFungibleTokenCollectionTypeQualifiedIdentifier,
+				nonFungibleTokenContractLocation.TypeID(nil, nonFungibleTokenCollectionTypeQualifiedIdentifier),
+			),
+		)
+
+		const nonFungibleTokenWithdrawTypeQualifiedIdentifier = nonFungibleTokenContractName + ".Withdraw"
+		const nonFungibleTokenOwnerTypeQualifiedIdentifier = nonFungibleTokenContractName + ".Owner"
+		expected := interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.NewEntitlementSetAuthorization(
+				nil,
+				func() []common.TypeID {
+					return []common.TypeID{
+						nonFungibleTokenContractLocation.TypeID(nil, nonFungibleTokenWithdrawTypeQualifiedIdentifier),
+						nonFungibleTokenContractLocation.TypeID(nil, nonFungibleTokenOwnerTypeQualifiedIdentifier),
+					}
+				},
+				2,
+				sema.Conjunction,
+			),
+			interpreter.NewIntersectionStaticType(
+				nil,
+				[]*interpreter.InterfaceStaticType{
+					interpreter.NewInterfaceStaticType(
+						nil,
+						nonFungibleTokenContractLocation,
+						nonFungibleTokenCollectionTypeQualifiedIdentifier,
+						nonFungibleTokenContractLocation.TypeID(nil, nonFungibleTokenCollectionTypeQualifiedIdentifier),
+					),
+				},
+			),
+		)
+
+		actual := migrate(t, input)
+
+		require.Equal(t, expected, actual)
+	})
+
+	t.Run("&NonFungibleToken.Collection{NonFungibleToken.CollectionPublic} => &{NonFungibleToken.Collection}", func(t *testing.T) {
+		t.Parallel()
+
+		systemContracts := systemcontracts.SystemContractsForChain(chainID)
+
+		const nonFungibleTokenContractName = "NonFungibleToken"
+		nonFungibleTokenContractLocation := common.NewAddressLocation(
+			nil,
+			common.Address(systemContracts.NonFungibleToken.Address),
+			nonFungibleTokenContractName,
+		)
+
+		const nonFungibleTokenVaultTypeQualifiedIdentifier = nonFungibleTokenContractName + ".Collection"
+		const nonFungibleTokenCollectionPublicTypeQualifiedIdentifier = nonFungibleTokenContractName + ".CollectionPublic"
+
+		inputIntersectionType := interpreter.NewIntersectionStaticType(
+			nil,
+			[]*interpreter.InterfaceStaticType{
+				interpreter.NewInterfaceStaticType(
+					nil,
+					nonFungibleTokenContractLocation,
+					nonFungibleTokenCollectionPublicTypeQualifiedIdentifier,
+					nonFungibleTokenContractLocation.TypeID(nil, nonFungibleTokenCollectionPublicTypeQualifiedIdentifier),
+				),
+			},
+		)
+		inputIntersectionType.LegacyType = interpreter.NewCompositeStaticType(
+			nil,
+			nonFungibleTokenContractLocation,
+			nonFungibleTokenVaultTypeQualifiedIdentifier,
+			nonFungibleTokenContractLocation.TypeID(nil, nonFungibleTokenVaultTypeQualifiedIdentifier),
+		)
+
+		input := interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.UnauthorizedAccess,
+			inputIntersectionType,
+		)
+
+		expected := interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.UnauthorizedAccess,
+			interpreter.NewIntersectionStaticType(
+				nil,
+				[]*interpreter.InterfaceStaticType{
+					interpreter.NewInterfaceStaticType(
+						nil,
+						nonFungibleTokenContractLocation,
+						nonFungibleTokenVaultTypeQualifiedIdentifier,
+						nonFungibleTokenContractLocation.TypeID(nil, nonFungibleTokenVaultTypeQualifiedIdentifier),
+					),
+				},
+			),
+		)
+
+		actual := migrate(t, input)
+
+		require.Equal(t, expected, actual)
+	})
+
 	t.Run("&{MetadataViews.Resolver} => &{ViewResolver.Resolver}", func(t *testing.T) {
 		t.Parallel()
 
