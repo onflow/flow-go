@@ -48,11 +48,11 @@ type TransactionSubscriptionMetadata struct {
 	txExecuted         bool
 }
 
-// SendAndSubscribeTransactionStatuses subscribes to transaction status changes starting from the transaction reference block ID.
+// SubscribeTransactionStatuses subscribes to transaction status changes starting from the transaction reference block ID.
 // Expected errors:
 // - storage.ErrNotFound if a block referenced by the transaction does not exist.
 // - irrecoverable.Exception if there is an internal error related to state inconsistency.
-func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody) subscription.Subscription {
+func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody) subscription.Subscription {
 	nextHeight, err := b.getStartHeight(ctx, tx.ReferenceBlockID, 0)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")

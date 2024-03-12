@@ -290,7 +290,7 @@ func (s *TransactionStatusSuite) addNewFinalizedBlock(parent *flow.Header, optio
 	s.broadcaster.Publish()
 }
 
-// TestSubscribeTransactionStatus tests the functionality of the SendAndSubscribeTransactionStatuses method in the Backend.
+// TestSubscribeTransactionStatus tests the functionality of the SubscribeTransactionStatuses method in the Backend.
 // It covers the emulation of transaction stages from pending to sealed, and receiving status updates.
 func (s *TransactionStatusSuite) TestSubscribeTransactionStatus() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -331,7 +331,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatus() {
 
 	// 1. Subscribe to transaction status and receive the first message with pending status
 	subCtx, subCancel := context.WithCancel(ctx)
-	sub := s.backend.SendAndSubscribeTransactionStatuses(subCtx, &transaction.TransactionBody)
+	sub := s.backend.SubscribeTransactionStatuses(subCtx, &transaction.TransactionBody)
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusPending)
 
 	// 2. Make transaction reference block sealed, and add a new finalized block that includes the transaction

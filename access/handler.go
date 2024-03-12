@@ -918,7 +918,7 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 		return err
 	}
 
-	sub := h.api.SendAndSubscribeTransactionStatuses(stream.Context(), &tx)
+	sub := h.api.SubscribeTransactionStatuses(stream.Context(), &tx)
 
 	for {
 		v, ok := <-sub.Channel()

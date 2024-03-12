@@ -819,22 +819,6 @@ func (_m *API) Ping(ctx context.Context) error {
 	return r0
 }
 
-// SendAndSubscribeTransactionStatuses provides a mock function with given fields: ctx, tx
-func (_m *API) SendAndSubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody) subscription.Subscription {
-	ret := _m.Called(ctx, tx)
-
-	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.TransactionBody) subscription.Subscription); ok {
-		r0 = rf(ctx, tx)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(subscription.Subscription)
-		}
-	}
-
-	return r0
-}
-
 // SendTransaction provides a mock function with given fields: ctx, tx
 func (_m *API) SendTransaction(ctx context.Context, tx *flow.TransactionBody) error {
 	ret := _m.Called(ctx, tx)
@@ -888,6 +872,22 @@ func (_m *API) SubscribeBlocks(ctx context.Context, startBlockID flow.Identifier
 	var r0 subscription.Subscription
 	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64, flow.BlockStatus) subscription.Subscription); ok {
 		r0 = rf(ctx, startBlockID, startHeight, blockStatus)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(subscription.Subscription)
+		}
+	}
+
+	return r0
+}
+
+// SubscribeTransactionStatuses provides a mock function with given fields: ctx, tx
+func (_m *API) SubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody) subscription.Subscription {
+	ret := _m.Called(ctx, tx)
+
+	var r0 subscription.Subscription
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.TransactionBody) subscription.Subscription); ok {
+		r0 = rf(ctx, tx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)

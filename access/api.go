@@ -78,10 +78,10 @@ type API interface {
 	// Each lightweight block are filtered by the provided block status, and only
 	// those blocks that match the status are returned.
 	SubscribeBlockDigests(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription
-	// SendAndSubscribeTransactionStatuses streams transaction statuses starting from the reference block saved in the
+	// SubscribeTransactionStatuses streams transaction statuses starting from the reference block saved in the
 	// transaction itself until the block containing the transaction becomes sealed or expired. When the transaction
 	// status becomes TransactionStatusSealed or TransactionStatusExpired, the subscription will automatically shut down.
-	SendAndSubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody) subscription.Subscription
+	SubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody) subscription.Subscription
 }
 
 // TODO: Combine this with flow.TransactionResult?
