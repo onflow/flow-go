@@ -37,12 +37,13 @@ type KVStoreReader interface {
 
 	VersionedEncodable
 
-	// GetProtocolStateVersion returns the current Protocol State version.
-	// The Protocol State version specifies the current version of the Protocol State,
-	// including the key-value store. Changes in the protocol state version
-	// correspond to changes in the set of key-value pairs which are supported,
-	// and which model is used for serialization.
-	// It can be updated by an UpdateKVStoreVersion service event.
+	// GetProtocolStateVersion returns the Protocol State Version that created the specific
+	// Snapshot backing this interface instance. Slightly simplified, the Protocol State
+	// Version defines the key-value store's data model (specifically, the set of all keys
+	// and the respective type for each corresponding value).
+	// Generally, changes in the protocol state version correspond to changes in the set
+	// of key-value pairs which are supported, and which model is used for serialization.
+	// The protocol state version is updated by UpdateKVStoreVersion service events.
 	GetProtocolStateVersion() uint64
 
 	// GetVersionUpgrade returns the upgrade version of protocol.
