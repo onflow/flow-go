@@ -7,7 +7,7 @@ import (
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethCrypto "github.com/ethereum/go-ethereum/crypto"
 	gethRLP "github.com/ethereum/go-ethereum/rlp"
-	gethTrie "github.com/onflow/go-ethereum/trie"
+	gethTrie "github.com/ethereum/go-ethereum/trie"
 )
 
 // Block represents a evm block.
