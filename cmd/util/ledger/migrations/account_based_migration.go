@@ -317,14 +317,6 @@ func MigrateGroupConcurrently(
 
 var knownProblematicAccounts = map[common.Address]string{}
 
-func mustHexToAddress(hex string) common.Address {
-	address, err := common.HexToAddress(hex)
-	if err != nil {
-		panic(err)
-	}
-	return address
-}
-
 type jobMigrateAccountGroup struct {
 	Address  common.Address
 	Payloads []*ledger.Payload
