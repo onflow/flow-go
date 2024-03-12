@@ -48,7 +48,7 @@ func (c *Config) ChainRules() gethParams.Rules {
 // and set a proper height for the specific release based on the Flow EVM heights
 // so it could gets activated at a desired time.
 var DefaultChainConfig = &gethParams.ChainConfig{
-	ChainID: types.FlowEVMTestnetChainID, // default is testnet
+	ChainID: types.FlowEVMPreviewNetChainID,
 
 	// Fork scheduling based on block heights
 	HomesteadBlock:      bigZero,
