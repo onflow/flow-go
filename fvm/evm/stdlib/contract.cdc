@@ -59,6 +59,15 @@ contract EVM {
                 address: self.bytes
             )
         }
+
+        /// Deposits the given vault into the EVM account with the given address
+        access(all)
+        fun deposit(from: @FlowToken.Vault) {
+            InternalEVM.deposit(
+                from: <-from,
+                to: self.bytes
+            )
+        }
     }
 
     access(all)
@@ -208,10 +217,7 @@ contract EVM {
         /// Deposits the given vault into the cadence owned account's balance
         access(all)
         fun deposit(from: @FlowToken.Vault) {
-            InternalEVM.deposit(
-                from: <-from,
-                to: self.addressBytes
-            )
+            self.address().deposit(from: <-from)
         }
 
         /// The EVM address of the cadence owned account behind an entitlement, acting as proof of access

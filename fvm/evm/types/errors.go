@@ -109,6 +109,9 @@ var (
 	// yeild to rounding error, i.e. the balance contains fractions smaller than 10^8 Flow (smallest unit allowed to transfer).
 	ErrWithdrawBalanceRounding = NewEVMValidationError(errors.New("withdraw failed! the balance is susceptible to the rounding error"))
 
+	// ErrDirectCallExecutionFailed is returned when the direct call execution has failed.
+	ErrDirectCallExecutionFailed = NewEVMValidationError(errors.New("direct call execution failed"))
+
 	// ErrInsufficientTotalSupply is returned when flow token
 	// is withdraw request is there but not enough balance is on EVM vault
 	// this should never happen but its a saftey measure to protect Flow against EVM issues.
