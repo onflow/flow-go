@@ -26,10 +26,10 @@ import (
 )
 
 func TestObserverIndexerEnabled(t *testing.T) {
-	suite.Run(t, new(ObserverIndexerEnabled))
+	suite.Run(t, new(ObserverIndexerEnabledSuite))
 }
 
-type ObserverIndexerEnabled struct {
+type ObserverIndexerEnabledSuite struct {
 	suite.Suite
 	net       *testnet.FlowNetwork
 	teardown  func()
@@ -39,7 +39,7 @@ type ObserverIndexerEnabled struct {
 	cancel context.CancelFunc
 }
 
-func (s *ObserverIndexerEnabled) TearDownTest() {
+func (s *ObserverIndexerEnabledSuite) TearDownTest() {
 	if s.net != nil {
 		s.net.Remove()
 		s.net = nil
@@ -50,7 +50,7 @@ func (s *ObserverIndexerEnabled) TearDownTest() {
 	}
 }
 
-func (s *ObserverIndexerEnabled) SetupTest() {
+func (s *ObserverIndexerEnabledSuite) SetupTest() {
 	s.localRpc = map[string]struct{}{
 		"Ping":                           {},
 		"GetLatestBlockHeader":           {},
@@ -121,7 +121,7 @@ func (s *ObserverIndexerEnabled) SetupTest() {
 // 1. CompareRPCs: verifies that the observer client returns the same errors as the access client for rpcs proxied to the upstream AN
 // 2. HandledByUpstream: stops the upstream AN and verifies that the observer client returns errors for all rpcs handled by the upstream
 // 3. HandledByObserver: stops the upstream AN and verifies that the observer client handles all other queries
-func (s *ObserverIndexerEnabled) TestObserverRPC() {
+func (s *ObserverIndexerEnabledSuite) TestObserverRPC() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -187,7 +187,7 @@ func (s *ObserverIndexerEnabled) TestObserverRPC() {
 // 1. CompareEndpoints: verifies that the observer client returns the same errors as the access client for rests proxied to the upstream AN
 // 2. HandledByUpstream: stops the upstream AN and verifies that the observer client returns errors for all rests handled by the upstream
 // 3. HandledByObserver: stops the upstream AN and verifies that the observer client handles all other queries
-func (s *ObserverIndexerEnabled) TestObserverRest() {
+func (s *ObserverIndexerEnabledSuite) TestObserverRest() {
 	t := s.T()
 
 	accessAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
@@ -267,15 +267,15 @@ func (s *ObserverIndexerEnabled) TestObserverRest() {
 	})
 }
 
-func (s *ObserverIndexerEnabled) getAccessClient() (accessproto.AccessAPIClient, error) {
+func (s *ObserverIndexerEnabledSuite) getAccessClient() (accessproto.AccessAPIClient, error) {
 	return s.getClient(s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCPort))
 }
 
-func (s *ObserverIndexerEnabled) getObserverClient() (accessproto.AccessAPIClient, error) {
+func (s *ObserverIndexerEnabledSuite) getObserverClient() (accessproto.AccessAPIClient, error) {
 	return s.getClient(s.net.ContainerByName("observer_1").Addr(testnet.GRPCPort))
 }
 
-func (s *ObserverIndexerEnabled) getClient(address string) (accessproto.AccessAPIClient, error) {
+func (s *ObserverIndexerEnabledSuite) getClient(address string) (accessproto.AccessAPIClient, error) {
 	// helper func to create an access client
 	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -286,7 +286,7 @@ func (s *ObserverIndexerEnabled) getClient(address string) (accessproto.AccessAP
 	return client, nil
 }
 
-func (s *ObserverIndexerEnabled) getRPCs() []RPCTest {
+func (s *ObserverIndexerEnabledSuite) getRPCs() []RPCTest {
 	return []RPCTest{
 		{name: "Ping", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
 			_, err := client.Ping(ctx, &accessproto.PingRequest{})
@@ -393,7 +393,7 @@ func (s *ObserverIndexerEnabled) getRPCs() []RPCTest {
 	}
 }
 
-func (s *ObserverIndexerEnabled) getRestEndpoints() []RestEndpointTest {
+func (s *ObserverIndexerEnabledSuite) getRestEndpoints() []RestEndpointTest {
 	transactionId := unittest.IdentifierFixture().String()
 	account := flow.Localnet.Chain().ServiceAddress().String()
 	block := unittest.BlockFixture()
