@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"net/http"
 	"testing"
 
@@ -76,6 +77,7 @@ func (s *ObserverIndexerEnabledSuite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel),
 			testnet.WithAdditionalFlag("--supports-observer=true"),
 			testnet.WithAdditionalFlagf("--public-network-execution-data-sync-enabled=true"),
+			//testnet.WithAdditionalFlagf("--script-execution-mode=%s", backend.IndexQueryModeLocalOnly),
 		),
 
 		// need one dummy execution node
@@ -99,9 +101,9 @@ func (s *ObserverIndexerEnabledSuite) SetupTest() {
 			fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 			fmt.Sprintf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
 			"--execution-data-sync-enabled=true",
-			"--event-query-mode=local-only",
-			"--script-execution-mode=local-only",
-			"--tx-result-query-mode=local-only",
+			//"--event-query-mode=local-only",
+			//"--script-execution-mode=local-only",
+			//"--tx-result-query-mode=local-only",
 			"--execution-data-indexing-enabled=true",
 		},
 	}}
