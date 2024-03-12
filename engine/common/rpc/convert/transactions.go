@@ -13,7 +13,7 @@ type TransactionSubscribeInfo struct {
 	MessageIndex uint64
 }
 
-func TransactionSubscribeInfoToSubscriptionResponse(data *TransactionSubscribeInfo) *access.SendAndSubscribeTransactionStatusesResponse {
+func TransactionSubscribeInfoToMessage(data *TransactionSubscribeInfo) *access.SendAndSubscribeTransactionStatusesResponse {
 	return &access.SendAndSubscribeTransactionStatusesResponse{
 		Id:           data.ID[:],
 		Status:       entities.TransactionStatus(data.Status),

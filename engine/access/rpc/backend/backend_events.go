@@ -276,7 +276,7 @@ func (b *backendEvents) getBlockEventsFromStorage(
 	return resp, missing, nil
 }
 
-// getBlockEventsFromExecutionNode retrieves events for all the specified headers that have the given type
+// getBlockEventsFromExecutionNode retrieves events for all the specified blocks that have the given type
 // from an execution node
 func (b *backendEvents) getBlockEventsFromExecutionNode(
 	ctx context.Context,

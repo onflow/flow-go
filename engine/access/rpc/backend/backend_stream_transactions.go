@@ -50,7 +50,8 @@ type TransactionSubscriptionMetadata struct {
 
 // SendAndSubscribeTransactionStatuses subscribes to transaction status changes starting from the transaction reference block ID.
 // Expected errors:
-//   - subscription.NewFailedSubscription if any error returned by `b.getStartHeight` function
+// - storage.ErrNotFound if a block referenced by the transaction does not exist.
+// - irrecoverable.Exception if there is an internal error related to state inconsistency.
 func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody) subscription.Subscription {
 	nextHeight, err := b.getStartHeight(ctx, tx.ReferenceBlockID, 0)
 	if err != nil {
@@ -93,7 +94,7 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *Tran
 
 		if txInfo.blockWithTx == nil {
 			// Check if block contains transaction.
-			err := b.searchForTransactionBlock(height, txInfo)
+			txInfo.blockWithTx, err = b.searchForTransactionBlock(height, txInfo)
 			if err != nil {
 				return nil, err
 			}
@@ -108,7 +109,7 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *Tran
 
 			if !txInfo.txExecuted {
 				// Check if transaction was executed.
-				err := b.searchForTransactionResult(blockID, txInfo)
+				txInfo.txExecuted, err = b.searchForTransactionResult(blockID, txInfo)
 				if err != nil {
 					return nil, err
 				}
@@ -141,24 +142,24 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *Tran
 func (b *backendSubscribeTransactions) searchForTransactionBlock(
 	height uint64,
 	txInfo *TransactionSubscriptionMetadata,
-) error {
+) (*flow.Header, error) {
 	block, err := b.txLocalDataProvider.blocks.ByHeight(height)
 	if err != nil {
-		return status.Errorf(codes.Internal, "could not get block by collection ID: %v", err)
+		return nil, status.Errorf(codes.Internal, "could not get block %d: %v", height, err)
 	}
 
 	collectionID, err := b.txLocalDataProvider.LookupCollectionIDInBlock(block, txInfo.txID)
 	if err != nil {
 		if status.Code(err) != codes.NotFound {
-			return status.Errorf(codes.Internal, "could not find transaction in block: %v", err)
+			return nil, status.Errorf(codes.Internal, "could not find transaction in block: %v", err)
 		}
 	}
 
 	if collectionID != flow.ZeroID {
-		txInfo.blockWithTx = block.Header
+		return block.Header, nil
 	}
 
-	return nil
+	return nil, nil
 }
 
 // searchForTransactionResult searches for the transaction result by block ID and transaction ID.
@@ -166,19 +167,19 @@ func (b *backendSubscribeTransactions) searchForTransactionBlock(
 func (b *backendSubscribeTransactions) searchForTransactionResult(
 	blockID flow.Identifier,
 	txInfo *TransactionSubscriptionMetadata,
-) error {
+) (bool, error) {
 	result, err := b.txLocalDataProvider.txResultsIndex.ByBlockIDTransactionID(blockID, txInfo.blockWithTx.Height, txInfo.txID)
 	if err != nil {
 		if !errors.Is(err, storage.ErrNotFound) &&
 			!errors.Is(err, storage.ErrHeightNotIndexed) &&
 			!errors.Is(err, indexer.ErrIndexNotInitialized) {
-			return rpc.ConvertError(err, fmt.Sprintf("failed to get transaction result for block %s", blockID), codes.Internal)
+			return false, rpc.ConvertError(err, fmt.Sprintf("failed to get transaction result for block %s", blockID), codes.Internal)
 		}
 	}
 
 	if result != nil {
-		txInfo.txExecuted = true
+		return true, nil
 	}
 
-	return nil
+	return false, nil
 }
