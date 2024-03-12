@@ -69,9 +69,10 @@ func NewEventFilter(
 	}
 
 	f := EventFilter{
-		EventTypes: make(map[flow.EventType]struct{}, len(eventTypes)),
-		Addresses:  make(map[string]struct{}, len(addresses)),
-		Contracts:  make(map[string]struct{}, len(contracts)),
+		EventTypes:        make(map[flow.EventType]struct{}, len(eventTypes)),
+		Addresses:         make(map[string]struct{}, len(addresses)),
+		Contracts:         make(map[string]struct{}, len(contracts)),
+		EventFieldFilters: make(map[flow.EventType][]FieldFilter, len(eventTypes)),
 	}
 
 	// Check all of the filters to ensure they are correctly formatted. This helps avoid searching
@@ -82,6 +83,7 @@ func NewEventFilter(
 			return EventFilter{}, err
 		}
 		f.EventTypes[eventType] = struct{}{}
+		f.EventFieldFilters[eventType] = []FieldFilter{}
 	}
 
 	for _, address := range addresses {
