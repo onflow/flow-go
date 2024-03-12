@@ -464,10 +464,12 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		fmt.Sprintf("--secure-rpc-addr=%s:%s", observerName, testnet.GRPCSecurePort),
 		fmt.Sprintf("--http-addr=%s:%s", observerName, testnet.GRPCWebPort),
 		fmt.Sprintf("--rest-addr=%s:%s", observerName, testnet.RESTPort),
+		fmt.Sprintf("--state-stream-addr=%s:%s", observerName, testnet.ExecutionStatePort),
 		"--execution-data-dir=/data/execution-data",
 		"--execution-data-sync-enabled=true",
 		"--execution-data-indexing-enabled=true",
 		"--execution-state-dir=/data/execution-state",
+		"--event-query-mode=execution-nodes-only",
 	)
 
 	service.AddExposedPorts(
@@ -475,6 +477,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		testnet.GRPCSecurePort,
 		testnet.GRPCWebPort,
 		testnet.RESTPort,
+		testnet.ExecutionStatePort,
 	)
 
 	// observer services rely on the access gateway
