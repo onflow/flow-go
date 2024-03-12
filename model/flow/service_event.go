@@ -21,8 +21,8 @@ func (set ServiceEventType) String() string {
 const (
 	ServiceEventSetup                       ServiceEventType = "setup"
 	ServiceEventCommit                      ServiceEventType = "commit"
-	ServiceEventVersionBeacon               ServiceEventType = "version-beacon"
-	ServiceEventProtocolStateVersionUpgrade ServiceEventType = "protocol-state-version-upgrade"
+	ServiceEventVersionBeacon               ServiceEventType = "version-beacon"                 // VersionBeacon only controls version of ENs, describing software compatability via semantic versioning
+	ServiceEventProtocolStateVersionUpgrade ServiceEventType = "protocol-state-version-upgrade" // Protocol State version applies to all nodes and uses an _integer version_ of the _protocol_
 )
 
 // ServiceEvent represents a service event, which is a special event that when
@@ -35,13 +35,6 @@ const (
 type ServiceEvent struct {
 	Type  ServiceEventType
 	Event interface{}
-}
-
-// serviceEventUnmarshalWrapper is a version of ServiceEvent used to unmarshal
-// into a wrapper with a specific event type.
-type serviceEventUnmarshalWrapper[E any] struct {
-	Type  ServiceEventType
-	Event E
 }
 
 // ServiceEventList is a handy container to enable comparisons
@@ -105,7 +98,7 @@ var (
 	}
 )
 
-// UnmarshalWrapped unmarshals the service event and returns it as a wrapped ServiceEvent type.
+// UnmarshalWrapped unmarshals the service event `b` and returns it as a wrapped ServiceEvent type.
 // The input bytes must be encoded as a generic wrapped ServiceEvent type.
 // Forwards errors from the underlying marshaller (treat errors as you would from eg. json.Unmarshal)
 func (marshaller marshallerImpl) UnmarshalWrapped(b []byte) (ServiceEvent, error) {
@@ -131,7 +124,6 @@ func (marshaller marshallerImpl) UnmarshalWrapped(b []byte) (ServiceEvent, error
 	default:
 		return ServiceEvent{}, fmt.Errorf("invalid type: %s", eventType)
 	}
-
 	if err != nil {
 		return ServiceEvent{}, fmt.Errorf("failed to unmarshal to service event to type %s: %w", eventType, err)
 	}
@@ -145,13 +137,16 @@ func (marshaller marshallerImpl) UnmarshalWrapped(b []byte) (ServiceEvent, error
 // Event portion of a ServiceEvent into a specific typed structure.
 // Forwards errors from the underlying marshaller (treat errors as you would from eg. json.Unmarshal)
 func unmarshalWrapped[E any](b []byte, marshaller marshallerImpl) (*E, error) {
-	eventWrapper := serviceEventUnmarshalWrapper[E]{}
-	err := marshaller.unmarshalFunc(b, &eventWrapper)
+	wrapper := struct {
+		Type  ServiceEventType
+		Event E
+	}{}
+	err := marshaller.unmarshalFunc(b, &wrapper)
 	if err != nil {
 		return nil, err
 	}
 
-	return &eventWrapper.Event, nil
+	return &wrapper.Event, nil
 }
 
 // UnmarshalWithType unmarshals the service event and returns it as a wrapped ServiceEvent type.
