@@ -41,6 +41,7 @@ type CadenceBaseMigrator struct {
 	) []migrations.ValueMigration
 	runtimeInterfaceConfig util.RuntimeInterfaceConfig
 	errorMessageHandler    *errorMessageHandler
+	contracts              map[common.AddressLocation][]byte
 }
 
 var _ AccountBasedMigration = (*CadenceBaseMigrator)(nil)
@@ -64,21 +65,13 @@ func (m *CadenceBaseMigrator) InitMigration(
 ) error {
 	m.log = log.With().Str("migration", m.name).Logger()
 
-	// The MigrateAccount function is only given the payloads for the account to be migrated.
-	// However, the migration needs to be able to get the code for contracts of any account.
-
-	contracts, err := getContractMap(allPayloads)
-	if err != nil {
-		return err
-	}
-
 	m.runtimeInterfaceConfig.GetContractCodeFunc = func(location runtime.Location) ([]byte, error) {
 		addressLocation, ok := location.(common.AddressLocation)
 		if !ok {
 			return nil, nil
 		}
 
-		contract, ok := contracts[addressLocation]
+		contract, ok := m.contracts[addressLocation]
 		if !ok {
 			return nil, fmt.Errorf("failed to get contract code for location %s", location)
 		}
@@ -87,36 +80,6 @@ func (m *CadenceBaseMigrator) InitMigration(
 	}
 
 	return nil
-}
-
-func getContractMap(allPayloads []*ledger.Payload) (map[common.AddressLocation][]byte, error) {
-	contracts := make(map[common.AddressLocation][]byte)
-
-	for _, payload := range allPayloads {
-		registerID, registerValue, err := convert.PayloadToRegister(payload)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert payload to register: %w", err)
-		}
-
-		contractName := flow.RegisterIDContractName(registerID)
-		if contractName == "" {
-			continue
-		}
-
-		address, err := common.BytesToAddress([]byte(registerID.Owner))
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert register owner to address: %w", err)
-		}
-
-		addressLocation := common.AddressLocation{
-			Address: address,
-			Name:    contractName,
-		}
-
-		contracts[addressLocation] = registerValue
-	}
-
-	return contracts, nil
 }
 
 func (m *CadenceBaseMigrator) MigrateAccount(
@@ -216,7 +179,7 @@ func checkPayloadsOwnership(payloads []*ledger.Payload, address common.Address, 
 func checkPayloadOwnership(payload *ledger.Payload, address common.Address, log zerolog.Logger) {
 	registerID, _, err := convert.PayloadToRegister(payload)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to convert payload to register")
+		log.Err(err).Msg("failed to convert payload to register")
 		return
 	}
 
@@ -225,7 +188,7 @@ func checkPayloadOwnership(payload *ledger.Payload, address common.Address, log 
 	if len(owner) > 0 {
 		payloadAddress, err := common.BytesToAddress([]byte(owner))
 		if err != nil {
-			log.Error().Err(err).Msgf("failed to convert register owner to address: %x", owner)
+			log.Err(err).Msgf("failed to convert register owner to address: %x", owner)
 			return
 		}
 
@@ -246,6 +209,7 @@ func NewCadence1ValueMigrator(
 	diffMigrations bool,
 	logVerboseDiff bool,
 	errorMessageHandler *errorMessageHandler,
+	contracts map[common.AddressLocation][]byte,
 	compositeTypeConverter statictypes.CompositeTypeConverterFunc,
 	interfaceTypeConverter statictypes.InterfaceTypeConverterFunc,
 ) *CadenceBaseMigrator {
@@ -274,6 +238,7 @@ func NewCadence1ValueMigrator(
 			}
 		},
 		errorMessageHandler: errorMessageHandler,
+		contracts:           contracts,
 	}
 }
 
@@ -285,6 +250,7 @@ func NewCadence1LinkValueMigrator(
 	diffMigrations bool,
 	logVerboseDiff bool,
 	errorMessageHandler *errorMessageHandler,
+	contracts map[common.AddressLocation][]byte,
 	capabilityMapping *capcons.CapabilityMapping,
 ) *CadenceBaseMigrator {
 	var diffReporter reporters.ReportWriter
@@ -316,6 +282,7 @@ func NewCadence1LinkValueMigrator(
 			}
 		},
 		errorMessageHandler: errorMessageHandler,
+		contracts:           contracts,
 	}
 }
 
@@ -328,6 +295,7 @@ func NewCadence1CapabilityValueMigrator(
 	diffMigrations bool,
 	logVerboseDiff bool,
 	errorMessageHandler *errorMessageHandler,
+	contracts map[common.AddressLocation][]byte,
 	capabilityMapping *capcons.CapabilityMapping,
 ) *CadenceBaseMigrator {
 	var diffReporter reporters.ReportWriter
@@ -353,6 +321,7 @@ func NewCadence1CapabilityValueMigrator(
 			}
 		},
 		errorMessageHandler: errorMessageHandler,
+		contracts:           contracts,
 	}
 }
 

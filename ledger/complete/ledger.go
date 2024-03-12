@@ -377,7 +377,7 @@ func (l *Ledger) MigrateAt(
 
 		// migrate payloads
 		for i, migrate := range migrations {
-			l.logger.Info().Msgf("migration %d/%d is underway", i, len(migrations))
+			l.logger.Info().Msgf("migration %d/%d is underway", i+1, len(migrations))
 
 			start := time.Now()
 			payloads, err = migrate(payloads)
@@ -426,9 +426,9 @@ func (l *Ledger) MigrateAt(
 		}
 	}
 
-	statecommitment := ledger.State(newTrie.RootHash())
+	stateCommitment := ledger.State(newTrie.RootHash())
 
-	l.logger.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", statecommitment.String())
+	l.logger.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", stateCommitment.String())
 
 	return newTrie, nil
 }

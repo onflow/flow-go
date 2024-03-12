@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -87,6 +88,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 		burnerContractChange,
 		stagedContracts,
 		false,
+		0,
 	)
 
 	for _, migration := range migrations {
@@ -109,9 +111,6 @@ func TestCadenceValuesMigration(t *testing.T) {
 	// Check error logs.
 	require.Empty(t, logWriter.logs)
 }
-
-// TODO:
-//func TestCadenceValuesMigrationWithSwappedOrder(t *testing.T) {
 
 var flowTokenAddress = func() common.Address {
 	address, _ := common.HexToAddress("0ae53cb6e3f42a79")
@@ -727,6 +726,7 @@ func TestBootstrappedStateMigration(t *testing.T) {
 		burnerContractChange,
 		nil,
 		false,
+		0,
 	)
 
 	for _, migration := range migrations {
@@ -758,11 +758,6 @@ func TestProgramParsingError(t *testing.T) {
 	chain := chainID.Chain()
 
 	testAddress := common.Address(chain.ServiceAddress())
-
-	// TODO: EVM contract is not deployed in snapshot yet, so can't update it
-	const evmContractChange = EVMContractChangeNone
-
-	const burnerContractChange = BurnerContractChangeUpdate
 
 	payloads, err := newBootstrapPayloads(chainID)
 	require.NoError(t, err)
@@ -843,6 +838,11 @@ func TestProgramParsingError(t *testing.T) {
 
 	// Migrate
 
+	// TODO: EVM contract is not deployed in snapshot yet, so can't update it
+	const evmContractChange = EVMContractChangeNone
+
+	const burnerContractChange = BurnerContractChangeUpdate
+
 	migrations := NewCadence1Migrations(
 		logger,
 		rwf,
@@ -854,6 +854,7 @@ func TestProgramParsingError(t *testing.T) {
 		burnerContractChange,
 		nil,
 		false,
+		0,
 	)
 
 	for _, migration := range migrations {
@@ -881,4 +882,426 @@ func TestProgramParsingError(t *testing.T) {
 
 	assert.Contains(t, entry.Message, "`pub` is no longer a valid access keyword")
 	assert.NotContains(t, entry.Message, "runtime/debug.Stack()")
+}
+
+func TestCoreContractUsage(t *testing.T) {
+	t.Parallel()
+
+	const chainID = flow.Emulator
+
+	migrate := func(t *testing.T, staticType interpreter.StaticType) interpreter.StaticType {
+
+		rwf := &testReportWriterFactory{}
+
+		logWriter := &writer{}
+		logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
+
+		const nWorker = 2
+
+		chain := chainID.Chain()
+
+		testFlowAddress, err := chain.AddressAtIndex(1_000_000)
+		require.NoError(t, err)
+
+		testAddress := common.Address(testFlowAddress)
+
+		payloads, err := newBootstrapPayloads(chainID)
+		require.NoError(t, err)
+
+		runtime, err := NewMigratorRuntime(
+			testAddress,
+			payloads,
+			util.RuntimeInterfaceConfig{},
+		)
+		require.NoError(t, err)
+
+		err = runtime.Accounts.Create(nil, testFlowAddress)
+		require.NoError(t, err)
+
+		storage := runtime.Storage
+
+		storageDomain := common.PathDomainStorage.Identifier()
+		storageMapKey := interpreter.StringStorageMapKey("test")
+
+		storageMap := storage.GetStorageMap(
+			testAddress,
+			storageDomain,
+			true,
+		)
+
+		capabilityValue := interpreter.NewUnmeteredCapabilityValue(
+			0,
+			interpreter.AddressValue(testAddress),
+			staticType,
+		)
+
+		storageMap.WriteValue(
+			runtime.Interpreter,
+			storageMapKey,
+			capabilityValue,
+		)
+
+		err = storage.Commit(runtime.Interpreter, false)
+		require.NoError(t, err)
+
+		// finalize the transaction
+		result, err := runtime.TransactionState.FinalizeMainTransaction()
+		require.NoError(t, err)
+
+		// Merge the changes to the original payloads.
+
+		expectedAddresses := map[flow.Address]struct{}{
+			flow.Address(testAddress): {},
+		}
+
+		payloads, err = MergeRegisterChanges(
+			runtime.Snapshot.Payloads,
+			result.WriteSet,
+			expectedAddresses,
+			nil,
+			logger,
+		)
+		require.NoError(t, err)
+
+		// Migrate
+
+		// TODO: EVM contract is not deployed in snapshot yet, so can't update it
+		const evmContractChange = EVMContractChangeNone
+
+		const burnerContractChange = BurnerContractChangeUpdate
+
+		migrations := NewCadence1Migrations(
+			logger,
+			rwf,
+			nWorker,
+			chainID,
+			false,
+			false,
+			evmContractChange,
+			burnerContractChange,
+			nil,
+			false,
+			0,
+		)
+
+		for _, migration := range migrations {
+			payloads, err = migration.Migrate(payloads)
+			require.NoError(
+				t,
+				err,
+				"migration `%s` failed, logs: %v",
+				migration.Name,
+				logWriter.logs,
+			)
+		}
+
+		// Check error logs
+		require.Len(t, logWriter.logs, 0)
+
+		// Get result
+
+		mr, err := NewMigratorRuntime(
+			testAddress,
+			payloads,
+			util.RuntimeInterfaceConfig{},
+		)
+		require.NoError(t, err)
+
+		storageMap = mr.Storage.GetStorageMap(
+			testAddress,
+			storageDomain,
+			false,
+		)
+		require.NotNil(t, storageMap)
+
+		resultValue := storageMap.ReadValue(nil, storageMapKey)
+		require.NotNil(t, resultValue)
+		require.IsType(t, &interpreter.IDCapabilityValue{}, resultValue)
+
+		resultCap := resultValue.(*interpreter.IDCapabilityValue)
+		return resultCap.BorrowType
+	}
+
+	t.Run("&FungibleToken.Vault => auth(Withdraw) &{FungibleToken.Vault}", func(t *testing.T) {
+		t.Parallel()
+
+		systemContracts := systemcontracts.SystemContractsForChain(chainID)
+
+		const fungibleTokenContractName = "FungibleToken"
+		fungibleTokenContractLocation := common.NewAddressLocation(
+			nil,
+			common.Address(systemContracts.FungibleToken.Address),
+			fungibleTokenContractName,
+		)
+
+		const fungibleTokenVaultTypeQualifiedIdentifier = fungibleTokenContractName + ".Vault"
+
+		input := interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.UnauthorizedAccess,
+			interpreter.NewCompositeStaticType(
+				nil,
+				fungibleTokenContractLocation,
+				fungibleTokenVaultTypeQualifiedIdentifier,
+				fungibleTokenContractLocation.TypeID(nil, fungibleTokenVaultTypeQualifiedIdentifier),
+			),
+		)
+
+		const fungibleTokenWithdrawTypeQualifiedIdentifier = fungibleTokenContractName + ".Withdraw"
+		expected := interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.NewEntitlementSetAuthorization(
+				nil,
+				func() []common.TypeID {
+					return []common.TypeID{
+						fungibleTokenContractLocation.TypeID(nil, fungibleTokenWithdrawTypeQualifiedIdentifier),
+					}
+				},
+				1,
+				sema.Conjunction,
+			),
+			interpreter.NewIntersectionStaticType(
+				nil,
+				[]*interpreter.InterfaceStaticType{
+					interpreter.NewInterfaceStaticType(
+						nil,
+						fungibleTokenContractLocation,
+						fungibleTokenVaultTypeQualifiedIdentifier,
+						fungibleTokenContractLocation.TypeID(nil, fungibleTokenVaultTypeQualifiedIdentifier),
+					),
+				},
+			),
+		)
+
+		actual := migrate(t, input)
+
+		require.Equal(t, expected, actual)
+	})
+
+	t.Run("&FungibleToken.Vault{FungibleToken.Balance} => &{FungibleToken.Vault}", func(t *testing.T) {
+		t.Parallel()
+
+		systemContracts := systemcontracts.SystemContractsForChain(chainID)
+
+		const fungibleTokenContractName = "FungibleToken"
+		fungibleTokenContractLocation := common.NewAddressLocation(
+			nil,
+			common.Address(systemContracts.FungibleToken.Address),
+			fungibleTokenContractName,
+		)
+
+		const fungibleTokenVaultTypeQualifiedIdentifier = fungibleTokenContractName + ".Vault"
+		const fungibleTokenBalanceTypeQualifiedIdentifier = fungibleTokenContractName + ".Balance"
+
+		inputIntersectionType := interpreter.NewIntersectionStaticType(
+			nil,
+			[]*interpreter.InterfaceStaticType{
+				interpreter.NewInterfaceStaticType(
+					nil,
+					fungibleTokenContractLocation,
+					fungibleTokenBalanceTypeQualifiedIdentifier,
+					fungibleTokenContractLocation.TypeID(nil, fungibleTokenBalanceTypeQualifiedIdentifier),
+				),
+			},
+		)
+		inputIntersectionType.LegacyType = interpreter.NewCompositeStaticType(
+			nil,
+			fungibleTokenContractLocation,
+			fungibleTokenVaultTypeQualifiedIdentifier,
+			fungibleTokenContractLocation.TypeID(nil, fungibleTokenVaultTypeQualifiedIdentifier),
+		)
+
+		input := interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.UnauthorizedAccess,
+			inputIntersectionType,
+		)
+
+		expected := interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.UnauthorizedAccess,
+			interpreter.NewIntersectionStaticType(
+				nil,
+				[]*interpreter.InterfaceStaticType{
+					interpreter.NewInterfaceStaticType(
+						nil,
+						fungibleTokenContractLocation,
+						fungibleTokenVaultTypeQualifiedIdentifier,
+						fungibleTokenContractLocation.TypeID(nil, fungibleTokenVaultTypeQualifiedIdentifier),
+					),
+				},
+			),
+		)
+
+		actual := migrate(t, input)
+
+		require.Equal(t, expected, actual)
+	})
+
+	t.Run("&NonFungibleToken.NFT => &{NonFungibleToken.NFT}", func(t *testing.T) {
+		t.Parallel()
+
+		systemContracts := systemcontracts.SystemContractsForChain(chainID)
+
+		const nonFungibleTokenContractName = "NonFungibleToken"
+		nonFungibleTokenContractLocation := common.NewAddressLocation(
+			nil,
+			common.Address(systemContracts.NonFungibleToken.Address),
+			nonFungibleTokenContractName,
+		)
+
+		const nonFungibleTokenNFTTypeQualifiedIdentifier = nonFungibleTokenContractName + ".NFT"
+
+		input := interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.UnauthorizedAccess,
+			interpreter.NewCompositeStaticType(
+				nil,
+				nonFungibleTokenContractLocation,
+				nonFungibleTokenNFTTypeQualifiedIdentifier,
+				nonFungibleTokenContractLocation.TypeID(nil, nonFungibleTokenNFTTypeQualifiedIdentifier),
+			),
+		)
+
+		expected := interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.UnauthorizedAccess,
+			interpreter.NewIntersectionStaticType(
+				nil,
+				[]*interpreter.InterfaceStaticType{
+					interpreter.NewInterfaceStaticType(
+						nil,
+						nonFungibleTokenContractLocation,
+						nonFungibleTokenNFTTypeQualifiedIdentifier,
+						nonFungibleTokenContractLocation.TypeID(nil, nonFungibleTokenNFTTypeQualifiedIdentifier),
+					),
+				},
+			),
+		)
+
+		actual := migrate(t, input)
+
+		require.Equal(t, expected, actual)
+	})
+
+	t.Run("&{MetadataViews.Resolver} => &{ViewResolver.Resolver}", func(t *testing.T) {
+		t.Parallel()
+
+		systemContracts := systemcontracts.SystemContractsForChain(chainID)
+
+		const metadataViewsContractName = "MetadataViews"
+		metadataViewsContractLocation := common.NewAddressLocation(
+			nil,
+			common.Address(systemContracts.MetadataViews.Address),
+			metadataViewsContractName,
+		)
+
+		const metadataViewsResolverTypeQualifiedIdentifier = metadataViewsContractName + ".Resolver"
+
+		input := interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.UnauthorizedAccess,
+			interpreter.NewIntersectionStaticType(
+				nil,
+				[]*interpreter.InterfaceStaticType{
+					interpreter.NewInterfaceStaticType(
+						nil,
+						metadataViewsContractLocation,
+						metadataViewsResolverTypeQualifiedIdentifier,
+						metadataViewsContractLocation.TypeID(nil, metadataViewsResolverTypeQualifiedIdentifier),
+					),
+				},
+			),
+		)
+
+		const viewResolverContractName = "ViewResolver"
+		viewResolverContractLocation := common.NewAddressLocation(
+			nil,
+			common.Address(systemContracts.MetadataViews.Address),
+			viewResolverContractName,
+		)
+
+		const viewResolverResolverTypeQualifiedIdentifier = viewResolverContractName + ".Resolver"
+
+		expected := interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.UnauthorizedAccess,
+			interpreter.NewIntersectionStaticType(
+				nil,
+				[]*interpreter.InterfaceStaticType{
+					interpreter.NewInterfaceStaticType(
+						nil,
+						viewResolverContractLocation,
+						viewResolverResolverTypeQualifiedIdentifier,
+						viewResolverContractLocation.TypeID(nil, viewResolverResolverTypeQualifiedIdentifier),
+					),
+				},
+			),
+		)
+
+		actual := migrate(t, input)
+
+		require.Equal(t, expected, actual)
+	})
+
+	t.Run("&{MetadataViews.ResolverCollection} => &{ViewResolver.ResolverCollection}", func(t *testing.T) {
+		t.Parallel()
+
+		systemContracts := systemcontracts.SystemContractsForChain(chainID)
+
+		const metadataViewsContractName = "MetadataViews"
+		metadataViewsContractLocation := common.NewAddressLocation(
+			nil,
+			common.Address(systemContracts.MetadataViews.Address),
+			metadataViewsContractName,
+		)
+
+		const metadataViewsResolverTypeQualifiedIdentifier = metadataViewsContractName + ".ResolverCollection"
+
+		input := interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.UnauthorizedAccess,
+			interpreter.NewIntersectionStaticType(
+				nil,
+				[]*interpreter.InterfaceStaticType{
+					interpreter.NewInterfaceStaticType(
+						nil,
+						metadataViewsContractLocation,
+						metadataViewsResolverTypeQualifiedIdentifier,
+						metadataViewsContractLocation.TypeID(nil, metadataViewsResolverTypeQualifiedIdentifier),
+					),
+				},
+			),
+		)
+
+		const viewResolverContractName = "ViewResolver"
+		viewResolverContractLocation := common.NewAddressLocation(
+			nil,
+			common.Address(systemContracts.MetadataViews.Address),
+			viewResolverContractName,
+		)
+
+		const viewResolverResolverTypeQualifiedIdentifier = viewResolverContractName + ".ResolverCollection"
+
+		expected := interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.UnauthorizedAccess,
+			interpreter.NewIntersectionStaticType(
+				nil,
+				[]*interpreter.InterfaceStaticType{
+					interpreter.NewInterfaceStaticType(
+						nil,
+						viewResolverContractLocation,
+						viewResolverResolverTypeQualifiedIdentifier,
+						viewResolverContractLocation.TypeID(nil, viewResolverResolverTypeQualifiedIdentifier),
+					),
+				},
+			),
+		)
+
+		actual := migrate(t, input)
+
+		require.Equal(t, expected, actual)
+	})
+
 }
