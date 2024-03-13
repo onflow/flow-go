@@ -835,12 +835,12 @@ func (_m *AccessAPIServer) SendTransaction(_a0 context.Context, _a1 *access.Send
 	return r0, r1
 }
 
-// SubscribeBlockDigests provides a mock function with given fields: _a0, _a1
-func (_m *AccessAPIServer) SubscribeBlockDigests(_a0 *access.SubscribeBlockDigestsRequest, _a1 access.AccessAPI_SubscribeBlockDigestsServer) error {
+// SubscribeBlockDigestsFromLatest provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) SubscribeBlockDigestsFromLatest(_a0 *access.SubscribeBlockDigestsFromLatestRequest, _a1 access.AccessAPI_SubscribeBlockDigestsFromLatestServer) error {
 	ret := _m.Called(_a0, _a1)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*access.SubscribeBlockDigestsRequest, access.AccessAPI_SubscribeBlockDigestsServer) error); ok {
+	if rf, ok := ret.Get(0).(func(*access.SubscribeBlockDigestsFromLatestRequest, access.AccessAPI_SubscribeBlockDigestsFromLatestServer) error); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Error(0)
@@ -849,12 +849,12 @@ func (_m *AccessAPIServer) SubscribeBlockDigests(_a0 *access.SubscribeBlockDiges
 	return r0
 }
 
-// SubscribeBlockHeaders provides a mock function with given fields: _a0, _a1
-func (_m *AccessAPIServer) SubscribeBlockHeaders(_a0 *access.SubscribeBlockHeadersRequest, _a1 access.AccessAPI_SubscribeBlockHeadersServer) error {
+// SubscribeBlockDigestsFromStartBlockID provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) SubscribeBlockDigestsFromStartBlockID(_a0 *access.SubscribeBlockDigestsFromStartBlockIDRequest, _a1 access.AccessAPI_SubscribeBlockDigestsFromStartBlockIDServer) error {
 	ret := _m.Called(_a0, _a1)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*access.SubscribeBlockHeadersRequest, access.AccessAPI_SubscribeBlockHeadersServer) error); ok {
+	if rf, ok := ret.Get(0).(func(*access.SubscribeBlockDigestsFromStartBlockIDRequest, access.AccessAPI_SubscribeBlockDigestsFromStartBlockIDServer) error); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Error(0)
@@ -863,12 +863,96 @@ func (_m *AccessAPIServer) SubscribeBlockHeaders(_a0 *access.SubscribeBlockHeade
 	return r0
 }
 
-// SubscribeBlocks provides a mock function with given fields: _a0, _a1
-func (_m *AccessAPIServer) SubscribeBlocks(_a0 *access.SubscribeBlocksRequest, _a1 access.AccessAPI_SubscribeBlocksServer) error {
+// SubscribeBlockDigestsFromStartHeight provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) SubscribeBlockDigestsFromStartHeight(_a0 *access.SubscribeBlockDigestsFromStartHeightRequest, _a1 access.AccessAPI_SubscribeBlockDigestsFromStartHeightServer) error {
 	ret := _m.Called(_a0, _a1)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*access.SubscribeBlocksRequest, access.AccessAPI_SubscribeBlocksServer) error); ok {
+	if rf, ok := ret.Get(0).(func(*access.SubscribeBlockDigestsFromStartHeightRequest, access.AccessAPI_SubscribeBlockDigestsFromStartHeightServer) error); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SubscribeBlockHeadersFromLatest provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) SubscribeBlockHeadersFromLatest(_a0 *access.SubscribeBlockHeadersFromLatestRequest, _a1 access.AccessAPI_SubscribeBlockHeadersFromLatestServer) error {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*access.SubscribeBlockHeadersFromLatestRequest, access.AccessAPI_SubscribeBlockHeadersFromLatestServer) error); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SubscribeBlockHeadersFromStartBlockID provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) SubscribeBlockHeadersFromStartBlockID(_a0 *access.SubscribeBlockHeadersFromStartBlockIDRequest, _a1 access.AccessAPI_SubscribeBlockHeadersFromStartBlockIDServer) error {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*access.SubscribeBlockHeadersFromStartBlockIDRequest, access.AccessAPI_SubscribeBlockHeadersFromStartBlockIDServer) error); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SubscribeBlockHeadersFromStartHeight provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) SubscribeBlockHeadersFromStartHeight(_a0 *access.SubscribeBlockHeadersFromStartHeightRequest, _a1 access.AccessAPI_SubscribeBlockHeadersFromStartHeightServer) error {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*access.SubscribeBlockHeadersFromStartHeightRequest, access.AccessAPI_SubscribeBlockHeadersFromStartHeightServer) error); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SubscribeBlocksFromLatest provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) SubscribeBlocksFromLatest(_a0 *access.SubscribeBlocksFromLatestRequest, _a1 access.AccessAPI_SubscribeBlocksFromLatestServer) error {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*access.SubscribeBlocksFromLatestRequest, access.AccessAPI_SubscribeBlocksFromLatestServer) error); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SubscribeBlocksFromStartBlockID provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) SubscribeBlocksFromStartBlockID(_a0 *access.SubscribeBlocksFromStartBlockIDRequest, _a1 access.AccessAPI_SubscribeBlocksFromStartBlockIDServer) error {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*access.SubscribeBlocksFromStartBlockIDRequest, access.AccessAPI_SubscribeBlocksFromStartBlockIDServer) error); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SubscribeBlocksFromStartHeight provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) SubscribeBlocksFromStartHeight(_a0 *access.SubscribeBlocksFromStartHeightRequest, _a1 access.AccessAPI_SubscribeBlocksFromStartHeightServer) error {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*access.SubscribeBlocksFromStartHeightRequest, access.AccessAPI_SubscribeBlocksFromStartHeightServer) error); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Error(0)

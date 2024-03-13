@@ -181,7 +181,7 @@ func (e *Engine) processOnFinalizedBlock(_ *model.Block) error {
 	var err error
 	// NOTE: The BlockTracker is currently only used by the access node and not by the observer node.
 	if e.backend.BlockTracker != nil {
-		err = e.backend.ProcessOnFinalizedBlock()
+		err = e.backend.BlockTracker.ProcessOnFinalizedBlock()
 		if err != nil {
 			return err
 		}
@@ -189,7 +189,7 @@ func (e *Engine) processOnFinalizedBlock(_ *model.Block) error {
 
 	err = e.backend.ProcessFinalizedBlockHeight(finalizedHeader.Height)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not process finalized block height %d: %w", finalizedHeader.Height, err)
 	}
 
 	return nil

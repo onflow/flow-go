@@ -242,15 +242,15 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 
 	eventIndexer := index.NewEventsIndex(suite.events)
 
-	suite.executionDataTracker, err = subscription.NewExecutionDataTracker(
+	suite.executionDataTracker = subscription.NewExecutionDataTracker(
 		suite.state,
 		rootBlock.Header.Height,
 		suite.headers,
+		nil,
 		rootBlock.Header.Height,
 		eventIndexer,
 		false,
 	)
-	require.NoError(suite.T(), err)
 
 	stateStreamBackend, err := statestreambackend.New(
 		suite.log,
@@ -278,7 +278,6 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		suite.chainID,
 		suite.unsecureGrpcServer,
 		stateStreamBackend,
-		nil,
 	)
 	assert.NoError(suite.T(), err)
 

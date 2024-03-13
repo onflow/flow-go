@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/engine/access/index"
+
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
@@ -201,7 +203,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 		return s.finalizedBlock.Header
 	}, nil)
 
-	s.blockTracker.On("GetStartHeight", mock.Anything, mock.Anything, mock.Anything).Return(func(_ context.Context, id flow.Identifier, _ uint64) (uint64, error) {
+	s.blockTracker.On("GetStartHeightFromBlockID", mock.Anything).Return(func(_ flow.Identifier) (uint64, error) {
 		finalizedHeader := s.finalizedBlock.Header
 		return finalizedHeader.Height, nil
 	}, nil)
@@ -245,7 +247,7 @@ func (s *TransactionStatusSuite) backendParams() Params {
 			ResponseLimit:  subscription.DefaultResponseLimit,
 			Broadcaster:    s.broadcaster,
 		},
-		TxResultsIndex: NewTransactionResultsIndex(s.transactionResults),
+		TxResultsIndex: index.NewTransactionResultsIndex(s.transactionResults),
 	}
 }
 

@@ -54,6 +54,78 @@ func (_m *ExecutionDataTracker) GetStartHeight(_a0 context.Context, _a1 flow.Ide
 	return r0, r1
 }
 
+// GetStartHeightFromBlockID provides a mock function with given fields: _a0
+func (_m *ExecutionDataTracker) GetStartHeightFromBlockID(_a0 flow.Identifier) (uint64, error) {
+	ret := _m.Called(_a0)
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (uint64, error)); ok {
+		return rf(_a0)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Identifier) uint64); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(_a0)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetStartHeightFromHeight provides a mock function with given fields: _a0
+func (_m *ExecutionDataTracker) GetStartHeightFromHeight(_a0 uint64) (uint64, error) {
+	ret := _m.Called(_a0)
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(uint64) (uint64, error)); ok {
+		return rf(_a0)
+	}
+	if rf, ok := ret.Get(0).(func(uint64) uint64); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func(uint64) error); ok {
+		r1 = rf(_a0)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetStartHeightFromLatest provides a mock function with given fields: _a0
+func (_m *ExecutionDataTracker) GetStartHeightFromLatest(_a0 context.Context) (uint64, error) {
+	ret := _m.Called(_a0)
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (uint64, error)); ok {
+		return rf(_a0)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) uint64); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(_a0)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // OnExecutionData provides a mock function with given fields: _a0
 func (_m *ExecutionDataTracker) OnExecutionData(_a0 *execution_data.BlockExecutionDataEntity) error {
 	ret := _m.Called(_a0)

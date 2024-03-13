@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -71,8 +72,6 @@ type Backend struct {
 	backendAccounts
 	backendExecutionResults
 	backendNetwork
-
-	subscription.BlockTracker
 	backendSubscribeBlocks
 	backendSubscribeTransactions
 
@@ -83,7 +82,8 @@ type Backend struct {
 	connFactory       connection.ConnectionFactory
 
 	// cache the response to GetNodeVersionInfo since it doesn't change
-	nodeInfo *access.NodeVersionInfo
+	nodeInfo     *access.NodeVersionInfo
+	BlockTracker subscription.BlockTracker
 }
 
 type Params struct {
@@ -112,13 +112,12 @@ type Params struct {
 	ScriptExecutor            execution.ScriptExecutor
 	ScriptExecutionMode       IndexQueryMode
 	EventQueryMode            IndexQueryMode
-	TxResultQueryMode         IndexQueryMode
-	EventsIndex               *index.EventsIndex
-	TxResultsIndex            *TransactionResultsIndex
 	BlockTracker              subscription.BlockTracker
 	SubscriptionParams        SubscriptionParams
 
-	UseIndex bool
+	EventsIndex       *index.EventsIndex
+	TxResultQueryMode IndexQueryMode
+	TxResultsIndex    *index.TransactionResultsIndex
 }
 
 type SubscriptionParams struct {
@@ -162,6 +161,13 @@ func New(params Params) (*Backend, error) {
 		}
 	}
 
+	// the system tx is hardcoded and never changes during runtime
+	systemTx, err := blueprints.SystemChunkTransaction(params.ChainID.Chain())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create system chunk transaction: %w", err)
+	}
+	systemTxID := systemTx.ID()
+
 	// initialize node version info
 	nodeInfo := getNodeVersionInfo(params.State.Params())
 
@@ -171,6 +177,7 @@ func New(params Params) (*Backend, error) {
 		blocks:         params.Blocks,
 		eventsIndex:    params.EventsIndex,
 		txResultsIndex: params.TxResultsIndex,
+		systemTxID:     systemTxID,
 	}
 
 	b := &Backend{
@@ -205,6 +212,8 @@ func New(params Params) (*Backend, error) {
 			txResultCache:                 txResCache,
 			txErrorMessagesCache:          txErrorMessagesCache,
 			txResultQueryMode:             params.TxResultQueryMode,
+			systemTx:                      systemTx,
+			systemTxID:                    systemTxID,
 		},
 		backendEvents: backendEvents{
 			log:               params.Log,
@@ -254,6 +263,7 @@ func New(params Params) (*Backend, error) {
 			sendTimeout:    params.SubscriptionParams.SendTimeout,
 			responseLimit:  params.SubscriptionParams.ResponseLimit,
 			sendBufferSize: params.SubscriptionParams.SendBufferSize,
+			blockTracker:   params.BlockTracker,
 		},
 		backendSubscribeTransactions: backendSubscribeTransactions{
 			txLocalDataProvider: transactionsLocalDataProvider,
@@ -263,6 +273,7 @@ func New(params Params) (*Backend, error) {
 			sendTimeout:         params.SubscriptionParams.SendTimeout,
 			responseLimit:       params.SubscriptionParams.ResponseLimit,
 			sendBufferSize:      params.SubscriptionParams.SendBufferSize,
+			blockTracker:        params.BlockTracker,
 		},
 		collections:       params.Collections,
 		executionReceipts: params.ExecutionReceipts,
@@ -272,15 +283,6 @@ func New(params Params) (*Backend, error) {
 	}
 
 	b.backendTransactions.txErrorMessages = b
-
-	// NOTE: The BlockTracker is currently only used by the access node and not by the observer node.
-	if params.BlockTracker != nil {
-		b.backendSubscribeBlocks.getStartHeight = b.GetStartHeight
-		b.backendSubscribeBlocks.getHighestHeight = b.GetHighestHeight
-
-		b.backendSubscribeTransactions.getStartHeight = b.GetStartHeight
-		b.backendSubscribeTransactions.getHighestHeight = b.GetHighestHeight
-	}
 
 	retry.SetBackend(b)
 

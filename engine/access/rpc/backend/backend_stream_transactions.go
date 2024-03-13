@@ -34,8 +34,7 @@ type backendSubscribeTransactions struct {
 	responseLimit       float64
 	sendBufferSize      int
 
-	getStartHeight   subscription.GetStartHeightFunc
-	getHighestHeight subscription.GetHighestHeight
+	blockTracker subscription.BlockTracker
 }
 
 // TransactionSubscriptionMetadata holds data representing the status state for each transaction subscription.
@@ -52,7 +51,7 @@ type TransactionSubscriptionMetadata struct {
 // - storage.ErrNotFound if a block referenced by the transaction does not exist.
 // - irrecoverable.Exception if there is an internal error related to state inconsistency.
 func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody) subscription.Subscription {
-	nextHeight, err := b.getStartHeight(ctx, tx.ReferenceBlockID, 0)
+	nextHeight, err := b.blockTracker.GetStartHeightFromBlockID(tx.ReferenceBlockID)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")
 	}
@@ -79,7 +78,7 @@ func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(ctx context.
 // previous status state metadata.
 func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *TransactionSubscriptionMetadata) func(context.Context, uint64) (interface{}, error) {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
-		highestHeight, err := b.getHighestHeight(flow.BlockStatusFinalized)
+		highestHeight, err := b.blockTracker.GetHighestHeight(flow.BlockStatusFinalized)
 		if err != nil {
 			return nil, fmt.Errorf("could not get highest height for block %d: %w", height, err)
 		}

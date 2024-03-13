@@ -236,15 +236,15 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	require.NoError(s.T(), err)
 
 	// create real execution data tracker to use GetStartHeight from it, instead of mocking
-	s.executionDataTrackerReal, err = subscription.NewExecutionDataTracker(
+	s.executionDataTrackerReal = subscription.NewExecutionDataTracker(
 		s.state,
 		s.rootBlock.Header.Height,
 		s.headers,
+		s.broadcaster,
 		s.rootBlock.Header.Height,
 		s.eventsIndex,
 		false,
 	)
-	require.NoError(s.T(), err)
 
 	s.executionDataTracker.On(
 		"GetStartHeight",

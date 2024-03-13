@@ -286,7 +286,7 @@ type FlowAccessNodeBuilder struct {
 	ScriptExecutor             *backend.ScriptExecutor
 	RegistersAsyncStore        *execution.RegistersAsyncStore
 	EventsIndex                *index.EventsIndex
-	TxResultsIndex             *backend.TransactionResultsIndex
+	TxResultsIndex             *index.TransactionResultsIndex
 	IndexerDependencies        *cmd.DependencyList
 	collectionExecutedMetric   module.CollectionExecutedMetric
 
@@ -889,17 +889,15 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			useIndex := builder.executionDataIndexingEnabled &&
 				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
 
-			executionDataTracker, err := subscription.NewExecutionDataTracker(
+			executionDataTracker := subscription.NewExecutionDataTracker(
 				node.State,
 				builder.executionDataConfig.InitialBlockHeight,
 				node.Storage.Headers,
+				broadcaster,
 				highestAvailableHeight,
 				builder.EventsIndex,
 				useIndex,
 			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to initialize execution data tracker: %w", err)
-			}
 
 			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,
@@ -928,7 +926,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				node.RootChainID,
 				builder.stateStreamGrpcServer,
 				builder.stateStreamBackend,
-				broadcaster,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream engine: %w", err)
@@ -1543,11 +1540,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("transaction result index", func(node *cmd.NodeConfig) error {
-			builder.TxResultsIndex = backend.NewTransactionResultsIndex(builder.Storage.LightTransactionResults)
-			return nil
-		}).
-		Module("transaction result index", func(node *cmd.NodeConfig) error {
-			builder.TxResultsIndex = backend.NewTransactionResultsIndex(builder.Storage.LightTransactionResults)
+			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Storage.LightTransactionResults)
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -1595,37 +1588,24 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("event query mode 'compare' is not supported")
 			}
 
+			broadcaster := engine.NewBroadcaster()
+			// create BlockTracker that will track for new blocks (finalized and sealed) and
+			// handles block-related operations.
+			blockTracker, err := subscription.NewBlockTracker(
+				node.State,
+				builder.FinalizedRootBlock.Header.Height,
+				node.Storage.Headers,
+				broadcaster,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to initialize block tracker: %w", err)
+			}
 			txResultQueryMode, err := backend.ParseIndexQueryMode(config.BackendConfig.TxResultQueryMode)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse transaction result query mode: %w", err)
 			}
 			if txResultQueryMode == backend.IndexQueryModeCompare {
 				return nil, fmt.Errorf("transaction result query mode 'compare' is not supported")
-			}
-
-			// use the events index for events if enabled and the node is configured to use it for
-			// regular event queries
-			useIndex := builder.executionDataIndexingEnabled &&
-				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
-
-			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
-			if err != nil {
-				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
-			}
-			broadcaster := engine.NewBroadcaster()
-			// create BlockTracker that will track for new blocks (finalized and sealed) and
-			// handles block-related operations.
-			blockTracker, err := subscription.NewBlockTracker(
-				node.State,
-				builder.executionDataConfig.InitialBlockHeight,
-				node.Storage.Headers,
-				highestAvailableHeight,
-				broadcaster,
-				builder.EventsIndex,
-				useIndex,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to initialize block tracker: %w", err)
 			}
 
 			nodeBackend, err := backend.New(backend.Params{
@@ -1661,7 +1641,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					ResponseLimit:  builder.stateStreamConf.ResponseLimit,
 					SendBufferSize: int(builder.stateStreamConf.ClientSendBufferSize),
 				},
-				UseIndex:          useIndex,
 				EventsIndex:       builder.EventsIndex,
 				TxResultQueryMode: txResultQueryMode,
 				TxResultsIndex:    builder.TxResultsIndex,

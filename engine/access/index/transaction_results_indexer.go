@@ -1,4 +1,4 @@
-package backend
+package index
 
 import (
 	"fmt"
