@@ -37,13 +37,6 @@ type ServiceEvent struct {
 	Event interface{}
 }
 
-// serviceEventUnmarshalWrapper is a version of ServiceEvent used to unmarshal
-// into a wrapper with a specific event type.
-type serviceEventUnmarshalWrapper[E any] struct {
-	Type  ServiceEventType
-	Event E
-}
-
 // ServiceEventList is a handy container to enable comparisons
 type ServiceEventList []ServiceEvent
 
