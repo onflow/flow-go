@@ -17,7 +17,7 @@ import (
 type StateMachine struct {
 	view        uint64
 	parentState protocol_state.KVStoreReader
-	state       protocol_state.KVStoreAPI
+	mutator     protocol_state.KVStoreMutator
 	params      protocol.GlobalParams
 }
 
@@ -29,19 +29,19 @@ func NewProcessingStateMachine(
 	view uint64,
 	params protocol.GlobalParams,
 	parentState protocol_state.KVStoreReader,
-	mutator protocol_state.KVStoreAPI,
+	mutator protocol_state.KVStoreMutator,
 ) *StateMachine {
 	return &StateMachine{
 		view:        view,
 		parentState: parentState,
-		state:       mutator.Clone(),
+		mutator:     mutator,
 		params:      params,
 	}
 }
 
 // Build returns updated key-value store model, state ID and a flag indicating if there were any changes.
 func (m *StateMachine) Build() (updatedState protocol_state.KVStoreReader, stateID flow.Identifier, hasChanges bool) {
-	updatedState = m.state.Clone()
+	updatedState = m.mutator
 	stateID = updatedState.ID()
 	hasChanges = stateID != m.parentState.ID()
 	return
@@ -83,7 +83,7 @@ func (m *StateMachine) ProcessUpdate(update *flow.ServiceEvent) error {
 			Data:           versionUpgrade.NewProtocolStateVersion,
 			ActivationView: versionUpgrade.ActiveView,
 		}
-		m.state.SetVersionUpgrade(activator)
+		m.mutator.SetVersionUpgrade(activator)
 
 	// Service events not explicitly expected are ignored
 	default:

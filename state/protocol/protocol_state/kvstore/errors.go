@@ -31,3 +31,5 @@ var ErrInvalidUpgradeVersion = errors.New("invalid upgrade version for the Proto
 // ErrInvalidActivationView is a sentinel returned when we attempt to process a KV store update
 // which has an activation view `V` so that `CurrentView + SafetyBuffer < V` does NOT hold.
 var ErrInvalidActivationView = errors.New("invalid activation view for the new Protocol State version")
+
+var ErrIncompatibleVersionChange = errors.New("incompatible version change when replicating the Protocol State's kvstore")

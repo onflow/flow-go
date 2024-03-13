@@ -50,7 +50,8 @@ type KVStoreReader interface {
 	GetInvalidEpochTransitionAttempted() (bool, error)
 }
 
-// KVStoreAPI is the latest read-writer interface to the Protocol State key-value store.
+// KVStoreAPI is the latest interface to the Protocol State key-value store which implements 'Prototype'
+// pattern for replicating protocol state between versions.
 //
 // Caution:
 // Engineers evolving this interface must ensure that it is backwards-compatible
@@ -60,9 +61,36 @@ type KVStoreReader interface {
 type KVStoreAPI interface {
 	KVStoreReader
 
-	// Clone returns a deep copy of the KVStoreAPI.
-	// This is used to create a new instance of the KVStoreAPI to avoid mutating the original.
-	Clone() KVStoreAPI
+	// Replicate instantiates a Protocol State Snapshot of the given `protocolVersion`.
+	// We reference to the Protocol State Snapshot, whose `Replicate` method is called
+	// as the 'Parent Snapshot'.
+	// If the `protocolVersion` matches the version of the Parent Snapshot, `Replicate` behaves
+	// exactly like a deep copy. If `protocolVersion` is newer, the data model corresponding
+	// to the newer version is used and values from the Parent Snapshot are replicated into
+	// the new data model. In all cases, the new Snapshot can be mutated without changing the
+	// Parent Snapshot.
+	//
+	// Caution:
+	// Since we are potentially converting from the older protocol version of the parent to
+	// a newer version, it is possible that the replicated state snapshot is incomplete
+	// or otherwise requires further inputs or mutations to result in the valid Protocol
+	// State Snapshot according to the new protocol version. Therefore, we represent the outcome
+	// of the replication as a `KVStoreMutator`
+	// Expected errors during normal operations:
+	//  - ErrIncompatibleVersionChange if replicating the Parent Snapshot into a Snapshot
+	//    with the specified `protocolVersion` is not supported.
+	Replicate(protocolVersion uint64) (KVStoreMutator, error)
+}
+
+// KVStoreMutator is the latest read-writer interface to the Protocol State key-value store.
+//
+// Caution:
+// Engineers evolving this interface must ensure that it is backwards-compatible
+// with all versions of Protocol State Snapshots that can be retrieved from the local
+// database, which should exactly correspond to the versioned model types defined in
+// ./kvstore/models.go
+type KVStoreMutator interface {
+	KVStoreReader
 
 	// v0
 

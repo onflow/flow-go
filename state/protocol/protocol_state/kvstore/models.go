@@ -1,6 +1,7 @@
 package kvstore
 
 import (
+	"fmt"
 	"github.com/huandu/go-clone/generic"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -43,15 +44,31 @@ type modelv0 struct {
 	upgradableModel
 }
 
-var _ protocol_state.KVStoreReader = new(modelv0)
-var _ protocol_state.KVStoreAPI = new(modelv0)
+var _ protocol_state.KVStoreAPI = (*modelv0)(nil)
+var _ protocol_state.KVStoreMutator = (*modelv0)(nil)
 
 // ID returns an identifier for this key-value store snapshot by hashing internal fields.
 func (model *modelv0) ID() flow.Identifier { return flow.MakeID(model) }
 
 // Clone returns a deep copy of the KVStoreAPI.
 // This is used to create a new instance of the KVStoreAPI to avoid mutating the original.
-func (model *modelv0) Clone() protocol_state.KVStoreAPI { return clone.Clone(model) }
+func (model *modelv0) Replicate(protocolVersion uint64) (protocol_state.KVStoreMutator, error) {
+	version := model.GetProtocolStateVersion()
+	if version == protocolVersion {
+		// no need for migration, return a complete copy
+		return clone.Clone(model), nil
+	} else if protocolVersion != 1 {
+		return nil, fmt.Errorf("unsupported replication version %d, expect %d: %w",
+			protocolVersion, 1, ErrIncompatibleVersionChange)
+	}
+
+	// perform actual replication to the next version
+	v1 := &modelv1{
+		upgradableModel:                 clone.Clone(model.upgradableModel),
+		InvalidEpochTransitionAttempted: false,
+	}
+	return v1, nil
+}
 
 // VersionedEncode encodes the key-value store, returning the version separately
 // from the encoded bytes.
@@ -94,15 +111,24 @@ type modelv1 struct {
 	InvalidEpochTransitionAttempted bool
 }
 
-var _ protocol_state.KVStoreReader = new(modelv1)
-var _ protocol_state.KVStoreAPI = new(modelv1)
+var _ protocol_state.KVStoreAPI = (*modelv1)(nil)
+var _ protocol_state.KVStoreMutator = (*modelv1)(nil)
 
 // ID returns an identifier for this key-value store snapshot by hashing internal fields.
 func (model *modelv1) ID() flow.Identifier { return flow.MakeID(model) }
 
 // Clone returns a deep copy of the KVStoreAPI.
 // This is used to create a new instance of the KVStoreAPI to avoid mutating the original.
-func (model *modelv1) Clone() protocol_state.KVStoreAPI { return clone.Clone(model) }
+func (model *modelv1) Replicate(protocolVersion uint64) (protocol_state.KVStoreMutator, error) {
+	version := model.GetProtocolStateVersion()
+	if version == protocolVersion {
+		// no need for migration, return a complete copy
+		return clone.Clone(model), nil
+	} else {
+		return nil, fmt.Errorf("unsupported replication version %d: %w",
+			protocolVersion, ErrIncompatibleVersionChange)
+	}
+}
 
 // VersionedEncode encodes the key-value store, returning the version separately
 // from the encoded bytes.
