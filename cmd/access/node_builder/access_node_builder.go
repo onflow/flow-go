@@ -932,7 +932,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 			builder.StateStreamEng = stateStreamEng
 
-			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.StateStreamEng.OnExecutionData)
+			execDataDistributor.AddOnExecutionDataReceivedConsumer(func(data *execution_data.BlockExecutionDataEntity) {
+				err := builder.stateStreamBackend.ExecutionDataTracker.OnExecutionData(data)
+				if err != nil {
+					builder.Logger.Fatal().Err(err).Msg("failed to notify of new execution data")
+				}
+			})
 
 			return builder.StateStreamEng, nil
 		})

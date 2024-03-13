@@ -159,7 +159,7 @@ func (e *ExecutionDataTrackerImpl) OnExecutionData(executionData *execution_data
 	header, err := e.headers.ByBlockID(executionData.BlockID)
 	if err != nil {
 		// if the execution data is available, the block must be locally finalized
-		return rpc.ConvertError(err, "failed to get header for block", codes.Internal)
+		return err
 	}
 
 	// sets the highest height for which execution data is available.
