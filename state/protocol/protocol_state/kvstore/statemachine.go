@@ -79,6 +79,39 @@ func (m *StateMachine) ProcessUpdate(update *flow.ServiceEvent) error {
 				m.parentState.GetProtocolStateVersion(), versionUpgrade.NewProtocolStateVersion, ErrInvalidUpgradeVersion)
 		}
 
+		// checkPendingUpgrade checks if there is a pending upgrade in the state and validates if we can set the new upgrade.
+		// We allow setting version upgrade if all the conditions are met:
+		// (i) the activation view is higher than the current view + Δ.
+		// (ii) if there is a pending upgrade, the new version should be the same as the pending upgrade.
+		// Condition (ii) is checked in this function.
+		checkPendingUpgrade := func(store protocol_state.KVStoreReader) error {
+			if pendingUpgrade := store.GetVersionUpgrade(); pendingUpgrade != nil {
+				if pendingUpgrade.ActivationView < m.view {
+					// pending upgrade has been activated, we can ignore it.
+					return nil
+				}
+
+				// we allow updating pending upgrade iff the new version is the same as the pending upgrade
+				// the activation view may differ, but it has to meet the same threshold.
+				if pendingUpgrade.Data != versionUpgrade.NewProtocolStateVersion {
+					return protocol.NewInvalidServiceEventErrorf("requested to upgrade to %d but pending upgrade with version already stored %d: %w",
+						pendingUpgrade.Data, versionUpgrade.NewProtocolStateVersion, ErrInvalidUpgradeVersion)
+				}
+			}
+			return nil
+		}
+
+		// check in case there is a pending upgrade in parent state.
+		err := checkPendingUpgrade(m.parentState)
+		if err != nil {
+			return fmt.Errorf("version upgrade invalid with respect to the parent state: %w", err)
+		}
+		// check in case there are multiple upgrades in the same block.
+		err = checkPendingUpgrade(m.mutator)
+		if err != nil {
+			return fmt.Errorf("version upgrade invalid with respect to the current state: %w", err)
+		}
+
 		activator := &protocol_state.ViewBasedActivator[uint64]{
 			Data:           versionUpgrade.NewProtocolStateVersion,
 			ActivationView: versionUpgrade.ActiveView,
