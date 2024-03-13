@@ -37,6 +37,7 @@ import (
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rest"
@@ -46,6 +47,7 @@ import (
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
@@ -84,7 +86,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
-	"github.com/onflow/flow-go/network/p2p/subscription"
+	networkingsubscription "github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	relaynet "github.com/onflow/flow-go/network/relay"
@@ -203,14 +205,14 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		},
 		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
-			ExecutionDataCacheSize:  state_stream.DefaultCacheSize,
-			ClientSendTimeout:       state_stream.DefaultSendTimeout,
-			ClientSendBufferSize:    state_stream.DefaultSendBufferSize,
-			MaxGlobalStreams:        state_stream.DefaultMaxGlobalStreams,
+			ExecutionDataCacheSize:  subscription.DefaultCacheSize,
+			ClientSendTimeout:       subscription.DefaultSendTimeout,
+			ClientSendBufferSize:    subscription.DefaultSendBufferSize,
+			MaxGlobalStreams:        subscription.DefaultMaxGlobalStreams,
 			EventFilterConfig:       state_stream.DefaultEventFilterConfig,
-			ResponseLimit:           state_stream.DefaultResponseLimit,
-			HeartbeatInterval:       state_stream.DefaultHeartbeatInterval,
 			RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
+			ResponseLimit:           subscription.DefaultResponseLimit,
+			HeartbeatInterval:       subscription.DefaultHeartbeatInterval,
 		},
 		stateStreamFilterConf:        nil,
 		ExecutionNodeAddress:         "localhost:9000",
@@ -287,8 +289,8 @@ type FlowAccessNodeBuilder struct {
 	ExecutionIndexerCore       *indexer.IndexerCore
 	ScriptExecutor             *backend.ScriptExecutor
 	RegistersAsyncStore        *execution.RegistersAsyncStore
-	EventsIndex                *backend.EventsIndex
-	TxResultsIndex             *backend.TransactionResultsIndex
+	EventsIndex                *index.EventsIndex
+	TxResultsIndex             *index.TransactionResultsIndex
 	IndexerDependencies        *cmd.DependencyList
 	collectionExecutedMetric   module.CollectionExecutedMetric
 
@@ -904,6 +906,17 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			useIndex := builder.executionDataIndexingEnabled &&
 				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
 
+			executionDataTracker := subscription.NewExecutionDataTracker(
+				builder.Logger,
+				node.State,
+				builder.executionDataConfig.InitialBlockHeight,
+				node.Storage.Headers,
+				broadcaster,
+				highestAvailableHeight,
+				builder.EventsIndex,
+				useIndex,
+			)
+
 			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,
 				builder.stateStreamConf,
@@ -914,11 +927,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.ExecutionDataStore,
 				executionDataStoreCache,
 				broadcaster,
-				builder.executionDataConfig.InitialBlockHeight,
-				highestAvailableHeight,
 				builder.RegistersAsyncStore,
 				builder.EventsIndex,
 				useIndex,
+				executionDataTracker,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
@@ -932,14 +944,14 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				node.RootChainID,
 				builder.stateStreamGrpcServer,
 				builder.stateStreamBackend,
-				broadcaster,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream engine: %w", err)
 			}
 			builder.StateStreamEng = stateStreamEng
 
-			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.StateStreamEng.OnExecutionData)
+			// setup requester to notify ExecutionDataTracker when new execution data is received
+			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.stateStreamBackend.OnExecutionData)
 
 			return builder.StateStreamEng, nil
 		})
@@ -1553,11 +1565,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("events index", func(node *cmd.NodeConfig) error {
-			builder.EventsIndex = backend.NewEventsIndex(builder.Storage.Events)
+			builder.EventsIndex = index.NewEventsIndex(builder.Storage.Events)
 			return nil
 		}).
 		Module("transaction result index", func(node *cmd.NodeConfig) error {
-			builder.TxResultsIndex = backend.NewTransactionResultsIndex(builder.Storage.LightTransactionResults)
+			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Storage.LightTransactionResults)
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -1605,6 +1617,18 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("event query mode 'compare' is not supported")
 			}
 
+			broadcaster := engine.NewBroadcaster()
+			// create BlockTracker that will track for new blocks (finalized and sealed) and
+			// handles block-related operations.
+			blockTracker, err := subscription.NewBlockTracker(
+				node.State,
+				builder.FinalizedRootBlock.Header.Height,
+				node.Storage.Headers,
+				broadcaster,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to initialize block tracker: %w", err)
+			}
 			txResultQueryMode, err := backend.ParseIndexQueryMode(config.BackendConfig.TxResultQueryMode)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse transaction result query mode: %w", err)
@@ -1638,9 +1662,16 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ScriptExecutor:            builder.ScriptExecutor,
 				ScriptExecutionMode:       scriptExecMode,
 				EventQueryMode:            eventQueryMode,
-				EventsIndex:               builder.EventsIndex,
-				TxResultQueryMode:         txResultQueryMode,
-				TxResultsIndex:            builder.TxResultsIndex,
+				BlockTracker:              blockTracker,
+				SubscriptionParams: backend.SubscriptionParams{
+					Broadcaster:    broadcaster,
+					SendTimeout:    builder.stateStreamConf.ClientSendTimeout,
+					ResponseLimit:  builder.stateStreamConf.ResponseLimit,
+					SendBufferSize: int(builder.stateStreamConf.ClientSendBufferSize),
+				},
+				EventsIndex:       builder.EventsIndex,
+				TxResultQueryMode: txResultQueryMode,
+				TxResultsIndex:    builder.TxResultsIndex,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
@@ -1901,7 +1932,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 			Unicast: builder.FlowConfig.NetworkConfig.Unicast,
 		}).
 		SetBasicResolver(builder.Resolver).
-		SetSubscriptionFilter(subscription.NewRoleBasedFilter(flow.RoleAccess, builder.IdentityProvider)).
+		SetSubscriptionFilter(networkingsubscription.NewRoleBasedFilter(flow.RoleAccess, builder.IdentityProvider)).
 		SetConnectionManager(connManager).
 		SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
 			return dht.NewDHT(ctx, h, protocols.FlowPublicDHTProtocolID(builder.SporkID), builder.Logger, networkMetrics, dht.AsServer())

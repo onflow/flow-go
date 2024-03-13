@@ -1272,7 +1272,6 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 
 // TestTransactionPendingToFinalizedStatusTransition tests that the status of transaction changes from Finalized to Expired
 func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
-
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
@@ -2200,6 +2199,7 @@ func (suite *Suite) defaultBackendParams() Params {
 		AccessMetrics:            metrics.NewNoopCollector(),
 		Log:                      suite.log,
 		TxErrorMessagesCacheSize: 1000,
+		BlockTracker:             nil,
 		TxResultQueryMode:        IndexQueryModeExecutionNodesOnly,
 	}
 }
