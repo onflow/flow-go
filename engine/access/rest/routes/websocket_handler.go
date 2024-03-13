@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -110,7 +111,7 @@ func (wsController *WebsocketController) wsErrorHandler(err error) {
 // It listens to the subscription's channel for events and writes them to the WebSocket connection.
 // If an error occurs or the subscription channel is closed, it handles the error or termination accordingly.
 // The function uses a ticker to periodically send ping messages to the client to maintain the connection.
-func (wsController *WebsocketController) writeEvents(sub state_stream.Subscription) {
+func (wsController *WebsocketController) writeEvents(sub subscription.Subscription) {
 	ticker := time.NewTicker(pingPeriod)
 	defer ticker.Stop()
 
@@ -229,7 +230,7 @@ type SubscribeHandlerFunc func(
 	ctx context.Context,
 	request *request.Request,
 	wsController *WebsocketController,
-) (state_stream.Subscription, error)
+) (subscription.Subscription, error)
 
 // WSHandler is websocket handler implementing custom websocket handler function and allows easier handling of errors and
 // responses as it wraps functionality for handling error and responses outside of endpoint handling.

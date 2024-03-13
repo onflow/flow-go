@@ -8,8 +8,9 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
-	rpcbackend "github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -30,27 +31,27 @@ type EventsBackend struct {
 	sendBufferSize int
 
 	getExecutionData GetExecutionDataFunc
-	getStartHeight   GetStartHeightFunc
+	getStartHeight   subscription.GetStartHeightFunc
 
 	useIndex    bool
-	eventsIndex *rpcbackend.EventsIndex
+	eventsIndex *index.EventsIndex
 }
 
-func (b *EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) state_stream.Subscription {
-	nextHeight, err := b.getStartHeight(startBlockID, startHeight)
+func (b *EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
+	nextHeight, err := b.getStartHeight(ctx, startBlockID, startHeight)
 	if err != nil {
-		return NewFailedSubscription(err, "could not get start height")
+		return subscription.NewFailedSubscription(err, "could not get start height")
 	}
 
-	sub := NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getResponseFactory(filter))
+	sub := subscription.NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getResponseFactory(filter))
 
-	go NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
+	go subscription.NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
 
 	return sub
 }
 
-// getResponseFactory returns a function function that returns the event response for a given height.
-func (b *EventsBackend) getResponseFactory(filter state_stream.EventFilter) GetDataByHeightFunc {
+// getResponseFactory returns a function that returns the event response for a given height.
+func (b *EventsBackend) getResponseFactory(filter state_stream.EventFilter) subscription.GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (response interface{}, err error) {
 		if b.useIndex {
 			response, err = b.getEventsFromStorage(height, filter)
