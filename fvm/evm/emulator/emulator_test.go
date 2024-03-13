@@ -248,7 +248,7 @@ func TestContractInteraction(t *testing.T) {
 					nonce += 1
 
 					ret := new(big.Int).SetBytes(res.ReturnedValue)
-					require.Equal(t, types.FlowEVMTestnetChainID, ret)
+					require.Equal(t, types.FlowEVMPreviewNetChainID, ret)
 				})
 			})
 
@@ -328,7 +328,7 @@ func TestContractInteraction(t *testing.T) {
 					tx := account.SignTx(
 						t,
 						gethTypes.NewTx(&gethTypes.DynamicFeeTx{
-							ChainID:   types.FlowEVMTestnetChainID,
+							ChainID:   types.FlowEVMPreviewNetChainID,
 							Nonce:     account.Nonce(),
 							GasTipCap: big.NewInt(2),
 							GasFeeCap: big.NewInt(3),

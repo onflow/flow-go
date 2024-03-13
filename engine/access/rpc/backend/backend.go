@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -158,6 +159,13 @@ func New(params Params) (*Backend, error) {
 		}
 	}
 
+	// the system tx is hardcoded and never changes during runtime
+	systemTx, err := blueprints.SystemChunkTransaction(params.ChainID.Chain())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create system chunk transaction: %w", err)
+	}
+	systemTxID := systemTx.ID()
+
 	// initialize node version info
 	nodeInfo := getNodeVersionInfo(params.State.Params())
 
@@ -184,6 +192,7 @@ func New(params Params) (*Backend, error) {
 				blocks:         params.Blocks,
 				eventsIndex:    params.EventsIndex,
 				txResultsIndex: params.TxResultsIndex,
+				systemTxID:     systemTxID,
 			},
 			log:                  params.Log,
 			staticCollectionRPC:  params.CollectionRPC,
@@ -199,6 +208,8 @@ func New(params Params) (*Backend, error) {
 			txResultCache:        txResCache,
 			txErrorMessagesCache: txErrorMessagesCache,
 			txResultQueryMode:    params.TxResultQueryMode,
+			systemTx:             systemTx,
+			systemTxID:           systemTxID,
 		},
 		backendEvents: backendEvents{
 			log:               params.Log,
