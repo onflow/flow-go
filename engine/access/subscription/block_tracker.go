@@ -1,14 +1,14 @@
 package subscription
 
 import (
-	"fmt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
-
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -26,6 +26,7 @@ type BlockTracker interface {
 	// ProcessOnFinalizedBlock drives the subscription logic when a block is finalized.
 	// The input to this callback is treated as trusted. This method should be executed on
 	// `OnFinalizedBlock` notifications from the node-internal consensus instance.
+	// No errors are expected during normal operation.
 	ProcessOnFinalizedBlock() error
 }
 
@@ -51,9 +52,7 @@ type BlockTrackerImpl struct {
 // - headers: The storage headers for accessing block headers.
 // - broadcaster: The engine broadcaster for publishing notifications.
 //
-// Returns:
-// - *BlockTrackerImpl: A new instance of BlockTrackerImpl.
-// - error: An error indicating the result of the operation, if any.
+// No errors are expected during normal operation.
 func NewBlockTracker(
 	state protocol.State,
 	rootHeight uint64,
@@ -84,9 +83,10 @@ func NewBlockTracker(
 // GetHighestHeight returns the highest height based on the specified block status.
 //
 // Parameters:
-// - blockStatus: The status of the block, which could be only BlockStatusSealed or BlockStatusFinalized.
+// - blockStatus: The status of the block. It is expected that blockStatus has already been handled for invalid flow.BlockStatusUnknown.
 //
-// No errors are expected during normal operation.
+// Expected errors during normal operation:
+// - codes.InvalidArgument    - if block status is flow.BlockStatusUnknown.
 func (b *BlockTrackerImpl) GetHighestHeight(blockStatus flow.BlockStatus) (uint64, error) {
 	switch blockStatus {
 	case flow.BlockStatusFinalized:
@@ -94,7 +94,7 @@ func (b *BlockTrackerImpl) GetHighestHeight(blockStatus flow.BlockStatus) (uint6
 	case flow.BlockStatusSealed:
 		return b.sealedHighestHeight.Value(), nil
 	}
-	return 0, fmt.Errorf("invalid block status: %s", blockStatus)
+	return 0, status.Errorf(codes.InvalidArgument, "invalid block status: %s", blockStatus)
 }
 
 // ProcessOnFinalizedBlock drives the subscription logic when a block is finalized.
@@ -119,9 +119,8 @@ func (b *BlockTrackerImpl) ProcessOnFinalizedBlock() error {
 		return irrecoverable.NewExceptionf("unable to get latest sealed header: %w", err)
 	}
 
-	// always publish since there is also a new finalized block.
 	_ = b.sealedHighestHeight.Set(sealedHeader.Height)
-
+	// always publish since there is also a new finalized block.
 	b.broadcaster.Publish()
 
 	return nil

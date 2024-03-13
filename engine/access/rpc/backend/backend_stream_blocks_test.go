@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 // BackendBlocksSuite is a test suite for the backendBlocks functionality related to blocks subscription.
@@ -105,52 +106,25 @@ func (s *BackendBlocksSuite) SetupTest() {
 	}
 
 	s.headers.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
-		func(blockID flow.Identifier) *flow.Header {
+		func(blockID flow.Identifier) (*flow.Header, error) {
 			for _, block := range s.blockMap {
 				if block.ID() == blockID {
-					return block.Header
+					return block.Header, nil
 				}
 			}
-			return nil
-		},
-		func(blockID flow.Identifier) error {
-			for _, block := range s.blockMap {
-				if block.ID() == blockID {
-					return nil
-				}
-			}
-			return storage.ErrNotFound
+			return nil, storage.ErrNotFound
 		},
 	).Maybe()
 
 	s.headers.On("ByHeight", mock.AnythingOfType("uint64")).Return(
-		func(height uint64) *flow.Header {
-			if block, ok := s.blockMap[height]; ok {
-				return block.Header
-			}
-			return nil
-		},
-		func(height uint64) error {
-			if _, ok := s.blockMap[height]; ok {
-				return nil
-			}
-			return storage.ErrNotFound
-		},
+		mocks.ConvertStorageOutput(
+			mocks.StorageMapGetter(s.blockMap),
+			func(block *flow.Block) *flow.Header { return block.Header },
+		),
 	).Maybe()
 
 	s.blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(
-		func(height uint64) *flow.Block {
-			if block, ok := s.blockMap[height]; ok {
-				return block
-			}
-			return &flow.Block{}
-		},
-		func(height uint64) error {
-			if _, ok := s.blockMap[height]; ok {
-				return nil
-			}
-			return storage.ErrNotFound
-		},
+		mocks.StorageMapGetter(s.blockMap),
 	).Maybe()
 
 	s.snapshot.On("Head").Return(s.rootBlock.Header, nil).Twice()
