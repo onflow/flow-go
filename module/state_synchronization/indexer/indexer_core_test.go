@@ -84,6 +84,16 @@ func (i *indexCoreTest) useDefaultBlockByHeight() *indexCoreTest {
 			return flow.ZeroID, fmt.Errorf("not found")
 		})
 
+	i.headers.
+		On("ByHeight", mocks.AnythingOfType("uint64")).
+		Return(func(height uint64) (*flow.Header, error) {
+			for _, b := range i.blocks {
+				if b.Header.Height == height {
+					return b.Header, nil
+				}
+			}
+			return nil, fmt.Errorf("not found")
+		})
 	return i
 }
 
