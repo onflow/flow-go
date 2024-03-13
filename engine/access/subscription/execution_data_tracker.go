@@ -43,7 +43,7 @@ type ExecutionDataTracker interface {
 	// Expected errors during normal operation:
 	// - codes.InvalidArgument - if both startBlockID and startHeight are provided, if the start height is less than the root block height,
 	// if the start height is out of bounds based on indexed heights (when index is used).
-	// - codes.ErrNotFound   - if a block is provided and does not exist.
+	// - codes.NotFound   - if a block is provided and does not exist.
 	// - codes.Internal        - if there is an internal error.
 	GetStartHeight(context.Context, flow.Identifier, uint64) (uint64, error)
 	// GetHighestHeight returns the highest height that we have consecutive execution data for.
@@ -120,7 +120,7 @@ func NewExecutionDataTracker(
 // Expected errors during normal operation:
 // - codes.InvalidArgument - if both startBlockID and startHeight are provided, if the start height is less than the root block height,
 // if the start height is out of bounds based on indexed heights (when index is used).
-// - codes.ErrNotFound   - if a block is provided and does not exist.
+// - codes.NotFound        - if a block is provided and does not exist.
 // - codes.Internal        - if there is an internal error.
 func (e *ExecutionDataTrackerImpl) GetStartHeight(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
 	var height uint64 = 0
