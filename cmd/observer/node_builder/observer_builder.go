@@ -1634,15 +1634,11 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		rpcHandler := apiproxy.NewFlowAccessAPIRouter(apiproxy.Params{
-			Log:         builder.Logger,
-			State:       node.State,
-			Blocks:      node.Storage.Blocks,
-			Headers:     node.Storage.Headers,
-			RootChainID: node.RootChainID,
-			Metrics:     observerCollector,
-			Upstream:    forwarder,
-			Local:       engineBuilder.DefaultHandler(nil),
-			UseIndex:    useIndex,
+			Log:      builder.Logger,
+			Metrics:  observerCollector,
+			Upstream: forwarder,
+			Local:    engineBuilder.DefaultHandler(nil),
+			UseIndex: useIndex,
 		})
 
 		// build the rpc engine
