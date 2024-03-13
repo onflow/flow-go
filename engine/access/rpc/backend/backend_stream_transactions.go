@@ -136,8 +136,10 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *Tran
 	}
 }
 
-// searchForTransactionBlock searches for the block containing transaction information at the given height.
-// It returns the header where the transaction is present.
+// searchForTransactionBlock searches for the block containing the specified transaction.
+// It retrieves the block at the given height and checks if the transaction is included in that block.
+// Expected errors:
+// - codes.Internal if an internal error occurs while retrieving or processing the block.
 func (b *backendSubscribeTransactions) searchForTransactionBlock(
 	height uint64,
 	txInfo *TransactionSubscriptionMetadata,
@@ -161,7 +163,9 @@ func (b *backendSubscribeTransactions) searchForTransactionBlock(
 	return nil, nil
 }
 
-// searchForExecutionResult searches for the execution result by block ID. It returns true if the  execution result was found.
+// searchForExecutionResult searches for the execution result of a block. It retrieves the execution result for the specified block ID.
+// Expected errors:
+// - codes.Internal if an internal error occurs while retrieving execution result.
 func (b *backendSubscribeTransactions) searchForExecutionResult(
 	blockID flow.Identifier,
 ) (bool, error) {

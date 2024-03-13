@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/utils/unittest/mocks"
+
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 
 	"github.com/rs/zerolog"
@@ -130,19 +132,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 	}
 
 	s.reporter = syncmock.NewIndexReporter(s.T())
-
-	s.results.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(func(blockID flow.Identifier) (*flow.ExecutionResult, error) {
-		if result, ok := s.resultsMap[blockID]; ok {
-			return result, nil
-		}
-		return nil, nil
-	},
-		func(blockID flow.Identifier) (*flow.ExecutionResult, error) {
-			if _, ok := s.resultsMap[blockID]; ok {
-				return nil, nil
-			}
-			return nil, storage.ErrNotFound
-		})
+	s.results.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(mocks.StorageMapGetter(s.resultsMap))
 
 	s.seals.On("HighestInFork", mock.AnythingOfType("flow.Identifier")).Return(
 		func(_ flow.Identifier) (*flow.Seal, error) {
@@ -198,20 +188,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 		},
 	)
 
-	s.blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(
-		func(height uint64) *flow.Block {
-			if block, ok := s.blockMap[height]; ok {
-				return block
-			}
-			return &flow.Block{}
-		},
-		func(height uint64) error {
-			if _, ok := s.blockMap[height]; ok {
-				return nil
-			}
-			return storage.ErrNotFound
-		},
-	)
+	s.blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(mocks.StorageMapGetter(s.blockMap))
 
 	s.state.On("Sealed").Return(s.sealedSnapshot, nil)
 	s.state.On("Final").Return(s.finalSnapshot, nil)
@@ -323,7 +300,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatus() {
 			assert.Equal(s.T(), expectedMsgIndex, txInfo.MessageIndex)
 			wasSet := expectedMsgIndexCounter.Set(expectedMsgIndex + 1)
 			require.True(s.T(), wasSet)
-		}, 50*time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
+		}, time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
 	}
 
 	// 1. Subscribe to transaction status and receive the first message with pending status
