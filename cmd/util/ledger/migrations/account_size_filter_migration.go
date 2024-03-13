@@ -40,23 +40,21 @@ func NewAccountSizeFilterMigration(
 			payloadCountByAddress[owner] = accountInfo
 		}
 
-		if log.Debug().Enabled() {
-			for address, info := range payloadCountByAddress {
-				log.Debug().Msgf(
-					"address %x has %d payloads and a total size of %s",
-					address,
-					info.count,
-					ByteCountIEC(int64(info.size)),
-				)
+		for address, info := range payloadCountByAddress {
+			log.Debug().Msgf(
+				"address %x has %d payloads and a total size of %s",
+				address,
+				info.count,
+				ByteCountIEC(int64(info.size)),
+			)
 
-				if _, ok := exceptions[address]; !ok && info.size > maxAccountSize {
-					log.Warn().Msgf(
-						"dropping payloads of account %x. size of payloads %s exceeds max size %s",
-						address,
-						ByteCountIEC(int64(info.size)),
-						ByteCountIEC(int64(maxAccountSize)),
-					)
-				}
+			if _, ok := exceptions[address]; !ok && info.size > maxAccountSize {
+				log.Warn().Msgf(
+					"dropping payloads of account %x. size of payloads %s exceeds max size %s",
+					address,
+					ByteCountIEC(int64(info.size)),
+					ByteCountIEC(int64(maxAccountSize)),
+				)
 			}
 		}
 
