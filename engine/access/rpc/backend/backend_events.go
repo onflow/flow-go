@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type BackendEvents struct {
+type backendEvents struct {
 	headers           storage.Headers
 	executionReceipts storage.ExecutionReceipts
 	state             protocol.State
@@ -47,7 +47,7 @@ type blockMetadata struct {
 	Timestamp time.Time
 }
 
-// NewBackendEvents creates BackendEvents instance
+// NewBackendEvents creates backendEvents instance
 func NewBackendEvents(
 	headers storage.Headers,
 	executionReceipts storage.ExecutionReceipts,
@@ -58,8 +58,8 @@ func NewBackendEvents(
 	maxHeightRange uint,
 	nodeCommunicator Communicator,
 	queryMode IndexQueryMode,
-	eventsIndex *EventsIndex) *BackendEvents {
-	return &BackendEvents{
+	eventsIndex *EventsIndex) *backendEvents {
+	return &backendEvents{
 		headers:           headers,
 		executionReceipts: executionReceipts,
 		state:             state,
@@ -76,7 +76,7 @@ func NewBackendEvents(
 
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and
 // the end block height (inclusive) that have the given type.
-func (b *BackendEvents) GetEventsForHeightRange(
+func (b *backendEvents) GetEventsForHeightRange(
 	ctx context.Context,
 	eventType string,
 	startHeight, endHeight uint64,
@@ -148,7 +148,7 @@ func (b *BackendEvents) GetEventsForHeightRange(
 }
 
 // GetEventsForBlockIDs retrieves events for all the specified block IDs that have the given type
-func (b *BackendEvents) GetEventsForBlockIDs(
+func (b *backendEvents) GetEventsForBlockIDs(
 	ctx context.Context,
 	eventType string,
 	blockIDs []flow.Identifier,
@@ -179,7 +179,7 @@ func (b *BackendEvents) GetEventsForBlockIDs(
 
 // getBlockEvents retrieves events for all the specified blocks that have the given type
 // It gets all events available in storage, and requests the rest from an execution node.
-func (b *BackendEvents) getBlockEvents(
+func (b *backendEvents) getBlockEvents(
 	ctx context.Context,
 	blockInfos []blockMetadata,
 	eventType string,
@@ -246,7 +246,7 @@ func (b *BackendEvents) getBlockEvents(
 
 // getBlockEventsFromStorage retrieves events for all the specified blocks that have the given type
 // from the local storage
-func (b *BackendEvents) getBlockEventsFromStorage(
+func (b *backendEvents) getBlockEventsFromStorage(
 	ctx context.Context,
 	blockInfos []blockMetadata,
 	eventType flow.EventType,
@@ -304,7 +304,7 @@ func (b *BackendEvents) getBlockEventsFromStorage(
 
 // getBlockEventsFromExecutionNode retrieves events for all the specified blocks that have the given type
 // from an execution node
-func (b *BackendEvents) getBlockEventsFromExecutionNode(
+func (b *backendEvents) getBlockEventsFromExecutionNode(
 	ctx context.Context,
 	blockInfos []blockMetadata,
 	eventType string,
@@ -410,7 +410,7 @@ func verifyAndConvertToAccessEvents(
 // We attempt querying each EN in sequence. If any EN returns a valid response, then errors from
 // other ENs are logged and swallowed. If all ENs fail to return a valid response, then an
 // error aggregating all failures is returned.
-func (b *BackendEvents) getEventsFromAnyExeNode(ctx context.Context,
+func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context,
 	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, *flow.IdentitySkeleton, error) {
 	var resp *execproto.GetEventsForBlockIDsResponse
@@ -446,7 +446,7 @@ func (b *BackendEvents) getEventsFromAnyExeNode(ctx context.Context,
 	return resp, execNode, errToReturn
 }
 
-func (b *BackendEvents) tryGetEvents(ctx context.Context,
+func (b *backendEvents) tryGetEvents(ctx context.Context,
 	execNode *flow.IdentitySkeleton,
 	req *execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
