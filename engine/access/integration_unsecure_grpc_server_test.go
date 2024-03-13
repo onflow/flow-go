@@ -243,6 +243,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	eventIndexer := index.NewEventsIndex(suite.events)
 
 	suite.executionDataTracker = subscription.NewExecutionDataTracker(
+		suite.log,
 		suite.state,
 		rootBlock.Header.Height,
 		suite.headers,

@@ -3,6 +3,8 @@ package subscription
 import (
 	"context"
 
+	"github.com/rs/zerolog"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -16,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // ExecutionDataTracker is an interface for tracking the highest consecutive block height for which we have received a
@@ -46,8 +49,7 @@ type ExecutionDataTracker interface {
 	// GetHighestHeight returns the highest height that we have consecutive execution data for.
 	GetHighestHeight() uint64
 	// OnExecutionData is used to notify the tracker when a new execution data is received.
-	// No errors expected during normal operations.
-	OnExecutionData(*execution_data.BlockExecutionDataEntity) error
+	OnExecutionData(*execution_data.BlockExecutionDataEntity)
 }
 
 var _ ExecutionDataTracker = (*ExecutionDataTrackerImpl)(nil)
@@ -55,6 +57,7 @@ var _ ExecutionDataTracker = (*ExecutionDataTrackerImpl)(nil)
 // ExecutionDataTrackerImpl is an implementation of the ExecutionDataTracker interface.
 type ExecutionDataTrackerImpl struct {
 	BaseTracker
+	log           zerolog.Logger
 	headers       storage.Headers
 	broadcaster   *engine.Broadcaster
 	indexReporter state_synchronization.IndexReporter
@@ -67,6 +70,7 @@ type ExecutionDataTrackerImpl struct {
 // NewExecutionDataTracker creates a new ExecutionDataTrackerImpl instance.
 //
 // Parameters:
+// - log: The logger to use for logging.
 // - state: The protocol state used for retrieving block information.
 // - rootHeight: The root block height, serving as the baseline for calculating the start height.
 // - headers: The storage headers for accessing block headers.
@@ -78,6 +82,7 @@ type ExecutionDataTrackerImpl struct {
 // Returns:
 // - *ExecutionDataTrackerImpl: A new instance of ExecutionDataTrackerImpl.
 func NewExecutionDataTracker(
+	log zerolog.Logger,
 	state protocol.State,
 	rootHeight uint64,
 	headers storage.Headers,
@@ -88,6 +93,7 @@ func NewExecutionDataTracker(
 ) *ExecutionDataTrackerImpl {
 	return &ExecutionDataTrackerImpl{
 		BaseTracker:   NewBaseTrackerImpl(rootHeight, state, headers),
+		log:           log,
 		headers:       headers,
 		broadcaster:   broadcaster,
 		highestHeight: counters.NewMonotonousCounter(highestAvailableFinalizedHeight),
@@ -153,20 +159,22 @@ func (e *ExecutionDataTrackerImpl) GetHighestHeight() uint64 {
 }
 
 // OnExecutionData is used to notify the tracker when a new execution data is received.
-//
-// No errors expected during normal operations.
-func (e *ExecutionDataTrackerImpl) OnExecutionData(executionData *execution_data.BlockExecutionDataEntity) error {
+func (e *ExecutionDataTrackerImpl) OnExecutionData(executionData *execution_data.BlockExecutionDataEntity) {
+	log := e.log.With().Hex("block_id", logging.ID(executionData.BlockID)).Logger()
+
+	log.Trace().Msg("received execution data")
+
 	header, err := e.headers.ByBlockID(executionData.BlockID)
 	if err != nil {
 		// if the execution data is available, the block must be locally finalized
-		return err
+		log.Fatal().Err(err).Msg("failed to notify of new execution data")
+		return
 	}
 
 	// sets the highest height for which execution data is available.
 	_ = e.highestHeight.Set(header.Height)
 
 	e.broadcaster.Publish()
-	return nil
 }
 
 // checkStartHeight validates the provided start height and adjusts it if necessary based on the tracker's configuration.

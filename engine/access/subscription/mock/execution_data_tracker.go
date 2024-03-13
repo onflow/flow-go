@@ -127,17 +127,8 @@ func (_m *ExecutionDataTracker) GetStartHeightFromLatest(_a0 context.Context) (u
 }
 
 // OnExecutionData provides a mock function with given fields: _a0
-func (_m *ExecutionDataTracker) OnExecutionData(_a0 *execution_data.BlockExecutionDataEntity) error {
-	ret := _m.Called(_a0)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*execution_data.BlockExecutionDataEntity) error); ok {
-		r0 = rf(_a0)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
+func (_m *ExecutionDataTracker) OnExecutionData(_a0 *execution_data.BlockExecutionDataEntity) {
+	_m.Called(_a0)
 }
 
 type mockConstructorTestingTNewExecutionDataTracker interface {

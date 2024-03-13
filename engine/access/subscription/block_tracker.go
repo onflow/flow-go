@@ -12,10 +12,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// GetHighestHeight is a function type for getting the highest height.
-// Block status could be only BlockStatusSealed or BlockStatusFinalized.
-type GetHighestHeight func(flow.BlockStatus) (uint64, error)
-
 // BlockTracker is an interface for tracking blocks and handling block-related operations.
 type BlockTracker interface {
 	BaseTracker

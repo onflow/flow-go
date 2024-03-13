@@ -237,6 +237,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 	// create real execution data tracker to use GetStartHeight from it, instead of mocking
 	s.executionDataTrackerReal = subscription.NewExecutionDataTracker(
+		logger,
 		s.state,
 		s.rootBlock.Header.Height,
 		s.headers,

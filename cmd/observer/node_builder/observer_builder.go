@@ -1335,6 +1335,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
 
 			executionDataTracker := subscription.NewExecutionDataTracker(
+				builder.Logger,
 				node.State,
 				builder.executionDataConfig.InitialBlockHeight,
 				node.Storage.Headers,
@@ -1377,12 +1378,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			}
 			builder.StateStreamEng = stateStreamEng
 
-			execDataDistributor.AddOnExecutionDataReceivedConsumer(func(data *execution_data.BlockExecutionDataEntity) {
-				err := builder.stateStreamBackend.ExecutionDataTracker.OnExecutionData(data)
-				if err != nil {
-					builder.Logger.Fatal().Err(err).Msg("failed to notify of new execution data")
-				}
-			})
+			// setup requester to notify ExecutionDataTracker when new execution data is received
+			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.stateStreamBackend.ExecutionDataTracker.OnExecutionData)
 
 			return builder.StateStreamEng, nil
 		})
