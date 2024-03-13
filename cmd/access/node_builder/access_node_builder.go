@@ -934,7 +934,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			builder.StateStreamEng = stateStreamEng
 
 			// setup requester to notify ExecutionDataTracker when new execution data is received
-			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.stateStreamBackend.ExecutionDataTracker.OnExecutionData)
+			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.stateStreamBackend.OnExecutionData)
 
 			return builder.StateStreamEng, nil
 		})
