@@ -47,8 +47,8 @@ const (
 
 	EventNameEpochSetup                  = "EpochSetup"
 	EventNameEpochCommit                 = "EpochCommit"
-	EventNameVersionBeacon               = "VersionBeacon"
-	EventNameProtocolStateVersionUpgrade = "ProtocolStateVersionUpgrade"
+	EventNameVersionBeacon               = "VersionBeacon"               // VersionBeacon only controls version of ENs, describing software compatability via semantic versioning
+	EventNameProtocolStateVersionUpgrade = "ProtocolStateVersionUpgrade" // Protocol State version applies to all nodes and uses an _integer version_ of the _protocol state_
 
 	//  Unqualified names of service event contract functions (not including address prefix or contract name)
 
@@ -402,7 +402,6 @@ func init() {
 			VersionBeacon:               event(ContractNameNodeVersionBeacon, EventNameVersionBeacon),
 			ProtocolStateVersionUpgrade: event(ContractNameNodeVersionBeacon, EventNameProtocolStateVersionUpgrade),
 		}
-
 		return events
 	}
 
