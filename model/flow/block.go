@@ -136,6 +136,6 @@ func NewBlockDigest(
 }
 
 // ID returns the id of the BlockDigest.
-func (b BlockDigest) ID() Identifier {
+func (b *BlockDigest) ID() Identifier {
 	return b.id
 }

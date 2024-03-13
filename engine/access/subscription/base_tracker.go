@@ -35,10 +35,40 @@ func NewStreamingData(maxStreams uint32) StreamingData {
 // BaseTracker is an interface for a tracker that provides base GetStartHeight method related to both blocks and execution data tracking.
 type BaseTracker interface {
 	// GetStartHeightFromBlockID returns the start height based on the provided starting block ID.
+	// If the start block is the root block, skip it and begin from the next block.
+	//
+	// Parameters:
+	// - startBlockID: The identifier of the starting block.
+	//
+	// Returns:
+	// - uint64: The start height associated with the provided block ID.
+	// - error: An error indicating any issues with retrieving the start height.
+	//
+	// Expected errors during normal operation:
+	// - codes.NotFound - if the block was not found in storage
+	// - codes.Internal - for any other error
 	GetStartHeightFromBlockID(flow.Identifier) (uint64, error)
 	// GetStartHeightFromHeight returns the start height based on the provided starting block height.
+	// If the start block is the root block, skip it and begin from the next block.
+	//
+	// Parameters:
+	// - startHeight: The height of the starting block.
+	//
+	// Returns:
+	// - uint64: The start height associated with the provided block height.
+	// - error: An error indicating any issues with retrieving the start height.
+	//
+	// Expected errors during normal operation:
+	// - codes.InvalidArgument   - if the start height is less than the root block height.
+	// - codes.NotFound  - if the header was not found in storage.
 	GetStartHeightFromHeight(uint64) (uint64, error)
 	// GetStartHeightFromLatest returns the start height based on the latest sealed block.
+	// If the start block is the root block, skip it and begin from the next block.
+	//
+	// Parameters:
+	// - ctx: Context for the operation.
+	//
+	// No errors are expected during normal operation.
 	GetStartHeightFromLatest(context.Context) (uint64, error)
 }
 
@@ -83,7 +113,8 @@ func NewBaseTrackerImpl(
 // - error: An error indicating any issues with retrieving the start height.
 //
 // Expected errors during normal operation:
-// - rpc.ConvertStorageError - if there is an issue retrieving the header from the storage.
+// - codes.NotFound - if the block was not found in storage
+// - codes.Internal - for any other error
 func (b *BaseTrackerImpl) GetStartHeightFromBlockID(startBlockID flow.Identifier) (uint64, error) {
 	header, err := b.headers.ByBlockID(startBlockID)
 	if err != nil {
@@ -106,7 +137,7 @@ func (b *BaseTrackerImpl) GetStartHeightFromBlockID(startBlockID flow.Identifier
 //
 // Expected errors during normal operation:
 // - codes.InvalidArgument   - if the start height is less than the root block height.
-// - rpc.ConvertStorageError - if there is an issue retrieving the header from the storage.
+// - codes.NotFound  - if the header was not found in storage.
 func (b *BaseTrackerImpl) GetStartHeightFromHeight(startHeight uint64) (uint64, error) {
 	if startHeight < b.rootBlockHeight {
 		return 0, status.Errorf(codes.InvalidArgument, "start height must be greater than or equal to the root height %d", b.rootBlockHeight)
@@ -126,10 +157,6 @@ func (b *BaseTrackerImpl) GetStartHeightFromHeight(startHeight uint64) (uint64, 
 //
 // Parameters:
 // - ctx: Context for the operation.
-//
-// Returns:
-// - uint64: The start height associated with the provided block height.
-// - error: An error indicating any issues with retrieving the start height.
 //
 // No errors are expected during normal operation.
 func (b *BaseTrackerImpl) GetStartHeightFromLatest(ctx context.Context) (uint64, error) {
