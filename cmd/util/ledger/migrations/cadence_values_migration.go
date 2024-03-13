@@ -116,12 +116,8 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		reporter,
 	)
 
-	migration.Migrate(
-		&migrations.AddressSliceIterator{
-			Addresses: []common.Address{
-				address,
-			},
-		},
+	migration.MigrateAccount(
+		address,
 		migration.NewValueMigrationsPathMigrator(
 			reporter,
 			valueMigrations...,
