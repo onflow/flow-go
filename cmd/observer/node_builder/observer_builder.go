@@ -1444,28 +1444,10 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
-		var upstream apiproxy.FlowAccessAPIForwarderInterface
-		if useIndex {
-			// backend access node forwarder
-			localForwarder, err := apiproxy.NewFlowAccessAPILocalForwarder(
-				accessBackend,
-				builder.NodeID,
-				builder.State,
-				builder.upstreamIdentities,
-				connFactory)
-			if err != nil {
-				return nil, err
-			}
-
-			upstream = localForwarder
-		} else {
-			// upstream access node forwarder
-			forwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, connFactory)
-			if err != nil {
-				return nil, err
-			}
-
-			upstream = forwarder
+		// upstream access node forwarder
+		forwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, connFactory)
+		if err != nil {
+			return nil, err
 		}
 
 		rpcHandler := apiproxy.NewFlowAccessAPIRouter(apiproxy.Params{
@@ -1475,7 +1457,9 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			Headers:     node.Storage.Headers,
 			RootChainID: node.RootChainID,
 			Metrics:     observerCollector,
-			Upstream:    upstream,
+			Upstream:    forwarder,
+			Local:       engineBuilder.DefaultHandler(nil),
+			UseIndex:    useIndex,
 		})
 
 		// build the rpc engine
