@@ -47,33 +47,6 @@ type blockMetadata struct {
 	Timestamp time.Time
 }
 
-// NewBackendEvents creates backendEvents instance
-func NewBackendEvents(
-	headers storage.Headers,
-	executionReceipts storage.ExecutionReceipts,
-	state protocol.State,
-	chain flow.Chain,
-	connFactory connection.ConnectionFactory,
-	log zerolog.Logger,
-	maxHeightRange uint,
-	nodeCommunicator Communicator,
-	queryMode IndexQueryMode,
-	eventsIndex *EventsIndex) *backendEvents {
-	return &backendEvents{
-		headers:           headers,
-		executionReceipts: executionReceipts,
-		state:             state,
-		chain:             chain,
-		connFactory:       connFactory,
-		log:               log,
-		maxHeightRange:    maxHeightRange,
-		nodeCommunicator:  nodeCommunicator,
-		queryMode:         queryMode,
-		eventsIndex:       eventsIndex,
-	}
-
-}
-
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and
 // the end block height (inclusive) that have the given type.
 func (b *backendEvents) GetEventsForHeightRange(
