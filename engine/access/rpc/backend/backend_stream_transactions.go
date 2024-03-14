@@ -49,7 +49,7 @@ type TransactionSubscriptionMetadata struct {
 // SubscribeTransactionStatuses subscribes to transaction status changes starting from the transaction reference block ID.
 // Expected errors:
 // - storage.ErrNotFound if a block referenced by the transaction does not exist.
-// - irrecoverable.Exception if there is an internal error related to state inconsistency.
+// - All other errors are potential symptoms of bugs or state corruption.
 func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody) subscription.Subscription {
 	nextHeight, err := b.blockTracker.GetStartHeightFromBlockID(tx.ReferenceBlockID)
 	if err != nil {

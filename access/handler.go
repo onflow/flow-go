@@ -1111,7 +1111,6 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 	}
 
 	sub := h.api.SubscribeTransactionStatuses(stream.Context(), &tx)
-
 	for {
 		v, ok := <-sub.Channel()
 		if !ok {
