@@ -330,7 +330,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 			assert.Equal(s.T(), expectedMsgIndex, txInfo.MessageIndex)
 			wasSet := expectedMsgIndexCounter.Set(expectedMsgIndex + 1)
 			require.True(s.T(), wasSet)
-		}, 120*time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
+		}, time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
 	}
 
 	// Subscribe to transaction status and receive the first message with pending status
