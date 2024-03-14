@@ -1599,9 +1599,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		// use the events index for events if enabled
 		useIndex := builder.executionDataIndexingEnabled
 		if useIndex {
-			//backendParams.ScriptExecutionMode = backend.IndexQueryModeLocalOnly
+			backendParams.ScriptExecutionMode = backend.IndexQueryModeLocalOnly
 			backendParams.EventQueryMode = backend.IndexQueryModeLocalOnly
-			//backendParams.TxResultQueryMode = backend.IndexQueryModeExecutionNodesOnly
 			backendParams.TxResultsIndex = builder.TxResultsIndex
 			backendParams.EventsIndex = builder.EventsIndex
 		}
