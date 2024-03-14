@@ -37,7 +37,7 @@ while read -r input; do
 
     # sleep is workaround for slow initialization of some node types, so that benchmark does not quit immediately with "connection refused"
     sleep 30;
-    go run ../benchmark/cmd/ci -log-level info -git-repo-path ../../ -tps-initial 800 -tps-min 1 -tps-max 1200 -duration 30m -load-type "$load"
+    go run ../benchmark/cmd/ci -log-level info -git-repo-path ../../ -tps-initial 800 -tps-min 1 -tps-max 1200 -duration 30m -load-type "$load" -load-config "load-config.yml"
 
     # instead of running "make stop" which uses docker-compose for a lot of older versions,
     # we explicitly run the command here with "docker compose"

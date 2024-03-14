@@ -55,7 +55,7 @@ func main() {
 	maxTPSFlag := flag.Int("tps-max", *initialTPSFlag, "maximum transactions per second allowed")
 	minTPSFlag := flag.Int("tps-min", *initialTPSFlag, "minimum transactions per second allowed")
 	loadTypeFlag := flag.String("load-type", string(defaultLoadType), "load type (token-transfer / const-exec / evm from the load config file)")
-	loadConfigFileLocationFlag := flag.String("load-config-file", "", "load config file location. If not provided, default config will be used.")
+	loadConfigFileLocationFlag := flag.String("load-config", "", "load config file location. If not provided, default config will be used.")
 
 	adjustIntervalFlag := flag.Duration("tps-adjust-interval", defaultAdjustInterval, "interval for adjusting TPS")
 	adjustDelayFlag := flag.Duration("tps-adjust-delay", 120*time.Second, "delay before adjusting TPS")
