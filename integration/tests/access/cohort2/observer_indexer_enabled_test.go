@@ -77,9 +77,9 @@ func (s *ObserverIndexerEnabledSuite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel),
 			testnet.WithAdditionalFlag("--supports-observer=true"),
 			testnet.WithAdditionalFlagf("--public-network-execution-data-sync-enabled=true"),
-			testnet.WithAdditionalFlagf("--script-execution-mode=%s", backend.IndexQueryModeLocalOnly),
-			testnet.WithAdditionalFlagf("--tx-result-query-mode=%s", backend.IndexQueryModeLocalOnly),
-			testnet.WithAdditionalFlag("--event-query-mode=local-only"),
+			testnet.WithAdditionalFlagf("--script-execution-mode=%s", backend.IndexQueryModeExecutionNodesOnly),
+			testnet.WithAdditionalFlagf("--tx-result-query-mode=%s", backend.IndexQueryModeExecutionNodesOnly),
+			testnet.WithAdditionalFlag("--event-query-mode=execution-nodes-only"),
 		),
 
 		// need one dummy execution node
@@ -104,6 +104,7 @@ func (s *ObserverIndexerEnabledSuite) SetupTest() {
 			fmt.Sprintf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
 			"--execution-data-sync-enabled=true",
 			"--execution-data-indexing-enabled=true",
+			"--event-query-mode=execution-nodes-only",
 		},
 	}}
 

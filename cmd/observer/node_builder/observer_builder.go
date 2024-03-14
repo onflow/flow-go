@@ -163,6 +163,9 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 				MaxHeightRange:            backend.DefaultMaxHeightRange,
 				PreferredExecutionNodeIDs: nil,
 				FixedExecutionNodeIDs:     nil,
+				ScriptExecutionMode:       backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				EventQueryMode:            backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				TxResultQueryMode:         backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
 			},
 			RestConfig: rest.Config{
 				ListenAddress: "",
@@ -1584,9 +1587,9 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		// use the events index for events if enabled
 		useIndex := builder.executionDataIndexingEnabled
 		if useIndex {
-			backendParams.ScriptExecutionMode = backend.IndexQueryModeLocalOnly
+			//backendParams.ScriptExecutionMode = backend.IndexQueryModeLocalOnly
 			backendParams.EventQueryMode = backend.IndexQueryModeLocalOnly
-			backendParams.TxResultQueryMode = backend.IndexQueryModeLocalOnly
+			//backendParams.TxResultQueryMode = backend.IndexQueryModeExecutionNodesOnly
 			backendParams.TxResultsIndex = builder.TxResultsIndex
 			backendParams.EventsIndex = builder.EventsIndex
 		}

@@ -132,7 +132,7 @@ func (h *FlowAccessAPIRouter) GetTransaction(context context.Context, req *acces
 
 func (h *FlowAccessAPIRouter) GetTransactionResult(context context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
 	//if h.useIndex {
-	//	// TODO: add impl for tx errors
+	//	// TODO: add implementation for tx errors
 	//	res, err := h.local.GetTransactionResult(context, req)
 	//	h.log("local", "GetTransactionResult", err)
 	//	return res, err
@@ -144,6 +144,13 @@ func (h *FlowAccessAPIRouter) GetTransactionResult(context context.Context, req 
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResultsByBlockID(context context.Context, req *access.GetTransactionsByBlockIDRequest) (*access.TransactionResultsResponse, error) {
+	//if h.useIndex {
+	//	// TODO: add implementation for tx errors
+	//	res, err := h.local.GetTransactionResultsByBlockID(context, req)
+	//	h.log("local", "GetTransactionResult", err)
+	//	return res, err
+	//}
+
 	res, err := h.upstream.GetTransactionResultsByBlockID(context, req)
 	h.log("upstream", "GetTransactionResultsByBlockID", err)
 	return res, err
@@ -156,6 +163,13 @@ func (h *FlowAccessAPIRouter) GetTransactionsByBlockID(context context.Context, 
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResultByIndex(context context.Context, req *access.GetTransactionByIndexRequest) (*access.TransactionResultResponse, error) {
+	//if h.useIndex {
+	//	// TODO: add implementation for tx errors
+	//	res, err := h.local.GetTransactionResultByIndex(context, req)
+	//	h.log("local", "GetTransactionResult", err)
+	//	return res, err
+	//}
+
 	res, err := h.upstream.GetTransactionResultByIndex(context, req)
 	h.log("upstream", "GetTransactionResultByIndex", err)
 	return res, err
