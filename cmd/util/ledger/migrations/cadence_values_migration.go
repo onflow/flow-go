@@ -60,7 +60,7 @@ func (m *CadenceBaseMigrator) Close() error {
 
 func (m *CadenceBaseMigrator) InitMigration(
 	log zerolog.Logger,
-	allPayloads []*ledger.Payload,
+	_ []*ledger.Payload,
 	_ int,
 ) error {
 	m.log = log.With().Str("migration", m.name).Logger()

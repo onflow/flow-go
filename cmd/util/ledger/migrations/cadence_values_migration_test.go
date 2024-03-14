@@ -469,22 +469,12 @@ func checkReporters(
 				common.PathDomainStorage,
 			),
 			newCadenceValueMigrationReportEntry(
-				"StringNormalizingMigration",
-				"string_value_2",
-				common.PathDomainStorage,
-			),
-			newCadenceValueMigrationReportEntry(
 				"StaticTypeMigration",
 				"type_value",
 				common.PathDomainStorage,
 			),
 
 			// String keys in dictionary
-			newCadenceValueMigrationReportEntry(
-				"StringNormalizingMigration",
-				"dictionary_with_string_keys",
-				common.PathDomainStorage,
-			),
 			newCadenceValueMigrationReportEntry(
 				"StringNormalizingMigration",
 				"dictionary_with_string_keys",
@@ -579,17 +569,7 @@ func checkReporters(
 				common.PathDomainStorage,
 			),
 			newCadenceValueMigrationReportEntry(
-				"StringNormalizingMigration",
-				"dictionary_with_auth_reference_typed_key",
-				common.PathDomainStorage,
-			),
-			newCadenceValueMigrationReportEntry(
 				"EntitlementsMigration",
-				"dictionary_with_reference_typed_key",
-				common.PathDomainStorage,
-			),
-			newCadenceValueMigrationReportEntry(
-				"StringNormalizingMigration",
 				"dictionary_with_reference_typed_key",
 				common.PathDomainStorage,
 			),
