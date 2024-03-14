@@ -41,7 +41,7 @@ type backendEvents struct {
 }
 
 // blockMetadata is used to capture information about requested blocks to avoid repeated blockID
-// calculations and passing around full block blocks.
+// calculations and passing around full block headers.
 type blockMetadata struct {
 	ID        flow.Identifier
 	Height    uint64
@@ -96,11 +96,11 @@ func (b *backendEvents) GetEventsForHeightRange(
 		endHeight = sealed.Height
 	}
 
-	// find the block blocks for all the blocks between min and max height (inclusive)
+	// find the block headers for all the blocks between min and max height (inclusive)
 	blockHeaders := make([]blockMetadata, 0, endHeight-startHeight+1)
 
 	for i := startHeight; i <= endHeight; i++ {
-		// this looks inefficient, but is actually what's done under the covers by `blocks.ByHeight`
+		// this looks inefficient, but is actually what's done under the covers by `headers.ByHeight`
 		// and avoids calculating header.ID() for each block.
 		blockID, err := b.headers.BlockIDByHeight(i)
 		if err != nil {
@@ -133,7 +133,7 @@ func (b *backendEvents) GetEventsForBlockIDs(
 		return nil, status.Errorf(codes.InvalidArgument, "requested block range (%d) exceeded maximum (%d)", len(blockIDs), b.maxHeightRange)
 	}
 
-	// find the block blocks for all the block IDs
+	// find the block headers for all the block IDs
 	blockHeaders := make([]blockMetadata, 0, len(blockIDs))
 	for _, blockID := range blockIDs {
 		header, err := b.headers.ByBlockID(blockID)
@@ -151,7 +151,7 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	return b.getBlockEvents(ctx, blockHeaders, eventType, requiredEventEncodingVersion)
 }
 
-// getBlockEvents retrieves events for all the specified headers that have the given type
+// getBlockEvents retrieves events for all the specified blocks that have the given type
 // It gets all events available in storage, and requests the rest from an execution node.
 func (b *backendEvents) getBlockEvents(
 	ctx context.Context,
@@ -218,7 +218,7 @@ func (b *backendEvents) getBlockEvents(
 	}
 }
 
-// getBlockEventsFromStorage retrieves events for all the specified headers that have the given type
+// getBlockEventsFromStorage retrieves events for all the specified blocks that have the given type
 // from the local storage
 func (b *backendEvents) getBlockEventsFromStorage(
 	ctx context.Context,
