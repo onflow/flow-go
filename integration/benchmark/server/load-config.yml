@@ -1,12 +1,20 @@
 token-transfer:
   load_type: token-transfer
   tps_initial: 800
+  tps_min: 1
+  tps_max: 1200
 create-account:
   load_type: create-account
   tps_initial: 600
+  tps_min: 1
+  tps_max: 1200
 ledger-heavy:
   load_type: ledger-heavy
   tps_initial: 3
+  tps_min: 1
+  tps_max: 1200
 evm-transfer:
   load_type: evm-transfer
   tps_initial: 500
+  tps_min: 1
+  tps_max: 1200

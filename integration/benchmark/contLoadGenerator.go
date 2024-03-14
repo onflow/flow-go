@@ -7,9 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rs/zerolog"
-	"gopkg.in/yaml.v3"
-
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/access"
 	"github.com/onflow/flow-go-sdk/crypto"
@@ -20,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/rs/zerolog"
 )
 
 const lostTransactionThreshold = 180 * time.Second
@@ -56,24 +54,6 @@ type LoadConfig struct {
 	TpsMax     int    `yaml:"tps_max"`
 	TpsMin     int    `yaml:"tps_min"`
 	TPSInitial int    `yaml:"tps_initial"`
-}
-
-func DefaultLoadConfig() LoadConfig {
-	return LoadConfig{
-		TpsMax: 1200,
-		TpsMin: 1,
-	}
-}
-
-func (s *LoadConfig) UnmarshalYAML(value *yaml.Node) error {
-	config := DefaultLoadConfig()
-
-	if err := value.Decode(&config); err != nil {
-		return err
-	}
-
-	*s = config
-	return nil
 }
 
 type LoadParams struct {
