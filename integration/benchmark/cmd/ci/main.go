@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"flag"
-	"net"
+	"gopkg.in/yaml.v3"
 	"os"
 	"strings"
 	"time"
@@ -21,7 +21,6 @@ import (
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
 	"github.com/onflow/flow-go/integration/benchmark"
-	pb "github.com/onflow/flow-go/integration/benchmark/proto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -33,7 +32,7 @@ type BenchmarkInfo struct {
 
 // Hardcoded CI values
 const (
-	defaultLoadType             = "token-transfer"
+	defaultLoadType             = load.TokenTransferLoadType
 	metricport                  = uint(8080)
 	accessNodeAddress           = "127.0.0.1:4001"
 	pushgateway                 = "127.0.0.1:9091"
@@ -45,34 +44,42 @@ const (
 	defaultMetricCollectionInterval = 20 * time.Second
 
 	// gRPC constants
-	defaultMaxMsgSize  = 1024 * 1024 * 16 // 16 MB
-	defaultGRPCAddress = "127.0.0.1:4777"
+	defaultMaxMsgSize = 1024 * 1024 * 16 // 16 MB
 )
 
 func main() {
 	logLvl := flag.String("log-level", "info", "set log level")
 
 	// CI relevant flags
-	grpcAddressFlag := flag.String("grpc-address", defaultGRPCAddress, "listen address for gRPC server")
 	initialTPSFlag := flag.Int("tps-initial", 10, "starting transactions per second")
 	maxTPSFlag := flag.Int("tps-max", *initialTPSFlag, "maximum transactions per second allowed")
 	minTPSFlag := flag.Int("tps-min", *initialTPSFlag, "minimum transactions per second allowed")
+	loadTypeFlag := flag.String("load-type", string(defaultLoadType), "load type (token-transfer / const-exec / evm from the load config file)")
+	loadConfigFileLocationFlag := flag.String("load-config-file", "", "load config file location. If not provided, default config will be used.")
+
 	adjustIntervalFlag := flag.Duration("tps-adjust-interval", defaultAdjustInterval, "interval for adjusting TPS")
 	adjustDelayFlag := flag.Duration("tps-adjust-delay", 120*time.Second, "delay before adjusting TPS")
-	statIntervalFlag := flag.Duration("stat-interval", defaultMetricCollectionInterval, "")
 	durationFlag := flag.Duration("duration", 10*time.Minute, "test duration")
+
+	statIntervalFlag := flag.Duration("stat-interval", defaultMetricCollectionInterval, "")
 	gitRepoPathFlag := flag.String("git-repo-path", "../..", "git repo path of the filesystem")
 	gitRepoURLFlag := flag.String("git-repo-url", "https://github.com/onflow/flow-go.git", "git repo URL")
 	bigQueryUpload := flag.Bool("bigquery-upload", true, "whether to upload results to BigQuery (true / false)")
 	bigQueryProjectFlag := flag.String("bigquery-project", "dapperlabs-data", "project name for the bigquery uploader")
 	bigQueryDatasetFlag := flag.String("bigquery-dataset", "dev_src_flow_tps_metrics", "dataset name for the bigquery uploader")
 	bigQueryRawTableFlag := flag.String("bigquery-raw-table", "rawResults", "table name for the bigquery raw results")
-	loadTypeFlag := flag.String("load-type", defaultLoadType, "load type (token-transfer / const-exec / evm)")
 	flag.Parse()
 
-	loadType := *loadTypeFlag
-
 	log := setupLogger(logLvl)
+
+	loadConfig := getLoadConfig(
+		log,
+		*loadConfigFileLocationFlag,
+		*loadTypeFlag,
+		*minTPSFlag,
+		*maxTPSFlag,
+		*initialTPSFlag,
+	)
 
 	if *gitRepoPathFlag == "" {
 		flag.PrintDefaults()
@@ -85,26 +92,6 @@ func main() {
 	server := metrics.NewServer(log, metricport)
 	<-server.Ready()
 	loaderMetrics := metrics.NewLoaderCollector()
-
-	grpcServerOptions := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(defaultMaxMsgSize),
-		grpc.MaxSendMsgSize(defaultMaxMsgSize),
-	}
-	grpcServer := grpc.NewServer(grpcServerOptions...)
-	defer grpcServer.Stop()
-
-	pb.RegisterBenchmarkServer(grpcServer, &benchmarkServer{})
-
-	grpcListener, err := net.Listen("tcp", *grpcAddressFlag)
-	if err != nil {
-		log.Fatal().Err(err).Str("address", *grpcAddressFlag).Msg("failed to listen")
-	}
-
-	go func() {
-		if err := grpcServer.Serve(grpcListener); err != nil {
-			log.Fatal().Err(err).Msg("failed to serve")
-		}
-	}()
 
 	sp := benchmark.NewStatsPusher(ctx, log, pushgateway, "loader", prometheus.DefaultGatherer)
 	defer sp.Stop()
@@ -136,10 +123,7 @@ func main() {
 
 	// prepare load generator
 	log.Info().
-		Str("load_type", loadType).
-		Int("initialTPS", *initialTPSFlag).
-		Int("minTPS", *minTPSFlag).
-		Int("maxTPS", *maxTPSFlag).
+		Interface("loadConfig", loadConfig).
 		Dur("duration", *durationFlag).
 		Msg("Running load case")
 
@@ -164,7 +148,7 @@ func main() {
 		},
 		benchmark.LoadParams{
 			NumberOfAccounts: maxInflight,
-			LoadType:         load.LoadType(loadType),
+			LoadConfig:       loadConfig,
 			FeedbackEnabled:  feedbackEnabled,
 		},
 	)
@@ -187,9 +171,9 @@ func main() {
 		AdjusterParams{
 			Delay:       *adjustDelayFlag,
 			Interval:    *adjustIntervalFlag,
-			InitialTPS:  uint(*initialTPSFlag),
-			MinTPS:      uint(*minTPSFlag),
-			MaxTPS:      uint(*maxTPSFlag),
+			InitialTPS:  uint(loadConfig.TPSInitial),
+			MinTPS:      uint(loadConfig.TpsMin),
+			MaxTPS:      uint(loadConfig.TpsMax),
 			MaxInflight: uint(maxInflight / 2),
 		},
 	)
@@ -218,7 +202,7 @@ func main() {
 	// only upload valid data
 	if *bigQueryUpload {
 		repoInfo := MustGetRepoInfo(log, *gitRepoURLFlag, *gitRepoPathFlag)
-		mustUploadData(ctx, log, recorder, repoInfo, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryRawTableFlag, loadType)
+		mustUploadData(ctx, log, recorder, repoInfo, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryRawTableFlag, loadConfig.LoadName)
 	} else {
 		log.Info().Int("raw_tps_size", len(recorder.BenchmarkResults.RawTPS)).Msg("logging tps results locally")
 		// log results locally when not uploading to BigQuery
@@ -226,6 +210,55 @@ func main() {
 			log.Info().Int("tps_record_index", i).Interface("tpsRecord", tpsRecord).Msg("tps_record")
 		}
 	}
+}
+
+func getLoadConfig(
+	log zerolog.Logger,
+	loadConfigLocation string,
+	load string,
+	minTPS int,
+	maxTPS int,
+	initialTPS int,
+) benchmark.LoadConfig {
+	if loadConfigLocation == "" {
+		lc := benchmark.LoadConfig{
+			LoadName:   load,
+			LoadType:   load,
+			TpsMax:     maxTPS,
+			TpsMin:     minTPS,
+			TPSInitial: initialTPS,
+		}
+
+		log.Info().
+			Interface("loadConfig", lc).
+			Msg("Load config file not provided, using parameters supplied in TPS flags")
+		return lc
+	}
+
+	var loadConfigs map[string]benchmark.LoadConfig
+
+	// check if the file exists
+	if _, err := os.Stat(loadConfigLocation); os.IsNotExist(err) {
+		log.Fatal().Err(err).Str("loadConfigLocation", loadConfigLocation).Msg("load config file not found")
+	}
+
+	yamlFile, err := os.ReadFile(loadConfigLocation)
+	if err != nil {
+		log.Fatal().Err(err).Str("loadConfigLocation", loadConfigLocation).Msg("failed to read load config file")
+	}
+
+	err = yaml.Unmarshal(yamlFile, &loadConfigs)
+	if err != nil {
+		log.Fatal().Err(err).Str("loadConfigLocation", loadConfigLocation).Msg("failed to unmarshal load config file")
+	}
+
+	lc, ok := loadConfigs[load]
+	if !ok {
+		log.Fatal().Str("load", load).Msg("load not found in load config file")
+	}
+	lc.LoadName = load
+
+	return lc
 }
 
 // setupLogger parses log level and apply to logger
@@ -252,7 +285,7 @@ func mustUploadData(
 	bigQueryProject string,
 	bigQueryDataset string,
 	bigQueryRawTable string,
-	loadType string,
+	loadName string,
 ) {
 	log.Info().Msg("Initializing BigQuery")
 	db, err := NewDB(ctx, log, bigQueryProject)
@@ -278,7 +311,7 @@ func mustUploadData(
 		bigQueryRawTable,
 		recorder.BenchmarkResults,
 		*repoInfo,
-		BenchmarkInfo{BenchmarkType: loadType},
+		BenchmarkInfo{BenchmarkType: loadName},
 		MustGetDefaultEnvironment(),
 	)
 	if err != nil {

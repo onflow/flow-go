@@ -46,9 +46,20 @@ type NetworkParams struct {
 	ChainId           flow.ChainID
 }
 
+type LoadConfig struct {
+	// LoadName is the name of the load. This can be different from the LoadType
+	// and is used to identify the load in the results. The use case is when a single
+	// load type is used to run multiple loads with different parameters.
+	LoadName   string `yaml:"-"`
+	LoadType   string `yaml:"load_type"`
+	TpsMax     int    `default:"1200" yaml:"tps_max"`
+	TpsMin     int    `default:"1" yaml:"tps_min"`
+	TPSInitial int    `yaml:"tps_initial"`
+}
+
 type LoadParams struct {
 	NumberOfAccounts int
-	LoadType         load.LoadType
+	LoadConfig       LoadConfig
 
 	// TODO(rbtz): inject a TxFollower
 	FeedbackEnabled bool
@@ -157,7 +168,7 @@ func New(
 		Proposer:               servAcc,
 	}
 
-	l := load.CreateLoadType(log, loadParams.LoadType)
+	l := load.CreateLoadType(log, load.LoadType(loadParams.LoadConfig.LoadType))
 
 	err = l.Setup(log, lc)
 	if err != nil {

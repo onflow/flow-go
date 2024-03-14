@@ -7,7 +7,7 @@ set -o pipefail
 # this will keep the TPS automation code separate from the code that's being tested so we won't run into issues
 # of having old versions of automation code just because we happen to be testing an older version flow-go
 git clone https://github.com/onflow/flow-go.git
-cd flow-go/integration/localnet
+cd flow-go/integration/localnet || exit
 
 git fetch
 git fetch --tags
@@ -37,7 +37,7 @@ while read -r input; do
 
     # sleep is workaround for slow initialization of some node types, so that benchmark does not quit immediately with "connection refused"
     sleep 30;
-    go run ../benchmark/cmd/ci -log-level debug -git-repo-path ../../ -tps-initial 800 -tps-min 1 -tps-max 1200 -duration 30m -load-type "$load"
+    go run ../benchmark/cmd/ci -log-level info -git-repo-path ../../ -tps-initial 800 -tps-min 1 -tps-max 1200 -duration 30m -load-type "$load"
 
     # instead of running "make stop" which uses docker-compose for a lot of older versions,
     # we explicitly run the command here with "docker compose"
