@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"gopkg.in/yaml.v3"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/access"
@@ -52,9 +53,27 @@ type LoadConfig struct {
 	// load type is used to run multiple loads with different parameters.
 	LoadName   string `yaml:"-"`
 	LoadType   string `yaml:"load_type"`
-	TpsMax     int    `default:"1200" yaml:"tps_max"`
-	TpsMin     int    `default:"1" yaml:"tps_min"`
+	TpsMax     int    `yaml:"tps_max"`
+	TpsMin     int    `yaml:"tps_min"`
 	TPSInitial int    `yaml:"tps_initial"`
+}
+
+func DefaultLoadConfig() LoadConfig {
+	return LoadConfig{
+		TpsMax: 1200,
+		TpsMin: 1,
+	}
+}
+
+func (s *LoadConfig) UnmarshalYAML(value *yaml.Node) error {
+	config := DefaultLoadConfig()
+
+	if err := value.Decode(&config); err != nil {
+		return err
+	}
+
+	*s = config
+	return nil
 }
 
 type LoadParams struct {
