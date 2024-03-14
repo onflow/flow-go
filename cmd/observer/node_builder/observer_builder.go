@@ -37,6 +37,7 @@ import (
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
+	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rest"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
@@ -45,6 +46,7 @@ import (
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
@@ -84,7 +86,7 @@ import (
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
-	"github.com/onflow/flow-go/network/p2p/subscription"
+	networkingsubscription "github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -178,13 +180,13 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		},
 		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
-			ExecutionDataCacheSize:  state_stream.DefaultCacheSize,
-			ClientSendTimeout:       state_stream.DefaultSendTimeout,
-			ClientSendBufferSize:    state_stream.DefaultSendBufferSize,
-			MaxGlobalStreams:        state_stream.DefaultMaxGlobalStreams,
+			ExecutionDataCacheSize:  subscription.DefaultCacheSize,
+			ClientSendTimeout:       subscription.DefaultSendTimeout,
+			ClientSendBufferSize:    subscription.DefaultSendBufferSize,
+			MaxGlobalStreams:        subscription.DefaultMaxGlobalStreams,
 			EventFilterConfig:       state_stream.DefaultEventFilterConfig,
-			ResponseLimit:           state_stream.DefaultResponseLimit,
-			HeartbeatInterval:       state_stream.DefaultHeartbeatInterval,
+			ResponseLimit:           subscription.DefaultResponseLimit,
+			HeartbeatInterval:       subscription.DefaultHeartbeatInterval,
 			RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
 		},
 		stateStreamFilterConf:        nil,
@@ -234,7 +236,7 @@ type ObserverServiceBuilder struct {
 	FollowerCore         module.HotStuffFollower
 	ExecutionIndexer     *indexer.Indexer
 	ExecutionIndexerCore *indexer.IndexerCore
-	TxResultsIndex       *backend.TransactionResultsIndex
+	TxResultsIndex       *index.TransactionResultsIndex
 	IndexerDependencies  *cmd.DependencyList
 
 	ExecutionDataDownloader execution_data.Downloader
@@ -242,7 +244,7 @@ type ObserverServiceBuilder struct {
 	ExecutionDataStore      execution_data.ExecutionDataStore
 
 	RegistersAsyncStore *execution.RegistersAsyncStore
-	EventsIndex         *backend.EventsIndex
+	EventsIndex         *index.EventsIndex
 
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
@@ -951,8 +953,8 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 			Unicast: builder.FlowConfig.NetworkConfig.Unicast,
 		}).
 		SetSubscriptionFilter(
-			subscription.NewRoleBasedFilter(
-				subscription.UnstakedRole, builder.IdentityProvider,
+			networkingsubscription.NewRoleBasedFilter(
+				networkingsubscription.UnstakedRole, builder.IdentityProvider,
 			),
 		).
 		SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
@@ -1338,6 +1340,17 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			useIndex := builder.executionDataIndexingEnabled &&
 				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
 
+			executionDataTracker := subscription.NewExecutionDataTracker(
+				builder.Logger,
+				node.State,
+				builder.executionDataConfig.InitialBlockHeight,
+				node.Storage.Headers,
+				broadcaster,
+				highestAvailableHeight,
+				builder.EventsIndex,
+				useIndex,
+			)
+
 			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,
 				builder.stateStreamConf,
@@ -1348,11 +1361,10 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.ExecutionDataStore,
 				executionDataStoreCache,
 				broadcaster,
-				builder.executionDataConfig.InitialBlockHeight,
-				highestAvailableHeight,
 				builder.RegistersAsyncStore,
 				builder.EventsIndex,
 				useIndex,
+				executionDataTracker,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
@@ -1366,14 +1378,14 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				node.RootChainID,
 				builder.stateStreamGrpcServer,
 				builder.stateStreamBackend,
-				broadcaster,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream engine: %w", err)
 			}
 			builder.StateStreamEng = stateStreamEng
 
-			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.StateStreamEng.OnExecutionData)
+			// setup requester to notify ExecutionDataTracker when new execution data is received
+			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.stateStreamBackend.OnExecutionData)
 
 			return builder.StateStreamEng, nil
 		})
@@ -1525,11 +1537,11 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		return nil
 	})
 	builder.Module("events index", func(node *cmd.NodeConfig) error {
-		builder.EventsIndex = backend.NewEventsIndex(builder.Storage.Events)
+		builder.EventsIndex = index.NewEventsIndex(builder.Storage.Events)
 		return nil
 	})
 	builder.Module("transaction result index", func(node *cmd.NodeConfig) error {
-		builder.TxResultsIndex = backend.NewTransactionResultsIndex(builder.Storage.LightTransactionResults)
+		builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Storage.LightTransactionResults)
 		return nil
 	})
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

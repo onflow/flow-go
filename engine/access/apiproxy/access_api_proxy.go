@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	accessflow "github.com/onflow/flow-go/access"
@@ -282,6 +283,56 @@ func (h *FlowAccessAPIRouter) GetExecutionResultByID(context context.Context, re
 	res, err := h.upstream.GetExecutionResultByID(context, req)
 	h.log("upstream", "GetExecutionResultByID", err)
 	return res, err
+}
+
+func (h *FlowAccessAPIRouter) SubscribeBlocksFromStartBlockID(req *access.SubscribeBlocksFromStartBlockIDRequest, server access.AccessAPI_SubscribeBlocksFromStartBlockIDServer) error {
+	// SubscribeBlocksFromStartBlockID is not implemented for observer yet
+	return status.Errorf(codes.Unimplemented, "method SubscribeBlocksFromStartBlockID not implemented")
+}
+
+func (h *FlowAccessAPIRouter) SubscribeBlocksFromStartHeight(req *access.SubscribeBlocksFromStartHeightRequest, server access.AccessAPI_SubscribeBlocksFromStartHeightServer) error {
+	// SubscribeBlocksFromStartHeight is not implemented for observer yet
+	return status.Errorf(codes.Unimplemented, "method SubscribeBlocksFromStartHeight not implemented")
+}
+
+func (h *FlowAccessAPIRouter) SubscribeBlocksFromLatest(req *access.SubscribeBlocksFromLatestRequest, server access.AccessAPI_SubscribeBlocksFromLatestServer) error {
+	// SubscribeBlocksFromLatest is not implemented for observer yet
+	return status.Errorf(codes.Unimplemented, "method SubscribeBlocksFromLatest not implemented")
+}
+
+func (h *FlowAccessAPIRouter) SubscribeBlockHeadersFromStartBlockID(req *access.SubscribeBlockHeadersFromStartBlockIDRequest, server access.AccessAPI_SubscribeBlockHeadersFromStartBlockIDServer) error {
+	// SubscribeBlockHeadersFromStartBlockID is not implemented for observer yet
+	return status.Errorf(codes.Unimplemented, "method SubscribeBlockHeadersFromStartBlockID not implemented")
+}
+
+func (h *FlowAccessAPIRouter) SubscribeBlockHeadersFromStartHeight(req *access.SubscribeBlockHeadersFromStartHeightRequest, server access.AccessAPI_SubscribeBlockHeadersFromStartHeightServer) error {
+	// SubscribeBlockHeadersFromStartHeight is not implemented for observer yet
+	return status.Errorf(codes.Unimplemented, "method SubscribeBlockHeadersFromStartHeight not implemented")
+}
+
+func (h *FlowAccessAPIRouter) SubscribeBlockHeadersFromLatest(req *access.SubscribeBlockHeadersFromLatestRequest, server access.AccessAPI_SubscribeBlockHeadersFromLatestServer) error {
+	// SubscribeBlockHeadersFromLatest is not implemented for observer yet
+	return status.Errorf(codes.Unimplemented, "method SubscribeBlockHeadersFromLatest not implemented")
+}
+
+func (h *FlowAccessAPIRouter) SubscribeBlockDigestsFromStartBlockID(req *access.SubscribeBlockDigestsFromStartBlockIDRequest, server access.AccessAPI_SubscribeBlockDigestsFromStartBlockIDServer) error {
+	// SubscribeBlockDigestsFromStartBlockID is not implemented for observer yet
+	return status.Errorf(codes.Unimplemented, "method SubscribeBlockDigestsFromStartBlockID not implemented")
+}
+
+func (h *FlowAccessAPIRouter) SubscribeBlockDigestsFromStartHeight(req *access.SubscribeBlockDigestsFromStartHeightRequest, server access.AccessAPI_SubscribeBlockDigestsFromStartHeightServer) error {
+	// SubscribeBlockDigestsFromStartHeight is not implemented for observer yet
+	return status.Errorf(codes.Unimplemented, "method SubscribeBlockDigestsFromStartHeight not implemented")
+}
+
+func (h *FlowAccessAPIRouter) SubscribeBlockDigestsFromLatest(req *access.SubscribeBlockDigestsFromLatestRequest, server access.AccessAPI_SubscribeBlockDigestsFromLatestServer) error {
+	// SubscribeBlockDigestsFromLatest is not implemented for observer yet
+	return status.Errorf(codes.Unimplemented, "method SubscribeBlockDigestsFromLatest not implemented")
+}
+
+func (h *FlowAccessAPIRouter) SendAndSubscribeTransactionStatuses(req *access.SendAndSubscribeTransactionStatusesRequest, server access.AccessAPI_SendAndSubscribeTransactionStatusesServer) error {
+	//SendAndSubscribeTransactionStatuses is not implemented for observer yet
+	return status.Errorf(codes.Unimplemented, "method SendAndSubscribeTransactionStatuses not implemented")
 }
 
 // FlowAccessAPIForwarder forwards all requests to a set of upstream access nodes or observers

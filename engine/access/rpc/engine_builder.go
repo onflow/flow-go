@@ -80,9 +80,9 @@ func (builder *RPCEngineBuilder) WithLegacy() *RPCEngineBuilder {
 
 func (builder *RPCEngineBuilder) DefaultHandler(signerIndicesDecoder hotstuff.BlockSignerDecoder) *access.Handler {
 	if signerIndicesDecoder == nil {
-		return access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me)
+		return access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams)
 	} else {
-		return access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, access.WithBlockSignerDecoder(signerIndicesDecoder))
+		return access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams, access.WithBlockSignerDecoder(signerIndicesDecoder))
 	}
 }
 
