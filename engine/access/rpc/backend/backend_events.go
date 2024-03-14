@@ -58,21 +58,11 @@ func (b *backendEvents) GetEventsForHeightRange(
 ) ([]flow.BlockEvents, error) {
 
 	if endHeight < startHeight {
-		b.log.Debug().
-			Bool("endHeight < startHeight", endHeight < startHeight).
-			Uint64("endHeight", endHeight).
-			Uint64("startHeight", startHeight).
-			Msg("InvalidArgument start height must not be larger than end height")
 		return nil, status.Error(codes.InvalidArgument, "start height must not be larger than end height")
 	}
 
 	rangeSize := endHeight - startHeight + 1 // range is inclusive on both ends
 	if rangeSize > uint64(b.maxHeightRange) {
-		b.log.Debug().
-			Bool("rangeSize > uint64(b.maxHeightRange)", rangeSize > uint64(b.maxHeightRange)).
-			Uint64("rangeSize", rangeSize).
-			Uint64("maxHeightRange", uint64(b.maxHeightRange)).
-			Msg("InvalidArgument requested block range")
 		return nil, status.Errorf(codes.InvalidArgument,
 			"requested block range (%d) exceeded maximum (%d)", rangeSize, b.maxHeightRange)
 	}
