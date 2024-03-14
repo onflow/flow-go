@@ -27,10 +27,15 @@ func TestObserverIndexerEnabled(t *testing.T) {
 	suite.Run(t, new(ObserverIndexerEnabledSuite))
 }
 
+// ObserverIndexerEnabledSuite tests the observer with the indexer enabled.
+// It uses ObserverSuite as a base to reuse the test cases that need to be run for any observer variation.
 type ObserverIndexerEnabledSuite struct {
 	ObserverSuite
 }
 
+// SetupTest sets up the test suite by starting the network and preparing the observer client.
+// By overriding this function, we can ensure that the observer is started with correct parameters and select
+// the RPCs and REST endpoints that are tested.
 func (s *ObserverIndexerEnabledSuite) SetupTest() {
 	s.localRpc = map[string]struct{}{
 		"Ping":                           {},

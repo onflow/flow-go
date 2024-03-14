@@ -30,14 +30,18 @@ func TestObserver(t *testing.T) {
 	suite.Run(t, new(ObserverSuite))
 }
 
+// ObserverSuite is a general test suite for observer nodes APIs.
+// It is used to test the observer node's RPC and REST APIs.
+// It verified that the observer's API behaves similarly to the access node's API.
 type ObserverSuite struct {
 	suite.Suite
-	net                 *testnet.FlowNetwork
-	teardown            func()
-	localRpc            map[string]struct{}
-	localRest           map[string]struct{}
-	testedRPCs          func() []RPCTest
-	testedRestEndpoints func() []RestEndpointTest
+	net       *testnet.FlowNetwork
+	localRpc  map[string]struct{} // RPC methods handled locally by observer
+	localRest map[string]struct{} // REST endpoints handled locally by observer
+
+	// we use functors to allow reusing the same test suite for different sets of RPCs and REST endpoints
+	testedRPCs          func() []RPCTest          // RPC methods to test
+	testedRestEndpoints func() []RestEndpointTest // REST endpoints to test
 
 	cancel context.CancelFunc
 }
