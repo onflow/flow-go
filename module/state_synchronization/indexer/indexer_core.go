@@ -336,9 +336,6 @@ func (c *IndexerCore) updateProgramCache(height uint64, events []flow.Event, col
 		header.ParentID,
 	)
 
-	// configure the derived transaction data to allow scripts to cache programs
-	derivedBlockData.AllowWritesInReadonlyTransaction()
-
 	// get a list of all contracts that were updated in this block
 	invalidatedPrograms, err := findContractUpdates(events)
 	if err != nil {

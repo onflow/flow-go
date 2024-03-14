@@ -66,6 +66,7 @@ func NewScripts(
 	options := computation.DefaultFVMOptions(chainID, false, false)
 	blocks := environment.NewBlockFinder(header)
 	options = append(options, fvm.WithBlocks(blocks)) // add blocks for getBlocks calls in scripts
+	options = append(options, fvm.WithAllowProgramCacheWritesInScriptsEnabled(true))
 	vmCtx := fvm.NewContext(options...)
 
 	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)

@@ -69,13 +69,27 @@ func (database *BlockDatabase) NewTransaction(
 func (database *BlockDatabase) NewSnapshotReadTransaction(
 	parameters state.StateParameters,
 ) Transaction {
-
 	return &transaction{
 		TransactionData: database.BlockData.
 			NewSnapshotReadTransactionData(parameters),
 		DerivedTransactionData: database.DerivedBlockData.
 			NewSnapshotReadDerivedTransactionData(),
 	}
+}
+
+func (database *BlockDatabase) NewCachingSnapshotReadTransaction(
+	parameters state.StateParameters,
+) (Transaction, error) {
+	derivedTxn, err := database.DerivedBlockData.NewDerivedTransactionData(0, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create dervied transaction: %w", err)
+	}
+
+	return &transaction{
+		TransactionData: database.BlockData.
+			NewSnapshotReadTransactionData(parameters),
+		DerivedTransactionData: derivedTxn,
+	}, nil
 }
 
 func (txn *transaction) Validate() error {

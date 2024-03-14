@@ -49,8 +49,6 @@ type DerivedDataTable[TKey comparable, TVal any] struct {
 	latestCommitExecutionTime logical.Time
 
 	invalidators chainedTableInvalidators[TKey, TVal] // Guarded by lock.
-
-	allowWritesInReadonlyTransaction bool
 }
 
 type TableTransaction[TKey comparable, TVal any] struct {
@@ -289,7 +287,7 @@ func (table *DerivedDataTable[TKey, TVal]) commit(
 
 	// Don't perform actual commit for snapshot read transaction.  This is
 	// safe since all values are derived from the primary source.
-	if txn.isSnapshotReadTransaction && !table.allowWritesInReadonlyTransaction {
+	if txn.isSnapshotReadTransaction {
 		return nil
 	}
 

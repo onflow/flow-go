@@ -42,6 +42,10 @@ type Context struct {
 	tracing.TracerSpan
 
 	environment.EnvironmentParams
+
+	// AllowProgramCacheWritesInScripts determines if the program cache can be written to in scripts
+	// By default, the program cache is only updated by transactions.
+	AllowProgramCacheWritesInScripts bool
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -372,6 +376,13 @@ func WithEventEncoder(encoder environment.EventEncoder) Option {
 func WithEVMEnabled(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.EVMEnabled = enabled
+		return ctx
+	}
+}
+
+func WithAllowProgramCacheWritesInScriptsEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.AllowProgramCacheWritesInScripts = enabled
 		return ctx
 	}
 }
