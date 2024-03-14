@@ -76,6 +76,8 @@ func parseAccountContractUpdated(event *flow.Event) (common.AddressLocation, err
 	return common.NewAddressLocation(nil, common.Address(address), contractName.String()), nil
 }
 
+var _ derived.TransactionInvalidator = (*accessInvalidator)(nil)
+
 // accessInvalidator is a derived.TransactionInvalidator that invalidates programs and meter param overrides.
 type accessInvalidator struct {
 	programs            *programInvalidator
@@ -89,6 +91,8 @@ func (inv *accessInvalidator) ProgramInvalidator() derived.ProgramInvalidator {
 func (inv *accessInvalidator) MeterParamOverridesInvalidator() derived.MeterParamOverridesInvalidator {
 	return inv.meterParamOverrides
 }
+
+var _ derived.ProgramInvalidator = (*programInvalidator)(nil)
 
 // programInvalidator is a derived.ProgramInvalidator that invalidates all programs or a specific set of programs.
 // this is used to invalidate all programs who's code was updated in a specific block.
@@ -105,6 +109,8 @@ func (inv *programInvalidator) ShouldInvalidateEntry(location common.AddressLoca
 	_, ok := inv.invalidated[location]
 	return inv.invalidateAll || ok
 }
+
+var _ derived.MeterParamOverridesInvalidator = (*meterParamOverridesInvalidator)(nil)
 
 // meterParamOverridesInvalidator is a derived.MeterParamOverridesInvalidator that invalidates meter param overrides.
 type meterParamOverridesInvalidator struct {
