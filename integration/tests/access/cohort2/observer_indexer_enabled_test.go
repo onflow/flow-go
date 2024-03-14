@@ -1,16 +1,12 @@
 package cohort2
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
 
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
 	"github.com/rs/zerolog"
@@ -22,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
@@ -31,24 +28,7 @@ func TestObserverIndexerEnabled(t *testing.T) {
 }
 
 type ObserverIndexerEnabledSuite struct {
-	suite.Suite
-	net       *testnet.FlowNetwork
-	teardown  func()
-	localRpc  map[string]struct{}
-	localRest map[string]struct{}
-
-	cancel context.CancelFunc
-}
-
-func (s *ObserverIndexerEnabledSuite) TearDownTest() {
-	if s.net != nil {
-		s.net.Remove()
-		s.net = nil
-	}
-	if s.cancel != nil {
-		s.cancel()
-		s.cancel = nil
-	}
+	ObserverSuite
 }
 
 func (s *ObserverIndexerEnabledSuite) SetupTest() {
@@ -71,6 +51,9 @@ func (s *ObserverIndexerEnabledSuite) SetupTest() {
 		"getNetworkParameters": {},
 		"getNodeVersionInfo":   {},
 	}
+
+	s.testedRPCs = s.getRPCs
+	s.testedRestEndpoints = s.getRestEndpoints
 
 	nodeConfigs := []testnet.NodeConfig{
 		// access node with unstaked nodes supported
@@ -119,11 +102,13 @@ func (s *ObserverIndexerEnabledSuite) SetupTest() {
 	s.net.Start(ctx)
 }
 
-// TestObserverRPC runs the following tests:
-// 1. CompareRPCs: verifies that the observer client returns the same errors as the access client for rpcs proxied to the upstream AN
-// 2. HandledByUpstream: stops the upstream AN and verifies that the observer client returns errors for all rpcs handled by the upstream
-// 3. HandledByObserver: stops the upstream AN and verifies that the observer client handles all other queries
-func (s *ObserverIndexerEnabledSuite) TestObserverRPC() {
+// TestObserverIndexedRPCs tests RPCs that are handled by the observer by using a dedicated indexer for the events.
+// For now the observer only supports the following RPCs:
+// - GetEventsForHeightRange
+// - GetEventsForBlockIDs
+// To ensure that the observer is handling these RPCs, we stop the upstream access node and verify that the observer client
+// returns success for valid requests and errors for invalid ones.
+func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCs() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -133,159 +118,43 @@ func (s *ObserverIndexerEnabledSuite) TestObserverRPC() {
 	observer, err := s.getObserverClient()
 	require.NoError(t, err)
 
-	access, err := s.getAccessClient()
-	require.NoError(t, err)
-
-	t.Run("CompareRPCs", func(t *testing.T) {
-		// verify that both clients return the same errors for proxied rpcs
-		for _, rpc := range s.getRPCs() {
-			// skip rpcs handled locally by observer
-			if _, local := s.localRpc[rpc.name]; local {
-				continue
-			}
-			t.Run(rpc.name, func(t *testing.T) {
-				accessErr := rpc.call(ctx, access)
-				observerErr := rpc.call(ctx, observer)
-				assert.Equal(t, accessErr, observerErr)
-			})
-		}
-	})
-
 	// stop the upstream access container
 	err = s.net.StopContainerByName(ctx, testnet.PrimaryAN)
 	require.NoError(t, err)
 
-	t.Run("HandledByUpstream", func(t *testing.T) {
-		// verify that we receive Unavailable errors from all rpcs handled upstream
-		for _, rpc := range s.getRPCs() {
-			if _, local := s.localRpc[rpc.name]; local {
-				continue
-			}
-			t.Run(rpc.name, func(t *testing.T) {
-				err := rpc.call(ctx, observer)
-				assert.Equal(t, codes.Unavailable, status.Code(err))
-			})
-		}
+	t.Run("GetEventsForHeightRange", func(t *testing.T) {
+		// verify that we receive no error if the request is valid
+		_, err = observer.GetEventsForHeightRange(ctx, &accessproto.GetEventsForHeightRangeRequest{
+			Type:                 string(flow.EventAccountCreated),
+			StartHeight:          0,
+			EndHeight:            5,
+			EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+		})
+		assert.NoError(t, err)
+
+		// verify that we receive an error if the request is invalid
+		_, err = observer.GetEventsForHeightRange(ctx, &accessproto.GetEventsForHeightRangeRequest{})
+		assert.Equal(t, codes.InvalidArgument, status.Code(err))
 	})
+	t.Run("GetEventsForBlockIDs", func(t *testing.T) {
+		// verify that we receive no error if the request is valid
+		genesisBlock, err := observer.GetBlockByHeight(ctx, &accessproto.GetBlockByHeightRequest{
+			Height:            0,
+			FullBlockResponse: false,
+		})
+		require.NoError(t, err)
 
-	t.Run("HandledByObserver", func(t *testing.T) {
-		// verify that we receive NotFound or no error from all rpcs handled locally
-		for _, rpc := range s.getRPCs() {
-			if _, local := s.localRpc[rpc.name]; !local {
-				continue
-			}
-			t.Run(rpc.name, func(t *testing.T) {
-				err := rpc.call(ctx, observer)
-				if err == nil {
-					return
-				}
-				assert.Equal(t, codes.NotFound, status.Code(err))
-			})
-		}
+		_, err = observer.GetEventsForBlockIDs(ctx, &accessproto.GetEventsForBlockIDsRequest{
+			Type:                 string(flow.EventAccountCreated),
+			BlockIds:             [][]byte{genesisBlock.Block.Id},
+			EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+		})
+		assert.NoError(t, err)
+
+		// verify that we receive an error if the request is invalid
+		_, err = observer.GetEventsForBlockIDs(ctx, &accessproto.GetEventsForBlockIDsRequest{})
+		assert.Equal(t, codes.InvalidArgument, status.Code(err))
 	})
-}
-
-// TestObserverRest runs the following tests:
-// 1. CompareEndpoints: verifies that the observer client returns the same errors as the access client for rests proxied to the upstream AN
-// 2. HandledByUpstream: stops the upstream AN and verifies that the observer client returns errors for all rests handled by the upstream
-// 3. HandledByObserver: stops the upstream AN and verifies that the observer client handles all other queries
-func (s *ObserverIndexerEnabledSuite) TestObserverRest() {
-	t := s.T()
-
-	accessAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
-	observerAddr := s.net.ContainerByName("observer_1").Addr(testnet.RESTPort)
-
-	httpClient := http.DefaultClient
-	makeHttpCall := func(method string, url string, body interface{}) (*http.Response, error) {
-		switch method {
-		case http.MethodGet:
-			return httpClient.Get(url)
-		case http.MethodPost:
-			jsonBody, _ := json.Marshal(body)
-			return httpClient.Post(url, "application/json", bytes.NewBuffer(jsonBody))
-		}
-		panic("not supported")
-	}
-	makeObserverCall := func(method string, path string, body interface{}) (*http.Response, error) {
-		return makeHttpCall(method, "http://"+observerAddr+"/v1"+path, body)
-	}
-	makeAccessCall := func(method string, path string, body interface{}) (*http.Response, error) {
-		return makeHttpCall(method, "http://"+accessAddr+"/v1"+path, body)
-	}
-
-	t.Run("CompareEndpoints", func(t *testing.T) {
-		// verify that both clients return the same errors for proxied rests
-		for _, endpoint := range s.getRestEndpoints() {
-			// skip rest handled locally by observer
-			if _, local := s.localRest[endpoint.name]; local {
-				continue
-			}
-			t.Run(endpoint.name, func(t *testing.T) {
-				accessResp, accessErr := makeAccessCall(endpoint.method, endpoint.path, endpoint.body)
-				observerResp, observerErr := makeObserverCall(endpoint.method, endpoint.path, endpoint.body)
-				assert.NoError(t, accessErr)
-				assert.NoError(t, observerErr)
-				assert.Equal(t, accessResp.Status, observerResp.Status)
-				assert.Equal(t, accessResp.StatusCode, observerResp.StatusCode)
-				assert.Contains(t, [...]int{
-					http.StatusNotFound,
-					http.StatusOK,
-				}, observerResp.StatusCode)
-			})
-		}
-	})
-
-	// stop the upstream access container
-	err := s.net.StopContainerByName(context.Background(), testnet.PrimaryAN)
-	require.NoError(t, err)
-
-	t.Run("HandledByUpstream", func(t *testing.T) {
-		// verify that we receive StatusServiceUnavailable errors from all rests handled upstream
-		for _, endpoint := range s.getRestEndpoints() {
-			if _, local := s.localRest[endpoint.name]; local {
-				continue
-			}
-			t.Run(endpoint.name, func(t *testing.T) {
-				observerResp, observerErr := makeObserverCall(endpoint.method, endpoint.path, endpoint.body)
-				require.NoError(t, observerErr)
-				assert.Contains(t, [...]int{
-					http.StatusServiceUnavailable}, observerResp.StatusCode)
-			})
-		}
-	})
-
-	t.Run("HandledByObserver", func(t *testing.T) {
-		// verify that we receive NotFound or no error from all rests handled locally
-		for _, endpoint := range s.getRestEndpoints() {
-			if _, local := s.localRest[endpoint.name]; !local {
-				continue
-			}
-			t.Run(endpoint.name, func(t *testing.T) {
-				observerResp, observerErr := makeObserverCall(endpoint.method, endpoint.path, endpoint.body)
-				require.NoError(t, observerErr)
-				assert.Contains(t, [...]int{http.StatusNotFound, http.StatusOK}, observerResp.StatusCode)
-			})
-		}
-	})
-}
-
-func (s *ObserverIndexerEnabledSuite) getAccessClient() (accessproto.AccessAPIClient, error) {
-	return s.getClient(s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCPort))
-}
-
-func (s *ObserverIndexerEnabledSuite) getObserverClient() (accessproto.AccessAPIClient, error) {
-	return s.getClient(s.net.ContainerByName("observer_1").Addr(testnet.GRPCPort))
-}
-
-func (s *ObserverIndexerEnabledSuite) getClient(address string) (accessproto.AccessAPIClient, error) {
-	// helper func to create an access client
-	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return nil, err
-	}
-
-	client := accessproto.NewAccessAPIClient(conn)
-	return client, nil
 }
 
 func (s *ObserverIndexerEnabledSuite) getRPCs() []RPCTest {
@@ -370,14 +239,6 @@ func (s *ObserverIndexerEnabledSuite) getRPCs() []RPCTest {
 		}},
 		{name: "ExecuteScriptAtBlockHeight", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
 			_, err := client.ExecuteScriptAtBlockHeight(ctx, &accessproto.ExecuteScriptAtBlockHeightRequest{})
-			return err
-		}},
-		{name: "GetEventsForHeightRange", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetEventsForHeightRange(ctx, &accessproto.GetEventsForHeightRangeRequest{})
-			return err
-		}},
-		{name: "GetEventsForBlockIDs", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetEventsForBlockIDs(ctx, &accessproto.GetEventsForBlockIDsRequest{})
 			return err
 		}},
 		{name: "GetNetworkParameters", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {

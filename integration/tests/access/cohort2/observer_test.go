@@ -32,10 +32,12 @@ func TestObserver(t *testing.T) {
 
 type ObserverSuite struct {
 	suite.Suite
-	net       *testnet.FlowNetwork
-	teardown  func()
-	localRpc  map[string]struct{}
-	localRest map[string]struct{}
+	net                 *testnet.FlowNetwork
+	teardown            func()
+	localRpc            map[string]struct{}
+	localRest           map[string]struct{}
+	testedRPCs          func() []RPCTest
+	testedRestEndpoints func() []RestEndpointTest
 
 	cancel context.CancelFunc
 }
@@ -71,6 +73,9 @@ func (s *ObserverSuite) SetupTest() {
 		"getNetworkParameters": {},
 		"getNodeVersionInfo":   {},
 	}
+
+	s.testedRPCs = s.getRPCs
+	s.testedRestEndpoints = s.getRestEndpoints
 
 	nodeConfigs := []testnet.NodeConfig{
 		// access node with unstaked nodes supported
@@ -127,7 +132,7 @@ func (s *ObserverSuite) TestObserverRPC() {
 
 	t.Run("CompareRPCs", func(t *testing.T) {
 		// verify that both clients return the same errors for proxied rpcs
-		for _, rpc := range s.getRPCs() {
+		for _, rpc := range s.testedRPCs() {
 			// skip rpcs handled locally by observer
 			if _, local := s.localRpc[rpc.name]; local {
 				continue
@@ -146,7 +151,7 @@ func (s *ObserverSuite) TestObserverRPC() {
 
 	t.Run("HandledByUpstream", func(t *testing.T) {
 		// verify that we receive Unavailable errors from all rpcs handled upstream
-		for _, rpc := range s.getRPCs() {
+		for _, rpc := range s.testedRPCs() {
 			if _, local := s.localRpc[rpc.name]; local {
 				continue
 			}
@@ -159,7 +164,7 @@ func (s *ObserverSuite) TestObserverRPC() {
 
 	t.Run("HandledByObserver", func(t *testing.T) {
 		// verify that we receive NotFound or no error from all rpcs handled locally
-		for _, rpc := range s.getRPCs() {
+		for _, rpc := range s.testedRPCs() {
 			if _, local := s.localRpc[rpc.name]; !local {
 				continue
 			}
@@ -204,7 +209,7 @@ func (s *ObserverSuite) TestObserverRest() {
 
 	t.Run("CompareEndpoints", func(t *testing.T) {
 		// verify that both clients return the same errors for proxied rests
-		for _, endpoint := range s.getRestEndpoints() {
+		for _, endpoint := range s.testedRestEndpoints() {
 			// skip rest handled locally by observer
 			if _, local := s.localRest[endpoint.name]; local {
 				continue
@@ -230,7 +235,7 @@ func (s *ObserverSuite) TestObserverRest() {
 
 	t.Run("HandledByUpstream", func(t *testing.T) {
 		// verify that we receive StatusServiceUnavailable errors from all rests handled upstream
-		for _, endpoint := range s.getRestEndpoints() {
+		for _, endpoint := range s.testedRestEndpoints() {
 			if _, local := s.localRest[endpoint.name]; local {
 				continue
 			}
@@ -245,7 +250,7 @@ func (s *ObserverSuite) TestObserverRest() {
 
 	t.Run("HandledByObserver", func(t *testing.T) {
 		// verify that we receive NotFound or no error from all rests handled locally
-		for _, endpoint := range s.getRestEndpoints() {
+		for _, endpoint := range s.testedRestEndpoints() {
 			if _, local := s.localRest[endpoint.name]; !local {
 				continue
 			}

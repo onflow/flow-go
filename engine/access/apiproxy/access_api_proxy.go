@@ -227,7 +227,7 @@ func (h *FlowAccessAPIRouter) ExecuteScriptAtBlockHeight(context context.Context
 func (h *FlowAccessAPIRouter) GetEventsForHeightRange(context context.Context, req *access.GetEventsForHeightRangeRequest) (*access.EventsResponse, error) {
 	if h.useIndex {
 		res, err := h.local.GetEventsForHeightRange(context, req)
-		h.log("local", "GetTransactionResult", err)
+		h.log("local", "GetEventsForHeightRange", err)
 		return res, err
 	}
 
@@ -239,7 +239,7 @@ func (h *FlowAccessAPIRouter) GetEventsForHeightRange(context context.Context, r
 func (h *FlowAccessAPIRouter) GetEventsForBlockIDs(context context.Context, req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
 	if h.useIndex {
 		res, err := h.local.GetEventsForBlockIDs(context, req)
-		h.log("local", "GetTransactionResult", err)
+		h.log("local", "GetEventsForBlockIDs", err)
 		return res, err
 	}
 
