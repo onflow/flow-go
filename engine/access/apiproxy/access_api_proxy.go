@@ -132,12 +132,7 @@ func (h *FlowAccessAPIRouter) GetTransaction(context context.Context, req *acces
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResult(context context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
-	//if h.useIndex {
-	//	// TODO: add implementation for tx errors
-	//	res, err := h.local.GetTransactionResult(context, req)
-	//	h.log("local", "GetTransactionResult", err)
-	//	return res, err
-	//}
+	//TODO: add implementation for transaction error message before adding local impl
 
 	res, err := h.upstream.GetTransactionResult(context, req)
 	h.log("upstream", "GetTransactionResult", err)
@@ -145,12 +140,7 @@ func (h *FlowAccessAPIRouter) GetTransactionResult(context context.Context, req 
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResultsByBlockID(context context.Context, req *access.GetTransactionsByBlockIDRequest) (*access.TransactionResultsResponse, error) {
-	//if h.useIndex {
-	//	// TODO: add implementation for tx errors
-	//	res, err := h.local.GetTransactionResultsByBlockID(context, req)
-	//	h.log("local", "GetTransactionResult", err)
-	//	return res, err
-	//}
+	//TODO: add implementation for transaction error message before adding local impl
 
 	res, err := h.upstream.GetTransactionResultsByBlockID(context, req)
 	h.log("upstream", "GetTransactionResultsByBlockID", err)
@@ -164,12 +154,7 @@ func (h *FlowAccessAPIRouter) GetTransactionsByBlockID(context context.Context, 
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResultByIndex(context context.Context, req *access.GetTransactionByIndexRequest) (*access.TransactionResultResponse, error) {
-	//if h.useIndex {
-	//	// TODO: add implementation for tx errors
-	//	res, err := h.local.GetTransactionResultByIndex(context, req)
-	//	h.log("local", "GetTransactionResult", err)
-	//	return res, err
-	//}
+	//TODO: add implementation for transaction error message before adding local impl
 
 	res, err := h.upstream.GetTransactionResultByIndex(context, req)
 	h.log("upstream", "GetTransactionResultByIndex", err)
