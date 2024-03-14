@@ -48,8 +48,7 @@ type TransactionSubscriptionMetadata struct {
 
 // SubscribeTransactionStatuses subscribes to transaction status changes starting from the transaction reference block ID.
 // Expected errors:
-// - storage.ErrNotFound if a block referenced by the transaction does not exist.
-// - All other errors are potential symptoms of bugs or state corruption.
+// If invalid tx parameters will be supplied SubscribeTransactionStatuses will return a failed subscription.
 func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody) subscription.Subscription {
 	nextHeight, err := b.blockTracker.GetStartHeightFromBlockID(tx.ReferenceBlockID)
 	if err != nil {
@@ -138,7 +137,7 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *Tran
 // searchForTransactionBlock searches for the block containing the specified transaction.
 // It retrieves the block at the given height and checks if the transaction is included in that block.
 // Expected errors:
-// - codes.Internal if an internal error occurs while retrieving or processing the block.
+// - codes.Internal when unable to retrieve the block or collection ID
 func (b *backendSubscribeTransactions) searchForTransactionBlock(
 	height uint64,
 	txInfo *TransactionSubscriptionMetadata,

@@ -1111,30 +1111,19 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 	}
 
 	sub := h.api.SubscribeTransactionStatuses(stream.Context(), &tx)
-	for {
-		v, ok := <-sub.Channel()
-		if !ok {
-			if sub.Err() != nil {
-				return rpc.ConvertError(sub.Err(), "stream encountered an error", codes.Internal)
-			}
-			return nil
-		}
 
-		txSubInfo, ok := v.(*convert.TransactionSubscribeInfo)
-		if !ok {
-			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
-		}
-
+	return subscription.HandleSubscription(sub, func(txSubInfo *convert.TransactionSubscribeInfo) error {
 		err = stream.Send(convert.TransactionSubscribeInfoToMessage(txSubInfo))
-
 		if err != nil {
 			return rpc.ConvertError(err, "could not send response", codes.Internal)
 		}
 
 		if txSubInfo.Status == flow.TransactionStatusSealed || txSubInfo.Status == flow.TransactionStatusExpired {
-			return nil
+			sub.Close()
 		}
-	}
+
+		return nil
+	})
 }
 
 func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flow.BlockStatus) (*access.BlockResponse, error) {
