@@ -4,10 +4,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
 )
