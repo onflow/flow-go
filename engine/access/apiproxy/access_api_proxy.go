@@ -237,7 +237,6 @@ func (h *FlowAccessAPIRouter) GetEventsForHeightRange(context context.Context, r
 }
 
 func (h *FlowAccessAPIRouter) GetEventsForBlockIDs(context context.Context, req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
-
 	if h.useIndex {
 		res, err := h.local.GetEventsForBlockIDs(context, req)
 		h.log("local", "GetTransactionResult", err)
