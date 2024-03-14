@@ -380,6 +380,7 @@ func WithEVMEnabled(enabled bool) Option {
 	}
 }
 
+// WithAllowProgramCacheWritesInScriptsEnabled enables caching of programs accessed by scripts
 func WithAllowProgramCacheWritesInScriptsEnabled(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.AllowProgramCacheWritesInScripts = enabled
