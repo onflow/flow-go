@@ -78,7 +78,7 @@ func GetSimpleValueStore() *TestValueStore {
 			bytesRead += len(fk) + len(value)
 			return len(value) > 0, nil
 		},
-		AllocateStorageIndexFunc: func(owner []byte) (atree.StorageIndex, error) {
+		AllocateStorageIndexFunc: func(owner []byte) (atree.SlabIndex, error) {
 			index := allocator[string(owner)]
 			// TODO: figure out why it result in a collision
 			if index == 0 {
@@ -89,7 +89,7 @@ func GetSimpleValueStore() *TestValueStore {
 			binary.BigEndian.PutUint64(data[:], index)
 			bytesRead += len(owner) + 8
 			bytesWritten += len(owner) + 8
-			return atree.StorageIndex(data), nil
+			return atree.SlabIndex(data), nil
 		},
 		TotalStorageSizeFunc: func() int {
 			size := 0
@@ -191,7 +191,7 @@ type TestValueStore struct {
 	GetValueFunc             func(owner, key []byte) ([]byte, error)
 	SetValueFunc             func(owner, key, value []byte) error
 	ValueExistsFunc          func(owner, key []byte) (bool, error)
-	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
+	AllocateStorageIndexFunc func(owner []byte) (atree.SlabIndex, error)
 	TotalStorageSizeFunc     func() int
 	TotalBytesReadFunc       func() int
 	TotalBytesWrittenFunc    func() int
@@ -222,7 +222,7 @@ func (vs *TestValueStore) ValueExists(owner, key []byte) (bool, error) {
 	return vs.ValueExistsFunc(owner, key)
 }
 
-func (vs *TestValueStore) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
+func (vs *TestValueStore) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
 	if vs.AllocateStorageIndexFunc == nil {
 		panic("method not set")
 	}
