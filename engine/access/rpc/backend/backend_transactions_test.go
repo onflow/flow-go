@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	acc "github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/index"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -460,7 +461,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 	params.ConnFactory = connFactory
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 
-	params.TxResultsIndex = NewTransactionResultsIndex(suite.transactionResults)
+	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
 	err := params.TxResultsIndex.Initialize(reporter)
 	suite.Require().NoError(err)
 
@@ -510,7 +511,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_UnknownTransaction(
 
 	params := suite.defaultBackendParams()
 
-	params.TxResultsIndex = NewTransactionResultsIndex(suite.transactionResults)
+	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
 	err := params.TxResultsIndex.Initialize(reporter)
 	suite.Require().NoError(err)
 
@@ -559,7 +560,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_FailedToFetch() {
 	params.ConnFactory = connFactory
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 
-	params.TxResultsIndex = NewTransactionResultsIndex(suite.transactionResults)
+	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
 	err := params.TxResultsIndex.Initialize(reporter)
 	suite.Require().NoError(err)
 
@@ -616,7 +617,7 @@ func (suite *Suite) TestLookupTransactionErrorMessages_HappyPath() {
 	params.ConnFactory = connFactory
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 
-	params.TxResultsIndex = NewTransactionResultsIndex(suite.transactionResults)
+	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
 	err := params.TxResultsIndex.Initialize(reporter)
 	suite.Require().NoError(err)
 
@@ -696,7 +697,7 @@ func (suite *Suite) TestLookupTransactionErrorMessages_HappyPath_NoFailedTxns() 
 
 	params := suite.defaultBackendParams()
 
-	params.TxResultsIndex = NewTransactionResultsIndex(suite.transactionResults)
+	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
 	err := params.TxResultsIndex.Initialize(reporter)
 	suite.Require().NoError(err)
 
@@ -725,7 +726,7 @@ func (suite *Suite) TestLookupTransactionErrorMessages_UnknownTransaction() {
 
 	params := suite.defaultBackendParams()
 
-	params.TxResultsIndex = NewTransactionResultsIndex(suite.transactionResults)
+	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
 	err := params.TxResultsIndex.Initialize(reporter)
 	suite.Require().NoError(err)
 
@@ -780,7 +781,7 @@ func (suite *Suite) TestLookupTransactionErrorMessages_FailedToFetch() {
 	params.ConnFactory = connFactory
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 
-	params.TxResultsIndex = NewTransactionResultsIndex(suite.transactionResults)
+	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
 	err := params.TxResultsIndex.Initialize(reporter)
 	suite.Require().NoError(err)
 
@@ -1032,12 +1033,15 @@ func (suite *Suite) assertTransactionResultResponse(
 	txFailed bool,
 	eventsForTx []flow.Event,
 ) {
-
 	suite.Require().NoError(err)
 	suite.Assert().Equal(block.ID(), response.BlockID)
 	suite.Assert().Equal(block.Header.Height, response.BlockHeight)
 	suite.Assert().Equal(txId, response.TransactionID)
-	suite.Assert().Equal(block.Payload.Guarantees[0].CollectionID, response.CollectionID)
+	if txId == suite.systemTx.ID() {
+		suite.Assert().Equal(flow.ZeroID, response.CollectionID)
+	} else {
+		suite.Assert().Equal(block.Payload.Guarantees[0].CollectionID, response.CollectionID)
+	}
 	suite.Assert().Equal(len(eventsForTx), len(response.Events))
 	// When there are error messages occurred in the transaction, the status should be 1
 	if txFailed {
@@ -1116,11 +1120,11 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 	params.TxResultQueryMode = IndexQueryModeLocalOnly
 
-	params.EventsIndex = NewEventsIndex(suite.events)
+	params.EventsIndex = index.NewEventsIndex(suite.events)
 	err := params.EventsIndex.Initialize(reporter)
 	suite.Require().NoError(err)
 
-	params.TxResultsIndex = NewTransactionResultsIndex(suite.transactionResults)
+	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
 	err = params.TxResultsIndex.Initialize(reporter)
 	suite.Require().NoError(err)
 
@@ -1208,11 +1212,11 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 	params.TxResultQueryMode = IndexQueryModeLocalOnly
 
-	params.EventsIndex = NewEventsIndex(suite.events)
+	params.EventsIndex = index.NewEventsIndex(suite.events)
 	err := params.EventsIndex.Initialize(reporter)
 	suite.Require().NoError(err)
 
-	params.TxResultsIndex = NewTransactionResultsIndex(suite.transactionResults)
+	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
 	err = params.TxResultsIndex.Initialize(reporter)
 	suite.Require().NoError(err)
 
@@ -1254,13 +1258,19 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	suite.collections.On("LightByID", mock.Anything).Return(&lightCol, nil)
 
 	lightTxResults := make([]flow.LightTransactionResult, len(lightCol.Transactions))
-	for i, txId := range lightCol.Transactions {
+	for i, txID := range lightCol.Transactions {
 		lightTxResults[i] = flow.LightTransactionResult{
-			TransactionID:   txId,
+			TransactionID:   txID,
 			Failed:          false,
 			ComputationUsed: 0,
 		}
 	}
+	// simulate the system tx
+	lightTxResults = append(lightTxResults, flow.LightTransactionResult{
+		TransactionID:   suite.systemTx.ID(),
+		Failed:          false,
+		ComputationUsed: 10,
+	})
 
 	// Mark the first transaction as failed
 	lightTxResults[0].Failed = true
@@ -1299,11 +1309,11 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	params.ConnFactory = connFactory
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 
-	params.EventsIndex = NewEventsIndex(suite.events)
+	params.EventsIndex = index.NewEventsIndex(suite.events)
 	err := params.EventsIndex.Initialize(reporter)
 	suite.Require().NoError(err)
 
-	params.TxResultsIndex = NewTransactionResultsIndex(suite.transactionResults)
+	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
 	err = params.TxResultsIndex.Initialize(reporter)
 	suite.Require().NoError(err)
 

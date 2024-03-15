@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -18,25 +19,25 @@ type EventsBackend struct {
 	responseLimit  float64
 	sendBufferSize int
 
-	getStartHeight  GetStartHeightFunc
+	getStartHeight  subscription.GetStartHeightFunc
 	eventsRetriever EventsRetriever
 }
 
-func (b *EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) state_stream.Subscription {
-	nextHeight, err := b.getStartHeight(startBlockID, startHeight)
+func (b *EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
+	nextHeight, err := b.getStartHeight(ctx, startBlockID, startHeight)
 	if err != nil {
-		return NewFailedSubscription(err, "could not get start height")
+		return subscription.NewFailedSubscription(err, "could not get start height")
 	}
 
-	sub := NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getResponseFactory(filter))
+	sub := subscription.NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getResponseFactory(filter))
 
-	go NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
+	go subscription.NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
 
 	return sub
 }
 
 // getResponseFactory returns a function that returns the event response for a given height.
-func (b *EventsBackend) getResponseFactory(filter state_stream.EventFilter) GetDataByHeightFunc {
+func (b *EventsBackend) getResponseFactory(filter state_stream.EventFilter) subscription.GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (response interface{}, err error) {
 		eventsResponse, err := b.eventsRetriever.GetAllEventsResponse(ctx, height)
 		if err != nil {

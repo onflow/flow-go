@@ -34,7 +34,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -175,12 +177,12 @@ func (s *BackendAccountStatusesSuite) SetupTest() {
 
 	s.broadcaster = engine.NewBroadcaster()
 
-	s.execDataHeroCache = herocache.NewBlockExecutionData(state_stream.DefaultCacheSize, logger, metrics.NewNoopCollector())
+	s.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metrics.NewNoopCollector())
 	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
 
 	conf := Config{
-		ClientSendTimeout:       state_stream.DefaultSendTimeout,
-		ClientSendBufferSize:    state_stream.DefaultSendBufferSize,
+		ClientSendTimeout:       subscription.DefaultSendTimeout,
+		ClientSendBufferSize:    subscription.DefaultSendBufferSize,
 		RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
 	}
 
@@ -235,7 +237,7 @@ func (s *BackendAccountStatusesSuite) SetupTest() {
 
 	s.registerID = unittest.RegisterIDFixture()
 
-	s.eventsIndex = backend.NewEventsIndex(s.events)
+	s.eventsIndex = index.NewEventsIndex(s.events)
 	s.registersAsync = execution.NewRegistersAsyncStore()
 	s.registers = storagemock.NewRegisterIndex(s.T())
 	err = s.registersAsync.Initialize(s.registers)
@@ -478,7 +480,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatuses() {
 	}
 }
 
-// TestSubscribeAccountStatusesHandlesErrors tests handling of expected errors in the SubscribeAccountStatuses.
+// TestSubscribeAccountStatusesHandlesErrors tests handling o f expected errors in the SubscribeAccountStatuses.
 func (s *BackendExecutionDataSuite) TestSubscribeAccountStatusesHandlesErrors() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 
+	"github.com/onflow/flow-go/engine/access/index"
 	access "github.com/onflow/flow-go/engine/access/mock"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -47,7 +48,7 @@ type BackendEventsSuite struct {
 	params     *protocol.Params
 	rootHeader *flow.Header
 
-	eventsIndex       *EventsIndex
+	eventsIndex       *index.EventsIndex
 	events            *storagemock.Events
 	headers           *storagemock.Headers
 	receipts          *storagemock.ExecutionReceipts
@@ -83,7 +84,7 @@ func (s *BackendEventsSuite) SetupTest() {
 
 	s.execClient = access.NewExecutionAPIClient(s.T())
 	s.executionNodes = unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-	s.eventsIndex = NewEventsIndex(s.events)
+	s.eventsIndex = index.NewEventsIndex(s.events)
 
 	blockCount := 5
 	s.blocks = make([]*flow.Block, blockCount)
@@ -309,7 +310,7 @@ func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
 
 		s.Run(fmt.Sprintf("all from en - %s - %s", tt.encoding.String(), tt.queryMode), func() {
 			events := storagemock.NewEvents(s.T())
-			eventsIndex := NewEventsIndex(events)
+			eventsIndex := index.NewEventsIndex(events)
 
 			switch tt.queryMode {
 			case IndexQueryModeLocalOnly:
@@ -339,7 +340,7 @@ func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
 
 		s.Run(fmt.Sprintf("mixed storage & en - %s - %s", tt.encoding.String(), tt.queryMode), func() {
 			events := storagemock.NewEvents(s.T())
-			eventsIndex := NewEventsIndex(events)
+			eventsIndex := index.NewEventsIndex(events)
 
 			switch tt.queryMode {
 			case IndexQueryModeLocalOnly, IndexQueryModeExecutionNodesOnly:

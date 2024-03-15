@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 )
@@ -30,7 +31,7 @@ type AccountStatusesBackend struct {
 	responseLimit  float64
 	sendBufferSize int
 
-	getStartHeight  GetStartHeightFunc
+	getStartHeight  subscription.GetStartHeightFunc
 	eventsRetriever EventsRetriever
 }
 
@@ -41,14 +42,14 @@ type AccountStatusesBackend struct {
 // - codes.ErrNotFound`: For unindexed start blockID or for unindexed start height.
 // - codes.Internal: If there is an internal error.
 func (b *AccountStatusesBackend) SubscribeAccountStatuses(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) state_stream.Subscription {
-	nextHeight, err := b.getStartHeight(startBlockID, startHeight)
+	nextHeight, err := b.getStartHeight(ctx, startBlockID, startHeight)
 	if err != nil {
-		return NewFailedSubscription(err, "could not get start height")
+		return subscription.NewFailedSubscription(err, "could not get start height")
 	}
 
 	messageIndex := counters.NewMonotonousCounter(0)
-	sub := NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getAccountStatusResponseFactory(&messageIndex, filter))
-	go NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
+	sub := subscription.NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getAccountStatusResponseFactory(&messageIndex, filter))
+	go subscription.NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
 
 	return sub
 }

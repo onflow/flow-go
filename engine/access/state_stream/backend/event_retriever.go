@@ -6,7 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	rpcbackend "github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -22,7 +22,7 @@ type EventsRetriever struct {
 	log              zerolog.Logger
 	headers          storage.Headers
 	getExecutionData GetExecutionDataFunc
-	eventsIndex      *rpcbackend.EventsIndex
+	eventsIndex      *index.EventsIndex
 	useEventsIndex   bool
 }
 
