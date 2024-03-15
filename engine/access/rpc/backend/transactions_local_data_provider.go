@@ -390,7 +390,7 @@ func (t *TransactionsLocalDataProvider) LookupCollectionIDInBlock(
 	for _, guarantee := range block.Payload.Guarantees {
 		collection, err := t.collections.LightByID(guarantee.ID())
 		if err != nil {
-			return flow.ZeroID, err
+			return flow.ZeroID, fmt.Errorf("failed to get collection %s in indexed block: %w", guarantee.ID(), err)
 		}
 
 		for _, collectionTxID := range collection.Transactions {

@@ -2,6 +2,8 @@ package cohort1
 
 import (
 	"context"
+	"github.com/onflow/flow-go-sdk/templates"
+	"github.com/onflow/flow-go-sdk/test"
 	"io"
 	"testing"
 	"time"
@@ -10,9 +12,6 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go-sdk/templates"
 
 	"github.com/onflow/flow-go/integration/tests/mvp"
 
@@ -200,63 +199,36 @@ func (s *AccessAPISuite) TestMVPScriptExecutionLocalStorage() {
 	mvp.RunMVPTest(s.T(), s.ctx, s.net, s.accessNode2)
 }
 
-func (s *AccessAPISuite) getAccessClient() (accessproto.AccessAPIClient, error) {
-	return s.getClient(s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCPort))
-}
-
-func (s *AccessAPISuite) getClient(address string) (accessproto.AccessAPIClient, error) {
-	// helper func to create an access client
-	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return nil, err
-	}
-
-	return accessproto.NewAccessAPIClient(conn), nil
-}
-
 func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
-	accessClient, err := s.getAccessClient()
+	accessNodeContainer := s.net.ContainerByName(testnet.PrimaryAN)
+
+	conn, err := grpc.Dial(accessNodeContainer.Addr(testnet.GRPCPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	s.Require().NoError(err)
-	s.Require().NotNil(accessClient)
+	s.Require().NotNil(conn)
 
-	blockHeader, err := accessClient.GetLatestBlockHeader(s.ctx, &accessproto.GetLatestBlockHeaderRequest{IsSealed: true})
+	accessClient := accessproto.NewAccessAPIClient(conn)
+	serviceClient, err := accessNodeContainer.TestnetClient()
 	s.Require().NoError(err)
-	s.Require().NotNil(blockHeader)
+	s.Require().NotNil(serviceClient)
 
-	latestBlockID := blockHeader.GetBlock().GetId()
-
-	// Create a new account to deploy Counter to
-	accountPrivateKey := lib.RandomPrivateKey()
-	accountKey := sdk.NewAccountKey().
-		FromPrivateKey(accountPrivateKey).
-		SetHashAlgo(sdkcrypto.SHA3_256).
-		SetWeight(sdk.AccountKeyWeightThreshold)
-
-	serviceAddress := sdk.Address(s.serviceClient.Chain.ServiceAddress())
-
-	// Generate the account creation transaction
-	createAccountTx, err := templates.CreateAccount(
-		[]*sdk.AccountKey{accountKey},
-		[]templates.Contract{
-			{
-				Name:   lib.CounterContract.Name,
-				Source: lib.CounterContract.ToCadence(),
-			},
-		}, serviceAddress)
+	latestBlockID, err := serviceClient.GetLatestBlockID(s.ctx)
 	s.Require().NoError(err)
 
-	createAccountTx.
-		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
-		SetProposalKey(serviceAddress, 0, s.serviceClient.GetSeqNumber()).
-		SetPayer(serviceAddress).
-		SetComputeLimit(9999)
+	accountKey := test.AccountKeyGenerator().New()
+	payer := serviceClient.SDKServiceAddress()
 
-	// Sign the transaction
-	signedTx, err := s.serviceClient.SignTransaction(createAccountTx)
+	tx, err := templates.CreateAccount([]*sdk.AccountKey{accountKey}, nil, payer)
+	s.Require().NoError(err)
+	tx.SetComputeLimit(1000).
+		SetReferenceBlockID(sdk.HexToID(latestBlockID.String())).
+		SetProposalKey(payer, 0, serviceClient.GetSeqNumber()).
+		SetPayer(payer)
+
+	tx, err = serviceClient.SignTransaction(tx)
 	s.Require().NoError(err)
 
-	authorizers := make([][]byte, len(signedTx.Authorizers))
-	for i, auth := range signedTx.Authorizers {
+	authorizers := make([][]byte, len(tx.Authorizers))
+	for i, auth := range tx.Authorizers {
 		authorizers[i] = auth.Bytes()
 	}
 
@@ -273,35 +245,39 @@ func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
 		return msgSigs
 	}
 
-	subClient, err := accessClient.SendAndSubscribeTransactionStatuses(s.ctx, &accessproto.SendAndSubscribeTransactionStatusesRequest{
-		Transaction: &entities.Transaction{
-			Script:           signedTx.Script,
-			Arguments:        signedTx.Arguments,
-			ReferenceBlockId: signedTx.ReferenceBlockID.Bytes(),
-			GasLimit:         signedTx.GasLimit,
-			ProposalKey: &entities.Transaction_ProposalKey{
-				Address:        signedTx.ProposalKey.Address.Bytes(),
-				KeyId:          uint32(signedTx.ProposalKey.KeyIndex),
-				SequenceNumber: signedTx.ProposalKey.SequenceNumber,
-			},
-			Payer:              signedTx.Payer.Bytes(),
-			Authorizers:        authorizers,
-			PayloadSignatures:  convertToMessageSig(signedTx.PayloadSignatures),
-			EnvelopeSignatures: convertToMessageSig(signedTx.EnvelopeSignatures),
+	transactionMsg := &entities.Transaction{
+		Script:           tx.Script,
+		Arguments:        tx.Arguments,
+		ReferenceBlockId: tx.ReferenceBlockID.Bytes(),
+		GasLimit:         tx.GasLimit,
+		ProposalKey: &entities.Transaction_ProposalKey{
+			Address:        tx.ProposalKey.Address.Bytes(),
+			KeyId:          uint32(tx.ProposalKey.KeyIndex),
+			SequenceNumber: tx.ProposalKey.SequenceNumber,
 		},
+		Payer:              tx.Payer.Bytes(),
+		Authorizers:        authorizers,
+		PayloadSignatures:  convertToMessageSig(tx.PayloadSignatures),
+		EnvelopeSignatures: convertToMessageSig(tx.EnvelopeSignatures),
+	}
+
+	subClient, err := accessClient.SendAndSubscribeTransactionStatuses(s.ctx, &accessproto.SendAndSubscribeTransactionStatusesRequest{
+		Transaction: transactionMsg,
 	})
 	s.Require().NoError(err)
 
 	for {
 		resp, err := subClient.Recv()
-		if err == io.EOF {
-			break
-		}
 		if err != nil {
+			if err == io.EOF {
+				return
+			}
+
+			s.log.Info().Msgf("####**** %s", err.Error())
 			break
 		}
 
-		s.log.Info().Msgf("!!!! %s %d %s", resp.Status.String(), resp.GetMessageIndex(), string(resp.GetId()))
+		s.log.Info().Msgf("!!!! %s %d %s", resp.Status.String(), resp.GetMessageIndex(), sdk.Identifier(resp.GetId()).Hex())
 	}
 }
 
