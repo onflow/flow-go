@@ -103,10 +103,10 @@ type BootstrapNodeInfo struct {
 	NetworkPublicKey crypto.PublicKey // the network public key of the bootstrap peer
 }
 
-func bootstrapIdentities(bootstrapNodes []BootstrapNodeInfo) flow.IdentityList {
-	ids := make(flow.IdentityList, len(bootstrapNodes))
+func bootstrapIdentities(bootstrapNodes []BootstrapNodeInfo) flow.IdentitySkeletonList {
+	ids := make(flow.IdentitySkeletonList, len(bootstrapNodes))
 	for i, b := range bootstrapNodes {
-		ids[i] = &flow.Identity{
+		ids[i] = &flow.IdentitySkeleton{
 			Role:          flow.RoleAccess,
 			NetworkPubKey: b.NetworkPublicKey,
 			Address:       fmt.Sprintf("%s:%d", b.Host, b.Port),

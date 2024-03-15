@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
@@ -50,6 +51,7 @@ type BackendExecutionDataSuite struct {
 	results        *storagemock.ExecutionResults
 	registers      *storagemock.RegisterIndex
 	registersAsync *execution.RegistersAsyncStore
+	eventsIndex    *backend.EventsIndex
 
 	bs                blobs.Blobstore
 	eds               execution_data.ExecutionDataStore
@@ -156,9 +158,10 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 	s.registerID = unittest.RegisterIDFixture()
 
+	s.eventsIndex = backend.NewEventsIndex(s.events)
 	s.registersAsync = execution.NewRegistersAsyncStore()
 	s.registers = storagemock.NewRegisterIndex(s.T())
-	err = s.registersAsync.InitDataAvailable(s.registers)
+	err = s.registersAsync.Initialize(s.registers)
 	require.NoError(s.T(), err)
 	s.registers.On("LatestHeight").Return(rootBlock.Header.Height).Maybe()
 	s.registers.On("FirstHeight").Return(rootBlock.Header.Height).Maybe()
@@ -211,7 +214,6 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		conf,
 		s.state,
 		s.headers,
-		s.events,
 		s.seals,
 		s.results,
 		s.eds,
@@ -220,6 +222,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		rootBlock.Header.Height,
 		rootBlock.Header.Height, // initialize with no downloaded data
 		s.registersAsync,
+		s.eventsIndex,
 		false,
 	)
 	require.NoError(s.T(), err)
@@ -409,18 +412,21 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 	})
 
 	s.Run("returns error if block height is out of range", func() {
-		_, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.backend.rootBlockHeight+1)
+		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.backend.rootBlockHeight+1)
+		require.Nil(s.T(), res)
 		require.Equal(s.T(), codes.OutOfRange, status.Code(err))
 	})
 
 	s.Run("returns error if register path is not indexed", func() {
 		falseID := flow.RegisterIDs{flow.RegisterID{Owner: "ha", Key: "ha"}}
-		_, err := s.backend.GetRegisterValues(falseID, s.backend.rootBlockHeight)
+		res, err := s.backend.GetRegisterValues(falseID, s.backend.rootBlockHeight)
+		require.Nil(s.T(), res)
 		require.Equal(s.T(), codes.NotFound, status.Code(err))
 	})
 
 	s.Run("returns error if too many registers are requested", func() {
-		_, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.registerRequestLimit+1), s.backend.rootBlockHeight)
+		res, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.registerRequestLimit+1), s.backend.rootBlockHeight)
+		require.Nil(s.T(), res)
 		require.Equal(s.T(), codes.InvalidArgument, status.Code(err))
 	})
 }

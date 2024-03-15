@@ -108,7 +108,7 @@ func (pt *happyPathBlockTime) TargetPublicationTime(proposalView uint64, timeVie
 	return pt.TimeObserved.Add(pt.ConstrainedBlockTime()) // happy path
 }
 
-/* *************************************** fallbackTiming for EECC *************************************** */
+/* *************************************** fallbackTiming for EFM *************************************** */
 
 // fallbackTiming implements ProposalTiming, for the basic fallback:
 // function `TargetPublicationTime(..)` always returns `timeViewEntered + defaultProposalDuration`

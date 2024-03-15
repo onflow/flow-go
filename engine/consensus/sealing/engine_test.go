@@ -1,5 +1,3 @@
-// (c) 2021 Dapper Labs - ALL RIGHTS RESERVED
-
 package sealing
 
 import (

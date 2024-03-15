@@ -902,7 +902,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	// ejected identity
 	ejectedIdentityPeerID := unittest.PeerIdFixture(t)
 	ejectedIdentity := unittest.IdentityFixture()
-	ejectedIdentity.Ejected = true
+	ejectedIdentity.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 
 	// invalid messages this should force a notification to disseminate
 	invalidPublishMsgs := []*pb.Message{

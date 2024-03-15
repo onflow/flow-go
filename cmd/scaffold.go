@@ -755,10 +755,7 @@ func (fnb *FlowNodeBuilder) initMetrics() error {
 		// metrics enabled, report node info metrics as post init event
 		fnb.PostInit(func(nodeConfig *NodeConfig) error {
 			nodeInfoMetrics := metrics.NewNodeInfoCollector()
-			protocolVersion, err := fnb.RootSnapshot.Params().ProtocolVersion()
-			if err != nil {
-				return fmt.Errorf("could not query root snapshoot protocol version: %w", err)
-			}
+			protocolVersion := fnb.RootSnapshot.Params().ProtocolVersion()
 			nodeInfoMetrics.NodeInfo(build.Version(), build.Commit(), nodeConfig.SporkID.String(), protocolVersion)
 			return nil
 		})
@@ -1006,8 +1003,9 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	collections := bstorage.NewCollections(fnb.DB, transactions)
 	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
 	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
-	statuses := bstorage.NewEpochStatuses(fnb.Metrics.Cache, fnb.DB)
 	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
+	protocolState := bstorage.NewProtocolState(fnb.Metrics.Cache, setups, epochCommits, fnb.DB,
+		bstorage.DefaultProtocolStateCacheSize, bstorage.DefaultProtocolStateByBlockIDCacheSize)
 	versionBeacons := bstorage.NewVersionBeacons(fnb.DB)
 
 	fnb.Storage = Storage{
@@ -1025,7 +1023,7 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		Setups:             setups,
 		EpochCommits:       epochCommits,
 		VersionBeacons:     versionBeacons,
-		Statuses:           statuses,
+		ProtocolState:      protocolState,
 		Commits:            commits,
 	}
 
@@ -1059,8 +1057,8 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(
 			filter.And(
-				filter.HasRole(flow.RoleConsensus),
-				filter.Not(filter.HasNodeID(node.Me.NodeID())),
+				filter.HasRole[flow.Identity](flow.RoleConsensus),
+				filter.Not(filter.HasNodeID[flow.Identity](node.Me.NodeID())),
 				underlay.NotEjectedFilter,
 			),
 			node.IdentityProvider,
@@ -1089,7 +1087,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.QuorumCertificates,
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
-			fnb.Storage.Statuses,
+			fnb.Storage.ProtocolState,
 			fnb.Storage.VersionBeacons,
 		)
 		if err != nil {
@@ -1098,11 +1096,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 		fnb.State = state
 
 		// set root snapshot field
-		rootBlock, err := state.Params().FinalizedRoot()
-		if err != nil {
-			return fmt.Errorf("could not get root block from protocol state: %w", err)
-		}
-
+		rootBlock := state.Params().FinalizedRoot()
 		rootSnapshot := state.AtBlockID(rootBlock.ID())
 		if err := fnb.setRootSnapshot(rootSnapshot); err != nil {
 			return err
@@ -1141,7 +1135,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.QuorumCertificates,
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
-			fnb.Storage.Statuses,
+			fnb.Storage.ProtocolState,
 			fnb.Storage.VersionBeacons,
 			fnb.RootSnapshot,
 			options...,
@@ -1230,10 +1224,7 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 	}
 
 	fnb.RootChainID = fnb.FinalizedRootBlock.Header.ChainID
-	fnb.SporkID, err = fnb.RootSnapshot.Params().SporkID()
-	if err != nil {
-		return fmt.Errorf("failed to read spork ID: %w", err)
-	}
+	fnb.SporkID = fnb.RootSnapshot.Params().SporkID()
 
 	return nil
 }
@@ -1257,11 +1248,7 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 	// We enforce this strictly for MainNet. For other networks (e.g. TestNet or BenchNet), we
 	// are lenient, to allow ghost node to run as any role.
 	if self.Role.String() != fnb.BaseConfig.NodeRole {
-		rootBlockHeader, err := fnb.State.Params().FinalizedRoot()
-		if err != nil {
-			return fmt.Errorf("could not get root block from protocol state: %w", err)
-		}
-
+		rootBlockHeader := fnb.State.Params().FinalizedRoot()
 		if rootBlockHeader.ChainID == flow.Mainnet {
 			return fmt.Errorf("running as incorrect role, expected: %v, actual: %v, exiting",
 				self.Role.String(),
@@ -1282,7 +1269,7 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 		return fmt.Errorf("configured staking key does not match protocol state")
 	}
 
-	fnb.Me, err = local.New(self, fnb.StakingKey)
+	fnb.Me, err = local.New(self.IdentitySkeleton, fnb.StakingKey)
 	if err != nil {
 		return fmt.Errorf("could not initialize local: %w", err)
 	}

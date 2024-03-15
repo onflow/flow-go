@@ -14,11 +14,11 @@ type Verifier struct {
 }
 
 // VerifyQC provides a mock function with given fields: signers, sigData, view, blockID
-func (_m *Verifier) VerifyQC(signers flow.IdentityList, sigData []byte, view uint64, blockID flow.Identifier) error {
+func (_m *Verifier) VerifyQC(signers flow.GenericIdentityList[flow.IdentitySkeleton], sigData []byte, view uint64, blockID flow.Identifier) error {
 	ret := _m.Called(signers, sigData, view, blockID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.IdentityList, []byte, uint64, flow.Identifier) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.GenericIdentityList[flow.IdentitySkeleton], []byte, uint64, flow.Identifier) error); ok {
 		r0 = rf(signers, sigData, view, blockID)
 	} else {
 		r0 = ret.Error(0)
@@ -28,11 +28,11 @@ func (_m *Verifier) VerifyQC(signers flow.IdentityList, sigData []byte, view uin
 }
 
 // VerifyTC provides a mock function with given fields: signers, sigData, view, highQCViews
-func (_m *Verifier) VerifyTC(signers flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64) error {
+func (_m *Verifier) VerifyTC(signers flow.GenericIdentityList[flow.IdentitySkeleton], sigData []byte, view uint64, highQCViews []uint64) error {
 	ret := _m.Called(signers, sigData, view, highQCViews)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.IdentityList, []byte, uint64, []uint64) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.GenericIdentityList[flow.IdentitySkeleton], []byte, uint64, []uint64) error); ok {
 		r0 = rf(signers, sigData, view, highQCViews)
 	} else {
 		r0 = ret.Error(0)
@@ -42,11 +42,11 @@ func (_m *Verifier) VerifyTC(signers flow.IdentityList, sigData []byte, view uin
 }
 
 // VerifyVote provides a mock function with given fields: voter, sigData, view, blockID
-func (_m *Verifier) VerifyVote(voter *flow.Identity, sigData []byte, view uint64, blockID flow.Identifier) error {
+func (_m *Verifier) VerifyVote(voter *flow.IdentitySkeleton, sigData []byte, view uint64, blockID flow.Identifier) error {
 	ret := _m.Called(voter, sigData, view, blockID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.Identity, []byte, uint64, flow.Identifier) error); ok {
+	if rf, ok := ret.Get(0).(func(*flow.IdentitySkeleton, []byte, uint64, flow.Identifier) error); ok {
 		r0 = rf(voter, sigData, view, blockID)
 	} else {
 		r0 = ret.Error(0)

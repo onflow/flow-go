@@ -25,12 +25,21 @@ func ConvertAddress(b [AddressLength]byte) Address {
 
 // HexToAddress converts a hex string to an Address.
 func HexToAddress(h string) Address {
+	addr, _ := StringToAddress(h)
+	return addr
+}
+
+// StringToAddress converts a string to an Address and return an error if the string is malformed
+func StringToAddress(h string) (Address, error) {
 	trimmed := strings.TrimPrefix(h, "0x")
 	if len(trimmed)%2 == 1 {
 		trimmed = "0" + trimmed
 	}
-	b, _ := hex.DecodeString(trimmed)
-	return BytesToAddress(b)
+	b, err := hex.DecodeString(trimmed)
+	if err != nil {
+		return EmptyAddress, fmt.Errorf("can not decode hex string (%v) to address: %w", h, err)
+	}
+	return BytesToAddress(b), nil
 }
 
 // BytesToAddress returns Address with value b.

@@ -108,35 +108,35 @@ func GenerateNodeInfos(consensus, collection, execution, verification, access in
 	// CONSENSUS = 1
 	consensusNodes := unittest.NodeInfosFixture(consensus,
 		unittest.WithRole(flow.RoleConsensus),
-		unittest.WithWeight(flow.DefaultInitialWeight),
+		unittest.WithInitialWeight(flow.DefaultInitialWeight),
 	)
 	nodes = append(nodes, consensusNodes...)
 
 	// COLLECTION = 1
 	collectionNodes := unittest.NodeInfosFixture(collection,
 		unittest.WithRole(flow.RoleCollection),
-		unittest.WithWeight(flow.DefaultInitialWeight),
+		unittest.WithInitialWeight(flow.DefaultInitialWeight),
 	)
 	nodes = append(nodes, collectionNodes...)
 
 	// EXECUTION = 1
 	executionNodes := unittest.NodeInfosFixture(execution,
 		unittest.WithRole(flow.RoleExecution),
-		unittest.WithWeight(flow.DefaultInitialWeight),
+		unittest.WithInitialWeight(flow.DefaultInitialWeight),
 	)
 	nodes = append(nodes, executionNodes...)
 
 	// VERIFICATION = 1
 	verificationNodes := unittest.NodeInfosFixture(verification,
 		unittest.WithRole(flow.RoleVerification),
-		unittest.WithWeight(flow.DefaultInitialWeight),
+		unittest.WithInitialWeight(flow.DefaultInitialWeight),
 	)
 	nodes = append(nodes, verificationNodes...)
 
 	// ACCESS = 1
 	accessNodes := unittest.NodeInfosFixture(access,
 		unittest.WithRole(flow.RoleAccess),
-		unittest.WithWeight(flow.DefaultInitialWeight),
+		unittest.WithInitialWeight(flow.DefaultInitialWeight),
 	)
 	nodes = append(nodes, accessNodes...)
 

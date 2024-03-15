@@ -109,15 +109,19 @@ type SubscriptionProviderParameters struct {
 
 // GossipSubTracerParameters keys.
 const (
-	LocalMeshLogIntervalKey         = "local-mesh-logging-interval"
-	ScoreTracerIntervalKey          = "score-tracer-interval"
-	RPCSentTrackerCacheSizeKey      = "rpc-sent-tracker-cache-size"
-	RPCSentTrackerQueueCacheSizeKey = "rpc-sent-tracker-queue-cache-size"
-	RPCSentTrackerNumOfWorkersKey   = "rpc-sent-tracker-workers"
+	LocalMeshLogIntervalKey              = "local-mesh-logging-interval"
+	ScoreTracerIntervalKey               = "score-tracer-interval"
+	RPCSentTrackerCacheSizeKey           = "rpc-sent-tracker-cache-size"
+	RPCSentTrackerQueueCacheSizeKey      = "rpc-sent-tracker-queue-cache-size"
+	RPCSentTrackerNumOfWorkersKey        = "rpc-sent-tracker-workers"
+	DuplicateMessageCacheTrackerKey      = "duplicate-message-tracker"
+	DuplicateMessageCacheTrackerSizeKey  = "cache-size"
+	DuplicateMessageCacheTrackerDecayKey = "decay"
 )
 
 // GossipSubTracerParameters is the config for the gossipsub tracer. GossipSub tracer is used to trace the local mesh events and peer scores.
 type GossipSubTracerParameters struct {
+	DuplicateMessageTrackerConfig DuplicateMessageTrackerConfig `validate:"required" mapstructure:"duplicate-message-tracker"`
 	// LocalMeshLogInterval is the interval at which the local mesh is logged.
 	LocalMeshLogInterval time.Duration `validate:"gt=0s" mapstructure:"local-mesh-logging-interval"`
 	// ScoreTracerInterval is the interval at which the score tracer logs the peer scores.
@@ -128,6 +132,16 @@ type GossipSubTracerParameters struct {
 	RPCSentTrackerQueueCacheSize uint32 `validate:"gt=0" mapstructure:"rpc-sent-tracker-queue-cache-size"`
 	// RpcSentTrackerNumOfWorkers number of workers for rpc sent tracker worker pool.
 	RpcSentTrackerNumOfWorkers int `validate:"gt=0" mapstructure:"rpc-sent-tracker-workers"`
+}
+
+// DuplicateMessageTrackerConfig duplicate message cache config.
+type DuplicateMessageTrackerConfig struct {
+	// CacheSize cache size of the gossipsub duplicate message tracker.
+	CacheSize uint32 `validate:"gt=0" mapstructure:"cache-size"`
+	// Decay rate of decay for the peer duplicate message counters.
+	Decay float64 `validate:"gt=0,lt=1" mapstructure:"decay"`
+	// SkipDecayThreshold the threshold for which when the counter is below this value, the decay function will not be called
+	SkipDecayThreshold float64 `validate:"gt=0,lt=1" mapstructure:"skip-decay-threshold"`
 }
 
 // ResourceScope is the scope of the resource, e.g., system, transient, protocol, peer, peer-protocol.

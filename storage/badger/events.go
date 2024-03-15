@@ -86,6 +86,7 @@ func (e *Events) Store(blockID flow.Identifier, blockEvents []flow.EventsList) e
 }
 
 // ByBlockID returns the events for the given block ID
+// Note: This method will return an empty slice and no error if no entries for the blockID are found
 func (e *Events) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
 	tx := e.db.NewTransaction(false)
 	defer tx.Discard()
@@ -97,6 +98,7 @@ func (e *Events) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
 }
 
 // ByBlockIDTransactionID returns the events for the given block ID and transaction ID
+// Note: This method will return an empty slice and no error if no entries for the blockID are found
 func (e *Events) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) ([]flow.Event, error) {
 	events, err := e.ByBlockID(blockID)
 	if err != nil {
@@ -112,6 +114,8 @@ func (e *Events) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Ident
 	return matched, nil
 }
 
+// ByBlockIDTransactionIndex returns the events for the given block ID and transaction index
+// Note: This method will return an empty slice and no error if no entries for the blockID are found
 func (e *Events) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) ([]flow.Event, error) {
 	events, err := e.ByBlockID(blockID)
 	if err != nil {
@@ -128,6 +132,7 @@ func (e *Events) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint
 }
 
 // ByBlockIDEventType returns the events for the given block ID and event type
+// Note: This method will return an empty slice and no error if no entries for the blockID are found
 func (e *Events) ByBlockIDEventType(blockID flow.Identifier, eventType flow.EventType) ([]flow.Event, error) {
 	events, err := e.ByBlockID(blockID)
 	if err != nil {

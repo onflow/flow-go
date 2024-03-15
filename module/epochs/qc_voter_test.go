@@ -75,8 +75,8 @@ func (suite *Suite) SetupTest() {
 	})
 
 	var err error
-	assignments := unittest.ClusterAssignment(2, suite.nodes)
-	suite.clustering, err = factory.NewClusterList(assignments, suite.nodes)
+	assignments := unittest.ClusterAssignment(2, suite.nodes.ToSkeleton())
+	suite.clustering, err = factory.NewClusterList(assignments, suite.nodes.ToSkeleton())
 	suite.Require().NoError(err)
 
 	suite.epoch.On("Counter").Return(suite.counter, nil)

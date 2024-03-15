@@ -50,15 +50,15 @@ func (_m *Packer) Pack(view uint64, sig *hotstuff.BlockSignatureData) ([]byte, [
 }
 
 // Unpack provides a mock function with given fields: signerIdentities, sigData
-func (_m *Packer) Unpack(signerIdentities flow.IdentityList, sigData []byte) (*hotstuff.BlockSignatureData, error) {
+func (_m *Packer) Unpack(signerIdentities flow.GenericIdentityList[flow.IdentitySkeleton], sigData []byte) (*hotstuff.BlockSignatureData, error) {
 	ret := _m.Called(signerIdentities, sigData)
 
 	var r0 *hotstuff.BlockSignatureData
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.IdentityList, []byte) (*hotstuff.BlockSignatureData, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.GenericIdentityList[flow.IdentitySkeleton], []byte) (*hotstuff.BlockSignatureData, error)); ok {
 		return rf(signerIdentities, sigData)
 	}
-	if rf, ok := ret.Get(0).(func(flow.IdentityList, []byte) *hotstuff.BlockSignatureData); ok {
+	if rf, ok := ret.Get(0).(func(flow.GenericIdentityList[flow.IdentitySkeleton], []byte) *hotstuff.BlockSignatureData); ok {
 		r0 = rf(signerIdentities, sigData)
 	} else {
 		if ret.Get(0) != nil {
@@ -66,7 +66,7 @@ func (_m *Packer) Unpack(signerIdentities flow.IdentityList, sigData []byte) (*h
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(flow.IdentityList, []byte) error); ok {
+	if rf, ok := ret.Get(1).(func(flow.GenericIdentityList[flow.IdentitySkeleton], []byte) error); ok {
 		r1 = rf(signerIdentities, sigData)
 	} else {
 		r1 = ret.Error(1)

@@ -43,6 +43,17 @@ func TestParseEvent(t *testing.T) {
 				Name:         "EventA",
 			},
 		},
+		{
+			name:      "evm event",
+			eventType: "evm.BlockExecuted",
+			expected: events.ParsedEvent{
+				Type:         events.ProtocolEventType,
+				EventType:    "evm.BlockExecuted",
+				Contract:     "evm",
+				ContractName: "evm",
+				Name:         "BlockExecuted",
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -69,6 +80,8 @@ func TestParseEvent_Invalid(t *testing.T) {
 		"B.0000000000000001.invalid.event", // invalid first part
 		"flow",                             // incorrect number of parts for protocol event
 		"flow.invalid.event",               // incorrect number of parts for protocol event
+		"evm",                              // incorrect number of parts for protocol event
+		"evm.invalid.event",                // incorrect number of parts for protocol event
 		"A.0000000000000001.invalid",       // incorrect number of parts for account event
 		"A.0000000000000001.invalid.a.b",   // incorrect number of parts for account event
 
@@ -111,6 +124,17 @@ func TestValidateEvent(t *testing.T) {
 				Name:         "EventA",
 			},
 		},
+		{
+			name:      "evm event",
+			eventType: "evm.BlockExecuted",
+			expected: events.ParsedEvent{
+				Type:         events.ProtocolEventType,
+				EventType:    "evm.BlockExecuted",
+				Contract:     "evm",
+				ContractName: "evm",
+				Name:         "BlockExecuted",
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -137,6 +161,8 @@ func TestValidateEvent_Invalid(t *testing.T) {
 		"B.0000000000000001.invalid.event", // invalid first part
 		"flow",                             // incorrect number of parts for protocol event
 		"flow.invalid.event",               // incorrect number of parts for protocol event
+		"evm",                              // incorrect number of parts for protocol event
+		"evm.invalid.event",                // incorrect number of parts for protocol event
 		"A.0000000000000001.invalid",       // incorrect number of parts for account event
 		"A.0000000000000001.invalid.a.b",   // incorrect number of parts for account event
 		flow.EventType(fmt.Sprintf("A.%s.Contract1.EventA", unittest.RandomAddressFixture())), // address from wrong chain

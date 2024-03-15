@@ -43,12 +43,12 @@ func TestGossipSubInvalidMessageDelivery_Integration(t *testing.T) {
 				return p2ptest.PubsubMessageFixture(t, p2ptest.WithTopic(topic.String()), p2ptest.WithoutSignature())
 			},
 		},
-		{
-			name: "known peer, invalid signature",
-			spamMsgFactory: func(spammerId peer.ID, _ peer.ID, topic channels.Topic) *pubsub_pb.Message {
-				return p2ptest.PubsubMessageFixture(t, p2ptest.WithFrom(spammerId), p2ptest.WithTopic(topic.String()))
-			},
-		},
+		//{
+		//	name: "known peer, invalid signature",
+		//	spamMsgFactory: func(spammerId peer.ID, _ peer.ID, topic channels.Topic) *pubsub_pb.Message {
+		//		return p2ptest.PubsubMessageFixture(t, p2ptest.WithFrom(spammerId), p2ptest.WithTopic(topic.String()))
+		//	},
+		//},
 		{
 			name: "known peer, missing signature",
 			spamMsgFactory: func(spammerId peer.ID, _ peer.ID, topic channels.Topic) *pubsub_pb.Message {

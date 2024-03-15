@@ -10,7 +10,8 @@ import (
 type ScriptExecutor interface {
 
 	// ExecuteScriptAtBlockID executes a script at the given Block id
-	ExecuteScriptAtBlockID(ctx context.Context, script []byte, arguments [][]byte, blockID flow.Identifier) ([]byte, error)
+	// it returns the value, the computation used and the error (if any)
+	ExecuteScriptAtBlockID(ctx context.Context, script []byte, arguments [][]byte, blockID flow.Identifier) ([]byte, uint64, error)
 
 	// GetAccount returns the Account details at the given Block id
 	GetAccount(ctx context.Context, address flow.Address, blockID flow.Identifier) (*flow.Account, error)

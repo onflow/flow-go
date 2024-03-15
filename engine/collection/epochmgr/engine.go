@@ -532,10 +532,7 @@ func (e *Engine) activeClusterIDs() (flow.ChainIDList, error) {
 	defer e.mu.RUnlock()
 	clusterIDs := make(flow.ChainIDList, 0)
 	for _, epoch := range e.epochs {
-		chainID, err := epoch.state.Params().ChainID() // cached, does not hit database
-		if err != nil {
-			return nil, fmt.Errorf("failed to get active cluster ids: %w", err)
-		}
+		chainID := epoch.state.Params().ChainID() // cached, does not hit database
 		clusterIDs = append(clusterIDs, chainID)
 	}
 	return clusterIDs, nil

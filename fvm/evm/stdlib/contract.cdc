@@ -22,37 +22,70 @@ contract EVM {
             let balance = InternalEVM.balance(
                 address: self.bytes
             )
-
-            return Balance(flow: balance)
+            return Balance(attoflow: balance)
         }
     }
 
     access(all)
     struct Balance {
 
-        /// The balance in FLOW
+        /// The balance in atto-FLOW
+        /// Atto-FLOW is the smallest denomination of FLOW (1e18 FLOW)
+        /// that is used to store account balances inside EVM 
+        /// similar to the way WEI is used to store ETH divisible to 18 decimal places.
         access(all)
-        let flow: UFix64
+        var attoflow: UInt
 
-        /// Constructs a new balance, given the balance in FLOW
-        init(flow: UFix64) {
-            self.flow = flow
+        /// Constructs a new balance
+        access(all)
+        init(attoflow: UInt) {
+            self.attoflow = attoflow
         }
 
-        // TODO:
-        // /// Returns the balance in terms of atto-FLOW.
-        // /// Atto-FLOW is the smallest denomination of FLOW inside EVM
-        // access(all)
-        // fun toAttoFlow(): UInt64
+        /// Sets the balance by a UFix64 (8 decimal points), the format 
+        /// that is used in Cadence to store FLOW tokens.  
+        access(all)
+        fun setFLOW(flow: UFix64){
+            self.attoflow = InternalEVM.castToAttoFLOW(balance: flow)
+        }
+
+        /// Casts the balance to a UFix64 (rounding down)
+        /// Warning! casting a balance to a UFix64 which supports a lower level of precision 
+        /// (8 decimal points in compare to 18) might result in rounding down error.
+        /// Use the toAttoFlow function if you care need more accuracy. 
+        access(all)
+        fun inFLOW(): UFix64 {
+            return InternalEVM.castToFLOW(balance: self.attoflow)
+        }
+
+        /// Returns the balance in Atto-FLOW
+        access(all)
+        fun inAttoFLOW(): UInt {
+            return self.attoflow
+        }
     }
 
     access(all)
     resource BridgedAccount {
 
         access(self)
-        let addressBytes: [UInt8; 20]
+        var addressBytes: [UInt8; 20]
 
-        init(addressBytes: [UInt8; 20]) {
+        init() {
+            // address is initially set to zero
+            // but updated through initAddress later
+            // we have to do this since we need resource id (uuid)
+            // to calculate the EVM address for this bridge account
+            self.addressBytes = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] 
+        }
+
+        access(contract)
+        fun initAddress(addressBytes: [UInt8; 20]) {
+           // only allow set address for the first time
+           // check address is empty
+            for item in self.addressBytes {
+                assert(item == 0, message: "address byte is not empty")
+            }
            self.addressBytes = addressBytes
         }
 
@@ -79,11 +112,15 @@ contract EVM {
         }
 
         /// Withdraws the balance from the bridged account's balance
+        /// Note that amounts smaller than 10nF (10e-8) can't be withdrawn 
+        /// given that Flow Token Vaults use UFix64s to store balances.
+        /// If the given balance conversion to UFix64 results in 
+        /// rounding error, this function would fail. 
         access(all)
         fun withdraw(balance: Balance): @FlowToken.Vault {
             let vault <- InternalEVM.withdraw(
                 from: self.addressBytes,
-                amount: balance.flow
+                amount: balance.attoflow
             ) as! @FlowToken.Vault
             return <-vault
         }
@@ -100,7 +137,7 @@ contract EVM {
                 from: self.addressBytes,
                 code: code,
                 gasLimit: gasLimit,
-                value: value.flow
+                value: value.attoflow
             )
             return EVMAddress(bytes: addressBytes)
         }
@@ -119,7 +156,7 @@ contract EVM {
                  to: to.bytes,
                  data: data,
                  gasLimit: gasLimit,
-                 value: value.flow
+                 value: value.attoflow
             )
         }
     }
@@ -127,9 +164,10 @@ contract EVM {
     /// Creates a new bridged account
     access(all)
     fun createBridgedAccount(): @BridgedAccount {
-        return <-create BridgedAccount(
-            addressBytes: InternalEVM.createBridgedAccount()
-        )
+        let acc <-create BridgedAccount()
+        let addr = InternalEVM.createBridgedAccount(uuid: acc.uuid)
+        acc.initAddress(addressBytes: addr)
+        return <-acc
     }
 
     /// Runs an a RLP-encoded EVM transaction, deducts the gas fees,

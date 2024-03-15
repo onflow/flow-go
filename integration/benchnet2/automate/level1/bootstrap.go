@@ -44,7 +44,7 @@ func (b *Bootstrap) GenTemplateData(outputToFile bool, dockerTag string, dockerR
 	}
 
 	// examine "Identities" section for list of node data to extract and build out node data list
-	identities := dataMap["Identities"].([]interface{})
+	identities := dataMap["Epochs"].(map[string]any)["Current"].(map[string]any)["InitialIdentities"].([]any)
 	var nodeDataList []NodeData
 
 	for _, identity := range identities {

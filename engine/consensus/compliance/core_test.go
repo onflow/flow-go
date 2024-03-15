@@ -82,7 +82,7 @@ func (cs *CommonSuite) SetupTest() {
 	// initialize the paramaters
 	cs.participants = unittest.IdentityListFixture(3,
 		unittest.WithRole(flow.RoleConsensus),
-		unittest.WithWeight(1000),
+		unittest.WithInitialWeight(1000),
 	)
 	cs.myID = cs.participants[0].NodeID
 	block := unittest.BlockFixture()
@@ -172,7 +172,7 @@ func (cs *CommonSuite) SetupTest() {
 	// set up protocol snapshot mock
 	cs.snapshot = &protocol.Snapshot{}
 	cs.snapshot.On("Identities", mock.Anything).Return(
-		func(filter flow.IdentityFilter) flow.IdentityList {
+		func(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return cs.participants.Filter(filter)
 		},
 		nil,

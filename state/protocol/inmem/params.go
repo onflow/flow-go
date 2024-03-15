@@ -11,22 +11,28 @@ type Params struct {
 
 var _ protocol.GlobalParams = (*Params)(nil)
 
-func (p Params) ChainID() (flow.ChainID, error) {
-	return p.enc.ChainID, nil
+func NewParams(enc EncodableParams) *Params {
+	return &Params{
+		enc: enc,
+	}
 }
 
-func (p Params) SporkID() (flow.Identifier, error) {
-	return p.enc.SporkID, nil
+func (p Params) ChainID() flow.ChainID {
+	return p.enc.ChainID
 }
 
-func (p Params) SporkRootBlockHeight() (uint64, error) {
-	return p.enc.SporkRootBlockHeight, nil
+func (p Params) SporkID() flow.Identifier {
+	return p.enc.SporkID
 }
 
-func (p Params) ProtocolVersion() (uint, error) {
-	return p.enc.ProtocolVersion, nil
+func (p Params) SporkRootBlockHeight() uint64 {
+	return p.enc.SporkRootBlockHeight
 }
 
-func (p Params) EpochCommitSafetyThreshold() (uint64, error) {
-	return p.enc.EpochCommitSafetyThreshold, nil
+func (p Params) ProtocolVersion() uint {
+	return p.enc.ProtocolVersion
+}
+
+func (p Params) EpochCommitSafetyThreshold() uint64 {
+	return p.enc.EpochCommitSafetyThreshold
 }

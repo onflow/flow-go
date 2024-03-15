@@ -208,6 +208,43 @@ network-config:
           tracker-cache-decay: 0.99
           # The upper bound on the amount of cluster prefixed control messages that will be processed
           hard-threshold: 100
+        process:
+          inspection:
+            # Serves as a fail-safe mechanism to globally deactivate inspection logic. When this fail-safe is activated it disables all
+            # aspects of the inspection logic, irrespective of individual configurations like inspection.enable-graft, inspection.enable-prune, etc.
+            # Consequently, all metrics collection and logging related to the rpc and inspection will also be disabled.
+            # It is important to note that activating this fail-safe results in a comprehensive deactivation inspection features.
+            # Please use this setting judiciously, considering its broad impact on the behavior of control message handling.
+            disabled: false
+            # Enables graft control message inspection.
+            enable-graft: true
+            # Enables prune control message inspection.
+            enable-prune: true
+            # Enables ihave control message inspection.
+            enable-ihave: true
+            # Enables iwant control message inspection.
+            enable-iwant: true
+            # Enables publish message inspection.
+            enable-publish: true
+          truncation:
+            # Serves as a fail-safe mechanism to globally deactivate truncation logic. When this fail-safe is activated it disables all
+            # aspects of the truncation logic, irrespective of individual configurations like truncation.enable-graft, truncation.enable-prune, etc.
+            # Consequently, all metrics collection and logging related to the rpc and inspection will also be disabled.
+            # It is important to note that activating this fail-safe results in a comprehensive deactivation truncation features.
+            # Please use this setting judiciously, considering its broad impact on the behavior of control message handling.
+            disabled: false
+            # Enables graft control message truncation.
+            enable-graft: true
+            # Enables prune control message truncation.
+            enable-prune: true
+            # Enables ihave control message truncation.
+            enable-ihave: true
+            # Enables ihave message id truncation.
+            enable-ihave-message-id: true
+            # Enables iwant control message truncation.
+            enable-iwant: true
+            # Enables iwant message id truncation.
+            enable-iwant-message-id: true
     rpc-tracer:
       # The default interval at which the mesh tracer logs the mesh topology. This is used for debugging and forensics purposes.
       #	Note that we purposefully choose this logging interval high enough to avoid spamming the logs. Moreover, the
@@ -224,7 +261,14 @@ network-config:
       rpc-sent-tracker-queue-cache-size: 100_000
       # Number of workers for rpc sent tracker worker pool.
       rpc-sent-tracker-workers: 5
-      # Peer scoring is the default value for enabling peer scoring
+      # Cache size of the gossipsub duplicate message tracker.
+      duplicate-message-tracker:
+         cache-size: 10_000
+         decay: .5
+         # The threshold for which when the counter is below this value, the decay function will not be called.
+         # instead, the counter will be set to 0. This is to prevent the counter from becoming a large number over time.
+         skip-decay-threshold: 0.1
+    # Peer scoring is the default value for enabling peer scoring
     peer-scoring-enabled: true
     scoring-parameters:
       peer-scoring:
@@ -468,6 +512,11 @@ network-config:
             # It is applied to the peer's score when the peer subscribes to a topic that it is
             # not authorized to subscribe to.
             invalid-subscription-penalty: -100
+            # The penalty for duplicate messages detected by the gossipsub tracer for a peer.
+            # The penalty is multiplied by the current duplicate message count for a peer before it is applied to the application specific score.
+            duplicate-message-penalty: -10e-4
+            # The threshold at which the duplicate message count for a peer will result in the peer being penalized
+            duplicate-message-threshold: 10e+4
             # This is the reward for well-behaving staked peers.
             # If a peer does not have any misbehavior record, e.g., invalid subscription,
             # invalid message, etc., it will be rewarded with this score.

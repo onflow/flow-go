@@ -93,7 +93,7 @@ func testSequence(t *testing.T, sequence []fun, connMgr *connection.ConnManager)
 func generatePeerInfo(t *testing.T) peer.ID {
 	key := p2pfixtures.NetworkingKeyFixtures(t)
 	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("1.1.1.1:0"))
-	pInfo, err := utils.PeerAddressInfo(*identity)
+	pInfo, err := utils.PeerAddressInfo(identity.IdentitySkeleton)
 	require.NoError(t, err)
 	return pInfo.ID
 }

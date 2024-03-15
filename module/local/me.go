@@ -13,11 +13,11 @@ import (
 )
 
 type Local struct {
-	me *flow.Identity
+	me flow.IdentitySkeleton
 	sk crypto.PrivateKey // instance of the node's private staking key
 }
 
-func New(id *flow.Identity, sk crypto.PrivateKey) (*Local, error) {
+func New(id flow.IdentitySkeleton, sk crypto.PrivateKey) (*Local, error) {
 	if !sk.PublicKey().Equals(id.StakingPubKey) {
 		return nil, fmt.Errorf("cannot initialize with mismatching keys, expect %v, but got %v",
 			id.StakingPubKey, sk.PublicKey())
@@ -42,8 +42,8 @@ func (l *Local) Sign(msg []byte, hasher hash.Hasher) (crypto.Signature, error) {
 	return l.sk.Sign(msg, hasher)
 }
 
-func (l *Local) NotMeFilter() flow.IdentityFilter {
-	return filter.Not(filter.HasNodeID(l.NodeID()))
+func (l *Local) NotMeFilter() flow.IdentityFilter[flow.Identity] {
+	return filter.Not(filter.HasNodeID[flow.Identity](l.NodeID()))
 }
 
 // SignFunc provides a signature oracle that given a message, a hasher, and a signing function, it

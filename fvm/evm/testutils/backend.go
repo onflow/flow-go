@@ -1,6 +1,7 @@
 package testutils
 
 import (
+	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -32,10 +33,11 @@ func RunWithTestFlowEVMRootAddress(t testing.TB, backend atree.Ledger, f func(fl
 
 func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
 	tb := &TestBackend{
-		TestValueStore:   GetSimpleValueStore(),
-		testEventEmitter: getSimpleEventEmitter(),
-		testMeter:        getSimpleMeter(),
-		TestBlockInfo:    &TestBlockInfo{},
+		TestValueStore:      GetSimpleValueStore(),
+		testEventEmitter:    getSimpleEventEmitter(),
+		testMeter:           getSimpleMeter(),
+		TestBlockInfo:       &TestBlockInfo{},
+		TestRandomGenerator: getSimpleRandomGenerator(),
 	}
 	f(tb)
 }
@@ -76,14 +78,14 @@ func GetSimpleValueStore() *TestValueStore {
 			bytesRead += len(fk) + len(value)
 			return len(value) > 0, nil
 		},
-		AllocateStorageIndexFunc: func(owner []byte) (atree.StorageIndex, error) {
+		AllocateStorageIndexFunc: func(owner []byte) (atree.SlabIndex, error) {
 			index := allocator[string(owner)]
 			var data [8]byte
 			allocator[string(owner)] = index + 1
 			binary.BigEndian.PutUint64(data[:], index)
 			bytesRead += len(owner) + 8
 			bytesWritten += len(owner) + 8
-			return atree.StorageIndex(data), nil
+			return atree.SlabIndex(data), nil
 		},
 		TotalStorageSizeFunc: func() int {
 			size := 0
@@ -157,6 +159,7 @@ type TestBackend struct {
 	*testMeter
 	*testEventEmitter
 	*TestBlockInfo
+	*TestRandomGenerator
 }
 
 var _ types.Backend = &TestBackend{}
@@ -179,7 +182,7 @@ type TestValueStore struct {
 	GetValueFunc             func(owner, key []byte) ([]byte, error)
 	SetValueFunc             func(owner, key, value []byte) error
 	ValueExistsFunc          func(owner, key []byte) (bool, error)
-	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
+	AllocateStorageIndexFunc func(owner []byte) (atree.SlabIndex, error)
 	TotalStorageSizeFunc     func() int
 	TotalBytesReadFunc       func() int
 	TotalBytesWrittenFunc    func() int
@@ -210,7 +213,7 @@ func (vs *TestValueStore) ValueExists(owner, key []byte) (bool, error) {
 	return vs.ValueExistsFunc(owner, key)
 }
 
-func (vs *TestValueStore) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
+func (vs *TestValueStore) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
 	if vs.AllocateStorageIndexFunc == nil {
 		panic("method not set")
 	}
@@ -404,4 +407,26 @@ func (tb *TestBlockInfo) GetBlockAtHeight(height uint64) (runtime.Block, bool, e
 		panic("GetBlockAtHeight method is not set")
 	}
 	return tb.GetBlockAtHeightFunc(height)
+}
+
+type TestRandomGenerator struct {
+	ReadRandomFunc func([]byte) error
+}
+
+var _ environment.RandomGenerator = &TestRandomGenerator{}
+
+func (t *TestRandomGenerator) ReadRandom(buffer []byte) error {
+	if t.ReadRandomFunc == nil {
+		panic("ReadRandomFunc method is not set")
+	}
+	return t.ReadRandomFunc(buffer)
+}
+
+func getSimpleRandomGenerator() *TestRandomGenerator {
+	return &TestRandomGenerator{
+		ReadRandomFunc: func(buffer []byte) error {
+			_, err := rand.Read(buffer)
+			return err
+		},
+	}
 }

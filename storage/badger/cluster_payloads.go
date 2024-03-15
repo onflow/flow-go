@@ -47,6 +47,7 @@ func NewClusterPayloads(cacheMetrics module.CacheMetrics, db *badger.DB) *Cluste
 func (cp *ClusterPayloads) storeTx(blockID flow.Identifier, payload *cluster.Payload) func(*transaction.Tx) error {
 	return cp.cache.PutTx(blockID, payload)
 }
+
 func (cp *ClusterPayloads) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*cluster.Payload, error) {
 	return func(tx *badger.Txn) (*cluster.Payload, error) {
 		val, err := cp.cache.Get(blockID)(tx)

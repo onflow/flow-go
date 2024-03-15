@@ -420,7 +420,7 @@ func StateSnapshotForKnownBlock(block *flow.Header, identities map[flow.Identifi
 		},
 	)
 	snapshot.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			var idts flow.IdentityList
 			for _, i := range identities {
 				if selector(i) {
@@ -429,7 +429,7 @@ func StateSnapshotForKnownBlock(block *flow.Header, identities map[flow.Identifi
 			}
 			return idts
 		},
-		func(selector flow.IdentityFilter) error {
+		func(selector flow.IdentityFilter[flow.Identity]) error {
 			return nil
 		},
 	)

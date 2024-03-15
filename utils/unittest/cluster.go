@@ -12,7 +12,7 @@ import (
 
 // TransactionForCluster generates a transaction that will be assigned to the
 // target cluster ID.
-func TransactionForCluster(clusters flow.ClusterList, target flow.IdentityList) flow.TransactionBody {
+func TransactionForCluster(clusters flow.ClusterList, target flow.IdentitySkeletonList) flow.TransactionBody {
 	tx := TransactionBodyFixture()
 	return AlterTransactionForCluster(tx, clusters, target, func(*flow.TransactionBody) {})
 }
@@ -22,7 +22,7 @@ func TransactionForCluster(clusters flow.ClusterList, target flow.IdentityList) 
 //
 // The `after` function is run after each modification to allow for any content
 // dependent changes to the transaction (eg. signing it).
-func AlterTransactionForCluster(tx flow.TransactionBody, clusters flow.ClusterList, target flow.IdentityList, after func(tx *flow.TransactionBody)) flow.TransactionBody {
+func AlterTransactionForCluster(tx flow.TransactionBody, clusters flow.ClusterList, target flow.IdentitySkeletonList, after func(tx *flow.TransactionBody)) flow.TransactionBody {
 
 	// Bound to avoid infinite loop in case the routing algorithm is broken
 	for i := 0; i < 10000; i++ {
@@ -46,12 +46,12 @@ func AlterTransactionForCluster(tx flow.TransactionBody, clusters flow.ClusterLi
 
 // ClusterAssignment creates an assignment list with n clusters and with nodes
 // evenly distributed among clusters.
-func ClusterAssignment(n uint, nodes flow.IdentityList) flow.AssignmentList {
+func ClusterAssignment(n uint, nodes flow.IdentitySkeletonList) flow.AssignmentList {
 
-	collectors := nodes.Filter(filter.HasRole(flow.RoleCollection))
+	collectors := nodes.Filter(filter.HasRole[flow.IdentitySkeleton](flow.RoleCollection))
 
 	// order, so the same list results in the same
-	slices.SortFunc(collectors, flow.Canonical)
+	slices.SortFunc(collectors, flow.Canonical[flow.IdentitySkeleton])
 
 	assignments := make(flow.AssignmentList, n)
 	for i, collector := range collectors {
@@ -62,9 +62,9 @@ func ClusterAssignment(n uint, nodes flow.IdentityList) flow.AssignmentList {
 	return assignments
 }
 
-func ClusterList(n uint, nodes flow.IdentityList) flow.ClusterList {
+func ClusterList(n uint, nodes flow.IdentitySkeletonList) flow.ClusterList {
 	assignments := ClusterAssignment(n, nodes)
-	clusters, err := factory.NewClusterList(assignments, nodes.Filter(filter.HasRole(flow.RoleCollection)))
+	clusters, err := factory.NewClusterList(assignments, nodes.Filter(filter.HasRole[flow.IdentitySkeleton](flow.RoleCollection)))
 	if err != nil {
 		panic(err)
 	}

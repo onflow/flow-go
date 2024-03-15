@@ -107,6 +107,16 @@ func (_m *LibP2PMetrics) DNSLookupDuration(duration time.Duration) {
 	_m.Called(duration)
 }
 
+// DuplicateMessagePenalties provides a mock function with given fields: penalty
+func (_m *LibP2PMetrics) DuplicateMessagePenalties(penalty float64) {
+	_m.Called(penalty)
+}
+
+// DuplicateMessagesCounts provides a mock function with given fields: count
+func (_m *LibP2PMetrics) DuplicateMessagesCounts(count float64) {
+	_m.Called(count)
+}
+
 // InboundConnections provides a mock function with given fields: connectionCount
 func (_m *LibP2PMetrics) InboundConnections(connectionCount uint) {
 	_m.Called(connectionCount)

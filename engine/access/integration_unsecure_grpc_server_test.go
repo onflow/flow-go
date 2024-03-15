@@ -243,7 +243,6 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		conf,
 		suite.state,
 		suite.headers,
-		suite.events,
 		suite.seals,
 		suite.results,
 		nil,
@@ -252,6 +251,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		rootBlock.Header.Height,
 		rootBlock.Header.Height,
 		suite.registers,
+		backend.NewEventsIndex(suite.events),
 		false,
 	)
 	assert.NoError(suite.T(), err)

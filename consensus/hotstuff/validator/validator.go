@@ -294,7 +294,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 //   - model.ErrViewForUnknownEpoch if the vote refers unknown epoch
 //
 // Any other error should be treated as exception
-func (v *Validator) ValidateVote(vote *model.Vote) (*flow.Identity, error) {
+func (v *Validator) ValidateVote(vote *model.Vote) (*flow.IdentitySkeleton, error) {
 	voter, err := v.committee.IdentityByEpoch(vote.View, vote.SignerID)
 	if model.IsInvalidSignerError(err) {
 		return nil, newInvalidVoteError(vote, err)

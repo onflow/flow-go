@@ -35,8 +35,8 @@ func TestTimeoutProcessor(t *testing.T) {
 type TimeoutProcessorTestSuite struct {
 	suite.Suite
 
-	participants  flow.IdentityList
-	signer        *flow.Identity
+	participants  flow.IdentitySkeletonList
+	signer        *flow.IdentitySkeleton
 	view          uint64
 	sigWeight     uint64
 	totalWeight   atomic.Uint64
@@ -54,7 +54,7 @@ func (s *TimeoutProcessorTestSuite) SetupTest() {
 	s.validator = mocks.NewValidator(s.T())
 	s.sigAggregator = mocks.NewTimeoutSignatureAggregator(s.T())
 	s.notifier = mocks.NewTimeoutCollectorConsumer(s.T())
-	s.participants = unittest.IdentityListFixture(11, unittest.WithWeight(s.sigWeight)).Sort(flow.Canonical)
+	s.participants = unittest.IdentityListFixture(11, unittest.WithInitialWeight(s.sigWeight)).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 	s.signer = s.participants[0]
 	s.view = (uint64)(rand.Uint32() + 100)
 	s.totalWeight = *atomic.NewUint64(0)
@@ -461,20 +461,19 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 	// signers hold objects that are created with private key and can sign votes and proposals
 	signers := make(map[flow.Identifier]*verification.StakingSigner)
 	// prepare staking signers, each signer has its own private/public key pair
+	// identities must be in canonical order
 	stakingSigners := unittest.IdentityListFixture(11, func(identity *flow.Identity) {
 		stakingPriv := unittest.StakingPrivKeyFixture()
 		identity.StakingPubKey = stakingPriv.PublicKey()
 
-		me, err := local.New(identity, stakingPriv)
+		me, err := local.New(identity.IdentitySkeleton, stakingPriv)
 		require.NoError(t, err)
 
 		signers[identity.NodeID] = verification.NewStakingSigner(me)
-	})
-	// identities must be in canonical order
-	stakingSigners = stakingSigners.Sort(flow.Canonical)
+	}).Sort(flow.Canonical[flow.Identity])
 
 	// utility function which generates a valid timeout for every signer
-	createTimeouts := func(participants flow.IdentityList, view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) []*model.TimeoutObject {
+	createTimeouts := func(participants flow.IdentitySkeletonList, view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) []*model.TimeoutObject {
 		timeouts := make([]*model.TimeoutObject, 0, len(participants))
 		for _, signer := range participants {
 			timeout, err := signers[signer.NodeID].CreateTimeout(view, newestQC, lastViewTC)
@@ -490,20 +489,22 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 	block := helper.MakeBlock(helper.WithBlockView(view-1),
 		helper.WithBlockProposer(leader.NodeID))
 
+	stakingSignersSkeleton := stakingSigners.ToSkeleton()
+
 	committee := mocks.NewDynamicCommittee(t)
-	committee.On("IdentitiesByEpoch", mock.Anything).Return(stakingSigners, nil)
+	committee.On("IdentitiesByEpoch", mock.Anything).Return(stakingSignersSkeleton, nil)
 	committee.On("IdentitiesByBlock", mock.Anything).Return(stakingSigners, nil)
-	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.TotalWeight()), nil)
-	committee.On("TimeoutThresholdForView", mock.Anything).Return(committees.WeightThresholdToTimeout(stakingSigners.TotalWeight()), nil)
+	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSignersSkeleton.TotalWeight()), nil)
+	committee.On("TimeoutThresholdForView", mock.Anything).Return(committees.WeightThresholdToTimeout(stakingSignersSkeleton.TotalWeight()), nil)
 
 	// create first QC for view N-1, this will be our olderQC
-	olderQC := createRealQC(t, committee, stakingSigners, signers, block)
+	olderQC := createRealQC(t, committee, stakingSignersSkeleton, signers, block)
 	// now create a second QC for view N, this will be our newest QC
 	nextBlock := helper.MakeBlock(
 		helper.WithBlockView(view),
 		helper.WithBlockProposer(leader.NodeID),
 		helper.WithBlockQC(olderQC))
-	newestQC := createRealQC(t, committee, stakingSigners, signers, nextBlock)
+	newestQC := createRealQC(t, committee, stakingSignersSkeleton, signers, nextBlock)
 
 	// At this point we have created two QCs for round N-1 and N.
 	// Next step is create a TC for view N.
@@ -522,7 +523,7 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 		lastViewTC = tc
 	}
 
-	aggregator, err := NewTimeoutSignatureAggregator(view, stakingSigners, msig.CollectorTimeoutTag)
+	aggregator, err := NewTimeoutSignatureAggregator(view, stakingSignersSkeleton, msig.CollectorTimeoutTag)
 	require.NoError(t, err)
 
 	notifier := mocks.NewTimeoutCollectorConsumer(t)
@@ -532,7 +533,7 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 	require.NoError(t, err)
 
 	// last view was successful, no lastViewTC in this case
-	timeouts := createTimeouts(stakingSigners, view, olderQC, nil)
+	timeouts := createTimeouts(stakingSignersSkeleton, view, olderQC, nil)
 	for _, timeout := range timeouts {
 		err := processor.Process(timeout)
 		require.NoError(t, err)
@@ -543,7 +544,7 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 	// at this point we have created QCs for view N-1 and N additionally a TC for view N, we can create TC for view N+1
 	// with timeout objects containing both QC and TC for view N
 
-	aggregator, err = NewTimeoutSignatureAggregator(view+1, stakingSigners, msig.CollectorTimeoutTag)
+	aggregator, err = NewTimeoutSignatureAggregator(view+1, stakingSignersSkeleton, msig.CollectorTimeoutTag)
 	require.NoError(t, err)
 
 	notifier = mocks.NewTimeoutCollectorConsumer(t)
@@ -554,8 +555,8 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 
 	// part of committee will use QC, another part TC, this will result in aggregated signature consisting
 	// of two types of messages with views N-1 and N representing the newest QC known to replicas.
-	timeoutsWithQC := createTimeouts(stakingSigners[:len(stakingSigners)/2], view+1, newestQC, nil)
-	timeoutsWithTC := createTimeouts(stakingSigners[len(stakingSigners)/2:], view+1, olderQC, lastViewTC)
+	timeoutsWithQC := createTimeouts(stakingSignersSkeleton[:len(stakingSignersSkeleton)/2], view+1, newestQC, nil)
+	timeoutsWithTC := createTimeouts(stakingSignersSkeleton[len(stakingSignersSkeleton)/2:], view+1, olderQC, lastViewTC)
 	timeouts = append(timeoutsWithQC, timeoutsWithTC...)
 	for _, timeout := range timeouts {
 		err := processor.Process(timeout)
@@ -569,7 +570,7 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 func createRealQC(
 	t *testing.T,
 	committee hotstuff.DynamicCommittee,
-	signers flow.IdentityList,
+	signers flow.IdentitySkeletonList,
 	signerObjects map[flow.Identifier]*verification.StakingSigner,
 	block *model.Block,
 ) *flow.QuorumCertificate {

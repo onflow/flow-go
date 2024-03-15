@@ -13,28 +13,28 @@ import (
 
 func TestBalance(t *testing.T) {
 	// test attoflow to flow
-
-	bal, err := types.NewBalanceFromAttoFlow(types.OneFlowInAttoFlow)
-	require.NoError(t, err)
-
-	conv := bal.ToAttoFlow()
-	require.Equal(t, types.OneFlowInAttoFlow, conv)
-
-	// encoding decoding
-	ret, err := types.DecodeBalance(bal.Encode())
-	require.NoError(t, err)
-	require.Equal(t, bal, ret)
+	bal := types.OneFlowBalance
+	require.Equal(t, bal, types.NewBalanceFromUFix64(types.OneFlowInUFix64))
 
 	// 100.0002 Flow
 	u, err := cadence.NewUFix64("100.0002")
 	require.NoError(t, err)
 	require.Equal(t, "100.00020000", u.String())
 
-	bb := types.Balance(u).ToAttoFlow()
-	require.Equal(t, "100000200000000000000", bb.String())
+	bb := types.NewBalanceFromUFix64(u)
+	require.Equal(t, "100000200000000000000", types.BalanceToBigInt(bb).String())
+	require.False(t, types.BalanceConvertionToUFix64ProneToRoundingError(bb))
+	bret, roundedOff, err := types.ConvertBalanceToUFix64(bb)
+	require.NoError(t, err)
+	require.Equal(t, u, bret)
+	require.False(t, roundedOff)
 
-	// invalid conversion
-	_, err = types.NewBalanceFromAttoFlow(big.NewInt(1))
-	require.Error(t, err)
-
+	// rounded off flag
+	bal = types.NewBalance(big.NewInt(1))
+	require.NoError(t, err)
+	require.True(t, types.BalanceConvertionToUFix64ProneToRoundingError(bal))
+	bret, roundedOff, err = types.ConvertBalanceToUFix64(bal)
+	require.NoError(t, err)
+	require.Equal(t, cadence.UFix64(0), bret)
+	require.True(t, roundedOff)
 }

@@ -87,7 +87,7 @@ func TestRegisterID_IsInternalState(t *testing.T) {
 func TestRegisterID_String(t *testing.T) {
 	t.Run("atree slab", func(t *testing.T) {
 		// slab with 189 should result in \\xbd
-		slabIndex := atree.StorageIndex([8]byte{0, 0, 0, 0, 0, 0, 0, 189})
+		slabIndex := atree.SlabIndex([8]byte{0, 0, 0, 0, 0, 0, 0, 189})
 
 		id := flow.NewRegisterID(
 			flow.BytesToAddress([]byte{1, 2, 3, 10}),

@@ -143,6 +143,8 @@ func (g *Builder) OverrideDefaultRpcInspectorSuiteFactory(factory p2p.GossipSubR
 // - sporkId: the spork id of the node.
 // - idProvider: the identity provider of the node.
 // - rpcInspectorConfig: the rpc inspector config of the node.
+// - subscriptionProviderPrams: the subscription provider params of the node.
+// - meshTracer: gossipsub mesh tracer.
 // Returns:
 // - a new gossipsub builder.
 // Note: the builder is not thread-safe. It should only be used in the main thread.
@@ -158,27 +160,37 @@ func NewGossipSubBuilder(logger zerolog.Logger,
 		Logger()
 
 	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                             lg,
-		Metrics:                            metricsCfg.Metrics,
-		IDProvider:                         idProvider,
-		LoggerInterval:                     gossipSubCfg.RpcTracer.LocalMeshLogInterval,
-		RpcSentTrackerCacheSize:            gossipSubCfg.RpcTracer.RPCSentTrackerCacheSize,
-		RpcSentTrackerWorkerQueueCacheSize: gossipSubCfg.RpcTracer.RPCSentTrackerQueueCacheSize,
-		RpcSentTrackerNumOfWorkers:         gossipSubCfg.RpcTracer.RpcSentTrackerNumOfWorkers,
+		Logger:         lg,
+		Metrics:        metricsCfg.Metrics,
+		IDProvider:     idProvider,
+		LoggerInterval: gossipSubCfg.RpcTracer.LocalMeshLogInterval,
+		RpcSentTracker: tracer.RpcSentTrackerConfig{
+			CacheSize:            gossipSubCfg.RpcTracer.RPCSentTrackerCacheSize,
+			WorkerQueueCacheSize: gossipSubCfg.RpcTracer.RPCSentTrackerQueueCacheSize,
+			WorkerQueueNumber:    gossipSubCfg.RpcTracer.RpcSentTrackerNumOfWorkers,
+		},
+		DuplicateMessageTrackerCacheConfig: gossipSubCfg.RpcTracer.DuplicateMessageTrackerConfig,
 		HeroCacheMetricsFactory:            metricsCfg.HeroCacheFactory,
 		NetworkingType:                     networkType,
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
 	b := &Builder{
-		logger:                   lg,
-		metricsCfg:               metricsCfg,
-		sporkId:                  sporkId,
-		networkType:              networkType,
-		idProvider:               idProvider,
-		gossipSubFactory:         defaultGossipSubFactory(),
-		gossipSubConfigFunc:      defaultGossipSubAdapterConfig(),
-		scoreOptionConfig:        scoring.NewScoreOptionConfig(lg, gossipSubCfg.ScoringParameters, metricsCfg.HeroCacheFactory, idProvider, networkType),
+		logger:              lg,
+		metricsCfg:          metricsCfg,
+		sporkId:             sporkId,
+		networkType:         networkType,
+		idProvider:          idProvider,
+		gossipSubFactory:    defaultGossipSubFactory(),
+		gossipSubConfigFunc: defaultGossipSubAdapterConfig(),
+		scoreOptionConfig: scoring.NewScoreOptionConfig(lg,
+			gossipSubCfg.ScoringParameters,
+			metricsCfg.HeroCacheFactory,
+			metricsCfg.Metrics,
+			idProvider,
+			meshTracer.DuplicateMessageCount,
+			networkType,
+		),
 		rpcInspectorSuiteFactory: defaultInspectorSuite(meshTracer),
 		gossipSubTracer:          meshTracer,
 		gossipSubCfg:             gossipSubCfg,

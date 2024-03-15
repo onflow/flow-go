@@ -190,7 +190,7 @@ func AddNodesToEachOthersPeerStore(t *testing.T, nodes []p2p.LibP2PNode, ids flo
 			if node == other {
 				continue
 			}
-			otherPInfo, err := utils.PeerAddressInfo(*ids[i])
+			otherPInfo, err := utils.PeerAddressInfo(ids[i].IdentitySkeleton)
 			require.NoError(t, err)
 			node.Host().Peerstore().AddAddrs(otherPInfo.ID, otherPInfo.Addrs, peerstore.AddressTTL)
 		}

@@ -72,7 +72,7 @@ func (s *NodeDisallowListWrapperTestSuite) TestHonestNode() {
 		f := filter.In(identities[3:4])
 		expectedFilteredIdentities := identities.Filter(f)
 		s.provider.On("Identities", mock.Anything).Return(
-			func(filter flow.IdentityFilter) flow.IdentityList {
+			func(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 				return identities.Filter(filter)
 			},
 			nil,
@@ -111,15 +111,15 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 			originalIdentity := blocklist[index.Inc()]
 			s.provider.On("ByNodeID", originalIdentity.NodeID).Return(originalIdentity, expectedfound)
 
-			var expectedIdentity = *originalIdentity // expected Identity is a copy of the original
-			expectedIdentity.Ejected = true          // with the `Ejected` flag set to true
+			var expectedIdentity = *originalIdentity                                         // expected Identity is a copy of the original
+			expectedIdentity.EpochParticipationStatus = flow.EpochParticipationStatusEjected // with the `Ejected` flag set to true
 
 			i, found := s.wrapper.ByNodeID(originalIdentity.NodeID)
 			require.Equal(s.T(), expectedfound, found)
 			require.Equal(s.T(), &expectedIdentity, i)
 
 			// check that originalIdentity returned by wrapped `IdentityProvider` is _not_ modified
-			require.False(s.T(), originalIdentity.Ejected)
+			require.False(s.T(), originalIdentity.IsEjected())
 		})
 
 		s.Run(fmt.Sprintf("IdentityProvider.ByPeerID returning (<non-nil identity>, %v)", expectedfound), func() {
@@ -127,15 +127,15 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 			peerID := (peer.ID)(originalIdentity.NodeID.String())
 			s.provider.On("ByPeerID", peerID).Return(originalIdentity, expectedfound)
 
-			var expectedIdentity = *originalIdentity // expected Identity is a copy of the original
-			expectedIdentity.Ejected = true          // with the `Ejected` flag set to true
+			var expectedIdentity = *originalIdentity                                         // expected Identity is a copy of the original
+			expectedIdentity.EpochParticipationStatus = flow.EpochParticipationStatusEjected // with the `Ejected` flag set to true
 
 			i, found := s.wrapper.ByPeerID(peerID)
 			require.Equal(s.T(), expectedfound, found)
 			require.Equal(s.T(), &expectedIdentity, i)
 
 			// check that originalIdentity returned by `IdentityProvider` is _not_ modified by wrapper
-			require.False(s.T(), originalIdentity.Ejected)
+			require.False(s.T(), originalIdentity.IsEjected())
 		})
 	}
 
@@ -149,19 +149,19 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 
 		s.provider.On("Identities", mock.Anything).Return(combinedIdentities)
 
-		noFilter := filter.Not(filter.In(nil))
+		noFilter := filter.Not(filter.In[flow.Identity](nil))
 		identities := s.wrapper.Identities(noFilter)
 
 		require.Equal(s.T(), numIdentities, len(identities)) // expected number resulting identities have the
 		for _, i := range identities {
 			_, isBlocked := blocklistLookup[i.NodeID]
-			require.Equal(s.T(), isBlocked, i.Ejected)
+			require.Equal(s.T(), isBlocked, i.IsEjected())
 		}
 
 		// check that original `combinedIdentities` returned by `IdentityProvider` are _not_ modified by wrapper
 		require.Equal(s.T(), numIdentities, len(combinedIdentities)) // length of list should not be modified by wrapper
 		for _, i := range combinedIdentities {
-			require.False(s.T(), i.Ejected) // Ejected flag should still have the original value (false here)
+			require.False(s.T(), i.IsEjected()) // Ejected flag should still have the original value (false here)
 		}
 	})
 
@@ -183,13 +183,13 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 		for _, i := range identities {
 			_, isBlocked := blocklistLookup[i.NodeID]
 			require.False(s.T(), isBlocked)
-			require.False(s.T(), i.Ejected)
+			require.False(s.T(), i.IsEjected())
 		}
 
 		// check that original `combinedIdentities` returned by `IdentityProvider` are _not_ modified by wrapper
 		require.Equal(s.T(), numIdentities, len(combinedIdentities)) // length of list should not be modified by wrapper
 		for _, i := range combinedIdentities {
-			require.False(s.T(), i.Ejected) // Ejected flag should still have the original value (false here)
+			require.False(s.T(), i.IsEjected()) // Ejected flag should still have the original value (false here)
 		}
 	})
 }
@@ -222,13 +222,13 @@ func (s *NodeDisallowListWrapperTestSuite) TestUnknownNode() {
 // it in combination a no-op. We test two scenarious
 //   - Node whose original `Identity` has `Ejected = false`:
 //     After adding the node to the disallowList and then removing it again, the `Ejected` should be false.
-//   - Node whose original `Identity` has `Ejected = true`:
+//   - Node whose original `Identity` has `EpochParticipationStatus = flow.EpochParticipationStatusEjected`:
 //     After adding the node to the disallowList and then removing it again, the `Ejected` should be still be true.
 func (s *NodeDisallowListWrapperTestSuite) TestDisallowListAddRemove() {
-	for _, originalEjected := range []bool{true, false} {
-		s.Run(fmt.Sprintf("Add & remove node with Ejected = %v", originalEjected), func() {
+	for _, originalParticipationStatus := range []flow.EpochParticipationStatus{flow.EpochParticipationStatusEjected, flow.EpochParticipationStatusActive} {
+		s.Run(fmt.Sprintf("Add & remove node with EpochParticipationStatus = %v", originalParticipationStatus), func() {
 			originalIdentity := unittest.IdentityFixture()
-			originalIdentity.Ejected = originalEjected
+			originalIdentity.EpochParticipationStatus = originalParticipationStatus
 			peerID := (peer.ID)(originalIdentity.NodeID.String())
 			s.provider.On("ByNodeID", originalIdentity.NodeID).Return(originalIdentity, true)
 			s.provider.On("ByPeerID", peerID).Return(originalIdentity, true)
@@ -237,11 +237,11 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListAddRemove() {
 			// an Identity with `Ejected` equal to the original value should be returned
 			i, found := s.wrapper.ByNodeID(originalIdentity.NodeID)
 			require.True(s.T(), found)
-			require.Equal(s.T(), originalEjected, i.Ejected)
+			require.Equal(s.T(), originalParticipationStatus, i.EpochParticipationStatus)
 
 			i, found = s.wrapper.ByPeerID(peerID)
 			require.True(s.T(), found)
-			require.Equal(s.T(), originalEjected, i.Ejected)
+			require.Equal(s.T(), originalParticipationStatus, i.EpochParticipationStatus)
 
 			// step 2: _after_ putting node on disallowList,
 			// an Identity with `Ejected` equal to `true` should be returned
@@ -254,11 +254,11 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListAddRemove() {
 
 			i, found = s.wrapper.ByNodeID(originalIdentity.NodeID)
 			require.True(s.T(), found)
-			require.True(s.T(), i.Ejected)
+			require.True(s.T(), i.IsEjected())
 
 			i, found = s.wrapper.ByPeerID(peerID)
 			require.True(s.T(), found)
-			require.True(s.T(), i.Ejected)
+			require.True(s.T(), i.IsEjected())
 
 			// step 3: after removing the node from the disallowList,
 			// an Identity with `Ejected` equal to the original value should be returned
@@ -271,11 +271,11 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListAddRemove() {
 
 			i, found = s.wrapper.ByNodeID(originalIdentity.NodeID)
 			require.True(s.T(), found)
-			require.Equal(s.T(), originalEjected, i.Ejected)
+			require.Equal(s.T(), originalParticipationStatus, i.EpochParticipationStatus)
 
 			i, found = s.wrapper.ByPeerID(peerID)
 			require.True(s.T(), found)
-			require.Equal(s.T(), originalEjected, i.Ejected)
+			require.Equal(s.T(), originalParticipationStatus, i.EpochParticipationStatus)
 		})
 	}
 }

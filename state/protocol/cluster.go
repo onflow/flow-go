@@ -20,8 +20,10 @@ type Cluster interface {
 	// EpochCounter returns the epoch counter for this cluster.
 	EpochCounter() uint64
 
-	// Members returns the initial set of collector nodes in this cluster.
-	Members() flow.IdentityList
+	// Members returns the IdentitySkeletons of the cluster members in canonical order.
+	// This represents the cluster composition at the time the cluster was specified by the epoch smart
+	// contract (hence, we return IdentitySkeletons as opposed to full identities).
+	Members() flow.IdentitySkeletonList
 
 	// RootBlock returns the root block for this cluster.
 	RootBlock() *cluster.Block

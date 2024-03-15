@@ -18,8 +18,6 @@ import (
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol/inmem"
-	"github.com/onflow/flow-go/utils/io"
 )
 
 func makeDir(t *testing.T, base string, subdir string) string {
@@ -97,26 +95,6 @@ func WriteJSON(path string, data interface{}) error {
 func WriteFile(path string, data []byte) error {
 	err := os.WriteFile(path, data, 0644)
 	return err
-}
-
-// rootProtocolJsonWithoutAddresses strips out all node addresses from the root protocol json file specified as srcFile
-// and creates the dstFile with the modified contents
-func rootProtocolJsonWithoutAddresses(srcfile string, dstFile string) error {
-
-	data, err := io.ReadFile(filepath.Join(srcfile))
-	if err != nil {
-		return err
-	}
-
-	var rootSnapshot inmem.EncodableSnapshot
-	err = json.Unmarshal(data, &rootSnapshot)
-	if err != nil {
-		return err
-	}
-
-	strippedSnapshot := inmem.StrippedInmemSnapshot(rootSnapshot)
-
-	return WriteJSON(dstFile, strippedSnapshot)
 }
 
 func WriteObserverPrivateKey(observerName, bootstrapDir string) error {

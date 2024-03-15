@@ -65,7 +65,7 @@ func (u *Epoch) DKGPhase3FinalView() (uint64, error) {
 	return 0, u.err
 }
 
-func (u *Epoch) InitialIdentities() (flow.IdentityList, error) {
+func (u *Epoch) InitialIdentities() (flow.IdentitySkeletonList, error) {
 	return nil, u.err
 }
 

@@ -62,11 +62,15 @@ func withReader(
 		// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
 		// Container blocks only contain receipts of their preceding reference blocks. But they do not
 		// hold any guarantees.
-		root, err := s.State.Params().FinalizedRoot()
+		root, err := s.State.Final().Head()
 		require.NoError(t, err)
-		clusterCommittee := participants.Filter(filter.HasRole(flow.RoleCollection))
+		protocolState, err := s.State.Final().ProtocolState()
+		require.NoError(t, err)
+		protocolStateID := protocolState.Entry().ID()
+
+		clusterCommittee := participants.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 		sources := unittest.RandomSourcesFixture(10)
-		results := vertestutils.CompleteExecutionReceiptChainFixture(t, root, blockCount/2, sources, vertestutils.WithClusterCommittee(clusterCommittee))
+		results := vertestutils.CompleteExecutionReceiptChainFixture(t, root, protocolStateID, blockCount/2, sources, vertestutils.WithClusterCommittee(clusterCommittee))
 		blocks := vertestutils.ExtendStateWithFinalizedBlocks(t, results, s.State)
 
 		withBlockReader(reader, blocks)

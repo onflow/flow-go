@@ -56,10 +56,11 @@ func UntrustedExecutionResultFromInternal(internal *flow.ExecutionResult) Untrus
 // Deprecated: Please update flow.Payload to use []flow.Guarantee etc., then
 // replace instances of this type with flow.Payload
 type UntrustedBlockPayload struct {
-	Guarantees []flow.CollectionGuarantee
-	Seals      []flow.Seal
-	Receipts   []flow.ExecutionReceiptMeta
-	Results    []UntrustedExecutionResult
+	Guarantees      []flow.CollectionGuarantee
+	Seals           []flow.Seal
+	Receipts        []flow.ExecutionReceiptMeta
+	Results         []UntrustedExecutionResult
+	ProtocolStateID flow.Identifier
 }
 
 // UntrustedBlock is a duplicate of flow.Block used within
@@ -76,8 +77,10 @@ type UntrustedBlock struct {
 // ToInternal returns the internal representation of the type.
 func (ub *UntrustedBlock) ToInternal() *flow.Block {
 	block := flow.Block{
-		Header:  &ub.Header,
-		Payload: &flow.Payload{},
+		Header: &ub.Header,
+		Payload: &flow.Payload{
+			ProtocolStateID: ub.Payload.ProtocolStateID,
+		},
 	}
 	for _, guarantee := range ub.Payload.Guarantees {
 		guarantee := guarantee
@@ -104,6 +107,9 @@ func (ub *UntrustedBlock) ToInternal() *flow.Block {
 func UntrustedBlockFromInternal(flowBlock *flow.Block) UntrustedBlock {
 	block := UntrustedBlock{
 		Header: *flowBlock.Header,
+		Payload: UntrustedBlockPayload{
+			ProtocolStateID: flowBlock.Payload.ProtocolStateID,
+		},
 	}
 	for _, guarantee := range flowBlock.Payload.Guarantees {
 		block.Payload.Guarantees = append(block.Payload.Guarantees, *guarantee)

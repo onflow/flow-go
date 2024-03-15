@@ -42,6 +42,25 @@ func (b *ProtocolStateBlocks) FinalizedHeader() (*flow.Header, error) {
 	return b.state.Final().Head()
 }
 
+// RateLimiter is an interface for checking if an address is rate limited.
+// By convention, the address used is the payer field of a transaction.
+// This rate limiter is applied when a transaction is first received by a
+// node, meaning that if a transaction is rate-limited it will be dropped.
+type RateLimiter interface {
+	// IsRateLimited returns true if the address is rate limited
+	IsRateLimited(address flow.Address) bool
+}
+
+type NoopLimiter struct{}
+
+func NewNoopLimiter() *NoopLimiter {
+	return &NoopLimiter{}
+}
+
+func (l *NoopLimiter) IsRateLimited(address flow.Address) bool {
+	return false
+}
+
 type TransactionValidationOptions struct {
 	Expiry                       uint
 	ExpiryBuffer                 uint
@@ -58,6 +77,7 @@ type TransactionValidator struct {
 	chain                 flow.Chain // for checking validity of addresses
 	options               TransactionValidationOptions
 	serviceAccountAddress flow.Address
+	limiter               RateLimiter
 }
 
 func NewTransactionValidator(
@@ -70,10 +90,35 @@ func NewTransactionValidator(
 		chain:                 chain,
 		options:               options,
 		serviceAccountAddress: chain.ServiceAddress(),
+		limiter:               NewNoopLimiter(),
+	}
+}
+
+func NewTransactionValidatorWithLimiter(
+	blocks Blocks,
+	chain flow.Chain,
+	options TransactionValidationOptions,
+	rateLimiter RateLimiter,
+) *TransactionValidator {
+	return &TransactionValidator{
+		blocks:                blocks,
+		chain:                 chain,
+		options:               options,
+		serviceAccountAddress: chain.ServiceAddress(),
+		limiter:               rateLimiter,
 	}
 }
 
 func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
+	// rate limit transactions for specific payers.
+	// a short term solution to prevent attacks that send too many failed transactions
+	// if a transaction is from a payer that should be rate limited, all the following
+	// checks will be skipped
+	err = v.checkRateLimitPayer(tx)
+	if err != nil {
+		return err
+	}
+
 	err = v.checkTxSizeLimit(tx)
 	if err != nil {
 		return err
@@ -116,6 +161,15 @@ func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
 
 	// TODO replace checkSignatureFormat by verifying the account/payer signatures
 
+	return nil
+}
+
+func (v *TransactionValidator) checkRateLimitPayer(tx *flow.TransactionBody) error {
+	if v.limiter.IsRateLimited(tx.Payer) {
+		return InvalidTxRateLimitedError{
+			Payer: tx.Payer,
+		}
+	}
 	return nil
 }
 

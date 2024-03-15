@@ -13,7 +13,7 @@ type Requester struct {
 }
 
 // EntityByID provides a mock function with given fields: entityID, selector
-func (_m *Requester) EntityByID(entityID flow.Identifier, selector flow.IdentityFilter) {
+func (_m *Requester) EntityByID(entityID flow.Identifier, selector flow.IdentityFilter[flow.Identity]) {
 	_m.Called(entityID, selector)
 }
 
@@ -23,7 +23,7 @@ func (_m *Requester) Force() {
 }
 
 // Query provides a mock function with given fields: key, selector
-func (_m *Requester) Query(key flow.Identifier, selector flow.IdentityFilter) {
+func (_m *Requester) Query(key flow.Identifier, selector flow.IdentityFilter[flow.Identity]) {
 	_m.Called(key, selector)
 }
 

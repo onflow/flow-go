@@ -70,27 +70,29 @@ func (epoch EpochHeights) CommittedRange() []uint64 {
 
 // EpochBuilder is a testing utility for building epochs into chain state.
 type EpochBuilder struct {
-	t          *testing.T
-	states     []protocol.FollowerState
-	blocksByID map[flow.Identifier]*flow.Block
-	blocks     []*flow.Block
-	built      map[uint64]*EpochHeights
-	setupOpts  []func(*flow.EpochSetup)  // options to apply to the EpochSetup event
-	commitOpts []func(*flow.EpochCommit) // options to apply to the EpochCommit event
+	t                    *testing.T
+	mutableProtocolState protocol.MutableProtocolState
+	states               []protocol.FollowerState
+	blocksByID           map[flow.Identifier]*flow.Block
+	blocks               []*flow.Block
+	built                map[uint64]*EpochHeights
+	setupOpts            []func(*flow.EpochSetup)  // options to apply to the EpochSetup event
+	commitOpts           []func(*flow.EpochCommit) // options to apply to the EpochCommit event
 }
 
 // NewEpochBuilder returns a new EpochBuilder which will build epochs using the
 // given states. At least one state must be provided. If more than one are
 // provided they must have the same initial state.
-func NewEpochBuilder(t *testing.T, states ...protocol.FollowerState) *EpochBuilder {
+func NewEpochBuilder(t *testing.T, mutator protocol.MutableProtocolState, states ...protocol.FollowerState) *EpochBuilder {
 	require.True(t, len(states) >= 1, "must provide at least one state")
 
 	builder := &EpochBuilder{
-		t:          t,
-		states:     states,
-		blocksByID: make(map[flow.Identifier]*flow.Block),
-		blocks:     make([]*flow.Block, 0),
-		built:      make(map[uint64]*EpochHeights),
+		t:                    t,
+		mutableProtocolState: mutator,
+		states:               states,
+		blocksByID:           make(map[flow.Identifier]*flow.Block),
+		blocks:               make([]*flow.Block, 0),
+		built:                make(map[uint64]*EpochHeights),
 	}
 	return builder
 }
@@ -159,20 +161,20 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 
 	// prepare default values for the service events based on the current state
 	identities, err := state.Final().Identities(filter.Any)
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
 	epoch := state.Final().Epochs().Current()
 	counter, err := epoch.Counter()
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
 	finalView, err := epoch.FinalView()
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
 
 	// retrieve block A
 	A, err := state.Final().Head()
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
 
 	// check that block A satisfies initial condition
 	phase, err := state.Final().Phase()
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
 	require.Equal(builder.t, flow.EpochPhaseStaking, phase)
 
 	// Define receipts and seals for block B payload. They will be nil if A is
@@ -201,7 +203,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 
 	// defaults for the EpochSetup event
 	setupDefaults := []func(*flow.EpochSetup){
-		WithParticipants(identities),
+		WithParticipants(identities.ToSkeleton()),
 		SetupWithCounter(counter + 1),
 		WithFirstView(finalView + 1),
 		WithFinalView(finalView + 1_000_000),
@@ -364,11 +366,22 @@ func (builder *EpochBuilder) BuildBlocks(n uint) {
 }
 
 // addBlock adds the given block to the state by: extending the state,
-// finalizing the block, marking the block as valid, and caching the block.
+// finalizing the block, and caching the block.
 func (builder *EpochBuilder) addBlock(block *flow.Block) {
+	stateMutator, err := builder.mutableProtocolState.Mutator(block.Header.View, block.Header.ParentID)
+	require.NoError(builder.t, err)
+
+	err = stateMutator.ApplyServiceEventsFromValidatedSeals(block.Payload.Seals)
+	require.NoError(builder.t, err)
+
+	_, _, updatedStateId, _ := stateMutator.Build()
+	require.NoError(builder.t, err)
+
+	block.Payload.ProtocolStateID = updatedStateId
+	block.Header.PayloadHash = block.Payload.Hash()
 	blockID := block.ID()
 	for _, state := range builder.states {
-		err := state.ExtendCertified(context.Background(), block, CertifyBlock(block.Header))
+		err = state.ExtendCertified(context.Background(), block, CertifyBlock(block.Header))
 		require.NoError(builder.t, err)
 
 		err = state.Finalize(context.Background(), blockID)

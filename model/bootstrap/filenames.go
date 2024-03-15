@@ -23,8 +23,9 @@ var (
 	DirnameRootBlockVotes     = filepath.Join(DirnamePublicBootstrap, "root-block-votes")
 	FileNamePartnerWeights    = "partner-weights.json"
 
-	PathRootBlockData             = filepath.Join(DirnamePublicBootstrap, "root-block.json")
-	PathRootProtocolStateSnapshot = filepath.Join(DirnamePublicBootstrap, "root-protocol-state-snapshot.json")
+	PathRootBlockData                 = filepath.Join(DirnamePublicBootstrap, "root-block.json")
+	PathIntermediaryBootstrappingData = filepath.Join(DirnamePublicBootstrap, "intermediary-bootstrapping-data.json")
+	PathRootProtocolStateSnapshot     = filepath.Join(DirnamePublicBootstrap, "root-protocol-state-snapshot.json")
 
 	FilenameWALRootCheckpoint = "root.checkpoint"
 	PathRootCheckpoint        = filepath.Join(DirnameExecutionState, FilenameWALRootCheckpoint) // only available on an execution node

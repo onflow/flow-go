@@ -16,7 +16,7 @@ import (
 
 // Upstream is a container for an individual upstream containing the id, client and closer for it
 type Upstream struct {
-	id     *flow.Identity         // the public identity of one network participant (node)
+	id     *flow.IdentitySkeleton // the public identity of one network participant (node)
 	client access.AccessAPIClient // client with gRPC connection
 	closer io.Closer              // closer for client connection, should use to close the connection when done
 }
@@ -29,7 +29,7 @@ type Forwarder struct {
 	connFactory connection.ConnectionFactory
 }
 
-func NewForwarder(identities flow.IdentityList, connectionFactory connection.ConnectionFactory) (*Forwarder, error) {
+func NewForwarder(identities flow.IdentitySkeletonList, connectionFactory connection.ConnectionFactory) (*Forwarder, error) {
 	forwarder := &Forwarder{connFactory: connectionFactory}
 	err := forwarder.setFlowAccessAPI(identities)
 	return forwarder, err
@@ -39,7 +39,7 @@ func NewForwarder(identities flow.IdentityList, connectionFactory connection.Con
 // It is used by Observer services, Blockchain Data Service, etc.
 // Make sure that this is just for observation and not a staked participant in the flow network.
 // This means that observers see a copy of the data but there is no interaction to ensure integrity from the root block.
-func (f *Forwarder) setFlowAccessAPI(accessNodeAddressAndPort flow.IdentityList) error {
+func (f *Forwarder) setFlowAccessAPI(accessNodeAddressAndPort flow.IdentitySkeletonList) error {
 	f.upstream = make([]Upstream, accessNodeAddressAndPort.Count())
 	for i, identity := range accessNodeAddressAndPort {
 		// Store the faultTolerantClient setup parameters such as address, public, key and timeout, so that

@@ -17,6 +17,7 @@ type RpcInspectorParameters struct {
 
 // RpcValidationInspectorParameters keys.
 const (
+	ProcessKey                      = "process"
 	ClusterPrefixedMessageConfigKey = "cluster-prefixed-messages"
 	IWantConfigKey                  = "iwant"
 	IHaveConfigKey                  = "ihave"
@@ -25,7 +26,7 @@ const (
 	InspectionQueueConfigKey        = "inspection-queue"
 )
 
-// RpcValidationInspector validation limits used for gossipsub RPC control message inspection.
+// RpcValidationInspector rpc control message validation inspector configuration.
 type RpcValidationInspector struct {
 	ClusterPrefixedMessage ClusterPrefixedMessageInspectionParameters `mapstructure:"cluster-prefixed-messages"`
 	IWant                  IWantRpcInspectionParameters               `mapstructure:"iwant"`
@@ -33,6 +34,64 @@ type RpcValidationInspector struct {
 	GraftPrune             GraftPruneRpcInspectionParameters          `mapstructure:"graft-and-prune"`
 	PublishMessages        PublishMessageInspectionParameters         `mapstructure:"publish-messages"`
 	InspectionQueue        InspectionQueueParameters                  `mapstructure:"inspection-queue"`
+	// InspectionProcess configuration that controls which aspects of rpc inspection are enabled and disabled during inspect message request processing.
+	InspectionProcess InspectionProcess `mapstructure:"process"`
+}
+
+// InspectionProcess configuration that controls which aspects of rpc inspection are enabled and disabled during inspect message request processing.
+type InspectionProcess struct {
+	Inspect  Inspect  `validate:"required" mapstructure:"inspection"`
+	Truncate Truncate `validate:"required" mapstructure:"truncation"`
+}
+
+const (
+	InspectionKey = "inspection"
+	TruncationKey = "truncation"
+	EnableKey     = "enable"
+	DisabledKey   = "disabled"
+	MessageIDKey  = "message-id"
+)
+
+// Inspect configuration to enable/disable RPC inspection for a particular control message type.
+type Inspect struct {
+	// Disabled serves as a fail-safe mechanism to globally deactivate inspection logic. When this fail-safe is activated it disables all
+	// aspects of the inspection logic, irrespective of individual configurations like inspection.enable-graft, inspection.enable-prune, etc.
+	// Consequently, all metrics collection and logging related to the rpc and inspection will also be disabled.
+	// It is important to note that activating this fail-safe results in a comprehensive deactivation inspection features.
+	// Please use this setting judiciously, considering its broad impact on the behavior of control message handling.
+	Disabled bool `mapstructure:"disabled"`
+	// EnableGraft enable graft control message inspection.
+	EnableGraft bool `mapstructure:"enable-graft"`
+	// EnablePrune enable prune control message inspection.
+	EnablePrune bool `mapstructure:"enable-prune"`
+	// EnableIHave enable iHave control message inspection.
+	EnableIHave bool `mapstructure:"enable-ihave"`
+	// EnableIWant enable iWant control message inspection.
+	EnableIWant bool `mapstructure:"enable-iwant"`
+	// EnablePublish enable publish message inspection.
+	EnablePublish bool `mapstructure:"enable-publish"`
+}
+
+// Truncate configuration to enable/disable RPC truncation for a particular control message type.
+type Truncate struct {
+	// Disabled serves as a fail-safe mechanism to globally deactivate truncation logic. When this fail-safe is activated it disables all
+	// aspects of the truncation logic, irrespective of individual configurations like truncation.enable-graft, truncation.enable-prune, etc.
+	// Consequently, all metrics collection and logging related to the rpc and inspection will also be disabled.
+	// It is important to note that activating this fail-safe results in a comprehensive deactivation truncation features.
+	// Please use this setting judiciously, considering its broad impact on the behavior of control message handling.
+	Disabled bool `mapstructure:"disabled"`
+	// EnableGraft enable graft control message truncation.
+	EnableGraft bool `mapstructure:"enable-graft"`
+	// EnablePrune enable prune control message truncation.
+	EnablePrune bool `mapstructure:"enable-prune"`
+	// EnableIHave enable iHave control message truncation.
+	EnableIHave bool `mapstructure:"enable-ihave"`
+	// EnableIHaveMessageIds enable iHave message id truncation.
+	EnableIHaveMessageIds bool `mapstructure:"enable-ihave-message-id"`
+	// EnableIWant enable iWant control message truncation.
+	EnableIWant bool `mapstructure:"enable-iwant"`
+	// EnableIWantMessageIds enable iWant message id truncation.
+	EnableIWantMessageIds bool `mapstructure:"enable-iwant-message-id"`
 }
 
 const (

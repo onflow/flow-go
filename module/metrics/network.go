@@ -27,6 +27,7 @@ type NetworkCollector struct {
 	*GossipSubScoreMetrics
 	*LocalGossipSubRouterMetrics
 	*GossipSubRpcValidationInspectorMetrics
+	*GossipSubScoringRegistryMetrics
 	*AlspMetrics
 	outboundMessageSize          *prometheus.HistogramVec
 	inboundMessageSize           *prometheus.HistogramVec
@@ -77,6 +78,7 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 	nc.LocalGossipSubRouterMetrics = NewGossipSubLocalMeshMetrics(nc.prefix)
 	nc.GossipSubScoreMetrics = NewGossipSubScoreMetrics(nc.prefix)
 	nc.GossipSubRpcValidationInspectorMetrics = NewGossipSubRPCValidationInspectorMetrics(nc.prefix)
+	nc.GossipSubScoringRegistryMetrics = NewGossipSubScoringRegistryMetrics(nc.prefix)
 	nc.AlspMetrics = NewAlspMetrics()
 
 	nc.outboundMessageSize = promauto.NewHistogramVec(

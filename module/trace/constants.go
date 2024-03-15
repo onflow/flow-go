@@ -12,6 +12,7 @@ const (
 	ProtoStateMutatorExtendCheckGuarantees SpanName = "proto.state.mutator.extend.checkGuarantees"
 	ProtoStateMutatorExtendCheckSeals      SpanName = "proto.state.mutator.extend.checkSeals"
 	ProtoStateMutatorExtendCheckReceipts   SpanName = "proto.state.mutator.extend.checkReceipts"
+	ProtoStateMutatorEvolveProtocolState   SpanName = "proto.state.mutator.extend.evolveProtocolState"
 	ProtoStateMutatorExtendDBInsert        SpanName = "proto.state.mutator.extend.dbInsert"
 
 	// HeaderExtend

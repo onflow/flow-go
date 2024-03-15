@@ -28,7 +28,7 @@ type ChunkDataPackRequestInfo struct {
 func (c ChunkDataPackRequestInfo) SampleTargets(count int) (flow.IdentifierList, error) {
 	// if there are enough receipts produced the same result (agrees), we sample from them.
 	if len(c.Agrees) >= count {
-		sample, err := c.Targets.Filter(filter.HasNodeID(c.Agrees...)).Sample(uint(count))
+		sample, err := c.Targets.Filter(filter.HasNodeID[flow.Identity](c.Agrees...)).Sample(uint(count))
 		if err != nil {
 			return nil, fmt.Errorf("sampling target failed: %w", err)
 		}
@@ -41,7 +41,7 @@ func (c ChunkDataPackRequestInfo) SampleTargets(count int) (flow.IdentifierList,
 	// fetch from the one produced the same result (the only agree)
 	need := uint(count - len(c.Agrees))
 
-	nonResponders, err := c.Targets.Filter(filter.Not(filter.HasNodeID(c.Disagrees...))).Sample(need)
+	nonResponders, err := c.Targets.Filter(filter.Not(filter.HasNodeID[flow.Identity](c.Disagrees...))).Sample(need)
 	if err != nil {
 		return nil, fmt.Errorf("sampling target failed: %w", err)
 	}

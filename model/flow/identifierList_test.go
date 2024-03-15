@@ -16,7 +16,7 @@ import (
 func TestCanonicalOrderingMatch(t *testing.T) {
 	identities := unittest.IdentityListFixture(100)
 	require.Equal(t,
-		identities.Sort(flow.Canonical).NodeIDs(),
+		identities.Sort(flow.Canonical[flow.Identity]).NodeIDs(),
 		identities.NodeIDs().Sort(flow.IdentifierCanonical))
 }
 

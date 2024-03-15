@@ -1,6 +1,8 @@
 package badger
 
 import (
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -48,7 +50,7 @@ func (ec *EpochCommits) retrieveTx(commitID flow.Identifier) func(tx *badger.Txn
 	return func(tx *badger.Txn) (*flow.EpochCommit, error) {
 		val, err := ec.cache.Get(commitID)(tx)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not retrieve EpochCommit event with id %x: %w", commitID, err)
 		}
 		return val, nil
 	}

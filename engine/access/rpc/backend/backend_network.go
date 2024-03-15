@@ -54,17 +54,10 @@ func (b *backendNetwork) GetNetworkParameters(_ context.Context) access.NetworkP
 	}
 }
 
-func (b *backendNetwork) GetNodeVersionInfo(ctx context.Context) (*access.NodeVersionInfo, error) {
+func (b *backendNetwork) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo, error) {
 	stateParams := b.state.Params()
-	sporkId, err := stateParams.SporkID()
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to read spork ID: %v", err)
-	}
-
-	protocolVersion, err := stateParams.ProtocolVersion()
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to read protocol version: %v", err)
-	}
+	sporkId := stateParams.SporkID()
+	protocolVersion := stateParams.ProtocolVersion()
 
 	return &access.NodeVersionInfo{
 		Semver:          build.Version(),

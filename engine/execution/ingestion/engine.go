@@ -205,7 +205,8 @@ func (e *Engine) BlockProcessable(b *flow.Header, _ *flow.QuorumCertificate) {
 
 	// TODO: this should not be blocking: https://github.com/onflow/flow-go/issues/4400
 
-	// skip if stopControl tells to skip
+	// skip if stopControl tells to skip, so that we can avoid fetching collections
+	// for this block
 	if !e.stopControl.ShouldExecuteBlock(b) {
 		return
 	}
@@ -363,6 +364,12 @@ func (e *Engine) executeBlock(
 	ctx context.Context,
 	executableBlock *entity.ExecutableBlock,
 ) {
+
+	// don't execute the block if the stop control says no
+	if !e.stopControl.ShouldExecuteBlock(executableBlock.Block.Header) {
+		return
+	}
+
 	lg := e.log.With().
 		Hex("block_id", logging.Entity(executableBlock)).
 		Uint64("height", executableBlock.Block.Header.Height).
@@ -445,6 +452,8 @@ func (e *Engine) executeBlock(
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("block executed")
 
+	e.stopControl.OnBlockExecuted(executableBlock.Block.Header)
+
 	err = e.onBlockExecuted(executableBlock, finalEndState)
 	if err != nil {
 		lg.Err(err).Msg("failed in process block's children")
@@ -453,8 +462,6 @@ func (e *Engine) executeBlock(
 	if e.executionDataPruner != nil {
 		e.executionDataPruner.NotifyFulfilledHeight(executableBlock.Height())
 	}
-
-	e.stopControl.OnBlockExecuted(executableBlock.Block.Header)
 
 	e.unit.Ctx()
 

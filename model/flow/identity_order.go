@@ -15,8 +15,8 @@ package flow
 // Use `IsCanonical` for canonical order checks.
 //
 // The current function is based on the identifiers bytes lexicographic comparison.
-func Canonical(identity1 *Identity, identity2 *Identity) int {
-	return IdentifierCanonical(identity1.NodeID, identity2.NodeID)
+func Canonical[T GenericIdentity](identity1 *T, identity2 *T) int {
+	return IdentifierCanonical((*identity1).GetNodeID(), (*identity2).GetNodeID())
 }
 
 // IsCanonical returns true if and only if the given Identities are in canonical order.
@@ -27,7 +27,7 @@ func Canonical(identity1 *Identity, identity2 *Identity) int {
 // The strictness is important, meaning that two identities with the same
 // NodeID do not satisfy the canonical order.
 // This also implies that the canonical order is irreflexive ((i,i) isn't in canonical order).
-func IsCanonical(i1, i2 *Identity) bool {
+func IsCanonical[T GenericIdentity](i1, i2 *T) bool {
 	return Canonical(i1, i2) < 0
 }
 
@@ -52,7 +52,7 @@ func ByReferenceOrder(nodeIDs []Identifier) func(*Identity, *Identity) int {
 //
 // The strictness is important here, meaning that a list with 2 successive entities
 // with equal NodeID isn't considered well sorted.
-func IsIdentityListCanonical(il IdentityList) bool {
+func IsIdentityListCanonical[T GenericIdentity](il GenericIdentityList[T]) bool {
 	for i := 0; i < len(il)-1; i++ {
 		if !IsCanonical(il[i], il[i+1]) {
 			return false

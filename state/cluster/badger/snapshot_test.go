@@ -66,7 +66,7 @@ func (suite *SnapshotSuite) SetupTest() {
 		all.QuorumCertificates,
 		all.Setups,
 		all.EpochCommits,
-		all.Statuses,
+		all.ProtocolState,
 		all.VersionBeacons,
 		root,
 	)
@@ -290,8 +290,6 @@ func (suite *SnapshotSuite) TestPending_Grandchildren() {
 }
 
 func (suite *SnapshotSuite) TestParams_ChainID() {
-
-	chainID, err := suite.state.Params().ChainID()
-	suite.Require().Nil(err)
+	chainID := suite.state.Params().ChainID()
 	suite.Assert().Equal(suite.genesis.Header.ChainID, chainID)
 }

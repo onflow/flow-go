@@ -58,8 +58,3 @@ func GetRandomLogFixture(t testing.TB) *gethTypes.Log {
 		Data: RandomData(t),
 	}
 }
-
-// MakeABalanceInFlow makes a balance object that has `amount` Flow Token in it
-func MakeABalanceInFlow(amount uint64) types.Balance {
-	return types.Balance(uint64(100_000_000) * amount)
-}

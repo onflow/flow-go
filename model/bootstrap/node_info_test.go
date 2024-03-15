@@ -25,7 +25,7 @@ func TestIdentityListCanonical(t *testing.T) {
 	nodesCopy := make([]bootstrap.NodeInfo, len(nodes))
 	copy(nodesCopy, nodes)
 
-	sortedNodes := bootstrap.Sort(nodes, flow.Canonical)
+	sortedNodes := bootstrap.Sort(nodes, flow.Canonical[flow.Identity])
 	sortedIds := bootstrap.ToIdentityList(sortedNodes)
 	require.True(t, flow.IsIdentityListCanonical(sortedIds))
 	// make sure original list didn't change
@@ -34,7 +34,7 @@ func TestIdentityListCanonical(t *testing.T) {
 	// check `IsIdentityListCanonical` detects order equality in a sorted list
 	nodes[1] = nodes[10] // add a duplication
 	copy(nodesCopy, nodes)
-	sortedNodes = bootstrap.Sort(nodes, flow.Canonical)
+	sortedNodes = bootstrap.Sort(nodes, flow.Canonical[flow.Identity])
 	sortedIds = bootstrap.ToIdentityList(sortedNodes)
 	assert.False(t, flow.IsIdentityListCanonical(sortedIds))
 	// make sure original list didn't change

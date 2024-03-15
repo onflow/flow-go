@@ -68,7 +68,7 @@ func (epoch *epochInfo) fractionComplete(curView uint64) float64 {
 // interface, specifically `happyPathBlockTime` on the happy path. The purpose of the
 // `ProposalTiming` wrapper is to translate the raw controller output into a form
 // that is useful for the event handler. Edge cases, such as initialization or
-// EECC are implemented by other implementations of `ProposalTiming`.
+// EFM are implemented by other implementations of `ProposalTiming`.
 type BlockTimeController struct {
 	component.Component
 	protocol.Consumer // consumes protocol state events
@@ -242,7 +242,7 @@ func (ctl *BlockTimeController) processEventsWorkerLogic(ctx irrecoverable.Signa
 		case <-ctl.epochFallbacks:
 			err := ctl.processEpochFallbackTriggered()
 			if err != nil {
-				ctl.log.Err(err).Msgf("fatal error processing epoch EECC event")
+				ctl.log.Err(err).Msgf("fatal error processing epoch EFM event")
 				ctx.Throw(err)
 			}
 		default:
@@ -270,7 +270,7 @@ func (ctl *BlockTimeController) processEventsWorkerLogic(ctx irrecoverable.Signa
 		case <-ctl.epochFallbacks:
 			err := ctl.processEpochFallbackTriggered()
 			if err != nil {
-				ctl.log.Err(err).Msgf("fatal error processing epoch EECC event")
+				ctl.log.Err(err).Msgf("fatal error processing epoch EFM event")
 				ctx.Throw(err)
 				return
 			}

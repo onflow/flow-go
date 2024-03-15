@@ -285,7 +285,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ClusterPrefix
 func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFailure() {
 	s.Run("sender is ejected", func() {
 		identity, _ := unittest.IdentityWithNetworkingKeyFixture()
-		identity.Ejected = true
+		identity.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 		getIdentityFunc := s.getIdentity(identity)
 		pid, err := unittest.PeerIDFromFlowID(identity)
 		require.NoError(s.T(), err)

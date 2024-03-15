@@ -139,7 +139,7 @@ func (s *Suite) TestOnFinalizedBlock() {
 	))
 
 	// prepare cluster committee members
-	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole(flow.RoleCollection))
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 	refBlockID := unittest.IdentifierFixture()
 	for _, guarantee := range block.Payload.Guarantees {
 		guarantee.ReferenceBlockID = refBlockID
@@ -326,7 +326,7 @@ func (s *Suite) TestRequestMissingCollections() {
 	heightMap := make(map[uint64]*flow.Block, blkCnt)
 
 	// prepare cluster committee members
-	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole(flow.RoleCollection))
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 
 	// generate the test blocks and collections
 	var collIDs []flow.Identifier
@@ -469,7 +469,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 	collMap := make(map[flow.Identifier]*flow.LightCollection, blkCnt*collPerBlk)
 
 	// prepare cluster committee members
-	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole(flow.RoleCollection))
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 
 	refBlockID := unittest.IdentifierFixture()
 	// generate the test blocks, cgs and collections
