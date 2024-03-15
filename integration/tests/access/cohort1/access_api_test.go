@@ -267,18 +267,21 @@ func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
 	})
 	s.Require().NoError(err)
 
+	expectedCounter := uint64(0)
 	for {
 		resp, err := subClient.Recv()
 		if err != nil {
 			if err == io.EOF {
-				return
+				break
 			}
 
-			s.log.Info().Msgf("####**** %s", err.Error())
+			s.log.Info().Msgf("Error from transaction subscription %s", err.Error())
 			break
 		}
+		s.Assert().Equal(expectedCounter, resp.GetMessageIndex())
+		expectedCounter++
 
-		s.log.Info().Msgf("!!!! %s %d %s", resp.Status.String(), resp.GetMessageIndex(), sdk.Identifier(resp.GetId()).Hex())
+		s.log.Info().Msgf("Get transaction subscription responce: status: %s message index: %d transaction ID: %s", resp.Status.String(), resp.GetMessageIndex(), sdk.Identifier(resp.GetId()).Hex())
 	}
 }
 
