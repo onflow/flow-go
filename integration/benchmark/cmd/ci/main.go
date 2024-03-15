@@ -3,24 +3,22 @@ package main
 import (
 	"context"
 	"flag"
-	"gopkg.in/yaml.v3"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/onflow/flow-go/integration/benchmark/load"
-
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"gopkg.in/yaml.v3"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/access"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
 	"github.com/onflow/flow-go/integration/benchmark"
+	"github.com/onflow/flow-go/integration/benchmark/load"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
