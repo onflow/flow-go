@@ -23,7 +23,7 @@ type StateMachineSuite struct {
 
 	view        uint64
 	parentState *mock.KVStoreReader
-	mutator     *mock.KVStoreAPI
+	mutator     *mock.KVStoreMutator
 	params      *mockprotocol.GlobalParams
 
 	stateMachine *StateMachine
@@ -31,11 +31,10 @@ type StateMachineSuite struct {
 
 func (s *StateMachineSuite) SetupTest() {
 	s.parentState = mock.NewKVStoreReader(s.T())
-	s.mutator = mock.NewKVStoreAPI(s.T())
+	s.mutator = mock.NewKVStoreMutator(s.T())
 	s.params = mockprotocol.NewGlobalParams(s.T())
 	s.view = 1000
 
-	s.mutator.On("Clone").Return(s.mutator).Once()
 	s.params.On("EpochCommitSafetyThreshold").Return(uint64(100)).Maybe()
 
 	s.stateMachine = NewProcessingStateMachine(s.view, s.params, s.parentState, s.mutator)
@@ -63,6 +62,8 @@ func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
 		upgrade.ActiveView = s.view + s.params.EpochCommitSafetyThreshold() + 1
 		upgrade.NewProtocolStateVersion = oldVersion + 1
 
+		s.parentState.On("GetVersionUpgrade").Return(nil)
+		s.mutator.On("GetVersionUpgrade").Return(nil)
 		s.mutator.On("SetVersionUpgrade", &protocol_state.ViewBasedActivator[uint64]{
 			Data:           upgrade.NewProtocolStateVersion,
 			ActivationView: upgrade.ActiveView,
@@ -103,7 +104,6 @@ func (s *StateMachineSuite) TestBuild_NoChanges() {
 	s.parentState.On("ID").Return(stateID)
 
 	s.mutator.On("ID").Return(stateID)
-	s.mutator.On("Clone").Return(s.mutator).Once()
 
 	updatedState, id, hasChanges := s.stateMachine.Build()
 	require.False(s.T(), hasChanges, "initial state should not have changes")
@@ -119,7 +119,6 @@ func (s *StateMachineSuite) TestBuild_HasChanges() {
 
 	updatedStateID := unittest.IdentifierFixture()
 	s.mutator.On("ID").Return(updatedStateID)
-	s.mutator.On("Clone").Return(s.mutator).Once()
 
 	updatedState, id, hasChanges := s.stateMachine.Build()
 	require.True(s.T(), hasChanges, "initial state should have changes")
