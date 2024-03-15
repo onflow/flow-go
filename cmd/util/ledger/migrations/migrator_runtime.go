@@ -107,7 +107,7 @@ func NewMigratorRuntime(
 }
 
 type migratorRuntime struct {
-	Snapshot                *util.PayloadSnapshot
+	Snapshot                util.MigrationStorageSnapshot
 	TransactionState        state.NestedTransactionPreparer
 	Interpreter             *interpreter.Interpreter
 	Storage                 *runtime.Storage

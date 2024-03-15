@@ -78,7 +78,7 @@ func (n NopMemoryGauge) MeterMemory(common.MemoryUsage) error {
 var _ common.MemoryGauge = (*NopMemoryGauge)(nil)
 
 type PayloadsReadonlyLedger struct {
-	Snapshot *PayloadSnapshot
+	Snapshot MigrationStorageSnapshot
 
 	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
 	SetValueFunc             func(owner, key, value []byte) (err error)
@@ -113,7 +113,7 @@ func (p *PayloadsReadonlyLedger) AllocateStorageIndex(owner []byte) (atree.Stora
 	panic("AllocateStorageIndex not expected to be called")
 }
 
-func NewPayloadsReadonlyLedger(snapshot *PayloadSnapshot) *PayloadsReadonlyLedger {
+func NewPayloadsReadonlyLedger(snapshot MigrationStorageSnapshot) *PayloadsReadonlyLedger {
 	return &PayloadsReadonlyLedger{Snapshot: snapshot}
 }
 
