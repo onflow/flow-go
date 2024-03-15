@@ -2,12 +2,14 @@ package backend
 
 import (
 	"context"
+	"google.golang.org/grpc/codes"
 	"time"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/state_stream"
@@ -68,11 +70,13 @@ func (b *AccountStatusesBackend) getAccountStatusResponseFactory(messageIndex *c
 		for _, event := range allProtocolEvents {
 			data, err := ccf.Decode(nil, event.Payload)
 			if err != nil {
+				b.log.Error().Err(err).Msg("could not decode event payload")
 				continue
 			}
 
 			cdcEvent, ok := data.(cadence.Event)
 			if !ok {
+				b.log.Error().Err(err).Msg("could not cast to cadence event")
 				continue
 			}
 
@@ -100,7 +104,7 @@ func (b *AccountStatusesBackend) getAccountStatusResponseFactory(messageIndex *c
 		}
 
 		if ok := messageIndex.Set(index + 1); !ok {
-			b.log.Debug().Msg("message index already incremented")
+			return nil, status.Error(codes.Internal, "message index already incremented")
 		}
 
 		return response, nil

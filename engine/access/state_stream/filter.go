@@ -83,7 +83,6 @@ func NewEventFilter(
 			return EventFilter{}, err
 		}
 		f.EventTypes[eventType] = struct{}{}
-		f.EventFieldFilters[eventType] = []FieldFilter{}
 	}
 
 	for _, address := range addresses {
