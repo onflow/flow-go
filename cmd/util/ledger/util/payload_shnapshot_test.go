@@ -119,7 +119,7 @@ func benchmarkMerge(b *testing.B, payloadsNum int, changes []int) {
 	payloads := createPayloads(payloadsNum)
 
 	for _, changesNum := range changes {
-		b.Run("changes_"+strconv.Itoa(payloadsNum), func(b *testing.B) {
+		b.Run("changes_"+strconv.Itoa(changesNum), func(b *testing.B) {
 
 			// third of the changes should be new payloads
 			// third of the changes should be existing payloads
