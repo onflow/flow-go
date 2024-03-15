@@ -41,7 +41,7 @@ type AccountStatusesBackend struct {
 // - codes.InvalidArgument: If start height before root height, or both startBlockID and startHeight are provided.
 // - codes.ErrNotFound`: For unindexed start blockID or for unindexed start height.
 // - codes.Internal: If there is an internal error.
-func (b *AccountStatusesBackend) SubscribeAccountStatuses(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) state_stream.Subscription {
+func (b *AccountStatusesBackend) SubscribeAccountStatuses(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
 	nextHeight, err := b.getStartHeight(ctx, startBlockID, startHeight)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")
@@ -55,7 +55,7 @@ func (b *AccountStatusesBackend) SubscribeAccountStatuses(ctx context.Context, s
 }
 
 // getAccountStatusResponseFactory returns a function that returns the account statuses response for a given height.
-func (b *AccountStatusesBackend) getAccountStatusResponseFactory(messageIndex *counters.StrictMonotonousCounter, filter state_stream.EventFilter) GetDataByHeightFunc {
+func (b *AccountStatusesBackend) getAccountStatusResponseFactory(messageIndex *counters.StrictMonotonousCounter, filter state_stream.EventFilter) subscription.GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
 		var err error
 		eventsResponse, err := b.eventsRetriever.GetAllEventsResponse(ctx, height)

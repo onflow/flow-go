@@ -73,15 +73,15 @@ func (_m *API) GetRegisterValues(registerIDs flow.RegisterIDs, height uint64) ([
 }
 
 // SubscribeAccountStatuses provides a mock function with given fields: ctx, startBlockID, startHeight, filter
-func (_m *API) SubscribeAccountStatuses(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) state_stream.Subscription {
+func (_m *API) SubscribeAccountStatuses(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
 	ret := _m.Called(ctx, startBlockID, startHeight, filter)
 
-	var r0 state_stream.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64, state_stream.EventFilter) state_stream.Subscription); ok {
+	var r0 subscription.Subscription
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64, state_stream.EventFilter) subscription.Subscription); ok {
 		r0 = rf(ctx, startBlockID, startHeight, filter)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(state_stream.Subscription)
+			r0 = ret.Get(0).(subscription.Subscription)
 		}
 	}
 
