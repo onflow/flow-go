@@ -96,7 +96,6 @@ type Params struct {
 	Transactions              storage.Transactions
 	ExecutionReceipts         storage.ExecutionReceipts
 	ExecutionResults          storage.ExecutionResults
-	LightTransactionResults   storage.LightTransactionResults
 	ChainID                   flow.ChainID
 	AccessMetrics             module.AccessMetrics
 	ConnFactory               connection.ConnectionFactory
@@ -171,7 +170,7 @@ func New(params Params) (*Backend, error) {
 	// initialize node version info
 	nodeInfo := getNodeVersionInfo(params.State.Params())
 
-	transactionsLocalDataProvider := TransactionsLocalDataProvider{
+	transactionsLocalDataProvider := &TransactionsLocalDataProvider{
 		state:          params.State,
 		collections:    params.Collections,
 		blocks:         params.Blocks,

@@ -51,6 +51,7 @@ type TransactionStatusSuite struct {
 	receipts           *storagemock.ExecutionReceipts
 	results            *storagemock.ExecutionResults
 	transactionResults *storagemock.LightTransactionResults
+	events             *storagemock.Events
 	seals              *storagemock.Seals
 
 	colClient              *access.AccessAPIClient
@@ -108,6 +109,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.archiveClient = access.NewAccessAPIClient(s.T())
 	s.execClient = access.NewExecutionAPIClient(s.T())
 	s.transactionResults = storagemock.NewLightTransactionResults(s.T())
+	s.events = storagemock.NewEvents(s.T())
 	s.chainID = flow.Testnet
 	s.historicalAccessClient = access.NewAccessAPIClient(s.T())
 	s.connectionFactory = connectionmock.NewConnectionFactory(s.T())
@@ -183,7 +185,6 @@ func (s *TransactionStatusSuite) backendParams() Params {
 		Transactions:             s.transactions,
 		ExecutionReceipts:        s.receipts,
 		ExecutionResults:         s.results,
-		LightTransactionResults:  s.transactionResults,
 		ChainID:                  s.chainID,
 		CollectionRPC:            s.colClient,
 		MaxHeightRange:           DefaultMaxHeightRange,
@@ -200,6 +201,7 @@ func (s *TransactionStatusSuite) backendParams() Params {
 			Broadcaster:    s.broadcaster,
 		},
 		TxResultsIndex: index.NewTransactionResultsIndex(s.transactionResults),
+		EventsIndex:    index.NewEventsIndex(s.events),
 	}
 }
 
@@ -339,9 +341,9 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 
 	// Generate 600 blocks without transaction included and check, that transaction still pending
 	startHeight := s.finalizedBlock.Header.Height + 1
-	lastHeight := startHeight + flow.DefaultTransactionExpiry + 1
+	lastHeight := startHeight + flow.DefaultTransactionExpiry
 
-	for i := startHeight; i < lastHeight; i++ {
+	for i := startHeight; i <= lastHeight; i++ {
 		s.sealedBlock = s.finalizedBlock
 		s.addNewFinalizedBlock(s.sealedBlock.Header)
 		checkNewSubscriptionMessage(sub, flow.TransactionStatusPending)

@@ -26,7 +26,7 @@ import (
 )
 
 type backendTransactions struct {
-	TransactionsLocalDataProvider
+	*TransactionsLocalDataProvider
 	staticCollectionRPC  accessproto.AccessAPIClient // rpc client tied to a fixed collection node
 	transactions         storage.Transactions
 	executionReceipts    storage.ExecutionReceipts

@@ -26,7 +26,7 @@ import (
 
 // backendSubscribeTransactions handles transaction subscriptions.
 type backendSubscribeTransactions struct {
-	txLocalDataProvider TransactionsLocalDataProvider
+	txLocalDataProvider *TransactionsLocalDataProvider
 	executionResults    storage.ExecutionResults
 	log                 zerolog.Logger
 	broadcaster         *engine.Broadcaster
