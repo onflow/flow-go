@@ -47,7 +47,6 @@ type TransactionSubscriptionMetadata struct {
 }
 
 // SubscribeTransactionStatuses subscribes to transaction status changes starting from the transaction reference block ID.
-// Expected errors:
 // If invalid tx parameters will be supplied SubscribeTransactionStatuses will return a failed subscription.
 func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody) subscription.Subscription {
 	nextHeight, err := b.blockTracker.GetStartHeightFromBlockID(tx.ReferenceBlockID)
@@ -73,8 +72,8 @@ func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(ctx context.
 	return sub
 }
 
-// getTransactionStatusResponse creates a function for handling transaction status subscriptions based on new block and
-// previous status state metadata.
+// getTransactionStatusResponse returns a callback function that produces transaction status
+// subscription responses based on new blocks.
 func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *TransactionSubscriptionMetadata) func(context.Context, uint64) (interface{}, error) {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
 		highestHeight, err := b.blockTracker.GetHighestHeight(flow.BlockStatusFinalized)
@@ -82,8 +81,8 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *Tran
 			return nil, fmt.Errorf("could not get highest height for block %d: %w", height, err)
 		}
 
-		// Fail early if no notification has been received for the given block height.
-		// Note: It's possible for the data to exist in the data store before the notification is
+		// Fail early if no block finalized notification has been received for the given height.
+		// Note: It's possible that the block is locally finalized before the notification is
 		// received. This ensures a consistent view is available to all streams.
 		if height > highestHeight {
 			return nil, fmt.Errorf("block %d is not available yet: %w", height, storage.ErrNotFound)
@@ -170,7 +169,7 @@ func (b *backendSubscribeTransactions) searchForExecutionResult(
 	result, err := b.executionResults.ByBlockID(blockID)
 	if err != nil {
 		if !errors.Is(err, storage.ErrNotFound) {
-			return false, rpc.ConvertError(err, fmt.Sprintf("failed to get execution result for block %s", blockID), codes.Internal)
+			return false, status.Errorf(codes.Internal, "failed to get execution result for block %s: %v", blockID, err)
 		}
 	}
 
