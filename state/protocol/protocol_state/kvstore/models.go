@@ -51,8 +51,11 @@ var _ protocol_state.KVStoreMutator = (*modelv0)(nil)
 // ID returns an identifier for this key-value store snapshot by hashing internal fields.
 func (model *modelv0) ID() flow.Identifier { return flow.MakeID(model) }
 
-// Clone returns a deep copy of the KVStoreAPI.
-// This is used to create a new instance of the KVStoreAPI to avoid mutating the original.
+// Replicate instantiates a Protocol State Snapshot of the given `protocolVersion`.
+// It clones existing snapshot if `protocolVersion = 0` and performs a migration if `protocolVersion = 1`.
+// Expected errors during normal operations:
+//   - ErrIncompatibleVersionChange if replicating the Parent Snapshot into a Snapshot
+//     with the specified `protocolVersion` is not supported.
 func (model *modelv0) Replicate(protocolVersion uint64) (protocol_state.KVStoreMutator, error) {
 	version := model.GetProtocolStateVersion()
 	if version == protocolVersion {
@@ -118,8 +121,11 @@ var _ protocol_state.KVStoreMutator = (*modelv1)(nil)
 // ID returns an identifier for this key-value store snapshot by hashing internal fields.
 func (model *modelv1) ID() flow.Identifier { return flow.MakeID(model) }
 
-// Clone returns a deep copy of the KVStoreAPI.
-// This is used to create a new instance of the KVStoreAPI to avoid mutating the original.
+// Replicate instantiates a Protocol State Snapshot of the given `protocolVersion`.
+// It clones existing snapshot if `protocolVersion = 1`, other versions are not supported yet.
+// Expected errors during normal operations:
+//   - ErrIncompatibleVersionChange if replicating the Parent Snapshot into a Snapshot
+//     with the specified `protocolVersion` is not supported.
 func (model *modelv1) Replicate(protocolVersion uint64) (protocol_state.KVStoreMutator, error) {
 	version := model.GetProtocolStateVersion()
 	if version == protocolVersion {

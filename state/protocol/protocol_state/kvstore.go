@@ -71,11 +71,9 @@ type KVStoreAPI interface {
 	// Parent Snapshot.
 	//
 	// Caution:
-	// Since we are potentially converting from the older protocol version of the parent to
-	// a newer version, it is possible that the replicated state snapshot is incomplete
-	// or otherwise requires further inputs or mutations to result in the valid Protocol
-	// State Snapshot according to the new protocol version. Therefore, we represent the outcome
-	// of the replication as a `KVStoreMutator`
+	// Implementors of this function decide on their own how to perform the migration from parent protocol version
+	// to the given `protocolVersion`. It is required that outcome of `Replicate` is a valid KV store model which can be
+	// incorporated in the protocol state without extra operations.
 	// Expected errors during normal operations:
 	//  - ErrIncompatibleVersionChange if replicating the Parent Snapshot into a Snapshot
 	//    with the specified `protocolVersion` is not supported.

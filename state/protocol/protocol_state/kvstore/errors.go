@@ -32,4 +32,6 @@ var ErrInvalidUpgradeVersion = errors.New("invalid upgrade version for the Proto
 // which has an activation view `V` so that `CurrentView + SafetyBuffer < V` does NOT hold.
 var ErrInvalidActivationView = errors.New("invalid activation view for the new Protocol State version")
 
+// ErrIncompatibleVersionChange is a sentinel returned when we attempt to replicate a parent KV store snapshot into a snapshot
+// with the specified `protocolVersion` but such operation is not supported by the parent snapshot.
 var ErrIncompatibleVersionChange = errors.New("incompatible version change when replicating the Protocol State's kvstore")
