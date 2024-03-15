@@ -268,12 +268,12 @@ func convertAccountsStatusesResults(eventVersion entities.EventEncodingVersion, 
 
 func (h *Handler) SubscribeAccountStatusesFromStartBlockID(request *executiondata.SubscribeAccountStatusesFromStartBlockIDRequest, stream executiondata.ExecutionDataAPI_SubscribeAccountStatusesFromStartBlockIDServer) error {
 	// check if the maximum number of streams is reached
-	if h.streamCount.Load() >= h.maxStreams {
+	if h.StreamCount.Load() >= h.MaxStreams {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
 
-	h.streamCount.Add(1)
-	defer h.streamCount.Add(-1)
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
 
 	startBlockID := flow.ZeroID
 	if request.GetStartBlockId() != nil {
@@ -343,12 +343,12 @@ func (h *Handler) SubscribeAccountStatusesFromStartBlockID(request *executiondat
 
 func (h *Handler) SubscribeAccountStatusesFromStartHeight(request *executiondata.SubscribeAccountStatusesFromStartHeightRequest, stream executiondata.ExecutionDataAPI_SubscribeAccountStatusesFromStartHeightServer) error {
 	// check if the maximum number of streams is reached
-	if h.streamCount.Load() >= h.maxStreams {
+	if h.StreamCount.Load() >= h.MaxStreams {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
 
-	h.streamCount.Add(1)
-	defer h.streamCount.Add(-1)
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
 
 	filter, err := h.createAccountStatusesFilter(request.GetFilter())
 	if err != nil {
@@ -409,12 +409,12 @@ func (h *Handler) SubscribeAccountStatusesFromStartHeight(request *executiondata
 
 func (h *Handler) SubscribeAccountStatusesFromLatestBlock(request *executiondata.SubscribeAccountStatusesFromLatestBlockRequest, stream executiondata.ExecutionDataAPI_SubscribeAccountStatusesFromLatestBlockServer) error {
 	// check if the maximum number of streams is reached
-	if h.streamCount.Load() >= h.maxStreams {
+	if h.StreamCount.Load() >= h.MaxStreams {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
 
-	h.streamCount.Add(1)
-	defer h.streamCount.Add(-1)
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
 
 	filter, err := h.createAccountStatusesFilter(request.GetFilter())
 	if err != nil {
