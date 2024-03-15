@@ -1110,7 +1110,8 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 		return err
 	}
 
-	sub := h.api.SubscribeTransactionStatuses(stream.Context(), &tx)
+	subCtx, cancel := context.WithCancel(stream.Context())
+	sub := h.api.SubscribeTransactionStatuses(subCtx, &tx)
 
 	return subscription.HandleSubscription(sub, func(txSubInfo *convert.TransactionSubscribeInfo) error {
 		err = stream.Send(convert.TransactionSubscribeInfoToMessage(txSubInfo))
@@ -1119,7 +1120,7 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 		}
 
 		if txSubInfo.Status == flow.TransactionStatusSealed || txSubInfo.Status == flow.TransactionStatusExpired {
-			sub.Close()
+			cancel()
 		}
 
 		return nil

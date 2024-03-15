@@ -52,9 +52,6 @@ type Subscription interface {
 
 	// Err returns the error that caused the subscription to fail
 	Err() error
-
-	// Close should be called when the subscription needs to be manually ended gracefully, and it closes the subscription channel.
-	Close()
 }
 
 // Streamable represents a subscription that can be streamed.

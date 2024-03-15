@@ -220,7 +220,6 @@ func (s *TransactionStatusSuite) addNewFinalizedBlock(parent *flow.Header, optio
 // It covers the emulation of transaction stages from pending to sealed, and receiving status updates.
 func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	s.sealedSnapshot.On("Head").Return(func() *flow.Header {
 		return s.sealedBlock.Header
@@ -285,14 +284,14 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusSealed)
 
 	// 5. Stop subscription
-	sub.Close()
+	cancel()
 
 	// Ensure subscription shuts down gracefully
 	unittest.RequireReturnsBefore(s.T(), func() {
 		v, ok := <-sub.Channel()
 		assert.Nil(s.T(), v)
 		assert.False(s.T(), ok)
-		assert.NoError(s.T(), sub.Err())
+		assert.ErrorIs(s.T(), sub.Err(), context.Canceled)
 	}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
 }
 
@@ -300,7 +299,6 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 // when transaction become expired
 func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	s.blocks.On("GetLastFullBlockHeight").Return(func() (uint64, error) {
 		return s.sealedBlock.Header.Height, nil
@@ -355,13 +353,13 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusExpired)
 
 	// Stop subscription
-	sub.Close()
+	cancel()
 
 	// Ensure subscription shuts down gracefully
 	unittest.RequireReturnsBefore(s.T(), func() {
 		v, ok := <-sub.Channel()
 		assert.Nil(s.T(), v)
 		assert.False(s.T(), ok)
-		assert.NoError(s.T(), sub.Err())
+		assert.ErrorIs(s.T(), sub.Err(), context.Canceled)
 	}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
 }
