@@ -2,8 +2,17 @@ package cohort1
 
 import (
 	"context"
+	"io"
 	"testing"
 	"time"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go-sdk/templates"
 
 	"github.com/onflow/flow-go/integration/tests/mvp"
 
@@ -189,6 +198,111 @@ func (s *AccessAPISuite) TestMVPScriptExecutionLocalStorage() {
 	// uses the provided access node to handle the Access API calls. there is an existing test that
 	// covers the default config, so we only need to test with local storage.
 	mvp.RunMVPTest(s.T(), s.ctx, s.net, s.accessNode2)
+}
+
+func (s *AccessAPISuite) getAccessClient() (accessproto.AccessAPIClient, error) {
+	return s.getClient(s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCPort))
+}
+
+func (s *AccessAPISuite) getClient(address string) (accessproto.AccessAPIClient, error) {
+	// helper func to create an access client
+	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, err
+	}
+
+	return accessproto.NewAccessAPIClient(conn), nil
+}
+
+func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
+	accessClient, err := s.getAccessClient()
+	s.Require().NoError(err)
+	s.Require().NotNil(accessClient)
+
+	blockHeader, err := accessClient.GetLatestBlockHeader(s.ctx, &accessproto.GetLatestBlockHeaderRequest{IsSealed: true})
+	s.Require().NoError(err)
+	s.Require().NotNil(blockHeader)
+
+	latestBlockID := blockHeader.GetBlock().GetId()
+
+	// Create a new account to deploy Counter to
+	accountPrivateKey := lib.RandomPrivateKey()
+	accountKey := sdk.NewAccountKey().
+		FromPrivateKey(accountPrivateKey).
+		SetHashAlgo(sdkcrypto.SHA3_256).
+		SetWeight(sdk.AccountKeyWeightThreshold)
+
+	serviceAddress := sdk.Address(s.serviceClient.Chain.ServiceAddress())
+
+	// Generate the account creation transaction
+	createAccountTx, err := templates.CreateAccount(
+		[]*sdk.AccountKey{accountKey},
+		[]templates.Contract{
+			{
+				Name:   lib.CounterContract.Name,
+				Source: lib.CounterContract.ToCadence(),
+			},
+		}, serviceAddress)
+	s.Require().NoError(err)
+
+	createAccountTx.
+		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
+		SetProposalKey(serviceAddress, 0, s.serviceClient.GetSeqNumber()).
+		SetPayer(serviceAddress).
+		SetComputeLimit(9999)
+
+	// Sign the transaction
+	signedTx, err := s.serviceClient.SignTransaction(createAccountTx)
+	s.Require().NoError(err)
+
+	authorizers := make([][]byte, len(signedTx.Authorizers))
+	for i, auth := range signedTx.Authorizers {
+		authorizers[i] = auth.Bytes()
+	}
+
+	convertToMessageSig := func(sigs []sdk.TransactionSignature) []*entities.Transaction_Signature {
+		msgSigs := make([]*entities.Transaction_Signature, len(sigs))
+		for i, sig := range sigs {
+			msgSigs[i] = &entities.Transaction_Signature{
+				Address:   sig.Address.Bytes(),
+				KeyId:     uint32(sig.KeyIndex),
+				Signature: sig.Signature,
+			}
+		}
+
+		return msgSigs
+	}
+
+	subClient, err := accessClient.SendAndSubscribeTransactionStatuses(s.ctx, &accessproto.SendAndSubscribeTransactionStatusesRequest{
+		Transaction: &entities.Transaction{
+			Script:           signedTx.Script,
+			Arguments:        signedTx.Arguments,
+			ReferenceBlockId: signedTx.ReferenceBlockID.Bytes(),
+			GasLimit:         signedTx.GasLimit,
+			ProposalKey: &entities.Transaction_ProposalKey{
+				Address:        signedTx.ProposalKey.Address.Bytes(),
+				KeyId:          uint32(signedTx.ProposalKey.KeyIndex),
+				SequenceNumber: signedTx.ProposalKey.SequenceNumber,
+			},
+			Payer:              signedTx.Payer.Bytes(),
+			Authorizers:        authorizers,
+			PayloadSignatures:  convertToMessageSig(signedTx.PayloadSignatures),
+			EnvelopeSignatures: convertToMessageSig(signedTx.EnvelopeSignatures),
+		},
+	})
+	s.Require().NoError(err)
+
+	for {
+		resp, err := subClient.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			break
+		}
+
+		s.log.Info().Msgf("!!!! %s %d %s", resp.Status.String(), resp.GetMessageIndex(), string(resp.GetId()))
+	}
 }
 
 func (s *AccessAPISuite) testGetAccount(client *client.Client) {
