@@ -20,6 +20,9 @@ type MigrationStorageSnapshot interface {
 		expectedChangeAddresses map[flow.Address]struct{},
 		logger zerolog.Logger,
 	) ([]*ledger.Payload, error)
+
+	Len() int
+	PayloadMap() map[flow.RegisterID]*ledger.Payload
 }
 
 type PayloadSnapshot struct {
@@ -57,6 +60,14 @@ func (p PayloadSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 func (p PayloadSnapshot) Exists(id flow.RegisterID) bool {
 	_, exists := p.Payloads[id]
 	return exists
+}
+
+func (p PayloadSnapshot) Len() int {
+	return len(p.Payloads)
+}
+
+func (p PayloadSnapshot) PayloadMap() map[flow.RegisterID]*ledger.Payload {
+	return p.Payloads
 }
 
 // ApplyChangesAndGetNewPayloads applies the given changes to the snapshot and returns the new payloads.
