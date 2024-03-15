@@ -2,11 +2,12 @@ package cohort1
 
 import (
 	"context"
-	"github.com/onflow/flow-go-sdk/templates"
-	"github.com/onflow/flow-go-sdk/test"
 	"io"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go-sdk/templates"
+	"github.com/onflow/flow-go-sdk/test"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
