@@ -30,6 +30,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
+	github.com/huandu/go-clone/generic v1.7.2
 	github.com/improbable-eng/grpc-web v0.15.0
 	github.com/ipfs/go-block-format v0.1.2
 	github.com/ipfs/go-blockservice v0.4.0
@@ -104,7 +105,6 @@ require (
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/golang-lru/v2 v2.0.2
-	github.com/huandu/go-clone/generic v1.7.2
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230711213910-baad011d2b13
 	github.com/onflow/flow-nft/lib/go/contracts v1.1.0
