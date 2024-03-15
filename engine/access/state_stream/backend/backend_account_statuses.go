@@ -2,13 +2,13 @@ package backend
 
 import (
 	"context"
-	"google.golang.org/grpc/codes"
 	"time"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
@@ -37,13 +37,13 @@ type AccountStatusesBackend struct {
 	eventsRetriever EventsRetriever
 }
 
-// SubscribeAccountStatuses subscribes to account status changes starting from a specific block ID
+// subscribeAccountStatuses subscribes to account status changes starting from a specific block ID
 // and block height, with an optional status filter.
 // Errors:
 // - codes.InvalidArgument: If start height before root height, or both startBlockID and startHeight are provided.
 // - codes.ErrNotFound`: For unindexed start blockID or for unindexed start height.
 // - codes.Internal: If there is an internal error.
-func (b *AccountStatusesBackend) SubscribeAccountStatuses(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
+func (b *AccountStatusesBackend) subscribeAccountStatuses(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
 	nextHeight, err := b.getStartHeight(ctx, startBlockID, startHeight)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")
@@ -54,6 +54,35 @@ func (b *AccountStatusesBackend) SubscribeAccountStatuses(ctx context.Context, s
 	go subscription.NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
 
 	return sub
+}
+
+// SubscribeAccountStatusesFromStartBlockID subscribes to the streaming of account status changes starting from
+// a specific block ID with an optional status filter.
+func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartBlockID(
+	ctx context.Context,
+	startBlockID flow.Identifier,
+	filter state_stream.EventFilter,
+) subscription.Subscription {
+	return b.subscribeAccountStatuses(ctx, startBlockID, 0, filter)
+}
+
+// SubscribeAccountStatusesFromStartHeight subscribes to the streaming of account status changes starting from
+// a specific block height, with an optional status filter.
+func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartHeight(
+	ctx context.Context,
+	startHeight uint64,
+	filter state_stream.EventFilter,
+) subscription.Subscription {
+	return b.subscribeAccountStatuses(ctx, flow.ZeroID, startHeight, filter)
+}
+
+// SubscribeAccountStatusesFromLatestBlock subscribes to the streaming of account status changes starting from a
+// latest sealed block, with an optional status filter.
+func (b *AccountStatusesBackend) SubscribeAccountStatusesFromLatestBlock(
+	ctx context.Context,
+	filter state_stream.EventFilter,
+) subscription.Subscription {
+	return b.subscribeAccountStatuses(ctx, flow.ZeroID, 0, filter)
 }
 
 // getAccountStatusResponseFactory returns a function that returns the account statuses response for a given height.
@@ -70,7 +99,7 @@ func (b *AccountStatusesBackend) getAccountStatusResponseFactory(messageIndex *c
 		for _, event := range allProtocolEvents {
 			data, err := ccf.Decode(nil, event.Payload)
 			if err != nil {
-				b.log.Error().Err(err).Msg("could not decode event payload")
+				b.log.Info().Err(err).Msg("could not decode event payload")
 				continue
 			}
 
@@ -104,7 +133,7 @@ func (b *AccountStatusesBackend) getAccountStatusResponseFactory(messageIndex *c
 		}
 
 		if ok := messageIndex.Set(index + 1); !ok {
-			return nil, status.Error(codes.Internal, "message index already incremented")
+			return nil, status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
 
 		return response, nil

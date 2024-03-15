@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -18,6 +21,18 @@ const (
 	// DefaultMaxContracts is the default maximum number of contracts that can be specified in a filter
 	DefaultMaxContracts = 1000
 )
+
+var defaultCoreEvents = []string{
+	"flow.AccountCreated",
+	"flow.AccountKeyAdded",
+	"flow.AccountKeyRemoved",
+	"flow.AccountContractAdded",
+	"flow.AccountContractUpdated",
+	"flow.AccountContractRemoved",
+	"flow.InboxValuePublished",
+	"flow.InboxValueUnpublished",
+	"flow.InboxValueClaimed",
+}
 
 // EventFilterConfig is used to configure the limits for EventFilters
 type EventFilterConfig struct {
@@ -143,6 +158,26 @@ func (f *EventFilter) Match(event flow.Event) bool {
 	}
 
 	return false
+}
+
+// GetCoreEventTypes validates the provided core event types and returns them if they are all core events.
+// If no event types are provided, it returns all default core events.
+// Expected errors:
+// - codes.InvalidArgument: If the provided event types contain non-core events.
+func GetCoreEventTypes(providedEventTypes []string) ([]string, error) {
+	if len(providedEventTypes) > 0 {
+		for _, eventType := range providedEventTypes {
+			for _, coreEventType := range defaultCoreEvents {
+				if coreEventType != eventType {
+					return nil, status.Errorf(codes.InvalidArgument, "invalid provided event types for filter")
+				}
+			}
+		}
+
+		return providedEventTypes, nil
+	}
+
+	return defaultCoreEvents, nil
 }
 
 // validateEventType ensures that the event type matches the expected format
