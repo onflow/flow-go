@@ -82,7 +82,13 @@ func TestKVStoreAPI(t *testing.T) {
 	})
 }
 
-// TestKVStoreAPI_Replicate tests that cloning of KV store correctly works. All versions need to be support this.
+// TestKVStoreAPI_Replicate tests that replication logic of KV store correctly works. All versions need to be support this.
+// There are a few invariants that needs to be met:
+// - if model M is replicated and the requested version is equal to M.Version then an exact copy needs to be returned.
+// - if model M is replicated and the requested version is lower than M.Version then an error has to be returned.
+// - if model M is replicated and the requested version is greater than M.Version then behavior depends on concrete model.
+// If replication from version v to v' is not supported a sentinel error should be returned, otherwise component needs to return
+// a new model with version which is equal to the requested version.
 func TestKVStoreAPI_Replicate(t *testing.T) {
 	t.Run("v0", func(t *testing.T) {
 		model := &modelv0{
@@ -98,7 +104,7 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 		require.True(t, reflect.DeepEqual(model, cpy)) // expect the same model
 
 		model.VersionUpgrade.ActivationView++ // change
-		require.False(t, reflect.DeepEqual(model, cpy))
+		require.False(t, reflect.DeepEqual(model, cpy), "expect to have a deep copy")
 	})
 	t.Run("v0->v1", func(t *testing.T) {
 		model := &modelv0{
