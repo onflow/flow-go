@@ -1655,8 +1655,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			UseIndex: useIndex,
 		})
 
-		//WithBlockSignerDecoder(signature.NewBlockSignerDecoder(builder.Committee))
-
 		// build the rpc engine
 		builder.RpcEng, err = engineBuilder.
 			WithRpcHandler(rpcHandler).
