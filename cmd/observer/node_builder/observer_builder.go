@@ -1651,9 +1651,11 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			Log:      builder.Logger,
 			Metrics:  observerCollector,
 			Upstream: forwarder,
-			Local:    engineBuilder.DefaultHandler(nil),
+			Local:    engineBuilder.DefaultHandler(hotsignature.NewBlockSignerDecoder(builder.Committee)),
 			UseIndex: useIndex,
 		})
+
+		//WithBlockSignerDecoder(signature.NewBlockSignerDecoder(builder.Committee))
 
 		// build the rpc engine
 		builder.RpcEng, err = engineBuilder.
