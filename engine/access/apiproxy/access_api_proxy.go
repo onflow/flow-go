@@ -15,6 +15,11 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 )
 
+const (
+	LocalApiService    = "local"
+	UpstreamApiService = "upstream"
+)
+
 // FlowAccessAPIRouter is a structure that represents the routing proxy algorithm.
 // It splits requests between a local and a remote API service.
 type FlowAccessAPIRouter struct {
@@ -67,67 +72,79 @@ func (h *FlowAccessAPIRouter) log(handler, rpc string, err error) {
 // Ping pings the service. It is special in the sense that it responds successful,
 // only if all underlying services are ready.
 func (h *FlowAccessAPIRouter) Ping(context context.Context, req *access.PingRequest) (*access.PingResponse, error) {
-	h.log("local", "Ping", nil)
+	h.log(LocalApiService, "Ping", nil)
 	return &access.PingResponse{}, nil
 }
 
 func (h *FlowAccessAPIRouter) GetNodeVersionInfo(ctx context.Context, request *access.GetNodeVersionInfoRequest) (*access.GetNodeVersionInfoResponse, error) {
 	res, err := h.local.GetNodeVersionInfo(ctx, request)
-	h.log("local", "GetNodeVersionInfo", err)
+	h.log(LocalApiService, "GetNodeVersionInfo", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetLatestBlockHeader(context context.Context, req *access.GetLatestBlockHeaderRequest) (*access.BlockHeaderResponse, error) {
 	res, err := h.local.GetLatestBlockHeader(context, req)
-	h.log("local", "GetLatestBlockHeader", err)
+	h.log(LocalApiService, "GetLatestBlockHeader", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetBlockHeaderByID(context context.Context, req *access.GetBlockHeaderByIDRequest) (*access.BlockHeaderResponse, error) {
 	res, err := h.local.GetBlockHeaderByID(context, req)
-	h.log("local", "GetBlockHeaderByID", err)
+	h.log(LocalApiService, "GetBlockHeaderByID", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetBlockHeaderByHeight(context context.Context, req *access.GetBlockHeaderByHeightRequest) (*access.BlockHeaderResponse, error) {
 	res, err := h.local.GetBlockHeaderByHeight(context, req)
-	h.log("local", "GetBlockHeaderByHeight", err)
+	h.log(LocalApiService, "GetBlockHeaderByHeight", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetLatestBlock(context context.Context, req *access.GetLatestBlockRequest) (*access.BlockResponse, error) {
 	res, err := h.local.GetLatestBlock(context, req)
-	h.log("local", "GetLatestBlock", err)
+	h.log(LocalApiService, "GetLatestBlock", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetBlockByID(context context.Context, req *access.GetBlockByIDRequest) (*access.BlockResponse, error) {
 	res, err := h.local.GetBlockByID(context, req)
-	h.log("local", "GetBlockByID", err)
+	h.log(LocalApiService, "GetBlockByID", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetBlockByHeight(context context.Context, req *access.GetBlockByHeightRequest) (*access.BlockResponse, error) {
 	res, err := h.local.GetBlockByHeight(context, req)
-	h.log("local", "GetBlockByHeight", err)
+	h.log(LocalApiService, "GetBlockByHeight", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetCollectionByID(context context.Context, req *access.GetCollectionByIDRequest) (*access.CollectionResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetCollectionByID(context, req)
+		h.log(LocalApiService, "GetCollectionByID", err)
+		return res, err
+	}
+
 	res, err := h.upstream.GetCollectionByID(context, req)
-	h.log("upstream", "GetCollectionByID", err)
+	h.log(UpstreamApiService, "GetCollectionByID", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) SendTransaction(context context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
 	res, err := h.upstream.SendTransaction(context, req)
-	h.log("upstream", "SendTransaction", err)
+	h.log(UpstreamApiService, "SendTransaction", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetTransaction(context context.Context, req *access.GetTransactionRequest) (*access.TransactionResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetTransaction(context, req)
+		h.log(LocalApiService, "GetTransaction", err)
+		return res, err
+	}
+
 	res, err := h.upstream.GetTransaction(context, req)
-	h.log("upstream", "GetTransaction", err)
+	h.log(UpstreamApiService, "GetTransaction", err)
 	return res, err
 }
 
@@ -135,7 +152,7 @@ func (h *FlowAccessAPIRouter) GetTransactionResult(context context.Context, req 
 	//TODO: add implementation for transaction error message before adding local impl
 
 	res, err := h.upstream.GetTransactionResult(context, req)
-	h.log("upstream", "GetTransactionResult", err)
+	h.log(UpstreamApiService, "GetTransactionResult", err)
 	return res, err
 }
 
@@ -143,13 +160,19 @@ func (h *FlowAccessAPIRouter) GetTransactionResultsByBlockID(context context.Con
 	//TODO: add implementation for transaction error message before adding local impl
 
 	res, err := h.upstream.GetTransactionResultsByBlockID(context, req)
-	h.log("upstream", "GetTransactionResultsByBlockID", err)
+	h.log(UpstreamApiService, "GetTransactionResultsByBlockID", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionsByBlockID(context context.Context, req *access.GetTransactionsByBlockIDRequest) (*access.TransactionsResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetTransactionsByBlockID(context, req)
+		h.log(LocalApiService, "GetTransactionsByBlockID", err)
+		return res, err
+	}
+
 	res, err := h.upstream.GetTransactionsByBlockID(context, req)
-	h.log("upstream", "GetTransactionsByBlockID", err)
+	h.log(UpstreamApiService, "GetTransactionsByBlockID", err)
 	return res, err
 }
 
@@ -157,115 +180,175 @@ func (h *FlowAccessAPIRouter) GetTransactionResultByIndex(context context.Contex
 	//TODO: add implementation for transaction error message before adding local impl
 
 	res, err := h.upstream.GetTransactionResultByIndex(context, req)
-	h.log("upstream", "GetTransactionResultByIndex", err)
+	h.log(UpstreamApiService, "GetTransactionResultByIndex", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetSystemTransaction(context context.Context, req *access.GetSystemTransactionRequest) (*access.TransactionResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetSystemTransaction(context, req)
+		h.log(LocalApiService, "GetSystemTransaction", err)
+		return res, err
+	}
+
 	res, err := h.upstream.GetSystemTransaction(context, req)
-	h.log("upstream", "GetSystemTransaction", err)
+	h.log(UpstreamApiService, "GetSystemTransaction", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetSystemTransactionResult(context context.Context, req *access.GetSystemTransactionResultRequest) (*access.TransactionResultResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetSystemTransactionResult(context, req)
+		h.log(LocalApiService, "GetSystemTransactionResult", err)
+		return res, err
+	}
+
 	res, err := h.upstream.GetSystemTransactionResult(context, req)
-	h.log("upstream", "GetSystemTransactionResult", err)
+	h.log(UpstreamApiService, "GetSystemTransactionResult", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetAccount(context context.Context, req *access.GetAccountRequest) (*access.GetAccountResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetAccount(context, req)
+		h.log(LocalApiService, "GetAccount", err)
+		return res, err
+	}
+
 	res, err := h.upstream.GetAccount(context, req)
-	h.log("upstream", "GetAccount", err)
+	h.log(UpstreamApiService, "GetAccount", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetAccountAtLatestBlock(context context.Context, req *access.GetAccountAtLatestBlockRequest) (*access.AccountResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetAccountAtLatestBlock(context, req)
+		h.log(LocalApiService, "GetAccountAtLatestBlock", err)
+		return res, err
+	}
+
 	res, err := h.upstream.GetAccountAtLatestBlock(context, req)
-	h.log("upstream", "GetAccountAtLatestBlock", err)
+	h.log(UpstreamApiService, "GetAccountAtLatestBlock", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetAccountAtBlockHeight(context context.Context, req *access.GetAccountAtBlockHeightRequest) (*access.AccountResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetAccountAtBlockHeight(context, req)
+		h.log(LocalApiService, "GetAccountAtBlockHeight", err)
+		return res, err
+	}
+
 	res, err := h.upstream.GetAccountAtBlockHeight(context, req)
-	h.log("upstream", "GetAccountAtBlockHeight", err)
+	h.log(UpstreamApiService, "GetAccountAtBlockHeight", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) ExecuteScriptAtLatestBlock(context context.Context, req *access.ExecuteScriptAtLatestBlockRequest) (*access.ExecuteScriptResponse, error) {
+	if h.useIndex {
+		res, err := h.local.ExecuteScriptAtLatestBlock(context, req)
+		h.log(LocalApiService, "ExecuteScriptAtLatestBlock", err)
+		return res, err
+	}
+
 	res, err := h.upstream.ExecuteScriptAtLatestBlock(context, req)
-	h.log("upstream", "ExecuteScriptAtLatestBlock", err)
+	h.log(UpstreamApiService, "ExecuteScriptAtLatestBlock", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) ExecuteScriptAtBlockID(context context.Context, req *access.ExecuteScriptAtBlockIDRequest) (*access.ExecuteScriptResponse, error) {
+	if h.useIndex {
+		res, err := h.local.ExecuteScriptAtBlockID(context, req)
+		h.log(LocalApiService, "ExecuteScriptAtBlockID", err)
+		return res, err
+	}
+
 	res, err := h.upstream.ExecuteScriptAtBlockID(context, req)
-	h.log("upstream", "ExecuteScriptAtBlockID", err)
+	h.log(UpstreamApiService, "ExecuteScriptAtBlockID", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) ExecuteScriptAtBlockHeight(context context.Context, req *access.ExecuteScriptAtBlockHeightRequest) (*access.ExecuteScriptResponse, error) {
+	if h.useIndex {
+		res, err := h.local.ExecuteScriptAtBlockHeight(context, req)
+		h.log(LocalApiService, "ExecuteScriptAtBlockHeight", err)
+		return res, err
+	}
+
 	res, err := h.upstream.ExecuteScriptAtBlockHeight(context, req)
-	h.log("upstream", "ExecuteScriptAtBlockHeight", err)
+	h.log(UpstreamApiService, "ExecuteScriptAtBlockHeight", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetEventsForHeightRange(context context.Context, req *access.GetEventsForHeightRangeRequest) (*access.EventsResponse, error) {
 	if h.useIndex {
 		res, err := h.local.GetEventsForHeightRange(context, req)
-		h.log("local", "GetEventsForHeightRange", err)
+		h.log(LocalApiService, "GetEventsForHeightRange", err)
 		return res, err
 	}
 
 	res, err := h.upstream.GetEventsForHeightRange(context, req)
-	h.log("upstream", "GetEventsForHeightRange", err)
+	h.log(UpstreamApiService, "GetEventsForHeightRange", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetEventsForBlockIDs(context context.Context, req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
 	if h.useIndex {
 		res, err := h.local.GetEventsForBlockIDs(context, req)
-		h.log("local", "GetEventsForBlockIDs", err)
+		h.log(LocalApiService, "GetEventsForBlockIDs", err)
 		return res, err
 	}
 
 	res, err := h.upstream.GetEventsForBlockIDs(context, req)
-	h.log("upstream", "GetEventsForBlockIDs", err)
+	h.log(UpstreamApiService, "GetEventsForBlockIDs", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetNetworkParameters(context context.Context, req *access.GetNetworkParametersRequest) (*access.GetNetworkParametersResponse, error) {
 	res, err := h.local.GetNetworkParameters(context, req)
-	h.log("local", "GetNetworkParameters", err)
+	h.log(LocalApiService, "GetNetworkParameters", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetLatestProtocolStateSnapshot(context context.Context, req *access.GetLatestProtocolStateSnapshotRequest) (*access.ProtocolStateSnapshotResponse, error) {
 	res, err := h.local.GetLatestProtocolStateSnapshot(context, req)
-	h.log("local", "GetLatestProtocolStateSnapshot", err)
+	h.log(LocalApiService, "GetLatestProtocolStateSnapshot", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetProtocolStateSnapshotByBlockID(context context.Context, req *access.GetProtocolStateSnapshotByBlockIDRequest) (*access.ProtocolStateSnapshotResponse, error) {
 	res, err := h.local.GetProtocolStateSnapshotByBlockID(context, req)
-	h.log("local", "GetProtocolStateSnapshotByBlockID", err)
+	h.log(LocalApiService, "GetProtocolStateSnapshotByBlockID", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetProtocolStateSnapshotByHeight(context context.Context, req *access.GetProtocolStateSnapshotByHeightRequest) (*access.ProtocolStateSnapshotResponse, error) {
 	res, err := h.local.GetProtocolStateSnapshotByHeight(context, req)
-	h.log("local", "GetProtocolStateSnapshotByHeight", err)
+	h.log(LocalApiService, "GetProtocolStateSnapshotByHeight", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetExecutionResultForBlockID(context context.Context, req *access.GetExecutionResultForBlockIDRequest) (*access.ExecutionResultForBlockIDResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetExecutionResultForBlockID(context, req)
+		h.log(LocalApiService, "GetExecutionResultForBlockID", err)
+		return res, err
+	}
+
 	res, err := h.upstream.GetExecutionResultForBlockID(context, req)
-	h.log("upstream", "GetExecutionResultForBlockID", err)
+	h.log(UpstreamApiService, "GetExecutionResultForBlockID", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetExecutionResultByID(context context.Context, req *access.GetExecutionResultByIDRequest) (*access.ExecutionResultByIDResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetExecutionResultByID(context, req)
+		h.log(LocalApiService, "GetExecutionResultByID", err)
+		return res, err
+	}
+
 	res, err := h.upstream.GetExecutionResultByID(context, req)
-	h.log("upstream", "GetExecutionResultByID", err)
+	h.log(UpstreamApiService, "GetExecutionResultByID", err)
 	return res, err
 }
 
