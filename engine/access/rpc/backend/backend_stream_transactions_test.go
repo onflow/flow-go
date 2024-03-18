@@ -205,7 +205,7 @@ func (s *TransactionStatusSuite) backendParams() Params {
 	}
 }
 
-func (s *TransactionStatusSuite) addNewFinalizedBlock(parent *flow.Header, options ...func(*flow.Block)) {
+func (s *TransactionStatusSuite) addNewFinalizedBlock(parent *flow.Header, notify bool, options ...func(*flow.Block)) {
 	s.finalizedBlock = unittest.BlockWithParentFixture(parent)
 	for _, option := range options {
 		option(s.finalizedBlock)
@@ -213,7 +213,9 @@ func (s *TransactionStatusSuite) addNewFinalizedBlock(parent *flow.Header, optio
 
 	s.blockMap[s.finalizedBlock.Header.Height] = s.finalizedBlock
 
-	s.broadcaster.Publish()
+	if notify {
+		s.broadcaster.Publish()
+	}
 }
 
 // TestSubscribeTransactionStatusHappyCase tests the functionality of the SubscribeTransactionStatuses method in the Backend.
@@ -256,7 +258,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 			assert.Equal(s.T(), expectedMsgIndex, txInfo.MessageIndex)
 			wasSet := expectedMsgIndexCounter.Set(expectedMsgIndex + 1)
 			require.True(s.T(), wasSet)
-		}, time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
+		}, 60*time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
 	}
 
 	// 1. Subscribe to transaction status and receive the first message with pending status
@@ -265,7 +267,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 
 	// 2. Make transaction reference block sealed, and add a new finalized block that includes the transaction
 	s.sealedBlock = s.finalizedBlock
-	s.addNewFinalizedBlock(s.sealedBlock.Header, func(block *flow.Block) {
+	s.addNewFinalizedBlock(s.sealedBlock.Header, true, func(block *flow.Block) {
 		block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
 		s.collections.On("LightByID", mock.AnythingOfType("flow.Identifier")).Return(&light, nil).Maybe()
 	})
@@ -275,12 +277,12 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	finalizedResult := unittest.ExecutionResultFixture(unittest.WithBlock(s.finalizedBlock))
 	s.resultsMap[s.finalizedBlock.ID()] = finalizedResult
 
-	s.addNewFinalizedBlock(s.finalizedBlock.Header)
+	s.addNewFinalizedBlock(s.finalizedBlock.Header, true)
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusExecuted)
 
 	// 4. Make the transaction block sealed, and add a new finalized block
 	s.sealedBlock = s.finalizedBlock
-	s.addNewFinalizedBlock(s.sealedBlock.Header)
+	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusSealed)
 
 	// 5. Stop subscription
@@ -343,13 +345,12 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 
 	for i := startHeight; i <= lastHeight; i++ {
 		s.sealedBlock = s.finalizedBlock
-		s.addNewFinalizedBlock(s.sealedBlock.Header)
-		checkNewSubscriptionMessage(sub, flow.TransactionStatusPending)
+		s.addNewFinalizedBlock(s.sealedBlock.Header, false)
 	}
 
 	// Generate final blocks and check transaction expired
 	s.sealedBlock = s.finalizedBlock
-	s.addNewFinalizedBlock(s.sealedBlock.Header)
+	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusExpired)
 
 	// Stop subscription

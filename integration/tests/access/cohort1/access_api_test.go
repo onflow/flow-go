@@ -200,21 +200,34 @@ func (s *AccessAPISuite) TestMVPScriptExecutionLocalStorage() {
 	mvp.RunMVPTest(s.T(), s.ctx, s.net, s.accessNode2)
 }
 
+// TestSendAndSubscribeTransactionStatuses tests the functionality of sending and subscribing to transaction statuses.
+//
+// This test verifies that a transaction can be created, signed, sent to the access API, and then the status of the transaction
+// can be subscribed to. It performs the following steps:
+// 1. Establishes a connection to the access API.
+// 2. Creates a new account key and prepares a transaction for account creation.
+// 3. Signs the transaction.
+// 4. Sends and subscribes to the transaction status using the access API.
+// 5. Verifies the received transaction statuses, ensuring they are received in order and the final status is "SEALED".
 func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
 	accessNodeContainer := s.net.ContainerByName(testnet.PrimaryAN)
 
+	// Establish a gRPC connection to the access API
 	conn, err := grpc.Dial(accessNodeContainer.Addr(testnet.GRPCPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	s.Require().NoError(err)
 	s.Require().NotNil(conn)
 
+	// Create a client for the access API
 	accessClient := accessproto.NewAccessAPIClient(conn)
 	serviceClient, err := accessNodeContainer.TestnetClient()
 	s.Require().NoError(err)
 	s.Require().NotNil(serviceClient)
 
+	// Get the latest block ID
 	latestBlockID, err := serviceClient.GetLatestBlockID(s.ctx)
 	s.Require().NoError(err)
 
+	// Generate a new account transaction
 	accountKey := test.AccountKeyGenerator().New()
 	payer := serviceClient.SDKServiceAddress()
 
@@ -228,6 +241,7 @@ func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
 	tx, err = serviceClient.SignTransaction(tx)
 	s.Require().NoError(err)
 
+	// Convert the transaction to a message format expected by the access API
 	authorizers := make([][]byte, len(tx.Authorizers))
 	for i, auth := range tx.Authorizers {
 		authorizers[i] = auth.Bytes()
@@ -262,12 +276,16 @@ func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
 		EnvelopeSignatures: convertToMessageSig(tx.EnvelopeSignatures),
 	}
 
+	// Send and subscribe to the transaction status using the access API
 	subClient, err := accessClient.SendAndSubscribeTransactionStatuses(s.ctx, &accessproto.SendAndSubscribeTransactionStatusesRequest{
 		Transaction: transactionMsg,
 	})
 	s.Require().NoError(err)
 
 	expectedCounter := uint64(0)
+	var expectedFinalTxStatus entities.TransactionStatus
+	var txID sdk.Identifier
+
 	for {
 		resp, err := subClient.Recv()
 		if err != nil {
@@ -275,14 +293,21 @@ func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
 				break
 			}
 
-			s.log.Info().Msgf("Error from transaction subscription %s", err.Error())
+			s.Require().Equal(status.Code(err), codes.Canceled)
 			break
 		}
-		s.Assert().Equal(expectedCounter, resp.GetMessageIndex())
-		expectedCounter++
+		if txID == sdk.EmptyID {
+			txID = sdk.Identifier(resp.GetId())
+		}
 
-		s.log.Info().Msgf("Get transaction subscription responce: status: %s message index: %d transaction ID: %s", resp.Status.String(), resp.GetMessageIndex(), sdk.Identifier(resp.GetId()).Hex())
+		s.Assert().Equal(expectedCounter, resp.GetMessageIndex())
+		s.Assert().Equal(txID, sdk.Identifier(resp.GetId()))
+
+		expectedCounter++
+		expectedFinalTxStatus = resp.Status
 	}
+
+	s.Assert().Equal(expectedFinalTxStatus, entities.TransactionStatus_SEALED)
 }
 
 func (s *AccessAPISuite) testGetAccount(client *client.Client) {

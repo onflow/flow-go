@@ -21,6 +21,9 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// ErrTransactionNotInBlock represents an error indicating that the transaction is not found in the block.
+var ErrTransactionNotInBlock = errors.New("transaction not in block")
+
 // TransactionErrorMessage declares the lookup transaction error methods by different input parameters.
 type TransactionErrorMessage interface {
 	// LookupErrorMessageByTransactionID is a function type for getting transaction error message by block ID and transaction ID.
@@ -399,7 +402,7 @@ func (t *TransactionsLocalDataProvider) LookupCollectionIDInBlock(
 			}
 		}
 	}
-	return flow.ZeroID, status.Error(codes.NotFound, "transaction not found in block")
+	return flow.ZeroID, ErrTransactionNotInBlock
 }
 
 // buildTxIDToCollectionIDMapping returns a map of transaction ID to collection ID based on the provided block.

@@ -14,6 +14,12 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// ErrBlockNotReady represents an error indicating that a block is not yet available or ready.
+var ErrBlockNotReady = errors.New("block not ready")
+
+// ErrResponseNotAvailableForBlock represents an error indicating that the response is not available for the given block.
+var ErrResponseNotAvailableForBlock = errors.New("response not available for block")
+
 // Streamer represents a streaming subscription that delivers data to clients.
 type Streamer struct {
 	log         zerolog.Logger
@@ -89,7 +95,14 @@ func (s *Streamer) sendAllAvailable(ctx context.Context) error {
 		response, err := s.sub.Next(ctx)
 
 		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) || errors.Is(err, storage.ErrHeightNotIndexed) || execution_data.IsBlobNotFoundError(err) {
+			if errors.Is(err, ErrResponseNotAvailableForBlock) {
+				continue
+			}
+
+			if errors.Is(err, storage.ErrNotFound) ||
+				errors.Is(err, storage.ErrHeightNotIndexed) ||
+				execution_data.IsBlobNotFoundError(err) ||
+				errors.Is(err, ErrBlockNotReady) {
 				// no more available
 				return nil
 			}
