@@ -1,6 +1,8 @@
 # from https://github.com/onflow/flow-go/blob/fa60c8f96b4a22f0f252c4b82a5dc4bbf54128c1/integration/localnet/values.yml
 
-defaults: {}
+defaults:
+  terminationGracePeriodSeconds: 180
+
 access:
   defaults:{{template "defaults"}}
     resources:
