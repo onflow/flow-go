@@ -104,6 +104,7 @@ func (s *ObserverIndexerEnabledSuite) SetupTest() {
 			fmt.Sprintf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
 			"--execution-data-sync-enabled=true",
 			"--execution-data-indexing-enabled=true",
+			"--local-api-service-enabled=true",
 			"--event-query-mode=execution-nodes-only",
 		},
 	}}
