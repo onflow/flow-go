@@ -216,6 +216,7 @@ func (h *Handler) GetRegisterValues(_ context.Context, request *executiondata.Ge
 	return &executiondata.GetRegisterValuesResponse{Values: values}, nil
 }
 
+// createAccountStatusesFilter creates an event filter for account statuses based on the provided status filter.
 func (h *Handler) createAccountStatusesFilter(statusFilter *executiondata.StatusFilter) (state_stream.EventFilter, error) {
 	filter := state_stream.EventFilter{}
 
@@ -239,15 +240,14 @@ func (h *Handler) createAccountStatusesFilter(statusFilter *executiondata.Status
 
 		addresses := statusFilter.GetAddress()
 		if len(addresses) > 0 {
-			var fieldFilters []state_stream.FieldFilter
-			for _, address := range addresses {
-				fieldFilters = append(fieldFilters, state_stream.FieldFilter{
-					FieldName:   "address",
-					TargetValue: address,
-				})
-			}
-
 			for eventType := range filter.EventTypes {
+				var fieldFilters []state_stream.FieldFilter
+				for _, address := range addresses {
+					fieldFilter := state_stream.GetCoreEventAccountFieldFilter(eventType)
+					fieldFilter.TargetValue = address
+					fieldFilters = append(fieldFilters, fieldFilter)
+				}
+
 				filter.EventFieldFilters[eventType] = fieldFilters
 			}
 		}
@@ -256,6 +256,7 @@ func (h *Handler) createAccountStatusesFilter(statusFilter *executiondata.Status
 	return filter, nil
 }
 
+// convertAccountsStatusesResults converts account statuses response to the appropriate format.
 func convertAccountsStatusesResults(eventVersion entities.EventEncodingVersion, resp *AccountStatusesResponse) ([]*executiondata.SubscribeAccountStatusesResponse_Result, error) {
 	var results []*executiondata.SubscribeAccountStatusesResponse_Result
 	for address, events := range resp.AccountEvents {
@@ -272,7 +273,14 @@ func convertAccountsStatusesResults(eventVersion entities.EventEncodingVersion, 
 	return results, nil
 }
 
-func (h *Handler) SubscribeAccountStatusesFromStartBlockID(request *executiondata.SubscribeAccountStatusesFromStartBlockIDRequest, stream executiondata.ExecutionDataAPI_SubscribeAccountStatusesFromStartBlockIDServer) error {
+// SubscribeAccountStatusesFromStartBlockID streams account statuses for all blocks starting at the requested
+// start block ID, up until the latest available block. Once the latest is
+// reached, the stream will remain open and responses are sent for each new
+// block as it becomes available.
+func (h *Handler) SubscribeAccountStatusesFromStartBlockID(
+	request *executiondata.SubscribeAccountStatusesFromStartBlockIDRequest,
+	stream executiondata.ExecutionDataAPI_SubscribeAccountStatusesFromStartBlockIDServer,
+) error {
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
@@ -334,7 +342,14 @@ func (h *Handler) SubscribeAccountStatusesFromStartBlockID(request *executiondat
 	})
 }
 
-func (h *Handler) SubscribeAccountStatusesFromStartHeight(request *executiondata.SubscribeAccountStatusesFromStartHeightRequest, stream executiondata.ExecutionDataAPI_SubscribeAccountStatusesFromStartHeightServer) error {
+// SubscribeAccountStatusesFromStartHeight streams account statuses for all blocks starting at the requested
+// start block height, up until the latest available block. Once the latest is
+// reached, the stream will remain open and responses are sent for each new
+// block as it becomes available.
+func (h *Handler) SubscribeAccountStatusesFromStartHeight(
+	request *executiondata.SubscribeAccountStatusesFromStartHeightRequest,
+	stream executiondata.ExecutionDataAPI_SubscribeAccountStatusesFromStartHeightServer,
+) error {
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
@@ -386,7 +401,14 @@ func (h *Handler) SubscribeAccountStatusesFromStartHeight(request *executiondata
 	})
 }
 
-func (h *Handler) SubscribeAccountStatusesFromLatestBlock(request *executiondata.SubscribeAccountStatusesFromLatestBlockRequest, stream executiondata.ExecutionDataAPI_SubscribeAccountStatusesFromLatestBlockServer) error {
+// SubscribeAccountStatusesFromLatestBlock streams account statuses for all blocks starting
+// at the last sealed block, up until the latest available block. Once the latest is
+// reached, the stream will remain open and responses are sent for each new
+// block as it becomes available.
+func (h *Handler) SubscribeAccountStatusesFromLatestBlock(
+	request *executiondata.SubscribeAccountStatusesFromLatestBlockRequest,
+	stream executiondata.ExecutionDataAPI_SubscribeAccountStatusesFromLatestBlockServer,
+) error {
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")

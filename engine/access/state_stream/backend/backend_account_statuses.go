@@ -43,7 +43,12 @@ type AccountStatusesBackend struct {
 // - codes.InvalidArgument: If start height before root height, or both startBlockID and startHeight are provided.
 // - codes.ErrNotFound`: For unindexed start blockID or for unindexed start height.
 // - codes.Internal: If there is an internal error.
-func (b *AccountStatusesBackend) subscribeAccountStatuses(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
+func (b *AccountStatusesBackend) subscribeAccountStatuses(
+	ctx context.Context,
+	startBlockID flow.Identifier,
+	startHeight uint64,
+	filter state_stream.EventFilter,
+) subscription.Subscription {
 	nextHeight, err := b.getStartHeight(ctx, startBlockID, startHeight)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")
@@ -93,10 +98,10 @@ func (b *AccountStatusesBackend) getAccountStatusResponseFactory(messageIndex *c
 		if err != nil {
 			return nil, err
 		}
-		allProtocolEvents := filter.Filter(eventsResponse.Events)
+		filteredProtocolEvents := filter.Filter(eventsResponse.Events)
 		allAccountProtocolEvents := map[string]flow.EventsList{}
 
-		for _, event := range allProtocolEvents {
+		for _, event := range filteredProtocolEvents {
 			data, err := ccf.Decode(nil, event.Payload)
 			if err != nil {
 				b.log.Info().Err(err).Msg("could not decode event payload")
@@ -115,11 +120,11 @@ func (b *AccountStatusesBackend) getAccountStatusResponseFactory(messageIndex *c
 				continue
 			}
 
-			for _, filter := range filter.EventFieldFilters[event.Type] {
-				for i, field := range fields {
-					if field.Identifier == filter.FieldName && fieldValues[i].String() == filter.TargetValue {
-						allAccountProtocolEvents[filter.TargetValue] = append(allAccountProtocolEvents[filter.TargetValue], event)
-					}
+			accountField := state_stream.GetCoreEventAccountFieldFilter(event.Type)
+			for i, field := range fields {
+				if field.Identifier == accountField.FieldName {
+					fieldValue := fieldValues[i].String()
+					allAccountProtocolEvents[fieldValue] = append(allAccountProtocolEvents[fieldValue], event)
 				}
 			}
 		}

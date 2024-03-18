@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -139,7 +142,7 @@ func (f *EventFilter) Match(event flow.Event) bool {
 	}
 
 	if _, ok := f.EventTypes[event.Type]; ok {
-		return true
+		return f.matchFieldFilter(&event)
 	}
 
 	parsed, err := events.ParseEvent(event.Type)
@@ -160,6 +163,47 @@ func (f *EventFilter) Match(event flow.Event) bool {
 	return false
 }
 
+// matchFieldFilter checks if the provided event matches the field filters defined in the event filter.
+//
+// This method is called internally by the EventFilter's Match method to determine if an event matches the field filters criteria.
+// It compares the field values of the event with the target values specified in the field filters.
+// If the event matches all field filters, it returns true; otherwise, it returns false.
+// If there is an error decoding the event payload or if the event does not contain the expected fields, it returns false.
+func (f *EventFilter) matchFieldFilter(event *flow.Event) bool {
+	fieldFilters := f.EventFieldFilters[event.Type]
+	if len(fieldFilters) > 0 {
+		data, err := ccf.Decode(nil, event.Payload)
+		if err != nil {
+			return false
+		}
+
+		cdcEvent, ok := data.(cadence.Event)
+		if !ok {
+			return false
+		}
+
+		fieldValues := cdcEvent.GetFieldValues()
+		fields := cdcEvent.GetFields()
+		if fieldValues == nil || fields == nil {
+			return false
+		}
+
+		for _, filter := range fieldFilters {
+			for i, field := range fields {
+				if field.Identifier == filter.FieldName {
+					if fieldValues[i].String() != filter.TargetValue {
+						return false
+					}
+				}
+			}
+		}
+
+		return true
+	}
+
+	return true
+}
+
 // GetCoreEventTypes validates the provided core event types and returns them if they are all core events.
 // If no event types are provided, it returns all default core events.
 // Expected errors:
@@ -178,6 +222,32 @@ func GetCoreEventTypes(providedEventTypes []string) ([]string, error) {
 	}
 
 	return defaultCoreEvents, nil
+}
+
+// GetCoreEventAccountFieldFilter returns the field filter for the specified core event type related to an account.
+func GetCoreEventAccountFieldFilter(eventType flow.EventType) FieldFilter {
+	switch eventType {
+	case "flow.AccountCreated":
+		fallthrough
+	case "flow.AccountKeyAdded":
+		fallthrough
+	case "flow.AccountKeyRemoved":
+		fallthrough
+	case "flow.AccountContractAdded":
+		fallthrough
+	case "flow.AccountContractUpdated":
+		fallthrough
+	case "flow.AccountContractRemoved":
+		return FieldFilter{FieldName: "address"}
+	case "flow.InboxValuePublished":
+		fallthrough
+	case "flow.InboxValueUnpublished":
+		fallthrough
+	case "flow.InboxValueClaimed":
+		return FieldFilter{FieldName: "provider"}
+	}
+
+	return FieldFilter{}
 }
 
 // validateEventType ensures that the event type matches the expected format
