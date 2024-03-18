@@ -543,8 +543,8 @@ func (NoopRuntimeInterface) GetAccountContractNames(_ runtime.Address) ([]string
 	panic("unexpected GetAccountContractNames call")
 }
 
-func (NoopRuntimeInterface) AllocateStorageIndex(_ []byte) (atree.StorageIndex, error) {
-	panic("unexpected AllocateStorageIndex call")
+func (NoopRuntimeInterface) AllocateSlabIndex(_ []byte) (atree.SlabIndex, error) {
+	panic("unexpected AllocateSlabIndex call")
 }
 
 func (NoopRuntimeInterface) ComputationUsed() (uint64, error) {

@@ -40,8 +40,8 @@ func (we *WrappedEnvironment) ValueExists(owner, key []byte) (bool, error) {
 	return b, handleEnvironmentError(err)
 }
 
-func (we *WrappedEnvironment) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	index, err := we.env.AllocateStorageIndex(owner)
+func (we *WrappedEnvironment) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
+	index, err := we.env.AllocateSlabIndex(owner)
 	return index, handleEnvironmentError(err)
 }
 

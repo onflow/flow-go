@@ -174,8 +174,8 @@ func (f FakeAccounts) Create(_ []flow.AccountPublicKey, _ flow.Address) error { 
 func (f FakeAccounts) GetValue(_ flow.RegisterID) (flow.RegisterValue, error) { return nil, nil }
 func (f FakeAccounts) GetStorageUsed(_ flow.Address) (uint64, error)          { return 0, nil }
 func (f FakeAccounts) SetValue(_ flow.RegisterID, _ []byte) error             { return nil }
-func (f FakeAccounts) AllocateStorageIndex(_ flow.Address) (atree.StorageIndex, error) {
-	return atree.StorageIndex{}, nil
+func (f FakeAccounts) AllocateSlabIndex(_ flow.Address) (atree.SlabIndex, error) {
+	return atree.SlabIndex{}, nil
 }
 func (f FakeAccounts) GenerateAccountLocalID(address flow.Address) (uint64, error) {
 	return 0, nil

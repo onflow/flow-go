@@ -15,20 +15,20 @@ type Accounts struct {
 	mock.Mock
 }
 
-// AllocateStorageIndex provides a mock function with given fields: address
-func (_m *Accounts) AllocateStorageIndex(address flow.Address) (atree.StorageIndex, error) {
+// AllocateSlabIndex provides a mock function with given fields: address
+func (_m *Accounts) AllocateSlabIndex(address flow.Address) (atree.SlabIndex, error) {
 	ret := _m.Called(address)
 
-	var r0 atree.StorageIndex
+	var r0 atree.SlabIndex
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Address) (atree.StorageIndex, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Address) (atree.SlabIndex, error)); ok {
 		return rf(address)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Address) atree.StorageIndex); ok {
+	if rf, ok := ret.Get(0).(func(flow.Address) atree.SlabIndex); ok {
 		r0 = rf(address)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(atree.StorageIndex)
+			r0 = ret.Get(0).(atree.SlabIndex)
 		}
 	}
 
