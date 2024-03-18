@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -90,26 +91,10 @@ func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Ident
 		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", parentID, err)
 	}
 
-	parentKVStoreData, err := s.kvStoreSnapshotDB.ByBlockID(parentID)
+	kvStoreStateMachine, err := s.createKVStoreStateMachine(candidateView, parentID)
 	if err != nil {
-		return nil, fmt.Errorf("could not query parent KV store snapshot at block (%x): %w", parentID, err)
+		return nil, fmt.Errorf("could not create KV store state machine: %w", err)
 	}
-
-	parentKVStore, err := kvstore.VersionedDecode(parentKVStoreData.Version, parentKVStoreData.Data)
-	if err != nil {
-		return nil, fmt.Errorf("could not decode parent KV store (version=%d) snapshot at block (%x): %w",
-			parentKVStoreData.Version, parentID, err)
-	}
-
-	// TODO: add upgrades
-	protocolVersion := parentKVStore.GetProtocolStateVersion()
-	candidateBlockKVStore, err := parentKVStore.Replicate(protocolVersion)
-	if err != nil {
-		return nil, fmt.Errorf("could not replicate parent KV store (version=%d) to protocol version %d: %w",
-			protocolVersion, err)
-	}
-
-	kvStoreStateMachine := kvstore.NewProcessingStateMachine(candidateView, s.globalParams, parentKVStore, candidateBlockKVStore)
 
 	return newStateMutator(
 		s.headers,
@@ -127,4 +112,39 @@ func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Ident
 		},
 		kvStoreStateMachine,
 	)
+}
+
+func (s *MutableProtocolState) createKVStoreStateMachine(candidateView uint64, parentID flow.Identifier) (protocol_state.KeyValueStoreStateMachine, error) {
+	parentKVStore, err := s.retrieveKVStoreSnapshotByBlockID(parentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve parent KV store snapshot at block (%x): %w", parentID, err)
+	}
+
+	protocolVersion := parentKVStore.GetProtocolStateVersion()
+	if versionUpgrade := parentKVStore.GetVersionUpgrade(); versionUpgrade != nil {
+		if candidateView >= versionUpgrade.ActivationView {
+			protocolVersion = versionUpgrade.Data
+		}
+	}
+	candidateBlockKVStore, err := parentKVStore.Replicate(protocolVersion)
+	if err != nil {
+		return nil, fmt.Errorf("could not replicate parent KV store (version=%d) to protocol version %d: %w",
+			parentKVStore.GetProtocolStateVersion(), protocolVersion, err)
+	}
+
+	return kvstore.NewProcessingStateMachine(candidateView, s.globalParams, parentKVStore, candidateBlockKVStore), nil
+}
+
+func (s *MutableProtocolState) retrieveKVStoreSnapshotByBlockID(blockID flow.Identifier) (protocol_state.KVStoreAPI, error) {
+	kvStoreData, err := s.kvStoreSnapshotDB.ByBlockID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not query parent KV store snapshot at block (%x): %w", blockID, err)
+	}
+
+	kvStore, err := kvstore.VersionedDecode(kvStoreData.Version, kvStoreData.Data)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode parent KV store (version=%d) snapshot at block (%x): %w",
+			kvStoreData.Version, blockID, err)
+	}
+	return kvStore, nil
 }
