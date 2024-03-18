@@ -254,6 +254,15 @@ func (m *stateMutator) applyServiceEventsFromOrderedResults(results []*flow.Exec
 				}
 			case *flow.VersionBeacon:
 				// do nothing for now
+			case *flow.ProtocolStateVersionUpgrade:
+				err := m.kvStoreStateMachine.ProcessUpdate(&event)
+				if err != nil {
+					if protocol.IsInvalidServiceEventError(err) {
+						// TODO: report invalid service event
+					} else {
+						return nil, fmt.Errorf("could not process kv store update event: %w", err)
+					}
+				}
 			default:
 				return nil, fmt.Errorf("invalid service event type (type_name=%s, go_type=%T)", event.Type, ev)
 			}
