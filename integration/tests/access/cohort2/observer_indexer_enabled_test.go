@@ -198,7 +198,10 @@ func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCsHappyPath() {
 
 	// wait for data to be synced by observer
 	require.Eventually(t, func() bool {
-		_, err := observer.GetAccountAtLatestBlock(ctx, &accessproto.GetAccountAtLatestBlockRequest{Address: newAccountAddress.Bytes()})
+		_, err := observer.GetAccountAtBlockHeight(ctx, &accessproto.GetAccountAtBlockHeightRequest{
+			Address:     newAccountAddress.Bytes(),
+			BlockHeight: accountCreationTxRes.BlockHeight,
+		})
 		statusErr, ok := status.FromError(err)
 		if !ok || err == nil {
 			return true

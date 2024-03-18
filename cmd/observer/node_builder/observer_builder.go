@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -147,6 +148,8 @@ type ObserverServiceConfig struct {
 	executionDataDir             string
 	executionDataStartHeight     uint64
 	executionDataConfig          edrequester.ExecutionDataConfig
+	scriptExecMinBlock           uint64
+	scriptExecMaxBlock           uint64
 }
 
 // DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
@@ -216,6 +219,8 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			RetryDelay:         edrequester.DefaultRetryDelay,
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
+		scriptExecMinBlock: 0,
+		scriptExecMaxBlock: math.MaxUint64,
 	}
 }
 
@@ -247,6 +252,7 @@ type ObserverServiceBuilder struct {
 
 	RegistersAsyncStore *execution.RegistersAsyncStore
 	EventsIndex         *index.EventsIndex
+	ScriptExecutor      *backend.ScriptExecutor
 
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
@@ -701,11 +707,18 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"state-stream-max-register-values",
 			defaultConfig.stateStreamConf.RegisterIDsRequestLimit,
 			"maximum number of register ids to include in a single request to the GetRegisters endpoint")
-
 		flags.StringVar(&builder.rpcConf.BackendConfig.EventQueryMode,
 			"event-query-mode",
 			defaultConfig.rpcConf.BackendConfig.EventQueryMode,
 			"mode to use when querying events. one of [local-only, execution-nodes-only(default), failover]")
+		flags.Uint64Var(&builder.scriptExecMinBlock,
+			"script-execution-min-height",
+			defaultConfig.scriptExecMinBlock,
+			"lowest block height to allow for script execution. default: no limit")
+		flags.Uint64Var(&builder.scriptExecMaxBlock,
+			"script-execution-max-height",
+			defaultConfig.scriptExecMaxBlock,
+			"highest block height to allow for script execution. default: no limit")
 
 	}).ValidateFlags(func() error {
 		if builder.executionDataSyncEnabled {
@@ -868,6 +881,8 @@ func (builder *ObserverServiceBuilder) Initialize() error {
 
 	builder.enqueueConnectWithStakedAN()
 
+	builder.BuildConsensusFollower()
+
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()
 	}
@@ -999,13 +1014,6 @@ func (builder *ObserverServiceBuilder) initObserverLocal() func(node *cmd.NodeCo
 		}
 		return nil
 	}
-}
-
-// Build enqueues the sync engine and the follower engine for the observer.
-// Currently, the observer only runs the follower engine.
-func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
-	builder.BuildConsensusFollower()
-	return builder.FlowNodeBuilder.Build()
 }
 
 func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverServiceBuilder {
@@ -1299,6 +1307,26 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil, err
 			}
 
+			// create script execution module, this depends on the indexer being initialized and the
+			// having the register storage bootstrapped
+			scripts, err := execution.NewScripts(
+				builder.Logger,
+				metrics.NewExecutionCollector(builder.Tracer),
+				builder.RootChainID,
+				query.NewProtocolStateWrapper(builder.State),
+				builder.Storage.Headers,
+				builder.ExecutionIndexerCore.RegisterValue,
+				builder.scriptExecutorConfig,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts)
+			if err != nil {
+				return nil, err
+			}
+
 			err = builder.TxResultsIndex.Initialize(builder.ExecutionIndexer)
 			if err != nil {
 				return nil, err
@@ -1547,6 +1575,10 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Storage.LightTransactionResults)
 		return nil
 	})
+	builder.Module("script executor", func(node *cmd.NodeConfig) error {
+		builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
+		return nil
+	})
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		accessMetrics := builder.AccessMetrics
 		config := builder.rpcConf
@@ -1604,6 +1636,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			backendParams.EventQueryMode = backend.IndexQueryModeLocalOnly
 			backendParams.TxResultsIndex = builder.TxResultsIndex
 			backendParams.EventsIndex = builder.EventsIndex
+			backendParams.ScriptExecutor = builder.ScriptExecutor
 		}
 
 		accessBackend, err := backend.New(backendParams)
@@ -1647,6 +1680,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		if err != nil {
 			return nil, err
 		}
+
+		builder.Logger.Info().Msgf("*****Committee %v", builder.Committee)
 
 		rpcHandler := apiproxy.NewFlowAccessAPIRouter(apiproxy.Params{
 			Log:      builder.Logger,
