@@ -1,16 +1,21 @@
 package cohort2
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	sdk "github.com/onflow/flow-go-sdk"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go-sdk/templates"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"net/http"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -60,6 +65,18 @@ func (s *ObserverIndexerEnabledSuite) SetupTest() {
 	s.testedRPCs = s.getRPCs
 	s.testedRestEndpoints = s.getRestEndpoints
 
+	consensusConfigs := []func(config *testnet.NodeConfig){
+		// `cruise-ctl-fallback-proposal-duration` is set to 250ms instead to of 100ms
+		// to purposely slow down the block rate. This is needed since the crypto module
+		// update providing faster BLS operations.
+		// TODO: fix the access integration test logic to function without slowing down
+		// the block rate
+		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=250ms"),
+		testnet.WithAdditionalFlagf("--required-verification-seal-approvals=%d", 1),
+		testnet.WithAdditionalFlagf("--required-construction-seal-approvals=%d", 1),
+		testnet.WithLogLevel(zerolog.FatalLevel),
+	}
+
 	nodeConfigs := []testnet.NodeConfig{
 		// access node with unstaked nodes supported
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel),
@@ -70,19 +87,14 @@ func (s *ObserverIndexerEnabledSuite) SetupTest() {
 			testnet.WithAdditionalFlag("--event-query-mode=execution-nodes-only"),
 		),
 
-		// need one dummy execution node
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
-
-		// need one dummy verification node (unused ghost)
-		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost()),
-
-		// need one controllable collection node
 		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel)),
-
-		// need three consensus nodes (unused ghost)
-		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost()),
-		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost()),
-		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost()),
+		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
+		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
+		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
+		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
 	}
 
 	observers := []testnet.ObserverConfig{{
@@ -107,59 +119,130 @@ func (s *ObserverIndexerEnabledSuite) SetupTest() {
 	s.net.Start(ctx)
 }
 
-// TestObserverIndexedRPCs tests RPCs that are handled by the observer by using a dedicated indexer for the events.
+// TestObserverIndexedRPCsHappyPath tests RPCs that are handled by the observer by using a dedicated indexer for the events.
 // For now the observer only supports the following RPCs:
 // - GetEventsForHeightRange
 // - GetEventsForBlockIDs
 // To ensure that the observer is handling these RPCs, we stop the upstream access node and verify that the observer client
 // returns success for valid requests and errors for invalid ones.
-func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCs() {
+func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCsHappyPath() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	t := s.T()
 
+	// prepare environment to create a new account
+	serviceAccountClient, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
+	require.NoError(t, err)
+
+	latestBlockID, err := serviceAccountClient.GetLatestBlockID(ctx)
+	require.NoError(t, err)
+
+	// create new account to deploy Counter to
+	accountPrivateKey := lib.RandomPrivateKey()
+
+	accountKey := sdk.NewAccountKey().
+		FromPrivateKey(accountPrivateKey).
+		SetHashAlgo(sdkcrypto.SHA3_256).
+		SetWeight(sdk.AccountKeyWeightThreshold)
+
+	serviceAddress := sdk.Address(serviceAccountClient.Chain.ServiceAddress())
+
+	// Generate the account creation transaction
+	createAccountTx, err := templates.CreateAccount(
+		[]*sdk.AccountKey{accountKey},
+		[]templates.Contract{
+			{
+				Name:   lib.CounterContract.Name,
+				Source: lib.CounterContract.ToCadence(),
+			},
+		}, serviceAddress)
+	require.NoError(t, err)
+	createAccountTx.
+		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
+		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
+		SetPayer(serviceAddress).
+		SetComputeLimit(9999)
+
+	// send the create account tx
+	childCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	err = serviceAccountClient.SignAndSendTransaction(childCtx, createAccountTx)
+	require.NoError(t, err)
+
+	cancel()
+
+	// wait for account to be created
+	var accountCreationTxRes *sdk.TransactionResult
+	unittest.RequireReturnsBefore(t, func() {
+		accountCreationTxRes, err = serviceAccountClient.WaitForSealed(context.Background(), createAccountTx.ID())
+		require.NoError(t, err)
+	}, 20*time.Second, "has to seal before timeout")
+
+	// obtain the account address
+	var accountCreatedPayload []byte
+	var newAccountAddress sdk.Address
+	for _, event := range accountCreationTxRes.Events {
+		if event.Type == sdk.EventAccountCreated {
+			accountCreatedEvent := sdk.AccountCreatedEvent(event)
+			accountCreatedPayload = accountCreatedEvent.Payload
+			newAccountAddress = accountCreatedEvent.Address()
+		}
+	}
+	require.NotEqual(t, sdk.EmptyAddress, newAccountAddress)
+
+	// now we can query events using observer to data which has to be locally indexed
+
 	// get an observer client
 	observer, err := s.getObserverClient()
+	require.NoError(t, err)
+
+	// wait for data to be synced by observer
+	require.Eventually(t, func() bool {
+		_, err := observer.GetAccountAtLatestBlock(ctx, &accessproto.GetAccountAtLatestBlockRequest{Address: newAccountAddress.Bytes()})
+		statusErr, ok := status.FromError(err)
+		if !ok || err == nil {
+			return true
+		}
+		return statusErr.Code() != codes.OutOfRange
+	}, 30*time.Second, 1*time.Second)
+
+	blockWithAccount, err := observer.GetBlockHeaderByID(ctx, &accessproto.GetBlockHeaderByIDRequest{
+		Id: accountCreationTxRes.BlockID[:],
+	})
 	require.NoError(t, err)
 
 	// stop the upstream access container
 	err = s.net.StopContainerByName(ctx, testnet.PrimaryAN)
 	require.NoError(t, err)
 
-	t.Run("GetEventsForHeightRange", func(t *testing.T) {
-		// verify that we receive no error if the request is valid
-		_, err = observer.GetEventsForHeightRange(ctx, &accessproto.GetEventsForHeightRangeRequest{
-			Type:                 string(flow.EventAccountCreated),
-			StartHeight:          0,
-			EndHeight:            5,
-			EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
-		})
-		assert.NoError(t, err)
-
-		// verify that we receive an error if the request is invalid
-		_, err = observer.GetEventsForHeightRange(ctx, &accessproto.GetEventsForHeightRangeRequest{})
-		assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	eventsByBlockID, err := observer.GetEventsForBlockIDs(ctx, &accessproto.GetEventsForBlockIDsRequest{
+		Type:                 sdk.EventAccountCreated,
+		BlockIds:             [][]byte{blockWithAccount.Block.Id},
+		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
 	})
-	t.Run("GetEventsForBlockIDs", func(t *testing.T) {
-		// verify that we receive no error if the request is valid
-		genesisBlock, err := observer.GetBlockByHeight(ctx, &accessproto.GetBlockByHeightRequest{
-			Height:            0,
-			FullBlockResponse: false,
-		})
-		require.NoError(t, err)
+	require.NoError(t, err)
 
-		_, err = observer.GetEventsForBlockIDs(ctx, &accessproto.GetEventsForBlockIDsRequest{
-			Type:                 string(flow.EventAccountCreated),
-			BlockIds:             [][]byte{genesisBlock.Block.Id},
-			EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
-		})
-		assert.NoError(t, err)
-
-		// verify that we receive an error if the request is invalid
-		_, err = observer.GetEventsForBlockIDs(ctx, &accessproto.GetEventsForBlockIDsRequest{})
-		assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	eventsByHeight, err := observer.GetEventsForHeightRange(ctx, &accessproto.GetEventsForHeightRangeRequest{
+		Type:                 sdk.EventAccountCreated,
+		StartHeight:          blockWithAccount.Block.Height,
+		EndHeight:            blockWithAccount.Block.Height,
+		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
 	})
+	require.NoError(t, err)
+
+	// validate that there is an event that we are looking for
+	require.Equal(t, eventsByHeight.Results, eventsByBlockID.Results)
+	found := false
+	for _, eventsInBlock := range eventsByHeight.Results {
+		for _, event := range eventsInBlock.Events {
+			if event.Type == sdk.EventAccountCreated {
+				if bytes.Equal(event.Payload, accountCreatedPayload) {
+					found = true
+				}
+			}
+		}
+	}
+	require.True(t, found)
 }
 
 func (s *ObserverIndexerEnabledSuite) getRPCs() []RPCTest {
