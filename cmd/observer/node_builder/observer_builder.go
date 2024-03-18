@@ -143,6 +143,7 @@ type ObserverServiceConfig struct {
 	scriptExecutorConfig         query.QueryConfig
 	executionDataSyncEnabled     bool
 	executionDataIndexingEnabled bool
+	useLocalServiceAPI           bool
 	executionDataDir             string
 	executionDataStartHeight     uint64
 	executionDataConfig          edrequester.ExecutionDataConfig
@@ -204,6 +205,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		scriptExecutorConfig:         query.NewDefaultConfig(),
 		executionDataSyncEnabled:     false,
 		executionDataIndexingEnabled: false,
+		useLocalServiceAPI:           false,
 		executionDataDir:             filepath.Join(homedir, ".flow", "execution_data"),
 		executionDataStartHeight:     0,
 		executionDataConfig: edrequester.ExecutionDataConfig{
@@ -621,6 +623,7 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"execution-data-indexing-enabled",
 			defaultConfig.executionDataIndexingEnabled,
 			"whether to enable the execution data indexing")
+		flags.BoolVar(&builder.useLocalServiceAPI, "local-api-service-enabled", defaultConfig.useLocalServiceAPI, "whether to use execution data indexing for api service")
 		flags.StringVar(&builder.registersDBPath, "execution-state-dir", defaultConfig.registersDBPath, "directory to use for execution-state database")
 		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "execution-state checkpoint file")
 
@@ -1596,9 +1599,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
 		}
 
-		// use the events index for events if enabled
-		useIndex := builder.executionDataIndexingEnabled
-		if useIndex {
+		if builder.useLocalServiceAPI {
 			backendParams.ScriptExecutionMode = backend.IndexQueryModeLocalOnly
 			backendParams.EventQueryMode = backend.IndexQueryModeLocalOnly
 			backendParams.TxResultsIndex = builder.TxResultsIndex
@@ -1652,7 +1653,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			Metrics:  observerCollector,
 			Upstream: forwarder,
 			Local:    engineBuilder.DefaultHandler(hotsignature.NewBlockSignerDecoder(builder.Committee)),
-			UseIndex: useIndex,
+			UseIndex: builder.useLocalServiceAPI,
 		})
 
 		// build the rpc engine
