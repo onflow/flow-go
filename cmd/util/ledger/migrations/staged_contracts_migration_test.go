@@ -937,9 +937,10 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 
-		migration := NewStagedContractsMigration(chainID, log)
+		migration := NewStagedContractsMigration(chainID, log).
+			WithContractUpdateValidation()
+
 		migration.RegisterContractUpdates(stagedContracts)
-		migration.WithContractUpdateValidation()
 
 		err = migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -1027,9 +1028,10 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 
-		migration := NewStagedContractsMigration(chainID, log)
+		migration := NewStagedContractsMigration(chainID, log).
+			WithContractUpdateValidation()
+
 		migration.RegisterContractUpdates(stagedContracts)
-		migration.WithContractUpdateValidation()
 
 		err = migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -1070,6 +1072,77 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 		require.Len(t, payloads2, 1)
 		assert.Equal(t, ftContract, string(payloads2[0].Value()))
-
 	})
+
+	t.Run("import from other account", func(t *testing.T) {
+		t.Parallel()
+
+		addressA := address
+
+		addressB, err := addressGenerator.NextAddress()
+		require.NoError(t, err)
+
+		oldCodeA := fmt.Sprintf(`
+            import B from %s
+
+            pub contract A {}
+        `,
+			addressB.HexWithPrefix(),
+		)
+
+		newCodeA := fmt.Sprintf(`
+            import B from %s
+
+            access(all) contract A {}
+        `,
+			addressB.HexWithPrefix(),
+		)
+
+		codeB := `
+		   access(all) contract B {}
+		`
+
+		stagedContracts := []StagedContract{
+			{
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(newCodeA),
+				},
+				Address: common.Address(addressA),
+			},
+		}
+
+		contractACode := newContractPayload(common.Address(addressA), "A", []byte(oldCodeA))
+		contractBCode := newContractPayload(common.Address(addressB), "B", []byte(codeB))
+
+		payloads1 := []*ledger.Payload{contractACode}
+		allPayloads := []*ledger.Payload{contractACode, contractBCode}
+
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(chainID, log).
+			WithContractUpdateValidation()
+
+		migration.RegisterContractUpdates(stagedContracts)
+
+		err = migration.InitMigration(log, allPayloads, 0)
+		require.NoError(t, err)
+
+		payloads1, err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(addressA),
+			payloads1,
+		)
+		require.NoError(t, err)
+
+		err = migration.Close()
+		require.NoError(t, err)
+
+		require.Empty(t, logWriter.logs)
+
+		require.Len(t, payloads1, 1)
+		assert.Equal(t, newCodeA, string(payloads1[0].Value()))
+	})
+
 }

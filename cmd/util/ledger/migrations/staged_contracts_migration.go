@@ -35,6 +35,9 @@ type StagedContractsMigration struct {
 	contractsByLocation            map[common.Location][]byte
 	enableUpdateValidation         bool
 	userDefinedTypeChangeCheckFunc func(oldTypeID common.TypeID, newTypeID common.TypeID) (checked bool, valid bool)
+	elaborations                   map[common.Location]*sema.Elaboration
+	contractAdditionHandler        stdlib.AccountContractAdditionHandler
+	contractNamesProvider          stdlib.AccountContractNamesProvider
 }
 
 type StagedContract struct {
@@ -92,7 +95,7 @@ func (m *StagedContractsMigration) Close() error {
 
 func (m *StagedContractsMigration) InitMigration(
 	log zerolog.Logger,
-	_ []*ledger.Payload,
+	allPayloads []*ledger.Payload,
 	_ int,
 ) error {
 	m.log = log.
@@ -106,6 +109,33 @@ func (m *StagedContractsMigration) InitMigration(
 		Address: common.Address(BurnerAddressForChain(m.chainID)),
 	}
 	m.contractsByLocation[burnerLocation] = coreContracts.Burner()
+
+	// Initialize elaborations, ContractAdditionHandler and ContractNamesProvider.
+	// These needs to be initialized using **ALL** payloads, not just the payloads of the account.
+
+	elaborations := map[common.Location]*sema.Elaboration{}
+
+	config := util.RuntimeInterfaceConfig{
+		GetContractCodeFunc: func(location runtime.Location) ([]byte, error) {
+			// TODO: also consider updated system contracts
+			return m.contractsByLocation[location], nil
+		},
+		GetOrLoadProgramListener: func(location runtime.Location, program *interpreter.Program, err error) {
+			if err == nil {
+				elaborations[location] = program.Elaboration
+			}
+		},
+	}
+
+	// Pass empty address. We are only interested in the created `env` object.
+	mr, err := NewMigratorRuntime(common.Address{}, allPayloads, config)
+	if err != nil {
+		return err
+	}
+
+	m.elaborations = elaborations
+	m.contractAdditionHandler = mr.ContractAdditionHandler
+	m.contractNamesProvider = mr.ContractNamesProvider
 
 	return nil
 }
@@ -191,25 +221,6 @@ func (m *StagedContractsMigration) MigrateAccount(
 		return oldPayloads, nil
 	}
 
-	elaborations := map[common.Location]*sema.Elaboration{}
-
-	config := util.RuntimeInterfaceConfig{
-		GetContractCodeFunc: func(location runtime.Location) ([]byte, error) {
-			// TODO: also consider updated system contracts
-			return m.contractsByLocation[location], nil
-		},
-		GetOrLoadProgramListener: func(location runtime.Location, program *interpreter.Program, err error) {
-			if err == nil {
-				elaborations[location] = program.Elaboration
-			}
-		},
-	}
-
-	mr, err := NewMigratorRuntime(address, oldPayloads, config)
-	if err != nil {
-		return nil, err
-	}
-
 	for payloadIndex, payload := range oldPayloads {
 		key, err := payload.Key()
 		if err != nil {
@@ -234,12 +245,10 @@ func (m *StagedContractsMigration) MigrateAccount(
 
 		if m.enableUpdateValidation {
 			err = m.checkContractUpdateValidity(
-				mr,
 				address,
 				name,
 				newCode,
 				oldCode,
-				elaborations,
 			)
 		}
 
@@ -280,12 +289,10 @@ func (m *StagedContractsMigration) MigrateAccount(
 }
 
 func (m *StagedContractsMigration) checkContractUpdateValidity(
-	mr *migratorRuntime,
 	address common.Address,
 	contractName string,
 	newCode []byte,
 	oldCode ledger.Value,
-	elaborations map[common.Location]*sema.Elaboration,
 ) error {
 	location := common.AddressLocation{
 		Name:    contractName,
@@ -298,7 +305,7 @@ func (m *StagedContractsMigration) checkContractUpdateValidity(
 	// should not be effective during the execution
 	const getAndSetProgram = false
 
-	newProgram, err := mr.ContractAdditionHandler.ParseAndCheckProgram(newCode, location, getAndSetProgram)
+	newProgram, err := m.contractAdditionHandler.ParseAndCheckProgram(newCode, location, getAndSetProgram)
 	if err != nil {
 		return err
 	}
@@ -311,10 +318,10 @@ func (m *StagedContractsMigration) checkContractUpdateValidity(
 	validator := stdlib.NewCadenceV042ToV1ContractUpdateValidator(
 		location,
 		contractName,
-		mr.ContractNamesProvider,
+		m.contractNamesProvider,
 		oldProgram,
 		newProgram.Program,
-		elaborations,
+		m.elaborations,
 	)
 
 	validator.WithUserDefinedTypeChangeChecker(
