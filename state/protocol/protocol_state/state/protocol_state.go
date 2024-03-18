@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -50,10 +51,11 @@ func (s *ProtocolState) GlobalParams() protocol.GlobalParams {
 // by acting as factory for protocol.StateMutator which can be used to apply state-changing operations.
 type MutableProtocolState struct {
 	ProtocolState
-	headers storage.Headers
-	results storage.ExecutionResults
-	setups  storage.EpochSetups
-	commits storage.EpochCommits
+	headers           storage.Headers
+	results           storage.ExecutionResults
+	setups            storage.EpochSetups
+	commits           storage.EpochCommits
+	kvStoreSnapshotDB storage.ProtocolKVStore
 }
 
 var _ protocol.MutableProtocolState = (*MutableProtocolState)(nil)
@@ -66,13 +68,15 @@ func NewMutableProtocolState(
 	results storage.ExecutionResults,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
+	kvStoreSnapshotDB storage.ProtocolKVStore,
 ) *MutableProtocolState {
 	return &MutableProtocolState{
-		ProtocolState: *NewProtocolState(protocolStateDB, globalParams),
-		headers:       headers,
-		results:       results,
-		setups:        setups,
-		commits:       commits,
+		ProtocolState:     *NewProtocolState(protocolStateDB, globalParams),
+		headers:           headers,
+		results:           results,
+		setups:            setups,
+		commits:           commits,
+		kvStoreSnapshotDB: kvStoreSnapshotDB,
 	}
 }
 
@@ -85,6 +89,28 @@ func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Ident
 	if err != nil {
 		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", parentID, err)
 	}
+
+	parentKVStoreData, err := s.kvStoreSnapshotDB.ByBlockID(parentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not query parent KV store snapshot at block (%x): %w", parentID, err)
+	}
+
+	parentKVStore, err := kvstore.VersionedDecode(parentKVStoreData.Version, parentKVStoreData.Data)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode parent KV store (version=%d) snapshot at block (%x): %w",
+			parentKVStoreData.Version, parentID, err)
+	}
+
+	// TODO: add upgrades
+	protocolVersion := parentKVStore.GetProtocolStateVersion()
+	candidateBlockKVStore, err := parentKVStore.Replicate(protocolVersion)
+	if err != nil {
+		return nil, fmt.Errorf("could not replicate parent KV store (version=%d) to protocol version %d: %w",
+			protocolVersion, err)
+	}
+
+	kvStoreStateMachine := kvstore.NewProcessingStateMachine(candidateView, s.globalParams, parentKVStore, candidateBlockKVStore)
+
 	return newStateMutator(
 		s.headers,
 		s.results,
@@ -99,5 +125,6 @@ func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Ident
 		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.ProtocolStateMachine, error) { // needed for translating from concrete implementation type to interface type
 			return epochs.NewEpochFallbackStateMachine(candidateView, parentState), nil
 		},
+		kvStoreStateMachine,
 	)
 }
