@@ -286,11 +286,9 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusSealed)
 
+	//// 5. Stop subscription
 	s.sealedBlock = s.finalizedBlock
 	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
-
-	//// 5. Stop subscription
-	//cancel()
 
 	// Ensure subscription shuts down gracefully
 	unittest.RequireReturnsBefore(s.T(), func() {
@@ -357,9 +355,6 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 	s.sealedBlock = s.finalizedBlock
 	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusExpired)
-
-	//// Stop subscription
-	//cancel()
 
 	// Ensure subscription shuts down gracefully
 	unittest.RequireReturnsBefore(s.T(), func() {
