@@ -1,4 +1,4 @@
-package protocol_state
+package epochs
 
 import "github.com/onflow/flow-go/model/flow"
 

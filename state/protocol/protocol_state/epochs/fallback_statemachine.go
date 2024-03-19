@@ -2,7 +2,6 @@ package epochs
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
 )
 
 // FallbackStateMachine is a special structure that encapsulates logic for processing service events
@@ -15,7 +14,7 @@ type FallbackStateMachine struct {
 	baseStateMachine
 }
 
-var _ protocol_state.EpochStateMachine = (*FallbackStateMachine)(nil)
+var _ EpochStateMachine = (*FallbackStateMachine)(nil)
 
 // NewEpochFallbackStateMachine constructs a state machine for epoch fallback, it automatically sets
 // InvalidEpochTransitionAttempted to true, thereby recording that we have entered epoch fallback mode.

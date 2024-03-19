@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
 	"github.com/onflow/flow-go/storage"
 )
@@ -94,10 +93,10 @@ func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Ident
 		s.globalParams,
 		candidateView,
 		parentState,
-		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (protocol_state.EpochStateMachine, error) { // needed for translating from concrete implementation type to interface type
+		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.EpochStateMachine, error) { // needed for translating from concrete implementation type to interface type
 			return epochs.NewStateMachine(candidateView, parentState)
 		},
-		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (protocol_state.EpochStateMachine, error) { // needed for translating from concrete implementation type to interface type
+		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.EpochStateMachine, error) { // needed for translating from concrete implementation type to interface type
 			return epochs.NewEpochFallbackStateMachine(candidateView, parentState), nil
 		},
 	)

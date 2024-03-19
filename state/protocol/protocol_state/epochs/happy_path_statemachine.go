@@ -2,8 +2,6 @@ package epochs
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
@@ -26,7 +24,7 @@ type HappyPathStateMachine struct {
 	baseStateMachine
 }
 
-var _ protocol_state.EpochStateMachine = (*HappyPathStateMachine)(nil)
+var _ EpochStateMachine = (*HappyPathStateMachine)(nil)
 
 // NewStateMachine creates a new protocol state HappyPathStateMachine.
 // An exception is returned in case the `InvalidEpochTransitionAttempted` flag is set in the `parentState`. This means that
