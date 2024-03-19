@@ -374,3 +374,9 @@ func (nc *NoopCollector) CollectionFinalized(light flow.LightCollection) {}
 func (nc *NoopCollector) CollectionExecuted(light flow.LightCollection)  {}
 func (nc *NoopCollector) ExecutionReceiptReceived(r *flow.ExecutionReceipt) {
 }
+
+func (nc *NoopCollector) AccountBalance(bal float64)         {}
+func (nc *NoopCollector) RecommendedMinBalance(bal float64)  {}
+func (nc *NoopCollector) IsMisconfigured(misconfigured bool) {}
+
+var _ module.MachineAccountMetrics = (*NoopCollector)(nil)

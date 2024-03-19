@@ -16,6 +16,7 @@ const (
 	namespaceChainsync         = "chainsync"
 	namespaceFollowerEngine    = "follower"
 	namespaceRestAPI           = "access_rest_api"
+	namespaceMachineAcct       = "machine_account"
 )
 
 // Network subsystems represent the various layers of networking.
