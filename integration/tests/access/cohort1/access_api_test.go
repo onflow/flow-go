@@ -293,9 +293,9 @@ func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
 				break
 			}
 
-			s.Require().Equal(codes.Internal, status.Code(err))
-			break
+			s.Require().NoError(err)
 		}
+
 		if txID == sdk.EmptyID {
 			txID = sdk.Identifier(resp.GetId())
 		}

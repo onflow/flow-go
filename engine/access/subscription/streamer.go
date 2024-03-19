@@ -77,6 +77,12 @@ func (s *Streamer) Stream(ctx context.Context) {
 		err := s.sendAllAvailable(ctx)
 
 		if err != nil {
+			//TODO: The functionality to graceful shutdown on demand should be improved with https://github.com/onflow/flow-go/issues/5561
+			if errors.Is(err, ErrEndOfData) {
+				s.sub.Close()
+				return
+			}
+
 			s.log.Err(err).Msg("error sending response")
 			s.sub.Fail(err)
 			return

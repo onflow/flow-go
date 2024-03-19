@@ -295,7 +295,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 		v, ok := <-sub.Channel()
 		assert.Nil(s.T(), v)
 		assert.False(s.T(), ok)
-		assert.ErrorIs(s.T(), sub.Err(), subscription.ErrEndOfData)
+		assert.NoError(s.T(), sub.Err())
 	}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
 }
 
@@ -361,6 +361,6 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 		v, ok := <-sub.Channel()
 		assert.Nil(s.T(), v)
 		assert.False(s.T(), ok)
-		assert.ErrorIs(s.T(), sub.Err(), subscription.ErrEndOfData)
+		assert.NoError(s.T(), sub.Err())
 	}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
 }

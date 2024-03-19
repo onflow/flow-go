@@ -101,7 +101,7 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *Tran
 			txInfo.blockWithTx, txInfo.blockID, err = b.searchForTransactionBlock(height, txInfo)
 			if err != nil {
 				if errors.Is(err, storage.ErrNotFound) {
-					return nil, fmt.Errorf("could not find block %d in storage: %v", height, subscription.ErrBlockNotReady)
+					return nil, fmt.Errorf("could not find block %d in storage: %w", height, subscription.ErrBlockNotReady)
 				}
 
 				if !errors.Is(err, ErrTransactionNotInBlock) {
