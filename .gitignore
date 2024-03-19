@@ -70,3 +70,6 @@ go.work.sum
 
 # Local testing result files
 tps-results*.json
+
+# crypto relic folder
+crypto/relic/

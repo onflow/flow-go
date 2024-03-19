@@ -6,7 +6,7 @@
 FROM golang:1.20-bullseye AS build-setup
 
 RUN apt-get update
-RUN apt-get -y install zip apt-utils gcc-aarch64-linux-gnu
+RUN apt-get -y install zip cmake
 
 ## (2) Setup crypto dependencies
 FROM build-setup AS build-env
@@ -22,6 +22,11 @@ ARG VERSION
 ENV GOPRIVATE=
 
 COPY . .
+
+RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=secret,id=git_creds,dst=/root/.netrc \
+    make crypto_setup_gopath
 
 # Update the git config to use SSH rather than HTTPS for clones
 RUN git config --global url.git@github.com:.insteadOf https://github.com/
