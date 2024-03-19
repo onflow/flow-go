@@ -2,7 +2,6 @@ package subscription
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -186,10 +185,6 @@ func NewHeightBasedSubscription(bufferSize int, firstHeight uint64, getData GetD
 func (s *HeightBasedSubscription) Next(ctx context.Context) (interface{}, error) {
 	v, err := s.getData(ctx, s.nextHeight)
 	if err != nil {
-		if errors.Is(err, ErrResponseNotAvailableForBlock) {
-			s.nextHeight++
-		}
-
 		return nil, fmt.Errorf("could not get data for height %d: %w", s.nextHeight, err)
 	}
 	s.nextHeight++

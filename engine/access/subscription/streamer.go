@@ -20,9 +20,6 @@ var ErrBlockNotReady = errors.New("block not ready")
 // ErrEndOfData represents an error indicating that no more data available for streaming.
 var ErrEndOfData = errors.New("end of data")
 
-// ErrResponseNotAvailableForBlock represents an error indicating that the response is not available for the given block.
-var ErrResponseNotAvailableForBlock = errors.New("response not available for block")
-
 // Streamer represents a streaming subscription that delivers data to clients.
 type Streamer struct {
 	log         zerolog.Logger
@@ -97,11 +94,11 @@ func (s *Streamer) sendAllAvailable(ctx context.Context) error {
 
 		response, err := s.sub.Next(ctx)
 
-		if err != nil {
-			if errors.Is(err, ErrResponseNotAvailableForBlock) {
-				continue
-			}
+		if response == nil && err == nil {
+			continue
+		}
 
+		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) ||
 				errors.Is(err, storage.ErrHeightNotIndexed) ||
 				execution_data.IsBlobNotFoundError(err) ||

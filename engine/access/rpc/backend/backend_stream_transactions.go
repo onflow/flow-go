@@ -134,7 +134,7 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *Tran
 
 		// The same transaction status should not be reported, so return here with no response
 		if txInfo.lastTxStatus == txStatus {
-			return nil, fmt.Errorf("transaction status %s was already reported %w", txInfo.lastTxStatus.String(), subscription.ErrResponseNotAvailableForBlock)
+			return nil, nil
 		}
 		txInfo.lastTxStatus = txStatus
 
