@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"strconv"
 	"time"
 
 	"github.com/onflow/cadence"
@@ -13,7 +17,6 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -23,6 +26,7 @@ var (
 	// We will log a warning once for a soft limit, and will log an error
 	// in perpetuity for a hard limit.
 	// Taken from https://www.notion.so/dapperlabs/Machine-Account-f3c293593ea442a39614fcebf705a132
+	// TODO update these for FLIP74
 
 	defaultSoftMinBalanceLN cadence.UFix64
 	defaultHardMinBalanceLN cadence.UFix64
@@ -51,16 +55,15 @@ func init() {
 }
 
 const (
-	checkMachineAccountRetryBase      = time.Second * 5
-	checkMachineAccountRetryMax       = time.Minute * 10
-	checkMachineAccountRetryJitterPct = 5
+	checkMachineAccountRetryBase      = time.Second * 30
+	checkMachineAccountRetryMax       = time.Minute * 30
+	checkMachineAccountRetryJitterPct = 10
 )
 
-// checkMachineAccountRetryBackoff returns the default backoff for checking
-// machine account configs.
-// * exponential backoff with base of 5s
-// * maximum inter-check wait of 10m
-// * 5% jitter
+// checkMachineAccountRetryBackoff returns the default backoff for checking machine account configs.
+//   - exponential backoff with base of 30s
+//   - maximum inter-check wait of 30
+//   - 10% jitter
 func checkMachineAccountRetryBackoff() retry.Backoff {
 	backoff := retry.NewExponential(checkMachineAccountRetryBase)
 	backoff = retry.WithCappedDuration(checkMachineAccountRetryMax, backoff)
@@ -100,12 +103,14 @@ type MachineAccountValidatorConfigOption func(*MachineAccountValidatorConfig)
 // MachineAccountConfigValidator is used to validate that a machine account is
 // configured correctly.
 type MachineAccountConfigValidator struct {
-	unit   *engine.Unit
-	config MachineAccountValidatorConfig
-	log    zerolog.Logger
-	client *client.Client
-	role   flow.Role
-	info   bootstrap.NodeMachineAccountInfo
+	config  MachineAccountValidatorConfig
+	metrics module.MachineAccountMetrics
+	log     zerolog.Logger
+	client  *client.Client
+	role    flow.Role
+	info    bootstrap.NodeMachineAccountInfo
+
+	component.Component
 }
 
 func NewMachineAccountConfigValidator(
@@ -113,6 +118,7 @@ func NewMachineAccountConfigValidator(
 	flowClient *client.Client,
 	role flow.Role,
 	info bootstrap.NodeMachineAccountInfo,
+	// TODO metrics
 	opts ...MachineAccountValidatorConfigOption,
 ) (*MachineAccountConfigValidator, error) {
 
@@ -122,72 +128,90 @@ func NewMachineAccountConfigValidator(
 	}
 
 	validator := &MachineAccountConfigValidator{
-		unit:   engine.NewUnit(),
 		config: conf,
 		log:    log.With().Str("component", "machine_account_config_validator").Logger(),
 		client: flowClient,
 		role:   role,
 		info:   info,
 	}
+
+	validator.Component = component.NewComponentManagerBuilder().
+		AddWorker(validator.reportMachineAccountConfigWorker).
+		Build()
+
 	return validator, nil
 }
 
-// Ready will launch the validator function in a goroutine.
-func (validator *MachineAccountConfigValidator) Ready() <-chan struct{} {
-	return validator.unit.Ready(func() {
-		validator.unit.Launch(func() {
-			validator.validateMachineAccountConfig(validator.unit.Ctx())
-		})
-	})
-}
-
-// Done will cancel the context of the unit, which will end the validator
-// goroutine, if it is still running.
-func (validator *MachineAccountConfigValidator) Done() <-chan struct{} {
-	return validator.unit.Done()
-}
-
-// validateMachineAccountConfig checks that the machine account in use by this
-// BaseClient object is correctly configured. If the machine account is critically
-// mis-configured, or a correct configuration cannot be confirmed, this function
-// will perpetually log errors indicating the problem.
+// reportMachineAccountConfigWorker is a worker function that periodically checks
+// and reports on the health of the node's configured machine account.
+// When a misconfiguration or insufficient account balance is detected, the worker
+// will report metrics and log specific information about what is wrong.
 //
-// This function should be invoked as a goroutine by using Ready and Done.
-func (validator *MachineAccountConfigValidator) validateMachineAccountConfig(ctx context.Context) {
-
-	log := validator.log
+// This worker runs perpetually in the background, executing once per 30 minutes
+// in the steady state. It will execute more frequently right after startup.
+func (validator *MachineAccountConfigValidator) reportMachineAccountConfigWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
 
 	backoff := checkMachineAccountRetryBackoff()
 
-	err := retry.Do(ctx, backoff, func(ctx context.Context) error {
-		account, err := validator.client.GetAccount(ctx, validator.info.SDKAddress())
-		if err != nil {
-			// we cannot validate a correct configuration - log an error and try again
-			log.Error().
-				Err(err).
-				Str("machine_account_address", validator.info.Address).
-				Msg("failed to validate machine account config - could not get machine account")
-			return retry.RetryableError(err)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
 		}
 
-		err = CheckMachineAccountInfo(log, validator.config, validator.role, validator.info, account)
+		err := validator.checkAndReportOnMachineAccountConfig(ctx)
 		if err != nil {
-			// either we cannot validate the configuration or there is a critical
-			// misconfiguration - log a warning and retry - we will continue checking
-			// and logging until the problem is resolved
-			log.Error().
-				Err(err).
-				Msg("critical machine account misconfiguration")
-			return retry.RetryableError(err)
+			ctx.Throw(err)
 		}
-		return nil
-	})
+
+		next, _ := backoff.Next()
+		t := time.NewTimer(next)
+		select {
+		case <-ctx.Done():
+			t.Stop()
+			return
+		case <-t.C:
+		}
+	}
+}
+
+// checkAndReportOnMachineAccountConfig checks the node's machine account for misconfiguration
+// or insufficient balance once. Any discovered issues are logged and reported in metrics.
+// No errors are expected during normal operation.
+func (validator *MachineAccountConfigValidator) checkAndReportOnMachineAccountConfig(ctx context.Context) error {
+
+	account, err := validator.client.GetAccount(ctx, validator.info.SDKAddress())
 	if err != nil {
-		log.Error().Err(err).Msg("failed to check machine account configuration after retry")
-		return
+		// we cannot validate a correct configuration - log an error and try again
+		validator.log.Error().
+			Err(err).
+			Str("machine_account_address", validator.info.Address).
+			Msg("failed to validate machine account config - could not get machine account")
+		return nil
 	}
 
-	log.Info().Msg("confirmed valid machine account configuration. machine account config validator exiting...")
+	accountBalance, err := ufix64Tofloat64(cadence.UFix64(account.Balance))
+	if err != nil {
+		return irrecoverable.NewExceptionf("failed to convert account balance (%d): %w", account.Balance, err)
+	}
+	validator.metrics.AccountBalance(accountBalance)
+
+	err = CheckMachineAccountInfo(validator.log, validator.config, validator.role, validator.info, account)
+	if err != nil {
+		// either we cannot validate the configuration or there is a critical
+		// misconfiguration - log a warning and retry - we will continue checking
+		// and logging until the problem is resolved
+		validator.metrics.IsMisconfigured(true)
+		validator.log.Error().
+			Err(err).
+			Msg("critical machine account misconfiguration")
+		return nil
+	}
+	validator.metrics.IsMisconfigured(false)
+
+	return nil
 }
 
 // CheckMachineAccountInfo checks a node machine account config, logging
@@ -288,4 +312,14 @@ func CheckMachineAccountInfo(
 	}
 
 	return nil
+}
+
+// ufix64Tofloat64 converts a cadence.UFix64 type to float64.
+// All UFix64 values should be convertible to float64, so no errors are expected.
+func ufix64Tofloat64(fix cadence.UFix64) (float64, error) {
+	f, err := strconv.ParseFloat(fix.String(), 64)
+	if err != nil {
+		return 0, err
+	}
+	return f, nil
 }
