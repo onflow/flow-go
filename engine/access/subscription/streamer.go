@@ -17,6 +17,9 @@ import (
 // ErrBlockNotReady represents an error indicating that a block is not yet available or ready.
 var ErrBlockNotReady = errors.New("block not ready")
 
+// ErrEndOfData represents an error indicating that no more data available for streaming.
+var ErrEndOfData = errors.New("end of data")
+
 // ErrResponseNotAvailableForBlock represents an error indicating that the response is not available for the given block.
 var ErrResponseNotAvailableForBlock = errors.New("response not available for block")
 

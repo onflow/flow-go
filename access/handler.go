@@ -1121,10 +1121,6 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 			return rpc.ConvertError(err, "could not send response", codes.Internal)
 		}
 
-		if txSubInfo.Status == flow.TransactionStatusSealed || txSubInfo.Status == flow.TransactionStatusExpired {
-			cancel()
-		}
-
 		return nil
 	})
 }

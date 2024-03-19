@@ -222,6 +222,7 @@ func (s *TransactionStatusSuite) addNewFinalizedBlock(parent *flow.Header, notif
 // It covers the emulation of transaction stages from pending to sealed, and receiving status updates.
 func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	s.sealedSnapshot.On("Head").Return(func() *flow.Header {
 		return s.sealedBlock.Header
@@ -258,7 +259,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 			assert.Equal(s.T(), expectedMsgIndex, txInfo.MessageIndex)
 			wasSet := expectedMsgIndexCounter.Set(expectedMsgIndex + 1)
 			require.True(s.T(), wasSet)
-		}, 60*time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
+		}, time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
 	}
 
 	// 1. Subscribe to transaction status and receive the first message with pending status
@@ -285,15 +286,18 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusSealed)
 
-	// 5. Stop subscription
-	cancel()
+	s.sealedBlock = s.finalizedBlock
+	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
+
+	//// 5. Stop subscription
+	//cancel()
 
 	// Ensure subscription shuts down gracefully
 	unittest.RequireReturnsBefore(s.T(), func() {
 		v, ok := <-sub.Channel()
 		assert.Nil(s.T(), v)
 		assert.False(s.T(), ok)
-		assert.ErrorIs(s.T(), sub.Err(), context.Canceled)
+		assert.ErrorIs(s.T(), sub.Err(), subscription.ErrEndOfData)
 	}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
 }
 
@@ -301,6 +305,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 // when transaction become expired
 func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	s.blocks.On("GetLastFullBlockHeight").Return(func() (uint64, error) {
 		return s.sealedBlock.Header.Height, nil
@@ -353,14 +358,14 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusExpired)
 
-	// Stop subscription
-	cancel()
+	//// Stop subscription
+	//cancel()
 
 	// Ensure subscription shuts down gracefully
 	unittest.RequireReturnsBefore(s.T(), func() {
 		v, ok := <-sub.Channel()
 		assert.Nil(s.T(), v)
 		assert.False(s.T(), ok)
-		assert.ErrorIs(s.T(), sub.Err(), context.Canceled)
+		assert.ErrorIs(s.T(), sub.Err(), subscription.ErrEndOfData)
 	}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
 }
