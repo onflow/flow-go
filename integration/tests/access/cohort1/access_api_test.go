@@ -283,7 +283,7 @@ func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
 	s.Require().NoError(err)
 
 	expectedCounter := uint64(0)
-	var expectedFinalTxStatus entities.TransactionStatus
+	var finalTxStatus entities.TransactionStatus
 	var txID sdk.Identifier
 
 	for {
@@ -293,7 +293,7 @@ func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
 				break
 			}
 
-			s.Require().Equal(status.Code(err), codes.Canceled)
+			s.Require().Equal(codes.Internal, status.Code(err))
 			break
 		}
 		if txID == sdk.EmptyID {
@@ -304,10 +304,10 @@ func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
 		s.Assert().Equal(txID, sdk.Identifier(resp.GetId()))
 
 		expectedCounter++
-		expectedFinalTxStatus = resp.Status
+		finalTxStatus = resp.Status
 	}
 
-	s.Assert().Equal(expectedFinalTxStatus, entities.TransactionStatus_SEALED)
+	s.Assert().Equal(entities.TransactionStatus_SEALED, finalTxStatus)
 }
 
 func (s *AccessAPISuite) testGetAccount(client *client.Client) {
