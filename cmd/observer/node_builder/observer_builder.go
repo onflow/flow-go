@@ -144,7 +144,7 @@ type ObserverServiceConfig struct {
 	scriptExecutorConfig         query.QueryConfig
 	executionDataSyncEnabled     bool
 	executionDataIndexingEnabled bool
-	useLocalServiceAPI           bool
+	localServiceAPIEnabled       bool
 	executionDataDir             string
 	executionDataStartHeight     uint64
 	executionDataConfig          edrequester.ExecutionDataConfig
@@ -208,7 +208,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		scriptExecutorConfig:         query.NewDefaultConfig(),
 		executionDataSyncEnabled:     false,
 		executionDataIndexingEnabled: false,
-		useLocalServiceAPI:           false,
+		localServiceAPIEnabled:       false,
 		executionDataDir:             filepath.Join(homedir, ".flow", "execution_data"),
 		executionDataStartHeight:     0,
 		executionDataConfig: edrequester.ExecutionDataConfig{
@@ -629,7 +629,7 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"execution-data-indexing-enabled",
 			defaultConfig.executionDataIndexingEnabled,
 			"whether to enable the execution data indexing")
-		flags.BoolVar(&builder.useLocalServiceAPI, "local-api-service-enabled", defaultConfig.useLocalServiceAPI, "whether to use execution data indexing for api service")
+		flags.BoolVar(&builder.localServiceAPIEnabled, "local-service-api-enabled", defaultConfig.localServiceAPIEnabled, "whether to use local indexed data for api queries")
 		flags.StringVar(&builder.registersDBPath, "execution-state-dir", defaultConfig.registersDBPath, "directory to use for execution-state database")
 		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "execution-state checkpoint file")
 
@@ -1631,7 +1631,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
 		}
 
-		if builder.useLocalServiceAPI {
+		if builder.localServiceAPIEnabled {
 			backendParams.ScriptExecutionMode = backend.IndexQueryModeLocalOnly
 			backendParams.EventQueryMode = backend.IndexQueryModeLocalOnly
 			backendParams.TxResultsIndex = builder.TxResultsIndex
@@ -1681,14 +1681,12 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
-		builder.Logger.Info().Msgf("*****Committee %v", builder.Committee)
-
 		rpcHandler := apiproxy.NewFlowAccessAPIRouter(apiproxy.Params{
 			Log:      builder.Logger,
 			Metrics:  observerCollector,
 			Upstream: forwarder,
 			Local:    engineBuilder.DefaultHandler(hotsignature.NewBlockSignerDecoder(builder.Committee)),
-			UseIndex: builder.useLocalServiceAPI,
+			UseIndex: builder.localServiceAPIEnabled,
 		})
 
 		// build the rpc engine
