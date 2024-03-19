@@ -118,7 +118,7 @@ func NewMachineAccountConfigValidator(
 	flowClient *client.Client,
 	role flow.Role,
 	info bootstrap.NodeMachineAccountInfo,
-	// TODO metrics
+	metrics module.MachineAccountMetrics,
 	opts ...MachineAccountValidatorConfigOption,
 ) (*MachineAccountConfigValidator, error) {
 
@@ -128,11 +128,12 @@ func NewMachineAccountConfigValidator(
 	}
 
 	validator := &MachineAccountConfigValidator{
-		config: conf,
-		log:    log.With().Str("component", "machine_account_config_validator").Logger(),
-		client: flowClient,
-		role:   role,
-		info:   info,
+		config:  conf,
+		log:     log.With().Str("component", "machine_account_config_validator").Logger(),
+		client:  flowClient,
+		role:    role,
+		info:    info,
+		metrics: metrics,
 	}
 
 	validator.Component = component.NewComponentManagerBuilder().

@@ -103,31 +103,32 @@ func main() {
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
 
-		err                 error
-		mutableState        protocol.ParticipantState
-		beaconPrivateKey    *encodable.RandomBeaconPrivKey
-		guarantees          mempool.Guarantees
-		receipts            mempool.ExecutionTree
-		seals               mempool.IncorporatedResultSeals
-		pendingReceipts     mempool.PendingReceipts
-		receiptRequester    *requester.Engine
-		syncCore            *chainsync.Core
-		comp                *compliance.Engine
-		hot                 module.HotStuff
-		conMetrics          module.ConsensusMetrics
-		mainMetrics         module.HotstuffMetrics
-		receiptValidator    module.ReceiptValidator
-		chunkAssigner       *chmodule.ChunkAssigner
-		followerDistributor *pubsub.FollowerDistributor
-		dkgBrokerTunnel     *dkgmodule.BrokerTunnel
-		blockTimer          protocol.BlockTimer
-		proposalDurProvider hotstuff.ProposalDurationProvider
-		committee           *committees.Consensus
-		epochLookup         *epochs.EpochLookup
-		hotstuffModules     *consensus.HotstuffModules
-		dkgState            *bstorage.DKGState
-		safeBeaconKeys      *bstorage.SafeBeaconPrivateKeys
-		getSealingConfigs   module.SealingConfigsGetter
+		err                   error
+		mutableState          protocol.ParticipantState
+		beaconPrivateKey      *encodable.RandomBeaconPrivKey
+		guarantees            mempool.Guarantees
+		receipts              mempool.ExecutionTree
+		seals                 mempool.IncorporatedResultSeals
+		pendingReceipts       mempool.PendingReceipts
+		receiptRequester      *requester.Engine
+		syncCore              *chainsync.Core
+		comp                  *compliance.Engine
+		hot                   module.HotStuff
+		conMetrics            module.ConsensusMetrics
+		machineAccountMetrics module.MachineAccountMetrics
+		mainMetrics           module.HotstuffMetrics
+		receiptValidator      module.ReceiptValidator
+		chunkAssigner         *chmodule.ChunkAssigner
+		followerDistributor   *pubsub.FollowerDistributor
+		dkgBrokerTunnel       *dkgmodule.BrokerTunnel
+		blockTimer            protocol.BlockTimer
+		proposalDurProvider   hotstuff.ProposalDurationProvider
+		committee             *committees.Consensus
+		epochLookup           *epochs.EpochLookup
+		hotstuffModules       *consensus.HotstuffModules
+		dkgState              *bstorage.DKGState
+		safeBeaconKeys        *bstorage.SafeBeaconPrivateKeys
+		getSealingConfigs     module.SealingConfigsGetter
 	)
 	var deprecatedFlagBlockRateDelay time.Duration
 
@@ -201,6 +202,10 @@ func main() {
 		ValidateRootSnapshot(badgerState.ValidRootSnapshotContainsEntityExpiryRange).
 		Module("consensus node metrics", func(node *cmd.NodeConfig) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
+			return nil
+		}).
+		Module("machine account metrics", func(node *cmd.NodeConfig) error {
+			machineAccountMetrics = metrics.NewMachineAccountCollector(node.MetricsRegisterer)
 			return nil
 		}).
 		Module("dkg state", func(node *cmd.NodeConfig) error {
@@ -427,6 +432,7 @@ func main() {
 				flowClient,
 				flow.RoleCollection,
 				*machineAccountInfo,
+				machineAccountMetrics,
 				opts...,
 			)
 			return validator, err
