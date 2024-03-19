@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package engine
 
 import (
@@ -9,6 +7,7 @@ import (
 )
 
 // Unit handles synchronization management, startup, and shutdown for engines.
+// New components should use component.ComponentManager rather than Unit.
 type Unit struct {
 	admitLock sync.Mutex // used for synchronizing context cancellation with work admittance
 
