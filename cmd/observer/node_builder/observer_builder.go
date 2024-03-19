@@ -881,13 +881,6 @@ func (builder *ObserverServiceBuilder) Initialize() error {
 
 	builder.enqueueConnectWithStakedAN()
 
-	builder.BuildConsensusFollower()
-
-	if builder.executionDataSyncEnabled {
-		builder.BuildExecutionSyncComponents()
-	}
-	builder.enqueueRPCServer()
-
 	if builder.BaseConfig.MetricsEnabled {
 		builder.EnqueueMetricsServerInit()
 		if err := builder.RegisterBadgerMetrics(); err != nil {
@@ -1014,6 +1007,19 @@ func (builder *ObserverServiceBuilder) initObserverLocal() func(node *cmd.NodeCo
 		}
 		return nil
 	}
+}
+
+// Build enqueues the sync engine and the follower engine for the observer.
+// Currently, the observer only runs the follower engine.
+func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
+	builder.BuildConsensusFollower()
+
+	if builder.executionDataSyncEnabled {
+		builder.BuildExecutionSyncComponents()
+	}
+
+	builder.enqueueRPCServer()
+	return builder.FlowNodeBuilder.Build()
 }
 
 func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverServiceBuilder {
