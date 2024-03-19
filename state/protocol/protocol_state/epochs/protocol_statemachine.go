@@ -1,4 +1,4 @@
-package protocol_state
+package epochs
 
 import (
 	"fmt"
@@ -8,8 +8,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// protocolStateMachine is a dedicated structure that encapsulates all logic for evolving protocol state, based on the content
-// of a new block. It guarantees protocol-compliant evolution of the protocol state by implementing the
+// protocolStateMachine is a dedicated structure for evolving the Epoch-related portion of the overall Protocol State.
+// Based on the content of a new block, it updates epoch data, including the identity table, on the happy path.
+// The protocolStateMachine guarantees protocol-compliant evolution of Epoch-related sub-state via the
 // following state transitions:
 //   - epoch setup: transitions current epoch from staking to setup phase, creates next epoch protocol state when processed.
 //   - epoch commit: transitions current epoch from setup to commit phase, commits next epoch protocol state when processed.
@@ -26,10 +27,10 @@ type protocolStateMachine struct {
 
 var _ ProtocolStateMachine = (*protocolStateMachine)(nil)
 
-// newStateMachine creates a new protocol state protocolStateMachine.
+// NewStateMachine creates a new protocol state protocolStateMachine.
 // An exception is returned in case the `InvalidEpochTransitionAttempted` flag is set in the `parentState`. This means that
 // the protocol state evolution has reached an undefined state from the perspective of the happy path state machine.
-func newStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*protocolStateMachine, error) {
+func NewStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*protocolStateMachine, error) {
 	if parentState.InvalidEpochTransitionAttempted {
 		return nil, irrecoverable.NewExceptionf("cannot create happy path protocol state machine at view (%d) for a parent state"+
 			"which is in Epoch Fallback Mode", view)

@@ -1,4 +1,4 @@
-package protocol_state
+package state
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
@@ -13,7 +14,7 @@ import (
 // StateMachineFactoryMethod is a factory to create state machines for evolving the protocol state.
 // Currently, we have `protocolStateMachine` and `epochFallbackStateMachine` as ProtocolStateMachine
 // implementations, whose constructors both have the same signature as StateMachineFactoryMethod.
-type StateMachineFactoryMethod = func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error)
+type StateMachineFactoryMethod = func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.ProtocolStateMachine, error)
 
 // stateMutator is a stateful object to evolve the protocol state. It is instantiated from the parent block's protocol state.
 // State-changing operations can be iteratively applied and the stateMutator will internally evolve its in-memory state.
@@ -33,8 +34,8 @@ type stateMutator struct {
 	results                          storage.ExecutionResults
 	setups                           storage.EpochSetups
 	commits                          storage.EpochCommits
-	stateMachine                     ProtocolStateMachine
-	epochFallbackStateMachineFactory func() (ProtocolStateMachine, error)
+	epochHappyPathStateMachine       epochs.ProtocolStateMachine
+	epochFallbackStateMachineFactory func() (epochs.ProtocolStateMachine, error)
 	pendingDbUpdates                 []transaction.DeferredDBUpdate
 }
 
@@ -55,7 +56,7 @@ func newStateMutator(
 	epochFallbackStateMachineFactory StateMachineFactoryMethod,
 ) (*stateMutator, error) {
 	var (
-		stateMachine ProtocolStateMachine
+		stateMachine epochs.ProtocolStateMachine
 		err          error
 	)
 	candidateAttemptsInvalidEpochTransition := epochFallbackTriggeredByIncorporatingCandidate(candidateView, params, parentState)
@@ -77,13 +78,13 @@ func newStateMutator(
 	}
 
 	return &stateMutator{
-		headers:      headers,
-		results:      results,
-		setups:       setups,
-		commits:      commits,
-		stateMachine: stateMachine,
+		headers:                    headers,
+		results:                    results,
+		setups:                     setups,
+		commits:                    commits,
+		epochHappyPathStateMachine: stateMachine,
 		// instead of storing arguments that later might be used when entering EFM, capture them in factory method.
-		epochFallbackStateMachineFactory: func() (ProtocolStateMachine, error) {
+		epochFallbackStateMachineFactory: func() (epochs.ProtocolStateMachine, error) {
 			return epochFallbackStateMachineFactory(candidateView, parentState)
 		},
 	}, nil
@@ -100,7 +101,7 @@ func newStateMutator(
 //
 // updated protocol state entry, state ID and a flag indicating if there were any changes.
 func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, dbUpdates []transaction.DeferredDBUpdate) {
-	updatedState, stateID, hasChanges = m.stateMachine.Build()
+	updatedState, stateID, hasChanges = m.epochHappyPathStateMachine.Build()
 	dbUpdates = m.pendingDbUpdates
 	return
 }
@@ -162,16 +163,16 @@ func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStat
 //     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 //     of this function is not nil. If such an exception is returned, continuing is not an option.
 func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) error {
-	parentProtocolState := m.stateMachine.ParentState()
+	parentProtocolState := m.epochHappyPathStateMachine.ParentState()
 
 	// perform protocol state transition to next epoch if next epoch is committed and we are at first block of epoch
 	phase := parentProtocolState.EpochPhase()
 	if phase == flow.EpochPhaseCommitted {
 		activeSetup := parentProtocolState.CurrentEpochSetup
-		if m.stateMachine.View() > activeSetup.FinalView {
+		if m.epochHappyPathStateMachine.View() > activeSetup.FinalView {
 			// TODO: this is a temporary workaround to allow for the epoch transition to be triggered
 			// most likely it will be not needed when we refactor protocol state entries and define strict safety rules.
-			err := m.stateMachine.TransitionToNextEpoch()
+			err := m.epochHappyPathStateMachine.TransitionToNextEpoch()
 			if err != nil {
 				return fmt.Errorf("could not transition protocol state to next epoch: %w", err)
 			}
@@ -228,7 +229,7 @@ func (m *stateMutator) applyServiceEventsFromOrderedResults(results []*flow.Exec
 		for _, event := range result.ServiceEvents {
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
-				processed, err := m.stateMachine.ProcessEpochSetup(ev)
+				processed, err := m.epochHappyPathStateMachine.ProcessEpochSetup(ev)
 				if err != nil {
 					return nil, fmt.Errorf("could not process epoch setup event: %w", err)
 				}
@@ -239,7 +240,7 @@ func (m *stateMutator) applyServiceEventsFromOrderedResults(results []*flow.Exec
 				}
 
 			case *flow.EpochCommit:
-				processed, err := m.stateMachine.ProcessEpochCommit(ev)
+				processed, err := m.epochHappyPathStateMachine.ProcessEpochCommit(ev)
 				if err != nil {
 					return nil, fmt.Errorf("could not process epoch commit event: %w", err)
 				}
@@ -263,7 +264,7 @@ func (m *stateMutator) applyServiceEventsFromOrderedResults(results []*flow.Exec
 // At the moment, this is a one-way transition: once we enter EFM, the only way to return to normal is with a spork.
 func (m *stateMutator) transitionToEpochFallbackMode(results []*flow.ExecutionResult) ([]func(tx *transaction.Tx) error, error) {
 	var err error
-	m.stateMachine, err = m.epochFallbackStateMachineFactory()
+	m.epochHappyPathStateMachine, err = m.epochFallbackStateMachineFactory()
 	if err != nil {
 		return nil, fmt.Errorf("could not create epoch fallback state machine: %w", err)
 	}
