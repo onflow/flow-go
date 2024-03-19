@@ -186,6 +186,7 @@ func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCsHappyPath() {
 			accountCreatedEvent := sdk.AccountCreatedEvent(event)
 			accountCreatedPayload = accountCreatedEvent.Payload
 			newAccountAddress = accountCreatedEvent.Address()
+			break
 		}
 	}
 	require.NotEqual(t, sdk.EmptyAddress, newAccountAddress)
@@ -246,6 +247,12 @@ func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCsHappyPath() {
 		}
 	}
 	require.True(t, found)
+
+	_, err = observer.GetExecutionResultForBlockID(ctx, &accessproto.GetExecutionResultForBlockIDRequest{
+		BlockId: blockWithAccount.Block.Id,
+	})
+	require.NoError(t, err)
+
 }
 
 func (s *ObserverIndexerEnabledSuite) getRPCs() []RPCTest {
