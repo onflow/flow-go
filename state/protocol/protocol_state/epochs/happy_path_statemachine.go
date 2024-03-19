@@ -2,15 +2,16 @@ package epochs
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// protocolStateMachine is a dedicated structure for evolving the Epoch-related portion of the overall Protocol State.
+// HappyPathStateMachine is a dedicated structure for evolving the Epoch-related portion of the overall Protocol State.
 // Based on the content of a new block, it updates epoch data, including the identity table, on the happy path.
-// The protocolStateMachine guarantees protocol-compliant evolution of Epoch-related sub-state via the
+// The HappyPathStateMachine guarantees protocol-compliant evolution of Epoch-related sub-state via the
 // following state transitions:
 //   - epoch setup: transitions current epoch from staking to setup phase, creates next epoch protocol state when processed.
 //   - epoch commit: transitions current epoch from setup to commit phase, commits next epoch protocol state when processed.
@@ -21,22 +22,22 @@ import (
 //
 // All updates are applied to a copy of parent protocol state, so parent protocol state is not modified. The stateMachine internally
 // tracks the current protocol state. A separate instance should be created for each block to processing the updates therein.
-type protocolStateMachine struct {
-	baseProtocolStateMachine
+type HappyPathStateMachine struct {
+	baseStateMachine
 }
 
-var _ ProtocolStateMachine = (*protocolStateMachine)(nil)
+var _ protocol_state.EpochStateMachine = (*HappyPathStateMachine)(nil)
 
-// NewStateMachine creates a new protocol state protocolStateMachine.
+// NewStateMachine creates a new protocol state HappyPathStateMachine.
 // An exception is returned in case the `InvalidEpochTransitionAttempted` flag is set in the `parentState`. This means that
 // the protocol state evolution has reached an undefined state from the perspective of the happy path state machine.
-func NewStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*protocolStateMachine, error) {
+func NewStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*HappyPathStateMachine, error) {
 	if parentState.InvalidEpochTransitionAttempted {
 		return nil, irrecoverable.NewExceptionf("cannot create happy path protocol state machine at view (%d) for a parent state"+
 			"which is in Epoch Fallback Mode", view)
 	}
-	return &protocolStateMachine{
-		baseProtocolStateMachine: baseProtocolStateMachine{
+	return &HappyPathStateMachine{
+		baseStateMachine: baseStateMachine{
 			parentState: parentState,
 			state:       parentState.ProtocolStateEntry.Copy(),
 			view:        view,
@@ -54,9 +55,9 @@ func NewStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*pr
 // Implementors must never return (true, error).
 // Expected errors indicating that we are leaving the happy-path of the epoch transitions
 //   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
-//     CAUTION: the protocolStateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
-//     after such error and discard the protocolStateMachine!
-func (u *protocolStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error) {
+//     CAUTION: the HappyPathStateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
+//     after such error and discard the HappyPathStateMachine!
+func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error) {
 	err := protocol.IsValidExtendingEpochSetup(epochSetup, u.parentState.ProtocolStateEntry, u.parentState.CurrentEpochSetup)
 	if err != nil {
 		return false, fmt.Errorf("invalid epoch setup event: %w", err)
@@ -135,9 +136,9 @@ func (u *protocolStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (b
 // Implementors must never return (true, error).
 // Expected errors indicating that we are leaving the happy-path of the epoch transitions
 //   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
-//     CAUTION: the protocolStateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
-//     after such error and discard the protocolStateMachine!
-func (u *protocolStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error) {
+//     CAUTION: the HappyPathStateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
+//     after such error and discard the HappyPathStateMachine!
+func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error) {
 	if u.state.NextEpoch == nil {
 		return false, protocol.NewInvalidServiceEventErrorf("protocol state has been setup yet")
 	}
@@ -160,7 +161,7 @@ func (u *protocolStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit)
 // - invalid state transition has not been attempted (this is ensured by constructor),
 // - candidate block is in the next epoch.
 // No errors are expected during normal operations.
-func (u *protocolStateMachine) TransitionToNextEpoch() error {
+func (u *HappyPathStateMachine) TransitionToNextEpoch() error {
 	nextEpoch := u.state.NextEpoch
 	// Check if there is next epoch protocol state
 	if nextEpoch == nil {

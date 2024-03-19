@@ -6,15 +6,15 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // StateMachineFactoryMethod is a factory to create state machines for evolving the protocol state.
-// Currently, we have `protocolStateMachine` and `epochFallbackStateMachine` as ProtocolStateMachine
+// Currently, we have `protocolStateMachine` and `epochFallbackStateMachine` as EpochStateMachine
 // implementations, whose constructors both have the same signature as StateMachineFactoryMethod.
-type StateMachineFactoryMethod = func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.ProtocolStateMachine, error)
+type StateMachineFactoryMethod = func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (protocol_state.EpochStateMachine, error)
 
 // stateMutator is a stateful object to evolve the protocol state. It is instantiated from the parent block's protocol state.
 // State-changing operations can be iteratively applied and the stateMutator will internally evolve its in-memory state.
@@ -34,8 +34,8 @@ type stateMutator struct {
 	results                          storage.ExecutionResults
 	setups                           storage.EpochSetups
 	commits                          storage.EpochCommits
-	epochHappyPathStateMachine       epochs.ProtocolStateMachine
-	epochFallbackStateMachineFactory func() (epochs.ProtocolStateMachine, error)
+	epochHappyPathStateMachine       protocol_state.EpochStateMachine
+	epochFallbackStateMachineFactory func() (protocol_state.EpochStateMachine, error)
 	pendingDbUpdates                 []transaction.DeferredDBUpdate
 }
 
@@ -56,7 +56,7 @@ func newStateMutator(
 	epochFallbackStateMachineFactory StateMachineFactoryMethod,
 ) (*stateMutator, error) {
 	var (
-		stateMachine epochs.ProtocolStateMachine
+		stateMachine protocol_state.EpochStateMachine
 		err          error
 	)
 	candidateAttemptsInvalidEpochTransition := epochFallbackTriggeredByIncorporatingCandidate(candidateView, params, parentState)
@@ -84,7 +84,7 @@ func newStateMutator(
 		commits:                    commits,
 		epochHappyPathStateMachine: stateMachine,
 		// instead of storing arguments that later might be used when entering EFM, capture them in factory method.
-		epochFallbackStateMachineFactory: func() (epochs.ProtocolStateMachine, error) {
+		epochFallbackStateMachineFactory: func() (protocol_state.EpochStateMachine, error) {
 			return epochFallbackStateMachineFactory(candidateView, parentState)
 		},
 	}, nil
@@ -110,7 +110,7 @@ func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStat
 // sealed service events:
 //   - iterating over the sealed service events in order of increasing height
 //   - identifying state-changing service event and calling into the embedded
-//     ProtocolStateMachine to apply the respective state update
+//     EpochStateMachine to apply the respective state update
 //   - tracking deferred database updates necessary to persist the updated
 //     protocol state's *dependencies*. Persisting and indexing `updatedState`
 //     is the responsibility of the calling code (specifically `FollowerState`)

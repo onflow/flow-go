@@ -17,7 +17,7 @@ func TestProtocolStateMachine(t *testing.T) {
 }
 
 // BaseProtocolStateMachineSuite is a base test suite that holds common functionality for testing protocol state machines.
-// It reflects the portion of data which is present in baseProtocolStateMachine.
+// It reflects the portion of data which is present in baseStateMachine.
 type BaseProtocolStateMachineSuite struct {
 	suite.Suite
 
@@ -35,7 +35,7 @@ func (s *BaseProtocolStateMachineSuite) SetupTest() {
 // ProtocolStateMachineSuite is a dedicated test suite for testing happy path state machine.
 type ProtocolStateMachineSuite struct {
 	BaseProtocolStateMachineSuite
-	stateMachine *protocolStateMachine
+	stateMachine *HappyPathStateMachine
 }
 
 func (s *ProtocolStateMachineSuite) SetupTest() {
@@ -45,7 +45,7 @@ func (s *ProtocolStateMachineSuite) SetupTest() {
 	require.NoError(s.T(), err)
 }
 
-// TestNewstateMachine tests if the constructor correctly setups invariants for protocolStateMachine.
+// TestNewstateMachine tests if the constructor correctly setups invariants for HappyPathStateMachine.
 func (s *ProtocolStateMachineSuite) TestNewstateMachine() {
 	require.NotSame(s.T(), s.stateMachine.parentState, s.stateMachine.state, "except to take deep copy of parent state")
 	require.Nil(s.T(), s.stateMachine.parentState.NextEpoch)
@@ -54,7 +54,7 @@ func (s *ProtocolStateMachineSuite) TestNewstateMachine() {
 	require.Equal(s.T(), s.parentProtocolState, s.stateMachine.ParentState())
 }
 
-// TestTransitionToNextEpoch tests a scenario where the protocolStateMachine processes first block from next epoch.
+// TestTransitionToNextEpoch tests a scenario where the HappyPathStateMachine processes first block from next epoch.
 // It has to discard the parent state and build a new state with data from next epoch.
 func (s *ProtocolStateMachineSuite) TestTransitionToNextEpoch() {
 	// update protocol state with next epoch information
@@ -63,7 +63,7 @@ func (s *ProtocolStateMachineSuite) TestTransitionToNextEpoch() {
 	candidate := unittest.BlockHeaderFixture(
 		unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FinalView + 1))
 	var err error
-	// since the candidate block is from next epoch, protocolStateMachine should transition to next epoch
+	// since the candidate block is from next epoch, HappyPathStateMachine should transition to next epoch
 	s.stateMachine, err = NewStateMachine(candidate.View, s.parentProtocolState.Copy())
 	require.NoError(s.T(), err)
 	err = s.stateMachine.TransitionToNextEpoch()
@@ -111,7 +111,7 @@ func (s *ProtocolStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
 	})
 }
 
-// TestBuild tests if the protocolStateMachine returns correct protocol state.
+// TestBuild tests if the HappyPathStateMachine returns correct protocol state.
 func (s *ProtocolStateMachineSuite) TestBuild() {
 	updatedState, stateID, hasChanges := s.stateMachine.Build()
 	require.Equal(s.T(), stateID, s.parentProtocolState.ID(), "should return same protocol state")
@@ -135,12 +135,12 @@ func (s *ProtocolStateMachineSuite) TestBuild() {
 func (s *ProtocolStateMachineSuite) TestCreateStateMachineAfterInvalidStateTransitionAttempted() {
 	s.parentProtocolState.InvalidEpochTransitionAttempted = true
 	var err error
-	// create new protocolStateMachine with next epoch information
+	// create new HappyPathStateMachine with next epoch information
 	s.stateMachine, err = NewStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 	require.Error(s.T(), err)
 }
 
-// TestProcessEpochCommit tests if processing epoch commit event correctly updates internal state of protocolStateMachine and
+// TestProcessEpochCommit tests if processing epoch commit event correctly updates internal state of HappyPathStateMachine and
 // correctly behaves when invariants are violated.
 func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 	var err error
@@ -473,7 +473,7 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 		toBeUpdated.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 	}
 
-	// now we can use it to construct protocolStateMachine for next block, which will process epoch setup event.
+	// now we can use it to construct HappyPathStateMachine for next block, which will process epoch setup event.
 	nextBlock := unittest.BlockHeaderWithParentFixture(s.candidate)
 	s.stateMachine, err = NewStateMachine(nextBlock.View, updatedRichProtocolState)
 	require.NoError(s.T(), err)
