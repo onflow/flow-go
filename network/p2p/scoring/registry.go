@@ -50,6 +50,9 @@ type GossipSubAppSpecificScoreRegistry struct {
 
 	penalty p2pconfig.MisbehaviourPenalties
 
+	// getDuplicateMessageCount callback used to get a gauge of the number of duplicate messages detected for each peer.
+	getDuplicateMessageCount func(id peer.ID) float64
+
 	validator p2p.SubscriptionValidator
 
 	// scoreTTL is the time to live of the application specific score of a peer; the registry keeps a cached copy of the
@@ -62,7 +65,12 @@ type GossipSubAppSpecificScoreRegistry struct {
 	appScoreCache p2p.GossipSubApplicationSpecificScoreCache
 
 	// appScoreUpdateWorkerPool is the worker pool for handling the application specific score update of peers in a non-blocking way.
-	appScoreUpdateWorkerPool *worker.Pool[peer.ID]
+	appScoreUpdateWorkerPool  *worker.Pool[peer.ID]
+	invCtrlMsgNotifWorkerPool *worker.Pool[*p2p.InvCtrlMsgNotif]
+
+	appSpecificScoreParams    p2pconfig.ApplicationSpecificScoreParameters
+	duplicateMessageThreshold float64
+	collector                 module.GossipSubScoringRegistryMetrics
 
 	// silencePeriodDuration duration that the startup silence period will last, during which nodes will not be penalized
 	silencePeriodDuration time.Duration
@@ -70,11 +78,6 @@ type GossipSubAppSpecificScoreRegistry struct {
 	silencePeriodStartTime time.Time
 	// silencePeriodElapsed atomic bool that stores a bool flag which indicates if the silence period is over or not.
 	silencePeriodElapsed *atomic.Bool
-
-	unknownIdentityPenalty     float64
-	minAppSpecificPenalty      float64
-	stakedIdentityReward       float64
-	invalidSubscriptionPenalty float64
 }
 
 // GossipSubAppSpecificScoreRegistryConfig is the configuration for the GossipSubAppSpecificScoreRegistry.
@@ -95,6 +98,9 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	// an authorized peer is found).
 	IdProvider module.IdentityProvider `validate:"required"`
 
+	// GetDuplicateMessageCount callback used to get a gauge of the number of duplicate messages detected for each peer.
+	GetDuplicateMessageCount func(id peer.ID) float64
+
 	// SpamRecordCacheFactory is a factory function that returns a new GossipSubSpamRecordCache. It is used to initialize the spamScoreCache.
 	// The cache is used to store the application specific penalty of peers.
 	SpamRecordCacheFactory func() p2p.GossipSubSpamRecordCache `validate:"required"`
@@ -112,6 +118,10 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	ScoringRegistryStartupSilenceDuration time.Duration
 
 	AppSpecificScoreParams p2pconfig.ApplicationSpecificScoreParameters `validate:"required"`
+
+	DuplicateMessageThreshold float64 `validate:"gt=0"`
+
+	Collector module.GossipSubScoringRegistryMetrics `validate:"required"`
 }
 
 // NewGossipSubAppSpecificScoreRegistry returns a new GossipSubAppSpecificScoreRegistry.
@@ -130,29 +140,34 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 	}
 
 	lg := config.Logger.With().Str("module", "app_score_registry").Logger()
-	store := queue.NewHeroStore(config.Parameters.ScoreUpdateRequestQueueSize,
-		lg.With().Str("component", "app_specific_score_update").Logger(),
-		metrics.GossipSubAppSpecificScoreUpdateQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType))
 
 	reg := &GossipSubAppSpecificScoreRegistry{
-		logger:                     config.Logger.With().Str("module", "app_score_registry").Logger(),
-		spamScoreCache:             config.SpamRecordCacheFactory(),
-		appScoreCache:              config.AppScoreCacheFactory(),
-		penalty:                    config.Penalty,
-		validator:                  config.Validator,
-		idProvider:                 config.IdProvider,
-		scoreTTL:                   config.Parameters.ScoreTTL,
-		silencePeriodDuration:      config.ScoringRegistryStartupSilenceDuration,
-		silencePeriodElapsed:       atomic.NewBool(false),
-		unknownIdentityPenalty:     config.AppSpecificScoreParams.UnknownIdentityPenalty,
-		minAppSpecificPenalty:      config.AppSpecificScoreParams.MinAppSpecificPenalty,
-		stakedIdentityReward:       config.AppSpecificScoreParams.StakedIdentityReward,
-		invalidSubscriptionPenalty: config.AppSpecificScoreParams.InvalidSubscriptionPenalty,
+		logger:                    config.Logger.With().Str("module", "app_score_registry").Logger(),
+		getDuplicateMessageCount:  config.GetDuplicateMessageCount,
+		spamScoreCache:            config.SpamRecordCacheFactory(),
+		appScoreCache:             config.AppScoreCacheFactory(),
+		penalty:                   config.Penalty,
+		validator:                 config.Validator,
+		idProvider:                config.IdProvider,
+		scoreTTL:                  config.Parameters.ScoreTTL,
+		silencePeriodDuration:     config.ScoringRegistryStartupSilenceDuration,
+		silencePeriodElapsed:      atomic.NewBool(false),
+		appSpecificScoreParams:    config.AppSpecificScoreParams,
+		duplicateMessageThreshold: config.DuplicateMessageThreshold,
+		collector:                 config.Collector,
 	}
 
-	reg.appScoreUpdateWorkerPool = worker.NewWorkerPoolBuilder[peer.ID](lg.With().Str("component", "app_specific_score_update_worker_pool").Logger(),
-		store,
+	appSpecificScore := queue.NewHeroStore(config.Parameters.ScoreUpdateRequestQueueSize,
+		lg.With().Str("component", "app_specific_score_update").Logger(),
+		metrics.GossipSubAppSpecificScoreUpdateQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType))
+	reg.appScoreUpdateWorkerPool = worker.NewWorkerPoolBuilder[peer.ID](lg.With().Str("component", "app_specific_score_update_worker_pool").Logger(), appSpecificScore,
 		reg.processAppSpecificScoreUpdateWork).Build()
+
+	invalidCtrlMsgNotificationStore := queue.NewHeroStore(config.Parameters.InvalidControlMessageNotificationQueueSize,
+		lg.With().Str("component", "invalid_control_message_notification_queue").Logger(),
+		metrics.RpcInspectorNotificationQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType),
+		queue.WithMessageEntityFactory(queue.NewMessageEntityWithNonce))
+	reg.invCtrlMsgNotifWorkerPool = worker.NewWorkerPoolBuilder[*p2p.InvCtrlMsgNotif](lg, invalidCtrlMsgNotificationStore, reg.handleMisbehaviourReport).Build()
 
 	builder := component.NewComponentManagerBuilder()
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -176,7 +191,7 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		}
 		reg.silencePeriodStartTime = time.Now()
 		ready()
-	})
+	}).AddWorker(reg.invCtrlMsgNotifWorkerPool.WorkerLogic()) // we must NOT have more than one worker for processing notifications; handling notifications are NOT idempotent.
 
 	for i := 0; i < config.Parameters.ScoreUpdateWorkerNum; i++ {
 		builder.AddWorker(reg.appScoreUpdateWorkerPool.WorkerLogic())
@@ -283,7 +298,16 @@ func (r *GossipSubAppSpecificScoreRegistry) computeAppSpecificScore(pid peer.ID)
 		}
 	}
 
-	// (4) staking reward: for staked peers, a default positive reward is applied only if the peer has no penalty on spamming and subscription.
+	// (4) duplicate messages penalty: the duplicate messages penalty is applied to the application specific penalty as long
+	// as the number of duplicate messages detected for a peer is greater than 0. This counter is decayed overtime, thus sustained
+	// good behavior should eventually lead to the duplicate messages penalty applied being 0.
+	duplicateMessagesPenalty := r.duplicateMessagesPenalty(pid)
+	if duplicateMessagesPenalty < 0 {
+		lg = lg.With().Float64("duplicate_messages_penalty", duplicateMessagesPenalty).Logger()
+		appSpecificScore += duplicateMessagesPenalty
+	}
+
+	// (5) staking reward: for staked peers, a default positive reward is applied only if the peer has no penalty on spamming and subscription.
 	if stakingScore > 0 && appSpecificScore == float64(0) {
 		lg = lg.With().Float64("staking_reward", stakingScore).Logger()
 		appSpecificScore += stakingScore
@@ -292,7 +316,6 @@ func (r *GossipSubAppSpecificScoreRegistry) computeAppSpecificScore(pid peer.ID)
 	lg.Trace().
 		Float64("total_app_specific_score", appSpecificScore).
 		Msg("application specific score computed")
-
 	return appSpecificScore
 }
 
@@ -326,7 +349,7 @@ func (r *GossipSubAppSpecificScoreRegistry) stakingScore(pid peer.ID) (float64, 
 			Err(err).
 			Bool(logging.KeySuspicious, true).
 			Msg("invalid peer identity, penalizing peer")
-		return r.unknownIdentityPenalty, flow.Identifier{}, 0
+		return r.appSpecificScoreParams.UnknownIdentityPenalty, flow.Identifier{}, 0
 	}
 
 	lg = lg.With().
@@ -339,13 +362,13 @@ func (r *GossipSubAppSpecificScoreRegistry) stakingScore(pid peer.ID) (float64, 
 	if flowId.Role == flow.RoleAccess {
 		lg.Trace().
 			Msg("pushing access node to edge by penalizing with minimum penalty value")
-		return r.minAppSpecificPenalty, flowId.NodeID, flowId.Role
+		return r.appSpecificScoreParams.MinAppSpecificPenalty, flowId.NodeID, flowId.Role
 	}
 
 	lg.Trace().
 		Msg("rewarding well-behaved non-access node peer with maximum reward value")
 
-	return r.stakedIdentityReward, flowId.NodeID, flowId.Role
+	return r.appSpecificScoreParams.StakedIdentityReward, flowId.NodeID, flowId.Role
 }
 
 func (r *GossipSubAppSpecificScoreRegistry) subscriptionPenalty(pid peer.ID, flowId flow.Identifier, role flow.Role) float64 {
@@ -357,27 +380,63 @@ func (r *GossipSubAppSpecificScoreRegistry) subscriptionPenalty(pid peer.ID, flo
 			Hex("flow_id", logging.ID(flowId)).
 			Bool(logging.KeySuspicious, true).
 			Msg("invalid subscription detected, penalizing peer")
-		return r.invalidSubscriptionPenalty
+		return r.appSpecificScoreParams.InvalidSubscriptionPenalty
 	}
 
 	return 0
 }
 
+// duplicateMessagesPenalty returns the duplicate message penalty for a peer. A penalty is only returned if the duplicate
+// message count for a peer exceeds the DefaultDuplicateMessageThreshold. A penalty is applied for the amount of duplicate
+// messages above the DefaultDuplicateMessageThreshold.
+func (r *GossipSubAppSpecificScoreRegistry) duplicateMessagesPenalty(pid peer.ID) float64 {
+	duplicateMessageCount, duplicateMessagePenalty := 0.0, 0.0
+	defer func() {
+		r.collector.DuplicateMessagesCounts(duplicateMessageCount)
+		r.collector.DuplicateMessagePenalties(duplicateMessagePenalty)
+	}()
+
+	duplicateMessageCount = r.getDuplicateMessageCount(pid)
+	if duplicateMessageCount > r.duplicateMessageThreshold {
+		duplicateMessagePenalty = (duplicateMessageCount - r.duplicateMessageThreshold) * r.appSpecificScoreParams.DuplicateMessagePenalty
+		if duplicateMessagePenalty < r.appSpecificScoreParams.MaxAppSpecificPenalty {
+			return r.appSpecificScoreParams.MaxAppSpecificPenalty
+		}
+	}
+	return duplicateMessagePenalty
+}
+
 // OnInvalidControlMessageNotification is called when a new invalid control message notification is distributed.
 // Any error on consuming event must handle internally.
 // The implementation must be concurrency safe, but can be blocking.
+// Note: there is no real-time guarantee on processing the notification.
 func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(notification *p2p.InvCtrlMsgNotif) {
-	// we use mutex to ensure the method is concurrency safe.
+	lg := r.logger.With().Str("peer_id", p2plogging.PeerId(notification.PeerID)).Logger()
+	if ok := r.invCtrlMsgNotifWorkerPool.Submit(notification); !ok {
+		// we use a queue with a fixed size, so this can happen when queue is full or when the notification is duplicate.
+		// TODO: we have to add a metric for this case.
+		// TODO: we should not have deduplication for this case, as we need to penalize the peer for each misbehaviour, we need to add a nonce to the notification.
+		lg.Warn().Msg("gossipsub rpc inspector notification queue is full or notification is duplicate, discarding notification")
+	}
+	lg.Trace().Msg("gossipsub rpc inspector notification submitted to the queue")
+}
 
+// handleMisbehaviourReport is the worker function that is called by the worker pool to handle the misbehaviour report of a peer.
+// The function is called in a non-blocking way, and the worker pool is used to limit the number of concurrent executions of the function.
+// Args:
+// - notification: the notification of the misbehaviour report of a peer.
+// Returns:
+// - error: an error if the update failed; any returned error is an irrecoverable error and indicates a bug or misconfiguration.
+func (r *GossipSubAppSpecificScoreRegistry) handleMisbehaviourReport(notification *p2p.InvCtrlMsgNotif) error {
+	// we use mutex to ensure the method is concurrency safe.
 	lg := r.logger.With().
 		Err(notification.Error).
-		Str("peer_id", p2plogging.PeerId(notification.PeerID)).
 		Str("misbehavior_type", notification.MsgType.String()).Logger()
 
 	// during startup silence period avoid penalizing nodes, ignore all notifications
 	if !r.afterSilencePeriod() {
 		lg.Trace().Msg("ignoring invalid control message notification for peer during silence period")
-		return
+		return nil
 	}
 
 	record, err := r.spamScoreCache.Adjust(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
@@ -392,6 +451,8 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 		case p2pmsg.CtrlMsgIWant:
 			penalty += r.penalty.IWantMisbehaviour
 		case p2pmsg.RpcPublishMessage:
+			penalty += r.penalty.PublishMisbehaviour
+		case p2pmsg.CtrlMsgRPC:
 			penalty += r.penalty.PublishMisbehaviour
 		default:
 			// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
@@ -415,6 +476,8 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	lg.Debug().
 		Float64("spam_record_penalty", record.Penalty).
 		Msg("applied misbehaviour penalty and updated application specific penalty")
+
+	return nil
 }
 
 // afterSilencePeriod returns true if registry silence period is over, false otherwise.

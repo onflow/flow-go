@@ -17,6 +17,7 @@ type RpcInspectorParameters struct {
 
 // RpcValidationInspectorParameters keys.
 const (
+	ProcessKey                      = "process"
 	ClusterPrefixedMessageConfigKey = "cluster-prefixed-messages"
 	IWantConfigKey                  = "iwant"
 	IHaveConfigKey                  = "ihave"
@@ -25,7 +26,7 @@ const (
 	InspectionQueueConfigKey        = "inspection-queue"
 )
 
-// RpcValidationInspector validation limits used for gossipsub RPC control message inspection.
+// RpcValidationInspector rpc control message validation inspector configuration.
 type RpcValidationInspector struct {
 	ClusterPrefixedMessage ClusterPrefixedMessageInspectionParameters `mapstructure:"cluster-prefixed-messages"`
 	IWant                  IWantRpcInspectionParameters               `mapstructure:"iwant"`
@@ -33,6 +34,67 @@ type RpcValidationInspector struct {
 	GraftPrune             GraftPruneRpcInspectionParameters          `mapstructure:"graft-and-prune"`
 	PublishMessages        PublishMessageInspectionParameters         `mapstructure:"publish-messages"`
 	InspectionQueue        InspectionQueueParameters                  `mapstructure:"inspection-queue"`
+	// InspectionProcess configuration that controls which aspects of rpc inspection are enabled and disabled during inspect message request processing.
+	InspectionProcess InspectionProcess `mapstructure:"process"`
+}
+
+// InspectionProcess configuration that controls which aspects of rpc inspection are enabled and disabled during inspect message request processing.
+type InspectionProcess struct {
+	Inspect  Inspect  `validate:"required" mapstructure:"inspection"`
+	Truncate Truncate `validate:"required" mapstructure:"truncation"`
+}
+
+const (
+	InspectionKey       = "inspection"
+	TruncationKey       = "truncation"
+	EnableKey           = "enable"
+	DisabledKey         = "disabled"
+	MessageIDKey        = "message-id"
+	RejectUnstakedPeers = "reject-unstaked-peers"
+)
+
+// Inspect configuration to enable/disable RPC inspection for a particular control message type.
+type Inspect struct {
+	// Disabled serves as a fail-safe mechanism to globally deactivate inspection logic. When this fail-safe is activated it disables all
+	// aspects of the inspection logic, irrespective of individual configurations like inspection.enable-graft, inspection.enable-prune, etc.
+	// Consequently, all metrics collection and logging related to the rpc and inspection will also be disabled.
+	// It is important to note that activating this fail-safe results in a comprehensive deactivation inspection features.
+	// Please use this setting judiciously, considering its broad impact on the behavior of control message handling.
+	Disabled bool `mapstructure:"disabled"`
+	// EnableGraft enable graft control message inspection.
+	EnableGraft bool `mapstructure:"enable-graft"`
+	// EnablePrune enable prune control message inspection.
+	EnablePrune bool `mapstructure:"enable-prune"`
+	// EnableIHave enable iHave control message inspection.
+	EnableIHave bool `mapstructure:"enable-ihave"`
+	// EnableIWant enable iWant control message inspection.
+	EnableIWant bool `mapstructure:"enable-iwant"`
+	// EnablePublish enable publish message inspection.
+	EnablePublish bool `mapstructure:"enable-publish"`
+	// RejectUnstakedPeers when set to true RPC's will be rejected from unstaked peers.
+	RejectUnstakedPeers bool `mapstructure:"reject-unstaked-peers"`
+}
+
+// Truncate configuration to enable/disable RPC truncation for a particular control message type.
+type Truncate struct {
+	// Disabled serves as a fail-safe mechanism to globally deactivate truncation logic. When this fail-safe is activated it disables all
+	// aspects of the truncation logic, irrespective of individual configurations like truncation.enable-graft, truncation.enable-prune, etc.
+	// Consequently, all metrics collection and logging related to the rpc and inspection will also be disabled.
+	// It is important to note that activating this fail-safe results in a comprehensive deactivation truncation features.
+	// Please use this setting judiciously, considering its broad impact on the behavior of control message handling.
+	Disabled bool `mapstructure:"disabled"`
+	// EnableGraft enable graft control message truncation.
+	EnableGraft bool `mapstructure:"enable-graft"`
+	// EnablePrune enable prune control message truncation.
+	EnablePrune bool `mapstructure:"enable-prune"`
+	// EnableIHave enable iHave control message truncation.
+	EnableIHave bool `mapstructure:"enable-ihave"`
+	// EnableIHaveMessageIds enable iHave message id truncation.
+	EnableIHaveMessageIds bool `mapstructure:"enable-ihave-message-id"`
+	// EnableIWant enable iWant control message truncation.
+	EnableIWant bool `mapstructure:"enable-iwant"`
+	// EnableIWantMessageIds enable iWant message id truncation.
+	EnableIWantMessageIds bool `mapstructure:"enable-iwant-message-id"`
 }
 
 const (
@@ -79,6 +141,10 @@ type GraftPruneRpcInspectionParameters struct {
 	// Ideally, a GRAFT or PRUNE message should not have any duplicate topics, hence a topic ID is counted as a duplicate only if it is repeated more than once.
 	// When the total number of duplicate topic ids in a single GRAFT or PRUNE message exceeds this threshold, the inspection of message will fail.
 	DuplicateTopicIdThreshold int `validate:"gte=0" mapstructure:"duplicate-topic-id-threshold"`
+
+	// InvalidTopicIdThreshold Maximum number of total invalid topic ids in a single GRAFT or PRUNE message, ideally this should be 0 but we allow for some tolerance
+	// to avoid penalizing peers that are not malicious but are misbehaving due to bugs or other issues.
+	InvalidTopicIdThreshold int `validate:"gte=0" mapstructure:"invalid-topic-id-threshold"`
 }
 
 const (
@@ -86,6 +152,7 @@ const (
 	MessageIdCountThreshold    = "message-id-count-threshold"
 	CacheMissThresholdKey      = "cache-miss-threshold"
 	DuplicateMsgIDThresholdKey = "duplicate-message-id-threshold"
+	InvalidTopicIdThresholdKey = "invalid-topic-id-threshold"
 )
 
 // IWantRpcInspectionParameters contains the "numerical values" for iwant rpc control inspection.
@@ -148,6 +215,10 @@ type IHaveRpcInspectionParameters struct {
 	// Ideally, an iHave message should not have any duplicate message IDs, hence a message id is considered duplicate when it is repeated more than once
 	// within the same iHave message. When the total number of duplicate message ids in a single iHave message exceeds this threshold, the inspection of message will fail.
 	DuplicateMessageIdThreshold int `validate:"gte=0" mapstructure:"duplicate-message-id-threshold"`
+
+	// InvalidTopicIdThreshold Maximum number of total invalid topic ids in a single IHAVE message, ideally this should be 0 but we allow for some tolerance
+	// to avoid penalizing peers that are not malicious but are misbehaving due to bugs or other issues.
+	InvalidTopicIdThreshold int `validate:"gte=0" mapstructure:"invalid-topic-id-threshold"`
 }
 
 const (

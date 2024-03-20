@@ -43,7 +43,7 @@ func SelectionForConsensus(epoch protocol.Epoch) (*LeaderSelection, error) {
 		firstView,
 		rng,
 		int(finalView-firstView+1), // add 1 because both first/final view are inclusive
-		identities.Filter(filter.IsVotingConsensusCommitteeMember),
+		identities.Filter(filter.IsConsensusCommitteeMember),
 	)
 	return leaders, err
 }

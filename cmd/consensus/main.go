@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package main
 
 import (
@@ -65,6 +63,7 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
@@ -91,7 +90,6 @@ func main() {
 		emergencySealing                      bool
 		dkgMessagingEngineConfig              = dkgeng.DefaultMessagingEngineConfig()
 		cruiseCtlConfig                       = cruisectl.DefaultConfig()
-		cruiseCtlTargetTransitionTimeFlag     = cruiseCtlConfig.TargetTransition.String()
 		cruiseCtlFallbackProposalDurationFlag time.Duration
 		cruiseCtlMinViewDurationFlag          time.Duration
 		cruiseCtlMaxViewDurationFlag          time.Duration
@@ -149,7 +147,6 @@ func main() {
 		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker, this is also used as initial timeout")
 		flags.Float64Var(&hotstuffTimeoutAdjustmentFactor, "hotstuff-timeout-adjustment-factor", timeout.DefaultConfig.TimeoutAdjustmentFactor, "adjustment of timeout duration in case of time out event")
 		flags.Uint64Var(&hotstuffHappyPathMaxRoundFailures, "hotstuff-happy-path-max-round-failures", timeout.DefaultConfig.HappyPathMaxRoundFailures, "number of failed rounds before first timeout increase")
-		flags.StringVar(&cruiseCtlTargetTransitionTimeFlag, "cruise-ctl-target-epoch-transition-time", cruiseCtlTargetTransitionTimeFlag, "the target epoch switchover schedule")
 		flags.DurationVar(&cruiseCtlFallbackProposalDurationFlag, "cruise-ctl-fallback-proposal-duration", cruiseCtlConfig.FallbackProposalDelay.Load(), "the proposal duration value to use when the controller is disabled, or in epoch fallback mode. In those modes, this value has the same as the old `--block-rate-delay`")
 		flags.DurationVar(&cruiseCtlMinViewDurationFlag, "cruise-ctl-min-view-duration", cruiseCtlConfig.MinViewDuration.Load(), "the lower bound of authority for the controller, when active. This is the smallest amount of time a view is allowed to take.")
 		flags.DurationVar(&cruiseCtlMaxViewDurationFlag, "cruise-ctl-max-view-duration", cruiseCtlConfig.MaxViewDuration.Load(), "the upper bound of authority for the controller when active. This is the largest amount of time a view is allowed to take.")
@@ -174,14 +171,6 @@ func main() {
 			}
 			startupTime = t
 			nodeBuilder.Logger.Info().Time("startup_time", startupTime).Msg("got startup_time")
-		}
-		// parse target transition time string, if set
-		if cruiseCtlTargetTransitionTimeFlag != cruiseCtlConfig.TargetTransition.String() {
-			transitionTime, err := cruisectl.ParseTransition(cruiseCtlTargetTransitionTimeFlag)
-			if err != nil {
-				return fmt.Errorf("invalid epoch transition time string: %w", err)
-			}
-			cruiseCtlConfig.TargetTransition = *transitionTime
 		}
 		// convert local flag variables to atomic config variables, for dynamically updatable fields
 		if cruiseCtlEnabledFlag != cruiseCtlConfig.Enabled.Load() {
@@ -480,7 +469,7 @@ func main() {
 				node.Me,
 				node.State,
 				channels.RequestReceiptsByBlockID,
-				filter.HasRole(flow.RoleExecution),
+				filter.HasRole[flow.Identity](flow.RoleExecution),
 				func() flow.Entity { return &flow.ExecutionReceipt{} },
 				requester.WithRetryInitial(2*time.Second),
 				requester.WithRetryMaximum(30*time.Second),
@@ -720,6 +709,14 @@ func main() {
 			return ctl, nil
 		}).
 		Component("consensus participant", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			mutableProtocolState := protocol_state.NewMutableProtocolState(
+				node.Storage.ProtocolState,
+				node.State.Params(),
+				node.Storage.Headers,
+				node.Storage.Results,
+				node.Storage.Setups,
+				node.Storage.EpochCommits,
+			)
 			// initialize the block builder
 			var build module.Builder
 			build, err = builder.NewBuilder(
@@ -732,6 +729,7 @@ func main() {
 				node.Storage.Blocks,
 				node.Storage.Results,
 				node.Storage.Receipts,
+				mutableProtocolState,
 				guarantees,
 				seals,
 				receipts,

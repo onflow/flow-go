@@ -11,15 +11,19 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/onflow/crypto"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
+	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/utils/io"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func makeDir(t *testing.T, base string, subdir string) string {
@@ -99,33 +103,13 @@ func WriteFile(path string, data []byte) error {
 	return err
 }
 
-// rootProtocolJsonWithoutAddresses strips out all node addresses from the root protocol json file specified as srcFile
-// and creates the dstFile with the modified contents
-func rootProtocolJsonWithoutAddresses(srcfile string, dstFile string) error {
-
-	data, err := io.ReadFile(filepath.Join(srcfile))
-	if err != nil {
-		return err
-	}
-
-	var rootSnapshot inmem.EncodableSnapshot
-	err = json.Unmarshal(data, &rootSnapshot)
-	if err != nil {
-		return err
-	}
-
-	strippedSnapshot := inmem.StrippedInmemSnapshot(rootSnapshot)
-
-	return WriteJSON(dstFile, strippedSnapshot)
-}
-
-func WriteObserverPrivateKey(observerName, bootstrapDir string) error {
+func WriteObserverPrivateKey(observerName, bootstrapDir string) (crypto.PrivateKey, error) {
 	// make the observer private key for named observer
 	// only used for localnet, not for use with production
 	networkSeed := cmd.GenerateRandomSeed(crypto.KeyGenSeedMinLen)
 	networkKey, err := utils.GeneratePublicNetworkingKey(networkSeed)
 	if err != nil {
-		return fmt.Errorf("could not generate networking key: %w", err)
+		return nil, fmt.Errorf("could not generate networking key: %w", err)
 	}
 
 	// hex encode
@@ -137,8 +121,91 @@ func WriteObserverPrivateKey(observerName, bootstrapDir string) error {
 	outputFile := fmt.Sprintf("%s/private-root-information/%s_key", bootstrapDir, observerName)
 	err = os.WriteFile(outputFile, output, 0600)
 	if err != nil {
-		return fmt.Errorf("could not write private key to file: %w", err)
+		return nil, fmt.Errorf("could not write private key to file: %w", err)
 	}
 
-	return nil
+	return networkKey, nil
+}
+
+func WriteTestExecutionService(_ flow.Identifier, address, observerName, bootstrapDir string) (bootstrap.NodeInfo, error) {
+	// make the observer private key for named observer
+	// only used for localnet, not for use with production
+	networkSeed := cmd.GenerateRandomSeed(crypto.KeyGenSeedMinLen)
+	networkKey, err := utils.GeneratePublicNetworkingKey(networkSeed)
+	if err != nil {
+		return bootstrap.NodeInfo{}, fmt.Errorf("could not generate networking key: %w", err)
+	}
+
+	// hex encode
+	keyBytes := networkKey.Encode()
+	output := make([]byte, hex.EncodedLen(len(keyBytes)))
+	hex.Encode(output, keyBytes)
+
+	encryptionKey, err := utils.GenerateSecretsDBEncryptionKey()
+	if err != nil {
+		return bootstrap.NodeInfo{}, err
+	}
+
+	pubKey, err := keyutils.LibP2PPublicKeyFromFlow(networkKey.PublicKey())
+	if err != nil {
+		return bootstrap.NodeInfo{}, fmt.Errorf("could not get libp2p public key from flow public key: %w", err)
+	}
+
+	peerID, err := peer.IDFromPublicKey(pubKey)
+	if err != nil {
+		return bootstrap.NodeInfo{}, fmt.Errorf("could not get peer ID from public key: %w", err)
+	}
+
+	nodeID, err := translator.NewPublicNetworkIDTranslator().GetFlowID(peerID)
+	if err != nil {
+		return bootstrap.NodeInfo{}, fmt.Errorf("could not get flow node ID: %w", err)
+	}
+
+	k, err := pubKey.Raw()
+	if err != nil {
+		return bootstrap.NodeInfo{}, err
+	}
+
+	ks := unittest.StakingKeys(1)
+	stakingKey := ks[0]
+
+	log.Info().Msgf("test execution node private key: %v, public key: %x, peerID: %v, nodeID: %v", networkKey, k, peerID, nodeID)
+
+	nodeInfo := bootstrap.NewPrivateNodeInfo(
+		nodeID,
+		flow.RoleExecution,
+		address,
+		0,
+		networkKey,
+		stakingKey,
+	)
+
+	path := fmt.Sprintf("%s/private-root-information/private-node-info_%v/%vjson",
+		bootstrapDir, nodeID, bootstrap.PathPrivNodeInfoPrefix)
+
+	private, err := nodeInfo.Private()
+	if err != nil {
+		return bootstrap.NodeInfo{}, err
+	}
+
+	err = io.WriteJSON(path, private)
+	if err != nil {
+		return bootstrap.NodeInfo{}, err
+	}
+
+	path = fmt.Sprintf("%s/private-root-information/private-node-info_%v/%v",
+		bootstrapDir, nodeID, bootstrap.FilenameSecretsEncryptionKey)
+	err = os.WriteFile(path, encryptionKey, 0644)
+	if err != nil {
+		return bootstrap.NodeInfo{}, err
+	}
+
+	// write network private key
+	outputFile := fmt.Sprintf("%s/private-root-information/private-node-info_%v/network_private_key", bootstrapDir, nodeID)
+	err = os.WriteFile(outputFile, output, 0600)
+	if err != nil {
+		return bootstrap.NodeInfo{}, fmt.Errorf("could not write private key to file: %w", err)
+	}
+
+	return nodeInfo, nil
 }

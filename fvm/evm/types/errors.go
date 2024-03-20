@@ -5,61 +5,121 @@ import (
 	"fmt"
 )
 
-var (
-	// ErrAccountDoesNotExist is returned when evm account doesn't exist
-	ErrAccountDoesNotExist = errors.New("account does not exist")
+type ErrorCode uint64
 
-	// ErrInsufficientBalance is returned when evm account doesn't have enough balance
-	ErrInsufficientBalance = errors.New("insufficient balance")
+// internal error codes
+const ( // code reserved for no error
+	ErrCodeNoError ErrorCode = 0
+
+	// covers all other validation codes that doesn't have an specific code
+	ValidationErrCodeMisc ErrorCode = 100
+	// invalid balance is provided (e.g. negative value)
+	ValidationErrCodeInvalidBalance ErrorCode = 101
+	// insufficient computation is left in the flow transaction
+	ValidationErrCodeInsufficientComputation ErrorCode = 102
+	// unauthroized method call
+	ValidationErrCodeUnAuthroizedMethodCall ErrorCode = 103
+	// withdraw balance is prone to rounding error
+	ValidationErrCodeWithdrawBalanceRounding ErrorCode = 104
+
+	// general execution error returned for cases that don't have an specific code
+	ExecutionErrCodeMisc ErrorCode = 400
+)
+
+// geth evm core errors (reserved range: [201-300) )
+const (
+	// the nonce of the tx is lower than the expected
+	ValidationErrCodeNonceTooLow ErrorCode = iota + 201
+	// the nonce of the tx is higher than the expected
+	ValidationErrCodeNonceTooHigh
+	// tx sender account has reached to the maximum nonce
+	ValidationErrCodeNonceMax
+	// not enough gas is available on the block to include this transaction
+	ValidationErrCodeGasLimitReached
+	// the transaction sender doesn't have enough funds for transfer(topmost call only).
+	ValidationErrCodeInsufficientFundsForTransfer
+	// creation transaction provides the init code bigger than init code size limit.
+	ValidationErrCodeMaxInitCodeSizeExceeded
+	// the total cost of executing a transaction is higher than the balance of the user's account.
+	ValidationErrCodeInsufficientFunds
+	// overflow detected when calculating the gas usage
+	ValidationErrCodeGasUintOverflow
+	// the transaction is specified to use less gas than required to start the invocation.
+	ValidationErrCodeIntrinsicGas
+	// the transaction is not supported in the current network configuration.
+	ValidationErrCodeTxTypeNotSupported
+	// tip was set to higher than the total fee cap
+	ValidationErrCodeTipAboveFeeCap
+	// an extremely big numbers is set for the tip field
+	ValidationErrCodeTipVeryHigh
+	// an extremely big numbers is set for the fee cap field
+	ValidationErrCodeFeeCapVeryHigh
+	// the transaction fee cap is less than the base fee of the block
+	ValidationErrCodeFeeCapTooLow
+	// the sender of a transaction is a contract
+	ValidationErrCodeSenderNoEOA
+	// the transaction fee cap is less than the blob gas fee of the block.
+	ValidationErrCodeBlobFeeCapTooLow
+)
+
+// evm execution errors (reserved range: [301-400) )
+const (
+	// execution ran out of gas
+	ExecutionErrCodeOutOfGas ErrorCode = iota + 301
+	// contract creation code storage out of gas
+	ExecutionErrCodeCodeStoreOutOfGas
+	// max call depth exceeded
+	ExecutionErrCodeDepth
+	// insufficient balance for transfer
+	ExecutionErrCodeInsufficientBalance
+	// contract address collision"
+	ExecutionErrCodeContractAddressCollision
+	// execution reverted
+	ExecutionErrCodeExecutionReverted
+	// max initcode size exceeded
+	ExecutionErrCodeMaxInitCodeSizeExceeded
+	// max code size exceeded
+	ExecutionErrCodeMaxCodeSizeExceeded
+	// invalid jump destination
+	ExecutionErrCodeInvalidJump
+	// write protection
+	ExecutionErrCodeWriteProtection
+	// return data out of bounds
+	ExecutionErrCodeReturnDataOutOfBounds
+	// gas uint64 overflow
+	ExecutionErrCodeGasUintOverflow
+	// invalid code: must not begin with 0xef
+	ExecutionErrCodeInvalidCode
+	// nonce uint64 overflow
+	ExecutionErrCodeNonceUintOverflow
+)
+
+var (
+	// ErrInvalidBalance is returned when an invalid balance is provided for transfer (e.g. negative)
+	ErrInvalidBalance = NewEVMValidationError(errors.New("invalid balance for transfer"))
 
 	// ErrInsufficientComputation is returned when not enough computation is
 	// left in the context of flow transaction to execute the evm operation.
-	ErrInsufficientComputation = errors.New("insufficient computation")
+	ErrInsufficientComputation = NewEVMValidationError(errors.New("insufficient computation"))
 
 	// ErrUnAuthroizedMethodCall method call, usually emited when calls are called on EOA accounts
-	ErrUnAuthroizedMethodCall = errors.New("unauthroized method call")
+	ErrUnAuthroizedMethodCall = NewEVMValidationError(errors.New("unauthroized method call"))
+
+	// ErrWithdrawBalanceRounding is returned when withdraw call has a balance that could
+	// yeild to rounding error, i.e. the balance contains fractions smaller than 10^8 Flow (smallest unit allowed to transfer).
+	ErrWithdrawBalanceRounding = NewEVMValidationError(errors.New("withdraw failed! the balance is susceptible to the rounding error"))
+
+	// ErrDirectCallExecutionFailed is returned when the direct call execution has failed.
+	ErrDirectCallExecutionFailed = NewEVMValidationError(errors.New("direct call execution failed"))
 
 	// ErrInsufficientTotalSupply is returned when flow token
 	// is withdraw request is there but not enough balance is on EVM vault
 	// this should never happen but its a saftey measure to protect Flow against EVM issues.
-	// TODO: we might consider this fatal
-	ErrInsufficientTotalSupply = errors.New("insufficient total supply")
-
-	// ErrWithdrawBalanceRounding is returned when withdraw call has a balance that could
-	// yeild to rounding error, i.e. the balance contains fractions smaller than 10^8 Flow (smallest unit allowed to transfer).
-	ErrWithdrawBalanceRounding = errors.New("withdraw failed! balance is susceptible to the rounding error")
+	ErrInsufficientTotalSupply = NewFatalError(errors.New("insufficient total supply"))
 
 	// ErrNotImplemented is a fatal error when something is called that is not implemented
 	ErrNotImplemented = NewFatalError(errors.New("a functionality is called that is not implemented"))
 )
-
-// EVMExecutionError is a non-fatal error, returned when execution of
-// an evm transaction or direct call has failed.
-type EVMExecutionError struct {
-	err error
-}
-
-// NewEVMExecutionError returns a new EVMExecutionError
-func NewEVMExecutionError(rootCause error) EVMExecutionError {
-	return EVMExecutionError{
-		err: rootCause,
-	}
-}
-
-// Unwrap unwraps the underlying evm error
-func (err EVMExecutionError) Unwrap() error {
-	return err.err
-}
-
-func (err EVMExecutionError) Error() string {
-	return fmt.Sprintf("EVM execution error: %v", err.err)
-}
-
-// IsEVMValidationError returns true if the error or any underlying errors
-// is of the type EVM execution error
-func IsEVMExecutionError(err error) bool {
-	return errors.As(err, &EVMExecutionError{})
-}
 
 // EVMValidationError is a non-fatal error, returned when validation steps of an EVM transaction
 // or direct call has failed.
@@ -112,7 +172,7 @@ func (err StateError) Error() string {
 }
 
 // IsAStateError returns true if the error or any underlying errors
-// is of the type EVM validation error
+// is a state error
 func IsAStateError(err error) bool {
 	return errors.As(err, &StateError{})
 }
@@ -162,4 +222,31 @@ func IsWithdrawBalanceRoundingError(err error) bool {
 // UnAuthroizedMethodCallError
 func IsAUnAuthroizedMethodCallError(err error) bool {
 	return errors.Is(err, ErrUnAuthroizedMethodCall)
+}
+
+// BackendError is a non-fatal error wraps errors returned from the backend
+type BackendError struct {
+	err error
+}
+
+// NewBackendError returns a new BackendError
+func NewBackendError(rootCause error) BackendError {
+	return BackendError{
+		err: rootCause,
+	}
+}
+
+// Unwrap unwraps the underlying evm error
+func (err BackendError) Unwrap() error {
+	return err.err
+}
+
+func (err BackendError) Error() string {
+	return fmt.Sprintf("backend error: %v", err.err)
+}
+
+// IsABackendError returns true if the error or
+// any underlying errors is a backend error
+func IsABackendError(err error) bool {
+	return errors.As(err, &BackendError{})
 }

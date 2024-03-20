@@ -30,7 +30,7 @@ var contractCode string
 //go:embed abiOnlyContract.cdc
 var abiOnlyContractCode string
 
-var flowTokenImportPattern = regexp.MustCompile(`^import "FlowToken"\n`)
+var flowTokenImportPattern = regexp.MustCompile(`(?m)^import "FlowToken"\n`)
 
 func ContractCode(flowTokenAddress flow.Address, evmAbiOnly bool) []byte {
 	if evmAbiOnly {
@@ -46,6 +46,9 @@ func ContractCode(flowTokenAddress flow.Address, evmAbiOnly bool) []byte {
 const ContractName = "EVM"
 const evmAddressTypeBytesFieldName = "bytes"
 const evmAddressTypeQualifiedIdentifier = "EVM.EVMAddress"
+const evmBalanceTypeQualifiedIdentifier = "EVM.Balance"
+const evmResultTypeQualifiedIdentifier = "EVM.Result"
+const evmStatusTypeQualifiedIdentifier = "EVM.Status"
 
 const abiEncodingByteSize = 32
 
@@ -926,7 +929,8 @@ var internalEVMTypeRunFunctionType = &sema.FunctionType{
 			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
 		},
 	},
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
+	// Actually EVM.Result, but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 
 func newInternalEVMTypeRunFunction(
@@ -967,10 +971,62 @@ func newInternalEVMTypeRunFunction(
 			// Run
 
 			cb := types.NewAddressFromBytes(coinbase)
-			handler.Run(transaction, cb)
+			result := handler.Run(transaction, cb)
 
-			return interpreter.Void
+			return NewResultValue(handler, gauge, inter, locationRange, result)
 		},
+	)
+}
+
+func NewResultValue(
+	handler types.ContractHandler,
+	gauge common.MemoryGauge,
+	inter *interpreter.Interpreter,
+	locationRange interpreter.LocationRange,
+	result *types.ResultSummary,
+) *interpreter.CompositeValue {
+	loc := common.NewAddressLocation(gauge, handler.EVMContractAddress(), ContractName)
+	return interpreter.NewCompositeValue(
+		inter,
+		locationRange,
+		loc,
+		evmResultTypeQualifiedIdentifier,
+		common.CompositeKindStructure,
+		[]interpreter.CompositeField{
+			{
+				Name: "status",
+				Value: interpreter.NewEnumCaseValue(
+					inter,
+					locationRange,
+					&sema.CompositeType{
+						Location:   loc,
+						Identifier: evmStatusTypeQualifiedIdentifier,
+						Kind:       common.CompositeKindEnum,
+					},
+					interpreter.NewUInt8Value(gauge, func() uint8 {
+						return uint8(result.Status)
+					}),
+					nil,
+				),
+			},
+			{
+				Name: "errorCode",
+				Value: interpreter.NewUInt64Value(gauge, func() uint64 {
+					return uint64(result.ErrorCode)
+				}),
+			},
+			{
+				Name: "gasUsed",
+				Value: interpreter.NewUInt64Value(gauge, func() uint64 {
+					return result.GasConsumed
+				}),
+			},
+			{
+				Name:  "data",
+				Value: interpreter.ByteSliceToByteArrayValue(inter, result.ReturnedValue),
+			},
+		},
+		common.ZeroAddress,
 	)
 }
 
@@ -1019,10 +1075,11 @@ var internalEVMTypeCallFunctionType = &sema.FunctionType{
 		},
 		{
 			Label:          "value",
-			TypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
 		},
 	},
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+	// Actually EVM.Result, but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 
 func AddressBytesArrayValueToEVMAddress(
@@ -1120,39 +1177,49 @@ func newInternalEVMTypeCallFunction(
 
 			// Get balance
 
-			balanceValue, ok := invocation.Arguments[4].(interpreter.UFix64Value)
+			balanceValue, ok := invocation.Arguments[4].(interpreter.UIntValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			balance := types.NewBalanceFromUFix64(cadence.UFix64(balanceValue))
+			balance := types.NewBalance(balanceValue.BigInt)
 			// Call
 
 			const isAuthorized = true
 			account := handler.AccountByAddress(fromAddress, isAuthorized)
 			result := account.Call(toAddress, data, gasLimit, balance)
 
-			return interpreter.ByteSliceToByteArrayValue(inter, result)
+			return NewResultValue(handler, gauge, inter, locationRange, result)
 		},
 	)
 }
 
-const internalEVMTypeCreateBridgedAccountFunctionName = "createBridgedAccount"
+const internalEVMTypeCreateCadenceOwnedAccountFunctionName = "createCadenceOwnedAccount"
 
-var internalEVMTypeCreateBridgedAccountFunctionType = &sema.FunctionType{
+var internalEVMTypeCreateCadenceOwnedAccountFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "uuid",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
+		},
+	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
 }
 
-func newInternalEVMTypeCreateBridgedAccountFunction(
+func newInternalEVMTypeCreateCadenceOwnedAccountFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewHostFunctionValue(
 		gauge,
-		internalEVMTypeCreateBridgedAccountFunctionType,
+		internalEVMTypeCreateCadenceOwnedAccountFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			inter := invocation.Interpreter
-			address := handler.AllocateAddress()
+			uuid, ok := invocation.Arguments[0].(interpreter.UInt64Value)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+			address := handler.DeployCOA(uint64(uuid))
 			return EVMAddressToAddressBytesArrayValue(inter, address)
 		},
 	)
@@ -1242,7 +1309,7 @@ var internalEVMTypeBalanceFunctionType = &sema.FunctionType{
 			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
 		},
 	},
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
 }
 
 // newInternalEVMTypeBalanceFunction returns the Flow balance of the account
@@ -1270,12 +1337,133 @@ func newInternalEVMTypeBalanceFunction(
 			const isAuthorized = false
 			account := handler.AccountByAddress(address, isAuthorized)
 
-			// TODO: return roundoff flag or handle it
-			ufix, _, err := types.ConvertBalanceToUFix64(account.Balance())
+			return interpreter.UIntValue{BigInt: account.Balance()}
+		},
+	)
+}
+
+const internalEVMTypeNonceFunctionName = "nonce"
+
+var internalEVMTypeNonceFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "address",
+			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
+}
+
+// newInternalEVMTypeNonceFunction returns the nonce of the account
+func newInternalEVMTypeNonceFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		internalEVMTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			addressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			address, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, addressValue)
 			if err != nil {
 				panic(err)
 			}
-			return interpreter.UFix64Value(ufix)
+
+			const isAuthorized = false
+			account := handler.AccountByAddress(address, isAuthorized)
+
+			return interpreter.UInt64Value(account.Nonce())
+		},
+	)
+}
+
+const internalEVMTypeCodeFunctionName = "code"
+
+var internalEVMTypeCodeFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "address",
+			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+}
+
+// newInternalEVMTypeCodeFunction returns the code of the account
+func newInternalEVMTypeCodeFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		internalEVMTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			addressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			address, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, addressValue)
+			if err != nil {
+				panic(err)
+			}
+
+			const isAuthorized = false
+			account := handler.AccountByAddress(address, isAuthorized)
+
+			return interpreter.ByteSliceToByteArrayValue(inter, account.Code())
+		},
+	)
+}
+
+const internalEVMTypeCodeHashFunctionName = "codeHash"
+
+var internalEVMTypeCodeHashFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "address",
+			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+}
+
+// newInternalEVMTypeCodeHashFunction returns the code hash of the account
+func newInternalEVMTypeCodeHashFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		internalEVMTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			addressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			address, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, addressValue)
+			if err != nil {
+				panic(err)
+			}
+
+			const isAuthorized = false
+			account := handler.AccountByAddress(address, isAuthorized)
+
+			return interpreter.ByteSliceToByteArrayValue(inter, account.CodeHash())
 		},
 	)
 }
@@ -1290,7 +1478,7 @@ var internalEVMTypeWithdrawFunctionType = &sema.FunctionType{
 		},
 		{
 			Label:          "amount",
-			TypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
 		},
 	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyResourceType),
@@ -1321,12 +1509,12 @@ func newInternalEVMTypeWithdrawFunction(
 
 			// Get amount
 
-			amountValue, ok := invocation.Arguments[1].(interpreter.UFix64Value)
+			amountValue, ok := invocation.Arguments[1].(interpreter.UIntValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			amount := types.NewBalanceFromUFix64(cadence.UFix64(amountValue))
+			amount := types.NewBalance(amountValue.BigInt)
 
 			// Withdraw
 
@@ -1334,10 +1522,12 @@ func newInternalEVMTypeWithdrawFunction(
 			account := handler.AccountByAddress(fromAddress, isAuthorized)
 			vault := account.Withdraw(amount)
 
-			// TODO: return rounded off flag or handle it ?
-			ufix, _, err := types.ConvertBalanceToUFix64(vault.Balance())
+			ufix, roundedOff, err := types.ConvertBalanceToUFix64(vault.Balance())
 			if err != nil {
 				panic(err)
+			}
+			if roundedOff {
+				panic(types.ErrWithdrawBalanceRounding)
 			}
 
 			// TODO: improve: maybe call actual constructor
@@ -1352,6 +1542,12 @@ func newInternalEVMTypeWithdrawFunction(
 						Name: "balance",
 						Value: interpreter.NewUFix64Value(gauge, func() uint64 {
 							return uint64(ufix)
+						}),
+					},
+					{
+						Name: sema.ResourceUUIDFieldName,
+						Value: interpreter.NewUInt64Value(gauge, func() uint64 {
+							return handler.GenerateResourceUUID()
 						}),
 					},
 				},
@@ -1379,7 +1575,7 @@ var internalEVMTypeDeployFunctionType = &sema.FunctionType{
 		},
 		{
 			Label:          "value",
-			TypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
 		},
 	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
@@ -1431,12 +1627,12 @@ func newInternalEVMTypeDeployFunction(
 
 			// Get value
 
-			amountValue, ok := invocation.Arguments[3].(interpreter.UFix64Value)
+			amountValue, ok := invocation.Arguments[3].(interpreter.UIntValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			amount := types.NewBalanceFromUFix64(cadence.UFix64(amountValue))
+			amount := types.NewBalance(amountValue.BigInt)
 
 			// Deploy
 
@@ -1445,6 +1641,71 @@ func newInternalEVMTypeDeployFunction(
 			address := account.Deploy(code, gasLimit, amount)
 
 			return EVMAddressToAddressBytesArrayValue(inter, address)
+		},
+	)
+}
+
+const internalEVMTypeCastToAttoFLOWFunctionName = "castToAttoFLOW"
+
+var internalEVMTypeCastToAttoFLOWFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "balance",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
+}
+
+func newInternalEVMTypeCastToAttoFLOWFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		internalEVMTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			balanceValue, ok := invocation.Arguments[0].(interpreter.UFix64Value)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+			balance := types.NewBalanceFromUFix64(cadence.UFix64(balanceValue))
+			return interpreter.UIntValue{BigInt: balance}
+		},
+	)
+}
+
+const internalEVMTypeCastToFLOWFunctionName = "castToFLOW"
+
+var internalEVMTypeCastToFLOWFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "balance",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
+}
+
+func newInternalEVMTypeCastToFLOWFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		internalEVMTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			balanceValue, ok := invocation.Arguments[0].(interpreter.UIntValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+			balance := types.NewBalance(balanceValue.BigInt)
+			// ignoring the rounding error and let user handle it
+			v, _, err := types.ConvertBalanceToUFix64(balance)
+			if err != nil {
+				panic(err)
+			}
+			return interpreter.UFix64Value(v)
 		},
 	)
 }
@@ -1460,15 +1721,20 @@ func NewInternalEVMContractValue(
 		internalEVMContractStaticType,
 		InternalEVMContractType.Fields,
 		map[string]interpreter.Value{
-			internalEVMTypeRunFunctionName:                  newInternalEVMTypeRunFunction(gauge, handler),
-			internalEVMTypeCreateBridgedAccountFunctionName: newInternalEVMTypeCreateBridgedAccountFunction(gauge, handler),
-			internalEVMTypeCallFunctionName:                 newInternalEVMTypeCallFunction(gauge, handler),
-			internalEVMTypeDepositFunctionName:              newInternalEVMTypeDepositFunction(gauge, handler),
-			internalEVMTypeWithdrawFunctionName:             newInternalEVMTypeWithdrawFunction(gauge, handler),
-			internalEVMTypeDeployFunctionName:               newInternalEVMTypeDeployFunction(gauge, handler),
-			internalEVMTypeBalanceFunctionName:              newInternalEVMTypeBalanceFunction(gauge, handler),
-			internalEVMTypeEncodeABIFunctionName:            newInternalEVMTypeEncodeABIFunction(gauge, location),
-			internalEVMTypeDecodeABIFunctionName:            newInternalEVMTypeDecodeABIFunction(gauge, location),
+			internalEVMTypeRunFunctionName:                       newInternalEVMTypeRunFunction(gauge, handler),
+			internalEVMTypeCreateCadenceOwnedAccountFunctionName: newInternalEVMTypeCreateCadenceOwnedAccountFunction(gauge, handler),
+			internalEVMTypeCallFunctionName:                      newInternalEVMTypeCallFunction(gauge, handler),
+			internalEVMTypeDepositFunctionName:                   newInternalEVMTypeDepositFunction(gauge, handler),
+			internalEVMTypeWithdrawFunctionName:                  newInternalEVMTypeWithdrawFunction(gauge, handler),
+			internalEVMTypeDeployFunctionName:                    newInternalEVMTypeDeployFunction(gauge, handler),
+			internalEVMTypeBalanceFunctionName:                   newInternalEVMTypeBalanceFunction(gauge, handler),
+			internalEVMTypeNonceFunctionName:                     newInternalEVMTypeNonceFunction(gauge, handler),
+			internalEVMTypeCodeFunctionName:                      newInternalEVMTypeCodeFunction(gauge, handler),
+			internalEVMTypeCodeHashFunctionName:                  newInternalEVMTypeCodeHashFunction(gauge, handler),
+			internalEVMTypeEncodeABIFunctionName:                 newInternalEVMTypeEncodeABIFunction(gauge, location),
+			internalEVMTypeDecodeABIFunctionName:                 newInternalEVMTypeDecodeABIFunction(gauge, location),
+			internalEVMTypeCastToAttoFLOWFunctionName:            newInternalEVMTypeCastToAttoFLOWFunction(gauge, handler),
+			internalEVMTypeCastToFLOWFunctionName:                newInternalEVMTypeCastToFLOWFunction(gauge, handler),
 		},
 		nil,
 		nil,
@@ -1493,8 +1759,8 @@ var InternalEVMContractType = func() *sema.CompositeType {
 		),
 		sema.NewUnmeteredPublicFunctionMember(
 			ty,
-			internalEVMTypeCreateBridgedAccountFunctionName,
-			internalEVMTypeCreateBridgedAccountFunctionType,
+			internalEVMTypeCreateCadenceOwnedAccountFunctionName,
+			internalEVMTypeCreateCadenceOwnedAccountFunctionType,
 			"",
 		),
 		sema.NewUnmeteredPublicFunctionMember(
@@ -1523,8 +1789,38 @@ var InternalEVMContractType = func() *sema.CompositeType {
 		),
 		sema.NewUnmeteredPublicFunctionMember(
 			ty,
+			internalEVMTypeCastToAttoFLOWFunctionName,
+			internalEVMTypeCastToAttoFLOWFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeCastToFLOWFunctionName,
+			internalEVMTypeCastToFLOWFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
 			internalEVMTypeBalanceFunctionName,
 			internalEVMTypeBalanceFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeNonceFunctionName,
+			internalEVMTypeNonceFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeCodeFunctionName,
+			internalEVMTypeCodeFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeCodeHashFunctionName,
+			internalEVMTypeCodeHashFunctionType,
 			"",
 		),
 		sema.NewUnmeteredPublicFunctionMember(
@@ -1597,13 +1893,61 @@ func NewEVMAddressCadenceType(address common.Address) *cadence.StructType {
 func NewBalanceCadenceType(address common.Address) *cadence.StructType {
 	return cadence.NewStructType(
 		common.NewAddressLocation(nil, address, ContractName),
-		"EVM.Balance",
+		evmBalanceTypeQualifiedIdentifier,
 		[]cadence.Field{
 			{
-				Identifier: "flow",
-				Type:       cadence.UFix64Type{},
+				Identifier: "attoflow",
+				Type:       cadence.UIntType{},
 			},
 		},
 		nil,
 	)
+}
+
+func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, error) {
+	str, ok := val.(cadence.Struct)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected value type")
+	}
+	if len(str.Fields) != 4 {
+		return nil, fmt.Errorf("invalid input: field count mismatch")
+	}
+
+	statusEnum, ok := str.Fields[0].(cadence.Enum)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for status field")
+	}
+
+	status, ok := statusEnum.Fields[0].(cadence.UInt8)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for status field")
+	}
+
+	errorCode, ok := str.Fields[1].(cadence.UInt64)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for error code field")
+	}
+
+	gasUsed, ok := str.Fields[2].(cadence.UInt64)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for gas field")
+	}
+
+	data, ok := str.Fields[3].(cadence.Array)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for data field")
+	}
+
+	convertedData := make([]byte, len(data.Values))
+	for i, value := range data.Values {
+		convertedData[i] = value.(cadence.UInt8).ToGoValue().(uint8)
+	}
+
+	return &types.ResultSummary{
+		Status:        types.Status(status),
+		ErrorCode:     types.ErrorCode(errorCode),
+		GasConsumed:   uint64(gasUsed),
+		ReturnedValue: convertedData,
+	}, nil
+
 }

@@ -109,6 +109,9 @@ const (
 	// PrimaryAN is the container name for the primary access node to use for API requests
 	PrimaryAN = "access_1"
 
+	// PrimaryON is the container name for the primary observer node to use for API requests
+	PrimaryON = "observer_1"
+
 	DefaultViewsInStakingAuction      uint64 = 5
 	DefaultViewsInDKGPhase            uint64 = 50
 	DefaultViewsInEpoch               uint64 = 200
@@ -271,7 +274,7 @@ func (net *FlowNetwork) RemoveContainers() {
 
 // DropDBs resets the protocol state database for all containers in the network
 // matching the given filter.
-func (net *FlowNetwork) DropDBs(filter flow.IdentityFilter) {
+func (net *FlowNetwork) DropDBs(filter flow.IdentityFilter[flow.Identity]) {
 	if net == nil || net.suite == nil {
 		return
 	}
@@ -654,10 +657,11 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 
 	// create a follower-specific directory for the bootstrap files
 	followerBootstrapDir := makeDir(t, tmpdir, DefaultBootstrapDir)
+	makeDir(t, followerBootstrapDir, bootstrap.DirnamePublicBootstrap)
 
-	// strip out the node addresses from root-protocol-state-snapshot.json and copy it to the follower-specific
+	// copy root protocol snapshot to the follower-specific folder
 	// bootstrap/public-root-information directory
-	err := rootProtocolJsonWithoutAddresses(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
+	err := io.Copy(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
 	require.NoError(t, err)
 
 	// consensus follower
@@ -726,7 +730,7 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 	accessPublicKey := hex.EncodeToString(accessNode.Config.NetworkPubKey().Encode())
 	require.NotEmptyf(t, accessPublicKey, "failed to find the staked conf for access node with container name '%s'", conf.BootstrapAccessName)
 
-	err = WriteObserverPrivateKey(conf.ContainerName, nodeBootstrapDir)
+	_, err = WriteObserverPrivateKey(conf.ContainerName, nodeBootstrapDir)
 	require.NoError(t, err)
 
 	containerOpts := testingdock.ContainerOpts{
@@ -778,6 +782,9 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 
 	nodeContainer.exposePort(RESTPort, testingdock.RandomPort(t))
 	nodeContainer.AddFlag("rest-addr", nodeContainer.ContainerAddr(RESTPort))
+
+	nodeContainer.exposePort(ExecutionStatePort, testingdock.RandomPort(t))
+	nodeContainer.AddFlag("state-stream-addr", nodeContainer.ContainerAddr(ExecutionStatePort))
 
 	nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(nodeContainer.HealthcheckCallback())
 
@@ -1044,7 +1051,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 
 	// IMPORTANT: we must use this ordering when writing the DKG keys as
 	//            this ordering defines the DKG participant's indices
-	stakedNodeInfos := bootstrap.Sort(toNodeInfos(stakedConfs), flow.Canonical)
+	stakedNodeInfos := bootstrap.Sort(toNodeInfos(stakedConfs), flow.Canonical[flow.Identity])
 
 	dkg, err := runBeaconKG(stakedConfs)
 	if err != nil {
@@ -1093,25 +1100,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	participants := bootstrap.ToIdentityList(stakedNodeInfos)
 
 	// generate root block
-	root := run.GenerateRootBlock(chainID, parentID, height, timestamp)
-
-	// generate QC
-	signerData, err := run.GenerateQCParticipantData(consensusNodes, consensusNodes, dkg)
-	if err != nil {
-		return nil, err
-	}
-	votes, err := run.GenerateRootBlockVotes(root, signerData)
-	if err != nil {
-		return nil, err
-	}
-	qc, invalidVotesErr, err := run.GenerateRootQC(root, votes, signerData, signerData.Identities())
-	if err != nil {
-		return nil, err
-	}
-
-	if len(invalidVotesErr) > 0 {
-		return nil, fmt.Errorf("has invalid votes: %v", invalidVotesErr)
-	}
+	rootHeader := run.GenerateRootHeader(chainID, parentID, height, timestamp)
 
 	// generate root blocks for each collector cluster
 	clusterRootBlocks, clusterAssignments, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, epochCounter, stakedConfs)
@@ -1141,19 +1130,21 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		return nil, err
 	}
 
-	dkgOffsetView := root.Header.View + networkConf.ViewsInStakingAuction - 1
+	dkgOffsetView := rootHeader.View + networkConf.ViewsInStakingAuction - 1
 
 	// generate epoch service events
 	epochSetup := &flow.EpochSetup{
 		Counter:            epochCounter,
-		FirstView:          root.Header.View,
+		FirstView:          rootHeader.View,
 		DKGPhase1FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase,
 		DKGPhase2FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*2,
 		DKGPhase3FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*3,
-		FinalView:          root.Header.View + networkConf.ViewsInEpoch - 1,
-		Participants:       participants,
+		FinalView:          rootHeader.View + networkConf.ViewsInEpoch - 1,
+		Participants:       participants.ToSkeleton(),
 		Assignments:        clusterAssignments,
 		RandomSource:       randomSource,
+		TargetDuration:     networkConf.ViewsInEpoch, // 1view/s
+		TargetEndTime:      uint64(time.Now().Unix()) + networkConf.ViewsInEpoch,
 	}
 
 	epochCommit := &flow.EpochCommit{
@@ -1162,6 +1153,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		DKGGroupKey:        dkg.PubGroupKey,
 		DKGParticipantKeys: dkg.PubKeyShares,
 	}
+	root := &flow.Block{
+		Header: rootHeader,
+	}
+	root.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(
+		inmem.ProtocolStateFromEpochServiceEvents(epochSetup, epochCommit).ID())))
 
 	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
 	if err != nil {
@@ -1178,7 +1174,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		RandomSource:                 cdcRandomSource,
 		CollectorClusters:            clusterAssignments,
 		ClusterQCs:                   clusterQCs,
-		DKGPubKeys:                   dkg.PubKeyShares,
+		DKGPubKeys:                   encodable.WrapRandomBeaconPubKeys(dkg.PubKeyShares),
 	}
 
 	// generate the initial execution state
@@ -1187,6 +1183,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		trieDir,
 		unittest.ServiceAccountPublicKey,
 		chain,
+		fvm.WithRootBlock(root.Header),
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
@@ -1204,6 +1201,24 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	seal, err := run.GenerateRootSeal(result)
 	if err != nil {
 		return nil, fmt.Errorf("generating root seal failed: %w", err)
+	}
+
+	// generate QC
+	signerData, err := run.GenerateQCParticipantData(consensusNodes, consensusNodes, dkg)
+	if err != nil {
+		return nil, err
+	}
+	votes, err := run.GenerateRootBlockVotes(root, signerData)
+	if err != nil {
+		return nil, err
+	}
+	qc, invalidVotesErr, err := run.GenerateRootQC(root, votes, signerData, signerData.Identities())
+	if err != nil {
+		return nil, err
+	}
+
+	if len(invalidVotesErr) > 0 {
+		return nil, fmt.Errorf("has invalid votes: %v", invalidVotesErr)
 	}
 
 	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(root, result, seal, qc, flow.DefaultProtocolVersion, networkConf.EpochCommitSafetyThreshold)
@@ -1311,8 +1326,8 @@ func runBeaconKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
 func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []ContainerConfig) ([]*cluster.Block, flow.AssignmentList, []*flow.QuorumCertificate, error) {
 
 	participantsUnsorted := toParticipants(confs)
-	participants := participantsUnsorted.Sort(flow.Canonical)
-	collectors := participants.Filter(filter.HasRole(flow.RoleCollection))
+	participants := participantsUnsorted.Sort(flow.Canonical[flow.Identity])
+	collectors := participants.Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 	assignments := unittest.ClusterAssignment(nClusters, collectors)
 	clusters, err := factory.NewClusterList(assignments, collectors)
 	if err != nil {
@@ -1344,7 +1359,7 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 		}
 
 		// must order in canonical ordering otherwise decoding signer indices from cluster QC would fail
-		clusterCommittee := bootstrap.ToIdentityList(clusterNodeInfos).Sort(flow.Canonical)
+		clusterCommittee := bootstrap.ToIdentityList(clusterNodeInfos).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 		qc, err := run.GenerateClusterRootQC(clusterNodeInfos, clusterCommittee, block)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("fail to generate cluster root QC with clusterNodeInfos %v, %w",

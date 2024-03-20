@@ -38,16 +38,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// from 18.8.2022
-var mainnetExecutionEffortWeights = meter.ExecutionEffortWeights{
-	common.ComputationKindStatement:          1569,
-	common.ComputationKindLoop:               1569,
-	common.ComputationKindFunctionInvocation: 1569,
-	environment.ComputationKindGetValue:      808,
-	environment.ComputationKindCreateAccount: 2837670,
-	environment.ComputationKindSetValue:      765,
-}
-
 type vmTest struct {
 	bootstrapOptions []fvm.BootstrapProcedureOption
 	contextOptions   []fvm.Option
@@ -1046,7 +1036,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		t.Run(fmt.Sprintf("Transaction Fees %d: %s", i, tc.name), newVMTest().withBootstrapProcedureOptions(
 			fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 			fvm.WithExecutionMemoryLimit(math.MaxUint64),
-			fvm.WithExecutionEffortWeights(mainnetExecutionEffortWeights),
+			fvm.WithExecutionEffortWeights(environment.MainnetExecutionEffortWeights),
 			fvm.WithExecutionMemoryWeights(meter.DefaultMemoryWeights),
 		).withContextOptions(
 			fvm.WithTransactionFeesEnabled(true),
@@ -1063,7 +1053,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 			fvm.WithExecutionMemoryLimit(math.MaxUint64),
-			fvm.WithExecutionEffortWeights(mainnetExecutionEffortWeights),
+			fvm.WithExecutionEffortWeights(environment.MainnetExecutionEffortWeights),
 			fvm.WithExecutionMemoryWeights(meter.DefaultMemoryWeights),
 		).withContextOptions(
 			fvm.WithTransactionFeesEnabled(true),
@@ -1414,7 +1404,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			// Use the maximum amount of computation so that the transaction still passes.
-			loops := uint64(997)
+			loops := uint64(996)
+			executionEffortNeededToCheckStorage := uint64(1)
 			maxExecutionEffort := uint64(997)
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(fmt.Sprintf(`
@@ -1437,8 +1428,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 
 			snapshotTree = snapshotTree.Append(executionSnapshot)
 
-			// expected used is number of loops.
-			require.Equal(t, loops, output.ComputationUsed)
+			// expected computation used is number of loops + 1 (from the storage limit check).
+			require.Equal(t, loops+executionEffortNeededToCheckStorage, output.ComputationUsed)
 
 			// increasing the number of loops should fail the transaction.
 			loops = loops + 1
@@ -1461,8 +1452,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 
 			require.ErrorContains(t, output.Err, "computation exceeds limit (997)")
-			// computation used should the actual computation used.
-			require.Equal(t, loops, output.ComputationUsed)
+			// expected computation used is still number of loops + 1 (from the storage limit check).
+			require.Equal(t, loops+executionEffortNeededToCheckStorage, output.ComputationUsed)
 
 			for _, event := range output.Events {
 				// the fee deduction event should only contain the max gas worth of execution effort.
@@ -1485,6 +1476,117 @@ func TestSettingExecutionWeights(t *testing.T) {
 				}
 			}
 			unittest.EnsureEventsIndexSeq(t, output.Events, chain.ChainID())
+		},
+	))
+
+	t.Run("transaction with more accounts touched uses more computation", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+		fvm.WithExecutionEffortWeights(
+			meter.ExecutionEffortWeights{
+				common.ComputationKindStatement: 0,
+				// only count loops
+				// the storage check has a loop
+				common.ComputationKindLoop:               1 << meter.MeterExecutionInternalPrecisionBytes,
+				common.ComputationKindFunctionInvocation: 0,
+			},
+		),
+	).withContextOptions(
+		fvm.WithAccountStorageLimit(true),
+		fvm.WithTransactionFeesEnabled(true),
+		fvm.WithMemoryLimit(math.MaxUint64),
+	).run(
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
+			// Create an account private key.
+			privateKeys, err := testutil.GenerateAccountPrivateKeys(5)
+			require.NoError(t, err)
+
+			// Bootstrap a ledger, creating accounts with the provided
+			// private keys and the root account.
+			snapshotTree, accounts, err := testutil.CreateAccounts(
+				vm,
+				snapshotTree,
+				privateKeys,
+				chain)
+			require.NoError(t, err)
+
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+			// create a transaction without loops so only the looping in the storage check is counted.
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(fmt.Sprintf(`
+					import FungibleToken from 0x%s
+					import FlowToken from 0x%s
+	
+					transaction() {
+						let sentVault: @FungibleToken.Vault
+	
+						prepare(signer: AuthAccount) {
+							let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+								?? panic("Could not borrow reference to the owner's Vault!")
+	
+							self.sentVault <- vaultRef.withdraw(amount: 5.0)
+						}
+	
+						execute {
+							let recipient1 = getAccount(%s)
+							let recipient2 = getAccount(%s)
+							let recipient3 = getAccount(%s)
+							let recipient4 = getAccount(%s)
+							let recipient5 = getAccount(%s)
+	
+							let receiverRef1 = recipient1.getCapability(/public/flowTokenReceiver)
+								.borrow<&{FungibleToken.Receiver}>()
+								?? panic("Could not borrow receiver reference to the recipient's Vault")
+							let receiverRef2 = recipient2.getCapability(/public/flowTokenReceiver)
+								.borrow<&{FungibleToken.Receiver}>()
+								?? panic("Could not borrow receiver reference to the recipient's Vault")
+							let receiverRef3 = recipient3.getCapability(/public/flowTokenReceiver)
+								.borrow<&{FungibleToken.Receiver}>()
+								?? panic("Could not borrow receiver reference to the recipient's Vault")
+							let receiverRef4 = recipient4.getCapability(/public/flowTokenReceiver)
+								.borrow<&{FungibleToken.Receiver}>()
+								?? panic("Could not borrow receiver reference to the recipient's Vault")
+							let receiverRef5 = recipient5.getCapability(/public/flowTokenReceiver)
+								.borrow<&{FungibleToken.Receiver}>()
+								?? panic("Could not borrow receiver reference to the recipient's Vault")
+	
+							receiverRef1.deposit(from: <-self.sentVault.withdraw(amount: 1.0))
+							receiverRef2.deposit(from: <-self.sentVault.withdraw(amount: 1.0))
+							receiverRef3.deposit(from: <-self.sentVault.withdraw(amount: 1.0))
+							receiverRef4.deposit(from: <-self.sentVault.withdraw(amount: 1.0))
+							receiverRef5.deposit(from: <-self.sentVault.withdraw(amount: 1.0))
+
+							destroy self.sentVault
+						}
+					}`,
+					sc.FungibleToken.Address,
+					sc.FlowToken.Address,
+					accounts[0].HexWithPrefix(),
+					accounts[1].HexWithPrefix(),
+					accounts[2].HexWithPrefix(),
+					accounts[3].HexWithPrefix(),
+					accounts[4].HexWithPrefix(),
+				))).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress())
+
+			err = testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			_, output, err := vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			// The storage check should loop once for each of the five accounts created +
+			// once for the service account
+			require.Equal(t, uint64(5+1), output.ComputationUsed)
 		},
 	))
 }
@@ -3044,7 +3146,7 @@ func TestEVM(t *testing.T) {
 								log(data.length)
 								assert(data.length == 160)
 
-								let acc <- EVM.createBridgedAccount()
+								let acc <- EVM.createCadenceOwnedAccount()
 								destroy acc
 							}
 						}
@@ -3065,7 +3167,7 @@ func TestEVM(t *testing.T) {
 			assert.ErrorContains(
 				t,
 				output.Err,
-				"value of type `EVM` has no member `createBridgedAccount`",
+				"value of type `EVM` has no member `createCadenceOwnedAccount`",
 			)
 		}),
 	)
@@ -3073,7 +3175,10 @@ func TestEVM(t *testing.T) {
 	// this test makes sure the execution error is correctly handled and returned as a correct type
 	t.Run("execution reverted", newVMTest().
 		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
-		withContextOptions(fvm.WithEVMEnabled(true)).
+		withContextOptions(
+			fvm.WithChain(flow.Emulator.Chain()),
+			fvm.WithEVMEnabled(true),
+		).
 		run(func(
 			t *testing.T,
 			vm fvm.VM,
@@ -3086,8 +3191,8 @@ func TestEVM(t *testing.T) {
 				import EVM from %s
 				
 				pub fun main() {
-					let bal = EVM.Balance(flow: 1.0);
-					let acc <- EVM.createBridgedAccount();
+					let bal = EVM.Balance(attoflow: 1000000000000000000);
+					let acc <- EVM.createCadenceOwnedAccount();
 					// withdraw insufficient balance
 					destroy acc.withdraw(balance: bal);
 					destroy acc;
@@ -3110,7 +3215,10 @@ func TestEVM(t *testing.T) {
 	// we have implemented a snapshot wrapper to return an error from the EVM
 	t.Run("internal evm error handling", newVMTest().
 		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
-		withContextOptions(fvm.WithEVMEnabled(true)).
+		withContextOptions(
+			fvm.WithChain(flow.Emulator.Chain()),
+			fvm.WithEVMEnabled(true),
+		).
 		run(func(
 			t *testing.T,
 			vm fvm.VM,
@@ -3138,7 +3246,7 @@ func TestEVM(t *testing.T) {
 				errStorage.
 					On("Get", mockery.AnythingOfType("flow.RegisterID")).
 					Return(func(id flow.RegisterID) (flow.RegisterValue, error) {
-						if id.Key == "AddressAllocator" {
+						if id.Key == "LatestBlock" {
 							return nil, e.err
 						}
 						return snapshotTree.Get(id)
@@ -3148,7 +3256,7 @@ func TestEVM(t *testing.T) {
 					import EVM from %s
 					
 					pub fun main() {
-						destroy <- EVM.createBridgedAccount();
+						destroy <- EVM.createCadenceOwnedAccount();
 					}
 				`, sc.EVMContract.Address.HexWithPrefix())))
 
@@ -3163,7 +3271,15 @@ func TestEVM(t *testing.T) {
 	)
 
 	t.Run("deploy contract code", newVMTest().
-		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
+		withBootstrapProcedureOptions(
+			fvm.WithSetupEVMEnabled(true),
+		).
+		withContextOptions(
+			// default is testnet, but testnet has a special EVM storage contract location
+			// so we have to use emulator here so that the EVM storage contract is deployed
+			// to the 5th address
+			fvm.WithChain(flow.Emulator.Chain()),
+		).
 		run(func(
 			t *testing.T,
 			vm fvm.VM,
@@ -3184,7 +3300,7 @@ func TestEVM(t *testing.T) {
 							let vaultRef = acc.borrow<&{FungibleToken.Provider}>(from: /storage/flowTokenVault)
 							?? panic("Could not borrow reference to the owner's Vault!")
 
-							let acc <- EVM.createBridgedAccount()
+							let acc <- EVM.createCadenceOwnedAccount()
 							let amount <- vaultRef.withdraw(amount: 0.0000001) as! @FlowToken.Vault
 							acc.deposit(from: <- amount)
 							destroy acc
@@ -3209,10 +3325,10 @@ func TestEVM(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
-			require.Len(t, output.Events, 3)
+			require.Len(t, output.Events, 6)
 
 			evmLocation := types.EVMLocation{}
-			txExe, blockExe := output.Events[1], output.Events[2]
+			txExe, blockExe := output.Events[4], output.Events[5]
 			assert.Equal(t, evmLocation.TypeID(nil, string(types.EventTypeTransactionExecuted)), common.TypeID(txExe.Type))
 			assert.Equal(t, evmLocation.TypeID(nil, string(types.EventTypeBlockExecuted)), common.TypeID(blockExe.Type))
 		}),

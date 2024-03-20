@@ -152,9 +152,9 @@ func TestNewFlowCachedAccessAPIProxy(t *testing.T) {
 		AccessMetrics:             metrics,
 		CollectionNodeGRPCTimeout: time.Second,
 		Manager: connection.NewManager(
-			nil,
 			unittest.Logger(),
 			metrics,
+			nil,
 			grpcutils.DefaultMaxMsgSize,
 			connection.CircuitBreakerConfig{},
 			grpcutils.NoCompressor,
@@ -162,7 +162,7 @@ func TestNewFlowCachedAccessAPIProxy(t *testing.T) {
 	}
 
 	// Prepare a proxy that fails due to the second connection being idle
-	l := flow.IdentityList{{Address: unittest.IPPort("11634")}, {Address: unittest.IPPort("11635")}}
+	l := flow.IdentitySkeletonList{{Address: unittest.IPPort("11634")}, {Address: unittest.IPPort("11635")}}
 	c := FlowAccessAPIForwarder{}
 	c.Forwarder, err = forwarder.NewForwarder(l, connectionFactory)
 	if err != nil {

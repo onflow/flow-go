@@ -4,31 +4,31 @@ import "fmt"
 
 type ErrorCode uint16
 
-func (ec ErrorCode) IsFailure() bool {
-	return ec >= FailureCodeUnknownFailure
-}
-
 func (ec ErrorCode) String() string {
-	if ec.IsFailure() {
-		return fmt.Sprintf("[Failure Code: %d]", ec)
-	}
 	return fmt.Sprintf("[Error Code: %d]", ec)
 }
 
+type FailureCode uint16
+
+func (fc FailureCode) String() string {
+	return fmt.Sprintf("[Failure Code: %d]", fc)
+}
+
 const (
-	FailureCodeUnknownFailure     ErrorCode = 2000
-	FailureCodeEncodingFailure    ErrorCode = 2001
-	FailureCodeLedgerFailure      ErrorCode = 2002
-	FailureCodeStateMergeFailure  ErrorCode = 2003
-	FailureCodeBlockFinderFailure ErrorCode = 2004
+	FailureCodeUnknownFailure     FailureCode = 2000
+	FailureCodeEncodingFailure    FailureCode = 2001
+	FailureCodeLedgerFailure      FailureCode = 2002
+	FailureCodeStateMergeFailure  FailureCode = 2003
+	FailureCodeBlockFinderFailure FailureCode = 2004
 	// Deprecated: No longer used.
-	FailureCodeHasherFailure                           ErrorCode = 2005
-	FailureCodeParseRestrictedModeInvalidAccessFailure ErrorCode = 2006
-	FailureCodePayerBalanceCheckFailure                ErrorCode = 2007
-	FailureCodeDerivedDataCacheImplementationFailure   ErrorCode = 2008
-	FailureCodeRandomSourceFailure                     ErrorCode = 2009
+	FailureCodeHasherFailure                           FailureCode = 2005
+	FailureCodeParseRestrictedModeInvalidAccessFailure FailureCode = 2006
+	FailureCodePayerBalanceCheckFailure                FailureCode = 2007
+	FailureCodeDerivedDataCacheImplementationFailure   FailureCode = 2008
+	FailureCodeRandomSourceFailure                     FailureCode = 2009
+	FailureCodeEVMFailure                              FailureCode = 2010
 	// Deprecated: No longer used.
-	FailureCodeMetaTransactionFailure ErrorCode = 2100
+	FailureCodeMetaTransactionFailure FailureCode = 2100
 )
 
 const (

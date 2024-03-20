@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/go-units"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
@@ -30,9 +31,12 @@ import (
 
 const checkpointFilenamePrefix = "checkpoint."
 
-const MagicBytesCheckpointHeader uint16 = 0x2137
-const MagicBytesCheckpointSubtrie uint16 = 0x2136
-const MagicBytesCheckpointToptrie uint16 = 0x2135
+const (
+	MagicBytesCheckpointHeader  uint16 = 0x2137
+	MagicBytesCheckpointSubtrie uint16 = 0x2136
+	MagicBytesCheckpointToptrie uint16 = 0x2135
+	MagicBytesPayloadHeader     uint16 = 0x2138
+)
 
 const VersionV1 uint16 = 0x01
 
@@ -252,7 +256,14 @@ func (c *Checkpointer) Checkpoint(to int) (err error) {
 		return fmt.Errorf("could not create checkpoint for %v: %w", to, err)
 	}
 
-	c.wal.log.Info().Msgf("created checkpoint %d with %d tries", to, len(tries))
+	checkpointFileSize, err := ReadCheckpointFileSize(c.wal.dir, fileName)
+	if err != nil {
+		return fmt.Errorf("could not read checkpoint file size: %w", err)
+	}
+
+	c.wal.log.Info().
+		Str("checkpoint_file_size", units.BytesSize(float64(checkpointFileSize))).
+		Msgf("created checkpoint %d with %d tries", to, len(tries))
 
 	return nil
 }

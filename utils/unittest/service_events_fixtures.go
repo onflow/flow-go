@@ -41,6 +41,8 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 		DKGPhase2FinalView: 160,
 		DKGPhase3FinalView: 170,
 		RandomSource:       randomSource,
+		TargetDuration:     200,
+		TargetEndTime:      2000000000,
 		Assignments: flow.AssignmentList{
 			{
 				flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000001"),
@@ -51,14 +53,14 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 				flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000004"),
 			},
 		},
-		Participants: flow.IdentityList{
+		Participants: flow.IdentitySkeletonList{
 			{
 				Role:          flow.RoleCollection,
 				NodeID:        flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000001"),
 				Address:       "1.flow.com",
 				NetworkPubKey: MustDecodePublicKeyHex(crypto.ECDSAP256, "378dbf45d85c614feb10d8bd4f78f4b6ef8eec7d987b937e123255444657fb3da031f232a507e323df3a6f6b8f50339c51d188e80c0e7a92420945cc6ca893fc"),
 				StakingPubKey: MustDecodePublicKeyHex(crypto.BLSBLS12381, "af4aade26d76bb2ab15dcc89adcef82a51f6f04b3cb5f4555214b40ec89813c7a5f95776ea4fe449de48166d0bbc59b919b7eabebaac9614cf6f9461fac257765415f4d8ef1376a2365ec9960121888ea5383d88a140c24c29962b0a14e4e4e7"),
-				Weight:        100,
+				InitialWeight: 100,
 			},
 			{
 				Role:          flow.RoleCollection,
@@ -66,7 +68,7 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 				Address:       "2.flow.com",
 				NetworkPubKey: MustDecodePublicKeyHex(crypto.ECDSAP256, "378dbf45d85c614feb10d8bd4f78f4b6ef8eec7d987b937e123255444657fb3da031f232a507e323df3a6f6b8f50339c51d188e80c0e7a92420945cc6ca893fc"),
 				StakingPubKey: MustDecodePublicKeyHex(crypto.BLSBLS12381, "af4aade26d76bb2ab15dcc89adcef82a51f6f04b3cb5f4555214b40ec89813c7a5f95776ea4fe449de48166d0bbc59b919b7eabebaac9614cf6f9461fac257765415f4d8ef1376a2365ec9960121888ea5383d88a140c24c29962b0a14e4e4e7"),
-				Weight:        100,
+				InitialWeight: 100,
 			},
 			{
 				Role:          flow.RoleCollection,
@@ -74,7 +76,7 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 				Address:       "3.flow.com",
 				NetworkPubKey: MustDecodePublicKeyHex(crypto.ECDSAP256, "378dbf45d85c614feb10d8bd4f78f4b6ef8eec7d987b937e123255444657fb3da031f232a507e323df3a6f6b8f50339c51d188e80c0e7a92420945cc6ca893fc"),
 				StakingPubKey: MustDecodePublicKeyHex(crypto.BLSBLS12381, "af4aade26d76bb2ab15dcc89adcef82a51f6f04b3cb5f4555214b40ec89813c7a5f95776ea4fe449de48166d0bbc59b919b7eabebaac9614cf6f9461fac257765415f4d8ef1376a2365ec9960121888ea5383d88a140c24c29962b0a14e4e4e7"),
-				Weight:        100,
+				InitialWeight: 100,
 			},
 			{
 				Role:          flow.RoleCollection,
@@ -82,7 +84,7 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 				Address:       "4.flow.com",
 				NetworkPubKey: MustDecodePublicKeyHex(crypto.ECDSAP256, "378dbf45d85c614feb10d8bd4f78f4b6ef8eec7d987b937e123255444657fb3da031f232a507e323df3a6f6b8f50339c51d188e80c0e7a92420945cc6ca893fc"),
 				StakingPubKey: MustDecodePublicKeyHex(crypto.BLSBLS12381, "af4aade26d76bb2ab15dcc89adcef82a51f6f04b3cb5f4555214b40ec89813c7a5f95776ea4fe449de48166d0bbc59b919b7eabebaac9614cf6f9461fac257765415f4d8ef1376a2365ec9960121888ea5383d88a140c24c29962b0a14e4e4e7"),
-				Weight:        100,
+				InitialWeight: 100,
 			},
 			{
 				Role:          flow.RoleConsensus,
@@ -90,7 +92,7 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 				Address:       "11.flow.com",
 				NetworkPubKey: MustDecodePublicKeyHex(crypto.ECDSAP256, "cfdfe8e4362c8f79d11772cb7277ab16e5033a63e8dd5d34caf1b041b77e5b2d63c2072260949ccf8907486e4cfc733c8c42ca0e4e208f30470b0d950856cd47"),
 				StakingPubKey: MustDecodePublicKeyHex(crypto.BLSBLS12381, "8207559cd7136af378bba53a8f0196dee3849a3ab02897c1995c3e3f6ca0c4a776c3ae869d1ddbb473090054be2400ad06d7910aa2c5d1780220fdf3765a3c1764bce10c6fe66a5a2be51a422e878518bd750424bb56b8a0ecf0f8ad2057e83f"),
-				Weight:        100,
+				InitialWeight: 100,
 			},
 			{
 				Role:          flow.RoleExecution,
@@ -98,7 +100,7 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 				Address:       "21.flow.com",
 				NetworkPubKey: MustDecodePublicKeyHex(crypto.ECDSAP256, "d64318ba0dbf68f3788fc81c41d507c5822bf53154530673127c66f50fe4469ccf1a054a868a9f88506a8999f2386d86fcd2b901779718cba4fb53c2da258f9e"),
 				StakingPubKey: MustDecodePublicKeyHex(crypto.BLSBLS12381, "880b162b7ec138b36af401d07868cb08d25746d905395edbb4625bdf105d4bb2b2f4b0f4ae273a296a6efefa7ce9ccb914e39947ce0e83745125cab05d62516076ff0173ed472d3791ccef937597c9ea12381d76f547a092a4981d77ff3fba83"),
-				Weight:        100,
+				InitialWeight: 100,
 			},
 			{
 				Role:          flow.RoleVerification,
@@ -106,7 +108,7 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 				Address:       "31.flow.com",
 				NetworkPubKey: MustDecodePublicKeyHex(crypto.ECDSAP256, "697241208dcc9142b6f53064adc8ff1c95760c68beb2ba083c1d005d40181fd7a1b113274e0163c053a3addd47cd528ec6a1f190cf465aac87c415feaae011ae"),
 				StakingPubKey: MustDecodePublicKeyHex(crypto.BLSBLS12381, "b1f97d0a06020eca97352e1adde72270ee713c7daf58da7e74bf72235321048b4841bdfc28227964bf18e371e266e32107d238358848bcc5d0977a0db4bda0b4c33d3874ff991e595e0f537c7b87b4ddce92038ebc7b295c9ea20a1492302aa7"),
-				Weight:        100,
+				InitialWeight: 100,
 			},
 		},
 	}
@@ -114,7 +116,7 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 	return event, expected
 }
 
-// EpochCommitFixture returns an EpochCommit service event as a Cadence event
+// EpochCommitFixtureByChainID returns an EpochCommit service event as a Cadence event
 // representation and as a protocol model representation.
 func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
 
@@ -172,8 +174,7 @@ func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.Versio
 	return event, expected
 }
 
-func createEpochSetupEvent(randomSource []byte) cadence.Event {
-	randomSourceHex := hex.EncodeToString(randomSource)
+func createEpochSetupEvent(randomSourceHex string) cadence.Event {
 
 	return cadence.NewEvent([]cadence.Value{
 		// counter
@@ -202,6 +203,12 @@ func createEpochSetupEvent(randomSource []byte) cadence.Event {
 
 		// DKGPhase3FinalView
 		cadence.UInt64(170),
+
+		// targetDuration
+		cadence.UInt64(200),
+
+		// targetEndTime
+		cadence.UInt64(2000000000),
 	}).WithType(newFlowEpochEpochSetupEventType())
 }
 
@@ -592,7 +599,7 @@ func createEpochCollectors() cadence.Array {
 	}).WithType(cadence.NewVariableSizedArrayType(clusterType))
 }
 
-func createEpochCommittedEvent() cadence.Event {
+func createEpochCommitEvent() cadence.Event {
 
 	clusterQCType := newFlowClusterQCClusterQCStructType()
 
@@ -651,7 +658,7 @@ func createEpochCommittedEvent() cadence.Event {
 			cadence.String("8c588266db5f5cda629e83f8aa04ae9413593fac19e4865d06d291c9d14fbdd9bdb86a7a12f9ef8590c79cb635e3163315d193087e9336092987150d0cd2b14ac6365f7dc93eec573752108b8c12368abb65f0652d9f644e5aed611c37926950"),
 			cadence.String("87a339e4e5c74f089da20a33f515d8c8f4464ab53ede5a74aa2432cd1ae66d522da0c122249ee176cd747ddc83ca81090498389384201614caf51eac392c1c0a916dfdcfbbdf7363f9552b6468434add3d3f6dc91a92bbe3ee368b59b7828488"),
 		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType{})),
-	}).WithType(newFlowEpochEpochCommittedEventType())
+	}).WithType(newFlowEpochEpochCommitEventType())
 }
 
 func createVersionBeaconEvent() cadence.Event {
@@ -880,11 +887,19 @@ func newFlowEpochEpochSetupEventType() *cadence.EventType {
 				Identifier: "DKGPhase3FinalView",
 				Type:       cadence.UInt64Type{},
 			},
+			{
+				Identifier: "targetDuration",
+				Type:       cadence.UInt64Type{},
+			},
+			{
+				Identifier: "targetEndTime",
+				Type:       cadence.UInt64Type{},
+			},
 		},
 	}
 }
 
-func newFlowEpochEpochCommittedEventType() *cadence.EventType {
+func newFlowEpochEpochCommitEventType() *cadence.EventType {
 
 	// A.01cf0e2f2f715450.FlowEpoch.EpochCommitted
 
@@ -1028,7 +1043,8 @@ func ufix64FromString(s string) cadence.UFix64 {
 }
 
 func EpochSetupFixtureCCF(randomSource []byte) []byte {
-	b, err := ccf.Encode(createEpochSetupEvent(randomSource))
+	randomSourceHex := hex.EncodeToString(randomSource)
+	b, err := ccf.Encode(createEpochSetupEvent(randomSourceHex))
 	if err != nil {
 		panic(err)
 	}
@@ -1046,34 +1062,7 @@ func EpochSetupCCFWithNonHexRandomSource() []byte {
 		randomSource = randomSource + "aa"
 	}
 
-	event := cadence.NewEvent([]cadence.Value{
-		// counter
-		cadence.NewUInt64(1),
-
-		// nodeInfo
-		createEpochNodes(),
-
-		// firstView
-		cadence.NewUInt64(100),
-
-		// finalView
-		cadence.NewUInt64(200),
-
-		// collectorClusters
-		createEpochCollectors(),
-
-		// randomSource
-		cadence.String(randomSource),
-
-		// DKGPhase1FinalView
-		cadence.UInt64(150),
-
-		// DKGPhase2FinalView
-		cadence.UInt64(160),
-
-		// DKGPhase3FinalView
-		cadence.UInt64(170),
-	}).WithType(newFlowEpochEpochSetupEventType())
+	event := createEpochSetupEvent(randomSource)
 
 	b, err := ccf.Encode(event)
 	if err != nil {
@@ -1087,7 +1076,7 @@ func EpochSetupCCFWithNonHexRandomSource() []byte {
 }
 
 var EpochCommitFixtureCCF = func() []byte {
-	b, err := ccf.Encode(createEpochCommittedEvent())
+	b, err := ccf.Encode(createEpochCommitEvent())
 	if err != nil {
 		panic(err)
 	}

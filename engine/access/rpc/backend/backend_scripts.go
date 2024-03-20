@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"crypto/md5" //nolint:gosec
-	"errors"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -237,7 +236,7 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 	var execDuration time.Duration
 	errToReturn := b.nodeCommunicator.CallAvailableNode(
 		executors,
-		func(node *flow.Identity) error {
+		func(node *flow.IdentitySkeleton) error {
 			execStartTime := time.Now()
 
 			result, err = b.tryExecuteScriptOnExecutionNode(ctx, node.Address, r)
@@ -265,7 +264,7 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 
 			return nil
 		},
-		func(node *flow.Identity, err error) bool {
+		func(node *flow.IdentitySkeleton, err error) bool {
 			if status.Code(err) == codes.InvalidArgument {
 				lg.Debug().Err(err).
 					Str("script_executor_addr", node.Address).
@@ -332,13 +331,14 @@ func convertScriptExecutionError(err error, height uint64) error {
 		return nil
 	}
 
+	var failure fvmerrors.CodedFailure
+	if fvmerrors.As(err, &failure) {
+		return rpc.ConvertError(err, "failed to execute script", codes.Internal)
+	}
+
+	// general FVM/ledger errors
 	var coded fvmerrors.CodedError
 	if fvmerrors.As(err, &coded) {
-		// general FVM/ledger errors
-		if coded.Code().IsFailure() {
-			return rpc.ConvertError(err, "failed to execute script", codes.Internal)
-		}
-
 		switch coded.Code() {
 		case fvmerrors.ErrCodeScriptExecutionCancelledError:
 			return status.Errorf(codes.Canceled, "script execution canceled: %v", err)
@@ -352,22 +352,5 @@ func convertScriptExecutionError(err error, height uint64) error {
 		}
 	}
 
-	return convertIndexError(err, height, "failed to execute script")
-}
-
-// convertIndexError converts errors related to index to a gRPC error
-func convertIndexError(err error, height uint64, defaultMsg string) error {
-	if err == nil {
-		return nil
-	}
-
-	if errors.Is(err, execution.ErrDataNotAvailable) {
-		return status.Errorf(codes.OutOfRange, "data for block height %d is not available", height)
-	}
-
-	if errors.Is(err, storage.ErrNotFound) {
-		return status.Errorf(codes.NotFound, "data not found: %v", err)
-	}
-
-	return rpc.ConvertError(err, defaultMsg, codes.Internal)
+	return rpc.ConvertIndexError(err, height, "failed to execute script")
 }

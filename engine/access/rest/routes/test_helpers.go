@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -94,8 +95,8 @@ var _ http.Hijacker = (*testHijackResponseRecorder)(nil)
 // Hijack implements the http.Hijacker interface by returning a fakeNetConn and a bufio.ReadWriter
 // that simulate a hijacked connection.
 func (w *testHijackResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	br := bufio.NewReaderSize(strings.NewReader(""), state_stream.DefaultSendBufferSize)
-	bw := bufio.NewWriterSize(&bytes.Buffer{}, state_stream.DefaultSendBufferSize)
+	br := bufio.NewReaderSize(strings.NewReader(""), subscription.DefaultSendBufferSize)
+	bw := bufio.NewWriterSize(&bytes.Buffer{}, subscription.DefaultSendBufferSize)
 	w.responseBuff = bytes.NewBuffer(make([]byte, 0))
 	w.closed = make(chan struct{}, 1)
 
@@ -137,8 +138,8 @@ func executeWsRequest(req *http.Request, stateStreamApi state_stream.API, respon
 
 	config := backend.Config{
 		EventFilterConfig: state_stream.DefaultEventFilterConfig,
-		MaxGlobalStreams:  state_stream.DefaultMaxGlobalStreams,
-		HeartbeatInterval: state_stream.DefaultHeartbeatInterval,
+		MaxGlobalStreams:  subscription.DefaultMaxGlobalStreams,
+		HeartbeatInterval: subscription.DefaultHeartbeatInterval,
 	}
 
 	router := NewRouterBuilder(unittest.Logger(), restCollector).AddWsRoutes(

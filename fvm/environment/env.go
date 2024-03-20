@@ -41,6 +41,8 @@ type Environment interface {
 	ConvertedServiceEvents() flow.ServiceEventList
 
 	// SystemContracts
+	ContractFunctionInvoker
+
 	AccountsStorageCapacity(
 		addresses []flow.Address,
 		payer flow.Address,
