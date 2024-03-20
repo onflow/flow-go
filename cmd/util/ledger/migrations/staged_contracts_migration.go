@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
-	"github.com/onflow/cadence/runtime/pretty"
 	"io"
 	"os"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/old_parser"
+	"github.com/onflow/cadence/runtime/pretty"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 
