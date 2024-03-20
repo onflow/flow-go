@@ -68,6 +68,7 @@ import (
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool/herocache"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
@@ -142,6 +143,9 @@ type ObserverServiceConfig struct {
 	upstreamNodePublicKeys       []string
 	upstreamIdentities           flow.IdentitySkeletonList // the identity list of upstream peers the node uses to forward API requests to
 	scriptExecutorConfig         query.QueryConfig
+	logTxTimeToFinalized         bool
+	logTxTimeToExecuted          bool
+	logTxTimeToFinalizedExecuted bool
 	executionDataSyncEnabled     bool
 	executionDataIndexingEnabled bool
 	localServiceAPIEnabled       bool
@@ -206,6 +210,9 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		registersDBPath:              filepath.Join(homedir, ".flow", "execution_state"),
 		checkpointFile:               cmd.NotSet,
 		scriptExecutorConfig:         query.NewDefaultConfig(),
+		logTxTimeToFinalized:         false,
+		logTxTimeToExecuted:          false,
+		logTxTimeToFinalizedExecuted: false,
 		executionDataSyncEnabled:     false,
 		executionDataIndexingEnabled: false,
 		localServiceAPIEnabled:       false,
@@ -236,6 +243,7 @@ type ObserverServiceBuilder struct {
 	FollowerState        stateprotocol.FollowerState
 	SyncCore             *chainsync.Core
 	RpcEng               *rpc.Engine
+	TransactionTimings   *stdmap.TransactionTimings // new Added
 	FollowerDistributor  *pubsub.FollowerDistributor
 	Committee            hotstuff.DynamicCommittee
 	Finalized            *flow.Header
@@ -266,8 +274,9 @@ type ObserverServiceBuilder struct {
 	// Public network
 	peerID peer.ID
 
-	RestMetrics   *metrics.RestCollector
-	AccessMetrics module.AccessMetrics
+	TransactionMetrics *metrics.TransactionCollector
+	RestMetrics        *metrics.RestCollector
+	AccessMetrics      module.AccessMetrics
 
 	// grpc servers
 	secureGrpcServer      *grpcserver.GrpcServer
@@ -624,6 +633,13 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"upstream-node-public-keys",
 			defaultConfig.upstreamNodePublicKeys,
 			"the networking public key of the upstream access node (in the same order as the upstream node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
+
+		flags.BoolVar(&builder.logTxTimeToFinalized, "log-tx-time-to-finalized", defaultConfig.logTxTimeToFinalized, "log transaction time to finalized")
+		flags.BoolVar(&builder.logTxTimeToExecuted, "log-tx-time-to-executed", defaultConfig.logTxTimeToExecuted, "log transaction time to executed")
+		flags.BoolVar(&builder.logTxTimeToFinalizedExecuted,
+			"log-tx-time-to-finalized-executed",
+			defaultConfig.logTxTimeToFinalizedExecuted,
+			"log transaction time to finalized and executed")
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
 		flags.BoolVar(&builder.executionDataIndexingEnabled,
 			"execution-data-indexing-enabled",
@@ -1202,7 +1218,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 		var indexedBlockHeight storage.ConsumerProgress
 
 		builder.Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
-			// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
+			// Note: progress is stored in the ftransaction metricsMAIN db since that is where indexed execution data is stored.
 			indexedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
 			return nil
 		}).Module("transaction results storage", func(node *cmd.NodeConfig) error {
@@ -1510,6 +1526,23 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 }
 
 func (builder *ObserverServiceBuilder) enqueueRPCServer() {
+
+	builder.Module("transaction metrics", func(node *cmd.NodeConfig) error {
+		var err error
+		builder.TransactionTimings, err = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
+		if err != nil {
+			return err
+		}
+
+		builder.TransactionMetrics = metrics.NewTransactionCollector(
+			node.Logger,
+			builder.TransactionTimings,
+			builder.logTxTimeToFinalized,
+			builder.logTxTimeToExecuted,
+			builder.logTxTimeToFinalizedExecuted,
+		)
+		return nil
+	})
 	builder.Module("rest metrics", func(node *cmd.NodeConfig) error {
 		m, err := metrics.NewRestCollector(routes.URLToRoute, node.MetricsRegisterer)
 		if err != nil {
@@ -1520,6 +1553,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	})
 	builder.Module("access metrics", func(node *cmd.NodeConfig) error {
 		builder.AccessMetrics = metrics.NewAccessCollector(
+			metrics.WithTransactionMetrics(builder.TransactionMetrics),
+			metrics.WithBackendScriptsMetrics(builder.TransactionMetrics),
 			metrics.WithRestMetrics(builder.RestMetrics),
 		)
 		return nil

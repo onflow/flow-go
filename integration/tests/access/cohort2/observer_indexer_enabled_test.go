@@ -27,6 +27,10 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
+var (
+	simpleScript = `pub fun main(): Int { return 42; }`
+)
+
 func TestObserverIndexerEnabled(t *testing.T) {
 	suite.Run(t, new(ObserverIndexerEnabledSuite))
 }
@@ -51,6 +55,15 @@ func (s *ObserverIndexerEnabledSuite) SetupTest() {
 		"GetBlockByHeight":               {},
 		"GetLatestProtocolStateSnapshot": {},
 		"GetNetworkParameters":           {},
+		"GetTransactionsByBlockID":       {},
+		"GetTransaction":                 {},
+		"GetCollectionByID":              {},
+		"ExecuteScriptAtBlockID":         {},
+		"ExecuteScriptAtLatestBlock":     {},
+		"ExecuteScriptAtBlockHeight":     {},
+		"GetAccount":                     {},
+		"GetAccountAtLatestBlock":        {},
+		"GetAccountAtBlockHeight":        {},
 	}
 
 	s.localRest = map[string]struct{}{
@@ -291,7 +304,7 @@ func (s *ObserverIndexerEnabledSuite) getRPCs() []RPCTest {
 			return err
 		}},
 		{name: "GetTransaction", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetTransaction(ctx, &accessproto.GetTransactionRequest{})
+			_, err := client.GetTransaction(ctx, &accessproto.GetTransactionRequest{Id: make([]byte, 32)})
 			return err
 		}},
 		{name: "GetTransactionResult", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
@@ -307,31 +320,49 @@ func (s *ObserverIndexerEnabledSuite) getRPCs() []RPCTest {
 			return err
 		}},
 		{name: "GetTransactionsByBlockID", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetTransactionsByBlockID(ctx, &accessproto.GetTransactionsByBlockIDRequest{})
+			_, err := client.GetTransactionsByBlockID(ctx, &accessproto.GetTransactionsByBlockIDRequest{BlockId: make([]byte, 32)})
 			return err
 		}},
 		{name: "GetAccount", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetAccount(ctx, &accessproto.GetAccountRequest{})
+			_, err := client.GetAccount(ctx, &accessproto.GetAccountRequest{
+				Address: sdk.HexToAddress("f8d6e0586b0a20c7").Bytes(),
+			})
 			return err
 		}},
 		{name: "GetAccountAtLatestBlock", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetAccountAtLatestBlock(ctx, &accessproto.GetAccountAtLatestBlockRequest{})
+			_, err := client.GetAccountAtLatestBlock(ctx, &accessproto.GetAccountAtLatestBlockRequest{
+				Address: sdk.HexToAddress("f8d6e0586b0a20c7").Bytes(),
+			})
 			return err
 		}},
 		{name: "GetAccountAtBlockHeight", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetAccountAtBlockHeight(ctx, &accessproto.GetAccountAtBlockHeightRequest{})
+			_, err := client.GetAccountAtBlockHeight(ctx, &accessproto.GetAccountAtBlockHeightRequest{
+				Address:     sdk.HexToAddress("f8d6e0586b0a20c7").Bytes(),
+				BlockHeight: 0,
+			})
 			return err
 		}},
 		{name: "ExecuteScriptAtLatestBlock", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.ExecuteScriptAtLatestBlock(ctx, &accessproto.ExecuteScriptAtLatestBlockRequest{})
+			_, err := client.ExecuteScriptAtLatestBlock(ctx, &accessproto.ExecuteScriptAtLatestBlockRequest{
+				Script:    []byte(simpleScript),
+				Arguments: make([][]byte, 0),
+			})
 			return err
 		}},
 		{name: "ExecuteScriptAtBlockID", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.ExecuteScriptAtBlockID(ctx, &accessproto.ExecuteScriptAtBlockIDRequest{})
+			_, err := client.ExecuteScriptAtBlockID(ctx, &accessproto.ExecuteScriptAtBlockIDRequest{
+				BlockId:   make([]byte, 32),
+				Script:    []byte("dummy script"),
+				Arguments: make([][]byte, 0),
+			})
 			return err
 		}},
 		{name: "ExecuteScriptAtBlockHeight", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.ExecuteScriptAtBlockHeight(ctx, &accessproto.ExecuteScriptAtBlockHeightRequest{})
+			_, err := client.ExecuteScriptAtBlockHeight(ctx, &accessproto.ExecuteScriptAtBlockHeightRequest{
+				BlockHeight: 0,
+				Script:      []byte(simpleScript),
+				Arguments:   make([][]byte, 0),
+			})
 			return err
 		}},
 		{name: "GetNetworkParameters", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
