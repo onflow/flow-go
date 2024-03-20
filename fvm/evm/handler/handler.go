@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"math/big"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence/runtime/common"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	"github.com/onflow/go-ethereum/rlp"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"

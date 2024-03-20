@@ -14,7 +14,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/ef-ds/deque v1.0.4
-	github.com/ethereum/go-ethereum v1.13.5
+	github.com/ethereum/go-ethereum v1.13.10
 	github.com/fxamacker/cbor/v2 v2.4.1-0.20230228173756-c0c9f774e40c
 	github.com/gammazero/workerpool v1.1.2
 	github.com/gogo/protobuf v1.3.2
@@ -108,6 +108,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230711213910-baad011d2b13
 	github.com/onflow/flow-nft/lib/go/contracts v1.1.0
+	github.com/onflow/go-ethereum v0.0.4
 	github.com/onflow/wal v0.0.0-20240208022732-d756cd497d3b
 	github.com/slok/go-http-metrics v0.10.0
 	github.com/sony/gobreaker v0.5.0
@@ -139,7 +140,7 @@ require (
 	github.com/aws/smithy-go v1.17.0 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/bits-and-blooms/bitset v1.7.0 // indirect
+	github.com/bits-and-blooms/bitset v1.10.0 // indirect
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
@@ -193,7 +194,7 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
-	github.com/holiman/uint256 v1.2.3 // indirect
+	github.com/holiman/uint256 v1.2.4 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect

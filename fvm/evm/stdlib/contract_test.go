@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
@@ -13,6 +12,7 @@ import (
 	cadenceStdlib "github.com/onflow/cadence/runtime/stdlib"
 	"github.com/onflow/cadence/runtime/tests/utils"
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
+	"github.com/onflow/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
