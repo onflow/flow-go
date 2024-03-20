@@ -248,11 +248,6 @@ func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCsHappyPath() {
 	}
 	require.True(t, found)
 
-	_, err = observer.GetExecutionResultForBlockID(ctx, &accessproto.GetExecutionResultForBlockIDRequest{
-		BlockId: blockWithAccount.Block.Id,
-	})
-	require.NoError(t, err)
-
 }
 
 func (s *ObserverIndexerEnabledSuite) getRPCs() []RPCTest {

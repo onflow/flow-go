@@ -329,12 +329,6 @@ func (h *FlowAccessAPIRouter) GetProtocolStateSnapshotByHeight(context context.C
 }
 
 func (h *FlowAccessAPIRouter) GetExecutionResultForBlockID(context context.Context, req *access.GetExecutionResultForBlockIDRequest) (*access.ExecutionResultForBlockIDResponse, error) {
-	if h.useIndex {
-		res, err := h.local.GetExecutionResultForBlockID(context, req)
-		h.log(LocalApiService, "GetExecutionResultForBlockID", err)
-		return res, err
-	}
-
 	res, err := h.upstream.GetExecutionResultForBlockID(context, req)
 	h.log(UpstreamApiService, "GetExecutionResultForBlockID", err)
 	return res, err
