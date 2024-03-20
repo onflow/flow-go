@@ -216,46 +216,6 @@ func (h *Handler) GetRegisterValues(_ context.Context, request *executiondata.Ge
 	return &executiondata.GetRegisterValuesResponse{Values: values}, nil
 }
 
-// createAccountStatusesFilter creates an event filter for account statuses based on the provided status filter.
-func (h *Handler) createAccountStatusesFilter(statusFilter *executiondata.StatusFilter) (state_stream.EventFilter, error) {
-	filter := state_stream.EventFilter{}
-
-	if statusFilter != nil {
-		var err error
-		filterEventTypes, err := state_stream.GetCoreEventTypes(statusFilter.GetEventType())
-		if err != nil {
-			return filter, err
-		}
-
-		filter, err = state_stream.NewEventFilter(
-			h.eventFilterConfig,
-			h.chain,
-			filterEventTypes,
-			[]string{},
-			[]string{},
-		)
-		if err != nil {
-			return filter, status.Errorf(codes.InvalidArgument, "invalid event filter: %v", err)
-		}
-
-		addresses := statusFilter.GetAddress()
-		if len(addresses) > 0 {
-			for eventType := range filter.EventTypes {
-				var fieldFilters []state_stream.FieldFilter
-				for _, address := range addresses {
-					fieldFilter := state_stream.GetCoreEventAccountFieldFilter(eventType)
-					fieldFilter.TargetValue = address
-					fieldFilters = append(fieldFilters, fieldFilter)
-				}
-
-				filter.EventFieldFilters[eventType] = fieldFilters
-			}
-		}
-	}
-
-	return filter, nil
-}
-
 // convertAccountsStatusesResults converts account statuses response to the appropriate format.
 func convertAccountsStatusesResults(eventVersion entities.EventEncodingVersion, resp *AccountStatusesResponse) ([]*executiondata.SubscribeAccountStatusesResponse_Result, error) {
 	var results []*executiondata.SubscribeAccountStatusesResponse_Result
@@ -271,6 +231,50 @@ func convertAccountsStatusesResults(eventVersion entities.EventEncodingVersion, 
 		})
 	}
 	return results, nil
+}
+
+type sendSubscribeAccountStatusesResponseFunc func(*executiondata.SubscribeAccountStatusesResponse) error
+
+func (h *Handler) handleAccountStatusesResponse(
+	requestHeartbeatInterval uint64,
+	evenVersion entities.EventEncodingVersion,
+	send sendSubscribeAccountStatusesResponseFunc,
+) func(resp *AccountStatusesResponse) error {
+	heartbeatInterval := requestHeartbeatInterval
+	if heartbeatInterval == 0 {
+		heartbeatInterval = h.defaultHeartbeatInterval
+	}
+
+	blocksSinceLastMessage := uint64(0)
+
+	return func(resp *AccountStatusesResponse) error {
+		// check if there are any events in the response. if not, do not send a message unless the last
+		// response was more than HeartbeatInterval blocks ago
+		if len(resp.AccountEvents) == 0 {
+			blocksSinceLastMessage++
+			if blocksSinceLastMessage < heartbeatInterval {
+				return nil
+			}
+			blocksSinceLastMessage = 0
+		}
+
+		results, err := convertAccountsStatusesResults(evenVersion, resp)
+		if err != nil {
+			return err
+		}
+
+		err = send(&executiondata.SubscribeAccountStatusesResponse{
+			BlockId:      convert.IdentifierToMessage(resp.BlockID),
+			BlockHeight:  resp.Height,
+			Results:      results,
+			MessageIndex: resp.MessageIndex,
+		})
+		if err != nil {
+			return rpc.ConvertError(err, "could not send response", codes.Internal)
+		}
+
+		return nil
+	}
 }
 
 // SubscribeAccountStatusesFromStartBlockID streams account statuses for all blocks starting at the requested
@@ -298,48 +302,15 @@ func (h *Handler) SubscribeAccountStatusesFromStartBlockID(
 		startBlockID = blockID
 	}
 
-	filter, err := h.createAccountStatusesFilter(request.GetFilter())
+	statusFilter := request.GetFilter()
+	filter, err := state_stream.NewAccountStatusFilter(h.eventFilterConfig, h.chain, statusFilter.GetEventType(), statusFilter.GetAddress())
 	if err != nil {
-		return err
+		return status.Errorf(codes.InvalidArgument, "could not create account status filter: %v", err)
 	}
 
 	sub := h.api.SubscribeAccountStatusesFromStartBlockID(stream.Context(), startBlockID, filter)
 
-	heartbeatInterval := request.HeartbeatInterval
-	if heartbeatInterval == 0 {
-		heartbeatInterval = h.defaultHeartbeatInterval
-	}
-
-	blocksSinceLastMessage := uint64(0)
-
-	return subscription.HandleSubscription(sub, func(resp *AccountStatusesResponse) error {
-		// check if there are any events in the response. if not, do not send a message unless the last
-		// response was more than HeartbeatInterval blocks ago
-		if len(resp.AccountEvents) == 0 {
-			blocksSinceLastMessage++
-			if blocksSinceLastMessage < heartbeatInterval {
-				return nil
-			}
-			blocksSinceLastMessage = 0
-		}
-
-		results, err := convertAccountsStatusesResults(request.GetEventEncodingVersion(), resp)
-		if err != nil {
-			return err
-		}
-
-		err = stream.Send(&executiondata.SubscribeAccountStatusesResponse{
-			BlockId:      convert.IdentifierToMessage(resp.BlockID),
-			BlockHeight:  resp.Height,
-			Results:      results,
-			MessageIndex: resp.MessageIndex,
-		})
-		if err != nil {
-			return rpc.ConvertError(err, "could not send response", codes.Internal)
-		}
-
-		return nil
-	})
+	return subscription.HandleSubscription(sub, h.handleAccountStatusesResponse(request.HeartbeatInterval, request.GetEventEncodingVersion(), stream.Send))
 }
 
 // SubscribeAccountStatusesFromStartHeight streams account statuses for all blocks starting at the requested
@@ -358,47 +329,15 @@ func (h *Handler) SubscribeAccountStatusesFromStartHeight(
 	h.StreamCount.Add(1)
 	defer h.StreamCount.Add(-1)
 
-	filter, err := h.createAccountStatusesFilter(request.GetFilter())
+	statusFilter := request.GetFilter()
+	filter, err := state_stream.NewAccountStatusFilter(h.eventFilterConfig, h.chain, statusFilter.GetEventType(), statusFilter.GetAddress())
 	if err != nil {
-		return err
+		return status.Errorf(codes.InvalidArgument, "could not create account status filter: %v", err)
 	}
 
 	sub := h.api.SubscribeAccountStatusesFromStartHeight(stream.Context(), request.GetStartBlockHeight(), filter)
 
-	heartbeatInterval := request.HeartbeatInterval
-	if heartbeatInterval == 0 {
-		heartbeatInterval = h.defaultHeartbeatInterval
-	}
-
-	blocksSinceLastMessage := uint64(0)
-	return subscription.HandleSubscription(sub, func(resp *AccountStatusesResponse) error {
-		// check if there are any events in the response. if not, do not send a message unless the last
-		// response was more than HeartbeatInterval blocks ago
-		if len(resp.AccountEvents) == 0 {
-			blocksSinceLastMessage++
-			if blocksSinceLastMessage < heartbeatInterval {
-				return nil
-			}
-			blocksSinceLastMessage = 0
-		}
-
-		results, err := convertAccountsStatusesResults(request.GetEventEncodingVersion(), resp)
-		if err != nil {
-			return err
-		}
-
-		err = stream.Send(&executiondata.SubscribeAccountStatusesResponse{
-			BlockId:      convert.IdentifierToMessage(resp.BlockID),
-			BlockHeight:  resp.Height,
-			Results:      results,
-			MessageIndex: resp.MessageIndex,
-		})
-		if err != nil {
-			return rpc.ConvertError(err, "could not send response", codes.Internal)
-		}
-
-		return nil
-	})
+	return subscription.HandleSubscription(sub, h.handleAccountStatusesResponse(request.HeartbeatInterval, request.GetEventEncodingVersion(), stream.Send))
 }
 
 // SubscribeAccountStatusesFromLatestBlock streams account statuses for all blocks starting
@@ -417,45 +356,13 @@ func (h *Handler) SubscribeAccountStatusesFromLatestBlock(
 	h.StreamCount.Add(1)
 	defer h.StreamCount.Add(-1)
 
-	filter, err := h.createAccountStatusesFilter(request.GetFilter())
+	statusFilter := request.GetFilter()
+	filter, err := state_stream.NewAccountStatusFilter(h.eventFilterConfig, h.chain, statusFilter.GetEventType(), statusFilter.GetAddress())
 	if err != nil {
-		return err
+		return status.Errorf(codes.InvalidArgument, "could not create account status filter: %v", err)
 	}
 
 	sub := h.api.SubscribeAccountStatusesFromLatestBlock(stream.Context(), filter)
 
-	heartbeatInterval := request.HeartbeatInterval
-	if heartbeatInterval == 0 {
-		heartbeatInterval = h.defaultHeartbeatInterval
-	}
-
-	blocksSinceLastMessage := uint64(0)
-	return subscription.HandleSubscription(sub, func(resp *AccountStatusesResponse) error {
-		// check if there are any events in the response. if not, do not send a message unless the last
-		// response was more than HeartbeatInterval blocks ago
-		if len(resp.AccountEvents) == 0 {
-			blocksSinceLastMessage++
-			if blocksSinceLastMessage < heartbeatInterval {
-				return nil
-			}
-			blocksSinceLastMessage = 0
-		}
-
-		results, err := convertAccountsStatusesResults(request.GetEventEncodingVersion(), resp)
-		if err != nil {
-			return err
-		}
-
-		err = stream.Send(&executiondata.SubscribeAccountStatusesResponse{
-			BlockId:      convert.IdentifierToMessage(resp.BlockID),
-			BlockHeight:  resp.Height,
-			Results:      results,
-			MessageIndex: resp.MessageIndex,
-		})
-		if err != nil {
-			return rpc.ConvertError(err, "could not send response", codes.Internal)
-		}
-
-		return nil
-	})
+	return subscription.HandleSubscription(sub, h.handleAccountStatusesResponse(request.HeartbeatInterval, request.GetEventEncodingVersion(), stream.Send))
 }

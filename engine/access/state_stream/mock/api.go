@@ -73,11 +73,11 @@ func (_m *API) GetRegisterValues(registerIDs flow.RegisterIDs, height uint64) ([
 }
 
 // SubscribeAccountStatusesFromLatestBlock provides a mock function with given fields: ctx, filter
-func (_m *API) SubscribeAccountStatusesFromLatestBlock(ctx context.Context, filter state_stream.EventFilter) subscription.Subscription {
+func (_m *API) SubscribeAccountStatusesFromLatestBlock(ctx context.Context, filter state_stream.AccountStatusFilter) subscription.Subscription {
 	ret := _m.Called(ctx, filter)
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, state_stream.EventFilter) subscription.Subscription); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, state_stream.AccountStatusFilter) subscription.Subscription); ok {
 		r0 = rf(ctx, filter)
 	} else {
 		if ret.Get(0) != nil {
@@ -89,11 +89,11 @@ func (_m *API) SubscribeAccountStatusesFromLatestBlock(ctx context.Context, filt
 }
 
 // SubscribeAccountStatusesFromStartBlockID provides a mock function with given fields: ctx, startBlockID, filter
-func (_m *API) SubscribeAccountStatusesFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, filter state_stream.EventFilter) subscription.Subscription {
+func (_m *API) SubscribeAccountStatusesFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, filter state_stream.AccountStatusFilter) subscription.Subscription {
 	ret := _m.Called(ctx, startBlockID, filter)
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, state_stream.EventFilter) subscription.Subscription); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, state_stream.AccountStatusFilter) subscription.Subscription); ok {
 		r0 = rf(ctx, startBlockID, filter)
 	} else {
 		if ret.Get(0) != nil {
@@ -105,11 +105,11 @@ func (_m *API) SubscribeAccountStatusesFromStartBlockID(ctx context.Context, sta
 }
 
 // SubscribeAccountStatusesFromStartHeight provides a mock function with given fields: ctx, startHeight, filter
-func (_m *API) SubscribeAccountStatusesFromStartHeight(ctx context.Context, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
+func (_m *API) SubscribeAccountStatusesFromStartHeight(ctx context.Context, startHeight uint64, filter state_stream.AccountStatusFilter) subscription.Subscription {
 	ret := _m.Called(ctx, startHeight, filter)
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, state_stream.EventFilter) subscription.Subscription); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, state_stream.AccountStatusFilter) subscription.Subscription); ok {
 		r0 = rf(ctx, startHeight, filter)
 	} else {
 		if ret.Get(0) != nil {

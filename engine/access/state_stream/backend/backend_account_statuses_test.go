@@ -55,7 +55,7 @@ type testType struct {
 	name            string // Test case name
 	highestBackfill int    // Highest backfill index
 	startValue      interface{}
-	filters         state_stream.EventFilter // Event filters
+	filters         state_stream.AccountStatusFilter // Event filters
 }
 
 // BackendAccountStatusesSuite is the test suite for AccountStatusesBackend.
@@ -425,49 +425,37 @@ func (s *BackendAccountStatusesSuite) generateFiltersForTestCases(baseTests []te
 	tests := make([]testType, 0, len(baseTests)*3)
 	var err error
 	for _, test := range baseTests {
-		addressFilter := state_stream.FieldFilter{
-			FieldName:   "address",
-			TargetValue: accountAddress,
-		}
 		t1 := test
 		t1.name = fmt.Sprintf("%s - all events", test.name)
-		t1.filters, err = state_stream.NewEventFilter(
+		t1.filters, err = state_stream.NewAccountStatusFilter(
 			state_stream.DefaultEventFilterConfig,
 			chainID.Chain(),
 			[]string{string(testProtocolEventTypes[0]), string(testProtocolEventTypes[1]), string(testProtocolEventTypes[2])},
-			nil,
-			nil,
+			[]string{accountAddress},
 		)
 		require.NoError(s.T(), err)
-		for _, eventType := range testProtocolEventTypes {
-			t1.filters.EventFieldFilters[eventType] = []state_stream.FieldFilter{addressFilter}
-		}
 		tests = append(tests, t1)
 
 		t2 := test
 		t2.name = fmt.Sprintf("%s - some events", test.name)
-		t2.filters, err = state_stream.NewEventFilter(
+		t2.filters, err = state_stream.NewAccountStatusFilter(
 			state_stream.DefaultEventFilterConfig,
 			chainID.Chain(),
 			[]string{string(testProtocolEventTypes[0])},
-			nil,
-			nil,
+			[]string{accountAddress},
 		)
 		require.NoError(s.T(), err)
-		t2.filters.EventFieldFilters[testProtocolEventTypes[0]] = []state_stream.FieldFilter{addressFilter}
 		tests = append(tests, t2)
 
 		t3 := test
 		t3.name = fmt.Sprintf("%s - no events", test.name)
-		t3.filters, err = state_stream.NewEventFilter(
+		t3.filters, err = state_stream.NewAccountStatusFilter(
 			state_stream.DefaultEventFilterConfig,
 			chainID.Chain(),
 			[]string{"flow.AccountKeyAdded"},
-			nil,
-			nil,
+			[]string{accountAddress},
 		)
 		require.NoError(s.T(), err)
-		t3.filters.EventFieldFilters["flow.AccountKeyAdded"] = []state_stream.FieldFilter{addressFilter}
 		tests = append(tests, t3)
 	}
 
@@ -482,7 +470,7 @@ func (s *BackendAccountStatusesSuite) generateFiltersForTestCases(baseTests []te
 // For each test case, it simulates backfill blocks and verifies the expected account events for each block.
 // It also ensures that the subscription shuts down gracefully after completing the test cases.
 func (s *BackendAccountStatusesSuite) subscribeToAccountStatuses(
-	subscribeFn func(ctx context.Context, startValue interface{}, filter state_stream.EventFilter) subscription.Subscription,
+	subscribeFn func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription.Subscription,
 	tests []testType,
 ) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -564,9 +552,16 @@ func (s *BackendAccountStatusesSuite) subscribeToAccountStatuses(
 	}
 }
 
-// SubscribeAccountStatusesFromStartBlockID tests the SubscribeAccountStatusesFromStartBlockID method.
-func (s *BackendAccountStatusesSuite) SubscribeAccountStatusesFromStartBlockID() {
-	call := func(ctx context.Context, startValue interface{}, filter state_stream.EventFilter) subscription.Subscription {
+// TestSubscribeAccountStatusesFromStartBlockID tests the SubscribeAccountStatusesFromStartBlockID method.
+func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartBlockID() {
+	s.executionDataTracker.On(
+		"GetStartHeightFromBlockID",
+		mock.AnythingOfType("flow.Identifier"),
+	).Return(func(startBlockID flow.Identifier) (uint64, error) {
+		return s.executionDataTrackerReal.GetStartHeightFromBlockID(startBlockID)
+	}, nil)
+
+	call := func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription.Subscription {
 		return s.backend.SubscribeAccountStatusesFromStartBlockID(ctx, startValue.(flow.Identifier), filter)
 	}
 
@@ -575,7 +570,14 @@ func (s *BackendAccountStatusesSuite) SubscribeAccountStatusesFromStartBlockID()
 
 // TestSubscribeAccountStatusesFromStartHeight tests the SubscribeAccountStatusesFromStartHeight method.
 func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartHeight() {
-	call := func(ctx context.Context, startValue interface{}, filter state_stream.EventFilter) subscription.Subscription {
+	s.executionDataTracker.On(
+		"GetStartHeightFromHeight",
+		mock.AnythingOfType("uint64"),
+	).Return(func(startHeight uint64) (uint64, error) {
+		return s.executionDataTrackerReal.GetStartHeightFromHeight(startHeight)
+	}, nil)
+
+	call := func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription.Subscription {
 		return s.backend.SubscribeAccountStatusesFromStartHeight(ctx, startValue.(uint64), filter)
 	}
 
@@ -584,7 +586,14 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartHeigh
 
 // TestSubscribeAccountStatusesFromLatestBlock tests the SubscribeAccountStatusesFromLatestBlock method.
 func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromLatestBlock() {
-	call := func(ctx context.Context, startValue interface{}, filter state_stream.EventFilter) subscription.Subscription {
+	s.executionDataTracker.On(
+		"GetStartHeightFromLatest",
+		mock.Anything,
+	).Return(func(ctx context.Context) (uint64, error) {
+		return s.executionDataTrackerReal.GetStartHeightFromLatest(ctx)
+	}, nil)
+
+	call := func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription.Subscription {
 		return s.backend.SubscribeAccountStatusesFromLatestBlock(ctx, filter)
 	}
 
@@ -596,20 +605,35 @@ func (s *BackendExecutionDataSuite) TestSubscribeAccountStatusesHandlesErrors() 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	s.Run("returns error for start height before root height", func() {
-		subCtx, subCancel := context.WithCancel(ctx)
-		defer subCancel()
-
-		sub := s.backend.SubscribeAccountStatusesFromStartHeight(subCtx, s.rootBlock.Header.Height-1, state_stream.EventFilter{})
-		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
-	})
+	// mock block tracker for SubscribeBlocksFromStartBlockID
+	s.executionDataTracker.On(
+		"GetStartHeightFromBlockID",
+		mock.AnythingOfType("flow.Identifier"),
+	).Return(func(startBlockID flow.Identifier) (uint64, error) {
+		return s.executionDataTrackerReal.GetStartHeightFromBlockID(startBlockID)
+	}, nil)
 
 	s.Run("returns error for unindexed start blockID", func() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeAccountStatusesFromStartBlockID(subCtx, unittest.IdentifierFixture(), state_stream.EventFilter{})
+		sub := s.backend.SubscribeAccountStatusesFromStartBlockID(subCtx, unittest.IdentifierFixture(), state_stream.AccountStatusFilter{})
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+	})
+
+	s.executionDataTracker.On(
+		"GetStartHeightFromHeight",
+		mock.AnythingOfType("uint64"),
+	).Return(func(startHeight uint64) (uint64, error) {
+		return s.executionDataTrackerReal.GetStartHeightFromHeight(startHeight)
+	}, nil)
+
+	s.Run("returns error for start height before root height", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		sub := s.backend.SubscribeAccountStatusesFromStartHeight(subCtx, s.rootBlock.Header.Height-1, state_stream.AccountStatusFilter{})
+		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
 	// make sure we're starting with a fresh cache
@@ -619,7 +643,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeAccountStatusesHandlesErrors() 
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeAccountStatusesFromStartHeight(subCtx, s.blocks[len(s.blocks)-1].Header.Height+10, state_stream.EventFilter{})
+		sub := s.backend.SubscribeAccountStatusesFromStartHeight(subCtx, s.blocks[len(s.blocks)-1].Header.Height+10, state_stream.AccountStatusFilter{})
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 }

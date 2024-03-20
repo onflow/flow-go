@@ -144,13 +144,13 @@ func New(
 	}
 
 	b.AccountStatusesBackend = AccountStatusesBackend{
-		log:             logger,
-		broadcaster:     broadcaster,
-		sendTimeout:     config.ClientSendTimeout,
-		responseLimit:   config.ResponseLimit,
-		sendBufferSize:  int(config.ClientSendBufferSize),
-		getStartHeight:  b.GetStartHeight,
-		eventsRetriever: eventsRetriever,
+		log:                  logger,
+		broadcaster:          broadcaster,
+		sendTimeout:          config.ClientSendTimeout,
+		responseLimit:        config.ResponseLimit,
+		sendBufferSize:       int(config.ClientSendBufferSize),
+		executionDataTracker: b.ExecutionDataTracker,
+		eventsRetriever:      eventsRetriever,
 	}
 
 	return b, nil

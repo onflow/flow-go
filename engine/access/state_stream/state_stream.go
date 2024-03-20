@@ -25,11 +25,11 @@ type API interface {
 	GetRegisterValues(registerIDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error)
 	// SubscribeAccountStatusesFromStartBlockID subscribes to the streaming of account status changes starting from
 	// a specific block ID with an optional status filter.
-	SubscribeAccountStatusesFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, filter EventFilter) subscription.Subscription
+	SubscribeAccountStatusesFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, filter AccountStatusFilter) subscription.Subscription
 	// SubscribeAccountStatusesFromStartHeight subscribes to the streaming of account status changes starting from
 	// a specific block height, with an optional status filter.
-	SubscribeAccountStatusesFromStartHeight(ctx context.Context, startHeight uint64, filter EventFilter) subscription.Subscription
+	SubscribeAccountStatusesFromStartHeight(ctx context.Context, startHeight uint64, filter AccountStatusFilter) subscription.Subscription
 	// SubscribeAccountStatusesFromLatestBlock subscribes to the streaming of account status changes starting from a
 	// latest sealed block, with an optional status filter.
-	SubscribeAccountStatusesFromLatestBlock(ctx context.Context, filter EventFilter) subscription.Subscription
+	SubscribeAccountStatusesFromLatestBlock(ctx context.Context, filter AccountStatusFilter) subscription.Subscription
 }
