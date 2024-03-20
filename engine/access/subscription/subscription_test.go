@@ -1,4 +1,4 @@
-package backend_test
+package subscription_test
 
 import (
 	"context"
@@ -7,11 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -21,7 +20,7 @@ func TestSubscription_SendReceive(t *testing.T) {
 
 	ctx := context.Background()
 
-	sub := backend.NewSubscription(1)
+	sub := subscription.NewSubscription(1)
 
 	assert.NotEmpty(t, sub.ID())
 
@@ -67,7 +66,7 @@ func TestSubscription_Failures(t *testing.T) {
 
 	// make sure closing a subscription twice does not cause a panic
 	t.Run("close only called once", func(t *testing.T) {
-		sub := backend.NewSubscription(1)
+		sub := subscription.NewSubscription(1)
 		sub.Close()
 		sub.Close()
 
@@ -76,7 +75,7 @@ func TestSubscription_Failures(t *testing.T) {
 
 	// make sure failing and closing the same subscription does not cause a panic
 	t.Run("close only called once with fail", func(t *testing.T) {
-		sub := backend.NewSubscription(1)
+		sub := subscription.NewSubscription(1)
 		sub.Fail(testErr)
 		sub.Close()
 
@@ -85,7 +84,7 @@ func TestSubscription_Failures(t *testing.T) {
 
 	// make sure an error is returned when sending on a closed subscription
 	t.Run("send after closed returns an error", func(t *testing.T) {
-		sub := backend.NewSubscription(1)
+		sub := subscription.NewSubscription(1)
 		sub.Fail(testErr)
 
 		err := sub.Send(context.Background(), "test", 10*time.Millisecond)
@@ -118,7 +117,7 @@ func TestHeightBasedSubscription(t *testing.T) {
 	}
 
 	// search from [start, last], checking the correct data is returned
-	sub := backend.NewHeightBasedSubscription(1, start, getData)
+	sub := subscription.NewHeightBasedSubscription(1, start, getData)
 	for i := start; i <= last; i++ {
 		data, err := sub.Next(ctx)
 		if err != nil {

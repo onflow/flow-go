@@ -191,7 +191,8 @@ func (h *ContractHandler) run(
 
 	bp.AppendTxHash(res.TxHash)
 
-	// TODO: in the future we might update the receipt hash here
+	// Populate receipt root
+	bp.PopulateReceiptRoot([]types.Result{*res})
 
 	blockHash, err := bp.Hash()
 	if err != nil {
@@ -307,7 +308,9 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	bp.AppendTxHash(res.TxHash)
-	// TODO: in the future we might update the receipt hash here
+
+	// Populate receipt root
+	bp.PopulateReceiptRoot([]types.Result{*res})
 
 	if totalSupplyDiff != nil {
 		if deductSupplyDiff {

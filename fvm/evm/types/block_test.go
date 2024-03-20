@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	gethCommon "github.com/onflow/go-ethereum/common"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,4 +31,13 @@ func Test_BlockHash(t *testing.T) {
 
 	// hashes should not equal if any data is changed
 	assert.NotEqual(t, h1, h2)
+
+	b.PopulateReceiptRoot(nil)
+	require.Equal(t, gethTypes.EmptyReceiptsHash, b.ReceiptRoot)
+
+	res := Result{
+		GasConsumed: 10,
+	}
+	b.PopulateReceiptRoot([]Result{res})
+	require.NotEqual(t, gethTypes.EmptyReceiptsHash, b.ReceiptRoot)
 }
