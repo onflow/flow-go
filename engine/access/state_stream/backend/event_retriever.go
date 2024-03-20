@@ -12,12 +12,14 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// EventsResponse represents the response containing events for a specific block.
 type EventsResponse struct {
 	BlockID flow.Identifier
 	Height  uint64
 	Events  flow.EventsList
 }
 
+// EventsRetriever retrieves events related to blocks
 type EventsRetriever struct {
 	log              zerolog.Logger
 	headers          storage.Headers
@@ -26,7 +28,7 @@ type EventsRetriever struct {
 	useEventsIndex   bool
 }
 
-// GetAllEventsResponse returns a function that returns the event response for a given height.
+// GetAllEventsResponse returns a function that retrieves the event response for a given block height.
 func (b *EventsRetriever) GetAllEventsResponse(ctx context.Context, height uint64) (*EventsResponse, error) {
 	var response *EventsResponse
 	var err error

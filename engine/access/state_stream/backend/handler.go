@@ -216,8 +216,11 @@ func (h *Handler) GetRegisterValues(_ context.Context, request *executiondata.Ge
 	return &executiondata.GetRegisterValuesResponse{Values: values}, nil
 }
 
-// convertAccountsStatusesResults converts account statuses response to the appropriate format.
-func convertAccountsStatusesResults(eventVersion entities.EventEncodingVersion, resp *AccountStatusesResponse) ([]*executiondata.SubscribeAccountStatusesResponse_Result, error) {
+// convertAccountsStatusesResultsToMessage converts account status responses to the message
+func convertAccountsStatusesResultsToMessage(
+	eventVersion entities.EventEncodingVersion,
+	resp *AccountStatusesResponse,
+) ([]*executiondata.SubscribeAccountStatusesResponse_Result, error) {
 	var results []*executiondata.SubscribeAccountStatusesResponse_Result
 	for address, events := range resp.AccountEvents {
 		convertedEvent, err := convert.EventsToMessagesWithEncodingConversion(events, entities.EventEncodingVersion_CCF_V0, eventVersion)
@@ -233,8 +236,10 @@ func convertAccountsStatusesResults(eventVersion entities.EventEncodingVersion, 
 	return results, nil
 }
 
+// sendSubscribeAccountStatusesResponseFunc defines the function signature for sending account status responses
 type sendSubscribeAccountStatusesResponseFunc func(*executiondata.SubscribeAccountStatusesResponse) error
 
+// handleAccountStatusesResponse handles account status responses by converting them to the message and sending them to the subscriber.
 func (h *Handler) handleAccountStatusesResponse(
 	requestHeartbeatInterval uint64,
 	evenVersion entities.EventEncodingVersion,
@@ -258,7 +263,7 @@ func (h *Handler) handleAccountStatusesResponse(
 			blocksSinceLastMessage = 0
 		}
 
-		results, err := convertAccountsStatusesResults(evenVersion, resp)
+		results, err := convertAccountsStatusesResultsToMessage(evenVersion, resp)
 		if err != nil {
 			return err
 		}

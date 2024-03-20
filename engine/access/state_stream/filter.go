@@ -53,7 +53,7 @@ const (
 	CoreEventInboxValueClaimed = "flow.InboxValueClaimed"
 )
 
-// defaultCoreEvents is a slice containing all default core event types.
+// defaultCoreEvents is an array containing all default core event types.
 var defaultCoreEvents = []string{
 	CoreEventAccountCreated,
 	CoreEventAccountKeyAdded,
@@ -87,11 +87,6 @@ type EventFilter struct {
 	Addresses         map[string]struct{}
 	Contracts         map[string]struct{}
 	EventFieldFilters map[flow.EventType]map[string]map[string]struct{}
-}
-
-type FieldFilter struct {
-	FieldName   string
-	TargetValue string
 }
 
 func NewEventFilter(
@@ -152,6 +147,7 @@ func NewEventFilter(
 	return f, nil
 }
 
+// addCoreEventFieldFilter adds a field filter for each core event type
 func (f *EventFilter) addCoreEventFieldFilter(eventType flow.EventType, address string) error {
 	f.EventFieldFilters[eventType] = make(map[string]map[string]struct{})
 	switch eventType {
@@ -261,6 +257,8 @@ func (f *EventFilter) matchFieldFilter(event *flow.Event) bool {
 	return false
 }
 
+// AccountStatusFilter defines a specific filter for account statuses.
+// It embeds the EventFilter type to inherit its functionality.
 type AccountStatusFilter struct {
 	*EventFilter
 }

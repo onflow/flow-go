@@ -34,8 +34,7 @@ type AccountStatusesBackend struct {
 	eventsRetriever      EventsRetriever
 }
 
-// subscribe subscribes to account status changes starting from a specific block ID
-// and block height, with an optional status filter.
+// subscribe creates and returns a subscription to receive account status updates starting from the specified height.
 func (b *AccountStatusesBackend) subscribe(
 	ctx context.Context,
 	nextHeight uint64,
