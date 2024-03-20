@@ -1744,6 +1744,28 @@ func newInternalEVMTypeCastToFLOWFunction(
 	)
 }
 
+const internalEVMTypeLatestBlockNumberFunctionName = "latestBlockNumber"
+
+var internalEVMTypeLatestBlockNumberFunctionType = &sema.FunctionType{
+	Purity:               sema.FunctionPurityView,
+	Parameters:           []sema.Parameter{},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
+}
+
+func newInternalEVMTypeLatestBlockNumberFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		internalEVMTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			height := handler.LastExecutedBlock().Height
+			return interpreter.UInt64Value(height)
+		},
+	)
+}
+
 func NewInternalEVMContractValue(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
@@ -1769,6 +1791,7 @@ func NewInternalEVMContractValue(
 			internalEVMTypeDecodeABIFunctionName:                 newInternalEVMTypeDecodeABIFunction(gauge, location),
 			internalEVMTypeCastToAttoFLOWFunctionName:            newInternalEVMTypeCastToAttoFLOWFunction(gauge),
 			internalEVMTypeCastToFLOWFunctionName:                newInternalEVMTypeCastToFLOWFunction(gauge),
+			internalEVMTypeLatestBlockNumberFunctionName:         newInternalEVMTypeLatestBlockNumberFunction(gauge, handler),
 		},
 		nil,
 		nil,
@@ -1867,6 +1890,12 @@ var InternalEVMContractType = func() *sema.CompositeType {
 			ty,
 			internalEVMTypeDecodeABIFunctionName,
 			internalEVMTypeDecodeABIFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeLatestBlockNumberFunctionName,
+			internalEVMTypeLatestBlockNumberFunctionType,
 			"",
 		),
 	})

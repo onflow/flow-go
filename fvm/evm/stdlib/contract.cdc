@@ -449,4 +449,10 @@ contract EVM {
         	problem: nil
         )
     }
+
+    /// Returns the number of the latest executed block.
+    access(all)
+    view fun latestBlockNumber(): UInt64 {
+        return InternalEVM.latestBlockNumber()
+    }
 }

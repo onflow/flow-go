@@ -4226,3 +4226,86 @@ func TestInternalEVMAccess(t *testing.T) {
 	)
 	require.Error(t, err)
 }
+
+func TestEVMFetchLatestBlockNumber(t *testing.T) {
+	t.Parallel()
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	latestBlockNumber := uint64(2)
+	handler := &testContractHandler{
+		lastExecutedBlock: func() *types.Block {
+			return &types.Block{Height: latestBlockNumber}
+		},
+	}
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: LocationResolver,
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+		false,
+	)
+
+	script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): UInt64 {
+        return EVM.latestBlockNumber()
+      }
+	`)
+
+	// Run script
+	value, err := rt.ExecuteScript(
+		runtime.Script{
+			Source:    script,
+			Arguments: [][]byte{},
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	assert.Equal(t, cadence.NewUInt64(latestBlockNumber), value)
+}
