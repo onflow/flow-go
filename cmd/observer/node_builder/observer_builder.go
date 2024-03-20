@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -50,7 +51,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
-	"github.com/onflow/flow-go/engine/protocol"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -68,6 +68,7 @@ import (
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool/herocache"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
@@ -142,11 +143,17 @@ type ObserverServiceConfig struct {
 	upstreamNodePublicKeys       []string
 	upstreamIdentities           flow.IdentitySkeletonList // the identity list of upstream peers the node uses to forward API requests to
 	scriptExecutorConfig         query.QueryConfig
+	logTxTimeToFinalized         bool
+	logTxTimeToExecuted          bool
+	logTxTimeToFinalizedExecuted bool
 	executionDataSyncEnabled     bool
 	executionDataIndexingEnabled bool
+	localServiceAPIEnabled       bool
 	executionDataDir             string
 	executionDataStartHeight     uint64
 	executionDataConfig          edrequester.ExecutionDataConfig
+	scriptExecMinBlock           uint64
+	scriptExecMaxBlock           uint64
 }
 
 // DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
@@ -166,6 +173,9 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 				MaxHeightRange:            backend.DefaultMaxHeightRange,
 				PreferredExecutionNodeIDs: nil,
 				FixedExecutionNodeIDs:     nil,
+				ScriptExecutionMode:       backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				EventQueryMode:            backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
+				TxResultQueryMode:         backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
 			},
 			RestConfig: rest.Config{
 				ListenAddress: "",
@@ -200,8 +210,12 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		registersDBPath:              filepath.Join(homedir, ".flow", "execution_state"),
 		checkpointFile:               cmd.NotSet,
 		scriptExecutorConfig:         query.NewDefaultConfig(),
+		logTxTimeToFinalized:         false,
+		logTxTimeToExecuted:          false,
+		logTxTimeToFinalizedExecuted: false,
 		executionDataSyncEnabled:     false,
 		executionDataIndexingEnabled: false,
+		localServiceAPIEnabled:       false,
 		executionDataDir:             filepath.Join(homedir, ".flow", "execution_data"),
 		executionDataStartHeight:     0,
 		executionDataConfig: edrequester.ExecutionDataConfig{
@@ -212,6 +226,8 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			RetryDelay:         edrequester.DefaultRetryDelay,
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
+		scriptExecMinBlock: 0,
+		scriptExecMaxBlock: math.MaxUint64,
 	}
 }
 
@@ -227,6 +243,7 @@ type ObserverServiceBuilder struct {
 	FollowerState        stateprotocol.FollowerState
 	SyncCore             *chainsync.Core
 	RpcEng               *rpc.Engine
+	TransactionTimings   *stdmap.TransactionTimings
 	FollowerDistributor  *pubsub.FollowerDistributor
 	Committee            hotstuff.DynamicCommittee
 	Finalized            *flow.Header
@@ -234,6 +251,7 @@ type ObserverServiceBuilder struct {
 	FollowerCore         module.HotStuffFollower
 	ExecutionIndexer     *indexer.Indexer
 	ExecutionIndexerCore *indexer.IndexerCore
+	TxResultsIndex       *index.TransactionResultsIndex
 	IndexerDependencies  *cmd.DependencyList
 
 	ExecutionDataDownloader execution_data.Downloader
@@ -242,6 +260,7 @@ type ObserverServiceBuilder struct {
 
 	RegistersAsyncStore *execution.RegistersAsyncStore
 	EventsIndex         *index.EventsIndex
+	ScriptExecutor      *backend.ScriptExecutor
 
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
@@ -255,8 +274,9 @@ type ObserverServiceBuilder struct {
 	// Public network
 	peerID peer.ID
 
-	RestMetrics   *metrics.RestCollector
-	AccessMetrics module.AccessMetrics
+	TransactionMetrics *metrics.TransactionCollector
+	RestMetrics        *metrics.RestCollector
+	AccessMetrics      module.AccessMetrics
 
 	// grpc servers
 	secureGrpcServer      *grpcserver.GrpcServer
@@ -538,7 +558,6 @@ func NewFlowObserverServiceBuilder(opts ...Option) *ObserverServiceBuilder {
 }
 
 func (builder *ObserverServiceBuilder) ParseFlags() error {
-
 	builder.BaseFlags()
 
 	builder.extraFlags()
@@ -614,11 +633,19 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"upstream-node-public-keys",
 			defaultConfig.upstreamNodePublicKeys,
 			"the networking public key of the upstream access node (in the same order as the upstream node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
+
+		flags.BoolVar(&builder.logTxTimeToFinalized, "log-tx-time-to-finalized", defaultConfig.logTxTimeToFinalized, "log transaction time to finalized")
+		flags.BoolVar(&builder.logTxTimeToExecuted, "log-tx-time-to-executed", defaultConfig.logTxTimeToExecuted, "log transaction time to executed")
+		flags.BoolVar(&builder.logTxTimeToFinalizedExecuted,
+			"log-tx-time-to-finalized-executed",
+			defaultConfig.logTxTimeToFinalizedExecuted,
+			"log transaction time to finalized and executed")
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
 		flags.BoolVar(&builder.executionDataIndexingEnabled,
 			"execution-data-indexing-enabled",
 			defaultConfig.executionDataIndexingEnabled,
 			"whether to enable the execution data indexing")
+		flags.BoolVar(&builder.localServiceAPIEnabled, "local-service-api-enabled", defaultConfig.localServiceAPIEnabled, "whether to use local indexed data for api queries")
 		flags.StringVar(&builder.registersDBPath, "execution-state-dir", defaultConfig.registersDBPath, "directory to use for execution-state database")
 		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "execution-state checkpoint file")
 
@@ -696,11 +723,18 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"state-stream-max-register-values",
 			defaultConfig.stateStreamConf.RegisterIDsRequestLimit,
 			"maximum number of register ids to include in a single request to the GetRegisters endpoint")
-
 		flags.StringVar(&builder.rpcConf.BackendConfig.EventQueryMode,
 			"event-query-mode",
 			defaultConfig.rpcConf.BackendConfig.EventQueryMode,
 			"mode to use when querying events. one of [local-only, execution-nodes-only(default), failover]")
+		flags.Uint64Var(&builder.scriptExecMinBlock,
+			"script-execution-min-height",
+			defaultConfig.scriptExecMinBlock,
+			"lowest block height to allow for script execution. default: no limit")
+		flags.Uint64Var(&builder.scriptExecMaxBlock,
+			"script-execution-max-height",
+			defaultConfig.scriptExecMaxBlock,
+			"highest block height to allow for script execution. default: no limit")
 
 	}).ValidateFlags(func() error {
 		if builder.executionDataSyncEnabled {
@@ -863,11 +897,6 @@ func (builder *ObserverServiceBuilder) Initialize() error {
 
 	builder.enqueueConnectWithStakedAN()
 
-	if builder.executionDataSyncEnabled {
-		builder.BuildExecutionSyncComponents()
-	}
-	builder.enqueueRPCServer()
-
 	if builder.BaseConfig.MetricsEnabled {
 		builder.EnqueueMetricsServerInit()
 		if err := builder.RegisterBadgerMetrics(); err != nil {
@@ -964,7 +993,6 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 			)
 		}).
 		Build()
-
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize libp2p node for observer: %w", err)
 	}
@@ -1001,6 +1029,12 @@ func (builder *ObserverServiceBuilder) initObserverLocal() func(node *cmd.NodeCo
 // Currently, the observer only runs the follower engine.
 func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 	builder.BuildConsensusFollower()
+
+	if builder.executionDataSyncEnabled {
+		builder.BuildExecutionSyncComponents()
+	}
+
+	builder.enqueueRPCServer()
 	return builder.FlowNodeBuilder.Build()
 }
 
@@ -1295,6 +1329,31 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil, err
 			}
 
+			// create script execution module, this depends on the indexer being initialized and the
+			// having the register storage bootstrapped
+			scripts, err := execution.NewScripts(
+				builder.Logger,
+				metrics.NewExecutionCollector(builder.Tracer),
+				builder.RootChainID,
+				query.NewProtocolStateWrapper(builder.State),
+				builder.Storage.Headers,
+				builder.ExecutionIndexerCore.RegisterValue,
+				builder.scriptExecutorConfig,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts)
+			if err != nil {
+				return nil, err
+			}
+
+			err = builder.TxResultsIndex.Initialize(builder.ExecutionIndexer)
+			if err != nil {
+				return nil, err
+			}
+
 			err = builder.RegistersAsyncStore.Initialize(registers)
 			if err != nil {
 				return nil, err
@@ -1467,6 +1526,23 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 }
 
 func (builder *ObserverServiceBuilder) enqueueRPCServer() {
+
+	builder.Module("transaction metrics", func(node *cmd.NodeConfig) error {
+		var err error
+		builder.TransactionTimings, err = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
+		if err != nil {
+			return err
+		}
+
+		builder.TransactionMetrics = metrics.NewTransactionCollector(
+			node.Logger,
+			builder.TransactionTimings,
+			builder.logTxTimeToFinalized,
+			builder.logTxTimeToExecuted,
+			builder.logTxTimeToFinalizedExecuted,
+		)
+		return nil
+	})
 	builder.Module("rest metrics", func(node *cmd.NodeConfig) error {
 		m, err := metrics.NewRestCollector(routes.URLToRoute, node.MetricsRegisterer)
 		if err != nil {
@@ -1477,6 +1553,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	})
 	builder.Module("access metrics", func(node *cmd.NodeConfig) error {
 		builder.AccessMetrics = metrics.NewAccessCollector(
+			metrics.WithTransactionMetrics(builder.TransactionMetrics),
+			metrics.WithBackendScriptsMetrics(builder.TransactionMetrics),
 			metrics.WithRestMetrics(builder.RestMetrics),
 		)
 		return nil
@@ -1534,6 +1612,14 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		builder.EventsIndex = index.NewEventsIndex(builder.Storage.Events)
 		return nil
 	})
+	builder.Module("transaction result index", func(node *cmd.NodeConfig) error {
+		builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Storage.LightTransactionResults)
+		return nil
+	})
+	builder.Module("script executor", func(node *cmd.NodeConfig) error {
+		builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
+		return nil
+	})
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		accessMetrics := builder.AccessMetrics
 		config := builder.rpcConf
@@ -1566,7 +1652,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			),
 		}
 
-		accessBackend, err := backend.New(backend.Params{
+		backendParams := backend.Params{
 			State:                     node.State,
 			Blocks:                    node.Storage.Blocks,
 			Headers:                   node.Storage.Headers,
@@ -1584,7 +1670,17 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			Log:                       node.Logger,
 			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
 			Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-		})
+		}
+
+		if builder.localServiceAPIEnabled {
+			backendParams.ScriptExecutionMode = backend.IndexQueryModeLocalOnly
+			backendParams.EventQueryMode = backend.IndexQueryModeLocalOnly
+			backendParams.TxResultsIndex = builder.TxResultsIndex
+			backendParams.EventsIndex = builder.EventsIndex
+			backendParams.ScriptExecutor = builder.ScriptExecutor
+		}
+
+		accessBackend, err := backend.New(backendParams)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize backend: %w", err)
 		}
@@ -1626,22 +1722,13 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
-		rpcHandler := &apiproxy.FlowAccessAPIRouter{
-			Logger:   builder.Logger,
+		rpcHandler := apiproxy.NewFlowAccessAPIRouter(apiproxy.Params{
+			Log:      builder.Logger,
 			Metrics:  observerCollector,
 			Upstream: forwarder,
-			Observer: protocol.NewHandler(protocol.New(
-				node.State,
-				node.Storage.Blocks,
-				node.Storage.Headers,
-				backend.NewNetworkAPI(
-					node.State,
-					node.RootChainID,
-					node.Storage.Headers,
-					backend.DefaultSnapshotHistoryLimit,
-				),
-			)),
-		}
+			Local:    engineBuilder.DefaultHandler(hotsignature.NewBlockSignerDecoder(builder.Committee)),
+			UseIndex: builder.localServiceAPIEnabled,
+		})
 
 		// build the rpc engine
 		builder.RpcEng, err = engineBuilder.
