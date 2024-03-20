@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"github.com/onflow/cadence/runtime/pretty"
 	"io"
 	"os"
 	"strings"
@@ -253,11 +254,28 @@ func (m *StagedContractsMigration) MigrateAccount(
 		}
 
 		if err != nil {
-			m.log.Err(err).
+			var builder strings.Builder
+			errorPrinter := pretty.NewErrorPrettyPrinter(&builder, false)
+
+			location := common.AddressLocation{
+				Name:    name,
+				Address: address,
+			}
+			printErr := errorPrinter.PrettyPrintError(err, location, nil)
+
+			var errorDetails string
+			if printErr == nil {
+				errorDetails = builder.String()
+			} else {
+				errorDetails = err.Error()
+			}
+
+			m.log.Error().
 				Msgf(
-					"failed to update contract %s in account %s",
+					"failed to update contract %s in account %s: %s",
 					name,
 					address.HexWithPrefix(),
+					errorDetails,
 				)
 		} else {
 			// change contract code
@@ -309,6 +327,8 @@ func (m *StagedContractsMigration) checkContractUpdateValidity(
 	if err != nil {
 		return err
 	}
+
+	m.elaborations[location] = newProgram.Elaboration
 
 	oldProgram, err := old_parser.ParseProgram(nil, oldCode, old_parser.Config{})
 	if err != nil {
