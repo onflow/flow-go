@@ -18,9 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
-	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 type BackendEventsSuite struct {
@@ -66,16 +64,6 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromLocalStorage() {
 		})
 		blockEvents[b.ID()] = events
 	}
-
-	s.events.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
-		mocks.StorageMapGetter(blockEvents),
-	)
-
-	reporter := syncmock.NewIndexReporter(s.T())
-	reporter.On("LowestIndexedHeight").Return(s.blocks[0].Header.Height, nil)
-	reporter.On("HighestIndexedHeight").Return(s.blocks[len(s.blocks)-1].Header.Height, nil)
-	err := s.eventsIndex.Initialize(reporter)
-	s.Require().NoError(err)
 
 	s.runTestSubscribeEvents()
 }
