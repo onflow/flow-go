@@ -25,9 +25,13 @@ func NewInterfaceTypeConversionRules(chainID flow.ChainID) StaticTypeMigrationRu
 	oldFungibleTokenResolverCollectionType, newFungibleTokenResolverCollectionType :=
 		newFungibleTokenMetadataViewsToViewResolverRule(systemContracts, "ResolverCollection")
 
+	oldNonFungibleTokenINFTType, newNonFungibleTokenNFTType :=
+		nonFungibleTokenInterfaceToInterfaceRule(systemContracts, "INFT", "NFT")
+
 	return StaticTypeMigrationRules{
 		oldFungibleTokenResolverType.ID():           newFungibleTokenResolverType,
 		oldFungibleTokenResolverCollectionType.ID(): newFungibleTokenResolverCollectionType,
+		oldNonFungibleTokenINFTType.ID():            newNonFungibleTokenNFTType,
 	}
 }
 
@@ -37,9 +41,9 @@ func NewCompositeTypeConversionRules(chainID flow.ChainID) StaticTypeMigrationRu
 	oldFungibleTokenVaultCompositeType, newFungibleTokenVaultType :=
 		fungibleTokenRule(systemContracts, "Vault")
 	oldNonFungibleTokenNFTCompositeType, newNonFungibleTokenNFTType :=
-		nonFungibleTokenRule(systemContracts, "NFT")
+		nonFungibleTokenCompositeToInterfaceRule(systemContracts, "NFT")
 	oldNonFungibleTokenCollectionCompositeType, newNonFungibleTokenCollectionType :=
-		nonFungibleTokenRule(systemContracts, "Collection")
+		nonFungibleTokenCompositeToInterfaceRule(systemContracts, "Collection")
 
 	return StaticTypeMigrationRules{
 		oldFungibleTokenVaultCompositeType.ID():         newFungibleTokenVaultType,
@@ -58,7 +62,7 @@ func NewCadence1CompositeStaticTypeConverter(chainID flow.ChainID) statictypes.C
 	return NewStaticTypeMigrator[*interpreter.CompositeStaticType](rules)
 }
 
-func nonFungibleTokenRule(
+func nonFungibleTokenCompositeToInterfaceRule(
 	systemContracts *systemcontracts.SystemContracts,
 	identifier string,
 ) (
@@ -90,6 +94,42 @@ func nonFungibleTokenRule(
 				TypeID:              nftTypeID,
 			},
 		},
+	}
+
+	return oldType, newType
+}
+
+func nonFungibleTokenInterfaceToInterfaceRule(
+	systemContracts *systemcontracts.SystemContracts,
+	oldIdentifier string,
+	newIdentifier string,
+) (
+	*interpreter.InterfaceStaticType,
+	*interpreter.InterfaceStaticType,
+) {
+	contract := systemContracts.NonFungibleToken
+
+	oldQualifiedIdentifier := fmt.Sprintf("%s.%s", contract.Name, oldIdentifier)
+	newQualifiedIdentifier := fmt.Sprintf("%s.%s", contract.Name, newIdentifier)
+
+	location := common.AddressLocation{
+		Address: common.Address(contract.Address),
+		Name:    contract.Name,
+	}
+
+	oldTypeID := location.TypeID(nil, oldQualifiedIdentifier)
+	newTypeID := location.TypeID(nil, newQualifiedIdentifier)
+
+	oldType := &interpreter.InterfaceStaticType{
+		Location:            location,
+		QualifiedIdentifier: oldQualifiedIdentifier,
+		TypeID:              oldTypeID,
+	}
+
+	newType := &interpreter.InterfaceStaticType{
+		Location:            location,
+		QualifiedIdentifier: newQualifiedIdentifier,
+		TypeID:              newTypeID,
 	}
 
 	return oldType, newType

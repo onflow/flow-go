@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/old_parser"
+	"github.com/onflow/cadence/runtime/pretty"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 
@@ -253,11 +254,28 @@ func (m *StagedContractsMigration) MigrateAccount(
 		}
 
 		if err != nil {
-			m.log.Err(err).
+			var builder strings.Builder
+			errorPrinter := pretty.NewErrorPrettyPrinter(&builder, false)
+
+			location := common.AddressLocation{
+				Name:    name,
+				Address: address,
+			}
+			printErr := errorPrinter.PrettyPrintError(err, location, nil)
+
+			var errorDetails string
+			if printErr == nil {
+				errorDetails = builder.String()
+			} else {
+				errorDetails = err.Error()
+			}
+
+			m.log.Error().
 				Msgf(
-					"failed to update contract %s in account %s",
+					"failed to update contract %s in account %s: %s",
 					name,
 					address.HexWithPrefix(),
+					errorDetails,
 				)
 		} else {
 			// change contract code
@@ -320,7 +338,7 @@ func (m *StagedContractsMigration) checkContractUpdateValidity(
 		contractName,
 		m.contractNamesProvider,
 		oldProgram,
-		newProgram.Program,
+		newProgram,
 		m.elaborations,
 	)
 
