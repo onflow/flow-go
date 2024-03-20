@@ -325,19 +325,19 @@ func (s *ObserverIndexerEnabledSuite) getRPCs() []RPCTest {
 		}},
 		{name: "GetAccount", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
 			_, err := client.GetAccount(ctx, &accessproto.GetAccountRequest{
-				Address: sdk.HexToAddress("f8d6e0586b0a20c7").Bytes(),
+				Address: flow.Localnet.Chain().ServiceAddress().Bytes(),
 			})
 			return err
 		}},
 		{name: "GetAccountAtLatestBlock", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
 			_, err := client.GetAccountAtLatestBlock(ctx, &accessproto.GetAccountAtLatestBlockRequest{
-				Address: sdk.HexToAddress("f8d6e0586b0a20c7").Bytes(),
+				Address: flow.Localnet.Chain().ServiceAddress().Bytes(),
 			})
 			return err
 		}},
 		{name: "GetAccountAtBlockHeight", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
 			_, err := client.GetAccountAtBlockHeight(ctx, &accessproto.GetAccountAtBlockHeightRequest{
-				Address:     sdk.HexToAddress("f8d6e0586b0a20c7").Bytes(),
+				Address:     flow.Localnet.Chain().ServiceAddress().Bytes(),
 				BlockHeight: 0,
 			})
 			return err

@@ -243,7 +243,7 @@ type ObserverServiceBuilder struct {
 	FollowerState        stateprotocol.FollowerState
 	SyncCore             *chainsync.Core
 	RpcEng               *rpc.Engine
-	TransactionTimings   *stdmap.TransactionTimings // new Added
+	TransactionTimings   *stdmap.TransactionTimings
 	FollowerDistributor  *pubsub.FollowerDistributor
 	Committee            hotstuff.DynamicCommittee
 	Finalized            *flow.Header
@@ -1218,7 +1218,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 		var indexedBlockHeight storage.ConsumerProgress
 
 		builder.Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
-			// Note: progress is stored in the ftransaction metricsMAIN db since that is where indexed execution data is stored.
+			// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
 			indexedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
 			return nil
 		}).Module("transaction results storage", func(node *cmd.NodeConfig) error {
