@@ -133,7 +133,7 @@ func TestStagedContractsMigration(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Len(t, logWriter.logs, 1)
-		require.Contains(t, logWriter.logs[0], `"migration":"StagedContractsMigration","error":"Parsing failed`)
+		require.Contains(t, logWriter.logs[0], `error: expected token '{'`)
 
 		// Payloads should still have the old code
 		require.Len(t, payloads, 1)
@@ -179,7 +179,7 @@ func TestStagedContractsMigration(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Len(t, logWriter.logs, 1)
-		require.Contains(t, logWriter.logs[0], `"migration":"StagedContractsMigration","error":"Parsing failed`)
+		require.Contains(t, logWriter.logs[0], `error: expected token '}'`)
 
 		// Payloads should still have the old code
 		require.Len(t, payloads, 1)
@@ -236,7 +236,7 @@ func TestStagedContractsMigration(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Len(t, logWriter.logs, 1)
-		require.Contains(t, logWriter.logs[0], `"migration":"StagedContractsMigration","error":"Parsing failed`)
+		require.Contains(t, logWriter.logs[0], `error: expected token '{'`)
 
 		require.Len(t, payloads, 2)
 		// First payload should still have the old code
@@ -1115,7 +1115,7 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 		contractACode := newContractPayload(common.Address(addressA), "A", []byte(oldCodeA))
 		contractBCode := newContractPayload(common.Address(addressB), "B", []byte(codeB))
 
-		payloads1 := []*ledger.Payload{contractACode}
+		accountPayloads := []*ledger.Payload{contractACode}
 		allPayloads := []*ledger.Payload{contractACode, contractBCode}
 
 		logWriter := &logWriter{}
@@ -1129,10 +1129,10 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 		err = migration.InitMigration(log, allPayloads, 0)
 		require.NoError(t, err)
 
-		payloads1, err = migration.MigrateAccount(
+		accountPayloads, err = migration.MigrateAccount(
 			context.Background(),
 			common.Address(addressA),
-			payloads1,
+			accountPayloads,
 		)
 		require.NoError(t, err)
 
@@ -1141,8 +1141,223 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 		require.Empty(t, logWriter.logs)
 
-		require.Len(t, payloads1, 1)
-		assert.Equal(t, newCodeA, string(payloads1[0].Value()))
+		require.Len(t, accountPayloads, 1)
+		assert.Equal(t, newCodeA, string(accountPayloads[0].Value()))
 	})
+}
 
+func TestStagedContractConformanceChanges(t *testing.T) {
+	t.Parallel()
+
+	chainID := flow.Emulator
+	systemContracts := systemcontracts.SystemContractsForChain(chainID)
+
+	addressGenerator := chainID.Chain().NewAddressGenerator()
+
+	address, err := addressGenerator.NextAddress()
+	require.NoError(t, err)
+
+	type testcase struct {
+		oldContract, oldInterface, newContract, newInterface string
+	}
+
+	test := func(oldContract, oldInterface, newContract, newInterface string) {
+
+		t.Run(fmt.Sprintf("%s.%s to %s.%s", oldContract, oldInterface, newContract, newInterface), func(t *testing.T) {
+
+			t.Parallel()
+
+			metadataViewsAddress := common.Address(systemContracts.MetadataViews.Address)
+			viewResolverAddress := common.Address(systemContracts.ViewResolver.Address)
+
+			oldCode := fmt.Sprintf(`
+                import %[2]s from %[1]s
+
+                pub contract C {
+                    pub resource A: %[2]s.%[3]s {}
+                }`,
+				metadataViewsAddress.HexWithPrefix(),
+				oldContract,
+				oldInterface,
+			)
+
+			newCode := fmt.Sprintf(`
+                import %[2]s from %[1]s
+
+                access(all) contract C {
+                    access(all) resource A: %[2]s.%[3]s {}
+                }`,
+				viewResolverAddress.HexWithPrefix(),
+				newContract,
+				newInterface,
+			)
+
+			newImportedContract := fmt.Sprintf(`
+                access(all) contract %s {
+                    access(all) resource interface %s {}
+		        }`,
+				newContract,
+				newInterface,
+			)
+
+			stagedContracts := []StagedContract{
+				{
+					Contract: Contract{
+						Name: "A",
+						Code: []byte(newCode),
+					},
+					Address: common.Address(address),
+				},
+			}
+
+			logWriter := &logWriter{}
+			log := zerolog.New(logWriter)
+
+			migration := NewStagedContractsMigration(chainID, log).
+				WithContractUpdateValidation()
+
+			migration.RegisterContractUpdates(stagedContracts)
+
+			contractCodePayload := newContractPayload(common.Address(address), "A", []byte(oldCode))
+			viewResolverCodePayload := newContractPayload(
+				viewResolverAddress,
+				newContract,
+				[]byte(newImportedContract),
+			)
+
+			accountPayloads := []*ledger.Payload{contractCodePayload}
+			allPayloads := []*ledger.Payload{contractCodePayload, viewResolverCodePayload}
+
+			err = migration.InitMigration(log, allPayloads, 0)
+			require.NoError(t, err)
+
+			accountPayloads, err = migration.MigrateAccount(
+				context.Background(),
+				common.Address(address),
+				accountPayloads,
+			)
+			require.NoError(t, err)
+
+			err = migration.Close()
+			require.NoError(t, err)
+
+			require.Empty(t, logWriter.logs)
+
+			require.Len(t, accountPayloads, 1)
+			assert.Equal(t, newCode, string(accountPayloads[0].Value()))
+		})
+	}
+
+	testCases := []testcase{
+		{
+			oldContract:  "MetadataViews",
+			oldInterface: "Resolver",
+			newContract:  "ViewResolver",
+			newInterface: "Resolver",
+		},
+		{
+			oldContract:  "MetadataViews",
+			oldInterface: "ResolverCollection",
+			newContract:  "ViewResolver",
+			newInterface: "ResolverCollection",
+		},
+		{
+			oldContract:  "NonFungibleToken",
+			oldInterface: "INFT",
+			newContract:  "NonFungibleToken",
+			newInterface: "NFT",
+		},
+	}
+
+	for _, testCase := range testCases {
+		test(
+			testCase.oldContract,
+			testCase.oldInterface,
+			testCase.newContract,
+			testCase.newInterface,
+		)
+	}
+
+	t.Run("MetadataViews.Resolver to ArbitraryContract.Resolver unsupported", func(t *testing.T) {
+
+		// `MetadataViews.Resolver` shouldn't be able to replace with any arbitrary `Resolver` interface!
+
+		t.Parallel()
+
+		metadataViewsAddress := common.Address(systemContracts.MetadataViews.Address)
+		viewResolverAddress := common.Address(systemContracts.ViewResolver.Address)
+
+		oldCode := fmt.Sprintf(`
+            import MetadataViews from %s
+
+            pub contract C {
+                pub resource A: MetadataViews.Resolver {}
+            }
+        `,
+			metadataViewsAddress.HexWithPrefix(),
+		)
+
+		newCode := fmt.Sprintf(`
+            import ArbitraryContract from %s
+
+            access(all) contract C {
+                access(all) resource A: ArbitraryContract.Resolver {}
+            }
+        `,
+			viewResolverAddress.HexWithPrefix(),
+		)
+
+		arbitraryContract := `
+            access(all) contract ArbitraryContract {
+                access(all) resource interface Resolver {}
+		    }
+        `
+
+		stagedContracts := []StagedContract{
+			{
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(newCode),
+				},
+				Address: common.Address(address),
+			},
+		}
+
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(chainID, log).
+			WithContractUpdateValidation()
+
+		migration.RegisterContractUpdates(stagedContracts)
+
+		contractCodePayload := newContractPayload(common.Address(address), "A", []byte(oldCode))
+		arbitraryContractCodePayload := newContractPayload(
+			viewResolverAddress,
+			"ArbitraryContract",
+			[]byte(arbitraryContract),
+		)
+
+		accountPayloads := []*ledger.Payload{contractCodePayload}
+		allPayloads := []*ledger.Payload{contractCodePayload, arbitraryContractCodePayload}
+
+		err = migration.InitMigration(log, allPayloads, 0)
+		require.NoError(t, err)
+
+		accountPayloads, err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(address),
+			accountPayloads,
+		)
+		require.NoError(t, err)
+
+		err = migration.Close()
+		require.NoError(t, err)
+
+		require.Len(t, logWriter.logs, 1)
+		require.Contains(t, logWriter.logs[0], "conformances does not match in `A`")
+
+		require.Len(t, accountPayloads, 1)
+		assert.Equal(t, oldCode, string(accountPayloads[0].Value()))
+	})
 }

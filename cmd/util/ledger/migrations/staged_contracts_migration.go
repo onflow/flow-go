@@ -328,8 +328,6 @@ func (m *StagedContractsMigration) checkContractUpdateValidity(
 		return err
 	}
 
-	m.elaborations[location] = newProgram.Elaboration
-
 	oldProgram, err := old_parser.ParseProgram(nil, oldCode, old_parser.Config{})
 	if err != nil {
 		return err
@@ -340,7 +338,7 @@ func (m *StagedContractsMigration) checkContractUpdateValidity(
 		contractName,
 		m.contractNamesProvider,
 		oldProgram,
-		newProgram.Program,
+		newProgram,
 		m.elaborations,
 	)
 
