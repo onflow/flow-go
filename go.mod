@@ -320,5 +320,3 @@ require (
 
 // Using custom fork until https://github.com/onflow/flow-go/issues/5338 is resolved
 replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483
-
-replace github.com/ethereum/go-ethereum v1.13.5 => github.com/onflow/go-ethereum v1.13.5-withprecompile
