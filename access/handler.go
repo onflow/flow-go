@@ -1113,7 +1113,6 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 	}
 
 	sub := h.api.SubscribeTransactionStatuses(ctx, &tx)
-
 	return subscription.HandleSubscription(sub, func(txSubInfo *convert.TransactionSubscribeInfo) error {
 		err = stream.Send(convert.TransactionSubscribeInfoToMessage(txSubInfo))
 		if err != nil {
