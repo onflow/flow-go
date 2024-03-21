@@ -312,6 +312,10 @@ func (m *StagedContractsMigration) checkContractUpdateValidity(
 	newCode []byte,
 	oldCode ledger.Value,
 ) error {
+	// Parsing and checking of programs has to be done synchronously.
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
 	location := common.AddressLocation{
 		Name:    contractName,
 		Address: address,

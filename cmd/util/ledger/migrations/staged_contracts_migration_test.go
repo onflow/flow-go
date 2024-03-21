@@ -1361,3 +1361,140 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 		assert.Equal(t, oldCode, string(accountPayloads[0].Value()))
 	})
 }
+
+func TestConcurrentContractUpdate(t *testing.T) {
+
+	t.Parallel()
+
+	chainID := flow.Emulator
+	addressGenerator := chainID.Chain().NewAddressGenerator()
+
+	addressA, err := addressGenerator.NextAddress()
+	require.NoError(t, err)
+
+	addressB, err := addressGenerator.NextAddress()
+	require.NoError(t, err)
+
+	addressImport, err := addressGenerator.NextAddress()
+	require.NoError(t, err)
+
+	oldCodeA := fmt.Sprintf(`
+        import Foo from %[1]s
+        import Bar from %[1]s
+        import Baz from %[1]s
+
+        pub contract A {}
+        `,
+		addressImport.HexWithPrefix(),
+	)
+
+	newCodeA := fmt.Sprintf(`
+        import Foo from %[1]s
+        import Baz from %[1]s
+        import Bar from %[1]s
+
+        access(all) contract A {
+            access(all) struct AA {}
+        }
+    `,
+		addressImport.HexWithPrefix(),
+	)
+
+	oldCodeB := fmt.Sprintf(`
+        import Foo from %[1]s
+        import Bar from %[1]s
+        import Baz from %[1]s
+
+        pub contract B {}
+        `,
+		addressImport.HexWithPrefix(),
+	)
+
+	newCodeB := fmt.Sprintf(`
+        import Foo from %[1]s
+        import Baz from %[1]s
+        import Bar from %[1]s
+
+        access(all) contract B {
+            access(all) struct BB {}
+        }
+    `,
+		addressImport.HexWithPrefix(),
+	)
+
+	codeFoo := `access(all) contract Foo {}`
+	codeBar := `access(all) contract Bar {}`
+	codeBaz := `access(all) contract Baz {}`
+
+	stagedContracts := []StagedContract{
+		{
+			Contract: Contract{
+				Name: "A",
+				Code: []byte(newCodeA),
+			},
+			Address: common.Address(addressA),
+		},
+		{
+			Contract: Contract{
+				Name: "B",
+				Code: []byte(newCodeB),
+			},
+			Address: common.Address(addressB),
+		},
+	}
+
+	allPayloads := []*ledger.Payload{
+		newContractPayload(common.Address(addressA), "A", []byte(oldCodeA)),
+		newContractPayload(common.Address(addressB), "B", []byte(oldCodeB)),
+		newContractPayload(common.Address(addressImport), "Foo", []byte(codeFoo)),
+		newContractPayload(common.Address(addressImport), "Bar", []byte(codeBar)),
+		newContractPayload(common.Address(addressImport), "Baz", []byte(codeBaz)),
+	}
+
+	rwf := &testReportWriterFactory{}
+
+	logWriter := &logWriter{}
+	logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
+
+	// NOTE: Run with multiple workers (>2)
+	const nWorker = 2
+
+	const evmContractChange = EVMContractChangeNone
+	const burnerContractChange = BurnerContractChangeNone
+
+	migrations := NewCadence1Migrations(
+		logger,
+		rwf,
+		nWorker,
+		chainID,
+		false,
+		false,
+		evmContractChange,
+		burnerContractChange,
+		stagedContracts,
+		false,
+		0,
+	)
+
+	for _, migration := range migrations {
+		// only run the staged contracts migration
+		if migration.Name != "staged-contracts-update-migration" {
+			continue
+		}
+
+		allPayloads, err = migration.Migrate(allPayloads)
+		require.NoError(
+			t,
+			err,
+			"migration `%s` failed, logs: %v",
+			migration.Name,
+			logWriter.logs,
+		)
+	}
+
+	// No errors.
+	require.Empty(t, logWriter.logs)
+
+	require.NoError(t, err)
+	require.Len(t, allPayloads, 5)
+}
