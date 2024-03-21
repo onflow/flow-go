@@ -1,4 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 package network
 
 import (
