@@ -7,17 +7,17 @@ contract EVM {
     access(all)
     event CadenceOwnedAccountCreated(addressBytes: [UInt8; 20])
 
-    /// FLOWTokenDeposit is emitted when FLOW tokens is bridged 
+    /// FLOWTokensDeposited is emitted when FLOW tokens is bridged 
     /// into the EVM environment. Note that this event is not emitted 
     /// for transfer of flow tokens between two EVM addresses.
     access(all)
-    event FLOWTokenDeposit(addressBytes: [UInt8; 20], amount: UFix64)
+    event FLOWTokensDeposited(addressBytes: [UInt8; 20], amount: UFix64)
 
-    /// FLOWTokenWithdraw is emitted when FLOW tokens are bridged 
+    /// FLOWTokensWithdrawn is emitted when FLOW tokens are bridged 
     /// out of the EVM environment. Note that this event is not emitted 
     /// for transfer of flow tokens between two EVM addresses.
     access(all)
-    event FLOWTokenWithdraw(addressBytes: [UInt8; 20], amount: UFix64)
+    event FLOWTokensWithdrawn(addressBytes: [UInt8; 20], amount: UFix64)
 
     /// EVMAddress is an EVM-compatible address
     access(all)
@@ -69,11 +69,14 @@ contract EVM {
         access(all)
         fun deposit(from: @FlowToken.Vault) {
             let amount = from.balance
+            if amount == 0.0 {
+                panic("calling deposit function with an empty vault is not allowed")
+            }
             InternalEVM.deposit(
                 from: <-from,
                 to: self.bytes
             )
-            emit FLOWTokenDeposit(addressBytes: self.bytes, amount: amount)
+            emit FLOWTokensDeposited(addressBytes: self.bytes, amount: amount)
         }
     }
 
@@ -113,6 +116,12 @@ contract EVM {
         access(all)
         fun inAttoFLOW(): UInt {
             return self.attoflow
+        }
+
+        /// Returns true if the balance is zero
+        access(all)
+        fun isZero(): Bool {
+            return self.attoflow == 0
         }
     }
 
@@ -234,11 +243,14 @@ contract EVM {
         /// rounding error, this function would fail.
         access(all)
         fun withdraw(balance: Balance): @FlowToken.Vault {
+            if balance.isZero() {
+                panic("calling withdraw function with zero balance is not allowed")
+            }
             let vault <- InternalEVM.withdraw(
                 from: self.addressBytes,
                 amount: balance.attoflow
             ) as! @FlowToken.Vault
-            emit FLOWTokenWithdraw(addressBytes: self.addressBytes, amount: balance.inFLOW())
+            emit FLOWTokensWithdrawn(addressBytes: self.addressBytes, amount: balance.inFLOW())
             return <-vault
         }
 

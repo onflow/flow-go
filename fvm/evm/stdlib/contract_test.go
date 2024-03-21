@@ -3398,7 +3398,7 @@ func TestCOADeposit(t *testing.T) {
 		"FlowToken.MinterCreated",
 		"FlowToken.TokensMinted",
 		"EVM.CadenceOwnedAccountCreated",
-		"EVM.FLOWTokenDeposit",
+		"EVM.FLOWTokensDeposited",
 	}
 	CheckCadenceEventTypes(t, events, expectedEventTypes)
 
@@ -3563,8 +3563,8 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 		"FlowToken.MinterCreated",
 		"FlowToken.TokensMinted",
 		"EVM.CadenceOwnedAccountCreated",
-		"EVM.FLOWTokenDeposit",
-		"EVM.FLOWTokenWithdraw",
+		"EVM.FLOWTokensDeposited",
+		"EVM.FLOWTokensWithdrawn",
 	}
 	CheckCadenceEventTypes(t, events, expectedEventTypes)
 
