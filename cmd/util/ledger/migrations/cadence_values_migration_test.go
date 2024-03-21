@@ -27,6 +27,8 @@ import (
 
 const snapshotPath = "test-data/cadence_values_migration/snapshot_cadence_v0.42.6"
 
+const snapshotPath2 = "test-data/cadence_values_migration/emulator.sqlite"
+
 const testAccountAddress = "01cf0e2f2f715450"
 
 type writer struct {
@@ -42,6 +44,9 @@ func (w *writer) Write(p []byte) (n int, err error) {
 
 //go:embed test-data/cadence_values_migration/test_contract_upgraded.cdc
 var testContractUpgraded []byte
+
+//go:embed test-data/cadence_values_migration/exampleNFT_upgraded.cdc
+var exampleNFTContractUpdated []byte
 
 func TestCadenceValuesMigration(t *testing.T) {
 
@@ -1402,4 +1407,83 @@ func TestCoreContractUsage(t *testing.T) {
 		require.Equal(t, expected, actual)
 	})
 
+}
+
+func TestStagedContractsMigration2(t *testing.T) {
+
+	t.Parallel()
+
+	serviceAccountAddress, err := common.HexToAddress("f8d6e0586b0a20c7")
+	require.NoError(t, err)
+
+	address, err := common.HexToAddress("179b6b1cb6755e31")
+	require.NoError(t, err)
+
+	// Get the old payloads
+	payloads, err := util.PayloadsFromEmulatorSnapshot(snapshotPath2)
+	require.NoError(t, err)
+
+	rwf := &testReportWriterFactory{}
+
+	logWriter := &writer{}
+	logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
+
+	const nWorker = 2
+
+	const chainID = flow.Emulator
+	// TODO: EVM contract is not deployed in snapshot yet, so can't update it
+	const evmContractChange = EVMContractChangeNone
+
+	const burnerContractChange = BurnerContractChangeDeploy
+
+	stagedContracts := []StagedContract{
+		{
+			Contract: Contract{
+				Name: "ExampleNFT",
+				Code: exampleNFTContractUpdated,
+			},
+			Address: serviceAccountAddress,
+		},
+		{
+			Contract: Contract{
+				Name: "ExampleNFT",
+				Code: exampleNFTContractUpdated,
+			},
+			Address: address,
+		},
+	}
+
+	migrations := NewCadence1Migrations(
+		logger,
+		rwf,
+		nWorker,
+		chainID,
+		false,
+		false,
+		evmContractChange,
+		burnerContractChange,
+		stagedContracts,
+		false,
+		0,
+	)
+
+	for _, migration := range migrations {
+		payloads, err = migration.Migrate(payloads)
+		require.NoError(
+			t,
+			err,
+			"migration `%s` failed, logs: %v",
+			migration.Name,
+			logWriter.logs,
+		)
+	}
+
+	// Assert the migrated payloads
+	//checkMigratedPayloads(t, address, payloads)
+
+	// Check reporters
+	//checkReporters(t, rwf, address)
+
+	// Check error logs.
+	require.Empty(t, logWriter.logs)
 }
