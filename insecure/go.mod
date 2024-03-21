@@ -211,7 +211,7 @@ require (
 	github.com/onflow/flow-go-sdk v0.44.0 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.1.0 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240305102946-3efec6679252 // indirect
-	github.com/onflow/go-ethereum v0.0.4 // indirect
+	github.com/onflow/go-ethereum v1.13.4 // indirect
 	github.com/onflow/sdks v0.5.0 // indirect
 	github.com/onflow/wal v0.0.0-20240208022732-d756cd497d3b // indirect
 	github.com/onsi/ginkgo/v2 v2.13.2 // indirect
