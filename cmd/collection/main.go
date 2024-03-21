@@ -261,21 +261,21 @@ func main() {
 			err := node.Metrics.Mempool.Register(metrics.ResourceTransaction, pools.CombinedSize)
 			return err
 		}).
+		Module("machine account config", func(node *cmd.NodeConfig) error {
+			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
+			return err
+		}).
 		Module("collection node metrics", func(node *cmd.NodeConfig) error {
 			colMetrics = metrics.NewCollectionCollector(node.Tracer)
 			return nil
 		}).
 		Module("machine account metrics", func(node *cmd.NodeConfig) error {
-			machineAccountMetrics = metrics.NewMachineAccountCollector(node.MetricsRegisterer)
+			machineAccountMetrics = metrics.NewMachineAccountCollector(node.MetricsRegisterer, machineAccountInfo.FlowAddress())
 			return nil
 		}).
 		Module("main chain sync core", func(node *cmd.NodeConfig) error {
 			log := node.Logger.With().Str("sync_chain_id", node.RootChainID.String()).Logger()
 			mainChainSyncCore, err = chainsync.New(log, node.SyncCoreConfig, metrics.NewChainSyncCollector(node.RootChainID), node.RootChainID)
-			return err
-		}).
-		Module("machine account config", func(node *cmd.NodeConfig) error {
-			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
 			return err
 		}).
 		Module("sdk client connection options", func(node *cmd.NodeConfig) error {

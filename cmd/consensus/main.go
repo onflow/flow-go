@@ -200,12 +200,16 @@ func main() {
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
 		ValidateRootSnapshot(badgerState.ValidRootSnapshotContainsEntityExpiryRange).
+		Module("machine account config", func(node *cmd.NodeConfig) error {
+			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
+			return err
+		}).
 		Module("consensus node metrics", func(node *cmd.NodeConfig) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
 		Module("machine account metrics", func(node *cmd.NodeConfig) error {
-			machineAccountMetrics = metrics.NewMachineAccountCollector(node.MetricsRegisterer)
+			machineAccountMetrics = metrics.NewMachineAccountCollector(node.MetricsRegisterer, machineAccountInfo.FlowAddress())
 			return nil
 		}).
 		Module("dkg state", func(node *cmd.NodeConfig) error {
@@ -397,10 +401,6 @@ func main() {
 		Module("follower distributor", func(node *cmd.NodeConfig) error {
 			followerDistributor = pubsub.NewFollowerDistributor()
 			return nil
-		}).
-		Module("machine account config", func(node *cmd.NodeConfig) error {
-			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
-			return err
 		}).
 		Module("sdk client connection options", func(node *cmd.NodeConfig) error {
 			anIDS, err := common.ValidateAccessNodeIDSFlag(accessNodeIDS, node.RootChainID, node.State.Sealed())

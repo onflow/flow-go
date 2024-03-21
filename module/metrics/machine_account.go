@@ -1,6 +1,9 @@
 package metrics
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/prometheus/client_golang/prometheus"
+)
 
 // MachineAccountCollector implements metric collection for machine accounts.
 type MachineAccountCollector struct {
@@ -9,21 +12,24 @@ type MachineAccountCollector struct {
 	misconfigured         prometheus.Gauge
 }
 
-func NewMachineAccountCollector(registerer prometheus.Registerer) *MachineAccountCollector {
+func NewMachineAccountCollector(registerer prometheus.Registerer, machineAccountAddress flow.Address) *MachineAccountCollector {
 	accountBalance := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceMachineAcct,
-		Name:      "balance",
-		Help:      "the last observed balance of this node's machine account, in units of FLOW",
+		Namespace:   namespaceMachineAcct,
+		Name:        "balance",
+		Help:        "the last observed balance of this node's machine account, in units of FLOW",
+		ConstLabels: map[string]string{LabelAccountAddress: machineAccountAddress.String()},
 	})
 	recommendedMinBalance := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceMachineAcct,
-		Name:      "recommended_min_balance",
-		Help:      "the recommended minimum balance for this node role; refill the account when the balance reaches this threshold",
+		Namespace:   namespaceMachineAcct,
+		Name:        "recommended_min_balance",
+		Help:        "the recommended minimum balance for this node role; refill the account when the balance reaches this threshold",
+		ConstLabels: map[string]string{LabelAccountAddress: machineAccountAddress.String()},
 	})
 	misconfigured := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceMachineAcct,
-		Name:      "is_misconfigured",
-		Help:      "reported as a non-zero value when a misconfiguration is detected; check logs for further details",
+		Namespace:   namespaceMachineAcct,
+		Name:        "is_misconfigured",
+		Help:        "reported as a non-zero value when a misconfiguration is detected; check logs for further details",
+		ConstLabels: map[string]string{LabelAccountAddress: machineAccountAddress.String()},
 	})
 	registerer.MustRegister(accountBalance, recommendedMinBalance, misconfigured)
 
