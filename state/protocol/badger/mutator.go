@@ -608,29 +608,14 @@ func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow
 	}
 
 	// verify Protocol State commitment in the candidate block matches the locally-constructed value
-	hasChanges, updatedState, updatedStateID, dbUpdates := stateMutator.Build()
+	updatedStateID, dbUpdates, err := stateMutator.Build()
+	if err != nil {
+		return fmt.Errorf("could not build dynamic protocol state: %w", err)
+	}
 	if updatedStateID != candidate.Payload.ProtocolStateID {
 		return state.NewInvalidExtensionErrorf("invalid protocol state commitment %x in block, which should be %x", candidate.Payload.ProtocolStateID, updatedStateID)
 	}
-
-	// TODO: deal with protocol state ID, it has to be KV store state + protocol state ID
-	// maybe include protocol state ID in KV store. TBD.
-
-	// Schedule deferred database operations to index the protocol state by the candidate block's ID
-	// and persist the new protocol state (if there are any changes)
-	deferredDbOps.AddDbOp(m.protocolKVStoreSnapshotsDB.IndexTx(candidate.ID(), updatedState.ID()))
-	if hasChanges {
-		version, data, err := updatedState.VersionedEncode()
-		if err != nil {
-			return fmt.Errorf("could not encode protocol state: %w", err)
-		}
-		deferredDbOps.AddDbOp(operation.SkipDuplicatesTx(m.protocolKVStoreSnapshotsDB.StoreTx(updatedState.ID(),
-			&storage.KeyValueStoreData{
-				Version: version,
-				Data:    data,
-			})))
-		deferredDbOps.AddDbOps(dbUpdates...)
-	}
+	deferredDbOps.AddDbOps(dbUpdates...)
 	return nil
 }
 

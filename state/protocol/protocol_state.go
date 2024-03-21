@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
@@ -118,7 +117,7 @@ type StateMutator interface {
 	//     of the calling code (specifically `FollowerState`).
 	//
 	// updated protocol state entry, state ID and a flag indicating if there were any changes.
-	Build() (hasChanges bool, updatedState protocol_state.KVStoreReader, stateID flow.Identifier, dbUpdates []transaction.DeferredDBUpdate)
+	Build() (stateID flow.Identifier, dbUpdates []transaction.DeferredDBUpdate, err error)
 
 	// ApplyServiceEventsFromValidatedSeals applies the state changes that are delivered via
 	// sealed service events:

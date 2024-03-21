@@ -41,10 +41,8 @@ func NewPSVersionUpgradeStateMachine(
 }
 
 // Build returns updated key-value store model, state ID and a flag indicating if there were any changes.
-func (m *PSVersionUpgradeStateMachine) Build() (stateID flow.Identifier, dbUpdates []transaction.DeferredDBUpdate) {
-	stateID = flow.ZeroID
-	dbUpdates = nil
-	return
+func (m *PSVersionUpgradeStateMachine) Build() []transaction.DeferredDBUpdate {
+	return nil
 }
 
 // ProcessUpdate updates the current state of key-value store.

@@ -99,6 +99,7 @@ func (s *MutableProtocolState) Mutator(candidate *flow.Header) (protocol.StateMu
 		s.setups,
 		s.commits,
 		s.protocolStateDB,
+		s.kvStoreSnapshots,
 		s.globalParams,
 		candidate,
 		parentState,

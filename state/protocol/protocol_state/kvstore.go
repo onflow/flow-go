@@ -183,7 +183,7 @@ type OrthogonalStoreStateMachine[P any] interface {
 	//     of the calling code (specifically `FollowerState`).
 	//
 	// updated protocol state entry, state ID and a flag indicating if there were any changes.
-	Build() (stateID flow.Identifier, dbUpdates []transaction.DeferredDBUpdate)
+	Build() []transaction.DeferredDBUpdate
 
 	// Build returns updated key-value store model, state ID and a flag indicating if there were any changes.
 	//Build() (updatedState KVStoreReader, stateID flow.Identifier, hasChanges bool)

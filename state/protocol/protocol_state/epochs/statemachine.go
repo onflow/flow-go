@@ -134,17 +134,16 @@ func NewEpochStateMachine(
 	}, nil
 }
 
-func (e *EpochStateMachine) Build() (stateID flow.Identifier, dbUpdates []transaction.DeferredDBUpdate) {
+func (e *EpochStateMachine) Build() []transaction.DeferredDBUpdate {
 	updatedEpochState, updatedStateID, hasChanges := e.activeStateMachine.Build()
-	dbUpdates = e.pendingDbUpdates
+	dbUpdates := e.pendingDbUpdates
 	dbUpdates = append(dbUpdates, e.protocolStateDB.Index(e.candidate.ID(), updatedStateID))
 	if hasChanges {
 		dbUpdates = append(dbUpdates, operation.SkipDuplicatesTx(e.protocolStateDB.StoreTx(updatedStateID, updatedEpochState)))
 	}
 	e.mutator.SetEpochsStateID(updatedStateID)
-	stateID = updatedStateID
 
-	return
+	return dbUpdates
 }
 
 // ApplyServiceEventsFromValidatedSeals applies the state changes that are delivered via

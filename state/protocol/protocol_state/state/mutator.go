@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
@@ -31,9 +32,11 @@ type StateMachineFactoryMethod = func(candidateView uint64, parentState *flow.Ri
 //
 // Not safe for concurrent use.
 type stateMutator struct {
-	headers storage.Headers
-	results storage.ExecutionResults
+	headers          storage.Headers
+	results          storage.ExecutionResults
+	kvStoreSnapshots storage.ProtocolKVStore
 
+	candidate            *flow.Header
 	parentState          protocol_state.KVStoreReader
 	kvMutator            protocol_state.KVStoreMutator
 	orthoKVStoreMachines []protocol_state.KeyValueStoreStateMachine
@@ -50,6 +53,7 @@ func newStateMutator(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	protocolStateSnapshots storage.ProtocolState,
+	kvStoreSnapshots storage.ProtocolKVStore,
 	params protocol.GlobalParams,
 	candidate *flow.Header,
 	parentState protocol_state.KVStoreAPI,
@@ -89,8 +93,10 @@ func newStateMutator(
 	stateMachines = append(stateMachines, versionUpgradeStateMachine)
 
 	return &stateMutator{
+		candidate:            candidate,
 		headers:              headers,
 		results:              results,
+		kvStoreSnapshots:     kvStoreSnapshots,
 		orthoKVStoreMachines: stateMachines,
 		parentState:          parentState,
 		kvMutator:            replicatedState,
@@ -107,20 +113,26 @@ func newStateMutator(
 //     of the calling code (specifically `FollowerState`).
 //
 // updated protocol state entry, state ID and a flag indicating if there were any changes.
-func (m *stateMutator) Build() (hasChanges bool, updatedState protocol_state.KVStoreReader, stateID flow.Identifier, dbUpdates []transaction.DeferredDBUpdate) {
-	subStateIDs := make([]flow.Identifier, 0, len(m.orthoKVStoreMachines))
-
+func (m *stateMutator) Build() (flow.Identifier, []transaction.DeferredDBUpdate, error) {
+	var dbUpdates []transaction.DeferredDBUpdate
 	for _, stateMachine := range m.orthoKVStoreMachines {
-		subStateID, subStateDbUpdates := stateMachine.Build()
-		dbUpdates = append(dbUpdates, subStateDbUpdates...)
-		subStateIDs = append(subStateIDs, subStateID)
+		dbUpdates = append(dbUpdates, stateMachine.Build()...)
 	}
+	stateID := m.kvMutator.ID()
 
-	subStateIDs = append(subStateIDs, m.kvMutator.ID())
-	updatedState = m.kvMutator
-	stateID = flow.MakeID(subStateIDs)
-	hasChanges = stateID != m.parentState.ID()
-	return
+	// Schedule deferred database operations to index the protocol state by the candidate block's ID
+	// and persist the new protocol state (if there are any changes)
+	dbUpdates = append(dbUpdates, m.kvStoreSnapshots.IndexTx(m.candidate.ID(), stateID))
+	version, data, err := m.kvMutator.VersionedEncode()
+	if err != nil {
+		return flow.ZeroID, nil, fmt.Errorf("could not encode protocol state: %w", err)
+	}
+	dbUpdates = append(dbUpdates, operation.SkipDuplicatesTx(m.kvStoreSnapshots.StoreTx(stateID, &storage.KeyValueStoreData{
+		Version: version,
+		Data:    data,
+	})))
+
+	return stateID, dbUpdates, nil
 }
 
 // ApplyServiceEventsFromValidatedSeals applies the state changes that are delivered via
