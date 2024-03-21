@@ -6,7 +6,7 @@ import (
 )
 
 // baseStateMachine implements common logic for evolving protocol state both in happy path and epoch fallback
-// operation modes. It partially implements `EpochStateMachine` and is used as building block for more complex implementations.
+// operation modes. It partially implements `StateMachine` and is used as building block for more complex implementations.
 type baseStateMachine struct {
 	parentState *flow.RichProtocolStateEntry
 	state       *flow.ProtocolStateEntry
@@ -24,8 +24,8 @@ type baseStateMachine struct {
 
 // Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
 // CAUTION:
-// Do NOT call Build, if the EpochStateMachine instance has returned a `protocol.InvalidServiceEventError`
-// at any time during its lifetime. After this error, the EpochStateMachine is left with a potentially
+// Do NOT call Build, if the StateMachine instance has returned a `protocol.InvalidServiceEventError`
+// at any time during its lifetime. After this error, the StateMachine is left with a potentially
 // dysfunctional state and should be discarded.
 func (u *baseStateMachine) Build() (updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, hasChanges bool) {
 	updatedState = u.state.Copy()
@@ -35,7 +35,7 @@ func (u *baseStateMachine) Build() (updatedState *flow.ProtocolStateEntry, state
 }
 
 // View returns the view that is associated with this state HappyPathStateMachine.
-// The view of the EpochStateMachine equals the view of the block carrying the respective updates.
+// The view of the StateMachine equals the view of the block carrying the respective updates.
 func (u *baseStateMachine) View() uint64 {
 	return u.view
 }

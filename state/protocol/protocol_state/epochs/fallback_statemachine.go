@@ -14,7 +14,7 @@ type FallbackStateMachine struct {
 	baseStateMachine
 }
 
-var _ EpochStateMachine = (*FallbackStateMachine)(nil)
+var _ StateMachine = (*FallbackStateMachine)(nil)
 
 // NewEpochFallbackStateMachine constructs a state machine for epoch fallback, it automatically sets
 // InvalidEpochTransitionAttempted to true, thereby recording that we have entered epoch fallback mode.

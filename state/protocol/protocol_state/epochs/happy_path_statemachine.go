@@ -24,7 +24,7 @@ type HappyPathStateMachine struct {
 	baseStateMachine
 }
 
-var _ EpochStateMachine = (*HappyPathStateMachine)(nil)
+var _ StateMachine = (*HappyPathStateMachine)(nil)
 
 // NewStateMachine creates a new protocol state HappyPathStateMachine.
 // An exception is returned in case the `InvalidEpochTransitionAttempted` flag is set in the `parentState`. This means that
