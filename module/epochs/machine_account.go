@@ -4,9 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"strconv"
 	"time"
 
@@ -17,8 +14,12 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 var (
