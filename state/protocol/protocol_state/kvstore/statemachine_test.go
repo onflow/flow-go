@@ -26,7 +26,7 @@ type StateMachineSuite struct {
 	mutator     *mock.KVStoreMutator
 	params      *mockprotocol.GlobalParams
 
-	stateMachine *StateMachine
+	stateMachine *PSVersionUpgradeStateMachine
 }
 
 func (s *StateMachineSuite) SetupTest() {
@@ -37,7 +37,7 @@ func (s *StateMachineSuite) SetupTest() {
 
 	s.params.On("EpochCommitSafetyThreshold").Return(uint64(100)).Maybe()
 
-	s.stateMachine = NewProcessingStateMachine(s.view, s.params, s.parentState, s.mutator)
+	s.stateMachine = NewPSVersionUpgradeStateMachine(s.view, s.params, s.parentState, s.mutator)
 	require.NotNil(s.T(), s.stateMachine)
 }
 

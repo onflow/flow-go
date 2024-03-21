@@ -68,7 +68,7 @@ func (model *modelv0) Replicate(protocolVersion uint64) (protocol_state.KVStoreM
 
 	// perform actual replication to the next version
 	v1 := &modelv1{
-		upgradableModel:                 clone.Clone(model.upgradableModel),
+		modelv0:                         clone.Clone(*model),
 		InvalidEpochTransitionAttempted: false,
 	}
 	return v1, nil
@@ -104,7 +104,7 @@ func (model *modelv0) SetInvalidEpochTransitionAttempted(_ bool) error {
 // This represents the first model version which will be considered "latest" by any
 // deployed software version.
 type modelv1 struct {
-	upgradableModel
+	modelv0
 
 	// InvalidEpochTransitionAttempted encodes whether an invalid epoch transition
 	// has been detected in this fork. Under normal operations, this value is false.
@@ -165,4 +165,12 @@ func (model *modelv1) GetInvalidEpochTransitionAttempted() (bool, error) {
 func (model *modelv1) SetInvalidEpochTransitionAttempted(attempted bool) error {
 	model.InvalidEpochTransitionAttempted = attempted
 	return nil
+}
+
+// TODO: this is temporary, only for testing bootstrapping
+func NewLatestKVStore() protocol_state.KVStoreAPI {
+	return &modelv1{
+		modelv0:                         modelv0{},
+		InvalidEpochTransitionAttempted: false,
+	}
 }
