@@ -64,7 +64,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 							return result, nil
 						},
 					}
-					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, bs, aa, backend, em)
+					handler := handler.NewContractHandler(flow.Emulator, rootAddr, flowTokenAddress, bs, aa, backend, em)
 
 					coinbase := types.NewAddress(gethCommon.Address{})
 
@@ -842,6 +842,6 @@ func SetupHandler(t testing.TB, backend types.Backend, rootAddr flow.Address) *h
 	aa := handler.NewAddressAllocator()
 	emulator := emulator.NewEmulator(backend, rootAddr)
 
-	handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, bs, aa, backend, emulator)
+	handler := handler.NewContractHandler(flow.Emulator, rootAddr, flowTokenAddress, bs, aa, backend, emulator)
 	return handler
 }
