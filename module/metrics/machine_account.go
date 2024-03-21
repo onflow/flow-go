@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"github.com/onflow/flow-go/model/flow"
+
 	"github.com/prometheus/client_golang/prometheus"
 )
 
