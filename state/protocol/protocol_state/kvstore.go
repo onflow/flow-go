@@ -43,6 +43,8 @@ type KVStoreReader interface {
 	// with a past view if the upgrade has already been activated.
 	GetVersionUpgrade() *ViewBasedActivator[uint64]
 
+	GetEpochStateID() flow.Identifier
+
 	// v1
 
 	// GetInvalidEpochTransitionAttempted returns a flag indicating whether epoch
@@ -99,6 +101,8 @@ type KVStoreMutator interface {
 	// to update the Protocol State version when a flow.ProtocolStateVersionUpgrade is processed.
 	// It contains the new version and the view at which it has to be applied.
 	SetVersionUpgrade(version *ViewBasedActivator[uint64])
+
+	SetEpochStateID(stateID flow.Identifier)
 
 	// v1
 

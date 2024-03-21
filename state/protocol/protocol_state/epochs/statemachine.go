@@ -141,7 +141,7 @@ func (e *EpochStateMachine) Build() []transaction.DeferredDBUpdate {
 	if hasChanges {
 		dbUpdates = append(dbUpdates, operation.SkipDuplicatesTx(e.protocolStateDB.StoreTx(updatedStateID, updatedEpochState)))
 	}
-	e.mutator.SetEpochsStateID(updatedStateID)
+	e.mutator.SetEpochStateID(updatedStateID)
 
 	return dbUpdates
 }
