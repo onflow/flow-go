@@ -105,13 +105,9 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 
 	// events are encoded in CCF format in storage. convert to JSON-CDC if requested
 	if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
-		for _, e := range events {
-			payload, err := convert.CcfPayloadToJsonPayload(e.Payload)
-			if err != nil {
-				err = fmt.Errorf("failed to convert event payload for block %s: %w", blockID, err)
-				return nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
-			}
-			e.Payload = payload
+		events, err = convert.CcfEventsToJsonEvents(events)
+		if err != nil {
+			return nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
 		}
 	}
 
@@ -193,13 +189,9 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 
 		// events are encoded in CCF format in storage. convert to JSON-CDC if requested
 		if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
-			for _, e := range events {
-				payload, err := convert.CcfPayloadToJsonPayload(e.Payload)
-				if err != nil {
-					err = fmt.Errorf("failed to convert event payload for block %s: %w", blockID, err)
-					return nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
-				}
-				e.Payload = payload
+			events, err = convert.CcfEventsToJsonEvents(events)
+			if err != nil {
+				return nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
 			}
 		}
 
@@ -274,13 +266,9 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 
 	// events are encoded in CCF format in storage. convert to JSON-CDC if requested
 	if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
-		for _, e := range events {
-			payload, err := convert.CcfPayloadToJsonPayload(e.Payload)
-			if err != nil {
-				err = fmt.Errorf("failed to convert event payload for block %s: %w", blockID, err)
-				return nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
-			}
-			e.Payload = payload
+		events, err = convert.CcfEventsToJsonEvents(events)
+		if err != nil {
+			return nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
 		}
 	}
 
