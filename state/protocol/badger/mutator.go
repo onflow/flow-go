@@ -598,7 +598,7 @@ func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow
 	defer span.End()
 
 	// instantiate Protocol State Mutator from the parent block's state and apply any state-changing service events sealed by this block
-	stateMutator, err := m.protocolState.Mutator(candidate.Header.View, candidate.Header.ParentID)
+	stateMutator, err := m.protocolState.Mutator(candidate.Header)
 	if err != nil {
 		return fmt.Errorf("could not create protocol state mutator for view %d: %w", candidate.Header.View, err)
 	}
@@ -613,11 +613,22 @@ func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow
 		return state.NewInvalidExtensionErrorf("invalid protocol state commitment %x in block, which should be %x", candidate.Payload.ProtocolStateID, updatedStateID)
 	}
 
+	// TODO: deal with protocol state ID, it has to be KV store state + protocol state ID
+	// maybe include protocol state ID in KV store. TBD.
+
 	// Schedule deferred database operations to index the protocol state by the candidate block's ID
 	// and persist the new protocol state (if there are any changes)
-	deferredDbOps.AddDbOp(m.protocolStateSnapshotsDB.Index(candidate.ID(), updatedStateID))
+	deferredDbOps.AddDbOp(m.protocolKVStoreSnapshotsDB.IndexTx(candidate.ID(), updatedState.ID()))
 	if hasChanges {
-		deferredDbOps.AddDbOp(operation.SkipDuplicatesTx(m.protocolStateSnapshotsDB.StoreTx(updatedStateID, updatedState)))
+		version, data, err := updatedState.VersionedEncode()
+		if err != nil {
+			return fmt.Errorf("could not encode protocol state: %w", err)
+		}
+		deferredDbOps.AddDbOp(operation.SkipDuplicatesTx(m.protocolKVStoreSnapshotsDB.StoreTx(updatedState.ID(),
+			&storage.KeyValueStoreData{
+				Version: version,
+				Data:    data,
+			})))
 		deferredDbOps.AddDbOps(dbUpdates...)
 	}
 	return nil

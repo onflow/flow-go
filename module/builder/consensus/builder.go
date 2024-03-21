@@ -635,7 +635,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		return nil, fmt.Errorf("could not apply setter: %w", err)
 	}
 
-	stateMutator, err := b.mutableProtocolState.Mutator(header.View, header.ParentID)
+	stateMutator, err := b.mutableProtocolState.Mutator(header)
 	if err != nil {
 		return nil, fmt.Errorf("could not create protocol state stateMutator for view %d: %w", header.View, err)
 	}

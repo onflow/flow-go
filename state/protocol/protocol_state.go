@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
@@ -90,7 +91,7 @@ type MutableProtocolState interface {
 	// Has to be called for each block to evolve the protocol state.
 	// Expected errors during normal operations:
 	//  * `storage.ErrNotFound` if no protocol state for parent block is known.
-	Mutator(candidateView uint64, parentID flow.Identifier) (StateMutator, error)
+	Mutator(candidate *flow.Header) (StateMutator, error)
 }
 
 // StateMutator is a stateful object to evolve the protocol state. It is instantiated from the parent block's protocol state.
@@ -117,7 +118,7 @@ type StateMutator interface {
 	//     of the calling code (specifically `FollowerState`).
 	//
 	// updated protocol state entry, state ID and a flag indicating if there were any changes.
-	Build() (hasChanges bool, updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, dbUpdates []transaction.DeferredDBUpdate)
+	Build() (hasChanges bool, updatedState protocol_state.KVStoreReader, stateID flow.Identifier, dbUpdates []transaction.DeferredDBUpdate)
 
 	// ApplyServiceEventsFromValidatedSeals applies the state changes that are delivered via
 	// sealed service events:

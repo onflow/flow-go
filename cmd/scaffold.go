@@ -1006,6 +1006,8 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
 	protocolState := bstorage.NewProtocolState(fnb.Metrics.Cache, setups, epochCommits, fnb.DB,
 		bstorage.DefaultProtocolStateCacheSize, bstorage.DefaultProtocolStateByBlockIDCacheSize)
+	protocolKVStores := bstorage.NewProtocolKVStore(fnb.Metrics.Cache, fnb.DB,
+		bstorage.DefaultProtocolKVStoreCacheSize, bstorage.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeacons := bstorage.NewVersionBeacons(fnb.DB)
 
 	fnb.Storage = Storage{
@@ -1024,6 +1026,7 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		EpochCommits:       epochCommits,
 		VersionBeacons:     versionBeacons,
 		ProtocolState:      protocolState,
+		ProtocolKVStore:    protocolKVStores,
 		Commits:            commits,
 	}
 
@@ -1088,6 +1091,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
 			fnb.Storage.ProtocolState,
+			fnb.Storage.ProtocolKVStore,
 			fnb.Storage.VersionBeacons,
 		)
 		if err != nil {
@@ -1136,6 +1140,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
 			fnb.Storage.ProtocolState,
+			fnb.Storage.ProtocolKVStore,
 			fnb.Storage.VersionBeacons,
 			fnb.RootSnapshot,
 			options...,
