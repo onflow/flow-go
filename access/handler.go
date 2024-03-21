@@ -1093,8 +1093,7 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 	request *access.SendAndSubscribeTransactionStatusesRequest,
 	stream access.AccessAPI_SendAndSubscribeTransactionStatusesServer,
 ) error {
-	subCtx, cancel := context.WithCancel(stream.Context())
-	defer cancel()
+	ctx := stream.Context()
 
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {
@@ -1108,12 +1107,12 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 		return status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err = h.api.SendTransaction(subCtx, &tx)
+	err = h.api.SendTransaction(ctx, &tx)
 	if err != nil {
 		return err
 	}
 
-	sub := h.api.SubscribeTransactionStatuses(subCtx, &tx)
+	sub := h.api.SubscribeTransactionStatuses(ctx, &tx)
 
 	return subscription.HandleSubscription(sub, func(txSubInfo *convert.TransactionSubscribeInfo) error {
 		err = stream.Send(convert.TransactionSubscribeInfoToMessage(txSubInfo))
