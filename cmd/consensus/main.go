@@ -430,7 +430,7 @@ func main() {
 			validator, err := epochs.NewMachineAccountConfigValidator(
 				node.Logger,
 				flowClient,
-				flow.RoleCollection,
+				flow.RoleConsensus,
 				*machineAccountInfo,
 				machineAccountMetrics,
 				opts...,

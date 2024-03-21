@@ -35,6 +35,11 @@ var (
 	defaultHardMinBalanceSN cadence.UFix64
 )
 
+const (
+	recommendedMinBalanceLN = 0.002
+	recommendedMinBalanceSN = 0.05
+)
+
 func init() {
 	var err error
 	defaultSoftMinBalanceLN, err = cadence.NewUFix64("0.0025")
@@ -52,6 +57,18 @@ func init() {
 	defaultHardMinBalanceSN, err = cadence.NewUFix64("0.05")
 	if err != nil {
 		panic(fmt.Errorf("could not convert hard min balance for SN: %w", err))
+	}
+
+	// sanity checks
+	if asFloat, err := ufix64Tofloat64(defaultHardMinBalanceLN); err != nil {
+		panic(err)
+	} else if asFloat != recommendedMinBalanceLN {
+		panic(fmt.Errorf("failed sanity check: %f!=%f", asFloat, recommendedMinBalanceLN))
+	}
+	if asFloat, err := ufix64Tofloat64(defaultHardMinBalanceSN); err != nil {
+		panic(err)
+	} else if asFloat != recommendedMinBalanceSN {
+		panic(fmt.Errorf("failed sanity check: %f!=%f", asFloat, recommendedMinBalanceSN))
 	}
 }
 
@@ -135,6 +152,16 @@ func NewMachineAccountConfigValidator(
 		role:    role,
 		info:    info,
 		metrics: metrics,
+	}
+
+	// report recommended min balance once at construction
+	switch role {
+	case flow.RoleCollection:
+		validator.metrics.RecommendedMinBalance(recommendedMinBalanceLN)
+	case flow.RoleConsensus:
+		validator.metrics.RecommendedMinBalance(recommendedMinBalanceSN)
+	default:
+		return nil, fmt.Errorf("invalid role: %s", role)
 	}
 
 	validator.Component = component.NewComponentManagerBuilder().
