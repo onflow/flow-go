@@ -3,11 +3,9 @@ package backend
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -23,31 +21,55 @@ type EventsResponse struct {
 }
 
 type EventsBackend struct {
-	log            zerolog.Logger
-	headers        storage.Headers
-	broadcaster    *engine.Broadcaster
-	sendTimeout    time.Duration
-	responseLimit  float64
-	sendBufferSize int
+	log                 zerolog.Logger
+	subscriptionHandler *subscription.SubscriptionHandler
 
+	headers          storage.Headers
+	useIndex         bool
+	eventsIndex      *index.EventsIndex
 	getExecutionData GetExecutionDataFunc
-	getStartHeight   subscription.GetStartHeightFunc
 
-	useIndex    bool
-	eventsIndex *index.EventsIndex
+	executionDataTracker subscription.ExecutionDataTracker
 }
 
 func (b *EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
-	nextHeight, err := b.getStartHeight(ctx, startBlockID, startHeight)
+	nextHeight, err := b.executionDataTracker.GetStartHeight(ctx, startBlockID, startHeight)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")
 	}
 
-	sub := subscription.NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getResponseFactory(filter))
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter))
+}
 
-	go subscription.NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
+func (b *EventsBackend) SubscribeEventsFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, filter state_stream.EventFilter) subscription.Subscription {
+	nextHeight, err := b.executionDataTracker.GetStartHeightFromBlockID(startBlockID)
+	if err != nil {
+		return subscription.NewFailedSubscription(err, "could not get start height from block id")
+	}
 
-	return sub
+	return b.subscribeEvents(ctx, nextHeight, filter)
+}
+
+func (b *EventsBackend) SubscribeEventsFromStartHeight(ctx context.Context, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
+	nextHeight, err := b.executionDataTracker.GetStartHeightFromHeight(startHeight)
+	if err != nil {
+		return subscription.NewFailedSubscription(err, "could not get start height from block height")
+	}
+
+	return b.subscribeEvents(ctx, nextHeight, filter)
+}
+
+func (b *EventsBackend) SubscribeEventsFromLatest(ctx context.Context, filter state_stream.EventFilter) subscription.Subscription {
+	nextHeight, err := b.executionDataTracker.GetStartHeightFromLatest(ctx)
+	if err != nil {
+		return subscription.NewFailedSubscription(err, "could not get start height from block height")
+	}
+
+	return b.subscribeEvents(ctx, nextHeight, filter)
+}
+
+func (b *EventsBackend) subscribeEvents(ctx context.Context, nextHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter))
 }
 
 // getResponseFactory returns a function that returns the event response for a given height.

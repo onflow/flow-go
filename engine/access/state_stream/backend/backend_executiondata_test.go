@@ -101,11 +101,13 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
 	s.executionDataTracker = subscriptionmock.NewExecutionDataTracker(s.T())
 
-	conf := Config{
-		ClientSendTimeout:       subscription.DefaultSendTimeout,
-		ClientSendBufferSize:    subscription.DefaultSendBufferSize,
-		RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
-	}
+	subscriptionHandler := subscription.NewSubscriptionHandler(
+		logger,
+		s.broadcaster,
+		subscription.DefaultSendTimeout,
+		subscription.DefaultResponseLimit,
+		subscription.DefaultSendBufferSize,
+	)
 
 	var err error
 
@@ -220,17 +222,17 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 	s.backend, err = New(
 		logger,
-		conf,
 		s.state,
 		s.headers,
 		s.seals,
 		s.results,
 		s.eds,
 		s.execDataCache,
-		s.broadcaster,
 		s.registersAsync,
 		s.eventsIndex,
 		false,
+		state_stream.DefaultRegisterIDsRequestLimit,
+		subscriptionHandler,
 		s.executionDataTracker,
 	)
 	require.NoError(s.T(), err)

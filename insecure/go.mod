@@ -303,3 +303,6 @@ require (
 )
 
 replace github.com/onflow/flow-go => ../
+
+// TODO: Remove when it will be merged
+replace github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240305102946-3efec6679252 => github.com/The-K-R-O-K/flow/protobuf/go/flow v0.0.0-20240320190442-08aa0f9411cb

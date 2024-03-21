@@ -21,6 +21,9 @@ type API interface {
 	SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startBlockHeight uint64) subscription.Subscription
 	// SubscribeEvents subscribes to events starting from a specific block ID and block height, with an optional event filter.
 	SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter EventFilter) subscription.Subscription
+	SubscribeEventsFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, filter EventFilter) subscription.Subscription
+	SubscribeEventsFromStartHeight(ctx context.Context, startHeight uint64, filter EventFilter) subscription.Subscription
+	SubscribeEventsFromLatest(ctx context.Context, filter EventFilter) subscription.Subscription
 	// GetRegisterValues returns register values for a set of register IDs at the provided block height.
 	GetRegisterValues(registerIDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error)
 }
