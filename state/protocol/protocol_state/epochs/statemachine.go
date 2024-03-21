@@ -98,6 +98,13 @@ func NewEpochStateMachine(
 	if err != nil {
 		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", candidate.ParentID, err)
 	}
+
+	// sanity check: the parent epoch state ID must be set in KV store
+	if parentEpochState.ID() != parentState.GetEpochStateID() {
+		return nil, irrecoverable.NewExceptionf("broken invariant: parent epoch state ID mismatch, expected %x, got %x",
+			parentState.GetEpochStateID(), parentEpochState.ID())
+	}
+
 	var (
 		stateMachine StateMachine
 	)
