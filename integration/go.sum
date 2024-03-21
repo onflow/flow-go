@@ -94,8 +94,6 @@ github.com/CloudyKit/jet/v3 v3.0.0/go.mod h1:HKQPgSJmdK8hdoAbKUUWajkHyHo4RaU5rMd
 github.com/DataDog/zstd v1.4.1/go.mod h1:1jcaCB/ufaK+sKp1NBhlGmpz41jOoPQ35bpF36t7BBo=
 github.com/DataDog/zstd v1.5.2 h1:vUG4lAyuPCXO0TLbXvPv7EB7cNK1QV/luu55UHLrrn8=
 github.com/DataDog/zstd v1.5.2/go.mod h1:g4AWEaM3yOg3HYfnJ3YIawPnVdXJh9QME85blwSAmyw=
-github.com/Guitarheroua/flow-emulator v0.0.0-20240314051253-8c5cb181353a h1:M6+w1x6pH30ac97a5F8gEeaE/4dSiIeTUNxCfUL6OD0=
-github.com/Guitarheroua/flow-emulator v0.0.0-20240314051253-8c5cb181353a/go.mod h1:nDkqQUzevGIBKJsIF6xdHQp761uOgQ7rX2cP4w3KlsY=
 github.com/JohnCGriffin/overflow v0.0.0-20211019200055-46fa312c352c h1:RGWPOewvKIROun94nF7v2cua9qP+thov/7M50KEoeSU=
 github.com/Joker/hpp v1.0.0/go.mod h1:8x5n+M1Hp5hC0g8okX3sR3vFQwynaX/UgSOM9MeBKzY=
 github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible/go.mod h1:r7JcOSlj0wfOMncg0iLm8Leh48TZaKVeNIfJntJ2wa0=
@@ -1416,6 +1414,8 @@ github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1 h1:xF5wHug6H8vKfz
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1/go.mod h1:WHp24VkUQfcfZi0XjI1uRVRt5alM5SHVkwOil1U2Tpc=
 github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1 h1:EjWjbyVEA+bMxXbM44dE6MsYeqOu5a9q/EwSWa4ma2M=
 github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1/go.mod h1:c09d6sNyF/j5/pAynK7sNPb1XKqJqk1rxZPEqEL+dUo=
+github.com/onflow/flow-emulator v0.58.1-0.20240313174529-1d05170401b6 h1:07q2fysEezb3QGpRATEQZPG8Gz6exxlIe7l/yLagrn4=
+github.com/onflow/flow-emulator v0.58.1-0.20240313174529-1d05170401b6/go.mod h1:kQcINHh4JJs3LG5OsMJ9gSfTkEMZnH41WwnWpz6NG4E=
 github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230711213910-baad011d2b13 h1:B4ll7e3j+MqTJv2122Enq3RtDNzmIGRu9xjV7fo7un0=
 github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230711213910-baad011d2b13/go.mod h1:kTMFIySzEJJeupk+7EmXs0EJ6CBWY/MV9fv9iYQk+RU=
 github.com/onflow/flow-go-sdk v0.24.0/go.mod h1:IoptMLPyFXWvyd9yYA6/4EmSeeozl6nJoIv4FaEMg74=
