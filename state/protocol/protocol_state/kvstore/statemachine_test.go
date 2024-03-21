@@ -1,6 +1,7 @@
 package kvstore
 
 import (
+	"github.com/onflow/flow-go/model/flow"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -70,7 +71,7 @@ func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
 		}).Return()
 
 		se := upgrade.ServiceEvent()
-		err := s.stateMachine.ProcessUpdate(&se)
+		err := s.stateMachine.ProcessUpdate([]*flow.ServiceEvent{&se})
 		require.NoError(s.T(), err)
 	})
 	s.Run("invalid-protocol-state-version", func() {
@@ -82,7 +83,7 @@ func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
 		upgrade.NewProtocolStateVersion = oldVersion
 
 		se := upgrade.ServiceEvent()
-		err := s.stateMachine.ProcessUpdate(&se)
+		err := s.stateMachine.ProcessUpdate([]*flow.ServiceEvent{&se})
 		require.ErrorIs(s.T(), err, ErrInvalidUpgradeVersion, "has to be expected sentinel")
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err), "has to be expected sentinel")
 	})
@@ -91,7 +92,7 @@ func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
 		upgrade.ActiveView = s.view + s.params.EpochCommitSafetyThreshold()
 
 		se := upgrade.ServiceEvent()
-		err := s.stateMachine.ProcessUpdate(&se)
+		err := s.stateMachine.ProcessUpdate([]*flow.ServiceEvent{&se})
 		require.ErrorIs(s.T(), err, ErrInvalidActivationView, "has to be expected sentinel")
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err), "has to be expected sentinel")
 	})
@@ -105,10 +106,7 @@ func (s *StateMachineSuite) TestBuild_NoChanges() {
 
 	s.mutator.On("ID").Return(stateID)
 
-	updatedState, id, hasChanges := s.stateMachine.Build()
-	require.False(s.T(), hasChanges, "initial state should not have changes")
-	require.Equal(s.T(), s.parentState.ID(), id, "initial state should not have changes")
-	require.Equal(s.T(), s.parentState.ID(), updatedState.ID())
+	require.Empty(s.T(), s.stateMachine.Build())
 }
 
 // TestBuild_HasChanges ensures that state machine can build state when changes were applied.
@@ -120,8 +118,5 @@ func (s *StateMachineSuite) TestBuild_HasChanges() {
 	updatedStateID := unittest.IdentifierFixture()
 	s.mutator.On("ID").Return(updatedStateID)
 
-	updatedState, id, hasChanges := s.stateMachine.Build()
-	require.True(s.T(), hasChanges, "initial state should have changes")
-	require.Equal(s.T(), updatedState.ID(), id)
-	require.Equal(s.T(), updatedState.ID(), updatedStateID)
+	require.Empty(s.T(), s.stateMachine.Build())
 }

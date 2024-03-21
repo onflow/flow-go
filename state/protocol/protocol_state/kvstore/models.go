@@ -43,7 +43,7 @@ func (model *upgradableModel) GetVersionUpgrade() *protocol_state.ViewBasedActiv
 // with multiple supported KV model versions from the beginning.
 type modelv0 struct {
 	upgradableModel
-	epochStateID flow.Identifier
+	EpochStateID flow.Identifier
 }
 
 var _ protocol_state.KVStoreAPI = (*modelv0)(nil)
@@ -102,11 +102,11 @@ func (model *modelv0) SetInvalidEpochTransitionAttempted(_ bool) error {
 }
 
 func (model *modelv0) GetEpochStateID() flow.Identifier {
-	return model.epochStateID
+	return model.EpochStateID
 }
 
 func (model *modelv0) SetEpochStateID(id flow.Identifier) {
-	model.epochStateID = id
+	model.EpochStateID = id
 }
 
 // modelv1 is v1 of the Protocol State key-value store.
@@ -181,7 +181,7 @@ func NewLatestKVStore(epochStateID flow.Identifier) protocol_state.KVStoreAPI {
 	return &modelv1{
 		modelv0: modelv0{
 			upgradableModel: upgradableModel{},
-			epochStateID:    epochStateID,
+			EpochStateID:    epochStateID,
 		},
 		InvalidEpochTransitionAttempted: false,
 	}

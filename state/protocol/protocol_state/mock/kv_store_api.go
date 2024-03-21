@@ -14,6 +14,22 @@ type KVStoreAPI struct {
 	mock.Mock
 }
 
+// GetEpochStateID provides a mock function with given fields:
+func (_m *KVStoreAPI) GetEpochStateID() flow.Identifier {
+	ret := _m.Called()
+
+	var r0 flow.Identifier
+	if rf, ok := ret.Get(0).(func() flow.Identifier); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.Identifier)
+		}
+	}
+
+	return r0
+}
+
 // GetInvalidEpochTransitionAttempted provides a mock function with given fields:
 func (_m *KVStoreAPI) GetInvalidEpochTransitionAttempted() (bool, error) {
 	ret := _m.Called()

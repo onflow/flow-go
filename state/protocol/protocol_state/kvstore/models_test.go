@@ -1,6 +1,7 @@
 package kvstore
 
 import (
+	"github.com/onflow/flow-go/utils/unittest"
 	"math/rand"
 	"reflect"
 	"testing"
@@ -16,7 +17,15 @@ import (
 //   - instances should be equal after encoding, then decoding
 func TestEncodeDecode(t *testing.T) {
 	t.Run("v0", func(t *testing.T) {
-		model := &modelv0{}
+		model := &modelv0{
+			upgradableModel: upgradableModel{
+				VersionUpgrade: &protocol_state.ViewBasedActivator[uint64]{
+					Data:           13,
+					ActivationView: 1000,
+				},
+			},
+			EpochStateID: unittest.IdentifierFixture(),
+		}
 
 		version, encoded, err := model.VersionedEncode()
 		require.NoError(t, err)
@@ -130,11 +139,14 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 	})
 	t.Run("v1", func(t *testing.T) {
 		model := &modelv1{
-			upgradableModel: upgradableModel{
-				VersionUpgrade: &protocol_state.ViewBasedActivator[uint64]{
-					Data:           13,
-					ActivationView: 1000,
+			modelv0: modelv0{
+				upgradableModel: upgradableModel{
+					VersionUpgrade: &protocol_state.ViewBasedActivator[uint64]{
+						Data:           13,
+						ActivationView: 1000,
+					},
 				},
+				EpochStateID: unittest.IdentifierFixture(),
 			},
 			InvalidEpochTransitionAttempted: false,
 		}
