@@ -17,8 +17,8 @@ import (
 //   - instances should be equal after encoding, then decoding
 func TestEncodeDecode(t *testing.T) {
 	t.Run("v0", func(t *testing.T) {
-		model := &modelv0{
-			upgradableModel: upgradableModel{
+		model := &Modelv0{
+			UpgradableModel: UpgradableModel{
 				VersionUpgrade: &protocol_state.ViewBasedActivator[uint64]{
 					Data:           13,
 					ActivationView: 1000,
@@ -37,7 +37,7 @@ func TestEncodeDecode(t *testing.T) {
 	})
 
 	t.Run("v1", func(t *testing.T) {
-		model := &modelv1{
+		model := &Modelv1{
 			InvalidEpochTransitionAttempted: rand.Int()%2 == 0,
 		}
 
@@ -56,7 +56,7 @@ func TestEncodeDecode(t *testing.T) {
 //   - should return the appropriate sentinel for unsupported keys
 func TestKVStoreAPI(t *testing.T) {
 	t.Run("v0", func(t *testing.T) {
-		model := &modelv0{}
+		model := &Modelv0{}
 
 		// v0
 		assertModelIsUpgradable(t, model)
@@ -73,7 +73,7 @@ func TestKVStoreAPI(t *testing.T) {
 	})
 
 	t.Run("v1", func(t *testing.T) {
-		model := &modelv1{}
+		model := &Modelv1{}
 
 		// v0
 		assertModelIsUpgradable(t, model)
@@ -100,8 +100,8 @@ func TestKVStoreAPI(t *testing.T) {
 // a new model with version which is equal to the requested version.
 func TestKVStoreAPI_Replicate(t *testing.T) {
 	t.Run("v0", func(t *testing.T) {
-		model := &modelv0{
-			upgradableModel: upgradableModel{
+		model := &Modelv0{
+			UpgradableModel: UpgradableModel{
 				VersionUpgrade: &protocol_state.ViewBasedActivator[uint64]{
 					Data:           13,
 					ActivationView: 1000,
@@ -116,8 +116,8 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 		require.False(t, reflect.DeepEqual(model, cpy), "expect to have a deep copy")
 	})
 	t.Run("v0->v1", func(t *testing.T) {
-		model := &modelv0{
-			upgradableModel: upgradableModel{
+		model := &Modelv0{
+			UpgradableModel: UpgradableModel{
 				VersionUpgrade: &protocol_state.ViewBasedActivator[uint64]{
 					Data:           13,
 					ActivationView: 1000,
@@ -127,20 +127,20 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 		newVersion, err := model.Replicate(1)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), newVersion.GetProtocolStateVersion())
-		_, ok := newVersion.(*modelv1)
-		require.True(t, ok, "expected modelv1")
+		_, ok := newVersion.(*Modelv1)
+		require.True(t, ok, "expected Modelv1")
 		require.Equal(t, newVersion.GetVersionUpgrade(), model.GetVersionUpgrade())
 	})
 	t.Run("v0-invalid-upgrade", func(t *testing.T) {
-		model := &modelv0{}
+		model := &Modelv0{}
 		newVersion, err := model.Replicate(model.GetProtocolStateVersion() + 10)
 		require.ErrorIs(t, err, ErrIncompatibleVersionChange)
 		require.Nil(t, newVersion)
 	})
 	t.Run("v1", func(t *testing.T) {
-		model := &modelv1{
-			modelv0: modelv0{
-				upgradableModel: upgradableModel{
+		model := &Modelv1{
+			Modelv0: Modelv0{
+				UpgradableModel: UpgradableModel{
 					VersionUpgrade: &protocol_state.ViewBasedActivator[uint64]{
 						Data:           13,
 						ActivationView: 1000,
@@ -158,7 +158,7 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 		require.False(t, reflect.DeepEqual(model, cpy))
 	})
 	t.Run("v1-invalid-upgrade", func(t *testing.T) {
-		model := &modelv1{}
+		model := &Modelv1{}
 
 		for _, version := range []uint64{
 			model.GetProtocolStateVersion() - 1,
