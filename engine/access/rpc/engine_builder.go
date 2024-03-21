@@ -78,6 +78,14 @@ func (builder *RPCEngineBuilder) WithLegacy() *RPCEngineBuilder {
 	return builder
 }
 
+func (builder *RPCEngineBuilder) DefaultHandler(signerIndicesDecoder hotstuff.BlockSignerDecoder) *access.Handler {
+	if signerIndicesDecoder == nil {
+		return access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams)
+	} else {
+		return access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams, access.WithBlockSignerDecoder(signerIndicesDecoder))
+	}
+}
+
 // WithMetrics specifies the metrics should be collected.
 // Returns self-reference for chaining.
 func (builder *RPCEngineBuilder) WithMetrics() *RPCEngineBuilder {
@@ -94,11 +102,7 @@ func (builder *RPCEngineBuilder) Build() (*Engine, error) {
 	}
 	rpcHandler := builder.rpcHandler
 	if rpcHandler == nil {
-		if builder.signerIndicesDecoder == nil {
-			rpcHandler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams)
-		} else {
-			rpcHandler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams, access.WithBlockSignerDecoder(builder.signerIndicesDecoder))
-		}
+		rpcHandler = builder.DefaultHandler(builder.signerIndicesDecoder)
 	}
 	accessproto.RegisterAccessAPIServer(builder.unsecureGrpcServer.Server, rpcHandler)
 	accessproto.RegisterAccessAPIServer(builder.secureGrpcServer.Server, rpcHandler)
