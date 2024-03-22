@@ -2,8 +2,10 @@ package state_stream
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/model/flow"
+
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Core event types based on documentation https://cadence-lang.org/docs/language/core-events
