@@ -463,7 +463,7 @@ func TestDeployAtFunctionality(t *testing.T) {
 								0),
 						)
 						require.NoError(t, err)
-						require.Equal(t, gethVM.ErrContractAddressCollision, res.VMError)
+						require.Equal(t, gethVM.ErrContractAddressCollision, res.ValidationError)
 					})
 					// test deployment with not enough gas
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
