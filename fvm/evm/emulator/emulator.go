@@ -280,14 +280,15 @@ func (proc *procedure) deployAt(
 	// precheck 1 - check balance of the source
 	if value.Sign() != 0 &&
 		!proc.evm.Context.CanTransfer(proc.state, caller.ToCommon(), value) {
-		return res, gethCore.ErrInsufficientFundsForTransfer
+		res.ValidationError = gethCore.ErrInsufficientFundsForTransfer
+		return res, nil
 	}
 
 	// precheck 2 - ensure there's no existing eoa or contract is deployed at the address
 	contractHash := proc.state.GetCodeHash(addr)
 	if proc.state.GetNonce(addr) != 0 ||
 		(contractHash != (gethCommon.Hash{}) && contractHash != gethTypes.EmptyCodeHash) {
-		res.VMError = gethVM.ErrContractAddressCollision
+		res.ValidationError = gethVM.ErrContractAddressCollision
 		return res, nil
 	}
 

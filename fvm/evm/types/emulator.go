@@ -61,11 +61,11 @@ type ReadOnlyBlockView interface {
 	CodeHashOf(address Address) ([]byte, error)
 }
 
-// BlockView facilitates execution of a transaction or a direct evm  call in the context of a block
-// Errors returned by the methods are one of the followings:
-// - Fatal error
-// - Database error (non-fatal)
+// BlockView facilitates execution of a transaction or a direct evm call in the context of a block
+// Any error returned by any of the methods (e.g. stateDB errors) if non-fatal stops the outer flow transaction
+// if fatal stops the node.
 // EVM validation errors and EVM execution errors are part of the returned result
+// and should be handled separately.
 type BlockView interface {
 	// executes a direct call
 	DirectCall(call *DirectCall) (*Result, error)
