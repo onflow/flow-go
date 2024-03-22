@@ -16,6 +16,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const InvalidTransactionGasCost = 1_000
+
 // Emulator handles operations against evm runtime
 type Emulator struct {
 	rootAddr flow.Address
@@ -156,7 +158,7 @@ func (bl *BlockView) RunTransaction(
 		return nil, err
 	}
 	// all commmit errors (StateDB errors) has to be returned
-	return res, proc.commit()
+	return res, proc.commitAndFinalize()
 }
 
 func (bl *BlockView) newProcedure() (*procedure, error) {
@@ -185,7 +187,7 @@ type procedure struct {
 }
 
 // commit commits the changes to the state (with finalization)
-func (proc *procedure) commit() error {
+func (proc *procedure) commitAndFinalize() error {
 	err := proc.state.Commit(true)
 	if err != nil {
 		// if known types (state errors) don't do anything and return
@@ -221,7 +223,7 @@ func (proc *procedure) mintTo(
 		return res, err
 	}
 	// all commmit errors (StateDB errors) has to be returned
-	return res, proc.commit()
+	return res, proc.commitAndFinalize()
 }
 
 func (proc *procedure) withdrawFrom(
@@ -247,7 +249,7 @@ func (proc *procedure) withdrawFrom(
 	// now deduct the balance from the bridge
 	proc.state.SubBalance(bridge, call.Value)
 	// all commmit errors (StateDB errors) has to be returned
-	return res, proc.commit()
+	return res, proc.commitAndFinalize()
 }
 
 // deployAt deploys a contract at the given target address
@@ -363,7 +365,7 @@ func (proc *procedure) deployAt(
 
 	proc.state.SetCode(addr, ret)
 	res.DeployedContractAddress = to
-	return res, proc.commit()
+	return res, proc.commitAndFinalize()
 }
 
 func (proc *procedure) runDirect(
@@ -379,7 +381,7 @@ func (proc *procedure) runDirect(
 		return nil, err
 	}
 	// all commmit errors (StateDB errors) has to be returned
-	return res, proc.commit()
+	return res, proc.commitAndFinalize()
 }
 
 func (proc *procedure) run(
@@ -400,15 +402,16 @@ func (proc *procedure) run(
 		gasPool,
 	).TransitionDb()
 	if err != nil {
-		// if the error is a fatal error or a non-fatal state error return it
-		// this condition should never happen
-		// given all StateDB errors are withheld for the commit time.
-		if types.IsAFatalError(err) || types.IsAStateError(err) {
+		// if the error is a fatal error or a non-fatal state error or a backend err return it
+		// this condition should never happen given all StateDB errors are withheld for the commit time.
+		if types.IsAFatalError(err) || types.IsAStateError(err) || types.IsABackendError(err) {
 			return &res, err
 		}
 		// otherwise is a validation error (pre-check failure)
 		// no state change, wrap the error and return
-		return &res, types.NewEVMValidationError(err)
+		res.ValidationError = types.NewEVMValidationError(err)
+		res.GasConsumed = InvalidTransactionGasCost
+		return &res, nil
 	}
 
 	// if prechecks are passed, the exec result won't be nil
