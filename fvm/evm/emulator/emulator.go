@@ -184,9 +184,9 @@ type procedure struct {
 	state  types.StateDB
 }
 
-// commit commits the changes to the state.
+// commit commits the changes to the state (with finalization)
 func (proc *procedure) commit() error {
-	err := proc.state.Commit()
+	err := proc.state.Commit(true)
 	if err != nil {
 		// if known types (state errors) don't do anything and return
 		if types.IsAFatalError(err) || types.IsAStateError(err) {
