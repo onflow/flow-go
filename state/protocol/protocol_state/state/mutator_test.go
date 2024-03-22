@@ -2,7 +2,6 @@ package state
 
 import (
 	"errors"
-	"fmt"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
 	"testing"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	epochsmock "github.com/onflow/flow-go/state/protocol/protocol_state/epochs/mock"
+	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/rand"
@@ -28,15 +28,16 @@ func TestProtocolStateMutator(t *testing.T) {
 
 type StateMutatorSuite struct {
 	suite.Suite
-	protocolStateDB *storagemock.ProtocolState
-	headersDB       *storagemock.Headers
-	resultsDB       *storagemock.ExecutionResults
-	setupsDB        *storagemock.EpochSetups
-	commitsDB       *storagemock.EpochCommits
-	globalParams    *protocolmock.GlobalParams
-	parentState     *flow.RichProtocolStateEntry
-	stateMachine    *epochsmock.EpochStateMachine
-	candidateView   uint64
+	protocolStateDB   *storagemock.ProtocolState
+	headersDB         *storagemock.Headers
+	resultsDB         *storagemock.ExecutionResults
+	setupsDB          *storagemock.EpochSetups
+	commitsDB         *storagemock.EpochCommits
+	protocolKVStoreDB *storagemock.ProtocolKVStore
+	globalParams      *protocolmock.GlobalParams
+	parentState       *protocol_statemock.KVStoreAPI
+	stateMachine      *epochsmock.EpochStateMachine
+	candidate         *flow.Header
 
 	mutator *stateMutator
 }
@@ -49,8 +50,8 @@ func (s *StateMutatorSuite) SetupTest() {
 	s.commitsDB = storagemock.NewEpochCommits(s.T())
 	s.globalParams = protocolmock.NewGlobalParams(s.T())
 	s.globalParams.On("EpochCommitSafetyThreshold").Return(uint64(1_000))
-	s.parentState = unittest.ProtocolStateFixture()
-	s.candidateView = s.parentState.CurrentEpochSetup.FirstView + 1
+	s.parentState = protocol_statemock.NewKVStoreAPI(s.T())
+	s.candidate = unittest.BlockHeaderFixture(unittest.HeaderWithView(1000))
 	s.stateMachine = epochsmock.NewEpochStateMachine(s.T())
 
 	var err error
@@ -59,16 +60,11 @@ func (s *StateMutatorSuite) SetupTest() {
 		s.resultsDB,
 		s.setupsDB,
 		s.commitsDB,
+		s.protocolStateDB,
+		s.protocolKVStoreDB,
 		s.globalParams,
-		s.candidateView,
+		s.candidate,
 		s.parentState,
-		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-			return s.stateMachine, nil
-		},
-		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-			require.Fail(s.T(), "entering epoch fallback is not expected")
-			return nil, fmt.Errorf("not expecting epoch fallback")
-		},
 	)
 	require.NoError(s.T(), err)
 }

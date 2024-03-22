@@ -98,25 +98,7 @@ func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
 	})
 }
 
-// TestBuild_NoChanges ensures that state machine can build state when changes weren't applied.
-// In this case, state machine should return parent state and `hasChanges = false` flag.
-func (s *StateMachineSuite) TestBuild_NoChanges() {
-	stateID := unittest.IdentifierFixture()
-	s.parentState.On("ID").Return(stateID)
-
-	s.mutator.On("ID").Return(stateID)
-
-	require.Empty(s.T(), s.stateMachine.Build())
-}
-
-// TestBuild_HasChanges ensures that state machine can build state when changes were applied.
-// In this case, state machine should return an updated state and `hasChanges = true` flag.
-func (s *StateMachineSuite) TestBuild_HasChanges() {
-	stateID := unittest.IdentifierFixture()
-	s.parentState.On("ID").Return(stateID)
-
-	updatedStateID := unittest.IdentifierFixture()
-	s.mutator.On("ID").Return(updatedStateID)
-
+// TestBuild ensures that state machine returns empty list of deferred operations.
+func (s *StateMachineSuite) TestBuild() {
 	require.Empty(s.T(), s.stateMachine.Build())
 }
