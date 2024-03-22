@@ -1339,7 +1339,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 			// create script execution module, this depends on the indexer being initialized and the
 			// having the register storage bootstrapped
-			scripts, err := execution.NewScripts(
+			scripts := execution.NewScripts(
 				builder.Logger,
 				metrics.NewExecutionCollector(builder.Tracer),
 				builder.RootChainID,
@@ -1347,10 +1347,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Storage.Headers,
 				builder.ExecutionIndexerCore.RegisterValue,
 				builder.scriptExecutorConfig,
+				derivedChainData,
 			)
-			if err != nil {
-				return nil, err
-			}
 
 			err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts)
 			if err != nil {
