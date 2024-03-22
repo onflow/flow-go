@@ -14,6 +14,7 @@ import (
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -210,8 +211,11 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 	)
 	require.NoError(i.t, err)
 
+	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
+	require.NoError(i.t, err)
+
 	indexer, err := New(log, metrics.NewNoopCollector(), db, i.registers, i.headers, i.events,
-		i.collections, i.transactions, i.results, collectionExecutedMetric)
+		i.collections, i.transactions, i.results, flow.Testnet.Chain(), derivedChainData, collectionExecutedMetric)
 	require.NoError(i.t, err)
 	i.indexer = indexer
 	return i
@@ -670,11 +674,14 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	logger := zerolog.Nop()
 	metrics := metrics.NewNoopCollector()
 
+	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
+	require.NoError(t, err)
+
 	// this test makes sure index values for a single register are correctly updated and always last value is returned
 	t.Run("Single Index Value Changes", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(logger, metrics, db, registers,
-				nil, nil, nil, nil, nil, nil)
+				nil, nil, nil, nil, nil, flow.Testnet.Chain(), derivedChainData, nil)
 			require.NoError(t, err)
 
 			values := [][]byte{[]byte("1"), []byte("1"), []byte("2"), []byte("3"), []byte("4")}
@@ -696,7 +703,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	t.Run("Missing Register", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(logger, metrics, db, registers,
-				nil, nil, nil, nil, nil, nil)
+				nil, nil, nil, nil, nil, flow.Testnet.Chain(), derivedChainData, nil)
 			require.NoError(t, err)
 
 			value, err := index.RegisterValue(registerID, 0)
@@ -711,7 +718,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	t.Run("Single Index Value At Later Heights", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(logger, metrics, db, registers,
-				nil, nil, nil, nil, nil, nil)
+				nil, nil, nil, nil, nil, flow.Testnet.Chain(), derivedChainData, nil)
 			require.NoError(t, err)
 
 			storeValues := [][]byte{[]byte("1"), []byte("2")}
@@ -743,7 +750,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	t.Run("Empty and Nil Payloads", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(logger, metrics, db, registers,
-				nil, nil, nil, nil, nil, nil)
+				nil, nil, nil, nil, nil, flow.Testnet.Chain(), derivedChainData, nil)
 			require.NoError(t, err)
 
 			require.NoError(t, index.indexRegisters(map[ledger.Path]*ledger.Payload{}, 1))

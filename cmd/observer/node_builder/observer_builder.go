@@ -51,6 +51,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -1289,6 +1290,11 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 			builder.Storage.RegisterIndex = registers
 
+			derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
+			if err != nil {
+				return nil, fmt.Errorf("could not create derived chain data: %w", err)
+			}
+
 			var collectionExecutedMetric module.CollectionExecutedMetric = metrics.NewNoopCollector()
 			indexerCore, err := indexer.New(
 				builder.Logger,
@@ -1300,6 +1306,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Storage.Collections,
 				builder.Storage.Transactions,
 				builder.Storage.LightTransactionResults,
+				builder.RootChainID.Chain(),
+				derivedChainData,
 				collectionExecutedMetric,
 			)
 			if err != nil {

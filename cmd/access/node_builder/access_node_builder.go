@@ -52,6 +52,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -786,6 +787,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 				builder.Storage.RegisterIndex = registers
 
+				derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
+				if err != nil {
+					return nil, fmt.Errorf("could not create derived chain data: %w", err)
+				}
+
 				indexerCore, err := indexer.New(
 					builder.Logger,
 					metrics.NewExecutionStateIndexerCollector(),
@@ -796,6 +802,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.Storage.Collections,
 					builder.Storage.Transactions,
 					builder.Storage.LightTransactionResults,
+					builder.RootChainID.Chain(),
+					derivedChainData,
 					builder.collectionExecutedMetric,
 				)
 				if err != nil {
@@ -822,7 +830,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 				// create script execution module, this depends on the indexer being initialized and the
 				// having the register storage bootstrapped
-				scripts, err := execution.NewScripts(
+				scripts := execution.NewScripts(
 					builder.Logger,
 					metrics.NewExecutionCollector(builder.Tracer),
 					builder.RootChainID,
@@ -830,10 +838,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.Storage.Headers,
 					builder.ExecutionIndexerCore.RegisterValue,
 					builder.scriptExecutorConfig,
+					derivedChainData,
 				)
-				if err != nil {
-					return nil, err
-				}
 
 				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts)
 				if err != nil {

@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/query/mock"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -156,6 +157,9 @@ func (s *scriptTestSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.registerIndex = pebbleRegisters
 
+	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
+	s.Require().NoError(err)
+
 	index, err := indexer.New(
 		logger,
 		metrics.NewNoopCollector(),
@@ -166,11 +170,13 @@ func (s *scriptTestSuite) SetupTest() {
 		nil,
 		nil,
 		nil,
+		flow.Testnet.Chain(),
+		derivedChainData,
 		nil,
 	)
 	s.Require().NoError(err)
 
-	scripts, err := NewScripts(
+	scripts := NewScripts(
 		logger,
 		metrics.NewNoopCollector(),
 		s.chain.ChainID(),
@@ -178,6 +184,7 @@ func (s *scriptTestSuite) SetupTest() {
 		headers,
 		index.RegisterValue,
 		query.NewDefaultConfig(),
+		derivedChainData,
 	)
 	s.Require().NoError(err)
 	s.scripts = scripts

@@ -36,6 +36,7 @@ type IndexerCore struct {
 
 	chain            flow.Chain
 	derivedChainData *derived.DerivedChainData
+	serviceAddress   flow.Address
 }
 
 // New execution state indexer used to ingest block execution data and index it by height.
@@ -51,6 +52,8 @@ func New(
 	collections storage.Collections,
 	transactions storage.Transactions,
 	results storage.LightTransactionResults,
+	chain flow.Chain,
+	derivedChainData *derived.DerivedChainData,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 ) (*IndexerCore, error) {
 	log = log.With().Str("component", "execution_indexer").Logger()
@@ -71,6 +74,8 @@ func New(
 		collections:              collections,
 		transactions:             transactions,
 		results:                  results,
+		serviceAddress:           chain.ServiceAddress(),
+		derivedChainData:         derivedChainData,
 		collectionExecutedMetric: collectionExecutedMetric,
 	}, nil
 }
@@ -326,6 +331,10 @@ func HandleCollection(
 }
 
 func (c *IndexerCore) updateProgramCache(header *flow.Header, events []flow.Event, collections []*flow.Collection) error {
+	if c.derivedChainData == nil {
+		return nil
+	}
+
 	derivedBlockData := c.derivedChainData.GetOrCreateDerivedBlockData(
 		header.ID(),
 		header.ParentID,
@@ -348,7 +357,7 @@ func (c *IndexerCore) updateProgramCache(header *flow.Header, events []flow.Even
 			invalidated: updatedContracts,
 		},
 		meterParamOverrides: &meterParamOverridesInvalidator{
-			invalidateAll: hasAuthorizedTransaction(collections, c.chain.ServiceAddress()),
+			invalidateAll: hasAuthorizedTransaction(collections, c.serviceAddress),
 		},
 	})
 
