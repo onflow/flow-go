@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -65,7 +66,10 @@ func finalList(cmd *cobra.Command, args []string) {
 	validateNodes(localNodes, registeredNodes)
 
 	// write node-config.json with the new list of nodes to be used for the `finalize` command
-	writeJSON(model.PathFinallist, model.ToPublicNodeInfoList(localNodes))
+	err := common.WriteJSON(model.PathFinallist, flagOutdir, model.ToPublicNodeInfoList(localNodes))
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
 }
 
 func validateNodes(localNodes []model.NodeInfo, registeredNodes []model.NodeInfo) {
@@ -229,16 +233,16 @@ func checkMismatchingNodes(localNodes []model.NodeInfo, registeredNodes []model.
 }
 
 func assembleInternalNodesWithoutWeight() []model.NodeInfo {
-	privInternals := readInternalNodes()
+	privInternals := common.ReadInternalNodes(log, flagInternalNodePrivInfoDir)
 	log.Info().Msgf("read %v internal private node-info files", len(privInternals))
 
 	var nodes []model.NodeInfo
 	for _, internal := range privInternals {
 		// check if address is valid format
-		validateAddressFormat(internal.Address)
+		common.ValidateAddressFormat(log, internal.Address)
 
 		// validate every single internal node
-		nodeID := validateNodeID(internal.NodeID)
+		nodeID := ValidateNodeID(internal.NodeID)
 		node := model.NewPrivateNodeInfo(
 			nodeID,
 			internal.Role,
@@ -255,26 +259,29 @@ func assembleInternalNodesWithoutWeight() []model.NodeInfo {
 }
 
 func assemblePartnerNodesWithoutWeight() []model.NodeInfo {
-	partners := readPartnerNodes()
+	partners := common.ReadPartnerNodes(log, flagPartnerNodeInfoDir)
 	log.Info().Msgf("read %v partner node configuration files", len(partners))
 	return createPublicNodeInfo(partners)
 }
 
 func readStakingContractDetails() []model.NodeInfo {
 	var stakingNodes []model.NodeInfoPub
-	readJSON(flagStakingNodesPath, &stakingNodes)
+	err := common.ReadJSON(flagStakingNodesPath, &stakingNodes)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read json")
+	}
 	return createPublicNodeInfo(stakingNodes)
 }
 
 func createPublicNodeInfo(nodes []model.NodeInfoPub) []model.NodeInfo {
 	var publicInfoNodes []model.NodeInfo
 	for _, n := range nodes {
-		validateAddressFormat(n.Address)
+		common.ValidateAddressFormat(log, n.Address)
 
 		// validate every single partner node
-		nodeID := validateNodeID(n.NodeID)
-		networkPubKey := validateNetworkPubKey(n.NetworkPubKey)
-		stakingPubKey := validateStakingPubKey(n.StakingPubKey)
+		nodeID := ValidateNodeID(n.NodeID)
+		networkPubKey := ValidateNetworkPubKey(n.NetworkPubKey)
+		stakingPubKey := ValidateStakingPubKey(n.StakingPubKey)
 
 		// all nodes should have equal weight
 		node := model.NewPublicNodeInfo(

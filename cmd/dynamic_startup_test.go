@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
@@ -87,7 +88,7 @@ func TestGetSnapshotAtEpochAndPhase(t *testing.T) {
 		_, _, targetPhase, targetEpoch := dynamicJoinFlagsFixture()
 
 		// get snapshot
-		actualSnapshot, err := GetSnapshotAtEpochAndPhase(
+		actualSnapshot, err := common.GetSnapshotAtEpochAndPhase(
 			context.Background(),
 			unittest.Logger(),
 			targetEpoch,
@@ -113,7 +114,7 @@ func TestGetSnapshotAtEpochAndPhase(t *testing.T) {
 		_, _, targetPhase, targetEpoch := dynamicJoinFlagsFixture()
 
 		// get snapshot
-		actualSnapshot, err := GetSnapshotAtEpochAndPhase(
+		actualSnapshot, err := common.GetSnapshotAtEpochAndPhase(
 			context.Background(),
 			unittest.Logger(),
 			targetEpoch,
@@ -143,7 +144,7 @@ func TestGetSnapshotAtEpochAndPhase(t *testing.T) {
 		_, _, targetPhase, _ := dynamicJoinFlagsFixture()
 
 		// get snapshot
-		actualSnapshot, err := GetSnapshotAtEpochAndPhase(
+		actualSnapshot, err := common.GetSnapshotAtEpochAndPhase(
 			context.Background(),
 			unittest.Logger(),
 			5,

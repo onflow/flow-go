@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	ioutils "github.com/onflow/flow-go/utils/io"
@@ -49,7 +50,7 @@ func TestMachineAccountKeyFileExists(t *testing.T) {
 
 		// read file priv key file before command
 		var machineAccountPrivBefore model.NodeMachineAccountKey
-		readJSON(machineKeyFilePath, &machineAccountPrivBefore)
+		require.NoError(t, common.ReadJSON(machineKeyFilePath, &machineAccountPrivBefore))
 
 		// run command with flags
 		machineAccountKeyRun(nil, nil)
@@ -59,7 +60,7 @@ func TestMachineAccountKeyFileExists(t *testing.T) {
 
 		// read machine account key file again
 		var machineAccountPrivAfter model.NodeMachineAccountKey
-		readJSON(machineKeyFilePath, &machineAccountPrivAfter)
+		require.NoError(t, common.ReadJSON(machineKeyFilePath, &machineAccountPrivAfter))
 
 		// check if key was modified
 		assert.Equal(t, machineAccountPrivBefore, machineAccountPrivAfter)

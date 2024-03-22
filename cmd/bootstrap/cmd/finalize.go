@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/fvm"
 	model "github.com/onflow/flow-go/model/bootstrap"
@@ -115,11 +116,11 @@ func finalize(cmd *cobra.Command, args []string) {
 	}
 
 	log.Info().Msg("collecting partner network and staking keys")
-	partnerNodes := readPartnerNodeInfos()
+	partnerNodes := common.ReadPartnerNodeInfos(log, flagPartnerWeights, flagPartnerNodeInfoDir)
 	log.Info().Msg("")
 
 	log.Info().Msg("generating internal private networking and staking keys")
-	internalNodes := readInternalNodeInfos()
+	internalNodes := common.ReadInternalNodeInfos(log, flagInternalNodePrivInfoDir, flagConfig)
 	log.Info().Msg("")
 
 	log.Info().Msg("checking constraints on consensus nodes")
@@ -195,7 +196,10 @@ func finalize(cmd *cobra.Command, args []string) {
 	}
 
 	// write snapshot to disk
-	writeJSON(model.PathRootProtocolStateSnapshot, snapshot.Encodable())
+	err = common.WriteJSON(model.PathRootProtocolStateSnapshot, flagOutdir, snapshot.Encodable())
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
 	log.Info().Msg("")
 
 	// read snapshot and verify consistency
@@ -250,7 +254,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	// print count of all nodes
-	roleCounts := nodeCountByRole(stakingNodes)
+	roleCounts := common.NodeCountByRole(stakingNodes)
 	log.Info().Msg(fmt.Sprintf("created keys for %d %s nodes", roleCounts[flow.RoleConsensus], flow.RoleConsensus.String()))
 	log.Info().Msg(fmt.Sprintf("created keys for %d %s nodes", roleCounts[flow.RoleCollection], flow.RoleCollection.String()))
 	log.Info().Msg(fmt.Sprintf("created keys for %d %s nodes", roleCounts[flow.RoleVerification], flow.RoleVerification.String()))
@@ -263,7 +267,7 @@ func finalize(cmd *cobra.Command, args []string) {
 // readRootBlockVotes reads votes for root block
 func readRootBlockVotes() []*hotstuff.Vote {
 	var votes []*hotstuff.Vote
-	files, err := filesInDir(flagRootBlockVotesDir)
+	files, err := common.FilesInDir(flagRootBlockVotesDir)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read root block votes")
 	}
@@ -275,157 +279,15 @@ func readRootBlockVotes() []*hotstuff.Vote {
 
 		// read file and append to partners
 		var vote hotstuff.Vote
-		readJSON(f, &vote)
+		err = common.ReadJSON(f, &vote)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to read json")
+		}
+
 		votes = append(votes, &vote)
 		log.Info().Msgf("read vote %v for block %v from signerID %v", vote.ID(), vote.BlockID, vote.SignerID)
 	}
 	return votes
-}
-
-// readPartnerNodeInfos returns a list of partner nodes after gathering weights
-// and public key information from configuration files
-func readPartnerNodeInfos() []model.NodeInfo {
-	partners := readPartnerNodes()
-	log.Info().Msgf("read %d partner node configuration files", len(partners))
-
-	var weights PartnerWeights
-	readJSON(flagPartnerWeights, &weights)
-	log.Info().Msgf("read %d weights for partner nodes", len(weights))
-
-	var nodes []model.NodeInfo
-	for _, partner := range partners {
-		// validate every single partner node
-		nodeID := validateNodeID(partner.NodeID)
-		networkPubKey := validateNetworkPubKey(partner.NetworkPubKey)
-		stakingPubKey := validateStakingPubKey(partner.StakingPubKey)
-		weight, valid := validateWeight(weights[partner.NodeID])
-		if !valid {
-			log.Error().Msgf("weights: %v", weights)
-			log.Fatal().Msgf("partner node id %x has no weight", nodeID)
-		}
-		if weight != flow.DefaultInitialWeight {
-			log.Warn().Msgf("partner node (id=%x) has non-default weight (%d != %d)", partner.NodeID, weight, flow.DefaultInitialWeight)
-		}
-
-		node := model.NewPublicNodeInfo(
-			nodeID,
-			partner.Role,
-			partner.Address,
-			weight,
-			networkPubKey.PublicKey,
-			stakingPubKey.PublicKey,
-		)
-		nodes = append(nodes, node)
-	}
-
-	return nodes
-}
-
-// readPartnerNodes reads the partner node information
-func readPartnerNodes() []model.NodeInfoPub {
-	var partners []model.NodeInfoPub
-	files, err := filesInDir(flagPartnerNodeInfoDir)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not read partner node infos")
-	}
-	for _, f := range files {
-		// skip files that do not include node-infos
-		if !strings.Contains(f, model.PathPartnerNodeInfoPrefix) {
-			continue
-		}
-
-		// read file and append to partners
-		var p model.NodeInfoPub
-		readJSON(f, &p)
-		partners = append(partners, p)
-	}
-	return partners
-}
-
-// readInternalNodeInfos returns a list of internal nodes after collecting weights
-// from configuration files
-func readInternalNodeInfos() []model.NodeInfo {
-	privInternals := readInternalNodes()
-	log.Info().Msgf("read %v internal private node-info files", len(privInternals))
-
-	weights := internalWeightsByAddress()
-	log.Info().Msgf("read %d weights for internal nodes", len(weights))
-
-	var nodes []model.NodeInfo
-	for _, internal := range privInternals {
-		// check if address is valid format
-		validateAddressFormat(internal.Address)
-
-		// validate every single internal node
-		nodeID := validateNodeID(internal.NodeID)
-		weight, valid := validateWeight(weights[internal.Address])
-		if !valid {
-			log.Error().Msgf("weights: %v", weights)
-			log.Fatal().Msgf("internal node %v has no weight. Did you forget to update the node address?", internal)
-		}
-		if weight != flow.DefaultInitialWeight {
-			log.Warn().Msgf("internal node (id=%x) has non-default weight (%d != %d)", internal.NodeID, weight, flow.DefaultInitialWeight)
-		}
-
-		node := model.NewPrivateNodeInfo(
-			nodeID,
-			internal.Role,
-			internal.Address,
-			weight,
-			internal.NetworkPrivKey,
-			internal.StakingPrivKey,
-		)
-
-		nodes = append(nodes, node)
-	}
-
-	return nodes
-}
-
-// readInternalNodes reads our internal node private infos generated by
-// `keygen` command and returns it
-func readInternalNodes() []model.NodeInfoPriv {
-	var internalPrivInfos []model.NodeInfoPriv
-
-	// get files in internal priv node infos directory
-	files, err := filesInDir(flagInternalNodePrivInfoDir)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not read partner node infos")
-	}
-
-	// for each of the files
-	for _, f := range files {
-		// skip files that do not include node-infos
-		if !strings.Contains(f, model.PathPrivNodeInfoPrefix) {
-			continue
-		}
-
-		// read file and append to partners
-		var p model.NodeInfoPriv
-		readJSON(f, &p)
-		internalPrivInfos = append(internalPrivInfos, p)
-	}
-
-	return internalPrivInfos
-}
-
-// internalWeightsByAddress returns a mapping of node address by weight for internal nodes
-func internalWeightsByAddress() map[string]uint64 {
-	// read json
-	var configs []model.NodeConfig
-	readJSON(flagConfig, &configs)
-	log.Info().Interface("config", configs).Msgf("read internal node configurations")
-
-	weights := make(map[string]uint64)
-	for _, config := range configs {
-		if _, ok := weights[config.Address]; !ok {
-			weights[config.Address] = config.Weight
-		} else {
-			log.Error().Msgf("duplicate internal node address %s", config.Address)
-		}
-	}
-
-	return weights
 }
 
 // mergeNodeInfos merges the internal and partner nodes and checks if there are no
@@ -495,28 +357,28 @@ func readDKGData() dkg.DKGData {
 
 // Validation utility methods ------------------------------------------------
 
-func validateNodeID(nodeID flow.Identifier) flow.Identifier {
+func ValidateNodeID(nodeID flow.Identifier) flow.Identifier {
 	if nodeID == flow.ZeroID {
 		log.Fatal().Msg("NodeID must not be zero")
 	}
 	return nodeID
 }
 
-func validateNetworkPubKey(key encodable.NetworkPubKey) encodable.NetworkPubKey {
+func ValidateNetworkPubKey(key encodable.NetworkPubKey) encodable.NetworkPubKey {
 	if key.PublicKey == nil {
 		log.Fatal().Msg("NetworkPubKey must not be nil")
 	}
 	return key
 }
 
-func validateStakingPubKey(key encodable.StakingPubKey) encodable.StakingPubKey {
+func ValidateStakingPubKey(key encodable.StakingPubKey) encodable.StakingPubKey {
 	if key.PublicKey == nil {
 		log.Fatal().Msg("StakingPubKey must not be nil")
 	}
 	return key
 }
 
-func validateWeight(weight uint64) (uint64, bool) {
+func ValidateWeight(weight uint64) (uint64, bool) {
 	return weight, weight > 0
 }
 

@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -56,7 +57,10 @@ func genconfigCmdRun(_ *cobra.Command, _ []string) {
 		configs = append(configs, createConf(flow.RoleVerification, i))
 	}
 
-	writeJSON(flagConfig, configs)
+	err := common.WriteJSON(flagConfig, flagOutdir, configs)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
 }
 
 // genconfigCmd represents the genconfig command
