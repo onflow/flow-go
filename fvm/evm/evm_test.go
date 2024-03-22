@@ -896,8 +896,10 @@ func setupCOA(
                 .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 				?? panic("Could not borrow reference to the owner's Vault!")
 
-			let vault <- vaultRef.withdraw(amount: amount) as! @FlowToken.Vault
-			cadenceOwnedAccount1.deposit(from: <-vault)
+			if amount > 0.0 {
+				let vault <- vaultRef.withdraw(amount: amount) as! @FlowToken.Vault
+				cadenceOwnedAccount1.deposit(from: <-vault)
+			}
 			
 			account.storage.save<@EVM.CadenceOwnedAccount>(
 				<-cadenceOwnedAccount1,

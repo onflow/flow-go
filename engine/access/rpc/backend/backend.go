@@ -12,8 +12,12 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -68,6 +72,8 @@ type Backend struct {
 	backendAccounts
 	backendExecutionResults
 	backendNetwork
+	backendSubscribeBlocks
+	backendSubscribeTransactions
 
 	state             protocol.State
 	chainID           flow.ChainID
@@ -76,7 +82,8 @@ type Backend struct {
 	connFactory       connection.ConnectionFactory
 
 	// cache the response to GetNodeVersionInfo since it doesn't change
-	nodeInfo *access.NodeVersionInfo
+	nodeInfo     *access.NodeVersionInfo
+	BlockTracker subscription.BlockTracker
 }
 
 type Params struct {
@@ -104,9 +111,19 @@ type Params struct {
 	ScriptExecutor            execution.ScriptExecutor
 	ScriptExecutionMode       IndexQueryMode
 	EventQueryMode            IndexQueryMode
-	EventsIndex               *EventsIndex
-	TxResultQueryMode         IndexQueryMode
-	TxResultsIndex            *TransactionResultsIndex
+	BlockTracker              subscription.BlockTracker
+	SubscriptionParams        SubscriptionParams
+
+	EventsIndex       *index.EventsIndex
+	TxResultQueryMode IndexQueryMode
+	TxResultsIndex    *index.TransactionResultsIndex
+}
+
+type SubscriptionParams struct {
+	Broadcaster    *engine.Broadcaster
+	SendTimeout    time.Duration
+	ResponseLimit  float64
+	SendBufferSize int
 }
 
 var _ TransactionErrorMessage = (*Backend)(nil)
@@ -143,11 +160,28 @@ func New(params Params) (*Backend, error) {
 		}
 	}
 
+	// the system tx is hardcoded and never changes during runtime
+	systemTx, err := blueprints.SystemChunkTransaction(params.ChainID.Chain())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create system chunk transaction: %w", err)
+	}
+	systemTxID := systemTx.ID()
+
 	// initialize node version info
 	nodeInfo := getNodeVersionInfo(params.State.Params())
 
+	transactionsLocalDataProvider := &TransactionsLocalDataProvider{
+		state:          params.State,
+		collections:    params.Collections,
+		blocks:         params.Blocks,
+		eventsIndex:    params.EventsIndex,
+		txResultsIndex: params.TxResultsIndex,
+		systemTxID:     systemTxID,
+	}
+
 	b := &Backend{
-		state: params.State,
+		state:        params.State,
+		BlockTracker: params.BlockTracker,
 		// create the sub-backends
 		backendScripts: backendScripts{
 			log:               params.Log,
@@ -162,27 +196,23 @@ func New(params Params) (*Backend, error) {
 			scriptExecMode:    params.ScriptExecutionMode,
 		},
 		backendTransactions: backendTransactions{
-			TransactionsLocalDataProvider: TransactionsLocalDataProvider{
-				state:          params.State,
-				collections:    params.Collections,
-				blocks:         params.Blocks,
-				eventsIndex:    params.EventsIndex,
-				txResultsIndex: params.TxResultsIndex,
-			},
-			log:                  params.Log,
-			staticCollectionRPC:  params.CollectionRPC,
-			chainID:              params.ChainID,
-			transactions:         params.Transactions,
-			executionReceipts:    params.ExecutionReceipts,
-			transactionValidator: configureTransactionValidator(params.State, params.ChainID),
-			transactionMetrics:   params.AccessMetrics,
-			retry:                retry,
-			connFactory:          params.ConnFactory,
-			previousAccessNodes:  params.HistoricalAccessNodes,
-			nodeCommunicator:     params.Communicator,
-			txResultCache:        txResCache,
-			txErrorMessagesCache: txErrorMessagesCache,
-			txResultQueryMode:    params.TxResultQueryMode,
+			TransactionsLocalDataProvider: transactionsLocalDataProvider,
+			log:                           params.Log,
+			staticCollectionRPC:           params.CollectionRPC,
+			chainID:                       params.ChainID,
+			transactions:                  params.Transactions,
+			executionReceipts:             params.ExecutionReceipts,
+			transactionValidator:          configureTransactionValidator(params.State, params.ChainID),
+			transactionMetrics:            params.AccessMetrics,
+			retry:                         retry,
+			connFactory:                   params.ConnFactory,
+			previousAccessNodes:           params.HistoricalAccessNodes,
+			nodeCommunicator:              params.Communicator,
+			txResultCache:                 txResCache,
+			txErrorMessagesCache:          txErrorMessagesCache,
+			txResultQueryMode:             params.TxResultQueryMode,
+			systemTx:                      systemTx,
+			systemTxID:                    systemTxID,
 		},
 		backendEvents: backendEvents{
 			log:               params.Log,
@@ -222,6 +252,27 @@ func New(params Params) (*Backend, error) {
 			chainID:              params.ChainID,
 			headers:              params.Headers,
 			snapshotHistoryLimit: params.SnapshotHistoryLimit,
+		},
+		backendSubscribeBlocks: backendSubscribeBlocks{
+			log:            params.Log,
+			state:          params.State,
+			headers:        params.Headers,
+			blocks:         params.Blocks,
+			broadcaster:    params.SubscriptionParams.Broadcaster,
+			sendTimeout:    params.SubscriptionParams.SendTimeout,
+			responseLimit:  params.SubscriptionParams.ResponseLimit,
+			sendBufferSize: params.SubscriptionParams.SendBufferSize,
+			blockTracker:   params.BlockTracker,
+		},
+		backendSubscribeTransactions: backendSubscribeTransactions{
+			txLocalDataProvider: transactionsLocalDataProvider,
+			log:                 params.Log,
+			executionResults:    params.ExecutionResults,
+			broadcaster:         params.SubscriptionParams.Broadcaster,
+			sendTimeout:         params.SubscriptionParams.SendTimeout,
+			responseLimit:       params.SubscriptionParams.ResponseLimit,
+			sendBufferSize:      params.SubscriptionParams.SendBufferSize,
+			blockTracker:        params.BlockTracker,
 		},
 		collections:       params.Collections,
 		executionReceipts: params.ExecutionReceipts,

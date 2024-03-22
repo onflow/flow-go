@@ -1,8 +1,8 @@
 package types
 
 import (
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
 )
 
 // Result captures the result of an interaction to the emulator
@@ -42,7 +42,13 @@ func (res *Result) VMErrorString() string {
 
 // Receipt constructs an EVM-style receipt
 // can be used by json-rpc and other integration to be returned.
-func (res *Result) Receipt() *gethTypes.ReceiptForStorage {
+//
+// This is method is also used to construct block receipt root hash
+// which requires the return receipt satisfy RLP encoding and cover these feilds
+// Type (txType), PostState or Status, CumulativeGasUsed, Logs and Logs Bloom
+// and for each log, Address, Topics, Data (consensus fields)
+// During execution we also do fill in BlockNumber, TxIndex, Index (event index)
+func (res *Result) Receipt() *gethTypes.Receipt {
 	receipt := &gethTypes.Receipt{
 		Type:              res.TxType,
 		CumulativeGasUsed: res.GasConsumed, // TODO: update to capture cumulative
@@ -56,7 +62,7 @@ func (res *Result) Receipt() *gethTypes.ReceiptForStorage {
 	}
 
 	receipt.Bloom = gethTypes.CreateBloom(gethTypes.Receipts{receipt})
-	return (*gethTypes.ReceiptForStorage)(receipt)
+	return receipt
 }
 
 // Status captures the status of an interaction to the emulator

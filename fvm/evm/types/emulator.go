@@ -3,10 +3,10 @@ package types
 import (
 	"math/big"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	gethVM "github.com/ethereum/go-ethereum/core/vm"
-	gethCrypto "github.com/ethereum/go-ethereum/crypto"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethVM "github.com/onflow/go-ethereum/core/vm"
+	gethCrypto "github.com/onflow/go-ethereum/crypto"
 )
 
 var (
@@ -39,7 +39,7 @@ type BlockContext struct {
 // NewDefaultBlockContext returns a new default block context
 func NewDefaultBlockContext(BlockNumber uint64) BlockContext {
 	return BlockContext{
-		ChainID:                FlowEVMTestnetChainID,
+		ChainID:                FlowEVMPreviewNetChainID,
 		BlockNumber:            BlockNumber,
 		DirectCallBaseGasUsage: DefaultDirectCallBaseGasUsage,
 		DirectCallGasPrice:     DefaultDirectCallGasPrice,

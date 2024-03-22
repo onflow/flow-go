@@ -3,7 +3,7 @@ package types_test
 import (
 	"testing"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
