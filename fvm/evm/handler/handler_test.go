@@ -158,7 +158,9 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					aa := handler.NewAddressAllocator()
 					em := &testutils.TestEmulator{
 						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
-							return &types.Result{}, types.NewEVMValidationError(fmt.Errorf("some sort of validation error"))
+							return &types.Result{
+								ValidationError: types.NewEVMValidationError(fmt.Errorf("some sort of validation error")),
+							}, nil
 						},
 					}
 					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, bs, aa, backend, em)
@@ -776,7 +778,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 					evmErr := fmt.Errorf("%w: next nonce %v, tx nonce %v", gethCore.ErrNonceTooLow, 1, 0)
 					em := &testutils.TestEmulator{
 						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
-							return &types.Result{}, types.NewEVMValidationError(evmErr)
+							return &types.Result{ValidationError: types.NewEVMValidationError(evmErr)}, nil
 						},
 					}
 					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, bs, aa, backend, em)
@@ -793,9 +795,11 @@ func TestHandler_TransactionRun(t *testing.T) {
 						big.NewInt(1),
 					)
 
-					rs := handler.Run([]byte(tx), coinbase)
-					require.Equal(t, types.StatusInvalid, rs.Status)
-					require.Equal(t, types.ValidationErrCodeInsufficientComputation, rs.ErrorCode)
+					assertPanic(t, isNotFatal, func() {
+						rs := handler.Run([]byte(tx), coinbase)
+						require.Equal(t, types.StatusInvalid, rs.Status)
+						require.Equal(t, types.ValidationErrCodeInsufficientComputation, rs.ErrorCode)
+					})
 
 					tx = eoa.PrepareSignAndEncodeTx(
 						t,
@@ -806,7 +810,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 						big.NewInt(1),
 					)
 
-					rs = handler.Run([]byte(tx), coinbase)
+					rs := handler.Run([]byte(tx), coinbase)
 					require.Equal(t, types.StatusInvalid, rs.Status)
 					require.Equal(t, types.ValidationErrCodeNonceTooLow, rs.ErrorCode)
 				})

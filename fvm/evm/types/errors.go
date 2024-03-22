@@ -100,10 +100,10 @@ var (
 
 	// ErrInsufficientComputation is returned when not enough computation is
 	// left in the context of flow transaction to execute the evm operation.
-	ErrInsufficientComputation = NewEVMValidationError(errors.New("insufficient computation"))
+	ErrInsufficientComputation = errors.New("insufficient computation")
 
 	// ErrUnAuthroizedMethodCall method call, usually emited when calls are called on EOA accounts
-	ErrUnAuthroizedMethodCall = NewEVMValidationError(errors.New("unauthroized method call"))
+	ErrUnAuthroizedMethodCall = errors.New("unauthroized method call")
 
 	// ErrWithdrawBalanceRounding is returned when withdraw call has a balance that could
 	// yeild to rounding error, i.e. the balance contains fractions smaller than 10^8 Flow (smallest unit allowed to transfer).
