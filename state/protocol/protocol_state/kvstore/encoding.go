@@ -3,20 +3,11 @@ package kvstore
 import (
 	"bytes"
 
-	"github.com/onflow/flow-go/module/irrecoverable"
-
 	"github.com/vmihailenco/msgpack/v4"
-)
 
-// VersionedEncodable defines the interface for a versioned key-value store independent
-// of the set of keys which are supported. This allows the storage layer to support
-// storing different key-value model versions within the same software version.
-type VersionedEncodable interface {
-	// VersionedEncode encodes the key-value store, returning the version separately
-	// from the encoded bytes.
-	// No errors are expected during normal operation.
-	VersionedEncode() (uint64, []byte, error)
-}
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
+)
 
 // versionedEncode is a helper function for implementing VersionedEncodable.
 // No errors are expected during normal operation.
@@ -31,13 +22,13 @@ func versionedEncode(version uint64, pairs any) (uint64, []byte, error) {
 // VersionedDecode decodes a serialized key-value store instance with the given version.
 // Errors:
 //   - ErrUnsupportedVersion if input version is not supported
-func VersionedDecode(version uint64, bz []byte) (API, error) {
-	var target API
+func VersionedDecode(version uint64, bz []byte) (protocol_state.KVStoreAPI, error) {
+	var target protocol_state.KVStoreAPI
 	switch version {
 	case 0:
-		target = new(modelv0)
+		target = new(Modelv0)
 	case 1:
-		target = new(modelv1)
+		target = new(Modelv1)
 	default:
 		return nil, ErrUnsupportedVersion
 	}

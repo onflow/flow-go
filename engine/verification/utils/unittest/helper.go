@@ -35,7 +35,7 @@ import (
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
+	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -655,6 +655,7 @@ func bootstrapSystem(
 
 		mutableProtocolState := protocol_state.NewMutableProtocolState(
 			stateFixture.Storage.ProtocolState,
+			stateFixture.Storage.ProtocolKVStore,
 			stateFixture.State.Params(),
 			stateFixture.Storage.Headers,
 			stateFixture.Storage.Results,

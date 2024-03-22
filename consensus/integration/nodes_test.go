@@ -55,7 +55,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
+	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/state/protocol/util"
 	storage "github.com/onflow/flow-go/storage/badger"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -378,6 +378,8 @@ func createNode(
 	commitsDB := storage.NewEpochCommits(metricsCollector, db)
 	protocolStateDB := storage.NewProtocolState(metricsCollector, setupsDB, commitsDB, db,
 		storage.DefaultProtocolStateCacheSize, storage.DefaultProtocolStateByBlockIDCacheSize)
+	protocokKVStoreDB := storage.NewProtocolKVStore(metricsCollector, db,
+		storage.DefaultProtocolKVStoreCacheSize, storage.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeaconDB := storage.NewVersionBeacons(db)
 	protocolStateEvents := events.NewDistributor()
 
@@ -399,6 +401,7 @@ func createNode(
 		setupsDB,
 		commitsDB,
 		protocolStateDB,
+		protocokKVStoreDB,
 		versionBeaconDB,
 		rootSnapshot,
 	)
@@ -462,6 +465,7 @@ func createNode(
 
 	mutableProtocolState := protocol_state.NewMutableProtocolState(
 		protocolStateDB,
+		protocokKVStoreDB,
 		state.Params(),
 		headersDB,
 		resultsDB,

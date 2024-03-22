@@ -63,7 +63,7 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
+	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
@@ -721,6 +721,7 @@ func main() {
 		Component("consensus participant", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			mutableProtocolState := protocol_state.NewMutableProtocolState(
 				node.Storage.ProtocolState,
+				node.Storage.ProtocolKVStore,
 				node.State.Params(),
 				node.Storage.Headers,
 				node.Storage.Results,

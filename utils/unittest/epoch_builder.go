@@ -368,13 +368,13 @@ func (builder *EpochBuilder) BuildBlocks(n uint) {
 // addBlock adds the given block to the state by: extending the state,
 // finalizing the block, and caching the block.
 func (builder *EpochBuilder) addBlock(block *flow.Block) {
-	stateMutator, err := builder.mutableProtocolState.Mutator(block.Header.View, block.Header.ParentID)
+	stateMutator, err := builder.mutableProtocolState.Mutator(block.Header)
 	require.NoError(builder.t, err)
 
 	err = stateMutator.ApplyServiceEventsFromValidatedSeals(block.Payload.Seals)
 	require.NoError(builder.t, err)
 
-	_, _, updatedStateId, _ := stateMutator.Build()
+	updatedStateId, _, err := stateMutator.Build()
 	require.NoError(builder.t, err)
 
 	block.Payload.ProtocolStateID = updatedStateId

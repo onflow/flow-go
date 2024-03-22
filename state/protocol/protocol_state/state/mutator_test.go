@@ -1,8 +1,8 @@
-package protocol_state
+package state
 
 import (
 	"errors"
-	"fmt"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,7 +14,8 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
-	protocolstatemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
+	epochsmock "github.com/onflow/flow-go/state/protocol/protocol_state/epochs/mock"
+	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/rand"
@@ -27,15 +28,16 @@ func TestProtocolStateMutator(t *testing.T) {
 
 type StateMutatorSuite struct {
 	suite.Suite
-	protocolStateDB *storagemock.ProtocolState
-	headersDB       *storagemock.Headers
-	resultsDB       *storagemock.ExecutionResults
-	setupsDB        *storagemock.EpochSetups
-	commitsDB       *storagemock.EpochCommits
-	globalParams    *protocolmock.GlobalParams
-	parentState     *flow.RichProtocolStateEntry
-	stateMachine    *protocolstatemock.ProtocolStateMachine
-	candidateView   uint64
+	protocolStateDB   *storagemock.ProtocolState
+	headersDB         *storagemock.Headers
+	resultsDB         *storagemock.ExecutionResults
+	setupsDB          *storagemock.EpochSetups
+	commitsDB         *storagemock.EpochCommits
+	protocolKVStoreDB *storagemock.ProtocolKVStore
+	globalParams      *protocolmock.GlobalParams
+	parentState       *protocol_statemock.KVStoreAPI
+	stateMachine      *epochsmock.EpochStateMachine
+	candidate         *flow.Header
 
 	mutator *stateMutator
 }
@@ -48,9 +50,9 @@ func (s *StateMutatorSuite) SetupTest() {
 	s.commitsDB = storagemock.NewEpochCommits(s.T())
 	s.globalParams = protocolmock.NewGlobalParams(s.T())
 	s.globalParams.On("EpochCommitSafetyThreshold").Return(uint64(1_000))
-	s.parentState = unittest.ProtocolStateFixture()
-	s.candidateView = s.parentState.CurrentEpochSetup.FirstView + 1
-	s.stateMachine = protocolstatemock.NewProtocolStateMachine(s.T())
+	s.parentState = protocol_statemock.NewKVStoreAPI(s.T())
+	s.candidate = unittest.BlockHeaderFixture(unittest.HeaderWithView(1000))
+	s.stateMachine = epochsmock.NewEpochStateMachine(s.T())
 
 	var err error
 	s.mutator, err = newStateMutator(
@@ -58,16 +60,11 @@ func (s *StateMutatorSuite) SetupTest() {
 		s.resultsDB,
 		s.setupsDB,
 		s.commitsDB,
+		s.protocolStateDB,
+		s.protocolKVStoreDB,
 		s.globalParams,
-		s.candidateView,
+		s.candidate,
 		s.parentState,
-		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
-			return s.stateMachine, nil
-		},
-		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
-			require.Fail(s.T(), "entering epoch fallback is not expected")
-			return nil, fmt.Errorf("not expecting epoch fallback")
-		},
 	)
 	require.NoError(s.T(), err)
 }
@@ -148,11 +145,11 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 			expectedConstructorCalled := false
 			s.candidateView = s.parentState.CurrentEpochSetup.FirstView + 1
 			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
 					expectedConstructorCalled = true // expect happy-path constructor
 					return s.stateMachine, nil
 				},
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
 					s.T().Fail()
 					return s.stateMachine, nil
 				},
@@ -167,11 +164,11 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 			expectedConstructorCalled := false
 			s.candidateView = s.parentState.CurrentEpochSetup.FinalView - 1
 			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
 					s.T().Fail()
 					return s.stateMachine, nil
 				},
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
 					expectedConstructorCalled = true // expect epoch-fallback state machine
 					return s.stateMachine, nil
 				},
@@ -192,11 +189,11 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 			expectedConstructorCalled := false
 			s.candidateView = s.parentState.CurrentEpochSetup.FirstView + 1
 			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
 					expectedConstructorCalled = true // expect happy-path constructor
 					return s.stateMachine, nil
 				},
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
 					s.T().Fail()
 					return s.stateMachine, nil
 				},
@@ -211,11 +208,11 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 			expectedConstructorCalled := false
 			s.candidateView = s.parentState.CurrentEpochSetup.FinalView - 1
 			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
 					s.T().Fail()
 					return s.stateMachine, nil
 				},
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
 					expectedConstructorCalled = true // expect epoch-fallback state machine
 					return s.stateMachine, nil
 				},
@@ -233,11 +230,11 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 			expectedConstructorCalled := false
 			s.candidateView = s.parentState.CurrentEpochSetup.FirstView + 1
 			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
 					expectedConstructorCalled = true // expect happy-path constructor
 					return s.stateMachine, nil
 				},
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
 					s.T().Fail()
 					return s.stateMachine, nil
 				},
@@ -252,11 +249,11 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 			expectedConstructorCalled := false
 			s.candidateView = s.parentState.CurrentEpochSetup.FinalView - 1
 			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
 					expectedConstructorCalled = true // expect happy-path constructor
 					return s.stateMachine, nil
 				},
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
 					s.T().Fail()
 					return s.stateMachine, nil
 				},
@@ -273,10 +270,10 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 		s.Run("happy-path", func() {
 			exception := irrecoverable.NewExceptionf("exception")
 			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
 					return nil, exception
 				},
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
 					s.T().Fail()
 					return s.stateMachine, nil
 				},
@@ -289,11 +286,11 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 			s.parentState.InvalidEpochTransitionAttempted = true // ensure we use epoch-fallback state machine
 			exception := irrecoverable.NewExceptionf("exception")
 			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
 					s.T().Fail()
 					return s.stateMachine, nil
 				},
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
 					return nil, exception
 				},
 			)
@@ -305,7 +302,7 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 }
 
 // TestApplyServiceEvents_InvalidEpochSetup tests that handleServiceEvents rejects invalid epoch setup event and sets
-// InvalidEpochTransitionAttempted flag in protocol.ProtocolStateMachine.
+// InvalidEpochTransitionAttempted flag in protocol.StateMachine.
 func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
 	s.Run("invalid-epoch-setup", func() {
 		mutator, err := newStateMutator(
@@ -316,13 +313,13 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
 			s.globalParams,
 			s.candidateView,
 			s.parentState,
-			func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+			func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
 				return s.stateMachine, nil
 			},
-			func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
-				epochFallbackStateMachine := protocolstatemock.NewProtocolStateMachine(s.T())
-				epochFallbackStateMachine.On("ProcessEpochSetup", mock.Anything).Return(false, nil)
-				return epochFallbackStateMachine, nil
+			func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
+				fallbackStateMachine := epochsmock.NewEpochStateMachine(s.T())
+				fallbackStateMachine.On("ProcessEpochSetup", mock.Anything).Return(false, nil)
+				return fallbackStateMachine, nil
 			},
 		)
 		require.NoError(s.T(), err)
@@ -368,7 +365,7 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
 }
 
 // TestApplyServiceEvents_InvalidEpochCommit tests that handleServiceEvents rejects invalid epoch commit event and sets
-// InvalidEpochTransitionAttempted flag in protocol.ProtocolStateMachine.
+// InvalidEpochTransitionAttempted flag in protocol.StateMachine.
 func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochCommit() {
 	s.Run("invalid-epoch-commit", func() {
 		mutator, err := newStateMutator(
@@ -379,13 +376,13 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochCommit() {
 			s.globalParams,
 			s.candidateView,
 			s.parentState,
-			func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+			func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
 				return s.stateMachine, nil
 			},
-			func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
-				epochFallbackStateMachine := protocolstatemock.NewProtocolStateMachine(s.T())
-				epochFallbackStateMachine.On("ProcessEpochCommit", mock.Anything).Return(false, nil)
-				return epochFallbackStateMachine, nil
+			func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
+				fallbackStateMachine := epochsmock.NewEpochStateMachine(s.T())
+				fallbackStateMachine.On("ProcessEpochCommit", mock.Anything).Return(false, nil)
+				return fallbackStateMachine, nil
 			},
 		)
 		require.NoError(s.T(), err)
