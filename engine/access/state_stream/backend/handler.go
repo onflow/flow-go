@@ -298,13 +298,9 @@ func (h *Handler) SubscribeAccountStatusesFromStartBlockID(
 	h.StreamCount.Add(1)
 	defer h.StreamCount.Add(-1)
 
-	startBlockID := flow.ZeroID
-	if request.GetStartBlockId() != nil {
-		blockID, err := convert.BlockID(request.GetStartBlockId())
-		if err != nil {
-			return status.Errorf(codes.InvalidArgument, "could not convert start block ID: %v", err)
-		}
-		startBlockID = blockID
+	startBlockID, err := convert.BlockID(request.GetStartBlockId())
+	if err != nil {
+		return status.Errorf(codes.InvalidArgument, "could not convert start block ID: %v", err)
 	}
 
 	statusFilter := request.GetFilter()

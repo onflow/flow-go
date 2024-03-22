@@ -102,7 +102,6 @@ func (b *AccountStatusesBackend) getAccountStatusResponseFactory(
 	filter state_stream.AccountStatusFilter,
 ) subscription.GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
-		var err error
 		eventsResponse, err := b.eventsRetriever.GetAllEventsResponse(ctx, height)
 		if err != nil {
 			return nil, err
