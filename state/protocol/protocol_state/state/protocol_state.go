@@ -2,6 +2,8 @@ package state
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -52,9 +54,8 @@ type MutableProtocolState struct {
 	ProtocolState
 	headers          storage.Headers
 	results          storage.ExecutionResults
-	setups           storage.EpochSetups
-	commits          storage.EpochCommits
 	kvStoreSnapshots storage.ProtocolKVStore
+	kvStoreFactories []protocol_state.KeyValueStoreStateMachineFactory
 }
 
 var _ protocol.MutableProtocolState = (*MutableProtocolState)(nil)
@@ -69,13 +70,16 @@ func NewMutableProtocolState(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 ) *MutableProtocolState {
+	kvStoreFactories := []protocol_state.KeyValueStoreStateMachineFactory{
+		kvstore.NewPSVersionUpgradeStateMachineFactory(globalParams),
+		epochs.NewEpochStateMachineFactory(globalParams, setups, commits, protocolStateDB),
+	}
 	return &MutableProtocolState{
 		ProtocolState:    *NewProtocolState(protocolStateDB, globalParams),
 		headers:          headers,
 		results:          results,
-		setups:           setups,
-		commits:          commits,
 		kvStoreSnapshots: kvStoreSnapshots,
+		kvStoreFactories: kvStoreFactories,
 	}
 }
 
@@ -96,12 +100,9 @@ func (s *MutableProtocolState) Mutator(candidate *flow.Header) (protocol.StateMu
 	return newStateMutator(
 		s.headers,
 		s.results,
-		s.setups,
-		s.commits,
-		s.protocolStateDB,
 		s.kvStoreSnapshots,
-		s.globalParams,
 		candidate,
 		parentState,
+		s.kvStoreFactories...,
 	)
 }

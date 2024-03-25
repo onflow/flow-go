@@ -112,29 +112,6 @@ type KVStoreMutator interface {
 	SetInvalidEpochTransitionAttempted(attempted bool) error
 }
 
-//// KeyValueStoreStateMachine implements a low-level interface for state-changing operations on the key-value store.
-//// It is used by higher level logic to evolve the protocol state when certain events that are stored in blocks are observed.
-//// The KeyValueStoreStateMachine is stateful and internally tracks the current state of key-value store.
-//// A separate instance is created for each block that is being processed.
-//type KeyValueStoreStateMachine interface {
-//	// Build returns updated key-value store model, state ID and a flag indicating if there were any changes.
-//	Build() (updatedState KVStoreReader, stateID flow.Identifier, hasChanges bool)
-//
-//	// ProcessUpdate updates the current state of key-value store.
-//	// KeyValueStoreStateMachine captures only a subset of all service events, those that are relevant for the KV store. All other events are ignored.
-//	// Implementors MUST ensure KeyValueStoreStateMachine is left in functional state if an invalid service event has been supplied.
-//	// Expected errors indicating that we have observed an invalid service event from protocol's point of view.
-//	// 	- `protocol.InvalidServiceEventError` - if the service event is invalid for the current protocol state.
-//	ProcessUpdate(update *flow.ServiceEvent) error
-//
-//	// View returns the view that is associated with this KeyValueStoreStateMachine.
-//	// The view of the KeyValueStoreStateMachine equals the view of the block carrying the respective updates.
-//	View() uint64
-//
-//	// ParentState returns parent state that is associated with this state machine.
-//	ParentState() KVStoreReader
-//}
-
 // OrthogonalStoreStateMachine represents a state machine, that exclusively evolves its state P.
 // The state's specific type P is kept as a generic. Generally, P is the type corresponding
 // to one specific key in the Key-Value store.
@@ -208,3 +185,7 @@ type OrthogonalStoreStateMachine[P any] interface {
 }
 
 type KeyValueStoreStateMachine = OrthogonalStoreStateMachine[KVStoreReader]
+
+type KeyValueStoreStateMachineFactory interface {
+	Create(candidate *flow.Header, parentState KVStoreReader, mutator KVStoreMutator) (KeyValueStoreStateMachine, error)
+}

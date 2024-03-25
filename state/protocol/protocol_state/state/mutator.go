@@ -6,17 +6,10 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
-
-// StateMachineFactoryMethod is a factory to create state machines for evolving the protocol state.
-// Currently, we have `protocolStateMachine` and `epochFallbackStateMachine` as StateMachine
-// implementations, whose constructors both have the same signature as StateMachineFactoryMethod.
-type StateMachineFactoryMethod = func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error)
 
 // stateMutator is a stateful object to evolve the protocol state. It is instantiated from the parent block's protocol state.
 // State-changing operations can be iteratively applied and the stateMutator will internally evolve its in-memory state.
@@ -50,16 +43,11 @@ var _ protocol.StateMutator = (*stateMutator)(nil)
 func newStateMutator(
 	headers storage.Headers,
 	results storage.ExecutionResults,
-	setups storage.EpochSetups,
-	commits storage.EpochCommits,
-	protocolStateSnapshots storage.ProtocolState,
 	kvStoreSnapshots storage.ProtocolKVStore,
-	params protocol.GlobalParams,
 	candidate *flow.Header,
 	parentState protocol_state.KVStoreAPI,
+	stateMachineFactories ...protocol_state.KeyValueStoreStateMachineFactory,
 ) (*stateMutator, error) {
-	stateMachines := make([]protocol_state.KeyValueStoreStateMachine, 0)
-
 	protocolVersion := parentState.GetProtocolStateVersion()
 	if versionUpgrade := parentState.GetVersionUpgrade(); versionUpgrade != nil {
 		if candidate.View >= versionUpgrade.ActivationView {
@@ -73,24 +61,14 @@ func newStateMutator(
 			parentState.GetProtocolStateVersion(), protocolVersion, err)
 	}
 
-	epochsStateMachine, err := epochs.NewEpochStateMachine(
-		candidate,
-		params,
-		setups,
-		commits,
-		protocolStateSnapshots,
-		parentState,
-		replicatedState,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("could not create epoch state machine: %w", err)
+	stateMachines := make([]protocol_state.KeyValueStoreStateMachine, 0, len(stateMachineFactories))
+	for _, factory := range stateMachineFactories {
+		stateMachine, err := factory.Create(candidate, parentState, replicatedState)
+		if err != nil {
+			return nil, fmt.Errorf("could not create state machine: %w", err)
+		}
+		stateMachines = append(stateMachines, stateMachine)
 	}
-
-	versionUpgradeStateMachine := kvstore.NewPSVersionUpgradeStateMachine(candidate.View, params, parentState, replicatedState)
-
-	// at this point, we define the order in which state machines process updates
-	stateMachines = append(stateMachines, epochsStateMachine)
-	stateMachines = append(stateMachines, versionUpgradeStateMachine)
 
 	return &stateMutator{
 		candidate:            candidate,
