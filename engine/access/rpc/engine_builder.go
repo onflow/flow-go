@@ -95,9 +95,9 @@ func (builder *RPCEngineBuilder) Build() (*Engine, error) {
 	rpcHandler := builder.rpcHandler
 	if rpcHandler == nil {
 		if builder.signerIndicesDecoder == nil {
-			rpcHandler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me)
+			rpcHandler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams)
 		} else {
-			rpcHandler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, access.WithBlockSignerDecoder(builder.signerIndicesDecoder))
+			rpcHandler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams, access.WithBlockSignerDecoder(builder.signerIndicesDecoder))
 		}
 	}
 	accessproto.RegisterAccessAPIServer(builder.unsecureGrpcServer.Server, rpcHandler)

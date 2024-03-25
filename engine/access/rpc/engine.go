@@ -177,7 +177,22 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 // No errors expected during normal operations.
 func (e *Engine) processOnFinalizedBlock(_ *model.Block) error {
 	finalizedHeader := e.finalizedHeaderCache.Get()
-	return e.backend.ProcessFinalizedBlockHeight(finalizedHeader.Height)
+
+	var err error
+	// NOTE: The BlockTracker is currently only used by the access node and not by the observer node.
+	if e.backend.BlockTracker != nil {
+		err = e.backend.BlockTracker.ProcessOnFinalizedBlock()
+		if err != nil {
+			return err
+		}
+	}
+
+	err = e.backend.ProcessFinalizedBlockHeight(finalizedHeader.Height)
+	if err != nil {
+		return fmt.Errorf("could not process finalized block height %d: %w", finalizedHeader.Height, err)
+	}
+
+	return nil
 }
 
 // RestApiAddress returns the listen address of the REST API server.

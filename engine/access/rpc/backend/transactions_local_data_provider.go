@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/codes"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -48,8 +49,8 @@ type TransactionsLocalDataProvider struct {
 	state           protocol.State
 	collections     storage.Collections
 	blocks          storage.Blocks
-	eventsIndex     *EventsIndex
-	txResultsIndex  *TransactionResultsIndex
+	eventsIndex     *index.EventsIndex
+	txResultsIndex  *index.TransactionResultsIndex
 	txErrorMessages TransactionErrorMessage
 	systemTxID      flow.Identifier
 }

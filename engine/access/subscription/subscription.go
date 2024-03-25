@@ -1,4 +1,4 @@
-package backend
+package subscription
 
 import (
 	"context"
@@ -8,8 +8,30 @@ import (
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc/status"
+)
 
-	"github.com/onflow/flow-go/engine/access/state_stream"
+const (
+	// DefaultSendBufferSize is the default buffer size for the subscription's send channel.
+	// The size is chosen to balance memory overhead from each subscription with performance when
+	// streaming existing data.
+	DefaultSendBufferSize = 10
+
+	// DefaultMaxGlobalStreams defines the default max number of streams that can be open at the same time.
+	DefaultMaxGlobalStreams = 1000
+
+	// DefaultCacheSize defines the default max number of objects for the execution data cache.
+	DefaultCacheSize = 100
+
+	// DefaultSendTimeout is the default timeout for sending a message to the client. After the timeout
+	// expires, the connection is closed.
+	DefaultSendTimeout = 30 * time.Second
+
+	// DefaultResponseLimit is default max responses per second allowed on a stream. After exceeding
+	// the limit, the stream is paused until more capacity is available.
+	DefaultResponseLimit = float64(0)
+
+	// DefaultHeartbeatInterval specifies the block interval at which heartbeat messages should be sent.
+	DefaultHeartbeatInterval = 1
 )
 
 // GetDataByHeightFunc is a callback used by subscriptions to retrieve data for a given height.
@@ -19,7 +41,38 @@ import (
 // All other errors are considered exceptions
 type GetDataByHeightFunc func(ctx context.Context, height uint64) (interface{}, error)
 
-var _ state_stream.Subscription = (*SubscriptionImpl)(nil)
+// Subscription represents a streaming request, and handles the communication between the grpc handler
+// and the backend implementation.
+type Subscription interface {
+	// ID returns the unique identifier for this subscription used for logging
+	ID() string
+
+	// Channel returns the channel from which subscription data can be read
+	Channel() <-chan interface{}
+
+	// Err returns the error that caused the subscription to fail
+	Err() error
+}
+
+// Streamable represents a subscription that can be streamed.
+type Streamable interface {
+	// ID returns the subscription ID
+	// Note: this is not a cryptographic hash
+	ID() string
+	// Close is called when a subscription ends gracefully, and closes the subscription channel
+	Close()
+	// Fail registers an error and closes the subscription channel
+	Fail(error)
+	// Send sends a value to the subscription channel or returns an error
+	// Expected errors:
+	// - context.DeadlineExceeded if send timed out
+	// - context.Canceled if the client disconnected
+	Send(context.Context, interface{}, time.Duration) error
+	// Next returns the value for the next height from the subscription
+	Next(context.Context) (interface{}, error)
+}
+
+var _ Subscription = (*SubscriptionImpl)(nil)
 
 type SubscriptionImpl struct {
 	id string
@@ -110,8 +163,8 @@ func NewFailedSubscription(err error, msg string) *SubscriptionImpl {
 	return sub
 }
 
-var _ state_stream.Subscription = (*HeightBasedSubscription)(nil)
-var _ state_stream.Streamable = (*HeightBasedSubscription)(nil)
+var _ Subscription = (*HeightBasedSubscription)(nil)
+var _ Streamable = (*HeightBasedSubscription)(nil)
 
 // HeightBasedSubscription is a subscription that retrieves data sequentially by block height
 type HeightBasedSubscription struct {
