@@ -5,7 +5,7 @@ import (
 	"errors"
 	"math/big"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethCommon "github.com/onflow/go-ethereum/common"
 )
 
 // This package provides fast and efficient

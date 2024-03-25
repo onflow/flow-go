@@ -3,7 +3,7 @@ package testutils
 import (
 	"math/big"
 
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 )

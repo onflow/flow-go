@@ -14,6 +14,18 @@ contract EVM {
     access(all)
     event CadenceOwnedAccountCreated(addressBytes: [UInt8; 20])
 
+    /// FLOWTokensDeposited is emitted when FLOW tokens is bridged 
+    /// into the EVM environment. Note that this event is not emitted 
+    /// for transfer of flow tokens between two EVM addresses.
+    access(all)
+    event FLOWTokensDeposited(addressBytes: [UInt8; 20], amount: UFix64)
+
+    /// FLOWTokensWithdrawn is emitted when FLOW tokens are bridged 
+    /// out of the EVM environment. Note that this event is not emitted 
+    /// for transfer of flow tokens between two EVM addresses.
+    access(all)
+    event FLOWTokensWithdrawn(addressBytes: [UInt8; 20], amount: UFix64)
+
     /// EVMAddress is an EVM-compatible address
     access(all)
     struct EVMAddress {
@@ -63,10 +75,15 @@ contract EVM {
         /// Deposits the given vault into the EVM account with the given address
         access(all)
         fun deposit(from: @FlowToken.Vault) {
+            let amount = from.balance
+            if amount == 0.0 {
+                panic("calling deposit function with an empty vault is not allowed")
+            }
             InternalEVM.deposit(
                 from: <-from,
                 to: self.bytes
             )
+            emit FLOWTokensDeposited(addressBytes: self.bytes, amount: amount)
         }
     }
 
@@ -106,6 +123,12 @@ contract EVM {
         access(all)
         view fun inAttoFLOW(): UInt {
             return self.attoflow
+        }
+
+        /// Returns true if the balance is zero
+        access(all)
+        fun isZero(): Bool {
+            return self.attoflow == 0
         }
     }
 
@@ -233,10 +256,14 @@ contract EVM {
         /// rounding error, this function would fail.
         access(Owner | Withdraw)
         fun withdraw(balance: Balance): @FlowToken.Vault {
+            if balance.isZero() {
+                panic("calling withdraw function with zero balance is not allowed")
+            }
             let vault <- InternalEVM.withdraw(
                 from: self.addressBytes,
                 amount: balance.attoflow
             ) as! @FlowToken.Vault
+            emit FLOWTokensWithdrawn(addressBytes: self.addressBytes, amount: balance.inFLOW())
             return <-vault
         }
 

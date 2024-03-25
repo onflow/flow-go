@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"math/big"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence/runtime/common"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	"github.com/onflow/go-ethereum/rlp"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
@@ -191,7 +191,8 @@ func (h *ContractHandler) run(
 
 	bp.AppendTxHash(res.TxHash)
 
-	// TODO: in the future we might update the receipt hash here
+	// Populate receipt root
+	bp.PopulateReceiptRoot([]types.Result{*res})
 
 	blockHash, err := bp.Hash()
 	if err != nil {
@@ -307,7 +308,9 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	bp.AppendTxHash(res.TxHash)
-	// TODO: in the future we might update the receipt hash here
+
+	// Populate receipt root
+	bp.PopulateReceiptRoot([]types.Result{*res})
 
 	if totalSupplyDiff != nil {
 		if deductSupplyDiff {

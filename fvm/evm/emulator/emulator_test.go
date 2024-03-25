@@ -6,10 +6,10 @@ import (
 	"math/big"
 	"testing"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	gethVM "github.com/ethereum/go-ethereum/core/vm"
-	gethParams "github.com/ethereum/go-ethereum/params"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethVM "github.com/onflow/go-ethereum/core/vm"
+	gethParams "github.com/onflow/go-ethereum/params"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator"
@@ -248,7 +248,7 @@ func TestContractInteraction(t *testing.T) {
 					nonce += 1
 
 					ret := new(big.Int).SetBytes(res.ReturnedValue)
-					require.Equal(t, types.FlowEVMTestnetChainID, ret)
+					require.Equal(t, types.FlowEVMPreviewNetChainID, ret)
 				})
 			})
 
@@ -328,7 +328,7 @@ func TestContractInteraction(t *testing.T) {
 					tx := account.SignTx(
 						t,
 						gethTypes.NewTx(&gethTypes.DynamicFeeTx{
-							ChainID:   types.FlowEVMTestnetChainID,
+							ChainID:   types.FlowEVMPreviewNetChainID,
 							Nonce:     account.Nonce(),
 							GasTipCap: big.NewInt(2),
 							GasFeeCap: big.NewInt(3),

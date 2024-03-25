@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
@@ -14,6 +13,7 @@ import (
 	"github.com/onflow/cadence/runtime/tests/utils"
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	coreContractstemplates "github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/onflow/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -3002,8 +3002,10 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 		false,
 	)
 
-	// Run script
+	// reset events
+	events = make([]cadence.Event, 0)
 
+	// Run script
 	actual, err := rt.ExecuteScript(
 		runtime.Script{
 			Source: script,
@@ -3033,6 +3035,20 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 	))
 
 	require.Equal(t, expected, actual)
+
+	// check deposit event
+	expectedEventTypes := []string{
+		"EVM.CadenceOwnedAccountCreated",
+		"EVM.CadenceOwnedAccountCreated",
+	}
+	CheckCadenceEventTypes(t, events, expectedEventTypes)
+
+	// check cadence owned account created events
+	expectedCoaAddress := types.Address{3}
+	require.Equal(t, expectedCoaAddress.ToCadenceValue().ToGoValue(), events[0].Fields[0].ToGoValue())
+
+	expectedCoaAddress = types.Address{4}
+	require.Equal(t, expectedCoaAddress.ToCadenceValue().ToGoValue(), events[1].Fields[0].ToGoValue())
 }
 
 func TestCadenceOwnedAccountCall(t *testing.T) {
@@ -3285,10 +3301,12 @@ func TestCOADeposit(t *testing.T) {
 
 	var deposited bool
 
+	var expectedCoaAddress = types.Address{5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+
 	handler := &testContractHandler{
 
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, expectedCoaAddress, fromAddress)
 			assert.False(t, isAuthorized)
 
 			return &testFlowAccount{
@@ -3373,6 +3391,9 @@ func TestCOADeposit(t *testing.T) {
 
 	// Run script
 
+	// reset events before script execution
+	events = make([]cadence.Event, 0)
+
 	_, err = rt.ExecuteScript(
 		runtime.Script{
 			Source: script,
@@ -3386,6 +3407,22 @@ func TestCOADeposit(t *testing.T) {
 	require.NoError(t, err)
 
 	require.True(t, deposited)
+
+	// check deposit event
+	expectedEventTypes := []string{
+		"FlowToken.MinterCreated",
+		"FlowToken.TokensMinted",
+		"EVM.CadenceOwnedAccountCreated",
+		"EVM.FLOWTokensDeposited",
+	}
+	CheckCadenceEventTypes(t, events, expectedEventTypes)
+
+	// token deposit event
+	tokenDepositEvent := events[3]
+	// check address
+	require.Equal(t, expectedCoaAddress.ToCadenceValue().ToGoValue(), tokenDepositEvent.Fields[0].ToGoValue())
+	// check amount
+	require.Equal(t, expectedBalance.ToGoValue(), tokenDepositEvent.Fields[1].ToGoValue())
 }
 
 func TestCadenceOwnedAccountWithdraw(t *testing.T) {
@@ -3405,10 +3442,12 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 
 	var nextUUID uint64 = 1
 
+	var expectedCoaAddress = types.Address{5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+
 	handler := &testContractHandler{
 		flowTokenAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, expectedCoaAddress, fromAddress)
 			assert.Equal(t, deposited, isAuthorized)
 
 			return &testFlowAccount{
@@ -3513,8 +3552,9 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 		false,
 	)
 
+	// reset events
+	events = make([]cadence.Event, 0)
 	// Run script
-
 	result, err := rt.ExecuteScript(
 		runtime.Script{
 			Source: script,
@@ -3532,6 +3572,23 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 	assert.Equal(t, expectedWithdrawBalance, result)
 
 	assert.Equal(t, []string{"1"}, logs)
+
+	// check deposit event
+	expectedEventTypes := []string{
+		"FlowToken.MinterCreated",
+		"FlowToken.TokensMinted",
+		"EVM.CadenceOwnedAccountCreated",
+		"EVM.FLOWTokensDeposited",
+		"EVM.FLOWTokensWithdrawn",
+	}
+	CheckCadenceEventTypes(t, events, expectedEventTypes)
+
+	// token deposit event
+	tokenWithdrawEvent := events[4]
+	// check address
+	require.Equal(t, expectedCoaAddress.ToCadenceValue().ToGoValue(), tokenWithdrawEvent.Fields[0].ToGoValue())
+	// check amount
+	require.Equal(t, expectedWithdrawBalance.ToGoValue(), tokenWithdrawEvent.Fields[1].ToGoValue())
 }
 
 func TestCadenceOwnedAccountDeploy(t *testing.T) {

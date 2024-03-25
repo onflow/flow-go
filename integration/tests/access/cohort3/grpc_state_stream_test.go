@@ -72,6 +72,8 @@ func (s *GrpcStateStreamSuite) SetupTest() {
 		testnet.WithAdditionalFlag("--execution-data-indexing-enabled=true"),
 		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
 		testnet.WithAdditionalFlag("--event-query-mode=local-only"),
+		testnet.WithAdditionalFlag("--supports-observer=true"),
+		testnet.WithAdditionalFlagf("--public-network-execution-data-sync-enabled=true"),
 	)
 	controlANConfig := testnet.NewNodeConfig(
 		flow.RoleAccess,
@@ -104,7 +106,20 @@ func (s *GrpcStateStreamSuite) SetupTest() {
 		controlANConfig, // access_2
 	}
 
-	conf := testnet.NewNetworkConfig("access_event_streaming_test", nodeConfigs)
+	// add the observer node config
+	observers := []testnet.ObserverConfig{{
+		ContainerName: testnet.PrimaryON,
+		LogLevel:      zerolog.DebugLevel,
+		AdditionalFlags: []string{
+			fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
+			fmt.Sprintf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
+			"--execution-data-sync-enabled=true",
+			"--event-query-mode=execution-nodes-only",
+			"--execution-data-indexing-enabled=true",
+		},
+	}}
+
+	conf := testnet.NewNetworkConfig("access_event_streaming_test", nodeConfigs, testnet.WithObservers(observers...))
 	s.net = testnet.PrepareFlowNetwork(s.T(), conf, flow.Localnet)
 
 	// start the network
@@ -124,12 +139,19 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 	sdkClientControlAN, err := getClient(controlANURL)
 	s.Require().NoError(err)
 
-	time.Sleep(20 * time.Second)
-
-	testEvents, testErrs, err := SubscribeEventsByBlockHeight(s.ctx, sdkClientTestAN, 0, &executiondata.EventFilter{})
+	testONURL := fmt.Sprintf("localhost:%s", s.net.ContainerByName(testnet.PrimaryON).Port(testnet.ExecutionStatePort))
+	sdkClientTestON, err := getClient(testONURL)
 	s.Require().NoError(err)
 
-	controlEvents, controlErrs, err := SubscribeEventsByBlockHeight(s.ctx, sdkClientControlAN, 0, &executiondata.EventFilter{})
+	time.Sleep(20 * time.Second)
+
+	testANEvents, testANErrs, err := SubscribeEventsByBlockHeight(s.ctx, sdkClientTestAN, 0, &executiondata.EventFilter{})
+	s.Require().NoError(err)
+
+	controlANEvents, controlANErrs, err := SubscribeEventsByBlockHeight(s.ctx, sdkClientControlAN, 0, &executiondata.EventFilter{})
+	s.Require().NoError(err)
+
+	testONEvents, testONErrs, err := SubscribeEventsByBlockHeight(s.ctx, sdkClientTestON, 0, &executiondata.EventFilter{})
 	s.Require().NoError(err)
 
 	txCount := 10
@@ -161,28 +183,37 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 
 	targetEvent := flow.EventType("flow.AccountCreated")
 
-	foundTxCount := 0
+	foundANTxCount := 0
+	foundONTxCount := 0
 	r := newResponseTracker()
 	for {
 		select {
-		case err := <-testErrs:
+		case err := <-testANErrs:
 			s.Require().NoErrorf(err, "unexpected test AN error")
-		case err := <-controlErrs:
+		case err := <-controlANErrs:
 			s.Require().NoErrorf(err, "unexpected control AN error")
-		case event := <-testEvents:
+		case err := <-testONErrs:
+			s.Require().NoErrorf(err, "unexpected test ON error")
+		case event := <-testANEvents:
 			if has(event.Events, targetEvent) {
-				s.T().Logf("adding test events: %d %d %v", event.BlockHeight, len(event.Events), event.Events)
-				r.Add(s.T(), event.BlockHeight, "test", &event)
-				foundTxCount++
+				s.T().Logf("adding access test events: %d %d %v", event.BlockHeight, len(event.Events), event.Events)
+				r.Add(s.T(), event.BlockHeight, "access_test", &event)
+				foundANTxCount++
 			}
-		case event := <-controlEvents:
+		case event := <-controlANEvents:
 			if has(event.Events, targetEvent) {
 				s.T().Logf("adding control events: %d %d %v", event.BlockHeight, len(event.Events), event.Events)
-				r.Add(s.T(), event.BlockHeight, "control", &event)
+				r.Add(s.T(), event.BlockHeight, "access_control", &event)
+			}
+		case event := <-testONEvents:
+			if has(event.Events, targetEvent) {
+				s.T().Logf("adding observer test events: %d %d %v", event.BlockHeight, len(event.Events), event.Events)
+				r.Add(s.T(), event.BlockHeight, "observer_test", &event)
+				foundONTxCount++
 			}
 		}
 
-		if foundTxCount >= txCount {
+		if foundANTxCount >= txCount && foundONTxCount >= txCount {
 			break
 		}
 	}
@@ -208,21 +239,24 @@ func (r *ResponseTracker) Add(t *testing.T, blockHeight uint64, name string, eve
 	}
 	r.r[blockHeight][name] = *events
 
-	if len(r.r[blockHeight]) != 2 {
+	if len(r.r[blockHeight]) != 3 {
 		return
 	}
 
-	err := r.compare(t, r.r[blockHeight])
+	err := r.compare(t, r.r[blockHeight]["access_control"], r.r[blockHeight]["access_test"])
 	if err != nil {
-		log.Fatalf("failure comparing %d: %v", blockHeight, err)
+		log.Fatalf("failure comparing access and access data %d: %v", blockHeight, err)
 	}
+
+	err = r.compare(t, r.r[blockHeight]["access_control"], r.r[blockHeight]["observer_test"])
+	if err != nil {
+		log.Fatalf("failure comparing access and observer data %d: %v", blockHeight, err)
+	}
+
 	delete(r.r, blockHeight)
 }
 
-func (r *ResponseTracker) compare(t *testing.T, data map[string]flow.BlockEvents) error {
-	controlData := data["control"]
-	testData := data["test"]
-
+func (r *ResponseTracker) compare(t *testing.T, controlData flow.BlockEvents, testData flow.BlockEvents) error {
 	require.Equal(t, controlData.BlockID, testData.BlockID)
 	require.Equal(t, controlData.BlockHeight, testData.BlockHeight)
 	require.Equal(t, len(controlData.Events), len(testData.Events))
@@ -261,7 +295,6 @@ func SubscribeEventsByBlockHeight(
 		Filter:               filter,
 		HeartbeatInterval:    1,
 	}
-
 	stream, err := client.SubscribeEvents(ctx, req)
 	if err != nil {
 		return nil, nil, err

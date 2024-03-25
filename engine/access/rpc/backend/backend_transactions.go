@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -27,7 +26,7 @@ import (
 )
 
 type backendTransactions struct {
-	TransactionsLocalDataProvider
+	*TransactionsLocalDataProvider
 	staticCollectionRPC  accessproto.AccessAPIClient // rpc client tied to a fixed collection node
 	transactions         storage.Transactions
 	executionReceipts    storage.ExecutionReceipts
@@ -43,6 +42,9 @@ type backendTransactions struct {
 	txResultCache        *lru.Cache[flow.Identifier, *access.TransactionResult]
 	txErrorMessagesCache *lru.Cache[flow.Identifier, string] // cache for transactions error messages, indexed by hash(block_id, tx_id).
 	txResultQueryMode    IndexQueryMode
+
+	systemTxID flow.Identifier
+	systemTx   *flow.TransactionBody
 }
 
 var _ TransactionErrorMessage = (*backendTransactions)(nil)
@@ -214,12 +216,7 @@ func (b *backendTransactions) GetTransactionsByBlockID(
 		transactions = append(transactions, collection.Transactions...)
 	}
 
-	systemTx, err := blueprints.SystemChunkTransaction(b.chainID.Chain())
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not get system chunk transaction: %v", err)
-	}
-
-	transactions = append(transactions, systemTx)
+	transactions = append(transactions, b.systemTx)
 
 	return transactions, nil
 }
@@ -288,7 +285,7 @@ func (b *backendTransactions) GetTransactionResult(
 		}
 
 		// an additional check to ensure the correctness of the collection ID.
-		expectedCollectionID, err := b.lookupCollectionIDInBlock(block, txID)
+		expectedCollectionID, err := b.LookupCollectionIDInBlock(block, txID)
 		if err != nil {
 			// if the collection has not been indexed yet, the lookup will return a not found error.
 			// if the request included a blockID or collectionID in its the search criteria, not found
@@ -314,9 +311,9 @@ func (b *backendTransactions) GetTransactionResult(
 		var txStatus flow.TransactionStatus
 		// Derive the status of the transaction.
 		if block == nil {
-			txStatus, err = b.deriveUnknownTransactionStatus(tx.ReferenceBlockID)
+			txStatus, err = b.DeriveUnknownTransactionStatus(tx.ReferenceBlockID)
 		} else {
-			txStatus, err = b.deriveTransactionStatus(blockID, blockHeight, false)
+			txStatus, err = b.DeriveTransactionStatus(blockID, blockHeight, false)
 		}
 
 		if err != nil {
@@ -442,7 +439,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromExecutionNode(
 			txResult := resp.TransactionResults[i]
 
 			// tx body is irrelevant to status if it's in an executed block
-			txStatus, err := b.deriveTransactionStatus(blockID, block.Header.Height, true)
+			txStatus, err := b.DeriveTransactionStatus(blockID, block.Header.Height, true)
 			if err != nil {
 				if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 					irrecoverable.Throw(ctx, err)
@@ -490,12 +487,8 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromExecutionNode(
 			return nil, status.Errorf(codes.Internal, "number of transaction results returned by execution node is more than the number of transactions  in the block")
 		}
 
-		systemTx, err := blueprints.SystemChunkTransaction(b.chainID.Chain())
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "could not get system chunk transaction: %v", err)
-		}
 		systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
-		systemTxStatus, err := b.deriveTransactionStatus(blockID, block.Header.Height, true)
+		systemTxStatus, err := b.DeriveTransactionStatus(blockID, block.Header.Height, true)
 		if err != nil {
 			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 				irrecoverable.Throw(ctx, err)
@@ -514,7 +507,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromExecutionNode(
 			Events:        events,
 			ErrorMessage:  systemTxResult.GetErrorMessage(),
 			BlockID:       blockID,
-			TransactionID: systemTx.ID(),
+			TransactionID: b.systemTxID,
 			BlockHeight:   block.Header.Height,
 		})
 	}
@@ -580,7 +573,7 @@ func (b *backendTransactions) getTransactionResultByIndexFromExecutionNode(
 	}
 
 	// tx body is irrelevant to status if it's in an executed block
-	txStatus, err := b.deriveTransactionStatus(blockID, block.Header.Height, true)
+	txStatus, err := b.DeriveTransactionStatus(blockID, block.Header.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
@@ -606,12 +599,7 @@ func (b *backendTransactions) getTransactionResultByIndexFromExecutionNode(
 
 // GetSystemTransaction returns system transaction
 func (b *backendTransactions) GetSystemTransaction(ctx context.Context, _ flow.Identifier) (*flow.TransactionBody, error) {
-	systemTx, err := blueprints.SystemChunkTransaction(b.chainID.Chain())
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not get system chunk transaction: %v", err)
-	}
-
-	return systemTx, nil
+	return b.systemTx, nil
 }
 
 // GetSystemTransactionResult returns system transaction result
@@ -637,13 +625,8 @@ func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, bl
 		return nil, rpc.ConvertError(err, "failed to retrieve result from execution node", codes.Internal)
 	}
 
-	systemTx, err := blueprints.SystemChunkTransaction(b.chainID.Chain())
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not get system chunk transaction: %v", err)
-	}
-
 	systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
-	systemTxStatus, err := b.deriveTransactionStatus(blockID, block.Header.Height, true)
+	systemTxStatus, err := b.DeriveTransactionStatus(blockID, block.Header.Height, true)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
@@ -659,7 +642,7 @@ func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, bl
 		Events:        events,
 		ErrorMessage:  systemTxResult.GetErrorMessage(),
 		BlockID:       blockID,
-		TransactionID: systemTx.ID(),
+		TransactionID: b.systemTxID,
 		BlockHeight:   block.Header.Height,
 	}, nil
 }
@@ -810,7 +793,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 	}
 
 	// tx body is irrelevant to status if it's in an executed block
-	txStatus, err := b.deriveTransactionStatus(blockID, block.Header.Height, true)
+	txStatus, err := b.DeriveTransactionStatus(blockID, block.Header.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)

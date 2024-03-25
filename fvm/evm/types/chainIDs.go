@@ -7,15 +7,19 @@ import (
 )
 
 var (
-	FlowEVMTestnetChainID = big.NewInt(646)
-	FlowEVMMainnetChainID = big.NewInt(747)
+	FlowEVMPreviewNetChainID = big.NewInt(646)
+	FlowEVMTestNetChainID    = big.NewInt(545)
+	FlowEVMMainNetChainID    = big.NewInt(747)
 )
 
 func EVMChainIDFromFlowChainID(flowChainID flow.ChainID) *big.Int {
-	// default evm chain ID is testnet
-	chainID := FlowEVMTestnetChainID
-	if flowChainID == flow.Mainnet {
-		chainID = FlowEVMMainnetChainID
+	// default evm chain ID is previewNet
+	switch flowChainID {
+	case flow.Mainnet:
+		return FlowEVMMainNetChainID
+	case flow.Testnet:
+		return FlowEVMTestNetChainID
+	default:
+		return FlowEVMPreviewNetChainID
 	}
-	return chainID
 }

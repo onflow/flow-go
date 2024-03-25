@@ -5,9 +5,12 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -17,6 +20,7 @@ import (
 )
 
 type Handler struct {
+	subscription.StreamingData
 	api                  API
 	chain                flow.Chain
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
@@ -29,8 +33,28 @@ type HandlerOption func(*Handler)
 
 var _ access.AccessAPIServer = (*Handler)(nil)
 
-func NewHandler(api API, chain flow.Chain, finalizedHeader module.FinalizedHeaderCache, me module.Local, options ...HandlerOption) *Handler {
+// sendSubscribeBlocksResponseFunc is a callback function used to send
+// SubscribeBlocksResponse to the client stream.
+type sendSubscribeBlocksResponseFunc func(*access.SubscribeBlocksResponse) error
+
+// sendSubscribeBlockHeadersResponseFunc is a callback function used to send
+// SubscribeBlockHeadersResponse to the client stream.
+type sendSubscribeBlockHeadersResponseFunc func(*access.SubscribeBlockHeadersResponse) error
+
+// sendSubscribeBlockDigestsResponseFunc is a callback function used to send
+// SubscribeBlockDigestsResponse to the client stream.
+type sendSubscribeBlockDigestsResponseFunc func(*access.SubscribeBlockDigestsResponse) error
+
+func NewHandler(
+	api API,
+	chain flow.Chain,
+	finalizedHeader module.FinalizedHeaderCache,
+	me module.Local,
+	maxStreams uint32,
+	options ...HandlerOption,
+) *Handler {
 	h := &Handler{
+		StreamingData:        subscription.NewStreamingData(maxStreams),
 		api:                  api,
 		chain:                chain,
 		finalizedHeaderCache: finalizedHeader,
@@ -701,6 +725,404 @@ func (h *Handler) GetExecutionResultByID(ctx context.Context, req *access.GetExe
 	}, nil
 }
 
+// SubscribeBlocksFromStartBlockID handles subscription requests for blocks started from block id.
+// It takes a SubscribeBlocksFromStartBlockIDRequest and an AccessAPI_SubscribeBlocksFromStartBlockIDServer stream as input.
+// The handler manages the subscription to block updates and sends the subscribed block information
+// to the client via the provided stream.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if invalid startBlockID provided or unknown block status provided.
+// - codes.ResourceExhausted - if the maximum number of streams is reached.
+// - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
+func (h *Handler) SubscribeBlocksFromStartBlockID(request *access.SubscribeBlocksFromStartBlockIDRequest, stream access.AccessAPI_SubscribeBlocksFromStartBlockIDServer) error {
+	// check if the maximum number of streams is reached
+	if h.StreamCount.Load() >= h.MaxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
+
+	startBlockID, blockStatus, err := h.getSubscriptionDataFromStartBlockID(request.GetStartBlockId(), request.GetBlockStatus())
+	if err != nil {
+		return err
+	}
+
+	sub := h.api.SubscribeBlocksFromStartBlockID(stream.Context(), startBlockID, blockStatus)
+	return subscription.HandleSubscription(sub, h.handleBlocksResponse(stream.Send, request.GetFullBlockResponse(), blockStatus))
+}
+
+// SubscribeBlocksFromStartHeight handles subscription requests for blocks started from block height.
+// It takes a SubscribeBlocksFromStartHeightRequest and an AccessAPI_SubscribeBlocksFromStartHeightServer stream as input.
+// The handler manages the subscription to block updates and sends the subscribed block information
+// to the client via the provided stream.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if unknown block status provided.
+// - codes.ResourceExhausted - if the maximum number of streams is reached.
+// - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
+func (h *Handler) SubscribeBlocksFromStartHeight(request *access.SubscribeBlocksFromStartHeightRequest, stream access.AccessAPI_SubscribeBlocksFromStartHeightServer) error {
+	// check if the maximum number of streams is reached
+	if h.StreamCount.Load() >= h.MaxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
+
+	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
+	err := checkBlockStatus(blockStatus)
+	if err != nil {
+		return err
+	}
+
+	sub := h.api.SubscribeBlocksFromStartHeight(stream.Context(), request.GetStartBlockHeight(), blockStatus)
+	return subscription.HandleSubscription(sub, h.handleBlocksResponse(stream.Send, request.GetFullBlockResponse(), blockStatus))
+}
+
+// SubscribeBlocksFromLatest handles subscription requests for blocks started from latest sealed block.
+// It takes a SubscribeBlocksFromLatestRequest and an AccessAPI_SubscribeBlocksFromLatestServer stream as input.
+// The handler manages the subscription to block updates and sends the subscribed block information
+// to the client via the provided stream.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if unknown block status provided.
+// - codes.ResourceExhausted - if the maximum number of streams is reached.
+// - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
+func (h *Handler) SubscribeBlocksFromLatest(request *access.SubscribeBlocksFromLatestRequest, stream access.AccessAPI_SubscribeBlocksFromLatestServer) error {
+	// check if the maximum number of streams is reached
+	if h.StreamCount.Load() >= h.MaxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
+
+	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
+	err := checkBlockStatus(blockStatus)
+	if err != nil {
+		return err
+	}
+
+	sub := h.api.SubscribeBlocksFromLatest(stream.Context(), blockStatus)
+	return subscription.HandleSubscription(sub, h.handleBlocksResponse(stream.Send, request.GetFullBlockResponse(), blockStatus))
+}
+
+// handleBlocksResponse handles the subscription to block updates and sends
+// the subscribed block information to the client via the provided stream.
+//
+// Parameters:
+// - send: The function responsible for sending the block response to the client.
+// - fullBlockResponse: A boolean indicating whether to include full block responses.
+// - blockStatus: The current block status.
+//
+// Returns a function that can be used as a callback for block updates.
+//
+// This function is designed to be used as a callback for block updates in a subscription.
+// It takes a block, processes it, and sends the corresponding response to the client using the provided send function.
+//
+// Expected errors during normal operation:
+//   - codes.Internal: If cannot convert a block to a message or the stream could not send a response.
+func (h *Handler) handleBlocksResponse(send sendSubscribeBlocksResponseFunc, fullBlockResponse bool, blockStatus flow.BlockStatus) func(*flow.Block) error {
+	return func(block *flow.Block) error {
+		msgBlockResponse, err := h.blockResponse(block, fullBlockResponse, blockStatus)
+		if err != nil {
+			return rpc.ConvertError(err, "could not convert block to message", codes.Internal)
+		}
+
+		err = send(&access.SubscribeBlocksResponse{
+			Block: msgBlockResponse.Block,
+		})
+		if err != nil {
+			return rpc.ConvertError(err, "could not send response", codes.Internal)
+		}
+
+		return nil
+	}
+}
+
+// SubscribeBlockHeadersFromStartBlockID handles subscription requests for block headers started from block id.
+// It takes a SubscribeBlockHeadersFromStartBlockIDRequest and an AccessAPI_SubscribeBlockHeadersFromStartBlockIDServer stream as input.
+// The handler manages the subscription to block updates and sends the subscribed block header information
+// to the client via the provided stream.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if invalid startBlockID provided or unknown block status provided.
+// - codes.ResourceExhausted - if the maximum number of streams is reached.
+// - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block header to message or could not send response.
+func (h *Handler) SubscribeBlockHeadersFromStartBlockID(request *access.SubscribeBlockHeadersFromStartBlockIDRequest, stream access.AccessAPI_SubscribeBlockHeadersFromStartBlockIDServer) error {
+	// check if the maximum number of streams is reached
+	if h.StreamCount.Load() >= h.MaxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
+
+	startBlockID, blockStatus, err := h.getSubscriptionDataFromStartBlockID(request.GetStartBlockId(), request.GetBlockStatus())
+	if err != nil {
+		return err
+	}
+
+	sub := h.api.SubscribeBlockHeadersFromStartBlockID(stream.Context(), startBlockID, blockStatus)
+	return subscription.HandleSubscription(sub, h.handleBlockHeadersResponse(stream.Send))
+}
+
+// SubscribeBlockHeadersFromStartHeight handles subscription requests for block headers started from block height.
+// It takes a SubscribeBlockHeadersFromStartHeightRequest and an AccessAPI_SubscribeBlockHeadersFromStartHeightServer stream as input.
+// The handler manages the subscription to block updates and sends the subscribed block header information
+// to the client via the provided stream.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if unknown block status provided.
+// - codes.ResourceExhausted - if the maximum number of streams is reached.
+// - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block header to message or could not send response.
+func (h *Handler) SubscribeBlockHeadersFromStartHeight(request *access.SubscribeBlockHeadersFromStartHeightRequest, stream access.AccessAPI_SubscribeBlockHeadersFromStartHeightServer) error {
+	// check if the maximum number of streams is reached
+	if h.StreamCount.Load() >= h.MaxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
+
+	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
+	err := checkBlockStatus(blockStatus)
+	if err != nil {
+		return err
+	}
+
+	sub := h.api.SubscribeBlockHeadersFromStartHeight(stream.Context(), request.GetStartBlockHeight(), blockStatus)
+	return subscription.HandleSubscription(sub, h.handleBlockHeadersResponse(stream.Send))
+}
+
+// SubscribeBlockHeadersFromLatest handles subscription requests for block headers started from latest sealed block.
+// It takes a SubscribeBlockHeadersFromLatestRequest and an AccessAPI_SubscribeBlockHeadersFromLatestServer stream as input.
+// The handler manages the subscription to block updates and sends the subscribed block header information
+// to the client via the provided stream.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if unknown block status provided.
+// - codes.ResourceExhausted - if the maximum number of streams is reached.
+// - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block header to message or could not send response.
+func (h *Handler) SubscribeBlockHeadersFromLatest(request *access.SubscribeBlockHeadersFromLatestRequest, stream access.AccessAPI_SubscribeBlockHeadersFromLatestServer) error {
+	// check if the maximum number of streams is reached
+	if h.StreamCount.Load() >= h.MaxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
+
+	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
+	err := checkBlockStatus(blockStatus)
+	if err != nil {
+		return err
+	}
+
+	sub := h.api.SubscribeBlockHeadersFromLatest(stream.Context(), blockStatus)
+	return subscription.HandleSubscription(sub, h.handleBlockHeadersResponse(stream.Send))
+}
+
+// handleBlockHeadersResponse handles the subscription to block updates and sends
+// the subscribed block header information to the client via the provided stream.
+//
+// Parameters:
+// - send: The function responsible for sending the block header response to the client.
+//
+// Returns a function that can be used as a callback for block header updates.
+//
+// This function is designed to be used as a callback for block header updates in a subscription.
+// It takes a block header, processes it, and sends the corresponding response to the client using the provided send function.
+//
+// Expected errors during normal operation:
+//   - codes.Internal: If could not decode the signer indices from the given block header, could not convert a block header to a message or the stream could not send a response.
+func (h *Handler) handleBlockHeadersResponse(send sendSubscribeBlockHeadersResponseFunc) func(*flow.Header) error {
+	return func(header *flow.Header) error {
+		signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(header)
+		if err != nil {
+			return rpc.ConvertError(err, "could not decode the signer indices from the given block header", codes.Internal) // the block was retrieved from local storage - so no errors are expected
+		}
+
+		msgHeader, err := convert.BlockHeaderToMessage(header, signerIDs)
+		if err != nil {
+			return rpc.ConvertError(err, "could not convert block header to message", codes.Internal)
+		}
+
+		err = send(&access.SubscribeBlockHeadersResponse{
+			Header: msgHeader,
+		})
+		if err != nil {
+			return rpc.ConvertError(err, "could not send response", codes.Internal)
+		}
+
+		return nil
+	}
+}
+
+// SubscribeBlockDigestsFromStartBlockID streams finalized or sealed lightweight block starting at the requested block id.
+// It takes a SubscribeBlockDigestsFromStartBlockIDRequest and an AccessAPI_SubscribeBlockDigestsFromStartBlockIDServer stream as input.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if invalid startBlockID provided or unknown block status provided,
+// - codes.ResourceExhausted - if the maximum number of streams is reached.
+// - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
+func (h *Handler) SubscribeBlockDigestsFromStartBlockID(request *access.SubscribeBlockDigestsFromStartBlockIDRequest, stream access.AccessAPI_SubscribeBlockDigestsFromStartBlockIDServer) error {
+	// check if the maximum number of streams is reached
+	if h.StreamCount.Load() >= h.MaxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
+
+	startBlockID, blockStatus, err := h.getSubscriptionDataFromStartBlockID(request.GetStartBlockId(), request.GetBlockStatus())
+	if err != nil {
+		return err
+	}
+
+	sub := h.api.SubscribeBlockDigestsFromStartBlockID(stream.Context(), startBlockID, blockStatus)
+	return subscription.HandleSubscription(sub, h.handleBlockDigestsResponse(stream.Send))
+}
+
+// SubscribeBlockDigestsFromStartHeight handles subscription requests for lightweight blocks started from block height.
+// It takes a SubscribeBlockDigestsFromStartHeightRequest and an AccessAPI_SubscribeBlockDigestsFromStartHeightServer stream as input.
+// The handler manages the subscription to block updates and sends the subscribed block information
+// to the client via the provided stream.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if unknown block status provided.
+// - codes.ResourceExhausted - if the maximum number of streams is reached.
+// - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
+func (h *Handler) SubscribeBlockDigestsFromStartHeight(request *access.SubscribeBlockDigestsFromStartHeightRequest, stream access.AccessAPI_SubscribeBlockDigestsFromStartHeightServer) error {
+	// check if the maximum number of streams is reached
+	if h.StreamCount.Load() >= h.MaxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
+
+	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
+	err := checkBlockStatus(blockStatus)
+	if err != nil {
+		return err
+	}
+
+	sub := h.api.SubscribeBlockDigestsFromStartHeight(stream.Context(), request.GetStartBlockHeight(), blockStatus)
+	return subscription.HandleSubscription(sub, h.handleBlockDigestsResponse(stream.Send))
+}
+
+// SubscribeBlockDigestsFromLatest handles subscription requests for lightweight block started from latest sealed block.
+// It takes a SubscribeBlockDigestsFromLatestRequest and an AccessAPI_SubscribeBlockDigestsFromLatestServer stream as input.
+// The handler manages the subscription to block updates and sends the subscribed block header information
+// to the client via the provided stream.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if unknown block status provided.
+// - codes.ResourceExhausted - if the maximum number of streams is reached.
+// - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
+func (h *Handler) SubscribeBlockDigestsFromLatest(request *access.SubscribeBlockDigestsFromLatestRequest, stream access.AccessAPI_SubscribeBlockDigestsFromLatestServer) error {
+	// check if the maximum number of streams is reached
+	if h.StreamCount.Load() >= h.MaxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
+
+	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
+	err := checkBlockStatus(blockStatus)
+	if err != nil {
+		return err
+	}
+
+	sub := h.api.SubscribeBlockDigestsFromLatest(stream.Context(), blockStatus)
+	return subscription.HandleSubscription(sub, h.handleBlockDigestsResponse(stream.Send))
+}
+
+// handleBlockDigestsResponse handles the subscription to block updates and sends
+// the subscribed block digest information to the client via the provided stream.
+//
+// Parameters:
+// - send: The function responsible for sending the block digest response to the client.
+//
+// Returns a function that can be used as a callback for block digest updates.
+//
+// This function is designed to be used as a callback for block digest updates in a subscription.
+// It takes a block digest, processes it, and sends the corresponding response to the client using the provided send function.
+//
+// Expected errors during normal operation:
+//   - codes.Internal: if the stream cannot send a response.
+func (h *Handler) handleBlockDigestsResponse(send sendSubscribeBlockDigestsResponseFunc) func(*flow.BlockDigest) error {
+	return func(blockDigest *flow.BlockDigest) error {
+		err := send(&access.SubscribeBlockDigestsResponse{
+			BlockId:        convert.IdentifierToMessage(blockDigest.ID()),
+			BlockHeight:    blockDigest.Height,
+			BlockTimestamp: timestamppb.New(blockDigest.Timestamp),
+		})
+		if err != nil {
+			return rpc.ConvertError(err, "could not send response", codes.Internal)
+		}
+
+		return nil
+	}
+}
+
+// getSubscriptionDataFromStartBlockID processes subscription start data from start block id.
+// It takes a union representing the start block id and a BlockStatus from the entities package.
+// Performs validation of input data and returns it in expected format for further processing.
+//
+// Returns:
+// - flow.Identifier: The start block id for searching.
+// - flow.BlockStatus: Block status.
+// - error: An error indicating the result of the operation, if any.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument: If blockStatus is flow.BlockStatusUnknown, or startBlockID could not convert to flow.Identifier.
+func (h *Handler) getSubscriptionDataFromStartBlockID(msgBlockId []byte, msgBlockStatus entities.BlockStatus) (flow.Identifier, flow.BlockStatus, error) {
+	startBlockID, err := convert.BlockID(msgBlockId)
+	if err != nil {
+		return flow.ZeroID, flow.BlockStatusUnknown, err
+	}
+
+	blockStatus := convert.MessageToBlockStatus(msgBlockStatus)
+	err = checkBlockStatus(blockStatus)
+	if err != nil {
+		return flow.ZeroID, flow.BlockStatusUnknown, err
+	}
+
+	return startBlockID, blockStatus, nil
+}
+
+// SendAndSubscribeTransactionStatuses streams transaction statuses starting from the reference block saved in the
+// transaction itself until the block containing the transaction becomes sealed or expired. When the transaction
+// status becomes TransactionStatusSealed or TransactionStatusExpired, the subscription will automatically shut down.
+func (h *Handler) SendAndSubscribeTransactionStatuses(
+	request *access.SendAndSubscribeTransactionStatusesRequest,
+	stream access.AccessAPI_SendAndSubscribeTransactionStatusesServer,
+) error {
+	ctx := stream.Context()
+
+	// check if the maximum number of streams is reached
+	if h.StreamCount.Load() >= h.MaxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
+
+	tx, err := convert.MessageToTransaction(request.GetTransaction(), h.chain)
+	if err != nil {
+		return status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	err = h.api.SendTransaction(ctx, &tx)
+	if err != nil {
+		return err
+	}
+
+	sub := h.api.SubscribeTransactionStatuses(ctx, &tx)
+	return subscription.HandleSubscription(sub, func(txSubInfo *convert.TransactionSubscribeInfo) error {
+		err = stream.Send(convert.TransactionSubscribeInfoToMessage(txSubInfo))
+		if err != nil {
+			return rpc.ConvertError(err, "could not send response", codes.Internal)
+		}
+
+		return nil
+	})
+}
+
 func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flow.BlockStatus) (*access.BlockResponse, error) {
 	metadata := h.buildMetadataResponse()
 
@@ -713,7 +1135,7 @@ func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flo
 	if fullResponse {
 		msg, err = convert.BlockToMessage(block, signerIDs)
 		if err != nil {
-			return nil, err
+			return nil, rpc.ConvertError(err, "could not convert block to message", codes.Internal)
 		}
 	} else {
 		msg = convert.BlockToMessageLight(block)
@@ -736,7 +1158,7 @@ func (h *Handler) blockHeaderResponse(header *flow.Header, status flow.BlockStat
 
 	msg, err := convert.BlockHeaderToMessage(header, signerIDs)
 	if err != nil {
-		return nil, err
+		return nil, rpc.ConvertError(err, "could not convert block header to message", codes.Internal)
 	}
 
 	return &access.BlockHeaderResponse{
@@ -776,4 +1198,15 @@ func WithBlockSignerDecoder(signerIndicesDecoder hotstuff.BlockSignerDecoder) fu
 	return func(handler *Handler) {
 		handler.signerIndicesDecoder = signerIndicesDecoder
 	}
+}
+
+// checkBlockStatus checks the validity of the provided block status.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if blockStatus is flow.BlockStatusUnknown
+func checkBlockStatus(blockStatus flow.BlockStatus) error {
+	if blockStatus != flow.BlockStatusFinalized && blockStatus != flow.BlockStatusSealed {
+		return status.Errorf(codes.InvalidArgument, "block status is unknown. Possible variants: BLOCK_FINALIZED, BLOCK_SEALED")
+	}
+	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/subscription"
 )
 
 // SubscribeEvents create websocket connection and write to it requested events.
@@ -13,7 +14,7 @@ func SubscribeEvents(
 	ctx context.Context,
 	request *request.Request,
 	wsController *WebsocketController,
-) (state_stream.Subscription, error) {
+) (subscription.Subscription, error) {
 	req, err := request.SubscribeEventsRequest()
 	if err != nil {
 		return nil, models.NewBadRequestError(err)

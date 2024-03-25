@@ -1,10 +1,28 @@
 package convert
 
 import (
+	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/model/flow"
 )
+
+// TransactionSubscribeInfo represents information about a subscribed transaction.
+// It contains the ID of the transaction, its status, and the index of the associated message.
+type TransactionSubscribeInfo struct {
+	ID           flow.Identifier
+	Status       flow.TransactionStatus
+	MessageIndex uint64
+}
+
+// TransactionSubscribeInfoToMessage converts a TransactionSubscribeInfo struct to a protobuf message
+func TransactionSubscribeInfoToMessage(data *TransactionSubscribeInfo) *access.SendAndSubscribeTransactionStatusesResponse {
+	return &access.SendAndSubscribeTransactionStatusesResponse{
+		Id:           data.ID[:],
+		Status:       entities.TransactionStatus(data.Status),
+		MessageIndex: data.MessageIndex,
+	}
+}
 
 // TransactionToMessage converts a flow.TransactionBody to a protobuf message
 func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {

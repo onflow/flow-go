@@ -16,8 +16,10 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/subscription"
+	subscriptionmock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/execution"
@@ -32,12 +34,14 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
-var chainID = flow.MonotonicEmulator
-var testEventTypes = []flow.EventType{
-	unittest.EventTypeFixture(chainID),
-	unittest.EventTypeFixture(chainID),
-	unittest.EventTypeFixture(chainID),
-}
+var (
+	chainID        = flow.MonotonicEmulator
+	testEventTypes = []flow.EventType{
+		unittest.EventTypeFixture(chainID),
+		unittest.EventTypeFixture(chainID),
+		unittest.EventTypeFixture(chainID),
+	}
+)
 
 type BackendExecutionDataSuite struct {
 	suite.Suite
@@ -51,14 +55,16 @@ type BackendExecutionDataSuite struct {
 	results        *storagemock.ExecutionResults
 	registers      *storagemock.RegisterIndex
 	registersAsync *execution.RegistersAsyncStore
-	eventsIndex    *backend.EventsIndex
+	eventsIndex    *index.EventsIndex
 
-	bs                blobs.Blobstore
-	eds               execution_data.ExecutionDataStore
-	broadcaster       *engine.Broadcaster
-	execDataCache     *cache.ExecutionDataCache
-	execDataHeroCache *herocache.BlockExecutionData
-	backend           *StateStreamBackend
+	bs                       blobs.Blobstore
+	eds                      execution_data.ExecutionDataStore
+	broadcaster              *engine.Broadcaster
+	execDataCache            *cache.ExecutionDataCache
+	execDataHeroCache        *herocache.BlockExecutionData
+	executionDataTracker     *subscriptionmock.ExecutionDataTracker
+	backend                  *StateStreamBackend
+	executionDataTrackerReal subscription.ExecutionDataTracker
 
 	blocks      []*flow.Block
 	blockEvents map[flow.Identifier][]flow.Event
@@ -67,6 +73,8 @@ type BackendExecutionDataSuite struct {
 	sealMap     map[flow.Identifier]*flow.Seal
 	resultMap   map[flow.Identifier]*flow.ExecutionResult
 	registerID  flow.RegisterID
+
+	rootBlock flow.Block
 }
 
 func TestBackendExecutionDataSuite(t *testing.T) {
@@ -89,12 +97,13 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 	s.broadcaster = engine.NewBroadcaster()
 
-	s.execDataHeroCache = herocache.NewBlockExecutionData(state_stream.DefaultCacheSize, logger, metrics.NewNoopCollector())
+	s.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metrics.NewNoopCollector())
 	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
+	s.executionDataTracker = subscriptionmock.NewExecutionDataTracker(s.T())
 
 	conf := Config{
-		ClientSendTimeout:       state_stream.DefaultSendTimeout,
-		ClientSendBufferSize:    state_stream.DefaultSendBufferSize,
+		ClientSendTimeout:       subscription.DefaultSendTimeout,
+		ClientSendBufferSize:    subscription.DefaultSendBufferSize,
 		RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
 	}
 
@@ -109,11 +118,11 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	s.blocks = make([]*flow.Block, 0, blockCount)
 
 	// generate blockCount consecutive blocks with associated seal, result and execution data
-	rootBlock := unittest.BlockFixture()
-	parent := rootBlock.Header
-	s.blockMap[rootBlock.Header.Height] = &rootBlock
+	s.rootBlock = unittest.BlockFixture()
+	parent := s.rootBlock.Header
+	s.blockMap[s.rootBlock.Header.Height] = &s.rootBlock
 
-	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, rootBlock.Header.Height, rootBlock.ID())
+	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Header.Height, s.rootBlock.ID())
 
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
@@ -158,13 +167,13 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 	s.registerID = unittest.RegisterIDFixture()
 
-	s.eventsIndex = backend.NewEventsIndex(s.events)
+	s.eventsIndex = index.NewEventsIndex(s.events)
 	s.registersAsync = execution.NewRegistersAsyncStore()
 	s.registers = storagemock.NewRegisterIndex(s.T())
 	err = s.registersAsync.Initialize(s.registers)
 	require.NoError(s.T(), err)
-	s.registers.On("LatestHeight").Return(rootBlock.Header.Height).Maybe()
-	s.registers.On("FirstHeight").Return(rootBlock.Header.Height).Maybe()
+	s.registers.On("LatestHeight").Return(s.rootBlock.Header.Height).Maybe()
+	s.registers.On("FirstHeight").Return(s.rootBlock.Header.Height).Maybe()
 	s.registers.On("Get", mock.AnythingOfType("RegisterID"), mock.AnythingOfType("uint64")).Return(
 		func(id flow.RegisterID, height uint64) (flow.RegisterValue, error) {
 			if id == s.registerID {
@@ -219,13 +228,33 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		s.eds,
 		s.execDataCache,
 		s.broadcaster,
-		rootBlock.Header.Height,
-		rootBlock.Header.Height, // initialize with no downloaded data
 		s.registersAsync,
 		s.eventsIndex,
 		false,
+		s.executionDataTracker,
 	)
 	require.NoError(s.T(), err)
+
+	// create real execution data tracker to use GetStartHeight from it, instead of mocking
+	s.executionDataTrackerReal = subscription.NewExecutionDataTracker(
+		logger,
+		s.state,
+		s.rootBlock.Header.Height,
+		s.headers,
+		s.broadcaster,
+		s.rootBlock.Header.Height,
+		s.eventsIndex,
+		false,
+	)
+
+	s.executionDataTracker.On(
+		"GetStartHeight",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Return(func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
+		return s.executionDataTrackerReal.GetStartHeight(ctx, startBlockID, startHeight)
+	}, nil).Maybe()
 }
 
 // generateMockEvents generates a set of mock events for a block split into multiple tx with
@@ -266,7 +295,8 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 	execData := s.execDataMap[block.ID()]
 
 	// notify backend block is available
-	s.backend.setHighestHeight(block.Header.Height)
+	s.executionDataTracker.On("GetHighestHeight").
+		Return(block.Header.Height)
 
 	var err error
 	s.Run("happy path TestGetExecutionDataByBlockID success", func() {
@@ -321,12 +351,12 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 			name:            "happy path - start from root block by height",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
 			startBlockID:    flow.ZeroID,
-			startHeight:     s.backend.rootBlockHeight, // start from root block
+			startHeight:     s.rootBlock.Header.Height, // start from root block
 		},
 		{
 			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1,     // backfill all blocks
-			startBlockID:    s.backend.rootBlockID, // start from root block
+			highestBackfill: len(s.blocks) - 1,       // backfill all blocks
+			startBlockID:    s.rootBlock.Header.ID(), // start from root block
 			startHeight:     0,
 		},
 	}
@@ -342,21 +372,24 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 			// this simulates a subscription on a past block
 			for i := 0; i <= test.highestBackfill; i++ {
 				s.T().Logf("backfilling block %d", i)
-				s.backend.setHighestHeight(s.blocks[i].Header.Height)
+				s.executionDataTracker.On("GetHighestHeight").
+					Return(s.blocks[i].Header.Height)
 			}
 
 			subCtx, subCancel := context.WithCancel(ctx)
 			sub := s.backend.SubscribeExecutionData(subCtx, test.startBlockID, test.startHeight)
 
-			// loop over all of the blocks
+			// loop over of the all blocks
 			for i, b := range s.blocks {
 				execData := s.execDataMap[b.ID()]
-				s.T().Logf("checking block %d %v", i, b.ID())
+				s.T().Logf("checking block %d %v %v", i, b.Header.Height, b.ID())
 
 				// simulate new exec data received.
 				// exec data for all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
-					s.backend.setHighestHeight(b.Header.Height)
+					s.executionDataTracker.On("GetHighestHeight").Unset()
+					s.executionDataTracker.On("GetHighestHeight").
+						Return(b.Header.Height)
 					s.broadcaster.Publish()
 				}
 
@@ -408,7 +441,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeExecutionData(subCtx, flow.ZeroID, s.backend.rootBlockHeight-1)
+		sub := s.backend.SubscribeExecutionData(subCtx, flow.ZeroID, s.rootBlock.Header.Height-1)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()))
 	})
 
@@ -434,26 +467,26 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 
 func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 	s.Run("normal case", func() {
-		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.backend.rootBlockHeight)
+		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.rootBlock.Header.Height)
 		require.NoError(s.T(), err)
 		require.NotEmpty(s.T(), res)
 	})
 
 	s.Run("returns error if block height is out of range", func() {
-		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.backend.rootBlockHeight+1)
+		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.rootBlock.Header.Height+1)
 		require.Nil(s.T(), res)
 		require.Equal(s.T(), codes.OutOfRange, status.Code(err))
 	})
 
 	s.Run("returns error if register path is not indexed", func() {
 		falseID := flow.RegisterIDs{flow.RegisterID{Owner: "ha", Key: "ha"}}
-		res, err := s.backend.GetRegisterValues(falseID, s.backend.rootBlockHeight)
+		res, err := s.backend.GetRegisterValues(falseID, s.rootBlock.Header.Height)
 		require.Nil(s.T(), res)
 		require.Equal(s.T(), codes.NotFound, status.Code(err))
 	})
 
 	s.Run("returns error if too many registers are requested", func() {
-		res, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.registerRequestLimit+1), s.backend.rootBlockHeight)
+		res, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.registerRequestLimit+1), s.rootBlock.Header.Height)
 		require.Nil(s.T(), res)
 		require.Equal(s.T(), codes.InvalidArgument, status.Code(err))
 	})
