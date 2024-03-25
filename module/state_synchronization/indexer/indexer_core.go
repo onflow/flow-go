@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -32,6 +33,10 @@ type IndexerCore struct {
 	batcher      bstorage.BatchBuilder
 
 	collectionExecutedMetric module.CollectionExecutedMetric
+
+	chain            flow.Chain
+	derivedChainData *derived.DerivedChainData
+	serviceAddress   flow.Address
 }
 
 // New execution state indexer used to ingest block execution data and index it by height.
@@ -47,6 +52,8 @@ func New(
 	collections storage.Collections,
 	transactions storage.Transactions,
 	results storage.LightTransactionResults,
+	chain flow.Chain,
+	derivedChainData *derived.DerivedChainData,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 ) (*IndexerCore, error) {
 	log = log.With().Str("component", "execution_indexer").Logger()
@@ -58,15 +65,16 @@ func New(
 		Msg("indexer initialized")
 
 	return &IndexerCore{
-		log:                      log,
-		metrics:                  metrics,
-		batcher:                  batcher,
-		registers:                registers,
-		headers:                  headers,
-		events:                   events,
-		collections:              collections,
-		transactions:             transactions,
-		results:                  results,
+		log:              log,
+		metrics:          metrics,
+		batcher:          batcher,
+		registers:        registers,
+		headers:          headers,
+		events:           events,
+		results:          results,
+		serviceAddress:   chain.ServiceAddress(),
+		derivedChainData: derivedChainData,
+
 		collectionExecutedMetric: collectionExecutedMetric,
 	}, nil
 }
@@ -97,27 +105,27 @@ func (c *IndexerCore) RegisterValue(ID flow.RegisterID, height uint64) (flow.Reg
 // Expected errors:
 // - storage.ErrNotFound if the block for execution data was not found
 func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEntity) error {
-	block, err := c.headers.ByBlockID(data.BlockID)
+	header, err := c.headers.ByBlockID(data.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not get the block by ID %s: %w", data.BlockID, err)
 	}
 
 	lg := c.log.With().
 		Hex("block_id", logging.ID(data.BlockID)).
-		Uint64("height", block.Height).
+		Uint64("height", header.Height).
 		Logger()
 
 	lg.Debug().Msgf("indexing new block")
 
 	// the height we are indexing must be exactly one bigger or same as the latest height indexed from the storage
 	latest := c.registers.LatestHeight()
-	if block.Height != latest+1 && block.Height != latest {
-		return fmt.Errorf("must index block data with the next height %d, but got %d", latest+1, block.Height)
+	if header.Height != latest+1 && header.Height != latest {
+		return fmt.Errorf("must index block data with the next height %d, but got %d", latest+1, header.Height)
 	}
 
 	// allow rerunning the indexer for same height since we are fetching height from register storage, but there are other storages
 	// for indexing resources which might fail to update the values, so this enables rerunning and reindexing those resources
-	if block.Height == latest {
+	if header.Height == latest {
 		lg.Warn().Msg("reindexing block data")
 		c.metrics.BlockReindexed()
 	}
@@ -140,12 +148,12 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 
 		err := c.events.BatchStore(data.BlockID, []flow.EventsList{events}, batch)
 		if err != nil {
-			return fmt.Errorf("could not index events at height %d: %w", block.Height, err)
+			return fmt.Errorf("could not index events at height %d: %w", header.Height, err)
 		}
 
 		err = c.results.BatchStore(data.BlockID, results, batch)
 		if err != nil {
-			return fmt.Errorf("could not index transaction results at height %d: %w", block.Height, err)
+			return fmt.Errorf("could not index transaction results at height %d: %w", header.Height, err)
 		}
 
 		batch.Flush()
@@ -203,7 +211,11 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		// second chunk updates: { X: 2 }
 		// then we should persist only {X: 2: Y: 2}
 		payloads := make(map[ledger.Path]*ledger.Payload)
+		events := make([]flow.Event, 0)
+		collections := make([]*flow.Collection, 0)
 		for _, chunk := range data.ChunkExecutionDatas {
+			events = append(events, chunk.Events...)
+			collections = append(collections, chunk.Collection)
 			update := chunk.TrieUpdate
 			if update != nil {
 				// this should never happen but we check anyway
@@ -217,9 +229,14 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 			}
 		}
 
-		err = c.indexRegisters(payloads, block.Height)
+		err = c.indexRegisters(payloads, header.Height)
 		if err != nil {
-			return fmt.Errorf("could not index register payloads at height %d: %w", block.Height, err)
+			return fmt.Errorf("could not index register payloads at height %d: %w", header.Height, err)
+		}
+
+		err = c.updateProgramCache(header, events, collections)
+		if err != nil {
+			return fmt.Errorf("could not update program cache at height %d: %w", header.Height, err)
 		}
 
 		registerCount = len(payloads)
@@ -234,13 +251,52 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 
 	err = g.Wait()
 	if err != nil {
-		return fmt.Errorf("failed to index block data at height %d: %w", block.Height, err)
+		return fmt.Errorf("failed to index block data at height %d: %w", header.Height, err)
 	}
 
-	c.metrics.BlockIndexed(block.Height, time.Since(start), eventCount, registerCount, resultCount)
+	c.metrics.BlockIndexed(header.Height, time.Since(start), eventCount, registerCount, resultCount)
 	lg.Debug().
 		Dur("duration_ms", time.Since(start)).
 		Msg("indexed block data")
+
+	return nil
+}
+
+func (c *IndexerCore) updateProgramCache(header *flow.Header, events []flow.Event, collections []*flow.Collection) error {
+	if c.derivedChainData == nil {
+		return nil
+	}
+
+	derivedBlockData := c.derivedChainData.GetOrCreateDerivedBlockData(
+		header.ID(),
+		header.ParentID,
+	)
+
+	// get a list of all contracts that were updated in this block
+	updatedContracts, err := findContractUpdates(events)
+	if err != nil {
+		return fmt.Errorf("could not find contract updates for block %d: %w", header.Height, err)
+	}
+
+	// invalidate cache entries for all modified programs
+	tx, err := derivedBlockData.NewDerivedTransactionData(0, 0)
+	if err != nil {
+		return fmt.Errorf("could not create derived transaction data for block %d: %w", header.Height, err)
+	}
+
+	tx.AddInvalidator(&accessInvalidator{
+		programs: &programInvalidator{
+			invalidated: updatedContracts,
+		},
+		meterParamOverrides: &meterParamOverridesInvalidator{
+			invalidateAll: hasAuthorizedTransaction(collections, c.serviceAddress),
+		},
+	})
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("could not commit derived transaction data for block %d: %w", header.Height, err)
+	}
 
 	return nil
 }

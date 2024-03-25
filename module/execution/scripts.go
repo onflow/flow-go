@@ -60,18 +60,15 @@ func NewScripts(
 	header storage.Headers,
 	registerAtHeight RegisterAtHeight,
 	queryConf query.QueryConfig,
-) (*Scripts, error) {
+	derivedChainData *derived.DerivedChainData,
+) *Scripts {
 	vm := fvm.NewVirtualMachine()
 
 	options := computation.DefaultFVMOptions(chainID, false, false)
 	blocks := environment.NewBlockFinder(header)
 	options = append(options, fvm.WithBlocks(blocks)) // add blocks for getBlocks calls in scripts
+	options = append(options, fvm.WithAllowProgramCacheWritesInScriptsEnabled(true))
 	vmCtx := fvm.NewContext(options...)
-
-	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
-	if err != nil {
-		return nil, err
-	}
 
 	queryExecutor := query.NewQueryExecutor(
 		queryConf,
@@ -87,7 +84,7 @@ func NewScripts(
 		executor:         queryExecutor,
 		headers:          header,
 		registerAtHeight: registerAtHeight,
-	}, nil
+	}
 }
 
 // ExecuteAtBlockHeight executes provided script against the block height.
