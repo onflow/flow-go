@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	gethCrypto "github.com/ethereum/go-ethereum/crypto"
+	gethCrypto "github.com/onflow/go-ethereum/crypto"
 )
 
 const FunctionSelectorLength = 4

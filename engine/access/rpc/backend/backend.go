@@ -72,6 +72,7 @@ type Backend struct {
 	backendExecutionResults
 	backendNetwork
 	backendSubscribeBlocks
+	backendSubscribeTransactions
 
 	state             protocol.State
 	chainID           flow.ChainID
@@ -161,6 +162,15 @@ func New(params Params) (*Backend, error) {
 	// initialize node version info
 	nodeInfo := getNodeVersionInfo(params.State.Params())
 
+	transactionsLocalDataProvider := &TransactionsLocalDataProvider{
+		state:          params.State,
+		collections:    params.Collections,
+		blocks:         params.Blocks,
+		eventsIndex:    params.EventsIndex,
+		txResultsIndex: params.TxResultsIndex,
+		systemTxID:     systemTxID,
+	}
+
 	b := &Backend{
 		state:        params.State,
 		BlockTracker: params.BlockTracker,
@@ -178,30 +188,23 @@ func New(params Params) (*Backend, error) {
 			scriptExecMode:    params.ScriptExecutionMode,
 		},
 		backendTransactions: backendTransactions{
-			TransactionsLocalDataProvider: TransactionsLocalDataProvider{
-				state:          params.State,
-				collections:    params.Collections,
-				blocks:         params.Blocks,
-				eventsIndex:    params.EventsIndex,
-				txResultsIndex: params.TxResultsIndex,
-				systemTxID:     systemTxID,
-			},
-			log:                  params.Log,
-			staticCollectionRPC:  params.CollectionRPC,
-			chainID:              params.ChainID,
-			transactions:         params.Transactions,
-			executionReceipts:    params.ExecutionReceipts,
-			transactionValidator: configureTransactionValidator(params.State, params.ChainID),
-			transactionMetrics:   params.AccessMetrics,
-			retry:                retry,
-			connFactory:          params.ConnFactory,
-			previousAccessNodes:  params.HistoricalAccessNodes,
-			nodeCommunicator:     params.Communicator,
-			txResultCache:        txResCache,
-			txErrorMessagesCache: txErrorMessagesCache,
-			txResultQueryMode:    params.TxResultQueryMode,
-			systemTx:             systemTx,
-			systemTxID:           systemTxID,
+			TransactionsLocalDataProvider: transactionsLocalDataProvider,
+			log:                           params.Log,
+			staticCollectionRPC:           params.CollectionRPC,
+			chainID:                       params.ChainID,
+			transactions:                  params.Transactions,
+			executionReceipts:             params.ExecutionReceipts,
+			transactionValidator:          configureTransactionValidator(params.State, params.ChainID),
+			transactionMetrics:            params.AccessMetrics,
+			retry:                         retry,
+			connFactory:                   params.ConnFactory,
+			previousAccessNodes:           params.HistoricalAccessNodes,
+			nodeCommunicator:              params.Communicator,
+			txResultCache:                 txResCache,
+			txErrorMessagesCache:          txErrorMessagesCache,
+			txResultQueryMode:             params.TxResultQueryMode,
+			systemTx:                      systemTx,
+			systemTxID:                    systemTxID,
 		},
 		backendEvents: backendEvents{
 			log:               params.Log,
@@ -247,6 +250,13 @@ func New(params Params) (*Backend, error) {
 			state:               params.State,
 			headers:             params.Headers,
 			blocks:              params.Blocks,
+			subscriptionHandler: params.SubscriptionHandler,
+			blockTracker:        params.BlockTracker,
+		},
+		backendSubscribeTransactions: backendSubscribeTransactions{
+			txLocalDataProvider: transactionsLocalDataProvider,
+			log:                 params.Log,
+			executionResults:    params.ExecutionResults,
 			subscriptionHandler: params.SubscriptionHandler,
 			blockTracker:        params.BlockTracker,
 		},

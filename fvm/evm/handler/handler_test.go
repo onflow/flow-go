@@ -8,15 +8,15 @@ import (
 	"strings"
 	"testing"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethCore "github.com/ethereum/go-ethereum/core"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	gethVM "github.com/ethereum/go-ethereum/core/vm"
-	gethParams "github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethCore "github.com/onflow/go-ethereum/core"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethVM "github.com/onflow/go-ethereum/core/vm"
+	gethParams "github.com/onflow/go-ethereum/params"
+	"github.com/onflow/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -64,7 +64,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 							return result, nil
 						},
 					}
-					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, bs, aa, backend, em)
+					handler := handler.NewContractHandler(flow.Emulator, rootAddr, flowTokenAddress, bs, aa, backend, em)
 
 					coinbase := types.NewAddress(gethCommon.Address{})
 
@@ -842,6 +842,6 @@ func SetupHandler(t testing.TB, backend types.Backend, rootAddr flow.Address) *h
 	aa := handler.NewAddressAllocator()
 	emulator := emulator.NewEmulator(backend, rootAddr)
 
-	handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, bs, aa, backend, emulator)
+	handler := handler.NewContractHandler(flow.Emulator, rootAddr, flowTokenAddress, bs, aa, backend, emulator)
 	return handler
 }
