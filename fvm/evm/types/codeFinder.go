@@ -8,11 +8,6 @@ import (
 )
 
 func ValidationErrorCode(err error) ErrorCode {
-	// if is a EVM validation error first unwrap one level
-	if IsEVMValidationError(err) {
-		err = errors.Unwrap(err)
-	}
-
 	// direct errors that are returned by the evm
 	switch err {
 	case gethVM.ErrGasUintOverflow:

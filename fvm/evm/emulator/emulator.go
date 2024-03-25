@@ -160,7 +160,7 @@ func (bl *BlockView) RunTransaction(
 		res = &types.Result{
 			TxType:          tx.Type(),
 			TxHash:          txHash,
-			ValidationError: types.NewEVMValidationError(err),
+			ValidationError: err,
 			GasConsumed:     InvalidTransactionGasCost,
 		}
 		return res, nil
@@ -444,7 +444,7 @@ func (proc *procedure) run(
 		}
 		// otherwise is a validation error (pre-check failure)
 		// no state change, wrap the error and return
-		res.ValidationError = types.NewEVMValidationError(err)
+		res.ValidationError = err
 		res.GasConsumed = InvalidTransactionGasCost
 		return &res, nil
 	}

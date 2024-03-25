@@ -373,7 +373,6 @@ func TestContractInteraction(t *testing.T) {
 					res, err := blk.RunTransaction(tx)
 					require.NoError(t, err)
 					require.Error(t, res.ValidationError)
-					require.True(t, types.IsEVMValidationError(res.ValidationError))
 				})
 			})
 
@@ -396,7 +395,6 @@ func TestContractInteraction(t *testing.T) {
 					res, err := blk.RunTransaction(tx)
 					require.NoError(t, err)
 					require.Error(t, res.ValidationError)
-					require.True(t, types.IsEVMValidationError(res.ValidationError))
 				})
 			})
 		})

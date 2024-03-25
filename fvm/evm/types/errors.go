@@ -125,34 +125,6 @@ var (
 	ErrNotImplemented = NewFatalError(errors.New("a functionality is called that is not implemented"))
 )
 
-// EVMValidationError is a non-fatal error, returned when validation steps of an EVM transaction
-// or direct call has failed.
-type EVMValidationError struct {
-	err error
-}
-
-// NewEVMValidationError returns a new EVMValidationError
-func NewEVMValidationError(rootCause error) EVMValidationError {
-	return EVMValidationError{
-		err: rootCause,
-	}
-}
-
-// Unwrap unwraps the underlying evm error
-func (err EVMValidationError) Unwrap() error {
-	return err.err
-}
-
-func (err EVMValidationError) Error() string {
-	return fmt.Sprintf("EVM validation error: %v", err.err)
-}
-
-// IsEVMValidationError returns true if the error or any underlying errors
-// is of the type EVM validation error
-func IsEVMValidationError(err error) bool {
-	return errors.As(err, &EVMValidationError{})
-}
-
 // StateError is a non-fatal error, returned when a state operation
 // has failed (e.g. reaching storage interaction limit)
 type StateError struct {

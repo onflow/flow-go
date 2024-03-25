@@ -159,7 +159,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					em := &testutils.TestEmulator{
 						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
 							return &types.Result{
-								ValidationError: types.NewEVMValidationError(fmt.Errorf("some sort of validation error")),
+								ValidationError: fmt.Errorf("some sort of validation error"),
 							}, nil
 						},
 					}
@@ -494,7 +494,7 @@ func TestHandler_COA(t *testing.T) {
 								return 0, nil
 							},
 							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
-								return &types.Result{}, types.NewEVMValidationError(fmt.Errorf("some sort of error"))
+								return &types.Result{}, fmt.Errorf("some sort of error")
 							},
 						}
 
@@ -778,7 +778,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 					evmErr := fmt.Errorf("%w: next nonce %v, tx nonce %v", gethCore.ErrNonceTooLow, 1, 0)
 					em := &testutils.TestEmulator{
 						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
-							return &types.Result{ValidationError: types.NewEVMValidationError(evmErr)}, nil
+							return &types.Result{ValidationError: evmErr}, nil
 						},
 					}
 					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, bs, aa, backend, em)
