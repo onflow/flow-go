@@ -34,7 +34,7 @@ func NewMigratorRuntime(
 	*migratorRuntime,
 	error,
 ) {
-	snapshot, err := util.NewPayloadSnapshot(payloads)
+	snapshot, err := util.NewMapBasedPayloadSnapshot(payloads)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
 	}

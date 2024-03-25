@@ -1,7 +1,8 @@
 package util_test
 
 import (
-	"math/rand"
+	"crypto/rand"
+	"math/big"
 	"strconv"
 	"testing"
 
@@ -49,6 +50,11 @@ func randomPayload(size int) []byte {
 	return payload
 }
 
+func randomInt(max int) int {
+	n, _ := rand.Int(rand.Reader, big.NewInt(int64(max)))
+	return int(n.Int64())
+}
+
 func createPayloads(payloadsNum int) []*ledger.Payload {
 	// 1kb payloads
 	payload := randomPayload(1024)
@@ -84,7 +90,7 @@ func benchmarkMerge(b *testing.B, payloadsNum int, changes []int) {
 			copy(p, payload)
 
 			// get random index
-			index := rand.Intn(existingPayloadCount)
+			index := randomInt(existingPayloadCount)
 
 			changes[flow.RegisterID{
 				Owner: flow.EmptyAddress.String(),
@@ -95,7 +101,7 @@ func benchmarkMerge(b *testing.B, payloadsNum int, changes []int) {
 		for i := 0; i < deletePayloads; i++ {
 
 			// get random index
-			index := rand.Intn(existingPayloadCount)
+			index := randomInt(existingPayloadCount)
 
 			changes[flow.RegisterID{
 				Owner: flow.EmptyAddress.String(),

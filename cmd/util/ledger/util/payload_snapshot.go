@@ -148,7 +148,7 @@ func NewMapBasedPayloadSnapshot(payloads []*ledger.Payload) (*MapBasedPayloadSna
 	return l, nil
 }
 
-func (p MapBasedPayloadSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+func (p *MapBasedPayloadSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 	index, exists := p.reverseMap[id]
 	if !exists {
 		return nil, nil
@@ -156,16 +156,16 @@ func (p MapBasedPayloadSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, er
 	return p.payloads[index].Value(), nil
 }
 
-func (p MapBasedPayloadSnapshot) Exists(id flow.RegisterID) bool {
+func (p *MapBasedPayloadSnapshot) Exists(id flow.RegisterID) bool {
 	_, exists := p.reverseMap[id]
 	return exists
 }
 
-func (p MapBasedPayloadSnapshot) Len() int {
+func (p *MapBasedPayloadSnapshot) Len() int {
 	return len(p.payloads)
 }
 
-func (p MapBasedPayloadSnapshot) PayloadMap() map[flow.RegisterID]*ledger.Payload {
+func (p *MapBasedPayloadSnapshot) PayloadMap() map[flow.RegisterID]*ledger.Payload {
 	result := make(map[flow.RegisterID]*ledger.Payload, len(p.payloads))
 	for id, index := range p.reverseMap {
 		result[id] = p.payloads[index]
@@ -175,7 +175,7 @@ func (p MapBasedPayloadSnapshot) PayloadMap() map[flow.RegisterID]*ledger.Payloa
 
 // ApplyChangesAndGetNewPayloads applies the given changes to the snapshot and returns the new payloads.
 // the snapshot is destroyed.
-func (p MapBasedPayloadSnapshot) ApplyChangesAndGetNewPayloads(
+func (p *MapBasedPayloadSnapshot) ApplyChangesAndGetNewPayloads(
 	changes map[flow.RegisterID]flow.RegisterValue,
 	expectedChangeAddresses map[flow.Address]struct{},
 	logger zerolog.Logger,
