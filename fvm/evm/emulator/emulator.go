@@ -140,19 +140,25 @@ func (bl *BlockView) RunTransaction(
 	if err != nil {
 		return nil, err
 	}
-	msg, err := gethCore.TransactionToMessage(tx, GetSigner(bl.config), proc.config.BlockContext.BaseFee)
+	txHash := tx.Hash()
+	msg, err := gethCore.TransactionToMessage(
+		tx,
+		GetSigner(bl.config),
+		proc.config.BlockContext.BaseFee)
 	if err != nil {
 		// this is not a fatal error (e.g. due to bad signature)
 		// not a valid transaction
-		return res, types.NewEVMValidationError(err)
+		res = &types.Result{
+			TxType:          tx.Type(),
+			TxHash:          txHash,
+			ValidationError: types.NewEVMValidationError(err),
+			GasConsumed:     InvalidTransactionGasCost,
+		}
+		return res, nil
 	}
-
-	txHash := tx.Hash()
 
 	// update tx context origin
 	proc.evm.TxContext.Origin = msg.From
-	// TODO: when we support multiple tx per block we need to update
-	// the tx index here to proper value
 	res, err = proc.run(msg, txHash, 0, tx.Type())
 	if err != nil {
 		return nil, err
@@ -222,6 +228,14 @@ func (proc *procedure) mintTo(
 	if err != nil {
 		return res, err
 	}
+
+	// if any error (invalid or vm) on the internal call, revert and don't commit any change
+	// this prevents having cases that we add balance to the bridge but the transfer
+	// fails due to gas, etc.
+	if res.Invalid() || res.Failed() {
+		return res, types.ErrInternalDirecCallFailed
+	}
+
 	// all commmit errors (StateDB errors) has to be returned
 	return res, proc.commitAndFinalize()
 }
@@ -230,7 +244,6 @@ func (proc *procedure) withdrawFrom(
 	call *types.DirectCall,
 	txHash gethCommon.Hash,
 ) (*types.Result, error) {
-
 	bridge := call.To.ToCommon()
 
 	// create bridge account if not exist
@@ -244,6 +257,11 @@ func (proc *procedure) withdrawFrom(
 	res, err := proc.run(msg, txHash, 0, types.DirectCallTxType)
 	if err != nil {
 		return res, err
+	}
+
+	// if any error (invalid or vm) on the internal call, revert and don't commit any change
+	if res.Invalid() || res.Failed() {
+		return res, types.ErrInternalDirecCallFailed
 	}
 
 	// now deduct the balance from the bridge
@@ -267,14 +285,16 @@ func (proc *procedure) deployAt(
 	value *big.Int,
 	txHash gethCommon.Hash,
 ) (*types.Result, error) {
-	if value.Sign() < 0 {
-		return nil, types.ErrInvalidBalance
-	}
-
 	res := &types.Result{
 		TxType: types.DirectCallTxType,
 		TxHash: txHash,
 	}
+
+	if value.Sign() < 0 {
+		res.ValidationError = types.ErrInvalidBalance
+		return res, nil
+	}
+
 	addr := to.ToCommon()
 
 	// precheck 1 - check balance of the source
@@ -288,7 +308,7 @@ func (proc *procedure) deployAt(
 	contractHash := proc.state.GetCodeHash(addr)
 	if proc.state.GetNonce(addr) != 0 ||
 		(contractHash != (gethCommon.Hash{}) && contractHash != gethTypes.EmptyCodeHash) {
-		res.ValidationError = gethVM.ErrContractAddressCollision
+		res.VMError = gethVM.ErrContractAddressCollision
 		return res, nil
 	}
 
@@ -385,6 +405,11 @@ func (proc *procedure) runDirect(
 	return res, proc.commitAndFinalize()
 }
 
+// run runs a geth core.message and returns the
+// results, any validation or execution errors
+// are captured inside the result, the remaining
+// return errors are errors requires extra handling
+// on upstream (e.g. backend errors).
 func (proc *procedure) run(
 	msg *gethCore.Message,
 	txHash gethCommon.Hash,

@@ -393,9 +393,10 @@ func TestContractInteraction(t *testing.T) {
 						R:        big.NewInt(2),
 						S:        big.NewInt(3),
 					})
-					_, err = blk.RunTransaction(tx)
-					require.Error(t, err)
-					require.True(t, types.IsEVMValidationError(err))
+					res, err := blk.RunTransaction(tx)
+					require.NoError(t, err)
+					require.Error(t, res.ValidationError)
+					require.True(t, types.IsEVMValidationError(res.ValidationError))
 				})
 			})
 		})
@@ -463,7 +464,7 @@ func TestDeployAtFunctionality(t *testing.T) {
 								0),
 						)
 						require.NoError(t, err)
-						require.Equal(t, gethVM.ErrContractAddressCollision, res.ValidationError)
+						require.Equal(t, gethVM.ErrContractAddressCollision, res.VMError)
 					})
 					// test deployment with not enough gas
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
