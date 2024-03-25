@@ -1522,10 +1522,10 @@ func TestSettingExecutionWeights(t *testing.T) {
 					import FlowToken from 0x%s
 	
 					transaction() {
-						let sentVault: @FungibleToken.Vault
+						let sentVault: @{FungibleToken.Vault}
 	
-						prepare(signer: AuthAccount) {
-							let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+						prepare(signer: auth(BorrowValue) &Account) {
+							let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 								?? panic("Could not borrow reference to the owner's Vault!")
 	
 							self.sentVault <- vaultRef.withdraw(amount: 5.0)
@@ -1537,21 +1537,16 @@ func TestSettingExecutionWeights(t *testing.T) {
 							let recipient3 = getAccount(%s)
 							let recipient4 = getAccount(%s)
 							let recipient5 = getAccount(%s)
-	
-							let receiverRef1 = recipient1.getCapability(/public/flowTokenReceiver)
-								.borrow<&{FungibleToken.Receiver}>()
+
+							let receiverRef1 = recipient1.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 								?? panic("Could not borrow receiver reference to the recipient's Vault")
-							let receiverRef2 = recipient2.getCapability(/public/flowTokenReceiver)
-								.borrow<&{FungibleToken.Receiver}>()
+							let receiverRef2 = recipient2.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 								?? panic("Could not borrow receiver reference to the recipient's Vault")
-							let receiverRef3 = recipient3.getCapability(/public/flowTokenReceiver)
-								.borrow<&{FungibleToken.Receiver}>()
+							let receiverRef3 = recipient3.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 								?? panic("Could not borrow receiver reference to the recipient's Vault")
-							let receiverRef4 = recipient4.getCapability(/public/flowTokenReceiver)
-								.borrow<&{FungibleToken.Receiver}>()
+							let receiverRef4 = recipient4.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 								?? panic("Could not borrow receiver reference to the recipient's Vault")
-							let receiverRef5 = recipient5.getCapability(/public/flowTokenReceiver)
-								.borrow<&{FungibleToken.Receiver}>()
+							let receiverRef5 = recipient5.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 								?? panic("Could not borrow receiver reference to the recipient's Vault")
 	
 							receiverRef1.deposit(from: <-self.sentVault.withdraw(amount: 1.0))
@@ -3117,6 +3112,7 @@ func TestEVM(t *testing.T) {
 					"A.ee82856bf20e2aa6.FungibleToken.Withdrawn",
 					evmLocation.TypeID(nil, string(types.EventTypeTransactionExecuted)),
 					evmLocation.TypeID(nil, string(types.EventTypeBlockExecuted)),
+					"A.f8d6e0586b0a20c7.EVM.FLOWTokensDeposited",
 				},
 				eventTypeIDs,
 			)
