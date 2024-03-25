@@ -16,6 +16,15 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// InvalidTransactionGasCost is a gas cost we charge when
+// a transaction or call fails at validation step.
+// in typical evm environment this doesn't exist given
+// if a transaction is invalid it won't be included
+// and no fees can be charged for users even though
+// the validation has used some resources, in our case
+// given we charge the fees on flow transaction and we
+// are doing on chain validation we can/should charge the
+// user for the validation fee.
 const InvalidTransactionGasCost = 1_000
 
 // Emulator handles operations against evm runtime
@@ -285,14 +294,13 @@ func (proc *procedure) deployAt(
 	value *big.Int,
 	txHash gethCommon.Hash,
 ) (*types.Result, error) {
+	if value.Sign() < 0 {
+		return nil, types.ErrInvalidBalance
+	}
+
 	res := &types.Result{
 		TxType: types.DirectCallTxType,
 		TxHash: txHash,
-	}
-
-	if value.Sign() < 0 {
-		res.ValidationError = types.ErrInvalidBalance
-		return res, nil
 	}
 
 	addr := to.ToCommon()
@@ -301,6 +309,7 @@ func (proc *procedure) deployAt(
 	if value.Sign() != 0 &&
 		!proc.evm.Context.CanTransfer(proc.state, caller.ToCommon(), value) {
 		res.ValidationError = gethCore.ErrInsufficientFundsForTransfer
+		res.GasConsumed = InvalidTransactionGasCost
 		return res, nil
 	}
 
@@ -431,7 +440,7 @@ func (proc *procedure) run(
 		// if the error is a fatal error or a non-fatal state error or a backend err return it
 		// this condition should never happen given all StateDB errors are withheld for the commit time.
 		if types.IsAFatalError(err) || types.IsAStateError(err) || types.IsABackendError(err) {
-			return &res, err
+			return nil, err
 		}
 		// otherwise is a validation error (pre-check failure)
 		// no state change, wrap the error and return

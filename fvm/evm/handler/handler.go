@@ -162,11 +162,18 @@ func (h *ContractHandler) run(
 		return nil, err
 	}
 
+	// saftey check for result
+	if res == nil {
+		return nil, types.ErrUnexpectedEmptyResult
+	}
+
+	// meter gas anyway (even for invalid or failed states)
 	err = h.meterGasUsage(res)
 	if err != nil {
 		return nil, err
 	}
 
+	// if is invalid tx skip the next steps (forming block, ...)
 	if res.Invalid() {
 		return res, nil
 	}
@@ -174,7 +181,7 @@ func (h *ContractHandler) run(
 	// step 3 - update block proposal
 	bp, err := h.blockStore.BlockProposal()
 	if err != nil {
-		return res, err
+		return nil, err
 	}
 
 	bp.AppendTxHash(res.TxHash)
@@ -184,7 +191,7 @@ func (h *ContractHandler) run(
 
 	blockHash, err := bp.Hash()
 	if err != nil {
-		return res, err
+		return nil, err
 	}
 
 	// step 4 - emit events
@@ -196,16 +203,20 @@ func (h *ContractHandler) run(
 		res,
 	))
 	if err != nil {
-		return res, err
+		return nil, err
 	}
 
 	err = h.emitEvent(types.NewBlockExecutedEvent(bp))
 	if err != nil {
-		return res, err
+		return nil, err
 	}
 
 	// step 5 - commit block proposal
-	return res, h.blockStore.CommitBlockProposal()
+	err = h.blockStore.CommitBlockProposal()
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 func (h *ContractHandler) checkGasLimit(limit types.GasLimit) error {
@@ -217,10 +228,7 @@ func (h *ContractHandler) checkGasLimit(limit types.GasLimit) error {
 }
 
 func (h *ContractHandler) meterGasUsage(res *types.Result) error {
-	if res != nil {
-		return h.backend.MeterComputation(environment.ComputationKindEVMGasUsage, uint(res.GasConsumed))
-	}
-	return nil
+	return h.backend.MeterComputation(environment.ComputationKindEVMGasUsage, uint(res.GasConsumed))
 }
 
 func (h *ContractHandler) emitEvent(event *types.Event) error {
@@ -262,24 +270,30 @@ func (h *ContractHandler) executeAndHandleCall(
 	totalSupplyDiff *big.Int,
 	deductSupplyDiff bool,
 ) (*types.Result, error) {
-	var res *types.Result
 	// execute the call
 	blk, err := h.emulator.NewBlockView(ctx)
 	if err != nil {
-		return res, err
+		return nil, err
 	}
 
-	res, err = blk.DirectCall(call)
+	res, err := blk.DirectCall(call)
 	// check backend errors first
 	if err != nil {
-		return res, err
+		return nil, err
 	}
 
+	// saftey check for result
+	if res == nil {
+		return nil, types.ErrUnexpectedEmptyResult
+	}
+
+	// gas meter even invalid or failed status
 	err = h.meterGasUsage(res)
 	if err != nil {
-		return res, err
+		return nil, err
 	}
 
+	// if is invalid skip the rest of states
 	if res.Invalid() {
 		return res, nil
 	}
@@ -287,7 +301,7 @@ func (h *ContractHandler) executeAndHandleCall(
 	// update block proposal
 	bp, err := h.blockStore.BlockProposal()
 	if err != nil {
-		return res, err
+		return nil, err
 	}
 
 	bp.AppendTxHash(res.TxHash)
@@ -299,7 +313,7 @@ func (h *ContractHandler) executeAndHandleCall(
 		if deductSupplyDiff {
 			bp.TotalSupply = new(big.Int).Sub(bp.TotalSupply, totalSupplyDiff)
 			if bp.TotalSupply.Sign() < 0 {
-				return res, types.ErrInsufficientTotalSupply
+				return nil, types.ErrInsufficientTotalSupply
 			}
 		} else {
 			bp.TotalSupply = new(big.Int).Add(bp.TotalSupply, totalSupplyDiff)
@@ -308,13 +322,13 @@ func (h *ContractHandler) executeAndHandleCall(
 
 	blockHash, err := bp.Hash()
 	if err != nil {
-		return res, err
+		return nil, err
 	}
 
 	// emit events
 	encoded, err := call.Encode()
 	if err != nil {
-		return res, err
+		return nil, err
 	}
 
 	err = h.emitEvent(
@@ -327,16 +341,21 @@ func (h *ContractHandler) executeAndHandleCall(
 		),
 	)
 	if err != nil {
-		return res, err
+		return nil, err
 	}
 
 	err = h.emitEvent(types.NewBlockExecutedEvent(bp))
 	if err != nil {
-		return res, err
+		return nil, err
 	}
 
 	// commit block proposal
-	return res, h.blockStore.CommitBlockProposal()
+	err = h.blockStore.CommitBlockProposal()
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
 }
 
 func (h *ContractHandler) GenerateResourceUUID() uint64 {
