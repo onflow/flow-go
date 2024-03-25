@@ -54,8 +54,8 @@ require (
 	github.com/onflow/cadence v1.0.0-preview.16
 	github.com/onflow/crypto v0.25.0
 	github.com/onflow/flow v0.3.4
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.2-0.20240305214031-d81e0c3b42f3
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.2-0.20240305214031-d81e0c3b42f3
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.2-0.20240322152746-bcf77eeccc0f
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.2-0.20240322152746-bcf77eeccc0f
 	github.com/onflow/flow-go-sdk v1.0.0-preview.14
 	github.com/onflow/flow/protobuf/go/flow v0.3.7
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
