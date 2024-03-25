@@ -630,8 +630,9 @@ func panicOnErrorOrInvalidOrFailedState(res *types.Result, err error) {
 		panic(fvmErrors.NewEVMError(res.VMError))
 	}
 
-	if err == nil {
-		return
+	// this should never happen
+	if err == nil && res == nil {
+		panic(fvmErrors.NewEVMError(types.ErrUnexpectedEmptyResult))
 	}
 
 	panicOnError(err)
