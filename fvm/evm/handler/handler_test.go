@@ -798,7 +798,6 @@ func TestHandler_TransactionRun(t *testing.T) {
 					assertPanic(t, isNotFatal, func() {
 						rs := handler.Run([]byte(tx), coinbase)
 						require.Equal(t, types.StatusInvalid, rs.Status)
-						require.Equal(t, types.ValidationErrCodeInsufficientComputation, rs.ErrorCode)
 					})
 
 					tx = eoa.PrepareSignAndEncodeTx(

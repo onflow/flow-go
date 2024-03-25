@@ -13,14 +13,6 @@ const ( // code reserved for no error
 
 	// covers all other validation codes that doesn't have an specific code
 	ValidationErrCodeMisc ErrorCode = 100
-	// invalid balance is provided (e.g. negative value)
-	ValidationErrCodeInvalidBalance ErrorCode = 101
-	// insufficient computation is left in the flow transaction
-	ValidationErrCodeInsufficientComputation ErrorCode = 102
-	// unauthroized method call
-	ValidationErrCodeUnAuthroizedMethodCall ErrorCode = 103
-	// withdraw balance is prone to rounding error
-	ValidationErrCodeWithdrawBalanceRounding ErrorCode = 104
 
 	// general execution error returned for cases that don't have an specific code
 	ExecutionErrCodeMisc ErrorCode = 400
