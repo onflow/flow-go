@@ -63,7 +63,7 @@ func NewContractHandler(
 // DeployCOA deploys a cadence-owned-account and returns the address
 func (h *ContractHandler) DeployCOA(uuid uint64) types.Address {
 	res, err := h.deployCOA(uuid)
-	panicOnAnyError(res, err)
+	panicOnErrorOrInvalidOrFailedState(res, err)
 	return res.DeployedContractAddress
 }
 
@@ -102,7 +102,7 @@ func (h *ContractHandler) AccountByAddress(addr types.Address, isAuthorized bool
 // LastExecutedBlock returns the last executed block
 func (h *ContractHandler) LastExecutedBlock() *types.Block {
 	block, err := h.blockStore.LatestBlock()
-	panicOnAnyError(nil, err)
+	panicOnError(err)
 	return block
 }
 
@@ -110,14 +110,14 @@ func (h *ContractHandler) LastExecutedBlock() *types.Block {
 // collects the gas fees and pay it to the coinbase address provided.
 func (h *ContractHandler) RunOrPanic(rlpEncodedTx []byte, coinbase types.Address) {
 	res, err := h.run(rlpEncodedTx, coinbase)
-	panicOnAnyError(res, err)
+	panicOnErrorOrInvalidOrFailedState(res, err)
 }
 
 // Run tries to run an rlpencoded evm transaction and
 // collects the gas fees and pay it to the coinbase address provided.
 func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) *types.ResultSummary {
 	res, err := h.run(rlpEncodedTx, coinbase)
-	panicOnFatalOrBackendError(err)
+	panicOnError(err)
 	return res.ResultSummary()
 }
 
@@ -256,7 +256,7 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
 		GetHashFunc: func(n uint64) gethCommon.Hash {
 			hash, err := h.blockStore.BlockHash(n)
-			panicOnAnyError(nil, err) // we have to handle it here given we can't continue with it even in try case
+			panicOnError(err) // we have to handle it here given we can't continue with it even in try case
 			return hash
 		},
 		ExtraPrecompiles: h.precompiles,
@@ -360,7 +360,7 @@ func (h *ContractHandler) executeAndHandleCall(
 
 func (h *ContractHandler) GenerateResourceUUID() uint64 {
 	uuid, err := h.backend.GenerateUUID()
-	panicOnAnyError(nil, err)
+	panicOnError(err)
 	return uuid
 }
 
@@ -390,7 +390,7 @@ func (a *Account) Address() types.Address {
 // from the storage already transalates into computation
 func (a *Account) Nonce() uint64 {
 	nonce, err := a.nonce()
-	panicOnAnyError(nil, err)
+	panicOnError(err)
 	return nonce
 }
 
@@ -414,7 +414,7 @@ func (a *Account) nonce() (uint64, error) {
 // from the storage already transalates into computation
 func (a *Account) Balance() types.Balance {
 	bal, err := a.balance()
-	panicOnAnyError(nil, err)
+	panicOnError(err)
 	return bal
 }
 
@@ -439,7 +439,7 @@ func (a *Account) balance() (types.Balance, error) {
 // from the storage already transalates into computation
 func (a *Account) Code() types.Code {
 	code, err := a.code()
-	panicOnAnyError(nil, err)
+	panicOnError(err)
 	return code
 }
 
@@ -462,7 +462,7 @@ func (a *Account) code() (types.Code, error) {
 // from the storage already transalates into computation
 func (a *Account) CodeHash() []byte {
 	codeHash, err := a.codeHash()
-	panicOnAnyError(nil, err)
+	panicOnError(err)
 	return codeHash
 }
 
@@ -483,7 +483,7 @@ func (a *Account) codeHash() ([]byte, error) {
 // and update the account balance with the new amount
 func (a *Account) Deposit(v *types.FLOWTokenVault) {
 	res, err := a.deposit(v)
-	panicOnAnyError(res, err)
+	panicOnErrorOrInvalidOrFailedState(res, err)
 }
 
 func (a *Account) deposit(v *types.FLOWTokenVault) (*types.Result, error) {
@@ -508,7 +508,7 @@ func (a *Account) deposit(v *types.FLOWTokenVault) (*types.Result, error) {
 // withdraw and return flow token from the Flex main vault.
 func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 	res, err := a.withdraw(b)
-	panicOnAnyError(res, err)
+	panicOnErrorOrInvalidOrFailedState(res, err)
 
 	return types.NewFlowTokenVault(b)
 }
@@ -537,7 +537,7 @@ func (a *Account) withdraw(b types.Balance) (*types.Result, error) {
 // Transfer transfers tokens between accounts
 func (a *Account) Transfer(to types.Address, balance types.Balance) {
 	res, err := a.transfer(to, balance)
-	panicOnAnyError(res, err)
+	panicOnErrorOrInvalidOrFailedState(res, err)
 }
 
 func (a *Account) transfer(to types.Address, balance types.Balance) (*types.Result, error) {
@@ -560,7 +560,7 @@ func (a *Account) transfer(to types.Address, balance types.Balance) (*types.Resu
 // the contract data is not controlled by the caller accounts
 func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types.Balance) types.Address {
 	res, err := a.deploy(code, gaslimit, balance)
-	panicOnAnyError(res, err)
+	panicOnErrorOrInvalidOrFailedState(res, err)
 	return types.Address(res.DeployedContractAddress)
 }
 
@@ -586,7 +586,7 @@ func (a *Account) deploy(code types.Code, gaslimit types.GasLimit, balance types
 // the balance would be deducted from the OFA account and would be transferred to the target address
 func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimit, balance types.Balance) *types.ResultSummary {
 	res, err := a.call(to, data, gaslimit, balance)
-	panicOnFatalOrBackendError(err)
+	panicOnError(err)
 	return res.ResultSummary()
 }
 
@@ -620,7 +620,7 @@ func (a *Account) precheck(authroized bool, gaslimit types.GasLimit) (types.Bloc
 	return a.fch.getBlockContext()
 }
 
-func panicOnAnyError(res *types.Result, err error) {
+func panicOnErrorOrInvalidOrFailedState(res *types.Result, err error) {
 
 	if res != nil && res.Invalid() {
 		panic(fvmErrors.NewEVMError(res.ValidationError))
@@ -634,14 +634,11 @@ func panicOnAnyError(res *types.Result, err error) {
 		return
 	}
 
-	panicOnFatalOrBackendError(err)
-
-	// if not FVM wrap it with EVM error and panic
-	panic(fvmErrors.NewEVMError(err))
+	panicOnError(err)
 }
 
-// panicOnFatalOrBackendError errors panic on fatal or backend-related errors
-func panicOnFatalOrBackendError(err error) {
+// panicOnError errors panic on returned errors
+func panicOnError(err error) {
 	if err == nil {
 		return
 	}
