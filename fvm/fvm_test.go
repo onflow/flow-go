@@ -3325,7 +3325,7 @@ func TestEVM(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
-			require.Len(t, output.Events, 6)
+			require.Len(t, output.Events, 7)
 
 			evmLocation := types.EVMLocation{}
 			txExe, blockExe := output.Events[4], output.Events[5]
