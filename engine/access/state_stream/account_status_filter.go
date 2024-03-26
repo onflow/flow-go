@@ -41,8 +41,8 @@ const (
 	CoreEventInboxValueClaimed = "flow.InboxValueClaimed"
 )
 
-// defaultCoreEvents is an array containing all default core event types.
-var defaultCoreEvents = []string{
+// DefaultCoreEvents is an array containing all default core event types.
+var DefaultCoreEvents = []string{
 	CoreEventAccountCreated,
 	CoreEventAccountKeyAdded,
 	CoreEventAccountKeyRemoved,
@@ -81,7 +81,7 @@ func NewAccountStatusFilter(
 
 	// If `eventTypes` is empty, the filter returns all core events for any accounts.
 	if len(eventTypes) == 0 {
-		eventTypes = defaultCoreEvents
+		eventTypes = DefaultCoreEvents
 	}
 
 	// Creates an `EventFilter` with the provided `eventTypes`.
@@ -99,7 +99,8 @@ func NewAccountStatusFilter(
 
 		// If there are non-core event types at this stage, it returns an error from `addCoreEventFieldFilter`.
 		for eventType := range filter.EventTypes {
-			err = filter.addCoreEventFieldFilter(eventType, address, chain)
+			// use the hex with prefix address to make sure it will match the cadence address
+			err = filter.addCoreEventFieldFilter(eventType, addr.HexWithPrefix(), chain)
 			if err != nil {
 				return AccountStatusFilter{}, err
 			}
@@ -148,7 +149,7 @@ func (f *AccountStatusFilter) CreateAccountRelatedCoreEvents(events flow.EventsL
 func validateCoreEventTypes(eventTypes []string) error {
 	for _, eventType := range eventTypes {
 		isMatch := false
-		for _, coreEventType := range defaultCoreEvents {
+		for _, coreEventType := range DefaultCoreEvents {
 			if coreEventType == eventType {
 				isMatch = true
 				break

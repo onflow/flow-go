@@ -6,18 +6,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/utils/unittest/generator"
+
 	subscriptionmock "github.com/onflow/flow-go/engine/access/subscription/mock"
 
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
-	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/encoding/ccf"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -42,12 +39,10 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var accountAddress = "0x1d7e57aa55817448"
-
 var testProtocolEventTypes = []flow.EventType{
-	"flow.AccountCreated",
-	"flow.AccountContractAdded",
-	"flow.AccountContractUpdated",
+	state_stream.CoreEventAccountCreated,
+	state_stream.CoreEventAccountContractAdded,
+	state_stream.CoreEventAccountContractUpdated,
 }
 
 // Define the test type struct
@@ -61,89 +56,13 @@ type testType struct {
 // BackendAccountStatusesSuite is the test suite for AccountStatusesBackend.
 type BackendAccountStatusesSuite struct {
 	BackendExecutionDataSuite
+	accountCreatedAddress  flow.Address
+	accountContractAdded   flow.Address
+	accountContractUpdated flow.Address
 }
 
 func TestBackendAccountStatusesSuite(t *testing.T) {
 	suite.Run(t, new(BackendAccountStatusesSuite))
-}
-
-// getAccountCreateEvent returns a mock account creation event.
-func (s *BackendAccountStatusesSuite) getAccountCreateEvent(address common.Address) flow.Event {
-	cadenceEvent := cadence.NewEvent(
-		[]cadence.Value{
-			cadence.NewAddress(address),
-		}).WithType(&cadence.EventType{
-		Location:            stdlib.FlowLocation{},
-		QualifiedIdentifier: "AccountCreated",
-		Fields: []cadence.Field{
-			{
-				Identifier: "address",
-				Type:       cadence.AddressType{},
-			},
-		},
-	})
-
-	payload, err := ccf.Encode(cadenceEvent)
-	require.NoError(s.T(), err)
-
-	event := unittest.EventFixture(
-		flow.EventType(cadenceEvent.EventType.Location.TypeID(nil, cadenceEvent.EventType.QualifiedIdentifier)),
-		0,
-		0,
-		unittest.IdentifierFixture(),
-		0,
-	)
-
-	event.Payload = payload
-
-	return event
-}
-
-// getAccountContractEvent returns a mock account contract event.
-func (s *BackendAccountStatusesSuite) getAccountContractEvent(qualifiedIdentifier string, address common.Address) flow.Event {
-	contractName, err := cadence.NewString("EventContract")
-	require.NoError(s.T(), err)
-
-	cadenceEvent := cadence.NewEvent(
-		[]cadence.Value{
-			cadence.NewAddress(address),
-			cadence.NewArray(
-				testutils.ConvertToCadence([]byte{111, 43, 164, 202, 220, 174, 148, 17, 253, 161, 9, 124, 237, 83, 227, 75, 115, 149, 141, 83, 129, 145, 252, 68, 122, 137, 80, 155, 89, 233, 136, 213}),
-			).WithType(cadence.NewConstantSizedArrayType(32, cadence.TheUInt8Type)),
-			contractName,
-		}).WithType(&cadence.EventType{
-		Location:            stdlib.FlowLocation{},
-		QualifiedIdentifier: qualifiedIdentifier,
-		Fields: []cadence.Field{
-			{
-				Identifier: "address",
-				Type:       cadence.AddressType{},
-			},
-			{
-				Identifier: "codeHash",
-				Type:       cadence.NewConstantSizedArrayType(32, cadence.TheUInt8Type),
-			},
-			{
-				Identifier: "contract",
-				Type:       cadence.StringType{},
-			},
-		},
-	})
-
-	payload, err := ccf.Encode(cadenceEvent)
-	require.NoError(s.T(), err)
-
-	event := unittest.EventFixture(
-		flow.EventType(cadenceEvent.EventType.Location.TypeID(nil, cadenceEvent.EventType.QualifiedIdentifier)),
-		0,
-		0,
-		unittest.IdentifierFixture(),
-		0,
-	)
-
-	event.Payload = payload
-
-	return event
 }
 
 // generateProtocolMockEvents generates a set of mock events.
@@ -151,18 +70,15 @@ func (s *BackendAccountStatusesSuite) generateProtocolMockEvents() flow.EventsLi
 	events := make([]flow.Event, 4)
 	events = append(events, unittest.EventFixture(testEventTypes[0], 0, 0, unittest.IdentifierFixture(), 0))
 
-	address, err := common.HexToAddress(accountAddress)
-	require.NoError(s.T(), err)
-
-	accountCreateEvent := s.getAccountCreateEvent(address)
+	accountCreateEvent := generator.GenerateAccountCreateEvent(s.T(), s.accountCreatedAddress)
 	accountCreateEvent.TransactionIndex = 1
 	events = append(events, accountCreateEvent)
 
-	accountContractAdded := s.getAccountContractEvent("AccountContractAdded", address)
+	accountContractAdded := generator.GenerateAccountContractEvent(s.T(), "AccountContractAdded", s.accountContractAdded)
 	accountContractAdded.TransactionIndex = 2
 	events = append(events, accountContractAdded)
 
-	accountContractUpdated := s.getAccountContractEvent("AccountContractUpdated", address)
+	accountContractUpdated := generator.GenerateAccountContractEvent(s.T(), "AccountContractUpdated", s.accountContractUpdated)
 	accountContractUpdated.TransactionIndex = 3
 	events = append(events, accountContractUpdated)
 
@@ -197,6 +113,14 @@ func (s *BackendAccountStatusesSuite) SetupTest() {
 	}
 
 	var err error
+	addressGenerator := chainID.Chain().NewAddressGenerator()
+
+	s.accountCreatedAddress, err = addressGenerator.NextAddress()
+	require.NoError(s.T(), err)
+	s.accountContractAdded, err = addressGenerator.NextAddress()
+	require.NoError(s.T(), err)
+	s.accountContractUpdated, err = addressGenerator.NextAddress()
+	require.NoError(s.T(), err)
 
 	blockCount := 5
 	s.execDataMap = make(map[flow.Identifier]*execution_data.BlockExecutionDataEntity, blockCount)
@@ -431,7 +355,7 @@ func (s *BackendAccountStatusesSuite) generateFiltersForTestCases(baseTests []te
 			state_stream.DefaultEventFilterConfig,
 			chainID.Chain(),
 			[]string{string(testProtocolEventTypes[0]), string(testProtocolEventTypes[1]), string(testProtocolEventTypes[2])},
-			[]string{accountAddress},
+			[]string{s.accountCreatedAddress.HexWithPrefix(), s.accountContractAdded.HexWithPrefix(), s.accountContractUpdated.HexWithPrefix()},
 		)
 		require.NoError(s.T(), err)
 		tests = append(tests, t1)
@@ -442,7 +366,7 @@ func (s *BackendAccountStatusesSuite) generateFiltersForTestCases(baseTests []te
 			state_stream.DefaultEventFilterConfig,
 			chainID.Chain(),
 			[]string{string(testProtocolEventTypes[0])},
-			[]string{accountAddress},
+			[]string{s.accountCreatedAddress.HexWithPrefix(), s.accountContractAdded.HexWithPrefix(), s.accountContractUpdated.HexWithPrefix()},
 		)
 		require.NoError(s.T(), err)
 		tests = append(tests, t2)
@@ -453,7 +377,7 @@ func (s *BackendAccountStatusesSuite) generateFiltersForTestCases(baseTests []te
 			state_stream.DefaultEventFilterConfig,
 			chainID.Chain(),
 			[]string{"flow.AccountKeyAdded"},
-			[]string{accountAddress},
+			[]string{s.accountCreatedAddress.HexWithPrefix(), s.accountContractAdded.HexWithPrefix(), s.accountContractUpdated.HexWithPrefix()},
 		)
 		require.NoError(s.T(), err)
 		tests = append(tests, t3)
@@ -512,7 +436,16 @@ func (s *BackendAccountStatusesSuite) subscribeToAccountStatuses(
 				expectedEvents := map[string]flow.EventsList{}
 				for _, event := range s.blockEvents[b.ID()] {
 					if test.filters.Match(event) {
-						expectedEvents[accountAddress] = append(expectedEvents[accountAddress], event)
+						var address string
+						switch event.Type {
+						case state_stream.CoreEventAccountCreated:
+							address = s.accountCreatedAddress.HexWithPrefix()
+						case state_stream.CoreEventAccountContractAdded:
+							address = s.accountContractAdded.HexWithPrefix()
+						case state_stream.CoreEventAccountContractUpdated:
+							address = s.accountContractUpdated.HexWithPrefix()
+						}
+						expectedEvents[address] = append(expectedEvents[address], event)
 					}
 				}
 
