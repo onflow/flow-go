@@ -142,13 +142,7 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 
 	sub := h.api.SubscribeEvents(stream.Context(), startBlockID, request.GetStartBlockHeight(), filter)
 
-	heartbeatInterval := request.HeartbeatInterval
-	if heartbeatInterval == 0 {
-		heartbeatInterval = h.defaultHeartbeatInterval
-	}
-
-	blocksSinceLastMessage := uint64(0)
-	return subscription.HandleSubscription(sub, h.handleEventsResponse(stream.Send, heartbeatInterval, blocksSinceLastMessage, request.GetEventEncodingVersion()))
+	return subscription.HandleSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
 }
 
 func (h *Handler) SubscribeEventsFromStartBlockID(request *executiondata.SubscribeEventsFromStartBlockIDRequest, stream executiondata.ExecutionDataAPI_SubscribeEventsFromStartBlockIDServer) error {
@@ -175,13 +169,7 @@ func (h *Handler) SubscribeEventsFromStartBlockID(request *executiondata.Subscri
 
 	sub := h.api.SubscribeEventsFromStartBlockID(stream.Context(), startBlockID, filter)
 
-	heartbeatInterval := request.HeartbeatInterval
-	if heartbeatInterval == 0 {
-		heartbeatInterval = h.defaultHeartbeatInterval
-	}
-
-	blocksSinceLastMessage := uint64(0)
-	return subscription.HandleSubscription(sub, h.handleEventsResponse(stream.Send, heartbeatInterval, blocksSinceLastMessage, request.GetEventEncodingVersion()))
+	return subscription.HandleSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
 }
 
 func (h *Handler) SubscribeEventsFromStartHeight(request *executiondata.SubscribeEventsFromStartHeightRequest, stream executiondata.ExecutionDataAPI_SubscribeEventsFromStartHeightServer) error {
@@ -199,13 +187,7 @@ func (h *Handler) SubscribeEventsFromStartHeight(request *executiondata.Subscrib
 
 	sub := h.api.SubscribeEventsFromStartHeight(stream.Context(), request.GetStartBlockHeight(), filter)
 
-	heartbeatInterval := request.HeartbeatInterval
-	if heartbeatInterval == 0 {
-		heartbeatInterval = h.defaultHeartbeatInterval
-	}
-
-	blocksSinceLastMessage := uint64(0)
-	return subscription.HandleSubscription(sub, h.handleEventsResponse(stream.Send, heartbeatInterval, blocksSinceLastMessage, request.GetEventEncodingVersion()))
+	return subscription.HandleSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
 }
 
 func (h *Handler) SubscribeEventsFromLatest(request *executiondata.SubscribeEventsFromLatestRequest, stream executiondata.ExecutionDataAPI_SubscribeEventsFromLatestServer) error {
@@ -223,16 +205,17 @@ func (h *Handler) SubscribeEventsFromLatest(request *executiondata.SubscribeEven
 
 	sub := h.api.SubscribeEventsFromLatest(stream.Context(), filter)
 
-	heartbeatInterval := request.HeartbeatInterval
+	return subscription.HandleSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
+}
+
+func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, requestHeartbeatInterval uint64, eventEncodingVersion entities.EventEncodingVersion) func(*EventsResponse) error {
+	heartbeatInterval := requestHeartbeatInterval
 	if heartbeatInterval == 0 {
 		heartbeatInterval = h.defaultHeartbeatInterval
 	}
 
 	blocksSinceLastMessage := uint64(0)
-	return subscription.HandleSubscription(sub, h.handleEventsResponse(stream.Send, heartbeatInterval, blocksSinceLastMessage, request.GetEventEncodingVersion()))
-}
 
-func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, heartbeatInterval uint64, blocksSinceLastMessage uint64, eventEncodingVersion entities.EventEncodingVersion) func(*EventsResponse) error {
 	return func(resp *EventsResponse) error {
 		// check if there are any events in the response. if not, do not send a message unless the last
 		// response was more than HeartbeatInterval blocks ago
@@ -253,9 +236,10 @@ func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, hea
 		}
 
 		err = send(&executiondata.SubscribeEventsResponse{
-			BlockHeight: resp.Height,
-			BlockId:     convert.IdentifierToMessage(resp.BlockID),
-			Events:      events,
+			BlockHeight:  resp.Height,
+			BlockId:      convert.IdentifierToMessage(resp.BlockID),
+			Events:       events,
+			MessageIndex: resp.MessageIndex,
 		})
 		if err != nil {
 			return rpc.ConvertError(err, "could not send response", codes.Internal)

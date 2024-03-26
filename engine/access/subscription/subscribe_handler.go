@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 )
 
-// SubscriptionHandler represents common streaming data configuration for access and state_stream handlers.
+// SubscriptionHandler represents common streaming data configuration for creating streaming subscription.
 type SubscriptionHandler struct {
 	log zerolog.Logger
 
@@ -20,6 +20,16 @@ type SubscriptionHandler struct {
 	sendBufferSize int
 }
 
+// NewSubscriptionHandler creates a new SubscriptionHandler instance.
+//
+// Parameters:
+// - log: The logger to use for logging.
+// - broadcaster: The engine broadcaster for publishing notifications.
+// - sendTimeout: The duration after which a send operation will timeout.
+// - responseLimit: The maximum allowed response time for a single stream.
+// - sendBufferSize: The size of the response buffer for sending messages to the client.
+//
+// Returns a new SubscriptionHandler instance.
 func NewSubscriptionHandler(
 	log zerolog.Logger,
 	broadcaster *engine.Broadcaster,
@@ -36,6 +46,14 @@ func NewSubscriptionHandler(
 	}
 }
 
+// Subscribe creates and starts a new subscription.
+//
+// Parameters:
+// - ctx: The context for the operation.
+// - nextHeight: The next height to start subscription from.
+// - getData: The function to retrieve data by height.
+//
+// No errors expected during normal operations.
 func (h *SubscriptionHandler) Subscribe(
 	ctx context.Context,
 	nextHeight uint64,
