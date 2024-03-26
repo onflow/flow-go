@@ -129,7 +129,7 @@ func (m *StagedContractsMigration) InitMigration(
 	}
 
 	// Pass empty address. We are only interested in the created `env` object.
-	mr, err := NewMigratorRuntime(common.Address{}, allPayloads, config)
+	mr, err := NewMigratorRuntime(m.log, common.Address{}, allPayloads, config)
 	if err != nil {
 		return err
 	}

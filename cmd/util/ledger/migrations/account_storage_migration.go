@@ -21,6 +21,7 @@ func NewAccountStorageMigration(
 	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
 
 		migrationRuntime, err := NewMigratorRuntime(
+			log,
 			address,
 			payloads,
 			util.RuntimeInterfaceConfig{},
@@ -61,7 +62,6 @@ func NewAccountStorageMigration(
 		newPayloads, err := migrationRuntime.Snapshot.ApplyChangesAndGetNewPayloads(
 			result.WriteSet,
 			expectedAddresses,
-			log,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to merge register changes: %w", err)

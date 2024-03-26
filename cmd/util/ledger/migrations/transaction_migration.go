@@ -27,7 +27,7 @@ func NewTransactionBasedMigration(
 			fvm.WithTransactionFeesEnabled(false))
 		ctx := fvm.NewContext(options...)
 
-		snapshot, err := util.NewMapBasedPayloadSnapshot(payloads)
+		snapshot, err := util.NewMapBasedPayloadSnapshot(logger, payloads)
 		if err != nil {
 			return nil, err
 		}
@@ -51,7 +51,6 @@ func NewTransactionBasedMigration(
 		return snapshot.ApplyChangesAndGetNewPayloads(
 			executionSnapshot.WriteSet,
 			expectedWriteAddresses,
-			logger,
 		)
 	}
 }

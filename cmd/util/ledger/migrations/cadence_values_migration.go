@@ -93,6 +93,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 	// Create all the runtime components we need for the migration
 
 	migrationRuntime, err := NewMigratorRuntime(
+		m.log,
 		address,
 		oldPayloads,
 		m.runtimeInterfaceConfig,
@@ -148,7 +149,6 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 	newPayloads, err := migrationRuntime.Snapshot.ApplyChangesAndGetNewPayloads(
 		result.WriteSet,
 		expectedAddresses,
-		m.log,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to merge register changes: %w", err)

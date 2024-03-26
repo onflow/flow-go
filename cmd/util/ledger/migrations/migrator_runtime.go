@@ -3,6 +3,8 @@ package migrations
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -27,6 +29,7 @@ var _ storage.TransactionPreparer = migrationTransactionPreparer{}
 
 // migratorRuntime is a runtime that can be used to run a migration on a single account
 func NewMigratorRuntime(
+	log zerolog.Logger,
 	address common.Address,
 	payloads []*ledger.Payload,
 	config util.RuntimeInterfaceConfig,
@@ -34,7 +37,7 @@ func NewMigratorRuntime(
 	*migratorRuntime,
 	error,
 ) {
-	snapshot, err := util.NewMapBasedPayloadSnapshot(payloads)
+	snapshot, err := util.NewMapBasedPayloadSnapshot(log, payloads)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
 	}

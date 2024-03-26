@@ -16,14 +16,14 @@ import (
 )
 
 func Benchmark_PayloadSnapshot(b *testing.B) {
-	benchMerge := func(
-		b *testing.B,
-		payloadsNum int, changesNum []int,
-	) {
-		b.Run("merge_"+strconv.Itoa(payloadsNum), func(b *testing.B) {
-			benchmarkMerge(b, payloadsNum, changesNum)
-		})
-	}
+	//benchMerge := func(
+	//	b *testing.B,
+	//	payloadsNum int, changesNum []int,
+	//) {
+	//	b.Run("merge_"+strconv.Itoa(payloadsNum), func(b *testing.B) {
+	//		benchmarkMerge(b, payloadsNum, changesNum)
+	//	})
+	//}
 
 	benchCreate := func(
 		b *testing.B,
@@ -34,14 +34,13 @@ func Benchmark_PayloadSnapshot(b *testing.B) {
 		})
 	}
 
-	benchCreate(b, 1000)
-	benchCreate(b, 100000)
-	benchCreate(b, 10000000)
+	//benchCreate(b, 1000)
+	//benchCreate(b, 100000)
+	benchCreate(b, 100000000)
 
-	benchMerge(b, 1000, []int{10, 100, 1000})
-	benchMerge(b, 100000, []int{10, 1000, 100000})
-	benchMerge(b, 10000000, []int{10, 10000, 10000000})
-
+	//benchMerge(b, 1000, []int{10, 100, 1000})
+	//benchMerge(b, 100000, []int{10, 1000, 100000})
+	//benchMerge(b, 10000000, []int{10, 10000, 10000000})
 }
 
 func randomPayload(size int) []byte {
@@ -137,11 +136,11 @@ func benchmarkMerge(b *testing.B, payloadsNum int, changes []int) {
 			b.Run("MapBasedPayloadSnapshot", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					b.StopTimer()
-					snapshot, err := util.NewMapBasedPayloadSnapshot(payloads)
+					snapshot, err := util.NewMapBasedPayloadSnapshot(zerolog.Nop(), payloads)
 					require.NoError(b, err)
 					b.StartTimer()
 
-					_, err = snapshot.ApplyChangesAndGetNewPayloads(changes, nil, zerolog.Nop())
+					_, err = snapshot.ApplyChangesAndGetNewPayloads(changes, nil)
 					require.NoError(b, err)
 				}
 			})
@@ -149,11 +148,11 @@ func benchmarkMerge(b *testing.B, payloadsNum int, changes []int) {
 			b.Run("PayloadSnapshot", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					b.StopTimer()
-					snapshot, err := util.NewPayloadSnapshot(payloads)
+					snapshot, err := util.NewPayloadSnapshot(zerolog.Nop(), payloads)
 					require.NoError(b, err)
 					b.StartTimer()
 
-					_, err = snapshot.ApplyChangesAndGetNewPayloads(changes, nil, zerolog.Nop())
+					_, err = snapshot.ApplyChangesAndGetNewPayloads(changes, nil)
 					require.NoError(b, err)
 				}
 			})
@@ -165,19 +164,22 @@ func benchmarkCreate(
 	b *testing.B,
 	payloadsNum int,
 ) {
-
 	payloads := createPayloads(payloadsNum)
 
 	b.Run("MapBasedPayloadSnapshot", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			_, err := util.NewMapBasedPayloadSnapshot(payloads)
-			require.NoError(b, err)
+		for _, workers := range []int{1, 2, 4, 8, 12} {
+			b.Run("workers_"+strconv.Itoa(workers), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					_, err := util.NewMapBasedPayloadSnapshotWithWorkers(zerolog.Nop(), payloads, workers)
+					require.NoError(b, err)
+				}
+			})
 		}
 	})
 
 	b.Run("PayloadSnapshot", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_, err := util.NewPayloadSnapshot(payloads)
+			_, err := util.NewPayloadSnapshot(zerolog.Nop(), payloads)
 			require.NoError(b, err)
 		}
 	})

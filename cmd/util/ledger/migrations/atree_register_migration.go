@@ -87,7 +87,7 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 	oldPayloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
 	// create all the runtime components we need for the migration
-	mr, err := NewMigratorRuntime(address, oldPayloads, util.RuntimeInterfaceConfig{})
+	mr, err := NewMigratorRuntime(m.log, address, oldPayloads, util.RuntimeInterfaceConfig{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
 	}

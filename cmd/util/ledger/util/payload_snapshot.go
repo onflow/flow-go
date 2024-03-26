@@ -1,9 +1,11 @@
 package util
 
 import (
-	"sort"
-
 	"github.com/rs/zerolog"
+	"golang.org/x/exp/maps"
+	"sort"
+	"sync"
+	"time"
 
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
@@ -18,7 +20,6 @@ type MigrationStorageSnapshot interface {
 	ApplyChangesAndGetNewPayloads(
 		changes map[flow.RegisterID]flow.RegisterValue,
 		expectedChangeAddresses map[flow.Address]struct{},
-		logger zerolog.Logger,
 	) ([]*ledger.Payload, error)
 
 	Len() int
@@ -27,13 +28,15 @@ type MigrationStorageSnapshot interface {
 
 type PayloadSnapshot struct {
 	Payloads map[flow.RegisterID]*ledger.Payload
+	log      zerolog.Logger
 }
 
 var _ MigrationStorageSnapshot = PayloadSnapshot{}
 
-func NewPayloadSnapshot(payloads []*ledger.Payload) (*PayloadSnapshot, error) {
+func NewPayloadSnapshot(log zerolog.Logger, payloads []*ledger.Payload) (*PayloadSnapshot, error) {
 	l := &PayloadSnapshot{
 		Payloads: make(map[flow.RegisterID]*ledger.Payload, len(payloads)),
+		log:      log,
 	}
 	for _, payload := range payloads {
 		key, err := payload.Key()
@@ -75,7 +78,6 @@ func (p PayloadSnapshot) PayloadMap() map[flow.RegisterID]*ledger.Payload {
 func (p PayloadSnapshot) ApplyChangesAndGetNewPayloads(
 	changes map[flow.RegisterID]flow.RegisterValue,
 	expectedChangeAddresses map[flow.Address]struct{},
-	logger zerolog.Logger,
 ) ([]*ledger.Payload, error) {
 	originalPayloads := p.Payloads
 
@@ -93,7 +95,7 @@ func (p PayloadSnapshot) ApplyChangesAndGetNewPayloads(
 
 			if _, ok := expectedChangeAddresses[ownerAddress]; !ok {
 				// something was changed that does not belong to this account. Log it.
-				logger.Error().
+				p.log.Error().
 					Str("key", id.String()).
 					Str("actual_address", ownerAddress.Hex()).
 					Interface("expected_addresses", expectedChangeAddresses).
@@ -110,7 +112,7 @@ func (p PayloadSnapshot) ApplyChangesAndGetNewPayloads(
 	for id, value := range originalPayloads {
 		if len(value.Value()) == 0 {
 			// This is strange, but we don't want to add empty values. Log it.
-			logger.Warn().Msgf("empty value for key %s", id)
+			p.log.Warn().Msgf("empty value for key %s", id)
 			continue
 		}
 
@@ -123,27 +125,152 @@ func (p PayloadSnapshot) ApplyChangesAndGetNewPayloads(
 type MapBasedPayloadSnapshot struct {
 	reverseMap map[flow.RegisterID]int
 	payloads   []*ledger.Payload
+	log        zerolog.Logger
 }
 
 var _ MigrationStorageSnapshot = (*MapBasedPayloadSnapshot)(nil)
 
-func NewMapBasedPayloadSnapshot(payloads []*ledger.Payload) (*MapBasedPayloadSnapshot, error) {
+func NewMapBasedPayloadSnapshot(log zerolog.Logger, payloads []*ledger.Payload) (*MapBasedPayloadSnapshot, error) {
+	return NewMapBasedPayloadSnapshotWithWorkers(log, payloads, 1)
+}
+
+// NewMapBasedPayloadSnapshotWithWorkers creates a new MapBasedPayloadSnapshot with the given number of workers.
+// The workers are used to create the reverse map in parallel.
+func NewMapBasedPayloadSnapshotWithWorkers(log zerolog.Logger, payloads []*ledger.Payload, workers int) (*MapBasedPayloadSnapshot, error) {
+
+	// limit the number of workers to prevent too many small jobs
+	const minPayloadsPerWorker = 10000
+	if len(payloads)/minPayloadsPerWorker < workers {
+		workers = len(payloads) / minPayloadsPerWorker
+	}
+	if workers < 1 {
+		workers = 1
+	}
+
+	// log the creation of the snapshot if it is large
+	if len(payloads) > minPayloadsPerWorker {
+		start := time.Now()
+		log.Info().
+			Int("payloads", len(payloads)).
+			Int("workers", workers).
+			Msgf("Creating payload snapshot")
+
+		defer func() {
+			log.Info().
+				Int("payloads", len(payloads)).
+				Int("workers", workers).
+				Dur("duration", time.Since(start)).
+				Msgf("Created payload snapshot")
+		}()
+	}
+
 	payloadsCopy := make([]*ledger.Payload, len(payloads))
 	copy(payloadsCopy, payloads)
-	l := &MapBasedPayloadSnapshot{
-		reverseMap: make(map[flow.RegisterID]int, len(payloads)),
-		payloads:   payloadsCopy,
+
+	type result struct {
+		minimap map[flow.RegisterID]int
+		err     error
 	}
-	for i, payload := range payloadsCopy {
-		key, err := payload.Key()
-		if err != nil {
-			return nil, err
+
+	minimaps := make(chan result, workers)
+	defer close(minimaps)
+
+	// create the minimaps in parallel
+	for i := 0; i < workers; i++ {
+		start := i * len(payloadsCopy) / workers
+		end := (i + 1) * len(payloadsCopy) / workers
+		if end > len(payloadsCopy) {
+			end = len(payloadsCopy)
 		}
-		id, err := convert.LedgerKeyToRegisterID(key)
-		if err != nil {
-			return nil, err
+		go func(payloads []*ledger.Payload) {
+			minimap := make(map[flow.RegisterID]int, len(payloads))
+			for i, payload := range payloads {
+				key, err := payload.Key()
+				if err != nil {
+					minimaps <- result{nil, err}
+					return
+				}
+				id, err := convert.LedgerKeyToRegisterID(key)
+				if err != nil {
+					minimaps <- result{nil, err}
+					return
+				}
+				minimap[id] = i
+			}
+			minimaps <- result{minimap, nil}
+		}(payloadsCopy[start:end])
+	}
+
+	// merge the minimaps in parallel
+	pairedMinimaps := make(
+		chan struct {
+			left  result
+			right result
+		}, workers/2)
+
+	go func() {
+		// we have to pair the minimaps to merge them
+		// we have to merge a total of workers-1 times
+		// before we are left with only one map
+		numberOfPairings := workers - 1
+		for i := 0; i < numberOfPairings; i++ {
+			left := <-minimaps
+			right := <-minimaps
+			pairedMinimaps <- struct {
+				left  result
+				right result
+			}{left, right}
 		}
-		l.reverseMap[id] = i
+		close(pairedMinimaps)
+	}()
+
+	// only half of the workers are needed to merge the maps
+	wg := sync.WaitGroup{}
+	wg.Add(workers / 2)
+	for i := 0; i < workers/2; i++ {
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case pair, ok := <-pairedMinimaps:
+					if !ok {
+						return
+					}
+					if pair.left.err != nil {
+						minimaps <- result{nil, pair.left.err}
+						return
+					}
+					if pair.right.err != nil {
+						minimaps <- result{nil, pair.right.err}
+						return
+					}
+					// merge the two minimaps
+					maps.Copy(pair.left.minimap, pair.right.minimap)
+					minimaps <- result{pair.left.minimap, nil}
+				}
+			}
+		}()
+	}
+
+	// wait for all workers to finish
+	wg.Wait()
+
+	r := <-minimaps
+	if r.err != nil {
+		return nil, r.err
+	}
+
+	select {
+	case _, ok := <-pairedMinimaps:
+		if ok {
+			panic("pairedMinimaps should be closed and empty")
+		}
+	}
+
+	l := &MapBasedPayloadSnapshot{
+		reverseMap: r.minimap,
+		payloads:   payloadsCopy,
+		log:        log,
 	}
 	return l, nil
 }
@@ -178,7 +305,6 @@ func (p *MapBasedPayloadSnapshot) PayloadMap() map[flow.RegisterID]*ledger.Paylo
 func (p *MapBasedPayloadSnapshot) ApplyChangesAndGetNewPayloads(
 	changes map[flow.RegisterID]flow.RegisterValue,
 	expectedChangeAddresses map[flow.Address]struct{},
-	logger zerolog.Logger,
 ) ([]*ledger.Payload, error) {
 
 	// append all new payloads at once at the end
@@ -191,7 +317,7 @@ func (p *MapBasedPayloadSnapshot) ApplyChangesAndGetNewPayloads(
 
 			if _, ok := expectedChangeAddresses[ownerAddress]; !ok {
 				// something was changed that does not belong to this account. Log it.
-				logger.Error().
+				p.log.Error().
 					Str("key", id.String()).
 					Str("actual_address", ownerAddress.Hex()).
 					Interface("expected_addresses", expectedChangeAddresses).
