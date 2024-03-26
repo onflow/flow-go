@@ -34,7 +34,6 @@ type IndexerCore struct {
 
 	collectionExecutedMetric module.CollectionExecutedMetric
 
-	chain            flow.Chain
 	derivedChainData *derived.DerivedChainData
 	serviceAddress   flow.Address
 }
