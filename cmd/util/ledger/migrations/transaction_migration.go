@@ -27,7 +27,7 @@ func NewTransactionBasedMigration(
 			fvm.WithTransactionFeesEnabled(false))
 		ctx := fvm.NewContext(options...)
 
-		snapshot, err := util.NewPayloadSnapshot(payloads)
+		snapshot, err := util.NewMapBasedPayloadSnapshot(payloads)
 		if err != nil {
 			return nil, err
 		}
@@ -48,11 +48,9 @@ func NewTransactionBasedMigration(
 			return nil, res.Err
 		}
 
-		return MergeRegisterChanges(
-			snapshot.Payloads,
+		return snapshot.ApplyChangesAndGetNewPayloads(
 			executionSnapshot.WriteSet,
 			expectedWriteAddresses,
-			nil,
 			logger,
 		)
 	}

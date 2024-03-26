@@ -129,7 +129,7 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 		m.rw.Write(migrationProblem{
 			Address: address.Hex(),
 			Key:     "",
-			Size:    len(mr.Snapshot.Payloads),
+			Size:    mr.Snapshot.Len(),
 			Kind:    "more_registers_after_migration",
 			Msg:     fmt.Sprintf("original: %d, new: %d", originalLen, newLen),
 		})
@@ -227,7 +227,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 
 			m.rw.Write(migrationProblem{
 				Address: mr.Address.Hex(),
-				Size:    len(mr.Snapshot.Payloads),
+				Size:    mr.Snapshot.Len(),
 				Key:     string(key),
 				Kind:    "migration_failure",
 				Msg:     err.Error(),
@@ -245,7 +245,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 	storageMapIds map[string]struct{},
 ) ([]*ledger.Payload, error) {
 	originalPayloadsSnapshot := mr.Snapshot
-	originalPayloads := originalPayloadsSnapshot.Payloads
+	originalPayloads := originalPayloadsSnapshot.PayloadMap()
 	newPayloads := make([]*ledger.Payload, 0, len(originalPayloads))
 
 	// store state payload so that it can be updated
@@ -331,7 +331,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 			m.rw.Write(migrationProblem{
 				Address: mr.Address.Hex(),
 				Key:     id.String(),
-				Size:    len(mr.Snapshot.Payloads),
+				Size:    mr.Snapshot.Len(),
 				Kind:    "not_migrated",
 				Msg:     fmt.Sprintf("%x", value.Value()),
 			})
