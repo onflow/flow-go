@@ -33,7 +33,6 @@ type IndexerCore struct {
 
 	collectionHandler requester.HandleFunc
 
-	chain            flow.Chain
 	derivedChainData *derived.DerivedChainData
 	serviceAddress   flow.Address
 }
