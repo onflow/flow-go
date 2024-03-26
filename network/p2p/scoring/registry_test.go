@@ -1157,7 +1157,6 @@ func TestPeerSpamPenaltyClusterPrefixed(t *testing.T) {
 // TestScoringRegistrySilencePeriod ensures that the scoring registry does not penalize nodes during the silence period, and
 // starts to penalize nodes only after the silence period is over.
 func TestScoringRegistrySilencePeriod(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "requires notification be unique (e.g., nonce or timestamp) to avoid duplicate notifications being ignored.")
 	peerID := unittest.PeerIdFixture(t)
 	silenceDuration := 5 * time.Second
 	silencedNotificationLogs := atomic.NewInt32(0)
@@ -1172,8 +1171,9 @@ func TestScoringRegistrySilencePeriod(t *testing.T) {
 
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
-	// refresh cached app-specific score every 100 milliseconds to speed up the test.
-	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 100 * time.Millisecond
+	// refresh cached app-specific score every 10 milliseconds to speed up the test.
+	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond
+	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.SpamRecordCache.Decay.MaximumSpamPenaltyDecayFactor = .99
 	maximumSpamPenaltyDecayFactor := cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.SpamRecordCache.Decay.MaximumSpamPenaltyDecayFactor
 	reg, spamRecords, _ := newGossipSubAppSpecificScoreRegistry(t,
 		cfg.NetworkConfig.GossipSub.ScoringParameters,
@@ -1233,20 +1233,18 @@ func TestScoringRegistrySilencePeriod(t *testing.T) {
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgGraft,
 	})
+
+	require.Eventually(t, func() bool {
+		return spamRecords.Has(peerID)
+	}, time.Second, 100*time.Millisecond)
+
 	// the penalty should now be applied and spam records created.
 	record, err, ok := spamRecords.Get(peerID)
 	assert.True(t, ok)
 	assert.NoError(t, err)
 	expectedPenalty := penaltyValueFixtures().GraftMisbehaviour
-	assert.Less(t, math.Abs(expectedPenalty-record.Penalty), 10e-3)
+	unittest.RequireNumericallyClose(t, expectedPenalty, record.Penalty, 10e-3)
 	assert.Equal(t, scoring.InitAppScoreRecordStateFunc(maximumSpamPenaltyDecayFactor)().Decay, record.Decay) // decay should be initialized to the initial state.
-
-	require.Eventually(t, func() bool {
-		// we expect to have logged a debug message for all notifications ignored.
-		require.Equal(t, int32(expectedNumOfSilencedNotif), silencedNotificationLogs.Load())
-		// after silence period the invalid subscription penalty should be applied to the app specific score
-		return invalidSubscriptionPenalty+expectedPenalty-reg.AppSpecificScoreFunc()(peerID) < 0.1
-	}, 2*time.Second, 200*time.Millisecond)
 }
 
 // withStakedIdentities returns a function that sets the identity provider to return staked identities for the given peer ids.

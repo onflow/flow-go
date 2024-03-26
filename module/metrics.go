@@ -310,11 +310,16 @@ type GossipSubRpcValidationInspectorMetrics interface {
 	//
 	//	duplicateTopicIds: the total number of duplicate topic ids received by the node on the iHave messages at the end of the async inspection of the RPC.
 	//	duplicateMessageIds: the number of duplicate message ids received by the node on the iHave messages at the end of the async inspection of the RPC.
-	OnIHaveMessagesInspected(duplicateTopicIds int, duplicateMessageIds int)
+	//	invalidTopicIds: the number of invalid message ids received by the node on the iHave messages at the end of the async inspection of the RPC.
+	OnIHaveMessagesInspected(duplicateTopicIds int, duplicateMessageIds, invalidTopicIds int)
 
 	// OnIHaveDuplicateTopicIdsExceedThreshold tracks the number of times that the async inspection of iHave messages of a single RPC failed due to the total number of duplicate topic ids
 	// received by the node on the iHave messages of that RPC exceeding the threshold, which results in a misbehaviour report.
 	OnIHaveDuplicateTopicIdsExceedThreshold()
+
+	// OnIHaveInvalidTopicIdsExceedThreshold tracks the number of times that the async inspection of iHave messages of a single RPC failed due to the total number of invalid topic ids
+	// received by the node on the iHave messages of that RPC exceeding the threshold, which results in a misbehaviour report.
+	OnIHaveInvalidTopicIdsExceedThreshold()
 
 	// OnIHaveDuplicateMessageIdsExceedThreshold tracks the number of times that the async inspection of iHave messages of a single RPC failed due to the total number of duplicate message ids
 	// received by the node on an iHave message exceeding the threshold, which results in a misbehaviour report.
@@ -336,6 +341,9 @@ type GossipSubRpcValidationInspectorMetrics interface {
 	// OnInvalidControlMessageNotificationSent tracks the number of times that the async inspection of a control message failed and resulted in dissemination of an invalid control message was sent.
 	OnInvalidControlMessageNotificationSent()
 
+	// OnRpcRejectedFromUnknownSender tracks the number of rpc's rejected from unstaked nodes.
+	OnRpcRejectedFromUnknownSender()
+
 	// OnPublishMessagesInspectionErrorExceedsThreshold tracks the number of times that async inspection of publish messages failed due to the number of errors.
 	OnPublishMessagesInspectionErrorExceedsThreshold()
 
@@ -343,19 +351,29 @@ type GossipSubRpcValidationInspectorMetrics interface {
 	// received by the node on prune messages of the same RPC excesses threshold, which results in a misbehaviour report.
 	OnPruneDuplicateTopicIdsExceedThreshold()
 
+	// OnPruneInvalidTopicIdsExceedThreshold tracks the number of times that the async inspection of prune messages for an RPC failed due to the number of invalid topic ids
+	// received by the node on prune messages of the same RPC excesses threshold, which results in a misbehaviour report.
+	OnPruneInvalidTopicIdsExceedThreshold()
+
 	// OnPruneMessageInspected is called at the end of the async inspection of prune messages of the RPC, regardless of the result of the inspection.
 	// Args:
 	// 	duplicateTopicIds: the number of duplicate topic ids received by the node on the prune messages of the RPC at the end of the async inspection prunes.
-	OnPruneMessageInspected(duplicateTopicIds int)
+	// 	invalidTopicIds: the number of invalid topic ids received by the node on the prune messages at the end of the async inspection of a single RPC.
+	OnPruneMessageInspected(duplicateTopicIds, invalidTopicIds int)
 
 	// OnGraftDuplicateTopicIdsExceedThreshold tracks the number of times that the async inspection of the graft messages of a single RPC failed due to the number of duplicate topic ids
 	// received by the node on graft messages of the same RPC excesses threshold, which results in a misbehaviour report.
 	OnGraftDuplicateTopicIdsExceedThreshold()
 
+	// OnGraftInvalidTopicIdsExceedThreshold tracks the number of times that the async inspection of the graft messages of a single RPC failed due to the number of invalid topic ids
+	// received by the node on graft messages of the same RPC excesses threshold, which results in a misbehaviour report.
+	OnGraftInvalidTopicIdsExceedThreshold()
+
 	// OnGraftMessageInspected is called at the end of the async inspection of graft messages of a single RPC, regardless of the result of the inspection.
 	// Args:
 	// 	duplicateTopicIds: the number of duplicate topic ids received by the node on the graft messages at the end of the async inspection of a single RPC.
-	OnGraftMessageInspected(duplicateTopicIds int)
+	// 	invalidTopicIds: the number of invalid topic ids received by the node on the graft messages at the end of the async inspection of a single RPC.
+	OnGraftMessageInspected(duplicateTopicIds, invalidTopicIds int)
 
 	// OnPublishMessageInspected is called at the end of the async inspection of publish messages of a single RPC, regardless of the result of the inspection.
 	// It tracks the total number of errors detected during the async inspection of the rpc together with their individual breakdown.
@@ -1083,4 +1101,12 @@ type ChainSyncMetrics interface {
 type DHTMetrics interface {
 	RoutingTablePeerAdded()
 	RoutingTablePeerRemoved()
+}
+
+type CollectionExecutedMetric interface {
+	CollectionFinalized(light flow.LightCollection)
+	CollectionExecuted(light flow.LightCollection)
+	BlockFinalized(block *flow.Block)
+	ExecutionReceiptReceived(r *flow.ExecutionReceipt)
+	UpdateLastFullBlockHeight(height uint64)
 }

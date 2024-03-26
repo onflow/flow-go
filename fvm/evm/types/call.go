@@ -1,13 +1,14 @@
 package types
 
 import (
+	"fmt"
 	"math/big"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethCore "github.com/ethereum/go-ethereum/core"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	gethParams "github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rlp"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethCore "github.com/onflow/go-ethereum/core"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethParams "github.com/onflow/go-ethereum/params"
+	"github.com/onflow/go-ethereum/rlp"
 )
 
 const (
@@ -21,11 +22,19 @@ const (
 	DeployCallSubType   = byte(4)
 	ContractCallSubType = byte(5)
 
-	DepositCallGasLimit  = gethParams.TxGas
-	WithdrawCallGasLimit = gethParams.TxGas
+	// Note that these gas values might need to change if we
+	// change the transaction (e.g. add accesslist),
+	// then it has to be updated to use Intrinsic function
+	// to calculate the minimum gas needed to run the transaction.
+	IntrinsicFeeForTokenTransfer = gethParams.TxGas
 
 	// 21_000 is the minimum for a transaction + max gas allowed for receive/fallback methods
-	DefaultGasLimitForTokenTransfer = 21_000 + 2_300
+	DefaultGasLimitForTokenTransfer = IntrinsicFeeForTokenTransfer + 2_300
+
+	// the value is set to the gas limit for transfer to facilitate transfers
+	// to smart contract addresses.
+	DepositCallGasLimit  = DefaultGasLimitForTokenTransfer
+	WithdrawCallGasLimit = DefaultGasLimitForTokenTransfer
 )
 
 // DirectCall captures all the data related to a direct call to evm
@@ -34,7 +43,7 @@ const (
 // Note that eventhough we don't check the nonce, it impacts
 // hash calculation and also impacts the address of resulting contract
 // when deployed through direct calls.
-// Users don't have the worry about the nonce, and the emulator would set
+// Users don't have the worry about the nonce, handler sets
 // it to the right value.
 type DirectCall struct {
 	Type     byte
@@ -45,6 +54,15 @@ type DirectCall struct {
 	Value    *big.Int
 	GasLimit uint64
 	Nonce    uint64
+}
+
+// DirectCallFromEncoded constructs a DirectCall from encoded data
+func DirectCallFromEncoded(encoded []byte) (*DirectCall, error) {
+	if encoded[0] != DirectCallTxType {
+		return nil, fmt.Errorf("tx type mismatch")
+	}
+	dc := &DirectCall{}
+	return dc, rlp.DecodeBytes(encoded[1:], dc)
 }
 
 // Encode encodes the direct call it also adds the type
@@ -71,8 +89,8 @@ func (dc *DirectCall) Message() *gethCore.Message {
 		Nonce:     dc.Nonce,
 		GasLimit:  dc.GasLimit,
 		GasPrice:  big.NewInt(0), // price is set to zero fo direct calls
-		GasTipCap: big.NewInt(1), // also known as maxPriorityFeePerGas (in GWei)
-		GasFeeCap: big.NewInt(2), // also known as maxFeePerGas (in GWei)
+		GasTipCap: big.NewInt(0), // also known as maxPriorityFeePerGas (in GWei)
+		GasFeeCap: big.NewInt(0), // also known as maxFeePerGas (in GWei)
 		// AccessList:        tx.AccessList(), // TODO revisit this value, the cost matter but performance might
 		SkipAccountChecks: true, // this would let us not set the nonce
 	}
@@ -105,6 +123,7 @@ func (dc *DirectCall) to() *gethCommon.Address {
 }
 
 func NewDepositCall(
+	bridge Address,
 	address Address,
 	amount *big.Int,
 	nonce uint64,
@@ -112,7 +131,7 @@ func NewDepositCall(
 	return &DirectCall{
 		Type:     DirectCallTxType,
 		SubType:  DepositCallSubType,
-		From:     EmptyAddress,
+		From:     bridge,
 		To:       address,
 		Data:     nil,
 		Value:    amount,
@@ -122,6 +141,7 @@ func NewDepositCall(
 }
 
 func NewWithdrawCall(
+	bridge Address,
 	address Address,
 	amount *big.Int,
 	nonce uint64,
@@ -130,7 +150,7 @@ func NewWithdrawCall(
 		Type:     DirectCallTxType,
 		SubType:  WithdrawCallSubType,
 		From:     address,
-		To:       EmptyAddress,
+		To:       bridge,
 		Data:     nil,
 		Value:    amount,
 		GasLimit: WithdrawCallGasLimit,

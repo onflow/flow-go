@@ -1,8 +1,10 @@
 package backend
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"sort"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -16,6 +18,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 
+	"github.com/onflow/flow-go/engine/access/index"
 	access "github.com/onflow/flow-go/engine/access/mock"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -45,7 +48,7 @@ type BackendEventsSuite struct {
 	params     *protocol.Params
 	rootHeader *flow.Header
 
-	eventsIndex       *EventsIndex
+	eventsIndex       *index.EventsIndex
 	events            *storagemock.Events
 	headers           *storagemock.Headers
 	receipts          *storagemock.ExecutionReceipts
@@ -81,7 +84,7 @@ func (s *BackendEventsSuite) SetupTest() {
 
 	s.execClient = access.NewExecutionAPIClient(s.T())
 	s.executionNodes = unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-	s.eventsIndex = NewEventsIndex(s.events)
+	s.eventsIndex = index.NewEventsIndex(s.events)
 
 	blockCount := 5
 	s.blocks = make([]*flow.Block, blockCount)
@@ -115,10 +118,19 @@ func (s *BackendEventsSuite) SetupTest() {
 	s.blockEvents = generator.GetEventsWithEncoding(10, entities.EventEncodingVersion_CCF_V0)
 	targetEvent = string(s.blockEvents[0].Type)
 
+	// events returned from the db are sorted by txID, txIndex, then eventIndex.
+	// reproduce that here to ensure output order works as expected
+	returnBlockEvents := make([]flow.Event, len(s.blockEvents))
+	copy(returnBlockEvents, s.blockEvents)
+
+	sort.Slice(returnBlockEvents, func(i, j int) bool {
+		return bytes.Compare(returnBlockEvents[i].TransactionID[:], returnBlockEvents[j].TransactionID[:]) < 0
+	})
+
 	s.events.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) ([]flow.Event, error) {
 		for _, headerID := range s.blockIDs {
 			if blockID == headerID {
-				return s.blockEvents, nil
+				return returnBlockEvents, nil
 			}
 		}
 		return nil, storage.ErrNotFound
@@ -298,7 +310,7 @@ func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
 
 		s.Run(fmt.Sprintf("all from en - %s - %s", tt.encoding.String(), tt.queryMode), func() {
 			events := storagemock.NewEvents(s.T())
-			eventsIndex := NewEventsIndex(events)
+			eventsIndex := index.NewEventsIndex(events)
 
 			switch tt.queryMode {
 			case IndexQueryModeLocalOnly:
@@ -328,7 +340,7 @@ func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
 
 		s.Run(fmt.Sprintf("mixed storage & en - %s - %s", tt.encoding.String(), tt.queryMode), func() {
 			events := storagemock.NewEvents(s.T())
-			eventsIndex := NewEventsIndex(events)
+			eventsIndex := index.NewEventsIndex(events)
 
 			switch tt.queryMode {
 			case IndexQueryModeLocalOnly, IndexQueryModeExecutionNodesOnly:

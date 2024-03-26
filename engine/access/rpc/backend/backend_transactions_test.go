@@ -16,11 +16,13 @@ import (
 	"google.golang.org/grpc/status"
 
 	acc "github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/index"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/util"
@@ -28,6 +30,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/generator"
 )
+
+const expectedErrorMsg = "expected test error"
 
 func (suite *Suite) withPreConfiguredState(f func(snap protocol.Snapshot)) {
 	identities := unittest.CompleteIdentitySet()
@@ -58,7 +62,6 @@ func (suite *Suite) withPreConfiguredState(f func(snap protocol.Snapshot)) {
 
 		f(snap)
 	})
-
 }
 
 // TestGetTransactionResultReturnsUnknown returns unknown result when tx not found
@@ -129,7 +132,6 @@ func (suite *Suite) TestGetTransactionResultReturnsTransactionError() {
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		)
 		suite.Require().Equal(err, status.Errorf(codes.Internal, "failed to find: %v", fmt.Errorf("some other error")))
-
 	})
 }
 
@@ -246,7 +248,6 @@ func (suite *Suite) TestGetTransactionResultFromCache() {
 // TestGetTransactionResultCacheNonExistent tests caches non existing result
 func (suite *Suite) TestGetTransactionResultCacheNonExistent() {
 	suite.withGetTransactionCachingTestSetup(func(block *flow.Block, tx *flow.Transaction) {
-
 		suite.historicalAccessClient.
 			On("GetTransactionResult", mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*access.GetTransactionRequest")).
 			Return(nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", tx.ID())).Once()
@@ -376,13 +377,13 @@ func (suite *Suite) TestLookupTransactionErrorMessage_HappyPath() {
 
 	suite.execClient.On("GetTransactionErrorMessage", mock.Anything, exeEventReq).Return(exeEventResp, nil).Once()
 
-	errMsg, err := backend.lookupTransactionErrorMessage(context.Background(), blockId, failedTxId)
+	errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, failedTxId)
 	suite.Require().NoError(err)
 	suite.Require().Equal(expectedErrorMsg, errMsg)
 
 	// ensure the transaction error message is cached after retrieval; we do this by mocking the grpc call
 	// only once
-	errMsg, err = backend.lookupTransactionErrorMessage(context.Background(), blockId, failedTxId)
+	errMsg, err = backend.LookupErrorMessageByTransactionID(context.Background(), blockId, failedTxId)
 	suite.Require().NoError(err)
 	suite.Require().Equal(expectedErrorMsg, errMsg)
 	suite.assertAllExpectations()
@@ -416,7 +417,7 @@ func (suite *Suite) TestLookupTransactionErrorMessage_FailedToFetch() {
 	suite.execClient.On("GetTransactionErrorMessage", mock.Anything, mock.Anything).Return(nil,
 		status.Error(codes.Unavailable, "")).Twice()
 
-	errMsg, err := backend.lookupTransactionErrorMessage(context.Background(), blockId, failedTxId)
+	errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, failedTxId)
 	suite.Require().Error(err)
 	suite.Require().Equal(codes.Unavailable, status.Code(err))
 	suite.Require().Empty(errMsg)
@@ -449,10 +450,20 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
+	// create a mock index reporter
+	reporter := syncmock.NewIndexReporter(suite.T())
+	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
+
 	params := suite.defaultBackendParams()
+
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = connFactory
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
+
+	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
+	err := params.TxResultsIndex.Initialize(reporter)
+	suite.Require().NoError(err)
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
@@ -471,13 +482,13 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 
 	suite.execClient.On("GetTransactionErrorMessageByIndex", mock.Anything, exeEventReq).Return(exeEventResp, nil).Once()
 
-	errMsg, err := backend.lookupTransactionErrorMessageByIndex(context.Background(), blockId, failedTxIndex)
+	errMsg, err := backend.LookupErrorMessageByIndex(context.Background(), blockId, block.Header.Height, failedTxIndex)
 	suite.Require().NoError(err)
 	suite.Require().Equal(expectedErrorMsg, errMsg)
 
 	// ensure the transaction error message is cached after retrieval; we do this by mocking the grpc call
 	// only once
-	errMsg, err = backend.lookupTransactionErrorMessageByIndex(context.Background(), blockId, failedTxIndex)
+	errMsg, err = backend.LookupErrorMessageByIndex(context.Background(), blockId, block.Header.Height, failedTxIndex)
 	suite.Require().NoError(err)
 	suite.Require().Equal(expectedErrorMsg, errMsg)
 	suite.assertAllExpectations()
@@ -493,11 +504,21 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_UnknownTransaction(
 	suite.transactionResults.On("ByBlockIDTransactionIndex", blockId, failedTxIndex).
 		Return(nil, storage.ErrNotFound).Once()
 
+	// create a mock index reporter
+	reporter := syncmock.NewIndexReporter(suite.T())
+	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
+
 	params := suite.defaultBackendParams()
+
+	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
+	err := params.TxResultsIndex.Initialize(reporter)
+	suite.Require().NoError(err)
+
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
-	errMsg, err := backend.lookupTransactionErrorMessageByIndex(context.Background(), blockId, failedTxIndex)
+	errMsg, err := backend.LookupErrorMessageByIndex(context.Background(), blockId, block.Header.Height, failedTxIndex)
 	suite.Require().Error(err)
 	suite.Require().Equal(codes.NotFound, status.Code(err))
 	suite.Require().Empty(errMsg)
@@ -529,10 +550,19 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_FailedToFetch() {
 	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
+	// create a mock index reporter
+	reporter := syncmock.NewIndexReporter(suite.T())
+	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
+
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = connFactory
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
+
+	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
+	err := params.TxResultsIndex.Initialize(reporter)
+	suite.Require().NoError(err)
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
@@ -541,7 +571,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_FailedToFetch() {
 	suite.execClient.On("GetTransactionErrorMessageByIndex", mock.Anything, mock.Anything).Return(nil,
 		status.Error(codes.Unavailable, "")).Twice()
 
-	errMsg, err := backend.lookupTransactionErrorMessageByIndex(context.Background(), blockId, failedTxIndex)
+	errMsg, err := backend.LookupErrorMessageByIndex(context.Background(), blockId, block.Header.Height, failedTxIndex)
 	suite.Require().Error(err)
 	suite.Require().Equal(codes.Unavailable, status.Code(err))
 	suite.Require().Empty(errMsg)
@@ -576,10 +606,20 @@ func (suite *Suite) TestLookupTransactionErrorMessages_HappyPath() {
 	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
+	// create a mock index reporter
+	reporter := syncmock.NewIndexReporter(suite.T())
+	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
+
 	params := suite.defaultBackendParams()
+
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = connFactory
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
+
+	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
+	err := params.TxResultsIndex.Initialize(reporter)
+	suite.Require().NoError(err)
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
@@ -606,7 +646,7 @@ func (suite *Suite) TestLookupTransactionErrorMessages_HappyPath() {
 		Return(exeEventResp, nil).
 		Once()
 
-	errMessages, err := backend.lookupTransactionErrorMessagesByBlockID(context.Background(), blockId)
+	errMessages, err := backend.LookupErrorMessagesByBlockID(context.Background(), blockId, block.Header.Height)
 	suite.Require().NoError(err)
 	suite.Require().Len(errMessages, len(exeEventResp.Results))
 	for _, expectedResult := range exeEventResp.Results {
@@ -617,7 +657,7 @@ func (suite *Suite) TestLookupTransactionErrorMessages_HappyPath() {
 
 	// ensure the transaction error message is cached after retrieval; we do this by mocking the grpc call
 	// only once
-	errMessages, err = backend.lookupTransactionErrorMessagesByBlockID(context.Background(), blockId)
+	errMessages, err = backend.LookupErrorMessagesByBlockID(context.Background(), blockId, block.Header.Height)
 	suite.Require().NoError(err)
 	suite.Require().Len(errMessages, len(exeEventResp.Results))
 	for _, expectedResult := range exeEventResp.Results {
@@ -650,12 +690,21 @@ func (suite *Suite) TestLookupTransactionErrorMessages_HappyPath_NoFailedTxns() 
 	suite.transactionResults.On("ByBlockID", blockId).
 		Return(resultsByBlockID, nil).Once()
 
+	// create a mock index reporter
+	reporter := syncmock.NewIndexReporter(suite.T())
+	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
+
 	params := suite.defaultBackendParams()
+
+	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
+	err := params.TxResultsIndex.Initialize(reporter)
+	suite.Require().NoError(err)
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
-	errMessages, err := backend.lookupTransactionErrorMessagesByBlockID(context.Background(), blockId)
+	errMessages, err := backend.LookupErrorMessagesByBlockID(context.Background(), blockId, block.Header.Height)
 	suite.Require().NoError(err)
 	suite.Require().Empty(errMessages)
 	suite.assertAllExpectations()
@@ -670,11 +719,21 @@ func (suite *Suite) TestLookupTransactionErrorMessages_UnknownTransaction() {
 	suite.transactionResults.On("ByBlockID", blockId).
 		Return(nil, storage.ErrNotFound).Once()
 
+	// create a mock index reporter
+	reporter := syncmock.NewIndexReporter(suite.T())
+	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
+
 	params := suite.defaultBackendParams()
+
+	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
+	err := params.TxResultsIndex.Initialize(reporter)
+	suite.Require().NoError(err)
+
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
-	errMsg, err := backend.lookupTransactionErrorMessagesByBlockID(context.Background(), blockId)
+	errMsg, err := backend.LookupErrorMessagesByBlockID(context.Background(), blockId, block.Header.Height)
 	suite.Require().Error(err)
 	suite.Require().Equal(codes.NotFound, status.Code(err))
 	suite.Require().Empty(errMsg)
@@ -712,10 +771,19 @@ func (suite *Suite) TestLookupTransactionErrorMessages_FailedToFetch() {
 	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
+	// create a mock index reporter
+	reporter := syncmock.NewIndexReporter(suite.T())
+	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
+
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = connFactory
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
+
+	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
+	err := params.TxResultsIndex.Initialize(reporter)
+	suite.Require().NoError(err)
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
@@ -726,7 +794,7 @@ func (suite *Suite) TestLookupTransactionErrorMessages_FailedToFetch() {
 	suite.execClient.On("GetTransactionErrorMessagesByBlockID", mock.Anything, mock.Anything).Return(nil,
 		status.Error(codes.Unavailable, "")).Twice()
 
-	errMsg, err := backend.lookupTransactionErrorMessagesByBlockID(context.Background(), blockId)
+	errMsg, err := backend.LookupErrorMessagesByBlockID(context.Background(), blockId, block.Header.Height)
 	suite.Require().Error(err)
 	suite.Require().Equal(codes.Unavailable, status.Code(err))
 	suite.Require().Empty(errMsg)
@@ -955,4 +1023,330 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 		suite.Require().Equal(err, status.Errorf(codes.Internal, "failed to convert events from system tx result: %v",
 			fmt.Errorf("conversion from format JSON_CDC_V0 to CCF_V0 is not supported")))
 	})
+}
+
+func (suite *Suite) assertTransactionResultResponse(
+	err error,
+	response *acc.TransactionResult,
+	block flow.Block,
+	txId flow.Identifier,
+	txFailed bool,
+	eventsForTx []flow.Event,
+) {
+	suite.Require().NoError(err)
+	suite.Assert().Equal(block.ID(), response.BlockID)
+	suite.Assert().Equal(block.Header.Height, response.BlockHeight)
+	suite.Assert().Equal(txId, response.TransactionID)
+	if txId == suite.systemTx.ID() {
+		suite.Assert().Equal(flow.ZeroID, response.CollectionID)
+	} else {
+		suite.Assert().Equal(block.Payload.Guarantees[0].CollectionID, response.CollectionID)
+	}
+	suite.Assert().Equal(len(eventsForTx), len(response.Events))
+	// When there are error messages occurred in the transaction, the status should be 1
+	if txFailed {
+		suite.Assert().Equal(uint(1), response.StatusCode)
+		suite.Assert().Equal(expectedErrorMsg, response.ErrorMessage)
+	} else {
+		suite.Assert().Equal(uint(0), response.StatusCode)
+		suite.Assert().Equal("", response.ErrorMessage)
+	}
+	suite.Assert().Equal(flow.TransactionStatusSealed, response.Status)
+}
+
+// TestTransactionResultFromStorage tests the retrieval of a transaction result (flow.TransactionResult) from storage
+// instead of requesting it from the Execution Node.
+func (suite *Suite) TestTransactionResultFromStorage() {
+	// Create fixtures for block, transaction, and collection
+	block := unittest.BlockFixture()
+	transaction := unittest.TransactionFixture()
+	col := flow.CollectionFromTransactions([]*flow.Transaction{&transaction})
+	guarantee := col.Guarantee()
+	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
+	txId := transaction.ID()
+	blockId := block.ID()
+
+	// Mock the behavior of the blocks and transactionResults objects
+	suite.blocks.
+		On("ByID", blockId).
+		Return(&block, nil)
+
+	suite.transactionResults.On("ByBlockIDTransactionID", blockId, txId).
+		Return(&flow.LightTransactionResult{
+			TransactionID:   txId,
+			Failed:          true,
+			ComputationUsed: 0,
+		}, nil)
+
+	suite.transactions.
+		On("ByID", txId).
+		Return(&transaction.TransactionBody, nil)
+
+	// Set up the light collection and mock the behavior of the collections object
+	lightCol := col.Light()
+	suite.collections.On("LightByID", col.ID()).Return(&lightCol, nil)
+
+	// Set up the events storage mock
+	totalEvents := 5
+	eventsForTx := unittest.EventsFixture(totalEvents, flow.EventAccountCreated)
+	eventMessages := make([]*entities.Event, totalEvents)
+	for j, event := range eventsForTx {
+		eventMessages[j] = convert.EventToMessage(event)
+	}
+
+	// expect a call to lookup events by block ID and transaction ID
+	suite.events.On("ByBlockIDTransactionID", blockId, txId).Return(eventsForTx, nil)
+
+	// Set up the state and snapshot mocks
+	_, fixedENIDs := suite.setupReceipts(&block)
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
+	suite.snapshot.On("Head", mock.Anything).Return(block.Header, nil)
+
+	// create a mock connection factory
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+
+	// create a mock index reporter
+	reporter := syncmock.NewIndexReporter(suite.T())
+	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
+
+	// Set up the backend parameters and the backend instance
+	params := suite.defaultBackendParams()
+	// the connection factory should be used to get the execution node client
+	params.ConnFactory = connFactory
+	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
+	params.TxResultQueryMode = IndexQueryModeLocalOnly
+
+	params.EventsIndex = index.NewEventsIndex(suite.events)
+	err := params.EventsIndex.Initialize(reporter)
+	suite.Require().NoError(err)
+
+	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
+	err = params.TxResultsIndex.Initialize(reporter)
+	suite.Require().NoError(err)
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
+
+	// Set up the expected error message for the execution node response
+
+	exeEventReq := &execproto.GetTransactionErrorMessageRequest{
+		BlockId:       blockId[:],
+		TransactionId: txId[:],
+	}
+
+	exeEventResp := &execproto.GetTransactionErrorMessageResponse{
+		TransactionId: txId[:],
+		ErrorMessage:  expectedErrorMsg,
+	}
+
+	suite.execClient.On("GetTransactionErrorMessage", mock.Anything, exeEventReq).Return(exeEventResp, nil).Once()
+
+	response, err := backend.GetTransactionResult(context.Background(), txId, blockId, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0)
+	suite.assertTransactionResultResponse(err, response, block, txId, true, eventsForTx)
+}
+
+// TestTransactionByIndexFromStorage tests the retrieval of a transaction result (flow.TransactionResult) by index
+// and returns it from storage instead of requesting from the Execution Node.
+func (suite *Suite) TestTransactionByIndexFromStorage() {
+	// Create fixtures for block, transaction, and collection
+	block := unittest.BlockFixture()
+	transaction := unittest.TransactionFixture()
+	col := flow.CollectionFromTransactions([]*flow.Transaction{&transaction})
+	guarantee := col.Guarantee()
+	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
+	blockId := block.ID()
+	txId := transaction.ID()
+	txIndex := rand.Uint32()
+
+	// Set up the light collection and mock the behavior of the collections object
+	lightCol := col.Light()
+	suite.collections.On("LightByID", col.ID()).Return(&lightCol, nil)
+
+	// Mock the behavior of the blocks and transactionResults objects
+	suite.blocks.
+		On("ByID", blockId).
+		Return(&block, nil)
+
+	suite.transactionResults.On("ByBlockIDTransactionIndex", blockId, txIndex).
+		Return(&flow.LightTransactionResult{
+			TransactionID:   txId,
+			Failed:          true,
+			ComputationUsed: 0,
+		}, nil)
+
+	// Set up the events storage mock
+	totalEvents := 5
+	eventsForTx := unittest.EventsFixture(totalEvents, flow.EventAccountCreated)
+	eventMessages := make([]*entities.Event, totalEvents)
+	for j, event := range eventsForTx {
+		eventMessages[j] = convert.EventToMessage(event)
+	}
+
+	// expect a call to lookup events by block ID and transaction ID
+	suite.events.On("ByBlockIDTransactionIndex", blockId, txIndex).Return(eventsForTx, nil)
+
+	// Set up the state and snapshot mocks
+	_, fixedENIDs := suite.setupReceipts(&block)
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
+	suite.snapshot.On("Head", mock.Anything).Return(block.Header, nil)
+
+	// Create a mock connection factory
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+
+	// create a mock index reporter
+	reporter := syncmock.NewIndexReporter(suite.T())
+	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
+
+	// Set up the backend parameters and the backend instance
+	params := suite.defaultBackendParams()
+	// the connection factory should be used to get the execution node client
+	params.ConnFactory = connFactory
+	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
+	params.TxResultQueryMode = IndexQueryModeLocalOnly
+
+	params.EventsIndex = index.NewEventsIndex(suite.events)
+	err := params.EventsIndex.Initialize(reporter)
+	suite.Require().NoError(err)
+
+	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
+	err = params.TxResultsIndex.Initialize(reporter)
+	suite.Require().NoError(err)
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
+
+	// Set up the expected error message for the execution node response
+	exeEventReq := &execproto.GetTransactionErrorMessageByIndexRequest{
+		BlockId: blockId[:],
+		Index:   txIndex,
+	}
+
+	exeEventResp := &execproto.GetTransactionErrorMessageResponse{
+		TransactionId: txId[:],
+		ErrorMessage:  expectedErrorMsg,
+	}
+
+	suite.execClient.On("GetTransactionErrorMessageByIndex", mock.Anything, exeEventReq).Return(exeEventResp, nil).Once()
+
+	response, err := backend.GetTransactionResultByIndex(context.Background(), blockId, txIndex, entities.EventEncodingVersion_JSON_CDC_V0)
+	suite.assertTransactionResultResponse(err, response, block, txId, true, eventsForTx)
+}
+
+// TestTransactionResultsByBlockIDFromStorage tests the retrieval of transaction results ([]flow.TransactionResult)
+// by block ID from storage instead of requesting from the Execution Node.
+func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
+	// Create fixtures for the block and collection
+	block := unittest.BlockFixture()
+	col := unittest.CollectionFixture(2)
+	guarantee := col.Guarantee()
+	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
+	blockId := block.ID()
+
+	// Mock the behavior of the blocks, collections and light transaction results objects
+	suite.blocks.
+		On("ByID", blockId).
+		Return(&block, nil)
+	lightCol := col.Light()
+	suite.collections.On("LightByID", mock.Anything).Return(&lightCol, nil)
+
+	lightTxResults := make([]flow.LightTransactionResult, len(lightCol.Transactions))
+	for i, txID := range lightCol.Transactions {
+		lightTxResults[i] = flow.LightTransactionResult{
+			TransactionID:   txID,
+			Failed:          false,
+			ComputationUsed: 0,
+		}
+	}
+	// simulate the system tx
+	lightTxResults = append(lightTxResults, flow.LightTransactionResult{
+		TransactionID:   suite.systemTx.ID(),
+		Failed:          false,
+		ComputationUsed: 10,
+	})
+
+	// Mark the first transaction as failed
+	lightTxResults[0].Failed = true
+	suite.transactionResults.On("ByBlockID", blockId).Return(lightTxResults, nil)
+
+	// Set up the events storage mock
+	totalEvents := 5
+	eventsForTx := unittest.EventsFixture(totalEvents, flow.EventAccountCreated)
+	eventMessages := make([]*entities.Event, totalEvents)
+	for j, event := range eventsForTx {
+		eventMessages[j] = convert.EventToMessage(event)
+	}
+
+	// expect a call to lookup events by block ID and transaction ID
+	suite.events.On("ByBlockIDTransactionID", blockId, mock.Anything).Return(eventsForTx, nil)
+
+	// Set up the state and snapshot mocks
+	_, fixedENIDs := suite.setupReceipts(&block)
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
+	suite.snapshot.On("Head", mock.Anything).Return(block.Header, nil)
+
+	// create a mock connection factory
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+
+	// create a mock index reporter
+	reporter := syncmock.NewIndexReporter(suite.T())
+	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
+
+	// Set up the state and snapshot mocks and the backend instance
+	params := suite.defaultBackendParams()
+	// the connection factory should be used to get the execution node client
+	params.ConnFactory = connFactory
+	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
+
+	params.EventsIndex = index.NewEventsIndex(suite.events)
+	err := params.EventsIndex.Initialize(reporter)
+	suite.Require().NoError(err)
+
+	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
+	err = params.TxResultsIndex.Initialize(reporter)
+	suite.Require().NoError(err)
+
+	params.TxResultQueryMode = IndexQueryModeLocalOnly
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
+
+	// Set up the expected error message for the execution node response
+	exeEventReq := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
+		BlockId: blockId[:],
+	}
+
+	res := &execproto.GetTransactionErrorMessagesResponse_Result{
+		TransactionId: lightTxResults[0].TransactionID[:],
+		ErrorMessage:  expectedErrorMsg,
+		Index:         1,
+	}
+	exeEventResp := &execproto.GetTransactionErrorMessagesResponse{
+		Results: []*execproto.GetTransactionErrorMessagesResponse_Result{
+			res,
+		},
+	}
+
+	suite.execClient.On("GetTransactionErrorMessagesByBlockID", mock.Anything, exeEventReq).Return(exeEventResp, nil).Once()
+
+	response, err := backend.GetTransactionResultsByBlockID(context.Background(), blockId, entities.EventEncodingVersion_JSON_CDC_V0)
+	suite.Require().NoError(err)
+	suite.Assert().Equal(len(lightTxResults), len(response))
+
+	// Assertions for each transaction result in the response
+	for i, responseResult := range response {
+		lightTx := lightTxResults[i]
+		suite.assertTransactionResultResponse(err, responseResult, block, lightTx.TransactionID, lightTx.Failed, eventsForTx)
+	}
 }

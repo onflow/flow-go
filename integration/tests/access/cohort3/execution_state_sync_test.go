@@ -120,6 +120,7 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 		AdditionalFlags: []string{
 			fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 			"--execution-data-sync-enabled=true",
+			"--event-query-mode=execution-nodes-only",
 		},
 	}}
 
@@ -204,13 +205,6 @@ func (s *ExecutionStateSyncSuite) TestHappyPath() {
 func (s *ExecutionStateSyncSuite) nodeExecutionDataStore(node *testnet.Container) execution_data.ExecutionDataStore {
 	ds, err := badgerds.NewDatastore(filepath.Join(node.ExecutionDataDBPath(), "blobstore"), &badgerds.DefaultOptions)
 	require.NoError(s.T(), err, "could not get execution datastore")
-
-	go func() {
-		<-s.ctx.Done()
-		if err := ds.Close(); err != nil {
-			s.T().Logf("could not close execution data datastore: %v", err)
-		}
-	}()
 
 	return execution_data.NewExecutionDataStore(blobs.NewBlobstore(ds), execution_data.DefaultSerializer)
 }

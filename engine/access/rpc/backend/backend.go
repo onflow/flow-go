@@ -12,8 +12,12 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -42,8 +46,10 @@ const DefaultLoggedScriptsCacheSize = 1_000_000
 // DefaultConnectionPoolSize is the default size for the connection pool to collection and execution nodes
 const DefaultConnectionPoolSize = 250
 
-var preferredENIdentifiers flow.IdentifierList
-var fixedENIdentifiers flow.IdentifierList
+var (
+	preferredENIdentifiers flow.IdentifierList
+	fixedENIdentifiers     flow.IdentifierList
+)
 
 // Backend implements the Access API.
 //
@@ -66,6 +72,8 @@ type Backend struct {
 	backendAccounts
 	backendExecutionResults
 	backendNetwork
+	backendSubscribeBlocks
+	backendSubscribeTransactions
 
 	state             protocol.State
 	chainID           flow.ChainID
@@ -74,7 +82,8 @@ type Backend struct {
 	connFactory       connection.ConnectionFactory
 
 	// cache the response to GetNodeVersionInfo since it doesn't change
-	nodeInfo *access.NodeVersionInfo
+	nodeInfo     *access.NodeVersionInfo
+	BlockTracker subscription.BlockTracker
 }
 
 type Params struct {
@@ -87,7 +96,6 @@ type Params struct {
 	Transactions              storage.Transactions
 	ExecutionReceipts         storage.ExecutionReceipts
 	ExecutionResults          storage.ExecutionResults
-	LightTransactionResults   storage.LightTransactionResults
 	ChainID                   flow.ChainID
 	AccessMetrics             module.AccessMetrics
 	ConnFactory               connection.ConnectionFactory
@@ -103,8 +111,22 @@ type Params struct {
 	ScriptExecutor            execution.ScriptExecutor
 	ScriptExecutionMode       IndexQueryMode
 	EventQueryMode            IndexQueryMode
-	EventsIndex               *EventsIndex
+	BlockTracker              subscription.BlockTracker
+	SubscriptionParams        SubscriptionParams
+
+	EventsIndex       *index.EventsIndex
+	TxResultQueryMode IndexQueryMode
+	TxResultsIndex    *index.TransactionResultsIndex
 }
+
+type SubscriptionParams struct {
+	Broadcaster    *engine.Broadcaster
+	SendTimeout    time.Duration
+	ResponseLimit  float64
+	SendBufferSize int
+}
+
+var _ TransactionErrorMessage = (*Backend)(nil)
 
 // New creates backend instance
 func New(params Params) (*Backend, error) {
@@ -138,11 +160,28 @@ func New(params Params) (*Backend, error) {
 		}
 	}
 
+	// the system tx is hardcoded and never changes during runtime
+	systemTx, err := blueprints.SystemChunkTransaction(params.ChainID.Chain())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create system chunk transaction: %w", err)
+	}
+	systemTxID := systemTx.ID()
+
 	// initialize node version info
 	nodeInfo := getNodeVersionInfo(params.State.Params())
 
+	transactionsLocalDataProvider := &TransactionsLocalDataProvider{
+		state:          params.State,
+		collections:    params.Collections,
+		blocks:         params.Blocks,
+		eventsIndex:    params.EventsIndex,
+		txResultsIndex: params.TxResultsIndex,
+		systemTxID:     systemTxID,
+	}
+
 	b := &Backend{
-		state: params.State,
+		state:        params.State,
+		BlockTracker: params.BlockTracker,
 		// create the sub-backends
 		backendScripts: backendScripts{
 			log:               params.Log,
@@ -157,23 +196,23 @@ func New(params Params) (*Backend, error) {
 			scriptExecMode:    params.ScriptExecutionMode,
 		},
 		backendTransactions: backendTransactions{
-			log:                  params.Log,
-			staticCollectionRPC:  params.CollectionRPC,
-			state:                params.State,
-			chainID:              params.ChainID,
-			collections:          params.Collections,
-			blocks:               params.Blocks,
-			transactions:         params.Transactions,
-			results:              params.LightTransactionResults,
-			executionReceipts:    params.ExecutionReceipts,
-			transactionValidator: configureTransactionValidator(params.State, params.ChainID),
-			transactionMetrics:   params.AccessMetrics,
-			retry:                retry,
-			connFactory:          params.ConnFactory,
-			previousAccessNodes:  params.HistoricalAccessNodes,
-			nodeCommunicator:     params.Communicator,
-			txResultCache:        txResCache,
-			txErrorMessagesCache: txErrorMessagesCache,
+			TransactionsLocalDataProvider: transactionsLocalDataProvider,
+			log:                           params.Log,
+			staticCollectionRPC:           params.CollectionRPC,
+			chainID:                       params.ChainID,
+			transactions:                  params.Transactions,
+			executionReceipts:             params.ExecutionReceipts,
+			transactionValidator:          configureTransactionValidator(params.State, params.ChainID),
+			transactionMetrics:            params.AccessMetrics,
+			retry:                         retry,
+			connFactory:                   params.ConnFactory,
+			previousAccessNodes:           params.HistoricalAccessNodes,
+			nodeCommunicator:              params.Communicator,
+			txResultCache:                 txResCache,
+			txErrorMessagesCache:          txErrorMessagesCache,
+			txResultQueryMode:             params.TxResultQueryMode,
+			systemTx:                      systemTx,
+			systemTxID:                    systemTxID,
 		},
 		backendEvents: backendEvents{
 			log:               params.Log,
@@ -214,12 +253,35 @@ func New(params Params) (*Backend, error) {
 			headers:              params.Headers,
 			snapshotHistoryLimit: params.SnapshotHistoryLimit,
 		},
+		backendSubscribeBlocks: backendSubscribeBlocks{
+			log:            params.Log,
+			state:          params.State,
+			headers:        params.Headers,
+			blocks:         params.Blocks,
+			broadcaster:    params.SubscriptionParams.Broadcaster,
+			sendTimeout:    params.SubscriptionParams.SendTimeout,
+			responseLimit:  params.SubscriptionParams.ResponseLimit,
+			sendBufferSize: params.SubscriptionParams.SendBufferSize,
+			blockTracker:   params.BlockTracker,
+		},
+		backendSubscribeTransactions: backendSubscribeTransactions{
+			txLocalDataProvider: transactionsLocalDataProvider,
+			log:                 params.Log,
+			executionResults:    params.ExecutionResults,
+			broadcaster:         params.SubscriptionParams.Broadcaster,
+			sendTimeout:         params.SubscriptionParams.SendTimeout,
+			responseLimit:       params.SubscriptionParams.ResponseLimit,
+			sendBufferSize:      params.SubscriptionParams.SendBufferSize,
+			blockTracker:        params.BlockTracker,
+		},
 		collections:       params.Collections,
 		executionReceipts: params.ExecutionReceipts,
 		connFactory:       params.ConnFactory,
 		chainID:           params.ChainID,
 		nodeInfo:          nodeInfo,
 	}
+
+	b.backendTransactions.txErrorMessages = b
 
 	retry.SetBackend(b)
 
@@ -267,7 +329,6 @@ func configureTransactionValidator(state protocol.State, chainID flow.ChainID) *
 
 // Ping responds to requests when the server is up.
 func (b *Backend) Ping(ctx context.Context) error {
-
 	// staticCollectionRPC is only set if a collection node address was provided at startup
 	if b.staticCollectionRPC != nil {
 		_, err := b.staticCollectionRPC.Ping(ctx, &accessproto.PingRequest{})
@@ -336,7 +397,6 @@ func executionNodesForBlockID(
 	state protocol.State,
 	log zerolog.Logger,
 ) (flow.IdentitySkeletonList, error) {
-
 	var (
 		executorIDs flow.IdentifierList
 		err         error
@@ -377,7 +437,7 @@ func executionNodesForBlockID(
 			case <-ctx.Done():
 				return nil, ctx.Err()
 			case <-time.After(100 * time.Millisecond << time.Duration(attempt)):
-				//retry after an exponential backoff
+				// retry after an exponential backoff
 			}
 		}
 
@@ -412,7 +472,6 @@ func findAllExecutionNodes(
 	executionReceipts storage.ExecutionReceipts,
 	log zerolog.Logger,
 ) (flow.IdentifierList, error) {
-
 	// lookup the receipt's storage with the block ID
 	allReceipts, err := executionReceipts.ByBlockID(blockID)
 	if err != nil {
@@ -469,7 +528,6 @@ func findAllExecutionNodes(
 // e.g. If execution nodes in identity table are {1,2,3,4}, preferred ENs are defined as {2,3,4}
 // and the executor IDs is {1,2,3}, then {2, 3} is returned as the chosen subset of ENs
 func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList) (flow.IdentitySkeletonList, error) {
-
 	allENs, err := state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive all execution IDs: %w", err)

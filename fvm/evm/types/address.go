@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"fmt"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime/sema"
+	gethCommon "github.com/onflow/go-ethereum/common"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -55,6 +55,15 @@ var EmptyAddress = Address(gethCommon.Address{})
 // Bytes returns a byte slice for the address
 func (fa Address) Bytes() []byte {
 	return fa[:]
+}
+
+// String returns the hex encoding of the address
+// it returns empty string if address is empty
+func (fa Address) String() string {
+	if fa == EmptyAddress {
+		return ""
+	}
+	return fa.ToCommon().Hex()
 }
 
 // ToCommon returns the geth address

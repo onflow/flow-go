@@ -9,11 +9,11 @@ import (
 	"math/big"
 	"time"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/cadence"
+	gethcommon "github.com/onflow/go-ethereum/common"
+	"github.com/onflow/go-ethereum/core/types"
+	"github.com/onflow/go-ethereum/crypto"
+	"github.com/onflow/go-ethereum/params"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
@@ -132,7 +132,7 @@ func (l *EVMTransferLoad) Setup(log zerolog.Logger, lc LoadContext) error {
 						data: [UInt8],
 						gasLimit: UInt64,
 						value: EVM.Balance
-					): [UInt8] {
+					): EVM.Result {
 						return self.acc.call(
 							to: to,
 							data: data,

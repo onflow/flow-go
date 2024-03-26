@@ -10,6 +10,11 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
+const (
+	QueuedItemProcessingLog = "processing queued work item"
+	QueuedItemProcessedLog  = "finished processing queued work item"
+)
+
 // Pool is a worker pool that can be used by a higher-level component to manage a set of workers.
 // The workers are managed by the higher-level component, but the worker pool provides the logic for
 // submitting work to the workers and for processing the work. The worker pool is responsible for
@@ -126,9 +131,9 @@ func (b *PoolBuilder[T]) workerLogic() component.ComponentWorker {
 						b.logger.Trace().Msg("store is empty, waiting for next notification")
 						break // store is empty; go back to outer for loop
 					}
-					b.logger.Trace().Msg("processing queued work item")
+					b.logger.Trace().Msg(QueuedItemProcessingLog)
 					err := processingFunc(msg.Payload.(T))
-					b.logger.Trace().Msg("finished processing queued work item")
+					b.logger.Trace().Msg(QueuedItemProcessedLog)
 					if err != nil {
 						ctx.Throw(fmt.Errorf("unexpected error processing queued work item: %w", err))
 						return

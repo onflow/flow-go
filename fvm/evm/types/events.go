@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	"github.com/onflow/go-ethereum/rlp"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -143,7 +143,7 @@ func (p *TransactionExecutedPayload) CadenceEvent() (cadence.Event, error) {
 			cadence.String(p.Result.VMErrorString()),
 			cadence.NewUInt8(p.Result.TxType),
 			cadence.NewUInt64(p.Result.GasConsumed),
-			cadence.String(hex.EncodeToString(p.Result.DeployedContractAddress.Bytes())),
+			cadence.String(p.Result.DeployedContractAddress.String()),
 			cadence.String(hex.EncodeToString(p.Result.ReturnedValue)),
 			cadence.String(hex.EncodeToString(encodedLogs)),
 		},

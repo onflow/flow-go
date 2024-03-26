@@ -1,8 +1,8 @@
 package types
 
 import (
-	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/cadence/runtime/common"
+	gethCommon "github.com/onflow/go-ethereum/common"
 )
 
 // EVM is an account inside FVM with special access to the underlying infrastructure
@@ -42,6 +42,9 @@ type ContractHandler interface {
 
 	// EVMContractAddress returns the address where EVM is deployed
 	EVMContractAddress() common.Address
+
+	// GenerateResourceUUID generates a new UUID for a resource
+	GenerateResourceUUID() uint64
 }
 
 // AddressAllocator allocates addresses, used by the handler

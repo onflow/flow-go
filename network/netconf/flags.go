@@ -103,6 +103,7 @@ func AllFlagNames() []string {
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.EnableKey, p2pconfig.IHaveKey),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.EnableKey, p2pconfig.IWantKey),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.EnableKey, p2pconfig.PublishKey),
+		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.RejectUnstakedPeers),
 
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.DisabledKey),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.EnableKey, p2pconfig.GraftKey),
@@ -130,7 +131,9 @@ func AllFlagNames() []string {
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IHaveConfigKey, p2pconfig.MessageIdCountThreshold),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IHaveConfigKey, p2pconfig.DuplicateTopicIdThresholdKey),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IHaveConfigKey, p2pconfig.DuplicateMessageIdThresholdKey),
+		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IHaveConfigKey, p2pconfig.InvalidTopicIdThresholdKey),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.GraftPruneKey, p2pconfig.DuplicateTopicIdThresholdKey),
+		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.GraftPruneKey, p2pconfig.InvalidTopicIdThresholdKey),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.GraftPruneKey, p2pconfig.MessageCountThreshold),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IWantConfigKey, p2pconfig.MessageCountThreshold),
 		BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IWantConfigKey, p2pconfig.MessageIdCountThreshold),
@@ -334,7 +337,9 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.EnableKey, p2pconfig.PublishKey),
 		config.GossipSub.RpcInspector.Validation.InspectionProcess.Inspect.EnablePublish,
 		"disable rpc publish message inspection")
-
+	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.InspectionKey, p2pconfig.RejectUnstakedPeers),
+		config.GossipSub.RpcInspector.Validation.InspectionProcess.Inspect.RejectUnstakedPeers,
+		"reject rpcs from unstaked peers")
 	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.ProcessKey, p2pconfig.TruncationKey, p2pconfig.DisabledKey),
 		config.GossipSub.RpcInspector.Validation.InspectionProcess.Truncate.Disabled,
 		"disable rpc truncation for all control message types")
@@ -383,6 +388,11 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Int(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IHaveConfigKey, p2pconfig.DuplicateMessageIdThresholdKey),
 		config.GossipSub.RpcInspector.Validation.IHave.DuplicateMessageIdThreshold,
 		"the max allowed duplicate message IDs in a single ihave control message, if exceeded a misbehavior report will be created")
+	flags.Int(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IHaveConfigKey, p2pconfig.InvalidTopicIdThresholdKey),
+		config.GossipSub.RpcInspector.Validation.IHave.InvalidTopicIdThreshold,
+		"the max allowed invalid topics in a single ihave control message, if exceeded a misbehavior report will be created",
+	)
+
 	flags.Int(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.GraftPruneKey, p2pconfig.MessageCountThreshold),
 		config.GossipSub.RpcInspector.Validation.GraftPrune.MessageCountThreshold,
 		"threshold for the number of graft or prune control messages to accept on a single RPC message, if exceeded the RPC message will be sampled and truncated")
@@ -407,6 +417,9 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Int(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.GraftPruneKey, p2pconfig.DuplicateTopicIdThresholdKey),
 		config.GossipSub.RpcInspector.Validation.GraftPrune.DuplicateTopicIdThreshold,
 		"the max allowed duplicate topic IDs across all graft or prune control messages in a single RPC message, if exceeded a misbehavior report will be created")
+	flags.Int(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.GraftPruneKey, p2pconfig.InvalidTopicIdThresholdKey),
+		config.GossipSub.RpcInspector.Validation.GraftPrune.InvalidTopicIdThreshold,
+		"the max allowed invalid topic across all graft or prune control messages in a single RPC message, if exceeded a misbehavior report will be created")
 
 	flags.Duration(BuildFlagName(gossipsubKey, p2pconfig.SubscriptionProviderKey, p2pconfig.UpdateIntervalKey),
 		config.GossipSub.SubscriptionProvider.UpdateInterval,

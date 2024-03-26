@@ -165,7 +165,8 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 
 	invalidCtrlMsgNotificationStore := queue.NewHeroStore(config.Parameters.InvalidControlMessageNotificationQueueSize,
 		lg.With().Str("component", "invalid_control_message_notification_queue").Logger(),
-		metrics.RpcInspectorNotificationQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType))
+		metrics.RpcInspectorNotificationQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType),
+		queue.WithMessageEntityFactory(queue.NewMessageEntityWithNonce))
 	reg.invCtrlMsgNotifWorkerPool = worker.NewWorkerPoolBuilder[*p2p.InvCtrlMsgNotif](lg, invalidCtrlMsgNotificationStore, reg.handleMisbehaviourReport).Build()
 
 	builder := component.NewComponentManagerBuilder()
@@ -450,6 +451,8 @@ func (r *GossipSubAppSpecificScoreRegistry) handleMisbehaviourReport(notificatio
 		case p2pmsg.CtrlMsgIWant:
 			penalty += r.penalty.IWantMisbehaviour
 		case p2pmsg.RpcPublishMessage:
+			penalty += r.penalty.PublishMisbehaviour
+		case p2pmsg.CtrlMsgRPC:
 			penalty += r.penalty.PublishMisbehaviour
 		default:
 			// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
