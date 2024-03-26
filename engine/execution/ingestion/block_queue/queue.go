@@ -21,12 +21,17 @@ type BlockQueue struct {
 	sync.Mutex
 	log zerolog.Logger
 
-	// if a block still exists in this map, it means either some of its collection is missing,
-	// or its parent block has not been executed.
-	// if a block's StartState is not nil, it means its parent block has been executed, and
-	// its parent block must have been removed from this map
-	// if a block's StartState is nil, it means its parent block has not been executed yet.
-	// and its parent must be found in the this map as well
+	// if a block still exists in this map, it means the block has not been executed.
+	// it could either be one of the following cases:
+	// 1) block is not executed due to some of its collection is missing
+	// 2) block is not executed due to its parent block has not been executed
+	// 3) block is ready to execute, but the execution has not been finished yet.
+	// some consistency checks:
+	// 1) since an executed block must have been removed from this map, if a block's
+	// parent block has been executed, then its parent block must have been removed
+	// from this map
+	// 2) if a block's parent block has not been executed, then its parent block must still
+	// exist in this map
 	blocks map[flow.Identifier]*entity.ExecutableBlock
 
 	// a collection could be included in multiple blocks,
