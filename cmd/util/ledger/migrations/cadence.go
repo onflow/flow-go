@@ -222,6 +222,7 @@ func NewCadence1ValueMigrations(
 	chainID flow.ChainID,
 	diffMigrations bool,
 	logVerboseDiff bool,
+	checkStorageHealthBeforeMigration bool,
 ) (migrations []NamedMigration) {
 
 	// Populated by CadenceLinkValueMigrator,
@@ -251,6 +252,7 @@ func NewCadence1ValueMigrations(
 			rwf,
 			diffMigrations,
 			logVerboseDiff,
+			checkStorageHealthBeforeMigration,
 			errorMessageHandler,
 			contracts,
 			NewCadence1CompositeStaticTypeConverter(chainID),
@@ -260,6 +262,7 @@ func NewCadence1ValueMigrations(
 			rwf,
 			diffMigrations,
 			logVerboseDiff,
+			checkStorageHealthBeforeMigration,
 			errorMessageHandler,
 			contracts,
 			capabilityMapping,
@@ -268,6 +271,7 @@ func NewCadence1ValueMigrations(
 			rwf,
 			diffMigrations,
 			logVerboseDiff,
+			checkStorageHealthBeforeMigration,
 			errorMessageHandler,
 			contracts,
 			capabilityMapping,
@@ -357,6 +361,7 @@ func NewCadence1Migrations(
 	chainID flow.ChainID,
 	diffMigrations bool,
 	logVerboseDiff bool,
+	checkStorageHealthBeforeMigration bool,
 	evmContractChange EVMContractChange,
 	burnerContractChange BurnerContractChange,
 	stagedContracts []StagedContract,
@@ -417,6 +422,7 @@ func NewCadence1Migrations(
 			nWorker,
 			chainID,
 			diffMigrations,
+			checkStorageHealthBeforeMigration,
 			logVerboseDiff,
 		)...,
 	)
