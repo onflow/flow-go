@@ -72,6 +72,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 			all.Setups,
 			all.EpochCommits,
 			all.ProtocolState,
+			all.ProtocolKVStore,
 			all.VersionBeacons,
 		)
 		require.NoError(t, err)
@@ -152,6 +153,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 			all.Setups,
 			all.EpochCommits,
 			all.ProtocolState,
+			all.ProtocolKVStore,
 			all.VersionBeacons,
 		)
 		require.NoError(t, err)
@@ -544,6 +546,7 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 		all.Setups,
 		all.EpochCommits,
 		all.ProtocolState,
+		all.ProtocolKVStore,
 		all.VersionBeacons,
 		rootSnapshot,
 	)

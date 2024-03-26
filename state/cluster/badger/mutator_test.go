@@ -94,6 +94,7 @@ func (suite *MutatorSuite) SetupTest() {
 		all.Setups,
 		all.EpochCommits,
 		all.ProtocolState,
+		all.ProtocolKVStore,
 		all.VersionBeacons,
 		rootSnapshot,
 	)
@@ -103,6 +104,7 @@ func (suite *MutatorSuite) SetupTest() {
 
 	suite.mutableProtocolState = protocol_state.NewMutableProtocolState(
 		all.ProtocolState,
+		all.ProtocolKVStore,
 		state.Params(),
 		all.Headers,
 		all.Results,

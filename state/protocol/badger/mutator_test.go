@@ -110,6 +110,7 @@ func TestExtendValid(t *testing.T) {
 			all.Setups,
 			all.EpochCommits,
 			all.ProtocolState,
+			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -840,6 +841,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 			all.Setups,
 			all.EpochCommits,
 			all.ProtocolState,
+			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -861,6 +863,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		mutableProtocolState := protocol_state.NewMutableProtocolState(
 			all.ProtocolState,
+			all.ProtocolKVStore,
 			state.Params(),
 			all.Headers,
 			all.Results,
@@ -2016,6 +2019,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 			all.Setups,
 			all.EpochCommits,
 			all.ProtocolState,
+			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -2576,6 +2580,7 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 			all.Setups,
 			all.EpochCommits,
 			all.ProtocolState,
+			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -2674,13 +2679,13 @@ func getRootProtocolStateID(t *testing.T, rootSnapshot *inmem.Snapshot) flow.Ide
 // calculateExpectedStateId is a utility function which makes easier to get expected protocol state ID after applying service events contained in seals.
 func calculateExpectedStateId(t *testing.T, mutableProtocolState realprotocol.MutableProtocolState) func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
 	return func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
-		stateMutator, err := mutableProtocolState.Mutator(header.View, header.ParentID)
+		stateMutator, err := mutableProtocolState.Mutator(header)
 		require.NoError(t, err)
 
 		err = stateMutator.ApplyServiceEventsFromValidatedSeals(seals)
 		require.NoError(t, err)
 
-		_, _, expectedStateID, _ := stateMutator.Build()
+		expectedStateID, _, err := stateMutator.Build()
 		require.NoError(t, err)
 		return expectedStateID
 	}
