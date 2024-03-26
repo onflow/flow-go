@@ -230,27 +230,34 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 	}
 
 	// the parent block is an unexecuted block.
-	// Note: the fact that its parent block is unexecuted might be outdated since OnBlockExecuted
-	// might be called concurrently in a different thread, it's necessary to check again
-	// whether the parent block is executed after the call.
+	// we can enqueue the block without providing the state commitment
 	missingColls, executables, err := e.blockQueue.HandleBlock(block, nil)
 	if err != nil {
 		if !errors.Is(err, block_queue.ErrMissingParent) {
 			return nil, nil, fmt.Errorf("unexpected error while adding block to block queue: %w", err)
 		}
 
-		// if the error is ErrMissingParent, it means OnBlockExecuted is called after us getting
-		// the parent commit and before HandleBlock was called, therefore, we should re-enqueue the block
-		// with the parent commit.
+		// if parent is missing, there are two possibilities:
+		// 1) parent was never enqueued to block queue
+		// 2) parent was enqueued, but it has been executed and removed from the block queue
+		// however, actually 1) is not possible 2) is the only possible case here, why?
+		// because forwardProcessableToHandler guarantees we always enqueue a block before its child,
+		// which means when HandleBlock is called with a block, then its parent block must have been
+		// called with HandleBlock already. Therefore, 1) is not possible.
+		// And the reason 2) is possible is because the fact that its parent block is missing
+		// might be outdated since OnBlockExecuted might be called concurrently in a different thread.
+		// it means OnBlockExecuted is called in a different thread after us getting the parent commit
+		// and before HandleBlock was called, therefore, we should re-enqueue the block with the
+		// parent commit. It's necessary to check again whether the parent block is executed after the call.
 		lg.Warn().Msgf(
-			"block is missing parent block %v, re-enqueueing",
-			block.Header.ParentID,
+			"block is missing parent block, re-enqueueing %v(parent: %v)",
+			blockID, block.Header.ParentID,
 		)
 
 		parentCommitment, err := e.execState.StateCommitmentByBlockID(block.Header.ParentID)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get parent state commitment for block %v when re-enqueue block %v: %w",
-				block.Header.ParentID, blockID, err)
+			return nil, nil, fmt.Errorf("failed to get parent state commitment when re-enqueue block %v (parent:%v): %w",
+				blockID, block.Header.ParentID, err)
 		}
 
 		// now re-enqueue the block with parent commit
@@ -278,14 +285,6 @@ func (e *Core) onBlockExecuted(
 ) error {
 	commit := computationResult.CurrentEndState()
 
-	// block queue decides when a block becomes executed, it doesn't care if the execution
-	// result has been saved to database, so we can notify block queue
-	// as soon as a block has been executed.
-	executables, err := e.blockQueue.OnBlockExecuted(block.ID(), commit)
-	if err != nil {
-		return fmt.Errorf("unexpected error while marking block as executed: %w", err)
-	}
-
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	defer wg.Wait()
@@ -295,9 +294,17 @@ func (e *Core) onBlockExecuted(
 		e.eventConsumer.BeforeComputationResultSaved(e.unit.Ctx(), computationResult)
 	}()
 
-	err = e.execState.SaveExecutionResults(e.unit.Ctx(), computationResult)
+	err := e.execState.SaveExecutionResults(e.unit.Ctx(), computationResult)
 	if err != nil {
 		return fmt.Errorf("cannot persist execution state: %w", err)
+	}
+
+	// must call OnBlockExecuted AFTER saving the execution result to storage
+	// because when enqueuing a block, we rely on execState.StateCommitmentByBlockID
+	// to determine whether a block has been executed or not.
+	executables, err := e.blockQueue.OnBlockExecuted(block.ID(), commit)
+	if err != nil {
+		return fmt.Errorf("unexpected error while marking block as executed: %w", err)
 	}
 
 	e.stopControl.OnBlockExecuted(block.Block.Header)
