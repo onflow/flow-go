@@ -97,14 +97,14 @@ func (m *stateMutator) Build() (flow.Identifier, []transaction.DeferredDBUpdate,
 		dbUpdates = append(dbUpdates, stateMachine.Build()...)
 	}
 	stateID := m.kvMutator.ID()
-
-	// Schedule deferred database operations to index the protocol state by the candidate block's ID
-	// and persist the new protocol state (if there are any changes)
-	dbUpdates = append(dbUpdates, m.kvStoreSnapshots.IndexTx(m.candidate.ID(), stateID))
 	version, data, err := m.kvMutator.VersionedEncode()
 	if err != nil {
 		return flow.ZeroID, nil, fmt.Errorf("could not encode protocol state: %w", err)
 	}
+
+	// Schedule deferred database operations to index the protocol state by the candidate block's ID
+	// and persist the new protocol state (if there are any changes)
+	dbUpdates = append(dbUpdates, m.kvStoreSnapshots.IndexTx(m.candidate.ID(), stateID))
 	dbUpdates = append(dbUpdates, operation.SkipDuplicatesTx(m.kvStoreSnapshots.StoreTx(stateID, &storage.KeyValueStoreData{
 		Version: version,
 		Data:    data,

@@ -15,15 +15,15 @@ type OrthogonalStoreStateMachine[P interface{}] struct {
 }
 
 // Build provides a mock function with given fields:
-func (_m *OrthogonalStoreStateMachine[P]) Build() []func(*transaction.Tx) error {
+func (_m *OrthogonalStoreStateMachine[P]) Build() []transaction.DeferredDBUpdate {
 	ret := _m.Called()
 
-	var r0 []func(*transaction.Tx) error
-	if rf, ok := ret.Get(0).(func() []func(*transaction.Tx) error); ok {
+	var r0 []transaction.DeferredDBUpdate
+	if rf, ok := ret.Get(0).(func() []transaction.DeferredDBUpdate); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]func(*transaction.Tx) error)
+			r0 = ret.Get(0).([]transaction.DeferredDBUpdate)
 		}
 	}
 

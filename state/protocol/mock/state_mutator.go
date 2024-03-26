@@ -29,13 +29,13 @@ func (_m *StateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal)
 }
 
 // Build provides a mock function with given fields:
-func (_m *StateMutator) Build() (flow.Identifier, []func(*transaction.Tx) error, error) {
+func (_m *StateMutator) Build() (flow.Identifier, []transaction.DeferredDBUpdate, error) {
 	ret := _m.Called()
 
 	var r0 flow.Identifier
-	var r1 []func(*transaction.Tx) error
+	var r1 []transaction.DeferredDBUpdate
 	var r2 error
-	if rf, ok := ret.Get(0).(func() (flow.Identifier, []func(*transaction.Tx) error, error)); ok {
+	if rf, ok := ret.Get(0).(func() (flow.Identifier, []transaction.DeferredDBUpdate, error)); ok {
 		return rf()
 	}
 	if rf, ok := ret.Get(0).(func() flow.Identifier); ok {
@@ -46,11 +46,11 @@ func (_m *StateMutator) Build() (flow.Identifier, []func(*transaction.Tx) error,
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() []func(*transaction.Tx) error); ok {
+	if rf, ok := ret.Get(1).(func() []transaction.DeferredDBUpdate); ok {
 		r1 = rf()
 	} else {
 		if ret.Get(1) != nil {
-			r1 = ret.Get(1).([]func(*transaction.Tx) error)
+			r1 = ret.Get(1).([]transaction.DeferredDBUpdate)
 		}
 	}
 
