@@ -177,6 +177,7 @@ generate-mocks: install-mock-generators
 	mockery --name '.*' --dir=module/component --case=underscore --output="./module/component/mock" --outpkg="component"
 	mockery --name '.*' --dir=network --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
 	mockery --name '.*' --dir=storage --case=underscore --output="./storage/mock" --outpkg="mock"
+	mockery --name 'DeferredDBUpdate' --dir=storage/badger/transaction --case=underscore --output="storage/mock" --outpkg="mock"
 	mockery --name '.*' --dir="state/protocol" --case=underscore --output="state/protocol/mock" --outpkg="mock"
 	mockery --name '.*' --dir="state/protocol/events" --case=underscore --output="./state/protocol/events/mock" --outpkg="mock"
 	mockery --name '.*' --dir="state/protocol/protocol_state" --case=underscore --output="state/protocol/protocol_state/mock" --outpkg="mock"
