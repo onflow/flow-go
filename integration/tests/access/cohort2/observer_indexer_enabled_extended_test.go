@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"net/http"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"testing"
 	"time"
 
@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 func TestObserverIndexerEnabledExtended(t *testing.T) {
@@ -41,38 +40,6 @@ type ObserverIndexerEnabledExtendedSuite struct {
 // By overriding this function, we can ensure that the observer is started with correct parameters and select
 // the RPCs and REST endpoints that are tested.
 func (s *ObserverIndexerEnabledExtendedSuite) SetupTest() {
-	s.localRpc = map[string]struct{}{
-		"Ping":                           {},
-		"GetLatestBlockHeader":           {},
-		"GetBlockHeaderByID":             {},
-		"GetBlockHeaderByHeight":         {},
-		"GetLatestBlock":                 {},
-		"GetBlockByID":                   {},
-		"GetBlockByHeight":               {},
-		"GetLatestProtocolStateSnapshot": {},
-		"GetNetworkParameters":           {},
-		"GetTransactionsByBlockID":       {},
-		"GetTransaction":                 {},
-		"GetCollectionByID":              {},
-		"ExecuteScriptAtBlockID":         {},
-		"ExecuteScriptAtLatestBlock":     {},
-		"ExecuteScriptAtBlockHeight":     {},
-		"GetAccount":                     {},
-		"GetAccountAtLatestBlock":        {},
-		"GetAccountAtBlockHeight":        {},
-	}
-
-	s.localRest = map[string]struct{}{
-		"getBlocksByIDs":       {},
-		"getBlocksByHeight":    {},
-		"getBlockPayloadByID":  {},
-		"getNetworkParameters": {},
-		"getNodeVersionInfo":   {},
-	}
-
-	s.testedRPCs = s.getRPCs
-	s.testedRestEndpoints = s.getRestEndpoints
-
 	consensusConfigs := []func(config *testnet.NodeConfig){
 		// `cruise-ctl-fallback-proposal-duration` is set to 250ms instead to of 100ms
 		// to purposely slow down the block rate. This is needed since the crypto module
@@ -134,12 +101,6 @@ func (s *ObserverIndexerEnabledExtendedSuite) SetupTest() {
 	s.net.Start(ctx)
 }
 
-// TestObserverIndexedRPCsHappyPath tests RPCs that are handled by the observer by using a dedicated indexer for the events.
-// For now the observer only supports the following RPCs:
-// - GetEventsForHeightRange
-// - GetEventsForBlockIDs
-// To ensure that the observer is handling these RPCs, we stop the upstream access node and verify that the observer client
-// returns success for valid requests and errors for invalid ones.
 func (s *ObserverIndexerEnabledExtendedSuite) TestObserverIndexedRPCsHappyPath() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -173,6 +134,7 @@ func (s *ObserverIndexerEnabledExtendedSuite) TestObserverIndexedRPCsHappyPath()
 			},
 		}, serviceAddress)
 	require.NoError(t, err)
+
 	createAccountTx.
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
 		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
@@ -208,12 +170,27 @@ func (s *ObserverIndexerEnabledExtendedSuite) TestObserverIndexedRPCsHappyPath()
 
 	// now we can query events using observer to data which has to be locally indexed
 
+	access, err := s.getClient(s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCPort))
+	require.NoError(t, err)
+
 	// get an observer client
 	observer, err := s.getObserverClient()
 	require.NoError(t, err)
 
 	observer_2, err := s.getClient(s.net.ContainerByName("observer_2").Addr(testnet.GRPCPort))
 	require.NoError(t, err)
+
+	// wait for data to be synced by observer
+	require.Eventually(t, func() bool {
+		_, err := observer.GetAccount(ctx, &accessproto.GetAccountRequest{
+			Address: newAccountAddress.Bytes(),
+		})
+		statusErr, ok := status.FromError(err)
+		if !ok || err == nil {
+			return true
+		}
+		return statusErr.Code() != codes.OutOfRange
+	}, 30*time.Second, 1*time.Second)
 
 	// wait for data to be synced by observer
 	require.Eventually(t, func() bool {
@@ -228,11 +205,10 @@ func (s *ObserverIndexerEnabledExtendedSuite) TestObserverIndexedRPCsHappyPath()
 		return statusErr.Code() != codes.OutOfRange
 	}, 30*time.Second, 1*time.Second)
 
-	// observer_2
+	// wait for data to be synced by observer
 	require.Eventually(t, func() bool {
-		_, err := observer_2.GetAccountAtBlockHeight(ctx, &accessproto.GetAccountAtBlockHeightRequest{
-			Address:     newAccountAddress.Bytes(),
-			BlockHeight: accountCreationTxRes.BlockHeight,
+		_, err := observer.GetAccountAtLatestBlock(ctx, &accessproto.GetAccountAtLatestBlockRequest{
+			Address: newAccountAddress.Bytes(),
 		})
 		statusErr, ok := status.FromError(err)
 		if !ok || err == nil {
@@ -251,8 +227,11 @@ func (s *ObserverIndexerEnabledExtendedSuite) TestObserverIndexedRPCsHappyPath()
 	})
 	require.NoError(t, err)
 
-	// stop the upstream access container
-	err = s.net.StopContainerByName(ctx, testnet.PrimaryAN)
+	accessEventsByBlockID, err := access.GetEventsForBlockIDs(ctx, &accessproto.GetEventsForBlockIDsRequest{
+		Type:                 sdk.EventAccountCreated,
+		BlockIds:             [][]byte{blockWithAccount.Block.Id},
+		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+	})
 	require.NoError(t, err)
 
 	eventsByBlockID, err := observer.GetEventsForBlockIDs(ctx, &accessproto.GetEventsForBlockIDsRequest{
@@ -262,9 +241,21 @@ func (s *ObserverIndexerEnabledExtendedSuite) TestObserverIndexedRPCsHappyPath()
 	})
 	require.NoError(t, err)
 
-	eventsByBlockID_2, err := observer.GetEventsForBlockIDs(ctx, &accessproto.GetEventsForBlockIDsRequest{
+	eventsByBlockID_2, err := observer_2.GetEventsForBlockIDs(ctx, &accessproto.GetEventsForBlockIDsRequest{
 		Type:                 sdk.EventAccountCreated,
 		BlockIds:             [][]byte{blockWithAccount_2.Block.Id},
+		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, eventsByBlockID.Results, accessEventsByBlockID.Results)
+	require.Equal(t, eventsByBlockID_2.Results, accessEventsByBlockID.Results)
+
+	// GetEventsForHeightRange
+	accessEventsByHeight, err := access.GetEventsForHeightRange(ctx, &accessproto.GetEventsForHeightRangeRequest{
+		Type:                 sdk.EventAccountCreated,
+		StartHeight:          blockWithAccount.Block.Height,
+		EndHeight:            blockWithAccount.Block.Height,
 		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
 	})
 	require.NoError(t, err)
@@ -277,13 +268,16 @@ func (s *ObserverIndexerEnabledExtendedSuite) TestObserverIndexedRPCsHappyPath()
 	})
 	require.NoError(t, err)
 
-	eventsByHeight_2, err := observer.GetEventsForHeightRange(ctx, &accessproto.GetEventsForHeightRangeRequest{
+	eventsByHeight_2, err := observer_2.GetEventsForHeightRange(ctx, &accessproto.GetEventsForHeightRangeRequest{
 		Type:                 sdk.EventAccountCreated,
 		StartHeight:          blockWithAccount_2.Block.Height,
 		EndHeight:            blockWithAccount_2.Block.Height,
 		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
 	})
 	require.NoError(t, err)
+
+	require.Equal(t, eventsByHeight.Results, accessEventsByHeight.Results)
+	require.Equal(t, eventsByHeight_2.Results, accessEventsByHeight.Results)
 
 	// validate that there is an event that we are looking for
 	require.Equal(t, eventsByHeight.Results, eventsByBlockID.Results)
@@ -299,219 +293,124 @@ func (s *ObserverIndexerEnabledExtendedSuite) TestObserverIndexedRPCsHappyPath()
 	}
 	require.True(t, found)
 
-	// validate that there is an event that we are looking for
-	require.Equal(t, eventsByHeight_2.Results, eventsByBlockID_2.Results)
-	found = false
-	for _, eventsInBlock := range eventsByHeight_2.Results {
-		for _, event := range eventsInBlock.Events {
-			if event.Type == sdk.EventAccountCreated {
-				if bytes.Equal(event.Payload, accountCreatedPayload) {
-					found = true
-				}
-			}
-		}
-	}
-	require.True(t, found)
+	// GetAccount
+	getAccountObserver1Response, err := observer.GetAccount(ctx, &accessproto.GetAccountRequest{
+		Address: newAccountAddress.Bytes(),
+	})
+	require.NoError(t, err)
 
-}
+	getAccountObserver2Response, err := observer_2.GetAccount(ctx, &accessproto.GetAccountRequest{
+		Address: newAccountAddress.Bytes(),
+	})
+	require.NoError(t, err)
 
-func (s *ObserverIndexerEnabledExtendedSuite) getRPCs() []RPCTest {
-	return []RPCTest{
-		{name: "Ping", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.Ping(ctx, &accessproto.PingRequest{})
-			return err
-		}},
-		{name: "GetLatestBlockHeader", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetLatestBlockHeader(ctx, &accessproto.GetLatestBlockHeaderRequest{})
-			return err
-		}},
-		{name: "GetBlockHeaderByID", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetBlockHeaderByID(ctx, &accessproto.GetBlockHeaderByIDRequest{
-				Id: make([]byte, 32),
-			})
-			return err
-		}},
-		{name: "GetBlockHeaderByHeight", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetBlockHeaderByHeight(ctx, &accessproto.GetBlockHeaderByHeightRequest{})
-			return err
-		}},
-		{name: "GetLatestBlock", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetLatestBlock(ctx, &accessproto.GetLatestBlockRequest{})
-			return err
-		}},
-		{name: "GetBlockByID", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetBlockByID(ctx, &accessproto.GetBlockByIDRequest{Id: make([]byte, 32)})
-			return err
-		}},
-		{name: "GetBlockByHeight", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetBlockByHeight(ctx, &accessproto.GetBlockByHeightRequest{})
-			return err
-		}},
-		{name: "GetCollectionByID", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetCollectionByID(ctx, &accessproto.GetCollectionByIDRequest{Id: make([]byte, 32)})
-			return err
-		}},
-		{name: "SendTransaction", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.SendTransaction(ctx, &accessproto.SendTransactionRequest{})
-			return err
-		}},
-		{name: "GetTransaction", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetTransaction(ctx, &accessproto.GetTransactionRequest{Id: make([]byte, 32)})
-			return err
-		}},
-		{name: "GetTransactionResult", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetTransactionResult(ctx, &accessproto.GetTransactionRequest{})
-			return err
-		}},
-		{name: "GetTransactionResultByIndex", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetTransactionResultByIndex(ctx, &accessproto.GetTransactionByIndexRequest{})
-			return err
-		}},
-		{name: "GetTransactionResultsByBlockID", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetTransactionResultsByBlockID(ctx, &accessproto.GetTransactionsByBlockIDRequest{})
-			return err
-		}},
-		{name: "GetTransactionsByBlockID", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetTransactionsByBlockID(ctx, &accessproto.GetTransactionsByBlockIDRequest{BlockId: make([]byte, 32)})
-			return err
-		}},
-		{name: "GetAccount", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetAccount(ctx, &accessproto.GetAccountRequest{
-				Address: flow.Localnet.Chain().ServiceAddress().Bytes(),
-			})
-			return err
-		}},
-		{name: "GetAccountAtLatestBlock", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetAccountAtLatestBlock(ctx, &accessproto.GetAccountAtLatestBlockRequest{
-				Address: flow.Localnet.Chain().ServiceAddress().Bytes(),
-			})
-			return err
-		}},
-		{name: "GetAccountAtBlockHeight", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetAccountAtBlockHeight(ctx, &accessproto.GetAccountAtBlockHeightRequest{
-				Address:     flow.Localnet.Chain().ServiceAddress().Bytes(),
-				BlockHeight: 0,
-			})
-			return err
-		}},
-		{name: "ExecuteScriptAtLatestBlock", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.ExecuteScriptAtLatestBlock(ctx, &accessproto.ExecuteScriptAtLatestBlockRequest{
-				Script:    []byte(simpleScript),
-				Arguments: make([][]byte, 0),
-			})
-			return err
-		}},
-		{name: "ExecuteScriptAtBlockID", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.ExecuteScriptAtBlockID(ctx, &accessproto.ExecuteScriptAtBlockIDRequest{
-				BlockId:   make([]byte, 32),
-				Script:    []byte("dummy script"),
-				Arguments: make([][]byte, 0),
-			})
-			return err
-		}},
-		{name: "ExecuteScriptAtBlockHeight", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.ExecuteScriptAtBlockHeight(ctx, &accessproto.ExecuteScriptAtBlockHeightRequest{
-				BlockHeight: 0,
-				Script:      []byte(simpleScript),
-				Arguments:   make([][]byte, 0),
-			})
-			return err
-		}},
-		{name: "GetNetworkParameters", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetNetworkParameters(ctx, &accessproto.GetNetworkParametersRequest{})
-			return err
-		}},
-		{name: "GetLatestProtocolStateSnapshot", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetLatestProtocolStateSnapshot(ctx, &accessproto.GetLatestProtocolStateSnapshotRequest{})
-			return err
-		}},
-		{name: "GetExecutionResultForBlockID", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetExecutionResultForBlockID(ctx, &accessproto.GetExecutionResultForBlockIDRequest{})
-			return err
-		}},
-	}
-}
+	getAccountAccessResponse, err := access.GetAccount(ctx, &accessproto.GetAccountRequest{
+		Address: newAccountAddress.Bytes(),
+	})
+	require.NoError(t, err)
 
-func (s *ObserverIndexerEnabledExtendedSuite) getRestEndpoints() []RestEndpointTest {
-	transactionId := unittest.IdentifierFixture().String()
-	account := flow.Localnet.Chain().ServiceAddress().String()
-	block := unittest.BlockFixture()
-	executionResult := unittest.ExecutionResultFixture()
-	collection := unittest.CollectionFixture(2)
-	eventType := unittest.EventTypeFixture(flow.Localnet)
+	require.Equal(t, getAccountAccessResponse.Account, getAccountObserver2Response.Account)
+	require.Equal(t, getAccountAccessResponse.Account, getAccountObserver1Response.Account)
 
-	return []RestEndpointTest{
-		{
-			name:   "getTransactionByID",
-			method: http.MethodGet,
-			path:   "/transactions/" + transactionId,
-		},
-		{
-			name:   "createTransaction",
-			method: http.MethodPost,
-			path:   "/transactions",
-			body:   createTx(s.net),
-		},
-		{
-			name:   "getTransactionResultByID",
-			method: http.MethodGet,
-			path:   fmt.Sprintf("/transaction_results/%s?block_id=%s&collection_id=%s", transactionId, block.ID().String(), collection.ID().String()),
-		},
-		{
-			name:   "getBlocksByIDs",
-			method: http.MethodGet,
-			path:   "/blocks/" + block.ID().String(),
-		},
-		{
-			name:   "getBlocksByHeight",
-			method: http.MethodGet,
-			path:   "/blocks?height=1",
-		},
-		{
-			name:   "getBlockPayloadByID",
-			method: http.MethodGet,
-			path:   "/blocks/" + block.ID().String() + "/payload",
-		},
-		{
-			name:   "getExecutionResultByID",
-			method: http.MethodGet,
-			path:   "/execution_results/" + executionResult.ID().String(),
-		},
-		{
-			name:   "getExecutionResultByBlockID",
-			method: http.MethodGet,
-			path:   "/execution_results?block_id=" + block.ID().String(),
-		},
-		{
-			name:   "getCollectionByID",
-			method: http.MethodGet,
-			path:   "/collections/" + collection.ID().String(),
-		},
-		{
-			name:   "executeScript",
-			method: http.MethodPost,
-			path:   "/scripts",
-			body:   createScript(),
-		},
-		{
-			name:   "getAccount",
-			method: http.MethodGet,
-			path:   "/accounts/" + account + "?block_height=1",
-		},
-		{
-			name:   "getEvents",
-			method: http.MethodGet,
-			path:   fmt.Sprintf("/events?type=%s&start_height=%d&end_height=%d", eventType, 0, 3),
-		},
-		{
-			name:   "getNetworkParameters",
-			method: http.MethodGet,
-			path:   "/network/parameters",
-		},
-		{
-			name:   "getNodeVersionInfo",
-			method: http.MethodGet,
-			path:   "/node_version_info",
-		},
-	}
+	// GetAccountAtBlockHeight
+	getAccountAtBlockHeightObserver1Response, err := observer.GetAccountAtBlockHeight(ctx, &accessproto.GetAccountAtBlockHeightRequest{
+		Address:     newAccountAddress.Bytes(),
+		BlockHeight: accountCreationTxRes.BlockHeight,
+	})
+	require.NoError(t, err)
+
+	getAccountAtBlockHeightObserver2Response, err := observer_2.GetAccountAtBlockHeight(ctx, &accessproto.GetAccountAtBlockHeightRequest{
+		Address:     newAccountAddress.Bytes(),
+		BlockHeight: accountCreationTxRes.BlockHeight,
+	})
+	require.NoError(t, err)
+
+	getAccountAtBlockHeightAccessResponse, err := access.GetAccountAtBlockHeight(ctx, &accessproto.GetAccountAtBlockHeightRequest{
+		Address:     newAccountAddress.Bytes(),
+		BlockHeight: accountCreationTxRes.BlockHeight,
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, getAccountAtBlockHeightObserver2Response.Account, getAccountAtBlockHeightAccessResponse.Account)
+	require.Equal(t, getAccountAtBlockHeightObserver1Response.Account, getAccountAtBlockHeightAccessResponse.Account)
+
+	//GetAccountAtLatestBlock
+	getAccountAtLatestBlockObserver1Response, err := observer.GetAccountAtLatestBlock(ctx, &accessproto.GetAccountAtLatestBlockRequest{
+		Address: newAccountAddress.Bytes(),
+	})
+	require.NoError(t, err)
+
+	getAccountAtLatestBlockObserver2Response, err := observer_2.GetAccountAtLatestBlock(ctx, &accessproto.GetAccountAtLatestBlockRequest{
+		Address: newAccountAddress.Bytes(),
+	})
+	require.NoError(t, err)
+
+	getAccountAtLatestBlockAccessResponse, err := access.GetAccountAtLatestBlock(ctx, &accessproto.GetAccountAtLatestBlockRequest{
+		Address: newAccountAddress.Bytes(),
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, getAccountAtLatestBlockObserver2Response.Account, getAccountAtLatestBlockAccessResponse.Account)
+	require.Equal(t, getAccountAtLatestBlockObserver1Response.Account, getAccountAtLatestBlockAccessResponse.Account)
+
+	// GetSystemTransaction
+	getSystemTransactionObserver1Response, err := observer.GetSystemTransaction(ctx, &accessproto.GetSystemTransactionRequest{
+		BlockId: blockWithAccount.Block.Id,
+	})
+	require.NoError(t, err)
+
+	getSystemTransactionObserver2Response, err := observer_2.GetSystemTransaction(ctx, &accessproto.GetSystemTransactionRequest{
+		BlockId: blockWithAccount.Block.Id,
+	})
+	require.NoError(t, err)
+
+	getSystemTransactionAccessResponse, err := access.GetSystemTransaction(ctx, &accessproto.GetSystemTransactionRequest{
+		BlockId: blockWithAccount.Block.Id,
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, getSystemTransactionObserver2Response.Transaction, getSystemTransactionAccessResponse.Transaction)
+	require.Equal(t, getSystemTransactionObserver1Response.Transaction, getSystemTransactionAccessResponse.Transaction)
+
+	// GetSystemTransactionResult
+	getSystemTransactionResultObserver2Response, err := observer_2.GetSystemTransactionResult(ctx, &accessproto.GetSystemTransactionResultRequest{
+		BlockId:              blockWithAccount.Block.Id,
+		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+	})
+	require.NoError(t, err)
+
+	getSystemTransactionResultAccessResponse, err := access.GetSystemTransactionResult(ctx, &accessproto.GetSystemTransactionResultRequest{
+		BlockId:              blockWithAccount.Block.Id,
+		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+	})
+	require.NoError(t, err)
+
+	//getSystemTransactionResultObserver1Response, err := observer.GetSystemTransactionResult(ctx, &accessproto.GetSystemTransactionResultRequest{
+	//	BlockId:              blockWithAccount.Block.Id,
+	//	EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+	//})
+	//require.NoError(t, err)
+
+	require.Equal(t, getSystemTransactionResultObserver2Response.Events, getSystemTransactionResultAccessResponse.Events)
+	//require.Equal(t, getSystemTransactionResultObserver1Response.Events, getSystemTransactionResultAccessResponse.Events)
+
+	// GetExecutionResultByID
+	getExecutionResultByIDObserver1Response, err := observer.GetExecutionResultByID(ctx, &accessproto.GetExecutionResultByIDRequest{
+		Id: blockWithAccount.Block.Id,
+	})
+	require.NoError(t, err)
+
+	getExecutionResultByIDObserver2Response, err := observer_2.GetExecutionResultByID(ctx, &accessproto.GetExecutionResultByIDRequest{
+		Id: blockWithAccount.Block.Id,
+	})
+	require.NoError(t, err)
+
+	getExecutionResultByIDAccessResponse, err := access.GetExecutionResultByID(ctx, &accessproto.GetExecutionResultByIDRequest{
+		Id: blockWithAccount.Block.Id,
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, getExecutionResultByIDAccessResponse.ExecutionResult, getExecutionResultByIDObserver2Response.ExecutionResult)
+	require.Equal(t, getExecutionResultByIDAccessResponse.ExecutionResult, getExecutionResultByIDObserver1Response.ExecutionResult)
+
 }
