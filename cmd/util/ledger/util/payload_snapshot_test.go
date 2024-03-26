@@ -16,14 +16,14 @@ import (
 )
 
 func Benchmark_PayloadSnapshot(b *testing.B) {
-	//benchMerge := func(
-	//	b *testing.B,
-	//	payloadsNum int, changesNum []int,
-	//) {
-	//	b.Run("merge_"+strconv.Itoa(payloadsNum), func(b *testing.B) {
-	//		benchmarkMerge(b, payloadsNum, changesNum)
-	//	})
-	//}
+	benchMerge := func(
+		b *testing.B,
+		payloadsNum int, changesNum []int,
+	) {
+		b.Run("merge_"+strconv.Itoa(payloadsNum), func(b *testing.B) {
+			benchmarkMerge(b, payloadsNum, changesNum)
+		})
+	}
 
 	benchCreate := func(
 		b *testing.B,
@@ -34,13 +34,13 @@ func Benchmark_PayloadSnapshot(b *testing.B) {
 		})
 	}
 
-	//benchCreate(b, 1000)
-	//benchCreate(b, 100000)
+	benchCreate(b, 1000)
+	benchCreate(b, 100000)
 	benchCreate(b, 100000000)
 
-	//benchMerge(b, 1000, []int{10, 100, 1000})
-	//benchMerge(b, 100000, []int{10, 1000, 100000})
-	//benchMerge(b, 10000000, []int{10, 10000, 10000000})
+	benchMerge(b, 1000, []int{10, 100, 1000})
+	benchMerge(b, 100000, []int{10, 1000, 100000})
+	benchMerge(b, 10000000, []int{10, 10000, 10000000})
 }
 
 func randomPayload(size int) []byte {

@@ -330,7 +330,7 @@ func NewCadence1ContractsMigrations(
 			migrations,
 			NamedMigration{
 				Name:    "burner-deployment-migration",
-				Migrate: NewBurnerDeploymentMigration(chainID, log),
+				Migrate: NewBurnerDeploymentMigration(chainID, log, nWorker),
 			},
 		)
 	}
@@ -385,7 +385,7 @@ func NewCadence1Migrations(
 	}
 
 	if prune {
-		migration := NewCadence1PruneMigration(chainID, log)
+		migration := NewCadence1PruneMigration(chainID, nWorker, log)
 		if migration != nil {
 			migrations = append(
 				migrations,

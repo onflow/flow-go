@@ -10,12 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func NewTransactionBasedMigration(
-	tx *flow.TransactionBody,
-	chainID flow.ChainID,
-	logger zerolog.Logger,
-	expectedWriteAddresses map[flow.Address]struct{},
-) ledger.Migration {
+func NewTransactionBasedMigration(tx *flow.TransactionBody, chainID flow.ChainID, logger zerolog.Logger, workers int, expectedWriteAddresses map[flow.Address]struct{}) ledger.Migration {
 	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
 
 		options := computation.DefaultFVMOptions(chainID, false, false)
@@ -27,7 +22,7 @@ func NewTransactionBasedMigration(
 			fvm.WithTransactionFeesEnabled(false))
 		ctx := fvm.NewContext(options...)
 
-		snapshot, err := util.NewMapBasedPayloadSnapshot(logger, payloads)
+		snapshot, err := util.NewMapBasedPayloadSnapshotWithWorkers(logger, payloads, workers)
 		if err != nil {
 			return nil, err
 		}

@@ -16,12 +16,14 @@ import (
 func NewAccountStorageMigration(
 	address common.Address,
 	log zerolog.Logger,
+	nWorker int,
 	migrate func(*runtime.Storage, *interpreter.Interpreter) error,
 ) ledger.Migration {
 	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
 
 		migrationRuntime, err := NewMigratorRuntime(
 			log,
+			nWorker,
 			address,
 			payloads,
 			util.RuntimeInterfaceConfig{},

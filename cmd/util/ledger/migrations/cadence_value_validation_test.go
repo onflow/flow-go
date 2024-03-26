@@ -55,6 +55,7 @@ func TestValidateCadenceValues(t *testing.T) {
 
 			mr, err := NewMigratorRuntime(
 				zerolog.Nop(),
+				2,
 				address,
 				[]*ledger.Payload{accountStatusPayload},
 				util.RuntimeInterfaceConfig{},
@@ -148,6 +149,7 @@ func createTestPayloads(t *testing.T, address common.Address, domain string) []*
 
 	mr, err := NewMigratorRuntime(
 		zerolog.Nop(),
+		2,
 		address,
 		[]*ledger.Payload{accountStatusPayload},
 		util.RuntimeInterfaceConfig{},

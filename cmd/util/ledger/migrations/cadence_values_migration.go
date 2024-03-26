@@ -94,6 +94,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 
 	migrationRuntime, err := NewMigratorRuntime(
 		m.log,
+		1,
 		address,
 		oldPayloads,
 		m.runtimeInterfaceConfig,

@@ -30,6 +30,7 @@ var _ storage.TransactionPreparer = migrationTransactionPreparer{}
 // migratorRuntime is a runtime that can be used to run a migration on a single account
 func NewMigratorRuntime(
 	log zerolog.Logger,
+	nWorker int,
 	address common.Address,
 	payloads []*ledger.Payload,
 	config util.RuntimeInterfaceConfig,
@@ -37,7 +38,7 @@ func NewMigratorRuntime(
 	*migratorRuntime,
 	error,
 ) {
-	snapshot, err := util.NewMapBasedPayloadSnapshot(log, payloads)
+	snapshot, err := util.NewMapBasedPayloadSnapshotWithWorkers(log, payloads, nWorker)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
 	}

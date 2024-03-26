@@ -1,11 +1,12 @@
 package util
 
 import (
-	"github.com/rs/zerolog"
-	"golang.org/x/exp/maps"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog"
+	"golang.org/x/exp/maps"
 
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
@@ -230,24 +231,18 @@ func NewMapBasedPayloadSnapshotWithWorkers(log zerolog.Logger, payloads []*ledge
 	for i := 0; i < workers/2; i++ {
 		go func() {
 			defer wg.Done()
-			for {
-				select {
-				case pair, ok := <-pairedMinimaps:
-					if !ok {
-						return
-					}
-					if pair.left.err != nil {
-						minimaps <- result{nil, pair.left.err}
-						return
-					}
-					if pair.right.err != nil {
-						minimaps <- result{nil, pair.right.err}
-						return
-					}
-					// merge the two minimaps
-					maps.Copy(pair.left.minimap, pair.right.minimap)
-					minimaps <- result{pair.left.minimap, nil}
+			for pair := range pairedMinimaps {
+				if pair.left.err != nil {
+					minimaps <- result{nil, pair.left.err}
+					return
 				}
+				if pair.right.err != nil {
+					minimaps <- result{nil, pair.right.err}
+					return
+				}
+				// merge the two minimaps
+				maps.Copy(pair.left.minimap, pair.right.minimap)
+				minimaps <- result{pair.left.minimap, nil}
 			}
 		}()
 	}
@@ -258,13 +253,6 @@ func NewMapBasedPayloadSnapshotWithWorkers(log zerolog.Logger, payloads []*ledge
 	r := <-minimaps
 	if r.err != nil {
 		return nil, r.err
-	}
-
-	select {
-	case _, ok := <-pairedMinimaps:
-		if ok {
-			panic("pairedMinimaps should be closed and empty")
-		}
 	}
 
 	l := &MapBasedPayloadSnapshot{

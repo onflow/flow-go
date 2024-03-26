@@ -25,7 +25,7 @@ func PruneEmptyMigration(payload []ledger.Payload) ([]ledger.Payload, error) {
 }
 
 // NewCadence1PruneMigration prunes some values from the service account in the Testnet state
-func NewCadence1PruneMigration(chainID flow.ChainID, log zerolog.Logger) ledger.Migration {
+func NewCadence1PruneMigration(chainID flow.ChainID, nWorker int, log zerolog.Logger) ledger.Migration {
 	if chainID != flow.Testnet {
 		return nil
 	}
@@ -45,6 +45,7 @@ func NewCadence1PruneMigration(chainID flow.ChainID, log zerolog.Logger) ledger.
 	return NewAccountStorageMigration(
 		serviceAccountAddress,
 		log,
+		nWorker,
 		migrate,
 	)
 }

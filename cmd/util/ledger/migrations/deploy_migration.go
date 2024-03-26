@@ -15,6 +15,7 @@ func NewDeploymentMigration(
 	contract Contract,
 	authorizer flow.Address,
 	expectedWriteAddresses map[flow.Address]struct{},
+	nWorker int,
 	logger zerolog.Logger,
 ) ledger.Migration {
 
@@ -36,6 +37,7 @@ func NewDeploymentMigration(
 		tx,
 		chainID,
 		logger,
+		nWorker,
 		expectedWriteAddresses,
 	)
 }
@@ -43,6 +45,7 @@ func NewDeploymentMigration(
 func NewBurnerDeploymentMigration(
 	chainID flow.ChainID,
 	logger zerolog.Logger,
+	nWorker int,
 ) ledger.Migration {
 	address := BurnerAddressForChain(chainID)
 	return NewDeploymentMigration(
@@ -55,6 +58,7 @@ func NewBurnerDeploymentMigration(
 		map[flow.Address]struct{}{
 			address: {},
 		},
+		nWorker,
 		logger,
 	)
 }
