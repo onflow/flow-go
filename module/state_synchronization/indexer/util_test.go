@@ -10,10 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/generator"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 // TestFindContractUpdates tests the findContractUpdates function returns all contract updates
