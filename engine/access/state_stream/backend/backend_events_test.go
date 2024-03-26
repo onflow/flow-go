@@ -8,6 +8,9 @@ import (
 	"testing"
 	"time"
 
+	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -42,7 +45,7 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromExecutionData() {
 // TestSubscribeEventsFromLocalStorage tests the SubscribeEvents method happy path for events
 // extracted from local storage
 func (s *BackendEventsSuite) TestSubscribeEventsFromLocalStorage() {
-	s.backend.useIndex = true
+	s.SetupBackend(true)
 
 	// events returned from the db are sorted by txID, txIndex, then eventIndex.
 	// reproduce that here to ensure output order works as expected
@@ -64,6 +67,16 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromLocalStorage() {
 		})
 		blockEvents[b.ID()] = events
 	}
+
+	s.events.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
+		mocks.StorageMapGetter(blockEvents),
+	)
+
+	reporter := syncmock.NewIndexReporter(s.T())
+	reporter.On("LowestIndexedHeight").Return(s.blocks[0].Header.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(s.blocks[len(s.blocks)-1].Header.Height, nil)
+	err := s.eventsIndex.Initialize(reporter)
+	s.Require().NoError(err)
 
 	s.runTestSubscribeEvents()
 }

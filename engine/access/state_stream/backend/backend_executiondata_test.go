@@ -8,6 +8,7 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -45,7 +46,7 @@ var (
 
 type BackendExecutionDataSuite struct {
 	suite.Suite
-
+	logger         zerolog.Logger
 	state          *protocolmock.State
 	params         *protocolmock.Params
 	snapshot       *protocolmock.Snapshot
@@ -82,7 +83,7 @@ func TestBackendExecutionDataSuite(t *testing.T) {
 }
 
 func (s *BackendExecutionDataSuite) SetupTest() {
-	logger := unittest.Logger()
+	s.logger = unittest.Logger()
 
 	s.state = protocolmock.NewState(s.T())
 	s.snapshot = protocolmock.NewSnapshot(s.T())
@@ -97,15 +98,9 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 	s.broadcaster = engine.NewBroadcaster()
 
-	s.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metrics.NewNoopCollector())
+	s.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, s.logger, metrics.NewNoopCollector())
 	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
 	s.executionDataTracker = subscriptionmock.NewExecutionDataTracker(s.T())
-
-	conf := Config{
-		ClientSendTimeout:       subscription.DefaultSendTimeout,
-		ClientSendBufferSize:    subscription.DefaultSendBufferSize,
-		RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
-	}
 
 	var err error
 
@@ -218,9 +213,18 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		),
 	).Maybe()
 
+	s.SetupBackend(false)
+}
+
+func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
+	var err error
 	s.backend, err = New(
-		logger,
-		conf,
+		s.logger,
+		Config{
+			ClientSendTimeout:       subscription.DefaultSendTimeout,
+			ClientSendBufferSize:    subscription.DefaultSendBufferSize,
+			RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
+		},
 		s.state,
 		s.headers,
 		s.seals,
@@ -230,21 +234,21 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		s.broadcaster,
 		s.registersAsync,
 		s.eventsIndex,
-		false,
+		useEventsIndex,
 		s.executionDataTracker,
 	)
 	require.NoError(s.T(), err)
 
 	// create real execution data tracker to use GetStartHeight from it, instead of mocking
 	s.executionDataTrackerReal = subscription.NewExecutionDataTracker(
-		logger,
+		s.logger,
 		s.state,
 		s.rootBlock.Header.Height,
 		s.headers,
 		s.broadcaster,
 		s.rootBlock.Header.Height,
 		s.eventsIndex,
-		false,
+		useEventsIndex,
 	)
 
 	s.executionDataTracker.On(

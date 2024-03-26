@@ -79,7 +79,6 @@ type StateStreamBackend struct {
 	broadcaster          *engine.Broadcaster
 	registers            *execution.RegistersAsyncStore
 	registerRequestLimit int
-	useIndex             bool
 }
 
 func New(
@@ -111,7 +110,6 @@ func New(
 		broadcaster:          broadcaster,
 		registers:            registers,
 		registerRequestLimit: int(config.RegisterIDsRequestLimit),
-		useIndex:             useEventsIndex,
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
