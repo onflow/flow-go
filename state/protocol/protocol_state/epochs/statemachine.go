@@ -253,7 +253,7 @@ func (e *EpochStateMachine) ParentState() protocol_state.KVStoreReader {
 // Results must be ordered by block height.
 // Expected errors during normal operations:
 // - `protocol.InvalidServiceEventError` if any service event is invalid or is not a valid state transition for the current protocol state
-func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(events []*flow.ServiceEvent) ([]func(tx *transaction.Tx) error, error) {
+func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(events []*flow.ServiceEvent) ([]transaction.DeferredDBUpdate, error) {
 	var dbUpdates []transaction.DeferredDBUpdate
 	for _, event := range events {
 		switch ev := event.Event.(type) {
@@ -288,7 +288,7 @@ func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(events []*flow.
 // transitionToEpochFallbackMode transitions the protocol state to Epoch Fallback Mode [EFM].
 // This is implemented by switching to a different state machine implementation, which ignores all service events and epoch transitions.
 // At the moment, this is a one-way transition: once we enter EFM, the only way to return to normal is with a spork.
-func (e *EpochStateMachine) transitionToEpochFallbackMode(events []*flow.ServiceEvent) ([]func(tx *transaction.Tx) error, error) {
+func (e *EpochStateMachine) transitionToEpochFallbackMode(events []*flow.ServiceEvent) ([]transaction.DeferredDBUpdate, error) {
 	var err error
 	e.activeStateMachine, err = e.epochFallbackStateMachineFactory()
 	if err != nil {

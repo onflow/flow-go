@@ -1,7 +1,6 @@
 package state
 
 import (
-	"github.com/stretchr/testify/mock"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -55,7 +54,7 @@ func (s *StateMutatorSuite) TestBuild_HappyPath() {
 	stateMachines := make([]*protocol_statemock.KeyValueStoreStateMachine, 2)
 	//expectedDbUpdateCalls := make([])
 	for i := range stateMachines {
-		dbUpdatedExecuted := &mock.Mock{}
+		dbUpdatedExecuted := storagemock.NewDeferredDBUpdate(s.T())
 		stateMachines[i] = protocol_statemock.NewKeyValueStoreStateMachine(s.T())
 		stateMachines[i].On("Build").Return([]transaction.DeferredDBUpdate{
 			func(tx *transaction.Tx) error {
