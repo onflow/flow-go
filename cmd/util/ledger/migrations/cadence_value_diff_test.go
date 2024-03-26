@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
@@ -171,6 +173,8 @@ func TestDiffCadenceValues(t *testing.T) {
 			)
 
 			mr, err := NewMigratorRuntime(
+				zerolog.Nop(),
+				2,
 				address,
 				[]*ledger.Payload{accountStatusPayload},
 				util.RuntimeInterfaceConfig{},
@@ -271,6 +275,8 @@ func TestDiffCadenceValues(t *testing.T) {
 			)
 
 			mr, err := NewMigratorRuntime(
+				zerolog.Nop(),
+				2,
 				address,
 				[]*ledger.Payload{accountStatusPayload},
 				util.RuntimeInterfaceConfig{},
@@ -378,6 +384,8 @@ func TestDiffCadenceValues(t *testing.T) {
 			)
 
 			mr, err := NewMigratorRuntime(
+				zerolog.Nop(),
+				2,
 				address,
 				[]*ledger.Payload{accountStatusPayload},
 				util.RuntimeInterfaceConfig{},
@@ -496,6 +504,8 @@ func TestDiffCadenceValues(t *testing.T) {
 			)
 
 			mr, err := NewMigratorRuntime(
+				zerolog.Nop(),
+				2,
 				address,
 				[]*ledger.Payload{accountStatusPayload},
 				util.RuntimeInterfaceConfig{},
@@ -621,6 +631,8 @@ func createStorageMapPayloads(t *testing.T, address common.Address, domain strin
 	)
 
 	mr, err := NewMigratorRuntime(
+		zerolog.Nop(),
+		2,
 		address,
 		[]*ledger.Payload{accountStatusPayload},
 		util.RuntimeInterfaceConfig{},

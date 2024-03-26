@@ -123,6 +123,8 @@ func checkMigratedPayloads(
 	newPayloads []*ledger.Payload,
 ) {
 	mr, err := NewMigratorRuntime(
+		zerolog.Nop(),
+		2,
 		address,
 		newPayloads,
 		util.RuntimeInterfaceConfig{},
@@ -743,6 +745,8 @@ func TestProgramParsingError(t *testing.T) {
 	require.NoError(t, err)
 
 	runtime, err := NewMigratorRuntime(
+		zerolog.Nop(),
+		2,
 		testAddress,
 		payloads,
 		util.RuntimeInterfaceConfig{},
@@ -799,7 +803,6 @@ func TestProgramParsingError(t *testing.T) {
 	payloads, err = runtime.Snapshot.ApplyChangesAndGetNewPayloads(
 		result.WriteSet,
 		expectedAddresses,
-		logger,
 	)
 	require.NoError(t, err)
 
@@ -887,6 +890,8 @@ func TestCoreContractUsage(t *testing.T) {
 		require.NoError(t, err)
 
 		runtime, err := NewMigratorRuntime(
+			zerolog.Nop(),
+			2,
 			testAddress,
 			payloads,
 			util.RuntimeInterfaceConfig{},
@@ -935,7 +940,6 @@ func TestCoreContractUsage(t *testing.T) {
 		payloads, err = runtime.Snapshot.ApplyChangesAndGetNewPayloads(
 			result.WriteSet,
 			expectedAddresses,
-			logger,
 		)
 		require.NoError(t, err)
 
@@ -977,6 +981,8 @@ func TestCoreContractUsage(t *testing.T) {
 		// Get result
 
 		mr, err := NewMigratorRuntime(
+			zerolog.Nop(),
+			2,
 			testAddress,
 			payloads,
 			util.RuntimeInterfaceConfig{},

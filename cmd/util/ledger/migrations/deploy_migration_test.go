@@ -67,6 +67,7 @@ func TestDeploy(t *testing.T) {
 
 	targetAddress := serviceAccountAddress
 
+	nWorker := 2
 	migration := NewDeploymentMigration(
 		chainID,
 		Contract{
@@ -91,6 +92,7 @@ func TestDeploy(t *testing.T) {
 		map[flow.Address]struct{}{
 			targetAddress: {},
 		},
+		nWorker,
 		zerolog.New(zerolog.NewTestWriter(t)),
 	)
 
