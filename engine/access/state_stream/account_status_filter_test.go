@@ -125,7 +125,7 @@ func TestAccountStatusFilterFiltering(t *testing.T) {
 	}
 
 	matched := filter.Filter(events)
-	matchedByAddress := filter.CreateAccountRelatedCoreEvents(matched, unittest.Logger())
+	matchedByAddress := filter.GroupCoreEventsByAccountAddress(matched, unittest.Logger())
 
 	assert.Len(t, matched, 2)
 

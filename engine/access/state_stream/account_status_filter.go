@@ -10,9 +10,6 @@ import (
 
 // Core event types based on documentation https://cadence-lang.org/docs/language/core-events
 const (
-	// DefaultAccountAddressesLimit specifies limitation for possible number of accounts that could be used in filter
-	DefaultAccountAddressesLimit = 50
-
 	// CoreEventAccountCreated is emitted when a new account gets created
 	CoreEventAccountCreated = "flow.AccountCreated"
 
@@ -74,9 +71,9 @@ func NewAccountStatusFilter(
 		if err != nil {
 			return AccountStatusFilter{}, err
 		}
-	} else if len(accountAddresses) > DefaultAccountAddressesLimit {
+	} else if len(accountAddresses) > DefaultMaxAccountAddresses {
 		// If `accountAddresses` exceeds the `DefaultAccountAddressesLimit`, it returns an error.
-		return AccountStatusFilter{}, fmt.Errorf("account limit exceeds, the limit is %d", DefaultAccountAddressesLimit)
+		return AccountStatusFilter{}, fmt.Errorf("account limit exceeds, the limit is %d", DefaultMaxAccountAddresses)
 	}
 
 	// If `eventTypes` is empty, the filter returns all core events for any accounts.
@@ -112,7 +109,7 @@ func NewAccountStatusFilter(
 	}, nil
 }
 
-// CreateAccountRelatedCoreEvents extracts account-related core events from the provided list of events.
+// GroupCoreEventsByAccountAddress extracts account-related core events from the provided list of events.
 // It filters events based on the account field specified by the event type and organizes them by account address.
 // Parameters:
 // - events: The list of events to extract account-related core events from.
@@ -120,7 +117,7 @@ func NewAccountStatusFilter(
 // Returns:
 //   - A map[string]flow.EventsList: A map where the key is the account address and the value is a list of
 //     account-related core events associated with that address.
-func (f *AccountStatusFilter) CreateAccountRelatedCoreEvents(events flow.EventsList, log zerolog.Logger) map[string]flow.EventsList {
+func (f *AccountStatusFilter) GroupCoreEventsByAccountAddress(events flow.EventsList, log zerolog.Logger) map[string]flow.EventsList {
 	allAccountProtocolEvents := map[string]flow.EventsList{}
 
 	for _, event := range events {

@@ -20,20 +20,25 @@ const (
 
 	// DefaultMaxContracts is the default maximum number of contracts that can be specified in a filter
 	DefaultMaxContracts = 1000
+
+	// DefaultMaxAccountAddresses specifies limitation for possible number of accounts that could be used in filter
+	DefaultMaxAccountAddresses = 100
 )
 
 // EventFilterConfig is used to configure the limits for EventFilters
 type EventFilterConfig struct {
-	MaxEventTypes int
-	MaxAddresses  int
-	MaxContracts  int
+	MaxEventTypes     int
+	MaxAddresses      int
+	MaxContracts      int
+	MaxAccountAddress int
 }
 
 // DefaultEventFilterConfig is the default configuration for EventFilters
 var DefaultEventFilterConfig = EventFilterConfig{
-	MaxEventTypes: DefaultMaxEventTypes,
-	MaxAddresses:  DefaultMaxAddresses,
-	MaxContracts:  DefaultMaxContracts,
+	MaxEventTypes:     DefaultMaxEventTypes,
+	MaxAddresses:      DefaultMaxAddresses,
+	MaxContracts:      DefaultMaxContracts,
+	MaxAccountAddress: DefaultMaxAccountAddresses,
 }
 
 type FieldFilter map[string]map[string]struct{}

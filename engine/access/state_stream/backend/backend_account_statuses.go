@@ -107,7 +107,7 @@ func (b *AccountStatusesBackend) getAccountStatusResponseFactory(
 			return nil, err
 		}
 		filteredProtocolEvents := filter.Filter(eventsResponse.Events)
-		allAccountProtocolEvents := filter.CreateAccountRelatedCoreEvents(filteredProtocolEvents, b.log)
+		allAccountProtocolEvents := filter.GroupCoreEventsByAccountAddress(filteredProtocolEvents, b.log)
 
 		index := messageIndex.Value()
 		if ok := messageIndex.Set(index + 1); !ok {
