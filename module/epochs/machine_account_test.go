@@ -205,3 +205,32 @@ func TestMachineAccountValidatorBackoff_Overflow(t *testing.T) {
 		lastWait = wait
 	}
 }
+
+// TestUfix64Tofloat64 sanity checks the conversion between cadence.UFix64 and float64.
+func TestUfix64Tofloat64(t *testing.T) {
+	for _, testcase := range []struct {
+		str      string
+		expected float64
+	}{{
+		str:      "1.01",
+		expected: 1.01,
+	}, {
+		str:      "0.0001",
+		expected: 0.0001,
+	}, {
+		str:      "100000.001",
+		expected: 100000.001,
+	}, {
+		str:      "0.0",
+		expected: 0,
+	}, {
+		str:      "123456.0",
+		expected: 123456,
+	}} {
+		cdc, err := cadence.NewUFix64(testcase.str)
+		require.NoError(t, err)
+		f, err := ufix64Tofloat64(cdc)
+		require.NoError(t, err)
+		assert.InDelta(t, testcase.expected, f, 0.0000001)
+	}
+}

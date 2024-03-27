@@ -1110,3 +1110,15 @@ type CollectionExecutedMetric interface {
 	ExecutionReceiptReceived(r *flow.ExecutionReceipt)
 	UpdateLastFullBlockHeight(height uint64)
 }
+
+type MachineAccountMetrics interface {
+	// AccountBalance reports the current balance of the machine account.
+	AccountBalance(bal float64)
+	// RecommendedMinBalance reports the recommended minimum balance. If the actual balance
+	// falls below this level, it must be refilled.
+	// NOTE: Operators should alert on `AccountBalance < RecommendedMinBalance`
+	RecommendedMinBalance(bal float64)
+	// IsMisconfigured reports whether a critical misconfiguration has been detected.
+	// NOTE Operators should alert on non-zero values reported here.
+	IsMisconfigured(misconfigured bool)
+}
