@@ -104,6 +104,19 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 
 	storage := migrationRuntime.Storage
 
+	// Check storage health before migration, if enabled.
+	var storageHealthErrorBefore error
+	if m.checkStorageHealthBeforeMigration {
+
+		storageHealthErrorBefore = storage.CheckHealth()
+		if storageHealthErrorBefore != nil {
+			m.log.Warn().
+				Err(storageHealthErrorBefore).
+				Str("account", address.Hex()).
+				Msg("storage health check before migration failed")
+		}
+	}
+
 	migration := migrations.NewStorageMigration(
 		migrationRuntime.Interpreter,
 		storage,
@@ -124,17 +137,6 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 			valueMigrations...,
 		),
 	)
-
-	var storageHealthErrorBefore error
-	if m.checkStorageHealthBeforeMigration {
-		storageHealthErrorBefore = storage.CheckHealth()
-		if storageHealthErrorBefore != nil {
-			m.log.Warn().
-				Err(storageHealthErrorBefore).
-				Str("account", address.Hex()).
-				Msg("storage health check before migration failed")
-		}
-	}
 
 	err = migration.Commit()
 	if err != nil {
