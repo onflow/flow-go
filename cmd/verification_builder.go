@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/follower"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	commonsync "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/verification/assigner"
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
 	"github.com/onflow/flow-go/engine/verification/fetcher"
@@ -194,7 +195,11 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				[]fvm.Option{fvm.WithLogger(node.Logger)},
 				node.FvmOptions...,
 			)
+
+			// TODO(JanezP): cleanup creation of fvm context github.com/onflow/flow-go/issues/5249
+			fvmOptions = append(fvmOptions, computation.DefaultFVMOptions(node.RootChainID, false, false)...)
 			vmCtx := fvm.NewContext(fvmOptions...)
+
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
 			approvalStorage := badger.NewResultApprovals(node.Metrics.Cache, node.DB)
 			verifierEng, err = verifier.New(
