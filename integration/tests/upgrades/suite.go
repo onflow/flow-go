@@ -45,12 +45,13 @@ func (s *Suite) SetupTest() {
 	}()
 
 	collectionConfigs := []func(*testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=10ms"),
+		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=100ms"),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=10ms"),
+		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=500ms"),
+		// TODO remove these? They tend to make tests flaky
 		testnet.WithAdditionalFlag(
 			fmt.Sprintf(
 				"--required-verification-seal-approvals=%d",
@@ -63,7 +64,7 @@ func (s *Suite) SetupTest() {
 				1,
 			),
 		),
-		testnet.WithLogLevel(zerolog.WarnLevel),
+		testnet.WithLogLevel(zerolog.InfoLevel),
 	}
 
 	// a ghost node masquerading as an access node
@@ -106,6 +107,7 @@ func (s *Suite) SetupTest() {
 		// set long staking phase to avoid QC/DKG transactions during test run
 		testnet.WithViewsInStakingAuction(10_000),
 		testnet.WithViewsInEpoch(100_000),
+		testnet.WithEpochCommitSafetyThreshold(10),
 	)
 	// initialize the network
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig, flow.Localnet)
