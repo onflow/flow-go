@@ -877,6 +877,7 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 // Suppose an EpochSetup service event is emitted during execution of block A. C seals A, therefore
 // we apply the metrics/events when C is finalized. The first block of the EpochSetup
 // phase is block C.
+// TODO: this should read data from the KVStore/ProtocolStateEntry for the block rather than parsing service events
 //
 // This function should only be called when epoch fallback *has not already been triggered*.
 // No errors are expected during normal operation.
@@ -913,10 +914,8 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.B
 				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseCommitted) })
 				// track epoch phase transition (setup->committed)
 				events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(ev.Counter-1, block.Header) })
-			case *flow.VersionBeacon:
-				// do nothing for now
 			default:
-				return nil, nil, fmt.Errorf("invalid service event type in payload (%T)", ev)
+				// do nothing
 			}
 		}
 	}

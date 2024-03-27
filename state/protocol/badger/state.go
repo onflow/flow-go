@@ -255,7 +255,7 @@ func bootstrapProtocolState(
 
 		// bootstrap KV store
 		// TODO: add proper bootstraping for the KV store
-		rootKVStore := kvstore.NewLatestKVStore(protocolStateID)
+		rootKVStore := kvstore.NewKVStoreV0(protocolStateID)
 		version, data, err := rootKVStore.VersionedEncode()
 		if err != nil {
 			return fmt.Errorf("could not encode root KV store: %w", err)
