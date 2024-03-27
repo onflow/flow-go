@@ -165,8 +165,10 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		flow.Address(address): {},
 	}
 
-	newPayloads, err := migrationRuntime.Snapshot.ApplyChangesAndGetNewPayloads(
+	newPayloads, err := MergeRegisterChanges(
+		migrationRuntime.Snapshot.Payloads,
 		result.WriteSet,
+		expectedAddresses,
 		expectedAddresses,
 		m.log,
 	)

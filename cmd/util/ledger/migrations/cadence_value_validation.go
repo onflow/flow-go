@@ -363,7 +363,7 @@ func newReadonlyStorageRuntime(payloads []*ledger.Payload) (
 	*readonlyStorageRuntime,
 	error,
 ) {
-	snapshot, err := util.NewMapBasedPayloadSnapshot(payloads)
+	snapshot, err := util.NewPayloadSnapshot(payloads)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
 	}
