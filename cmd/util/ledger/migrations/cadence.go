@@ -222,6 +222,7 @@ func NewCadence1ValueMigrations(
 	chainID flow.ChainID,
 	diffMigrations bool,
 	logVerboseDiff bool,
+	checkStorageHealthBeforeMigration bool,
 ) (migrations []NamedMigration) {
 
 	// Populated by CadenceLinkValueMigrator,
@@ -246,33 +247,47 @@ func NewCadence1ValueMigrations(
 		},
 	}
 
-	for _, accountBasedMigration := range []*CadenceBaseMigrator{
-		NewCadence1ValueMigrator(
-			rwf,
-			diffMigrations,
-			logVerboseDiff,
-			errorMessageHandler,
-			contracts,
-			NewCadence1CompositeStaticTypeConverter(chainID),
-			NewCadence1InterfaceStaticTypeConverter(chainID),
-		),
-		NewCadence1LinkValueMigrator(
-			rwf,
-			diffMigrations,
-			logVerboseDiff,
-			errorMessageHandler,
-			contracts,
-			capabilityMapping,
-		),
-		NewCadence1CapabilityValueMigrator(
-			rwf,
-			diffMigrations,
-			logVerboseDiff,
-			errorMessageHandler,
-			contracts,
-			capabilityMapping,
-		),
+	for index, migrationConstructor := range []func(checkStorageHealthBeforeMigration bool) *CadenceBaseMigrator{
+		func(checkStorageHealthBeforeMigration bool) *CadenceBaseMigrator {
+			return NewCadence1ValueMigrator(
+				rwf,
+				diffMigrations,
+				logVerboseDiff,
+				checkStorageHealthBeforeMigration,
+				errorMessageHandler,
+				contracts,
+				NewCadence1CompositeStaticTypeConverter(chainID),
+				NewCadence1InterfaceStaticTypeConverter(chainID),
+			)
+		},
+		func(checkStorageHealthBeforeMigration bool) *CadenceBaseMigrator {
+			return NewCadence1LinkValueMigrator(
+				rwf,
+				diffMigrations,
+				logVerboseDiff,
+				checkStorageHealthBeforeMigration,
+				errorMessageHandler,
+				contracts,
+				capabilityMapping,
+			)
+		},
+		func(checkStorageHealthBeforeMigration bool) *CadenceBaseMigrator {
+			return NewCadence1CapabilityValueMigrator(
+				rwf,
+				diffMigrations,
+				logVerboseDiff,
+				checkStorageHealthBeforeMigration,
+				errorMessageHandler,
+				contracts,
+				capabilityMapping,
+			)
+		},
 	} {
+		accountBasedMigration := migrationConstructor(
+			// Only check storage health before the first migration
+			checkStorageHealthBeforeMigration && index == 0,
+		)
+
 		migrations = append(
 			migrations,
 			NamedMigration{
@@ -357,6 +372,7 @@ func NewCadence1Migrations(
 	chainID flow.ChainID,
 	diffMigrations bool,
 	logVerboseDiff bool,
+	checkStorageHealthBeforeMigration bool,
 	evmContractChange EVMContractChange,
 	burnerContractChange BurnerContractChange,
 	stagedContracts []StagedContract,
@@ -417,6 +433,7 @@ func NewCadence1Migrations(
 			nWorker,
 			chainID,
 			diffMigrations,
+			checkStorageHealthBeforeMigration,
 			logVerboseDiff,
 		)...,
 	)

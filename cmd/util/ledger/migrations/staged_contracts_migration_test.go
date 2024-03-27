@@ -1469,6 +1469,7 @@ func TestConcurrentContractUpdate(t *testing.T) {
 		chainID,
 		false,
 		false,
+		false,
 		evmContractChange,
 		burnerContractChange,
 		stagedContracts,

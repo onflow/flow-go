@@ -22,27 +22,28 @@ import (
 )
 
 var (
-	flagExecutionStateDir             string
-	flagOutputDir                     string
-	flagBlockHash                     string
-	flagStateCommitment               string
-	flagDatadir                       string
-	flagChain                         string
-	flagNWorker                       int
-	flagNoMigration                   bool
-	flagNoReport                      bool
-	flagValidateMigration             bool
-	flagAllowPartialStateFromPayloads bool
-	flagSortPayloads                  bool
-	flagPrune                         bool
-	flagLogVerboseValidationError     bool
-	flagDiffMigration                 bool
-	flagLogVerboseDiff                bool
-	flagStagedContractsFile           string
-	flagInputPayloadFileName          string
-	flagOutputPayloadFileName         string
-	flagOutputPayloadByAddresses      string
-	flagMaxAccountSize                uint64
+	flagExecutionStateDir                 string
+	flagOutputDir                         string
+	flagBlockHash                         string
+	flagStateCommitment                   string
+	flagDatadir                           string
+	flagChain                             string
+	flagNWorker                           int
+	flagNoMigration                       bool
+	flagNoReport                          bool
+	flagValidateMigration                 bool
+	flagAllowPartialStateFromPayloads     bool
+	flagSortPayloads                      bool
+	flagPrune                             bool
+	flagLogVerboseValidationError         bool
+	flagDiffMigration                     bool
+	flagLogVerboseDiff                    bool
+	flagCheckStorageHealthBeforeMigration bool
+	flagStagedContractsFile               string
+	flagInputPayloadFileName              string
+	flagOutputPayloadFileName             string
+	flagOutputPayloadByAddresses          string
+	flagMaxAccountSize                    uint64
 )
 
 var Cmd = &cobra.Command{
@@ -91,6 +92,9 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagLogVerboseDiff, "log-verbose-diff", false,
 		"log entire Cadence values on diff (requires --diff flag)")
+
+	Cmd.Flags().BoolVar(&flagCheckStorageHealthBeforeMigration, "check-storage-health-before", false,
+		"check (atree) storage health before migration")
 
 	Cmd.Flags().StringVar(&flagStagedContractsFile, "staged-contracts", "",
 		"Staged contracts CSV file")
@@ -280,6 +284,10 @@ func run(*cobra.Command, []string) {
 		log.Warn().Msgf("--log-verbose-diff flag is enabled which may increase size of log")
 	}
 
+	if flagCheckStorageHealthBeforeMigration {
+		log.Warn().Msgf("--check-storage-health-before flag is enabled and will increase duration of migration")
+	}
+
 	var inputMsg string
 	if len(flagInputPayloadFileName) > 0 {
 		// Input is payloads
@@ -341,6 +349,7 @@ func run(*cobra.Command, []string) {
 			!flagNoMigration,
 			flagDiffMigration,
 			flagLogVerboseDiff,
+			flagCheckStorageHealthBeforeMigration,
 			chainID,
 			evmContractChange,
 			burnerContractChange,
@@ -362,6 +371,7 @@ func run(*cobra.Command, []string) {
 			!flagNoMigration,
 			flagDiffMigration,
 			flagLogVerboseDiff,
+			flagCheckStorageHealthBeforeMigration,
 			chainID,
 			evmContractChange,
 			burnerContractChange,
