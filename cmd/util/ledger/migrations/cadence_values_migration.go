@@ -145,6 +145,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 	migration := migrations.NewStorageMigration(
 		migrationRuntime.Interpreter,
 		storage,
+		m.name,
 	)
 
 	reporter := newValueMigrationReporter(m.reporter, m.log, m.errorMessageHandler)

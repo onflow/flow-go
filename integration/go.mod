@@ -21,13 +21,13 @@ require (
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v1.3.0
 	github.com/libp2p/go-libp2p v0.32.2
-	github.com/onflow/cadence v1.0.0-preview.16
+	github.com/onflow/cadence v1.0.0-preview.18
 	github.com/onflow/crypto v0.25.0
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.2-0.20240327170024-10241fffd864
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.2-0.20240327170024-10241fffd864
 	github.com/onflow/flow-emulator v1.0.0-M7.0.20240227020422-2ec59747f9be
 	github.com/onflow/flow-go v0.34.0-crescendo-preview.2.0.20240227001756-cb6311412b78
-	github.com/onflow/flow-go-sdk v1.0.0-preview.14
+	github.com/onflow/flow-go-sdk v1.0.0-preview.16
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.3.7
 	github.com/plus3it/gorecurcopy v0.0.1
