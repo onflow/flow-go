@@ -2,6 +2,7 @@ package stdlib_test
 
 import (
 	"encoding/binary"
+	"math/big"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -4262,4 +4263,52 @@ func TestInternalEVMAccess(t *testing.T) {
 		},
 	)
 	require.Error(t, err)
+}
+
+func TestEVMGetLatestBlock(t *testing.T) {
+	t.Parallel()
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	latestBlock := &types.Block{
+		Height:      uint64(2),
+		TotalSupply: big.NewInt(1500000000000000000),
+	}
+	handler := &testContractHandler{
+		evmContractAddress: common.Address(contractsAddress),
+		lastExecutedBlock: func() *types.Block {
+			return latestBlock
+		},
+	}
+
+	script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.EVMBlock {
+        return EVM.getLatestBlock()
+      }
+	`)
+
+	evmBlockCadenceType := stdlib.NewEVMBlockCadenceType(
+		common.Address(contractsAddress),
+	)
+
+	blockHeight := cadence.NewUInt64(latestBlock.Height)
+	hash, err := latestBlock.Hash()
+	require.NoError(t, err)
+	blockHash, err := cadence.NewString(hash.Hex())
+	require.NoError(t, err)
+	blockTotalSupply := cadence.NewIntFromBig(latestBlock.TotalSupply)
+
+	expectedEVMBlock := cadence.Struct{
+		StructType: evmBlockCadenceType,
+		Fields: []cadence.Value{
+			blockHeight,
+			blockHash,
+			blockTotalSupply,
+		},
+	}
+
+	RunEVMScript(t, handler, script, expectedEVMBlock)
 }
