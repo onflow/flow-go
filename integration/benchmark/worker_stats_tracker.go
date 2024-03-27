@@ -133,7 +133,7 @@ func NewPeriodicStatsLogger(
 	w := NewWorker(
 		ctx,
 		0,
-		1*time.Second,
+		3*time.Second,
 		func(workerID int) {
 			stats := st.GetStats()
 			log.Info().
