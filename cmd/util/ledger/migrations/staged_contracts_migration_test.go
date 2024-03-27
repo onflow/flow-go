@@ -1663,7 +1663,7 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 		err = migration.InitMigration(log, allPayloads, 0)
 		require.NoError(t, err)
 
-		accountPayloads, err = migration.MigrateAccount(
+		_, err = migration.MigrateAccount(
 			context.Background(),
 			common.Address(address),
 			accountPayloads,
