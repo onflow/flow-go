@@ -98,7 +98,7 @@ var (
 	ErrUnAuthroizedMethodCall = errors.New("unauthroized method call")
 
 	// ErrInternalDirecCallFailed is returned when a withdraw or deposit internal call has failed.
-	ErrInternalDirecCallFailed = errors.New("internal direct call execution failed")
+	ErrInternalDirectCallFailed = errors.New("internal direct call execution failed")
 
 	// ErrWithdrawBalanceRounding is returned when withdraw call has a balance that could
 	// yeild to rounding error, i.e. the balance contains fractions smaller than 10^8 Flow (smallest unit allowed to transfer).

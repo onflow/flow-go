@@ -229,8 +229,9 @@ func (proc *procedure) mintTo(
 	// if any error (invalid or vm) on the internal call, revert and don't commit any change
 	// this prevents having cases that we add balance to the bridge but the transfer
 	// fails due to gas, etc.
+	// TODO: in the future we might just return without error and handle everything on higher level
 	if res.Invalid() || res.Failed() {
-		return res, types.ErrInternalDirecCallFailed
+		return res, types.ErrInternalDirectCallFailed
 	}
 
 	// all commmit errors (StateDB errors) has to be returned
@@ -257,8 +258,9 @@ func (proc *procedure) withdrawFrom(
 	}
 
 	// if any error (invalid or vm) on the internal call, revert and don't commit any change
+	// TODO: in the future we might just return without error and handle everything on higher level
 	if res.Invalid() || res.Failed() {
-		return res, types.ErrInternalDirecCallFailed
+		return res, types.ErrInternalDirectCallFailed
 	}
 
 	// now deduct the balance from the bridge
