@@ -14,8 +14,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TestAccountStatusFilterContructor tests the constructor of the AccountStatusFilter with different scenarios.
-func TestAccountStatusFilterContructor(t *testing.T) {
+// TestAccountStatusFilterConstructor tests the constructor of the AccountStatusFilter with different scenarios.
+func TestAccountStatusFilterConstructor(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -38,17 +38,17 @@ func TestAccountStatusFilterContructor(t *testing.T) {
 		},
 		{
 			name:             "no filters, valid addresses",
-			accountAddresses: []string{"0000000000000001", "0000000000000002", "0000000000000003"},
+			accountAddresses: []string{"0x0000000000000001", "0x0000000000000002", "0x0000000000000003"},
 		},
 		{
 			name:             "valid filters, valid addresses",
 			eventTypes:       []string{state_stream.CoreEventAccountCreated, state_stream.CoreEventAccountContractAdded, state_stream.CoreEventInboxValueClaimed},
-			accountAddresses: []string{"0000000000000001", "0000000000000002", "0000000000000003"},
+			accountAddresses: []string{"0x0000000000000001", "0x0000000000000002", "0x0000000000000003"},
 		},
 		{
 			name:             "invalid filters, valid addresses",
 			eventTypes:       []string{state_stream.CoreEventAccountCreated, "A.0000000000000001.Contract1.EventA"},
-			accountAddresses: []string{"0000000000000001", "0000000000000002", "0000000000000003"},
+			accountAddresses: []string{"0x0000000000000001", "0x0000000000000002", "0x0000000000000003"},
 			err:              true,
 		},
 		{
@@ -72,18 +72,28 @@ func TestAccountStatusFilterContructor(t *testing.T) {
 				assert.NoError(t, err)
 
 				if len(test.eventTypes) == 0 {
-					assert.Equal(t, len(filter.EventTypes), len(state_stream.DefaultCoreEvents))
+					assert.Equal(t, len(state_stream.DefaultCoreEvents), len(filter.EventTypes))
 				} else {
-					assert.Equal(t, len(filter.EventTypes), len(test.eventTypes))
+					assert.Equal(t, len(test.eventTypes), len(filter.EventTypes))
 				}
 
 				for key := range filter.EventTypes {
 					switch key {
 					case state_stream.CoreEventAccountCreated,
 						state_stream.CoreEventAccountContractAdded:
-						assert.Equal(t, len(filter.EventFieldFilters[key]["address"]), len(test.accountAddresses))
+						actualAccountValues := filter.EventFieldFilters[key]["address"]
+						assert.Equal(t, len(test.accountAddresses), len(actualAccountValues))
+						for _, address := range test.accountAddresses {
+							_, ok := actualAccountValues[address]
+							assert.True(t, ok)
+						}
 					case state_stream.CoreEventInboxValueClaimed:
-						assert.Equal(t, len(filter.EventFieldFilters[key]["provider"]), len(test.accountAddresses))
+						actualAccountValues := filter.EventFieldFilters[key]["provider"]
+						assert.Equal(t, len(test.accountAddresses), len(actualAccountValues))
+						for _, address := range test.accountAddresses {
+							_, ok := actualAccountValues[address]
+							assert.True(t, ok)
+						}
 					}
 				}
 			}
