@@ -16,17 +16,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// InvalidTransactionGasCost is a gas cost we charge when
-// a transaction or call fails at validation step.
-// in typical evm environment this doesn't exist given
-// if a transaction is invalid it won't be included
-// and no fees can be charged for users even though
-// the validation has used some resources, in our case
-// given we charge the fees on flow transaction and we
-// are doing on chain validation we can/should charge the
-// user for the validation fee.
-const InvalidTransactionGasCost = 1_000
-
 // Emulator handles operations against evm runtime
 type Emulator struct {
 	rootAddr flow.Address
@@ -158,11 +147,10 @@ func (bl *BlockView) RunTransaction(
 		// this is not a fatal error (e.g. due to bad signature)
 		// not a valid transaction
 		res = &types.Result{
-			TxType:          tx.Type(),
-			TxHash:          txHash,
-			ValidationError: err,
-			GasConsumed:     InvalidTransactionGasCost,
+			TxType: tx.Type(),
+			TxHash: txHash,
 		}
+		res.SetValidationError(err)
 		return res, nil
 	}
 
@@ -308,8 +296,7 @@ func (proc *procedure) deployAt(
 	// precheck 1 - check balance of the source
 	if value.Sign() != 0 &&
 		!proc.evm.Context.CanTransfer(proc.state, caller.ToCommon(), value) {
-		res.ValidationError = gethCore.ErrInsufficientFundsForTransfer
-		res.GasConsumed = InvalidTransactionGasCost
+		res.SetValidationError(gethCore.ErrInsufficientFundsForTransfer)
 		return res, nil
 	}
 
@@ -444,8 +431,7 @@ func (proc *procedure) run(
 		}
 		// otherwise is a validation error (pre-check failure)
 		// no state change, wrap the error and return
-		res.ValidationError = err
-		res.GasConsumed = InvalidTransactionGasCost
+		res.SetValidationError(err)
 		return &res, nil
 	}
 
