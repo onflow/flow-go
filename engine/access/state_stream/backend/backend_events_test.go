@@ -8,6 +8,9 @@ import (
 	"testing"
 	"time"
 
+	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -18,9 +21,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
-	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 type BackendEventsSuite struct {
@@ -44,7 +45,7 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromExecutionData() {
 // TestSubscribeEventsFromLocalStorage tests the SubscribeEvents method happy path for events
 // extracted from local storage
 func (s *BackendEventsSuite) TestSubscribeEventsFromLocalStorage() {
-	s.backend.useIndex = true
+	s.SetupBackend(true)
 
 	// events returned from the db are sorted by txID, txIndex, then eventIndex.
 	// reproduce that here to ensure output order works as expected

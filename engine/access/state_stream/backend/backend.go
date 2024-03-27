@@ -67,6 +67,7 @@ type StateStreamBackend struct {
 
 	ExecutionDataBackend
 	EventsBackend
+	AccountStatusesBackend
 
 	log                  zerolog.Logger
 	state                protocol.State
@@ -122,17 +123,32 @@ func New(
 		getStartHeight:   b.GetStartHeight,
 	}
 
-	b.EventsBackend = EventsBackend{
+	eventsRetriever := EventsRetriever{
 		log:              logger,
 		headers:          headers,
-		broadcaster:      broadcaster,
-		sendTimeout:      config.ClientSendTimeout,
-		responseLimit:    config.ResponseLimit,
-		sendBufferSize:   int(config.ClientSendBufferSize),
 		getExecutionData: b.getExecutionData,
-		getStartHeight:   b.GetStartHeight,
-		useIndex:         useEventsIndex,
+		useEventsIndex:   useEventsIndex,
 		eventsIndex:      eventsIndex,
+	}
+
+	b.EventsBackend = EventsBackend{
+		log:             logger,
+		broadcaster:     broadcaster,
+		sendTimeout:     config.ClientSendTimeout,
+		responseLimit:   config.ResponseLimit,
+		sendBufferSize:  int(config.ClientSendBufferSize),
+		getStartHeight:  b.GetStartHeight,
+		eventsRetriever: eventsRetriever,
+	}
+
+	b.AccountStatusesBackend = AccountStatusesBackend{
+		log:                  logger,
+		broadcaster:          broadcaster,
+		sendTimeout:          config.ClientSendTimeout,
+		responseLimit:        config.ResponseLimit,
+		sendBufferSize:       int(config.ClientSendBufferSize),
+		executionDataTracker: b.ExecutionDataTracker,
+		eventsRetriever:      eventsRetriever,
 	}
 
 	return b, nil

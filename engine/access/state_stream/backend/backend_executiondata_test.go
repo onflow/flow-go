@@ -8,6 +8,7 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -45,7 +46,7 @@ var (
 
 type BackendExecutionDataSuite struct {
 	suite.Suite
-
+	logger         zerolog.Logger
 	state          *protocolmock.State
 	params         *protocolmock.Params
 	snapshot       *protocolmock.Snapshot
@@ -82,47 +83,11 @@ func TestBackendExecutionDataSuite(t *testing.T) {
 }
 
 func (s *BackendExecutionDataSuite) SetupTest() {
-	logger := unittest.Logger()
-
-	s.state = protocolmock.NewState(s.T())
-	s.snapshot = protocolmock.NewSnapshot(s.T())
-	s.params = protocolmock.NewParams(s.T())
-	s.headers = storagemock.NewHeaders(s.T())
-	s.events = storagemock.NewEvents(s.T())
-	s.seals = storagemock.NewSeals(s.T())
-	s.results = storagemock.NewExecutionResults(s.T())
-
-	s.bs = blobs.NewBlobstore(dssync.MutexWrap(datastore.NewMapDatastore()))
-	s.eds = execution_data.NewExecutionDataStore(s.bs, execution_data.DefaultSerializer)
-
-	s.broadcaster = engine.NewBroadcaster()
-
-	s.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metrics.NewNoopCollector())
-	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
-	s.executionDataTracker = subscriptionmock.NewExecutionDataTracker(s.T())
-
-	conf := Config{
-		ClientSendTimeout:       subscription.DefaultSendTimeout,
-		ClientSendBufferSize:    subscription.DefaultSendBufferSize,
-		RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
-	}
+	blockCount := 5
+	s.SetupTestSuite(blockCount)
 
 	var err error
-
-	blockCount := 5
-	s.execDataMap = make(map[flow.Identifier]*execution_data.BlockExecutionDataEntity, blockCount)
-	s.blockEvents = make(map[flow.Identifier][]flow.Event, blockCount)
-	s.blockMap = make(map[uint64]*flow.Block, blockCount)
-	s.sealMap = make(map[flow.Identifier]*flow.Seal, blockCount)
-	s.resultMap = make(map[flow.Identifier]*flow.ExecutionResult, blockCount)
-	s.blocks = make([]*flow.Block, 0, blockCount)
-
-	// generate blockCount consecutive blocks with associated seal, result and execution data
-	s.rootBlock = unittest.BlockFixture()
 	parent := s.rootBlock.Header
-	s.blockMap[s.rootBlock.Header.Height] = &s.rootBlock
-
-	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Header.Height, s.rootBlock.ID())
 
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
@@ -165,12 +130,50 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Header.Height, block.ID(), result.ExecutionDataID)
 	}
 
+	s.SetupTestMocks()
+}
+
+func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
+	s.logger = unittest.Logger()
+
+	s.state = protocolmock.NewState(s.T())
+	s.snapshot = protocolmock.NewSnapshot(s.T())
+	s.params = protocolmock.NewParams(s.T())
+	s.headers = storagemock.NewHeaders(s.T())
+	s.events = storagemock.NewEvents(s.T())
+	s.seals = storagemock.NewSeals(s.T())
+	s.results = storagemock.NewExecutionResults(s.T())
+
+	s.bs = blobs.NewBlobstore(dssync.MutexWrap(datastore.NewMapDatastore()))
+	s.eds = execution_data.NewExecutionDataStore(s.bs, execution_data.DefaultSerializer)
+
+	s.broadcaster = engine.NewBroadcaster()
+
+	s.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, s.logger, metrics.NewNoopCollector())
+	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
+	s.executionDataTracker = subscriptionmock.NewExecutionDataTracker(s.T())
+
+	s.execDataMap = make(map[flow.Identifier]*execution_data.BlockExecutionDataEntity, blockCount)
+	s.blockEvents = make(map[flow.Identifier][]flow.Event, blockCount)
+	s.blockMap = make(map[uint64]*flow.Block, blockCount)
+	s.sealMap = make(map[flow.Identifier]*flow.Seal, blockCount)
+	s.resultMap = make(map[flow.Identifier]*flow.ExecutionResult, blockCount)
+	s.blocks = make([]*flow.Block, 0, blockCount)
+
+	// generate blockCount consecutive blocks with associated seal, result and execution data
+	s.rootBlock = unittest.BlockFixture()
+	s.blockMap[s.rootBlock.Header.Height] = &s.rootBlock
+
+	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Header.Height, s.rootBlock.ID())
+}
+
+func (s *BackendExecutionDataSuite) SetupTestMocks() {
 	s.registerID = unittest.RegisterIDFixture()
 
 	s.eventsIndex = index.NewEventsIndex(s.events)
 	s.registersAsync = execution.NewRegistersAsyncStore()
 	s.registers = storagemock.NewRegisterIndex(s.T())
-	err = s.registersAsync.Initialize(s.registers)
+	err := s.registersAsync.Initialize(s.registers)
 	require.NoError(s.T(), err)
 	s.registers.On("LatestHeight").Return(s.rootBlock.Header.Height).Maybe()
 	s.registers.On("FirstHeight").Return(s.rootBlock.Header.Height).Maybe()
@@ -218,9 +221,18 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		),
 	).Maybe()
 
+	s.SetupBackend(false)
+}
+
+func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
+	var err error
 	s.backend, err = New(
-		logger,
-		conf,
+		s.logger,
+		Config{
+			ClientSendTimeout:       subscription.DefaultSendTimeout,
+			ClientSendBufferSize:    subscription.DefaultSendBufferSize,
+			RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
+		},
 		s.state,
 		s.headers,
 		s.seals,
@@ -230,21 +242,21 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		s.broadcaster,
 		s.registersAsync,
 		s.eventsIndex,
-		false,
+		useEventsIndex,
 		s.executionDataTracker,
 	)
 	require.NoError(s.T(), err)
 
 	// create real execution data tracker to use GetStartHeight from it, instead of mocking
 	s.executionDataTrackerReal = subscription.NewExecutionDataTracker(
-		logger,
+		s.logger,
 		s.state,
 		s.rootBlock.Header.Height,
 		s.headers,
 		s.broadcaster,
 		s.rootBlock.Header.Height,
 		s.eventsIndex,
-		false,
+		useEventsIndex,
 	)
 
 	s.executionDataTracker.On(
