@@ -2,6 +2,7 @@ package cohort1
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/dsl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -30,6 +32,36 @@ import (
 var (
 	simpleScript       = `pub fun main(): Int { return 42; }`
 	simpleScriptResult = cadence.NewInt(42)
+
+	OriginalContract = dsl.Contract{
+		Name: "TestingContract",
+		Members: []dsl.CadenceCode{
+			dsl.Code(`
+				access(all) fun message(): String {
+					return "Initial Contract"
+				}`,
+			),
+		},
+	}
+
+	UpdatedContract = dsl.Contract{
+		Name: "TestingContract",
+		Members: []dsl.CadenceCode{
+			dsl.Code(`
+				access(all) fun message(): String {
+					return "Updated Contract"
+				}`,
+			),
+		},
+	}
+)
+
+const (
+	GetMessageScript = `
+import TestingContract from 0x%s
+pub fun main(): String {
+	return TestingContract.message()
+}`
 )
 
 func TestAccessAPI(t *testing.T) {
@@ -157,7 +189,8 @@ func (s *AccessAPISuite) SetupTest() {
 // and should not interfere with each other.
 func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN1() {
 	// deploy the test contract
-	txResult := s.deployContract()
+	_ = s.deployContract(lib.CounterContract, false)
+	txResult := s.deployCounter()
 	targetHeight := txResult.BlockHeight + 1
 	s.waitUntilIndexed(targetHeight)
 
@@ -174,7 +207,8 @@ func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN1() {
 // and should not interfere with each other.
 func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN2() {
 	// deploy the test contract
-	txResult := s.deployContract()
+	_ = s.deployContract(lib.CounterContract, false)
+	txResult := s.deployCounter()
 	targetHeight := txResult.BlockHeight + 1
 	s.waitUntilIndexed(targetHeight)
 
@@ -189,6 +223,30 @@ func (s *AccessAPISuite) TestMVPScriptExecutionLocalStorage() {
 	// uses the provided access node to handle the Access API calls. there is an existing test that
 	// covers the default config, so we only need to test with local storage.
 	mvp.RunMVPTest(s.T(), s.ctx, s.net, s.accessNode2)
+}
+
+// TestContractUpdate tests that the Access API can index contract updates, and that the program cache
+// is invalidated when a contract is updated.
+func (s *AccessAPISuite) TestContractUpdate() {
+	txResult := s.deployContract(OriginalContract, false)
+	targetHeight := txResult.BlockHeight + 1
+	s.waitUntilIndexed(targetHeight)
+
+	script := fmt.Sprintf(GetMessageScript, s.serviceClient.SDKServiceAddress().Hex())
+
+	// execute script and verify we get the original message
+	result, err := s.an2Client.ExecuteScriptAtBlockHeight(s.ctx, targetHeight, []byte(script), nil)
+	s.Require().NoError(err)
+	s.Require().Equal("Initial Contract", result.ToGoValue().(string))
+
+	txResult = s.deployContract(UpdatedContract, true)
+	targetHeight = txResult.BlockHeight + 1
+	s.waitUntilIndexed(targetHeight)
+
+	// execute script and verify we get the updated message
+	result, err = s.an2Client.ExecuteScriptAtBlockHeight(s.ctx, targetHeight, []byte(script), nil)
+	s.Require().NoError(err)
+	s.Require().Equal("Updated Contract", result.ToGoValue().(string))
 }
 
 func (s *AccessAPISuite) testGetAccount(client *client.Client) {
@@ -306,20 +364,33 @@ func (s *AccessAPISuite) testExecuteScriptWithSimpleContract(client *client.Clie
 	})
 }
 
-func (s *AccessAPISuite) deployContract() *sdk.TransactionResult {
+func (s *AccessAPISuite) deployContract(contract dsl.Contract, isUpdate bool) *sdk.TransactionResult {
 	header, err := s.serviceClient.GetLatestSealedBlockHeader(s.ctx)
 	s.Require().NoError(err)
 
 	// Deploy the contract
-	tx, err := s.serviceClient.DeployContract(s.ctx, header.ID, lib.CounterContract)
+	var tx *sdk.Transaction
+	if isUpdate {
+		tx, err = s.serviceClient.UpdateContract(s.ctx, header.ID, contract)
+	} else {
+		tx, err = s.serviceClient.DeployContract(s.ctx, header.ID, contract)
+	}
 	s.Require().NoError(err)
 
-	_, err = s.serviceClient.WaitForExecuted(s.ctx, tx.ID())
+	result, err := s.serviceClient.WaitForExecuted(s.ctx, tx.ID())
+	s.Require().NoError(err)
+	s.Require().Empty(result.Error, "deploy tx should be accepted but got: %s", result.Error)
+
+	return result
+}
+
+func (s *AccessAPISuite) deployCounter() *sdk.TransactionResult {
+	header, err := s.serviceClient.GetLatestSealedBlockHeader(s.ctx)
 	s.Require().NoError(err)
 
 	// Add counter to service account
 	serviceAddress := s.serviceClient.SDKServiceAddress()
-	createCounterTx := sdk.NewTransaction().
+	tx := sdk.NewTransaction().
 		SetScript([]byte(lib.CreateCounterTx(serviceAddress).ToCadence())).
 		SetReferenceBlockID(sdk.Identifier(header.ID)).
 		SetProposalKey(serviceAddress, 0, s.serviceClient.GetSeqNumber()).
@@ -327,10 +398,10 @@ func (s *AccessAPISuite) deployContract() *sdk.TransactionResult {
 		AddAuthorizer(serviceAddress).
 		SetGasLimit(9999)
 
-	err = s.serviceClient.SignAndSendTransaction(s.ctx, createCounterTx)
+	err = s.serviceClient.SignAndSendTransaction(s.ctx, tx)
 	s.Require().NoError(err)
 
-	result, err := s.serviceClient.WaitForSealed(s.ctx, createCounterTx.ID())
+	result, err := s.serviceClient.WaitForSealed(s.ctx, tx.ID())
 	s.Require().NoError(err)
 	s.Require().Empty(result.Error, "create counter tx should be accepted but got: %s", result.Error)
 
