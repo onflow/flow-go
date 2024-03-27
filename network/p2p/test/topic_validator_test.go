@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -540,9 +541,13 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 
 	sporkId := unittest.IdentifierFixture()
 
-	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, "consensus_1", idProvider, p2ptest.WithRole(flow.RoleConsensus))
-	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, "consensus_2", idProvider, p2ptest.WithRole(flow.RoleConsensus))
-	an1, identity3 := p2ptest.NodeFixture(t, sporkId, "access_1", idProvider, p2ptest.WithRole(flow.RoleAccess))
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+	// turn off unstaked peer rejection so that nodes can connect
+	cfg.NetworkConfig.GossipSub.RpcInspector.Validation.InspectionProcess.Inspect.RejectUnstakedPeers = false
+	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, "consensus_1", idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.OverrideFlowConfig(cfg))
+	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, "consensus_2", idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.OverrideFlowConfig(cfg))
+	an1, identity3 := p2ptest.NodeFixture(t, sporkId, "access_1", idProvider, p2ptest.WithRole(flow.RoleAccess), p2ptest.OverrideFlowConfig(cfg))
 	idProvider.On("ByPeerID", sn1.ID()).Return(&identity1, true).Maybe()
 	idProvider.On("ByPeerID", sn2.ID()).Return(&identity2, true).Maybe()
 	idProvider.On("ByPeerID", an1.ID()).Return(&identity3, true).Maybe()

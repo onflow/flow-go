@@ -63,8 +63,12 @@ uint64_t gettid() { return syscall(SYS_gettid); }
 #include <stdint.h>
 #include <pthread.h>
 uint64_t gettid() { uint64_t tid; pthread_threadid_np(NULL, &tid); return tid; }
+#elif defined(_WIN32)
+#include <stdint.h>
+#include <windows.h>
+uint64_t gettid() { return (uint64_t)GetCurrentThreadId(); }
 #else
-#   error "Unknown platform; __linux__ or __APPLE__ supported"
+#   error "Unknown platform; __linux__ or __APPLE__ or _WIN32 expected"
 #endif
 */
 import "C"
@@ -238,7 +242,7 @@ func init() {
 	}
 
 	t2 := runtimeNanoAsTimeDuration()
-	if t2 <= t1 {
+	if t2 < t1 {
 		panic(fmt.Sprintf("ERROR: BINSTAT: INTERNAL: t1=%d but t2=%d\n", t1, t2))
 	}
 }

@@ -4,19 +4,19 @@ import (
 	"math"
 	"math/big"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethCore "github.com/ethereum/go-ethereum/core"
-	gethVM "github.com/ethereum/go-ethereum/core/vm"
-	gethParams "github.com/ethereum/go-ethereum/params"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethCore "github.com/onflow/go-ethereum/core"
+	gethVM "github.com/onflow/go-ethereum/core/vm"
+	gethParams "github.com/onflow/go-ethereum/params"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
 var (
-	FlowEVMTestnetChainID = big.NewInt(646)
-	FlowEVMMainnetChainID = big.NewInt(747)
-	BlockLevelGasLimit    = uint64(math.MaxUint64)
-	zero                  = uint64(0)
+	DefaultBlockLevelGasLimit = uint64(math.MaxUint64)
+	DefaultBaseFee            = big.NewInt(0)
+	zero                      = uint64(0)
+	bigZero                   = big.NewInt(0)
 )
 
 // Config sets the required parameters
@@ -31,8 +31,6 @@ type Config struct {
 	TxContext *gethVM.TxContext
 	// base unit of gas for direct calls
 	DirectCallBaseGasUsage uint64
-	// a set of extra precompiles to be injected
-	ExtraPrecompiles map[gethCommon.Address]gethVM.PrecompiledContract
 }
 
 func (c *Config) ChainRules() gethParams.Rules {
@@ -50,22 +48,22 @@ func (c *Config) ChainRules() gethParams.Rules {
 // and set a proper height for the specific release based on the Flow EVM heights
 // so it could gets activated at a desired time.
 var DefaultChainConfig = &gethParams.ChainConfig{
-	ChainID: FlowEVMTestnetChainID, // default is testnet
+	ChainID: types.FlowEVMPreviewNetChainID,
 
 	// Fork scheduling based on block heights
-	HomesteadBlock:      big.NewInt(0),
-	DAOForkBlock:        big.NewInt(0),
+	HomesteadBlock:      bigZero,
+	DAOForkBlock:        bigZero,
 	DAOForkSupport:      false,
-	EIP150Block:         big.NewInt(0),
-	EIP155Block:         big.NewInt(0),
-	EIP158Block:         big.NewInt(0),
-	ByzantiumBlock:      big.NewInt(0), // already on Byzantium
-	ConstantinopleBlock: big.NewInt(0), // already on Constantinople
-	PetersburgBlock:     big.NewInt(0), // already on Petersburg
-	IstanbulBlock:       big.NewInt(0), // already on Istanbul
-	BerlinBlock:         big.NewInt(0), // already on Berlin
-	LondonBlock:         big.NewInt(0), // already on London
-	MuirGlacierBlock:    big.NewInt(0), // already on MuirGlacier
+	EIP150Block:         bigZero,
+	EIP155Block:         bigZero,
+	EIP158Block:         bigZero,
+	ByzantiumBlock:      bigZero, // already on Byzantium
+	ConstantinopleBlock: bigZero, // already on Constantinople
+	PetersburgBlock:     bigZero, // already on Petersburg
+	IstanbulBlock:       bigZero, // already on Istanbul
+	BerlinBlock:         bigZero, // already on Berlin
+	LondonBlock:         bigZero, // already on London
+	MuirGlacierBlock:    bigZero, // already on MuirGlacier
 
 	// Fork scheduling based on timestamps
 	ShanghaiTime: &zero, // already on Shanghai
@@ -91,11 +89,12 @@ func defaultConfig() *Config {
 		BlockContext: &gethVM.BlockContext{
 			CanTransfer: gethCore.CanTransfer,
 			Transfer:    gethCore.Transfer,
-			GasLimit:    BlockLevelGasLimit,
-			BaseFee:     big.NewInt(0),
+			GasLimit:    DefaultBlockLevelGasLimit,
+			BaseFee:     DefaultBaseFee,
 			GetHash: func(n uint64) gethCommon.Hash {
 				return gethCommon.Hash{}
 			},
+			GetPrecompile: gethCore.GetPrecompile,
 		},
 	}
 }
@@ -111,21 +110,12 @@ func NewConfig(opts ...Option) *Config {
 
 type Option func(*Config) *Config
 
-// WithMainnetChainID sets the chain ID to flow evm testnet
-func WithTestnetChainID() Option {
+// WithChainID sets the evm chain ID
+func WithChainID(chainID *big.Int) Option {
 	return func(c *Config) *Config {
-		c.ChainConfig.ChainID = FlowEVMTestnetChainID
+		c.ChainConfig.ChainID = chainID
 		return c
 	}
-}
-
-// WithMainnetChainID sets the chain ID to flow evm mainnet
-func WithMainnetChainID() Option {
-	return func(c *Config) *Config {
-		c.ChainConfig.ChainID = FlowEVMMainnetChainID
-		return c
-	}
-
 }
 
 // WithOrigin sets the origin of the transaction (signer)
@@ -195,11 +185,16 @@ func WithDirectCallBaseGasUsage(gas uint64) Option {
 // WithExtraPrecompiles appends precompile list with extra precompiles
 func WithExtraPrecompiles(precompiles []types.Precompile) Option {
 	return func(c *Config) *Config {
+		extraPreCompMap := make(map[gethCommon.Address]gethVM.PrecompiledContract)
 		for _, pc := range precompiles {
-			if c.ExtraPrecompiles == nil {
-				c.ExtraPrecompiles = make(map[gethCommon.Address]gethVM.PrecompiledContract)
+			extraPreCompMap[pc.Address().ToCommon()] = pc
+		}
+		c.BlockContext.GetPrecompile = func(rules gethParams.Rules, addr gethCommon.Address) (gethVM.PrecompiledContract, bool) {
+			prec, found := extraPreCompMap[addr]
+			if found {
+				return prec, true
 			}
-			c.ExtraPrecompiles[pc.Address().ToCommon()] = pc
+			return gethCore.GetPrecompile(rules, addr)
 		}
 		return c
 	}

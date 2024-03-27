@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"math/big"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence/runtime/common"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	"github.com/onflow/go-ethereum/rlp"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
@@ -21,6 +21,7 @@ const InvalidTransactionComputationCost = 1_000
 // ContractHandler is responsible for triggering calls to emulator, metering,
 // event emission and updating the block
 type ContractHandler struct {
+	flowChainID        flow.ChainID
 	evmContractAddress flow.Address
 	flowTokenAddress   common.Address
 	blockStore         types.BlockStore
@@ -41,6 +42,7 @@ func (h *ContractHandler) EVMContractAddress() common.Address {
 var _ types.ContractHandler = &ContractHandler{}
 
 func NewContractHandler(
+	flowChainID flow.ChainID,
 	evmContractAddress flow.Address,
 	flowTokenAddress common.Address,
 	blockStore types.BlockStore,
@@ -49,6 +51,7 @@ func NewContractHandler(
 	emulator types.Emulator,
 ) *ContractHandler {
 	return &ContractHandler{
+		flowChainID:        flowChainID,
 		evmContractAddress: evmContractAddress,
 		flowTokenAddress:   flowTokenAddress,
 		blockStore:         blockStore,
@@ -93,6 +96,10 @@ func (h *ContractHandler) deployCOA(uuid uint64) (types.Address, error) {
 	if err != nil {
 		return types.Address{}, err
 	}
+	if res == nil || res.Failed() {
+		return types.Address{}, types.ErrDirectCallExecutionFailed
+	}
+
 	return res.DeployedContractAddress, nil
 }
 
@@ -184,7 +191,8 @@ func (h *ContractHandler) run(
 
 	bp.AppendTxHash(res.TxHash)
 
-	// TODO: in the future we might update the receipt hash here
+	// Populate receipt root
+	bp.PopulateReceiptRoot([]types.Result{*res})
 
 	blockHash, err := bp.Hash()
 	if err != nil {
@@ -249,7 +257,9 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 	if err != nil {
 		return types.BlockContext{}, err
 	}
+
 	return types.BlockContext{
+		ChainID:                types.EVMChainIDFromFlowChainID(h.flowChainID),
 		BlockNumber:            bp.Height,
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
 		GetHashFunc: func(n uint64) gethCommon.Hash {
@@ -298,7 +308,9 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	bp.AppendTxHash(res.TxHash)
-	// TODO: in the future we might update the receipt hash here
+
+	// Populate receipt root
+	bp.PopulateReceiptRoot([]types.Result{*res})
 
 	if totalSupplyDiff != nil {
 		if deductSupplyDiff {
@@ -342,6 +354,12 @@ func (h *ContractHandler) executeAndHandleCall(
 
 	// commit block proposal
 	return res, h.blockStore.CommitBlockProposal()
+}
+
+func (h *ContractHandler) GenerateResourceUUID() uint64 {
+	uuid, err := h.backend.GenerateUUID()
+	panicOnAnyError(err)
+	return uuid
 }
 
 type Account struct {
@@ -471,6 +489,7 @@ func (a *Account) deposit(v *types.FLOWTokenVault) error {
 	bridgeAccount := a.fch.AccountByAddress(bridge, false)
 
 	call := types.NewDepositCall(
+		bridge,
 		a.address,
 		v.Balance(),
 		bridgeAccount.Nonce(),
@@ -479,8 +498,17 @@ func (a *Account) deposit(v *types.FLOWTokenVault) error {
 	if err != nil {
 		return err
 	}
-	_, err = a.fch.executeAndHandleCall(ctx, call, v.Balance(), false)
-	return err
+
+	res, err := a.fch.executeAndHandleCall(ctx, call, v.Balance(), false)
+	if err != nil {
+		return err
+	}
+
+	if res == nil || res.Failed() {
+		return types.ErrDirectCallExecutionFailed
+	}
+
+	return nil
 }
 
 // Withdraw deducts the balance from the account and
@@ -493,6 +521,7 @@ func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 
 func (a *Account) withdraw(b types.Balance) (*types.FLOWTokenVault, error) {
 	call := types.NewWithdrawCall(
+		a.fch.addressAllocator.NativeTokenBridgeAddress(),
 		a.address,
 		b,
 		a.Nonce(),
@@ -508,9 +537,13 @@ func (a *Account) withdraw(b types.Balance) (*types.FLOWTokenVault, error) {
 		return nil, types.ErrWithdrawBalanceRounding
 	}
 
-	_, err = a.fch.executeAndHandleCall(ctx, call, b, true)
+	res, err := a.fch.executeAndHandleCall(ctx, call, b, true)
 	if err != nil {
 		return nil, err
+	}
+
+	if res == nil || res.Failed() {
+		return nil, types.ErrDirectCallExecutionFailed
 	}
 
 	return types.NewFlowTokenVault(b), nil
@@ -533,8 +566,16 @@ func (a *Account) transfer(to types.Address, balance types.Balance) error {
 	if err != nil {
 		return err
 	}
-	_, err = a.fch.executeAndHandleCall(ctx, call, nil, false)
-	return err
+	res, err := a.fch.executeAndHandleCall(ctx, call, nil, false)
+	if err != nil {
+		return err
+	}
+
+	if res == nil || res.Failed() {
+		return types.ErrDirectCallExecutionFailed
+	}
+
+	return nil
 }
 
 // Deploy deploys a contract to the EVM environment
@@ -563,6 +604,11 @@ func (a *Account) deploy(code types.Code, gaslimit types.GasLimit, balance types
 	if err != nil {
 		return types.Address{}, err
 	}
+
+	if res == nil || res.Failed() {
+		return types.Address{}, types.ErrDirectCallExecutionFailed
+	}
+
 	return types.Address(res.DeployedContractAddress), nil
 }
 

@@ -341,6 +341,9 @@ type GossipSubRpcValidationInspectorMetrics interface {
 	// OnInvalidControlMessageNotificationSent tracks the number of times that the async inspection of a control message failed and resulted in dissemination of an invalid control message was sent.
 	OnInvalidControlMessageNotificationSent()
 
+	// OnRpcRejectedFromUnknownSender tracks the number of rpc's rejected from unstaked nodes.
+	OnRpcRejectedFromUnknownSender()
+
 	// OnPublishMessagesInspectionErrorExceedsThreshold tracks the number of times that async inspection of publish messages failed due to the number of errors.
 	OnPublishMessagesInspectionErrorExceedsThreshold()
 
@@ -1098,4 +1101,12 @@ type ChainSyncMetrics interface {
 type DHTMetrics interface {
 	RoutingTablePeerAdded()
 	RoutingTablePeerRemoved()
+}
+
+type CollectionExecutedMetric interface {
+	CollectionFinalized(light flow.LightCollection)
+	CollectionExecuted(light flow.LightCollection)
+	BlockFinalized(block *flow.Block)
+	ExecutionReceiptReceived(r *flow.ExecutionReceipt)
+	UpdateLastFullBlockHeight(height uint64)
 }

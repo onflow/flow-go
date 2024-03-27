@@ -3,13 +3,13 @@ package emulator
 import (
 	"math/big"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethCore "github.com/ethereum/go-ethereum/core"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	gethVM "github.com/ethereum/go-ethereum/core/vm"
-	gethCrypto "github.com/ethereum/go-ethereum/crypto"
-	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/atree"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethCore "github.com/onflow/go-ethereum/core"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethVM "github.com/onflow/go-ethereum/core/vm"
+	gethCrypto "github.com/onflow/go-ethereum/crypto"
+	gethParams "github.com/onflow/go-ethereum/params"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -37,6 +37,7 @@ func NewEmulator(
 
 func newConfig(ctx types.BlockContext) *Config {
 	return NewConfig(
+		WithChainID(ctx.ChainID),
 		WithBlockNumber(new(big.Int).SetUint64(ctx.BlockNumber)),
 		WithCoinbase(ctx.GasFeeCollector.ToCommon()),
 		WithDirectCallBaseGasUsage(ctx.DirectCallBaseGasUsage),
@@ -57,7 +58,6 @@ func (em *Emulator) NewReadOnlyBlockView(ctx types.BlockContext) (types.ReadOnly
 // NewBlockView constructs a new block view (mutable)
 func (em *Emulator) NewBlockView(ctx types.BlockContext) (types.BlockView, error) {
 	cfg := newConfig(ctx)
-	SetupPrecompile(cfg)
 	return &BlockView{
 		config:   cfg,
 		rootAddr: em.rootAddr,
@@ -113,9 +113,9 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 	}
 	switch call.SubType {
 	case types.DepositCallSubType:
-		return proc.mintTo(call.To, call.Value, txHash)
+		return proc.mintTo(call, txHash)
 	case types.WithdrawCallSubType:
-		return proc.withdrawFrom(call.From, call.Value, txHash)
+		return proc.withdrawFrom(call, txHash)
 	case types.DeployCallSubType:
 		if !call.EmptyToField() {
 			return proc.deployAt(call.From, call.To, call.Data, call.GasLimit, call.Value, txHash)
@@ -124,7 +124,7 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 	default:
 		// TODO: when we support mutiple calls per block, we need
 		// to update the value zero here for tx index
-		return proc.runDirect(call.Message(), txHash, 0, types.DirectCallTxType)
+		return proc.runDirect(call.Message(), txHash, 0)
 	}
 }
 
@@ -155,8 +155,8 @@ func (bl *BlockView) RunTransaction(
 	if err != nil {
 		return nil, err
 	}
-	res.TxHash = txHash
-	return res, err
+	// all commmit errors (StateDB errors) has to be returned
+	return res, proc.commit()
 }
 
 func (bl *BlockView) newProcedure() (*procedure, error) {
@@ -200,64 +200,53 @@ func (proc *procedure) commit() error {
 }
 
 func (proc *procedure) mintTo(
-	address types.Address,
-	amount *big.Int,
+	call *types.DirectCall,
 	txHash gethCommon.Hash,
 ) (*types.Result, error) {
-	addr := address.ToCommon()
-	res := &types.Result{
-		GasConsumed: proc.config.DirectCallBaseGasUsage,
-		TxType:      types.DirectCallTxType,
-		TxHash:      txHash,
+	bridge := call.From.ToCommon()
+
+	// create bridge account if not exist
+	if !proc.state.Exist(bridge) {
+		proc.state.CreateAccount(bridge)
 	}
 
-	// create account if not exist
-	if !proc.state.Exist(addr) {
-		proc.state.CreateAccount(addr)
+	// add balance to the bridge account before transfer
+	proc.state.AddBalance(bridge, call.Value)
+
+	msg := call.Message()
+	proc.evm.TxContext.Origin = msg.From
+	// withdraw the amount and move it to the bridge account
+	res, err := proc.run(msg, txHash, 0, types.DirectCallTxType)
+	if err != nil {
+		return res, err
 	}
-
-	// add balance
-	proc.state.AddBalance(addr, amount)
-
-	// we don't need to increment any nonce, given the origin doesn't exist
+	// all commmit errors (StateDB errors) has to be returned
 	return res, proc.commit()
 }
 
 func (proc *procedure) withdrawFrom(
-	address types.Address,
-	amount *big.Int,
+	call *types.DirectCall,
 	txHash gethCommon.Hash,
 ) (*types.Result, error) {
 
-	addr := address.ToCommon()
-	res := &types.Result{
-		GasConsumed: proc.config.DirectCallBaseGasUsage,
-		TxType:      types.DirectCallTxType,
-		TxHash:      txHash,
+	bridge := call.To.ToCommon()
+
+	// create bridge account if not exist
+	if !proc.state.Exist(bridge) {
+		proc.state.CreateAccount(bridge)
 	}
 
-	// check if account exists
-	// while this method is only called for COAs
-	// it might be the case that someone creates a COA
-	// and never transfer tokens to and call for withdraw
-	if !proc.state.Exist(addr) {
-		proc.state.CreateAccount(addr)
+	// withdraw the amount and move it to the bridge account
+	msg := call.Message()
+	proc.evm.TxContext.Origin = msg.From
+	res, err := proc.run(msg, txHash, 0, types.DirectCallTxType)
+	if err != nil {
+		return res, err
 	}
 
-	// check the source account balance
-	// if balance is lower than amount needed for withdrawal, error out
-	if proc.state.GetBalance(addr).Cmp(amount) < 0 {
-		return res, gethCore.ErrInsufficientFundsForTransfer
-	}
-
-	// sub balance
-	proc.state.SubBalance(addr, amount)
-
-	// we increment the nonce for source account cause
-	// withdraw counts as a transaction
-	nonce := proc.state.GetNonce(addr)
-	proc.state.SetNonce(addr, nonce+1)
-
+	// now deduct the balance from the bridge
+	proc.state.SubBalance(bridge, call.Value)
+	// all commmit errors (StateDB errors) has to be returned
 	return res, proc.commit()
 }
 
@@ -381,12 +370,16 @@ func (proc *procedure) runDirect(
 	msg *gethCore.Message,
 	txHash gethCommon.Hash,
 	txIndex uint,
-	txType uint8,
 ) (*types.Result, error) {
 	// set the nonce for the message (needed for some opeartions like deployment)
 	msg.Nonce = proc.state.GetNonce(msg.From)
 	proc.evm.TxContext.Origin = msg.From
-	return proc.run(msg, txHash, txIndex, types.DirectCallTxType)
+	res, err := proc.run(msg, txHash, txIndex, types.DirectCallTxType)
+	if err != nil {
+		return nil, err
+	}
+	// all commmit errors (StateDB errors) has to be returned
+	return res, proc.commit()
 }
 
 func (proc *procedure) run(
@@ -438,29 +431,5 @@ func (proc *procedure) run(
 			res.VMError = execResult.Err
 		}
 	}
-	// all commmit errors (StateDB errors) has to be returned
-	// TODO: maybe handle them (if there are happy errors)
-	return &res, proc.commit()
-}
-
-func SetupPrecompile(cfg *Config) {
-	rules := cfg.ChainRules()
-	// captures the pointer to the map that has to be augmented
-	var precompiles map[gethCommon.Address]gethVM.PrecompiledContract
-	switch {
-	case rules.IsCancun:
-		precompiles = gethVM.PrecompiledContractsCancun
-	case rules.IsBerlin:
-		precompiles = gethVM.PrecompiledContractsBerlin
-	case rules.IsIstanbul:
-		precompiles = gethVM.PrecompiledContractsIstanbul
-	case rules.IsByzantium:
-		precompiles = gethVM.PrecompiledContractsByzantium
-	default:
-		precompiles = gethVM.PrecompiledContractsHomestead
-	}
-	for addr, contract := range cfg.ExtraPrecompiles {
-		// we override if exist since we call this method on every block
-		precompiles[addr] = contract
-	}
+	return &res, nil
 }

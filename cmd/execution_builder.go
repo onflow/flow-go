@@ -23,6 +23,7 @@ import (
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
+	"github.com/vmihailenco/msgpack"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/admin/commands"
@@ -70,24 +71,30 @@ import (
 	modelbootstrap "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/module/finalizedreader"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
+	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/blob"
+	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	storageerr "github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
@@ -135,7 +142,7 @@ type ExecutionNode struct {
 	txResults              *storage.TransactionResults
 	results                *storage.ExecutionResults
 	myReceipts             *storage.MyExecutionReceipts
-	providerEngine         *exeprovider.Engine
+	providerEngine         exeprovider.ProviderEngine
 	checkerEng             *checker.Engine
 	syncCore               *chainsync.Core
 	syncEngine             *synchronization.Engine
@@ -226,7 +233,8 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("collection requester engine", exeNode.LoadCollectionRequesterEngine).
 		Component("receipt provider engine", exeNode.LoadReceiptProviderEngine).
 		Component("synchronization engine", exeNode.LoadSynchronizationEngine).
-		Component("grpc server", exeNode.LoadGrpcServer)
+		Component("grpc server", exeNode.LoadGrpcServer).
+		Component("observer collection indexer", exeNode.LoadObserverCollectionIndexer)
 }
 
 func (exeNode *ExecutionNode) LoadMutableFollowerState(node *NodeConfig) error {
@@ -352,7 +360,11 @@ func (exeNode *ExecutionNode) LoadBlobService(
 		opts = append(opts, blob.WithRateLimit(float64(exeNode.exeConf.blobstoreRateLimit), exeNode.exeConf.blobstoreBurstLimit))
 	}
 
-	bs, err := node.EngineRegistry.RegisterBlobService(channels.ExecutionDataService, exeNode.executionDataDatastore, opts...)
+	edsChannel := channels.ExecutionDataService
+	if node.ObserverMode {
+		edsChannel = channels.PublicExecutionDataService
+	}
+	bs, err := node.EngineRegistry.RegisterBlobService(edsChannel, exeNode.executionDataDatastore, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register blob service: %w", err)
 	}
@@ -523,26 +535,30 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	}
 	exeNode.computationManager = manager
 
-	var chunkDataPackRequestQueueMetrics module.HeroCacheMetrics = metrics.NewNoopCollector()
-	if node.HeroCacheMetricsEnable {
-		chunkDataPackRequestQueueMetrics = metrics.ChunkDataPackRequestQueueMetricsFactory(node.MetricsRegisterer)
-	}
-	chdpReqQueue := queue.NewHeroStore(exeNode.exeConf.chunkDataPackRequestsCacheSize, node.Logger, chunkDataPackRequestQueueMetrics)
-	exeNode.providerEngine, err = exeprovider.New(
-		node.Logger,
-		node.Tracer,
-		node.EngineRegistry,
-		node.State,
-		exeNode.executionState,
-		exeNode.collector,
-		exeNode.checkAuthorizedAtBlock,
-		chdpReqQueue,
-		exeNode.exeConf.chunkDataPackRequestWorkers,
-		exeNode.exeConf.chunkDataPackQueryTimeout,
-		exeNode.exeConf.chunkDataPackDeliveryTimeout,
-	)
-	if err != nil {
-		return nil, err
+	if node.ObserverMode {
+		exeNode.providerEngine = &exeprovider.NoopEngine{}
+	} else {
+		var chunkDataPackRequestQueueMetrics module.HeroCacheMetrics = metrics.NewNoopCollector()
+		if node.HeroCacheMetricsEnable {
+			chunkDataPackRequestQueueMetrics = metrics.ChunkDataPackRequestQueueMetricsFactory(node.MetricsRegisterer)
+		}
+		chdpReqQueue := queue.NewHeroStore(exeNode.exeConf.chunkDataPackRequestsCacheSize, node.Logger, chunkDataPackRequestQueueMetrics)
+		exeNode.providerEngine, err = exeprovider.New(
+			node.Logger,
+			node.Tracer,
+			node.EngineRegistry,
+			node.State,
+			exeNode.executionState,
+			exeNode.collector,
+			exeNode.checkAuthorizedAtBlock,
+			chdpReqQueue,
+			exeNode.exeConf.chunkDataPackRequestWorkers,
+			exeNode.exeConf.chunkDataPackQueryTimeout,
+			exeNode.exeConf.chunkDataPackDeliveryTimeout,
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Get latest executed block and a view at that block
@@ -936,6 +952,87 @@ func (exeNode *ExecutionNode) LoadExecutionDataPruner(
 	return exeNode.executionDataPruner, err
 }
 
+func (exeNode *ExecutionNode) LoadObserverCollectionIndexer(
+	node *NodeConfig,
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+	if !node.ObserverMode {
+		node.Logger.Info().Msg("execution data downloader is disabled")
+		return &module.NoopReadyDoneAware{}, nil
+	}
+
+	node.Logger.Info().Msg("observer-mode is enabled, creating execution data downloader")
+
+	execDataDistributor := edrequester.NewExecutionDataDistributor()
+
+	executionDataDownloader := execution_data.NewDownloader(exeNode.blobService)
+
+	var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+	execDataCacheBackend := herocache.NewBlockExecutionData(10, node.Logger, heroCacheCollector)
+
+	// Execution Data cache that a downloader as the backend
+	// If the execution data doesn't exist, it uses the downloader to fetch it
+	executionDataCache := execdatacache.NewExecutionDataCache(
+		executionDataDownloader,
+		node.Storage.Headers,
+		node.Storage.Seals,
+		node.Storage.Results,
+		execDataCacheBackend,
+	)
+
+	processedBlockHeight := bstorage.NewConsumerProgress(node.DB, module.ConsumeProgressExecutionDataRequesterBlockHeight)
+	processedNotifications := bstorage.NewConsumerProgress(node.DB, module.ConsumeProgressExecutionDataRequesterNotification)
+
+	executionDataConfig := edrequester.ExecutionDataConfig{
+		InitialBlockHeight: node.SealedRootBlock.Header.Height,
+		MaxSearchAhead:     edrequester.DefaultMaxSearchAhead,
+		FetchTimeout:       edrequester.DefaultFetchTimeout,
+		MaxFetchTimeout:    edrequester.DefaultMaxFetchTimeout,
+		RetryDelay:         edrequester.DefaultRetryDelay,
+		MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
+	}
+
+	r, err := edrequester.New(
+		node.Logger,
+		metrics.NewExecutionDataRequesterCollector(),
+		executionDataDownloader,
+		executionDataCache,
+		processedBlockHeight,
+		processedNotifications,
+		node.State,
+		node.Storage.Headers,
+		executionDataConfig,
+		execDataDistributor,
+	)
+
+	if err != nil {
+		return &module.NoopReadyDoneAware{}, err
+	}
+
+	// subscribe the block finalization event, and trigger workers to fetch execution data
+	exeNode.followerDistributor.AddOnBlockFinalizedConsumer(r.OnBlockFinalized)
+
+	execDataDistributor.AddOnExecutionDataReceivedConsumer(func(data *execution_data.BlockExecutionDataEntity) {
+		res := &messages.EntityResponse{}
+		for _, chunk := range data.BlockExecutionData.ChunkExecutionDatas {
+			col := chunk.Collection
+			blob, _ := msgpack.Marshal(col)
+			res.EntityIDs = append(res.EntityIDs, col.ID())
+			res.Blobs = append(res.Blobs, blob)
+		}
+
+		// notify the collection requester that collections have been received
+		err := exeNode.collectionRequester.ProcessLocal(res)
+		if err != nil {
+			node.Logger.Fatal().Err(err).Msgf("failed to process collection from local execution data for block %v", data.BlockExecutionData.BlockID)
+		}
+	})
+
+	return r, nil
+}
+
 func (exeNode *ExecutionNode) LoadCheckerEngine(
 	node *NodeConfig,
 ) (
@@ -964,8 +1061,13 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 	module.ReadyDoneAware,
 	error,
 ) {
+	engineRegister := node.EngineRegistry
+	if node.ObserverMode {
+		engineRegister = &underlay.NoopEngineRegister{}
+	}
+
 	var err error
-	exeNode.collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.EngineRegistry, node.Me, node.State,
+	exeNode.collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, engineRegister, node.Me, node.State,
 		channels.RequestCollections,
 		filter.Any,
 		func() flow.Entity { return &flow.Collection{} },
@@ -1182,10 +1284,14 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 	}
 	receiptRequestQueue := queue.NewHeroStore(exeNode.exeConf.receiptRequestsCacheSize, node.Logger, receiptRequestQueueMetric)
 
+	engineRegister := node.EngineRegistry
+	if node.ObserverMode {
+		engineRegister = &underlay.NoopEngineRegister{}
+	}
 	eng, err := provider.New(
 		node.Logger.With().Str("engine", "receipt_provider").Logger(),
 		node.Metrics.Engine,
-		node.EngineRegistry,
+		engineRegister,
 		node.Me,
 		node.State,
 		receiptRequestQueue,
@@ -1212,6 +1318,7 @@ func (exeNode *ExecutionNode) LoadSynchronizationEngine(
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize spam detection config: %w", err)
 	}
+
 	exeNode.syncEngine, err = synchronization.New(
 		node.Logger,
 		node.Metrics.Engine,

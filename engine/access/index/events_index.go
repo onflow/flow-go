@@ -1,7 +1,8 @@
-package backend
+package index
 
 import (
 	"fmt"
+	"sort"
 
 	"go.uber.org/atomic"
 
@@ -11,80 +12,94 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// TransactionResultsIndex implements a wrapper around `storage.LightTransactionResult` ensuring that needed data has been synced and is available to the client.
-// Note: `TransactionResultsIndex` is created with empty report due to the next reasoning:
+var _ state_synchronization.IndexReporter = (*EventsIndex)(nil)
+
+// EventsIndex implements a wrapper around `storage.Events` ensuring that needed data has been synced and is available to the client.
+// Note: `EventsIndex` is created with empty report due to the next reasoning:
 // When the index is initially bootstrapped, the indexer needs to load an execution state checkpoint from
 // disk and index all the data. This process can take more than 1 hour on some systems. Consequently, the Initialize
 // pattern is implemented to enable the Access API to start up and serve queries before the index is fully ready. During
 // the initialization phase, all calls to retrieve data from this struct should return indexer.ErrIndexNotInitialized.
 // The caller is responsible for handling this error appropriately for the method.
-type TransactionResultsIndex struct {
-	results  storage.LightTransactionResults
+type EventsIndex struct {
+	events   storage.Events
 	reporter *atomic.Pointer[state_synchronization.IndexReporter]
 }
 
-var _ state_synchronization.IndexReporter = (*TransactionResultsIndex)(nil)
-
-func NewTransactionResultsIndex(results storage.LightTransactionResults) *TransactionResultsIndex {
-	return &TransactionResultsIndex{
-		results:  results,
+func NewEventsIndex(events storage.Events) *EventsIndex {
+	return &EventsIndex{
+		events:   events,
 		reporter: atomic.NewPointer[state_synchronization.IndexReporter](nil),
 	}
 }
 
 // Initialize replaces a previously non-initialized reporter. Can be called once.
 // No errors are expected during normal operations.
-func (t *TransactionResultsIndex) Initialize(indexReporter state_synchronization.IndexReporter) error {
-	if t.reporter.CompareAndSwap(nil, &indexReporter) {
+func (e *EventsIndex) Initialize(indexReporter state_synchronization.IndexReporter) error {
+	if e.reporter.CompareAndSwap(nil, &indexReporter) {
 		return nil
 	}
 	return fmt.Errorf("index reporter already initialized")
 }
 
-// ByBlockID checks data availability and returns all transaction results for a block
+// ByBlockID checks data availability and returns events for a block
 // Expected errors:
-//   - indexer.ErrIndexNotInitialized if the `TransactionResultsIndex` has not been initialized
+//   - indexer.ErrIndexNotInitialized if the `EventsIndex` has not been initialized
 //   - storage.ErrHeightNotIndexed when data is unavailable
 //   - codes.NotFound if result cannot be provided by storage due to the absence of data.
-func (t *TransactionResultsIndex) ByBlockID(blockID flow.Identifier, height uint64) ([]flow.LightTransactionResult, error) {
-	if err := t.checkDataAvailability(height); err != nil {
+func (e *EventsIndex) ByBlockID(blockID flow.Identifier, height uint64) ([]flow.Event, error) {
+	if err := e.checkDataAvailability(height); err != nil {
 		return nil, err
 	}
 
-	return t.results.ByBlockID(blockID)
+	events, err := e.events.ByBlockID(blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	// events are keyed/sorted by [blockID, txID, txIndex, eventIndex]
+	// we need to resort them by tx index then event index so the output is in execution order
+	sort.Slice(events, func(i, j int) bool {
+		if events[i].TransactionIndex == events[j].TransactionIndex {
+			return events[i].EventIndex < events[j].EventIndex
+		}
+		return events[i].TransactionIndex < events[j].TransactionIndex
+	})
+
+	return events, nil
 }
 
-// ByBlockIDTransactionID checks data availability and return the transaction result for the given block ID and transaction ID
+// ByBlockIDTransactionID checks data availability and return events for the given block ID and transaction ID
 // Expected errors:
-//   - indexer.ErrIndexNotInitialized if the `TransactionResultsIndex` has not been initialized
+//   - indexer.ErrIndexNotInitialized if the `EventsIndex` has not been initialized
 //   - storage.ErrHeightNotIndexed when data is unavailable
 //   - codes.NotFound if result cannot be provided by storage due to the absence of data.
-func (t *TransactionResultsIndex) ByBlockIDTransactionID(blockID flow.Identifier, height uint64, txID flow.Identifier) (*flow.LightTransactionResult, error) {
-	if err := t.checkDataAvailability(height); err != nil {
+func (e *EventsIndex) ByBlockIDTransactionID(blockID flow.Identifier, height uint64, transactionID flow.Identifier) ([]flow.Event, error) {
+	if err := e.checkDataAvailability(height); err != nil {
 		return nil, err
 	}
 
-	return t.results.ByBlockIDTransactionID(blockID, txID)
+	return e.events.ByBlockIDTransactionID(blockID, transactionID)
 }
 
-// ByBlockIDTransactionIndex checks data availability and return the transaction result for the given blockID and transaction index
+// ByBlockIDTransactionIndex checks data availability and return events for the transaction at given index in a given block
 // Expected errors:
-//   - indexer.ErrIndexNotInitialized if the `TransactionResultsIndex` has not been initialized
+//   - indexer.ErrIndexNotInitialized if the `EventsIndex` has not been initialized
 //   - storage.ErrHeightNotIndexed when data is unavailable
-//   - codes.NotFound when result cannot be provided by storage due to the absence of data.
-func (t *TransactionResultsIndex) ByBlockIDTransactionIndex(blockID flow.Identifier, height uint64, index uint32) (*flow.LightTransactionResult, error) {
-	if err := t.checkDataAvailability(height); err != nil {
+//   - codes.NotFound if result cannot be provided by storage due to the absence of data.
+func (e *EventsIndex) ByBlockIDTransactionIndex(blockID flow.Identifier, height uint64, txIndex uint32) ([]flow.Event, error) {
+	if err := e.checkDataAvailability(height); err != nil {
 		return nil, err
 	}
 
-	return t.results.ByBlockIDTransactionIndex(blockID, index)
+	return e.events.ByBlockIDTransactionIndex(blockID, txIndex)
 }
 
 // LowestIndexedHeight returns the lowest height indexed by the execution state indexer.
 // Expected errors:
-// - indexer.ErrIndexNotInitialized if the `TransactionResultsIndex` has not been initialized
-func (t *TransactionResultsIndex) LowestIndexedHeight() (uint64, error) {
-	reporter, err := t.getReporter()
+// - indexer.ErrIndexNotInitialized if the EventsIndex has not been initialized
+func (e *EventsIndex) LowestIndexedHeight() (uint64, error) {
+	reporter, err := e.getReporter()
 	if err != nil {
 		return 0, err
 	}
@@ -94,9 +109,9 @@ func (t *TransactionResultsIndex) LowestIndexedHeight() (uint64, error) {
 
 // HighestIndexedHeight returns the highest height indexed by the execution state indexer.
 // Expected errors:
-// - indexer.ErrIndexNotInitialized if the `TransactionResultsIndex` has not been initialized
-func (t *TransactionResultsIndex) HighestIndexedHeight() (uint64, error) {
-	reporter, err := t.getReporter()
+// - indexer.ErrIndexNotInitialized if the EventsIndex has not been initialized
+func (e *EventsIndex) HighestIndexedHeight() (uint64, error) {
+	reporter, err := e.getReporter()
 	if err != nil {
 		return 0, err
 	}
@@ -109,9 +124,9 @@ func (t *TransactionResultsIndex) HighestIndexedHeight() (uint64, error) {
 // Expected errors:
 //   - indexer.ErrIndexNotInitialized if the `TransactionResultsIndex` has not been initialized
 //   - storage.ErrHeightNotIndexed if the block at the provided height is not indexed yet
-//   - fmt.Errorf if the highest or lowest indexed heights cannot be retrieved from the reporter
-func (t *TransactionResultsIndex) checkDataAvailability(height uint64) error {
-	reporter, err := t.getReporter()
+//   - fmt.Errorf with custom message if the highest or lowest indexed heights cannot be retrieved from the reporter
+func (e *EventsIndex) checkDataAvailability(height uint64) error {
+	reporter, err := e.getReporter()
 	if err != nil {
 		return err
 	}
@@ -138,8 +153,8 @@ func (t *TransactionResultsIndex) checkDataAvailability(height uint64) error {
 // getReporter retrieves the current index reporter instance from the atomic pointer.
 // Expected errors:
 //   - indexer.ErrIndexNotInitialized if the reporter is not initialized
-func (t *TransactionResultsIndex) getReporter() (state_synchronization.IndexReporter, error) {
-	reporter := t.reporter.Load()
+func (e *EventsIndex) getReporter() (state_synchronization.IndexReporter, error) {
+	reporter := e.reporter.Load()
 	if reporter == nil {
 		return nil, indexer.ErrIndexNotInitialized
 	}

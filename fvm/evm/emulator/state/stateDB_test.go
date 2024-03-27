@@ -5,10 +5,10 @@ import (
 	"math/big"
 	"testing"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/atree"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethParams "github.com/onflow/go-ethereum/params"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
