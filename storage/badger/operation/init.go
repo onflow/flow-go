@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/storage"
 )
@@ -26,8 +27,34 @@ const (
 	dbMarkerSecret
 )
 
+// InitDB initializes the given database with the given database type marker.
+// from this version, values of key-value pairs stored in database will be compressed.
+// In order to be backward-compactiable, it checks if the database is storing compressed values.
+// If the database is storing uncompressed values, it will update the internal global flag, so
+// that it can parse the uncompressed values.
 func InsertPublicDBMarker(txn *badger.Txn) error {
-	return insertDBTypeMarker(dbMarkerPublic)(txn)
+	// attempt to read and insert the database type marker
+	// it also checks if the database is storing compressed values
+	err := insertDBTypeMarker(dbMarkerPublic)(txn)
+	if err != nil {
+		// if the error is due to uncompressed value, we will set the global flag as uncompressed
+		if isErrUncompressedValue(err) {
+			log.Warn().Msgf("fail to read protocol database as compressed, checking if the value is uncompressed")
+
+			// retry by setting the global flag as uncompressed
+			setCompressDisabled()
+			err = insertDBTypeMarker(dbMarkerPublic)(txn)
+			if err != nil {
+				return err
+			}
+
+			log.Warn().Msgf("warning: operating on protocol database that is not compressed, better to migrate all key-values")
+			return nil
+		}
+		return err
+	}
+
+	return nil
 }
 
 func InsertSecretDBMarker(txn *badger.Txn) error {
@@ -45,6 +72,9 @@ func EnsureSecretDB(db *badger.DB) error {
 // insertDBTypeMarker inserts a database type marker if none exists. If a marker
 // already exists in the database, this function will return an error if the
 // marker does not match the argument, or return nil if it matches.
+// possible error:
+// errUncompressedValue if the value is uncompressed
+// other errors are exceptions
 func insertDBTypeMarker(marker dbTypeMarker) func(*badger.Txn) error {
 	return func(txn *badger.Txn) error {
 		var storedMarker dbTypeMarker

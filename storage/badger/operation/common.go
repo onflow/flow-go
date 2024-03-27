@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -30,9 +29,9 @@ func batchWrite(key []byte, entity interface{}) func(writeBatch *badger.WriteBat
 		}
 
 		// serialize the entity data
-		val, err := msgpack.Marshal(entity)
+		val, err := encodeEntity(entity)
 		if err != nil {
-			return irrecoverable.NewExceptionf("could not encode entity: %w", err)
+			return err
 		}
 
 		// persist the entity data into the DB
@@ -74,9 +73,9 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 		}
 
 		// serialize the entity data
-		val, err := msgpack.Marshal(entity)
+		val, err := encodeEntity(entity)
 		if err != nil {
-			return irrecoverable.NewExceptionf("could not encode entity: %w", err)
+			return err
 		}
 
 		// persist the entity data into the DB
@@ -107,9 +106,9 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 		}
 
 		// serialize the entity data
-		val, err := msgpack.Marshal(entity)
+		val, err := encodeEntity(entity)
 		if err != nil {
-			return irrecoverable.NewExceptionf("could not encode entity: %w", err)
+			return err
 		}
 
 		// persist the entity data into the DB
@@ -136,9 +135,9 @@ func upsert(key []byte, entity interface{}) func(*badger.Txn) error {
 		}
 
 		// serialize the entity data
-		val, err := msgpack.Marshal(entity)
+		val, err := encodeEntity(entity)
 		if err != nil {
-			return irrecoverable.NewExceptionf("could not encode entity: %w", err)
+			return err
 		}
 
 		// persist the entity data into the DB
@@ -254,15 +253,9 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 		}
 
 		// get the value from the item
-		err = item.Value(func(val []byte) error {
-			err := msgpack.Unmarshal(val, entity)
-			return err
+		return item.Value(func(val []byte) error {
+			return decodeValue(val, entity)
 		})
-		if err != nil {
-			return irrecoverable.NewExceptionf("could not decode entity: %w", err)
-		}
-
-		return nil
 	}
 }
 
@@ -435,7 +428,7 @@ func iterate(start []byte, end []byte, iteration iterationFunc, opts ...func(*ba
 
 				// decode into the entity
 				entity := create()
-				err := msgpack.Unmarshal(val, entity)
+				err := decodeValue(val, entity)
 				if err != nil {
 					return irrecoverable.NewExceptionf("could not decode entity: %w", err)
 				}
@@ -497,7 +490,7 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 
 				// decode into the entity
 				entity := create()
-				err := msgpack.Unmarshal(val, entity)
+				err := decodeValue(val, entity)
 				if err != nil {
 					return irrecoverable.NewExceptionf("could not decode entity: %w", err)
 				}
@@ -547,7 +540,7 @@ func findHighestAtOrBelow(
 		}
 
 		return it.Item().Value(func(val []byte) error {
-			err := msgpack.Unmarshal(val, entity)
+			err := decodeValue(val, entity)
 			if err != nil {
 				return fmt.Errorf("could not decode entity: %w", err)
 			}
