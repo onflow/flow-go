@@ -8,31 +8,15 @@ import (
 
 	"github.com/onflow/flow-go/utils/unittest/generator"
 
-	subscriptionmock "github.com/onflow/flow-go/engine/access/subscription/mock"
-
-	"github.com/ipfs/go-datastore"
-	dssync "github.com/ipfs/go-datastore/sync"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/module/blobs"
-	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
-	"github.com/onflow/flow-go/module/mempool/herocache"
-	"github.com/onflow/flow-go/module/metrics"
-	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
-	"github.com/onflow/flow-go/storage"
-	storagemock "github.com/onflow/flow-go/storage/mock"
-	"github.com/onflow/flow-go/utils/unittest/mocks"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
@@ -91,28 +75,11 @@ func (s *BackendAccountStatusesSuite) generateProtocolMockEvents() flow.EventsLi
 
 // SetupTest initializes the test suite.
 func (s *BackendAccountStatusesSuite) SetupTest() {
-	s.logger = unittest.Logger()
-
-	s.state = protocolmock.NewState(s.T())
-	s.snapshot = protocolmock.NewSnapshot(s.T())
-	s.params = protocolmock.NewParams(s.T())
-	s.headers = storagemock.NewHeaders(s.T())
-	s.events = storagemock.NewEvents(s.T())
-	s.seals = storagemock.NewSeals(s.T())
-	s.results = storagemock.NewExecutionResults(s.T())
-
-	s.bs = blobs.NewBlobstore(dssync.MutexWrap(datastore.NewMapDatastore()))
-	s.eds = execution_data.NewExecutionDataStore(s.bs, execution_data.DefaultSerializer)
-
-	s.broadcaster = engine.NewBroadcaster()
-
-	s.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, s.logger, metrics.NewNoopCollector())
-	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
-	s.executionDataTracker = subscriptionmock.NewExecutionDataTracker(s.T())
-
+	blockCount := 5
 	var err error
-	addressGenerator := chainID.Chain().NewAddressGenerator()
+	s.SetupTestSuite(blockCount)
 
+	addressGenerator := chainID.Chain().NewAddressGenerator()
 	s.accountCreatedAddress, err = addressGenerator.NextAddress()
 	require.NoError(s.T(), err)
 	s.accountContractAdded, err = addressGenerator.NextAddress()
@@ -120,21 +87,7 @@ func (s *BackendAccountStatusesSuite) SetupTest() {
 	s.accountContractUpdated, err = addressGenerator.NextAddress()
 	require.NoError(s.T(), err)
 
-	blockCount := 5
-	s.execDataMap = make(map[flow.Identifier]*execution_data.BlockExecutionDataEntity, blockCount)
-	s.blockEvents = make(map[flow.Identifier][]flow.Event, blockCount)
-	s.blockMap = make(map[uint64]*flow.Block, blockCount)
-	s.sealMap = make(map[flow.Identifier]*flow.Seal, blockCount)
-	s.resultMap = make(map[flow.Identifier]*flow.ExecutionResult, blockCount)
-	s.blocks = make([]*flow.Block, 0, blockCount)
-
-	// generate blockCount consecutive blocks with associated seal, result and execution data
-	s.rootBlock = unittest.BlockFixture()
 	parent := s.rootBlock.Header
-	s.blockMap[s.rootBlock.Header.Height] = &s.rootBlock
-
-	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Header.Height, s.rootBlock.ID())
-
 	events := s.generateProtocolMockEvents()
 
 	for i := 0; i < blockCount; i++ {
@@ -167,60 +120,7 @@ func (s *BackendAccountStatusesSuite) SetupTest() {
 		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Header.Height, block.ID(), result.ExecutionDataID)
 	}
 
-	s.registerID = unittest.RegisterIDFixture()
-
-	s.eventsIndex = index.NewEventsIndex(s.events)
-	s.registersAsync = execution.NewRegistersAsyncStore()
-	s.registers = storagemock.NewRegisterIndex(s.T())
-	err = s.registersAsync.Initialize(s.registers)
-	require.NoError(s.T(), err)
-	s.registers.On("LatestHeight").Return(s.rootBlock.Header.Height).Maybe()
-	s.registers.On("FirstHeight").Return(s.rootBlock.Header.Height).Maybe()
-	s.registers.On("Get", mock.AnythingOfType("RegisterID"), mock.AnythingOfType("uint64")).Return(
-		func(id flow.RegisterID, height uint64) (flow.RegisterValue, error) {
-			if id == s.registerID {
-				return flow.RegisterValue{}, nil
-			}
-			return nil, storage.ErrNotFound
-		}).Maybe()
-
-	s.state.On("Sealed").Return(s.snapshot, nil).Maybe()
-	s.snapshot.On("Head").Return(s.blocks[0].Header, nil).Maybe()
-
-	s.seals.On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).Return(
-		mocks.StorageMapGetter(s.sealMap),
-	).Maybe()
-
-	s.results.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(
-		mocks.StorageMapGetter(s.resultMap),
-	).Maybe()
-
-	s.headers.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
-		func(blockID flow.Identifier) (*flow.Header, error) {
-			for _, block := range s.blockMap {
-				if block.ID() == blockID {
-					return block.Header, nil
-				}
-			}
-			return nil, storage.ErrNotFound
-		},
-	).Maybe()
-
-	s.headers.On("ByHeight", mock.AnythingOfType("uint64")).Return(
-		mocks.ConvertStorageOutput(
-			mocks.StorageMapGetter(s.blockMap),
-			func(block *flow.Block) *flow.Header { return block.Header },
-		),
-	).Maybe()
-
-	s.headers.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(
-		mocks.ConvertStorageOutput(
-			mocks.StorageMapGetter(s.blockMap),
-			func(block *flow.Block) flow.Identifier { return block.ID() },
-		),
-	).Maybe()
-
-	s.SetupBackend(false)
+	s.SetupTestMocks()
 }
 
 // subscribeFromStartBlockIdTestCases generates test cases for subscribing from a start block ID.
