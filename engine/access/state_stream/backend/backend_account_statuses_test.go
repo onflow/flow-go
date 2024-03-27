@@ -46,6 +46,7 @@ var testProtocolEventTypes = []flow.EventType{
 }
 
 // Define the test type struct
+// The struct is used for testing different test cases of each endpoint from AccountStatusesBackend.
 type testType struct {
 	name            string // Test case name
 	highestBackfill int    // Highest backfill index
@@ -53,7 +54,10 @@ type testType struct {
 	filters         state_stream.AccountStatusFilter // Event filters
 }
 
-// BackendAccountStatusesSuite is the test suite for AccountStatusesBackend.
+// BackendAccountStatusesSuite is a test suite for the AccountStatusesBackend functionality.
+// It is used to test the endpoints which enables users to subscribe to the streaming of account status changes.
+// It verified that each of endpoints works properly with expected data being returned. Also the suite tests
+// handling of expected errors in the SubscribeAccountStatuses.
 type BackendAccountStatusesSuite struct {
 	BackendExecutionDataSuite
 	accountCreatedAddress  flow.Address
@@ -87,7 +91,7 @@ func (s *BackendAccountStatusesSuite) generateProtocolMockEvents() flow.EventsLi
 
 // SetupTest initializes the test suite.
 func (s *BackendAccountStatusesSuite) SetupTest() {
-	logger := unittest.Logger()
+	s.logger = unittest.Logger()
 
 	s.state = protocolmock.NewState(s.T())
 	s.snapshot = protocolmock.NewSnapshot(s.T())
@@ -102,15 +106,9 @@ func (s *BackendAccountStatusesSuite) SetupTest() {
 
 	s.broadcaster = engine.NewBroadcaster()
 
-	s.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metrics.NewNoopCollector())
+	s.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, s.logger, metrics.NewNoopCollector())
 	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
 	s.executionDataTracker = subscriptionmock.NewExecutionDataTracker(s.T())
-
-	conf := Config{
-		ClientSendTimeout:       subscription.DefaultSendTimeout,
-		ClientSendBufferSize:    subscription.DefaultSendBufferSize,
-		RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
-	}
 
 	var err error
 	addressGenerator := chainID.Chain().NewAddressGenerator()
@@ -222,43 +220,7 @@ func (s *BackendAccountStatusesSuite) SetupTest() {
 		),
 	).Maybe()
 
-	s.backend, err = New(
-		logger,
-		conf,
-		s.state,
-		s.headers,
-		s.seals,
-		s.results,
-		s.eds,
-		s.execDataCache,
-		s.broadcaster,
-		s.registersAsync,
-		s.eventsIndex,
-		false,
-		s.executionDataTracker,
-	)
-	require.NoError(s.T(), err)
-
-	// create real execution data tracker to use GetStartHeight from it, instead of mocking
-	s.executionDataTrackerReal = subscription.NewExecutionDataTracker(
-		logger,
-		s.state,
-		s.rootBlock.Header.Height,
-		s.headers,
-		s.broadcaster,
-		s.rootBlock.Header.Height,
-		s.eventsIndex,
-		false,
-	)
-
-	s.executionDataTracker.On(
-		"GetStartHeight",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).Return(func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
-		return s.executionDataTrackerReal.GetStartHeight(ctx, startBlockID, startHeight)
-	}, nil).Maybe()
+	s.SetupBackend(false)
 }
 
 // subscribeFromStartBlockIdTestCases generates test cases for subscribing from a start block ID.
