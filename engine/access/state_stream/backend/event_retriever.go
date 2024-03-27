@@ -19,7 +19,8 @@ type EventsResponse struct {
 	Events  flow.EventsList
 }
 
-// EventsRetriever retrieves events related to blocks
+// EventsRetriever retrieves events by block height. It can be configured to retrieve events from
+// the events indexer(if available) or using a dedicated callback to query it from other sources.
 type EventsRetriever struct {
 	log              zerolog.Logger
 	headers          storage.Headers

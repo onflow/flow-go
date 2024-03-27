@@ -58,6 +58,9 @@ type AccountStatusFilter struct {
 }
 
 // NewAccountStatusFilter creates a new AccountStatusFilter based on the provided configuration.
+// Expected errors:
+// - error: An error, if any, encountered during core event type validating, check for max account addresses
+// or validating account addresses
 func NewAccountStatusFilter(
 	config EventFilterConfig,
 	chain flow.Chain,
@@ -88,7 +91,7 @@ func NewAccountStatusFilter(
 	}
 
 	for _, address := range accountAddresses {
-		//Validate account address
+		// Validate account address
 		addr := flow.HexToAddress(address)
 		if err := validateAddress(addr, chain); err != nil {
 			return AccountStatusFilter{}, err
@@ -118,7 +121,7 @@ func NewAccountStatusFilter(
 //   - A map[string]flow.EventsList: A map where the key is the account address and the value is a list of
 //     account-related core events associated with that address.
 func (f *AccountStatusFilter) GroupCoreEventsByAccountAddress(events flow.EventsList, log zerolog.Logger) map[string]flow.EventsList {
-	allAccountProtocolEvents := map[string]flow.EventsList{}
+	allAccountProtocolEvents := make(map[string]flow.EventsList)
 
 	for _, event := range events {
 		fields, fieldValues, err := getEventFields(&event)
