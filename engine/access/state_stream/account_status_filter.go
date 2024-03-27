@@ -60,7 +60,7 @@ type AccountStatusFilter struct {
 // NewAccountStatusFilter creates a new AccountStatusFilter based on the provided configuration.
 // Expected errors:
 // - error: An error, if any, encountered during core event type validating, check for max account addresses
-// or validating account addresses
+// or validating account addresses.
 func NewAccountStatusFilter(
 	config EventFilterConfig,
 	chain flow.Chain,

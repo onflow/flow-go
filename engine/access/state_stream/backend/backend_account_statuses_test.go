@@ -533,7 +533,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromLatestBloc
 	s.subscribeToAccountStatuses(call, s.subscribeFromLatestTestCases())
 }
 
-// TestSubscribeAccountStatusesHandlesErrors tests handling o f expected errors in the SubscribeAccountStatuses.
+// TestSubscribeAccountStatusesHandlesErrors tests handling of expected errors in the SubscribeAccountStatuses.
 func (s *BackendExecutionDataSuite) TestSubscribeAccountStatusesHandlesErrors() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

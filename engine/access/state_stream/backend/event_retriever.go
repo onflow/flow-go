@@ -30,6 +30,8 @@ type EventsRetriever struct {
 }
 
 // GetAllEventsResponse returns a function that retrieves the event response for a given block height.
+// Expected errors:
+// - error: An error, if any, encountered during getting events from storage or execution data.
 func (b *EventsRetriever) GetAllEventsResponse(ctx context.Context, height uint64) (*EventsResponse, error) {
 	var response *EventsResponse
 	var err error
@@ -51,6 +53,8 @@ func (b *EventsRetriever) GetAllEventsResponse(ctx context.Context, height uint6
 }
 
 // getEventsFromExecutionData returns the events for a given height extract from the execution data.
+// Expected errors:
+// - error: An error indicating issues with getting execution data for block
 func (b *EventsRetriever) getEventsFromExecutionData(ctx context.Context, height uint64) (*EventsResponse, error) {
 	executionData, err := b.getExecutionData(ctx, height)
 	if err != nil {
@@ -70,6 +74,9 @@ func (b *EventsRetriever) getEventsFromExecutionData(ctx context.Context, height
 }
 
 // getEventsFromStorage returns the events for a given height from the index storage.
+// Expected errors:
+// - error: An error indicating any issues with the provided block height or
+// an error indicating issue with getting events for a block.
 func (b *EventsRetriever) getEventsFromStorage(height uint64) (*EventsResponse, error) {
 	blockID, err := b.headers.BlockIDByHeight(height)
 	if err != nil {
