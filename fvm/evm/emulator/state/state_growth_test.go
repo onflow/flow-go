@@ -64,7 +64,7 @@ func (s *storageTest) run(runner func(state types.StateDB)) error {
 
 	runner(state)
 
-	err = state.Commit()
+	err = state.Commit(true)
 	if err != nil {
 		return err
 	}

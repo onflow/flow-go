@@ -16,6 +16,17 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// InvalidTransactionGasCost is a gas cost we charge when
+// a transaction or call fails at validation step.
+// in typical evm environment this doesn't exist given
+// if a transaction is invalid it won't be included
+// and no fees can be charged for users even though
+// the validation has used some resources, in our case
+// given we charge the fees on flow transaction and we
+// are doing on chain validation we can/should charge the
+// user for the validation fee.
+const InvalidTransactionGasCost = 1_000
+
 // Emulator handles operations against evm runtime
 type Emulator struct {
 	rootAddr flow.Address
@@ -138,25 +149,31 @@ func (bl *BlockView) RunTransaction(
 	if err != nil {
 		return nil, err
 	}
-	msg, err := gethCore.TransactionToMessage(tx, GetSigner(bl.config), proc.config.BlockContext.BaseFee)
+	txHash := tx.Hash()
+	msg, err := gethCore.TransactionToMessage(
+		tx,
+		GetSigner(bl.config),
+		proc.config.BlockContext.BaseFee)
 	if err != nil {
 		// this is not a fatal error (e.g. due to bad signature)
 		// not a valid transaction
-		return res, types.NewEVMValidationError(err)
+		res = &types.Result{
+			TxType:          tx.Type(),
+			TxHash:          txHash,
+			ValidationError: err,
+			GasConsumed:     InvalidTransactionGasCost,
+		}
+		return res, nil
 	}
-
-	txHash := tx.Hash()
 
 	// update tx context origin
 	proc.evm.TxContext.Origin = msg.From
-	// TODO: when we support multiple tx per block we need to update
-	// the tx index here to proper value
 	res, err = proc.run(msg, txHash, 0, tx.Type())
 	if err != nil {
 		return nil, err
 	}
 	// all commmit errors (StateDB errors) has to be returned
-	return res, proc.commit()
+	return res, proc.commitAndFinalize()
 }
 
 func (bl *BlockView) newProcedure() (*procedure, error) {
@@ -184,9 +201,9 @@ type procedure struct {
 	state  types.StateDB
 }
 
-// commit commits the changes to the state.
-func (proc *procedure) commit() error {
-	err := proc.state.Commit()
+// commit commits the changes to the state (with finalization)
+func (proc *procedure) commitAndFinalize() error {
+	err := proc.state.Commit(true)
 	if err != nil {
 		// if known types (state errors) don't do anything and return
 		if types.IsAFatalError(err) || types.IsAStateError(err) {
@@ -220,15 +237,22 @@ func (proc *procedure) mintTo(
 	if err != nil {
 		return res, err
 	}
+
+	// if any error (invalid or vm) on the internal call, revert and don't commit any change
+	// this prevents having cases that we add balance to the bridge but the transfer
+	// fails due to gas, etc.
+	if res.Invalid() || res.Failed() {
+		return res, types.ErrInternalDirecCallFailed
+	}
+
 	// all commmit errors (StateDB errors) has to be returned
-	return res, proc.commit()
+	return res, proc.commitAndFinalize()
 }
 
 func (proc *procedure) withdrawFrom(
 	call *types.DirectCall,
 	txHash gethCommon.Hash,
 ) (*types.Result, error) {
-
 	bridge := call.To.ToCommon()
 
 	// create bridge account if not exist
@@ -244,10 +268,15 @@ func (proc *procedure) withdrawFrom(
 		return res, err
 	}
 
+	// if any error (invalid or vm) on the internal call, revert and don't commit any change
+	if res.Invalid() || res.Failed() {
+		return res, types.ErrInternalDirecCallFailed
+	}
+
 	// now deduct the balance from the bridge
 	proc.state.SubBalance(bridge, call.Value)
 	// all commmit errors (StateDB errors) has to be returned
-	return res, proc.commit()
+	return res, proc.commitAndFinalize()
 }
 
 // deployAt deploys a contract at the given target address
@@ -273,12 +302,15 @@ func (proc *procedure) deployAt(
 		TxType: types.DirectCallTxType,
 		TxHash: txHash,
 	}
+
 	addr := to.ToCommon()
 
 	// precheck 1 - check balance of the source
 	if value.Sign() != 0 &&
 		!proc.evm.Context.CanTransfer(proc.state, caller.ToCommon(), value) {
-		return res, gethCore.ErrInsufficientFundsForTransfer
+		res.ValidationError = gethCore.ErrInsufficientFundsForTransfer
+		res.GasConsumed = InvalidTransactionGasCost
+		return res, nil
 	}
 
 	// precheck 2 - ensure there's no existing eoa or contract is deployed at the address
@@ -363,7 +395,7 @@ func (proc *procedure) deployAt(
 
 	proc.state.SetCode(addr, ret)
 	res.DeployedContractAddress = to
-	return res, proc.commit()
+	return res, proc.commitAndFinalize()
 }
 
 func (proc *procedure) runDirect(
@@ -379,9 +411,14 @@ func (proc *procedure) runDirect(
 		return nil, err
 	}
 	// all commmit errors (StateDB errors) has to be returned
-	return res, proc.commit()
+	return res, proc.commitAndFinalize()
 }
 
+// run runs a geth core.message and returns the
+// results, any validation or execution errors
+// are captured inside the result, the remaining
+// return errors are errors requires extra handling
+// on upstream (e.g. backend errors).
 func (proc *procedure) run(
 	msg *gethCore.Message,
 	txHash gethCommon.Hash,
@@ -400,15 +437,16 @@ func (proc *procedure) run(
 		gasPool,
 	).TransitionDb()
 	if err != nil {
-		// if the error is a fatal error or a non-fatal state error return it
-		// this condition should never happen
-		// given all StateDB errors are withheld for the commit time.
-		if types.IsAFatalError(err) || types.IsAStateError(err) {
-			return &res, err
+		// if the error is a fatal error or a non-fatal state error or a backend err return it
+		// this condition should never happen given all StateDB errors are withheld for the commit time.
+		if types.IsAFatalError(err) || types.IsAStateError(err) || types.IsABackendError(err) {
+			return nil, err
 		}
 		// otherwise is a validation error (pre-check failure)
 		// no state change, wrap the error and return
-		return &res, types.NewEVMValidationError(err)
+		res.ValidationError = err
+		res.GasConsumed = InvalidTransactionGasCost
+		return &res, nil
 	}
 
 	// if prechecks are passed, the exec result won't be nil

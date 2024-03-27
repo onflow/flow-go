@@ -13,6 +13,9 @@ import (
 // but we take a different apporach here and include more data so that
 // it requires less work for anyone who tracks and consume results.
 type Result struct {
+	// captures error returned during validation step (pre-checks)
+	ValidationError error
+	// captures error returned by the EVM
 	VMError error
 	// type of transaction defined by the evm package
 	// see DirectCallTxType as extra type we added type for direct calls.
@@ -27,6 +30,10 @@ type Result struct {
 	Logs []*gethTypes.Log
 	// TX hash holdes the cached value of tx hash
 	TxHash gethCommon.Hash
+}
+
+func (res *Result) Invalid() bool {
+	return res.ValidationError != nil
 }
 
 func (res *Result) Failed() bool {
@@ -49,6 +56,9 @@ func (res *Result) VMErrorString() string {
 // and for each log, Address, Topics, Data (consensus fields)
 // During execution we also do fill in BlockNumber, TxIndex, Index (event index)
 func (res *Result) Receipt() *gethTypes.Receipt {
+	if res.Invalid() {
+		return nil
+	}
 	receipt := &gethTypes.Receipt{
 		Type:              res.TxType,
 		CumulativeGasUsed: res.GasConsumed, // TODO: update to capture cumulative
@@ -91,22 +101,20 @@ type ResultSummary struct {
 	ReturnedValue           Data
 }
 
-func NewResultSummary(res *Result, validationError error) *ResultSummary {
+func (res *Result) ResultSummary() *ResultSummary {
 	rs := &ResultSummary{}
 
-	if res != nil {
-		rs.GasConsumed = res.GasConsumed
-		rs.DeployedContractAddress = res.DeployedContractAddress
-		rs.ReturnedValue = res.ReturnedValue
-	}
+	rs.GasConsumed = res.GasConsumed
+	rs.DeployedContractAddress = res.DeployedContractAddress
+	rs.ReturnedValue = res.ReturnedValue
 
-	if validationError != nil {
-		rs.ErrorCode = ValidationErrorCode(validationError)
+	if res.Invalid() {
+		rs.ErrorCode = ValidationErrorCode(res.ValidationError)
 		rs.Status = StatusInvalid
 		return rs
 	}
 
-	if res.VMError != nil {
+	if res.Failed() {
 		rs.ErrorCode = ExecutionErrorCode(res.VMError)
 		rs.Status = StatusFailed
 		return rs
