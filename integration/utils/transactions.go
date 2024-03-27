@@ -24,6 +24,9 @@ var createAndSetupNodeTxScript string
 //go:embed templates/remove-node.cdc
 var removeNodeTxScript string
 
+//go:embed templates/set-protocol-state-version.cdc
+var setProtocolStateVersionScript string
+
 func LocalnetEnv() templates.Environment {
 	return templates.Environment{
 		IDTableAddress:           "f8d6e0586b0a20c7",
@@ -173,6 +176,35 @@ func MakeAdminRemoveNodeTx(
 
 	id, _ := cadence.NewString(nodeID.String())
 	err := tx.AddArgument(id)
+	if err != nil {
+		return nil, err
+	}
+
+	return tx, nil
+}
+
+func MakeSetProtocolStateVersionTx(
+	env templates.Environment,
+	adminAccount *sdk.Account,
+	adminAccountKeyID int,
+	latestBlockID sdk.Identifier,
+	newProtocolVersion uint64,
+	activeViewDiff uint64,
+) (*sdk.Transaction, error) {
+	accountKey := adminAccount.Keys[adminAccountKeyID]
+	tx := sdk.NewTransaction().
+		SetScript([]byte(templates.ReplaceAddresses(setProtocolStateVersionScript, env))).
+		SetComputeLimit(9999).
+		SetReferenceBlockID(latestBlockID).
+		SetProposalKey(adminAccount.Address, adminAccountKeyID, accountKey.SequenceNumber).
+		SetPayer(adminAccount.Address).
+		AddAuthorizer(adminAccount.Address)
+
+	err := tx.AddArgument(cadence.NewUInt64(newProtocolVersion))
+	if err != nil {
+		return nil, err
+	}
+	err = tx.AddArgument(cadence.NewUInt64(activeViewDiff))
 	if err != nil {
 		return nil, err
 	}
