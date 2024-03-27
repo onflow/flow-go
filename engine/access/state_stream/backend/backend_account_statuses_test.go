@@ -6,12 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/utils/unittest/generator"
-
-	"github.com/stretchr/testify/mock"
-
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
@@ -20,7 +16,9 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 var testProtocolEventTypes = []flow.EventType{
