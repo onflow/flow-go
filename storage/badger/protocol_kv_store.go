@@ -54,7 +54,7 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 			var kvStore storage.KeyValueStoreData
 			err := operation.RetrieveProtocolKVStore(stateID, &kvStore)(tx)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("could not get kv snapshot by id: %w", err)
 			}
 			return &kvStore, nil
 		}
@@ -76,7 +76,7 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 	retrieveByBlockID := func(blockID flow.Identifier) func(tx *badger.Txn) (flow.Identifier, error) {
 		return func(tx *badger.Txn) (flow.Identifier, error) {
 			var stateID flow.Identifier
-			err := operation.LookupProtocolState(blockID, &stateID)(tx)
+			err := operation.LookupProtocolKVStore(blockID, &stateID)(tx)
 			if err != nil {
 				return flow.ZeroID, fmt.Errorf("could not lookup protocol state ID for block (%x): %w", blockID[:], err)
 			}

@@ -29,47 +29,38 @@ func (_m *StateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal)
 }
 
 // Build provides a mock function with given fields:
-func (_m *StateMutator) Build() (bool, *flow.ProtocolStateEntry, flow.Identifier, []func(*transaction.Tx) error) {
+func (_m *StateMutator) Build() (flow.Identifier, []func(*transaction.Tx) error, error) {
 	ret := _m.Called()
 
-	var r0 bool
-	var r1 *flow.ProtocolStateEntry
-	var r2 flow.Identifier
-	var r3 []func(*transaction.Tx) error
-	if rf, ok := ret.Get(0).(func() (bool, *flow.ProtocolStateEntry, flow.Identifier, []func(*transaction.Tx) error)); ok {
+	var r0 flow.Identifier
+	var r1 []func(*transaction.Tx) error
+	var r2 error
+	if rf, ok := ret.Get(0).(func() (flow.Identifier, []func(*transaction.Tx) error, error)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() bool); ok {
+	if rf, ok := ret.Get(0).(func() flow.Identifier); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(bool)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.Identifier)
+		}
 	}
 
-	if rf, ok := ret.Get(1).(func() *flow.ProtocolStateEntry); ok {
+	if rf, ok := ret.Get(1).(func() []func(*transaction.Tx) error); ok {
 		r1 = rf()
 	} else {
 		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(*flow.ProtocolStateEntry)
+			r1 = ret.Get(1).([]func(*transaction.Tx) error)
 		}
 	}
 
-	if rf, ok := ret.Get(2).(func() flow.Identifier); ok {
+	if rf, ok := ret.Get(2).(func() error); ok {
 		r2 = rf()
 	} else {
-		if ret.Get(2) != nil {
-			r2 = ret.Get(2).(flow.Identifier)
-		}
+		r2 = ret.Error(2)
 	}
 
-	if rf, ok := ret.Get(3).(func() []func(*transaction.Tx) error); ok {
-		r3 = rf()
-	} else {
-		if ret.Get(3) != nil {
-			r3 = ret.Get(3).([]func(*transaction.Tx) error)
-		}
-	}
-
-	return r0, r1, r2, r3
+	return r0, r1, r2
 }
 
 type mockConstructorTestingTNewStateMutator interface {

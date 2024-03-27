@@ -21,6 +21,7 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 	epochCommits := NewEpochCommits(metrics, db)
 	protocolState := NewProtocolState(metrics, setups, epochCommits, db,
 		DefaultProtocolStateCacheSize, DefaultProtocolStateByBlockIDCacheSize)
+	protocolKVStore := NewProtocolKVStore(metrics, db, DefaultProtocolKVStoreCacheSize, DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeacons := NewVersionBeacons(db)
 
 	commits := NewCommits(metrics, db)
@@ -41,6 +42,7 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 		Setups:             setups,
 		EpochCommits:       epochCommits,
 		ProtocolState:      protocolState,
+		ProtocolKVStore:    protocolKVStore,
 		VersionBeacons:     versionBeacons,
 		Results:            results,
 		Receipts:           receipts,

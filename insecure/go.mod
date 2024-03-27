@@ -126,6 +126,8 @@ require (
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
 	github.com/holiman/uint256 v1.2.3 // indirect
+	github.com/huandu/go-clone v1.7.2 // indirect
+	github.com/huandu/go-clone/generic v1.7.2 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/improbable-eng/grpc-web v0.15.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -206,8 +208,8 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.6.0 // indirect
 	github.com/onflow/cadence v0.42.8 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20231219201108-fbdb10b0a2da // indirect
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20231219201108-fbdb10b0a2da // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.2-0.20240318135301-f59efe400a8b // indirect
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.2-0.20240318135301-f59efe400a8b // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230711213910-baad011d2b13 // indirect
 	github.com/onflow/flow-go-sdk v0.44.0 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.1.0 // indirect

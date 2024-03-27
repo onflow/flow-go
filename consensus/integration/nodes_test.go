@@ -378,6 +378,8 @@ func createNode(
 	commitsDB := storage.NewEpochCommits(metricsCollector, db)
 	protocolStateDB := storage.NewProtocolState(metricsCollector, setupsDB, commitsDB, db,
 		storage.DefaultProtocolStateCacheSize, storage.DefaultProtocolStateByBlockIDCacheSize)
+	protocokKVStoreDB := storage.NewProtocolKVStore(metricsCollector, db,
+		storage.DefaultProtocolKVStoreCacheSize, storage.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeaconDB := storage.NewVersionBeacons(db)
 	protocolStateEvents := events.NewDistributor()
 
@@ -399,6 +401,7 @@ func createNode(
 		setupsDB,
 		commitsDB,
 		protocolStateDB,
+		protocokKVStoreDB,
 		versionBeaconDB,
 		rootSnapshot,
 	)
@@ -462,6 +465,7 @@ func createNode(
 
 	mutableProtocolState := protocol_state.NewMutableProtocolState(
 		protocolStateDB,
+		protocokKVStoreDB,
 		state.Params(),
 		headersDB,
 		resultsDB,

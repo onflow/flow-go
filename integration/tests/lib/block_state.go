@@ -20,7 +20,7 @@ type BlockState struct {
 	blocksByHeight    map[uint64][]*flow.Block
 	finalizedByHeight map[uint64]*flow.Block
 	highestFinalized  uint64
-	highestProposed   uint64
+	highestProposed   *flow.Block
 	highestSealed     *flow.Block
 }
 
@@ -33,6 +33,42 @@ func NewBlockState() *BlockState {
 	}
 }
 
+func (bs *BlockState) ByBlockID(id flow.Identifier) (*flow.Block, bool) {
+	block, ok := bs.blocksByID[id]
+	return block, ok
+}
+
+// WaitForHalt attempts to detect when consensus has halted by observing a certain duration
+// pass without progress (proposals with newer views).
+func (bs *BlockState) WaitForHalt(t *testing.T, requiredDurationWithoutProgress, tick, timeout time.Duration) {
+	timeSinceLastProgress := time.Duration(0)
+	lastView := bs.HighestProposedView()
+	start := time.Now()
+	lastProgress := start
+
+	t.Logf("waiting for halt: lastView=%d", lastView)
+
+	ticker := time.NewTicker(tick)
+	timer := time.NewTimer(timeout)
+	defer ticker.Stop()
+	defer timer.Stop()
+	for timeSinceLastProgress < requiredDurationWithoutProgress {
+		select {
+		case <-timer.C:
+			t.Fatalf("failed to observe progress halt after %s, requiring %s without progress to succeed", timeout, requiredDurationWithoutProgress)
+		case <-ticker.C:
+		}
+
+		latestView := bs.HighestProposedView()
+		if latestView > lastView {
+			lastView = latestView
+			lastProgress = time.Now()
+		}
+		timeSinceLastProgress = time.Now().Sub(lastProgress)
+	}
+	t.Logf("successfully observed progress halt for %s after %s of waiting", requiredDurationWithoutProgress, time.Since(start))
+}
+
 func (bs *BlockState) Add(t *testing.T, msg *messages.BlockProposal) {
 	b := msg.Block.ToInternal()
 	bs.Lock()
@@ -40,8 +76,10 @@ func (bs *BlockState) Add(t *testing.T, msg *messages.BlockProposal) {
 
 	bs.blocksByID[b.Header.ID()] = b
 	bs.blocksByHeight[b.Header.Height] = append(bs.blocksByHeight[b.Header.Height], b)
-	if b.Header.Height > bs.highestProposed {
-		bs.highestProposed = b.Header.Height
+	if bs.highestProposed == nil {
+		bs.highestProposed = b
+	} else if b.Header.View > bs.highestProposed.Header.View {
+		bs.highestProposed = b
 	}
 
 	if b.Header.Height < 3 {
@@ -232,7 +270,14 @@ func (bs *BlockState) HighestFinalized() (*flow.Block, bool) {
 func (bs *BlockState) HighestProposedHeight() uint64 {
 	bs.RLock()
 	defer bs.RUnlock()
-	return bs.highestProposed
+	return bs.highestProposed.Header.Height
+}
+
+// HighestProposedView returns the view of the highest proposed block.
+func (bs *BlockState) HighestProposedView() uint64 {
+	bs.RLock()
+	defer bs.RUnlock()
+	return bs.highestProposed.Header.View
 }
 
 // HighestFinalizedHeight returns the height of the highest finalized block.
@@ -257,6 +302,26 @@ func (bs *BlockState) WaitForSealed(t *testing.T, height uint64) *flow.Block {
 		blockStateTimeout,
 		100*time.Millisecond,
 		fmt.Sprintf("did not receive sealed block for height (%v) within %v seconds", height, blockStateTimeout))
+
+	bs.RLock()
+	defer bs.RUnlock()
+	return bs.highestSealed
+}
+
+func (bs *BlockState) WaitForSealedView(t *testing.T, view uint64) *flow.Block {
+	require.Eventually(t,
+		func() bool {
+			bs.RLock()
+			defer bs.RUnlock()
+
+			if bs.highestSealed != nil {
+				t.Logf("%v waiting for sealed view (%d/%d), last finalized %d", time.Now().UTC(), bs.highestSealed.Header.Height, view, bs.highestFinalized)
+			}
+			return bs.highestSealed != nil && bs.highestSealed.Header.View >= view
+		},
+		blockStateTimeout,
+		100*time.Millisecond,
+		fmt.Sprintf("did not receive sealed block for view (%v) within %v seconds", view, blockStateTimeout))
 
 	bs.RLock()
 	defer bs.RUnlock()

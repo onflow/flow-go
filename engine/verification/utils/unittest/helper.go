@@ -655,6 +655,7 @@ func bootstrapSystem(
 
 		mutableProtocolState := protocol_state.NewMutableProtocolState(
 			stateFixture.Storage.ProtocolState,
+			stateFixture.Storage.ProtocolKVStore,
 			stateFixture.State.Params(),
 			stateFixture.Storage.Headers,
 			stateFixture.Storage.Results,

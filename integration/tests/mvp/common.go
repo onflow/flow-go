@@ -53,7 +53,7 @@ func RunMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork, acc
 	require.NoError(t, err)
 	createAccountTx.
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
-		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
+		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetAndIncrementSeqNumber()).
 		SetPayer(serviceAddress).
 		SetComputeLimit(9999)
 
@@ -107,7 +107,7 @@ func RunMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork, acc
 		))).
 		AddAuthorizer(serviceAddress).
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
-		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
+		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetAndIncrementSeqNumber()).
 		SetPayer(serviceAddress).
 		SetComputeLimit(9999)
 

@@ -180,6 +180,7 @@ generate-mocks: install-mock-generators
 	mockery --name '.*' --dir="state/protocol" --case=underscore --output="state/protocol/mock" --outpkg="mock"
 	mockery --name '.*' --dir="state/protocol/events" --case=underscore --output="./state/protocol/events/mock" --outpkg="mock"
 	mockery --name '.*' --dir="state/protocol/protocol_state" --case=underscore --output="state/protocol/protocol_state/mock" --outpkg="mock"
+	mockery --name '.*' --dir="state/protocol/protocol_state/epochs" --case=underscore --output="state/protocol/protocol_state/epochs/mock" --outpkg="mock"
 	mockery --name '.*' --dir=engine/execution/computation/computer --case=underscore --output="./engine/execution/computation/computer/mock" --outpkg="mock"
 	mockery --name '.*' --dir=engine/execution/state --case=underscore --output="./engine/execution/state/mock" --outpkg="mock"
 	mockery --name '.*' --dir=engine/collection --case=underscore --output="./engine/collection/mock" --outpkg="mock"

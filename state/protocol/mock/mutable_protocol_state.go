@@ -56,25 +56,25 @@ func (_m *MutableProtocolState) GlobalParams() protocol.GlobalParams {
 	return r0
 }
 
-// Mutator provides a mock function with given fields: candidateView, parentID
-func (_m *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Identifier) (protocol.StateMutator, error) {
-	ret := _m.Called(candidateView, parentID)
+// Mutator provides a mock function with given fields: candidate
+func (_m *MutableProtocolState) Mutator(candidate *flow.Header) (protocol.StateMutator, error) {
+	ret := _m.Called(candidate)
 
 	var r0 protocol.StateMutator
 	var r1 error
-	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier) (protocol.StateMutator, error)); ok {
-		return rf(candidateView, parentID)
+	if rf, ok := ret.Get(0).(func(*flow.Header) (protocol.StateMutator, error)); ok {
+		return rf(candidate)
 	}
-	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier) protocol.StateMutator); ok {
-		r0 = rf(candidateView, parentID)
+	if rf, ok := ret.Get(0).(func(*flow.Header) protocol.StateMutator); ok {
+		r0 = rf(candidate)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(protocol.StateMutator)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(uint64, flow.Identifier) error); ok {
-		r1 = rf(candidateView, parentID)
+	if rf, ok := ret.Get(1).(func(*flow.Header) error); ok {
+		r1 = rf(candidate)
 	} else {
 		r1 = ret.Error(1)
 	}

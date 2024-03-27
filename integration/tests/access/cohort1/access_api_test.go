@@ -321,7 +321,7 @@ func (s *AccessAPISuite) deployContract() *sdk.TransactionResult {
 	createCounterTx := sdk.NewTransaction().
 		SetScript([]byte(lib.CreateCounterTx(serviceAddress).ToCadence())).
 		SetReferenceBlockID(sdk.Identifier(header.ID)).
-		SetProposalKey(serviceAddress, 0, s.serviceClient.GetSeqNumber()).
+		SetProposalKey(serviceAddress, 0, s.serviceClient.GetAndIncrementSeqNumber()).
 		SetPayer(serviceAddress).
 		AddAuthorizer(serviceAddress).
 		SetComputeLimit(9999)

@@ -16,7 +16,7 @@ func TestEpochFallbackStateMachine(t *testing.T) {
 // ProtocolStateMachineSuite is a dedicated test suite for testing happy path state machine.
 type EpochFallbackStateMachineSuite struct {
 	BaseProtocolStateMachineSuite
-	stateMachine *EpochFallbackStateMachine
+	stateMachine *FallbackStateMachine
 }
 
 func (s *EpochFallbackStateMachineSuite) SetupTest() {

@@ -21,6 +21,7 @@ type All struct {
 	Collections             Collections
 	Events                  Events
 	ProtocolState           ProtocolState
+	ProtocolKVStore         ProtocolKVStore
 	VersionBeacons          VersionBeacons
 	RegisterIndex           RegisterIndex
 }

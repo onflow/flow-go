@@ -148,7 +148,7 @@ func (s *AccessCircuitBreakerSuite) TestCircuitBreaker() {
 
 	createAccountTx.
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
-		SetProposalKey(serviceAddress, 0, accessClient.GetSeqNumber()).
+		SetProposalKey(serviceAddress, 0, accessClient.GetAndIncrementSeqNumber()).
 		SetPayer(serviceAddress).
 		SetComputeLimit(9999)
 

@@ -79,6 +79,7 @@ func RunWithBootstrapState(t testing.TB, rootSnapshot protocol.Snapshot, f func(
 			all.Setups,
 			all.EpochCommits,
 			all.ProtocolState,
+			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -105,6 +106,7 @@ func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f fu
 			all.Setups,
 			all.EpochCommits,
 			all.ProtocolState,
+			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -145,6 +147,7 @@ func RunWithFullProtocolStateAndMetrics(t testing.TB, rootSnapshot protocol.Snap
 			all.Setups,
 			all.EpochCommits,
 			all.ProtocolState,
+			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -186,6 +189,7 @@ func RunWithFullProtocolStateAndValidator(t testing.TB, rootSnapshot protocol.Sn
 			all.Setups,
 			all.EpochCommits,
 			all.ProtocolState,
+			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -226,6 +230,7 @@ func RunWithFollowerProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, 
 			all.Setups,
 			all.EpochCommits,
 			all.ProtocolState,
+			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -262,6 +267,7 @@ func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Sna
 			all.Setups,
 			all.EpochCommits,
 			all.ProtocolState,
+			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -301,6 +307,7 @@ func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot pr
 			all.Setups,
 			all.EpochCommits,
 			all.ProtocolState,
+			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -322,6 +329,7 @@ func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot pr
 		require.NoError(t, err)
 		mutableProtocolState := protocol_state.NewMutableProtocolState(
 			all.ProtocolState,
+			all.ProtocolKVStore,
 			state.Params(),
 			all.Headers,
 			all.Results,
@@ -350,6 +358,7 @@ func RunWithFollowerProtocolStateAndHeaders(t testing.TB, rootSnapshot protocol.
 			all.Setups,
 			all.EpochCommits,
 			all.ProtocolState,
+			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -387,6 +396,7 @@ func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snap
 			all.Setups,
 			all.EpochCommits,
 			all.ProtocolState,
+			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -408,6 +418,7 @@ func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snap
 		require.NoError(t, err)
 		mutableProtocolState := protocol_state.NewMutableProtocolState(
 			all.ProtocolState,
+			all.ProtocolKVStore,
 			state.Params(),
 			all.Headers,
 			all.Results,

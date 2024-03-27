@@ -14,6 +14,22 @@ type KVStoreMutator struct {
 	mock.Mock
 }
 
+// GetEpochStateID provides a mock function with given fields:
+func (_m *KVStoreMutator) GetEpochStateID() flow.Identifier {
+	ret := _m.Called()
+
+	var r0 flow.Identifier
+	if rf, ok := ret.Get(0).(func() flow.Identifier); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.Identifier)
+		}
+	}
+
+	return r0
+}
+
 // GetInvalidEpochTransitionAttempted provides a mock function with given fields:
 func (_m *KVStoreMutator) GetInvalidEpochTransitionAttempted() (bool, error) {
 	ret := _m.Called()
@@ -82,6 +98,11 @@ func (_m *KVStoreMutator) ID() flow.Identifier {
 	}
 
 	return r0
+}
+
+// SetEpochStateID provides a mock function with given fields: stateID
+func (_m *KVStoreMutator) SetEpochStateID(stateID flow.Identifier) {
+	_m.Called(stateID)
 }
 
 // SetInvalidEpochTransitionAttempted provides a mock function with given fields: attempted
