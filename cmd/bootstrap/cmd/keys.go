@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/crypto"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
@@ -20,7 +21,11 @@ import (
 func genNetworkAndStakingKeys() []model.NodeInfo {
 
 	var nodeConfigs []model.NodeConfig
-	readJSON(flagConfig, &nodeConfigs)
+	err := common.ReadJSON(flagConfig, &nodeConfigs)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read json")
+	}
+
 	nodes := len(nodeConfigs)
 	log.Info().Msgf("read %v node configurations", nodes)
 
@@ -62,8 +67,8 @@ func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto
 	}
 
 	log.Debug().
-		Str("networkPubKey", pubKeyToString(networkKey.PublicKey())).
-		Str("stakingPubKey", pubKeyToString(stakingKey.PublicKey())).
+		Str("networkPubKey", common.PubKeyToString(networkKey.PublicKey())).
+		Str("stakingPubKey", common.PubKeyToString(stakingKey.PublicKey())).
 		Msg("encoded public staking and network keys")
 
 	nodeInfo := model.NewPrivateNodeInfo(

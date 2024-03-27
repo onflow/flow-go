@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
 )
 
@@ -35,7 +36,7 @@ func dbEncryptionKeyRun(_ *cobra.Command, _ []string) {
 	log = log.With().Str("path", dbEncryptionKeyPath).Logger()
 
 	// check if the key already exists
-	exists, err := pathExists(path.Join(flagOutdir, dbEncryptionKeyPath))
+	exists, err := common.PathExists(path.Join(flagOutdir, dbEncryptionKeyPath))
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not check if db encryption key already exists")
 	}
@@ -50,5 +51,10 @@ func dbEncryptionKeyRun(_ *cobra.Command, _ []string) {
 	}
 	log.Info().Msg("generated db encryption key")
 
-	writeText(dbEncryptionKeyPath, dbEncryptionKey)
+	err = common.WriteText(dbEncryptionKeyPath, flagOutdir, dbEncryptionKey)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write file")
+	}
+
+	log.Info().Msgf("wrote file %v", dbEncryptionKeyPath)
 }

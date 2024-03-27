@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
@@ -48,6 +49,9 @@ func constructRootVotes(block *flow.Block, allNodes, internalNodes []bootstrap.N
 
 	for _, vote := range votes {
 		path := filepath.Join(bootstrap.DirnameRootBlockVotes, fmt.Sprintf(bootstrap.FilenameRootBlockVote, vote.SignerID))
-		writeJSON(path, vote)
+		err = common.WriteJSON(path, flagOutdir, vote)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to write json")
+		}
 	}
 }

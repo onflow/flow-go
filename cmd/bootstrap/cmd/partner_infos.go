@@ -203,12 +203,18 @@ func validateANNetworkKey(key string) error {
 // writeNodePubInfoFile writes the node-pub-info file
 func writeNodePubInfoFile(info *bootstrap.NodeInfoPub) {
 	fileOutputPath := fmt.Sprintf(bootstrap.PathNodeInfoPub, info.NodeID)
-	writeJSON(fileOutputPath, info)
+	err := common.WriteJSON(fileOutputPath, flagOutdir, info)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
 }
 
 // writePartnerWeightsFile writes the partner weights file
 func writePartnerWeightsFile(partnerWeights PartnerWeights) {
-	writeJSON(bootstrap.FileNamePartnerWeights, partnerWeights)
+	err := common.WriteJSON(bootstrap.FileNamePartnerWeights, flagOutdir, partnerWeights)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
 }
 
 func printNodeCounts(numOfNodesByType map[flow.Role]int, totalNumOfPartnerNodes, skippedNodes int) {

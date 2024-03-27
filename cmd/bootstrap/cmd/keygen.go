@@ -5,11 +5,11 @@ import (
 	"io"
 	"os"
 
-	"github.com/onflow/flow-go/cmd"
-	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
 )
 
@@ -22,7 +22,7 @@ var keygenCmd = &cobra.Command{
 	Long:  `Generate Staking and Networking keys for a list of nodes provided by the flag '--config'`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// check if out directory exists
-		exists, err := pathExists(flagOutdir)
+		exists, err := common.PathExists(flagOutdir)
 		if err != nil {
 			log.Error().Msg("could not check if directory exists")
 			return
@@ -49,12 +49,10 @@ var keygenCmd = &cobra.Command{
 
 		// write key files
 		writeJSONFile := func(relativePath string, val interface{}) error {
-			writeJSON(relativePath, val)
-			return nil
+			return common.WriteJSON(relativePath, flagOutdir, val)
 		}
 		writeFile := func(relativePath string, data []byte) error {
-			writeText(relativePath, data)
-			return nil
+			return common.WriteText(relativePath, flagOutdir, data)
 		}
 
 		log.Info().Msg("writing internal private key files")
@@ -85,7 +83,7 @@ var keygenCmd = &cobra.Command{
 		}
 
 		// count roles
-		roleCounts := nodeCountByRole(nodes)
+		roleCounts := common.NodeCountByRole(nodes)
 		for role, count := range roleCounts {
 			log.Info().Msg(fmt.Sprintf("created keys for %d %s nodes", count, role.String()))
 		}
@@ -127,5 +125,8 @@ func genNodePubInfo(nodes []model.NodeInfo) {
 	for _, node := range nodes {
 		pubNodes = append(pubNodes, node.Public())
 	}
-	writeJSON(model.PathInternalNodeInfosPub, pubNodes)
+	err := common.WriteJSON(model.PathInternalNodeInfosPub, flagOutdir, pubNodes)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
 }
