@@ -124,6 +124,8 @@ func TestBackend_RunLimitChecking(t *testing.T) {
 
 	for i := 0; i < swarm; i++ {
 		go func(x int) {
+			defer wg.Done()
+
 			// creates and adds a fake item to the mempool
 			item := unittest.MockEntityFixture()
 			_ = pool.Run(func(backdata mempool.BackData) error {
@@ -138,7 +140,6 @@ func TestBackend_RunLimitChecking(t *testing.T) {
 			// evaluates that the size remains in the permissible range
 			require.True(t, pool.Size() <= uint(limit),
 				fmt.Sprintf("size violation: should be at most: %d, got: %d", limit, pool.Size()))
-			wg.Done()
 		}(i)
 	}
 
@@ -172,10 +173,10 @@ func TestBackend_RegisterEjectionCallback(t *testing.T) {
 	wg.Add(swarm)
 	for i := 0; i < swarm; i++ {
 		go func(x int) {
+			defer wg.Done()
 			// creates and adds a fake item to the mempool
 			item := unittest.MockEntityFixture()
 			pool.Add(item)
-			wg.Done()
 		}(i)
 	}
 
@@ -237,7 +238,7 @@ func TestBackend_AdjustWithInit_Concurrent_HeroCache(t *testing.T) {
 		adjustDone.Add(1)
 		e := e // capture range variable
 		go func() {
-			adjustDone.Done()
+			defer adjustDone.Done()
 
 			backend.AdjustWithInit(e.ID(), func(entity flow.Entity) flow.Entity {
 				// increment nonce of the entity
@@ -274,7 +275,7 @@ func TestBackend_GetWithInit_Concurrent_HeroCache(t *testing.T) {
 		adjustDone.Add(1)
 		e := e // capture range variable
 		go func() {
-			adjustDone.Done()
+			defer adjustDone.Done()
 
 			entity, ok := backend.GetWithInit(e.ID(), func() flow.Entity {
 				return e
@@ -305,7 +306,7 @@ func TestBackend_AdjustWithInit_Concurrent_MapBased(t *testing.T) {
 		adjustDone.Add(1)
 		e := e // capture range variable
 		go func() {
-			adjustDone.Done()
+			defer adjustDone.Done()
 
 			backend.AdjustWithInit(e.ID(), func(entity flow.Entity) flow.Entity {
 				// increment nonce of the entity
@@ -340,7 +341,7 @@ func TestBackend_GetWithInit_Concurrent_MapBased(t *testing.T) {
 		adjustDone.Add(1)
 		e := e // capture range variable
 		go func() {
-			adjustDone.Done()
+			defer adjustDone.Done()
 
 			entity, ok := backend.GetWithInit(e.ID(), func() flow.Entity {
 				return e
@@ -365,8 +366,8 @@ func addRandomEntities(t *testing.T, backend *stdmap.Backend, num int) {
 	wg.Add(num)
 	for ; num > 0; num-- {
 		go func() {
+			defer wg.Done()
 			backend.Add(unittest.MockEntityFixture()) // creates and adds a fake item to the mempool
-			wg.Done()
 		}()
 	}
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "failed to add elements in time")
