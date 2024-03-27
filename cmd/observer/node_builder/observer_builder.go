@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -35,6 +36,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rest"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
@@ -46,13 +48,18 @@ import (
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/protocol"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
+	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -62,6 +69,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
 	consensus_follower "github.com/onflow/flow-go/module/upstream"
 	"github.com/onflow/flow-go/network"
@@ -91,6 +99,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	pStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -115,23 +124,28 @@ import (
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type ObserverServiceConfig struct {
-	bootstrapNodeAddresses    []string
-	bootstrapNodePublicKeys   []string
-	observerNetworkingKeyPath string
-	bootstrapIdentities       flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
-	apiRatelimits             map[string]int
-	apiBurstlimits            map[string]int
-	rpcConf                   rpc.Config
-	rpcMetricsEnabled         bool
-	apiTimeout                time.Duration
-	upstreamNodeAddresses     []string
-	upstreamNodePublicKeys    []string
-	executionDataSyncEnabled  bool
-	executionDataDir          string
-	executionDataStartHeight  uint64
-	executionDataConfig       edrequester.ExecutionDataConfig
-	executionDataCacheSize    uint32            // TODO: remove it when state stream is added
-	upstreamIdentities        flow.IdentityList // the identity list of upstream peers the node uses to forward API requests to
+	bootstrapNodeAddresses       []string
+	bootstrapNodePublicKeys      []string
+	observerNetworkingKeyPath    string
+	bootstrapIdentities          flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
+	apiRatelimits                map[string]int
+	apiBurstlimits               map[string]int
+	rpcConf                      rpc.Config
+	rpcMetricsEnabled            bool
+	registersDBPath              string
+	checkpointFile               string
+	apiTimeout                   time.Duration
+	stateStreamConf              statestreambackend.Config
+	stateStreamFilterConf        map[string]int
+	upstreamNodeAddresses        []string
+	upstreamNodePublicKeys       []string
+	upstreamIdentities           flow.IdentityList // the identity list of upstream peers the node uses to forward API requests to
+	scriptExecutorConfig         query.QueryConfig
+	executionDataSyncEnabled     bool
+	executionDataIndexingEnabled bool
+	executionDataDir             string
+	executionDataStartHeight     uint64
+	executionDataConfig          edrequester.ExecutionDataConfig
 }
 
 // DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
@@ -161,18 +175,34 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			MaxMsgSize:     grpcutils.DefaultMaxMsgSize,
 			CompressorName: grpcutils.NoCompressor,
 		},
-		rpcMetricsEnabled:         false,
-		apiRatelimits:             nil,
-		apiBurstlimits:            nil,
-		bootstrapNodeAddresses:    []string{},
-		bootstrapNodePublicKeys:   []string{},
-		observerNetworkingKeyPath: cmd.NotSet,
-		apiTimeout:                3 * time.Second,
-		upstreamNodeAddresses:     []string{},
-		upstreamNodePublicKeys:    []string{},
-		executionDataSyncEnabled:  false,
-		executionDataDir:          filepath.Join(homedir, ".flow", "execution_data"),
-		executionDataStartHeight:  0,
+		stateStreamConf: statestreambackend.Config{
+			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
+			ExecutionDataCacheSize:  state_stream.DefaultCacheSize,
+			ClientSendTimeout:       state_stream.DefaultSendTimeout,
+			ClientSendBufferSize:    state_stream.DefaultSendBufferSize,
+			MaxGlobalStreams:        state_stream.DefaultMaxGlobalStreams,
+			EventFilterConfig:       state_stream.DefaultEventFilterConfig,
+			ResponseLimit:           state_stream.DefaultResponseLimit,
+			HeartbeatInterval:       state_stream.DefaultHeartbeatInterval,
+			RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
+		},
+		stateStreamFilterConf:        nil,
+		rpcMetricsEnabled:            false,
+		apiRatelimits:                nil,
+		apiBurstlimits:               nil,
+		bootstrapNodeAddresses:       []string{},
+		bootstrapNodePublicKeys:      []string{},
+		observerNetworkingKeyPath:    cmd.NotSet,
+		apiTimeout:                   3 * time.Second,
+		upstreamNodeAddresses:        []string{},
+		upstreamNodePublicKeys:       []string{},
+		registersDBPath:              filepath.Join(homedir, ".flow", "execution_state"),
+		checkpointFile:               cmd.NotSet,
+		scriptExecutorConfig:         query.NewDefaultConfig(),
+		executionDataSyncEnabled:     false,
+		executionDataIndexingEnabled: false,
+		executionDataDir:             filepath.Join(homedir, ".flow", "execution_data"),
+		executionDataStartHeight:     0,
 		executionDataConfig: edrequester.ExecutionDataConfig{
 			InitialBlockHeight: 0,
 			MaxSearchAhead:     edrequester.DefaultMaxSearchAhead,
@@ -181,7 +211,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			RetryDelay:         edrequester.DefaultRetryDelay,
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
-		executionDataCacheSize: state_stream.DefaultCacheSize,
 	}
 }
 
@@ -192,36 +221,48 @@ type ObserverServiceBuilder struct {
 	*ObserverServiceConfig
 
 	// components
-	LibP2PNode          p2p.LibP2PNode
-	FollowerState       stateprotocol.FollowerState
-	SyncCore            *chainsync.Core
-	RpcEng              *rpc.Engine
-	FollowerDistributor *pubsub.FollowerDistributor
-	Committee           hotstuff.DynamicCommittee
-	Finalized           *flow.Header
-	Pending             []*flow.Header
-	FollowerCore        module.HotStuffFollower
+
+	LibP2PNode           p2p.LibP2PNode
+	FollowerState        stateprotocol.FollowerState
+	SyncCore             *chainsync.Core
+	RpcEng               *rpc.Engine
+	FollowerDistributor  *pubsub.FollowerDistributor
+	Committee            hotstuff.DynamicCommittee
+	Finalized            *flow.Header
+	Pending              []*flow.Header
+	FollowerCore         module.HotStuffFollower
+	ExecutionIndexer     *indexer.Indexer
+	ExecutionIndexerCore *indexer.IndexerCore
+	IndexerDependencies  *cmd.DependencyList
+
+	ExecutionDataDownloader execution_data.Downloader
+	ExecutionDataRequester  state_synchronization.ExecutionDataRequester
+	ExecutionDataStore      execution_data.ExecutionDataStore
+
+	RegistersAsyncStore *execution.RegistersAsyncStore
+	EventsIndex         *backend.EventsIndex
 
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
 	SyncEngineParticipantsProviderFactory func() module.IdentifierProvider
 
 	// engines
-	FollowerEng *follower.ComplianceEngine
-	SyncEng     *synceng.Engine
+	FollowerEng    *follower.ComplianceEngine
+	SyncEng        *synceng.Engine
+	StateStreamEng *statestreambackend.Engine
 
 	// Public network
 	peerID peer.ID
 
 	RestMetrics   *metrics.RestCollector
 	AccessMetrics module.AccessMetrics
-	// grpc servers
-	secureGrpcServer   *grpcserver.GrpcServer
-	unsecureGrpcServer *grpcserver.GrpcServer
 
-	ExecutionDataDownloader execution_data.Downloader
-	ExecutionDataRequester  state_synchronization.ExecutionDataRequester
-	ExecutionDataStore      execution_data.ExecutionDataStore
+	// grpc servers
+	secureGrpcServer      *grpcserver.GrpcServer
+	unsecureGrpcServer    *grpcserver.GrpcServer
+	stateStreamGrpcServer *grpcserver.GrpcServer
+
+	stateStreamBackend *statestreambackend.StateStreamBackend
 }
 
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
@@ -486,6 +527,7 @@ func NewFlowObserverServiceBuilder(opts ...Option) *ObserverServiceBuilder {
 		ObserverServiceConfig: config,
 		FlowNodeBuilder:       cmd.FlowNode("observer"),
 		FollowerDistributor:   pubsub.NewFollowerDistributor(),
+		IndexerDependencies:   cmd.NewDependencyList(),
 	}
 	anb.FollowerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(anb.Logger))
 	// the observer gets a version of the root snapshot file that does not contain any node addresses
@@ -572,6 +614,12 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			defaultConfig.upstreamNodePublicKeys,
 			"the networking public key of the upstream access node (in the same order as the upstream node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
+		flags.BoolVar(&builder.executionDataIndexingEnabled,
+			"execution-data-indexing-enabled",
+			defaultConfig.executionDataIndexingEnabled,
+			"whether to enable the execution data indexing")
+		flags.StringVar(&builder.registersDBPath, "execution-state-dir", defaultConfig.registersDBPath, "directory to use for execution-state database")
+		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "execution-state checkpoint file")
 
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
@@ -606,10 +654,53 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"execution-data-max-retry-delay",
 			defaultConfig.executionDataConfig.MaxRetryDelay,
 			"maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
-		flags.Uint32Var(&builder.executionDataCacheSize,
+
+		// Streaming API
+		flags.StringVar(&builder.stateStreamConf.ListenAddr,
+			"state-stream-addr",
+			defaultConfig.stateStreamConf.ListenAddr,
+			"the address the state stream server listens on (if empty the server will not be started)")
+		flags.Uint32Var(&builder.stateStreamConf.ExecutionDataCacheSize,
 			"execution-data-cache-size",
-			defaultConfig.executionDataCacheSize,
+			defaultConfig.stateStreamConf.ExecutionDataCacheSize,
 			"block execution data cache size")
+		flags.Uint32Var(&builder.stateStreamConf.MaxGlobalStreams,
+			"state-stream-global-max-streams", defaultConfig.stateStreamConf.MaxGlobalStreams,
+			"global maximum number of concurrent streams")
+		flags.UintVar(&builder.stateStreamConf.MaxExecutionDataMsgSize,
+			"state-stream-max-message-size",
+			defaultConfig.stateStreamConf.MaxExecutionDataMsgSize,
+			"maximum size for a gRPC message containing block execution data")
+		flags.StringToIntVar(&builder.stateStreamFilterConf,
+			"state-stream-event-filter-limits",
+			defaultConfig.stateStreamFilterConf,
+			"event filter limits for ExecutionData SubscribeEvents API e.g. EventTypes=100,Addresses=100,Contracts=100 etc.")
+		flags.DurationVar(&builder.stateStreamConf.ClientSendTimeout,
+			"state-stream-send-timeout",
+			defaultConfig.stateStreamConf.ClientSendTimeout,
+			"maximum wait before timing out while sending a response to a streaming client e.g. 30s")
+		flags.UintVar(&builder.stateStreamConf.ClientSendBufferSize,
+			"state-stream-send-buffer-size",
+			defaultConfig.stateStreamConf.ClientSendBufferSize,
+			"maximum number of responses to buffer within a stream")
+		flags.Float64Var(&builder.stateStreamConf.ResponseLimit,
+			"state-stream-response-limit",
+			defaultConfig.stateStreamConf.ResponseLimit,
+			"max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
+		flags.Uint64Var(&builder.stateStreamConf.HeartbeatInterval,
+			"state-stream-heartbeat-interval",
+			defaultConfig.stateStreamConf.HeartbeatInterval,
+			"default interval in blocks at which heartbeat messages should be sent. applied when client did not specify a value.")
+		flags.Uint32Var(&builder.stateStreamConf.RegisterIDsRequestLimit,
+			"state-stream-max-register-values",
+			defaultConfig.stateStreamConf.RegisterIDsRequestLimit,
+			"maximum number of register ids to include in a single request to the GetRegisters endpoint")
+
+		flags.StringVar(&builder.rpcConf.BackendConfig.EventQueryMode,
+			"event-query-mode",
+			defaultConfig.rpcConf.BackendConfig.EventQueryMode,
+			"mode to use when querying events. one of [local-only, execution-nodes-only(default), failover]")
+
 	}).ValidateFlags(func() error {
 		if builder.executionDataSyncEnabled {
 			if builder.executionDataConfig.FetchTimeout <= 0 {
@@ -626,6 +717,33 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			}
 			if builder.executionDataConfig.MaxSearchAhead == 0 {
 				return errors.New("execution-data-max-search-ahead must be greater than 0")
+			}
+		}
+		if builder.stateStreamConf.ListenAddr != "" {
+			if builder.stateStreamConf.ExecutionDataCacheSize == 0 {
+				return errors.New("execution-data-cache-size must be greater than 0")
+			}
+			if builder.stateStreamConf.ClientSendBufferSize == 0 {
+				return errors.New("state-stream-send-buffer-size must be greater than 0")
+			}
+			if len(builder.stateStreamFilterConf) > 3 {
+				return errors.New("state-stream-event-filter-limits must have at most 3 keys (EventTypes, Addresses, Contracts)")
+			}
+			for key, value := range builder.stateStreamFilterConf {
+				switch key {
+				case "EventTypes", "Addresses", "Contracts":
+					if value <= 0 {
+						return fmt.Errorf("state-stream-event-filter-limits %s must be greater than 0", key)
+					}
+				default:
+					return errors.New("state-stream-event-filter-limits may only contain the keys EventTypes, Addresses, Contracts")
+				}
+			}
+			if builder.stateStreamConf.ResponseLimit < 0 {
+				return errors.New("state-stream-response-limit must be greater than or equal to 0")
+			}
+			if builder.stateStreamConf.RegisterIDsRequestLimit <= 0 {
+				return errors.New("state-stream-max-register-values must be greater than 0")
 			}
 		}
 
@@ -894,9 +1012,11 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	var publicBsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
+	var executionDataStoreCache *execdatacache.ExecutionDataCache
 
 	// setup dependency chain to ensure indexer starts after the requester
 	requesterDependable := module.NewProxiedReadyDoneAware()
+	builder.IndexerDependencies.Add(requesterDependable)
 
 	builder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
@@ -951,7 +1071,18 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				heroCacheCollector = metrics.AccessNodeExecutionDataCacheMetrics(builder.MetricsRegisterer)
 			}
 
-			execDataCacheBackend = herocache.NewBlockExecutionData(builder.executionDataCacheSize, builder.Logger, heroCacheCollector)
+			execDataCacheBackend = herocache.NewBlockExecutionData(builder.stateStreamConf.ExecutionDataCacheSize, builder.Logger, heroCacheCollector)
+
+			// Execution Data cache that uses a blobstore as the backend (instead of a downloader)
+			// This ensures that it simply returns a not found error if the blob doesn't exist
+			// instead of attempting to download it from the network.
+			executionDataStoreCache = execdatacache.NewExecutionDataCache(
+				builder.ExecutionDataStore,
+				builder.Storage.Headers,
+				builder.Storage.Seals,
+				builder.Storage.Results,
+				execDataCacheBackend,
+			)
 
 			return nil
 		}).
@@ -1049,6 +1180,200 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			return builder.ExecutionDataRequester, nil
 		})
 
+	if builder.executionDataIndexingEnabled {
+		var indexedBlockHeight storage.ConsumerProgress
+
+		builder.Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
+			// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
+			indexedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
+			return nil
+		}).Module("transaction results storage", func(node *cmd.NodeConfig) error {
+			builder.Storage.LightTransactionResults = bstorage.NewLightTransactionResults(node.Metrics.Cache, node.DB, bstorage.DefaultCacheSize)
+			return nil
+		}).DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// Note: using a DependableComponent here to ensure that the indexer does not block
+			// other components from starting while bootstrapping the register db since it may
+			// take hours to complete.
+
+			pdb, err := pStorage.OpenRegisterPebbleDB(builder.registersDBPath)
+			if err != nil {
+				return nil, fmt.Errorf("could not open registers db: %w", err)
+			}
+			builder.ShutdownFunc(func() error {
+				return pdb.Close()
+			})
+
+			bootstrapped, err := pStorage.IsBootstrapped(pdb)
+			if err != nil {
+				return nil, fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
+			}
+
+			if !bootstrapped {
+				checkpointFile := builder.checkpointFile
+				if checkpointFile == cmd.NotSet {
+					checkpointFile = path.Join(builder.BootstrapDir, bootstrap.PathRootCheckpoint)
+				}
+
+				// currently, the checkpoint must be from the root block.
+				// read the root hash from the provided checkpoint and verify it matches the
+				// state commitment from the root snapshot.
+				err := wal.CheckpointHasRootHash(
+					node.Logger,
+					"", // checkpoint file already full path
+					checkpointFile,
+					ledger.RootHash(node.RootSeal.FinalState),
+				)
+				if err != nil {
+					return nil, fmt.Errorf("could not verify checkpoint file: %w", err)
+				}
+
+				checkpointHeight := builder.SealedRootBlock.Header.Height
+
+				if builder.SealedRootBlock.ID() != builder.RootSeal.BlockID {
+					return nil, fmt.Errorf("mismatching sealed root block and root seal: %v != %v",
+						builder.SealedRootBlock.ID(), builder.RootSeal.BlockID)
+				}
+
+				rootHash := ledger.RootHash(builder.RootSeal.FinalState)
+				bootstrap, err := pStorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, rootHash, builder.Logger)
+				if err != nil {
+					return nil, fmt.Errorf("could not create registers bootstrap: %w", err)
+				}
+
+				// TODO: find a way to hook a context up to this to allow a graceful shutdown
+				workerCount := 10
+				err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
+				if err != nil {
+					return nil, fmt.Errorf("could not load checkpoint file: %w", err)
+				}
+			}
+
+			registers, err := pStorage.NewRegisters(pdb)
+			if err != nil {
+				return nil, fmt.Errorf("could not create registers storage: %w", err)
+			}
+
+			builder.Storage.RegisterIndex = registers
+
+			var collectionExecutedMetric module.CollectionExecutedMetric = metrics.NewNoopCollector()
+			indexerCore, err := indexer.New(
+				builder.Logger,
+				metrics.NewExecutionStateIndexerCollector(),
+				builder.DB,
+				builder.Storage.RegisterIndex,
+				builder.Storage.Headers,
+				builder.Storage.Events,
+				builder.Storage.Collections,
+				builder.Storage.Transactions,
+				builder.Storage.LightTransactionResults,
+				collectionExecutedMetric,
+			)
+			if err != nil {
+				return nil, err
+			}
+			builder.ExecutionIndexerCore = indexerCore
+
+			// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
+			builder.ExecutionIndexer, err = indexer.NewIndexer(
+				builder.Logger,
+				registers.FirstHeight(),
+				registers,
+				indexerCore,
+				executionDataStoreCache,
+				builder.ExecutionDataRequester.HighestConsecutiveHeight,
+				indexedBlockHeight,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			// setup requester to notify indexer when new execution data is received
+			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
+
+			err = builder.EventsIndex.Initialize(builder.ExecutionIndexer)
+			if err != nil {
+				return nil, err
+			}
+
+			err = builder.RegistersAsyncStore.Initialize(registers)
+			if err != nil {
+				return nil, err
+			}
+
+			return builder.ExecutionIndexer, nil
+		}, builder.IndexerDependencies)
+	}
+
+	if builder.stateStreamConf.ListenAddr != "" {
+		builder.Component("exec state stream engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			for key, value := range builder.stateStreamFilterConf {
+				switch key {
+				case "EventTypes":
+					builder.stateStreamConf.MaxEventTypes = value
+				case "Addresses":
+					builder.stateStreamConf.MaxAddresses = value
+				case "Contracts":
+					builder.stateStreamConf.MaxContracts = value
+				}
+			}
+			builder.stateStreamConf.RpcMetricsEnabled = builder.rpcMetricsEnabled
+
+			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
+			if err != nil {
+				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
+			}
+			broadcaster := engine.NewBroadcaster()
+
+			eventQueryMode, err := backend.ParseIndexQueryMode(builder.rpcConf.BackendConfig.EventQueryMode)
+			if err != nil {
+				return nil, fmt.Errorf("could not parse event query mode: %w", err)
+			}
+
+			// use the events index for events if enabled and the node is configured to use it for
+			// regular event queries
+			useIndex := builder.executionDataIndexingEnabled &&
+				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
+
+			builder.stateStreamBackend, err = statestreambackend.New(
+				node.Logger,
+				builder.stateStreamConf,
+				node.State,
+				node.Storage.Headers,
+				node.Storage.Seals,
+				node.Storage.Results,
+				builder.ExecutionDataStore,
+				executionDataStoreCache,
+				broadcaster,
+				builder.executionDataConfig.InitialBlockHeight,
+				highestAvailableHeight,
+				builder.RegistersAsyncStore,
+				builder.EventsIndex,
+				useIndex,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create state stream backend: %w", err)
+			}
+
+			stateStreamEng, err := statestreambackend.NewEng(
+				node.Logger,
+				builder.stateStreamConf,
+				executionDataStoreCache,
+				node.Storage.Headers,
+				node.RootChainID,
+				builder.stateStreamGrpcServer,
+				builder.stateStreamBackend,
+				broadcaster,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create state stream engine: %w", err)
+			}
+			builder.StateStreamEng = stateStreamEng
+
+			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.StateStreamEng.OnExecutionData)
+
+			return builder.StateStreamEng, nil
+		})
+	}
 	return builder
 }
 
@@ -1132,24 +1457,6 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 }
 
 func (builder *ObserverServiceBuilder) enqueueRPCServer() {
-	builder.Module("creating grpc servers", func(node *cmd.NodeConfig) error {
-		builder.secureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
-			builder.rpcConf.SecureGRPCListenAddr,
-			builder.rpcConf.MaxMsgSize,
-			builder.rpcMetricsEnabled,
-			builder.apiRatelimits,
-			builder.apiBurstlimits,
-			grpcserver.WithTransportCredentials(builder.rpcConf.TransportCredentials)).Build()
-
-		builder.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
-			builder.rpcConf.UnsecureGRPCListenAddr,
-			builder.rpcConf.MaxMsgSize,
-			builder.rpcMetricsEnabled,
-			builder.apiRatelimits,
-			builder.apiBurstlimits).Build()
-
-		return nil
-	})
 	builder.Module("rest metrics", func(node *cmd.NodeConfig) error {
 		m, err := metrics.NewRestCollector(routes.URLToRoute, node.MetricsRegisterer)
 		if err != nil {
@@ -1172,6 +1479,49 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 		tlsConfig := grpcutils.DefaultServerTLSConfig(x509Certificate)
 		builder.rpcConf.TransportCredentials = credentials.NewTLS(tlsConfig)
+		return nil
+	})
+	builder.Module("creating grpc servers", func(node *cmd.NodeConfig) error {
+		builder.secureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
+			builder.rpcConf.SecureGRPCListenAddr,
+			builder.rpcConf.MaxMsgSize,
+			builder.rpcMetricsEnabled,
+			builder.apiRatelimits,
+			builder.apiBurstlimits,
+			grpcserver.WithTransportCredentials(builder.rpcConf.TransportCredentials)).Build()
+
+		builder.stateStreamGrpcServer = grpcserver.NewGrpcServerBuilder(
+			node.Logger,
+			builder.stateStreamConf.ListenAddr,
+			builder.stateStreamConf.MaxExecutionDataMsgSize,
+			builder.rpcMetricsEnabled,
+			builder.apiRatelimits,
+			builder.apiBurstlimits,
+			grpcserver.WithStreamInterceptor()).Build()
+
+		if builder.rpcConf.UnsecureGRPCListenAddr != builder.stateStreamConf.ListenAddr {
+			builder.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
+				builder.rpcConf.UnsecureGRPCListenAddr,
+				builder.rpcConf.MaxMsgSize,
+				builder.rpcMetricsEnabled,
+				builder.apiRatelimits,
+				builder.apiBurstlimits).Build()
+		} else {
+			builder.unsecureGrpcServer = builder.stateStreamGrpcServer
+		}
+
+		return nil
+	})
+	builder.Module("async register store", func(node *cmd.NodeConfig) error {
+		builder.RegistersAsyncStore = execution.NewRegistersAsyncStore()
+		return nil
+	})
+	builder.Module("events storage", func(node *cmd.NodeConfig) error {
+		builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
+		return nil
+	})
+	builder.Module("events index", func(node *cmd.NodeConfig) error {
+		builder.EventsIndex = backend.NewEventsIndex(builder.Storage.Events)
 		return nil
 	})
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -1241,7 +1591,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
-		stateStreamConfig := statestreambackend.Config{}
 		engineBuilder, err := rpc.NewBuilder(
 			node.Logger,
 			node.State,
@@ -1254,8 +1603,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			restHandler,
 			builder.secureGrpcServer,
 			builder.unsecureGrpcServer,
-			nil, // state streaming is not supported
-			stateStreamConfig,
+			builder.stateStreamBackend,
+			builder.stateStreamConf,
 		)
 		if err != nil {
 			return nil, err
@@ -1301,10 +1650,15 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		return builder.secureGrpcServer, nil
 	})
 
-	// build unsecure grpc server
-	builder.Component("unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return builder.unsecureGrpcServer, nil
+	builder.Component("state stream unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		return builder.stateStreamGrpcServer, nil
 	})
+
+	if builder.rpcConf.UnsecureGRPCListenAddr != builder.stateStreamConf.ListenAddr {
+		builder.Component("unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			return builder.unsecureGrpcServer, nil
+		})
+	}
 }
 
 func loadNetworkingKey(path string) (crypto.PrivateKey, error) {

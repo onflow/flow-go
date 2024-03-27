@@ -120,6 +120,7 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 		AdditionalFlags: []string{
 			fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 			"--execution-data-sync-enabled=true",
+			"--event-query-mode=execution-nodes-only",
 		},
 	}}
 
