@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"testing"
 	"time"
 
@@ -24,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 func TestObserverIndexerEnabledExtended(t *testing.T) {
