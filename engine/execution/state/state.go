@@ -506,7 +506,8 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 
 func (s *state) GetHighestFinalizedExecuted() uint64 {
 	if !s.enableRegisterStore {
-		panic("could not get highest finalized executed height without register store enabled")
+		// TODO: implement
+		return 0
 	}
 	return s.registerStore.LastFinalizedAndExecutedHeight()
 }

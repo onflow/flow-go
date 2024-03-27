@@ -63,9 +63,10 @@ type ExecutionConfig struct {
 	// It works around an issue where some collection nodes are not configured with enough
 	// this works around an issue where some collection nodes are not configured with enough
 	// file descriptors causing connection failures.
-	onflowOnlyLNs    bool
-	enableStorehouse bool
-	enableChecker    bool
+	onflowOnlyLNs            bool
+	enableStorehouse         bool
+	enableChecker            bool
+	enableNewIngestionEngine bool
 }
 
 func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
@@ -120,6 +121,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&exeConf.onflowOnlyLNs, "temp-onflow-only-lns", false, "do not use unless required. forces node to only request collections from onflow collection nodes")
 	flags.BoolVar(&exeConf.enableStorehouse, "enable-storehouse", false, "enable storehouse to store registers on disk, default is false")
 	flags.BoolVar(&exeConf.enableChecker, "enable-checker", true, "enable checker to check the correctness of the execution result, default is true")
+	flags.BoolVar(&exeConf.enableNewIngestionEngine, "enable-new-ingestion-engine", false, "enable new ingestion engine, default is false")
 
 }
 

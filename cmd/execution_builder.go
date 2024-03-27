@@ -150,7 +150,6 @@ type ExecutionNode struct {
 	followerEng            *followereng.ComplianceEngine // to sync blocks from consensus nodes
 	computationManager     *computation.Manager
 	collectionRequester    *requester.Engine
-	ingestionEng           *ingestion.Engine
 	scriptsEng             *scripts.Engine
 	followerDistributor    *pubsub.FollowerDistributor
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
@@ -1084,6 +1083,28 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 	}
 
 	fetcher := fetcher.NewCollectionFetcher(node.Logger, exeNode.collectionRequester, node.State, exeNode.exeConf.onflowOnlyLNs)
+
+	if exeNode.exeConf.enableNewIngestionEngine {
+		ingestionMachine, err := ingestion.NewMachine(
+			node.Logger,
+			node.ProtocolEvents,
+			exeNode.collectionRequester,
+			fetcher,
+			node.Storage.Headers,
+			node.Storage.Blocks,
+			node.Storage.Collections,
+			exeNode.executionState,
+			node.State,
+			exeNode.collector,
+			exeNode.computationManager,
+			exeNode.providerEngine,
+			exeNode.blockDataUploader,
+			exeNode.stopControl,
+		)
+
+		return ingestionMachine, err
+	}
+
 	var blockLoader ingestion.BlockLoader
 	if exeNode.exeConf.enableStorehouse {
 		blockLoader = loader.NewUnfinalizedLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
@@ -1091,7 +1112,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		blockLoader = loader.NewUnexecutedLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
 	}
 
-	exeNode.ingestionEng, err = ingestion.New(
+	ingestionEng, err := ingestion.New(
 		exeNode.ingestionUnit,
 		node.Logger,
 		node.EngineRegistry,
@@ -1113,11 +1134,11 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 
 	// TODO: we should solve these mutual dependencies better
 	// => https://github.com/dapperlabs/flow-go/issues/4360
-	exeNode.collectionRequester = exeNode.collectionRequester.WithHandle(exeNode.ingestionEng.OnCollection)
+	exeNode.collectionRequester.WithHandle(ingestionEng.OnCollection)
 
-	node.ProtocolEvents.AddConsumer(exeNode.ingestionEng)
+	node.ProtocolEvents.AddConsumer(ingestionEng)
 
-	return exeNode.ingestionEng, err
+	return ingestionEng, err
 }
 
 // create scripts engine for handling script execution
