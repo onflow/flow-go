@@ -114,7 +114,6 @@ func TestAccountStatusFilterFiltering(t *testing.T) {
 	require.NoError(t, err)
 
 	accountCreateEvent := generator.GenerateAccountCreateEvent(t, addressAccountCreate)
-
 	accountContractAdded := generator.GenerateAccountContractEvent(t, "AccountContractAdded", accountContractAddedAddress)
 
 	events := flow.EventsList{
