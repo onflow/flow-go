@@ -46,82 +46,7 @@ func (s *BackendEventsSuite) SetupTest() {
 	s.BackendExecutionDataSuite.SetupTest()
 }
 
-func (s *BackendEventsSuite) subscribeFromStartBlockIdTestCases() []testType {
-	baseTests := []testType{
-		{
-			name:            "happy path - all new blocks",
-			highestBackfill: -1, // no backfill
-			startBlockID:    s.rootBlock.ID(),
-		},
-		{
-			name:            "happy path - partial backfill",
-			highestBackfill: 2, // backfill the first 3 blocks
-			startBlockID:    s.blocks[0].ID(),
-		},
-		{
-			name:            "happy path - complete backfill",
-			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startBlockID:    s.blocks[0].ID(),
-		},
-		{
-			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startBlockID:    s.rootBlock.ID(),  // start from root block
-		},
-	}
-
-	return s.setupFilterForTestCases(baseTests)
-}
-
-func (s *BackendEventsSuite) subscribeFromStartHeightTestCases() []testType {
-	baseTests := []testType{
-		{
-			name:            "happy path - all new blocks",
-			highestBackfill: -1, // no backfill
-			startHeight:     s.rootBlock.Header.Height,
-		},
-		{
-			name:            "happy path - partial backfill",
-			highestBackfill: 2, // backfill the first 3 blocks
-			startHeight:     s.blocks[0].Header.Height,
-		},
-		{
-			name:            "happy path - complete backfill",
-			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startHeight:     s.blocks[0].Header.Height,
-		},
-		{
-			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1,         // backfill all blocks
-			startHeight:     s.rootBlock.Header.Height, // start from root block
-		},
-	}
-
-	return s.setupFilterForTestCases(baseTests)
-}
-
-// subscribeFromLatestTestCases generates variations of testType scenarios for subscriptions
-// starting from the latest sealed block. It is designed to test the subscription functionality when the subscription
-// starts from the latest available block, either sealed or finalized.
-func (s *BackendEventsSuite) subscribeFromLatestTestCases() []testType {
-	baseTests := []testType{
-		{
-			name:            "happy path - all new blocks",
-			highestBackfill: -1, // no backfill
-		},
-		{
-			name:            "happy path - partial backfill",
-			highestBackfill: 2, // backfill the first 3 blocks
-		},
-		{
-			name:            "happy path - complete backfill",
-			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-		},
-	}
-
-	return s.setupFilterForTestCases(baseTests)
-}
-
+// setupFilterForTestCases sets up variations of test scenarios with different event filters
 func (s *BackendEventsSuite) setupFilterForTestCases(baseTests []testType) []testType {
 	// create variations for each of the base test
 	tests := make([]testType, 0, len(baseTests)*3)
@@ -149,15 +74,8 @@ func (s *BackendEventsSuite) setupFilterForTestCases(baseTests []testType) []tes
 	return tests
 }
 
-// TestSubscribeEventsFromExecutionData tests the SubscribeEvents method happy path for events
-// extracted from ExecutionData
-func (s *BackendEventsSuite) TestSubscribeEventsFromExecutionData() {
-	s.runTestSubscribeEvents()
-}
-
-// TestSubscribeEventsFromLocalStorage tests the SubscribeEvents method happy path for events
-// extracted from local storage
-func (s *BackendEventsSuite) TestSubscribeEventsFromLocalStorage() {
+// setupLocalStorage prepares local storage for testing
+func (s *BackendEventsSuite) setupLocalStorage() {
 	s.backend.useIndex = true
 
 	// events returned from the db are sorted by txID, txIndex, then eventIndex.
@@ -191,9 +109,72 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromLocalStorage() {
 	err := s.eventsIndex.Initialize(reporter)
 	s.Require().NoError(err)
 
+	// create real execution data tracker which use index
+	s.executionDataTrackerReal = subscription.NewExecutionDataTracker(
+		s.log,
+		s.state,
+		s.rootBlock.Header.Height,
+		s.headers,
+		s.broadcaster,
+		s.rootBlock.Header.Height,
+		s.eventsIndex,
+		true,
+	)
+}
+
+// TestSubscribeEventsFromExecutionData tests the SubscribeEvents method happy path for events
+// extracted from ExecutionData
+func (s *BackendEventsSuite) TestSubscribeEventsFromExecutionData() {
 	s.runTestSubscribeEvents()
 }
 
+// TestSubscribeEventsFromLocalStorage tests the SubscribeEvents method happy path for events
+// extracted from local storage
+func (s *BackendEventsSuite) TestSubscribeEventsFromLocalStorage() {
+	s.setupLocalStorage()
+	s.runTestSubscribeEvents()
+}
+
+// TestSubscribeEventsFromStartBlockIDFromExecutionData tests the SubscribeEventsFromStartBlockID method happy path for events
+// extracted from ExecutionData
+func (s *BackendEventsSuite) TestSubscribeEventsFromStartBlockIDFromExecutionData() {
+	s.runTestSubscribeEventsFromStartBlockID()
+}
+
+// TestSubscribeEventsFromStartBlockIDFromLocalStorage tests the SubscribeEventsFromStartBlockID method happy path for events
+// extracted from local storage
+func (s *BackendEventsSuite) TestSubscribeEventsFromStartBlockIDFromLocalStorage() {
+	s.setupLocalStorage()
+	s.runTestSubscribeEventsFromStartBlockID()
+}
+
+// TestSubscribeEventsFromStartHeightFromExecutionData tests the SubscribeEventsFromStartHeight method happy path for events
+// extracted from ExecutionData
+func (s *BackendEventsSuite) TestSubscribeEventsFromStartHeightFromExecutionData() {
+	s.runTestSubscribeEventsFromStartHeight()
+}
+
+// TestSubscribeEventsFromStartHeightFromLocalStorage tests the SubscribeEventsFromStartHeight method happy path for events
+// extracted from local storage
+func (s *BackendEventsSuite) TestSubscribeEventsFromStartHeightFromLocalStorage() {
+	s.setupLocalStorage()
+	s.runTestSubscribeEventsFromStartHeight()
+}
+
+// TestSubscribeEventsFromLatestFromExecutionData tests the SubscribeEventsFromLatest method happy path for events
+// extracted from ExecutionData
+func (s *BackendEventsSuite) TestSubscribeEventsFromLatestFromExecutionData() {
+	s.runTestSubscribeEventsFromLatest()
+}
+
+// TestSubscribeEventsFromLatestFromLocalStorage tests the SubscribeEventsFromLatest method happy path for events
+// extracted from local storage
+func (s *BackendEventsSuite) TestSubscribeEventsFromLatestFromLocalStorage() {
+	s.setupLocalStorage()
+	s.runTestSubscribeEventsFromLatest()
+}
+
+// runTestSubscribeEvents runs the test suite for SubscribeEvents subscription
 func (s *BackendEventsSuite) runTestSubscribeEvents() {
 	tests := []testType{
 		{
@@ -235,8 +216,31 @@ func (s *BackendEventsSuite) runTestSubscribeEvents() {
 	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
 }
 
-// TestSubscribeEventsFromStartBlockID tests the SubscribeEventsFromStartBlockID method.
-func (s *BackendEventsSuite) TestSubscribeEventsFromStartBlockID() {
+// runTestSubscribeEventsFromStartBlockID runs the test suite for SubscribeEventsFromStartBlockID subscription
+func (s *BackendEventsSuite) runTestSubscribeEventsFromStartBlockID() {
+	tests := []testType{
+		{
+			name:            "happy path - all new blocks",
+			highestBackfill: -1, // no backfill
+			startBlockID:    s.rootBlock.ID(),
+		},
+		{
+			name:            "happy path - partial backfill",
+			highestBackfill: 2, // backfill the first 3 blocks
+			startBlockID:    s.blocks[0].ID(),
+		},
+		{
+			name:            "happy path - complete backfill",
+			highestBackfill: len(s.blocks) - 1, // backfill all blocks
+			startBlockID:    s.blocks[0].ID(),
+		},
+		{
+			name:            "happy path - start from root block by id",
+			highestBackfill: len(s.blocks) - 1, // backfill all blocks
+			startBlockID:    s.rootBlock.ID(),  // start from root block
+		},
+	}
+
 	s.executionDataTracker.On(
 		"GetStartHeightFromBlockID",
 		mock.AnythingOfType("flow.Identifier"),
@@ -248,11 +252,34 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromStartBlockID() {
 		return s.backend.SubscribeEventsFromStartBlockID(ctx, startBlockID, filter)
 	}
 
-	s.subscribe(call, s.requireEventsResponse, s.subscribeFromStartBlockIdTestCases())
+	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
 }
 
-// TestSubscribeEventsFromStartHeight tests the SubscribeEventsFromStartHeight method.
-func (s *BackendEventsSuite) TestSubscribeEventsFromStartHeight() {
+// runTestSubscribeEventsFromStartHeight runs the test suite for SubscribeEventsFromStartHeight subscription
+func (s *BackendEventsSuite) runTestSubscribeEventsFromStartHeight() {
+	tests := []testType{
+		{
+			name:            "happy path - all new blocks",
+			highestBackfill: -1, // no backfill
+			startHeight:     s.rootBlock.Header.Height,
+		},
+		{
+			name:            "happy path - partial backfill",
+			highestBackfill: 2, // backfill the first 3 blocks
+			startHeight:     s.blocks[0].Header.Height,
+		},
+		{
+			name:            "happy path - complete backfill",
+			highestBackfill: len(s.blocks) - 1, // backfill all blocks
+			startHeight:     s.blocks[0].Header.Height,
+		},
+		{
+			name:            "happy path - start from root block by id",
+			highestBackfill: len(s.blocks) - 1,         // backfill all blocks
+			startHeight:     s.rootBlock.Header.Height, // start from root block
+		},
+	}
+
 	s.executionDataTracker.On(
 		"GetStartHeightFromHeight",
 		mock.AnythingOfType("uint64"),
@@ -264,11 +291,26 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromStartHeight() {
 		return s.backend.SubscribeEventsFromStartHeight(ctx, startHeight, filter)
 	}
 
-	s.subscribe(call, s.requireEventsResponse, s.subscribeFromStartHeightTestCases())
+	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
 }
 
-// TestSubscribeEventsFromLatest tests the SubscribeEventsFromLatest method.
-func (s *BackendEventsSuite) TestSubscribeEventsFromLatest() {
+// runTestSubscribeEventsFromLatest runs the test suite for SubscribeEventsFromLatest subscription
+func (s *BackendEventsSuite) runTestSubscribeEventsFromLatest() {
+	tests := []testType{
+		{
+			name:            "happy path - all new blocks",
+			highestBackfill: -1, // no backfill
+		},
+		{
+			name:            "happy path - partial backfill",
+			highestBackfill: 2, // backfill the first 3 blocks
+		},
+		{
+			name:            "happy path - complete backfill",
+			highestBackfill: len(s.blocks) - 1, // backfill all blocks
+		},
+	}
+
 	s.executionDataTracker.On(
 		"GetStartHeightFromLatest",
 		mock.Anything,
@@ -280,9 +322,34 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromLatest() {
 		return s.backend.SubscribeEventsFromLatest(ctx, filter)
 	}
 
-	s.subscribe(call, s.requireEventsResponse, s.subscribeFromLatestTestCases())
+	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
 }
 
+// subscribe is a helper function to run test scenarios for event subscription in the BackendEventsSuite.
+// It covers various scenarios for subscribing, handling backfill, and receiving block updates.
+// The test cases include scenarios for different event filters.
+//
+// Parameters:
+//
+//   - subscribeFn: A function representing the subscription method to be tested.
+//     It takes a context, startBlockID, startHeight, and filter as parameters
+//     and returns a subscription.Subscription.
+//
+//   - requireFn: A function responsible for validating that the received information
+//     matches the expected data. It takes an actual interface{} and an expected *EventsResponse as parameters.
+//
+//   - tests: A slice of testType representing different test scenarios for subscriptions.
+//
+// The function performs the following steps for each test case:
+//
+//  1. Initializes the test context and cancellation function.
+//  2. Iterates through the provided test cases.
+//  3. For each test case, sets up a executionDataTracker mock if there are blocks to backfill.
+//  4. Mocks the latest sealed block if no startBlockID or startHeight is provided.
+//  5. Subscribes using the provided subscription function.
+//  6. Simulates the reception of new blocks and consumes them from the subscription channel.
+//  7. Ensures that there are no new messages waiting after all blocks have been processed.
+//  8. Cancels the subscription and ensures it shuts down gracefully.
 func (s *BackendEventsSuite) subscribe(
 	subscribeFn func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription,
 	requireFn func(interface{}, *EventsResponse),
@@ -379,10 +446,11 @@ func (s *BackendEventsSuite) requireEventsResponse(v interface{}, expected *Even
 	assert.Equal(s.T(), expected.BlockID, actual.BlockID)
 	assert.Equal(s.T(), expected.Height, actual.Height)
 	assert.Equal(s.T(), expected.Events, actual.Events)
-	//assert.Equal(s.T(), expected.BlockTimestamp, actual.BlockTimestamp)
+	assert.Equal(s.T(), expected.BlockTimestamp, actual.BlockTimestamp)
 	assert.Equal(s.T(), expected.MessageIndex, actual.MessageIndex)
 }
 
+// TestSubscribeEventsHandlesErrors tests error handling for SubscribeEvents subscription
 func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

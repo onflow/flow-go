@@ -5,6 +5,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
@@ -145,6 +146,20 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 	return subscription.HandleSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
 }
 
+// SubscribeEventsFromStartBlockID handles subscription requests for events starting at the specified block ID.
+// The handler manages the subscription and sends the subscribed information to the client via the provided stream.
+//
+// Responses are returned for each block containing at least one event that
+//
+//	matches the filter. Additionally, heartbeat responses
+//	(SubscribeEventsResponse with no events) are returned periodically to allow
+//	clients to track which blocks were searched. Clients can use this
+//	information to determine which block to start from when reconnecting.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument   - if invalid startBlockID is provided, if invalid event filter is provided.
+// - codes.ResourceExhausted - if the maximum number of streams is reached.
+// - codes.Internal          - could not convert events to entity, if stream encountered an error, if stream got unexpected response or could not send response.
 func (h *Handler) SubscribeEventsFromStartBlockID(request *executiondata.SubscribeEventsFromStartBlockIDRequest, stream executiondata.ExecutionDataAPI_SubscribeEventsFromStartBlockIDServer) error {
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {
@@ -172,6 +187,20 @@ func (h *Handler) SubscribeEventsFromStartBlockID(request *executiondata.Subscri
 	return subscription.HandleSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
 }
 
+// SubscribeEventsFromStartHeight handles subscription requests for events starting at the specified block height.
+// The handler manages the subscription and sends the subscribed information to the client via the provided stream.
+//
+// Responses are returned for each block containing at least one event that
+//
+//	matches the filter. Additionally, heartbeat responses
+//	(SubscribeEventsResponse with no events) are returned periodically to allow
+//	clients to track which blocks were searched. Clients can use this
+//	information to determine which block to start from when reconnecting.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument   - if invalid event filter is provided.
+// - codes.ResourceExhausted - if the maximum number of streams is reached.
+// - codes.Internal          - could not convert events to entity, if stream encountered an error, if stream got unexpected response or could not send response.
 func (h *Handler) SubscribeEventsFromStartHeight(request *executiondata.SubscribeEventsFromStartHeightRequest, stream executiondata.ExecutionDataAPI_SubscribeEventsFromStartHeightServer) error {
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {
@@ -190,6 +219,20 @@ func (h *Handler) SubscribeEventsFromStartHeight(request *executiondata.Subscrib
 	return subscription.HandleSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
 }
 
+// SubscribeEventsFromLatest handles subscription requests for events started from latest sealed block..
+// The handler manages the subscription and sends the subscribed information to the client via the provided stream.
+//
+// Responses are returned for each block containing at least one event that
+//
+//	matches the filter. Additionally, heartbeat responses
+//	(SubscribeEventsResponse with no events) are returned periodically to allow
+//	clients to track which blocks were searched. Clients can use this
+//	information to determine which block to start from when reconnecting.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument   - if invalid event filter is provided.
+// - codes.ResourceExhausted - if the maximum number of streams is reached.
+// - codes.Internal          - could not convert events to entity, if stream encountered an error, if stream got unexpected response or could not send response.
 func (h *Handler) SubscribeEventsFromLatest(request *executiondata.SubscribeEventsFromLatestRequest, stream executiondata.ExecutionDataAPI_SubscribeEventsFromLatestServer) error {
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {
@@ -208,6 +251,18 @@ func (h *Handler) SubscribeEventsFromLatest(request *executiondata.SubscribeEven
 	return subscription.HandleSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
 }
 
+// handleEventsResponse handles the event subscription and sends subscribed events to the client via the provided stream.
+//
+// Parameters:
+// - send: The function responsible for sending events response to the client.
+//
+// Returns a function that can be used as a callback for events updates.
+//
+// This function is designed to be used as a callback for events updates in a subscription.
+// It takes a EventsResponse, processes it, and sends the corresponding response to the client using the provided send function.
+//
+// Expected errors during normal operation:
+//   - codes.Internal - could not convert events to entity or the stream could not send a response.
 func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, requestHeartbeatInterval uint64, eventEncodingVersion entities.EventEncodingVersion) func(*EventsResponse) error {
 	heartbeatInterval := requestHeartbeatInterval
 	if heartbeatInterval == 0 {
@@ -236,10 +291,11 @@ func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, req
 		}
 
 		err = send(&executiondata.SubscribeEventsResponse{
-			BlockHeight:  resp.Height,
-			BlockId:      convert.IdentifierToMessage(resp.BlockID),
-			Events:       events,
-			MessageIndex: resp.MessageIndex,
+			BlockHeight:    resp.Height,
+			BlockId:        convert.IdentifierToMessage(resp.BlockID),
+			Events:         events,
+			BlockTimestamp: timestamppb.New(resp.BlockTimestamp),
+			MessageIndex:   resp.MessageIndex,
 		})
 		if err != nil {
 			return rpc.ConvertError(err, "could not send response", codes.Internal)
@@ -248,6 +304,18 @@ func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, req
 		return nil
 	}
 }
+
+// getEventFilter returns an event filter based on the provided event filter configuration.// If the event filter is nil, it returns an empty filter.
+// Otherwise, it initializes a new event filter using the provided filter parameters,
+// including the event type, address, and contract. It then validates the filter configuration
+// and returns the constructed event filter or an error if the filter configuration is invalid.
+// The event filter is used for subscription to events.
+//
+// Parameters:
+// - eventFilter: executiondata.EventFilter object containing filter parameters.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if the provided event filter is invalid.
 func (h *Handler) getEventFilter(eventFilter *executiondata.EventFilter) (state_stream.EventFilter, error) {
 	filter := state_stream.EventFilter{}
 	if eventFilter != nil {

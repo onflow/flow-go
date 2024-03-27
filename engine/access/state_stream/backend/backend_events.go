@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/storage"
@@ -160,11 +161,12 @@ func (b *EventsBackend) subscribeEvents(ctx context.Context, nextHeight uint64, 
 // - index: A strict monotonous counter used to track the message index.
 //
 // Expected errors during normal operation:
-// - codes.Internal: If the message index has already been incremented.
 // - codes.NotFound: If block header for the specified block height is not found, if events for the specified block height are not found.
+// - codes.Internal: If the message index has already been incremented.
 func (b *EventsBackend) getResponseFactory(filter state_stream.EventFilter, index *counters.StrictMonotonousCounter) subscription.GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
 		var response *EventsResponse
+		var header *flow.Header
 		var err error
 
 		if b.useIndex {
@@ -174,6 +176,13 @@ func (b *EventsBackend) getResponseFactory(filter state_stream.EventFilter, inde
 		}
 
 		if err == nil {
+			header, err = b.headers.ByHeight(height)
+			if err != nil {
+				return nil, rpc.ConvertStorageError(err)
+			}
+
+			response.BlockTimestamp = header.Timestamp
+
 			messageIndex := index.Value()
 			if ok := index.Set(messageIndex + 1); !ok {
 				return nil, status.Errorf(codes.Internal, "the message index has already been incremented to %d", index.Value())
