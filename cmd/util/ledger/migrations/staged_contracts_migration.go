@@ -261,7 +261,7 @@ func (m *StagedContractsMigration) MigrateAccount(
 				Name:    name,
 				Address: address,
 			}
-			printErr := errorPrinter.PrettyPrintError(err, location, nil)
+			printErr := errorPrinter.PrettyPrintError(err, location, m.contractsByLocation)
 
 			var errorDetails string
 			if printErr == nil {
