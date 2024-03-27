@@ -34,7 +34,7 @@ func NewMigratorRuntime(
 	*migratorRuntime,
 	error,
 ) {
-	snapshot, err := util.NewMapBasedPayloadSnapshot(payloads)
+	snapshot, err := util.NewPayloadSnapshot(payloads)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
 	}
@@ -107,7 +107,7 @@ func NewMigratorRuntime(
 }
 
 type migratorRuntime struct {
-	Snapshot                util.MigrationStorageSnapshot
+	Snapshot                *util.PayloadSnapshot
 	TransactionState        state.NestedTransactionPreparer
 	Interpreter             *interpreter.Interpreter
 	Storage                 *runtime.Storage
