@@ -186,3 +186,10 @@ func NewLatestKVStore(epochStateID flow.Identifier) protocol_state.KVStoreAPI {
 		InvalidEpochTransitionAttempted: false,
 	}
 }
+
+func NewKVStoreV0(epochStateID flow.Identifier) protocol_state.KVStoreAPI {
+	return &Modelv0{
+		UpgradableModel: UpgradableModel{},
+		EpochStateID:    epochStateID,
+	}
+}

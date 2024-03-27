@@ -240,8 +240,9 @@ func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) 
 			if protocol.IsInvalidServiceEventError(err) {
 				// TODO: log, report
 				continue
+			} else {
+				return fmt.Errorf("could not process service events: %w", err)
 			}
-			return fmt.Errorf("could not process service events: %w", err)
 		}
 	}
 

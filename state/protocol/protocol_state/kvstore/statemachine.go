@@ -73,7 +73,8 @@ func (m *PSVersionUpgradeStateMachine) ProcessUpdate(updates []*flow.ServiceEven
 					m.view+m.params.EpochCommitSafetyThreshold(), versionUpgrade.ActiveView, ErrInvalidActivationView)
 			}
 
-			if m.parentState.GetProtocolStateVersion() >= versionUpgrade.NewProtocolStateVersion {
+			// TODO we should require that versions are consecutive here, otherwise we can get into a bad state
+			if m.parentState.GetProtocolStateVersion()+1 != versionUpgrade.NewProtocolStateVersion {
 				return protocol.NewInvalidServiceEventErrorf("invalid protocol state version upgrade %d -> %d: %w",
 					m.parentState.GetProtocolStateVersion(), versionUpgrade.NewProtocolStateVersion, ErrInvalidUpgradeVersion)
 			}
