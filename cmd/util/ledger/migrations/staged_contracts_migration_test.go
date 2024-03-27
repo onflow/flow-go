@@ -878,7 +878,10 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 	addressGenerator := chainID.Chain().NewAddressGenerator()
 
-	address, err := addressGenerator.NextAddress()
+	addressA, err := addressGenerator.NextAddress()
+	require.NoError(t, err)
+
+	addressB, err := addressGenerator.NextAddress()
 	require.NoError(t, err)
 
 	t.Run("FungibleToken.Vault", func(t *testing.T) {
@@ -923,7 +926,7 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 					Name: "A",
 					Code: []byte(newCodeA),
 				},
-				Address: common.Address(address),
+				Address: common.Address(addressA),
 			},
 			{
 				Contract: Contract{
@@ -942,11 +945,11 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 		migration.RegisterContractUpdates(stagedContracts)
 
-		err = migration.InitMigration(log, nil, 0)
+		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
 		payloads1 := []*ledger.Payload{
-			newContractPayload(common.Address(address), "A", []byte(oldCodeA)),
+			newContractPayload(common.Address(addressA), "A", []byte(oldCodeA)),
 		}
 		payloads2 := []*ledger.Payload{
 			newContractPayload(ftAddress, "FungibleToken", []byte(ftContract)),
@@ -954,7 +957,7 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 		payloads1, err = migration.MigrateAccount(
 			context.Background(),
-			common.Address(address),
+			common.Address(addressA),
 			payloads1,
 		)
 		require.NoError(t, err)
@@ -1021,7 +1024,7 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 					Name: "A",
 					Code: []byte(newCodeA),
 				},
-				Address: common.Address(address),
+				Address: common.Address(addressA),
 			},
 		}
 
@@ -1037,7 +1040,7 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 		require.NoError(t, err)
 
 		payloads1 := []*ledger.Payload{
-			newContractPayload(common.Address(address), "A", []byte(oldCodeA)),
+			newContractPayload(common.Address(addressA), "A", []byte(oldCodeA)),
 		}
 
 		payloads2 := []*ledger.Payload{
@@ -1046,7 +1049,7 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 		payloads1, err = migration.MigrateAccount(
 			context.Background(),
-			common.Address(address),
+			common.Address(addressA),
 			payloads1,
 		)
 		require.NoError(t, err)
@@ -1076,11 +1079,6 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 	t.Run("import from other account", func(t *testing.T) {
 		t.Parallel()
-
-		addressA := address
-
-		addressB, err := addressGenerator.NextAddress()
-		require.NoError(t, err)
 
 		oldCodeA := fmt.Sprintf(`
             import B from %s
@@ -1126,7 +1124,7 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 		migration.RegisterContractUpdates(stagedContracts)
 
-		err = migration.InitMigration(log, allPayloads, 0)
+		err := migration.InitMigration(log, allPayloads, 0)
 		require.NoError(t, err)
 
 		accountPayloads, err = migration.MigrateAccount(
@@ -1157,13 +1155,21 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 	address, err := addressGenerator.NextAddress()
 	require.NoError(t, err)
 
-	type testcase struct {
+	type testCase struct {
 		oldContract, oldInterface, newContract, newInterface string
 	}
 
 	test := func(oldContract, oldInterface, newContract, newInterface string) {
 
-		t.Run(fmt.Sprintf("%s.%s to %s.%s", oldContract, oldInterface, newContract, newInterface), func(t *testing.T) {
+		name := fmt.Sprintf(
+			"%s.%s to %s.%s",
+			oldContract,
+			oldInterface,
+			newContract,
+			newInterface,
+		)
+
+		t.Run(name, func(t *testing.T) {
 
 			t.Parallel()
 
@@ -1228,7 +1234,7 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 			accountPayloads := []*ledger.Payload{contractCodePayload}
 			allPayloads := []*ledger.Payload{contractCodePayload, viewResolverCodePayload}
 
-			err = migration.InitMigration(log, allPayloads, 0)
+			err := migration.InitMigration(log, allPayloads, 0)
 			require.NoError(t, err)
 
 			accountPayloads, err = migration.MigrateAccount(
@@ -1248,7 +1254,7 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 		})
 	}
 
-	testCases := []testcase{
+	testCases := []testCase{
 		{
 			oldContract:  "MetadataViews",
 			oldInterface: "Resolver",
@@ -1341,7 +1347,7 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 		accountPayloads := []*ledger.Payload{contractCodePayload}
 		allPayloads := []*ledger.Payload{contractCodePayload, arbitraryContractCodePayload}
 
-		err = migration.InitMigration(log, allPayloads, 0)
+		err := migration.InitMigration(log, allPayloads, 0)
 		require.NoError(t, err)
 
 		accountPayloads, err = migration.MigrateAccount(
