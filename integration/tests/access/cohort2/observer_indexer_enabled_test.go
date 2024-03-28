@@ -23,12 +23,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 
+	"github.com/onflow/cadence"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 var (
-	simpleScript = `pub fun main(): Int { return 42; }`
+	simpleScript       = `pub fun main(): Int { return 42; }`
+	simpleScriptResult = cadence.NewInt(42)
 )
 
 func TestObserverIndexerEnabled(t *testing.T) {

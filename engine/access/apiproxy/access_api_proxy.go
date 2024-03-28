@@ -197,12 +197,6 @@ func (h *FlowAccessAPIRouter) GetSystemTransaction(context context.Context, req 
 }
 
 func (h *FlowAccessAPIRouter) GetSystemTransactionResult(context context.Context, req *access.GetSystemTransactionResultRequest) (*access.TransactionResultResponse, error) {
-	if h.useIndex {
-		res, err := h.local.GetSystemTransactionResult(context, req)
-		h.log(LocalApiService, "GetSystemTransactionResult", err)
-		return res, err
-	}
-
 	res, err := h.upstream.GetSystemTransactionResult(context, req)
 	h.log(UpstreamApiService, "GetSystemTransactionResult", err)
 	return res, err
