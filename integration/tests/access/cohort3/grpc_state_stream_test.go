@@ -171,6 +171,9 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 				startValue = header.Height
 			}
 
+			// wait for indexing
+			time.Sleep(3 * time.Second)
+
 			testANStream, err := rpc.call(s.ctx, sdkClientTestAN, startValue, &executiondata.EventFilter{})
 			s.Require().NoError(err)
 			testANEvents, testANErrs, err := SubscribeEventsHandler(s.ctx, testANStream)
