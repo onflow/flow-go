@@ -10,22 +10,26 @@ import (
 	"testing"
 	"time"
 
-	jsoncdc "github.com/onflow/cadence/encoding/json"
-	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/test"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+
+	"github.com/onflow/flow-go-sdk/test"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+
+	sdk "github.com/onflow/flow-go-sdk"
+
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 )
 
 var (
