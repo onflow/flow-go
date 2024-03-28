@@ -40,6 +40,7 @@ type EventsBackend struct {
 	executionDataTracker subscription.ExecutionDataTracker
 }
 
+// Deprecated: will be removed. Use SubscribeEventsFromStartBlockID, SubscribeEventsFromStartHeight or SubscribeEventsFromLatest.
 // SubscribeEvents streams events for all blocks starting at the specified block ID or block height
 // up until the latest available block. Once the latest is
 // reached, the stream will remain open and responses are sent for each new
