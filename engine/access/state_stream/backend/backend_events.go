@@ -40,7 +40,6 @@ type EventsBackend struct {
 	executionDataTracker subscription.ExecutionDataTracker
 }
 
-// Deprecated: will be removed. Use SubscribeEventsFromStartBlockID, SubscribeEventsFromStartHeight or SubscribeEventsFromLatest.
 // SubscribeEvents streams events for all blocks starting at the specified block ID or block height
 // up until the latest available block. Once the latest is
 // reached, the stream will remain open and responses are sent for each new
@@ -60,6 +59,8 @@ type EventsBackend struct {
 // - filter: The event filter used to filter events.
 //
 // If invalid parameters will be supplied SubscribeEvents will return a failed subscription.
+//
+// Method will be deprecated. Use SubscribeEventsFromStartBlockID, SubscribeEventsFromStartHeight or SubscribeEventsFromLatest.
 func (b *EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
 	nextHeight, err := b.executionDataTracker.GetStartHeight(ctx, startBlockID, startHeight)
 	if err != nil {
