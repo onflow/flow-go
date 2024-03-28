@@ -109,3 +109,8 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "ingest-tx-rate-limit", "data": { "command": "get_config" }}'
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "ingest-tx-rate-limit", "data": { "command": "set_config", "limit": 1, "burst": 1 }}'
 ```
+
+### To create a protocol snapshot for latest checkpoint (execution node only)
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "protocol-snapshot"}'
+```
