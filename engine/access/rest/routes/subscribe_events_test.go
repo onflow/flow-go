@@ -403,7 +403,7 @@ func requireResponse(t *testing.T, recorder *testHijackResponseRecorder, expecte
 	// Convert the actual response from respRecorder to JSON bytes
 	actualJSON := recorder.responseBuff.Bytes()
 	// Define a regular expression pattern to match JSON objects
-	pattern := `\{"BlockID":".*?","Height":\d+,"Events":\[(\{.*?})*\]\}`
+	pattern := `\{"BlockID":".*?","Height":\d+,"Events":\[(\{.*?})*\],"BlockTimestamp":".*?","MessageIndex":\d+\}`
 	matches := regexp.MustCompile(pattern).FindAll(actualJSON, -1)
 
 	// Unmarshal each matched JSON into []state_stream.EventsResponse
