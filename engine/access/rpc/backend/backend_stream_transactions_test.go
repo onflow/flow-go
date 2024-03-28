@@ -257,6 +257,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 			assert.Equal(s.T(), expectedTxStatus, txInfo.Status)
 
 			expectedMsgIndex := expectedMsgIndexCounter.Value()
+			assert.Equal(s.T(), expectedMsgIndex, txInfo.MessageIndex)
 			wasSet := expectedMsgIndexCounter.Set(expectedMsgIndex + 1)
 			require.True(s.T(), wasSet)
 		}, time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))

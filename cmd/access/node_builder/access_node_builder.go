@@ -914,7 +914,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				int(builder.stateStreamConf.RegisterIDsRequestLimit),
 				subscription.NewSubscriptionHandler(
 					builder.Logger,
-					broadcaster, builder.stateStreamConf.ClientSendTimeout,
+					broadcaster,
+					builder.stateStreamConf.ClientSendTimeout,
 					builder.stateStreamConf.ResponseLimit,
 					builder.stateStreamConf.ClientSendBufferSize,
 				),

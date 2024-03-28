@@ -149,12 +149,10 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 // SubscribeEventsFromStartBlockID handles subscription requests for events starting at the specified block ID.
 // The handler manages the subscription and sends the subscribed information to the client via the provided stream.
 //
-// Responses are returned for each block containing at least one event that
-//
-//	matches the filter. Additionally, heartbeat responses
-//	(SubscribeEventsResponse with no events) are returned periodically to allow
-//	clients to track which blocks were searched. Clients can use this
-//	information to determine which block to start from when reconnecting.
+// Responses are returned for each block containing at least one event that matches the filter. Additionally,
+// heartbeat responses (SubscribeEventsResponse with no events) are returned periodically to allow
+// clients to track which blocks were searched. Clients can use this
+// information to determine which block to start from when reconnecting.
 //
 // Expected errors during normal operation:
 // - codes.InvalidArgument   - if invalid startBlockID is provided, if invalid event filter is provided.
@@ -190,12 +188,10 @@ func (h *Handler) SubscribeEventsFromStartBlockID(request *executiondata.Subscri
 // SubscribeEventsFromStartHeight handles subscription requests for events starting at the specified block height.
 // The handler manages the subscription and sends the subscribed information to the client via the provided stream.
 //
-// Responses are returned for each block containing at least one event that
-//
-//	matches the filter. Additionally, heartbeat responses
-//	(SubscribeEventsResponse with no events) are returned periodically to allow
-//	clients to track which blocks were searched. Clients can use this
-//	information to determine which block to start from when reconnecting.
+// Responses are returned for each block containing at least one event that matches the filter. Additionally,
+// heartbeat responses (SubscribeEventsResponse with no events) are returned periodically to allow
+// clients to track which blocks were searched. Clients can use this
+// information to determine which block to start from when reconnecting.
 //
 // Expected errors during normal operation:
 // - codes.InvalidArgument   - if invalid event filter is provided.
@@ -222,12 +218,10 @@ func (h *Handler) SubscribeEventsFromStartHeight(request *executiondata.Subscrib
 // SubscribeEventsFromLatest handles subscription requests for events started from latest sealed block..
 // The handler manages the subscription and sends the subscribed information to the client via the provided stream.
 //
-// Responses are returned for each block containing at least one event that
-//
-//	matches the filter. Additionally, heartbeat responses
-//	(SubscribeEventsResponse with no events) are returned periodically to allow
-//	clients to track which blocks were searched. Clients can use this
-//	information to determine which block to start from when reconnecting.
+// Responses are returned for each block containing at least one event that matches the filter. Additionally,
+// heartbeat responses (SubscribeEventsResponse with no events) are returned periodically to allow
+// clients to track which blocks were searched. Clients can use this
+// information to determine which block to start from when reconnecting.
 //
 // Expected errors during normal operation:
 // - codes.InvalidArgument   - if invalid event filter is provided.
@@ -252,14 +246,13 @@ func (h *Handler) SubscribeEventsFromLatest(request *executiondata.SubscribeEven
 }
 
 // handleEventsResponse handles the event subscription and sends subscribed events to the client via the provided stream.
+// This function is designed to be used as a callback for events updates in a subscription.
+// It takes a EventsResponse, processes it, and sends the corresponding response to the client using the provided send function.
 //
 // Parameters:
 // - send: The function responsible for sending events response to the client.
 //
 // Returns a function that can be used as a callback for events updates.
-//
-// This function is designed to be used as a callback for events updates in a subscription.
-// It takes a EventsResponse, processes it, and sends the corresponding response to the client using the provided send function.
 //
 // Expected errors during normal operation:
 //   - codes.Internal - could not convert events to entity or the stream could not send a response.
