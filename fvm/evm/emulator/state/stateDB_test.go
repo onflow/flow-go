@@ -71,7 +71,7 @@ func TestStateDB(t *testing.T) {
 		ret = db.GetCommittedState(addr1, key1)
 		require.Equal(t, gethCommon.Hash{}, ret)
 
-		err = db.Commit()
+		err = db.Commit(true)
 		require.NoError(t, err)
 
 		ret = db.GetCommittedState(addr1, key1)
@@ -256,7 +256,7 @@ func TestStateDB(t *testing.T) {
 
 		db.CreateAccount(testutils.RandomCommonAddress(t))
 
-		err = db.Commit()
+		err = db.Commit(true)
 		// ret := db.Error()
 		require.Error(t, err)
 		// check wrapping
@@ -280,7 +280,7 @@ func TestStateDB(t *testing.T) {
 
 		db.CreateAccount(testutils.RandomCommonAddress(t))
 
-		err = db.Commit()
+		err = db.Commit(true)
 		// ret := db.Error()
 		require.Error(t, err)
 		// check wrapping
