@@ -38,12 +38,37 @@ const (
 	CoreEventInboxValueClaimed = "flow.InboxValueClaimed"
 )
 
-var defaultCoreEventsMap map[string]struct{}
+var defaultCoreEventsMap map[string]map[string]struct{}
 
 func init() {
-	defaultCoreEventsMap = make(map[string]struct{}, len(DefaultCoreEvents))
-	for i := range DefaultCoreEvents {
-		defaultCoreEventsMap[DefaultCoreEvents[i]] = struct{}{}
+	defaultCoreEventsMap = make(map[string]map[string]struct{}, len(DefaultCoreEvents))
+
+	addFilter := func(eventType, field string) {
+		if _, ok := defaultCoreEventsMap[eventType]; !ok {
+			defaultCoreEventsMap[eventType] = make(map[string]struct{})
+		}
+		defaultCoreEventsMap[eventType][field] = struct{}{}
+	}
+
+	for _, eventType := range DefaultCoreEvents {
+
+		switch eventType {
+		case CoreEventAccountCreated,
+			CoreEventAccountKeyAdded,
+			CoreEventAccountKeyRemoved,
+			CoreEventAccountContractAdded,
+			CoreEventAccountContractUpdated,
+			CoreEventAccountContractRemoved:
+			addFilter(eventType, "address")
+		case CoreEventInboxValuePublished,
+			CoreEventInboxValueClaimed:
+			addFilter(eventType, "provider")
+			addFilter(eventType, "recipient")
+		case CoreEventInboxValueUnpublished:
+			addFilter(eventType, "provider")
+		default:
+			panic(fmt.Errorf("unsupported event type: %s", eventType))
+		}
 	}
 }
 
@@ -119,7 +144,7 @@ func NewAccountStatusFilter(
 		// If there are non-core event types at this stage, it returns an error from `addCoreEventFieldFilter`.
 		for _, eventType := range eventTypes {
 			// use the hex with prefix address to make sure it will match the cadence address
-			err = accountStatusFilter.addCoreEventFieldFilter(flow.EventType(eventType), addr.HexWithPrefix(), chain)
+			err = accountStatusFilter.addCoreEventFieldFilter(flow.EventType(eventType), addr.HexWithPrefix())
 			if err != nil {
 				return AccountStatusFilter{}, err
 			}
@@ -150,7 +175,8 @@ func (f *AccountStatusFilter) GroupCoreEventsByAccountAddress(events flow.Events
 			continue
 		}
 
-		accountField := f.EventFieldFilters[event.Type]
+		//accountField := f.EventFieldFilters[event.Type]
+		accountField := defaultCoreEventsMap[string(event.Type)]
 		for i, field := range fields {
 			_, ok := accountField[field.Identifier]
 			if ok {
@@ -164,7 +190,7 @@ func (f *AccountStatusFilter) GroupCoreEventsByAccountAddress(events flow.Events
 }
 
 // addCoreEventFieldFilter adds a field filter for each core event type
-func (f *AccountStatusFilter) addCoreEventFieldFilter(eventType flow.EventType, address string, chain flow.Chain) error {
+func (f *AccountStatusFilter) addCoreEventFieldFilter(eventType flow.EventType, address string) error {
 	addFilter := func(field, value string) {
 		if _, ok := f.EventFieldFilters[eventType]; !ok {
 			f.EventFieldFilters[eventType] = make(FieldFilter)

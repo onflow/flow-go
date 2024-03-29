@@ -241,6 +241,28 @@ func (s *BackendAccountStatusesSuite) generateFiltersForTestCases(baseTests []te
 		)
 		require.NoError(s.T(), err)
 		tests = append(tests, t3)
+
+		t4 := test
+		t4.name = fmt.Sprintf("%s - no events, no addresses", test.name)
+		t4.filters, err = state_stream.NewAccountStatusFilter(
+			state_stream.DefaultEventFilterConfig,
+			chainID.Chain(),
+			[]string{},
+			[]string{},
+		)
+		require.NoError(s.T(), err)
+		tests = append(tests, t4)
+
+		t5 := test
+		t5.name = fmt.Sprintf("%s - some events, no addresses", test.name)
+		t5.filters, err = state_stream.NewAccountStatusFilter(
+			state_stream.DefaultEventFilterConfig,
+			chainID.Chain(),
+			[]string{"flow.AccountKeyAdded"},
+			[]string{},
+		)
+		require.NoError(s.T(), err)
+		tests = append(tests, t5)
 	}
 
 	return tests
