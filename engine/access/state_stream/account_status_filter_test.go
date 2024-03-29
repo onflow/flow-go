@@ -72,9 +72,11 @@ func TestAccountStatusFilterConstructor(t *testing.T) {
 				assert.NoError(t, err)
 
 				if len(test.eventTypes) == 0 {
-					assert.Equal(t, len(state_stream.DefaultCoreEvents), len(filter.EventTypes))
-				} else {
-					assert.Equal(t, len(test.eventTypes), len(filter.EventTypes))
+					if len(test.accountAddresses) > 0 {
+						assert.Equal(t, 0, len(filter.EventTypes))
+					} else {
+						assert.Equal(t, len(state_stream.DefaultCoreEvents), len(filter.EventTypes))
+					}
 				}
 
 				for key := range filter.EventTypes {

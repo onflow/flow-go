@@ -5,21 +5,17 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/counters"
 )
 
 type AccountStatusesResponse struct {
 	BlockID       flow.Identifier
 	Height        uint64
 	AccountEvents map[string]flow.EventsList
-	MessageIndex  uint64
 }
 
 // AccountStatusesBackend is a struct representing a backend implementation for subscribing to account statuses changes.
@@ -40,8 +36,7 @@ func (b *AccountStatusesBackend) subscribe(
 	nextHeight uint64,
 	filter state_stream.AccountStatusFilter,
 ) subscription.Subscription {
-	messageIndex := counters.NewMonotonousCounter(0)
-	sub := subscription.NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getAccountStatusResponseFactory(&messageIndex, filter))
+	sub := subscription.NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getAccountStatusResponseFactory(filter))
 	go subscription.NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
 
 	return sub
@@ -98,7 +93,6 @@ func (b *AccountStatusesBackend) SubscribeAccountStatusesFromLatestBlock(
 
 // getAccountStatusResponseFactory returns a function that returns the account statuses response for a given height.
 func (b *AccountStatusesBackend) getAccountStatusResponseFactory(
-	messageIndex *counters.StrictMonotonousCounter,
 	filter state_stream.AccountStatusFilter,
 ) subscription.GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
@@ -109,15 +103,10 @@ func (b *AccountStatusesBackend) getAccountStatusResponseFactory(
 		filteredProtocolEvents := filter.Filter(eventsResponse.Events)
 		allAccountProtocolEvents := filter.GroupCoreEventsByAccountAddress(filteredProtocolEvents, b.log)
 
-		index := messageIndex.Value()
-		if ok := messageIndex.Set(index + 1); !ok {
-			return nil, status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
-		}
 		return &AccountStatusesResponse{
 			BlockID:       eventsResponse.BlockID,
 			Height:        eventsResponse.Height,
 			AccountEvents: allAccountProtocolEvents,
-			MessageIndex:  index,
 		}, nil
 	}
 }

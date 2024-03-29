@@ -319,7 +319,6 @@ func (s *BackendAccountStatusesSuite) subscribeToAccountStatuses(
 
 					assert.Equal(s.T(), b.Header.ID(), resp.BlockID)
 					assert.Equal(s.T(), b.Header.Height, resp.Height)
-					assert.Equal(s.T(), expectedMsgIndex, resp.MessageIndex)
 					assert.Equal(s.T(), expectedEvents, resp.AccountEvents)
 				}, 60*time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
 

@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/counters"
 )
 
 type Handler struct {
@@ -241,16 +242,16 @@ type sendSubscribeAccountStatusesResponseFunc func(*executiondata.SubscribeAccou
 
 // handleAccountStatusesResponse handles account status responses by converting them to the message and sending them to the subscriber.
 func (h *Handler) handleAccountStatusesResponse(
-	requestHeartbeatInterval uint64,
+	heartbeatInterval uint64,
 	evenVersion entities.EventEncodingVersion,
 	send sendSubscribeAccountStatusesResponseFunc,
 ) func(resp *AccountStatusesResponse) error {
-	heartbeatInterval := requestHeartbeatInterval
 	if heartbeatInterval == 0 {
 		heartbeatInterval = h.defaultHeartbeatInterval
 	}
 
 	blocksSinceLastMessage := uint64(0)
+	messageIndex := counters.NewMonotonousCounter(0)
 
 	return func(resp *AccountStatusesResponse) error {
 		// check if there are any events in the response. if not, do not send a message unless the last
@@ -268,11 +269,16 @@ func (h *Handler) handleAccountStatusesResponse(
 			return err
 		}
 
+		index := messageIndex.Value()
+		if ok := messageIndex.Set(index + 1); !ok {
+			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
+		}
+
 		err = send(&executiondata.SubscribeAccountStatusesResponse{
 			BlockId:      convert.IdentifierToMessage(resp.BlockID),
 			BlockHeight:  resp.Height,
 			Results:      results,
-			MessageIndex: resp.MessageIndex,
+			MessageIndex: index,
 		})
 		if err != nil {
 			return rpc.ConvertError(err, "could not send response", codes.Internal)

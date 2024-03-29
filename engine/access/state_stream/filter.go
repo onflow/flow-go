@@ -110,50 +110,6 @@ func NewEventFilter(
 	return f, nil
 }
 
-// addCoreEventFieldFilter adds a field filter for each core event type
-func (f *EventFilter) addCoreEventFieldFilter(eventType flow.EventType, address string, chain flow.Chain) error {
-	if err := validateEventType(eventType, chain); err != nil {
-		return fmt.Errorf("impossible to add event field filter: %w", err)
-	}
-
-	if f.EventFieldFilters[eventType] == nil {
-		f.EventFieldFilters[eventType] = make(FieldFilter)
-	}
-
-	switch eventType {
-	case CoreEventAccountCreated,
-		CoreEventAccountKeyAdded,
-		CoreEventAccountKeyRemoved,
-		CoreEventAccountContractAdded,
-		CoreEventAccountContractUpdated,
-		CoreEventAccountContractRemoved:
-		if f.EventFieldFilters[eventType]["address"] == nil {
-			f.EventFieldFilters[eventType]["address"] = make(map[string]struct{})
-		}
-		f.EventFieldFilters[eventType]["address"][address] = struct{}{}
-	case CoreEventInboxValuePublished,
-		CoreEventInboxValueClaimed:
-		if f.EventFieldFilters[eventType]["provider"] == nil {
-			f.EventFieldFilters[eventType]["provider"] = make(map[string]struct{})
-		}
-		f.EventFieldFilters[eventType]["provider"][address] = struct{}{}
-
-		if f.EventFieldFilters[eventType]["recipient"] == nil {
-			f.EventFieldFilters[eventType]["recipient"] = make(map[string]struct{})
-		}
-		f.EventFieldFilters[eventType]["recipient"][address] = struct{}{}
-	case CoreEventInboxValueUnpublished:
-		if f.EventFieldFilters[eventType]["provider"] == nil {
-			f.EventFieldFilters[eventType]["provider"] = make(map[string]struct{})
-		}
-		f.EventFieldFilters[eventType]["provider"][address] = struct{}{}
-	default:
-		return fmt.Errorf("unsupported event type: %s", eventType)
-	}
-
-	return nil
-}
-
 // Filter applies the all filters on the provided list of events, and returns a list of events that match
 func (f *EventFilter) Filter(events flow.EventsList) flow.EventsList {
 	var filteredEvents flow.EventsList
