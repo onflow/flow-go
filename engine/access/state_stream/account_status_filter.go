@@ -51,7 +51,6 @@ func init() {
 	}
 
 	for _, eventType := range DefaultCoreEvents {
-
 		switch eventType {
 		case CoreEventAccountCreated,
 			CoreEventAccountKeyAdded,
