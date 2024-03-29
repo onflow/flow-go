@@ -42,7 +42,7 @@ type Account interface {
 	// the new deployed contract would be at the returned address and
 	// the contract data is not controlled by the COA
 	// works only for COAs
-	Deploy(Code, GasLimit, Balance) Address
+	Deploy(Code, GasLimit, Balance) *ResultSummary
 
 	// Call calls a smart contract function with the given data.
 	// The gas usage is limited by the given gas limit,
