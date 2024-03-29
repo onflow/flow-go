@@ -255,20 +255,20 @@ contract EVM {
         }
 
         /// Deploys a contract to the EVM environment.
-        /// Returns the address of the newly deployed contract
+        /// Returns the result which contains address of
+        /// the newly deployed contract
         access(all)
         fun deploy(
             code: [UInt8],
             gasLimit: UInt64,
             value: Balance
-        ): EVMAddress {
-            let addressBytes = InternalEVM.deploy(
+        ): Result {
+            return InternalEVM.deploy(
                 from: self.addressBytes,
                 code: code,
                 gasLimit: gasLimit,
                 value: value.attoflow
-            )
-            return EVMAddress(bytes: addressBytes)
+            ) as! Result
         }
 
         /// Calls a function with the given data.
