@@ -9,6 +9,15 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 )
 
+// This file contains the concrete types that define the structure of the underlying key-value store
+// for a particular Protocol State version.
+// Essentially enumerating the set of keys and values that are supported.
+// When a key is added or removed, this requires a new protocol state version.
+// To use new version of the protocol state, create a new versioned model in models.go (eg. modelv3 if latest model is modelv2)
+// ATTENTION: All models should be public with public fields otherwise the encoding/decoding will not work.
+
+// UpgradableModel is a utility struct that can be embedded in any model to provide
+// a common interface for managing protocol version upgrades.
 type UpgradableModel struct {
 	VersionUpgrade *protocol_state.ViewBasedActivator[uint64]
 }
@@ -101,10 +110,14 @@ func (model *Modelv0) SetInvalidEpochTransitionAttempted(_ bool) error {
 	return ErrKeyNotSupported
 }
 
+// GetEpochStateID returns the state ID of the epoch state.
+// This is part of the most basic model and is used to commit the epoch state to the KV store.
 func (model *Modelv0) GetEpochStateID() flow.Identifier {
 	return model.EpochStateID
 }
 
+// SetEpochStateID sets the state ID of the epoch state.
+// This method is used to commit the epoch state to the KV store when the state of the epoch is updated.
 func (model *Modelv0) SetEpochStateID(id flow.Identifier) {
 	model.EpochStateID = id
 }

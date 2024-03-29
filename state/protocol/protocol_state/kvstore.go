@@ -43,6 +43,8 @@ type KVStoreReader interface {
 	// with a past view if the upgrade has already been activated.
 	GetVersionUpgrade() *ViewBasedActivator[uint64]
 
+	// GetEpochStateID returns the state ID of the epoch state.
+	// This is part of the most basic model and is used to commit the epoch state to the KV store.
 	GetEpochStateID() flow.Identifier
 
 	// v1
@@ -102,6 +104,8 @@ type KVStoreMutator interface {
 	// It contains the new version and the view at which it has to be applied.
 	SetVersionUpgrade(version *ViewBasedActivator[uint64])
 
+	// SetEpochStateID sets the state ID of the epoch state.
+	// This method is used to commit the epoch state to the KV store when the state of the epoch is updated.
 	SetEpochStateID(stateID flow.Identifier)
 
 	// v1
