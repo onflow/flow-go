@@ -152,27 +152,23 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 	sdkClientTestON, err := getClient(testONURL)
 	s.Require().NoError(err)
 
-	time.Sleep(20 * time.Second)
-
 	txGenerator, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	s.Require().NoError(err)
+	header, err := txGenerator.GetLatestSealedBlockHeader(s.ctx)
+	s.Require().NoError(err)
+
+	time.Sleep(20 * time.Second)
 
 	var startValue interface{}
 	txCount := 10
 
 	for _, rpc := range s.testedRPCs() {
 		s.T().Run(rpc.name, func(t *testing.T) {
-			header, err := txGenerator.GetLatestSealedBlockHeader(s.ctx)
-			s.Require().NoError(err)
-
 			if rpc.name == "SubscribeEventsFromStartBlockID" {
 				startValue = header.ID.Bytes()
 			} else {
 				startValue = header.Height
 			}
-
-			// wait for indexing
-			time.Sleep(3 * time.Second)
 
 			testANStream, err := rpc.call(s.ctx, sdkClientTestAN, startValue, &executiondata.EventFilter{})
 			s.Require().NoError(err)
@@ -189,10 +185,12 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 			testONEvents, testONErrs, err := SubscribeEventsHandler(s.ctx, testONStream)
 			s.Require().NoError(err)
 
-			// generate events
-			go func() {
-				s.generateEvents(txGenerator, txCount)
-			}()
+			if rpc.generateEvents {
+				// generate events
+				go func() {
+					s.generateEvents(txGenerator, txCount)
+				}()
+			}
 
 			has := func(events []flow.Event, eventType flow.EventType) bool {
 				for _, event := range events {
@@ -252,7 +250,6 @@ func (s *GrpcStateStreamSuite) generateEvents(client *testnet.Client, txCount in
 	for i := 0; i < txCount; i++ {
 		accountKey := test.AccountKeyGenerator().New()
 		address, err := client.CreateAccount(s.ctx, accountKey, sdk.HexToID(refBlockID.String()))
-		//
 		if err != nil {
 			i--
 			continue
@@ -262,43 +259,61 @@ func (s *GrpcStateStreamSuite) generateEvents(client *testnet.Client, txCount in
 }
 
 type RPCTest struct {
-	name string
-	call func(ctx context.Context, client executiondata.ExecutionDataAPIClient, startValue interface{}, filter *executiondata.EventFilter) (executiondata.ExecutionDataAPI_SubscribeEventsClient, error)
+	name           string
+	call           func(ctx context.Context, client executiondata.ExecutionDataAPIClient, startValue interface{}, filter *executiondata.EventFilter) (executiondata.ExecutionDataAPI_SubscribeEventsClient, error)
+	generateEvents bool // add ability to integration test generate new events
 }
 
 func (s *GrpcStateStreamSuite) getRPCs() []RPCTest {
 	return []RPCTest{
-		{name: "SubscribeEvents", call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, startValue interface{}, filter *executiondata.EventFilter) (executiondata.ExecutionDataAPI_SubscribeEventsClient, error) {
-			return client.SubscribeEvents(ctx, &executiondata.SubscribeEventsRequest{
-				StartBlockHeight:     startValue.(uint64),
-				EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
-				Filter:               filter,
-				HeartbeatInterval:    1,
-			})
-		}},
-		{name: "SubscribeEventsFromStartBlockID", call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, startValue interface{}, filter *executiondata.EventFilter) (executiondata.ExecutionDataAPI_SubscribeEventsClient, error) {
-			return client.SubscribeEventsFromStartBlockID(ctx, &executiondata.SubscribeEventsFromStartBlockIDRequest{
-				StartBlockId:         startValue.([]byte),
-				EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
-				Filter:               filter,
-				HeartbeatInterval:    1,
-			})
-		}},
-		{name: "SubscribeEventsFromStartHeight", call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, startValue interface{}, filter *executiondata.EventFilter) (executiondata.ExecutionDataAPI_SubscribeEventsClient, error) {
-			return client.SubscribeEventsFromStartHeight(ctx, &executiondata.SubscribeEventsFromStartHeightRequest{
-				StartBlockHeight:     startValue.(uint64),
-				EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
-				Filter:               filter,
-				HeartbeatInterval:    1,
-			})
-		}},
-		{name: "SubscribeEventsFromLatest", call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, _ interface{}, filter *executiondata.EventFilter) (executiondata.ExecutionDataAPI_SubscribeEventsClient, error) {
-			return client.SubscribeEventsFromLatest(ctx, &executiondata.SubscribeEventsFromLatestRequest{
-				EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
-				Filter:               filter,
-				HeartbeatInterval:    1,
-			})
-		}},
+		{
+			name: "SubscribeEventsFromLatest",
+			call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, _ interface{}, filter *executiondata.EventFilter) (executiondata.ExecutionDataAPI_SubscribeEventsClient, error) {
+				return client.SubscribeEventsFromLatest(ctx, &executiondata.SubscribeEventsFromLatestRequest{
+					EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+					Filter:               filter,
+					HeartbeatInterval:    1,
+				})
+			},
+			generateEvents: true,
+		},
+		{
+			name: "SubscribeEvents",
+			call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, _ interface{}, filter *executiondata.EventFilter) (executiondata.ExecutionDataAPI_SubscribeEventsClient, error) {
+				return client.SubscribeEvents(ctx, &executiondata.SubscribeEventsRequest{
+					StartBlockId:         convert.IdentifierToMessage(flow.ZeroID),
+					StartBlockHeight:     0,
+					EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+					Filter:               filter,
+					HeartbeatInterval:    1,
+				})
+			},
+			generateEvents: true,
+		},
+		{
+			name: "SubscribeEventsFromStartBlockID",
+			call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, startValue interface{}, filter *executiondata.EventFilter) (executiondata.ExecutionDataAPI_SubscribeEventsClient, error) {
+				return client.SubscribeEventsFromStartBlockID(ctx, &executiondata.SubscribeEventsFromStartBlockIDRequest{
+					StartBlockId:         startValue.([]byte),
+					EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+					Filter:               filter,
+					HeartbeatInterval:    1,
+				})
+			},
+			generateEvents: false, // use previous events
+		},
+		{
+			name: "SubscribeEventsFromStartHeight",
+			call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, startValue interface{}, filter *executiondata.EventFilter) (executiondata.ExecutionDataAPI_SubscribeEventsClient, error) {
+				return client.SubscribeEventsFromStartHeight(ctx, &executiondata.SubscribeEventsFromStartHeightRequest{
+					StartBlockHeight:     startValue.(uint64),
+					EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+					Filter:               filter,
+					HeartbeatInterval:    1,
+				})
+			},
+			generateEvents: false, // use previous events
+		},
 	}
 }
 
