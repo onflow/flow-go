@@ -1,11 +1,11 @@
 package test
 
 import (
-	"github.com/onflow/flow-go/utils/unittest"
 	"testing"
 
 	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestVerificationHappyPath evaluates behavior of the pipeline of verification node engines as:

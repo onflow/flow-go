@@ -1,12 +1,12 @@
 package kvstore
 
 import (
-	"github.com/onflow/flow-go/model/flow"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"

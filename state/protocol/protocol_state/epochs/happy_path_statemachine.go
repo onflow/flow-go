@@ -2,6 +2,7 @@ package epochs
 
 import (
 	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
