@@ -190,32 +190,21 @@ func (f *AccountStatusFilter) GroupCoreEventsByAccountAddress(events flow.Events
 
 // addCoreEventFieldFilter adds a field filter for each core event type
 func (f *AccountStatusFilter) addCoreEventFieldFilter(eventType flow.EventType, address string) error {
-	addFilter := func(field, value string) {
+	// Get the field associated with the event type from the defaultCoreEventsMap
+	fields, ok := defaultCoreEventsMap[string(eventType)]
+	if !ok {
+		return fmt.Errorf("unsupported event type: %s", eventType)
+	}
+
+	// Add the field filter for each field associated with the event type
+	for field := range fields {
 		if _, ok := f.EventFieldFilters[eventType]; !ok {
 			f.EventFieldFilters[eventType] = make(FieldFilter)
 		}
 		if _, ok := f.EventFieldFilters[eventType][field]; !ok {
 			f.EventFieldFilters[eventType][field] = make(map[string]struct{})
 		}
-		f.EventFieldFilters[eventType][field][value] = struct{}{}
-	}
-
-	switch eventType {
-	case CoreEventAccountCreated,
-		CoreEventAccountKeyAdded,
-		CoreEventAccountKeyRemoved,
-		CoreEventAccountContractAdded,
-		CoreEventAccountContractUpdated,
-		CoreEventAccountContractRemoved:
-		addFilter("address", address)
-	case CoreEventInboxValuePublished,
-		CoreEventInboxValueClaimed:
-		addFilter("provider", address)
-		addFilter("recipient", address)
-	case CoreEventInboxValueUnpublished:
-		addFilter("provider", address)
-	default:
-		return fmt.Errorf("unsupported event type: %s", eventType)
+		f.EventFieldFilters[eventType][field][address] = struct{}{}
 	}
 
 	return nil
