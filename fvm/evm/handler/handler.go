@@ -558,10 +558,10 @@ func (a *Account) transfer(to types.Address, balance types.Balance) (*types.Resu
 // Deploy deploys a contract to the EVM environment
 // the new deployed contract would be at the returned address and
 // the contract data is not controlled by the caller accounts
-func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types.Balance) types.Address {
+func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types.Balance) *types.ResultSummary {
 	res, err := a.deploy(code, gaslimit, balance)
 	panicOnErrorOrInvalidOrFailedState(res, err)
-	return types.Address(res.DeployedContractAddress)
+	return res.ResultSummary()
 }
 
 func (a *Account) deploy(code types.Code, gaslimit types.GasLimit, balance types.Balance) (*types.Result, error) {
