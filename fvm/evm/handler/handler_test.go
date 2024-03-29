@@ -590,7 +590,8 @@ func TestHandler_COA(t *testing.T) {
 				require.Equal(t, bal, foa.Balance())
 
 				testContract := testutils.GetStorageTestContract(t)
-				addr := foa.Deploy(testContract.ByteCode, math.MaxUint64, types.NewBalanceFromUFix64(0))
+				result := foa.Deploy(testContract.ByteCode, math.MaxUint64, types.NewBalanceFromUFix64(0))
+				addr := result.DeployedContractAddress
 				require.NotNil(t, addr)
 
 				num := big.NewInt(22)
@@ -655,8 +656,11 @@ func TestHandler_COA(t *testing.T) {
 				foa.Deposit(vault)
 
 				testContract := testutils.GetStorageTestContract(t)
-				addr := foa.Deploy(testContract.ByteCode, math.MaxUint64, types.EmptyBalance)
+				result := foa.Deploy(testContract.ByteCode, math.MaxUint64, types.EmptyBalance)
+				addr := result.DeployedContractAddress
 				require.NotNil(t, addr)
+				require.Equal(t, types.StatusSuccessful, result.Status)
+				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
 
 				ret := foa.Call(
 					addr,
