@@ -242,7 +242,7 @@ func assembleInternalNodesWithoutWeight() []model.NodeInfo {
 		common.ValidateAddressFormat(log, internal.Address)
 
 		// validate every single internal node
-		nodeID := ValidateNodeID(internal.NodeID)
+		nodeID := common.ValidateNodeID(log, internal.NodeID)
 		node := model.NewPrivateNodeInfo(
 			nodeID,
 			internal.Role,
@@ -279,9 +279,9 @@ func createPublicNodeInfo(nodes []model.NodeInfoPub) []model.NodeInfo {
 		common.ValidateAddressFormat(log, n.Address)
 
 		// validate every single partner node
-		nodeID := ValidateNodeID(n.NodeID)
-		networkPubKey := ValidateNetworkPubKey(n.NetworkPubKey)
-		stakingPubKey := ValidateStakingPubKey(n.StakingPubKey)
+		nodeID := common.ValidateNodeID(log, n.NodeID)
+		networkPubKey := common.ValidateNetworkPubKey(log, n.NetworkPubKey)
+		stakingPubKey := common.ValidateStakingPubKey(log, n.StakingPubKey)
 
 		// all nodes should have equal weight
 		node := model.NewPublicNodeInfo(

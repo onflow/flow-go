@@ -5,7 +5,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/cmd"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -16,7 +15,7 @@ func ReadPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNodeInf
 	partners := ReadPartnerNodes(log, partnerNodeInfoDir)
 	log.Info().Msgf("read %d partner node configuration files", len(partners))
 
-	var weights cmd.PartnerWeights
+	var weights PartnerWeights
 	err := ReadJSON(partnerWeightsPath, &weights)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to read partner weights json")
@@ -26,10 +25,10 @@ func ReadPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNodeInf
 	var nodes []bootstrap.NodeInfo
 	for _, partner := range partners {
 		// validate every single partner node
-		nodeID := cmd.ValidateNodeID(partner.NodeID)
-		networkPubKey := cmd.ValidateNetworkPubKey(partner.NetworkPubKey)
-		stakingPubKey := cmd.ValidateStakingPubKey(partner.StakingPubKey)
-		weight, valid := cmd.ValidateWeight(weights[partner.NodeID])
+		nodeID := ValidateNodeID(log, partner.NodeID)
+		networkPubKey := ValidateNetworkPubKey(log, partner.NetworkPubKey)
+		stakingPubKey := ValidateStakingPubKey(log, partner.StakingPubKey)
+		weight, valid := ValidateWeight(weights[partner.NodeID])
 		if !valid {
 			log.Error().Msgf("weights: %v", weights)
 			log.Fatal().Msgf("partner node id %x has no weight", nodeID)
@@ -91,8 +90,8 @@ func ReadInternalNodeInfos(log zerolog.Logger, internalNodePrivInfoDir, internal
 		ValidateAddressFormat(log, internal.Address)
 
 		// validate every single internal node
-		nodeID := cmd.ValidateNodeID(internal.NodeID)
-		weight, valid := cmd.ValidateWeight(weights[internal.Address])
+		nodeID := ValidateNodeID(log, internal.NodeID)
+		weight, valid := ValidateWeight(weights[internal.Address])
 		if !valid {
 			log.Error().Msgf("weights: %v", weights)
 			log.Fatal().Msgf("internal node %v has no weight. Did you forget to update the node address?", internal)

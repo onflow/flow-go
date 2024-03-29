@@ -2,9 +2,10 @@ package common
 
 import (
 	"errors"
-
+	"fmt"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/model/bootstrap"
 	model "github.com/onflow/flow-go/model/bootstrap"
@@ -13,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/assignment"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 // ConstructClusterAssignment random cluster assignment with internal and partner nodes.
@@ -102,6 +104,43 @@ func ConstructRootQCsForClusters(log zerolog.Logger, clusterList flow.ClusterLis
 	}
 
 	return qcs
+}
+
+// ConvertClusterAssignmentsCdc converts golang cluster assignments type to cadence array of arrays.
+func ConvertClusterAssignmentsCdc(assignments flow.AssignmentList) cadence.Array {
+	assignmentsCdc := make([]cadence.Value, len(assignments))
+	for i, asmt := range assignments {
+		fmt.Println(asmt.Len())
+		vals := make([]cadence.Value, asmt.Len())
+		for j, k := range asmt {
+			fmt.Println(k.String())
+			vals[j] = cadence.String(k.String())
+		}
+		assignmentsCdc[i] = cadence.NewArray(vals).WithType(cadence.NewVariableSizedArrayType(cadence.StringType{}))
+	}
+
+	return cadence.NewArray(assignmentsCdc).WithType(cadence.NewVariableSizedArrayType(cadence.NewVariableSizedArrayType(cadence.StringType{})))
+}
+
+// ConvertClusterQcsCdc converts golang cluster qcs type to cadence struct.
+func ConvertClusterQcsCdc(qcs []*flow.QuorumCertificate, clusterList flow.ClusterList) ([]*flow.ClusterQCVoteData, error) {
+	voteData := make([]*flow.ClusterQCVoteData, len(qcs))
+	for i, qc := range qcs {
+		c, ok := clusterList.ByIndex(uint(i))
+		if !ok {
+			return nil, fmt.Errorf("could not get cluster list for cluster index %v", i)
+		}
+		voterIds, err := signature.DecodeSignerIndicesToIdentifiers(c.NodeIDs(), qc.SignerIndices)
+		if err != nil {
+			return nil, fmt.Errorf("could not decode signer indices: %w", err)
+		}
+		voteData[i] = &flow.ClusterQCVoteData{
+			SigData:  qc.SigData,
+			VoterIDs: voterIds,
+		}
+	}
+
+	return voteData, nil
 }
 
 // Filters a list of nodes to include only nodes that will sign the QC for the

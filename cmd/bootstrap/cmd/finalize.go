@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
-	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/state/protocol"
@@ -46,10 +45,7 @@ var (
 	flagGenesisTokenSupply          string
 )
 
-// PartnerWeights is the format of the JSON file specifying partner node weights.
-type PartnerWeights map[flow.Identifier]uint64
-
-// finalizeCmd represents the finalize command
+// finalizeCmd represents the finalize command`
 var finalizeCmd = &cobra.Command{
 	Use:   "finalize",
 	Short: "Finalize the bootstrapping process",
@@ -356,31 +352,6 @@ func readDKGData() dkg.DKGData {
 }
 
 // Validation utility methods ------------------------------------------------
-
-func ValidateNodeID(nodeID flow.Identifier) flow.Identifier {
-	if nodeID == flow.ZeroID {
-		log.Fatal().Msg("NodeID must not be zero")
-	}
-	return nodeID
-}
-
-func ValidateNetworkPubKey(key encodable.NetworkPubKey) encodable.NetworkPubKey {
-	if key.PublicKey == nil {
-		log.Fatal().Msg("NetworkPubKey must not be nil")
-	}
-	return key
-}
-
-func ValidateStakingPubKey(key encodable.StakingPubKey) encodable.StakingPubKey {
-	if key.PublicKey == nil {
-		log.Fatal().Msg("StakingPubKey must not be nil")
-	}
-	return key
-}
-
-func ValidateWeight(weight uint64) (uint64, bool) {
-	return weight, weight > 0
-}
 
 // loadRootProtocolSnapshot loads the root protocol snapshot from disk
 func loadRootProtocolSnapshot(path string) (*inmem.Snapshot, error) {

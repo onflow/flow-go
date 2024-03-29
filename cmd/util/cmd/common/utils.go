@@ -8,11 +8,12 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
+	"github.com/multiformats/go-multiaddr"
 	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/io"
@@ -128,3 +129,31 @@ func ValidateAddressFormat(log zerolog.Logger, address string) {
 	_, err = multiaddr.NewMultiaddr(lp2pAddr)
 	checkErr(err)
 }
+
+func ValidateNodeID(lg zerolog.Logger, nodeID flow.Identifier) flow.Identifier {
+	if nodeID == flow.ZeroID {
+		lg.Fatal().Msg("NodeID must not be zero")
+	}
+	return nodeID
+}
+
+func ValidateNetworkPubKey(lg zerolog.Logger, key encodable.NetworkPubKey) encodable.NetworkPubKey {
+	if key.PublicKey == nil {
+		lg.Fatal().Msg("NetworkPubKey must not be nil")
+	}
+	return key
+}
+
+func ValidateStakingPubKey(lg zerolog.Logger, key encodable.StakingPubKey) encodable.StakingPubKey {
+	if key.PublicKey == nil {
+		lg.Fatal().Msg("StakingPubKey must not be nil")
+	}
+	return key
+}
+
+func ValidateWeight(weight uint64) (uint64, bool) {
+	return weight, weight > 0
+}
+
+// PartnerWeights is the format of the JSON file specifying partner node weights.
+type PartnerWeights map[flow.Identifier]uint64

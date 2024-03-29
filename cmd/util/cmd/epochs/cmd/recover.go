@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"github.com/spf13/cobra"
 
@@ -20,10 +21,10 @@ import (
 // identities, generates the cluster QC's and retrieves the DKG key vector of the last successful epoch.
 var (
 	generateRecoverEpochTxArgsCmd = &cobra.Command{
-		Use:   "generate-efm-recovery-data",
+		Use:   "recover-epoch-tx-args",
 		Short: "Generates recover epoch transaction arguments",
 		Long:  "Generates transaction arguments for the epoch recovery transaction.",
-		Run:   generateRecoverEpochTxArgs,
+		Run:   generateRecoverEpochTxArgs(getSnapshot),
 	}
 
 	flagAnAddress               string
@@ -31,7 +32,7 @@ var (
 	flagPartnerWeights          string
 	flagPartnerNodeInfoDir      string
 	flagInternalNodePrivInfoDir string
-	flagConfig                  string
+	flagNodeConfigJson          string
 	flagCollectionClusters      int
 	flagStartView               uint64
 	flagStakingEndView          uint64
@@ -44,12 +45,10 @@ func init() {
 }
 
 func addGenerateRecoverEpochTxArgsCmdFlags() {
-	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagBucketNetworkName, "bucket-network-name", "",
-		"when retrieving the root snapshot from a GCP bucket, the network name portion of the URL (eg. \"mainnet-13\")")
 	generateRecoverEpochTxArgsCmd.Flags().IntVar(&flagCollectionClusters, "collection-clusters", 0,
 		"number of collection clusters")
 	// required parameters for network configuration and generation of root node identities
-	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagConfig, "config", "",
+	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagNodeConfigJson, "node-config", "",
 		"path to a JSON file containing multiple node configurations (fields Role, Address, Weight)")
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagInternalNodePrivInfoDir, "internal-priv-dir", "", "path to directory "+
 		"containing the output from the `keygen` command for internal nodes")
@@ -63,10 +62,7 @@ func addGenerateRecoverEpochTxArgsCmdFlags() {
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEndView, "end-view", 0, "end view of the recovery epoch")
 }
 
-// generateRecoverEpochTxArgs generates recover epoch transaction arguments from a root protocol state snapshot and writes it to a JSON file
-func generateRecoverEpochTxArgs(cmd *cobra.Command, args []string) {
-	stdout := cmd.OutOrStdout()
-
+func getSnapshot() *inmem.Snapshot {
 	// get flow client with secure client connection to download protocol snapshot from access node
 	config, err := common.NewFlowClientConfig(flagAnAddress, flagAnPubkey, flow.ZeroID, false)
 	if err != nil {
@@ -83,19 +79,28 @@ func generateRecoverEpochTxArgs(cmd *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("failed")
 	}
 
-	// extract arguments from recover epoch tx from snapshot
-	txArgs := extractRecoverEpochArgs(snapshot)
+	return snapshot
+}
 
-	// encode to JSON
-	encodedTxArgs, err := epochcmdutil.EncodeArgs(txArgs)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not encode recover epoch transaction arguments")
-	}
+// generateRecoverEpochTxArgs generates recover epoch transaction arguments from a root protocol state snapshot and writes it to a JSON file
+func generateRecoverEpochTxArgs(getSnapshot func() *inmem.Snapshot) func(cmd *cobra.Command, args []string) {
+	return func(cmd *cobra.Command, args []string) {
+		stdout := cmd.OutOrStdout()
 
-	// write JSON args to stdout
-	_, err = stdout.Write(encodedTxArgs)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not write jsoncdc encoded arguments")
+		// extract arguments from recover epoch tx from snapshot
+		txArgs := extractRecoverEpochArgs(getSnapshot())
+
+		// encode to JSON
+		encodedTxArgs, err := epochcmdutil.EncodeArgs(txArgs)
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not encode recover epoch transaction arguments")
+		}
+
+		// write JSON args to stdout
+		_, err = stdout.Write(encodedTxArgs)
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not write jsoncdc encoded arguments")
+		}
 	}
 }
 
@@ -116,8 +121,8 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 	partnerNodes := common.ReadPartnerNodeInfos(log, flagPartnerWeights, flagPartnerNodeInfoDir)
 	log.Info().Msg("")
 
-	log.Info().Msg("generating internal private networking and staking keys")
-	internalNodes := common.ReadInternalNodeInfos(log, flagInternalNodePrivInfoDir, flagConfig)
+	log.Info().Msg("collecting internal node network and staking keys")
+	internalNodes := common.ReadInternalNodeInfos(log, flagInternalNodePrivInfoDir, flagNodeConfigJson)
 	log.Info().Msg("")
 
 	log.Info().Msg("computing collection node clusters")
@@ -125,6 +130,7 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate cluster assignment")
 	}
+
 	log.Info().Msg("")
 
 	epochCounter, err := epoch.Counter()
@@ -137,14 +143,13 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 
 	log.Info().Msg("constructing root QCs for collection node clusters")
 	clusterQCs := common.ConstructRootQCsForClusters(log, clusters, internalNodes, clusterBlocks)
-	fmt.Sprintf("", clusterQCs)
 	log.Info().Msg("")
 
 	randomSource, err := epoch.RandomSource()
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to get random source for current epoch")
 	}
-	randomSourceCdc, err := cadence.NewString(string(randomSource))
+	randomSourceCdc, err := cadence.NewString(hex.EncodeToString(randomSource))
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to get random source cadence string")
 	}
@@ -171,6 +176,14 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 		return skeleton
 	})
 
+	// @TODO: cluster qcs are converted into flow.ClusterQCVoteData types,
+	// we need a corresponding type in cadence on the FlowClusterQC contract
+	// to store this struct.
+	_, err = common.ConvertClusterQcsCdc(clusterQCs, clusters)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to convert cluster qcs to cadence type")
+	}
+
 	args := []cadence.Value{
 		randomSourceCdc,
 		cadence.NewUInt64(flagStartView),
@@ -178,8 +191,7 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 		cadence.NewUInt64(flagEndView),
 		cadence.NewArray(dkgPubKeys),
 		cadence.NewArray(nodeIds),
-		// clusters
-		// clusterQcs
+		//common.ConvertClusterAssignmentsCdc(assignments),
 	}
 
 	return args
