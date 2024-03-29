@@ -83,6 +83,7 @@ type GenericNode struct {
 	Setups                 storage.EpochSetups
 	EpochCommits           storage.EpochCommits
 	ProtocolStateSnapshots storage.ProtocolState
+	ProtocolKVStore        storage.ProtocolKVStore
 	State                  protocol.ParticipantState
 	Index                  storage.Index
 	Me                     module.Local
