@@ -39,8 +39,8 @@ type Account interface {
 	Transfer(to Address, balance Balance)
 
 	// Deploy deploys a contract to the environment
-	// the new deployed contract would be at the returned address and
-	// the contract data is not controlled by the COA
+	// the new deployed contract would be at the returned
+	// result address and the contract data is not controlled by the COA
 	// works only for COAs
 	Deploy(Code, GasLimit, Balance) *ResultSummary
 
