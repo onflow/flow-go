@@ -12,19 +12,19 @@ package types
 // deploy contracts to the environment,
 // or call methods on contracts without the need to sign a transaction.
 type Account interface {
-	// Returns the address of this account
+	// Address returns the address of this account
 	Address() Address
 
-	// Returns the balance of this account
+	// Balance returns the balance of this account
 	Balance() Balance
 
-	// Returns the code of this account
+	// Code returns the code of this account
 	Code() Code
 
-	// Returns the code hash of this account
+	// CodeHash returns the code hash of this account
 	CodeHash() []byte
 
-	// Returns the nonce of this account
+	// Nonce returns the nonce of this account
 	Nonce() uint64
 
 	// Deposit deposits the token from the given vault into this account
