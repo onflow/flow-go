@@ -44,20 +44,29 @@ func ContractCode(flowTokenAddress flow.Address, evmAbiOnly bool) []byte {
 }
 
 const ContractName = "EVM"
+
 const evmAddressTypeBytesFieldName = "bytes"
+
 const evmAddressTypeQualifiedIdentifier = "EVM.EVMAddress"
+
 const evmBalanceTypeQualifiedIdentifier = "EVM.Balance"
+
 const evmResultTypeQualifiedIdentifier = "EVM.Result"
+
 const evmStatusTypeQualifiedIdentifier = "EVM.Status"
+
 const evmBlockTypeQualifiedIdentifier = "EVM.EVMBlock"
 
 const abiEncodingByteSize = 32
 
 var EVMTransactionBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.TheUInt8Type)
+
 var evmTransactionBytesType = sema.NewVariableSizedType(nil, sema.UInt8Type)
 
 var evmAddressBytesType = sema.NewConstantSizedType(nil, sema.UInt8Type, types.AddressLength)
+
 var evmAddressBytesStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, evmAddressBytesType)
+
 var EVMAddressBytesCadenceType = cadence.NewConstantSizedArrayType(types.AddressLength, cadence.TheUInt8Type)
 
 // abiEncodingError
@@ -264,19 +273,33 @@ func newInternalEVMTypeEncodeABIFunction(
 }
 
 var gethTypeString = gethABI.Type{T: gethABI.StringTy}
+
 var gethTypeBool = gethABI.Type{T: gethABI.BoolTy}
+
 var gethTypeUint8 = gethABI.Type{T: gethABI.UintTy, Size: 8}
+
 var gethTypeUint16 = gethABI.Type{T: gethABI.UintTy, Size: 16}
+
 var gethTypeUint32 = gethABI.Type{T: gethABI.UintTy, Size: 32}
+
 var gethTypeUint64 = gethABI.Type{T: gethABI.UintTy, Size: 64}
+
 var gethTypeUint128 = gethABI.Type{T: gethABI.UintTy, Size: 128}
+
 var gethTypeUint256 = gethABI.Type{T: gethABI.UintTy, Size: 256}
+
 var gethTypeInt8 = gethABI.Type{T: gethABI.IntTy, Size: 8}
+
 var gethTypeInt16 = gethABI.Type{T: gethABI.IntTy, Size: 16}
+
 var gethTypeInt32 = gethABI.Type{T: gethABI.IntTy, Size: 32}
+
 var gethTypeInt64 = gethABI.Type{T: gethABI.IntTy, Size: 64}
+
 var gethTypeInt128 = gethABI.Type{T: gethABI.IntTy, Size: 128}
+
 var gethTypeInt256 = gethABI.Type{T: gethABI.IntTy, Size: 256}
+
 var gethTypeAddress = gethABI.Type{Size: 20, T: gethABI.AddressTy}
 
 func gethABIType(staticType interpreter.StaticType, evmAddressTypeID common.TypeID) (gethABI.Type, bool) {
@@ -1579,7 +1602,8 @@ var internalEVMTypeDeployFunctionType = &sema.FunctionType{
 			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
 		},
 	},
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+	// Actually EVM.Result, but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 
 func newInternalEVMTypeDeployFunction(
@@ -1639,9 +1663,11 @@ func newInternalEVMTypeDeployFunction(
 
 			const isAuthorized = true
 			account := handler.AccountByAddress(fromAddress, isAuthorized)
-			address := account.Deploy(code, gasLimit, amount)
+			result := account.Deploy(code, gasLimit, amount)
 
-			return EVMAddressToAddressBytesArrayValue(inter, address)
+			// assign deployed contract address to return value since it's the only result of the deploy
+			result.ReturnedValue = result.DeployedContractAddress[:]
+			return NewResultValue(handler, gauge, inter, locationRange, result)
 		},
 	)
 }
