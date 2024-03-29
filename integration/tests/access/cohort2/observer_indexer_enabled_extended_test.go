@@ -31,15 +31,16 @@ func TestObserverIndexerEnabledExtended(t *testing.T) {
 	suite.Run(t, new(ObserverIndexerEnabledExtendedSuite))
 }
 
-// ObserverIndexerEnabledExtendedSuite tests the observer with the indexer enabled.
+// ObserverIndexerEnabledExtendedSuite tests the observer with the indexer enabled,
+// observer configured to proxy requests to an access node and access node itself. All responses are compared
+// to ensure all of the endpoints are working as expected.
 // It uses ObserverSuite as a base to reuse the test cases that need to be run for any observer variation.
 type ObserverIndexerEnabledExtendedSuite struct {
 	ObserverSuite
 }
 
-// SetupTest sets up the test suite by starting the network and preparing the observer client.
-// By overriding this function, we can ensure that the observer is started with correct parameters and select
-// the RPCs and REST endpoints that are tested.
+// SetupTest sets up the test suite by starting the network and preparing both observer clients and access client to be
+// call all endpoints and compare responses.
 func (s *ObserverIndexerEnabledExtendedSuite) SetupTest() {
 	consensusConfigs := []func(config *testnet.NodeConfig){
 		// `cruise-ctl-fallback-proposal-duration` is set to 250ms instead to of 100ms
