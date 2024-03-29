@@ -242,7 +242,7 @@ func init() {
 	}
 
 	t2 := runtimeNanoAsTimeDuration()
-	if t2 <= t1 {
+	if t2 < t1 {
 		panic(fmt.Sprintf("ERROR: BINSTAT: INTERNAL: t1=%d but t2=%d\n", t1, t2))
 	}
 }
