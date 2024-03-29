@@ -114,8 +114,8 @@ github.com/StackExchange/wmi v1.2.1 h1:VIkavFPXSjcnS+O8yTq7NI32k0R5Aj+v39y29VYDO
 github.com/StackExchange/wmi v1.2.1/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9SBzvHz7e8=
 github.com/The-K-R-O-K/flow-emulator v0.0.0-20240328093409-8d73aa09e0b9 h1:t/lLXY/L70vpFo3/MAAvrJesSmoBZcxHTTPiWFX1ZLg=
 github.com/The-K-R-O-K/flow-emulator v0.0.0-20240328093409-8d73aa09e0b9/go.mod h1:/086wbPkrQvn/WrrV2rbV9OXc5t6hlSLkMqsjRyDDEM=
-github.com/The-K-R-O-K/flow/protobuf/go/flow v0.0.0-20240325091550-e992f45aaa3e h1:6CCZCTEWUkUEAJ2FMzbGwolbr+sFbnjHg6tmhOverhY=
-github.com/The-K-R-O-K/flow/protobuf/go/flow v0.0.0-20240325091550-e992f45aaa3e/go.mod h1:NA2pX2nw8zuaxfKphhKsk00kWLwfd+tv8mS23YXO4Sk=
+github.com/The-K-R-O-K/flow/protobuf/go/flow v0.0.0-20240329131059-d01f7f0cf505 h1:lldKPUtb9dwt4LOxc0iFao1KF77B3pnpj1ZTY1YD6AU=
+github.com/The-K-R-O-K/flow/protobuf/go/flow v0.0.0-20240329131059-d01f7f0cf505/go.mod h1:NA2pX2nw8zuaxfKphhKsk00kWLwfd+tv8mS23YXO4Sk=
 github.com/VictoriaMetrics/fastcache v1.5.3/go.mod h1:+jv9Ckb+za/P1ZRg/sulP5Ni1v49daAVERr0H3CuscE=
 github.com/VictoriaMetrics/fastcache v1.12.1 h1:i0mICQuojGDL3KblA7wUNlY5lOK6a4bwt3uRKnkZU40=
 github.com/VictoriaMetrics/fastcache v1.12.1/go.mod h1:tX04vaqcNoQeGLD+ra5pU5sWkuxnzWhEzLwhP9w653o=

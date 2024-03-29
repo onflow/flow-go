@@ -119,6 +119,21 @@ func (h *Handler) SubscribeExecutionData(request *executiondata.SubscribeExecuti
 	}
 }
 
+// SubscribeEvents is deprecated and will be removed in a future version.
+// Use SubscribeEventsFromStartBlockID, SubscribeEventsFromStartHeight or SubscribeEventsFromLatest.
+//
+// SubscribeEvents handles subscription requests for events starting at the specified block ID or block height.
+// The handler manages the subscription and sends the subscribed information to the client via the provided stream.
+//
+// Responses are returned for each block containing at least one event that matches the filter. Additionally,
+// heartbeat responses (SubscribeEventsResponse with no events) are returned periodically to allow
+// clients to track which blocks were searched. Clients can use this
+// information to determine which block to start from when reconnecting.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument   - if provided both startBlockID and startHeight, if invalid startBlockID is provided, if invalid event filter is provided.
+// - codes.ResourceExhausted - if the maximum number of streams is reached.
+// - codes.Internal          - could not convert events to entity, if stream encountered an error, if stream got unexpected response or could not send response.
 func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest, stream executiondata.ExecutionDataAPI_SubscribeEventsServer) error {
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {

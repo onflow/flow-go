@@ -322,4 +322,4 @@ require (
 replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483
 
 // TODO: Remove when it will be merged
-replace github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240305102946-3efec6679252 => github.com/The-K-R-O-K/flow/protobuf/go/flow v0.0.0-20240325091550-e992f45aaa3e
+replace github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240305102946-3efec6679252 => github.com/The-K-R-O-K/flow/protobuf/go/flow v0.0.0-20240329131059-d01f7f0cf505

@@ -19,6 +19,9 @@ type API interface {
 	GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionData, error)
 	// SubscribeExecutionData subscribes to execution data starting from a specific block ID and block height.
 	SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startBlockHeight uint64) subscription.Subscription
+	// SubscribeEvents is deprecated and will be removed in a future version.
+	// Use SubscribeEventsFromStartBlockID, SubscribeEventsFromStartHeight or SubscribeEventsFromLatest.
+	//
 	// SubscribeEvents streams events for all blocks starting at the specified block ID or block height
 	// up until the latest available block. Once the latest is
 	// reached, the stream will remain open and responses are sent for each new
@@ -38,8 +41,6 @@ type API interface {
 	// - filter: The event filter used to filter events.
 	//
 	// If invalid parameters will be supplied SubscribeEvents will return a failed subscription.
-	//
-	// Method will be deprecated. Use SubscribeEventsFromStartBlockID, SubscribeEventsFromStartHeight or SubscribeEventsFromLatest.
 	SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter EventFilter) subscription.Subscription
 	// SubscribeEventsFromStartBlockID streams events starting at the specified block ID,
 	// up until the latest available block. Once the latest is
