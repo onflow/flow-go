@@ -188,7 +188,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 	storageMapIds[string(atree.SlabIndexToLedgerKey(storageMap.StorageID().Index))] = struct{}{}
 
 	iterator := storageMap.Iterator(nil)
-	keys := make([]interpreter.StringStorageMapKey, 0, storageMap.Count())
+	keys := make([]interpreter.StorageMapKey, 0, storageMap.Count())
 	// to be safe avoid modifying the map while iterating
 	for {
 		key := iterator.NextKey()
@@ -196,12 +196,16 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 			break
 		}
 
-		stringKey, ok := key.(interpreter.StringAtreeValue)
-		if !ok {
-			return fmt.Errorf("invalid key type %T, expected interpreter.StringAtreeValue", key)
-		}
+		switch key := key.(type) {
+		case interpreter.StringAtreeValue:
+			keys = append(keys, interpreter.StringStorageMapKey(key))
 
-		keys = append(keys, interpreter.StringStorageMapKey(stringKey))
+		case interpreter.Uint64AtreeValue:
+			keys = append(keys, interpreter.Uint64StorageMapKey(key))
+
+		default:
+			return fmt.Errorf("invalid key type %T, expected interpreter.StringAtreeValue or interpreter.Uint64AtreeValue", key)
+		}
 	}
 
 	for _, key := range keys {
@@ -237,7 +241,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 			m.rw.Write(migrationProblem{
 				Address: mr.Address.Hex(),
 				Size:    len(mr.Snapshot.Payloads),
-				Key:     string(key),
+				Key:     fmt.Sprintf("%v (%T)", key, key),
 				Kind:    "migration_failure",
 				Msg:     err.Error(),
 			})

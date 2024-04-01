@@ -84,12 +84,20 @@ func validateStorageDomain(
 			break
 		}
 
-		stringKey, ok := key.(interpreter.StringAtreeValue)
-		if !ok {
-			return fmt.Errorf("invalid key type %T, expected interpreter.StringAtreeValue", key)
+		var mapKey interpreter.StorageMapKey
+
+		switch key := key.(type) {
+		case interpreter.StringAtreeValue:
+			mapKey = interpreter.StringStorageMapKey(key)
+
+		case interpreter.Uint64AtreeValue:
+			mapKey = interpreter.Uint64StorageMapKey(key)
+
+		default:
+			return fmt.Errorf("invalid key type %T, expected interpreter.StringAtreeValue or interpreter.Uint64AtreeValue", key)
 		}
 
-		newValue := newStorageMap.ReadValue(nil, interpreter.StringStorageMapKey(stringKey))
+		newValue := newStorageMap.ReadValue(nil, mapKey)
 
 		err := cadenceValueEqual(oldRuntime.Interpreter, oldValue, newRuntime.Interpreter, newValue)
 		if err != nil {
@@ -97,7 +105,7 @@ func validateStorageDomain(
 				log.Info().
 					Str("address", address.Hex()).
 					Str("domain", domain).
-					Str("key", string(stringKey)).
+					Str("key", fmt.Sprintf("%v (%T)", mapKey, mapKey)).
 					Str("trace", err.Error()).
 					Str("old value", oldValue.String()).
 					Str("new value", newValue.String()).
