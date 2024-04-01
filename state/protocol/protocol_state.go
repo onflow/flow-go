@@ -83,6 +83,8 @@ type ProtocolState interface {
 	GlobalParams() GlobalParams
 }
 
+// MutableProtocolState is the read-write interface for protocol state, it allows evolving the protocol state by
+// creating a StateMutator for each block and applying state-changing service events.
 type MutableProtocolState interface {
 	ProtocolState
 
