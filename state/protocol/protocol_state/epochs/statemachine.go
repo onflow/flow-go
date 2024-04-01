@@ -71,6 +71,11 @@ type StateMachine interface {
 	ParentState() *flow.RichProtocolStateEntry
 }
 
+// StateMachineFactoryMethod is a factory method to create state machines for evolving the protocol's epoch state.
+// Currently, we have `HappyPathStateMachine` and `FallbackStateMachine` as StateMachine
+// implementations, whose constructors both have the same signature as StateMachineFactoryMethod.
+type StateMachineFactoryMethod = func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (StateMachine, error)
+
 // EpochStateMachine is a hierarchical state machine that encapsulates the logic for protocol-compliant evolution of Epoch-related sub-state.
 // EpochStateMachine processes a subset of service events that are relevant for the Epoch state, and ignores all other events.
 // EpochStateMachine delegates the processing of service events to an embedded StateMachine,
@@ -104,6 +109,8 @@ func NewEpochStateMachine(
 	protocolStateDB storage.ProtocolState,
 	parentState protocol_state.KVStoreReader,
 	mutator protocol_state.KVStoreMutator,
+	happyPathStateMachineFactory StateMachineFactoryMethod,
+	epochFallbackStateMachineFactory StateMachineFactoryMethod,
 ) (*EpochStateMachine, error) {
 	parentEpochState, err := protocolStateDB.ByBlockID(candidate.ParentID)
 	if err != nil {
@@ -129,9 +136,9 @@ func NewEpochStateMachine(
 		// and we must use only the `epochFallbackStateMachine` along this fork.
 		//
 		// TODO for 'leaving Epoch Fallback via special service event': this might need to change.
-		stateMachine = NewFallbackStateMachine(candidate.View, parentEpochState)
+		stateMachine, err = epochFallbackStateMachineFactory(candidate.View, parentEpochState)
 	} else {
-		stateMachine, err = NewHappyPathStateMachine(candidate.View, parentEpochState)
+		stateMachine, err = happyPathStateMachineFactory(candidate.View, parentEpochState)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize protocol state machine: %w", err)
@@ -143,7 +150,7 @@ func NewEpochStateMachine(
 		parentState:        parentState,
 		mutator:            mutator,
 		epochFallbackStateMachineFactory: func() (StateMachine, error) {
-			return NewFallbackStateMachine(candidate.View, parentEpochState), nil
+			return epochFallbackStateMachineFactory(candidate.View, parentEpochState)
 		},
 		setups:           setups,
 		commits:          commits,
