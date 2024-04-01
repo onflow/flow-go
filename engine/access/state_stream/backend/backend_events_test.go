@@ -25,8 +25,10 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
-// testType represents a test scenario for subscribe events endpoints
-type testType struct {
+// eventsTestType represents a test scenario for subscribe events endpoints.
+// The old version of test case is used to test SubscribeEvents as well.
+// After removing SubscribeEvents endpoint testType struct as a test case can be used.
+type eventsTestType struct {
 	name            string
 	highestBackfill int
 	startBlockID    flow.Identifier
@@ -71,9 +73,9 @@ func (s *BackendEventsSuite) SetupTest() {
 // - All events: Includes all event types.
 // - Some events: Includes only event types that match the provided filter.
 // - No events: Includes a custom event type "A.0x1.NonExistent.Event".
-func (s *BackendEventsSuite) setupFilterForTestCases(baseTests []testType) []testType {
+func (s *BackendEventsSuite) setupFilterForTestCases(baseTests []eventsTestType) []eventsTestType {
 	// create variations for each of the base test
-	tests := make([]testType, 0, len(baseTests)*3)
+	tests := make([]eventsTestType, 0, len(baseTests)*3)
 	var err error
 
 	for _, test := range baseTests {
@@ -100,7 +102,7 @@ func (s *BackendEventsSuite) setupFilterForTestCases(baseTests []testType) []tes
 
 // setupLocalStorage prepares local storage for testing
 func (s *BackendEventsSuite) setupLocalStorage() {
-	s.backend.useIndex = true
+	s.SetupBackend(true)
 
 	// events returned from the db are sorted by txID, txIndex, then eventIndex.
 	// reproduce that here to ensure output order works as expected
@@ -132,18 +134,6 @@ func (s *BackendEventsSuite) setupLocalStorage() {
 	reporter.On("HighestIndexedHeight").Return(s.blocks[len(s.blocks)-1].Header.Height, nil)
 	err := s.eventsIndex.Initialize(reporter)
 	s.Require().NoError(err)
-
-	// create real execution data tracker which use index
-	s.executionDataTrackerReal = subscription.NewExecutionDataTracker(
-		s.log,
-		s.state,
-		s.rootBlock.Header.Height,
-		s.headers,
-		s.broadcaster,
-		s.rootBlock.Header.Height,
-		s.eventsIndex,
-		true,
-	)
 }
 
 // TestSubscribeEventsFromExecutionData tests the SubscribeEvents method happy path for events
@@ -200,7 +190,7 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromLatestFromLocalStorage() {
 
 // runTestSubscribeEvents runs the test suite for SubscribeEvents subscription
 func (s *BackendEventsSuite) runTestSubscribeEvents() {
-	tests := []testType{
+	tests := []eventsTestType{
 		{
 			name:            "happy path - all new blocks",
 			highestBackfill: -1, // no backfill
@@ -237,12 +227,12 @@ func (s *BackendEventsSuite) runTestSubscribeEvents() {
 		return s.backend.SubscribeEvents(ctx, startBlockID, startHeight, filter)
 	}
 
-	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
+	s.subscribe(call, s.requireSubscribeEventsResponse, s.setupFilterForTestCases(tests))
 }
 
 // runTestSubscribeEventsFromStartBlockID runs the test suite for SubscribeEventsFromStartBlockID subscription
 func (s *BackendEventsSuite) runTestSubscribeEventsFromStartBlockID() {
-	tests := []testType{
+	tests := []eventsTestType{
 		{
 			name:            "happy path - all new blocks",
 			highestBackfill: -1, // no backfill
@@ -276,12 +266,12 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromStartBlockID() {
 		return s.backend.SubscribeEventsFromStartBlockID(ctx, startBlockID, filter)
 	}
 
-	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
+	s.subscribe(call, s.requireSubscribeEventsResponse, s.setupFilterForTestCases(tests))
 }
 
 // runTestSubscribeEventsFromStartHeight runs the test suite for SubscribeEventsFromStartHeight subscription
 func (s *BackendEventsSuite) runTestSubscribeEventsFromStartHeight() {
-	tests := []testType{
+	tests := []eventsTestType{
 		{
 			name:            "happy path - all new blocks",
 			highestBackfill: -1, // no backfill
@@ -315,12 +305,12 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromStartHeight() {
 		return s.backend.SubscribeEventsFromStartHeight(ctx, startHeight, filter)
 	}
 
-	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
+	s.subscribe(call, s.requireSubscribeEventsResponse, s.setupFilterForTestCases(tests))
 }
 
 // runTestSubscribeEventsFromLatest runs the test suite for SubscribeEventsFromLatest subscription
 func (s *BackendEventsSuite) runTestSubscribeEventsFromLatest() {
-	tests := []testType{
+	tests := []eventsTestType{
 		{
 			name:            "happy path - all new blocks",
 			highestBackfill: -1, // no backfill
@@ -346,7 +336,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromLatest() {
 		return s.backend.SubscribeEventsFromLatest(ctx, filter)
 	}
 
-	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
+	s.subscribe(call, s.requireSubscribeEventsResponse, s.setupFilterForTestCases(tests))
 }
 
 // subscribe is a helper function to run test scenarios for event subscription in the BackendEventsSuite.
@@ -376,8 +366,8 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromLatest() {
 //  8. Cancels the subscription and ensures it shuts down gracefully.
 func (s *BackendEventsSuite) subscribe(
 	subscribeFn func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription,
-	requireFn func(interface{}, *EventsResponse),
-	tests []testType,
+	requireFn func(interface{}, *SubscribeEventsResponse),
+	tests []eventsTestType,
 ) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -428,10 +418,12 @@ func (s *BackendEventsSuite) subscribe(
 					v, ok := <-sub.Channel()
 					require.True(s.T(), ok, "channel closed while waiting for exec data for block %x %v: err: %v", b.Header.Height, b.ID(), sub.Err())
 
-					expected := &EventsResponse{
-						BlockID:        b.ID(),
-						Height:         b.Header.Height,
-						Events:         expectedEvents,
+					expected := &SubscribeEventsResponse{
+						EventsResponse: EventsResponse{
+							BlockID: b.ID(),
+							Height:  b.Header.Height,
+							Events:  expectedEvents,
+						},
 						BlockTimestamp: b.Header.Timestamp,
 						MessageIndex:   expectedMsgIndexCounter.Value(),
 					}
@@ -463,8 +455,8 @@ func (s *BackendEventsSuite) subscribe(
 }
 
 // requireEventsResponse ensures that the received event information matches the expected data.
-func (s *BackendEventsSuite) requireEventsResponse(v interface{}, expected *EventsResponse) {
-	actual, ok := v.(*EventsResponse)
+func (s *BackendEventsSuite) requireSubscribeEventsResponse(v interface{}, expected *SubscribeEventsResponse) {
+	actual, ok := v.(*SubscribeEventsResponse)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 
 	assert.Equal(s.T(), expected.BlockID, actual.BlockID)

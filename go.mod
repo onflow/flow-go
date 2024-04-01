@@ -57,7 +57,7 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1
 	github.com/onflow/flow-go-sdk v0.44.0
-	github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240305102946-3efec6679252
+	github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240329135840-9f04832ba3a1
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pierrec/lz4 v2.6.1+incompatible
 	github.com/pkg/errors v0.9.1
@@ -322,4 +322,4 @@ require (
 replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483
 
 // TODO: Remove when it will be merged
-replace github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240305102946-3efec6679252 => github.com/The-K-R-O-K/flow/protobuf/go/flow v0.0.0-20240329131059-d01f7f0cf505
+replace github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240329135840-9f04832ba3a1 => github.com/The-K-R-O-K/flow/protobuf/go/flow v0.0.0-20240329141113-0bb8e1a13bd8

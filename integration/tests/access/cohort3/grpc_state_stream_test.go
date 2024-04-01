@@ -318,22 +318,22 @@ func (s *GrpcStateStreamSuite) getRPCs() []RPCTest {
 }
 
 type ResponseTracker struct {
-	r  map[uint64]map[string]backend.EventsResponse
+	r  map[uint64]map[string]backend.SubscribeEventsResponse
 	mu sync.RWMutex
 }
 
 func newResponseTracker() *ResponseTracker {
 	return &ResponseTracker{
-		r: make(map[uint64]map[string]backend.EventsResponse),
+		r: make(map[uint64]map[string]backend.SubscribeEventsResponse),
 	}
 }
 
-func (r *ResponseTracker) Add(t *testing.T, blockHeight uint64, name string, events *backend.EventsResponse) {
+func (r *ResponseTracker) Add(t *testing.T, blockHeight uint64, name string, events *backend.SubscribeEventsResponse) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if _, ok := r.r[blockHeight]; !ok {
-		r.r[blockHeight] = make(map[string]backend.EventsResponse)
+		r.r[blockHeight] = make(map[string]backend.SubscribeEventsResponse)
 	}
 	r.r[blockHeight][name] = *events
 
@@ -354,7 +354,7 @@ func (r *ResponseTracker) Add(t *testing.T, blockHeight uint64, name string, eve
 	delete(r.r, blockHeight)
 }
 
-func (r *ResponseTracker) compare(t *testing.T, controlData backend.EventsResponse, testData backend.EventsResponse) error {
+func (r *ResponseTracker) compare(t *testing.T, controlData backend.SubscribeEventsResponse, testData backend.SubscribeEventsResponse) error {
 	require.Equal(t, controlData.BlockID, testData.BlockID)
 	require.Equal(t, controlData.Height, testData.Height)
 	require.Equal(t, len(controlData.Events), len(testData.Events))
@@ -384,8 +384,8 @@ func getClient(address string) (executiondata.ExecutionDataAPIClient, error) {
 func SubscribeEventsHandler(
 	ctx context.Context,
 	stream executiondata.ExecutionDataAPI_SubscribeEventsClient,
-) (<-chan backend.EventsResponse, <-chan error, error) {
-	sub := make(chan backend.EventsResponse)
+) (<-chan backend.SubscribeEventsResponse, <-chan error, error) {
+	sub := make(chan backend.SubscribeEventsResponse)
 	errChan := make(chan error)
 
 	sendErr := func(err error) {
@@ -412,10 +412,12 @@ func SubscribeEventsHandler(
 
 			events := convert.MessagesToEvents(resp.GetEvents())
 
-			response := backend.EventsResponse{
-				Height:         resp.GetBlockHeight(),
-				BlockID:        convert.MessageToIdentifier(resp.GetBlockId()),
-				Events:         events,
+			response := backend.SubscribeEventsResponse{
+				EventsResponse: backend.EventsResponse{
+					Height:  resp.GetBlockHeight(),
+					BlockID: convert.MessageToIdentifier(resp.GetBlockId()),
+					Events:  events,
+				},
 				BlockTimestamp: resp.GetBlockTimestamp().AsTime(),
 				MessageIndex:   resp.MessageIndex,
 			}

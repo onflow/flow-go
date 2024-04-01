@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	mockstatestream "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/generator"
 )
@@ -109,7 +110,7 @@ func (s *SubscribeEventsSuite) SetupTest() {
 //   - Subscribing to events of a specific type (some events).
 //
 // For each scenario, this test function creates WebSocket requests, simulates WebSocket responses with mock data,
-// and validates that the received WebSocket response matches the expected EventsResponses.
+// and validates that the received WebSocket response matches the expected SubscribeEventsResponses.
 func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 	testVectors := []testType{
 		{
@@ -178,11 +179,13 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 				test.contracts)
 			require.NoError(s.T(), err)
 
-			var expectedEventsResponses []*backend.EventsResponse
-			var subscriptionEventsResponses []*backend.EventsResponse
+			var expectedEventsResponses []*backend.SubscribeEventsResponse
+			var subscriptionEventsResponses []*backend.SubscribeEventsResponse
 			startBlockFound := test.startBlockID == flow.ZeroID
 
 			// construct expected event responses based on the provided test configuration
+			expectedMsgIndexCounter := counters.NewMonotonousCounter(0)
+
 			for i, block := range s.blocks {
 				blockID := block.ID()
 				if startBlockFound || blockID == test.startBlockID {
@@ -202,28 +205,38 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 							}
 						}
 						if len(expectedEvents) > 0 || (i+1)%int(test.heartbeatInterval) == 0 {
-							expectedEventsResponses = append(expectedEventsResponses, &backend.EventsResponse{
-								Height:  block.Header.Height,
-								BlockID: blockID,
-								Events:  expectedEvents,
+							expectedEventsResponses = append(expectedEventsResponses, &backend.SubscribeEventsResponse{
+								EventsResponse: backend.EventsResponse{
+									Height:  block.Header.Height,
+									BlockID: blockID,
+									Events:  expectedEvents,
+								},
+								BlockTimestamp: block.Header.Timestamp,
+								MessageIndex:   expectedMsgIndexCounter.Value(),
 							})
 						}
-						subscriptionEventsResponses = append(subscriptionEventsResponses, &backend.EventsResponse{
-							Height:  block.Header.Height,
-							BlockID: blockID,
-							Events:  subscriptionEvents,
+						subscriptionEventsResponses = append(subscriptionEventsResponses, &backend.SubscribeEventsResponse{
+							EventsResponse: backend.EventsResponse{
+								Height:  block.Header.Height,
+								BlockID: blockID,
+								Events:  subscriptionEvents,
+							},
+							BlockTimestamp: block.Header.Timestamp,
+							MessageIndex:   expectedMsgIndexCounter.Value(),
 						})
+						wasSet := expectedMsgIndexCounter.Set(expectedMsgIndexCounter.Value() + 1)
+						require.True(s.T(), wasSet)
 					}
 				}
 			}
 
-			// Create a channel to receive mock EventsResponse objects
+			// Create a channel to receive mock SubscribeEventsResponse objects
 			ch := make(chan interface{})
 			var chReadOnly <-chan interface{}
-			// Simulate sending a mock EventsResponse
+			// Simulate sending a mock SubscribeEventsResponse
 			go func() {
 				for _, eventResponse := range subscriptionEventsResponses {
-					// Send the mock EventsResponse through the channel
+					// Send the mock SubscribeEventsResponse through the channel
 					ch <- eventResponse
 				}
 			}()
@@ -395,10 +408,10 @@ func requireError(t *testing.T, recorder *testHijackResponseRecorder, expected s
 	require.Contains(t, recorder.responseBuff.String(), expected)
 }
 
-// requireResponse validates that the response received from WebSocket communication matches the expected EventsResponses.
+// requireResponse validates that the response received from WebSocket communication matches the expected SubscribeEventsResponse.
 // This function compares the BlockID, Events count, and individual event properties for each expected and actual
-// EventsResponse. It ensures that the response received from WebSocket matches the expected structure and content.
-func requireResponse(t *testing.T, recorder *testHijackResponseRecorder, expected []*backend.EventsResponse) {
+// SubscribeEventsResponse. It ensures that the response received from WebSocket matches the expected structure and content.
+func requireResponse(t *testing.T, recorder *testHijackResponseRecorder, expected []*backend.SubscribeEventsResponse) {
 	<-recorder.closed
 	// Convert the actual response from respRecorder to JSON bytes
 	actualJSON := recorder.responseBuff.Bytes()
@@ -406,7 +419,7 @@ func requireResponse(t *testing.T, recorder *testHijackResponseRecorder, expecte
 	pattern := `\{"BlockID":".*?","Height":\d+,"Events":\[(\{.*?})*\],"BlockTimestamp":".*?","MessageIndex":\d+\}`
 	matches := regexp.MustCompile(pattern).FindAll(actualJSON, -1)
 
-	// Unmarshal each matched JSON into []state_stream.EventsResponse
+	// Unmarshal each matched JSON into []state_stream.SubscribeEventsResponse
 	var actual []backend.EventsResponse
 	for _, match := range matches {
 		var response backend.EventsResponse

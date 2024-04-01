@@ -66,6 +66,7 @@ type StateStreamBackend struct {
 
 	ExecutionDataBackend
 	EventsBackend
+	AccountStatusesBackend
 
 	log                  zerolog.Logger
 	state                protocol.State
@@ -116,14 +117,27 @@ func New(
 		executionDataTracker: executionDataTracker,
 	}
 
+	eventsRetriever := EventsRetriever{
+		log:              logger,
+		headers:          headers,
+		getExecutionData: b.getExecutionData,
+		useEventsIndex:   useEventsIndex,
+		eventsIndex:      eventsIndex,
+	}
+
 	b.EventsBackend = EventsBackend{
 		log:                  logger,
 		headers:              headers,
-		getExecutionData:     b.getExecutionData,
-		useIndex:             useEventsIndex,
-		eventsIndex:          eventsIndex,
 		subscriptionHandler:  subscriptionHandler,
 		executionDataTracker: executionDataTracker,
+		eventsRetriever:      eventsRetriever,
+	}
+
+	b.AccountStatusesBackend = AccountStatusesBackend{
+		log:                  logger,
+		subscriptionHandler:  subscriptionHandler,
+		executionDataTracker: b.ExecutionDataTracker,
+		eventsRetriever:      eventsRetriever,
 	}
 
 	return b, nil

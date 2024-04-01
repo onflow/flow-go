@@ -2,7 +2,6 @@ package backend
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -10,34 +9,27 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
-type EventsResponse struct {
-	BlockID        flow.Identifier
-	Height         uint64
-	Events         flow.EventsList
+type SubscribeEventsResponse struct {
+	EventsResponse
 	BlockTimestamp time.Time
 	MessageIndex   uint64
 }
 
 type EventsBackend struct {
-	log                 zerolog.Logger
-	subscriptionHandler *subscription.SubscriptionHandler
+	log zerolog.Logger
 
-	headers          storage.Headers
-	useIndex         bool
-	eventsIndex      *index.EventsIndex
-	getExecutionData GetExecutionDataFunc
-
+	headers              storage.Headers
+	subscriptionHandler  *subscription.SubscriptionHandler
 	executionDataTracker subscription.ExecutionDataTracker
+	eventsRetriever      EventsRetriever
 }
 
 // SubscribeEvents is deprecated and will be removed in a future version.
@@ -167,98 +159,32 @@ func (b *EventsBackend) subscribeEvents(ctx context.Context, nextHeight uint64, 
 // - codes.NotFound: If block header for the specified block height is not found, if events for the specified block height are not found.
 // - codes.Internal: If the message index has already been incremented.
 func (b *EventsBackend) getResponseFactory(filter state_stream.EventFilter, index *counters.StrictMonotonousCounter) subscription.GetDataByHeightFunc {
-	return func(ctx context.Context, height uint64) (interface{}, error) {
-		var response *EventsResponse
-		var header *flow.Header
-		var err error
-
-		if b.useIndex {
-			response, err = b.getEventsFromStorage(height, filter)
-		} else {
-			response, err = b.getEventsFromExecutionData(ctx, height, filter)
+	return func(ctx context.Context, height uint64) (response interface{}, err error) {
+		eventsResponse, err := b.eventsRetriever.GetAllEventsResponse(ctx, height)
+		if err != nil {
+			return nil, err
 		}
 
-		if err == nil {
-			header, err = b.headers.ByHeight(height)
-			if err != nil {
-				return nil, rpc.ConvertStorageError(err)
-			}
-
-			response.BlockTimestamp = header.Timestamp
-
-			messageIndex := index.Value()
-			if ok := index.Set(messageIndex + 1); !ok {
-				return nil, status.Errorf(codes.Internal, "the message index has already been incremented to %d", index.Value())
-			}
-			response.MessageIndex = messageIndex
-
-			if b.log.GetLevel() == zerolog.TraceLevel {
-				b.log.Trace().
-					Hex("block_id", logging.ID(response.BlockID)).
-					Uint64("height", height).
-					Int("events", len(response.Events)).
-					Msg("sending events")
-			}
+		header, err := b.headers.ByHeight(height)
+		if err != nil {
+			return nil, rpc.ConvertStorageError(err)
 		}
-		return response, err
+
+		messageIndex := index.Value()
+		if ok := index.Set(messageIndex + 1); !ok {
+			return nil, status.Errorf(codes.Internal, "the message index has already been incremented to %d", index.Value())
+		}
+
+		subscribeEventsResponse := &SubscribeEventsResponse{
+			EventsResponse: EventsResponse{
+				BlockID: eventsResponse.BlockID,
+				Height:  eventsResponse.Height,
+				Events:  filter.Filter(eventsResponse.Events),
+			},
+			BlockTimestamp: header.Timestamp,
+			MessageIndex:   messageIndex,
+		}
+
+		return subscribeEventsResponse, nil
 	}
-}
-
-// getEventsFromExecutionData retrieves the events for a given height extracted from the execution data.
-//
-// Parameters:
-// - ctx: Context for the operation.
-// - height: The height of the block for which events are retrieved.
-// - filter: The event filter used to filter events.
-//
-// Expected errors during normal operation:
-//   - codes.NotFound: If block header for the specified block height is not found, if events for the specified block height are not found.
-func (b *EventsBackend) getEventsFromExecutionData(ctx context.Context, height uint64, filter state_stream.EventFilter) (*EventsResponse, error) {
-	executionData, err := b.getExecutionData(ctx, height)
-	if err != nil {
-		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
-	}
-
-	var events flow.EventsList
-	for _, chunkExecutionData := range executionData.ChunkExecutionDatas {
-		events = append(events, filter.Filter(chunkExecutionData.Events)...)
-	}
-
-	return &EventsResponse{
-		BlockID: executionData.BlockID,
-		Height:  height,
-		Events:  events,
-	}, nil
-}
-
-// getEventsFromStorage retrieves the events for a given height from the index storage.
-//
-// Parameters:
-// - height: The height of the block for which events are retrieved.
-// - filter: The event filter used to filter events.
-//
-// Expected errors during normal operation:
-//   - codes.NotFound: If block header for the specified block height is not found, if events for the specified block height are not found.
-func (b *EventsBackend) getEventsFromStorage(height uint64, filter state_stream.EventFilter) (*EventsResponse, error) {
-	blockID, err := b.headers.BlockIDByHeight(height)
-	if err != nil {
-		return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
-	}
-
-	events, err := b.eventsIndex.ByBlockID(blockID, height)
-	if err != nil {
-		return nil, fmt.Errorf("could not get events for block %d: %w", height, err)
-	}
-
-	b.log.Trace().
-		Uint64("height", height).
-		Hex("block_id", logging.ID(blockID)).
-		Int("events", len(events)).
-		Msg("events from storage")
-
-	return &EventsResponse{
-		BlockID: blockID,
-		Height:  height,
-		Events:  filter.Filter(events),
-	}, nil
 }

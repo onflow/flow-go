@@ -144,7 +144,7 @@ func (wsController *WebsocketController) writeEvents(sub subscription.Subscripti
 				return
 			}
 
-			resp, ok := event.(*backend.EventsResponse)
+			resp, ok := event.(*backend.SubscribeEventsResponse)
 			if !ok {
 				err = fmt.Errorf("unexpected response type: %s", event)
 				wsController.wsErrorHandler(err)
