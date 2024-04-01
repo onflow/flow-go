@@ -17,6 +17,10 @@ import (
 
 var _ commands.AdminCommand = (*ProtocolSnapshotCommand)(nil)
 
+type protocolSnapshotData struct {
+	blocksToSkip uint
+}
+
 // ProtocolSnapshotCommand is a command that generates a protocol snapshot for a checkpoint (usually latest checkpoint)
 // This command is only available for execution node
 type ProtocolSnapshotCommand struct {
@@ -46,23 +50,12 @@ func NewProtocolSnapshotCommand(
 func (s *ProtocolSnapshotCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
 	s.logger.Info().Msgf("admintool: generating protocol snapshot")
 
-	blocksToSkip := uint(0)
-
-	// blocksToSkip is the number of blocks to skip when iterating the sealed heights to find the state commitment
-	// in the checkpoint file.
-	// default is 0
-	input, ok := req.Data.(map[string]interface{})
-	if ok {
-		data, ok := input["blocks-to-skip"]
-
-		if ok {
-			n, ok := data.(float64)
-			if !ok {
-				return nil, fmt.Errorf("could not parse blocks-to-skip: %v", data)
-			}
-			blocksToSkip = uint(n)
-		}
+	validated, ok := req.ValidatorData.(*protocolSnapshotData)
+	if !ok {
+		return nil, fmt.Errorf("fail to parse validator data")
 	}
+
+	blocksToSkip := validated.blocksToSkip
 
 	snapshot, sealedHeight, commit, err := common.GenerateProtocolSnapshotForCheckpoint(
 		s.logger, s.state, s.headers, s.seals, s.checkpointDir, blocksToSkip)
@@ -92,6 +85,28 @@ func (s *ProtocolSnapshotCommand) Handler(_ context.Context, req *admin.CommandR
 	return commands.ConvertToMap(serializable.Encodable())
 }
 
-func (s *ProtocolSnapshotCommand) Validator(_ *admin.CommandRequest) error {
+func (s *ProtocolSnapshotCommand) Validator(req *admin.CommandRequest) error {
+	// blocksToSkip is the number of blocks to skip when iterating the sealed heights to find the state commitment
+	// in the checkpoint file.
+	// default is 0
+	validated := &protocolSnapshotData{
+		blocksToSkip: uint(0),
+	}
+
+	input, ok := req.Data.(map[string]interface{})
+	if ok {
+		data, ok := input["blocks-to-skip"]
+
+		if ok {
+			n, ok := data.(float64)
+			if !ok {
+				return fmt.Errorf("could not parse blocks-to-skip: %v", data)
+			}
+			validated.blocksToSkip = uint(n)
+		}
+	}
+
+	req.ValidatorData = validated
+
 	return nil
 }
