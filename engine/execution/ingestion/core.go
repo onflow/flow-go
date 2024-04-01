@@ -108,7 +108,8 @@ func (e *Core) OnBlock(header *flow.Header, qc *flow.QuorumCertificate) {
 	// qc.Block is equivalent to header.ID()
 	err := e.throttle.OnBlock(qc.BlockID)
 	if err != nil {
-		e.log.Fatal().Err(err).Msgf("error processing block %v (%v)", header.Height, header.ID())
+		e.log.Fatal().Err(err).Msgf("error processing block %v (qc.BlockID: %v, blockID: %v)",
+			header.Height, qc.BlockID, header.ID())
 	}
 }
 
@@ -199,7 +200,10 @@ func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
 }
 
 func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
-	[]*block_queue.MissingCollection, []*entity.ExecutableBlock, error) {
+	[]*block_queue.MissingCollection,
+	[]*entity.ExecutableBlock,
+	error,
+) {
 	lg := e.log.With().
 		Hex("block_id", blockID[:]).
 		Uint64("height", block.Header.Height).
@@ -226,7 +230,8 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 
 	// handle exception
 	if !errors.Is(err, storage.ErrNotFound) {
-		return nil, nil, fmt.Errorf("failed to get parent state commitment for block %v: %w", block.Header.ParentID, err)
+		return nil, nil, fmt.Errorf("failed to get state commitment for parent block %v of block %v (height: %v): %w",
+			block.Header.ParentID, blockID, block.Header.Height, err)
 	}
 
 	// the parent block is an unexecuted block.
@@ -250,13 +255,13 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 		// and before HandleBlock was called, therefore, we should re-enqueue the block with the
 		// parent commit. It's necessary to check again whether the parent block is executed after the call.
 		lg.Warn().Msgf(
-			"block is missing parent block, re-enqueueing %v(parent: %v)",
+			"block is missing parent block, re-enqueueing %v (parent: %v)",
 			blockID, block.Header.ParentID,
 		)
 
 		parentCommitment, err := e.execState.StateCommitmentByBlockID(block.Header.ParentID)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get parent state commitment when re-enqueue block %v (parent:%v): %w",
+			return nil, nil, fmt.Errorf("failed to get parent state commitment when re-enqueue block %v (parent: %v): %w",
 				blockID, block.Header.ParentID, err)
 		}
 
