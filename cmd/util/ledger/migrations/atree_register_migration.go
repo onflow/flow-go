@@ -37,8 +37,9 @@ type AtreeRegisterMigrator struct {
 
 	nWorkers int
 
-	validateMigratedValues    bool
-	logVerboseValidationError bool
+	validateMigratedValues             bool
+	logVerboseValidationError          bool
+	continueMigrationOnValidationError bool
 }
 
 var _ AccountBasedMigration = (*AtreeRegisterMigrator)(nil)
@@ -48,16 +49,18 @@ func NewAtreeRegisterMigrator(
 	rwf reporters.ReportWriterFactory,
 	validateMigratedValues bool,
 	logVerboseValidationError bool,
+	continueMigrationOnValidationError bool,
 ) *AtreeRegisterMigrator {
 
 	sampler := util2.NewTimedSampler(30 * time.Second)
 
 	migrator := &AtreeRegisterMigrator{
-		sampler:                   sampler,
-		rwf:                       rwf,
-		rw:                        rwf.ReportWriter("atree-register-migrator"),
-		validateMigratedValues:    validateMigratedValues,
-		logVerboseValidationError: logVerboseValidationError,
+		sampler:                            sampler,
+		rwf:                                rwf,
+		rw:                                 rwf.ReportWriter("atree-register-migrator"),
+		validateMigratedValues:             validateMigratedValues,
+		logVerboseValidationError:          logVerboseValidationError,
+		continueMigrationOnValidationError: continueMigrationOnValidationError,
 	}
 
 	return migrator
@@ -118,7 +121,14 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 	if m.validateMigratedValues {
 		err = validateCadenceValues(address, oldPayloads, newPayloads, m.log, m.logVerboseValidationError)
 		if err != nil {
-			return nil, err
+			if !m.continueMigrationOnValidationError {
+				return nil, err
+			}
+
+			m.log.Error().
+				Err(err).
+				Hex("address", address[:]).
+				Msg("failed not validate atree migration")
 		}
 	}
 
