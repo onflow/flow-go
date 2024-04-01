@@ -137,3 +137,11 @@ func (m *ComputationMeter) Merge(child ComputationMeter) {
 		m.computationIntensities[key] += intensity
 	}
 }
+
+func (i *MeteredComputationIntensities) AsRaw() map[uint]uint {
+	raw := make(map[uint]uint)
+	for k, v := range *i {
+		raw[uint(k)] = v
+	}
+	return raw
+}

@@ -41,11 +41,6 @@ func (_m *ExecutionMetrics) ExecutionBlockExecuted(dur time.Duration, stats modu
 	_m.Called(dur, stats)
 }
 
-// ExecutionBlockExecutionEffortVectorComponent provides a mock function with given fields: _a0, _a1
-func (_m *ExecutionMetrics) ExecutionBlockExecutionEffortVectorComponent(_a0 string, _a1 uint) {
-	_m.Called(_a0, _a1)
-}
-
 // ExecutionCheckpointSize provides a mock function with given fields: bytes
 func (_m *ExecutionMetrics) ExecutionCheckpointSize(bytes uint64) {
 	_m.Called(bytes)
@@ -106,9 +101,9 @@ func (_m *ExecutionMetrics) ExecutionSync(syncing bool) {
 	_m.Called(syncing)
 }
 
-// ExecutionTransactionExecuted provides a mock function with given fields: dur, numTxnConflictRetries, compUsed, memoryUsed, eventCounts, eventSize, failed
-func (_m *ExecutionMetrics) ExecutionTransactionExecuted(dur time.Duration, numTxnConflictRetries int, compUsed uint64, memoryUsed uint64, eventCounts int, eventSize int, failed bool) {
-	_m.Called(dur, numTxnConflictRetries, compUsed, memoryUsed, eventCounts, eventSize, failed)
+// ExecutionTransactionExecuted provides a mock function with given fields: id, isSystemTransaction, dur, numTxnConflictRetries, intensities, compUsed, memoryUsed, eventCounts, eventSize, failed
+func (_m *ExecutionMetrics) ExecutionTransactionExecuted(id flow.Identifier, isSystemTransaction bool, dur time.Duration, numTxnConflictRetries int, intensities map[uint]uint, compUsed uint64, memoryUsed uint64, eventCounts int, eventSize int, failed bool) {
+	_m.Called(id, isSystemTransaction, dur, numTxnConflictRetries, intensities, compUsed, memoryUsed, eventCounts, eventSize, failed)
 }
 
 // FinishBlockReceivedToExecuted provides a mock function with given fields: blockID

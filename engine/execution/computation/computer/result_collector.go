@@ -270,12 +270,15 @@ func (collector *resultCollector) processTransactionResult(
 	}
 
 	collector.metrics.ExecutionTransactionExecuted(
+		txn.ID,
+		txn.isSystemTransaction,
 		timeSpent,
 		numConflictRetries,
+		output.ComputationIntensities.AsRaw(),
 		output.ComputationUsed,
 		output.MemoryEstimate,
 		len(output.Events),
-		flow.EventsList(output.Events).ByteSize(),
+		output.Events.ByteSize(),
 		output.Err != nil,
 	)
 
@@ -406,12 +409,6 @@ func (collector *resultCollector) Finalize(
 	collector.metrics.ExecutionBlockExecuted(
 		time.Since(collector.blockStartTime),
 		collector.blockStats)
-
-	for kind, intensity := range collector.blockMeter.ComputationIntensities() {
-		collector.metrics.ExecutionBlockExecutionEffortVectorComponent(
-			kind.String(),
-			intensity)
-	}
 
 	return collector.result, nil
 }

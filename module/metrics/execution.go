@@ -747,18 +747,17 @@ func (ec *ExecutionCollector) ExecutionCollectionExecuted(
 	ec.collectionTransactionCounts.Observe(float64(stats.NumberOfTransactions))
 }
 
-func (ec *ExecutionCollector) ExecutionBlockExecutionEffortVectorComponent(compKind string, value uint) {
-	ec.blockComputationVector.With(prometheus.Labels{LabelComputationKind: compKind}).Set(float64(value))
-}
-
 func (ec *ExecutionCollector) ExecutionBlockCachedPrograms(programs int) {
 	ec.blockCachedPrograms.Set(float64(programs))
 }
 
 // ExecutionTransactionExecuted reports stats for executing a transaction
 func (ec *ExecutionCollector) ExecutionTransactionExecuted(
+	id flow.Identifier,
+	transaction bool,
 	dur time.Duration,
-	numConflictRetries int,
+	numTxnConflictRetries int,
+	intensities map[uint]uint,
 	compUsed uint64,
 	memoryUsed uint64,
 	eventCounts int,
@@ -767,7 +766,7 @@ func (ec *ExecutionCollector) ExecutionTransactionExecuted(
 ) {
 	ec.totalExecutedTransactionsCounter.Inc()
 	ec.transactionExecutionTime.Observe(float64(dur.Milliseconds()))
-	ec.transactionConflictRetries.Observe(float64(numConflictRetries))
+	ec.transactionConflictRetries.Observe(float64(numTxnConflictRetries))
 	ec.transactionComputationUsed.Observe(float64(compUsed))
 	ec.transactionNormalizedTimePerComputation.Observe(
 		flow.NormalizedExecutionTimePerComputationUnit(dur, compUsed))

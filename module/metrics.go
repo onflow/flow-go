@@ -911,6 +911,7 @@ type ExecutionMetrics interface {
 	RuntimeMetrics
 	ProviderMetrics
 	WALMetrics
+	//ExecutionEffortMetrics
 
 	// StartBlockReceivedToExecuted starts a span to trace the duration of a block
 	// from being received for execution to execution being finished
@@ -932,9 +933,6 @@ type ExecutionMetrics interface {
 	// ExecutionBlockExecuted reports the total time and computation spent on executing a block
 	ExecutionBlockExecuted(dur time.Duration, stats ExecutionResultStats)
 
-	// ExecutionBlockExecutionEffortVectorComponent reports the unweighted effort of given ComputationKind at block level
-	ExecutionBlockExecutionEffortVectorComponent(string, uint)
-
 	// ExecutionBlockCachedPrograms reports the number of cached programs at the end of a block
 	ExecutionBlockCachedPrograms(programs int)
 
@@ -943,13 +941,17 @@ type ExecutionMetrics interface {
 
 	// ExecutionTransactionExecuted reports stats on executing a single transaction
 	ExecutionTransactionExecuted(
+		id flow.Identifier,
+		isSystemTransaction bool,
 		dur time.Duration,
 		numTxnConflictRetries int,
+		intensities map[uint]uint,
 		compUsed uint64,
 		memoryUsed uint64,
 		eventCounts int,
 		eventSize int,
-		failed bool)
+		failed bool,
+	)
 
 	// ExecutionChunkDataPackGenerated reports stats on chunk data pack generation
 	ExecutionChunkDataPackGenerated(proofSize, numberOfTransactions int)

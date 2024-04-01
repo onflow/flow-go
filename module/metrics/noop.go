@@ -167,9 +167,8 @@ func (nc *NoopCollector) ExecutionLastFinalizedExecutedBlockHeight(height uint64
 func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _ module.ExecutionResultStats) {}
 func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _ module.ExecutionResultStats) {
 }
-func (nc *NoopCollector) ExecutionBlockExecutionEffortVectorComponent(_ string, _ uint) {}
-func (nc *NoopCollector) ExecutionBlockCachedPrograms(programs int)                     {}
-func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _ int, _, _ uint64, _, _ int, _ bool) {
+func (nc *NoopCollector) ExecutionBlockCachedPrograms(programs int) {}
+func (nc *NoopCollector) ExecutionTransactionExecuted(id flow.Identifier, transaction bool, dur time.Duration, numTxnConflictRetries int, intensities map[uint]uint, compUsed uint64, memoryUsed uint64, eventCounts int, eventSize int, failed bool) {
 }
 func (nc *NoopCollector) ExecutionChunkDataPackGenerated(_, _ int)                              {}
 func (nc *NoopCollector) ExecutionScriptExecuted(dur time.Duration, compUsed, _, _ uint64)      {}
