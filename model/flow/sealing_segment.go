@@ -34,7 +34,7 @@ type SealingSegment struct {
 	//  (ii) All blocks that are sealed by `head`. This is relevant if `head` contains _multiple_ seals.
 	// (iii) The sealing segment holds the history of all non-expired collection guarantees, i.e.
 	//       limitHeight := max(blockSealedAtHead.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
-	// 			 where blockSealedAtHead is the block sealed by `head` block.
+	//       where blockSealedAtHead is the block sealed by `head` block.
 	// (Potentially longer history is permitted)
 	ExtraBlocks []*Block
 
