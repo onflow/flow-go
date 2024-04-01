@@ -108,26 +108,44 @@ func generateRecoverEpochTxArgs(getSnapshot func() *inmem.Snapshot) func(cmd *co
 // extractResetEpochArgs extracts the required transaction arguments for the `resetEpoch` transaction
 func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 	epoch := snapshot.Epochs().Current()
+
 	ids, err := snapshot.Identities(filter.IsValidProtocolParticipant)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to get initial identities for current epoch")
+		log.Fatal().Err(err).Msg("failed to get  valid protocol participants from snapshot")
 	}
+
+	// separate collector nodes by internal and partner nodes
+	collectors := ids.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
+	internalCollectors := make(flow.IdentityList, 0)
+	partnerCollectors := make(flow.IdentityList, 0)
+
+	log.Info().Msg("collecting internal node network and staking keys")
+	internalNodes := common.ReadInternalNodeInfos(log, flagInternalNodePrivInfoDir, flagNodeConfigJson)
+	internalNodesMap := make(map[flow.Identifier]struct{})
+	for _, node := range internalNodes {
+		if !ids.Exists(node.Identity()) {
+			log.Fatal().Msg(fmt.Sprintf("node ID found in internal node infos missing from protocol snapshot identities: %s", node.NodeID))
+		}
+		internalNodesMap[node.NodeID] = struct{}{}
+	}
+	log.Info().Msg("")
+
+	collectors.Map(func(identity flow.Identity) flow.Identity {
+		if _, ok := internalNodesMap[identity.NodeID]; ok {
+			internalCollectors = append(internalCollectors, &identity)
+		} else {
+			partnerCollectors = append(partnerCollectors, &identity)
+		}
+		return identity
+	})
 
 	currentEpochDKG, err := epoch.DKG()
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to get DKG for current epoch")
 	}
 
-	log.Info().Msg("collecting partner network and staking keys")
-	partnerNodes := common.ReadPartnerNodeInfos(log, flagPartnerWeights, flagPartnerNodeInfoDir)
-	log.Info().Msg("")
-
-	log.Info().Msg("collecting internal node network and staking keys")
-	internalNodes := common.ReadInternalNodeInfos(log, flagInternalNodePrivInfoDir, flagNodeConfigJson)
-	log.Info().Msg("")
-
 	log.Info().Msg("computing collection node clusters")
-	_, clusters, err := common.ConstructClusterAssignment(log, partnerNodes, internalNodes, flagCollectionClusters)
+	_, clusters, err := common.ConstructClusterAssignment(log, partnerCollectors, internalCollectors, flagCollectionClusters)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate cluster assignment")
 	}

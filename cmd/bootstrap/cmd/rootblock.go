@@ -172,7 +172,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	participants := model.ToIdentityList(stakingNodes).Sort(flow.Canonical[flow.Identity])
 
 	log.Info().Msg("computing collection node clusters")
-	assignments, clusters, err := common.ConstructClusterAssignment(log, partnerNodes, internalNodes, int(flagCollectionClusters))
+	assignments, clusters, err := common.ConstructClusterAssignment(log, model.ToIdentityList(partnerNodes), model.ToIdentityList(internalNodes), int(flagCollectionClusters))
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate cluster assignment")
 	}

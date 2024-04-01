@@ -29,10 +29,10 @@ import (
 // satisfied, an exception is returned.
 // Note that if an exception is returned with a certain number of internal/partner nodes, there is no chance
 // of succeeding the assignment by re-running the function without increasing the internal nodes ratio.
-func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes []bootstrap.NodeInfo, numCollectionClusters int) (flow.AssignmentList, flow.ClusterList, error) {
+func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes flow.IdentityList, numCollectionClusters int) (flow.AssignmentList, flow.ClusterList, error) {
 
-	partners := bootstrap.ToIdentityList(partnerNodes).Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
-	internals := bootstrap.ToIdentityList(internalNodes).Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
+	partners := partnerNodes.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
+	internals := internalNodes.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 	nCollectors := len(partners) + len(internals)
 
 	// ensure we have at least as many collection nodes as clusters

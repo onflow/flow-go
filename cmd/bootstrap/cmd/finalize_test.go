@@ -114,14 +114,14 @@ func TestClusterAssignment(t *testing.T) {
 
 	log := zerolog.Nop()
 	// should not error
-	_, clusters, err := common.ConstructClusterAssignment(log, partners, internals, int(flagCollectionClusters))
+	_, clusters, err := common.ConstructClusterAssignment(log, model.ToIdentityList(partners), model.ToIdentityList(internals), int(flagCollectionClusters))
 	require.NoError(t, err)
 	require.True(t, checkClusterConstraint(clusters, partners, internals))
 
 	// unhappy Path
 	internals = internals[:21] // reduce one internal node
 	// should error
-	_, _, err = common.ConstructClusterAssignment(log, partners, internals, int(flagCollectionClusters))
+	_, _, err = common.ConstructClusterAssignment(log, model.ToIdentityList(partners), model.ToIdentityList(internals), int(flagCollectionClusters))
 	require.Error(t, err)
 	// revert the flag value
 	flagCollectionClusters = tmp
