@@ -67,8 +67,8 @@ func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto
 	}
 
 	log.Debug().
-		Str("networkPubKey", common.PubKeyToString(networkKey.PublicKey())).
-		Str("stakingPubKey", common.PubKeyToString(stakingKey.PublicKey())).
+		Str("networkPubKey", networkKey.PublicKey().String()).
+		Str("stakingPubKey", stakingKey.PublicKey().String()).
 		Msg("encoded public staking and network keys")
 
 	nodeInfo := model.NewPrivateNodeInfo(
