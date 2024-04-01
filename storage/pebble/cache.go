@@ -17,7 +17,6 @@ type CacheType int
 
 const (
 	CacheTypeLRU CacheType = iota + 1
-	CacheTypeARC
 	CacheTypeTwoQueue
 )
 
@@ -25,8 +24,6 @@ func ParseCacheType(s string) (CacheType, error) {
 	switch s {
 	case CacheTypeLRU.String():
 		return CacheTypeLRU, nil
-	case CacheTypeARC.String():
-		return CacheTypeARC, nil
 	case CacheTypeTwoQueue.String():
 		return CacheTypeTwoQueue, nil
 	default:
@@ -38,8 +35,6 @@ func (m CacheType) String() string {
 	switch m {
 	case CacheTypeLRU:
 		return "lru"
-	case CacheTypeARC:
-		return "arc"
 	case CacheTypeTwoQueue:
 		return "2q"
 	default:
@@ -57,7 +52,7 @@ type CacheBackend interface {
 
 // wrapped is a wrapper around lru.Cache to implement CacheBackend
 // this is needed because the standard lru cache implementation provides additional features that
-// the ARC and 2Q caches do not. This standardizes the interface to allow swapping between types.
+// the 2Q cache do not. This standardizes the interface to allow swapping between types.
 type wrapped struct {
 	cache *lru.Cache[string, flow.RegisterValue]
 }
@@ -116,8 +111,6 @@ func getCache(cacheType CacheType, size int) (CacheBackend, error) {
 			return nil, err
 		}
 		return &wrapped{cache: cache}, nil
-	case CacheTypeARC:
-		return lru.NewARC[string, flow.RegisterValue](size)
 	case CacheTypeTwoQueue:
 		return lru.New2Q[string, flow.RegisterValue](size)
 	default:

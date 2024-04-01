@@ -6,6 +6,9 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/ipfs/boxo/bitswap"
+	bsmsg "github.com/ipfs/boxo/bitswap/message"
+	bsnet "github.com/ipfs/boxo/bitswap/network"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
@@ -17,9 +20,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
-	"github.com/onflow/go-bitswap"
-	bsmsg "github.com/onflow/go-bitswap/message"
-	bsnet "github.com/onflow/go-bitswap/network"
 	"github.com/rs/zerolog"
 	"golang.org/x/time/rate"
 

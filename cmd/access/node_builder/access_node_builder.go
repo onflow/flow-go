@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ipfs/boxo/bitswap"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/go-bitswap"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
@@ -1201,7 +1201,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVar(&builder.registerCacheType,
 			"register-cache-type",
 			defaultConfig.registerCacheType,
-			"type of backend cache to use for registers (lru, arc, 2q)")
+			"type of backend cache to use for registers (lru or 2q)")
 		flags.UintVar(&builder.registerCacheSize,
 			"register-cache-size",
 			defaultConfig.registerCacheSize,
