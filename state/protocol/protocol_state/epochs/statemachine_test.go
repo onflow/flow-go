@@ -3,6 +3,11 @@ package epochs
 import (
 	"errors"
 	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
@@ -10,9 +15,6 @@ import (
 	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"testing"
 )
 
 func TestEpochStateMachine(t *testing.T) {
@@ -25,7 +27,6 @@ type EpochStateMachineSuite struct {
 	suite.Suite
 	epochStateDB          *storagemock.ProtocolState
 	headersDB             *storagemock.Headers
-	resultsDB             *storagemock.ExecutionResults
 	setupsDB              *storagemock.EpochSetups
 	commitsDB             *storagemock.EpochCommits
 	globalParams          *protocolmock.GlobalParams
@@ -40,8 +41,6 @@ type EpochStateMachineSuite struct {
 
 func (s *EpochStateMachineSuite) SetupTest() {
 	s.epochStateDB = storagemock.NewProtocolState(s.T())
-	s.headersDB = storagemock.NewHeaders(s.T())
-	s.resultsDB = storagemock.NewExecutionResults(s.T())
 	s.setupsDB = storagemock.NewEpochSetups(s.T())
 	s.commitsDB = storagemock.NewEpochCommits(s.T())
 	s.globalParams = protocolmock.NewGlobalParams(s.T())
