@@ -30,7 +30,12 @@ func TestAtreeRegisterMigration(t *testing.T) {
 			"test-data/bootstrapped_v0.31",
 			migrations.CreateAccountBasedMigration(log, 2,
 				[]migrations.AccountBasedMigration{
-					migrations.NewAtreeRegisterMigrator(reporters.NewReportFileWriterFactory(dir, log), true, false),
+					migrations.NewAtreeRegisterMigrator(
+						reporters.NewReportFileWriterFactory(dir, log),
+						true,
+						false,
+						false,
+					),
 				},
 			),
 			func(t *testing.T, oldPayloads []*ledger.Payload, newPayloads []*ledger.Payload) {
