@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -188,7 +187,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 	}
 	storageMapIds[string(atree.SlabIndexToLedgerKey(storageMap.StorageID().Index))] = struct{}{}
 
-	iterator := storageMap.Iterator(util.NopMemoryGauge{})
+	iterator := storageMap.Iterator(nil)
 	keys := make([]interpreter.StringStorageMapKey, 0, storageMap.Count())
 	// to be safe avoid modifying the map while iterating
 	for {
@@ -210,7 +209,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 			var value interpreter.Value
 
 			err := capturePanic(func() {
-				value = storageMap.ReadValue(util.NopMemoryGauge{}, key)
+				value = storageMap.ReadValue(nil, key)
 			})
 			if err != nil {
 				return fmt.Errorf("failed to read value for key %s: %w", key, err)

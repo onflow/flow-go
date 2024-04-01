@@ -17,8 +17,6 @@ import (
 	"github.com/onflow/flow-go/ledger"
 )
 
-var nopMemoryGauge = util.NopMemoryGauge{}
-
 // TODO: optimize memory by reusing payloads snapshot created for migration
 func validateCadenceValues(
 	address common.Address,
@@ -79,7 +77,7 @@ func validateStorageDomain(
 		return fmt.Errorf("old storage map count %d, new storage map count %d", oldStorageMap.Count(), newStorageMap.Count())
 	}
 
-	oldIterator := oldStorageMap.Iterator(nopMemoryGauge)
+	oldIterator := oldStorageMap.Iterator(nil)
 	for {
 		key, oldValue := oldIterator.Next()
 		if key == nil {
@@ -91,7 +89,7 @@ func validateStorageDomain(
 			return fmt.Errorf("invalid key type %T, expected interpreter.StringAtreeValue", key)
 		}
 
-		newValue := newStorageMap.ReadValue(nopMemoryGauge, interpreter.StringStorageMapKey(stringKey))
+		newValue := newStorageMap.ReadValue(nil, interpreter.StringStorageMapKey(stringKey))
 
 		err := cadenceValueEqual(oldRuntime.Interpreter, oldValue, newRuntime.Interpreter, newValue)
 		if err != nil {
@@ -274,7 +272,7 @@ func cadenceCompositeValueEqual(
 
 	var err *validationError
 	vFieldNames := make([]string, 0, 10) // v's field names
-	v.ForEachField(nopMemoryGauge, func(fieldName string, fieldValue interpreter.Value) bool {
+	v.ForEachField(nil, func(fieldName string, fieldValue interpreter.Value) bool {
 		otherFieldValue := otherComposite.GetField(otherInterpreter, interpreter.EmptyLocationRange, fieldName)
 
 		err = cadenceValueEqual(vInterpreter, fieldValue, otherInterpreter, otherFieldValue)
@@ -292,7 +290,7 @@ func cadenceCompositeValueEqual(
 
 	if len(vFieldNames) != otherComposite.FieldCount() {
 		otherFieldNames := make([]string, 0, len(vFieldNames)) // otherComposite's field names
-		otherComposite.ForEachField(nopMemoryGauge, func(fieldName string, _ interpreter.Value) bool {
+		otherComposite.ForEachField(nil, func(fieldName string, _ interpreter.Value) bool {
 			otherFieldNames = append(otherFieldNames, fieldName)
 			return true
 		})
@@ -329,7 +327,7 @@ func cadenceDictionaryValueEqual(
 
 	oldIterator := v.Iterator()
 	for {
-		key := oldIterator.NextKey(nopMemoryGauge)
+		key := oldIterator.NextKey(nil)
 		if key == nil {
 			break
 		}
@@ -372,7 +370,7 @@ func newReadonlyStorageRuntime(payloads []*ledger.Payload) (
 
 	readonlyLedger := util.NewPayloadsReadonlyLedger(snapshot)
 
-	storage := runtime.NewStorage(readonlyLedger, nopMemoryGauge)
+	storage := runtime.NewStorage(readonlyLedger, nil)
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{
 		AccountLinkingEnabled: true,
