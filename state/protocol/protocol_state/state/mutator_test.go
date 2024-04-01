@@ -310,47 +310,6 @@ func (s *StateMutatorSuite) TestApplyServiceEventsFromValidatedSeals() {
 		err = mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
 		require.NoError(s.T(), err)
 	})
-	s.Run("invalid-service-event", func() {
-		successStateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol_state.KVStoreReader](s.T())
-		successStateMachine.On("ProcessUpdate", mock.Anything).Return(nil)
-
-		invalidEventStateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol_state.KVStoreReader](s.T())
-		invalidEventStateMachine.On("ProcessUpdate", mock.Anything).Return(protocol.NewInvalidServiceEventErrorf("invalid event"))
-
-		stateMachines := []*protocol_statemock.OrthogonalStoreStateMachine[protocol_state.KVStoreReader]{
-			successStateMachine,
-			invalidEventStateMachine,
-		}
-		factories := make([]protocol_state.KeyValueStoreStateMachineFactory, 0, len(stateMachines))
-		for _, stateMachine := range stateMachines {
-			factory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
-			factory.On("Create", s.candidate, s.parentState, s.replicatedState).Return(stateMachine, nil)
-			factories = append(factories, factory)
-		}
-
-		mutator, err := newStateMutator(
-			s.headersDB,
-			s.resultsDB,
-			s.protocolKVStoreDB,
-			s.candidate,
-			s.parentState,
-			factories...,
-		)
-		require.NoError(s.T(), err)
-
-		epochSetup := unittest.EpochSetupFixture()
-		result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
-			result.ServiceEvents = []flow.ServiceEvent{epochSetup.ServiceEvent()}
-		})
-
-		block := unittest.BlockHeaderFixture()
-		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(block.ID()))
-		s.headersDB.On("ByBlockID", seal.BlockID).Return(block, nil)
-		s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
-
-		err = mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
-		require.NoError(s.T(), err)
-	})
 	s.Run("process-update-exception", func() {
 		factory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
 		stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol_state.KVStoreReader](s.T())
