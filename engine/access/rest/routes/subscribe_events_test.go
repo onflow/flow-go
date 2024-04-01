@@ -25,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	mockstatestream "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/generator"
 )
@@ -179,12 +178,9 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 				test.contracts)
 			require.NoError(s.T(), err)
 
-			var expectedEventsResponses []*backend.SubscribeEventsResponse
+			var expectedEventsResponses []*backend.EventsResponse
 			var subscriptionEventsResponses []*backend.SubscribeEventsResponse
 			startBlockFound := test.startBlockID == flow.ZeroID
-
-			// construct expected event responses based on the provided test configuration
-			expectedMsgIndexCounter := counters.NewMonotonousCounter(0)
 
 			for i, block := range s.blocks {
 				blockID := block.ID()
@@ -205,27 +201,21 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 							}
 						}
 						if len(expectedEvents) > 0 || (i+1)%int(test.heartbeatInterval) == 0 {
-							expectedEventsResponses = append(expectedEventsResponses, &backend.SubscribeEventsResponse{
-								EventsResponse: backend.EventsResponse{
-									Height:  block.Header.Height,
-									BlockID: blockID,
-									Events:  expectedEvents,
-								},
+							expectedEventsResponses = append(expectedEventsResponses, &backend.EventsResponse{
+								Height:         block.Header.Height,
+								BlockID:        blockID,
+								Events:         expectedEvents,
 								BlockTimestamp: block.Header.Timestamp,
-								MessageIndex:   expectedMsgIndexCounter.Value(),
 							})
 						}
 						subscriptionEventsResponses = append(subscriptionEventsResponses, &backend.SubscribeEventsResponse{
 							EventsResponse: backend.EventsResponse{
-								Height:  block.Header.Height,
-								BlockID: blockID,
-								Events:  subscriptionEvents,
+								Height:         block.Header.Height,
+								BlockID:        blockID,
+								Events:         subscriptionEvents,
+								BlockTimestamp: block.Header.Timestamp,
 							},
-							BlockTimestamp: block.Header.Timestamp,
-							MessageIndex:   expectedMsgIndexCounter.Value(),
 						})
-						wasSet := expectedMsgIndexCounter.Set(expectedMsgIndexCounter.Value() + 1)
-						require.True(s.T(), wasSet)
 					}
 				}
 			}
@@ -408,18 +398,18 @@ func requireError(t *testing.T, recorder *testHijackResponseRecorder, expected s
 	require.Contains(t, recorder.responseBuff.String(), expected)
 }
 
-// requireResponse validates that the response received from WebSocket communication matches the expected SubscribeEventsResponse.
+// requireResponse validates that the response received from WebSocket communication matches the expected EventsResponse.
 // This function compares the BlockID, Events count, and individual event properties for each expected and actual
-// SubscribeEventsResponse. It ensures that the response received from WebSocket matches the expected structure and content.
-func requireResponse(t *testing.T, recorder *testHijackResponseRecorder, expected []*backend.SubscribeEventsResponse) {
+// EventsResponse. It ensures that the response received from WebSocket matches the expected structure and content.
+func requireResponse(t *testing.T, recorder *testHijackResponseRecorder, expected []*backend.EventsResponse) {
 	<-recorder.closed
 	// Convert the actual response from respRecorder to JSON bytes
 	actualJSON := recorder.responseBuff.Bytes()
 	// Define a regular expression pattern to match JSON objects
-	pattern := `\{"BlockID":".*?","Height":\d+,"Events":\[(\{.*?})*\],"BlockTimestamp":".*?","MessageIndex":\d+\}`
+	pattern := `\{"BlockID":".*?","Height":\d+,"Events":\[(\{.*?})*\],"BlockTimestamp":".*?"\}`
 	matches := regexp.MustCompile(pattern).FindAll(actualJSON, -1)
 
-	// Unmarshal each matched JSON into []state_stream.SubscribeEventsResponse
+	// Unmarshal each matched JSON into []state_stream.EventsResponse
 	var actual []backend.EventsResponse
 	for _, match := range matches {
 		var response backend.EventsResponse
@@ -444,7 +434,6 @@ func requireResponse(t *testing.T, recorder *testHijackResponseRecorder, expecte
 			require.Equal(t, expectedEvent.Type, actualEvent.Type)
 			require.Equal(t, expectedEvent.TransactionID, actualEvent.TransactionID)
 			require.Equal(t, expectedEvent.TransactionIndex, actualEvent.TransactionIndex)
-			require.Equal(t, expectedEvent.EventIndex, actualEvent.EventIndex)
 			// payload is not expected to match, but it should decode
 
 			// payload must decode to valid json-cdc encoded data

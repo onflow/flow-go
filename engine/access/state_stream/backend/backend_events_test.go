@@ -420,12 +420,12 @@ func (s *BackendEventsSuite) subscribe(
 
 					expected := &SubscribeEventsResponse{
 						EventsResponse: EventsResponse{
-							BlockID: b.ID(),
-							Height:  b.Header.Height,
-							Events:  expectedEvents,
+							BlockID:        b.ID(),
+							Height:         b.Header.Height,
+							Events:         expectedEvents,
+							BlockTimestamp: b.Header.Timestamp,
 						},
-						BlockTimestamp: b.Header.Timestamp,
-						MessageIndex:   expectedMsgIndexCounter.Value(),
+						MessageIndex: expectedMsgIndexCounter.Value(),
 					}
 					requireFn(v, expected)
 

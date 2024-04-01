@@ -173,7 +173,7 @@ func (wsController *WebsocketController) writeEvents(sub subscription.Subscripti
 			}
 
 			// Write the response to the WebSocket connection
-			err = wsController.conn.WriteJSON(event)
+			err = wsController.conn.WriteJSON(resp.EventsResponse)
 			if err != nil {
 				wsController.wsErrorHandler(err)
 				return

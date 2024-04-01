@@ -414,12 +414,12 @@ func SubscribeEventsHandler(
 
 			response := backend.SubscribeEventsResponse{
 				EventsResponse: backend.EventsResponse{
-					Height:  resp.GetBlockHeight(),
-					BlockID: convert.MessageToIdentifier(resp.GetBlockId()),
-					Events:  events,
+					Height:         resp.GetBlockHeight(),
+					BlockID:        convert.MessageToIdentifier(resp.GetBlockId()),
+					Events:         events,
+					BlockTimestamp: resp.GetBlockTimestamp().AsTime(),
 				},
-				BlockTimestamp: resp.GetBlockTimestamp().AsTime(),
-				MessageIndex:   resp.MessageIndex,
+				MessageIndex: resp.MessageIndex,
 			}
 
 			select {

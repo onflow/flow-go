@@ -127,7 +127,6 @@ func New(
 
 	b.EventsBackend = EventsBackend{
 		log:                  logger,
-		headers:              headers,
 		subscriptionHandler:  subscriptionHandler,
 		executionDataTracker: executionDataTracker,
 		eventsRetriever:      eventsRetriever,

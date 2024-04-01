@@ -2,7 +2,6 @@ package backend
 
 import (
 	"context"
-	"time"
 
 	"github.com/rs/zerolog"
 
@@ -11,22 +10,19 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
-	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
-	"github.com/onflow/flow-go/storage"
 )
 
+// SubscribeEventsResponse represents the subscription response containing events for a specific block and messageIndex
 type SubscribeEventsResponse struct {
 	EventsResponse
-	BlockTimestamp time.Time
-	MessageIndex   uint64
+	MessageIndex uint64
 }
 
 type EventsBackend struct {
 	log zerolog.Logger
 
-	headers              storage.Headers
 	subscriptionHandler  *subscription.SubscriptionHandler
 	executionDataTracker subscription.ExecutionDataTracker
 	eventsRetriever      EventsRetriever
@@ -165,11 +161,6 @@ func (b *EventsBackend) getResponseFactory(filter state_stream.EventFilter, inde
 			return nil, err
 		}
 
-		header, err := b.headers.ByHeight(height)
-		if err != nil {
-			return nil, rpc.ConvertStorageError(err)
-		}
-
 		messageIndex := index.Value()
 		if ok := index.Set(messageIndex + 1); !ok {
 			return nil, status.Errorf(codes.Internal, "the message index has already been incremented to %d", index.Value())
@@ -177,12 +168,12 @@ func (b *EventsBackend) getResponseFactory(filter state_stream.EventFilter, inde
 
 		subscribeEventsResponse := &SubscribeEventsResponse{
 			EventsResponse: EventsResponse{
-				BlockID: eventsResponse.BlockID,
-				Height:  eventsResponse.Height,
-				Events:  filter.Filter(eventsResponse.Events),
+				BlockID:        eventsResponse.BlockID,
+				Height:         eventsResponse.Height,
+				Events:         filter.Filter(eventsResponse.Events),
+				BlockTimestamp: eventsResponse.BlockTimestamp,
 			},
-			BlockTimestamp: header.Timestamp,
-			MessageIndex:   messageIndex,
+			MessageIndex: messageIndex,
 		}
 
 		return subscribeEventsResponse, nil
