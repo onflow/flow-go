@@ -20,17 +20,17 @@ import (
 //   - identity changes: updates identity table for previous (if available), current, and next epoch (if available).
 //
 // All updates are applied to a copy of parent protocol state, so parent protocol state is not modified. The stateMachine internally
-// tracks the current protocol state. A separate instance should be created for each block to processing the updates therein.
+// tracks the current protocol state. A separate instance should be created for each block to process the updates therein.
 type HappyPathStateMachine struct {
 	baseStateMachine
 }
 
 var _ StateMachine = (*HappyPathStateMachine)(nil)
 
-// NewStateMachine creates a new protocol state HappyPathStateMachine.
+// NewHappyPathStateMachine creates a new protocol state HappyPathStateMachine.
 // An exception is returned in case the `InvalidEpochTransitionAttempted` flag is set in the `parentState`. This means that
 // the protocol state evolution has reached an undefined state from the perspective of the happy path state machine.
-func NewStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*HappyPathStateMachine, error) {
+func NewHappyPathStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*HappyPathStateMachine, error) {
 	if parentState.InvalidEpochTransitionAttempted {
 		return nil, irrecoverable.NewExceptionf("cannot create happy path protocol state machine at view (%d) for a parent state"+
 			"which is in Epoch Fallback Mode", view)

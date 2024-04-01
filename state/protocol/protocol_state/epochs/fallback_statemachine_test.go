@@ -22,7 +22,7 @@ type EpochFallbackStateMachineSuite struct {
 func (s *EpochFallbackStateMachineSuite) SetupTest() {
 	s.BaseProtocolStateMachineSuite.SetupTest()
 	s.parentProtocolState.InvalidEpochTransitionAttempted = true
-	s.stateMachine = NewEpochFallbackStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+	s.stateMachine = NewFallbackStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 }
 
 // ProcessEpochSetupIsNoop ensures that processing epoch setup event is noop.
@@ -65,7 +65,7 @@ func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpoch() {
 // `InvalidEpochTransitionAttempted` to true to record that we have entered epoch fallback mode[EFM].
 func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 	s.parentProtocolState.InvalidEpochTransitionAttempted = false
-	s.stateMachine = NewEpochFallbackStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+	s.stateMachine = NewFallbackStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID())
 	require.Equal(s.T(), s.candidate.View, s.stateMachine.View())
 

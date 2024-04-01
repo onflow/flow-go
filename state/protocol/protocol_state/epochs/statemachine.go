@@ -71,6 +71,11 @@ type StateMachine interface {
 	ParentState() *flow.RichProtocolStateEntry
 }
 
+// EpochStateMachine is a hierarchical state machine that encapsulates the logic for protocol-compliant evolution of Epoch-related sub-state.
+// EpochStateMachine processes a subset of service events that are relevant for the Epoch state, and ignores all other events.
+// EpochStateMachine delegates the processing of service events to an embedded StateMachine,
+// which is either a HappyPathStateMachine or a FallbackStateMachine depending on the operation mode of the protocol.
+// It relies on Key-Value Store to commit read the parent state and to commit the updates to the Dynamic Protocol State.
 type EpochStateMachine struct {
 	candidate                        *flow.Header
 	activeStateMachine               StateMachine
@@ -86,6 +91,11 @@ type EpochStateMachine struct {
 
 var _ protocol_state.KeyValueStoreStateMachine = (*EpochStateMachine)(nil)
 
+// NewEpochStateMachine creates a new higher-level hierarchical state machine for protocol-compliant evolution of Epoch-related sub-state.
+// NewEpochStateMachine performs initialization of state machine depending on the operation mode of the protocol.
+// - for the happy path, it initializes a HappyPathStateMachine,
+// - for the epoch fallback mode it initializes a FallbackStateMachine.
+// No errors are expected during normal operations.
 func NewEpochStateMachine(
 	candidate *flow.Header,
 	params protocol.GlobalParams,
@@ -119,9 +129,9 @@ func NewEpochStateMachine(
 		// and we must use only the `epochFallbackStateMachine` along this fork.
 		//
 		// TODO for 'leaving Epoch Fallback via special service event': this might need to change.
-		stateMachine = NewEpochFallbackStateMachine(candidate.View, parentEpochState)
+		stateMachine = NewFallbackStateMachine(candidate.View, parentEpochState)
 	} else {
-		stateMachine, err = NewStateMachine(candidate.View, parentEpochState)
+		stateMachine, err = NewHappyPathStateMachine(candidate.View, parentEpochState)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize protocol state machine: %w", err)
@@ -133,7 +143,7 @@ func NewEpochStateMachine(
 		parentState:        parentState,
 		mutator:            mutator,
 		epochFallbackStateMachineFactory: func() (StateMachine, error) {
-			return NewEpochFallbackStateMachine(candidate.View, parentEpochState), nil
+			return NewFallbackStateMachine(candidate.View, parentEpochState), nil
 		},
 		setups:           setups,
 		commits:          commits,
@@ -142,6 +152,13 @@ func NewEpochStateMachine(
 	}, nil
 }
 
+// Build schedules updates to the protocol state by obtaining the updated state from the active state machine,
+// preparing deferred DB updates and committing updated sub-state ID to the KV store.
+// ATTENTION: In mature implementation all parts of the Dynamic Protocol State will rely on the Key-Value Store as storage
+// but to avoid a large refactoring we are using a hybrid approach where only the epoch state ID is stored in the KV Store
+// but the actual epoch state is stored separately, nevertheless, the epoch state ID is used to sanity check if the
+// epoch state is consistent with the KV Store. Using this approach, we commit the epoch sub-state to the KV Store which in
+// affects the Dynamic Protocol State ID which is essentially hash of the KV Store.
 func (e *EpochStateMachine) Build() []transaction.DeferredDBUpdate {
 	updatedEpochState, updatedStateID, hasChanges := e.activeStateMachine.Build()
 	dbUpdates := e.pendingDbUpdates
@@ -154,66 +171,17 @@ func (e *EpochStateMachine) Build() []transaction.DeferredDBUpdate {
 	return dbUpdates
 }
 
-// ApplyServiceEventsFromValidatedSeals applies the state changes that are delivered via
-// sealed service events:
-//   - iterating over the sealed service events in order of increasing height
-//   - identifying state-changing service event and calling into the embedded
-//     StateMachine to apply the respective state update
-//   - tracking deferred database updates necessary to persist the updated
-//     protocol state's *dependencies*. Persisting and indexing `updatedState`
-//     is the responsibility of the calling code (specifically `FollowerState`)
-//
-// All updates only mutate the `StateMutator`'s internal in-memory copy of the
-// protocol state, without changing the parent state (i.e. the state we started from).
-//
-// SAFETY REQUIREMENT:
-// The StateMutator assumes that the proposal has passed the following correctness checks!
-//   - The seals in the payload continuously follow the ancestry of this fork. Specifically,
-//     there are no gaps in the seals.
-//   - The seals guarantee correctness of the sealed execution result, including the contained
-//     service events. This is actively checked by the verification node, whose aggregated
-//     approvals in the form of a seal attest to the correctness of the sealed execution result,
-//     including the contained.
-//
-// Consensus nodes actively verify protocol compliance for any block proposal they receive,
-// including integrity of each seal individually as well as the seals continuously following the
-// fork. Light clients only process certified blocks, which guarantees that consensus nodes already
-// ran those checks and found the proposal to be valid.
-//
-// Details on SERVICE EVENTS:
-// Consider a chain where a service event is emitted during execution of block A.
-// Block B contains an execution receipt for A. Block C contains a seal for block
-// A's execution result.
-//
-//	A <- .. <- B(RA) <- .. <- C(SA)
-//
-// Service Events are included within execution results, which are stored
-// opaquely as part of the block payload in block B. We only validate, process and persist
-// the typed service event to storage once we process C, the block containing the
-// seal for block A. This is because we rely on the sealing subsystem to validate
-// correctness of the service event before processing it.
-// Consequently, any change to the protocol state introduced by a service event
-// emitted during execution of block A would only become visible when querying
-// C or its descendants.
-//
-// Error returns:
-//   - Per convention, the input seals from the block payload have already been confirmed to be protocol compliant.
-//     Hence, the service events in the sealed execution results represent the honest execution path.
-//     Therefore, the sealed service events should encode a valid evolution of the protocol state -- provided
-//     the system smart contracts are correct.
-//   - As we can rule out byzantine attacks as the source of failures, the only remaining sources of problems
-//     can be (a) bugs in the system smart contracts or (b) bugs in the node implementation.
-//     A service event not representing a valid state transition despite all consistency checks passing
-//     is interpreted as case (a) and handled internally within the StateMutator. In short, we go into Epoch
-//     Fallback Mode by copying the parent state (a valid state snapshot) and setting the
-//     `InvalidEpochTransitionAttempted` flag. All subsequent Epoch-lifecycle events are ignored.
-//   - A consistency or sanity check failing within the StateMutator is likely the symptom of an internal bug
-//     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
-//     of this function is not nil. If such an exception is returned, continuing is not an option.
+// ProcessUpdate applies the state changes that are delivered via sealed service events.
+// The block's payload might contain epoch preparation service events for the next
+// epoch. In this case, we need to update the tentative protocol state.
+// We need to validate whether all information is available in the protocol
+// state to go to the next epoch when needed. In cases where there is a bug
+// in the smart contract, it could be that this happens too late, and we should trigger epoch fallback mode.
+// No errors are expected during normal operations.
 func (e *EpochStateMachine) ProcessUpdate(update []*flow.ServiceEvent) error {
 	parentProtocolState := e.activeStateMachine.ParentState()
 
-	// perform protocol state transition to next epoch if next epoch is committed and we are at first block of epoch
+	// perform protocol state transition to next epoch if next epoch is committed, and we are at first block of epoch
 	phase := parentProtocolState.EpochPhase()
 	if phase == flow.EpochPhaseCommitted {
 		activeSetup := parentProtocolState.CurrentEpochSetup
@@ -240,10 +208,12 @@ func (e *EpochStateMachine) ProcessUpdate(update []*flow.ServiceEvent) error {
 	return nil
 }
 
+// View returns the view that is associated with this EpochStateMachine.
 func (e *EpochStateMachine) View() uint64 {
 	return e.activeStateMachine.View()
 }
 
+// ParentState returns parent state that is associated with this state machine.
 func (e *EpochStateMachine) ParentState() protocol_state.KVStoreReader {
 	return e.parentState
 }

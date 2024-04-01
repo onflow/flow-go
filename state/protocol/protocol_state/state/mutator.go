@@ -171,12 +171,6 @@ func (m *stateMutator) Build() (flow.Identifier, []transaction.DeferredDBUpdate,
 //     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 //     of this function is not nil. If such an exception is returned, continuing is not an option.
 func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) error {
-	// We apply service events from blocks which are sealed by this candidate block.
-	// The block's payload might contain epoch preparation service events for the next
-	// epoch. In this case, we need to update the tentative protocol state.
-	// We need to validate whether all information is available in the protocol
-	// state to go to the next epoch when needed. In cases where there is a bug
-	// in the smart contract, it could be that this happens too late and we should trigger epoch fallback mode.
 
 	// block payload may not specify seals in order, so order them by block height before processing
 	orderedSeals, err := protocol.OrderedSeals(seals, m.headers)
