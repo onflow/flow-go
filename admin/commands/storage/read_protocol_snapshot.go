@@ -48,14 +48,14 @@ func NewProtocolSnapshotCommand(
 }
 
 func (s *ProtocolSnapshotCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
-	s.logger.Info().Msgf("admintool: generating protocol snapshot")
-
 	validated, ok := req.ValidatorData.(*protocolSnapshotData)
 	if !ok {
 		return nil, fmt.Errorf("fail to parse validator data")
 	}
 
 	blocksToSkip := validated.blocksToSkip
+
+	s.logger.Info().Uint("blocksToSkip", blocksToSkip).Msgf("admintool: generating protocol snapshot")
 
 	snapshot, sealedHeight, commit, err := common.GenerateProtocolSnapshotForCheckpoint(
 		s.logger, s.state, s.headers, s.seals, s.checkpointDir, blocksToSkip)
