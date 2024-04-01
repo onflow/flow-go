@@ -109,7 +109,7 @@ func (s *SubscribeEventsSuite) SetupTest() {
 //   - Subscribing to events of a specific type (some events).
 //
 // For each scenario, this test function creates WebSocket requests, simulates WebSocket responses with mock data,
-// and validates that the received WebSocket response matches the expected SubscribeEventsResponses.
+// and validates that the received WebSocket response matches the expected EventsResponses.
 func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 	testVectors := []testType{
 		{
@@ -434,6 +434,7 @@ func requireResponse(t *testing.T, recorder *testHijackResponseRecorder, expecte
 			require.Equal(t, expectedEvent.Type, actualEvent.Type)
 			require.Equal(t, expectedEvent.TransactionID, actualEvent.TransactionID)
 			require.Equal(t, expectedEvent.TransactionIndex, actualEvent.TransactionIndex)
+			require.Equal(t, expectedEvent.EventIndex, actualEvent.EventIndex)
 			// payload is not expected to match, but it should decode
 
 			// payload must decode to valid json-cdc encoded data

@@ -413,7 +413,7 @@ func (s *BackendEventsSuite) subscribe(
 					}
 				}
 
-				// consume block from subscription
+				// consume events response from subscription
 				unittest.RequireReturnsBefore(s.T(), func() {
 					v, ok := <-sub.Channel()
 					require.True(s.T(), ok, "channel closed while waiting for exec data for block %x %v: err: %v", b.Header.Height, b.ID(), sub.Err())
