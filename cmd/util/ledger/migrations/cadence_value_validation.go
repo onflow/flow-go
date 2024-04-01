@@ -286,6 +286,9 @@ func cadenceCompositeValueEqual(
 		vFieldNames = append(vFieldNames, fieldName)
 		return true
 	})
+	if err != nil {
+		return err
+	}
 
 	// TODO: Use CompositeValue.FieldCount() from Cadence after it is merged and available.
 	otherFieldNames := make([]string, 0, len(vFieldNames)) // otherComposite's field names
