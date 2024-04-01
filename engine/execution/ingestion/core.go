@@ -271,8 +271,8 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 			return nil, nil, fmt.Errorf("unexpected error while reenqueue block to block queue: %w", err)
 		}
 
-		missingColls = deduplicate(append(missingColls, missing...))
-		executables = deduplicate(append(executables, execs...))
+		missingColls = flow.Deduplicate(append(missingColls, missing...))
+		executables = flow.Deduplicate(append(executables, execs...))
 	}
 
 	lg.Info().Bool("parent_is_executed", false).
@@ -441,26 +441,4 @@ func (e *Core) fetch(missingColls []*block_queue.MissingCollection) error {
 	}
 
 	return nil
-}
-
-type IDEntity interface {
-	ID() flow.Identifier
-}
-
-// deduplicate entities in a slice by the ID method
-func deduplicate[T IDEntity](entities []T) []T {
-	seen := make(map[flow.Identifier]struct{}, len(entities))
-	result := make([]T, 0, len(entities))
-
-	for _, entity := range entities {
-		id := entity.ID()
-		if _, ok := seen[id]; ok {
-			continue
-		}
-
-		seen[id] = struct{}{}
-		result = append(result, entity)
-	}
-
-	return result
 }
