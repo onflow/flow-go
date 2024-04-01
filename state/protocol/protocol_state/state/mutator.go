@@ -198,12 +198,9 @@ func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) 
 	}
 
 	for _, stateMachine := range m.orthoKVStoreMachines {
+		// only exceptions should be propagated
 		err := stateMachine.ProcessUpdate(orderedUpdates)
 		if err != nil {
-			if protocol.IsInvalidServiceEventError(err) {
-				// TODO: log, report
-				continue
-			}
 			return fmt.Errorf("could not process service events: %w", err)
 		}
 	}

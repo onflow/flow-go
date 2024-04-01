@@ -170,13 +170,12 @@ type OrthogonalStoreStateMachine[P any] interface {
 	// updated protocol state entry, state ID and a flag indicating if there were any changes.
 	Build() []transaction.DeferredDBUpdate
 
-	// ProcessUpdate updates the current state of key-value store.
-	// KeyValueStoreStateMachine captures only a subset of all service events, those that are relevant for the KV store,
-	// all other events are ignored.
+	// ProcessUpdate processes an ordered list of sealed service events.
+	// Usually, each state machine performs filtering of relevant events and ignores all other events.
 	// No errors are expected during normal operations.
 	ProcessUpdate(update []*flow.ServiceEvent) error
 
-	// View returns the view that is associated with this KeyValueStoreStateMachine.
+	// View returns the view associated with this KeyValueStoreStateMachine.
 	// The view of the KeyValueStoreStateMachine equals the view of the block carrying the respective updates.
 	View() uint64
 
