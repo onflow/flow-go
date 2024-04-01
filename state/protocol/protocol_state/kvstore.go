@@ -159,21 +159,15 @@ type KVStoreMutator interface {
 type OrthogonalStoreStateMachine[P any] interface {
 
 	// Build returns:
-	//   - hasChanges: flag whether there were any changes; otherwise, `updatedState` and `stateID` equal the parent state
-	//   - updatedState: the ProtocolState after applying all updates.
-	//   - stateID: the hash commitment to the `updatedState`
-	//   - dbUpdates: database updates necessary for persisting the updated protocol state's *dependencies*.
-	//     If hasChanges is false, updatedState is empty. Caution: persisting the `updatedState` itself and adding
-	//     it to the relevant indices is _not_ in `dbUpdates`. Persisting and indexing `updatedState` is the responsibility
-	//     of the calling code (specifically `FollowerState`).
-	//
-	// updated protocol state entry, state ID and a flag indicating if there were any changes.
+	//   - database updates necessary for persisting the updated protocol sub-state and its *dependencies*.
+	//     It may contain updates for the sub-state itself and for any dependency that is affected by the update.
+	//     Deferred updates must be applied in a transaction to ensure atomicity.
 	Build() []transaction.DeferredDBUpdate
 
 	// ProcessUpdate processes an ordered list of sealed service events.
 	// Usually, each state machine performs filtering of relevant events and ignores all other events.
 	// No errors are expected during normal operations.
-	ProcessUpdate(update []*flow.ServiceEvent) error
+	ProcessUpdate(orderedUpdates []*flow.ServiceEvent) error
 
 	// View returns the view associated with this KeyValueStoreStateMachine.
 	// The view of the KeyValueStoreStateMachine equals the view of the block carrying the respective updates.
@@ -183,8 +177,15 @@ type OrthogonalStoreStateMachine[P any] interface {
 	ParentState() P
 }
 
+// KeyValueStoreStateMachine is a type alias for a state machine that operates on an instance of KVStoreReader.
+// StateMutator uses this type to store and perform operations on orthogonal state machines.
 type KeyValueStoreStateMachine = OrthogonalStoreStateMachine[KVStoreReader]
 
+// KeyValueStoreStateMachineFactory is an abstract factory interface for creating KeyValueStoreStateMachine instances.
+// It is used separate creation of state machines from their usage, which allows less coupling and superior testability.
+// For each concrete type injected in State Mutator a dedicated abstract factory has to be created.
 type KeyValueStoreStateMachineFactory interface {
+	// Create creates a new instance of an underlying type that operates on KV Store and is created for a specific candidate block.
+	// No errors are expected during normal operations.
 	Create(candidate *flow.Header, parentState KVStoreReader, mutator KVStoreMutator) (KeyValueStoreStateMachine, error)
 }

@@ -7,12 +7,16 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// EpochStateMachineFactory is a factory for creating EpochStateMachine instances.
+// It holds all the necessary data to create a new instance of EpochStateMachine.
 type EpochStateMachineFactory struct {
 	params          protocol.GlobalParams
 	setups          storage.EpochSetups
 	commits         storage.EpochCommits
 	protocolStateDB storage.ProtocolState
 }
+
+var _ protocol_state.KeyValueStoreStateMachineFactory = (*EpochStateMachineFactory)(nil)
 
 func NewEpochStateMachineFactory(
 	params protocol.GlobalParams,
@@ -27,6 +31,8 @@ func NewEpochStateMachineFactory(
 	}
 }
 
+// Create creates a new instance of an underlying type that operates on KV Store and is created for a specific candidate block.
+// No errors are expected during normal operations.
 func (f *EpochStateMachineFactory) Create(
 	candidate *flow.Header,
 	parentState protocol_state.KVStoreReader,
