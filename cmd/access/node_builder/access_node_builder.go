@@ -1307,7 +1307,7 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 				filter.And(
 					filter.HasRole[flow.Identity](flow.RoleConsensus),
 					filter.Not(filter.HasNodeID[flow.Identity](node.Me.NodeID())),
-					underlay.NotEjectedFilter,
+					filter.NotEjectedFilter,
 				),
 				builder.IdentityProvider,
 			)

@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	epochcmdutil "github.com/onflow/flow-go/cmd/util/cmd/epochs/utils"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
@@ -107,7 +108,7 @@ func generateRecoverEpochTxArgs(getSnapshot func() *inmem.Snapshot) func(cmd *co
 // extractResetEpochArgs extracts the required transaction arguments for the `resetEpoch` transaction
 func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 	epoch := snapshot.Epochs().Current()
-	ids, err := epoch.InitialIdentities()
+	ids, err := snapshot.Identities(filter.IsValidProtocolParticipant)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to get initial identities for current epoch")
 	}
@@ -156,24 +157,24 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 
 	dkgPubKeys := make([]cadence.Value, 0)
 	nodeIds := make([]cadence.Value, 0)
-	ids.Map(func(skeleton flow.IdentitySkeleton) flow.IdentitySkeleton {
-		if skeleton.GetRole() == flow.RoleConsensus {
-			dkgPubKey, keyShareErr := currentEpochDKG.KeyShare(skeleton.GetNodeID())
+	ids.Map(func(identity flow.Identity) flow.Identity {
+		if identity.GetRole() == flow.RoleConsensus {
+			dkgPubKey, keyShareErr := currentEpochDKG.KeyShare(identity.GetNodeID())
 			if keyShareErr != nil {
-				log.Fatal().Err(keyShareErr).Msg(fmt.Sprintf("failed to get dkg pub key share for node: %s", skeleton.GetNodeID()))
+				log.Fatal().Err(keyShareErr).Msg(fmt.Sprintf("failed to get dkg pub key share for node: %s", identity.GetNodeID()))
 			}
 			dkgPubKeyCdc, cdcErr := cadence.NewString(dkgPubKey.String())
 			if cdcErr != nil {
-				log.Fatal().Err(cdcErr).Msg(fmt.Sprintf("failed to get dkg pub key cadence string for node: %s", skeleton.GetNodeID()))
+				log.Fatal().Err(cdcErr).Msg(fmt.Sprintf("failed to get dkg pub key cadence string for node: %s", identity.GetNodeID()))
 			}
 			dkgPubKeys = append(dkgPubKeys, dkgPubKeyCdc)
 		}
-		nodeIdCdc, err := cadence.NewString(skeleton.GetNodeID().String())
+		nodeIdCdc, err := cadence.NewString(identity.GetNodeID().String())
 		if err != nil {
-			log.Fatal().Err(err).Msg(fmt.Sprintf("failed to convert node ID to cadence string: %s", skeleton.GetNodeID()))
+			log.Fatal().Err(err).Msg(fmt.Sprintf("failed to convert node ID to cadence string: %s", identity.GetNodeID()))
 		}
 		nodeIds = append(nodeIds, nodeIdCdc)
-		return skeleton
+		return identity
 	})
 
 	// @TODO: cluster qcs are converted into flow.ClusterQCVoteData types,

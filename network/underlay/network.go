@@ -74,14 +74,6 @@ var (
 	ErrUnicastMsgWithoutSub = errors.New("networking layer does not have subscription for the channel ID indicated in the unicast message received")
 )
 
-// NotEjectedFilter is an identity filter that, when applied to the identity
-// table at a given snapshot, returns all nodes that we should communicate with
-// over the networking layer.
-//
-// NOTE: The protocol state includes nodes from the previous/next epoch that should
-// be included in network communication. We omit any nodes that have been ejected.
-var NotEjectedFilter = filter.Not(filter.HasParticipationStatus(flow.EpochParticipationStatusEjected))
-
 // Network serves as the comprehensive networking layer that integrates three interfaces within Flow; Underlay, EngineRegistry, and ConduitAdapter.
 // It is responsible for creating conduits through which engines can send and receive messages to and from other engines on the network, as well as registering other services
 // such as BlobService and PingService. It also provides a set of APIs that can be used to send messages to other nodes on the network.
@@ -545,7 +537,7 @@ func (n *Network) UnRegisterChannel(channel channels.Channel) error {
 }
 
 func (n *Network) Identities() flow.IdentityList {
-	return n.identityProvider.Identities(NotEjectedFilter)
+	return n.identityProvider.Identities(filter.NotEjectedFilter)
 }
 
 func (n *Network) Identity(pid peer.ID) (*flow.Identity, bool) {
