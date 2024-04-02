@@ -593,6 +593,7 @@ func TestHandler_COA(t *testing.T) {
 				result := foa.Deploy(testContract.ByteCode, math.MaxUint64, types.NewBalanceFromUFix64(0))
 				addr := result.DeployedContractAddress
 				require.NotNil(t, addr)
+				assert.Equal(t, addr.Bytes(), []byte(result.ReturnedValue))
 
 				num := big.NewInt(22)
 				_ = foa.Call(
@@ -607,7 +608,7 @@ func TestHandler_COA(t *testing.T) {
 					math.MaxUint64,
 					types.NewBalanceFromUFix64(0))
 
-				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue))
+				require.Equal(t, num, res.ReturnedValue.AsBigInt())
 			})
 		})
 	})
