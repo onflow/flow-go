@@ -404,6 +404,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		fmt.Sprintf("--rpc-addr=%s:%s", container.ContainerName, testnet.GRPCPort),
 		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
 		fmt.Sprintf("--extensive-tracing=%t", extesiveTracing),
+		fmt.Sprintf("--enable-new-ingestion-engine=%v", true),
 		"--execution-data-dir=/data/execution-data",
 		"--chunk-data-pack-dir=/data/chunk-data-pack",
 	)
