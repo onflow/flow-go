@@ -185,7 +185,7 @@ func (e *EpochStateMachine) Build() []transaction.DeferredDBUpdate {
 // state to go to the next epoch when needed. In cases where there is a bug
 // in the smart contract, it could be that this happens too late, and we should trigger epoch fallback mode.
 // No errors are expected during normal operations.
-func (e *EpochStateMachine) ProcessUpdate(update []*flow.ServiceEvent) error {
+func (e *EpochStateMachine) ProcessUpdate(update []flow.ServiceEvent) error {
 	parentProtocolState := e.activeStateMachine.ParentState()
 
 	// perform protocol state transition to next epoch if next epoch is committed, and we are at first block of epoch
@@ -231,7 +231,7 @@ func (e *EpochStateMachine) ParentState() protocol_state.KVStoreReader {
 // Results must be ordered by block height.
 // Expected errors during normal operations:
 // - `protocol.InvalidServiceEventError` if any service event is invalid or is not a valid state transition for the current protocol state
-func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(orderedUpdates []*flow.ServiceEvent) ([]transaction.DeferredDBUpdate, error) {
+func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(orderedUpdates []flow.ServiceEvent) ([]transaction.DeferredDBUpdate, error) {
 	var dbUpdates []transaction.DeferredDBUpdate
 	for _, event := range orderedUpdates {
 		switch ev := event.Event.(type) {
@@ -266,7 +266,7 @@ func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(orderedUpdates 
 // transitionToEpochFallbackMode transitions the protocol state to Epoch Fallback Mode [EFM].
 // This is implemented by switching to a different state machine implementation, which ignores all service events and epoch transitions.
 // At the moment, this is a one-way transition: once we enter EFM, the only way to return to normal is with a spork.
-func (e *EpochStateMachine) transitionToEpochFallbackMode(orderedUpdates []*flow.ServiceEvent) ([]transaction.DeferredDBUpdate, error) {
+func (e *EpochStateMachine) transitionToEpochFallbackMode(orderedUpdates []flow.ServiceEvent) ([]transaction.DeferredDBUpdate, error) {
 	var err error
 	e.activeStateMachine, err = e.epochFallbackStateMachineFactory()
 	if err != nil {

@@ -167,7 +167,7 @@ type OrthogonalStoreStateMachine[P any] interface {
 	// ProcessUpdate processes an ordered list of sealed service events.
 	// Usually, each state machine performs filtering of relevant events and ignores all other events.
 	// No errors are expected during normal operations.
-	ProcessUpdate(orderedUpdates []*flow.ServiceEvent) error
+	ProcessUpdate(orderedUpdates []flow.ServiceEvent) error
 
 	// View returns the view associated with this KeyValueStoreStateMachine.
 	// The view of the KeyValueStoreStateMachine equals the view of the block carrying the respective updates.

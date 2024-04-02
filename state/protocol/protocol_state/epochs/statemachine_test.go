@@ -111,9 +111,7 @@ func (s *EpochStateMachineSuite) TestHappyPathWithDbChanges() {
 	//	unittest.IdentifierFixture(), true)
 
 	epochSetup := unittest.EpochSetupFixture()
-	epochSetupServiceEvent := epochSetup.ServiceEvent()
 	epochCommit := unittest.EpochCommitFixture()
-	epochCommitServiceEvent := epochCommit.ServiceEvent()
 
 	//epochSetupStored := mock.Mock{}
 	//epochSetupStored.On("EpochSetupStored").Return()
@@ -131,7 +129,7 @@ func (s *EpochStateMachineSuite) TestHappyPathWithDbChanges() {
 	//	return nil
 	//}).Once()
 
-	err := s.stateMachine.ProcessUpdate([]*flow.ServiceEvent{&epochSetupServiceEvent, &epochCommitServiceEvent})
+	err := s.stateMachine.ProcessUpdate([]flow.ServiceEvent{epochSetup.ServiceEvent(), epochCommit.ServiceEvent()})
 	require.NoError(s.T(), err)
 
 	dbUpdates := s.stateMachine.Build()
@@ -377,7 +375,6 @@ func (s *EpochStateMachineSuite) TestProcessUpdate_InvalidEpochSetup() {
 		require.NoError(s.T(), err)
 
 		epochSetup := unittest.EpochSetupFixture()
-		serviceEvent := epochSetup.ServiceEvent()
 
 		s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState)
 		s.happyPathStateMachine.On("ProcessEpochSetup", epochSetup).
@@ -387,17 +384,16 @@ func (s *EpochStateMachineSuite) TestProcessUpdate_InvalidEpochSetup() {
 		fallbackStateMachine.On("ProcessEpochSetup", epochSetup).Return(false, nil).Once()
 		fallbackPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).Return(fallbackStateMachine, nil).Once()
 
-		err = stateMachine.ProcessUpdate([]*flow.ServiceEvent{&serviceEvent})
+		err = stateMachine.ProcessUpdate([]flow.ServiceEvent{epochSetup.ServiceEvent()})
 		require.NoError(s.T(), err)
 	})
 	s.Run("process-epoch-setup-exception", func() {
 		epochSetup := unittest.EpochSetupFixture()
-		serviceEvent := epochSetup.ServiceEvent()
 
 		exception := errors.New("exception")
 		s.happyPathStateMachine.On("ProcessEpochSetup", epochSetup).Return(false, exception).Once()
 
-		err := s.stateMachine.ProcessUpdate([]*flow.ServiceEvent{&serviceEvent})
+		err := s.stateMachine.ProcessUpdate([]flow.ServiceEvent{epochSetup.ServiceEvent()})
 		require.Error(s.T(), err)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
@@ -424,7 +420,6 @@ func (s *EpochStateMachineSuite) TestProcessUpdate_InvalidEpochCommit() {
 		require.NoError(s.T(), err)
 
 		epochCommit := unittest.EpochCommitFixture()
-		serviceEvent := epochCommit.ServiceEvent()
 
 		s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState)
 		s.happyPathStateMachine.On("ProcessEpochCommit", epochCommit).
@@ -434,7 +429,7 @@ func (s *EpochStateMachineSuite) TestProcessUpdate_InvalidEpochCommit() {
 		fallbackStateMachine.On("ProcessEpochCommit", epochCommit).Return(false, nil).Once()
 		fallbackPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).Return(fallbackStateMachine, nil).Once()
 
-		err = stateMachine.ProcessUpdate([]*flow.ServiceEvent{&serviceEvent})
+		err = stateMachine.ProcessUpdate([]flow.ServiceEvent{epochCommit.ServiceEvent()})
 		require.NoError(s.T(), err)
 	})
 	s.Run("process-epoch-commit-exception", func() {
@@ -442,12 +437,11 @@ func (s *EpochStateMachineSuite) TestProcessUpdate_InvalidEpochCommit() {
 		//s.stateMachine.On("ParentState").Return(parentState)
 
 		epochCommit := unittest.EpochCommitFixture()
-		serviceEvent := epochCommit.ServiceEvent()
 
 		exception := errors.New("exception")
 		s.happyPathStateMachine.On("ProcessEpochCommit", epochCommit).Return(false, exception).Once()
 
-		err := s.stateMachine.ProcessUpdate([]*flow.ServiceEvent{&serviceEvent})
+		err := s.stateMachine.ProcessUpdate([]flow.ServiceEvent{epochCommit.ServiceEvent()})
 		require.Error(s.T(), err)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 	})

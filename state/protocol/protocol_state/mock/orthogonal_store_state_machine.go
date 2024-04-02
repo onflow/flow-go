@@ -45,11 +45,11 @@ func (_m *OrthogonalStoreStateMachine[P]) ParentState() P {
 }
 
 // ProcessUpdate provides a mock function with given fields: orderedUpdates
-func (_m *OrthogonalStoreStateMachine[P]) ProcessUpdate(orderedUpdates []*flow.ServiceEvent) error {
+func (_m *OrthogonalStoreStateMachine[P]) ProcessUpdate(orderedUpdates []flow.ServiceEvent) error {
 	ret := _m.Called(orderedUpdates)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func([]*flow.ServiceEvent) error); ok {
+	if rf, ok := ret.Get(0).(func([]flow.ServiceEvent) error); ok {
 		r0 = rf(orderedUpdates)
 	} else {
 		r0 = ret.Error(0)

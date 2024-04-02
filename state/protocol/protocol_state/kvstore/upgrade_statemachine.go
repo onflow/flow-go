@@ -48,7 +48,7 @@ func (m *PSVersionUpgradeStateMachine) Build() []transaction.DeferredDBUpdate {
 // ProcessUpdate processes an ordered list of sealed service events.
 // Implementation processes only relevant service events and ignores all other events.
 // No errors are expected during normal operations.
-func (m *PSVersionUpgradeStateMachine) ProcessUpdate(orderedUpdates []*flow.ServiceEvent) error {
+func (m *PSVersionUpgradeStateMachine) ProcessUpdate(orderedUpdates []flow.ServiceEvent) error {
 	for _, update := range orderedUpdates {
 		switch update.Type {
 		case flow.ServiceEventProtocolStateVersionUpgrade:

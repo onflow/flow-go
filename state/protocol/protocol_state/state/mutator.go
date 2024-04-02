@@ -190,10 +190,10 @@ func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) 
 	}
 
 	// order all service events in one list
-	orderedUpdates := make([]*flow.ServiceEvent, 0)
+	orderedUpdates := make([]flow.ServiceEvent, 0)
 	for _, result := range results {
 		for _, event := range result.ServiceEvents {
-			orderedUpdates = append(orderedUpdates, &event)
+			orderedUpdates = append(orderedUpdates, event)
 		}
 	}
 
