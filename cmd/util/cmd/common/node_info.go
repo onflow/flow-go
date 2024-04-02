@@ -47,6 +47,7 @@ func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNod
 		if err != nil {
 			return nil, fmt.Errorf(fmt.Sprintf("invalid staking public key: %s", partner.StakingPubKey))
 		}
+
 		weight := weights[partner.NodeID]
 		if valid := ValidateWeight(weight); !valid {
 			return nil, fmt.Errorf(fmt.Sprintf("invalid partner weight: %d", weight))
@@ -128,7 +129,7 @@ func ReadFullInternalNodeInfos(log zerolog.Logger, internalNodePrivInfoDir, inte
 	if err != nil {
 		return nil, err
 	}
-	
+
 	log.Info().Msgf("read %v internal private node-info files", len(privInternals))
 
 	weights := internalWeightsByAddress(log, internalWeightsConfig)
@@ -144,7 +145,8 @@ func ReadFullInternalNodeInfos(log zerolog.Logger, internalNodePrivInfoDir, inte
 		if err != nil {
 			return nil, fmt.Errorf(fmt.Sprintf("invalid internal node ID: %s", internal.NodeID))
 		}
-		weight := weights[internal.NodeID.String()]
+		weight := weights[internal.Address]
+
 		if valid := ValidateWeight(weight); !valid {
 			return nil, fmt.Errorf(fmt.Sprintf("invalid partner weight: %d", weight))
 		}

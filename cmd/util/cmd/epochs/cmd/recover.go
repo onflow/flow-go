@@ -32,7 +32,6 @@ var (
 	flagInternalNodePrivInfoDir  string
 	flagNodeConfigJson           string
 	flagCollectionClusters       int
-	flagStartView                uint64
 	flagNumViewsInEpoch          uint64
 	flagNumViewsInStakingAuction uint64
 	flagEpochCounter             uint64
@@ -51,7 +50,6 @@ func addGenerateRecoverEpochTxArgsCmdFlags() {
 		"path to a JSON file containing multiple node configurations (fields Role, Address, Weight)")
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagInternalNodePrivInfoDir, "internal-priv-dir", "", "path to directory "+
 		"containing the output from the `keygen` command for internal nodes")
-	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagStartView, "start-view", 0, "start view of the recovery epoch")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 4000, "length of each epoch measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 100, "length of the epoch staking phase measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "the epoch counter used to generate the root cluster block")
@@ -142,7 +140,8 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 	}
 
 	log.Info().Msg("computing collection node clusters")
-	_, clusters, err := common.ConstructClusterAssignment(log, partnerCollectors, internalCollectors, flagCollectionClusters)
+
+	assignments, clusters, err := common.ConstructClusterAssignment(log, partnerCollectors, internalCollectors, flagCollectionClusters)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate cluster assignment")
 	}
@@ -207,7 +206,8 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 		cadence.NewArray(dkgPubKeys),
 		// node ids
 		cadence.NewArray(nodeIds),
-		//common.ConvertClusterAssignmentsCdc(assignments),
+		// clusters,
+		common.ConvertClusterAssignmentsCdc(assignments),
 	}
 
 	return args
