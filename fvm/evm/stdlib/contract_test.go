@@ -3605,6 +3605,7 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 					return &types.ResultSummary{
 						Status:                  types.StatusSuccessful,
 						DeployedContractAddress: types.Address{4},
+						ReturnedValue:           types.Data{4},
 					}
 				},
 			}
@@ -3687,18 +3688,9 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	expected := cadence.NewArray([]cadence.Value{
-		cadence.UInt8(4), cadence.UInt8(0),
-		cadence.UInt8(0), cadence.UInt8(0),
-		cadence.UInt8(0), cadence.UInt8(0),
-		cadence.UInt8(0), cadence.UInt8(0),
-		cadence.UInt8(0), cadence.UInt8(0),
-		cadence.UInt8(0), cadence.UInt8(0),
-		cadence.UInt8(0), cadence.UInt8(0),
-		cadence.UInt8(0), cadence.UInt8(0),
-		cadence.UInt8(0), cadence.UInt8(0),
-		cadence.UInt8(0), cadence.UInt8(0),
-	}).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type{}))
+	expected := cadence.
+		NewArray([]cadence.Value{cadence.UInt8(4)}).
+		WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type{}))
 
 	require.Equal(t, expected, actual)
 
