@@ -67,11 +67,16 @@ type ReadOnlyBlockView interface {
 // EVM validation errors and EVM execution errors are part of the returned result
 // and should be handled separately.
 type BlockView interface {
-	// executes a direct call
+	// DirectCall executes a direct call
 	DirectCall(call *DirectCall) (*Result, error)
 
 	// RunTransaction executes an evm transaction
 	RunTransaction(tx *gethTypes.Transaction) (*Result, error)
+
+	// BatchRunTransactions executes a batch of evm transactions producing
+	// a slice of execution Result where each result corresponds to each
+	// item in the txs slice.
+	BatchRunTransactions(txs []*gethTypes.Transaction) ([]*Result, error)
 }
 
 // Emulator emulates an evm-compatible chain
