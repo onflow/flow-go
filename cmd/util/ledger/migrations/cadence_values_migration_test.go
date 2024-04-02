@@ -798,11 +798,9 @@ func TestProgramParsingError(t *testing.T) {
 		flow.Address(testAddress): {},
 	}
 
-	payloads, err = MergeRegisterChanges(
-		runtime.Snapshot.Payloads,
+	payloads, err = runtime.Snapshot.ApplyChangesAndGetNewPayloads(
 		result.WriteSet,
 		expectedAddresses,
-		nil,
 		logger,
 	)
 	require.NoError(t, err)
@@ -937,11 +935,9 @@ func TestCoreContractUsage(t *testing.T) {
 			flow.Address(testAddress): {},
 		}
 
-		payloads, err = MergeRegisterChanges(
-			runtime.Snapshot.Payloads,
+		payloads, err = runtime.Snapshot.ApplyChangesAndGetNewPayloads(
 			result.WriteSet,
 			expectedAddresses,
-			nil,
 			logger,
 		)
 		require.NoError(t, err)

@@ -58,11 +58,9 @@ func NewAccountStorageMigration(
 			flow.Address(address): {},
 		}
 
-		newPayloads, err := MergeRegisterChanges(
-			migrationRuntime.Snapshot.Payloads,
+		newPayloads, err := migrationRuntime.Snapshot.ApplyChangesAndGetNewPayloads(
 			result.WriteSet,
 			expectedAddresses,
-			nil,
 			log,
 		)
 		if err != nil {
