@@ -156,6 +156,11 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 	dkgPubKeys := make([]cadence.Value, 0)
 	nodeIds := make([]cadence.Value, 0)
 
+	dkgGroupKeyCdc, cdcErr := cadence.NewString(currentEpochDKG.GroupKey().String())
+	if cdcErr != nil {
+		log.Fatal().Err(cdcErr).Msg("failed to get dkg group key cadence string")
+	}
+	dkgPubKeys = append(dkgPubKeys, dkgGroupKeyCdc)
 	for _, id := range ids {
 		if id.GetRole() == flow.RoleConsensus {
 			dkgPubKey, keyShareErr := currentEpochDKG.KeyShare(id.GetNodeID())
