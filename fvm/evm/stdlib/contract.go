@@ -1899,6 +1899,7 @@ func NewInternalEVMContractValue(
 		InternalEVMContractType.Fields,
 		map[string]interpreter.Value{
 			internalEVMTypeRunFunctionName:                       newInternalEVMTypeRunFunction(gauge, handler),
+			internalEVMTypeBatchRunFunctionName:                  newInternalEVMTypeBatchRunFunction(gauge, handler),
 			internalEVMTypeCreateCadenceOwnedAccountFunctionName: newInternalEVMTypeCreateCadenceOwnedAccountFunction(gauge, handler),
 			internalEVMTypeCallFunctionName:                      newInternalEVMTypeCallFunction(gauge, handler),
 			internalEVMTypeDepositFunctionName:                   newInternalEVMTypeDepositFunction(gauge, handler),
