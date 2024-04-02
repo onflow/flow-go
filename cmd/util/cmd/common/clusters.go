@@ -130,10 +130,8 @@ func ConstructRootQCsForClusters(log zerolog.Logger, clusterList flow.ClusterLis
 func ConvertClusterAssignmentsCdc(assignments flow.AssignmentList) cadence.Array {
 	assignmentsCdc := make([]cadence.Value, len(assignments))
 	for i, asmt := range assignments {
-		fmt.Println(asmt.Len())
 		vals := make([]cadence.Value, asmt.Len())
 		for j, k := range asmt {
-			fmt.Println(k.String())
 			vals[j] = cadence.String(k.String())
 		}
 		assignmentsCdc[i] = cadence.NewArray(vals).WithType(cadence.NewVariableSizedArrayType(cadence.StringType{}))

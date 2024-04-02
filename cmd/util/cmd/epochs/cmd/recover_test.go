@@ -56,6 +56,7 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		require.NoError(t, err)
 		// compare to expected values
 		expectedArgs := extractRecoverEpochArgs(rootSnapshot)
-		unittest.VerifyCdcArguments(t, expectedArgs[:len(expectedArgs)-2], outputTxArgs[:len(expectedArgs)-2])
+		unittest.VerifyCdcArguments(t, expectedArgs[:len(expectedArgs)-1], outputTxArgs[:len(expectedArgs)-1])
+		// @TODO validate cadence values for generated cluster assignments and clusters
 	})
 }
