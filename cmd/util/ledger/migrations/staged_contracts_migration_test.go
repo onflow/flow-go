@@ -1478,16 +1478,13 @@ func TestConcurrentContractUpdate(t *testing.T) {
 	migrations := NewCadence1Migrations(
 		logger,
 		rwf,
-		nWorker,
-		chainID,
-		false,
-		false,
-		false,
-		evmContractChange,
-		burnerContractChange,
-		stagedContracts,
-		false,
-		0,
+		Options{
+			NWorker:              nWorker,
+			ChainID:              chainID,
+			EVMContractChange:    evmContractChange,
+			BurnerContractChange: burnerContractChange,
+			StagedContracts:      stagedContracts,
+		},
 	)
 
 	for _, migration := range migrations {
