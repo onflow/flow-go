@@ -1,6 +1,7 @@
 package common
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/rs/zerolog"
@@ -9,18 +10,23 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// ReadPartnerNodeInfos returns a list of partner nodes after gathering weights
-// and public key information from configuration files
-func ReadPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNodeInfoDir string) []bootstrap.NodeInfo {
+// ReadFullPartnerNodeInfos reads partner node info and partner weight information from the specified paths and constructs
+// a list of full bootstrap.NodeInfo for each partner node.
+// Args:
+// - log: the logger instance.
+// - partnerWeightsPath: path to partner weights configuration file.
+// - partnerNodeInfoDir: path to partner nodes configuration file.
+// Returns:
+// - []bootstrap.NodeInfo: the generated node info list.
+// - error: if any error occurs. Any error returned from this function is irrecoverable.
+func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNodeInfoDir string) []bootstrap.NodeInfo {
 	partners := ReadPartnerNodes(log, partnerNodeInfoDir)
 	log.Info().Msgf("read %d partner node configuration files", len(partners))
 
-	var weights PartnerWeights
-	err := ReadJSON(partnerWeightsPath, &weights)
+	weights, err := ReadPartnerWeights(partnerWeightsPath)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to read partner weights json")
+		log.Fatal().Err(fmt.Errorf("failed to read partner weights: %w", err))
 	}
-	log.Info().Msgf("read %d weights for partner nodes", len(weights))
 
 	var nodes []bootstrap.NodeInfo
 	for _, partner := range partners {
@@ -51,7 +57,29 @@ func ReadPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNodeInf
 	return nodes
 }
 
-// ReadPartnerNodes reads the partner node information
+// ReadPartnerWeights reads the partner weights configuration file and returns a list of PartnerWeights.
+// Args:
+// - partnerWeightsPath: path to partner weights configuration file.
+// Returns:
+// - PartnerWeights: the generated partner weights list.
+// - error: if any error occurs. Any error returned from this function is irrecoverable.
+func ReadPartnerWeights(partnerWeightsPath string) (PartnerWeights, error) {
+	var weights PartnerWeights
+
+	err := ReadJSON(partnerWeightsPath, &weights)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read partner weights json: %w", err)
+	}
+
+	return weights, nil
+}
+
+// ReadPartnerNodes reads the partner node info from the configuration file and returns a list of []bootstrap.NodeInfoPub.
+// Args:
+// - partnerNodeInfoDir: path to partner nodes configuration file.
+// Returns:
+// - []bootstrap.NodeInfoPub: the generated partner node info list.
+// - error: if any error occurs. Any error returned from this function is irrecoverable.
 func ReadPartnerNodes(log zerolog.Logger, partnerNodeInfoDir string) []bootstrap.NodeInfoPub {
 	var partners []bootstrap.NodeInfoPub
 	files, err := FilesInDir(partnerNodeInfoDir)

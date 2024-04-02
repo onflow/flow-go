@@ -145,7 +145,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	}
 
 	log.Info().Msg("collecting partner network and staking keys")
-	partnerNodes := common.ReadPartnerNodeInfos(log, flagPartnerWeights, flagPartnerNodeInfoDir)
+	partnerNodes := common.ReadFullPartnerNodeInfos(log, flagPartnerWeights, flagPartnerNodeInfoDir)
 	log.Info().Msg("")
 
 	log.Info().Msg("generating internal private networking and staking keys")
