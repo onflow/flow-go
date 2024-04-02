@@ -560,7 +560,7 @@ func (a *Account) transfer(to types.Address, balance types.Balance) (*types.Resu
 // the contract data is not controlled by the caller accounts
 func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types.Balance) *types.ResultSummary {
 	res, err := a.deploy(code, gaslimit, balance)
-	panicOnErrorOrInvalidOrFailedState(res, err)
+	panicOnError(err)
 	return res.ResultSummary()
 }
 
