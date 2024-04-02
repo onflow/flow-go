@@ -603,7 +603,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					import FlowToken from %s
 	
 					access(all)
-					fun main(): [UInt8; 20] {
+					fun main(): EVM.Result {
 						let admin = getAuthAccount(%s)
 							.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
 						let minter <- admin.createNewMinter(allowedAmount: 2.34)
@@ -613,13 +613,13 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 						let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
 						cadenceOwnedAccount.deposit(from: <-vault)
 	
-						let address = cadenceOwnedAccount.deploy(
+						let res = cadenceOwnedAccount.deploy(
 							code: [],
 							gasLimit: 53000,
 							value: EVM.Balance(attoflow: 1230000000000000000)
 						)
 						destroy cadenceOwnedAccount
-						return address.bytes
+						return res
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
@@ -635,6 +635,12 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
+
+				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+				require.Equal(t, types.StatusSuccessful, res.Status)
+				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				require.Equal(t, res.DeployedContractAddress, res.ReturnedValue)
 			})
 	})
 }
