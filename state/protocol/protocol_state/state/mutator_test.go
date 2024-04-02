@@ -23,6 +23,8 @@ func TestProtocolStateMutator(t *testing.T) {
 	suite.Run(t, new(StateMutatorSuite))
 }
 
+// StateMutatorSuite is a test suite for the stateMutator, it holds the minimum mocked state to set up a stateMutator.
+// Tests in this suite are designed to rely on automatic assertions when leaving the scope of the test.
 type StateMutatorSuite struct {
 	suite.Suite
 
@@ -61,12 +63,15 @@ func (s *StateMutatorSuite) SetupTest() {
 	require.NoError(s.T(), err)
 }
 
-// TestHappyPathWithDbChanges tests that `stateMutator` returns cached db updates when building protocol state after applying service events.
-// Whenever `stateMutator` successfully processes an epoch setup or epoch commit event, it has to create a deferred db update to store the event.
-// Deferred db updates are cached in `stateMutator` and returned when building protocol state when calling `Build`.
+// TestBuild_HappyPath tests that `stateMutator` returns all updates from sub-state state machines and prepares updates to the KV store
+// when building protocol state.
+// In this test, we expect all state machines to return a single deferred db update that will be subsequently returned and executed.
+// We also expect that the resulting state will be indexed and stored in the protocol KV store. To assert that, we mock the corresponding
+// storage methods and expect them to be called when applying deferred updates in caller code.
 func (s *StateMutatorSuite) TestBuild_HappyPath() {
 	resultingStateID := unittest.IdentifierFixture()
 	factories := make([]protocol_state.KeyValueStoreStateMachineFactory, 2)
+	// setup factories, each factory will create a state machine that will return a single deferred db update
 	for i := range factories {
 		factory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
 		stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol_state.KVStoreReader](s.T())
@@ -90,6 +95,7 @@ func (s *StateMutatorSuite) TestBuild_HappyPath() {
 	)
 	require.NoError(s.T(), err)
 
+	// expect actual DB calls that take a badger transaction and apply deferred updates
 	indexTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
 	indexTxDeferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
 	storeTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
@@ -98,6 +104,8 @@ func (s *StateMutatorSuite) TestBuild_HappyPath() {
 	s.replicatedState.On("ID").Return(resultingStateID)
 	stateBytes := unittest.RandomBytes(32)
 	s.replicatedState.On("VersionedEncode").Return(s.latestProtocolVersion, stateBytes, nil).Once()
+
+	// expect calls to prepare a deferred update for indexing and storing the resulting state
 	s.protocolKVStoreDB.On("IndexTx", s.candidate.ID(), resultingStateID).Return(indexTxDeferredUpdate.Execute).Once()
 	s.protocolKVStoreDB.On("StoreTx", resultingStateID, &storage.KeyValueStoreData{
 		Version: s.latestProtocolVersion,
@@ -116,9 +124,12 @@ func (s *StateMutatorSuite) TestBuild_HappyPath() {
 	}
 }
 
+// TestBuild_NoChanges tests that `stateMutator` returns minimal needed updates when building protocol state even if there was no service events applied.
+// The minimal needed updates are the index and store of the state that was previously replicated and possibly mutated.
 func (s *StateMutatorSuite) TestBuild_NoChanges() {
 	resultingStateID := unittest.IdentifierFixture()
 
+	// expect actual DB calls that take a badger transaction and apply deferred updates
 	indexTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
 	indexTxDeferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
 	storeTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
@@ -127,6 +138,7 @@ func (s *StateMutatorSuite) TestBuild_NoChanges() {
 	s.replicatedState.On("ID").Return(resultingStateID)
 	stateBytes := unittest.RandomBytes(32)
 	s.replicatedState.On("VersionedEncode").Return(s.latestProtocolVersion, stateBytes, nil).Once()
+	// expect calls to prepare a deferred update for indexing and storing the resulting state
 	s.protocolKVStoreDB.On("IndexTx", s.candidate.ID(), resultingStateID).Return(indexTxDeferredUpdate.Execute).Once()
 	s.protocolKVStoreDB.On("StoreTx", resultingStateID, &storage.KeyValueStoreData{
 		Version: s.latestProtocolVersion,
@@ -143,6 +155,7 @@ func (s *StateMutatorSuite) TestBuild_NoChanges() {
 	}
 }
 
+// TestBuild_EncodeFailed tests that `stateMutator` returns an exception when encoding the resulting state fails.
 func (s *StateMutatorSuite) TestBuild_EncodeFailed() {
 	resultingStateID := unittest.IdentifierFixture()
 
@@ -155,9 +168,11 @@ func (s *StateMutatorSuite) TestBuild_EncodeFailed() {
 	require.Empty(s.T(), dbUpdates)
 }
 
-// TestStateMutator_Constructor tests the behaviour of the StateMutator constructor.
-// We expect the constructor to select the appropriate state machine constructor, and
-// to handle (pass-through) exceptions from the state machine constructor.
+// TestStateMutator_Constructor tests the behavior of the stateMutator constructor.
+// The constructor must make a series of operations among them:
+// - Check if there is a version upgrade available.
+// - Replicate the parent state to the actual version.
+// - Create a state machine for each sub-state of the Dynamic Protocol State.
 func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 	s.Run("no-upgrade", func() {
 		mutator, err := newStateMutator(
@@ -274,8 +289,8 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 	})
 }
 
-// TestApplyServiceEvents_InvalidEpochSetup tests that handleServiceEvents rejects invalid epoch setup event and sets
-// InvalidEpochTransitionAttempted flag in protocol.StateMachine.
+// TestApplyServiceEventsFromValidatedSeals tests that stateMutator delivers updates to each of the injected state machines.
+// In case of an exception from a state machine, the exception is propagated to the caller.
 func (s *StateMutatorSuite) TestApplyServiceEventsFromValidatedSeals() {
 	s.Run("happy-path", func() {
 		factories := make([]protocol_state.KeyValueStoreStateMachineFactory, 2)
@@ -343,7 +358,7 @@ func (s *StateMutatorSuite) TestApplyServiceEventsFromValidatedSeals() {
 	})
 }
 
-// TestApplyServiceEventsSealsOrdered tests that handleServiceEvents processes seals in order of block height.
+// TestApplyServiceEventsSealsOrdered tests that ApplyServiceEventsFromValidatedSeals processes seals in order of block height.
 func (s *StateMutatorSuite) TestApplyServiceEventsSealsOrdered() {
 	blocks := unittest.ChainFixtureFrom(10, unittest.BlockHeaderFixture())
 	var seals []*flow.Seal

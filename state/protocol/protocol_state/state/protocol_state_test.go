@@ -15,7 +15,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestProtocolState_AtBlockID
+// TestProtocolState_AtBlockID tests different scenarios of retrieving a protocol state by block ID.
+// Happy and unhappy paths are covered.
 func TestProtocolState_AtBlockID(t *testing.T) {
 	entry := unittest.ProtocolStateFixture(unittest.WithValidDKG())
 	otherEntry := unittest.ProtocolStateFixture(unittest.WithValidDKG())

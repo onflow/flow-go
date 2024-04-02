@@ -88,9 +88,9 @@ func (s *EpochStateMachineSuite) SetupTest() {
 	require.NoError(s.T(), err)
 }
 
-// TestOnHappyPathNoDbChanges tests that hierarchical epoch state machine maintains index of epoch states and commits
+// TestBuild_NoChanges tests that hierarchical epoch state machine maintains index of epoch states and commits
 // epoch state ID in the KV store even when there were no events to process.
-func (s *EpochStateMachineSuite) TestOnHappyPathNoDbChanges() {
+func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 	s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState)
 	s.happyPathStateMachine.On("Build").Return(s.parentEpochState.ProtocolStateEntry, s.parentEpochState.ID(), false).Once()
 
@@ -113,10 +113,10 @@ func (s *EpochStateMachineSuite) TestOnHappyPathNoDbChanges() {
 	}
 }
 
-// TestHappyPathWithDbChanges tests that hierarchical epoch state machine maintains index of epoch states and commits
+// TestBuild_HappyPath tests that hierarchical epoch state machine maintains index of epoch states and commits
 // as well as stores updated epoch state in respective storage when there were updates made to the epoch state.
 // This test also ensures that updated state ID is committed in the KV store.
-func (s *EpochStateMachineSuite) TestHappyPathWithDbChanges() {
+func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState)
 	updatedState := unittest.ProtocolStateFixture().ProtocolStateEntry
 	updatedStateID := updatedState.ID()
