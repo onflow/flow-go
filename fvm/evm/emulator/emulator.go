@@ -384,6 +384,7 @@ func (proc *procedure) deployAt(
 
 	proc.state.SetCode(addr, ret)
 	res.DeployedContractAddress = to
+	res.ReturnedValue = to[:] // assign address to return value since it's the only returned value
 	return res, proc.commitAndFinalize()
 }
 

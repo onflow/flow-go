@@ -1665,8 +1665,6 @@ func newInternalEVMTypeDeployFunction(
 			account := handler.AccountByAddress(fromAddress, isAuthorized)
 			result := account.Deploy(code, gasLimit, amount)
 
-			// assign deployed contract address to return value since it's the only result of the deploy
-			result.ReturnedValue = result.DeployedContractAddress[:]
 			return NewResultValue(handler, gauge, inter, locationRange, result)
 		},
 	)
