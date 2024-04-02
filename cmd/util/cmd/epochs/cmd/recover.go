@@ -20,7 +20,7 @@ import (
 // identities, generates the cluster QC's and retrieves the DKG key vector of the last successful epoch.
 var (
 	generateRecoverEpochTxArgsCmd = &cobra.Command{
-		Use:   "generate-efm-recovery-data",
+		Use:   "efm-recover-tx-args",
 		Short: "Generates recover epoch transaction arguments",
 		Long:  "Generates transaction arguments for the epoch recovery transaction.",
 		Run:   generateRecoverEpochTxArgs,
