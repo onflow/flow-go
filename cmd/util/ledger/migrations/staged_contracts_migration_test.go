@@ -397,7 +397,13 @@ func TestStagedContractsMigration(t *testing.T) {
 			common.Address(address1),
 			nil,
 		)
-		require.ErrorContains(t, err, "failed to find all contract registers that need to be changed")
+		require.NoError(t, err)
+
+		require.Len(t, logWriter.logs, 1)
+		assert.Contains(t,
+			logWriter.logs[0],
+			`"failed to find all contract registers that need to be changed for address"`,
+		)
 	})
 }
 

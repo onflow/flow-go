@@ -3,13 +3,10 @@ package migrations
 import (
 	"context"
 	"encoding/csv"
-	"fmt"
 	"io"
 	"os"
 	"strings"
 	"sync"
-
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -18,6 +15,7 @@ import (
 	"github.com/onflow/cadence/runtime/pretty"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
@@ -79,16 +77,20 @@ func (m *StagedContractsMigration) Close() error {
 	defer m.mutex.RUnlock()
 
 	if len(m.stagedContracts) > 0 {
-		var sb strings.Builder
-		sb.WriteString("failed to find all contract registers that need to be changed:\n")
+		dict := zerolog.Dict()
 		for address, contracts := range m.stagedContracts {
-			_, _ = fmt.Fprintf(&sb, "- address: %s\n", address.HexWithPrefix())
+			arr := zerolog.Arr()
 			for registerID := range contracts {
-				_, _ = fmt.Fprintf(&sb, "  - %s\n", flow.RegisterIDContractName(registerID))
+				arr = arr.Str(flow.RegisterIDContractName(registerID))
 			}
+			dict = dict.Array(
+				address.HexWithPrefix(),
+				arr,
+			)
 		}
-		return fmt.Errorf(sb.String())
-
+		m.log.Error().
+			Dict("contracts", dict).
+			Msg("failed to find all contract registers that need to be changed")
 	}
 
 	return nil
@@ -291,16 +293,14 @@ func (m *StagedContractsMigration) MigrateAccount(
 	}
 
 	if len(contractUpdates) > 0 {
-		var sb strings.Builder
-		_, _ = fmt.Fprintf(
-			&sb,
-			"failed to find all contract registers that need to be changed for address %s:\n",
-			address.HexWithPrefix(),
-		)
+		arr := zerolog.Arr()
 		for registerID := range contractUpdates {
-			_, _ = fmt.Fprintf(&sb, "  - %s\n", flow.RegisterIDContractName(registerID))
+			arr = arr.Str(flow.RegisterIDContractName(registerID))
 		}
-		return nil, fmt.Errorf(sb.String())
+		m.log.Error().
+			Array("contracts", arr).
+			Str("address", address.HexWithPrefix()).
+			Msg("failed to find all contract registers that need to be changed for address")
 	}
 
 	return oldPayloads, nil
