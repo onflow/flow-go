@@ -130,29 +130,49 @@ func ValidateAddressFormat(log zerolog.Logger, address string) {
 	checkErr(err)
 }
 
-func ValidateNodeID(lg zerolog.Logger, nodeID flow.Identifier) flow.Identifier {
+// ValidateNodeID returns an error if node ID is non-zero.
+// Args:
+// - nodeID: the node ID to validate.
+// Returns:
+// - error: if node id is the zero value.
+func ValidateNodeID(nodeID flow.Identifier) error {
 	if nodeID == flow.ZeroID {
-		lg.Fatal().Msg("NodeID must not be zero")
+		return fmt.Errorf("NodeID must not be zero")
 	}
-	return nodeID
+	return nil
 }
 
-func ValidateNetworkPubKey(lg zerolog.Logger, key encodable.NetworkPubKey) encodable.NetworkPubKey {
+// ValidateNetworkPubKey returns an error if network public key is nil.
+// Args:
+// - key: the public key.
+// Returns:
+// - error: if the network key is nil.
+func ValidateNetworkPubKey(key encodable.NetworkPubKey) error {
 	if key.PublicKey == nil {
-		lg.Fatal().Msg("NetworkPubKey must not be nil")
+		return fmt.Errorf("network public key must not be nil")
 	}
-	return key
+	return nil
 }
 
-func ValidateStakingPubKey(lg zerolog.Logger, key encodable.StakingPubKey) encodable.StakingPubKey {
+// ValidateStakingPubKey returns an error if the staking key is nil.
+// Args:
+// - key: the public key.
+// Returns:
+// - error: if the staking key is nil.
+func ValidateStakingPubKey(key encodable.StakingPubKey) error {
 	if key.PublicKey == nil {
-		lg.Fatal().Msg("StakingPubKey must not be nil")
+		return fmt.Errorf("staking public key must not be nil")
 	}
-	return key
+	return nil
 }
 
-func ValidateWeight(weight uint64) (uint64, bool) {
-	return weight, weight > 0
+// ValidateWeight returns true if weight is greater than 0.
+// Args:
+// - weight: the weight to check.
+// Returns:
+// - bool: true if weight is greater than 0.
+func ValidateWeight(weight uint64) bool {
+	return weight > 0
 }
 
 // PartnerWeights is the format of the JSON file specifying partner node weights.

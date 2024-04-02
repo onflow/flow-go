@@ -145,11 +145,18 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	}
 
 	log.Info().Msg("collecting partner network and staking keys")
-	partnerNodes := common.ReadFullPartnerNodeInfos(log, flagPartnerWeights, flagPartnerNodeInfoDir)
+	partnerNodes, err := common.ReadFullPartnerNodeInfos(log, flagPartnerWeights, flagPartnerNodeInfoDir)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read full partner node infos")
+	}
 	log.Info().Msg("")
 
 	log.Info().Msg("generating internal private networking and staking keys")
-	internalNodes := common.ReadInternalNodeInfos(log, flagInternalNodePrivInfoDir, flagConfig)
+	internalNodes, err := common.ReadFullInternalNodeInfos(log, flagInternalNodePrivInfoDir, flagConfig)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read full internal node infos")
+	}
+
 	log.Info().Msg("")
 
 	log.Info().Msg("checking constraints on consensus nodes")

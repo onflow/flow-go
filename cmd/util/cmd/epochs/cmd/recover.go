@@ -114,7 +114,11 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 	partnerCollectors := make(flow.IdentityList, 0)
 
 	log.Info().Msg("collecting internal node network and staking keys")
-	internalNodes := common.ReadInternalNodeInfos(log, flagInternalNodePrivInfoDir, flagNodeConfigJson)
+	internalNodes, err := common.ReadFullInternalNodeInfos(log, flagInternalNodePrivInfoDir, flagNodeConfigJson)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read full internal node infos")
+	}
+
 	internalNodesMap := make(map[flow.Identifier]struct{})
 	for _, node := range internalNodes {
 		if !ids.Exists(node.Identity()) {

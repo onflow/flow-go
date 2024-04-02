@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd"
@@ -233,7 +234,11 @@ func checkMismatchingNodes(localNodes []model.NodeInfo, registeredNodes []model.
 }
 
 func assembleInternalNodesWithoutWeight() []model.NodeInfo {
-	privInternals := common.ReadInternalNodes(log, flagInternalNodePrivInfoDir)
+	privInternals, err := common.ReadInternalNodeInfos(flagInternalNodePrivInfoDir)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read internal node infos")
+	}
+
 	log.Info().Msgf("read %v internal private node-info files", len(privInternals))
 
 	var nodes []model.NodeInfo
@@ -242,9 +247,13 @@ func assembleInternalNodesWithoutWeight() []model.NodeInfo {
 		common.ValidateAddressFormat(log, internal.Address)
 
 		// validate every single internal node
-		nodeID := common.ValidateNodeID(log, internal.NodeID)
+		err := common.ValidateNodeID(internal.NodeID)
+		if err != nil {
+			log.Fatal().Err(err).Msg(fmt.Sprintf("invalid node ID: %s", internal.NodeID))
+		}
+
 		node := model.NewPrivateNodeInfo(
-			nodeID,
+			internal.NodeID,
 			internal.Role,
 			internal.Address,
 			flow.DefaultInitialWeight,
@@ -259,7 +268,10 @@ func assembleInternalNodesWithoutWeight() []model.NodeInfo {
 }
 
 func assemblePartnerNodesWithoutWeight() []model.NodeInfo {
-	partners := common.ReadPartnerNodes(log, flagPartnerNodeInfoDir)
+	partners, err := common.ReadPartnerNodeInfos(flagPartnerNodeInfoDir)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read partner node infos")
+	}
 	log.Info().Msgf("read %v partner node configuration files", len(partners))
 	return createPublicNodeInfo(partners)
 }
@@ -279,18 +291,27 @@ func createPublicNodeInfo(nodes []model.NodeInfoPub) []model.NodeInfo {
 		common.ValidateAddressFormat(log, n.Address)
 
 		// validate every single partner node
-		nodeID := common.ValidateNodeID(log, n.NodeID)
-		networkPubKey := common.ValidateNetworkPubKey(log, n.NetworkPubKey)
-		stakingPubKey := common.ValidateStakingPubKey(log, n.StakingPubKey)
+		err := common.ValidateNodeID(n.NodeID)
+		if err != nil {
+			log.Fatal().Err(err).Msg(fmt.Sprintf("invalid node ID: %s", n.NodeID))
+		}
+		err = common.ValidateNetworkPubKey(n.NetworkPubKey)
+		if err != nil {
+			log.Fatal().Err(err).Msg(fmt.Sprintf("invalid network public key: %s", n.NetworkPubKey))
+		}
+		err = common.ValidateStakingPubKey(n.StakingPubKey)
+		if err != nil {
+			log.Fatal().Err(err).Msg(fmt.Sprintf("invalid staking public key: %s", n.StakingPubKey))
+		}
 
 		// all nodes should have equal weight
 		node := model.NewPublicNodeInfo(
-			nodeID,
+			n.NodeID,
 			n.Role,
 			n.Address,
 			flow.DefaultInitialWeight,
-			networkPubKey,
-			stakingPubKey,
+			n.NetworkPubKey,
+			n.StakingPubKey,
 		)
 
 		publicInfoNodes = append(publicInfoNodes, node)

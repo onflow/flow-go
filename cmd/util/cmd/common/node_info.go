@@ -13,48 +13,61 @@ import (
 // ReadFullPartnerNodeInfos reads partner node info and partner weight information from the specified paths and constructs
 // a list of full bootstrap.NodeInfo for each partner node.
 // Args:
-// - log: the logger instance.
+// - log: logger used to log debug information.
 // - partnerWeightsPath: path to partner weights configuration file.
 // - partnerNodeInfoDir: path to partner nodes configuration file.
 // Returns:
 // - []bootstrap.NodeInfo: the generated node info list.
 // - error: if any error occurs. Any error returned from this function is irrecoverable.
-func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNodeInfoDir string) []bootstrap.NodeInfo {
-	partners := ReadPartnerNodes(log, partnerNodeInfoDir)
+func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNodeInfoDir string) ([]bootstrap.NodeInfo, error) {
+	partners, err := ReadPartnerNodeInfos(partnerNodeInfoDir)
+	if err != nil {
+		return nil, err
+	}
 	log.Info().Msgf("read %d partner node configuration files", len(partners))
 
 	weights, err := ReadPartnerWeights(partnerWeightsPath)
 	if err != nil {
-		log.Fatal().Err(fmt.Errorf("failed to read partner weights: %w", err))
+		return nil, err
 	}
+	log.Info().Msgf("read %d weights for partner nodes", len(weights))
 
 	var nodes []bootstrap.NodeInfo
 	for _, partner := range partners {
 		// validate every single partner node
-		nodeID := ValidateNodeID(log, partner.NodeID)
-		networkPubKey := ValidateNetworkPubKey(log, partner.NetworkPubKey)
-		stakingPubKey := ValidateStakingPubKey(log, partner.StakingPubKey)
-		weight, valid := ValidateWeight(weights[partner.NodeID])
-		if !valid {
-			log.Error().Msgf("weights: %v", weights)
-			log.Fatal().Msgf("partner node id %x has no weight", nodeID)
+		err = ValidateNodeID(partner.NodeID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid node ID: %s", partner.NodeID)
 		}
+		err = ValidateNetworkPubKey(partner.NetworkPubKey)
+		if err != nil {
+			return nil, fmt.Errorf(fmt.Sprintf("invalid network public key: %s", partner.NetworkPubKey))
+		}
+		err = ValidateStakingPubKey(partner.StakingPubKey)
+		if err != nil {
+			return nil, fmt.Errorf(fmt.Sprintf("invalid staking public key: %s", partner.StakingPubKey))
+		}
+		weight := weights[partner.NodeID]
+		if valid := ValidateWeight(weight); !valid {
+			return nil, fmt.Errorf(fmt.Sprintf("invalid partner weight: %d", weight))
+		}
+
 		if weight != flow.DefaultInitialWeight {
 			log.Warn().Msgf("partner node (id=%x) has non-default weight (%d != %d)", partner.NodeID, weight, flow.DefaultInitialWeight)
 		}
 
 		node := bootstrap.NewPublicNodeInfo(
-			nodeID,
+			partner.NodeID,
 			partner.Role,
 			partner.Address,
 			weight,
-			networkPubKey.PublicKey,
-			stakingPubKey.PublicKey,
+			partner.NetworkPubKey.PublicKey,
+			partner.StakingPubKey.PublicKey,
 		)
 		nodes = append(nodes, node)
 	}
 
-	return nodes
+	return nodes, nil
 }
 
 // ReadPartnerWeights reads the partner weights configuration file and returns a list of PartnerWeights.
@@ -70,43 +83,52 @@ func ReadPartnerWeights(partnerWeightsPath string) (PartnerWeights, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read partner weights json: %w", err)
 	}
-
 	return weights, nil
 }
 
-// ReadPartnerNodes reads the partner node info from the configuration file and returns a list of []bootstrap.NodeInfoPub.
+// ReadPartnerNodeInfos reads the partner node info from the configuration file and returns a list of []bootstrap.NodeInfoPub.
 // Args:
 // - partnerNodeInfoDir: path to partner nodes configuration file.
 // Returns:
 // - []bootstrap.NodeInfoPub: the generated partner node info list.
 // - error: if any error occurs. Any error returned from this function is irrecoverable.
-func ReadPartnerNodes(log zerolog.Logger, partnerNodeInfoDir string) []bootstrap.NodeInfoPub {
+func ReadPartnerNodeInfos(partnerNodeInfoDir string) ([]bootstrap.NodeInfoPub, error) {
 	var partners []bootstrap.NodeInfoPub
 	files, err := FilesInDir(partnerNodeInfoDir)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not read partner node infos")
+		return nil, fmt.Errorf("could not read partner node infos: %w", err)
 	}
 	for _, f := range files {
 		// skip files that do not include node-infos
 		if !strings.Contains(f, bootstrap.PathPartnerNodeInfoPrefix) {
 			continue
 		}
-
 		// read file and append to partners
 		var p bootstrap.NodeInfoPub
 		err = ReadJSON(f, &p)
 		if err != nil {
-			log.Fatal().Err(err).Msg("failed to read node info")
+			return nil, fmt.Errorf("failed to read node info: %w", err)
 		}
 		partners = append(partners, p)
 	}
-	return partners
+	return partners, nil
 }
 
-// ReadInternalNodeInfos returns a list of internal nodes after collecting weights
-// from configuration files.
-func ReadInternalNodeInfos(log zerolog.Logger, internalNodePrivInfoDir, internalWeightsConfig string) []bootstrap.NodeInfo {
-	privInternals := ReadInternalNodes(log, internalNodePrivInfoDir)
+// ReadFullInternalNodeInfos reads internal node info and internal node weight information from the specified paths and constructs
+// a list of full bootstrap.NodeInfo for each internal node.
+// Args:
+// - log: logger used to log debug information.
+// - internalNodePrivInfoDir: path to internal nodes  private info.
+// - internalWeightsConfig: path to internal weights configuration file.
+// Returns:
+// - []bootstrap.NodeInfo: the generated node info list.
+// - error: if any error occurs. Any error returned from this function is irrecoverable.
+func ReadFullInternalNodeInfos(log zerolog.Logger, internalNodePrivInfoDir, internalWeightsConfig string) ([]bootstrap.NodeInfo, error) {
+	privInternals, err := ReadInternalNodeInfos(internalNodePrivInfoDir)
+	if err != nil {
+		return nil, err
+	}
+	
 	log.Info().Msgf("read %v internal private node-info files", len(privInternals))
 
 	weights := internalWeightsByAddress(log, internalWeightsConfig)
@@ -118,18 +140,20 @@ func ReadInternalNodeInfos(log zerolog.Logger, internalNodePrivInfoDir, internal
 		ValidateAddressFormat(log, internal.Address)
 
 		// validate every single internal node
-		nodeID := ValidateNodeID(log, internal.NodeID)
-		weight, valid := ValidateWeight(weights[internal.Address])
-		if !valid {
-			log.Error().Msgf("weights: %v", weights)
-			log.Fatal().Msgf("internal node %v has no weight. Did you forget to update the node address?", internal)
+		err := ValidateNodeID(internal.NodeID)
+		if err != nil {
+			return nil, fmt.Errorf(fmt.Sprintf("invalid internal node ID: %s", internal.NodeID))
+		}
+		weight := weights[internal.NodeID.String()]
+		if valid := ValidateWeight(weight); !valid {
+			return nil, fmt.Errorf(fmt.Sprintf("invalid partner weight: %d", weight))
 		}
 		if weight != flow.DefaultInitialWeight {
 			log.Warn().Msgf("internal node (id=%x) has non-default weight (%d != %d)", internal.NodeID, weight, flow.DefaultInitialWeight)
 		}
 
 		node := bootstrap.NewPrivateNodeInfo(
-			nodeID,
+			internal.NodeID,
 			internal.Role,
 			internal.Address,
 			weight,
@@ -140,18 +164,22 @@ func ReadInternalNodeInfos(log zerolog.Logger, internalNodePrivInfoDir, internal
 		nodes = append(nodes, node)
 	}
 
-	return nodes
+	return nodes, nil
 }
 
-// ReadInternalNodes reads our internal node private infos generated by
-// `keygen` command and returns it
-func ReadInternalNodes(log zerolog.Logger, internalNodePrivInfoDir string) []bootstrap.NodeInfoPriv {
+// ReadInternalNodeInfos reads our internal node private infos generated by `keygen` command and returns it.
+// Args:
+// - internalNodePrivInfoDir: path to internal nodes  private info.
+// Returns:
+// - []bootstrap.NodeInfo: the generated private node info list.
+// - error: if any error occurs. Any error returned from this function is irrecoverable.
+func ReadInternalNodeInfos(internalNodePrivInfoDir string) ([]bootstrap.NodeInfoPriv, error) {
 	var internalPrivInfos []bootstrap.NodeInfoPriv
 
 	// get files in internal priv node infos directory
 	files, err := FilesInDir(internalNodePrivInfoDir)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not read partner node infos")
+		return nil, fmt.Errorf("could not read partner node infos: %w", err)
 	}
 
 	// for each of the files
@@ -165,12 +193,12 @@ func ReadInternalNodes(log zerolog.Logger, internalNodePrivInfoDir string) []boo
 		var p bootstrap.NodeInfoPriv
 		err = ReadJSON(f, &p)
 		if err != nil {
-			log.Fatal().Err(err).Msg("failed to read json")
+			return nil, fmt.Errorf("failed to read json: %w", err)
 		}
 		internalPrivInfos = append(internalPrivInfos, p)
 	}
 
-	return internalPrivInfos
+	return internalPrivInfos, nil
 }
 
 // internalWeightsByAddress returns a mapping of node address by weight for internal nodes
