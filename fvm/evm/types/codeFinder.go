@@ -3,27 +3,11 @@ package types
 import (
 	"errors"
 
-	gethCore "github.com/ethereum/go-ethereum/core"
-	gethVM "github.com/ethereum/go-ethereum/core/vm"
+	gethCore "github.com/onflow/go-ethereum/core"
+	gethVM "github.com/onflow/go-ethereum/core/vm"
 )
 
 func ValidationErrorCode(err error) ErrorCode {
-	// if is a EVM validation error first unwrap one level
-	if IsEVMValidationError(err) {
-		// check local errors
-		switch err {
-		case ErrInvalidBalance:
-			return ValidationErrCodeInvalidBalance
-		case ErrInsufficientComputation:
-			return ValidationErrCodeInsufficientComputation
-		case ErrUnAuthroizedMethodCall:
-			return ValidationErrCodeUnAuthroizedMethodCall
-		case ErrWithdrawBalanceRounding:
-			return ValidationErrCodeWithdrawBalanceRounding
-		}
-		err = errors.Unwrap(err)
-	}
-
 	// direct errors that are returned by the evm
 	switch err {
 	case gethVM.ErrGasUintOverflow:

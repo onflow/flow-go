@@ -7,6 +7,18 @@ contract EVM {
     access(all)
     event CadenceOwnedAccountCreated(addressBytes: [UInt8; 20])
 
+    /// FLOWTokensDeposited is emitted when FLOW tokens is bridged
+    /// into the EVM environment. Note that this event is not emitted
+    /// for transfer of flow tokens between two EVM addresses.
+    access(all)
+    event FLOWTokensDeposited(addressBytes: [UInt8; 20], amount: UFix64)
+
+    /// FLOWTokensWithdrawn is emitted when FLOW tokens are bridged
+    /// out of the EVM environment. Note that this event is not emitted
+    /// for transfer of flow tokens between two EVM addresses.
+    access(all)
+    event FLOWTokensWithdrawn(addressBytes: [UInt8; 20], amount: UFix64)
+
     /// EVMAddress is an EVM-compatible address
     access(all)
     struct EVMAddress {
@@ -56,10 +68,15 @@ contract EVM {
         /// Deposits the given vault into the EVM account with the given address
         access(all)
         fun deposit(from: @FlowToken.Vault) {
+            let amount = from.balance
+            if amount == 0.0 {
+                panic("calling deposit function with an empty vault is not allowed")
+            }
             InternalEVM.deposit(
                 from: <-from,
                 to: self.bytes
             )
+            emit FLOWTokensDeposited(addressBytes: self.bytes, amount: amount)
         }
     }
 
@@ -99,6 +116,12 @@ contract EVM {
         access(all)
         fun inAttoFLOW(): UInt {
             return self.attoflow
+        }
+
+        /// Returns true if the balance is zero
+        access(all)
+        fun isZero(): Bool {
+            return self.attoflow == 0
         }
     }
 
@@ -220,10 +243,14 @@ contract EVM {
         /// rounding error, this function would fail.
         access(all)
         fun withdraw(balance: Balance): @FlowToken.Vault {
+            if balance.isZero() {
+                panic("calling withdraw function with zero balance is not allowed")
+            }
             let vault <- InternalEVM.withdraw(
                 from: self.addressBytes,
                 amount: balance.attoflow
             ) as! @FlowToken.Vault
+            emit FLOWTokensWithdrawn(addressBytes: self.addressBytes, amount: balance.inFLOW())
             return <-vault
         }
 
@@ -345,7 +372,7 @@ contract EVM {
     struct ValidationResult {
         access(all)
         let isValid: Bool
-        
+
         access(all)
         let problem: String?
 
@@ -406,13 +433,13 @@ contract EVM {
         if !isValid{
             return ValidationResult(
                 isValid: false,
-                problem: "the given signatures are not valid or provide enough weight" 
+                problem: "the given signatures are not valid or provide enough weight"
             )
         }
 
         let coaRef = acc.getCapability(path)
             .borrow<&EVM.CadenceOwnedAccount{EVM.Addressable}>()
-        
+
         if coaRef == nil {
              return ValidationResult(
                  isValid: false,
@@ -430,10 +457,35 @@ contract EVM {
                 )
             }
         }
-        
+
         return ValidationResult(
-        	isValid: true,
-        	problem: nil
+            isValid: true,
+            problem: nil
         )
+    }
+
+    /// Block returns information about the latest executed block.
+    access(all)
+    struct EVMBlock {
+        access(all)
+        let height: UInt64
+
+        access(all)
+        let hash: String
+
+        access(all)
+        let totalSupply: Int
+
+        init(height: UInt64, hash: String, totalSupply: Int) {
+            self.height = height
+            self.hash = hash
+            self.totalSupply = totalSupply
+        }
+    }
+
+    /// Returns the latest executed block.
+    access(all)
+    fun getLatestBlock(): EVMBlock {
+        return InternalEVM.getLatestBlock() as! EVMBlock
     }
 }

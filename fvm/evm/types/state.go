@@ -3,9 +3,9 @@ package types
 import (
 	"math/big"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	gethVM "github.com/ethereum/go-ethereum/core/vm"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethVM "github.com/onflow/go-ethereum/core/vm"
 )
 
 // StateDB acts as the main interface to the EVM runtime
@@ -13,7 +13,15 @@ type StateDB interface {
 	gethVM.StateDB
 
 	// Commit commits the changes
-	Commit() error
+	// setting `finalize` flag
+	// calls a subsequent call to Finalize
+	// defering finalization and calling it once at the end
+	// improves efficiency of batch operations.
+	Commit(finalize bool) error
+
+	// Finalize flushes all the changes
+	// to the permanent storage
+	Finalize() error
 
 	// Logs collects and prepares logs
 	Logs(
@@ -22,8 +30,13 @@ type StateDB interface {
 		txIndex uint,
 	) []*gethTypes.Log
 
-	// returns a map of preimages
+	// Preimages returns a map of preimages
 	Preimages() map[gethCommon.Hash][]byte
+
+	// Reset resets uncommitted changes and transient artifacts such as error, logs,
+	// preimages, access lists, ...
+	// The method is often called between execution of different transactions
+	Reset()
 }
 
 // ReadOnlyView provides a readonly view of the state

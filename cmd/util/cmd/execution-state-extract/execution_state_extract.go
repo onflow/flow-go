@@ -364,6 +364,7 @@ func newMigrations(
 						rwf,
 						flagValidateMigration,
 						flagLogVerboseValidationError,
+						flagContinueMigrationOnValidationError,
 					),
 
 					&migrators.DeduplicateContractNamesMigration{},
