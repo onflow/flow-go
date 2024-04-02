@@ -443,9 +443,11 @@ func (proc *procedure) run(
 		res.GasConsumed = execResult.UsedGas
 		if !execResult.Failed() { // collect vm errors
 			res.ReturnedValue = execResult.ReturnData
-			// If the transaction created a contract, store the creation address in the receipt.
+			// If the transaction created a contract, store the creation address in the receipt,
+			// and overwrite the return value with the contract address.
 			if msg.To == nil {
 				res.DeployedContractAddress = types.NewAddress(gethCrypto.CreateAddress(msg.From, msg.Nonce))
+				res.ReturnedValue = res.DeployedContractAddress[:]
 			}
 			// replace tx index and tx hash
 			res.Logs = proc.state.Logs(
