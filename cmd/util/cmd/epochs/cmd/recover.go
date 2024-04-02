@@ -27,15 +27,15 @@ var (
 		Run:   generateRecoverEpochTxArgs(getSnapshot),
 	}
 
-	flagAnAddress               string
-	flagAnPubkey                string
-	flagInternalNodePrivInfoDir string
-	flagNodeConfigJson          string
-	flagCollectionClusters      int
-	flagStartView               uint64
-	flagStakingEndView          uint64
-	flagEndView                 uint64
-	flagEpochCounter            uint64
+	flagAnAddress                string
+	flagAnPubkey                 string
+	flagInternalNodePrivInfoDir  string
+	flagNodeConfigJson           string
+	flagCollectionClusters       int
+	flagStartView                uint64
+	flagNumViewsInEpoch          uint64
+	flagNumViewsInStakingAuction uint64
+	flagEpochCounter             uint64
 )
 
 func init() {
@@ -51,9 +51,10 @@ func addGenerateRecoverEpochTxArgsCmdFlags() {
 		"path to a JSON file containing multiple node configurations (fields Role, Address, Weight)")
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagInternalNodePrivInfoDir, "internal-priv-dir", "", "path to directory "+
 		"containing the output from the `keygen` command for internal nodes")
+
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagStartView, "start-view", 0, "start view of the recovery epoch")
-	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagStakingEndView, "staking-end-view", 0, "end view of the staking phase of the recovery epoch")
-	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEndView, "end-view", 0, "end view of the recovery epoch")
+	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 4000, "length of each epoch measured in views")
+	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 100, "length of the epoch staking phase measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "the epoch counter used to generate the root cluster block")
 }
 
@@ -183,11 +184,21 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 		log.Fatal().Err(err).Msg("failed to convert cluster qcs to cadence type")
 	}
 
+	currEpochFinalView, err := epoch.FinalView()
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to get final view of current epoch")
+	}
+
 	args := []cadence.Value{
-		cadence.NewUInt64(flagStartView),
-		cadence.NewUInt64(flagStakingEndView),
-		cadence.NewUInt64(flagEndView),
+		// epoch start view
+		cadence.NewUInt64(currEpochFinalView + 1),
+		// staking phase end view
+		cadence.NewUInt64(currEpochFinalView + flagNumViewsInStakingAuction),
+		// epoch end view
+		cadence.NewUInt64(currEpochFinalView + flagNumViewsInEpoch),
+		// dkg pub keys
 		cadence.NewArray(dkgPubKeys),
+		// node ids
 		cadence.NewArray(nodeIds),
 		//common.ConvertClusterAssignmentsCdc(assignments),
 	}
