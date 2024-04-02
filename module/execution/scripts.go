@@ -67,6 +67,7 @@ func NewScripts(
 	options := computation.DefaultFVMOptions(chainID, false, false)
 	blocks := environment.NewBlockFinder(header)
 	options = append(options, fvm.WithBlocks(blocks)) // add blocks for getBlocks calls in scripts
+	options = append(options, fvm.WithMetricsReporter(metrics))
 	options = append(options, fvm.WithAllowProgramCacheWritesInScriptsEnabled(true))
 	vmCtx := fvm.NewContext(options...)
 

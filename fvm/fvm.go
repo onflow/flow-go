@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/cadence"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	errors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
