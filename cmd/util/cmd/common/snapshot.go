@@ -43,6 +43,16 @@ func GetSnapshot(ctx context.Context, client *grpc.Client) (*inmem.Snapshot, err
 // GetSnapshotAtEpochAndPhase will get the latest finalized protocol snapshot and check the current epoch and epoch phase.
 // If we are past the target epoch and epoch phase we exit the retry mechanism immediately.
 // If not check the snapshot at the specified interval until we reach the target epoch and phase.
+// Args:
+// - ctx: context used when getting the snapshot from the network.
+// - log: the logger
+// - startupEpoch: the desired epoch in which to take a snapshot for startup.
+// - startupEpochPhase: the desired epoch phase in which to take a snapshot for startup.
+// - retryInterval: sleep interval used to retry getting the snapshot from the network in our desired epoch and epoch phase.
+// - getSnapshot: func used to get the snapshot.
+// Returns:
+// - protocol.Snapshot: the protocol snapshot.
+// - error: if any error occurs. Any error returned from this function is irrecoverable.
 func GetSnapshotAtEpochAndPhase(ctx context.Context, log zerolog.Logger, startupEpoch uint64, startupEpochPhase flow.EpochPhase, retryInterval time.Duration, getSnapshot GetProtocolSnapshot) (protocol.Snapshot, error) {
 	start := time.Now()
 
