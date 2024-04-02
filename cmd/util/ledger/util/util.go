@@ -141,7 +141,7 @@ func PayloadsAndAccountsFromEmulatorSnapshot(db *sql.DB) (
 	[]common.Address,
 	error,
 ) {
-	rows, err := db.Query("SELECT key, value, version, height FROM ledger")
+	rows, err := db.Query("SELECT key, value, version, height FROM ledger ORDER BY height DESC")
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -184,6 +184,10 @@ func PayloadsAndAccountsFromEmulatorSnapshot(db *sql.DB) (
 			ledgerKey,
 			value,
 		)
+
+		if _, ok := payloadSet[registerId]; ok {
+			continue
+		}
 
 		payloads = append(payloads, payload)
 		payloadSet[registerId] = PayloadMetaInfo{
