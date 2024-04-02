@@ -121,7 +121,11 @@ func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) *type
 	return res.ResultSummary()
 }
 
-func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Address) ([]*types.ResultSummary, error) {
+// BatchRun tries to run batch of rlp-encoded transactions and
+// collects the gas fees and pay it to the coinbase address provided.
+// All transactions provided in the batch are included in a single block,
+// except for invalid transactions.
+func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte, coinbase types.Address) ([]*types.ResultSummary, error) {
 	// prepare block view used to run the batch
 	ctx, err := h.getBlockContext()
 	if err != nil {
@@ -149,8 +153,8 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		if err != nil {
 			return nil, err
 		}
-		txs[i] = tx
 
+		txs[i] = tx
 		totalGasLimit += types.GasLimit(tx.Gas())
 	}
 
@@ -191,6 +195,12 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 	blockHash, err := bp.Hash()
 	if err != nil {
 		return nil, err
+	}
+
+	// if there were no valid transactions skip emitting events
+	// and commiting a new block
+	if len(bp.TransactionHashes) == 0 {
+		return resSummary, nil
 	}
 
 	for i, r := range res {
