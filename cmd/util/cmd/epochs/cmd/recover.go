@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"github.com/spf13/cobra"
 
@@ -154,15 +153,6 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 	clusterQCs := common.ConstructRootQCsForClusters(log, clusters, internalNodes, clusterBlocks)
 	log.Info().Msg("")
 
-	randomSource, err := epoch.RandomSource()
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to get random source for current epoch")
-	}
-	randomSourceCdc, err := cadence.NewString(hex.EncodeToString(randomSource))
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to get random source cadence string")
-	}
-
 	dkgPubKeys := make([]cadence.Value, 0)
 	nodeIds := make([]cadence.Value, 0)
 	ids.Map(func(identity flow.Identity) flow.Identity {
@@ -194,7 +184,6 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 	}
 
 	args := []cadence.Value{
-		randomSourceCdc,
 		cadence.NewUInt64(flagStartView),
 		cadence.NewUInt64(flagStakingEndView),
 		cadence.NewUInt64(flagEndView),
