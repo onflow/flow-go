@@ -212,6 +212,21 @@ type TransactionResult struct {
 	BlockHeight   uint64
 }
 
+// TransactionSubscribeInfo represents information about a subscribed transaction.
+// It contains the ID of the transaction, its status, and the index of the associated message.
+type TransactionSubscribeInfo struct {
+	Result       *TransactionResult
+	MessageIndex uint64
+}
+
+// TransactionSubscribeInfoToMessage converts a TransactionSubscribeInfo struct to a protobuf message
+func TransactionSubscribeInfoToMessage(data *TransactionSubscribeInfo) *access.SendAndSubscribeTransactionStatusesResponse {
+	return &access.SendAndSubscribeTransactionStatusesResponse{
+		TransactionResults: TransactionResultToMessage(data.Result),
+		MessageIndex:       data.MessageIndex,
+	}
+}
+
 func TransactionResultToMessage(result *TransactionResult) *access.TransactionResultResponse {
 	return &access.TransactionResultResponse{
 		Status:        entities.TransactionStatus(result.Status),

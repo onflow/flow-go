@@ -320,3 +320,5 @@ require (
 
 // Using custom fork until https://github.com/onflow/flow-go/issues/5338 is resolved
 replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483
+
+replace github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240305102946-3efec6679252 => github.com/The-K-R-O-K/flow/protobuf/go/flow v0.0.0-20240326125130-d668d54a6c4c

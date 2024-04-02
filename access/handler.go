@@ -1113,8 +1113,8 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 	}
 
 	sub := h.api.SubscribeTransactionStatuses(ctx, &tx)
-	return subscription.HandleSubscription(sub, func(txSubInfo *convert.TransactionSubscribeInfo) error {
-		err = stream.Send(convert.TransactionSubscribeInfoToMessage(txSubInfo))
+	return subscription.HandleSubscription(sub, func(txSubInfo *TransactionSubscribeInfo) error {
+		err = stream.Send(TransactionSubscribeInfoToMessage(txSubInfo))
 		if err != nil {
 			return rpc.ConvertError(err, "could not send response", codes.Internal)
 		}
