@@ -41,7 +41,7 @@ func TestExtractExecutionState(t *testing.T) {
 			db := common.InitStorage(datadir)
 			commits := badger.NewCommits(metr, db)
 
-			_, err := getStateCommitment(commits, unittest.IdentifierFixture())
+			_, err := commits.ByBlockID(unittest.IdentifierFixture())
 			require.Error(t, err)
 		})
 	})
@@ -58,7 +58,7 @@ func TestExtractExecutionState(t *testing.T) {
 			err := commits.Store(blockID, stateCommitment)
 			require.NoError(t, err)
 
-			retrievedStateCommitment, err := getStateCommitment(commits, blockID)
+			retrievedStateCommitment, err := commits.ByBlockID(blockID)
 			require.NoError(t, err)
 			require.Equal(t, stateCommitment, retrievedStateCommitment)
 		})
@@ -66,6 +66,13 @@ func TestExtractExecutionState(t *testing.T) {
 
 	t.Run("empty WAL doesn't find anything", func(t *testing.T) {
 		withDirs(t, func(datadir, execdir, outdir string) {
+			opts := migrations.Options{
+				NWorker:              10,
+				ChainID:              flow.Emulator,
+				EVMContractChange:    migrations.EVMContractChangeNone,
+				BurnerContractChange: migrations.BurnerContractChangeDeploy,
+			}
+
 			err := extractExecutionState(
 				zerolog.Nop(),
 				execdir,
@@ -73,18 +80,10 @@ func TestExtractExecutionState(t *testing.T) {
 				outdir,
 				10,
 				false,
-				false,
-				false,
-				false,
-				flow.Emulator,
-				migrations.EVMContractChangeNone,
-				migrations.BurnerContractChangeDeploy,
-				nil,
 				"",
 				nil,
 				false,
-				false,
-				0,
+				opts,
 			)
 			require.Error(t, err)
 		})

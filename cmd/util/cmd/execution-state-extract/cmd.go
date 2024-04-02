@@ -181,7 +181,7 @@ func run(*cobra.Command, []string) {
 		cache := &metrics.NoopCollector{}
 		commits := badger.NewCommits(cache, db)
 
-		stateCommitment, err = getStateCommitment(commits, blockID)
+		stateCommitment, err = commits.ByBlockID(blockID)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("cannot get state commitment for block %v", blockID)
 		}
@@ -340,6 +340,19 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msgf("error loading staged contracts: %s", err.Error())
 	}
 
+	opts := migrations.Options{
+		NWorker:                           flagNWorker,
+		DiffMigrations:                    flagDiffMigration,
+		LogVerboseDiff:                    flagLogVerboseDiff,
+		CheckStorageHealthBeforeMigration: flagCheckStorageHealthBeforeMigration,
+		ChainID:                           chainID,
+		EVMContractChange:                 evmContractChange,
+		BurnerContractChange:              burnerContractChange,
+		StagedContracts:                   stagedContracts,
+		Prune:                             flagPrune,
+		MaxAccountSize:                    flagMaxAccountSize,
+	}
+
 	if len(flagInputPayloadFileName) > 0 {
 		err = extractExecutionStateFromPayloads(
 			log.Logger,
@@ -347,19 +360,11 @@ func run(*cobra.Command, []string) {
 			flagOutputDir,
 			flagNWorker,
 			!flagNoMigration,
-			flagDiffMigration,
-			flagLogVerboseDiff,
-			flagCheckStorageHealthBeforeMigration,
-			chainID,
-			evmContractChange,
-			burnerContractChange,
-			stagedContracts,
 			flagInputPayloadFileName,
 			flagOutputPayloadFileName,
 			exportedAddresses,
 			flagSortPayloads,
-			flagPrune,
-			flagMaxAccountSize,
+			opts,
 		)
 	} else {
 		err = extractExecutionState(
@@ -369,18 +374,10 @@ func run(*cobra.Command, []string) {
 			flagOutputDir,
 			flagNWorker,
 			!flagNoMigration,
-			flagDiffMigration,
-			flagLogVerboseDiff,
-			flagCheckStorageHealthBeforeMigration,
-			chainID,
-			evmContractChange,
-			burnerContractChange,
-			stagedContracts,
 			flagOutputPayloadFileName,
 			exportedAddresses,
 			flagSortPayloads,
-			flagPrune,
-			flagMaxAccountSize,
+			opts,
 		)
 	}
 

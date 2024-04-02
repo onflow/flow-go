@@ -80,16 +80,13 @@ func TestCadenceValuesMigration(t *testing.T) {
 	migrations := NewCadence1Migrations(
 		logger,
 		rwf,
-		nWorker,
-		chainID,
-		false,
-		false,
-		false,
-		evmContractChange,
-		burnerContractChange,
-		stagedContracts,
-		false,
-		0,
+		Options{
+			NWorker:              nWorker,
+			ChainID:              chainID,
+			EVMContractChange:    evmContractChange,
+			BurnerContractChange: burnerContractChange,
+			StagedContracts:      stagedContracts,
+		},
 	)
 
 	for _, migration := range migrations {
@@ -699,16 +696,12 @@ func TestBootstrappedStateMigration(t *testing.T) {
 	migrations := NewCadence1Migrations(
 		logger,
 		rwf,
-		nWorker,
-		chainID,
-		false,
-		false,
-		false,
-		evmContractChange,
-		burnerContractChange,
-		nil,
-		false,
-		0,
+		Options{
+			NWorker:              nWorker,
+			ChainID:              chainID,
+			EVMContractChange:    evmContractChange,
+			BurnerContractChange: burnerContractChange,
+		},
 	)
 
 	for _, migration := range migrations {
@@ -826,16 +819,12 @@ func TestProgramParsingError(t *testing.T) {
 	migrations := NewCadence1Migrations(
 		logger,
 		rwf,
-		nWorker,
-		chainID,
-		false,
-		false,
-		false,
-		evmContractChange,
-		burnerContractChange,
-		nil,
-		false,
-		0,
+		Options{
+			NWorker:              nWorker,
+			ChainID:              chainID,
+			EVMContractChange:    evmContractChange,
+			BurnerContractChange: burnerContractChange,
+		},
 	)
 
 	for _, migration := range migrations {
@@ -952,16 +941,12 @@ func TestCoreContractUsage(t *testing.T) {
 		migrations := NewCadence1Migrations(
 			logger,
 			rwf,
-			nWorker,
-			chainID,
-			false,
-			false,
-			false,
-			evmContractChange,
-			burnerContractChange,
-			nil,
-			false,
-			0,
+			Options{
+				NWorker:              nWorker,
+				ChainID:              chainID,
+				EVMContractChange:    evmContractChange,
+				BurnerContractChange: burnerContractChange,
+			},
 		)
 
 		for _, migration := range migrations {
