@@ -36,6 +36,7 @@ var (
 	flagStartView               uint64
 	flagStakingEndView          uint64
 	flagEndView                 uint64
+	flagEpochCounter            uint64
 )
 
 func init() {
@@ -54,6 +55,7 @@ func addGenerateRecoverEpochTxArgsCmdFlags() {
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagStartView, "start-view", 0, "start view of the recovery epoch")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagStakingEndView, "staking-end-view", 0, "end view of the staking phase of the recovery epoch")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEndView, "end-view", 0, "end view of the recovery epoch")
+	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "the epoch counter used to generate the root cluster block")
 }
 
 func getSnapshot() *inmem.Snapshot {
@@ -142,15 +144,10 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate cluster assignment")
 	}
-
 	log.Info().Msg("")
 
-	epochCounter, err := epoch.Counter()
-	if err != nil {
-		log.Fatal().Err(err).Msg("unable to get epoch counter from current epoch")
-	}
 	log.Info().Msg("constructing root blocks for collection node clusters")
-	clusterBlocks := run.GenerateRootClusterBlocks(epochCounter, clusters)
+	clusterBlocks := run.GenerateRootClusterBlocks(flagEpochCounter, clusters)
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root QCs for collection node clusters")
