@@ -2,7 +2,10 @@ package epochs_test
 
 import (
 	"errors"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
+	"github.com/stretchr/testify/assert"
+	mocks "github.com/stretchr/testify/mock"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -55,8 +58,14 @@ func (s *EpochStateMachineSuite) SetupTest() {
 	s.happyPathStateMachineFactory = mock.NewStateMachineFactoryMethod(s.T())
 	s.fallbackPathStateMachineFactory = mock.NewStateMachineFactoryMethod(s.T())
 
-	s.epochStateDB.On("ByBlockID", s.candidate.ParentID).Return(s.parentEpochState, nil)
-	s.parentState.On("GetEpochStateID").Return(s.parentEpochState.ID())
+	s.epochStateDB.On("ByBlockID", mocks.Anything).Return(func(_ flow.Identifier) *flow.RichProtocolStateEntry {
+		return s.parentEpochState
+	}, func(_ flow.Identifier) error {
+		return nil
+	})
+	s.parentState.On("GetEpochStateID").Return(func() flow.Identifier {
+		return s.parentEpochState.ID()
+	})
 
 	s.happyPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).
 		Return(s.happyPathStateMachine, nil).Once()
@@ -74,6 +83,218 @@ func (s *EpochStateMachineSuite) SetupTest() {
 		s.fallbackPathStateMachineFactory.Execute,
 	)
 	require.NoError(s.T(), err)
+}
+
+// TestStateMutator_Constructor tests the behaviour of the StateMutator constructor.
+// We expect the constructor to select the appropriate state machine constructor, and
+// to handle (pass-through) exceptions from the state machine constructor.
+func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
+	s.Run("EpochStaking phase", func() {
+		// Since we are before the epoch commitment deadline, we should use the happy-path state machine
+		s.Run("before commitment deadline", func() {
+			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			// expect to be called
+			happyPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).
+				Return(s.happyPathStateMachine, nil).Once()
+			// don't expect to be called
+			fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+
+			candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FirstView + 1))
+			stateMachine, err := epochs.NewEpochStateMachine(
+				candidate,
+				s.globalParams,
+				s.setupsDB,
+				s.commitsDB,
+				s.epochStateDB,
+				s.parentState,
+				s.mutator,
+				happyPathStateMachineFactory.Execute,
+				fallbackPathStateMachineFactory.Execute,
+			)
+			require.NoError(s.T(), err)
+			assert.NotNil(s.T(), stateMachine)
+		})
+		// Since we are past the epoch commitment deadline, and have not entered the EpochCommitted
+		// phase, we should use the epoch fallback state machine.
+		s.Run("past commitment deadline", func() {
+			// don't expect to be called
+			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			// expect to be called
+			fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+
+			candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FinalView - 1))
+			fallbackPathStateMachineFactory.On("Execute", candidate.View, s.parentEpochState).
+				Return(s.happyPathStateMachine, nil).Once()
+			stateMachine, err := epochs.NewEpochStateMachine(
+				candidate,
+				s.globalParams,
+				s.setupsDB,
+				s.commitsDB,
+				s.epochStateDB,
+				s.parentState,
+				s.mutator,
+				happyPathStateMachineFactory.Execute,
+				fallbackPathStateMachineFactory.Execute,
+			)
+			require.NoError(s.T(), err)
+			assert.NotNil(s.T(), stateMachine)
+		})
+	})
+
+	s.Run("EpochSetup phase", func() {
+		s.parentEpochState = unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
+		s.parentEpochState.NextEpochCommit = nil
+		s.parentEpochState.NextEpoch.CommitID = flow.ZeroID
+
+		// Since we are before the epoch commitment deadline, we should use the happy-path state machine
+		s.Run("before commitment deadline", func() {
+			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			// don't expect to be called
+			fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+
+			candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FirstView + 1))
+			// expect to be called
+			happyPathStateMachineFactory.On("Execute", candidate.View, s.parentEpochState).
+				Return(s.happyPathStateMachine, nil).Once()
+			stateMachine, err := epochs.NewEpochStateMachine(
+				candidate,
+				s.globalParams,
+				s.setupsDB,
+				s.commitsDB,
+				s.epochStateDB,
+				s.parentState,
+				s.mutator,
+				happyPathStateMachineFactory.Execute,
+				fallbackPathStateMachineFactory.Execute,
+			)
+			require.NoError(s.T(), err)
+			assert.NotNil(s.T(), stateMachine)
+		})
+		// Since we are past the epoch commitment deadline, and have not entered the EpochCommitted
+		// phase, we should use the epoch fallback state machine.
+		s.Run("past commitment deadline", func() {
+			// don't expect to be called
+			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+
+			candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FinalView - 1))
+			// expect to be called
+			fallbackPathStateMachineFactory.On("Execute", candidate.View, s.parentEpochState).
+				Return(s.happyPathStateMachine, nil).Once()
+			stateMachine, err := epochs.NewEpochStateMachine(
+				candidate,
+				s.globalParams,
+				s.setupsDB,
+				s.commitsDB,
+				s.epochStateDB,
+				s.parentState,
+				s.mutator,
+				happyPathStateMachineFactory.Execute,
+				fallbackPathStateMachineFactory.Execute,
+			)
+			require.NoError(s.T(), err)
+			assert.NotNil(s.T(), stateMachine)
+		})
+	})
+
+	s.Run("EpochCommitted phase", func() {
+		s.parentEpochState = unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
+		// Since we are before the epoch commitment deadline, we should use the happy-path state machine
+		s.Run("before commitment deadline", func() {
+			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			// expect to be called
+			happyPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).
+				Return(s.happyPathStateMachine, nil).Once()
+			// don't expect to be called
+			fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+
+			candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FirstView + 1))
+			stateMachine, err := epochs.NewEpochStateMachine(
+				candidate,
+				s.globalParams,
+				s.setupsDB,
+				s.commitsDB,
+				s.epochStateDB,
+				s.parentState,
+				s.mutator,
+				happyPathStateMachineFactory.Execute,
+				fallbackPathStateMachineFactory.Execute,
+			)
+			require.NoError(s.T(), err)
+			assert.NotNil(s.T(), stateMachine)
+		})
+		// Despite being past the epoch commitment deadline, since we are in the EpochCommitted phase
+		// already, we should proceed with the happy-path state machine
+		s.Run("past commitment deadline", func() {
+			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			// don't expect to be called
+			fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+
+			candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FinalView - 1))
+			// expect to be called
+			happyPathStateMachineFactory.On("Execute", candidate.View, s.parentEpochState).
+				Return(s.happyPathStateMachine, nil).Once()
+			stateMachine, err := epochs.NewEpochStateMachine(
+				candidate,
+				s.globalParams,
+				s.setupsDB,
+				s.commitsDB,
+				s.epochStateDB,
+				s.parentState,
+				s.mutator,
+				happyPathStateMachineFactory.Execute,
+				fallbackPathStateMachineFactory.Execute,
+			)
+			require.NoError(s.T(), err)
+			assert.NotNil(s.T(), stateMachine)
+		})
+	})
+
+	// if a state machine constructor returns an error, the stateMutator constructor should fail
+	// and propagate the error to the caller
+	s.Run("state machine constructor returns error", func() {
+		s.Run("happy-path", func() {
+			exception := irrecoverable.NewExceptionf("exception")
+			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			happyPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).Return(nil, exception).Once()
+			fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+
+			stateMachine, err := epochs.NewEpochStateMachine(
+				s.candidate,
+				s.globalParams,
+				s.setupsDB,
+				s.commitsDB,
+				s.epochStateDB,
+				s.parentState,
+				s.mutator,
+				happyPathStateMachineFactory.Execute,
+				fallbackPathStateMachineFactory.Execute,
+			)
+			assert.ErrorIs(s.T(), err, exception)
+			assert.Nil(s.T(), stateMachine)
+		})
+		s.Run("epoch-fallback", func() {
+			s.parentEpochState.InvalidEpochTransitionAttempted = true // ensure we use epoch-fallback state machine
+			exception := irrecoverable.NewExceptionf("exception")
+			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			fallbackPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).Return(nil, exception).Once()
+
+			stateMachine, err := epochs.NewEpochStateMachine(
+				s.candidate,
+				s.globalParams,
+				s.setupsDB,
+				s.commitsDB,
+				s.epochStateDB,
+				s.parentState,
+				s.mutator,
+				happyPathStateMachineFactory.Execute,
+				fallbackPathStateMachineFactory.Execute,
+			)
+			assert.ErrorIs(s.T(), err, exception)
+			assert.Nil(s.T(), stateMachine)
+		})
+	})
 }
 
 // TestApplyServiceEventsTransitionToNextEpoch tests that EpochStateMachine transitions to the next epoch
