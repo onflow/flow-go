@@ -57,8 +57,9 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 
 	// first, round-robin internal nodes into each cluster
 	for i, node := range internals {
-		identifierLists[i%numCollectionClusters] = append(identifierLists[i%numCollectionClusters], node.NodeID)
-		constraint[i%numCollectionClusters] += 1
+		clusterIndex := i % numCollectionClusters
+		identifierLists[clusterIndex] = append(identifierLists[clusterIndex], node.NodeID)
+		constraint[clusterIndex] += 1
 	}
 
 	// next, round-robin partner nodes into each cluster

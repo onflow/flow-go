@@ -21,7 +21,7 @@ import (
 // identities, generates the cluster QC's and retrieves the DKG key vector of the last successful epoch.
 var (
 	generateRecoverEpochTxArgsCmd = &cobra.Command{
-		Use:   "recover-epoch-tx-args",
+		Use:   "efm-recover-tx-args",
 		Short: "Generates recover epoch transaction arguments",
 		Long:  "Generates transaction arguments for the epoch recovery transaction.",
 		Run:   generateRecoverEpochTxArgs(getSnapshot),
@@ -44,14 +44,13 @@ func init() {
 }
 
 func addGenerateRecoverEpochTxArgsCmdFlags() {
-	generateRecoverEpochTxArgsCmd.Flags().IntVar(&flagCollectionClusters, "collection-clusters", 0,
+	generateRecoverEpochTxArgsCmd.Flags().IntVar(&flagCollectionClusters, "collection-clusters", 3,
 		"number of collection clusters")
 	// required parameters for network configuration and generation of root node identities
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagNodeConfigJson, "node-config", "",
 		"path to a JSON file containing multiple node configurations (fields Role, Address, Weight)")
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagInternalNodePrivInfoDir, "internal-priv-dir", "", "path to directory "+
 		"containing the output from the `keygen` command for internal nodes")
-
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagStartView, "start-view", 0, "start view of the recovery epoch")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 4000, "length of each epoch measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 100, "length of the epoch staking phase measured in views")
