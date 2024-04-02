@@ -32,6 +32,7 @@ type testContractHandler struct {
 	accountByAddress     func(types.Address, bool) types.Account
 	lastExecutedBlock    func() *types.Block
 	run                  func(tx []byte, coinbase types.Address) *types.ResultSummary
+	batchRun             func(txs [][]byte, coinbase types.Address) []*types.ResultSummary
 	generateResourceUUID func() uint64
 }
 
@@ -73,6 +74,13 @@ func (t *testContractHandler) Run(tx []byte, coinbase types.Address) *types.Resu
 		panic("unexpected Run")
 	}
 	return t.run(tx, coinbase)
+}
+
+func (t *testContractHandler) BatchRun(txs [][]byte, coinbase types.Address) []*types.ResultSummary {
+	if t.batchRun == nil {
+		panic("unexpected BatchRun")
+	}
+	return t.batchRun(txs, coinbase)
 }
 
 func (t *testContractHandler) GenerateResourceUUID() uint64 {
