@@ -387,11 +387,26 @@ func (s *ObserverIndexerEnabledSuite) TestAllObserverIndexedRPCsHappyPath() {
 	})
 	require.NoError(t, err)
 
+	eventsByBlockID, err := observerLocal.GetEventsForBlockIDs(ctx, &accessproto.GetEventsForBlockIDsRequest{
+		Type:                 sdk.EventAccountCreated,
+		BlockIds:             [][]byte{blockWithAccount.Block.Id},
+		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+	})
+	require.NoError(s.T(), err)
+
 	// GetEventsForBlockIDs
-	eventsByBlockID := s.checkGetEventsForBlockIDsRPC(ctx, observerLocal, observerUpstream, accessNode, [][]byte{blockWithAccount.Block.Id})
+	s.checkGetEventsForBlockIDsRPC(ctx, eventsByBlockID, observerUpstream, accessNode, [][]byte{blockWithAccount.Block.Id})
+
+	eventsByHeight, err := observerLocal.GetEventsForHeightRange(ctx, &accessproto.GetEventsForHeightRangeRequest{
+		Type:                 sdk.EventAccountCreated,
+		StartHeight:          blockWithAccount.Block.Height,
+		EndHeight:            blockWithAccount.Block.Height,
+		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+	})
+	require.NoError(s.T(), err)
 
 	// GetEventsForHeightRange
-	eventsByHeight := s.checkGetEventsForHeightRangeRPC(ctx, observerLocal, observerUpstream, accessNode, blockWithAccount.Block.Height, blockWithAccount.Block.Height)
+	s.checkGetEventsForHeightRangeRPC(ctx, eventsByHeight, observerUpstream, accessNode, blockWithAccount.Block.Height, blockWithAccount.Block.Height)
 
 	// validate that there is an event that we are looking for
 	require.Equal(t, eventsByHeight.Results, eventsByBlockID.Results)
@@ -652,18 +667,11 @@ func (s *ObserverIndexerEnabledSuite) getRestEndpoints() []RestEndpointTest {
 
 func (s *ObserverIndexerEnabledSuite) checkGetEventsForBlockIDsRPC(
 	ctx context.Context,
-	observerLocal accessproto.AccessAPIClient,
+	observerLocalResponse *accessproto.EventsResponse,
 	observerUpstream accessproto.AccessAPIClient,
 	accessNode accessproto.AccessAPIClient,
 	blockIds [][]byte,
-) *accessproto.EventsResponse {
-	observerLocalResponse, err := observerLocal.GetEventsForBlockIDs(ctx, &accessproto.GetEventsForBlockIDsRequest{
-		Type:                 sdk.EventAccountCreated,
-		BlockIds:             blockIds,
-		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
-	})
-	require.NoError(s.T(), err)
-
+) {
 	observerUpstreamResponse, err := observerUpstream.GetEventsForBlockIDs(ctx, &accessproto.GetEventsForBlockIDsRequest{
 		Type:                 sdk.EventAccountCreated,
 		BlockIds:             blockIds,
@@ -680,26 +688,16 @@ func (s *ObserverIndexerEnabledSuite) checkGetEventsForBlockIDsRPC(
 
 	require.Equal(s.T(), accessNodeResponse.Results, observerLocalResponse.Results)
 	require.Equal(s.T(), accessNodeResponse.Results, observerUpstreamResponse.Results)
-
-	return observerLocalResponse
 }
 
 func (s *ObserverIndexerEnabledSuite) checkGetEventsForHeightRangeRPC(
 	ctx context.Context,
-	observerLocal accessproto.AccessAPIClient,
+	observerLocalResponse *accessproto.EventsResponse,
 	observerUpstream accessproto.AccessAPIClient,
 	accessNode accessproto.AccessAPIClient,
 	startHeight uint64,
 	endHeight uint64,
-) *accessproto.EventsResponse {
-	observerLocalResponse, err := observerLocal.GetEventsForHeightRange(ctx, &accessproto.GetEventsForHeightRangeRequest{
-		Type:                 sdk.EventAccountCreated,
-		StartHeight:          startHeight,
-		EndHeight:            endHeight,
-		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
-	})
-	require.NoError(s.T(), err)
-
+) {
 	observerUpstreamResponse, err := observerUpstream.GetEventsForHeightRange(ctx, &accessproto.GetEventsForHeightRangeRequest{
 		Type:                 sdk.EventAccountCreated,
 		StartHeight:          startHeight,
@@ -718,8 +716,6 @@ func (s *ObserverIndexerEnabledSuite) checkGetEventsForHeightRangeRPC(
 
 	require.Equal(s.T(), accessNodeResponse.Results, observerLocalResponse.Results)
 	require.Equal(s.T(), accessNodeResponse.Results, observerUpstreamResponse.Results)
-
-	return observerLocalResponse
 }
 
 func (s *ObserverIndexerEnabledSuite) checkGetAccountAtBlockHeightRPC(
