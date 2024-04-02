@@ -2,21 +2,21 @@ package epochs_test
 
 import (
 	"errors"
-	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
-	"github.com/onflow/flow-go/storage/badger/transaction"
-	"github.com/stretchr/testify/assert"
-	mocks "github.com/stretchr/testify/mock"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs/mock"
 	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
