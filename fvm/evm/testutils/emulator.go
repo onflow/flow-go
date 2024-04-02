@@ -9,12 +9,13 @@ import (
 )
 
 type TestEmulator struct {
-	BalanceOfFunc      func(address types.Address) (*big.Int, error)
-	NonceOfFunc        func(address types.Address) (uint64, error)
-	CodeOfFunc         func(address types.Address) (types.Code, error)
-	CodeHashOfFunc     func(address types.Address) ([]byte, error)
-	DirectCallFunc     func(call *types.DirectCall) (*types.Result, error)
-	RunTransactionFunc func(tx *gethTypes.Transaction) (*types.Result, error)
+	BalanceOfFunc           func(address types.Address) (*big.Int, error)
+	NonceOfFunc             func(address types.Address) (uint64, error)
+	CodeOfFunc              func(address types.Address) (types.Code, error)
+	CodeHashOfFunc          func(address types.Address) ([]byte, error)
+	DirectCallFunc          func(call *types.DirectCall) (*types.Result, error)
+	RunTransactionFunc      func(tx *gethTypes.Transaction) (*types.Result, error)
+	BatchRunTransactionFunc func(txs []*gethTypes.Transaction) ([]*types.Result, error)
 }
 
 var _ types.Emulator = &TestEmulator{}
@@ -75,4 +76,12 @@ func (em *TestEmulator) RunTransaction(tx *gethTypes.Transaction) (*types.Result
 		panic("method not set")
 	}
 	return em.RunTransactionFunc(tx)
+}
+
+// BatchRunTransactions batch runs transactions and collect gas fees to the coinbase account
+func (em *TestEmulator) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*types.Result, error) {
+	if em.BatchRunTransactionFunc == nil {
+		panic("method not set")
+	}
+	return em.BatchRunTransactionFunc(txs)
 }
