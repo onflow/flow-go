@@ -42,8 +42,6 @@ func init() {
 }
 
 func addGenerateRecoverEpochTxArgsCmdFlags() {
-	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagBucketNetworkName, "bucket-network-name", "",
-		"when retrieving the root snapshot from a GCP bucket, the network name portion of the URL (eg. \"mainnet-13\")")
 	generateRecoverEpochTxArgsCmd.Flags().IntVar(&flagCollectionClusters, "collection-clusters", 0,
 		"number of collection clusters")
 	// required parameters for network configuration and generation of root node identities
