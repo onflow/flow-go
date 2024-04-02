@@ -21,21 +21,22 @@ import (
 )
 
 var (
-	flagExecutionStateDir             string
-	flagOutputDir                     string
-	flagBlockHash                     string
-	flagStateCommitment               string
-	flagDatadir                       string
-	flagChain                         string
-	flagNWorker                       int
-	flagNoMigration                   bool
-	flagNoReport                      bool
-	flagValidateMigration             bool
-	flagLogVerboseValidationError     bool
-	flagAllowPartialStateFromPayloads bool
-	flagInputPayloadFileName          string
-	flagOutputPayloadFileName         string
-	flagOutputPayloadByAddresses      string
+	flagExecutionStateDir                  string
+	flagOutputDir                          string
+	flagBlockHash                          string
+	flagStateCommitment                    string
+	flagDatadir                            string
+	flagChain                              string
+	flagNWorker                            int
+	flagNoMigration                        bool
+	flagNoReport                           bool
+	flagValidateMigration                  bool
+	flagLogVerboseValidationError          bool
+	flagAllowPartialStateFromPayloads      bool
+	flagContinueMigrationOnValidationError bool
+	flagInputPayloadFileName               string
+	flagOutputPayloadFileName              string
+	flagOutputPayloadByAddresses           string
 )
 
 var Cmd = &cobra.Command{
@@ -80,6 +81,9 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagAllowPartialStateFromPayloads, "allow-partial-state-from-payload-file", false,
 		"allow input payload file containing partial state (e.g. not all accounts)")
+
+	Cmd.Flags().BoolVar(&flagContinueMigrationOnValidationError, "continue-migration-on-validation-errors", false,
+		"continue migration even if validation fails")
 
 	// If specified, the state will consist of payloads from the given input payload file.
 	// If not specified, then the state will be extracted from the latest checkpoint file.
