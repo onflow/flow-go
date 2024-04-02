@@ -87,50 +87,66 @@ func (s *EpochStateMachineSuite) SetupTest() {
 
 // TestOnHappyPathNoDbChanges tests that stateMutator doesn't cache any db updates when there are no changes.
 func (s *EpochStateMachineSuite) TestOnHappyPathNoDbChanges() {
-	//s.stateMachine.On("ParentState").Return(parentState)
-	//s.stateMachine.On("Build").Return(parentState.ProtocolStateEntry, parentState.ID(), false)
+	s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState)
+	s.happyPathStateMachine.On("Build").Return(s.parentEpochState.ProtocolStateEntry, s.parentEpochState.ID(), false).Once()
 
 	err := s.stateMachine.ProcessUpdate(nil)
 	require.NoError(s.T(), err)
 
 	indexTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
 	indexTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
-	storeTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
-	storeTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
+
+	s.epochStateDB.On("Index", s.candidate.ID(), s.parentEpochState.ID()).Return(indexTxDeferredUpdate.Execute, nil).Once()
+	s.mutator.On("SetEpochStateID", s.parentEpochState.ID()).Return(nil).Once()
 
 	dbUpdates := s.stateMachine.Build()
-	require.Empty(s.T(), dbUpdates)
+	// in next loop we assert that we have received expected deferred db updates by executing them
+	// and expecting that corresponding mock methods will be called
+	tx := &transaction.Tx{}
+	for _, dbUpdate := range dbUpdates {
+		err := dbUpdate(tx)
+		require.NoError(s.T(), err)
+	}
 }
 
 // TestHappyPathWithDbChanges tests that `stateMutator` returns cached db updates when building protocol state after applying service events.
 // Whenever `stateMutator` successfully processes an epoch setup or epoch commit event, it has to create a deferred db update to store the event.
 // Deferred db updates are cached in `stateMutator` and returned when building protocol state when calling `Build`.
 func (s *EpochStateMachineSuite) TestHappyPathWithDbChanges() {
-	//s.stateMachine.On("ParentState").Return(parentState)
-	//s.stateMachine.On("Build").Return(unittest.ProtocolStateFixture().ProtocolStateEntry,
-	//	unittest.IdentifierFixture(), true)
+	s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState)
+	updatedState := unittest.ProtocolStateFixture().ProtocolStateEntry
+	updatedStateID := updatedState.ID()
+	s.happyPathStateMachine.On("Build").Return(updatedState, updatedStateID, true).Once()
 
 	epochSetup := unittest.EpochSetupFixture()
 	epochCommit := unittest.EpochCommitFixture()
 
-	//epochSetupStored := mock.Mock{}
-	//epochSetupStored.On("EpochSetupStored").Return()
-	//s.stateMachine.On("ProcessEpochSetup", epochSetup).Return(true, nil).Once()
-	//s.setupsDB.On("StoreTx", epochSetup).Return(func(*transaction.Tx) error {
-	//	epochSetupStored.MethodCalled("EpochSetupStored")
-	//	return nil
-	//}).Once()
+	// expected both events to be processed
+	s.happyPathStateMachine.On("ProcessEpochSetup", epochSetup).Return(true, nil).Once()
+	s.happyPathStateMachine.On("ProcessEpochCommit", epochCommit).Return(true, nil).Once()
 
-	//epochCommitStored := mock.Mock{}
-	//epochCommitStored.On("EpochCommitStored").Return()
-	//s.stateMachine.On("ProcessEpochCommit", epochCommit).Return(true, nil).Once()
-	//s.commitsDB.On("StoreTx", epochCommit).Return(func(*transaction.Tx) error {
-	//	epochCommitStored.MethodCalled("EpochCommitStored")
-	//	return nil
-	//}).Once()
+	// prepare a DB update for epoch setup
+	storeEpochSetupTx := storagemock.NewDeferredDBUpdate(s.T())
+	storeEpochSetupTx.On("Execute", mocks.Anything).Return(nil).Once()
+	s.setupsDB.On("StoreTx", epochSetup).Return(storeEpochSetupTx.Execute, nil).Once()
+
+	// prepare a DB update for epoch commit
+	storeEpochCommitTx := storagemock.NewDeferredDBUpdate(s.T())
+	storeEpochCommitTx.On("Execute", mocks.Anything).Return(nil).Once()
+	s.commitsDB.On("StoreTx", epochCommit).Return(storeEpochCommitTx.Execute, nil).Once()
 
 	err := s.stateMachine.ProcessUpdate([]flow.ServiceEvent{epochSetup.ServiceEvent(), epochCommit.ServiceEvent()})
 	require.NoError(s.T(), err)
+
+	// prepare a DB update for epoch state
+	indexTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
+	indexTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
+	storeTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
+	storeTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
+
+	s.epochStateDB.On("Index", s.candidate.ID(), updatedStateID).Return(indexTxDeferredUpdate.Execute, nil).Once()
+	s.epochStateDB.On("StoreTx", updatedStateID, updatedState).Return(storeTxDeferredUpdate.Execute, nil).Once()
+	s.mutator.On("SetEpochStateID", updatedStateID).Return(nil).Once()
 
 	dbUpdates := s.stateMachine.Build()
 	// in next loop we assert that we have received expected deferred db updates by executing them
