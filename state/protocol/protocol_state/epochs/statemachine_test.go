@@ -27,6 +27,7 @@ func TestEpochStateMachine(t *testing.T) {
 
 // EpochStateMachineSuite is a dedicated test suite for testing hierarchical epoch state machine.
 // All needed dependencies are mocked, including KV store as a whole, and all the necessary storages.
+// Tests in this suite are designed to rely on automatic assertions when leaving the scope of the test.
 type EpochStateMachineSuite struct {
 	suite.Suite
 	epochStateDB                    *storagemock.ProtocolState
@@ -70,6 +71,8 @@ func (s *EpochStateMachineSuite) SetupTest() {
 	s.happyPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).
 		Return(s.happyPathStateMachine, nil).Once()
 
+	s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState).Maybe()
+
 	var err error
 	s.stateMachine, err = epochs.NewEpochStateMachine(
 		s.candidate,
@@ -85,7 +88,8 @@ func (s *EpochStateMachineSuite) SetupTest() {
 	require.NoError(s.T(), err)
 }
 
-// TestOnHappyPathNoDbChanges tests that stateMutator doesn't cache any db updates when there are no changes.
+// TestOnHappyPathNoDbChanges tests that hierarchical epoch state machine maintains index of epoch states and commits
+// epoch state ID in the KV store even when there were no events to process.
 func (s *EpochStateMachineSuite) TestOnHappyPathNoDbChanges() {
 	s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState)
 	s.happyPathStateMachine.On("Build").Return(s.parentEpochState.ProtocolStateEntry, s.parentEpochState.ID(), false).Once()
@@ -109,9 +113,9 @@ func (s *EpochStateMachineSuite) TestOnHappyPathNoDbChanges() {
 	}
 }
 
-// TestHappyPathWithDbChanges tests that `stateMutator` returns cached db updates when building protocol state after applying service events.
-// Whenever `stateMutator` successfully processes an epoch setup or epoch commit event, it has to create a deferred db update to store the event.
-// Deferred db updates are cached in `stateMutator` and returned when building protocol state when calling `Build`.
+// TestHappyPathWithDbChanges tests that hierarchical epoch state machine maintains index of epoch states and commits
+// as well as stores updated epoch state in respective storage when there were updates made to the epoch state.
+// This test also ensures that updated state ID is committed in the KV store.
 func (s *EpochStateMachineSuite) TestHappyPathWithDbChanges() {
 	s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState)
 	updatedState := unittest.ProtocolStateFixture().ProtocolStateEntry
@@ -158,9 +162,9 @@ func (s *EpochStateMachineSuite) TestHappyPathWithDbChanges() {
 	}
 }
 
-// TestEpochStateMachine_Constructor tests the behavior of the StateMutator constructor.
-// We expect the constructor to select the appropriate state machine constructor, and
-// to handle (pass-through) exceptions from the state machine constructor.
+// TestEpochStateMachine_Constructor tests the behavior of the EpochStateMachine constructor.
+// We expect the constructor to select the appropriate internal state machine constructor, and
+// to handle (pass-through) exceptions from the internal state machine constructor.
 func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 	s.Run("EpochStaking phase", func() {
 		// Since we are before the epoch commitment deadline, we should use the happy-path state machine
@@ -370,8 +374,8 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 	})
 }
 
-// TestProcessUpdate_InvalidEpochSetup tests that handleServiceEvents rejects invalid epoch setup event and sets
-// InvalidEpochTransitionAttempted flag in protocol.ProtocolStateMachine.
+// TestProcessUpdate_InvalidEpochSetup tests that hierarchical state machine rejects invalid epoch setup event and
+// replaces the happy path state machine with the fallback state machine.
 func (s *EpochStateMachineSuite) TestProcessUpdate_InvalidEpochSetup() {
 	s.Run("invalid-epoch-setup", func() {
 		happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
@@ -415,8 +419,8 @@ func (s *EpochStateMachineSuite) TestProcessUpdate_InvalidEpochSetup() {
 	})
 }
 
-// TestProcessUpdate_InvalidEpochCommit tests that handleServiceEvents rejects invalid epoch commit event and sets
-// InvalidEpochTransitionAttempted flag in protocol.ProtocolStateMachine.
+// TestProcessUpdate_InvalidEpochCommit tests that hierarchical state machine rejects invalid epoch commit event and
+// replaces the happy path state machine with the fallback state machine.
 func (s *EpochStateMachineSuite) TestProcessUpdate_InvalidEpochCommit() {
 	s.Run("invalid-epoch-commit", func() {
 		happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
@@ -449,9 +453,6 @@ func (s *EpochStateMachineSuite) TestProcessUpdate_InvalidEpochCommit() {
 		require.NoError(s.T(), err)
 	})
 	s.Run("process-epoch-commit-exception", func() {
-		//parentState := unittest.ProtocolStateFixture()
-		//s.stateMachine.On("ParentState").Return(parentState)
-
 		epochCommit := unittest.EpochCommitFixture()
 
 		exception := errors.New("exception")
@@ -463,10 +464,11 @@ func (s *EpochStateMachineSuite) TestProcessUpdate_InvalidEpochCommit() {
 	})
 }
 
-// TestApplyServiceEventsTransitionToNextEpoch tests that EpochStateMachine transitions to the next epoch
+// TestProcessUpdateTransitionToNextEpoch tests that EpochStateMachine transitions to the next epoch
 // when the epoch has been committed, and we are at the first block of the next epoch.
-func (s *EpochStateMachineSuite) TestApplyServiceEventsTransitionToNextEpoch() {
+func (s *EpochStateMachineSuite) TestProcessUpdateTransitionToNextEpoch() {
 	parentState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
+	s.happyPathStateMachine.On("ParentState").Unset()
 	s.happyPathStateMachine.On("ParentState").Return(parentState)
 	// we are at the first block of the next epoch
 	s.happyPathStateMachine.On("View").Return(parentState.CurrentEpochSetup.FinalView + 1)
@@ -475,11 +477,11 @@ func (s *EpochStateMachineSuite) TestApplyServiceEventsTransitionToNextEpoch() {
 	require.NoError(s.T(), err)
 }
 
-// TestApplyServiceEventsTransitionToNextEpoch_Error tests that error that has been
+// TestProcessUpdateTransitionToNextEpoch_Error tests that error that has been
 // observed when transitioning to the next epoch and propagated to the caller.
-func (s *EpochStateMachineSuite) TestApplyServiceEventsTransitionToNextEpoch_Error() {
+func (s *EpochStateMachineSuite) TestProcessUpdateTransitionToNextEpoch_Error() {
 	parentState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
-
+	s.happyPathStateMachine.On("ParentState").Unset()
 	s.happyPathStateMachine.On("ParentState").Return(parentState)
 	// we are at the first block of the next epoch
 	s.happyPathStateMachine.On("View").Return(parentState.CurrentEpochSetup.FinalView + 1)
@@ -488,4 +490,12 @@ func (s *EpochStateMachineSuite) TestApplyServiceEventsTransitionToNextEpoch_Err
 	err := s.stateMachine.ProcessUpdate(nil)
 	require.ErrorIs(s.T(), err, exception)
 	require.False(s.T(), protocol.IsInvalidServiceEventError(err))
+}
+
+// TestProcessUpdate_EventsAreFiltered tests that EpochStateMachine filters out all events that are not expected.
+func (s *EpochStateMachineSuite) TestProcessUpdate_EventsAreFiltered() {
+	err := s.stateMachine.ProcessUpdate([]flow.ServiceEvent{
+		unittest.ProtocolStateVersionUpgradeFixture().ServiceEvent(),
+	})
+	require.NoError(s.T(), err)
 }
