@@ -37,20 +37,31 @@ func ContractCode(flowTokenAddress flow.Address) []byte {
 }
 
 const ContractName = "EVM"
+
 const evmAddressTypeBytesFieldName = "bytes"
+
 const evmAddressTypeQualifiedIdentifier = "EVM.EVMAddress"
+
 const evmBalanceTypeQualifiedIdentifier = "EVM.Balance"
+
 const evmResultTypeQualifiedIdentifier = "EVM.Result"
+
 const evmStatusTypeQualifiedIdentifier = "EVM.Status"
+
 const evmBlockTypeQualifiedIdentifier = "EVM.EVMBlock"
 
 const abiEncodingByteSize = 32
 
 var EVMTransactionBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.TheUInt8Type)
+
 var evmTransactionBytesType = sema.NewVariableSizedType(nil, sema.UInt8Type)
 
+var evmTransactionsBatchBytesType = sema.NewVariableSizedType(nil, evmTransactionBytesType)
+
 var evmAddressBytesType = sema.NewConstantSizedType(nil, sema.UInt8Type, types.AddressLength)
+
 var evmAddressBytesStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, evmAddressBytesType)
+
 var EVMAddressBytesCadenceType = cadence.NewConstantSizedArrayType(types.AddressLength, cadence.TheUInt8Type)
 
 // abiEncodingError
@@ -257,19 +268,33 @@ func newInternalEVMTypeEncodeABIFunction(
 }
 
 var gethTypeString = gethABI.Type{T: gethABI.StringTy}
+
 var gethTypeBool = gethABI.Type{T: gethABI.BoolTy}
+
 var gethTypeUint8 = gethABI.Type{T: gethABI.UintTy, Size: 8}
+
 var gethTypeUint16 = gethABI.Type{T: gethABI.UintTy, Size: 16}
+
 var gethTypeUint32 = gethABI.Type{T: gethABI.UintTy, Size: 32}
+
 var gethTypeUint64 = gethABI.Type{T: gethABI.UintTy, Size: 64}
+
 var gethTypeUint128 = gethABI.Type{T: gethABI.UintTy, Size: 128}
+
 var gethTypeUint256 = gethABI.Type{T: gethABI.UintTy, Size: 256}
+
 var gethTypeInt8 = gethABI.Type{T: gethABI.IntTy, Size: 8}
+
 var gethTypeInt16 = gethABI.Type{T: gethABI.IntTy, Size: 16}
+
 var gethTypeInt32 = gethABI.Type{T: gethABI.IntTy, Size: 32}
+
 var gethTypeInt64 = gethABI.Type{T: gethABI.IntTy, Size: 64}
+
 var gethTypeInt128 = gethABI.Type{T: gethABI.IntTy, Size: 128}
+
 var gethTypeInt256 = gethABI.Type{T: gethABI.IntTy, Size: 256}
+
 var gethTypeAddress = gethABI.Type{Size: 20, T: gethABI.AddressTy}
 
 func gethABIType(staticType interpreter.StaticType, evmAddressTypeID common.TypeID) (gethABI.Type, bool) {
@@ -968,6 +993,90 @@ func newInternalEVMTypeRunFunction(
 			result := handler.Run(transaction, cb)
 
 			return NewResultValue(handler, gauge, inter, locationRange, result)
+		},
+	)
+}
+
+const internalEVMTypeBatchRunFunctionName = "batchRun"
+
+var internalEVMTypeBatchRunFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "txs",
+			TypeAnnotation: sema.NewTypeAnnotation(evmTransactionsBatchBytesType),
+		},
+		{
+			Label:          "coinbase",
+			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+		},
+	},
+	// Actually [EVM.Result], but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.NewVariableSizedType(nil, sema.AnyStructType)),
+}
+
+func newInternalEVMTypeBatchRunFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		internalEVMTypeBatchRunFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			// Get transactions batch argument
+
+			transactionsBatchValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			batchCount := transactionsBatchValue.Count()
+			var transactionBatch [][]byte
+			if batchCount > 0 {
+				transactionBatch = make([][]byte, batchCount)
+				i := 0
+				transactionsBatchValue.Iterate(inter, func(transactionValue interpreter.Value) (resume bool) {
+					t, err := interpreter.ByteArrayValueToByteSlice(inter, transactionValue, locationRange)
+					if err != nil {
+						panic(err)
+					}
+					transactionBatch[i] = t
+					return true
+				})
+			}
+
+			// Get coinbase argument
+
+			coinbaseValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			coinbase, err := interpreter.ByteArrayValueToByteSlice(inter, coinbaseValue, locationRange)
+			if err != nil {
+				panic(err)
+			}
+
+			// Run
+
+			cb := types.NewAddressFromBytes(coinbase)
+			batchResults := handler.BatchRun(transactionBatch, cb)
+
+			// Convert batch run result summary type to cadence array of structs
+			results := interpreter.NewArrayValue(
+				inter,
+				locationRange,
+				interpreter.NewVariableSizedStaticType(nil, interpreter.CompositeStaticType{}),
+				common.ZeroAddress,
+			)
+			for _, result := range batchResults {
+				res := NewResultValue(handler, gauge, inter, locationRange, result)
+				results.Append(inter, locationRange, res)
+			}
+
+			return results
 		},
 	)
 }
