@@ -1,8 +1,8 @@
-package epochs
+package epochs_test
 
 import (
 	"errors"
-	"fmt"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -25,18 +25,20 @@ func TestEpochStateMachine(t *testing.T) {
 // All needed dependencies are mocked, including KV store as a whole, and all the necessary storages.
 type EpochStateMachineSuite struct {
 	suite.Suite
-	epochStateDB          *storagemock.ProtocolState
-	headersDB             *storagemock.Headers
-	setupsDB              *storagemock.EpochSetups
-	commitsDB             *storagemock.EpochCommits
-	globalParams          *protocolmock.GlobalParams
-	parentState           *protocol_statemock.KVStoreReader
-	parentEpochState      *flow.RichProtocolStateEntry
-	mutator               *protocol_statemock.KVStoreMutator
-	happyPathStateMachine *mock.StateMachine
-	candidate             *flow.Header
+	epochStateDB                    *storagemock.ProtocolState
+	headersDB                       *storagemock.Headers
+	setupsDB                        *storagemock.EpochSetups
+	commitsDB                       *storagemock.EpochCommits
+	globalParams                    *protocolmock.GlobalParams
+	parentState                     *protocol_statemock.KVStoreReader
+	parentEpochState                *flow.RichProtocolStateEntry
+	mutator                         *protocol_statemock.KVStoreMutator
+	happyPathStateMachine           *mock.StateMachine
+	happyPathStateMachineFactory    *mock.StateMachineFactoryMethod
+	fallbackPathStateMachineFactory *mock.StateMachineFactoryMethod
+	candidate                       *flow.Header
 
-	stateMachine *EpochStateMachine
+	stateMachine *epochs.EpochStateMachine
 }
 
 func (s *EpochStateMachineSuite) SetupTest() {
@@ -50,12 +52,17 @@ func (s *EpochStateMachineSuite) SetupTest() {
 	s.mutator = protocol_statemock.NewKVStoreMutator(s.T())
 	s.candidate = unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FirstView + 1))
 	s.happyPathStateMachine = mock.NewStateMachine(s.T())
+	s.happyPathStateMachineFactory = mock.NewStateMachineFactoryMethod(s.T())
+	s.fallbackPathStateMachineFactory = mock.NewStateMachineFactoryMethod(s.T())
 
 	s.epochStateDB.On("ByBlockID", s.candidate.ParentID).Return(s.parentEpochState, nil)
 	s.parentState.On("GetEpochStateID").Return(s.parentEpochState.ID())
 
+	s.happyPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).
+		Return(s.happyPathStateMachine, nil).Once()
+
 	var err error
-	s.stateMachine, err = NewEpochStateMachine(
+	s.stateMachine, err = epochs.NewEpochStateMachine(
 		s.candidate,
 		s.globalParams,
 		s.setupsDB,
@@ -63,13 +70,8 @@ func (s *EpochStateMachineSuite) SetupTest() {
 		s.epochStateDB,
 		s.parentState,
 		s.mutator,
-		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (StateMachine, error) {
-			return s.happyPathStateMachine, nil
-		},
-		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (StateMachine, error) {
-			require.Fail(s.T(), "entering epoch fallback is not expected")
-			return nil, fmt.Errorf("not expecting epoch fallback")
-		},
+		s.happyPathStateMachineFactory.Execute,
+		s.fallbackPathStateMachineFactory.Execute,
 	)
 	require.NoError(s.T(), err)
 }
