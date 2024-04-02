@@ -18,7 +18,6 @@ import (
 )
 
 // ConstructClusterAssignment random cluster assignment with internal and partner nodes.
-// The number of clusters is read from the `flagCollectionClusters` flag.
 // The number of nodes in each cluster is deterministic and only depends on the number of clusters
 // and the number of nodes. The repartition of internal and partner nodes is also deterministic
 // and only depends on the number of clusters and nodes.
@@ -29,6 +28,15 @@ import (
 // satisfied, an exception is returned.
 // Note that if an exception is returned with a certain number of internal/partner nodes, there is no chance
 // of succeeding the assignment by re-running the function without increasing the internal nodes ratio.
+// Args:
+// - log: the logger instance.
+// - partnerNodes: identity list of partner nodes.
+// - internalNodes: identity list of internal nodes.
+// - numCollectionClusters: the number of collectors in each generated cluster.
+// Returns:
+// - flow.AssignmentList: the generated assignment list.
+// - flow.ClusterList: the generate collection cluster list.
+// - error: if any error occurs. Any error returned from this function is irrecoverable.
 func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes flow.IdentityList, numCollectionClusters int) (flow.AssignmentList, flow.ClusterList, error) {
 
 	partners := partnerNodes.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
@@ -64,8 +72,9 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 
 	// next, round-robin partner nodes into each cluster
 	for i, node := range partners {
-		identifierLists[i%len(identifierLists)] = append(identifierLists[i%len(identifierLists)], node.NodeID)
-		constraint[i%numCollectionClusters] -= 2
+		clusterIndex := i % numCollectionClusters
+		identifierLists[clusterIndex] = append(identifierLists[clusterIndex], node.NodeID)
+		constraint[clusterIndex] -= 2
 	}
 
 	// check the 2/3 constraint: for every cluster `i`, constraint[i] must be strictly positive
@@ -86,6 +95,16 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 	return assignments, clusters, nil
 }
 
+// ConstructRootQCsForClusters constructs a root QC for each cluster in the list.
+// Args:
+// - log: the logger instance.
+// - clusterList: identity list of partner nodes.
+// - nodeInfos: identity list of internal nodes.
+// - clusterBlocks: the number of collectors in each generated cluster.
+// Returns:
+// - flow.AssignmentList: the generated assignment list.
+// - flow.ClusterList: the generate collection cluster list.
+// - error: if any error occurs. Any error returned from this function is irrecoverable.
 func ConstructRootQCsForClusters(log zerolog.Logger, clusterList flow.ClusterList, nodeInfos []bootstrap.NodeInfo, clusterBlocks []*cluster.Block) []*flow.QuorumCertificate {
 
 	if len(clusterBlocks) != len(clusterList) {
