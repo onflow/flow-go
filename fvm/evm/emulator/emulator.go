@@ -128,9 +128,10 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 	}
 }
 
-// RunTransaction runs an evm transaction
-func (bl *BlockView) RunTransaction(
+func (bl *BlockView) runTransaction(
 	tx *gethTypes.Transaction,
+	finalize bool,
+	txIndex uint,
 ) (*types.Result, error) {
 	var res *types.Result
 	var err error
@@ -156,12 +157,43 @@ func (bl *BlockView) RunTransaction(
 
 	// update tx context origin
 	proc.evm.TxContext.Origin = msg.From
-	res, err = proc.run(msg, txHash, 0, tx.Type())
+	res, err = proc.run(msg, txHash, txIndex, tx.Type())
 	if err != nil {
 		return nil, err
 	}
 	// all commmit errors (StateDB errors) has to be returned
-	return res, proc.commitAndFinalize()
+	if err := proc.commit(finalize); err != nil {
+		return nil, err
+	}
+
+	// we can always reset after committing,
+	// this clears state for any subsequent transaction runs
+	proc.state.Reset()
+
+	return res, nil
+}
+
+// RunTransaction runs an evm transaction
+func (bl *BlockView) RunTransaction(
+	tx *gethTypes.Transaction,
+) (*types.Result, error) {
+	return bl.runTransaction(tx, true, 0)
+}
+
+func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*types.Result, error) {
+	batchLen := len(txs)
+	res := make([]*types.Result, batchLen)
+
+	for i, tx := range txs {
+		finalize := i+1 == batchLen // only finalize during last transaction
+		r, err := bl.runTransaction(tx, finalize, uint(i))
+		if err != nil {
+			return nil, err
+		}
+		res[i] = r
+	}
+
+	return res, nil
 }
 
 func (bl *BlockView) newProcedure() (*procedure, error) {
@@ -189,9 +221,9 @@ type procedure struct {
 	state  types.StateDB
 }
 
-// commit commits the changes to the state (with finalization)
-func (proc *procedure) commitAndFinalize() error {
-	err := proc.state.Commit(true)
+// commit commits the changes to the state (with optional finalization)
+func (proc *procedure) commit(finalize bool) error {
+	err := proc.state.Commit(finalize)
 	if err != nil {
 		// if known types (state errors) don't do anything and return
 		if types.IsAFatalError(err) || types.IsAStateError(err) {
@@ -235,7 +267,7 @@ func (proc *procedure) mintTo(
 	}
 
 	// all commmit errors (StateDB errors) has to be returned
-	return res, proc.commitAndFinalize()
+	return res, proc.commit(true)
 }
 
 func (proc *procedure) withdrawFrom(
@@ -266,7 +298,7 @@ func (proc *procedure) withdrawFrom(
 	// now deduct the balance from the bridge
 	proc.state.SubBalance(bridge, call.Value)
 	// all commmit errors (StateDB errors) has to be returned
-	return res, proc.commitAndFinalize()
+	return res, proc.commit(true)
 }
 
 // deployAt deploys a contract at the given target address
@@ -384,7 +416,7 @@ func (proc *procedure) deployAt(
 
 	proc.state.SetCode(addr, ret)
 	res.DeployedContractAddress = to
-	return res, proc.commitAndFinalize()
+	return res, proc.commit(true)
 }
 
 func (proc *procedure) runDirect(
@@ -400,7 +432,7 @@ func (proc *procedure) runDirect(
 		return nil, err
 	}
 	// all commmit errors (StateDB errors) has to be returned
-	return res, proc.commitAndFinalize()
+	return res, proc.commit(true)
 }
 
 // run runs a geth core.message and returns the
