@@ -433,8 +433,8 @@ func NewCadence1Migrations(
 			nWorker,
 			chainID,
 			diffMigrations,
-			checkStorageHealthBeforeMigration,
 			logVerboseDiff,
+			checkStorageHealthBeforeMigration,
 		)...,
 	)
 
