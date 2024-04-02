@@ -51,11 +51,6 @@ func addGenerateRecoverEpochTxArgsCmdFlags() {
 		"path to a JSON file containing multiple node configurations (fields Role, Address, Weight)")
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagInternalNodePrivInfoDir, "internal-priv-dir", "", "path to directory "+
 		"containing the output from the `keygen` command for internal nodes")
-	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", "path to directory "+
-		"containing one JSON file starting with node-info.pub.<NODE_ID>.json for every partner node (fields "+
-		" in the JSON file: Role, Address, NodeID, NetworkPubKey, StakingPubKey)")
-	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagPartnerWeights, "partner-weights", "", "path to a JSON file containing "+
-		"a map from partner node's NodeID to their stake")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagStartView, "start-view", 0, "start view of the recovery epoch")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagStakingEndView, "staking-end-view", 0, "end view of the staking phase of the recovery epoch")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEndView, "end-view", 0, "end view of the recovery epoch")
