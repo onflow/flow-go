@@ -75,7 +75,8 @@ type BackendExecutionDataSuite struct {
 	resultMap   map[flow.Identifier]*flow.ExecutionResult
 	registerID  flow.RegisterID
 
-	rootBlock flow.Block
+	rootBlock          flow.Block
+	highestBlockHeader *flow.Header
 }
 
 func TestBackendExecutionDataSuite(t *testing.T) {
@@ -163,6 +164,7 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	s.rootBlock = unittest.BlockFixture()
 	s.blockMap[s.rootBlock.Header.Height] = &s.rootBlock
+	s.highestBlockHeader = s.rootBlock.Header
 
 	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Header.Height, s.rootBlock.ID())
 }
@@ -269,6 +271,10 @@ func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
 	).Return(func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
 		return s.executionDataTrackerReal.GetStartHeight(ctx, startBlockID, startHeight)
 	}, nil).Maybe()
+
+	s.executionDataTracker.On("GetHighestHeight").Return(func() uint64 {
+		return s.highestBlockHeader.Height
+	}).Maybe()
 }
 
 // generateMockEvents generates a set of mock events for a block split into multiple tx with
@@ -309,8 +315,7 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 	execData := s.execDataMap[block.ID()]
 
 	// notify backend block is available
-	s.executionDataTracker.On("GetHighestHeight").
-		Return(block.Header.Height)
+	s.highestBlockHeader = block.Header
 
 	var err error
 	s.Run("happy path TestGetExecutionDataByBlockID success", func() {
@@ -386,8 +391,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 			// this simulates a subscription on a past block
 			for i := 0; i <= test.highestBackfill; i++ {
 				s.T().Logf("backfilling block %d", i)
-				s.executionDataTracker.On("GetHighestHeight").
-					Return(s.blocks[i].Header.Height)
+				s.highestBlockHeader = s.blocks[i].Header
 			}
 
 			subCtx, subCancel := context.WithCancel(ctx)
@@ -401,9 +405,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 				// simulate new exec data received.
 				// exec data for all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
-					s.executionDataTracker.On("GetHighestHeight").Unset()
-					s.executionDataTracker.On("GetHighestHeight").
-						Return(b.Header.Height)
+					s.highestBlockHeader = b.Header
 					s.broadcaster.Publish()
 				}
 

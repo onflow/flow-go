@@ -377,8 +377,7 @@ func (s *BackendEventsSuite) subscribe(
 			// add "backfill" block - blocks that are already in the database before the test starts
 			// this simulates a subscription on a past block
 			if test.highestBackfill > 0 {
-				s.executionDataTracker.On("GetHighestHeight").
-					Return(s.blocks[test.highestBackfill].Header.Height).Maybe()
+				s.highestBlockHeader = s.blocks[test.highestBackfill].Header
 			}
 
 			subCtx, subCancel := context.WithCancel(ctx)
@@ -399,9 +398,7 @@ func (s *BackendEventsSuite) subscribe(
 				// simulate new block received.
 				// all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
-					s.executionDataTracker.On("GetHighestHeight").Unset()
-					s.executionDataTracker.On("GetHighestHeight").
-						Return(b.Header.Height).Maybe()
+					s.highestBlockHeader = b.Header
 
 					s.broadcaster.Publish()
 				}
