@@ -124,8 +124,19 @@ func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) *type
 // BatchRun tries to run batch of rlp-encoded transactions and
 // collects the gas fees and pay it to the coinbase address provided.
 // All transactions provided in the batch are included in a single block,
-// except for invalid transactions.
-func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte, coinbase types.Address) ([]*types.ResultSummary, error) {
+// except for invalid transactions
+func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte, coinbase types.Address) []*types.ResultSummary {
+	res, err := h.batchRun(rlpEncodedTxs, coinbase)
+	panicOnError(err)
+
+	resSummary := make([]*types.ResultSummary, len(res))
+	for i, r := range res {
+		resSummary[i] = r.ResultSummary()
+	}
+	return resSummary
+}
+
+func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Address) ([]*types.Result, error) {
 	// prepare block view used to run the batch
 	ctx, err := h.getBlockContext()
 	if err != nil {
@@ -177,14 +188,12 @@ func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 	bp.PopulateReceiptRoot(res)
 
 	// meter all the transaction gas usage and append hashes to the block
-	resSummary := make([]*types.ResultSummary, batchLen)
-	for i, r := range res {
+	for _, r := range res {
 		// meter gas anyway (even for invalid or failed states)
 		err = h.meterGasUsage(r)
 		if err != nil {
 			return nil, err
 		}
-		resSummary[i] = r.ResultSummary()
 
 		// include it in a block only if valid (not invalid)
 		if !r.Invalid() {
@@ -200,7 +209,7 @@ func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 	// if there were no valid transactions skip emitting events
 	// and commiting a new block
 	if len(bp.TransactionHashes) == 0 {
-		return resSummary, nil
+		return res, nil
 	}
 
 	for i, r := range res {
@@ -229,7 +238,7 @@ func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		return nil, err
 	}
 
-	return resSummary, nil
+	return res, nil
 }
 
 func (h *ContractHandler) run(
