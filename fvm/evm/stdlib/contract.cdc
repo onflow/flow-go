@@ -325,6 +325,17 @@ contract EVM {
         return runResult
     }
 
+    /// Runs a batch of RLP-encoded EVM transactions, deducts the gas fees,
+    /// and deposits the gas fees into the provided coinbase address.
+    /// An invalid transaction is not executed and not included in the block.
+    access(all)
+    fun batchRun(txs: [[UInt8]], coinbase: EVMAddress): [Result] {
+        return InternalEVM.batchRun(
+            txs: txs,
+            coinbase: coinbase.bytes
+        ) as! [Result]
+    }
+
     access(all)
     fun encodeABI(_ values: [AnyStruct]): [UInt8] {
         return InternalEVM.encodeABI(values)
