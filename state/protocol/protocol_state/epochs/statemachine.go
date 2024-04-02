@@ -74,7 +74,7 @@ type StateMachine interface {
 // StateMachineFactoryMethod is a factory method to create state machines for evolving the protocol's epoch state.
 // Currently, we have `HappyPathStateMachine` and `FallbackStateMachine` as StateMachine
 // implementations, whose constructors both have the same signature as StateMachineFactoryMethod.
-type StateMachineFactoryMethod = func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (StateMachine, error)
+type StateMachineFactoryMethod func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (StateMachine, error)
 
 // EpochStateMachine is a hierarchical state machine that encapsulates the logic for protocol-compliant evolution of Epoch-related sub-state.
 // EpochStateMachine processes a subset of service events that are relevant for the Epoch state, and ignores all other events.
