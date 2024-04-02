@@ -130,7 +130,6 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 
 	log.Info().Msg("constructing root QCs for collection node clusters")
 	clusterQCs := common.ConstructRootQCsForClusters(log, clusters, internalNodes, clusterBlocks)
-	fmt.Sprintf("", clusterQCs)
 	log.Info().Msg("")
 
 	randomSource, err := epoch.RandomSource()
