@@ -42,7 +42,7 @@ func init() {
 }
 
 func addGenerateRecoverEpochTxArgsCmdFlags() {
-	generateRecoverEpochTxArgsCmd.Flags().IntVar(&flagCollectionClusters, "collection-clusters", 0,
+	generateRecoverEpochTxArgsCmd.Flags().IntVar(&flagCollectionClusters, "collection-clusters", 3,
 		"number of collection clusters")
 	// required parameters for network configuration and generation of root node identities
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagConfig, "config", "",
