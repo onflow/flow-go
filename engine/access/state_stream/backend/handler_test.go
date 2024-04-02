@@ -80,9 +80,7 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 	}
 
 	// notify backend block is available
-	s.executionDataTracker.On(
-		"GetHighestHeight").
-		Return(s.blocks[len(s.blocks)-1].Header.Height)
+	s.highestBlockHeader = s.blocks[len(s.blocks)-1].Header
 
 	s.Run("All events filter", func() {
 		// create empty event filter
@@ -404,7 +402,7 @@ func TestEventStream(t *testing.T) {
 		stream *StreamMock[executiondata.SubscribeEventsRequest, executiondata.SubscribeEventsResponse],
 		api *ssmock.API,
 		request *executiondata.SubscribeEventsRequest,
-		response *EventsResponse,
+		response *SubscribeEventsResponse,
 	) {
 		sub := subscription.NewSubscription(1)
 
@@ -499,10 +497,12 @@ func TestEventStream(t *testing.T) {
 				&executiondata.SubscribeEventsRequest{
 					EventEncodingVersion: test.eventVersion,
 				},
-				&EventsResponse{
-					BlockID: blockID,
-					Height:  blockHeight,
-					Events:  ccfEvents,
+				&SubscribeEventsResponse{
+					EventsResponse: EventsResponse{
+						BlockID: blockID,
+						Height:  blockHeight,
+						Events:  ccfEvents,
+					},
 				},
 			)
 			handleExecutionDataStreamResponses(stream, test.eventVersion, test.expected)
