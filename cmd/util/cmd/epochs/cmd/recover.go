@@ -28,8 +28,6 @@ var (
 
 	flagAnAddress               string
 	flagAnPubkey                string
-	flagPartnerWeights          string
-	flagPartnerNodeInfoDir      string
 	flagInternalNodePrivInfoDir string
 	flagConfig                  string
 	flagCollectionClusters      int
