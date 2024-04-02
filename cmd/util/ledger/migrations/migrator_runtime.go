@@ -29,7 +29,7 @@ func newMigratorRuntime(
 	accounts := environment.NewAccounts(transactionState)
 
 	accountsAtreeLedger := util.NewAccountsAtreeLedger(accounts)
-	storage := runtime.NewStorage(accountsAtreeLedger, util.NopMemoryGauge{})
+	storage := runtime.NewStorage(accountsAtreeLedger, nil)
 
 	ri := &util.MigrationRuntimeInterface{
 		Accounts: accounts,
@@ -80,5 +80,5 @@ type migratorRuntime struct {
 }
 
 func (mr *migratorRuntime) GetReadOnlyStorage() *runtime.Storage {
-	return runtime.NewStorage(util.NewPayloadsReadonlyLedger(mr.Snapshot), util.NopMemoryGauge{})
+	return runtime.NewStorage(util.NewPayloadsReadonlyLedger(mr.Snapshot), nil)
 }
