@@ -125,14 +125,13 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 	}
 	log.Info().Msg("")
 
-	collectors.Map(func(identity flow.Identity) flow.Identity {
-		if _, ok := internalNodesMap[identity.NodeID]; ok {
-			internalCollectors = append(internalCollectors, &identity)
+	for _, collector := range collectors {
+		if _, ok := internalNodesMap[collector.NodeID]; ok {
+			internalCollectors = append(internalCollectors, collector)
 		} else {
-			partnerCollectors = append(partnerCollectors, &identity)
+			partnerCollectors = append(partnerCollectors, collector)
 		}
-		return identity
-	})
+	}
 
 	currentEpochDKG, err := epoch.DKG()
 	if err != nil {
@@ -156,25 +155,25 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 
 	dkgPubKeys := make([]cadence.Value, 0)
 	nodeIds := make([]cadence.Value, 0)
-	ids.Map(func(identity flow.Identity) flow.Identity {
-		if identity.GetRole() == flow.RoleConsensus {
-			dkgPubKey, keyShareErr := currentEpochDKG.KeyShare(identity.GetNodeID())
+
+	for _, id := range ids {
+		if id.GetRole() == flow.RoleConsensus {
+			dkgPubKey, keyShareErr := currentEpochDKG.KeyShare(id.GetNodeID())
 			if keyShareErr != nil {
-				log.Fatal().Err(keyShareErr).Msg(fmt.Sprintf("failed to get dkg pub key share for node: %s", identity.GetNodeID()))
+				log.Fatal().Err(keyShareErr).Msg(fmt.Sprintf("failed to get dkg pub key share for node: %s", id.GetNodeID()))
 			}
 			dkgPubKeyCdc, cdcErr := cadence.NewString(dkgPubKey.String())
 			if cdcErr != nil {
-				log.Fatal().Err(cdcErr).Msg(fmt.Sprintf("failed to get dkg pub key cadence string for node: %s", identity.GetNodeID()))
+				log.Fatal().Err(cdcErr).Msg(fmt.Sprintf("failed to get dkg pub key cadence string for node: %s", id.GetNodeID()))
 			}
 			dkgPubKeys = append(dkgPubKeys, dkgPubKeyCdc)
 		}
-		nodeIdCdc, err := cadence.NewString(identity.GetNodeID().String())
+		nodeIdCdc, err := cadence.NewString(id.GetNodeID().String())
 		if err != nil {
-			log.Fatal().Err(err).Msg(fmt.Sprintf("failed to convert node ID to cadence string: %s", identity.GetNodeID()))
+			log.Fatal().Err(err).Msg(fmt.Sprintf("failed to convert node ID to cadence string: %s", id.GetNodeID()))
 		}
 		nodeIds = append(nodeIds, nodeIdCdc)
-		return identity
-	})
+	}
 
 	// @TODO: cluster qcs are converted into flow.ClusterQCVoteData types,
 	// we need a corresponding type in cadence on the FlowClusterQC contract
