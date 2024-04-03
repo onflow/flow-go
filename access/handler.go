@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/counters"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -1113,10 +1114,22 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 	}
 
 	sub := h.api.SubscribeTransactionStatuses(ctx, &tx)
-	return subscription.HandleSubscription(sub, func(txSubInfo *TransactionSubscribeInfo) error {
-		err = stream.Send(TransactionSubscribeInfoToMessage(txSubInfo))
-		if err != nil {
-			return rpc.ConvertError(err, "could not send response", codes.Internal)
+
+	messageIndex := counters.NewMonotonousCounter(0)
+	return subscription.HandleSubscription(sub, func(txResults []*TransactionResult) error {
+		for i := range txResults {
+			value := messageIndex.Value()
+			if ok := messageIndex.Set(value + 1); !ok {
+				return status.Errorf(codes.Internal, "the message index has already been incremented to %d", messageIndex.Value())
+			}
+
+			err = stream.Send(&access.SendAndSubscribeTransactionStatusesResponse{
+				TransactionResults: TransactionResultToMessage(txResults[i]),
+				MessageIndex:       value,
+			})
+			if err != nil {
+				return rpc.ConvertError(err, "could not send response", codes.Internal)
+			}
 		}
 
 		return nil

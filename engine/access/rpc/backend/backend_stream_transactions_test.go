@@ -32,7 +32,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	subscriptionmock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/metrics"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -139,16 +138,6 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.reporter = syncmock.NewIndexReporter(s.T())
 
 	s.blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(mocks.StorageMapGetter(s.blockMap))
-	s.blocks.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(func(blockID flow.Identifier) (*flow.Block, error) {
-		for _, block := range s.blockMap {
-			if block.ID() == blockID {
-				return block, nil
-			}
-		}
-
-		return nil, nil
-	}, nil)
-
 	s.state.On("Final").Return(s.finalSnapshot, nil)
 	s.state.On("AtBlockID", mock.AnythingOfType("flow.Identifier")).Return(func(blockID flow.Identifier) protocolint.Snapshot {
 		s.tempSnapshot.On("Head").Unset()
@@ -180,11 +169,6 @@ func (s *TransactionStatusSuite) SetupTest() {
 	}, nil)
 
 	backendParams := s.backendParams()
-	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Header.Height, nil)
-	s.reporter.On("HighestIndexedHeight").Return(func() (uint64, error) {
-		finalizedHeader := s.finalizedBlock.Header
-		return finalizedHeader.Height, nil
-	}, nil)
 	err := backendParams.EventsIndex.Initialize(s.reporter)
 	require.NoError(s.T(), err)
 	err = backendParams.TxResultsIndex.Initialize(s.reporter)
@@ -244,6 +228,20 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Header.Height, nil)
+	s.reporter.On("HighestIndexedHeight").Return(func() (uint64, error) {
+		finalizedHeader := s.finalizedBlock.Header
+		return finalizedHeader.Height, nil
+	}, nil)
+	s.blocks.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(func(blockID flow.Identifier) (*flow.Block, error) {
+		for _, block := range s.blockMap {
+			if block.ID() == blockID {
+				return block, nil
+			}
+		}
+
+		return nil, nil
+	}, nil)
 	s.sealedSnapshot.On("Head").Return(func() *flow.Header {
 		return s.sealedBlock.Header
 	}, nil)
@@ -281,8 +279,6 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 		mock.AnythingOfType("flow.Identifier"),
 	).Return(&txResult, nil)
 
-	expectedMsgIndexCounter := counters.NewMonotonousCounter(0)
-
 	// Create a special common function to read subscription messages from the channel and check converting it to transaction info
 	// and check results for correctness
 	checkNewSubscriptionMessage := func(sub subscription.Subscription, expectedTxStatus flow.TransactionStatus) {
@@ -292,16 +288,13 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 				"channel closed while waiting for transaction info:\n\t- txID %x\n\t- blockID: %x \n\t- err: %v",
 				txId, s.finalizedBlock.ID(), sub.Err())
 
-			txInfo, ok := v.(*accessapi.TransactionSubscribeInfo)
+			txResults, ok := v.([]*accessapi.TransactionResult)
 			require.True(s.T(), ok, "unexpected response type: %T", v)
+			require.Len(s.T(), txResults, 1)
 
-			assert.Equal(s.T(), txId, txInfo.Result.TransactionID)
-			assert.Equal(s.T(), expectedTxStatus, txInfo.Result.Status)
-
-			expectedMsgIndex := expectedMsgIndexCounter.Value()
-			assert.Equal(s.T(), expectedMsgIndex, txInfo.MessageIndex)
-			wasSet := expectedMsgIndexCounter.Set(expectedMsgIndex + 1)
-			require.True(s.T(), wasSet)
+			result := txResults[0]
+			assert.Equal(s.T(), txId, result.TransactionID)
+			assert.Equal(s.T(), expectedTxStatus, result.Status)
 		}, 60*time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
 	}
 
@@ -341,68 +334,63 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
 }
 
-//// TestSubscribeTransactionStatusExpired tests the functionality of the SubscribeTransactionStatuses method in the Backend
-//// when transaction become expired
-//func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
-//	ctx, cancel := context.WithCancel(context.Background())
-//	defer cancel()
-//
-//	s.blocks.On("GetLastFullBlockHeight").Return(func() (uint64, error) {
-//		return s.sealedBlock.Header.Height, nil
-//	}, nil)
-//
-//	// Generate sent transaction with ref block of the current finalized block
-//	transaction := unittest.TransactionFixture()
-//	transaction.SetReferenceBlockID(s.finalizedBlock.ID())
-//	txId := transaction.ID()
-//
-//	expectedMsgIndexCounter := counters.NewMonotonousCounter(0)
-//
-//	// Create a special common function to read subscription messages from the channel and check converting it to transaction info
-//	// and check results for correctness
-//	checkNewSubscriptionMessage := func(sub subscription.Subscription, expectedTxStatus flow.TransactionStatus) {
-//		unittest.RequireReturnsBefore(s.T(), func() {
-//			v, ok := <-sub.Channel()
-//			require.True(s.T(), ok,
-//				"channel closed while waiting for transaction info:\n\t- txID %x\n\t- blockID: %x \n\t- err: %v",
-//				txId, s.finalizedBlock.ID(), sub.Err())
-//
-//			txInfo, ok := v.(*accessapi.TransactionSubscribeInfo)
-//			require.True(s.T(), ok, "unexpected response type: %T", v)
-//
-//			assert.Equal(s.T(), txId, txInfo.Result.TransactionID)
-//			assert.Equal(s.T(), expectedTxStatus, txInfo.Result.Status)
-//
-//			expectedMsgIndex := expectedMsgIndexCounter.Value()
-//			assert.Equal(s.T(), expectedMsgIndex, txInfo.MessageIndex)
-//			wasSet := expectedMsgIndexCounter.Set(expectedMsgIndex + 1)
-//			require.True(s.T(), wasSet)
-//		}, time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
-//	}
-//
-//	// Subscribe to transaction status and receive the first message with pending status
-//	sub := s.backend.SubscribeTransactionStatuses(ctx, &transaction.TransactionBody)
-//	checkNewSubscriptionMessage(sub, flow.TransactionStatusPending)
-//
-//	// Generate 600 blocks without transaction included and check, that transaction still pending
-//	startHeight := s.finalizedBlock.Header.Height + 1
-//	lastHeight := startHeight + flow.DefaultTransactionExpiry
-//
-//	for i := startHeight; i <= lastHeight; i++ {
-//		s.sealedBlock = s.finalizedBlock
-//		s.addNewFinalizedBlock(s.sealedBlock.Header, false)
-//	}
-//
-//	// Generate final blocks and check transaction expired
-//	s.sealedBlock = s.finalizedBlock
-//	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
-//	checkNewSubscriptionMessage(sub, flow.TransactionStatusExpired)
-//
-//	// Ensure subscription shuts down gracefully
-//	unittest.RequireReturnsBefore(s.T(), func() {
-//		v, ok := <-sub.Channel()
-//		assert.Nil(s.T(), v)
-//		assert.False(s.T(), ok)
-//		assert.NoError(s.T(), sub.Err())
-//	}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
-//}
+// TestSubscribeTransactionStatusExpired tests the functionality of the SubscribeTransactionStatuses method in the Backend
+// when transaction become expired
+func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s.blocks.On("GetLastFullBlockHeight").Return(func() (uint64, error) {
+		return s.sealedBlock.Header.Height, nil
+	}, nil)
+
+	// Generate sent transaction with ref block of the current finalized block
+	transaction := unittest.TransactionFixture()
+	transaction.SetReferenceBlockID(s.finalizedBlock.ID())
+	txId := transaction.ID()
+
+	// Create a special common function to read subscription messages from the channel and check converting it to transaction info
+	// and check results for correctness
+	checkNewSubscriptionMessage := func(sub subscription.Subscription, expectedTxStatus flow.TransactionStatus) {
+		unittest.RequireReturnsBefore(s.T(), func() {
+			v, ok := <-sub.Channel()
+			require.True(s.T(), ok,
+				"channel closed while waiting for transaction info:\n\t- txID %x\n\t- blockID: %x \n\t- err: %v",
+				txId, s.finalizedBlock.ID(), sub.Err())
+
+			txResults, ok := v.([]*accessapi.TransactionResult)
+			require.True(s.T(), ok, "unexpected response type: %T", v)
+			require.Len(s.T(), txResults, 1)
+
+			result := txResults[0]
+			assert.Equal(s.T(), txId, result.TransactionID)
+			assert.Equal(s.T(), expectedTxStatus, result.Status)
+		}, time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
+	}
+
+	// Subscribe to transaction status and receive the first message with pending status
+	sub := s.backend.SubscribeTransactionStatuses(ctx, &transaction.TransactionBody)
+	checkNewSubscriptionMessage(sub, flow.TransactionStatusPending)
+
+	// Generate 600 blocks without transaction included and check, that transaction still pending
+	startHeight := s.finalizedBlock.Header.Height + 1
+	lastHeight := startHeight + flow.DefaultTransactionExpiry
+
+	for i := startHeight; i <= lastHeight; i++ {
+		s.sealedBlock = s.finalizedBlock
+		s.addNewFinalizedBlock(s.sealedBlock.Header, false)
+	}
+
+	// Generate final blocks and check transaction expired
+	s.sealedBlock = s.finalizedBlock
+	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
+	checkNewSubscriptionMessage(sub, flow.TransactionStatusExpired)
+
+	// Ensure subscription shuts down gracefully
+	unittest.RequireReturnsBefore(s.T(), func() {
+		v, ok := <-sub.Channel()
+		assert.Nil(s.T(), v)
+		assert.False(s.T(), ok)
+		assert.NoError(s.T(), sub.Err())
+	}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
+}
