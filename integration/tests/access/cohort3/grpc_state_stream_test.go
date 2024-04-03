@@ -145,13 +145,27 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 
 	time.Sleep(20 * time.Second)
 
-	testANEvents, testANErrs, err := SubscribeEventsByBlockHeight(s.ctx, sdkClientTestAN, 0, &executiondata.EventFilter{})
+	// TODO: will be refactored after https://github.com/onflow/flow-go/pull/5602 merged
+	req := &executiondata.SubscribeEventsRequest{
+		StartBlockHeight:     0,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+		Filter:               &executiondata.EventFilter{},
+		HeartbeatInterval:    1,
+	}
+
+	testANStream, err := sdkClientTestAN.SubscribeEvents(s.ctx, req)
+	s.Require().NoError(err)
+	testANEvents, testANErrs, err := SubscribeHandler(s.ctx, testANStream.Recv, eventsResponseHandler)
 	s.Require().NoError(err)
 
-	controlANEvents, controlANErrs, err := SubscribeEventsByBlockHeight(s.ctx, sdkClientControlAN, 0, &executiondata.EventFilter{})
+	controlANStream, err := sdkClientControlAN.SubscribeEvents(s.ctx, req)
+	s.Require().NoError(err)
+	controlANEvents, controlANErrs, err := SubscribeHandler(s.ctx, controlANStream.Recv, eventsResponseHandler)
 	s.Require().NoError(err)
 
-	testONEvents, testONErrs, err := SubscribeEventsByBlockHeight(s.ctx, sdkClientTestON, 0, &executiondata.EventFilter{})
+	testONStream, err := sdkClientTestON.SubscribeEvents(s.ctx, req)
+	s.Require().NoError(err)
+	testONEvents, testONErrs, err := SubscribeHandler(s.ctx, testONStream.Recv, eventsResponseHandler)
 	s.Require().NoError(err)
 
 	txCount := 10
@@ -185,7 +199,8 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 
 	foundANTxCount := 0
 	foundONTxCount := 0
-	r := newResponseTracker()
+	r := NewResponseTracker(compareEventsResponse)
+
 	for {
 		select {
 		case err := <-testANErrs:
@@ -219,44 +234,75 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 	}
 }
 
-type ResponseTracker struct {
-	r  map[uint64]map[string]flow.BlockEvents
-	mu sync.RWMutex
+// ResponseTracker is a generic tracker for responses.
+type ResponseTracker[T any] struct {
+	r       map[uint64]map[string]T
+	mu      sync.RWMutex
+	compare func(t *testing.T, responses map[uint64]map[string]T, blockHeight uint64) error //func(control, test T) error
 }
 
-func newResponseTracker() *ResponseTracker {
-	return &ResponseTracker{
-		r: make(map[uint64]map[string]flow.BlockEvents),
+// NewResponseTracker creates a new ResponseTracker.
+func NewResponseTracker[T any](
+	compare func(t *testing.T, responses map[uint64]map[string]T, blockHeight uint64) error,
+) *ResponseTracker[T] {
+	return &ResponseTracker[T]{
+		r:       make(map[uint64]map[string]T),
+		compare: compare,
 	}
 }
 
-func (r *ResponseTracker) Add(t *testing.T, blockHeight uint64, name string, events *flow.BlockEvents) {
+func (r *ResponseTracker[T]) Add(t *testing.T, blockHeight uint64, name string, response T) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if _, ok := r.r[blockHeight]; !ok {
-		r.r[blockHeight] = make(map[string]flow.BlockEvents)
+		r.r[blockHeight] = make(map[string]T)
 	}
-	r.r[blockHeight][name] = *events
+	r.r[blockHeight][name] = response
 
-	if len(r.r[blockHeight]) != 3 {
-		return
-	}
-
-	err := r.compare(t, r.r[blockHeight]["access_control"], r.r[blockHeight]["access_test"])
+	err := r.compare(t, r.r, blockHeight)
 	if err != nil {
-		log.Fatalf("failure comparing access and access data %d: %v", blockHeight, err)
-	}
-
-	err = r.compare(t, r.r[blockHeight]["access_control"], r.r[blockHeight]["observer_test"])
-	if err != nil {
-		log.Fatalf("failure comparing access and observer data %d: %v", blockHeight, err)
+		log.Fatalf("comparison error at block height %d: %v", blockHeight, err)
 	}
 
 	delete(r.r, blockHeight)
 }
 
-func (r *ResponseTracker) compare(t *testing.T, controlData flow.BlockEvents, testData flow.BlockEvents) error {
+func eventsResponseHandler(msg *executiondata.SubscribeEventsResponse) (flow.BlockEvents, error) {
+	events := convert.MessagesToEvents(msg.GetEvents())
+
+	return flow.BlockEvents{
+		BlockHeight:    msg.GetBlockHeight(),
+		BlockID:        convert.MessageToIdentifier(msg.GetBlockId()),
+		Events:         events,
+		BlockTimestamp: msg.GetBlockTimestamp().AsTime(),
+	}, nil
+}
+
+func compareEventsResponse(t *testing.T, responses map[uint64]map[string]*flow.BlockEvents, blockHeight uint64) error {
+	if len(responses[blockHeight]) != 3 {
+		return nil
+	}
+	accessControlData := responses[blockHeight]["access_control"]
+	accessTestData := responses[blockHeight]["access_test"]
+	observerTestData := responses[blockHeight]["observer_test"]
+
+	// Compare access_control with access_test
+	err := compareEvents(t, accessControlData, accessTestData)
+	if err != nil {
+		return fmt.Errorf("failure comparing access and access data: %d: %v", blockHeight, err)
+	}
+
+	// Compare access_control with observer_test
+	err = compareEvents(t, accessControlData, observerTestData)
+	if err != nil {
+		return fmt.Errorf("failure comparing access and observer data: %d: %v", blockHeight, err)
+	}
+
+	return nil
+}
+
+func compareEvents(t *testing.T, controlData, testData *flow.BlockEvents) error {
 	require.Equal(t, controlData.BlockID, testData.BlockID)
 	require.Equal(t, controlData.BlockHeight, testData.BlockHeight)
 	require.Equal(t, len(controlData.Events), len(testData.Events))
@@ -283,24 +329,12 @@ func getClient(address string) (executiondata.ExecutionDataAPIClient, error) {
 	return executiondata.NewExecutionDataAPIClient(conn), nil
 }
 
-func SubscribeEventsByBlockHeight(
+func SubscribeHandler[T any, V any](
 	ctx context.Context,
-	client executiondata.ExecutionDataAPIClient,
-	startHeight uint64,
-	filter *executiondata.EventFilter,
-) (<-chan flow.BlockEvents, <-chan error, error) {
-	req := &executiondata.SubscribeEventsRequest{
-		StartBlockHeight:     startHeight,
-		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
-		Filter:               filter,
-		HeartbeatInterval:    1,
-	}
-	stream, err := client.SubscribeEvents(ctx, req)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	sub := make(chan flow.BlockEvents)
+	recv func() (T, error),
+	responseHandler func(T) (V, error),
+) (<-chan V, <-chan error, error) {
+	sub := make(chan V)
 	errChan := make(chan error)
 
 	sendErr := func(err error) {
@@ -315,23 +349,20 @@ func SubscribeEventsByBlockHeight(
 		defer close(errChan)
 
 		for {
-			resp, err := stream.Recv()
+			t, err := recv()
 			if err != nil {
 				if err == io.EOF {
 					return
 				}
 
-				sendErr(fmt.Errorf("error receiving event: %w", err))
+				sendErr(fmt.Errorf("error receiving block: %w", err))
 				return
 			}
 
-			events := convert.MessagesToEvents(resp.GetEvents())
-
-			response := flow.BlockEvents{
-				BlockHeight:    resp.GetBlockHeight(),
-				BlockID:        convert.MessageToIdentifier(resp.GetBlockId()),
-				Events:         events,
-				BlockTimestamp: resp.GetBlockTimestamp().AsTime(),
+			response, err := responseHandler(t)
+			if err != nil {
+				sendErr(fmt.Errorf("error converting response: %w", err))
+				return
 			}
 
 			select {
