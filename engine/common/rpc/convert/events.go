@@ -241,6 +241,20 @@ func CcfEventToJsonEvent(e flow.Event) (*flow.Event, error) {
 	}, nil
 }
 
+// CcfEventsToJsonEvents returns a new event with the payload converted from CCF to JSON
+func CcfEventsToJsonEvents(events []flow.Event) ([]flow.Event, error) {
+	convertedEvents := make([]flow.Event, len(events))
+	for i, e := range events {
+		payload, err := CcfPayloadToJsonPayload(e.Payload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert event payload for event %d: %w", i, err)
+		}
+		e.Payload = payload
+		convertedEvents[i] = e
+	}
+	return convertedEvents, nil
+}
+
 // MessagesToBlockEvents converts a protobuf EventsResponse_Result messages to a slice of flow.BlockEvents.
 func MessagesToBlockEvents(blocksEvents []*accessproto.EventsResponse_Result) []flow.BlockEvents {
 	evs := make([]flow.BlockEvents, len(blocksEvents))
