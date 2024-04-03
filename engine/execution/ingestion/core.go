@@ -94,11 +94,17 @@ func NewCore(
 		AddWorker(e.launchWorker).
 		Build()
 
+	e.log.Info().Msgf("ingestion_core build successfully")
+
 	return e
 }
 
 func (e *Core) launchWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	if e.stopControl.IsExecutionStopped() {
+	executionStopped := e.stopControl.IsExecutionStopped()
+
+	e.log.Info().Bool("execution_stopped", executionStopped).Msgf("launching worker")
+
+	if executionStopped {
 		ready()
 		return
 	}
