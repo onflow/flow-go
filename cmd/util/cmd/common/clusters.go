@@ -104,7 +104,6 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 // Returns:
 // - flow.AssignmentList: the generated assignment list.
 // - flow.ClusterList: the generate collection cluster list.
-// - error: if any error occurs. Any error returned from this function is irrecoverable.
 func ConstructRootQCsForClusters(log zerolog.Logger, clusterList flow.ClusterList, nodeInfos []bootstrap.NodeInfo, clusterBlocks []*cluster.Block) []*flow.QuorumCertificate {
 
 	if len(clusterBlocks) != len(clusterList) {
