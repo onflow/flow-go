@@ -23,8 +23,8 @@ require (
 	github.com/libp2p/go-libp2p v0.32.2
 	github.com/onflow/cadence v1.0.0-preview.18
 	github.com/onflow/crypto v0.25.0
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.2-0.20240327170024-10241fffd864
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.2-0.20240327170024-10241fffd864
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.2-0.20240402184019-90048578066e
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.2-0.20240402184019-90048578066e
 	github.com/onflow/flow-emulator v1.0.0-M7.0.20240227020422-2ec59747f9be
 	github.com/onflow/flow-go v0.34.0-crescendo-preview.2.0.20240227001756-cb6311412b78
 	github.com/onflow/flow-go-sdk v1.0.0-preview.16
@@ -252,10 +252,10 @@ require (
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.6.1-0.20240308163425-dc825c20b1a2 // indirect
-	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20240327162334-bd133114f87a // indirect
-	github.com/onflow/flow-ft/lib/go/templates v0.7.1-0.20240327162334-bd133114f87a // indirect
-	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20240326155818-c01c72c091c0 // indirect
-	github.com/onflow/flow-nft/lib/go/templates v0.0.0-20240326155818-c01c72c091c0 // indirect
+	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20240402160548-a9c331660956 // indirect
+	github.com/onflow/flow-ft/lib/go/templates v0.7.1-0.20240402160548-a9c331660956 // indirect
+	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20240402163945-74687e7a5b9d // indirect
+	github.com/onflow/flow-nft/lib/go/templates v0.0.0-20240402163945-74687e7a5b9d // indirect
 	github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba // indirect
 	github.com/onflow/wal v0.0.0-20240208022732-d756cd497d3b // indirect
 	github.com/onsi/ginkgo/v2 v2.13.2 // indirect
