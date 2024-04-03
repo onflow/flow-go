@@ -254,7 +254,7 @@ func bootstrapProtocolState(
 		}
 
 		// bootstrap KV store
-		// TODO: add proper bootstraping for the KV store
+		// TODO: add proper bootstrapping for the KV store
 		rootKVStore := kvstore.NewLatestKVStore(protocolStateID)
 		version, data, err := rootKVStore.VersionedEncode()
 		if err != nil {
@@ -270,7 +270,7 @@ func bootstrapProtocolState(
 		}
 
 		// NOTE: as specified in the godoc, this code assumes that each block
-		// in the sealing segment in within the same phase within the same epoch.
+		// in the sealing segment is within the same phase within the same epoch.
 		// the sealing segment.
 		for _, block := range segment.AllBlocks() {
 			blockID := block.ID()

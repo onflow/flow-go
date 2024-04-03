@@ -12,10 +12,13 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// StateMachine implements a low-level interface for state-changing operations on the protocol state.
-// It is used by higher level logic to evolve the protocol state when certain events that are stored in blocks are observed.
-// The StateMachine is stateful and internally tracks the current protocol state. A separate instance is created for
-// each block that is being processed.
+// StateMachine implements a low-level interface for state-changing operations on the Epoch state.
+// It is used by higher level logic to coordinate the Epoch handover, evolving its internal state 
+// when Epoch-related Service Events are sealed or specific view-thresholds are reached. 
+//
+// The StateMachine is fork-aware, in that it starts with the Epoch state of the parent block and 
+// consumes a sequence of sealed Service Events from the child block. A separate instance is created for
+// each block that is being processed. Calling `Build()` constructs a snapshot of the resulting Epoch state. 
 type StateMachine interface {
 	// Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
 	// CAUTION:
@@ -24,9 +27,9 @@ type StateMachine interface {
 	// dysfunctional state and should be discarded.
 	Build() (updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, hasChanges bool)
 
-	// ProcessEpochSetup updates current protocol state with data from epoch setup event.
-	// Processing epoch setup event also affects identity table for current epoch.
-	// Observing an epoch setup event, transitions protocol state from staking to setup phase, we stop returning
+	// ProcessEpochSetup updates the internally-maintained interim Epoch state with data from epoch setup event.
+	// Processing an epoch setup event also affects the identity table for the current epoch.
+	// Specifically, we transition the Epoch state from staking to setup phase, we stop returning
 	// identities from previous+current epochs and start returning identities from current+next epochs.
 	// As a result of this operation protocol state for the next epoch will be created.
 	// Returned boolean indicates if event triggered a transition in the state machine or not.
@@ -37,7 +40,7 @@ type StateMachine interface {
 	//     after such error and discard the HappyPathStateMachine!
 	ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error)
 
-	// ProcessEpochCommit updates current protocol state with data from epoch commit event.
+	// ProcessEpochCommit updates the internally-maintained interim Epoch state with data from epoch commit event.
 	// Observing an epoch setup commit, transitions protocol state from setup to commit phase.
 	// At this point, we have finished construction of the next epoch.
 	// As a result of this operation protocol state for next epoch will be committed.
@@ -55,7 +58,7 @@ type StateMachine interface {
 	// - `protocol.InvalidServiceEventError` if the updated identity is not found in current and adjacent epochs.
 	EjectIdentity(nodeID flow.Identifier) error
 
-	// TransitionToNextEpoch discards current protocol state and transitions to the next epoch.
+	// TransitionToNextEpoch transitions our reference frame of 'current epoch' to the pending but committed epoch.
 	// Epoch transition is only allowed when:
 	// - next epoch has been set up,
 	// - next epoch has been committed,
