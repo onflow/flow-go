@@ -50,9 +50,13 @@ func (b *Block) PopulateReceiptRoot(results []*Result) {
 		return
 	}
 
-	receipts := make(gethTypes.Receipts, len(results))
-	for i, res := range results {
-		receipts[i] = res.Receipt()
+	receipts := make(gethTypes.Receipts, 0)
+	for _, res := range results {
+		r := res.Receipt()
+		if r == nil {
+			continue
+		}
+		receipts = append(receipts, r)
 	}
 	b.ReceiptRoot = gethTypes.DeriveSha(receipts, gethTrie.NewStackTrie(nil))
 }
