@@ -283,13 +283,13 @@ func TestEVMBatchRun(t *testing.T) {
 					sc.EVMContract.Address.HexWithPrefix(),
 				))
 
-				batchCount := 1
+				batchCount := 5
 				var num int64
-				txsBatch := make([]cadence.Value, batchCount)
+				txBytes := make([]cadence.Value, batchCount)
 				for i := 0; i < batchCount; i++ {
 					num = int64(i)
 					// prepare batch of transaction payloads
-					txBytes := testAccount.PrepareSignAndEncodeTx(t,
+					tx := testAccount.PrepareSignAndEncodeTx(t,
 						testContract.DeployedAt.ToCommon(),
 						testContract.MakeCallData(t, "store", big.NewInt(num)),
 						big.NewInt(0),
@@ -298,8 +298,8 @@ func TestEVMBatchRun(t *testing.T) {
 					)
 
 					// build txs argument
-					txsBatch[i] = cadence.NewArray(
-						ConvertToCadence(txBytes),
+					txBytes[i] = cadence.NewArray(
+						ConvertToCadence(tx),
 					).WithType(stdlib.EVMTransactionBytesCadenceType)
 				}
 
@@ -307,11 +307,16 @@ func TestEVMBatchRun(t *testing.T) {
 					ConvertToCadence(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
+				txs := cadence.NewArray(txBytes).
+					WithType(cadence.NewVariableSizedArrayType(
+						stdlib.EVMTransactionBytesCadenceType,
+					))
+
 				tx := fvm.Transaction(
 					flow.NewTransactionBody().
 						SetScript(batchRunCode).
 						AddAuthorizer(sc.FlowServiceAccount.Address).
-						AddArgument(json.MustEncode(cadence.NewArray(txsBatch))).
+						AddArgument(json.MustEncode(txs)).
 						AddArgument(json.MustEncode(coinbase)),
 					0)
 
