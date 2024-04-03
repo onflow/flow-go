@@ -332,7 +332,7 @@ contract EVM {
     fun batchRun(txs: [[UInt8]], coinbase: EVMAddress): [Result] {
         return InternalEVM.batchRun(
             txs: txs,
-            coinbase: coinbase.bytes
+            coinbase: coinbase.bytes,
         ) as! [Result]
     }
 

@@ -56,7 +56,7 @@ var EVMTransactionBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.T
 
 var evmTransactionBytesType = sema.NewVariableSizedType(nil, sema.UInt8Type)
 
-var EVMTransactionsBatchBytesType = sema.NewVariableSizedType(nil, evmTransactionBytesType)
+var evmTransactionsBatchBytesType = sema.NewVariableSizedType(nil, evmTransactionBytesType)
 
 var evmAddressBytesType = sema.NewConstantSizedType(nil, sema.UInt8Type, types.AddressLength)
 
@@ -1003,7 +1003,7 @@ var internalEVMTypeBatchRunFunctionType = &sema.FunctionType{
 	Parameters: []sema.Parameter{
 		{
 			Label:          "txs",
-			TypeAnnotation: sema.NewTypeAnnotation(EVMTransactionsBatchBytesType),
+			TypeAnnotation: sema.NewTypeAnnotation(evmTransactionsBatchBytesType),
 		},
 		{
 			Label:          "coinbase",
@@ -1059,24 +1059,40 @@ func newInternalEVMTypeBatchRunFunction(
 				panic(err)
 			}
 
-			// Run
+			// Batch run
 
 			cb := types.NewAddressFromBytes(coinbase)
 			batchResults := handler.BatchRun(transactionBatch, cb)
 
 			// Convert batch run result summary type to cadence array of structs
-			results := interpreter.NewArrayValue(
-				inter,
-				locationRange,
-				interpreter.NewVariableSizedStaticType(nil, interpreter.CompositeStaticType{}),
-				common.ZeroAddress,
-			)
+			values := make([]interpreter.Value, 0)
 			for _, result := range batchResults {
 				res := NewResultValue(handler, gauge, inter, locationRange, result)
-				results.Append(inter, locationRange, res)
+				values = append(values, res)
 			}
 
-			return results
+			loc := common.NewAddressLocation(gauge, handler.EVMContractAddress(), ContractName)
+			evmResultType := interpreter.NewVariableSizedStaticType(
+				inter,
+				interpreter.NewCompositeStaticType(
+					nil,
+					loc,
+					evmResultTypeQualifiedIdentifier,
+					common.NewTypeIDFromQualifiedName(
+						nil,
+						loc,
+						evmResultTypeQualifiedIdentifier,
+					),
+				),
+			)
+
+			return interpreter.NewArrayValue(
+				inter,
+				locationRange,
+				evmResultType,
+				common.ZeroAddress,
+				values...,
+			)
 		},
 	)
 }
