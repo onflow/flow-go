@@ -9,9 +9,10 @@ import (
 )
 
 var ErrSnapshotPhaseMismatch = errors.New("snapshot does not contain a valid sealing segment")
-var ErrSnapshotHistoryLimit = fmt.Errorf("reached the snapshot history limit")
+var ErrSnapshotHistoryLimit = errors.New("reached the snapshot history limit")
 
-// GetDynamicBootstrapSnapshot will return a valid snapshot for dynamic bootstrapping
+// GetDynamicBootstrapSnapshot returns `refSnapshot` if it is valid for use in dynamic bootstrapping.
+// Otherwise returns an error. (Effectively this validates that the input snapshot can be used in dynamic bootstrapping.)
 // Expected error returns during normal operations:
 // * ErrSnapshotPhaseMismatch - snapshot does not contain a valid sealing segment
 // All other errors should be treated as exceptions.
@@ -31,6 +32,8 @@ func GetClosestDynamicBootstrapSnapshot(state protocol.State, refSnapshot protoc
 	return getValidSnapshot(state, refSnapshot, 0, true, snapshotHistoryLimit)
 }
 
+// GetCounterAndPhase returns the current epoch counter and phase, at `height`.
+// No errors are expected during normal operation. 
 func GetCounterAndPhase(state protocol.State, height uint64) (uint64, flow.EpochPhase, error) {
 	snapshot := state.AtHeight(height)
 
@@ -59,6 +62,7 @@ func IsEpochOrPhaseDifferent(counter1, counter2 uint64, phase1, phase2 flow.Epoc
 // where the transition happens.
 // Expected error returns during normal operations:
 // * ErrSnapshotPhaseMismatch - snapshot does not contain a valid sealing segment
+// * ErrSnapshotHistoryLimit - failed to find a valid snapshot after checking `snapshotHistoryLimit` blocks
 // All other errors should be treated as exceptions.
 func getValidSnapshot(
 	state protocol.State,
