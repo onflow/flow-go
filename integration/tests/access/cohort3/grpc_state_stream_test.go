@@ -286,6 +286,7 @@ func (s *GrpcStateStreamSuite) getRPCs() []RPCTest {
 		{
 			name: "SubscribeEvents",
 			call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, _ interface{}, filter *executiondata.EventFilter) (executiondata.ExecutionDataAPI_SubscribeEventsClient, error) {
+				//nolint: staticcheck
 				return client.SubscribeEvents(ctx, &executiondata.SubscribeEventsRequest{
 					StartBlockId:         convert.IdentifierToMessage(flow.ZeroID),
 					StartBlockHeight:     0,
