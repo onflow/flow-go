@@ -1353,8 +1353,8 @@ github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483/go.mod h1:pIZgTWdm3k3p
 github.com/onflow/cadence v0.20.1/go.mod h1:7mzUvPZUIJztIbr9eTvs+fQjWWHTF8veC+yk4ihcNIA=
 github.com/onflow/cadence v0.42.9 h1:EX+eak/Jjy9PyKcAEmOViGOHMyP/nCOwJO+deodZlJE=
 github.com/onflow/cadence v0.42.9/go.mod h1:1wFd+LiNiN6qoZXof3MBdpM6d8BsxbVIxOA77LbIYmE=
-github.com/onflow/crypto v0.25.0 h1:BeWbLsh3ZD13Ej+Uky6kg1PL1ZIVBDVX+2MVBNwqddg=
-github.com/onflow/crypto v0.25.0/go.mod h1:C8FbaX0x8y+FxWjbkHy0Q4EASCDR9bSPWZqlpCLYyVI=
+github.com/onflow/crypto v0.25.1 h1:0txy2PKPMM873JbpxQNbJmuOJtD56bfs48RQfm0ts5A=
+github.com/onflow/crypto v0.25.1/go.mod h1:C8FbaX0x8y+FxWjbkHy0Q4EASCDR9bSPWZqlpCLYyVI=
 github.com/onflow/flow v0.3.4 h1:FXUWVdYB90f/rjNcY0Owo30gL790tiYff9Pb/sycXYE=
 github.com/onflow/flow v0.3.4/go.mod h1:lzyAYmbu1HfkZ9cfnL5/sjrrsnJiUU8fRL26CqLP7+c=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1 h1:xF5wHug6H8vKfz7p1LYy9jck6eD9K1HLjTdi6o4kg1k=

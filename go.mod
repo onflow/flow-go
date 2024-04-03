@@ -52,7 +52,7 @@ require (
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/onflow/atree v0.6.0
 	github.com/onflow/cadence v0.42.9
-	github.com/onflow/crypto v0.25.0
+	github.com/onflow/crypto v0.25.1
 	github.com/onflow/flow v0.3.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1
