@@ -313,7 +313,7 @@ func (b *backendTransactions) GetTransactionResult(
 		if block == nil {
 			txStatus, err = b.DeriveUnknownTransactionStatus(tx.ReferenceBlockID)
 		} else {
-			txStatus, err = b.DeriveTransactionStatus(blockID, blockHeight, false)
+			txStatus, err = b.DeriveTransactionStatus(blockHeight, false)
 		}
 
 		if err != nil {
@@ -439,7 +439,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromExecutionNode(
 			txResult := resp.TransactionResults[i]
 
 			// tx body is irrelevant to status if it's in an executed block
-			txStatus, err := b.DeriveTransactionStatus(blockID, block.Header.Height, true)
+			txStatus, err := b.DeriveTransactionStatus(block.Header.Height, true)
 			if err != nil {
 				if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 					irrecoverable.Throw(ctx, err)
@@ -488,7 +488,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromExecutionNode(
 		}
 
 		systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
-		systemTxStatus, err := b.DeriveTransactionStatus(blockID, block.Header.Height, true)
+		systemTxStatus, err := b.DeriveTransactionStatus(block.Header.Height, true)
 		if err != nil {
 			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 				irrecoverable.Throw(ctx, err)
@@ -573,7 +573,7 @@ func (b *backendTransactions) getTransactionResultByIndexFromExecutionNode(
 	}
 
 	// tx body is irrelevant to status if it's in an executed block
-	txStatus, err := b.DeriveTransactionStatus(blockID, block.Header.Height, true)
+	txStatus, err := b.DeriveTransactionStatus(block.Header.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
@@ -626,7 +626,7 @@ func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, bl
 	}
 
 	systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
-	systemTxStatus, err := b.DeriveTransactionStatus(blockID, block.Header.Height, true)
+	systemTxStatus, err := b.DeriveTransactionStatus(block.Header.Height, true)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
@@ -793,7 +793,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 	}
 
 	// tx body is irrelevant to status if it's in an executed block
-	txStatus, err := b.DeriveTransactionStatus(blockID, block.Header.Height, true)
+	txStatus, err := b.DeriveTransactionStatus(block.Header.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
