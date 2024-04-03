@@ -13,12 +13,12 @@ import (
 )
 
 // StateMachine implements a low-level interface for state-changing operations on the Epoch state.
-// It is used by higher level logic to coordinate the Epoch handover, evolving its internal state 
-// when Epoch-related Service Events are sealed or specific view-thresholds are reached. 
+// It is used by higher level logic to coordinate the Epoch handover, evolving its internal state
+// when Epoch-related Service Events are sealed or specific view-thresholds are reached.
 //
-// The StateMachine is fork-aware, in that it starts with the Epoch state of the parent block and 
+// The StateMachine is fork-aware, in that it starts with the Epoch state of the parent block and
 // consumes a sequence of sealed Service Events from the child block. A separate instance is created for
-// each block that is being processed. Calling `Build()` constructs a snapshot of the resulting Epoch state. 
+// each block that is being processed. Calling `Build()` constructs a snapshot of the resulting Epoch state.
 type StateMachine interface {
 	// Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
 	// CAUTION:
@@ -36,8 +36,8 @@ type StateMachine interface {
 	// Implementors must never return (true, error).
 	// Expected errors indicating that we are leaving the happy-path of the epoch transitions
 	//   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
-	//     CAUTION: the HappyPathStateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
-	//     after such error and discard the HappyPathStateMachine!
+	//     CAUTION: the StateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
+	//     after such error and discard the StateMachine!
 	ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error)
 
 	// ProcessEpochCommit updates the internally-maintained interim Epoch state with data from epoch commit event.
@@ -48,8 +48,8 @@ type StateMachine interface {
 	// Implementors must never return (true, error).
 	// Expected errors indicating that we are leaving the happy-path of the epoch transitions
 	//   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
-	//     CAUTION: the HappyPathStateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
-	//     after such error and discard the HappyPathStateMachine!
+	//     CAUTION: the StateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
+	//     after such error and discard the StateMachine!
 	ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error)
 
 	// EjectIdentity updates identity table by changing the node's participation status to 'ejected'.
