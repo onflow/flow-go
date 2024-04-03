@@ -98,9 +98,9 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 // ConstructRootQCsForClusters constructs a root QC for each cluster in the list.
 // Args:
 // - log: the logger instance.
-// - clusterList: identity list of partner nodes.
-// - nodeInfos: identity list of internal nodes.
-// - clusterBlocks: the number of collectors in each generated cluster.
+// - clusterList: list of clusters
+// - nodeInfos: list of NodeInfos (must contain all internal nodes)
+// - clusterBlocks: list of root blocks for each cluster
 // Returns:
 // - flow.AssignmentList: the generated assignment list.
 // - flow.ClusterList: the generate collection cluster list.
