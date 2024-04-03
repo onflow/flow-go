@@ -332,11 +332,11 @@ func (suite *SameGRPCPortTestSuite) TestEnginesOnTheSameGrpcPort() {
 	})
 
 	suite.Run("happy path - grpc execution data api client can connect successfully", func() {
-		req := &executiondataproto.SubscribeEventsRequest{}
+		req := &executiondataproto.SubscribeEventsFromLatestRequest{}
 
 		client := suite.unsecureExecutionDataAPIClient(conn)
 
-		_, err := client.SubscribeEvents(ctx, req)
+		_, err := client.SubscribeEventsFromLatest(ctx, req)
 		assert.NoError(suite.T(), err, "failed to subscribe events")
 	})
 	defer closer.Close()
