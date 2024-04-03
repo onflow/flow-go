@@ -219,6 +219,8 @@ func (r *FungibleTokenTracker) iterateChildren(tr trace, addr flow.Address, valu
 
 				// continue iteration
 				return true
-			})
+			},
+			interpreter.EmptyLocationRange,
+		)
 	}
 }
