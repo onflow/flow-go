@@ -35,6 +35,7 @@ import (
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/state/protocol/snapshots"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -403,7 +404,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 
 		// the handler should return a snapshot history limit error
 		_, err = backend.GetLatestProtocolStateSnapshot(context.Background())
-		suite.Require().ErrorIs(err, SnapshotHistoryLimitErr)
+		suite.Require().ErrorIs(err, snapshots.ErrSnapshotHistoryLimit)
 	})
 }
 
@@ -677,7 +678,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 			suite.Require().Error(err)
 			suite.Require().Empty(bytes)
 			suite.Require().Equal(status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block, try again with different block: %v",
-				ErrSnapshotPhaseMismatch).Error(),
+				snapshots.ErrSnapshotPhaseMismatch).Error(),
 				err.Error())
 		})
 
@@ -698,7 +699,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 			suite.Require().Error(err)
 			suite.Require().Empty(bytes)
 			suite.Require().Equal(status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block, try again with different block: %v",
-				ErrSnapshotPhaseMismatch).Error(),
+				snapshots.ErrSnapshotPhaseMismatch).Error(),
 				err.Error())
 		})
 	})
@@ -815,7 +816,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight_InvalidSegment() {
 		suite.Require().Error(err)
 		suite.Require().Equal(status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block, try "+
 			"again with different block: %v",
-			ErrSnapshotPhaseMismatch).Error(),
+			snapshots.ErrSnapshotPhaseMismatch).Error(),
 			err.Error())
 	})
 }
