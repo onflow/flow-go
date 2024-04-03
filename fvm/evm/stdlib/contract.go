@@ -56,7 +56,7 @@ var EVMTransactionBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.T
 
 var evmTransactionBytesType = sema.NewVariableSizedType(nil, sema.UInt8Type)
 
-var evmTransactionsBatchBytesType = sema.NewVariableSizedType(nil, evmTransactionBytesType)
+var EVMTransactionsBatchBytesType = sema.NewVariableSizedType(nil, evmTransactionBytesType)
 
 var evmAddressBytesType = sema.NewConstantSizedType(nil, sema.UInt8Type, types.AddressLength)
 
@@ -1003,7 +1003,7 @@ var internalEVMTypeBatchRunFunctionType = &sema.FunctionType{
 	Parameters: []sema.Parameter{
 		{
 			Label:          "txs",
-			TypeAnnotation: sema.NewTypeAnnotation(evmTransactionsBatchBytesType),
+			TypeAnnotation: sema.NewTypeAnnotation(EVMTransactionsBatchBytesType),
 		},
 		{
 			Label:          "coinbase",
@@ -1934,6 +1934,12 @@ var InternalEVMContractType = func() *sema.CompositeType {
 			ty,
 			internalEVMTypeRunFunctionName,
 			internalEVMTypeRunFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeBatchRunFunctionName,
+			internalEVMTypeBatchRunFunctionType,
 			"",
 		),
 		sema.NewUnmeteredPublicFunctionMember(
