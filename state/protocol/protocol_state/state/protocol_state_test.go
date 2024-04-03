@@ -100,14 +100,14 @@ func TestMutableProtocolState_Mutator(t *testing.T) {
 		require.NoError(t, err)
 		kvStoreSnapshotsDB.On("ByBlockID", candidate.ParentID).Return(parentState, nil)
 
-		mutator, err := mutableState.Mutator(candidate)
+		mutator, err := mutableState.Mutator(candidate.View, candidate.ParentID)
 		require.NoError(t, err)
 		require.NotNil(t, mutator)
 	})
 	t.Run("parent-not-found", func(t *testing.T) {
 		candidate := unittest.BlockHeaderFixture()
 		kvStoreSnapshotsDB.On("ByBlockID", candidate.ParentID).Return(nil, storage.ErrNotFound)
-		mutator, err := mutableState.Mutator(candidate)
+		mutator, err := mutableState.Mutator(candidate.View, candidate.ParentID)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 		require.Nil(t, mutator)
 	})

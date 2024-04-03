@@ -2,7 +2,7 @@ package protocol_state
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // This file contains versioned read and read-write interfaces to the Protocol State's
@@ -162,7 +162,7 @@ type OrthogonalStoreStateMachine[P any] interface {
 	//   - database updates necessary for persisting the updated protocol sub-state and its *dependencies*.
 	//     It may contain updates for the sub-state itself and for any dependency that is affected by the update.
 	//     Deferred updates must be applied in a transaction to ensure atomicity.
-	Build() []transaction.DeferredDBUpdate
+	Build() protocol.DeferredDBUpdates
 
 	// ProcessUpdate processes an ordered list of sealed service events.
 	// Usually, each state machine performs filtering of relevant events and ignores all other events.
@@ -187,5 +187,5 @@ type KeyValueStoreStateMachine = OrthogonalStoreStateMachine[KVStoreReader]
 type KeyValueStoreStateMachineFactory interface {
 	// Create creates a new instance of an underlying type that operates on KV Store and is created for a specific candidate block.
 	// No errors are expected during normal operations.
-	Create(candidate *flow.Header, parentState KVStoreReader, mutator KVStoreMutator) (KeyValueStoreStateMachine, error)
+	Create(view uint64, parentID flow.Identifier, parentState KVStoreReader, mutator KVStoreMutator) (KeyValueStoreStateMachine, error)
 }

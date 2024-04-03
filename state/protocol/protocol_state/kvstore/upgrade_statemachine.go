@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // PSVersionUpgradeStateMachine is a dedicated structure that encapsulates all logic for evolving KV store, based on the content
@@ -41,8 +40,8 @@ func NewPSVersionUpgradeStateMachine(
 }
 
 // Build returns updated key-value store model, state ID and a flag indicating if there were any changes.
-func (m *PSVersionUpgradeStateMachine) Build() []transaction.DeferredDBUpdate {
-	return nil
+func (m *PSVersionUpgradeStateMachine) Build() protocol.DeferredDBUpdates {
+	return protocol.DeferredDBUpdates{}
 }
 
 // ProcessUpdate processes an ordered list of sealed service events.

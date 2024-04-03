@@ -89,21 +89,22 @@ func NewMutableProtocolState(
 // Has to be called for each block to evolve the protocol state.
 // Expected errors during normal operations:
 //   - `storage.ErrNotFound` if no protocol state for parent block is known.
-func (s *MutableProtocolState) Mutator(candidate *flow.Header) (protocol.StateMutator, error) {
-	parentStateData, err := s.kvStoreSnapshots.ByBlockID(candidate.ParentID)
+func (s *MutableProtocolState) Mutator(view uint64, parentID flow.Identifier) (protocol.StateMutator, error) {
+	parentStateData, err := s.kvStoreSnapshots.ByBlockID(parentID)
 	if err != nil {
-		return nil, fmt.Errorf("could not query parent KV store at block (%x): %w", candidate.ParentID, err)
+		return nil, fmt.Errorf("could not query parent KV store at block (%x): %w", parentID, err)
 	}
 	parentState, err := kvstore.VersionedDecode(parentStateData.Version, parentStateData.Data)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode parent protocol state (version=%d) at block (%x): %w",
-			parentStateData.Version, candidate.ParentID, err)
+			parentStateData.Version, parentID, err)
 	}
 	return newStateMutator(
 		s.headers,
 		s.results,
 		s.kvStoreSnapshots,
-		candidate,
+		view,
+		parentID,
 		parentState,
 		s.kvStoreFactories...,
 	)

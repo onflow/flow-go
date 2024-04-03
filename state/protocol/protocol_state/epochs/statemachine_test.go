@@ -75,7 +75,8 @@ func (s *EpochStateMachineSuite) SetupTest() {
 
 	var err error
 	s.stateMachine, err = epochs.NewEpochStateMachine(
-		s.candidate,
+		s.candidate.View,
+		s.candidate.ParentID,
 		s.globalParams,
 		s.setupsDB,
 		s.commitsDB,
@@ -107,7 +108,7 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 	// in next loop we assert that we have received expected deferred db updates by executing them
 	// and expecting that corresponding mock methods will be called
 	tx := &transaction.Tx{}
-	for _, dbUpdate := range dbUpdates {
+	for _, dbUpdate := range dbUpdates.Decorate(s.candidate.ID()) {
 		err := dbUpdate(tx)
 		require.NoError(s.T(), err)
 	}
@@ -156,7 +157,7 @@ func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	// in next loop we assert that we have received expected deferred db updates by executing them
 	// and expecting that corresponding mock methods will be called
 	tx := &transaction.Tx{}
-	for _, dbUpdate := range dbUpdates {
+	for _, dbUpdate := range dbUpdates.Decorate(s.candidate.ID()) {
 		err := dbUpdate(tx)
 		require.NoError(s.T(), err)
 	}
@@ -178,7 +179,8 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 
 			candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FirstView + 1))
 			stateMachine, err := epochs.NewEpochStateMachine(
-				candidate,
+				candidate.View,
+				candidate.ParentID,
 				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
@@ -203,7 +205,8 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			fallbackPathStateMachineFactory.On("Execute", candidate.View, s.parentEpochState).
 				Return(s.happyPathStateMachine, nil).Once()
 			stateMachine, err := epochs.NewEpochStateMachine(
-				candidate,
+				candidate.View,
+				candidate.ParentID,
 				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
@@ -234,7 +237,8 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			happyPathStateMachineFactory.On("Execute", candidate.View, s.parentEpochState).
 				Return(s.happyPathStateMachine, nil).Once()
 			stateMachine, err := epochs.NewEpochStateMachine(
-				candidate,
+				candidate.View,
+				candidate.ParentID,
 				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
@@ -259,7 +263,8 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			fallbackPathStateMachineFactory.On("Execute", candidate.View, s.parentEpochState).
 				Return(s.happyPathStateMachine, nil).Once()
 			stateMachine, err := epochs.NewEpochStateMachine(
-				candidate,
+				candidate.View,
+				candidate.ParentID,
 				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
@@ -287,7 +292,8 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 
 			candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FirstView + 1))
 			stateMachine, err := epochs.NewEpochStateMachine(
-				candidate,
+				candidate.View,
+				candidate.ParentID,
 				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
@@ -312,7 +318,8 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			happyPathStateMachineFactory.On("Execute", candidate.View, s.parentEpochState).
 				Return(s.happyPathStateMachine, nil).Once()
 			stateMachine, err := epochs.NewEpochStateMachine(
-				candidate,
+				candidate.View,
+				candidate.ParentID,
 				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
@@ -337,7 +344,8 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
 
 			stateMachine, err := epochs.NewEpochStateMachine(
-				s.candidate,
+				s.candidate.View,
+				s.candidate.ParentID,
 				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
@@ -358,7 +366,8 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			fallbackPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).Return(nil, exception).Once()
 
 			stateMachine, err := epochs.NewEpochStateMachine(
-				s.candidate,
+				s.candidate.View,
+				s.candidate.ParentID,
 				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
@@ -382,7 +391,8 @@ func (s *EpochStateMachineSuite) TestProcessUpdate_InvalidEpochSetup() {
 		happyPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).Return(s.happyPathStateMachine, nil).Once()
 		fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
 		stateMachine, err := epochs.NewEpochStateMachine(
-			s.candidate,
+			s.candidate.View,
+			s.candidate.ParentID,
 			s.globalParams,
 			s.setupsDB,
 			s.commitsDB,
@@ -427,7 +437,8 @@ func (s *EpochStateMachineSuite) TestProcessUpdate_InvalidEpochCommit() {
 		happyPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).Return(s.happyPathStateMachine, nil).Once()
 		fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
 		stateMachine, err := epochs.NewEpochStateMachine(
-			s.candidate,
+			s.candidate.View,
+			s.candidate.ParentID,
 			s.globalParams,
 			s.setupsDB,
 			s.commitsDB,

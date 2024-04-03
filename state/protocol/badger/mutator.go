@@ -598,7 +598,7 @@ func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow
 	defer span.End()
 
 	// instantiate Protocol State Mutator from the parent block's state and apply any state-changing service events sealed by this block
-	stateMutator, err := m.protocolState.Mutator(candidate.Header)
+	stateMutator, err := m.protocolState.Mutator(candidate.Header.View, candidate.Header.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not create protocol state mutator for view %d: %w", candidate.Header.View, err)
 	}
@@ -615,7 +615,7 @@ func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow
 	if updatedStateID != candidate.Payload.ProtocolStateID {
 		return state.NewInvalidExtensionErrorf("invalid protocol state commitment %x in block, which should be %x", candidate.Payload.ProtocolStateID, updatedStateID)
 	}
-	deferredDbOps.AddDbOps(dbUpdates...)
+	deferredDbOps.AddDbOps(dbUpdates.Decorate(candidate.ID())...)
 	return nil
 }
 

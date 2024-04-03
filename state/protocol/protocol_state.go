@@ -92,7 +92,7 @@ type MutableProtocolState interface {
 	// Has to be called for each block to evolve the protocol state.
 	// Expected errors during normal operations:
 	//  * `storage.ErrNotFound` if no protocol state for parent block is known.
-	Mutator(candidate *flow.Header) (StateMutator, error)
+	Mutator(view uint64, parentID flow.Identifier) (StateMutator, error)
 }
 
 // StateMutator is a stateful object to evolve the protocol state. It is instantiated from the parent block's protocol state.
@@ -119,7 +119,7 @@ type StateMutator interface {
 	//     of the calling code (specifically `FollowerState`).
 	//
 	// updated protocol state entry, state ID and a flag indicating if there were any changes.
-	Build() (stateID flow.Identifier, dbUpdates []transaction.DeferredDBUpdate, err error)
+	Build() (stateID flow.Identifier, dbUpdates DeferredDBUpdates, err error)
 
 	// ApplyServiceEventsFromValidatedSeals applies the state changes that are delivered via
 	// sealed service events:
@@ -178,4 +178,38 @@ type StateMutator interface {
 	//     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 	//     of this function is not nil. If such an exception is returned, continuing is not an option.
 	ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) error
+}
+
+type DeferredDBUpdate func(tx *transaction.Tx, blockID flow.Identifier) error
+
+type DeferredDBUpdates struct {
+	innerUpdates []DeferredDBUpdate
+}
+
+func (d *DeferredDBUpdates) Add(update ...DeferredDBUpdate) {
+	d.innerUpdates = append(d.innerUpdates, update...)
+}
+
+func (d *DeferredDBUpdates) Merge(other DeferredDBUpdates) {
+	d.innerUpdates = append(d.innerUpdates, other.innerUpdates...)
+}
+
+func (d *DeferredDBUpdates) AddBadgerUpdate(update ...transaction.DeferredDBUpdate) {
+	for _, u := range update {
+		u := u
+		d.innerUpdates = append(d.innerUpdates, func(tx *transaction.Tx, _ flow.Identifier) error {
+			return u(tx)
+		})
+	}
+}
+
+func (d *DeferredDBUpdates) Decorate(blockID flow.Identifier) []transaction.DeferredDBUpdate {
+	updates := make([]transaction.DeferredDBUpdate, 0, len(d.innerUpdates))
+	for _, update := range d.innerUpdates {
+		update := update
+		updates = append(updates, func(tx *transaction.Tx) error {
+			return update(tx, blockID)
+		})
+	}
+	return updates
 }

@@ -85,7 +85,6 @@ type StateMachineFactoryMethod func(candidateView uint64, parentState *flow.Rich
 // which is either a HappyPathStateMachine or a FallbackStateMachine depending on the operation mode of the protocol.
 // It relies on Key-Value Store to commit read the parent state and to commit the updates to the Dynamic Protocol State.
 type EpochStateMachine struct {
-	candidate                        *flow.Header
 	activeStateMachine               StateMachine
 	parentState                      protocol_state.KVStoreReader
 	mutator                          protocol_state.KVStoreMutator
@@ -94,7 +93,7 @@ type EpochStateMachine struct {
 	setups           storage.EpochSetups
 	commits          storage.EpochCommits
 	protocolStateDB  storage.ProtocolState
-	pendingDbUpdates []transaction.DeferredDBUpdate
+	pendingDbUpdates protocol.DeferredDBUpdates
 }
 
 var _ protocol_state.KeyValueStoreStateMachine = (*EpochStateMachine)(nil)
@@ -105,7 +104,8 @@ var _ protocol_state.KeyValueStoreStateMachine = (*EpochStateMachine)(nil)
 // - for the epoch fallback mode it initializes a FallbackStateMachine.
 // No errors are expected during normal operations.
 func NewEpochStateMachine(
-	candidate *flow.Header,
+	view uint64,
+	parentID flow.Identifier,
 	params protocol.GlobalParams,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
@@ -115,9 +115,9 @@ func NewEpochStateMachine(
 	happyPathStateMachineFactory StateMachineFactoryMethod,
 	epochFallbackStateMachineFactory StateMachineFactoryMethod,
 ) (*EpochStateMachine, error) {
-	parentEpochState, err := protocolStateDB.ByBlockID(candidate.ParentID)
+	parentEpochState, err := protocolStateDB.ByBlockID(parentID)
 	if err != nil {
-		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", candidate.ParentID, err)
+		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", parentID, err)
 	}
 
 	// sanity check: the parent epoch state ID must be set in KV store
@@ -129,7 +129,7 @@ func NewEpochStateMachine(
 	var (
 		stateMachine StateMachine
 	)
-	candidateAttemptsInvalidEpochTransition := epochFallbackTriggeredByIncorporatingCandidate(candidate.View, params, parentEpochState)
+	candidateAttemptsInvalidEpochTransition := epochFallbackTriggeredByIncorporatingCandidate(view, params, parentEpochState)
 	if parentEpochState.InvalidEpochTransitionAttempted || candidateAttemptsInvalidEpochTransition {
 		// Case 1: InvalidEpochTransitionAttempted is true, indicating that we have encountered an invalid
 		//         epoch service event or an invalid state transition previously in this fork.
@@ -139,26 +139,24 @@ func NewEpochStateMachine(
 		// and we must use only the `epochFallbackStateMachine` along this fork.
 		//
 		// TODO for 'leaving Epoch Fallback via special service event': this might need to change.
-		stateMachine, err = epochFallbackStateMachineFactory(candidate.View, parentEpochState)
+		stateMachine, err = epochFallbackStateMachineFactory(view, parentEpochState)
 	} else {
-		stateMachine, err = happyPathStateMachineFactory(candidate.View, parentEpochState)
+		stateMachine, err = happyPathStateMachineFactory(view, parentEpochState)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize protocol state machine: %w", err)
 	}
 
 	return &EpochStateMachine{
-		candidate:          candidate,
 		activeStateMachine: stateMachine,
 		parentState:        parentState,
 		mutator:            mutator,
 		epochFallbackStateMachineFactory: func() (StateMachine, error) {
-			return epochFallbackStateMachineFactory(candidate.View, parentEpochState)
+			return epochFallbackStateMachineFactory(view, parentEpochState)
 		},
-		setups:           setups,
-		commits:          commits,
-		protocolStateDB:  protocolStateDB,
-		pendingDbUpdates: nil,
+		setups:          setups,
+		commits:         commits,
+		protocolStateDB: protocolStateDB,
 	}, nil
 }
 
@@ -169,12 +167,14 @@ func NewEpochStateMachine(
 // but the actual epoch state is stored separately, nevertheless, the epoch state ID is used to sanity check if the
 // epoch state is consistent with the KV Store. Using this approach, we commit the epoch sub-state to the KV Store which in
 // affects the Dynamic Protocol State ID which is essentially hash of the KV Store.
-func (e *EpochStateMachine) Build() []transaction.DeferredDBUpdate {
+func (e *EpochStateMachine) Build() protocol.DeferredDBUpdates {
 	updatedEpochState, updatedStateID, hasChanges := e.activeStateMachine.Build()
 	dbUpdates := e.pendingDbUpdates
-	dbUpdates = append(dbUpdates, e.protocolStateDB.Index(e.candidate.ID(), updatedStateID))
+	dbUpdates.Add(func(tx *transaction.Tx, blockID flow.Identifier) error {
+		return e.protocolStateDB.Index(blockID, updatedStateID)(tx)
+	})
 	if hasChanges {
-		dbUpdates = append(dbUpdates, operation.SkipDuplicatesTx(e.protocolStateDB.StoreTx(updatedStateID, updatedEpochState)))
+		dbUpdates.AddBadgerUpdate(operation.SkipDuplicatesTx(e.protocolStateDB.StoreTx(updatedStateID, updatedEpochState)))
 	}
 	e.mutator.SetEpochStateID(updatedStateID)
 
@@ -214,7 +214,7 @@ func (e *EpochStateMachine) ProcessUpdate(update []flow.ServiceEvent) error {
 			return irrecoverable.NewExceptionf("could not apply service events from ordered results: %w", err)
 		}
 	}
-	e.pendingDbUpdates = append(e.pendingDbUpdates, dbUpdates...)
+	e.pendingDbUpdates.AddBadgerUpdate(dbUpdates...)
 	return nil
 }
 

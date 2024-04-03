@@ -30,7 +30,6 @@ type stateMutator struct {
 	results          storage.ExecutionResults
 	kvStoreSnapshots storage.ProtocolKVStore
 
-	candidate            *flow.Header
 	parentState          protocol_state.KVStoreReader
 	kvMutator            protocol_state.KVStoreMutator
 	orthoKVStoreMachines []protocol_state.KeyValueStoreStateMachine
@@ -45,13 +44,14 @@ func newStateMutator(
 	headers storage.Headers,
 	results storage.ExecutionResults,
 	kvStoreSnapshots storage.ProtocolKVStore,
-	candidate *flow.Header,
+	view uint64,
+	parentID flow.Identifier,
 	parentState protocol_state.KVStoreAPI,
 	stateMachineFactories ...protocol_state.KeyValueStoreStateMachineFactory,
 ) (*stateMutator, error) {
 	protocolVersion := parentState.GetProtocolStateVersion()
 	if versionUpgrade := parentState.GetVersionUpgrade(); versionUpgrade != nil {
-		if candidate.View >= versionUpgrade.ActivationView {
+		if view >= versionUpgrade.ActivationView {
 			protocolVersion = versionUpgrade.Data
 		}
 	}
@@ -64,7 +64,7 @@ func newStateMutator(
 
 	stateMachines := make([]protocol_state.KeyValueStoreStateMachine, 0, len(stateMachineFactories))
 	for _, factory := range stateMachineFactories {
-		stateMachine, err := factory.Create(candidate, parentState, replicatedState)
+		stateMachine, err := factory.Create(view, parentID, parentState, replicatedState)
 		if err != nil {
 			return nil, fmt.Errorf("could not create state machine: %w", err)
 		}
@@ -72,7 +72,6 @@ func newStateMutator(
 	}
 
 	return &stateMutator{
-		candidate:            candidate,
 		headers:              headers,
 		results:              results,
 		kvStoreSnapshots:     kvStoreSnapshots,
@@ -92,21 +91,23 @@ func newStateMutator(
 //     of the calling code (specifically `FollowerState`).
 //
 // updated protocol state entry, state ID and a flag indicating if there were any changes.
-func (m *stateMutator) Build() (flow.Identifier, []transaction.DeferredDBUpdate, error) {
-	var dbUpdates []transaction.DeferredDBUpdate
+func (m *stateMutator) Build() (flow.Identifier, protocol.DeferredDBUpdates, error) {
+	var dbUpdates protocol.DeferredDBUpdates
 	for _, stateMachine := range m.orthoKVStoreMachines {
-		dbUpdates = append(dbUpdates, stateMachine.Build()...)
+		dbUpdates.Merge(stateMachine.Build())
 	}
 	stateID := m.kvMutator.ID()
 	version, data, err := m.kvMutator.VersionedEncode()
 	if err != nil {
-		return flow.ZeroID, nil, fmt.Errorf("could not encode protocol state: %w", err)
+		return flow.ZeroID, protocol.DeferredDBUpdates{}, fmt.Errorf("could not encode protocol state: %w", err)
 	}
 
 	// Schedule deferred database operations to index the protocol state by the candidate block's ID
 	// and persist the new protocol state (if there are any changes)
-	dbUpdates = append(dbUpdates, m.kvStoreSnapshots.IndexTx(m.candidate.ID(), stateID))
-	dbUpdates = append(dbUpdates, operation.SkipDuplicatesTx(m.kvStoreSnapshots.StoreTx(stateID, &storage.KeyValueStoreData{
+	dbUpdates.Add(func(tx *transaction.Tx, blockID flow.Identifier) error {
+		return m.kvStoreSnapshots.IndexTx(blockID, stateID)(tx)
+	})
+	dbUpdates.AddBadgerUpdate(operation.SkipDuplicatesTx(m.kvStoreSnapshots.StoreTx(stateID, &storage.KeyValueStoreData{
 		Version: version,
 		Data:    data,
 	})))

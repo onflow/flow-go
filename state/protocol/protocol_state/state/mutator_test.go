@@ -57,7 +57,8 @@ func (s *StateMutatorSuite) SetupTest() {
 		s.headersDB,
 		s.resultsDB,
 		s.protocolKVStoreDB,
-		s.candidate,
+		s.candidate.View,
+		s.candidate.ParentID,
 		s.parentState,
 	)
 	require.NoError(s.T(), err)
@@ -77,10 +78,10 @@ func (s *StateMutatorSuite) TestBuild_HappyPath() {
 		stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol_state.KVStoreReader](s.T())
 		deferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
 		deferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
-		stateMachine.On("Build").Return([]transaction.DeferredDBUpdate{
-			deferredUpdate.Execute,
-		})
-		factory.On("Create", s.candidate, s.parentState, s.replicatedState).Return(stateMachine, nil)
+		deferredDBUpdates := protocol.DeferredDBUpdates{}
+		deferredDBUpdates.AddBadgerUpdate(deferredUpdate.Execute)
+		stateMachine.On("Build").Return(deferredDBUpdates)
+		factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, s.replicatedState).Return(stateMachine, nil)
 		factories[i] = factory
 	}
 
@@ -89,7 +90,8 @@ func (s *StateMutatorSuite) TestBuild_HappyPath() {
 		s.headersDB,
 		s.resultsDB,
 		s.protocolKVStoreDB,
-		s.candidate,
+		s.candidate.View,
+		s.candidate.ParentID,
 		s.parentState,
 		factories...,
 	)
@@ -118,7 +120,7 @@ func (s *StateMutatorSuite) TestBuild_HappyPath() {
 	// in next loop we assert that we have received expected deferred db updates by executing them
 	// and expecting that corresponding mock methods will be called
 	tx := &transaction.Tx{}
-	for _, dbUpdate := range dbUpdates {
+	for _, dbUpdate := range dbUpdates.Decorate(s.candidate.ID()) {
 		err := dbUpdate(tx)
 		require.NoError(s.T(), err)
 	}
@@ -149,7 +151,7 @@ func (s *StateMutatorSuite) TestBuild_NoChanges() {
 	require.NoError(s.T(), err)
 
 	tx := &transaction.Tx{}
-	for _, dbUpdate := range dbUpdates {
+	for _, dbUpdate := range dbUpdates.Decorate(s.candidate.ID()) {
 		err := dbUpdate(tx)
 		require.NoError(s.T(), err)
 	}
@@ -179,7 +181,8 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 			s.headersDB,
 			s.resultsDB,
 			s.protocolKVStoreDB,
-			s.candidate,
+			s.candidate.View,
+			s.candidate.ParentID,
 			s.parentState,
 		)
 		require.NoError(s.T(), err)
@@ -200,7 +203,8 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 			s.headersDB,
 			s.resultsDB,
 			s.protocolKVStoreDB,
-			s.candidate,
+			s.candidate.View,
+			s.candidate.ParentID,
 			parentState,
 		)
 		require.NoError(s.T(), err)
@@ -220,7 +224,8 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 			s.headersDB,
 			s.resultsDB,
 			s.protocolKVStoreDB,
-			s.candidate,
+			s.candidate.View,
+			s.candidate.ParentID,
 			parentState,
 		)
 		require.NoError(s.T(), err)
@@ -237,7 +242,8 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 			s.headersDB,
 			s.resultsDB,
 			s.protocolKVStoreDB,
-			s.candidate,
+			s.candidate.View,
+			s.candidate.ParentID,
 			parentState,
 		)
 		require.ErrorIs(s.T(), err, exception)
@@ -250,7 +256,7 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 			factory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
 			stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol_state.KVStoreReader](s.T())
 			calledIndex := i
-			factory.On("Create", s.candidate, s.parentState, s.replicatedState).Run(func(_ mock.Arguments) {
+			factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, s.replicatedState).Run(func(_ mock.Arguments) {
 				if lastCalledIdx >= calledIndex {
 					require.Failf(s.T(), "state machine factories must be called in order",
 						"expected %d, got %d", lastCalledIdx, calledIndex)
@@ -264,7 +270,8 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 			s.headersDB,
 			s.resultsDB,
 			s.protocolKVStoreDB,
-			s.candidate,
+			s.candidate.View,
+			s.candidate.ParentID,
 			s.parentState,
 			factories...,
 		)
@@ -274,13 +281,14 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 	s.Run("create-state-machine-exception", func() {
 		factory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
 		exception := errors.New("exception")
-		factory.On("Create", s.candidate, s.parentState, s.replicatedState).Return(nil, exception)
+		factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, s.replicatedState).Return(nil, exception)
 
 		mutator, err := newStateMutator(
 			s.headersDB,
 			s.resultsDB,
 			s.protocolKVStoreDB,
-			s.candidate,
+			s.candidate.View,
+			s.candidate.ParentID,
 			s.parentState,
 			factory,
 		)
@@ -298,7 +306,7 @@ func (s *StateMutatorSuite) TestApplyServiceEventsFromValidatedSeals() {
 			factory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
 			stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol_state.KVStoreReader](s.T())
 			stateMachine.On("ProcessUpdate", mock.Anything).Return(nil).Once()
-			factory.On("Create", s.candidate, s.parentState, s.replicatedState).Return(stateMachine, nil)
+			factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, s.replicatedState).Return(stateMachine, nil)
 			factories[i] = factory
 		}
 
@@ -306,7 +314,8 @@ func (s *StateMutatorSuite) TestApplyServiceEventsFromValidatedSeals() {
 			s.headersDB,
 			s.resultsDB,
 			s.protocolKVStoreDB,
-			s.candidate,
+			s.candidate.View,
+			s.candidate.ParentID,
 			s.parentState,
 			factories...,
 		)
@@ -330,13 +339,14 @@ func (s *StateMutatorSuite) TestApplyServiceEventsFromValidatedSeals() {
 		stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol_state.KVStoreReader](s.T())
 		exception := errors.New("exception")
 		stateMachine.On("ProcessUpdate", mock.Anything).Return(exception).Once()
-		factory.On("Create", s.candidate, s.parentState, s.replicatedState).Return(stateMachine, nil)
+		factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, s.replicatedState).Return(stateMachine, nil)
 
 		mutator, err := newStateMutator(
 			s.headersDB,
 			s.resultsDB,
 			s.protocolKVStoreDB,
-			s.candidate,
+			s.candidate.View,
+			s.candidate.ParentID,
 			s.parentState,
 			factory,
 		)
