@@ -393,17 +393,6 @@ func (builder *SealingSegmentBuilder) validateSegment() error {
 		}
 	}
 
-	// blocks must be connected
-	allBlocks := append(builder.extraBlocks, builder.blocks...)
-	prev := allBlocks[0]
-	for _, block := range allBlocks[1:] {
-		if block.Header.Height != prev.Header.Height+1 {
-			return fmt.Errorf("blocks are not connected, expected height %d, got %d", prev.Header.Height+1, block.Header.Height)
-		}
-
-		prev = block
-	}
-
 	// if root sealing segment, use different validation
 	if isRootSegment(builder.latestSeals) {
 		err := builder.validateRootSegment()
