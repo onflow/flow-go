@@ -232,9 +232,9 @@ func (dr *CadenceValueDiffReporter) diffStorageDomain(oldRuntime, newRuntime *re
 			continue
 		}
 
-		oldValue := oldStorageMap.ReadValue(nopMemoryGauge, mapKey)
+		oldValue := oldStorageMap.ReadValue(nil, mapKey)
 
-		newValue := newStorageMap.ReadValue(nopMemoryGauge, mapKey)
+		newValue := newStorageMap.ReadValue(nil, mapKey)
 
 		hasDifference := dr.diffValues(
 			oldRuntime.Interpreter,
