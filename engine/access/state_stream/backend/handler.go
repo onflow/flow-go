@@ -184,13 +184,9 @@ func (h *Handler) SubscribeEventsFromStartBlockID(request *executiondata.Subscri
 	h.StreamCount.Add(1)
 	defer h.StreamCount.Add(-1)
 
-	startBlockID := flow.ZeroID
-	if request.GetStartBlockId() != nil {
-		blockID, err := convert.BlockID(request.GetStartBlockId())
-		if err != nil {
-			return status.Errorf(codes.InvalidArgument, "could not convert start block ID: %v", err)
-		}
-		startBlockID = blockID
+	startBlockID, err := convert.BlockID(request.GetStartBlockId())
+	if err != nil {
+		return status.Errorf(codes.InvalidArgument, "could not convert start block ID: %v", err)
 	}
 
 	filter, err := h.getEventFilter(request.GetFilter())
@@ -328,19 +324,18 @@ func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, req
 // Expected errors during normal operation:
 // - codes.InvalidArgument - if the provided event filter is invalid.
 func (h *Handler) getEventFilter(eventFilter *executiondata.EventFilter) (state_stream.EventFilter, error) {
-	filter := state_stream.EventFilter{}
-	if eventFilter != nil {
-		var err error
-		filter, err = state_stream.NewEventFilter(
-			h.eventFilterConfig,
-			h.chain,
-			eventFilter.GetEventType(),
-			eventFilter.GetAddress(),
-			eventFilter.GetContract(),
-		)
-		if err != nil {
-			return filter, status.Errorf(codes.InvalidArgument, "invalid event filter: %v", err)
-		}
+	if eventFilter == nil {
+		return state_stream.EventFilter{}, nil
+	}
+	filter, err := state_stream.NewEventFilter(
+		h.eventFilterConfig,
+		h.chain,
+		eventFilter.GetEventType(),
+		eventFilter.GetAddress(),
+		eventFilter.GetContract(),
+	)
+	if err != nil {
+		return filter, status.Errorf(codes.InvalidArgument, "invalid event filter: %v", err)
 	}
 	return filter, nil
 }
