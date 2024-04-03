@@ -15,9 +15,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// FindHeightByCheckpoints finds the height of the sealed block that produces one of the state commitments
-// in the given checkpoint file.
-func FindHeightByCheckpoints(
+// FindHeightsByCheckpoints finds the sealed height that produces the state commitment included in the checkpoint file.
+func FindHeightsByCheckpoints(
 	logger zerolog.Logger,
 	headers storage.Headers,
 	seals storage.Seals,
@@ -25,13 +24,18 @@ func FindHeightByCheckpoints(
 	blocksToSkip uint,
 	startHeight uint64,
 	endHeight uint64,
-) (uint64, flow.StateCommitment, error) {
+) (
+	uint64, // sealed height that produces the state commitment included in the checkpoint file
+	flow.StateCommitment, // the state commitment that matches the sealed height
+	uint64, // the finalized height that seals the sealed height
+	error,
+) {
 
 	// find all trie root hashes in the checkpoint file
 	dir, fileName := filepath.Split(checkpointFilePath)
 	hashes, err := wal.ReadTriesRootHash(logger, dir, fileName)
 	if err != nil {
-		return 0, flow.DummyStateCommitment,
+		return 0, flow.DummyStateCommitment, 0,
 			fmt.Errorf("could not read trie root hashes from checkpoint file %v: %w",
 				checkpointFilePath, err)
 	}
@@ -39,33 +43,8 @@ func FindHeightByCheckpoints(
 	// convert all trie root hashes to state commitments
 	commitments := hashesToCommits(hashes)
 
-	// find a finalized block that produces one of the state commitment
-	// in the given list of state commitments
-	height, commit, err := findSealedHeightForCommits(
-		headers,
-		seals,
-		commitments,
-		blocksToSkip,
-		startHeight,
-		endHeight,
-	)
-	if err != nil {
-		return 0, flow.DummyStateCommitment, fmt.Errorf("could not find sealed height by checkpoints: %w", err)
-	}
-
-	return height, commit, nil
-}
-
-func findSealedHeightForCommits(
-	headers storage.Headers,
-	seals storage.Seals,
-	stateCommitments []flow.StateCommitment,
-	blocksToSkip uint,
-	startHeight uint64,
-	endHeight uint64,
-) (uint64, flow.StateCommitment, error) {
-	commitMap := make(map[flow.StateCommitment]struct{}, len(stateCommitments))
-	for _, commit := range stateCommitments {
+	commitMap := make(map[flow.StateCommitment]struct{}, len(commitments))
+	for _, commit := range commitments {
 		commitMap[commit] = struct{}{}
 	}
 
@@ -76,24 +55,35 @@ func findSealedHeightForCommits(
 	// end height must be a sealed block
 	step := blocksToSkip + 1
 	for height := endHeight; height >= startHeight; height -= uint64(step) {
-		blockID, err := headers.BlockIDByHeight(height)
+		finalizedID, err := headers.BlockIDByHeight(height)
 		if err != nil {
-			return 0, flow.DummyStateCommitment, fmt.Errorf("could not find block by height %v: %w", height, err)
+			return 0, flow.DummyStateCommitment, 0,
+				fmt.Errorf("could not find block by height %v: %w", height, err)
 		}
 
 		// since height is a sealed block height, then we must be able to find the seal for this block
-		seal, err := seals.FinalizedSealForBlock(blockID)
+		finalizedSeal, err := seals.HighestInFork(finalizedID)
 		if err != nil {
-			return 0, flow.DummyStateCommitment, fmt.Errorf("could not find seal for block %v at height %v: %w", blockID, height, err)
+			return 0, flow.DummyStateCommitment, 0,
+				fmt.Errorf("could not find seal for block %v at height %v: %w", finalizedID, height, err)
 		}
 
-		commit := seal.FinalState
+		commit := finalizedSeal.FinalState
 
 		_, ok := commitMap[commit]
 		if ok {
-			log.Info().Msgf("successfully found block %v at height %v for commit %x",
-				blockID, height, commit)
-			return height, commit, nil
+			sealedBlock, err := headers.ByBlockID(finalizedSeal.BlockID)
+			if err != nil {
+				return 0, flow.DummyStateCommitment, 0,
+					fmt.Errorf("could not find block by ID %v: %w", finalizedSeal.BlockID, err)
+			}
+
+			log.Info().Msgf("successfully found block %v (%v) that seals block %v (%v) for commit %x in checkpoint file %v",
+				height, finalizedID,
+				sealedBlock.Height, finalizedSeal.BlockID,
+				commit, checkpointFilePath)
+
+			return sealedBlock.Height, commit, height, nil
 		}
 
 		if height < uint64(step) {
@@ -101,7 +91,8 @@ func findSealedHeightForCommits(
 		}
 	}
 
-	return 0, flow.DummyStateCommitment, fmt.Errorf("could not find commit within height range [%v,%v]", startHeight, endHeight)
+	return 0, flow.DummyStateCommitment, 0,
+		fmt.Errorf("could not find commit within height range [%v,%v]", startHeight, endHeight)
 }
 
 // GenerateProtocolSnapshotForCheckpoint finds a sealed block that produces the state commitment contained in the latest
@@ -185,17 +176,11 @@ func GenerateProtocolSnapshotForCheckpointWithHeights(
 		Uint("blocksToSkip", blocksToSkip).
 		Msgf("generating protocol snapshot for checkpoint file %v", checkpointFilePath)
 	// find the height of the finalized block that produces the state commitment contained in the checkpoint file
-	sealedHeight, commit, err := FindHeightByCheckpoints(logger, headers, seals, checkpointFilePath, blocksToSkip, startHeight, endHeight)
+	sealedHeight, commit, finalizedHeight, err := FindHeightsByCheckpoints(logger, headers, seals, checkpointFilePath, blocksToSkip, startHeight, endHeight)
 	if err != nil {
 		return nil, 0, flow.DummyStateCommitment, fmt.Errorf("could not find sealed height in range [%v:%v] (blocksToSkip: %v) by checkpoints: %w",
 			startHeight, endHeight, blocksToSkip,
 			err)
-	}
-
-	// find which finalized height seals the block with the given sealed height
-	finalizedHeight, err := findFinalizedHeightBySealedHeight(state, sealedHeight)
-	if err != nil {
-		return nil, 0, flow.DummyStateCommitment, fmt.Errorf("could not find finalized height for sealed height %v: %w", sealedHeight, err)
 	}
 
 	snapshot := state.AtHeight(finalizedHeight)
@@ -214,36 +199,4 @@ func hashesToCommits(hashes []ledger.RootHash) []flow.StateCommitment {
 		commits[i] = flow.StateCommitment(h)
 	}
 	return commits
-}
-
-// findFinalizedHeightBySealedHeight finds the finalized height that seals the block with the given sealed height
-func findFinalizedHeightBySealedHeight(state protocol.State, sealedHeight uint64) (uint64, error) {
-	sealed, err := state.AtHeight(sealedHeight).Head()
-	if err != nil {
-		return 0, err
-	}
-	sealedID := sealed.ID()
-
-	lastFinalized, err := state.Final().Head()
-	if err != nil {
-		return 0, fmt.Errorf("could not get last finalized block: %w", err)
-	}
-	lastFinalizedHeight := lastFinalized.Height
-
-	// the finalized height that seals the given sealed height must be above the sealed height
-	// so if we iterate through each height, we should eventually find the finalized height
-	for height := sealedHeight; height <= lastFinalizedHeight; height++ {
-		_, seal, err := state.AtHeight(height).SealedResult()
-		if err != nil {
-			return 0, fmt.Errorf("could not get sealed result at height %v: %w", height, err)
-		}
-
-		// if the block contains a seal that seals the block with the given sealed height
-		// then it's the finalized height that we are looking for
-		if seal.BlockID == sealedID {
-			return height, nil
-		}
-	}
-
-	return 0, fmt.Errorf("could not find finalized height for sealed height %v", sealedHeight)
 }
