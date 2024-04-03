@@ -32,7 +32,7 @@ import (
 // - log: the logger instance.
 // - partnerNodes: identity list of partner nodes.
 // - internalNodes: identity list of internal nodes.
-// - numCollectionClusters: the number of collectors in each generated cluster.
+// - numCollectionClusters: the number of clusters to generate
 // Returns:
 // - flow.AssignmentList: the generated assignment list.
 // - flow.ClusterList: the generate collection cluster list.
@@ -125,13 +125,13 @@ func ConstructRootQCsForClusters(log zerolog.Logger, clusterList flow.ClusterLis
 	return qcs
 }
 
-// ConvertClusterAssignmentsCdc converts golang cluster assignments type to cadence array of arrays.
+// ConvertClusterAssignmentsCdc converts golang cluster assignments type to Cadence type `[[String]]`.
 func ConvertClusterAssignmentsCdc(assignments flow.AssignmentList) cadence.Array {
 	assignmentsCdc := make([]cadence.Value, len(assignments))
 	for i, asmt := range assignments {
 		vals := make([]cadence.Value, asmt.Len())
-		for j, k := range asmt {
-			vals[j] = cadence.String(k.String())
+		for j, nodeID := range asmt {
+			vals[j] = cadence.String(nodeID.String())
 		}
 		assignmentsCdc[i] = cadence.NewArray(vals).WithType(cadence.NewVariableSizedArrayType(cadence.StringType{}))
 	}
@@ -139,7 +139,7 @@ func ConvertClusterAssignmentsCdc(assignments flow.AssignmentList) cadence.Array
 	return cadence.NewArray(assignmentsCdc).WithType(cadence.NewVariableSizedArrayType(cadence.NewVariableSizedArrayType(cadence.StringType{})))
 }
 
-// ConvertClusterQcsCdc converts golang cluster qcs type to cadence struct.
+// ConvertClusterQcsCdc converts cluster QCs from `QuorumCertificate` type to `ClusterQCVoteData` type.
 func ConvertClusterQcsCdc(qcs []*flow.QuorumCertificate, clusterList flow.ClusterList) ([]*flow.ClusterQCVoteData, error) {
 	voteData := make([]*flow.ClusterQCVoteData, len(qcs))
 	for i, qc := range qcs {
