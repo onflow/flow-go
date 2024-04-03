@@ -71,6 +71,8 @@ func findSealedHeightForCommits(
 
 	// iterate backwards from the end height to the start height
 	// to find the block that produces a state commitment in the given list
+	// It is safe to skip blocks in this linear search because we expect `stateCommitments` to hold commits
+	// for a contiguous range of blocks (for correct operation we assume `blocksToSkip` is smaller than this range).
 	// end height must be a sealed block
 	step := blocksToSkip + 1
 	for height := endHeight; height >= startHeight; height -= uint64(step) {
@@ -164,6 +166,7 @@ func GenerateProtocolSnapshotForCheckpointWithHeights(
 	blocksToSkip uint,
 	endHeight uint64,
 ) (protocol.Snapshot, uint64, flow.StateCommitment, error) {
+	// Stop searching after 10,000 iterations or upon reaching the minimum height, whichever comes first.
 	startHeight := uint64(0)
 	// preventing startHeight from being negative
 	length := uint64(blocksToSkip+1) * 10000
