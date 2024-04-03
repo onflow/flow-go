@@ -144,7 +144,7 @@ func (wsController *WebsocketController) writeEvents(sub subscription.Subscripti
 				return
 			}
 
-			resp, ok := event.(*backend.SubscribeEventsResponse)
+			resp, ok := event.(*backend.EventsResponse)
 			if !ok {
 				err = fmt.Errorf("unexpected response type: %s", event)
 				wsController.wsErrorHandler(err)
@@ -173,7 +173,7 @@ func (wsController *WebsocketController) writeEvents(sub subscription.Subscripti
 			}
 
 			// Write the response to the WebSocket connection
-			err = wsController.conn.WriteJSON(resp.EventsResponse)
+			err = wsController.conn.WriteJSON(event)
 			if err != nil {
 				wsController.wsErrorHandler(err)
 				return

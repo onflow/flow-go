@@ -5,20 +5,10 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/counters"
 )
-
-// SubscribeEventsResponse represents the subscription response containing events for a specific block and messageIndex
-type SubscribeEventsResponse struct {
-	EventsResponse
-	MessageIndex uint64
-}
 
 type EventsBackend struct {
 	log zerolog.Logger
@@ -56,8 +46,7 @@ func (b *EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.I
 		return subscription.NewFailedSubscription(err, "could not get start height")
 	}
 
-	messageIndex := counters.NewMonotonousCounter(0)
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter, &messageIndex))
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter))
 }
 
 // SubscribeEventsFromStartBlockID streams events starting at the specified block ID,
@@ -141,41 +130,25 @@ func (b *EventsBackend) SubscribeEventsFromLatest(ctx context.Context, filter st
 //
 // No errors are expected during normal operation.
 func (b *EventsBackend) subscribeEvents(ctx context.Context, nextHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
-	messageIndex := counters.NewMonotonousCounter(0)
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter, &messageIndex))
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter))
 }
 
 // getResponseFactory returns a function that retrieves the event response for a given height.
 //
 // Parameters:
 // - filter: The event filter used to filter events.
-// - index: A strict monotonous counter used to track the message index.
 //
 // Expected errors during normal operation:
 // - codes.NotFound: If block header for the specified block height is not found, if events for the specified block height are not found.
-// - codes.Internal: If the message index has already been incremented.
-func (b *EventsBackend) getResponseFactory(filter state_stream.EventFilter, index *counters.StrictMonotonousCounter) subscription.GetDataByHeightFunc {
+func (b *EventsBackend) getResponseFactory(filter state_stream.EventFilter) subscription.GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (response interface{}, err error) {
 		eventsResponse, err := b.eventsRetriever.GetAllEventsResponse(ctx, height)
 		if err != nil {
 			return nil, err
 		}
 
-		messageIndex := index.Value()
-		if ok := index.Set(messageIndex + 1); !ok {
-			return nil, status.Errorf(codes.Internal, "the message index has already been incremented to %d", index.Value())
-		}
+		eventsResponse.Events = filter.Filter(eventsResponse.Events)
 
-		subscribeEventsResponse := &SubscribeEventsResponse{
-			EventsResponse: EventsResponse{
-				BlockID:        eventsResponse.BlockID,
-				Height:         eventsResponse.Height,
-				Events:         filter.Filter(eventsResponse.Events),
-				BlockTimestamp: eventsResponse.BlockTimestamp,
-			},
-			MessageIndex: messageIndex,
-		}
-
-		return subscribeEventsResponse, nil
+		return eventsResponse, nil
 	}
 }

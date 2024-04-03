@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -227,7 +226,7 @@ func (s *BackendEventsSuite) runTestSubscribeEvents() {
 		return s.backend.SubscribeEvents(ctx, startBlockID, startHeight, filter)
 	}
 
-	s.subscribe(call, s.requireSubscribeEventsResponse, s.setupFilterForTestCases(tests))
+	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
 }
 
 // runTestSubscribeEventsFromStartBlockID runs the test suite for SubscribeEventsFromStartBlockID subscription
@@ -266,7 +265,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromStartBlockID() {
 		return s.backend.SubscribeEventsFromStartBlockID(ctx, startBlockID, filter)
 	}
 
-	s.subscribe(call, s.requireSubscribeEventsResponse, s.setupFilterForTestCases(tests))
+	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
 }
 
 // runTestSubscribeEventsFromStartHeight runs the test suite for SubscribeEventsFromStartHeight subscription
@@ -305,7 +304,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromStartHeight() {
 		return s.backend.SubscribeEventsFromStartHeight(ctx, startHeight, filter)
 	}
 
-	s.subscribe(call, s.requireSubscribeEventsResponse, s.setupFilterForTestCases(tests))
+	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
 }
 
 // runTestSubscribeEventsFromLatest runs the test suite for SubscribeEventsFromLatest subscription
@@ -336,7 +335,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromLatest() {
 		return s.backend.SubscribeEventsFromLatest(ctx, filter)
 	}
 
-	s.subscribe(call, s.requireSubscribeEventsResponse, s.setupFilterForTestCases(tests))
+	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
 }
 
 // subscribe is a helper function to run test scenarios for event subscription in the BackendEventsSuite.
@@ -366,7 +365,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromLatest() {
 //  8. Cancels the subscription and ensures it shuts down gracefully.
 func (s *BackendEventsSuite) subscribe(
 	subscribeFn func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription,
-	requireFn func(interface{}, *SubscribeEventsResponse),
+	requireFn func(interface{}, *EventsResponse),
 	tests []eventsTestType,
 ) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -381,7 +380,6 @@ func (s *BackendEventsSuite) subscribe(
 			}
 
 			subCtx, subCancel := context.WithCancel(ctx)
-			expectedMsgIndexCounter := counters.NewMonotonousCounter(0)
 
 			// mock latest sealed if test case no start value provided
 			if test.startBlockID == flow.ZeroID && test.startHeight == 0 {
@@ -415,19 +413,13 @@ func (s *BackendEventsSuite) subscribe(
 					v, ok := <-sub.Channel()
 					require.True(s.T(), ok, "channel closed while waiting for exec data for block %x %v: err: %v", b.Header.Height, b.ID(), sub.Err())
 
-					expected := &SubscribeEventsResponse{
-						EventsResponse: EventsResponse{
-							BlockID:        b.ID(),
-							Height:         b.Header.Height,
-							Events:         expectedEvents,
-							BlockTimestamp: b.Header.Timestamp,
-						},
-						MessageIndex: expectedMsgIndexCounter.Value(),
+					expected := &EventsResponse{
+						BlockID:        b.ID(),
+						Height:         b.Header.Height,
+						Events:         expectedEvents,
+						BlockTimestamp: b.Header.Timestamp,
 					}
 					requireFn(v, expected)
-
-					wasSet := expectedMsgIndexCounter.Set(expectedMsgIndexCounter.Value() + 1)
-					require.True(s.T(), wasSet)
 
 				}, time.Second, fmt.Sprintf("timed out waiting for block %d %v", b.Header.Height, b.ID()))
 			}
@@ -452,15 +444,14 @@ func (s *BackendEventsSuite) subscribe(
 }
 
 // requireEventsResponse ensures that the received event information matches the expected data.
-func (s *BackendEventsSuite) requireSubscribeEventsResponse(v interface{}, expected *SubscribeEventsResponse) {
-	actual, ok := v.(*SubscribeEventsResponse)
+func (s *BackendEventsSuite) requireEventsResponse(v interface{}, expected *EventsResponse) {
+	actual, ok := v.(*EventsResponse)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 
 	assert.Equal(s.T(), expected.BlockID, actual.BlockID)
 	assert.Equal(s.T(), expected.Height, actual.Height)
 	assert.Equal(s.T(), expected.Events, actual.Events)
 	assert.Equal(s.T(), expected.BlockTimestamp, actual.BlockTimestamp)
-	assert.Equal(s.T(), expected.MessageIndex, actual.MessageIndex)
 }
 
 // TestSubscribeEventsHandlesErrors tests error handling for SubscribeEvents subscription

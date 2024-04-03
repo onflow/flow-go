@@ -179,9 +179,10 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 			require.NoError(s.T(), err)
 
 			var expectedEventsResponses []*backend.EventsResponse
-			var subscriptionEventsResponses []*backend.SubscribeEventsResponse
+			var subscriptionEventsResponses []*backend.EventsResponse
 			startBlockFound := test.startBlockID == flow.ZeroID
 
+			// construct expected event responses based on the provided test configuration
 			for i, block := range s.blocks {
 				blockID := block.ID()
 				if startBlockFound || blockID == test.startBlockID {
@@ -208,25 +209,23 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 								BlockTimestamp: block.Header.Timestamp,
 							})
 						}
-						subscriptionEventsResponses = append(subscriptionEventsResponses, &backend.SubscribeEventsResponse{
-							EventsResponse: backend.EventsResponse{
-								Height:         block.Header.Height,
-								BlockID:        blockID,
-								Events:         subscriptionEvents,
-								BlockTimestamp: block.Header.Timestamp,
-							},
+						subscriptionEventsResponses = append(subscriptionEventsResponses, &backend.EventsResponse{
+							Height:         block.Header.Height,
+							BlockID:        blockID,
+							Events:         subscriptionEvents,
+							BlockTimestamp: block.Header.Timestamp,
 						})
 					}
 				}
 			}
 
-			// Create a channel to receive mock SubscribeEventsResponse objects
+			// Create a channel to receive mock EventsResponse objects
 			ch := make(chan interface{})
 			var chReadOnly <-chan interface{}
-			// Simulate sending a mock SubscribeEventsResponse
+			// Simulate sending a mock EventsResponse
 			go func() {
 				for _, eventResponse := range subscriptionEventsResponses {
-					// Send the mock SubscribeEventsResponse through the channel
+					// Send the mock EventsResponse through the channel
 					ch <- eventResponse
 				}
 			}()

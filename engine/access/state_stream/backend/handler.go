@@ -270,15 +270,16 @@ func (h *Handler) SubscribeEventsFromLatest(request *executiondata.SubscribeEven
 //
 // Expected errors during normal operation:
 //   - codes.Internal - could not convert events to entity or the stream could not send a response.
-func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, requestHeartbeatInterval uint64, eventEncodingVersion entities.EventEncodingVersion) func(*SubscribeEventsResponse) error {
+func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, requestHeartbeatInterval uint64, eventEncodingVersion entities.EventEncodingVersion) func(*EventsResponse) error {
 	heartbeatInterval := requestHeartbeatInterval
 	if heartbeatInterval == 0 {
 		heartbeatInterval = h.defaultHeartbeatInterval
 	}
 
 	blocksSinceLastMessage := uint64(0)
+	messageIndex := counters.NewMonotonousCounter(0)
 
-	return func(resp *SubscribeEventsResponse) error {
+	return func(resp *EventsResponse) error {
 		// check if there are any events in the response. if not, do not send a message unless the last
 		// response was more than HeartbeatInterval blocks ago
 		if len(resp.Events) == 0 {
@@ -297,12 +298,17 @@ func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, req
 			return status.Errorf(codes.Internal, "could not convert events to entity: %v", err)
 		}
 
+		index := messageIndex.Value()
+		if ok := messageIndex.Set(index + 1); !ok {
+			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
+		}
+
 		err = send(&executiondata.SubscribeEventsResponse{
 			BlockHeight:    resp.Height,
 			BlockId:        convert.IdentifierToMessage(resp.BlockID),
 			Events:         events,
 			BlockTimestamp: timestamppb.New(resp.BlockTimestamp),
-			MessageIndex:   resp.MessageIndex,
+			MessageIndex:   index,
 		})
 		if err != nil {
 			return rpc.ConvertError(err, "could not send response", codes.Internal)

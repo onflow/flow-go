@@ -402,7 +402,7 @@ func TestEventStream(t *testing.T) {
 		stream *StreamMock[executiondata.SubscribeEventsRequest, executiondata.SubscribeEventsResponse],
 		api *ssmock.API,
 		request *executiondata.SubscribeEventsRequest,
-		response *SubscribeEventsResponse,
+		response *EventsResponse,
 	) {
 		sub := subscription.NewSubscription(1)
 
@@ -497,12 +497,10 @@ func TestEventStream(t *testing.T) {
 				&executiondata.SubscribeEventsRequest{
 					EventEncodingVersion: test.eventVersion,
 				},
-				&SubscribeEventsResponse{
-					EventsResponse: EventsResponse{
-						BlockID: blockID,
-						Height:  blockHeight,
-						Events:  ccfEvents,
-					},
+				&EventsResponse{
+					BlockID: blockID,
+					Height:  blockHeight,
+					Events:  ccfEvents,
 				},
 			)
 			handleExecutionDataStreamResponses(stream, test.eventVersion, test.expected)

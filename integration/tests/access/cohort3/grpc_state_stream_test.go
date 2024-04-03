@@ -36,6 +36,12 @@ var (
 	jsonOptions = []jsoncdc.Option{jsoncdc.WithAllowUnstructuredStaticTypes(true)}
 )
 
+// SubscribeEventsResponse represents the subscription response containing events for a specific block and messageIndex
+type SubscribeEventsResponse struct {
+	backend.EventsResponse
+	MessageIndex uint64
+}
+
 func TestGrpcStateStream(t *testing.T) {
 	suite.Run(t, new(GrpcStateStreamSuite))
 }
@@ -261,7 +267,7 @@ func (s *GrpcStateStreamSuite) generateEvents(client *testnet.Client, txCount in
 type RPCTest struct {
 	name           string
 	call           func(ctx context.Context, client executiondata.ExecutionDataAPIClient, startValue interface{}, filter *executiondata.EventFilter) (executiondata.ExecutionDataAPI_SubscribeEventsClient, error)
-	generateEvents bool // add ability to integration test generate new events
+	generateEvents bool // add ability to integration test generate new events or use old events to decrease running test time
 }
 
 func (s *GrpcStateStreamSuite) getRPCs() []RPCTest {
@@ -318,22 +324,22 @@ func (s *GrpcStateStreamSuite) getRPCs() []RPCTest {
 }
 
 type ResponseTracker struct {
-	r  map[uint64]map[string]backend.SubscribeEventsResponse
+	r  map[uint64]map[string]SubscribeEventsResponse
 	mu sync.RWMutex
 }
 
 func newResponseTracker() *ResponseTracker {
 	return &ResponseTracker{
-		r: make(map[uint64]map[string]backend.SubscribeEventsResponse),
+		r: make(map[uint64]map[string]SubscribeEventsResponse),
 	}
 }
 
-func (r *ResponseTracker) Add(t *testing.T, blockHeight uint64, name string, events *backend.SubscribeEventsResponse) {
+func (r *ResponseTracker) Add(t *testing.T, blockHeight uint64, name string, events *SubscribeEventsResponse) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if _, ok := r.r[blockHeight]; !ok {
-		r.r[blockHeight] = make(map[string]backend.SubscribeEventsResponse)
+		r.r[blockHeight] = make(map[string]SubscribeEventsResponse)
 	}
 	r.r[blockHeight][name] = *events
 
@@ -354,9 +360,11 @@ func (r *ResponseTracker) Add(t *testing.T, blockHeight uint64, name string, eve
 	delete(r.r, blockHeight)
 }
 
-func (r *ResponseTracker) compare(t *testing.T, controlData backend.SubscribeEventsResponse, testData backend.SubscribeEventsResponse) error {
+func (r *ResponseTracker) compare(t *testing.T, controlData SubscribeEventsResponse, testData SubscribeEventsResponse) error {
 	require.Equal(t, controlData.BlockID, testData.BlockID)
 	require.Equal(t, controlData.Height, testData.Height)
+	require.Equal(t, controlData.BlockTimestamp, testData.BlockTimestamp)
+	require.Equal(t, controlData.MessageIndex, testData.MessageIndex)
 	require.Equal(t, len(controlData.Events), len(testData.Events))
 
 	for i := range controlData.Events {
@@ -384,8 +392,8 @@ func getClient(address string) (executiondata.ExecutionDataAPIClient, error) {
 func SubscribeEventsHandler(
 	ctx context.Context,
 	stream executiondata.ExecutionDataAPI_SubscribeEventsClient,
-) (<-chan backend.SubscribeEventsResponse, <-chan error, error) {
-	sub := make(chan backend.SubscribeEventsResponse)
+) (<-chan SubscribeEventsResponse, <-chan error, error) {
+	sub := make(chan SubscribeEventsResponse)
 	errChan := make(chan error)
 
 	sendErr := func(err error) {
@@ -412,7 +420,7 @@ func SubscribeEventsHandler(
 
 			events := convert.MessagesToEvents(resp.GetEvents())
 
-			response := backend.SubscribeEventsResponse{
+			response := SubscribeEventsResponse{
 				EventsResponse: backend.EventsResponse{
 					Height:         resp.GetBlockHeight(),
 					BlockID:        convert.MessageToIdentifier(resp.GetBlockId()),
