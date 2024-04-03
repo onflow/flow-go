@@ -347,48 +347,57 @@ func (h *FlowAccessAPIRouter) GetExecutionResultByID(context context.Context, re
 }
 
 func (h *FlowAccessAPIRouter) SubscribeBlocksFromStartBlockID(req *access.SubscribeBlocksFromStartBlockIDRequest, server access.AccessAPI_SubscribeBlocksFromStartBlockIDServer) error {
-	// SubscribeBlocksFromStartBlockID is not implemented for observer yet
-	return status.Errorf(codes.Unimplemented, "method SubscribeBlocksFromStartBlockID not implemented")
+	err := h.local.SubscribeBlocksFromStartBlockID(req, server)
+	h.log(LocalApiService, "SubscribeBlocksFromStartBlockID", err)
+	return err
 }
 
 func (h *FlowAccessAPIRouter) SubscribeBlocksFromStartHeight(req *access.SubscribeBlocksFromStartHeightRequest, server access.AccessAPI_SubscribeBlocksFromStartHeightServer) error {
-	// SubscribeBlocksFromStartHeight is not implemented for observer yet
-	return status.Errorf(codes.Unimplemented, "method SubscribeBlocksFromStartHeight not implemented")
+	err := h.local.SubscribeBlocksFromStartHeight(req, server)
+	h.log(LocalApiService, "SubscribeBlocksFromStartHeight", err)
+	return err
 }
 
 func (h *FlowAccessAPIRouter) SubscribeBlocksFromLatest(req *access.SubscribeBlocksFromLatestRequest, server access.AccessAPI_SubscribeBlocksFromLatestServer) error {
-	// SubscribeBlocksFromLatest is not implemented for observer yet
-	return status.Errorf(codes.Unimplemented, "method SubscribeBlocksFromLatest not implemented")
+	err := h.local.SubscribeBlocksFromLatest(req, server)
+	h.log(LocalApiService, "SubscribeBlocksFromLatest", err)
+	return err
 }
 
 func (h *FlowAccessAPIRouter) SubscribeBlockHeadersFromStartBlockID(req *access.SubscribeBlockHeadersFromStartBlockIDRequest, server access.AccessAPI_SubscribeBlockHeadersFromStartBlockIDServer) error {
-	// SubscribeBlockHeadersFromStartBlockID is not implemented for observer yet
-	return status.Errorf(codes.Unimplemented, "method SubscribeBlockHeadersFromStartBlockID not implemented")
+	err := h.local.SubscribeBlockHeadersFromStartBlockID(req, server)
+	h.log(LocalApiService, "SubscribeBlockHeadersFromStartBlockID", err)
+	return err
 }
 
 func (h *FlowAccessAPIRouter) SubscribeBlockHeadersFromStartHeight(req *access.SubscribeBlockHeadersFromStartHeightRequest, server access.AccessAPI_SubscribeBlockHeadersFromStartHeightServer) error {
-	// SubscribeBlockHeadersFromStartHeight is not implemented for observer yet
-	return status.Errorf(codes.Unimplemented, "method SubscribeBlockHeadersFromStartHeight not implemented")
+	err := h.local.SubscribeBlockHeadersFromStartHeight(req, server)
+	h.log(LocalApiService, "SubscribeBlockHeadersFromStartHeight", err)
+	return err
 }
 
 func (h *FlowAccessAPIRouter) SubscribeBlockHeadersFromLatest(req *access.SubscribeBlockHeadersFromLatestRequest, server access.AccessAPI_SubscribeBlockHeadersFromLatestServer) error {
-	// SubscribeBlockHeadersFromLatest is not implemented for observer yet
-	return status.Errorf(codes.Unimplemented, "method SubscribeBlockHeadersFromLatest not implemented")
+	err := h.local.SubscribeBlockHeadersFromLatest(req, server)
+	h.log(LocalApiService, "SubscribeBlockHeadersFromLatest", err)
+	return err
 }
 
 func (h *FlowAccessAPIRouter) SubscribeBlockDigestsFromStartBlockID(req *access.SubscribeBlockDigestsFromStartBlockIDRequest, server access.AccessAPI_SubscribeBlockDigestsFromStartBlockIDServer) error {
-	// SubscribeBlockDigestsFromStartBlockID is not implemented for observer yet
-	return status.Errorf(codes.Unimplemented, "method SubscribeBlockDigestsFromStartBlockID not implemented")
+	err := h.local.SubscribeBlockDigestsFromStartBlockID(req, server)
+	h.log(LocalApiService, "SubscribeBlockDigestsFromStartBlockID", err)
+	return err
 }
 
 func (h *FlowAccessAPIRouter) SubscribeBlockDigestsFromStartHeight(req *access.SubscribeBlockDigestsFromStartHeightRequest, server access.AccessAPI_SubscribeBlockDigestsFromStartHeightServer) error {
-	// SubscribeBlockDigestsFromStartHeight is not implemented for observer yet
-	return status.Errorf(codes.Unimplemented, "method SubscribeBlockDigestsFromStartHeight not implemented")
+	err := h.local.SubscribeBlockDigestsFromStartHeight(req, server)
+	h.log(LocalApiService, "SubscribeBlockDigestsFromStartHeight", err)
+	return err
 }
 
 func (h *FlowAccessAPIRouter) SubscribeBlockDigestsFromLatest(req *access.SubscribeBlockDigestsFromLatestRequest, server access.AccessAPI_SubscribeBlockDigestsFromLatestServer) error {
-	// SubscribeBlockDigestsFromLatest is not implemented for observer yet
-	return status.Errorf(codes.Unimplemented, "method SubscribeBlockDigestsFromLatest not implemented")
+	err := h.local.SubscribeBlockDigestsFromLatest(req, server)
+	h.log(LocalApiService, "SubscribeBlockDigestsFromLatest", err)
+	return err
 }
 
 func (h *FlowAccessAPIRouter) SendAndSubscribeTransactionStatuses(req *access.SendAndSubscribeTransactionStatusesRequest, server access.AccessAPI_SendAndSubscribeTransactionStatusesServer) error {
