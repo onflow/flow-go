@@ -1043,6 +1043,7 @@ func newInternalEVMTypeBatchRunFunction(
 						panic(err)
 					}
 					transactionBatch[i] = t
+					i++
 					return true
 				})
 			}
