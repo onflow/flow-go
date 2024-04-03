@@ -133,6 +133,11 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 			}
 		}
 
+		// Load storage map.
+		for _, domain := range domains {
+			_ = storage.GetStorageMap(address, domain, false)
+		}
+
 		storageHealthErrorBefore = storage.CheckHealth()
 		if storageHealthErrorBefore != nil {
 			m.log.Warn().
