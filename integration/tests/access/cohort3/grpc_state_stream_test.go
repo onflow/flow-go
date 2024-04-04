@@ -450,7 +450,7 @@ func SubscribeHandler[T any, V any](
 		defer close(errChan)
 
 		for {
-			t, err := recv()
+			resp, err := recv()
 			if err != nil {
 				if err == io.EOF {
 					return
@@ -460,7 +460,7 @@ func SubscribeHandler[T any, V any](
 				return
 			}
 
-			response, err := responseHandler(t)
+			response, err := responseHandler(resp)
 			if err != nil {
 				sendErr(fmt.Errorf("error converting response: %w", err))
 				return
