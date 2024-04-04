@@ -355,7 +355,7 @@ func SubscribeHandler[T any, V any](
 					return
 				}
 
-				sendErr(fmt.Errorf("error receiving block: %w", err))
+				sendErr(fmt.Errorf("error receiving response: %w", err))
 				return
 			}
 
