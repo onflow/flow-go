@@ -21,12 +21,12 @@ import (
 var ErrEOFNotReached = errors.New("expect to reach EOF, but actually didn't")
 
 func ReadTriesRootHash(logger zerolog.Logger, dir string, fileName string) (
-	trieRootsToReturn []ledger.RootHash,
-	errToReturn error,
+	[]ledger.RootHash,
+	error,
 ) {
-	errToReturn = validateCheckpointFile(logger, dir, fileName)
-	if errToReturn != nil {
-		return nil, errToReturn
+	err := validateCheckpointFile(logger, dir, fileName)
+	if err != nil {
+		return nil, err
 	}
 	return readTriesRootHash(logger, dir, fileName)
 }

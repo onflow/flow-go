@@ -608,6 +608,33 @@ func TestReadCheckpointRootHash(t *testing.T) {
 	})
 }
 
+func TestReadCheckpointRootHashValidateChecksum(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createSimpleTrie(t)
+		fileName := "checkpoint"
+		logger := unittest.Logger()
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
+
+		// add a wrong checksum to top trie file
+		topTrieFilePath, _ := filePathTopTries(dir, fileName)
+		file, err := os.OpenFile(topTrieFilePath, os.O_RDWR, 0644)
+		require.NoError(t, err)
+
+		fileInfo, err := file.Stat()
+		require.NoError(t, err)
+		fileSize := fileInfo.Size()
+
+		invalidSum := encodeCRC32Sum(10)
+		_, err = file.WriteAt(invalidSum, fileSize-crc32SumSize)
+		require.NoError(t, err)
+		require.NoError(t, file.Close())
+
+		// ReadTriesRootHash will first validate the checksum and detect the error
+		_, err = ReadTriesRootHash(logger, dir, fileName)
+		require.Error(t, err)
+	})
+}
+
 func TestReadCheckpointRootHashMulti(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createMultipleRandomTries(t)
