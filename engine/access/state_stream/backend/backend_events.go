@@ -70,7 +70,7 @@ func (b *EventsBackend) SubscribeEventsFromStartBlockID(ctx context.Context, sta
 		return subscription.NewFailedSubscription(err, "could not get start height from block id")
 	}
 
-	return b.subscribeEvents(ctx, nextHeight, filter)
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter))
 }
 
 // SubscribeEventsFromStartHeight streams events starting at the specified block height,
@@ -94,7 +94,7 @@ func (b *EventsBackend) SubscribeEventsFromStartHeight(ctx context.Context, star
 		return subscription.NewFailedSubscription(err, "could not get start height from block height")
 	}
 
-	return b.subscribeEvents(ctx, nextHeight, filter)
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter))
 }
 
 // SubscribeEventsFromLatest subscribes to events starting at the latest sealed block,
@@ -117,19 +117,6 @@ func (b *EventsBackend) SubscribeEventsFromLatest(ctx context.Context, filter st
 		return subscription.NewFailedSubscription(err, "could not get start height from block height")
 	}
 
-	return b.subscribeEvents(ctx, nextHeight, filter)
-}
-
-// subscribeEvents is a helper function that subscribes to events starting at the specified height,
-// filtered by the provided event filter.
-//
-// Parameters:
-// - ctx: Context for the operation.
-// - nextHeight: The height of the starting block.
-// - filter: The event filter used to filter events.
-//
-// No errors are expected during normal operation.
-func (b *EventsBackend) subscribeEvents(ctx context.Context, nextHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
 	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponseFactory(filter))
 }
 
