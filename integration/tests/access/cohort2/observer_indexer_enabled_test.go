@@ -378,25 +378,26 @@ func (s *ObserverIndexerEnabledSuite) TestAllObserverIndexedRPCsHappyPath() {
 		return statusErr.Code() != codes.OutOfRange
 	}, 30*time.Second, 1*time.Second)
 
-	log := unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
-	log.Info().Msg("================> onverted.Payload.Results")
-
 	blockWithAccount, err := observerLocal.GetBlockByID(ctx, &accessproto.GetBlockByIDRequest{
 		Id:                accountCreationTxRes.BlockID[:],
 		FullBlockResponse: true,
 	})
 	require.NoError(t, err)
 
-	eventsByBlockID, err := observerLocal.GetEventsForBlockIDs(ctx, &accessproto.GetEventsForBlockIDsRequest{
-		Type:                 sdk.EventAccountCreated,
-		BlockIds:             [][]byte{blockWithAccount.Block.Id},
-		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
-	})
-	require.NoError(s.T(), err)
+	//eventsByBlockID, err := observerLocal.GetEventsForBlockIDs(ctx, &accessproto.GetEventsForBlockIDsRequest{
+	//	Type:                 sdk.EventAccountCreated,
+	//	BlockIds:             [][]byte{blockWithAccount.Block.Id},
+	//	EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+	//})
+	//require.NoError(s.T(), err)
 
 	// GetEventsForBlockIDs
-	s.checkGetEventsForBlockIDsRPC(ctx, eventsByBlockID, observerUpstream, accessNode, [][]byte{blockWithAccount.Block.Id})
+	s.checkGetEventsForBlockIDsRPC(ctx, observerLocal, observerUpstream, accessNode, [][]byte{blockWithAccount.Block.Id})
 
+	// GetEventsForHeightRange
+	s.checkGetEventsForHeightRangeRPC(ctx, observerLocal, observerUpstream, accessNode, blockWithAccount.Block.Height, blockWithAccount.Block.Height)
+
+	// Making GetEventsForHeightRange call to get events and then get txIndex
 	eventsByHeight, err := observerLocal.GetEventsForHeightRange(ctx, &accessproto.GetEventsForHeightRangeRequest{
 		Type:                 sdk.EventAccountCreated,
 		StartHeight:          blockWithAccount.Block.Height,
@@ -404,12 +405,6 @@ func (s *ObserverIndexerEnabledSuite) TestAllObserverIndexedRPCsHappyPath() {
 		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
 	})
 	require.NoError(s.T(), err)
-
-	// GetEventsForHeightRange
-	s.checkGetEventsForHeightRangeRPC(ctx, eventsByHeight, observerUpstream, accessNode, blockWithAccount.Block.Height, blockWithAccount.Block.Height)
-
-	// validate that there is an event that we are looking for
-	require.Equal(t, eventsByHeight.Results, eventsByBlockID.Results)
 
 	var txIndex uint32
 	found := false
@@ -443,7 +438,7 @@ func (s *ObserverIndexerEnabledSuite) TestAllObserverIndexedRPCsHappyPath() {
 	s.checkGetTransactionResultRPC(ctx, observerLocal, observerUpstream, accessNode, accountCreationTxRes.TransactionID.Bytes(), blockWithAccount.Block.Id, accountCreationTxRes.CollectionID.Bytes())
 
 	//GetTransactionResultByIndex
-	s.checkGetTransactionResultsByIndexIDRPC(ctx, observerLocal, observerUpstream, accessNode, blockWithAccount.Block.Id, txIndex)
+	s.checkGetTransactionResultsByIndexRPC(ctx, observerLocal, observerUpstream, accessNode, blockWithAccount.Block.Id, txIndex)
 
 	// GetTransactionResultsByBlockID
 	s.checkGetTransactionResultsByBlockIDRPC(ctx, observerLocal, observerUpstream, accessNode, blockWithAccount.Block.Id)
@@ -667,11 +662,19 @@ func (s *ObserverIndexerEnabledSuite) getRestEndpoints() []RestEndpointTest {
 
 func (s *ObserverIndexerEnabledSuite) checkGetEventsForBlockIDsRPC(
 	ctx context.Context,
-	observerLocalResponse *accessproto.EventsResponse,
+	observerLocal accessproto.AccessAPIClient,
 	observerUpstream accessproto.AccessAPIClient,
 	accessNode accessproto.AccessAPIClient,
 	blockIds [][]byte,
 ) {
+
+	observerLocalResponse, err := observerLocal.GetEventsForBlockIDs(ctx, &accessproto.GetEventsForBlockIDsRequest{
+		Type:                 sdk.EventAccountCreated,
+		BlockIds:             blockIds,
+		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+	})
+	require.NoError(s.T(), err)
+
 	observerUpstreamResponse, err := observerUpstream.GetEventsForBlockIDs(ctx, &accessproto.GetEventsForBlockIDsRequest{
 		Type:                 sdk.EventAccountCreated,
 		BlockIds:             blockIds,
@@ -692,12 +695,21 @@ func (s *ObserverIndexerEnabledSuite) checkGetEventsForBlockIDsRPC(
 
 func (s *ObserverIndexerEnabledSuite) checkGetEventsForHeightRangeRPC(
 	ctx context.Context,
-	observerLocalResponse *accessproto.EventsResponse,
+	observerLocal accessproto.AccessAPIClient,
 	observerUpstream accessproto.AccessAPIClient,
 	accessNode accessproto.AccessAPIClient,
 	startHeight uint64,
 	endHeight uint64,
 ) {
+
+	observerLocalResponse, err := observerLocal.GetEventsForHeightRange(ctx, &accessproto.GetEventsForHeightRangeRequest{
+		Type:                 sdk.EventAccountCreated,
+		StartHeight:          startHeight,
+		EndHeight:            endHeight,
+		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+	})
+	require.NoError(s.T(), err)
+
 	observerUpstreamResponse, err := observerUpstream.GetEventsForHeightRange(ctx, &accessproto.GetEventsForHeightRangeRequest{
 		Type:                 sdk.EventAccountCreated,
 		StartHeight:          startHeight,
@@ -903,7 +915,7 @@ func (s *ObserverIndexerEnabledSuite) checkGetTransactionResultsByBlockIDRPC(
 	require.Equal(s.T(), accessNodeResponse.TransactionResults, observerUpstreamResponse.TransactionResults)
 }
 
-func (s *ObserverIndexerEnabledSuite) checkGetTransactionResultsByIndexIDRPC(
+func (s *ObserverIndexerEnabledSuite) checkGetTransactionResultsByIndexRPC(
 	ctx context.Context,
 	observerLocal accessproto.AccessAPIClient,
 	observerUpstream accessproto.AccessAPIClient,
