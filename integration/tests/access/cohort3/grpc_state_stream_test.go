@@ -13,7 +13,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -24,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	sdk "github.com/onflow/flow-go-sdk"
@@ -211,6 +211,8 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 
 			foundANTxCount := 0
 			foundONTxCount := 0
+			messageIndex := counters.NewMonotonousCounter(0)
+
 			r := newResponseTracker()
 
 			for {
@@ -229,6 +231,10 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 					}
 				case event := <-controlANEvents:
 					if has(event.Events, targetEvent) {
+						if ok := messageIndex.Set(event.MessageIndex); !ok {
+							s.Require().NoErrorf(err, "messageIndex isn`t sequential")
+						}
+
 						s.T().Logf("adding control events: %d %d %v", event.Height, len(event.Events), event.Events)
 						r.Add(s.T(), event.Height, "access_control", &event)
 					}
