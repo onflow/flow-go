@@ -334,7 +334,7 @@ func (s *GrpcStateStreamSuite) getRPCs() []subscribeEventsRPCTest {
 type ResponseTracker[T any] struct {
 	r       map[uint64]map[string]T
 	mu      sync.RWMutex
-	compare func(t *testing.T, responses map[uint64]map[string]T, blockHeight uint64) error //func(control, test T) error
+	compare func(t *testing.T, responses map[uint64]map[string]T, blockHeight uint64) error
 }
 
 // NewResponseTracker creates a new ResponseTracker.
