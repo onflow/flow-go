@@ -33,7 +33,7 @@ func GetClosestDynamicBootstrapSnapshot(state protocol.State, refSnapshot protoc
 }
 
 // GetCounterAndPhase returns the current epoch counter and phase, at `height`.
-// No errors are expected during normal operation. 
+// No errors are expected during normal operation.
 func GetCounterAndPhase(state protocol.State, height uint64) (uint64, flow.EpochPhase, error) {
 	snapshot := state.AtHeight(height)
 
