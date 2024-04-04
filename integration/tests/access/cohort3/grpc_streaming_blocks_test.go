@@ -6,17 +6,20 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 func TestGrpcBlocksStream(t *testing.T) {
@@ -157,7 +160,7 @@ func (s *GrpcBlocksStreamSuite) TestHappyPath() {
 				select {
 				case err := <-accessBlockErrs:
 					s.Require().NoErrorf(err, "unexpected AN error")
-				case _ = <-observerBlockErrs:
+				case err := <-observerBlockErrs:
 					s.Require().NoErrorf(err, "unexpected ON error")
 				case block := <-accessBlocks:
 					s.T().Logf("AN block received: height: %d", block.Header.Height)
