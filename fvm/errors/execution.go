@@ -237,6 +237,17 @@ func IsOperationNotSupportedError(err error) bool {
 	return HasErrorCode(err, ErrCodeOperationNotSupportedError)
 }
 
+func NewBlockHeightOutOfRangeError(height uint64) CodedError {
+	return NewCodedError(
+		ErrCodeBlockHeightOutOfRangeError,
+		"block height (%v) is out of queriable range",
+		height)
+}
+
+func IsBlockHeightOutOfRangeError(err error) bool {
+	return HasErrorCode(err, ErrCodeBlockHeightOutOfRangeError)
+}
+
 // NewScriptExecutionCancelledError construct a new CodedError which indicates
 // that Cadence Script execution has been cancelled (e.g. request connection
 // has been droped)

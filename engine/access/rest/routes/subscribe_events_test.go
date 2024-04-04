@@ -203,15 +203,17 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 						}
 						if len(expectedEvents) > 0 || (i+1)%int(test.heartbeatInterval) == 0 {
 							expectedEventsResponses = append(expectedEventsResponses, &backend.EventsResponse{
-								Height:  block.Header.Height,
-								BlockID: blockID,
-								Events:  expectedEvents,
+								Height:         block.Header.Height,
+								BlockID:        blockID,
+								Events:         expectedEvents,
+								BlockTimestamp: block.Header.Timestamp,
 							})
 						}
 						subscriptionEventsResponses = append(subscriptionEventsResponses, &backend.EventsResponse{
-							Height:  block.Header.Height,
-							BlockID: blockID,
-							Events:  subscriptionEvents,
+							Height:         block.Header.Height,
+							BlockID:        blockID,
+							Events:         subscriptionEvents,
+							BlockTimestamp: block.Header.Timestamp,
 						})
 					}
 				}
@@ -395,7 +397,7 @@ func requireError(t *testing.T, recorder *testHijackResponseRecorder, expected s
 	require.Contains(t, recorder.responseBuff.String(), expected)
 }
 
-// requireResponse validates that the response received from WebSocket communication matches the expected EventsResponses.
+// requireResponse validates that the response received from WebSocket communication matches the expected EventsResponse.
 // This function compares the BlockID, Events count, and individual event properties for each expected and actual
 // EventsResponse. It ensures that the response received from WebSocket matches the expected structure and content.
 func requireResponse(t *testing.T, recorder *testHijackResponseRecorder, expected []*backend.EventsResponse) {
@@ -403,7 +405,7 @@ func requireResponse(t *testing.T, recorder *testHijackResponseRecorder, expecte
 	// Convert the actual response from respRecorder to JSON bytes
 	actualJSON := recorder.responseBuff.Bytes()
 	// Define a regular expression pattern to match JSON objects
-	pattern := `\{"BlockID":".*?","Height":\d+,"Events":\[(\{.*?})*\]\}`
+	pattern := `\{"BlockID":".*?","Height":\d+,"Events":\[(\{.*?})*\],"BlockTimestamp":".*?"\}`
 	matches := regexp.MustCompile(pattern).FindAll(actualJSON, -1)
 
 	// Unmarshal each matched JSON into []state_stream.EventsResponse

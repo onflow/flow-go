@@ -38,7 +38,7 @@ type GrpcBlocksStreamSuite struct {
 	net *testnet.FlowNetwork
 
 	// RPC methods to test
-	testedRPCs func() []RPCTest
+	testedRPCs func() []subscribeBlocksRPCTest
 }
 
 func (s *GrpcBlocksStreamSuite) TearDownTest() {
@@ -209,13 +209,13 @@ func compareBlocks(t *testing.T, accessBlock *flow.Block, observerBlock *flow.Bl
 	return nil
 }
 
-type RPCTest struct {
+type subscribeBlocksRPCTest struct {
 	name string
 	call func(ctx context.Context, client accessproto.AccessAPIClient, startValue interface{}) (accessproto.AccessAPI_SubscribeBlocksFromLatestClient, error)
 }
 
-func (s *GrpcBlocksStreamSuite) getRPCs() []RPCTest {
-	return []RPCTest{
+func (s *GrpcBlocksStreamSuite) getRPCs() []subscribeBlocksRPCTest {
+	return []subscribeBlocksRPCTest{
 		{
 			name: "SubscribeBlocksFromLatest",
 			call: func(ctx context.Context, client accessproto.AccessAPIClient, _ interface{}) (accessproto.AccessAPI_SubscribeBlocksFromLatestClient, error) {

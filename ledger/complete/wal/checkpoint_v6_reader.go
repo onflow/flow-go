@@ -20,6 +20,7 @@ import (
 // ErrEOFNotReached for indicating end of file not reached error
 var ErrEOFNotReached = errors.New("expect to reach EOF, but actually didn't")
 
+// TODO: validate the header file and the sub file that contains the root hashes
 var ReadTriesRootHash = readTriesRootHash
 var CheckpointHasRootHash = checkpointHasRootHash
 

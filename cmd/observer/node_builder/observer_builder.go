@@ -1408,17 +1408,23 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,
-				builder.stateStreamConf,
 				node.State,
 				node.Storage.Headers,
 				node.Storage.Seals,
 				node.Storage.Results,
 				builder.ExecutionDataStore,
 				executionDataStoreCache,
-				broadcaster,
 				builder.RegistersAsyncStore,
 				builder.EventsIndex,
 				useIndex,
+				int(builder.stateStreamConf.RegisterIDsRequestLimit),
+				subscription.NewSubscriptionHandler(
+					builder.Logger,
+					broadcaster,
+					builder.stateStreamConf.ClientSendTimeout,
+					builder.stateStreamConf.ResponseLimit,
+					builder.stateStreamConf.ClientSendBufferSize,
+				),
 				executionDataTracker,
 			)
 			if err != nil {
@@ -1686,12 +1692,13 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
 			Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
 			BlockTracker:              blockTracker,
-			SubscriptionParams: backend.SubscriptionParams{
-				Broadcaster:    broadcaster,
-				SendTimeout:    builder.stateStreamConf.ClientSendTimeout,
-				ResponseLimit:  builder.stateStreamConf.ResponseLimit,
-				SendBufferSize: int(builder.stateStreamConf.ClientSendBufferSize),
-			},
+			SubscriptionHandler: subscription.NewSubscriptionHandler(
+				builder.Logger,
+				broadcaster,
+				builder.stateStreamConf.ClientSendTimeout,
+				builder.stateStreamConf.ResponseLimit,
+				builder.stateStreamConf.ClientSendBufferSize,
+			),
 		}
 
 		if builder.localServiceAPIEnabled {
