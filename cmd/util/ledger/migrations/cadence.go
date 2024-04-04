@@ -218,11 +218,7 @@ type NamedMigration struct {
 func NewCadence1ValueMigrations(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
-	nWorker int,
-	chainID flow.ChainID,
-	diffMigrations bool,
-	logVerboseDiff bool,
-	checkStorageHealthBeforeMigration bool,
+	opts Options,
 ) (migrations []NamedMigration) {
 
 	// Populated by CadenceLinkValueMigrator,
@@ -247,46 +243,41 @@ func NewCadence1ValueMigrations(
 		},
 	}
 
-	for index, migrationConstructor := range []func(checkStorageHealthBeforeMigration bool) *CadenceBaseMigrator{
-		func(checkStorageHealthBeforeMigration bool) *CadenceBaseMigrator {
+	for index, migrationConstructor := range []func(opts Options) *CadenceBaseMigrator{
+		func(opts Options) *CadenceBaseMigrator {
 			return NewCadence1ValueMigrator(
 				rwf,
-				diffMigrations,
-				logVerboseDiff,
-				checkStorageHealthBeforeMigration,
 				errorMessageHandler,
 				contracts,
-				NewCadence1CompositeStaticTypeConverter(chainID),
-				NewCadence1InterfaceStaticTypeConverter(chainID),
+				NewCadence1CompositeStaticTypeConverter(opts.ChainID),
+				NewCadence1InterfaceStaticTypeConverter(opts.ChainID),
+				opts,
 			)
 		},
-		func(checkStorageHealthBeforeMigration bool) *CadenceBaseMigrator {
+		func(opts Options) *CadenceBaseMigrator {
 			return NewCadence1LinkValueMigrator(
 				rwf,
-				diffMigrations,
-				logVerboseDiff,
-				checkStorageHealthBeforeMigration,
 				errorMessageHandler,
 				contracts,
 				capabilityMapping,
+				opts,
 			)
 		},
-		func(checkStorageHealthBeforeMigration bool) *CadenceBaseMigrator {
+		func(opts Options) *CadenceBaseMigrator {
 			return NewCadence1CapabilityValueMigrator(
 				rwf,
-				diffMigrations,
-				logVerboseDiff,
-				checkStorageHealthBeforeMigration,
 				errorMessageHandler,
 				contracts,
 				capabilityMapping,
+				opts,
 			)
 		},
 	} {
-		accountBasedMigration := migrationConstructor(
-			// Only check storage health before the first migration
-			checkStorageHealthBeforeMigration && index == 0,
-		)
+		opts := opts
+		// Only check storage health before the first migration
+		opts.CheckStorageHealthBeforeMigration = opts.CheckStorageHealthBeforeMigration && index == 0
+
+		accountBasedMigration := migrationConstructor(opts)
 
 		migrations = append(
 			migrations,
@@ -294,7 +285,8 @@ func NewCadence1ValueMigrations(
 				Name: accountBasedMigration.name,
 				Migrate: NewAccountBasedMigration(
 					log,
-					nWorker, []AccountBasedMigration{
+					opts.NWorker,
+					[]AccountBasedMigration{
 						accountBasedMigration,
 					},
 				),
@@ -308,32 +300,28 @@ func NewCadence1ValueMigrations(
 func NewCadence1ContractsMigrations(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
-	nWorker int,
-	chainID flow.ChainID,
-	evmContractChange EVMContractChange,
-	burnerContractChange BurnerContractChange,
-	stagedContracts []StagedContract,
+	opts Options,
 ) []NamedMigration {
 
 	systemContractsMigration := NewSystemContractsMigration(
-		chainID,
+		opts.ChainID,
 		log,
 		rwf,
 		SystemContractChangesOptions{
-			EVM:    evmContractChange,
-			Burner: burnerContractChange,
+			EVM:    opts.EVMContractChange,
+			Burner: opts.BurnerContractChange,
 		},
 	)
 
-	stagedContractsMigration := NewStagedContractsMigration(chainID, log, rwf).
+	stagedContractsMigration := NewStagedContractsMigration(opts.ChainID, log, rwf).
 		WithContractUpdateValidation()
 
-	stagedContractsMigration.RegisterContractUpdates(stagedContracts)
+	stagedContractsMigration.RegisterContractUpdates(opts.StagedContracts)
 
 	toAccountBasedMigration := func(migration AccountBasedMigration) ledger.Migration {
 		return NewAccountBasedMigration(
 			log,
-			nWorker,
+			opts.NWorker,
 			[]AccountBasedMigration{
 				migration,
 			},
@@ -342,12 +330,12 @@ func NewCadence1ContractsMigrations(
 
 	var migrations []NamedMigration
 
-	if burnerContractChange == BurnerContractChangeDeploy {
+	if opts.BurnerContractChange == BurnerContractChangeDeploy {
 		migrations = append(
 			migrations,
 			NamedMigration{
 				Name:    "burner-deployment-migration",
-				Migrate: NewBurnerDeploymentMigration(chainID, log),
+				Migrate: NewBurnerDeploymentMigration(opts.ChainID, log),
 			},
 		)
 	}
@@ -367,28 +355,32 @@ func NewCadence1ContractsMigrations(
 	return migrations
 }
 
+type Options struct {
+	NWorker                           int
+	DiffMigrations                    bool
+	LogVerboseDiff                    bool
+	CheckStorageHealthBeforeMigration bool
+	ChainID                           flow.ChainID
+	EVMContractChange                 EVMContractChange
+	BurnerContractChange              BurnerContractChange
+	StagedContracts                   []StagedContract
+	Prune                             bool
+	MaxAccountSize                    uint64
+}
+
 func NewCadence1Migrations(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
-	nWorker int,
-	chainID flow.ChainID,
-	diffMigrations bool,
-	logVerboseDiff bool,
-	checkStorageHealthBeforeMigration bool,
-	evmContractChange EVMContractChange,
-	burnerContractChange BurnerContractChange,
-	stagedContracts []StagedContract,
-	prune bool,
-	maxAccountSize uint64,
+	opts Options,
 ) []NamedMigration {
 
 	var migrations []NamedMigration
 
-	if maxAccountSize > 0 {
+	if opts.MaxAccountSize > 0 {
 
 		maxSizeExceptions := map[string]struct{}{}
 
-		systemContracts := systemcontracts.SystemContractsForChain(chainID)
+		systemContracts := systemcontracts.SystemContractsForChain(opts.ChainID)
 		for _, systemContract := range systemContracts.All() {
 			maxSizeExceptions[string(systemContract.Address.Bytes())] = struct{}{}
 		}
@@ -397,13 +389,13 @@ func NewCadence1Migrations(
 			migrations,
 			NamedMigration{
 				Name:    "account-size-filter-migration",
-				Migrate: NewAccountSizeFilterMigration(maxAccountSize, maxSizeExceptions, log),
+				Migrate: NewAccountSizeFilterMigration(opts.MaxAccountSize, maxSizeExceptions, log),
 			},
 		)
 	}
 
-	if prune {
-		migration := NewCadence1PruneMigration(chainID, log)
+	if opts.Prune {
+		migration := NewCadence1PruneMigration(opts.ChainID, log)
 		if migration != nil {
 			migrations = append(
 				migrations,
@@ -420,11 +412,7 @@ func NewCadence1Migrations(
 		NewCadence1ContractsMigrations(
 			log,
 			rwf,
-			nWorker,
-			chainID,
-			evmContractChange,
-			burnerContractChange,
-			stagedContracts,
+			opts,
 		)...,
 	)
 
@@ -433,11 +421,7 @@ func NewCadence1Migrations(
 		NewCadence1ValueMigrations(
 			log,
 			rwf,
-			nWorker,
-			chainID,
-			diffMigrations,
-			checkStorageHealthBeforeMigration,
-			logVerboseDiff,
+			opts,
 		)...,
 	)
 

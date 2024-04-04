@@ -2,12 +2,14 @@ package migrations_test
 
 import (
 	"context"
+	"io"
 	"fmt"
 	"sync"
 	"testing"
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
@@ -46,13 +48,27 @@ access(all) contract B {
     access(all) fun bar() {}
 }`
 
+type logWriter struct {
+	logs []string
+}
+
+var _ io.Writer = &logWriter{}
+
+func (l *logWriter) Write(bytes []byte) (int, error) {
+	l.logs = append(l.logs, string(bytes))
+	return len(bytes), nil
+}
+
 func TestChangeContractCodeMigration(t *testing.T) {
 	t.Parallel()
 
-	address1, err := common.HexToAddress("0x1")
+	chainID := flow.Emulator
+	addressGenerator := chainID.Chain().NewAddressGenerator()
+
+	address1, err := addressGenerator.NextAddress()
 	require.NoError(t, err)
 
-	address2, err := common.HexToAddress("0x2")
+	address2, err := addressGenerator.NextAddress()
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -60,7 +76,8 @@ func TestChangeContractCodeMigration(t *testing.T) {
 	t.Run("no contracts", func(t *testing.T) {
 		t.Parallel()
 
-		log := zerolog.New(zerolog.NewTestWriter(t))
+		writer := &logWriter{}
+		log := zerolog.New(writer)
 
 		rwf := &testReportWriterFactory{}
 
@@ -69,7 +86,8 @@ func TestChangeContractCodeMigration(t *testing.T) {
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
-		_, err = migration.MigrateAccount(ctx, address1,
+		_, err = migration.MigrateAccount(ctx,
+			common.Address(address1),
 			[]*ledger.Payload{},
 		)
 
@@ -77,12 +95,15 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		err = migration.Close()
 		require.NoError(t, err)
+
+		require.Empty(t, writer.logs)
 	})
 
 	t.Run("1 contract - dont migrate", func(t *testing.T) {
 		t.Parallel()
 
-		log := zerolog.New(zerolog.NewTestWriter(t))
+		writer := &logWriter{}
+		log := zerolog.New(writer)
 
 		rwf := &testReportWriterFactory{}
 
@@ -91,9 +112,15 @@ func TestChangeContractCodeMigration(t *testing.T) {
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
-		payloads, err := migration.MigrateAccount(ctx, address1,
+		payloads, err := migration.MigrateAccount(
+			ctx,
+			common.Address(address1),
 			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte(contractA)),
+				newContractPayload(
+					common.Address(address1),
+					"A",
+					[]byte(contractA),
+				),
 			},
 		)
 
@@ -103,12 +130,15 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		err = migration.Close()
 		require.NoError(t, err)
+
+		require.Empty(t, writer.logs)
 	})
 
 	t.Run("1 contract - migrate", func(t *testing.T) {
 		t.Parallel()
 
-		log := zerolog.New(zerolog.NewTestWriter(t))
+		writer := &logWriter{}
+		log := zerolog.New(writer)
 
 		rwf := &testReportWriterFactory{}
 
@@ -119,7 +149,7 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		migration.RegisterContractChange(
 			migrations.StagedContract{
-				Address: address1,
+				Address: common.Address(address1),
 				Contract: migrations.Contract{
 					Name: "A",
 					Code: []byte(updatedContractA),
@@ -127,9 +157,15 @@ func TestChangeContractCodeMigration(t *testing.T) {
 			},
 		)
 
-		payloads, err := migration.MigrateAccount(ctx, address1,
+		payloads, err := migration.MigrateAccount(
+			ctx,
+			common.Address(address1),
 			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte(contractA)),
+				newContractPayload(
+					common.Address(address1),
+					"A",
+					[]byte(contractA),
+				),
 			},
 		)
 
@@ -139,12 +175,15 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		err = migration.Close()
 		require.NoError(t, err)
+
+		require.Empty(t, writer.logs)
 	})
 
 	t.Run("2 contracts - migrate 1", func(t *testing.T) {
 		t.Parallel()
 
-		log := zerolog.New(zerolog.NewTestWriter(t))
+		writer := &logWriter{}
+		log := zerolog.New(writer)
 
 		rwf := &testReportWriterFactory{}
 
@@ -155,7 +194,7 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		migration.RegisterContractChange(
 			migrations.StagedContract{
-				Address: address1,
+				Address: common.Address(address1),
 				Contract: migrations.Contract{
 					Name: "A",
 					Code: []byte(updatedContractA),
@@ -163,10 +202,12 @@ func TestChangeContractCodeMigration(t *testing.T) {
 			},
 		)
 
-		payloads, err := migration.MigrateAccount(ctx, address1,
+		payloads, err := migration.MigrateAccount(
+			ctx,
+			common.Address(address1),
 			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte(contractA)),
-				newContractPayload(address1, "B", []byte(contractB)),
+				newContractPayload(common.Address(address1), "A", []byte(contractA)),
+				newContractPayload(common.Address(address1), "B", []byte(contractB)),
 			},
 		)
 
@@ -177,12 +218,15 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		err = migration.Close()
 		require.NoError(t, err)
+
+		require.Empty(t, writer.logs)
 	})
 
 	t.Run("2 contracts - migrate 2", func(t *testing.T) {
 		t.Parallel()
 
-		log := zerolog.New(zerolog.NewTestWriter(t))
+		writer := &logWriter{}
+		log := zerolog.New(writer)
 
 		rwf := &testReportWriterFactory{}
 
@@ -193,7 +237,7 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		migration.RegisterContractChange(
 			migrations.StagedContract{
-				Address: address1,
+				Address: common.Address(address1),
 				Contract: migrations.Contract{
 					Name: "A",
 					Code: []byte(updatedContractA),
@@ -202,7 +246,7 @@ func TestChangeContractCodeMigration(t *testing.T) {
 		)
 		migration.RegisterContractChange(
 			migrations.StagedContract{
-				Address: address1,
+				Address: common.Address(address1),
 				Contract: migrations.Contract{
 					Name: "B",
 					Code: []byte(updatedContractB),
@@ -210,10 +254,12 @@ func TestChangeContractCodeMigration(t *testing.T) {
 			},
 		)
 
-		payloads, err := migration.MigrateAccount(ctx, address1,
+		payloads, err := migration.MigrateAccount(
+			ctx,
+			common.Address(address1),
 			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte(contractA)),
-				newContractPayload(address1, "B", []byte(contractB)),
+				newContractPayload(common.Address(address1), "A", []byte(contractA)),
+				newContractPayload(common.Address(address1), "B", []byte(contractB)),
 			},
 		)
 
@@ -224,12 +270,15 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		err = migration.Close()
 		require.NoError(t, err)
+
+		require.Empty(t, writer.logs)
 	})
 
 	t.Run("2 contracts on different accounts - migrate 1", func(t *testing.T) {
 		t.Parallel()
 
-		log := zerolog.New(zerolog.NewTestWriter(t))
+		writer := &logWriter{}
+		log := zerolog.New(writer)
 
 		rwf := &testReportWriterFactory{}
 
@@ -240,7 +289,7 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		migration.RegisterContractChange(
 			migrations.StagedContract{
-				Address: address1,
+				Address: common.Address(address1),
 				Contract: migrations.Contract{
 					Name: "A",
 					Code: []byte(updatedContractA),
@@ -248,10 +297,12 @@ func TestChangeContractCodeMigration(t *testing.T) {
 			},
 		)
 
-		payloads, err := migration.MigrateAccount(ctx, address1,
+		payloads, err := migration.MigrateAccount(
+			ctx,
+			common.Address(address1),
 			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte(contractA)),
-				newContractPayload(address2, "A", []byte(contractA)),
+				newContractPayload(common.Address(address1), "A", []byte(contractA)),
+				newContractPayload(common.Address(address2), "A", []byte(contractA)),
 			},
 		)
 
@@ -262,12 +313,19 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		err = migration.Close()
 		require.NoError(t, err)
+
+		require.Len(t, writer.logs, 1)
+		assert.Contains(t,
+			writer.logs[0],
+			"payload address ee82856bf20e2aa6 does not match expected address f8d6e0586b0a20c7",
+		)
 	})
 
 	t.Run("not all contracts on one account migrated", func(t *testing.T) {
 		t.Parallel()
 
-		log := zerolog.New(zerolog.NewTestWriter(t))
+		writer := &logWriter{}
+		log := zerolog.New(writer)
 
 		rwf := &testReportWriterFactory{}
 
@@ -278,7 +336,7 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		migration.RegisterContractChange(
 			migrations.StagedContract{
-				Address: address1,
+				Address: common.Address(address1),
 				Contract: migrations.Contract{
 					Name: "A",
 					Code: []byte(updatedContractA),
@@ -287,7 +345,7 @@ func TestChangeContractCodeMigration(t *testing.T) {
 		)
 		migration.RegisterContractChange(
 			migrations.StagedContract{
-				Address: address1,
+				Address: common.Address(address1),
 				Contract: migrations.Contract{
 					Name: "B",
 					Code: []byte(updatedContractB),
@@ -295,19 +353,28 @@ func TestChangeContractCodeMigration(t *testing.T) {
 			},
 		)
 
-		_, err = migration.MigrateAccount(ctx, address1,
+		_, err = migration.MigrateAccount(
+			ctx,
+			common.Address(address1),
 			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte(contractA)),
+				newContractPayload(common.Address(address1), "A", []byte(contractA)),
 			},
 		)
 
-		require.Error(t, err)
+		require.NoError(t, err)
+
+		require.Len(t, writer.logs, 1)
+		assert.Contains(t,
+			writer.logs[0],
+			`"failed to find all contract registers that need to be changed for address"`,
+		)
 	})
 
 	t.Run("not all accounts migrated", func(t *testing.T) {
 		t.Parallel()
 
-		log := zerolog.New(zerolog.NewTestWriter(t))
+		writer := &logWriter{}
+		log := zerolog.New(writer)
 
 		rwf := &testReportWriterFactory{}
 
@@ -318,7 +385,7 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		migration.RegisterContractChange(
 			migrations.StagedContract{
-				Address: address2,
+				Address: common.Address(address2),
 				Contract: migrations.Contract{
 					Name: "A",
 					Code: []byte(updatedContractA),
@@ -326,16 +393,24 @@ func TestChangeContractCodeMigration(t *testing.T) {
 			},
 		)
 
-		_, err = migration.MigrateAccount(ctx, address1,
+		_, err = migration.MigrateAccount(
+			ctx,
+			common.Address(address1),
 			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte(contractA)),
+				newContractPayload(common.Address(address1), "A", []byte(contractA)),
 			},
 		)
 
 		require.NoError(t, err)
 
 		err = migration.Close()
-		require.Error(t, err)
+		require.NoError(t, err)
+
+		require.Len(t, writer.logs, 1)
+		assert.Contains(t,
+			writer.logs[0],
+			`"failed to find all contract registers that need to be changed"`,
+		)
 	})
 }
 
