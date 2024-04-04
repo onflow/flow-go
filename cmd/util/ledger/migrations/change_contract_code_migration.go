@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 
 	"github.com/onflow/cadence/runtime/common"
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
@@ -18,9 +19,13 @@ type ChangeContractCodeMigration struct {
 
 var _ AccountBasedMigration = (*ChangeContractCodeMigration)(nil)
 
-func NewChangeContractCodeMigration(chainID flow.ChainID, log zerolog.Logger) *ChangeContractCodeMigration {
+func NewChangeContractCodeMigration(
+	chainID flow.ChainID,
+	log zerolog.Logger,
+	rwf reporters.ReportWriterFactory,
+) *ChangeContractCodeMigration {
 	return &ChangeContractCodeMigration{
-		StagedContractsMigration: NewStagedContractsMigration(chainID, log).
+		StagedContractsMigration: NewStagedContractsMigration(chainID, log, rwf).
 			// TODO:
 			//WithContractUpdateValidation().
 			WithName("ChangeContractCodeMigration"),
@@ -273,9 +278,10 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 func NewSystemContractsMigration(
 	chainID flow.ChainID,
 	log zerolog.Logger,
+	rwf reporters.ReportWriterFactory,
 	options SystemContractChangesOptions,
 ) *ChangeContractCodeMigration {
-	migration := NewChangeContractCodeMigration(chainID, log)
+	migration := NewChangeContractCodeMigration(chainID, log, rwf)
 	for _, change := range SystemContractChanges(chainID, options) {
 		migration.RegisterContractChange(change)
 	}

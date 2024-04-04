@@ -2,6 +2,8 @@ package migrations_test
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/onflow/cadence/runtime/common"
@@ -9,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -59,7 +62,9 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		log := zerolog.New(zerolog.NewTestWriter(t))
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log)
+		rwf := &testReportWriterFactory{}
+
+		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -79,7 +84,9 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		log := zerolog.New(zerolog.NewTestWriter(t))
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log)
+		rwf := &testReportWriterFactory{}
+
+		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -103,7 +110,9 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		log := zerolog.New(zerolog.NewTestWriter(t))
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log)
+		rwf := &testReportWriterFactory{}
+
+		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -137,7 +146,9 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		log := zerolog.New(zerolog.NewTestWriter(t))
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log)
+		rwf := &testReportWriterFactory{}
+
+		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -173,7 +184,9 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		log := zerolog.New(zerolog.NewTestWriter(t))
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log)
+		rwf := &testReportWriterFactory{}
+
+		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -218,7 +231,9 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		log := zerolog.New(zerolog.NewTestWriter(t))
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log)
+		rwf := &testReportWriterFactory{}
+
+		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -254,7 +269,9 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		log := zerolog.New(zerolog.NewTestWriter(t))
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log)
+		rwf := &testReportWriterFactory{}
+
+		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -292,7 +309,9 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		log := zerolog.New(zerolog.NewTestWriter(t))
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log)
+		rwf := &testReportWriterFactory{}
+
+		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -319,3 +338,39 @@ func TestChangeContractCodeMigration(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+type testReportWriterFactory struct {
+	lock          sync.Mutex
+	reportWriters map[string]*testReportWriter
+}
+
+func (f *testReportWriterFactory) ReportWriter(dataNamespace string) reporters.ReportWriter {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	if f.reportWriters == nil {
+		f.reportWriters = make(map[string]*testReportWriter)
+	}
+	reportWriter := &testReportWriter{}
+	if _, ok := f.reportWriters[dataNamespace]; ok {
+		panic(fmt.Sprintf("report writer already exists for namespace %s", dataNamespace))
+	}
+	f.reportWriters[dataNamespace] = reportWriter
+	return reportWriter
+}
+
+type testReportWriter struct {
+	lock    sync.Mutex
+	entries []any
+}
+
+var _ reporters.ReportWriter = &testReportWriter{}
+
+func (r *testReportWriter) Write(entry any) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	r.entries = append(r.entries, entry)
+}
+
+func (r *testReportWriter) Close() {}

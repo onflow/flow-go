@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"io"
 	"os"
 	"strings"
@@ -39,6 +40,7 @@ type StagedContractsMigration struct {
 	elaborations                   map[common.Location]*sema.Elaboration
 	contractAdditionHandler        stdlib.AccountContractAdditionHandler
 	contractNamesProvider          stdlib.AccountContractNamesProvider
+	reporter                       reporters.ReportWriter
 }
 
 type StagedContract struct {
@@ -53,13 +55,18 @@ type Contract struct {
 
 var _ AccountBasedMigration = &StagedContractsMigration{}
 
-func NewStagedContractsMigration(chainID flow.ChainID, log zerolog.Logger) *StagedContractsMigration {
+func NewStagedContractsMigration(
+	chainID flow.ChainID,
+	log zerolog.Logger,
+	rwf reporters.ReportWriterFactory,
+) *StagedContractsMigration {
 	return &StagedContractsMigration{
 		name:                "StagedContractsMigration",
 		log:                 log,
 		chainID:             chainID,
 		stagedContracts:     map[common.Address]map[flow.RegisterID]Contract{},
 		contractsByLocation: map[common.Location][]byte{},
+		reporter:            rwf.ReportWriter("staged-contracts-migrator"),
 	}
 }
 
@@ -77,6 +84,9 @@ func (m *StagedContractsMigration) WithName(name string) *StagedContractsMigrati
 func (m *StagedContractsMigration) Close() error {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
+
+	// Close the report writer so it flushes to file.
+	m.reporter.Close()
 
 	if len(m.stagedContracts) > 0 {
 		var sb strings.Builder
@@ -277,12 +287,23 @@ func (m *StagedContractsMigration) MigrateAccount(
 					address.HexWithPrefix(),
 					errorDetails,
 				)
+
+			m.reporter.Write(contractUpdateFailed{
+				AccountAddressHex: address.HexWithPrefix(),
+				ContractName:      name,
+				Error:             errorDetails,
+			})
 		} else {
 			// change contract code
 			oldPayloads[payloadIndex] = ledger.NewPayload(
 				key,
 				newCode,
 			)
+
+			m.reporter.Write(contractUpdateSuccessful{
+				AccountAddressHex: address.HexWithPrefix(),
+				ContractName:      name,
+			})
 		}
 
 		// remove contract from list of contracts to change
@@ -426,4 +447,15 @@ func newUserDefinedTypeChangeCheckerFunc(
 		}
 		return false, false
 	}
+}
+
+type contractUpdateSuccessful struct {
+	AccountAddressHex string `json:"address"`
+	ContractName      string `json:"name"`
+}
+
+type contractUpdateFailed struct {
+	AccountAddressHex string `json:"address"`
+	ContractName      string `json:"name"`
+	Error             string `json:"error"`
 }

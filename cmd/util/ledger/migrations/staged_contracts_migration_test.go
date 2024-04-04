@@ -71,7 +71,9 @@ func TestStagedContractsMigration(t *testing.T) {
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 
-		migration := NewStagedContractsMigration(chainID, log)
+		rwf := &testReportWriterFactory{}
+
+		migration := NewStagedContractsMigration(chainID, log, rwf)
 		migration.RegisterContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
@@ -114,7 +116,9 @@ func TestStagedContractsMigration(t *testing.T) {
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 
-		migration := NewStagedContractsMigration(chainID, log).
+		rwf := &testReportWriterFactory{}
+
+		migration := NewStagedContractsMigration(chainID, log, rwf).
 			WithContractUpdateValidation()
 		migration.RegisterContractUpdates(stagedContracts)
 
@@ -160,7 +164,9 @@ func TestStagedContractsMigration(t *testing.T) {
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 
-		migration := NewStagedContractsMigration(chainID, log).
+		rwf := &testReportWriterFactory{}
+
+		migration := NewStagedContractsMigration(chainID, log, rwf).
 			WithContractUpdateValidation()
 		migration.RegisterContractUpdates(stagedContracts)
 
@@ -216,7 +222,9 @@ func TestStagedContractsMigration(t *testing.T) {
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 
-		migration := NewStagedContractsMigration(chainID, log).
+		rwf := &testReportWriterFactory{}
+
+		migration := NewStagedContractsMigration(chainID, log, rwf).
 			WithContractUpdateValidation()
 		migration.RegisterContractUpdates(stagedContracts)
 
@@ -244,6 +252,27 @@ func TestStagedContractsMigration(t *testing.T) {
 		require.Equal(t, oldCode1, string(payloads[0].Value()))
 		// Second payload should have the updated code
 		require.Equal(t, newCode2, string(payloads[1].Value()))
+
+		reportWriter := rwf.reportWriters["staged-contracts-migrator"]
+		require.Len(t, reportWriter.entries, 2)
+		assert.Equal(
+			t,
+			contractUpdateFailed{
+				AccountAddressHex: address1.HexWithPrefix(),
+				ContractName:      "A",
+				Error:             "error: expected token '{'\n --> f8d6e0586b0a20c7.A:1:46\n  |\n1 | access(all) contract A { access(all) struct C () }\n  |                                               ^\n",
+			},
+			reportWriter.entries[0],
+		)
+
+		assert.Equal(
+			t,
+			contractUpdateSuccessful{
+				AccountAddressHex: address1.HexWithPrefix(),
+				ContractName:      "B",
+			},
+			reportWriter.entries[1],
+		)
 	})
 
 	t.Run("different accounts", func(t *testing.T) {
@@ -265,7 +294,9 @@ func TestStagedContractsMigration(t *testing.T) {
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 
-		migration := NewStagedContractsMigration(chainID, log)
+		rwf := &testReportWriterFactory{}
+
+		migration := NewStagedContractsMigration(chainID, log, rwf)
 		migration.RegisterContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
@@ -307,6 +338,17 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		// No errors.
 		require.Empty(t, logWriter.logs)
+
+		reportWriter := rwf.reportWriters["staged-contracts-migrator"]
+		require.Len(t, reportWriter.entries, 1)
+		assert.Equal(
+			t,
+			contractUpdateSuccessful{
+				AccountAddressHex: address2.HexWithPrefix(),
+				ContractName:      "A",
+			},
+			reportWriter.entries[0],
+		)
 	})
 
 	t.Run("multiple updates for same contract", func(t *testing.T) {
@@ -336,7 +378,9 @@ func TestStagedContractsMigration(t *testing.T) {
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 
-		migration := NewStagedContractsMigration(chainID, log)
+		rwf := &testReportWriterFactory{}
+
+		migration := NewStagedContractsMigration(chainID, log, rwf)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -384,7 +428,9 @@ func TestStagedContractsMigration(t *testing.T) {
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 
-		migration := NewStagedContractsMigration(chainID, log)
+		rwf := &testReportWriterFactory{}
+
+		migration := NewStagedContractsMigration(chainID, log, rwf)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -461,7 +507,9 @@ func TestStagedContractsWithImports(t *testing.T) {
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 
-		migration := NewStagedContractsMigration(chainID, log)
+		rwf := &testReportWriterFactory{}
+
+		migration := NewStagedContractsMigration(chainID, log, rwf)
 		migration.RegisterContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
@@ -536,7 +584,9 @@ func TestStagedContractsWithImports(t *testing.T) {
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 
-		migration := NewStagedContractsMigration(chainID, log).
+		rwf := &testReportWriterFactory{}
+
+		migration := NewStagedContractsMigration(chainID, log, rwf).
 			WithContractUpdateValidation()
 		migration.RegisterContractUpdates(stagedContracts)
 
@@ -627,7 +677,9 @@ func TestStagedContractsWithImports(t *testing.T) {
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 
-		migration := NewStagedContractsMigration(chainID, log).
+		rwf := &testReportWriterFactory{}
+
+		migration := NewStagedContractsMigration(chainID, log, rwf).
 			WithContractUpdateValidation()
 		migration.RegisterContractUpdates(stagedContracts)
 
@@ -723,7 +775,9 @@ func TestStagedContractsWithImports(t *testing.T) {
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 
-		migration := NewStagedContractsMigration(chainID, log).
+		rwf := &testReportWriterFactory{}
+
+		migration := NewStagedContractsMigration(chainID, log, rwf).
 			WithContractUpdateValidation()
 		migration.RegisterContractUpdates(stagedContracts)
 
@@ -941,7 +995,9 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 
-		migration := NewStagedContractsMigration(chainID, log).
+		rwf := &testReportWriterFactory{}
+
+		migration := NewStagedContractsMigration(chainID, log, rwf).
 			WithContractUpdateValidation()
 
 		migration.RegisterContractUpdates(stagedContracts)
@@ -1032,7 +1088,9 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 
-		migration := NewStagedContractsMigration(chainID, log).
+		rwf := &testReportWriterFactory{}
+
+		migration := NewStagedContractsMigration(chainID, log, rwf).
 			WithContractUpdateValidation()
 
 		migration.RegisterContractUpdates(stagedContracts)
@@ -1120,7 +1178,9 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 
-		migration := NewStagedContractsMigration(chainID, log).
+		rwf := &testReportWriterFactory{}
+
+		migration := NewStagedContractsMigration(chainID, log, rwf).
 			WithContractUpdateValidation()
 
 		migration.RegisterContractUpdates(stagedContracts)
@@ -1220,7 +1280,9 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 			logWriter := &logWriter{}
 			log := zerolog.New(logWriter)
 
-			migration := NewStagedContractsMigration(chainID, log).
+			rwf := &testReportWriterFactory{}
+
+			migration := NewStagedContractsMigration(chainID, log, rwf).
 				WithContractUpdateValidation()
 
 			migration.RegisterContractUpdates(stagedContracts)
@@ -1333,7 +1395,9 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 
-		migration := NewStagedContractsMigration(chainID, log).
+		rwf := &testReportWriterFactory{}
+
+		migration := NewStagedContractsMigration(chainID, log, rwf).
 			WithContractUpdateValidation()
 
 		migration.RegisterContractUpdates(stagedContracts)
@@ -1552,7 +1616,9 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 
-		migration := NewStagedContractsMigration(chainID, log).
+		rwf := &testReportWriterFactory{}
+
+		migration := NewStagedContractsMigration(chainID, log, rwf).
 			WithContractUpdateValidation()
 
 		migration.RegisterContractUpdates(stagedContracts)
@@ -1649,7 +1715,9 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
 
-		migration := NewStagedContractsMigration(chainID, log).
+		rwf := &testReportWriterFactory{}
+
+		migration := NewStagedContractsMigration(chainID, log, rwf).
 			WithContractUpdateValidation()
 
 		migration.RegisterContractUpdates(stagedContracts)

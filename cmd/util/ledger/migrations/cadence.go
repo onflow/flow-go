@@ -307,6 +307,7 @@ func NewCadence1ValueMigrations(
 
 func NewCadence1ContractsMigrations(
 	log zerolog.Logger,
+	rwf reporters.ReportWriterFactory,
 	nWorker int,
 	chainID flow.ChainID,
 	evmContractChange EVMContractChange,
@@ -317,13 +318,14 @@ func NewCadence1ContractsMigrations(
 	systemContractsMigration := NewSystemContractsMigration(
 		chainID,
 		log,
+		rwf,
 		SystemContractChangesOptions{
 			EVM:    evmContractChange,
 			Burner: burnerContractChange,
 		},
 	)
 
-	stagedContractsMigration := NewStagedContractsMigration(chainID, log).
+	stagedContractsMigration := NewStagedContractsMigration(chainID, log, rwf).
 		WithContractUpdateValidation()
 
 	stagedContractsMigration.RegisterContractUpdates(stagedContracts)
@@ -417,6 +419,7 @@ func NewCadence1Migrations(
 		migrations,
 		NewCadence1ContractsMigrations(
 			log,
+			rwf,
 			nWorker,
 			chainID,
 			evmContractChange,
