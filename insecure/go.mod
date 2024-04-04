@@ -210,7 +210,7 @@ require (
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230711213910-baad011d2b13 // indirect
 	github.com/onflow/flow-go-sdk v0.46.0 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.1.0 // indirect
-	github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240329135840-9f04832ba3a1 // indirect
+	github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240404170900-c321c1475f1e // indirect
 	github.com/onflow/go-ethereum v1.13.4 // indirect
 	github.com/onflow/sdks v0.5.0 // indirect
 	github.com/onflow/wal v0.0.0-20240208022732-d756cd497d3b // indirect
@@ -304,6 +304,3 @@ require (
 )
 
 replace github.com/onflow/flow-go => ../
-
-// TODO: Remove when it will be merged
-replace github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240329135840-9f04832ba3a1 => github.com/The-K-R-O-K/flow/protobuf/go/flow v0.0.0-20240403101026-bc18dca2e2f7
