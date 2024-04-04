@@ -213,3 +213,7 @@ func (d *DeferredDBUpdates) Decorate(blockID flow.Identifier) []transaction.Defe
 	}
 	return updates
 }
+
+// DeferredBlockPersistOp is a shorthand notation for an anonymous function that persists details
+// a `transaction.Tx` as input and runs some database operations as part of that transaction.
+type DeferredBlockPersistOp func(blockID flow.Identifier, tx *transaction.Tx) error

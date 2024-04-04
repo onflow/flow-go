@@ -17,8 +17,9 @@ import (
 // when Epoch-related Service Events are sealed or specific view-thresholds are reached.
 //
 // The StateMachine is fork-aware, in that it starts with the Epoch state of the parent block and
-// consumes a sequence of sealed Service Events from the child block. A separate instance is created for
-// each block that is being processed. Calling `Build()` constructs a snapshot of the resulting Epoch state.
+// evolves the state based on the relevant information in the child block (specifically Service Events
+// sealed in the child block and the child block's view). A separate instance must be created for each
+// block that is being processed. Calling `Build()` constructs a snapshot of the resulting Epoch state.
 type StateMachine interface {
 	// Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
 	// CAUTION:
@@ -181,14 +182,22 @@ func (e *EpochStateMachine) Build() protocol.DeferredDBUpdates {
 	return dbUpdates
 }
 
-// ProcessUpdate applies the state changes that are delivered via sealed service events.
-// The block's payload might contain epoch preparation service events for the next
-// epoch. In this case, we need to update the tentative protocol state.
-// We need to validate whether all information is available in the protocol
-// state to go to the next epoch when needed. In cases where there is a bug
-// in the smart contract, it could be that this happens too late, and we should trigger epoch fallback mode.
+// EvolveState evolves the Epoch state in accordance with the information in the candidate block (under
+// construction). Information that potentially changes the Epoch state (compared to the parent block's state):
+//   - Service Events sealed in the candidate block
+//   - the candidate block's view (already provided at construction time)
+//
+// CAUTION: EvolveState function MUST be called for all candidate blocks, even if `update` is empty! This
+// is because also the absence of expected service events by a certain view can result in the Epoch state
+// changing (for example not having received the EpochCommit event for the next epoch, but approaching
+// the end of the current epoch).
+//
+// The block's payload might contain epoch preparation service events for the next epoch. In this case,
+// we need to update the tentative protocol state. We need to validate whether all information is available
+// in the protocol state to go to the next epoch when needed. In cases where there is a bug in the smart
+// contract, it could be that this happens too late, and we should trigger epoch fallback mode.
 // No errors are expected during normal operations.
-func (e *EpochStateMachine) ProcessUpdate(update []flow.ServiceEvent) error {
+func (e *EpochStateMachine) EvolveState(sealedServiceEvents []flow.ServiceEvent) error {
 	parentProtocolState := e.activeStateMachine.ParentState()
 
 	// perform protocol state transition to next epoch if next epoch is committed, and we are at first block of epoch
@@ -203,10 +212,10 @@ func (e *EpochStateMachine) ProcessUpdate(update []flow.ServiceEvent) error {
 		}
 	}
 
-	dbUpdates, err := e.applyServiceEventsFromOrderedResults(update)
+	dbUpdates, err := e.applyServiceEventsFromOrderedResults(sealedServiceEvents)
 	if err != nil {
 		if protocol.IsInvalidServiceEventError(err) {
-			dbUpdates, err = e.transitionToEpochFallbackMode(update)
+			dbUpdates, err = e.transitionToEpochFallbackMode(sealedServiceEvents)
 			if err != nil {
 				return irrecoverable.NewExceptionf("could not transition to epoch fallback mode: %w", err)
 			}

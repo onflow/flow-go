@@ -116,28 +116,37 @@ type KVStoreMutator interface {
 	SetInvalidEpochTransitionAttempted(attempted bool) error
 }
 
-// OrthogonalStoreStateMachine represents a state machine, that exclusively evolves its state P.
-// The state's specific type P is kept as a generic. Generally, P is the type corresponding
+// OrthogonalStoreStateMachine represents a state machine that exclusively evolves its state Pi.
+// The state's specific type Pi is kept as a generic. Generally, Pi is the type corresponding
 // to one specific key in the Key-Value store.
-//
-// The Flow protocol defines its protocol state 𝓅 as the composition of disjoint sub-states P0, P1, ..., Pj
-// Formally, we write 𝒫 = P0 ⊗ P1 ⊗  ... ⊗ Pj, where '⊗' denotes the product state. We loosely associate
-// each P0, P1 ... with one specific key-value entry in the store. Correspondingly, we have one conceptually
-// independent state machine S0, S1, ... operating each on their own respective element P0, P1, ...
-// A one-to-one correspondence between kv-entry and state machine should be the default, but is not
-// strictly required. However, the strong requirement is that no entry is operated on my more than one
-// state machine.
 //
 // Orthogonal State Machines:
 // Orthogonality means that state machines can operate completely independently and work on disjoint
-// sub-states. They all consume the same inputs: the ordered sequence of Service Events sealed in one block.
-// In other words, each state machine S0, S1, ... has full visibility, but each draws their on independent
-// conclusions (maintain their own exclusive state).
-// This is a deliberate design choice. Thereby the default is favouring modularity and strong logical
-// independence. This is very beneficial for managing complexity in the long term.
+// sub-states. By convention, they all consume the same inputs (incl. the ordered sequence of
+// Service Events sealed in one block). In other words, each state machine S0, S1,… has full visibility
+// into the inputs, but each draws their on independent conclusions (maintain their own exclusive state).
+// There is no information exchange between the state machines; one state machines cannot read the state
+// of another.
 // We emphasize that this architecture choice does not prevent us of from implementing sequential state
-// machines for certain events. It is just that we would need to bundle these sequential state machines
-// into a composite state machine (conceptually a processing pipeline).
+// machines for certain use-cases. For example: state machine A provides its output as input to another
+// state machine B. Here, the order of running the state machines matter. This order-dependency is not
+// supported by the Protocol State, which executed the state machines in an arbitrary order. Therefore,
+// if we need state machines to be executed in some order, we have bundle them into one composite state
+// machine (conceptually a processing pipeline) by hand. The composite state machine's execution as a
+// whole can then be managed by the Protocol State, because the composite state machine is orthogonal
+// to all other remaining state machines.
+// Requiring all State Machines to be orthogonal is a deliberate design choice. Thereby the default is
+// favouring modularity and strong logical independence. This is very beneficial for managing complexity
+// in the long term.
+//
+// Key-Value-Store:
+// The Flow protocol defines the Key-Value-Store's state 𝒫 as the composition of disjoint sub-states
+// P0, P1, …, Pj. Formally, we write 𝒫 = P0 ⊗ P1 ⊗ … ⊗ Pj, where '⊗' denotes the product state. We
+// loosely associate each P0, P1,… with one specific key-value entry in the store. Correspondingly,
+// we have conceptually independent state machines S0, S1,… operating each on their own respective
+// sub-state P0, P1,… . A one-to-one correspondence between kv-entry and state machine should be the
+// default, but is not strictly required. However, the strong requirement is that no entry is operated
+// on my more than one state machine.
 //
 // Formally we write:
 //   - The overall protocol state 𝒫 is composed of disjoint substates 𝒫 = P0 ⊗ P1 ⊗  ... ⊗ Pj
@@ -152,11 +161,27 @@ type KVStoreMutator interface {
 //     𝒫' = 𝒮[𝒫](ξ) = S0[P0](ξ) ⊗ S1[P1](ξ) ⊗ ... ⊗ Sj[Pj](ξ) = P'0 ⊗ P'1 ⊗  ... ⊗ P'j
 //     Where each state machine Si individually generated the output state Si[Pi](ξ) = P'i
 //
+// Input ξ:
+// Conceptually, the consensus leader first executes these state machines during their block building
+// process. At this point, the ID of the final block is unknown. Nevertheless, some part of the payload
+// construction already happened, because at the sealed execution results are used as an input below.
+// There is a large degree of freedom what part of the block we permit as possible inputs to the state
+// machines. At the moment, the primary purpose is for the execution environment (with results undergone
+// verification and sealing) to send Service Events to the protocol layer. Therefore, the current
+// convention is:
+//  1. At time of state machine construction (for each block), the Protocol State framework provides:
+//     • candidateView: view of the block currently under construction
+//     • parentID: parent block's ID (generally used by state machines to read their respective sub-state)
+//  2. The Service Events sealed in the candidate block (under construction)
+//     are given to each state machine via the `EvolveState(..)` call.
+//     CAUTION: `EvolveState(..)` MUST be called for all candidate blocks, even if there are no seals
+//     (or an empty payload).
+//
 // The Protocol State is the framework, which orchestrates the orthogonal state machines,
 // feeds them with inputs, post-processes the outputs and overall manages state machines' life-cycle
 // from block to block. New key-value pairs and corresponding state machines can easily be added
 // by implementing the following interface (state machine) and adding a new entry to the KV store.
-type OrthogonalStoreStateMachine[P any] interface {
+type OrthogonalStoreStateMachine[Pi any] interface {
 
 	// Build returns:
 	//   - database updates necessary for persisting the updated protocol sub-state and its *dependencies*.
@@ -164,17 +189,25 @@ type OrthogonalStoreStateMachine[P any] interface {
 	//     Deferred updates must be applied in a transaction to ensure atomicity.
 	Build() protocol.DeferredDBUpdates
 
-	// ProcessUpdate processes an ordered list of sealed service events.
-	// Usually, each state machine performs filtering of relevant events and ignores all other events.
+	// EvolveState applies the state change(s) on sub-state P for the candidate block (under construction).
+	// Information that potentially changes the Epoch state (compared to the parent block's state):
+	//   - Service Events sealed in the candidate block
+	//   - the candidate block's view (already provided at construction time)
+	//
+	// CAUTION: EvolveState MUST be called for all candidate blocks, even if `sealedServiceEvents` is empty!
+	// This is because also the absence of expected service events by a certain view can also result in the
+	// Epoch state changing (for example not having received the EpochCommit event for the next epoch, but
+	// approaching the end of the current epoch).
+	//
 	// No errors are expected during normal operations.
-	ProcessUpdate(orderedUpdates []flow.ServiceEvent) error
+	EvolveState(sealedServiceEvents []flow.ServiceEvent) error
 
 	// View returns the view associated with this KeyValueStoreStateMachine.
 	// The view of the KeyValueStoreStateMachine equals the view of the block carrying the respective updates.
 	View() uint64
 
 	// ParentState returns parent state that is associated with this state machine.
-	ParentState() P
+	ParentState() Pi
 }
 
 // KeyValueStoreStateMachine is a type alias for a state machine that operates on an instance of KVStoreReader.
