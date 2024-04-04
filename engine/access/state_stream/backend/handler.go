@@ -270,8 +270,7 @@ func (h *Handler) SubscribeEventsFromLatest(request *executiondata.SubscribeEven
 //
 // Expected errors during normal operation:
 //   - codes.Internal - could not convert events to entity or the stream could not send a response.
-func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, requestHeartbeatInterval uint64, eventEncodingVersion entities.EventEncodingVersion) func(*EventsResponse) error {
-	heartbeatInterval := requestHeartbeatInterval
+func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, heartbeatInterval uint64, eventEncodingVersion entities.EventEncodingVersion) func(*EventsResponse) error {
 	if heartbeatInterval == 0 {
 		heartbeatInterval = h.defaultHeartbeatInterval
 	}
