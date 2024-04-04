@@ -278,7 +278,8 @@ func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
 
 	// Send and subscribe to the transaction status using the access API
 	subClient, err := accessClient.SendAndSubscribeTransactionStatuses(s.ctx, &accessproto.SendAndSubscribeTransactionStatusesRequest{
-		Transaction: transactionMsg,
+		Transaction:          transactionMsg,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	})
 	s.Require().NoError(err)
 

@@ -35,14 +35,19 @@ type backendSubscribeTransactions struct {
 // TransactionSubscriptionMetadata holds data representing the status state for each transaction subscription.
 type TransactionSubscriptionMetadata struct {
 	*access.TransactionResult
-	txReferenceBlockID flow.Identifier
-	blockWithTx        *flow.Header
-	txExecuted         bool
+	txReferenceBlockID   flow.Identifier
+	blockWithTx          *flow.Header
+	txExecuted           bool
+	eventEncodingVersion entities.EventEncodingVersion
 }
 
 // SubscribeTransactionStatuses subscribes to transaction status changes starting from the transaction reference block ID.
 // If invalid tx parameters will be supplied SubscribeTransactionStatuses will return a failed subscription.
-func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody) subscription.Subscription {
+func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(
+	ctx context.Context,
+	tx *flow.TransactionBody,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+) subscription.Subscription {
 	nextHeight, err := b.blockTracker.GetStartHeightFromBlockID(tx.ReferenceBlockID)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")
@@ -54,8 +59,9 @@ func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(ctx context.
 			BlockID:       flow.ZeroID,
 			Status:        flow.TransactionStatusUnknown,
 		},
-		txReferenceBlockID: tx.ReferenceBlockID,
-		blockWithTx:        nil,
+		txReferenceBlockID:   tx.ReferenceBlockID,
+		blockWithTx:          nil,
+		eventEncodingVersion: requiredEventEncodingVersion,
 	}
 
 	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getTransactionStatusResponse(&txInfo))
@@ -253,7 +259,7 @@ func (b *backendSubscribeTransactions) searchForTransactionResult(
 		txInfo.TransactionID,
 		txInfo.BlockID,
 		txInfo.CollectionID,
-		entities.EventEncodingVersion_CCF_V0,
+		txInfo.eventEncodingVersion,
 	)
 
 	if err != nil {

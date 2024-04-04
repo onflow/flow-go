@@ -1113,7 +1113,7 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 		return err
 	}
 
-	sub := h.api.SubscribeTransactionStatuses(ctx, &tx)
+	sub := h.api.SubscribeTransactionStatuses(ctx, &tx, request.GetEventEncodingVersion())
 
 	messageIndex := counters.NewMonotonousCounter(0)
 	return subscription.HandleSubscription(sub, func(txResults []*TransactionResult) error {

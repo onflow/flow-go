@@ -304,7 +304,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	}
 
 	// 1. Subscribe to transaction status and receive the first message with pending status
-	sub := s.backend.SubscribeTransactionStatuses(ctx, &transaction.TransactionBody)
+	sub := s.backend.SubscribeTransactionStatuses(ctx, &transaction.TransactionBody, entities.EventEncodingVersion_CCF_V0)
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusPending)
 
 	// 2. Make transaction reference block sealed, and add a new finalized block that includes the transaction
@@ -374,7 +374,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 	}
 
 	// Subscribe to transaction status and receive the first message with pending status
-	sub := s.backend.SubscribeTransactionStatuses(ctx, &transaction.TransactionBody)
+	sub := s.backend.SubscribeTransactionStatuses(ctx, &transaction.TransactionBody, entities.EventEncodingVersion_CCF_V0)
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusPending)
 
 	// Generate 600 blocks without transaction included and check, that transaction still pending
