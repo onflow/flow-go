@@ -74,11 +74,6 @@ func (m *StagedContractsMigration) WithContractUpdateValidation() *StagedContrac
 	return m
 }
 
-func (m *StagedContractsMigration) WithName(name string) *StagedContractsMigration {
-	m.name = name
-	return m
-}
-
 func (m *StagedContractsMigration) Close() error {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()

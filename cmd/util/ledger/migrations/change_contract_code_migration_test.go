@@ -2,8 +2,8 @@ package migrations_test
 
 import (
 	"context"
-	"io"
 	"fmt"
+	"io"
 	"sync"
 	"testing"
 

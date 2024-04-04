@@ -2,12 +2,12 @@ package migrations
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 
 	"github.com/onflow/cadence/runtime/common"
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	evm "github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
@@ -25,10 +25,14 @@ func NewChangeContractCodeMigration(
 	rwf reporters.ReportWriterFactory,
 ) *ChangeContractCodeMigration {
 	return &ChangeContractCodeMigration{
-		StagedContractsMigration: NewStagedContractsMigration(chainID, log, rwf).
-			// TODO:
-			//WithContractUpdateValidation().
-			WithName("ChangeContractCodeMigration"),
+		StagedContractsMigration: &StagedContractsMigration{
+			name:                "ChangeContractCodeMigration",
+			log:                 log,
+			chainID:             chainID,
+			stagedContracts:     map[common.Address]map[flow.RegisterID]Contract{},
+			contractsByLocation: map[common.Location][]byte{},
+			reporter:            rwf.ReportWriter("system-contracts-migrator"),
+		},
 	}
 }
 
