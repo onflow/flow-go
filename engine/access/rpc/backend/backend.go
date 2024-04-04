@@ -282,7 +282,7 @@ func New(params Params) (*Backend, error) {
 	}
 
 	b.backendTransactions.txErrorMessages = b
-
+	b.backendSubscribeTransactions.backendTransactions = &b.backendTransactions
 	retry.SetBackend(b)
 
 	preferredENIdentifiers, err = identifierList(params.PreferredExecutionNodeIDs)

@@ -26,6 +26,7 @@ import (
 // backendSubscribeTransactions handles transaction subscriptions.
 type backendSubscribeTransactions struct {
 	txLocalDataProvider *TransactionsLocalDataProvider
+	backendTransactions *backendTransactions
 	executionResults    storage.ExecutionResults
 	log                 zerolog.Logger
 	broadcaster         *engine.Broadcaster
@@ -112,7 +113,7 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *Tran
 
 		// Check, if transaction executed and transaction result already available
 		if txInfo.blockWithTx != nil && !txInfo.txExecuted {
-			txResult, err := b.searchForTransactionResult(ctx, txInfo.BlockID, txInfo.TransactionID)
+			txResult, err := b.searchForTransactionResult(ctx, txInfo)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "failed to get execution result for block %s: %v", txInfo.BlockID, err)
 			}
@@ -171,17 +172,17 @@ func (b *backendSubscribeTransactions) generateResultsWithMissingStatuses(
 	var results []*access.TransactionResult
 
 	// If the difference between statuses' values is more than one step, fill in the missing results.
-	if txInfo.Status-prevTxStatus > 1 {
+	if (txInfo.Status - prevTxStatus) > 1 {
 		for missingStatus := prevTxStatus + 1; missingStatus < txInfo.Status; missingStatus++ {
-			var missingTxResult *access.TransactionResult
+			var missingTxResult access.TransactionResult
 			switch missingStatus {
 			case flow.TransactionStatusPending:
-				missingTxResult = &access.TransactionResult{
+				missingTxResult = access.TransactionResult{
 					Status:        missingStatus,
 					TransactionID: txInfo.TransactionID,
 				}
 			case flow.TransactionStatusFinalized:
-				missingTxResult = &access.TransactionResult{
+				missingTxResult = access.TransactionResult{
 					Status:        missingStatus,
 					TransactionID: txInfo.TransactionID,
 					BlockID:       txInfo.BlockID,
@@ -189,17 +190,16 @@ func (b *backendSubscribeTransactions) generateResultsWithMissingStatuses(
 					CollectionID:  txInfo.CollectionID,
 				}
 			case flow.TransactionStatusExecuted:
-				missingTxResult = txInfo.TransactionResult
+				missingTxResult = *txInfo.TransactionResult
 				missingTxResult.Status = missingStatus
 			default:
 				return nil, fmt.Errorf("unexpected missing transaction status")
 			}
-			results = append(results, missingTxResult)
+			results = append(results, &missingTxResult)
 		}
 	}
 
 	results = append(results, txInfo.TransactionResult)
-
 	return results, nil
 }
 
@@ -223,7 +223,7 @@ func (b *backendSubscribeTransactions) validateBlockHeight(height uint64) error 
 // searchForTransactionBlockInfo searches for the block containing the specified transaction.
 // It retrieves the block at the given height and checks if the transaction is included in that block.
 // Expected errors:
-// - subscription.ErrBlockNotReady when unable to retrieve the block or collection ID
+// - ErrTransactionNotInBlock when unable to retrieve the collection
 // - codes.Internal when other errors occur during block or collection lookup
 func (b *backendSubscribeTransactions) searchForTransactionBlockInfo(
 	height uint64,
@@ -251,23 +251,24 @@ func (b *backendSubscribeTransactions) searchForTransactionBlockInfo(
 // - codes.Internal if an internal error occurs while retrieving execution result.
 func (b *backendSubscribeTransactions) searchForTransactionResult(
 	ctx context.Context,
-	blockID flow.Identifier,
-	txID flow.Identifier,
+	txInfo *TransactionSubscriptionMetadata,
 ) (*access.TransactionResult, error) {
-	_, err := b.executionResults.ByBlockID(blockID)
+	_, err := b.executionResults.ByBlockID(txInfo.BlockID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to get execution result for block %s: %w", blockID, err)
+		return nil, fmt.Errorf("failed to get execution result for block %s: %w", txInfo.BlockID, err)
 	}
 
-	block, err := b.txLocalDataProvider.blocks.ByID(blockID)
-	if err != nil {
-		return nil, fmt.Errorf("error looking up block: %w", err)
-	}
+	txResult, err := b.backendTransactions.GetTransactionResult(
+		ctx,
+		txInfo.TransactionID,
+		txInfo.BlockID,
+		txInfo.CollectionID,
+		entities.EventEncodingVersion_CCF_V0,
+	)
 
-	txResult, err := b.txLocalDataProvider.GetTransactionResultFromStorage(ctx, block, txID, entities.EventEncodingVersion_CCF_V0)
 	if err != nil {
 		// if either the storage or execution node reported no results or there were not enough execution results
 		if status.Code(err) == codes.NotFound {

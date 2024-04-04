@@ -204,8 +204,10 @@ func (s *TransactionStatusSuite) backendParams() Params {
 			ResponseLimit:  subscription.DefaultResponseLimit,
 			Broadcaster:    s.broadcaster,
 		},
-		TxResultsIndex: index.NewTransactionResultsIndex(s.transactionResults),
-		EventsIndex:    index.NewEventsIndex(s.events),
+		TxResultsIndex:    index.NewTransactionResultsIndex(s.transactionResults),
+		EventQueryMode:    IndexQueryModeLocalOnly,
+		TxResultQueryMode: IndexQueryModeLocalOnly,
+		EventsIndex:       index.NewEventsIndex(s.events),
 	}
 }
 
@@ -251,6 +253,8 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	// Generate sent transaction with ref block of the current finalized block
 	transaction := unittest.TransactionFixture()
 	transaction.SetReferenceBlockID(s.finalizedBlock.ID())
+	s.transactions.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(&transaction.TransactionBody, nil)
+
 	col := flow.CollectionFromTransactions([]*flow.Transaction{&transaction})
 	guarantee := col.Guarantee()
 	light := col.Light()
@@ -295,7 +299,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 			result := txResults[0]
 			assert.Equal(s.T(), txId, result.TransactionID)
 			assert.Equal(s.T(), expectedTxStatus, result.Status)
-		}, 60*time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
+		}, time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
 	}
 
 	// 1. Subscribe to transaction status and receive the first message with pending status
