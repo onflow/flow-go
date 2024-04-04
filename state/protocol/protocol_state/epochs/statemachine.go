@@ -104,7 +104,7 @@ var _ protocol_state.KeyValueStoreStateMachine = (*EpochStateMachine)(nil)
 // - for the epoch fallback mode it initializes a FallbackStateMachine.
 // No errors are expected during normal operations.
 func NewEpochStateMachine(
-	view uint64,
+	candidateView uint64,
 	parentID flow.Identifier,
 	params protocol.GlobalParams,
 	setups storage.EpochSetups,
@@ -129,7 +129,7 @@ func NewEpochStateMachine(
 	var (
 		stateMachine StateMachine
 	)
-	candidateAttemptsInvalidEpochTransition := epochFallbackTriggeredByIncorporatingCandidate(view, params, parentEpochState)
+	candidateAttemptsInvalidEpochTransition := epochFallbackTriggeredByIncorporatingCandidate(candidateView, params, parentEpochState)
 	if parentEpochState.InvalidEpochTransitionAttempted || candidateAttemptsInvalidEpochTransition {
 		// Case 1: InvalidEpochTransitionAttempted is true, indicating that we have encountered an invalid
 		//         epoch service event or an invalid state transition previously in this fork.
@@ -139,9 +139,9 @@ func NewEpochStateMachine(
 		// and we must use only the `epochFallbackStateMachine` along this fork.
 		//
 		// TODO for 'leaving Epoch Fallback via special service event': this might need to change.
-		stateMachine, err = epochFallbackStateMachineFactory(view, parentEpochState)
+		stateMachine, err = epochFallbackStateMachineFactory(candidateView, parentEpochState)
 	} else {
-		stateMachine, err = happyPathStateMachineFactory(view, parentEpochState)
+		stateMachine, err = happyPathStateMachineFactory(candidateView, parentEpochState)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize protocol state machine: %w", err)
@@ -152,7 +152,7 @@ func NewEpochStateMachine(
 		parentState:        parentState,
 		mutator:            mutator,
 		epochFallbackStateMachineFactory: func() (StateMachine, error) {
-			return epochFallbackStateMachineFactory(view, parentEpochState)
+			return epochFallbackStateMachineFactory(candidateView, parentEpochState)
 		},
 		setups:          setups,
 		commits:         commits,

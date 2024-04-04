@@ -92,7 +92,7 @@ type MutableProtocolState interface {
 	// Has to be called for each block to evolve the protocol state.
 	// Expected errors during normal operations:
 	//  * `storage.ErrNotFound` if no protocol state for parent block is known.
-	Mutator(view uint64, parentID flow.Identifier) (StateMutator, error)
+	Mutator(candidateView uint64, parentID flow.Identifier) (StateMutator, error)
 }
 
 // StateMutator is a stateful object to evolve the protocol state. It is instantiated from the parent block's protocol state.

@@ -44,14 +44,14 @@ func newStateMutator(
 	headers storage.Headers,
 	results storage.ExecutionResults,
 	kvStoreSnapshots storage.ProtocolKVStore,
-	view uint64,
+	candidateView uint64,
 	parentID flow.Identifier,
 	parentState protocol_state.KVStoreAPI,
 	stateMachineFactories ...protocol_state.KeyValueStoreStateMachineFactory,
 ) (*stateMutator, error) {
 	protocolVersion := parentState.GetProtocolStateVersion()
 	if versionUpgrade := parentState.GetVersionUpgrade(); versionUpgrade != nil {
-		if view >= versionUpgrade.ActivationView {
+		if candidateView >= versionUpgrade.ActivationView {
 			protocolVersion = versionUpgrade.Data
 		}
 	}
@@ -64,7 +64,7 @@ func newStateMutator(
 
 	stateMachines := make([]protocol_state.KeyValueStoreStateMachine, 0, len(stateMachineFactories))
 	for _, factory := range stateMachineFactories {
-		stateMachine, err := factory.Create(view, parentID, parentState, replicatedState)
+		stateMachine, err := factory.Create(candidateView, parentID, parentState, replicatedState)
 		if err != nil {
 			return nil, fmt.Errorf("could not create state machine: %w", err)
 		}

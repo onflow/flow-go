@@ -187,5 +187,5 @@ type KeyValueStoreStateMachine = OrthogonalStoreStateMachine[KVStoreReader]
 type KeyValueStoreStateMachineFactory interface {
 	// Create creates a new instance of an underlying type that operates on KV Store and is created for a specific candidate block.
 	// No errors are expected during normal operations.
-	Create(view uint64, parentID flow.Identifier, parentState KVStoreReader, mutator KVStoreMutator) (KeyValueStoreStateMachine, error)
+	Create(candidateView uint64, parentID flow.Identifier, parentState KVStoreReader, mutator KVStoreMutator) (KeyValueStoreStateMachine, error)
 }

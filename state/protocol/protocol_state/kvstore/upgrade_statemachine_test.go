@@ -43,7 +43,7 @@ func (s *StateMachineSuite) SetupTest() {
 }
 
 // TestInitialInvariants ensures that initial state machine invariants are met.
-// It checks that state machine has correct view and parent state.
+// It checks that state machine has correct candidateView and parent state.
 func (s *StateMachineSuite) TestInitialInvariants() {
 	require.Equal(s.T(), s.view, s.stateMachine.View())
 	require.Equal(s.T(), s.parentState, s.stateMachine.ParentState())
@@ -51,9 +51,9 @@ func (s *StateMachineSuite) TestInitialInvariants() {
 
 // TestProcessUpdate_ProtocolStateVersionUpgrade ensures that state machine can process protocol state version upgrade event.
 // It checks several cases including
-// * happy path - valid upgrade version and activation view
+// * happy path - valid upgrade version and activation candidateView
 // * invalid upgrade version - has to return sentinel error since version is invalid
-// * invalid activation view - has to return sentinel error since activation view doesn't meet threshold.
+// * invalid activation candidateView - has to return sentinel error since activation candidateView doesn't meet threshold.
 func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
 	s.Run("happy-path", func() {
 		oldVersion := uint64(0)
@@ -87,7 +87,7 @@ func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
 		require.ErrorIs(s.T(), err, ErrInvalidUpgradeVersion, "has to be expected sentinel")
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err), "has to be expected sentinel")
 	})
-	s.Run("invalid-activation-view", func() {
+	s.Run("invalid-activation-candidateView", func() {
 		unittest.SkipUnless(s.T(), unittest.TEST_TODO,
 			"this needs to be fixed to consume error for consumer, since sentinels are handled internally")
 		upgrade := unittest.ProtocolStateVersionUpgradeFixture()

@@ -24,15 +24,15 @@ type UpgradableModel struct {
 
 // SetVersionUpgrade sets the protocol upgrade version. This method is used
 // to update the Protocol State version when a flow.ProtocolStateVersionUpgrade is processed.
-// It contains the new version and the view at which it has to be applied.
+// It contains the new version and the candidateView at which it has to be applied.
 func (model *UpgradableModel) SetVersionUpgrade(activator *protocol_state.ViewBasedActivator[uint64]) {
 	model.VersionUpgrade = activator
 }
 
 // GetVersionUpgrade returns the upgrade version of protocol.
-// VersionUpgrade is a view-based activator that specifies the version which has to be applied
-// and the view from which on it has to be applied. It may return the current protocol version
-// with a past view if the upgrade has already been activated.
+// VersionUpgrade is a candidateView-based activator that specifies the version which has to be applied
+// and the candidateView from which on it has to be applied. It may return the current protocol version
+// with a past candidateView if the upgrade has already been activated.
 func (model *UpgradableModel) GetVersionUpgrade() *protocol_state.ViewBasedActivator[uint64] {
 	return model.VersionUpgrade
 }

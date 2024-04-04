@@ -15,10 +15,10 @@ import (
 // All updates are applied to a copy of parent KV store, so parent KV store is not modified.
 // A separate instance should be created for each block to process the updates therein.
 type PSVersionUpgradeStateMachine struct {
-	view        uint64
-	parentState protocol_state.KVStoreReader
-	mutator     protocol_state.KVStoreMutator
-	params      protocol.GlobalParams
+	candidateView uint64
+	parentState   protocol_state.KVStoreReader
+	mutator       protocol_state.KVStoreMutator
+	params        protocol.GlobalParams
 }
 
 var _ protocol_state.KeyValueStoreStateMachine = (*PSVersionUpgradeStateMachine)(nil)
@@ -26,16 +26,16 @@ var _ protocol_state.KeyValueStoreStateMachine = (*PSVersionUpgradeStateMachine)
 // NewPSVersionUpgradeStateMachine creates a new state machine to update a specific sub-state of the KV Store.
 // It performs
 func NewPSVersionUpgradeStateMachine(
-	view uint64,
+	candidateView uint64,
 	params protocol.GlobalParams,
 	parentState protocol_state.KVStoreReader,
 	mutator protocol_state.KVStoreMutator,
 ) *PSVersionUpgradeStateMachine {
 	return &PSVersionUpgradeStateMachine{
-		view:        view,
-		parentState: parentState,
-		mutator:     mutator,
-		params:      params,
+		candidateView: candidateView,
+		parentState:   parentState,
+		mutator:       mutator,
+		params:        params,
 	}
 }
 
@@ -75,23 +75,23 @@ func (m *PSVersionUpgradeStateMachine) ProcessUpdate(orderedUpdates []flow.Servi
 }
 
 // processSingleEvent performs processing of a single protocol version upgrade event.
-// Expected errors indicating that we have observed and invalid service event from protocol's point of view.
+// Expected errors indicating that we have observed and invalid service event from protocol's point of candidateView.
 //   - `protocol.InvalidServiceEventError` - if the service event is invalid for the current protocol state.
 //
 // All other errors should be treated as exceptions.
 func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.ProtocolStateVersionUpgrade) error {
-	// To switch the protocol version, replica needs to process a block with a view >= activation view.
+	// To switch the protocol version, replica needs to process a block with a candidateView >= activation candidateView.
 	// But we cannot activate a new version till the block containing the seal is finalized because we cannot switch between chain forks.
 	// The problem is that finality is local to each node due to the nature of the consensus algorithm itself.
 	// We would like to guarantee that all nodes switch the protocol version at exactly the same block.
 	// To guarantee that all nodes switch the protocol version at exactly the same block, we require that the
-	// activation view is higher than the sealing view + Δ when accepting the event. Δ represents the finalization lag
+	// activation candidateView is higher than the sealing candidateView + Δ when accepting the event. Δ represents the finalization lag
 	// to give time for replicas to finalize the block containing the seal for the version upgrade event.
-	// When replica reaches activation view and the latest finalized protocol state knows about the version upgrade,
+	// When replica reaches activation candidateView and the latest finalized protocol state knows about the version upgrade,
 	// then it's safe to switch the protocol version.
-	if m.view+m.params.EpochCommitSafetyThreshold() >= versionUpgrade.ActiveView {
-		return protocol.NewInvalidServiceEventErrorf("invalid protocol state version upgrade view %d -> %d: %w",
-			m.view+m.params.EpochCommitSafetyThreshold(), versionUpgrade.ActiveView, ErrInvalidActivationView)
+	if m.candidateView+m.params.EpochCommitSafetyThreshold() >= versionUpgrade.ActiveView {
+		return protocol.NewInvalidServiceEventErrorf("invalid protocol state version upgrade candidateView %d -> %d: %w",
+			m.candidateView+m.params.EpochCommitSafetyThreshold(), versionUpgrade.ActiveView, ErrInvalidActivationView)
 	}
 
 	if m.parentState.GetProtocolStateVersion() >= versionUpgrade.NewProtocolStateVersion {
@@ -101,18 +101,18 @@ func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.P
 
 	// checkPendingUpgrade checks if there is a pending upgrade in the state and validates if we can set the new upgrade.
 	// We allow setting version upgrade if all the conditions are met:
-	// (i) the activation view is higher than the current view + Δ.
+	// (i) the activation candidateView is higher than the current candidateView + Δ.
 	// (ii) if there is a pending upgrade, the new version should be the same as the pending upgrade.
 	// Condition (ii) is checked in this function.
 	checkPendingUpgrade := func(store protocol_state.KVStoreReader) error {
 		if pendingUpgrade := store.GetVersionUpgrade(); pendingUpgrade != nil {
-			if pendingUpgrade.ActivationView < m.view {
+			if pendingUpgrade.ActivationView < m.candidateView {
 				// pending upgrade has been activated, we can ignore it.
 				return nil
 			}
 
 			// we allow updating pending upgrade iff the new version is the same as the pending upgrade
-			// the activation view may differ, but it has to meet the same threshold.
+			// the activation candidateView may differ, but it has to meet the same threshold.
 			if pendingUpgrade.Data != versionUpgrade.NewProtocolStateVersion {
 				return protocol.NewInvalidServiceEventErrorf("requested to upgrade to %d but pending upgrade with version already stored %d: %w",
 					pendingUpgrade.Data, versionUpgrade.NewProtocolStateVersion, ErrInvalidUpgradeVersion)
@@ -140,10 +140,10 @@ func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.P
 	return nil
 }
 
-// View returns the view associated with this KeyValueStoreStateMachine.
-// The view of the KeyValueStoreStateMachine equals the view of the block carrying the respective updates.
+// View returns the candidateView associated with this KeyValueStoreStateMachine.
+// The candidateView of the KeyValueStoreStateMachine equals the candidateView of the block carrying the respective updates.
 func (m *PSVersionUpgradeStateMachine) View() uint64 {
-	return m.view
+	return m.candidateView
 }
 
 // ParentState returns parent state that is associated with this state machine.

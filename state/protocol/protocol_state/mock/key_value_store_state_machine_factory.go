@@ -14,17 +14,17 @@ type KeyValueStoreStateMachineFactory struct {
 	mock.Mock
 }
 
-// Create provides a mock function with given fields: view, parentID, parentState, mutator
-func (_m *KeyValueStoreStateMachineFactory) Create(view uint64, parentID flow.Identifier, parentState protocol_state.KVStoreReader, mutator protocol_state.KVStoreMutator) (protocol_state.OrthogonalStoreStateMachine[protocol_state.KVStoreReader], error) {
-	ret := _m.Called(view, parentID, parentState, mutator)
+// Create provides a mock function with given fields: candidateView, parentID, parentState, mutator
+func (_m *KeyValueStoreStateMachineFactory) Create(candidateView uint64, parentID flow.Identifier, parentState protocol_state.KVStoreReader, mutator protocol_state.KVStoreMutator) (protocol_state.OrthogonalStoreStateMachine[protocol_state.KVStoreReader], error) {
+	ret := _m.Called(candidateView, parentID, parentState, mutator)
 
 	var r0 protocol_state.OrthogonalStoreStateMachine[protocol_state.KVStoreReader]
 	var r1 error
 	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier, protocol_state.KVStoreReader, protocol_state.KVStoreMutator) (protocol_state.OrthogonalStoreStateMachine[protocol_state.KVStoreReader], error)); ok {
-		return rf(view, parentID, parentState, mutator)
+		return rf(candidateView, parentID, parentState, mutator)
 	}
 	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier, protocol_state.KVStoreReader, protocol_state.KVStoreMutator) protocol_state.OrthogonalStoreStateMachine[protocol_state.KVStoreReader]); ok {
-		r0 = rf(view, parentID, parentState, mutator)
+		r0 = rf(candidateView, parentID, parentState, mutator)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(protocol_state.OrthogonalStoreStateMachine[protocol_state.KVStoreReader])
@@ -32,7 +32,7 @@ func (_m *KeyValueStoreStateMachineFactory) Create(view uint64, parentID flow.Id
 	}
 
 	if rf, ok := ret.Get(1).(func(uint64, flow.Identifier, protocol_state.KVStoreReader, protocol_state.KVStoreMutator) error); ok {
-		r1 = rf(view, parentID, parentState, mutator)
+		r1 = rf(candidateView, parentID, parentState, mutator)
 	} else {
 		r1 = ret.Error(1)
 	}
