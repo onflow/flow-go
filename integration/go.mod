@@ -28,7 +28,7 @@ require (
 	github.com/onflow/flow-go v0.33.2-0.20240321224153-02cdb601e0b0
 	github.com/onflow/flow-go-sdk v0.46.0
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
-	github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240329135840-9f04832ba3a1
+	github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240404170900-c321c1475f1e
 	github.com/onflow/go-ethereum v1.13.4
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.18.0
@@ -361,9 +361,6 @@ require (
 replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/insecure => ../insecure
-
-// TODO: Remove when it will be merged
-replace github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240329135840-9f04832ba3a1 => github.com/The-K-R-O-K/flow/protobuf/go/flow v0.0.0-20240403101026-bc18dca2e2f7
 
 // TODO: Remove when it will be merged
 replace github.com/onflow/flow-emulator v0.61.2-0.20240321141132-30ce90652b49 => github.com/The-K-R-O-K/flow-emulator v0.0.0-20240404093936-ef4dc6f85540
