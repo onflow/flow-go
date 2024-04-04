@@ -52,8 +52,6 @@ func NewSubscriptionHandler(
 // - ctx: The context for the operation.
 // - startHeight: The height to start subscription from.
 // - getData: The function to retrieve data by height.
-//
-// No errors expected during normal operations.
 func (h *SubscriptionHandler) Subscribe(
 	ctx context.Context,
 	startHeight uint64,

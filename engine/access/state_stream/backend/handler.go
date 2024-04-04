@@ -318,7 +318,8 @@ func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, req
 	}
 }
 
-// getEventFilter returns an event filter based on the provided event filter configuration.// If the event filter is nil, it returns an empty filter.
+// getEventFilter returns an event filter based on the provided event filter configuration.
+// If the event filter is nil, it returns an empty filter.
 // Otherwise, it initializes a new event filter using the provided filter parameters,
 // including the event type, address, and contract. It then validates the filter configuration
 // and returns the constructed event filter or an error if the filter configuration is invalid.
