@@ -128,18 +128,15 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 	}
 }
 
-func (bl *BlockView) runTransaction(
+// RunTransaction runs an evm transaction
+func (bl *BlockView) RunTransaction(
 	tx *gethTypes.Transaction,
-	finalize bool,
-	txIndex uint,
 ) (*types.Result, error) {
-	var res *types.Result
-	var err error
 	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
 	}
-	txHash := tx.Hash()
+
 	msg, err := gethCore.TransactionToMessage(
 		tx,
 		GetSigner(bl.config),
@@ -147,53 +144,64 @@ func (bl *BlockView) runTransaction(
 	if err != nil {
 		// this is not a fatal error (e.g. due to bad signature)
 		// not a valid transaction
-		res = &types.Result{
-			TxType: tx.Type(),
-			TxHash: txHash,
-		}
-		res.SetValidationError(err)
-		return res, nil
+		return types.NewInvalidResult(tx, err), nil
 	}
 
 	// update tx context origin
 	proc.evm.TxContext.Origin = msg.From
-	res, err = proc.run(msg, txHash, txIndex, tx.Type())
+	res, err := proc.run(msg, tx.Hash(), 0, tx.Type())
 	if err != nil {
 		return nil, err
 	}
 	// all commmit errors (StateDB errors) has to be returned
-	if err := proc.commit(finalize); err != nil {
+	if err := proc.commit(true); err != nil {
 		return nil, err
 	}
 
-	// we can always reset after committing,
-	// this clears state for any subsequent transaction runs
-	proc.state.Reset()
-
 	return res, nil
-}
-
-// RunTransaction runs an evm transaction
-func (bl *BlockView) RunTransaction(
-	tx *gethTypes.Transaction,
-) (*types.Result, error) {
-	return bl.runTransaction(tx, true, 0)
 }
 
 func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*types.Result, error) {
-	batchLen := len(txs)
-	res := make([]*types.Result, batchLen)
+	batchResults := make([]*types.Result, len(txs))
+
+	proc, err := bl.newProcedure()
+	if err != nil {
+		return nil, err
+	}
 
 	for i, tx := range txs {
-		finalize := i+1 == batchLen // only finalize during last transaction
-		r, err := bl.runTransaction(tx, finalize, uint(i))
+		msg, err := gethCore.TransactionToMessage(
+			tx,
+			GetSigner(bl.config),
+			proc.config.BlockContext.BaseFee)
+		if err != nil {
+			batchResults[i] = types.NewInvalidResult(tx, err)
+			continue
+		}
+
+		// update tx context origin
+		proc.evm.TxContext.Origin = msg.From
+		res, err := proc.run(msg, tx.Hash(), uint(i), tx.Type())
 		if err != nil {
 			return nil, err
 		}
-		res[i] = r
+		// all commmit errors (StateDB errors) has to be returned
+		if err := proc.commit(false); err != nil {
+			return nil, err
+		}
+
+		// this clears state for any subsequent transaction runs
+		proc.state.Reset()
+
+		batchResults[i] = res
 	}
 
-	return res, nil
+	// finalize after all the batch transactions are executed to save resources
+	if err := proc.state.Finalize(); err != nil {
+		return nil, err
+	}
+
+	return batchResults, nil
 }
 
 func (bl *BlockView) newProcedure() (*procedure, error) {
