@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -12,7 +11,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
@@ -29,12 +27,9 @@ type backendSubscribeTransactions struct {
 	backendTransactions *backendTransactions
 	executionResults    storage.ExecutionResults
 	log                 zerolog.Logger
-	broadcaster         *engine.Broadcaster
-	sendTimeout         time.Duration
-	responseLimit       float64
-	sendBufferSize      int
 
-	blockTracker subscription.BlockTracker
+	subscriptionHandler *subscription.SubscriptionHandler
+	blockTracker        subscription.BlockTracker
 }
 
 // TransactionSubscriptionMetadata holds data representing the status state for each transaction subscription.
@@ -63,15 +58,7 @@ func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(ctx context.
 		blockWithTx:        nil,
 	}
 
-	sub := subscription.NewHeightBasedSubscription(
-		b.sendBufferSize,
-		nextHeight,
-		b.getTransactionStatusResponse(&txInfo),
-	)
-
-	go subscription.NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
-
-	return sub
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getTransactionStatusResponse(&txInfo))
 }
 
 // getTransactionStatusResponse returns a callback function that produces transaction status

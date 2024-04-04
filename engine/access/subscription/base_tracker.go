@@ -16,9 +16,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// GetStartHeightFunc is a function type for getting the start height.
-type GetStartHeightFunc func(context.Context, flow.Identifier, uint64) (uint64, error)
-
 // StreamingData represents common streaming data configuration for access and state_stream handlers.
 type StreamingData struct {
 	MaxStreams  int32

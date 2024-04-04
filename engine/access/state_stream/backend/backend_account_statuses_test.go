@@ -289,18 +289,14 @@ func (s *BackendAccountStatusesSuite) subscribeToAccountStatuses(
 
 			// Add "backfill" block - blocks that are already in the database before the test starts
 			// This simulates a subscription on a past block
-			for i := 0; i <= test.highestBackfill; i++ {
-				s.T().Logf("backfilling block %d", i)
-				s.executionDataTracker.On("GetHighestHeight").
-					Return(s.blocks[i].Header.Height)
+			if test.highestBackfill > 0 {
+				s.highestBlockHeader = s.blocks[test.highestBackfill].Header
 			}
 
 			// Set up subscription context and cancellation
 			subCtx, subCancel := context.WithCancel(ctx)
 
 			sub := subscribeFn(subCtx, test.startValue, test.filters)
-
-			expectedMsgIndex := uint64(0)
 
 			// Loop over all the blocks
 			for i, b := range s.blocks {
@@ -309,9 +305,8 @@ func (s *BackendAccountStatusesSuite) subscribeToAccountStatuses(
 				// Simulate new exec data received.
 				// Exec data for all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
-					s.executionDataTracker.On("GetHighestHeight").Unset()
-					s.executionDataTracker.On("GetHighestHeight").
-						Return(b.Header.Height)
+					s.highestBlockHeader = b.Header
+
 					s.broadcaster.Publish()
 				}
 
@@ -343,8 +338,6 @@ func (s *BackendAccountStatusesSuite) subscribeToAccountStatuses(
 					assert.Equal(s.T(), b.Header.Height, resp.Height)
 					assert.Equal(s.T(), expectedEvents, resp.AccountEvents)
 				}, 60*time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
-
-				expectedMsgIndex++
 			}
 
 			// Make sure there are no new messages waiting. The channel should be opened with nothing waiting

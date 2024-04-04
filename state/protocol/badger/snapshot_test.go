@@ -654,10 +654,66 @@ func TestSealingSegment(t *testing.T) {
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
 		})
 	})
+
+	// Root <- B1 <- B2 <- ... <- B700(Seal_B699)
+	// Expected sealing segment: [B699, B700], Extra blocks: [B98, B99, ..., B698]
+	// where DefaultTransactionExpiry = 600
+	t.Run("test extra blocks contain exactly DefaultTransactionExpiry number of blocks below the sealed block", func(t *testing.T) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+			root := unittest.BlockWithParentFixture(head)
+			root.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+			buildFinalizedBlock(t, state, root)
+
+			blocks := make([]*flow.Block, 0, flow.DefaultTransactionExpiry+3)
+			parent := root
+			for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
+				next := unittest.BlockWithParentProtocolState(parent)
+				next.Header.View = next.Header.Height + 1 // set view so we are still in the same epoch
+				buildFinalizedBlock(t, state, next)
+				blocks = append(blocks, next)
+				parent = next
+			}
+
+			// last sealed block
+			lastSealedBlock := parent
+			lastReceipt, lastSeal := unittest.ReceiptAndSealForBlock(lastSealedBlock)
+			prevLastBlock := unittest.BlockWithParentFixture(lastSealedBlock.Header)
+			prevLastBlock.SetPayload(unittest.PayloadFixture(
+				unittest.WithReceipts(lastReceipt),
+				unittest.WithProtocolStateID(rootProtocolStateID),
+			))
+			buildFinalizedBlock(t, state, prevLastBlock)
+
+			// last finalized block
+			lastBlock := unittest.BlockWithParentFixture(prevLastBlock.Header)
+			lastBlock.SetPayload(unittest.PayloadFixture(
+				unittest.WithSeals(lastSeal),
+				unittest.WithProtocolStateID(rootProtocolStateID),
+			))
+			buildFinalizedBlock(t, state, lastBlock)
+
+			// build a valid child to ensure we have a QC
+			buildFinalizedBlock(t, state, unittest.BlockWithParentProtocolState(lastBlock))
+
+			snapshot := state.AtBlockID(lastBlock.ID())
+			segment, err := snapshot.SealingSegment()
+			require.NoError(t, err)
+
+			assert.Equal(t, lastBlock.Header, segment.Highest().Header)
+			assert.Equal(t, lastBlock.Header, segment.Finalized().Header)
+			assert.Equal(t, lastSealedBlock.Header, segment.Sealed().Header)
+
+			// there are DefaultTransactionExpiry number of blocks in total
+			unittest.AssertEqualBlocksLenAndOrder(t, blocks[:flow.DefaultTransactionExpiry], segment.ExtraBlocks)
+			assert.Len(t, segment.ExtraBlocks, flow.DefaultTransactionExpiry)
+			assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
+
+		})
+	})
 	// Test the case where the reference block of the snapshot contains seals for blocks that are lower than the lowest sealing segment's block.
 	// This test case specifically checks if sealing segment includes both highest and lowest block sealed by head.
 	// ROOT <- B1 <- B2 <- B3(Seal_B1) <- B4 <- ... <- LastBlock(Seal_B2, Seal_B3, Seal_B4)
-	// Expected sealing segment: [B4, ..., B5], Extra blocks: [B2, B3]
+	// Expected sealing segment: [B4, ..., B5], Extra blocks: [Root, B1, B2, B3]
 	t.Run("highest block seals outside segment", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 			// build a block to seal
@@ -725,7 +781,8 @@ func TestSealingSegment(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, lastBlock.Header, segment.Highest().Header)
 			assert.Equal(t, block4.Header, segment.Sealed().Header)
-			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block2, block3}, segment.ExtraBlocks)
+			root := rootSnapshot.Encodable().SealingSegment.Sealed()
+			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{root, block1, block2, block3}, segment.ExtraBlocks)
 			assert.Len(t, segment.ExecutionResults, 2)
 
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
