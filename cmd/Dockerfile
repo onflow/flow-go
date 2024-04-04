@@ -3,7 +3,7 @@
 
 ####################################
 ## (1) Setup the build environment
-FROM golang:1.20-bullseye AS build-setup
+FROM golang:1.21.8-bullseye AS build-setup
 
 RUN apt-get update
 RUN apt-get -y install zip apt-utils gcc-aarch64-linux-gnu
@@ -85,7 +85,7 @@ RUN --mount=type=ssh \
 RUN chmod a+x /app/app
 
 ## (4) Add the statically linked debug binary to a distroless image configured for debugging
-FROM golang:1.20-bullseye as debug
+FROM golang:1.21.8-bullseye as debug
 
 RUN go install github.com/go-delve/delve/cmd/dlv@latest
 
