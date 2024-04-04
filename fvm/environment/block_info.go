@@ -142,6 +142,10 @@ func (info *blockInfo) GetBlockAtHeight(
 		return runtimeBlockFromHeader(info.blockHeader), true, nil
 	}
 
+	if height+uint64(flow.DefaultTransactionExpiry) < info.blockHeader.Height {
+		return runtime.Block{}, false, errors.NewBlockHeightOutOfRangeError(height)
+	}
+
 	header, err := info.blocks.ByHeightFrom(height, info.blockHeader)
 	// TODO (ramtin): remove dependency on storage and move this if condition
 	// to blockfinder
