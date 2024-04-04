@@ -397,7 +397,13 @@ func TestStagedContractsMigration(t *testing.T) {
 			common.Address(address1),
 			nil,
 		)
-		require.ErrorContains(t, err, "failed to find all contract registers that need to be changed")
+		require.NoError(t, err)
+
+		require.Len(t, logWriter.logs, 1)
+		assert.Contains(t,
+			logWriter.logs[0],
+			`"failed to find all contract registers that need to be changed for address"`,
+		)
 	})
 }
 
@@ -1472,16 +1478,13 @@ func TestConcurrentContractUpdate(t *testing.T) {
 	migrations := NewCadence1Migrations(
 		logger,
 		rwf,
-		nWorker,
-		chainID,
-		false,
-		false,
-		false,
-		evmContractChange,
-		burnerContractChange,
-		stagedContracts,
-		false,
-		0,
+		Options{
+			NWorker:              nWorker,
+			ChainID:              chainID,
+			EVMContractChange:    evmContractChange,
+			BurnerContractChange: burnerContractChange,
+			StagedContracts:      stagedContracts,
+		},
 	)
 
 	for _, migration := range migrations {
