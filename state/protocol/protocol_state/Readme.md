@@ -71,14 +71,10 @@ machines. At the moment, the primary purpose is for the execution environment (w
 verification and sealing) to send Service Events to the protocol layer. Therefore, the current
 convention is:
 1. At time of state machine construction (for each block), the Protocol State framework provides:
-   - `candidateView`: view of the block currently under construction
+   - `candidateView`: view of the block currently under construction (or being currently validated)
    - `parentID`: parent block's ID (generally used by state machines to read their respective sub-state)
 2. The Service Events sealed in the candidate block (under construction)
    are given to each state machine via the `EvolveState(..)` call.
-   CAUTION: `EvolveState(..)` MUST be called for all candidate blocks, even if there are no seals
-   (or an empty payload).
 
-The Protocol State is the framework, which orchestrates the orthogonal state machines,
-feeds them with inputs, post-processes the outputs and overall manages state machines' life-cycle
-from block to block. New key-value pairs and corresponding state machines can easily be added
-by implementing the following interface (state machine) and adding a new entry to the KV store.
+New key-value pairs and corresponding state machines can easily be added
+by implementing the `OrthogonalStoreStateMachine` interface and adding a new entry to the Key-Value-Store's data model (file `./kvstore/models.go`).
