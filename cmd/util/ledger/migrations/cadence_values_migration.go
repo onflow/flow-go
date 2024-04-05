@@ -503,7 +503,7 @@ func (t *cadenceValueMigrationReporter) MissingTarget(accountAddressPath interpr
 	})
 }
 
-type reportEntry interface {
+type valueMigrationReportEntry interface {
 	accountAddress() common.Address
 }
 
@@ -513,7 +513,7 @@ type cadenceValueMigrationReportEntry struct {
 	Migration     string                    `json:"migration"`
 }
 
-var _ reportEntry = cadenceValueMigrationReportEntry{}
+var _ valueMigrationReportEntry = cadenceValueMigrationReportEntry{}
 
 func (e cadenceValueMigrationReportEntry) accountAddress() common.Address {
 	return e.StorageKey.Address
@@ -524,7 +524,7 @@ type capConsLinkMigrationEntry struct {
 	CapabilityID       interpreter.UInt64Value `json:"capabilityID"`
 }
 
-var _ reportEntry = capConsLinkMigrationEntry{}
+var _ valueMigrationReportEntry = capConsLinkMigrationEntry{}
 
 func (e capConsLinkMigrationEntry) accountAddress() common.Address {
 	return e.AccountAddressPath.Address
@@ -536,7 +536,7 @@ type capConsPathCapabilityMigrationEntry struct {
 	BorrowType     *interpreter.ReferenceStaticType `json:"borrowType"`
 }
 
-var _ reportEntry = capConsPathCapabilityMigrationEntry{}
+var _ valueMigrationReportEntry = capConsPathCapabilityMigrationEntry{}
 
 func (e capConsPathCapabilityMigrationEntry) accountAddress() common.Address {
 	return e.AccountAddress
@@ -547,7 +547,7 @@ type capConsMissingCapabilityIDEntry struct {
 	AddressPath    interpreter.AddressPath `json:"addressPath"`
 }
 
-var _ reportEntry = capConsMissingCapabilityIDEntry{}
+var _ valueMigrationReportEntry = capConsMissingCapabilityIDEntry{}
 
 type capConsMissingTargetEntry struct {
 	AddressPath interpreter.AddressPath `json:"addressPath"`
@@ -557,7 +557,7 @@ func (e capConsMissingTargetEntry) accountAddress() common.Address {
 	return e.AddressPath.Address
 }
 
-var _ reportEntry = capConsMissingTargetEntry{}
+var _ valueMigrationReportEntry = capConsMissingTargetEntry{}
 
 func (e capConsMissingCapabilityIDEntry) accountAddress() common.Address {
 	return e.AccountAddress
