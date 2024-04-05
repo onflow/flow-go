@@ -204,8 +204,8 @@ require (
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/onflow/atree v0.6.1-0.20240314011440-92714cac03fb // indirect
-	github.com/onflow/cadence v0.42.8-0.20240314182815-638fa31cafa3 // indirect
+	github.com/onflow/atree v0.6.1-0.20240405171204-c6c951de7189 // indirect
+	github.com/onflow/cadence v0.42.8-0.20240405174600-e469d9dd3aa2 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20231219201108-fbdb10b0a2da // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20231219201108-fbdb10b0a2da // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230711213910-baad011d2b13 // indirect
