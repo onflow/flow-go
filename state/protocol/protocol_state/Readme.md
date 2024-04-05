@@ -59,7 +59,7 @@ Formally we write:
   state $\mathcal{P}'$. To emphasize that a certain state machine 𝒮 exclusively operates on state $\mathcal{P}$, we write
   $\mathcal{S}[\mathcal{P}] = S_0[P_0] \otimes S_1[P_1] \otimes\ldots\otimes S_j[P_j]$.
   Observing the events $\xi$, the output state $\mathcal{P}'$ is
-  $\mathcal{P}' = \mathcal{S} [\mathcal{P}] (\xi) = S_0[P_0](\xi) \otimes S_1[P_1](\xi) \otimes\ldots\otimes S_j[P_j](\xi)$
+  $\mathcal{P}' = \mathcal{S}[\mathcal{P}]$ a $(\xi) = S_0 [P_0] (\xi) \otimes S_1 [P_1] (\xi) \otimes\ldots\otimes S_j [P_j] (\xi)$
   $ = P_0' \otimes P_1' \otimes\ldots\otimes P_j'$
   Where each state machine Si individually generated the output state $S_i[P_i](\xi) = P_i'$
 
