@@ -60,7 +60,6 @@ type StateMachine interface {
 
 	// TransitionToNextEpoch transitions our reference frame of 'current epoch' to the pending but committed epoch.
 	// Epoch transition is only allowed when:
-	// - next epoch has been set up,
 	// - next epoch has been committed,
 	// - candidate block is in the next epoch.
 	// No errors are expected during normal operations.
@@ -83,7 +82,7 @@ type StateMachineFactoryMethod func(candidateView uint64, parentState *flow.Rich
 // EpochStateMachine processes a subset of service events that are relevant for the Epoch state, and ignores all other events.
 // EpochStateMachine delegates the processing of service events to an embedded StateMachine,
 // which is either a HappyPathStateMachine or a FallbackStateMachine depending on the operation mode of the protocol.
-// It relies on Key-Value Store to commit read the parent state and to commit the updates to the Dynamic Protocol State.
+// It relies on Key-Value Store to read the parent state and to persist the snapshot of the updated Epoch state.
 type EpochStateMachine struct {
 	activeStateMachine               StateMachine
 	parentState                      protocol_state.KVStoreReader
@@ -126,9 +125,7 @@ func NewEpochStateMachine(
 			parentState.GetEpochStateID(), parentEpochState.ID())
 	}
 
-	var (
-		stateMachine StateMachine
-	)
+	var stateMachine StateMachine
 	candidateAttemptsInvalidEpochTransition := epochFallbackTriggeredByIncorporatingCandidate(candidateView, params, parentEpochState)
 	if parentEpochState.InvalidEpochTransitionAttempted || candidateAttemptsInvalidEpochTransition {
 		// Case 1: InvalidEpochTransitionAttempted is true, indicating that we have encountered an invalid

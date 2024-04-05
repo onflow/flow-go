@@ -16,7 +16,7 @@ import (
 // To use new version of the protocol state, create a new versioned model in models.go (eg. modelv3 if latest model is modelv2)
 // ATTENTION: All models should be public with public fields otherwise the encoding/decoding will not work.
 
-// UpgradableModel is a utility struct that can be embedded in any model to provide
+// UpgradableModel is a utility struct that must be embedded in all model versions to provide
 // a common interface for managing protocol version upgrades.
 type UpgradableModel struct {
 	VersionUpgrade *protocol_state.ViewBasedActivator[uint64]
