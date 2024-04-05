@@ -28,7 +28,7 @@ var ErrUnsupportedVersion = errors.New("unsupported version for the Protocol Sta
 // the protocol state version than the node software.
 var ErrInvalidUpgradeVersion = errors.New("invalid upgrade version for the Protocol State's kvstore")
 
-// ErrInvalidActivationView is a sentinel returned when we attempt to process a KV store update
+// ErrInvalidActivationView is a sentinel returned when we attempt to process a KV store update,
 // which has an activation candidateView `V` so that `CurrentView + SafetyBuffer < V` does NOT hold.
 var ErrInvalidActivationView = errors.New("invalid activation candidateView for the new Protocol State version")
 
