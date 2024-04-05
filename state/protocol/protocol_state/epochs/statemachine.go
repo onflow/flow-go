@@ -179,15 +179,15 @@ func (e *EpochStateMachine) Build() protocol.DeferredBlockPersistOps {
 	return dbUpdates
 }
 
-// EvolveState evolves the Epoch state in accordance with the information in the candidate block (under
-// construction). Information that potentially changes the Epoch state (compared to the parent block's state):
+// EvolveState applies the state change(s) on sub-state P for the candidate block (under construction).
+// Information that potentially changes the Epoch state (compared to the parent block's state):
 //   - Service Events sealed in the candidate block
 //   - the candidate block's view (already provided at construction time)
 //
-// CAUTION: EvolveState function MUST be called for all candidate blocks, even if `update` is empty! This
-// is because also the absence of expected service events by a certain view can result in the Epoch state
-// changing (for example not having received the EpochCommit event for the next epoch, but approaching
-// the end of the current epoch).
+// CAUTION: EvolveState MUST be called for all candidate blocks, even if `sealedServiceEvents` is empty!
+// This is because also the absence of expected service events by a certain view can also result in the
+// Epoch state changing. (For example, not having received the EpochCommit event for the next epoch, but
+// approaching the end of the current epoch.)
 //
 // The block's payload might contain epoch preparation service events for the next epoch. In this case,
 // we need to update the tentative protocol state. We need to validate whether all information is available
