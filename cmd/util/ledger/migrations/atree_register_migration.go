@@ -39,6 +39,8 @@ type AtreeRegisterMigrator struct {
 	validateMigratedValues             bool
 	logVerboseValidationError          bool
 	continueMigrationOnValidationError bool
+	checkStorageHealthBeforeMigration  bool
+	checkStorageHealthAfterMigration   bool
 }
 
 var _ AccountBasedMigration = (*AtreeRegisterMigrator)(nil)
@@ -49,6 +51,8 @@ func NewAtreeRegisterMigrator(
 	validateMigratedValues bool,
 	logVerboseValidationError bool,
 	continueMigrationOnValidationError bool,
+	checkStorageHealthBeforeMigration bool,
+	checkStorageHealthAfterMigration bool,
 ) *AtreeRegisterMigrator {
 
 	sampler := util2.NewTimedSampler(30 * time.Second)
@@ -60,6 +64,8 @@ func NewAtreeRegisterMigrator(
 		validateMigratedValues:             validateMigratedValues,
 		logVerboseValidationError:          logVerboseValidationError,
 		continueMigrationOnValidationError: continueMigrationOnValidationError,
+		checkStorageHealthBeforeMigration:  checkStorageHealthBeforeMigration,
+		checkStorageHealthAfterMigration:   checkStorageHealthAfterMigration,
 	}
 
 	return migrator
@@ -92,6 +98,17 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 	mr, err := newMigratorRuntime(address, oldPayloads)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
+	}
+
+	// Check storage health before migration, if enabled.
+	if m.checkStorageHealthBeforeMigration {
+		err = checkStorageHealth(address, mr.Storage, oldPayloads)
+		if err != nil {
+			m.log.Warn().
+				Err(err).
+				Str("account", address.Hex()).
+				Msg("storage health check before migration failed")
+		}
 	}
 
 	// keep track of all storage maps that were accessed
@@ -144,7 +161,58 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 		})
 	}
 
+	// Check storage health after migration, if enabled.
+	if m.checkStorageHealthAfterMigration {
+		mr, err := newMigratorRuntime(address, newPayloads)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
+		}
+
+		err = checkStorageHealth(address, mr.Storage, newPayloads)
+		if err != nil {
+			m.log.Warn().
+				Err(err).
+				Str("account", address.Hex()).
+				Msg("storage health check after migration failed")
+		}
+	}
+
 	return newPayloads, nil
+}
+
+func checkStorageHealth(
+	address common.Address,
+	storage *runtime.Storage,
+	payloads []*ledger.Payload,
+) error {
+
+	for _, payload := range payloads {
+		registerID, _, err := convert.PayloadToRegister(payload)
+		if err != nil {
+			return fmt.Errorf("failed to convert payload to register: %w", err)
+		}
+
+		if !registerID.IsSlabIndex() {
+			continue
+		}
+
+		// Convert the register ID to a storage ID.
+		slabID := atree.NewStorageID(
+			atree.Address([]byte(registerID.Owner)),
+			atree.StorageIndex([]byte(registerID.Key[1:])))
+
+		// Retrieve the slab.
+		_, _, err = storage.Retrieve(slabID)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve slab %s: %w", slabID, err)
+		}
+	}
+
+	for _, domain := range domains {
+		_ = storage.GetStorageMap(address, domain, false)
+	}
+
+	return storage.CheckHealth()
 }
 
 func (m *AtreeRegisterMigrator) migrateAccountStorage(
