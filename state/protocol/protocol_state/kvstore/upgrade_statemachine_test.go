@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/mock"
@@ -73,8 +72,7 @@ func (s *StateMachineSuite) TestEvolveState_ProtocolStateVersionUpgrade() {
 		require.NoError(s.T(), err)
 	})
 	s.Run("invalid-protocol-state-version", func() {
-		unittest.SkipUnless(s.T(), unittest.TEST_TODO,
-			"this needs to be fixed to consume error for consumer, since sentinels are handled internally")
+		s.mutator = mock.NewKVStoreMutator(s.T())
 		oldVersion := uint64(0)
 		s.parentState.On("GetProtocolStateVersion").Return(oldVersion)
 
@@ -82,19 +80,40 @@ func (s *StateMachineSuite) TestEvolveState_ProtocolStateVersionUpgrade() {
 		upgrade.ActiveView = s.view + s.params.EpochCommitSafetyThreshold() + 1
 		upgrade.NewProtocolStateVersion = oldVersion
 
-		err := s.stateMachine.EvolveState([]flow.ServiceEvent{upgrade.ServiceEvent()})
-		require.ErrorIs(s.T(), err, ErrInvalidUpgradeVersion, "has to be expected sentinel")
-		require.True(s.T(), protocol.IsInvalidServiceEventError(err), "has to be expected sentinel")
+		_ = s.stateMachine.EvolveState([]flow.ServiceEvent{upgrade.ServiceEvent()})
+
+		// TODO: this needs to be fixed to consume error for consumer, since sentinels are handled internally
+		//require.ErrorIs(s.T(), err, ErrInvalidUpgradeVersion, "has to be expected sentinel")
+		//require.True(s.T(), protocol.IsInvalidServiceEventError(err), "has to be expected sentinel")
+		s.mutator.AssertNumberOfCalls(s.T(), "SetVersionUpgrade", 0)
+	})
+	s.Run("skipping-protocol-state-version", func() {
+		s.mutator = mock.NewKVStoreMutator(s.T())
+		oldVersion := uint64(0)
+		s.parentState.On("GetProtocolStateVersion").Return(oldVersion)
+
+		upgrade := unittest.ProtocolStateVersionUpgradeFixture()
+		upgrade.ActiveView = s.view + s.params.EpochCommitSafetyThreshold() + 1
+		upgrade.NewProtocolStateVersion = oldVersion + 2 // has to be exactly +1
+
+		_ = s.stateMachine.EvolveState([]flow.ServiceEvent{upgrade.ServiceEvent()})
+
+		// TODO: this needs to be fixed to consume error for consumer, since sentinels are handled internally
+		//require.ErrorIs(s.T(), err, ErrInvalidUpgradeVersion, "has to be expected sentinel")
+		//require.True(s.T(), protocol.IsInvalidServiceEventError(err), "has to be expected sentinel")
+		s.mutator.AssertNumberOfCalls(s.T(), "SetVersionUpgrade", 0)
 	})
 	s.Run("invalid-activation-view", func() {
-		unittest.SkipUnless(s.T(), unittest.TEST_TODO,
-			"this needs to be fixed to consume error for consumer, since sentinels are handled internally")
+		s.mutator = mock.NewKVStoreMutator(s.T())
 		upgrade := unittest.ProtocolStateVersionUpgradeFixture()
 		upgrade.ActiveView = s.view + s.params.EpochCommitSafetyThreshold()
 
-		err := s.stateMachine.EvolveState([]flow.ServiceEvent{upgrade.ServiceEvent()})
-		require.ErrorIs(s.T(), err, ErrInvalidActivationView, "has to be expected sentinel")
-		require.True(s.T(), protocol.IsInvalidServiceEventError(err), "has to be expected sentinel")
+		_ = s.stateMachine.EvolveState([]flow.ServiceEvent{upgrade.ServiceEvent()})
+
+		// TODO: this needs to be fixed to consume error for consumer, since sentinels are handled internally
+		//require.ErrorIs(s.T(), err, ErrInvalidActivationView, "has to be expected sentinel")
+		//require.True(s.T(), protocol.IsInvalidServiceEventError(err), "has to be expected sentinel")
+		s.mutator.AssertNumberOfCalls(s.T(), "SetVersionUpgrade", 0)
 	})
 }
 
