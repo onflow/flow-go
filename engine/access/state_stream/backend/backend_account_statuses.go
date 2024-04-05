@@ -2,11 +2,9 @@ package backend
 
 import (
 	"context"
-	"time"
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
@@ -20,11 +18,8 @@ type AccountStatusesResponse struct {
 
 // AccountStatusesBackend is a struct representing a backend implementation for subscribing to account statuses changes.
 type AccountStatusesBackend struct {
-	log            zerolog.Logger
-	broadcaster    *engine.Broadcaster
-	sendTimeout    time.Duration
-	responseLimit  float64
-	sendBufferSize int
+	log                 zerolog.Logger
+	subscriptionHandler *subscription.SubscriptionHandler
 
 	executionDataTracker subscription.ExecutionDataTracker
 	eventsRetriever      EventsRetriever
@@ -36,10 +31,7 @@ func (b *AccountStatusesBackend) subscribe(
 	nextHeight uint64,
 	filter state_stream.AccountStatusFilter,
 ) subscription.Subscription {
-	sub := subscription.NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getAccountStatusResponseFactory(filter))
-	go subscription.NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
-
-	return sub
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getAccountStatusResponseFactory(filter))
 }
 
 // SubscribeAccountStatusesFromStartBlockID subscribes to the streaming of account status changes starting from
