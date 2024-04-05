@@ -339,7 +339,7 @@ func (b *backendSubscribeBlocks) getBlock(height uint64, expectedBlockStatus flo
 
 // validateHeight checks if the given block height is valid and available based on the expected block status.
 // Expected errors during normal operation:
-// - storage.ErrNotFound: block for the given block height is not available.
+// - subscription.ErrBlockNotReady when unable to retrieve the block by height
 func (b *backendSubscribeBlocks) validateHeight(height uint64, expectedBlockStatus flow.BlockStatus) error {
 	highestHeight, err := b.blockTracker.GetHighestHeight(expectedBlockStatus)
 	if err != nil {
@@ -350,7 +350,7 @@ func (b *backendSubscribeBlocks) validateHeight(height uint64, expectedBlockStat
 	// note: it's possible for the data to exist in the data store before the notification is
 	// received. this ensures a consistent view is available to all streams.
 	if height > highestHeight {
-		return fmt.Errorf("block %d is not available yet: %w", height, storage.ErrNotFound)
+		return fmt.Errorf("block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
 	}
 
 	return nil
