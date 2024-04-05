@@ -45,8 +45,8 @@ The Flow protocol defines the Key-Value-Store's state $\mathcal{P}$ as the compo
 $P_0, P_1, \ldots, P_j$. Formally, we write $\mathcal{P} = P0 \otimes P1 \otimes \ldots \otimes Pj$, where $'\otimes'$ denotes the product state. We
 loosely associate each $P_0, P_1,\ldots$ with one specific key-value entry in the store. Correspondingly,
 we have conceptually independent state machines $S_0, S_1,\ldots$ operating each on their own respective
-sub-state $P_0, P_1, \ldots$. A one-to-one correspondence between kv-entry and state machine should be the
-default, but is not strictly required. However, the strong requirement is that no entry is operated
+sub-state $P_0, P_1, \ldots$ A one-to-one correspondence between key-value-pair and state machine should be the
+default, but is not strictly required. However, the strong requirement is that no key-value-pair is operated
 on my more than one state machine.
 
 Formally we write:
@@ -57,9 +57,10 @@ Formally we write:
   function. All other details of the state machine are implicit.)
 - The state machine $\mathcal{S}$ being in state $\mathcal{P}$ and observing the input $\xi = x_0\cdot x_1 \cdot x_2 \cdot\ldots\cdot x_z$ will output
   state $\mathcal{P}'$. To emphasize that a certain state machine 𝒮 exclusively operates on state $\mathcal{P}$, we write
-  $\mathcal{S}[\mathcal{P}] = S_0[P_0] \otimes S_1[P_1] \otimes\ldots\otimes S_j[P_j]$
-  Observing the events ξ the output state 𝒫' is
-  $\mathcal{P}' = \mathcal{S}[\mathcal{P}](\xi) = S_0[P_0](\xi) \otimes S_1[P_1](\xi) \otimes\ldots\otimes S_j[P_j](\xi) = P_0' \otimes P_1' \otimes\ldots\otimes P_j'$
+  $\mathcal{S}[\mathcal{P}] = S_0[P_0] \otimes S_1[P_1] \otimes\ldots\otimes S_j[P_j]$.
+  Observing the events $\xi$, the output state $\mathcal{P}'$ is
+  $\mathcal{P}' = \mathcal{S}[\mathcal{P}](\xi) = S_0[P_0](\xi) \otimes S_1[P_1](\xi) \otimes\ldots\otimes S_j[P_j](\xi)$
+  $ = P_0' \otimes P_1' \otimes\ldots\otimes P_j'$
   Where each state machine Si individually generated the output state $S_i[P_i](\xi) = P_i'$
 
 Input $\xi$:
