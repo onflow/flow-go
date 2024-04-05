@@ -1,20 +1,19 @@
 # Dynamic Protocol State in a nutshell
 
-- At its heart, the Dynamic Protocol State is a framework for storing a snapshot of protocol-defined parameters
-  and supplemental protocol-data into each block. Think about it as a key value store, where you can store values.
+- The Dynamic Protocol State is a framework for storing a snapshot of protocol-defined parameters
+  and supplemental protocol-data into each block. Think about it as a key value store in each block. 
 - The Flow network uses its Dynamic Protocol State to orchestrate Epoch switchovers and more generally control participation privileges
   for the network (including ejection of misbehaving or compromised nodes).
-- Furthermore, it is possible (though not yet implemented) to store and update protocol parameters with the Dynamic Protocol State.
-  For example, we could update consensus timing parameters such as `hotstuff-min-timeout`, where the value for the live network could be
-  adjusted on the fly via a governance transaction.
+- Furthermore, the Dynamic Protocol State makes it easily possible update operational protocol parameters on the live network via a governance transaction.
+  For example, we could update consensus timing parameters such as `hotstuff-min-timeout`.
 
-These examples all use the same primitives provided by the Dynamic Protocol State: 
- - (i) a Key-value store, whose hash-commitment is included as the end of every block,
+These examples from above all use the same primitives provided by the Dynamic Protocol State: 
+ - (i) a Key-value store, whose hash-commitment is included at the end of every block,
  - (ii) a set of rules (represented as a state machine) that updates the key-value-store from block to block, and
- - (iii) Using dedicated `Service Events` originating from the System Smart Contracts (via verification and sealing) as inputs to the state machine (ii).  
+ - (iii) dedicated `Service Events` originating from the System Smart Contracts (via verification and sealing) are the inputs to the state machines (ii).  
 
 This provides us with a very powerful set of primitives to orchestrate the low-level protocol on the fly with inputs from the System Smart Contracts.
-Engineers extending the protocol can introduce new values to the Key-Value Store and provide custom state machines for updating their values.
+Engineers extending the protocol can add new entries to the Key-Value Store and provide custom state machines for updating their values.
 Correct application of this state machine (i.e. correct evolution of data in the store) is guaranteed by the Dynamic Protocol State framework through BFT consensus. 
 
 
@@ -25,9 +24,10 @@ Correct application of this state machine (i.e. correct evolution of data in the
 Orthogonality means that state machines can operate completely independently and work on disjoint
 sub-states. By convention, they all consume the same inputs (incl. the ordered sequence of
 Service Events sealed in one block). In other words, each state machine $S_0, S_1,\ldots$ has full visibility
-into the inputs, but each draws their on independent conclusions (maintain their own exclusive state).
-There is no information exchange between the state machines; one state machines cannot read the state
+into the inputs, but each draws their on independent conclusions (maintaining their own exclusive state).
+There is no information exchange between the state machines; one state machines cannot read the current state
 of another.
+
 We emphasize that this architecture choice does not prevent us of from implementing sequential state
 machines for certain use-cases. For example: state machine A provides its output as input to another
 state machine B. Here, the order of running the state machines matter. This order-dependency is not
@@ -42,7 +42,7 @@ in the long term.
 
 Key-Value-Store:
 The Flow protocol defines the Key-Value-Store's state $\mathcal{P}$ as the composition of disjoint sub-states
-$P_0, P_1, \ldots, P_j$. Formally, we write $\mathcal{P} = P0 \otimes P1 \otimes \ldots \otimes Pj$, where '$\otimes$' denotes the product state. We
+$P_0, P_1, \ldots, P_j$. Formally, we write $\mathcal{P} = P0 \otimes P1 \otimes \ldots \otimes Pj$, where $'\otimes'$ denotes the product state. We
 loosely associate each $P_0, P_1,\ldots$ with one specific key-value entry in the store. Correspondingly,
 we have conceptually independent state machines $S_0, S_1,\ldots$ operating each on their own respective
 sub-state $P_0, P_1, \ldots$. A one-to-one correspondence between kv-entry and state machine should be the
