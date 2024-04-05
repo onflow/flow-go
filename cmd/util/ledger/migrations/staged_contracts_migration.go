@@ -63,7 +63,7 @@ func NewStagedContractsMigration(chainID flow.ChainID, log zerolog.Logger) *Stag
 
 func (m *StagedContractsMigration) WithContractUpdateValidation() *StagedContractsMigration {
 	m.enableUpdateValidation = true
-	m.userDefinedTypeChangeCheckFunc = newUserDefinedTypeChangeCheckerFunc(m.chainID)
+	m.userDefinedTypeChangeCheckFunc = NewUserDefinedTypeChangeCheckerFunc(m.chainID)
 	return m
 }
 
@@ -403,7 +403,7 @@ func StagedContractsFromCSV(path string) ([]StagedContract, error) {
 	return contracts, nil
 }
 
-func newUserDefinedTypeChangeCheckerFunc(
+func NewUserDefinedTypeChangeCheckerFunc(
 	chainID flow.ChainID,
 ) func(oldTypeID common.TypeID, newTypeID common.TypeID) (checked, valid bool) {
 
