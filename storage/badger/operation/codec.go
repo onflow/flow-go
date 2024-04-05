@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/golang/snappy"
+	"github.com/rs/zerolog/log"
 	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -20,6 +22,25 @@ var compressEnabled = true
 // should only be used during database initialization on startup.
 func setCompressDisabled() {
 	compressEnabled = false
+}
+
+func SyncCompressionFlag(db *badger.DB) error {
+	err := ensureDBWithType(db, dbMarkerPublic)
+	if err != nil && !errors.Is(err, badger.ErrKeyNotFound) {
+		return fmt.Errorf("could not retrieve database type marker: %w", err)
+	}
+
+	if isErrUncompressedValue(err) {
+		log.Warn().Msgf("protocol database is uncompressed, fallback to uncompressed value parsing")
+		setCompressDisabled()
+		// try again
+		err := ensureDBWithType(db, dbMarkerPublic)
+		if err != nil {
+			return fmt.Errorf("could not retrieve uncompressed database type marker: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // encodeEntity encodes the given entity using msgpack and then compress the

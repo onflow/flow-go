@@ -26,6 +26,11 @@ func InitStorageWithTruncate(datadir string, truncate bool) *badger.DB {
 		log.Fatal().Err(err).Msg("could not open key-value store")
 	}
 
+	err = operation.SyncCompressionFlag(db)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not sync compression flag")
+	}
+
 	// in order to void long iterations with big keys when initializing with an
 	// already populated database, we bootstrap the initial maximum key size
 	// upon starting
