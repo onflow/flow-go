@@ -25,7 +25,7 @@ WORKDIR /app
 
 # Keep Go's build cache between builds.
 # https://github.com/golang/go/issues/27719#issuecomment-514747274
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 CC="" CGO_CFLAGS="" go build -ldflags "-extldflags -static" \
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 CC="" CGO_CFLAGS="-O2 -D__BLST_PORTABLE__" go build -ldflags "-extldflags -static" \
     -o ./app ./cmd/consensus
 
 RUN chmod a+x /app/app
