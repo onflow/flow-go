@@ -169,11 +169,11 @@ type OrthogonalStoreStateMachine[P any] interface {
 	// No errors are expected during normal operations.
 	ProcessUpdate(orderedUpdates []flow.ServiceEvent) error
 
-	// View returns the view associated with this KeyValueStoreStateMachine.
-	// The view of the KeyValueStoreStateMachine equals the view of the block carrying the respective updates.
+	// View returns the view associated with this state machine.
+	// The view of the state machine equals the view of the block carrying the respective updates.
 	View() uint64
 
-	// ParentState returns parent state that is associated with this state machine.
+	// ParentState returns parent state associated with this state machine.
 	ParentState() P
 }
 

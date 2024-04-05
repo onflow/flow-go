@@ -140,13 +140,13 @@ func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.P
 	return nil
 }
 
-// View returns the candidateView associated with this KeyValueStoreStateMachine.
-// The candidateView of the KeyValueStoreStateMachine equals the candidateView of the block carrying the respective updates.
+// View returns the view associated with this state machine.
+// The view of the state machine equals the view of the block carrying the respective updates.
 func (m *PSVersionUpgradeStateMachine) View() uint64 {
 	return m.candidateView
 }
 
-// ParentState returns parent state that is associated with this state machine.
+// ParentState returns parent state associated with this state machine.
 func (m *PSVersionUpgradeStateMachine) ParentState() protocol_state.KVStoreReader {
 	return m.parentState
 }

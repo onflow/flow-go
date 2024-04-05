@@ -66,11 +66,11 @@ type StateMachine interface {
 	// No errors are expected during normal operations.
 	TransitionToNextEpoch() error
 
-	// View returns the view that is associated with this StateMachine.
-	// The view of the StateMachine equals the view of the block carrying the respective updates.
+	// View returns the view associated with this state machine.
+	// The view of the state machine equals the view of the block carrying the respective updates.
 	View() uint64
 
-	// ParentState returns parent protocol state that is associated with this StateMachine.
+	// ParentState returns parent protocol state associated with this state machine.
 	ParentState() *flow.RichProtocolStateEntry
 }
 
@@ -218,12 +218,13 @@ func (e *EpochStateMachine) ProcessUpdate(update []flow.ServiceEvent) error {
 	return nil
 }
 
-// View returns the view that is associated with this EpochStateMachine.
+// View returns the view associated with this state machine.
+// The view of the state machine equals the view of the block carrying the respective updates.
 func (e *EpochStateMachine) View() uint64 {
 	return e.activeStateMachine.View()
 }
 
-// ParentState returns parent state that is associated with this state machine.
+// ParentState returns parent state associated with this state machine.
 func (e *EpochStateMachine) ParentState() protocol_state.KVStoreReader {
 	return e.parentState
 }

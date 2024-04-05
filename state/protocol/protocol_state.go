@@ -109,16 +109,18 @@ type MutableProtocolState interface {
 //
 // Not safe for concurrent use.
 type StateMutator interface {
-	// Build returns:
-	//   - hasChanges: flag whether there were any changes; otherwise, `updatedState` and `stateID` equal the parent state
-	//   - updatedState: the ProtocolState after applying all updates.
-	//   - stateID: the hash commitment to the `updatedState`
-	//   - dbUpdates: database updates necessary for persisting the updated protocol state's *dependencies*.
-	//     If hasChanges is false, updatedState is empty. Caution: persisting the `updatedState` itself and adding
-	//     it to the relevant indices is _not_ in `dbUpdates`. Persisting and indexing `updatedState` is the responsibility
-	//     of the calling code (specifically `FollowerState`).
+	// Build constructs the resulting protocol state, *after* applying all the sealed service events in a block (under construction)
+	// via `ApplyServiceEventsFromValidatedSeals(...)`. It returns:
+	//  - stateID: the hash commitment to the updated Protocol State Snapshot
+	//  - dbUpdates: database updates necessary for persisting the State Snapshot itself including all data structures
+	//    that the Snapshot references. In addition, `dbUpdates` also populates the `ProtocolKVStore.ByBlockID`.
+	//    Therefore, even if there are no changes of the Protocol State, `dbUpdates` still contains deferred storage writes
+	//    that must be executed to populate the `ByBlockID` index.
+	//  - err: All error returns indicate potential state corruption and should therefore be treated as fatal.
 	//
-	// updated protocol state entry, state ID and a flag indicating if there were any changes.
+	// CAUTION:
+	//  - For Consensus Participants that are replicas, the calling code must check that the returned `stateID` matches the
+	//    commitment in the block proposal! If they don't match, the proposal is byzantine and should be slashed.
 	Build() (stateID flow.Identifier, dbUpdates DeferredDBUpdates, err error)
 
 	// ApplyServiceEventsFromValidatedSeals applies the state changes that are delivered via

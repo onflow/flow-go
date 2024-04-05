@@ -16,9 +16,9 @@ func TestProtocolStateMachine(t *testing.T) {
 	suite.Run(t, new(ProtocolStateMachineSuite))
 }
 
-// BaseProtocolStateMachineSuite is a base test suite that holds common functionality for testing protocol state machines.
+// BaseStateMachineSuite is a base test suite that holds common functionality for testing protocol state machines.
 // It reflects the portion of data which is present in baseStateMachine.
-type BaseProtocolStateMachineSuite struct {
+type BaseStateMachineSuite struct {
 	suite.Suite
 
 	parentProtocolState *flow.RichProtocolStateEntry
@@ -26,7 +26,7 @@ type BaseProtocolStateMachineSuite struct {
 	candidate           *flow.Header
 }
 
-func (s *BaseProtocolStateMachineSuite) SetupTest() {
+func (s *BaseStateMachineSuite) SetupTest() {
 	s.parentProtocolState = unittest.ProtocolStateFixture()
 	s.parentBlock = unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FirstView + 1))
 	s.candidate = unittest.BlockHeaderWithParentFixture(s.parentBlock)
@@ -34,12 +34,12 @@ func (s *BaseProtocolStateMachineSuite) SetupTest() {
 
 // ProtocolStateMachineSuite is a dedicated test suite for testing happy path state machine.
 type ProtocolStateMachineSuite struct {
-	BaseProtocolStateMachineSuite
+	BaseStateMachineSuite
 	stateMachine *HappyPathStateMachine
 }
 
 func (s *ProtocolStateMachineSuite) SetupTest() {
-	s.BaseProtocolStateMachineSuite.SetupTest()
+	s.BaseStateMachineSuite.SetupTest()
 	var err error
 	s.stateMachine, err = NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 	require.NoError(s.T(), err)
