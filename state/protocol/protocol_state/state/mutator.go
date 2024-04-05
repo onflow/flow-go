@@ -44,14 +44,14 @@ func newStateMutator(
 	headers storage.Headers,
 	results storage.ExecutionResults,
 	kvStoreSnapshots storage.ProtocolKVStore,
-	view uint64,
+	candidateView uint64,
 	parentID flow.Identifier,
 	parentState protocol_state.KVStoreAPI,
 	stateMachineFactories ...protocol_state.KeyValueStoreStateMachineFactory,
 ) (*stateMutator, error) {
 	protocolVersion := parentState.GetProtocolStateVersion()
 	if versionUpgrade := parentState.GetVersionUpgrade(); versionUpgrade != nil {
-		if view >= versionUpgrade.ActivationView {
+		if candidateView >= versionUpgrade.ActivationView {
 			protocolVersion = versionUpgrade.Data
 		}
 	}
@@ -64,7 +64,7 @@ func newStateMutator(
 
 	stateMachines := make([]protocol_state.KeyValueStoreStateMachine, 0, len(stateMachineFactories))
 	for _, factory := range stateMachineFactories {
-		stateMachine, err := factory.Create(view, parentID, parentState, replicatedState)
+		stateMachine, err := factory.Create(candidateView, parentID, parentState, replicatedState)
 		if err != nil {
 			return nil, fmt.Errorf("could not create state machine: %w", err)
 		}
@@ -81,25 +81,26 @@ func newStateMutator(
 	}, nil
 }
 
-// Build returns:
-//   - hasChanges: flag whether there were any changes; otherwise, `updatedState` and `stateID` equal the parent state
-//   - updatedState: the ProtocolState after applying all updates.
-//   - stateID: the hash commitment to the `updatedState`
-//   - dbUpdates: database updates necessary for persisting the updated protocol state's *dependencies*.
-//     If hasChanges is false, updatedState is empty. Caution: persisting the `updatedState` itself and adding
-//     it to the relevant indices is _not_ in `dbUpdates`. Persisting and indexing `updatedState` is the responsibility
-//     of the calling code (specifically `FollowerState`).
+// Build constructs the resulting protocol state, *after* applying all the sealed service events in a block (under construction)
+// via `ApplyServiceEventsFromValidatedSeals(...)`. It returns:
+//   - stateID: the hash commitment to the updated Protocol State Snapshot
+//   - dbUpdates: database updates necessary for persisting the State Snapshot itself including all data structures
+//     that the Snapshot references. In addition, `dbUpdates` also populates the `ProtocolKVStore.ByBlockID`.
+//     Therefore, even if there are no changes of the Protocol State, `dbUpdates` still contains deferred storage writes
+//     that must be executed to populate the `ByBlockID` index.
+//   - err: All error returns indicate potential state corruption and should therefore be treated as fatal.
 //
-// updated protocol state entry, state ID and a flag indicating if there were any changes.
-func (m *stateMutator) Build() (flow.Identifier, protocol.DeferredDBUpdates, error) {
-	var dbUpdates protocol.DeferredDBUpdates
+// CAUTION:
+//   - For Consensus Participants that are replicas, the calling code must check that the returned `stateID` matches the
+//     commitment in the block proposal! If they don't match, the proposal is byzantine and should be slashed.
+func (m *stateMutator) Build() (stateID flow.Identifier, dbUpdates protocol.DeferredBlockPersistOps, err error) {
 	for _, stateMachine := range m.orthoKVStoreMachines {
 		dbUpdates.Merge(stateMachine.Build())
 	}
-	stateID := m.kvMutator.ID()
+	stateID = m.kvMutator.ID()
 	version, data, err := m.kvMutator.VersionedEncode()
 	if err != nil {
-		return flow.ZeroID, protocol.DeferredDBUpdates{}, fmt.Errorf("could not encode protocol state: %w", err)
+		return flow.ZeroID, protocol.DeferredBlockPersistOps{}, fmt.Errorf("could not encode protocol state: %w", err)
 	}
 
 	// Schedule deferred database operations to index the protocol state by the candidate block's ID
@@ -202,7 +203,7 @@ func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) 
 		// only exceptions should be propagated
 		err := stateMachine.EvolveState(orderedUpdates)
 		if err != nil {
-			return fmt.Errorf("could not process service events: %w", err)
+			return fmt.Errorf("could not process protocol state change for candidate block: %w", err)
 		}
 	}
 

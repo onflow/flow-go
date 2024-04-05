@@ -16,7 +16,7 @@ import (
 // To use new version of the protocol state, create a new versioned model in models.go (eg. modelv3 if latest model is modelv2)
 // ATTENTION: All models should be public with public fields otherwise the encoding/decoding will not work.
 
-// UpgradableModel is a utility struct that can be embedded in any model to provide
+// UpgradableModel is a utility struct that must be embedded in all model versions to provide
 // a common interface for managing protocol version upgrades.
 type UpgradableModel struct {
 	VersionUpgrade *protocol_state.ViewBasedActivator[uint64]
@@ -31,7 +31,7 @@ func (model *UpgradableModel) SetVersionUpgrade(activator *protocol_state.ViewBa
 
 // GetVersionUpgrade returns the upgrade version of protocol.
 // VersionUpgrade is a view-based activator that specifies the version which has to be applied
-// and the view from which on it has to be applied. It may return the current protocol version
+// and the view from which it has to be applied. It may return the current protocol version
 // with a past view if the upgrade has already been activated.
 func (model *UpgradableModel) GetVersionUpgrade() *protocol_state.ViewBasedActivator[uint64] {
 	return model.VersionUpgrade
@@ -62,7 +62,7 @@ var _ protocol_state.KVStoreMutator = (*Modelv0)(nil)
 func (model *Modelv0) ID() flow.Identifier { return flow.MakeID(model) }
 
 // Replicate instantiates a Protocol State Snapshot of the given `protocolVersion`.
-// It clones existing snapshot if `protocolVersion = 0` and performs a migration if `protocolVersion = 1`.
+// It clones existing snapshot and performs a migration if `protocolVersion = 1`.
 // Expected errors during normal operations:
 //   - ErrIncompatibleVersionChange if replicating the Parent Snapshot into a Snapshot
 //     with the specified `protocolVersion` is not supported.

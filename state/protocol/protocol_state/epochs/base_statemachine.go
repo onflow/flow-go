@@ -24,8 +24,8 @@ type baseStateMachine struct {
 
 // Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
 // CAUTION:
-// Do NOT call Build, if the StateMachine instance has returned a `protocol.InvalidServiceEventError`
-// at any time during its lifetime. After this error, the StateMachine is left with a potentially
+// Do NOT call Build, if the baseStateMachine instance has returned a `protocol.InvalidServiceEventError`
+// at any time during its lifetime. After this error, the baseStateMachine is left with a potentially
 // dysfunctional state and should be discarded.
 func (u *baseStateMachine) Build() (updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, hasChanges bool) {
 	updatedState = u.state.Copy()
@@ -34,13 +34,13 @@ func (u *baseStateMachine) Build() (updatedState *flow.ProtocolStateEntry, state
 	return
 }
 
-// View returns the view that is associated with this state HappyPathStateMachine.
-// The view of the StateMachine equals the view of the block carrying the respective updates.
+// View returns the view associated with this state machine.
+// The view of the state machine equals the view of the block carrying the respective updates.
 func (u *baseStateMachine) View() uint64 {
 	return u.view
 }
 
-// ParentState returns parent protocol state that is associated with this state HappyPathStateMachine.
+// ParentState returns parent protocol state associated with this state machine.
 func (u *baseStateMachine) ParentState() *flow.RichProtocolStateEntry {
 	return u.parentState
 }

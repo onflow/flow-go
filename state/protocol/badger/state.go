@@ -273,6 +273,11 @@ func bootstrapProtocolState(
 		// in the sealing segment is within the same phase within the same epoch.
 		// the sealing segment.
 		for _, block := range segment.AllBlocks() {
+			// TODO: enable this once the genesis block has state ID from the KV store, not the Epoch Sub-State.
+			//if block.Payload.ProtocolStateID != protocolStateID {
+			//	return fmt.Errorf("block with height %d in sealing segment has mismatching protocol state ID, expecting %x got %x",
+			//		block.Header.Height, protocolStateID, block.Payload.ProtocolStateID)
+			//}
 			blockID := block.ID()
 			err = protocolState.Index(blockID, protocolStateID)(tx)
 			if err != nil {

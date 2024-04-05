@@ -61,17 +61,16 @@ type StateMachine interface {
 
 	// TransitionToNextEpoch transitions our reference frame of 'current epoch' to the pending but committed epoch.
 	// Epoch transition is only allowed when:
-	// - next epoch has been set up,
 	// - next epoch has been committed,
 	// - candidate block is in the next epoch.
 	// No errors are expected during normal operations.
 	TransitionToNextEpoch() error
 
-	// View returns the view that is associated with this StateMachine.
-	// The view of the StateMachine equals the view of the block carrying the respective updates.
+	// View returns the view associated with this state machine.
+	// The view of the state machine equals the view of the block carrying the respective updates.
 	View() uint64
 
-	// ParentState returns parent protocol state that is associated with this StateMachine.
+	// ParentState returns parent protocol state associated with this state machine.
 	ParentState() *flow.RichProtocolStateEntry
 }
 
@@ -84,7 +83,7 @@ type StateMachineFactoryMethod func(candidateView uint64, parentState *flow.Rich
 // EpochStateMachine processes a subset of service events that are relevant for the Epoch state, and ignores all other events.
 // EpochStateMachine delegates the processing of service events to an embedded StateMachine,
 // which is either a HappyPathStateMachine or a FallbackStateMachine depending on the operation mode of the protocol.
-// It relies on Key-Value Store to commit read the parent state and to commit the updates to the Dynamic Protocol State.
+// It relies on Key-Value Store to read the parent state and to persist the snapshot of the updated Epoch state.
 type EpochStateMachine struct {
 	activeStateMachine               StateMachine
 	parentState                      protocol_state.KVStoreReader
@@ -94,7 +93,7 @@ type EpochStateMachine struct {
 	setups           storage.EpochSetups
 	commits          storage.EpochCommits
 	protocolStateDB  storage.ProtocolState
-	pendingDbUpdates protocol.DeferredDBUpdates
+	pendingDbUpdates protocol.DeferredBlockPersistOps
 }
 
 var _ protocol_state.KeyValueStoreStateMachine = (*EpochStateMachine)(nil)
@@ -105,7 +104,7 @@ var _ protocol_state.KeyValueStoreStateMachine = (*EpochStateMachine)(nil)
 // - for the epoch fallback mode it initializes a FallbackStateMachine.
 // No errors are expected during normal operations.
 func NewEpochStateMachine(
-	view uint64,
+	candidateView uint64,
 	parentID flow.Identifier,
 	params protocol.GlobalParams,
 	setups storage.EpochSetups,
@@ -127,10 +126,8 @@ func NewEpochStateMachine(
 			parentState.GetEpochStateID(), parentEpochState.ID())
 	}
 
-	var (
-		stateMachine StateMachine
-	)
-	candidateAttemptsInvalidEpochTransition := epochFallbackTriggeredByIncorporatingCandidate(view, params, parentEpochState)
+	var stateMachine StateMachine
+	candidateAttemptsInvalidEpochTransition := epochFallbackTriggeredByIncorporatingCandidate(candidateView, params, parentEpochState)
 	if parentEpochState.InvalidEpochTransitionAttempted || candidateAttemptsInvalidEpochTransition {
 		// Case 1: InvalidEpochTransitionAttempted is true, indicating that we have encountered an invalid
 		//         epoch service event or an invalid state transition previously in this fork.
@@ -140,9 +137,9 @@ func NewEpochStateMachine(
 		// and we must use only the `epochFallbackStateMachine` along this fork.
 		//
 		// TODO for 'leaving Epoch Fallback via special service event': this might need to change.
-		stateMachine, err = epochFallbackStateMachineFactory(view, parentEpochState)
+		stateMachine, err = epochFallbackStateMachineFactory(candidateView, parentEpochState)
 	} else {
-		stateMachine, err = happyPathStateMachineFactory(view, parentEpochState)
+		stateMachine, err = happyPathStateMachineFactory(candidateView, parentEpochState)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize protocol state machine: %w", err)
@@ -153,7 +150,7 @@ func NewEpochStateMachine(
 		parentState:        parentState,
 		mutator:            mutator,
 		epochFallbackStateMachineFactory: func() (StateMachine, error) {
-			return epochFallbackStateMachineFactory(view, parentEpochState)
+			return epochFallbackStateMachineFactory(candidateView, parentEpochState)
 		},
 		setups:          setups,
 		commits:         commits,
@@ -168,7 +165,7 @@ func NewEpochStateMachine(
 // but the actual epoch state is stored separately, nevertheless, the epoch state ID is used to sanity check if the
 // epoch state is consistent with the KV Store. Using this approach, we commit the epoch sub-state to the KV Store which in
 // affects the Dynamic Protocol State ID which is essentially hash of the KV Store.
-func (e *EpochStateMachine) Build() protocol.DeferredDBUpdates {
+func (e *EpochStateMachine) Build() protocol.DeferredBlockPersistOps {
 	updatedEpochState, updatedStateID, hasChanges := e.activeStateMachine.Build()
 	dbUpdates := e.pendingDbUpdates
 	dbUpdates.Add(func(tx *transaction.Tx, blockID flow.Identifier) error {
@@ -201,6 +198,10 @@ func (e *EpochStateMachine) EvolveState(sealedServiceEvents []flow.ServiceEvent)
 	parentProtocolState := e.activeStateMachine.ParentState()
 
 	// perform protocol state transition to next epoch if next epoch is committed, and we are at first block of epoch
+	// TODO: The current implementation has edge cases for future light clients and can potentially drive consensus
+	//       into an irreconcilable state (not sure). See for details https://github.com/onflow/flow-go/issues/5631
+	//       These edge cases are very unlikely, so this is an acceptable implementation in the short - mid term.
+	//       However, this code will likely need to be changed when working on EFM recovery.
 	phase := parentProtocolState.EpochPhase()
 	if phase == flow.EpochPhaseCommitted {
 		activeSetup := parentProtocolState.CurrentEpochSetup
@@ -227,12 +228,13 @@ func (e *EpochStateMachine) EvolveState(sealedServiceEvents []flow.ServiceEvent)
 	return nil
 }
 
-// View returns the view that is associated with this EpochStateMachine.
+// View returns the view associated with this state machine.
+// The view of the state machine equals the view of the block carrying the respective updates.
 func (e *EpochStateMachine) View() uint64 {
 	return e.activeStateMachine.View()
 }
 
-// ParentState returns parent state that is associated with this state machine.
+// ParentState returns parent state associated with this state machine.
 func (e *EpochStateMachine) ParentState() protocol_state.KVStoreReader {
 	return e.parentState
 }

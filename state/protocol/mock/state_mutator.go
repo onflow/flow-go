@@ -29,13 +29,13 @@ func (_m *StateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal)
 }
 
 // Build provides a mock function with given fields:
-func (_m *StateMutator) Build() (flow.Identifier, protocol.DeferredDBUpdates, error) {
+func (_m *StateMutator) Build() (flow.Identifier, protocol.DeferredBlockPersistOps, error) {
 	ret := _m.Called()
 
 	var r0 flow.Identifier
-	var r1 protocol.DeferredDBUpdates
+	var r1 protocol.DeferredBlockPersistOps
 	var r2 error
-	if rf, ok := ret.Get(0).(func() (flow.Identifier, protocol.DeferredDBUpdates, error)); ok {
+	if rf, ok := ret.Get(0).(func() (flow.Identifier, protocol.DeferredBlockPersistOps, error)); ok {
 		return rf()
 	}
 	if rf, ok := ret.Get(0).(func() flow.Identifier); ok {
@@ -46,10 +46,10 @@ func (_m *StateMutator) Build() (flow.Identifier, protocol.DeferredDBUpdates, er
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() protocol.DeferredDBUpdates); ok {
+	if rf, ok := ret.Get(1).(func() protocol.DeferredBlockPersistOps); ok {
 		r1 = rf()
 	} else {
-		r1 = ret.Get(1).(protocol.DeferredDBUpdates)
+		r1 = ret.Get(1).(protocol.DeferredBlockPersistOps)
 	}
 
 	if rf, ok := ret.Get(2).(func() error); ok {

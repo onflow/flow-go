@@ -116,8 +116,8 @@ type KVStoreMutator interface {
 	SetInvalidEpochTransitionAttempted(attempted bool) error
 }
 
-// OrthogonalStoreStateMachine represents a state machine that exclusively evolves its state Pi.
-// The state's specific type Pi is kept as a generic. Generally, Pi is the type corresponding
+// OrthogonalStoreStateMachine represents a state machine that exclusively evolves its state P.
+// The state's specific type P is kept as a generic. Generally, P is the type corresponding
 // to one specific key in the Key-Value store.
 //
 // Orthogonal State Machines:
@@ -181,13 +181,13 @@ type KVStoreMutator interface {
 // feeds them with inputs, post-processes the outputs and overall manages state machines' life-cycle
 // from block to block. New key-value pairs and corresponding state machines can easily be added
 // by implementing the following interface (state machine) and adding a new entry to the KV store.
-type OrthogonalStoreStateMachine[Pi any] interface {
+type OrthogonalStoreStateMachine[P any] interface {
 
 	// Build returns:
 	//   - database updates necessary for persisting the updated protocol sub-state and its *dependencies*.
 	//     It may contain updates for the sub-state itself and for any dependency that is affected by the update.
 	//     Deferred updates must be applied in a transaction to ensure atomicity.
-	Build() protocol.DeferredDBUpdates
+	Build() protocol.DeferredBlockPersistOps
 
 	// EvolveState applies the state change(s) on sub-state P for the candidate block (under construction).
 	// Information that potentially changes the Epoch state (compared to the parent block's state):
@@ -196,18 +196,18 @@ type OrthogonalStoreStateMachine[Pi any] interface {
 	//
 	// CAUTION: EvolveState MUST be called for all candidate blocks, even if `sealedServiceEvents` is empty!
 	// This is because also the absence of expected service events by a certain view can also result in the
-	// Epoch state changing (for example not having received the EpochCommit event for the next epoch, but
-	// approaching the end of the current epoch).
+	// Epoch state changing. (For example, not having received the EpochCommit event for the next epoch, but
+	// approaching the end of the current epoch.)
 	//
 	// No errors are expected during normal operations.
 	EvolveState(sealedServiceEvents []flow.ServiceEvent) error
 
-	// View returns the view associated with this KeyValueStoreStateMachine.
-	// The view of the KeyValueStoreStateMachine equals the view of the block carrying the respective updates.
+	// View returns the view associated with this state machine.
+	// The view of the state machine equals the view of the block carrying the respective updates.
 	View() uint64
 
-	// ParentState returns parent state that is associated with this state machine.
-	ParentState() Pi
+	// ParentState returns parent state associated with this state machine.
+	ParentState() P
 }
 
 // KeyValueStoreStateMachine is a type alias for a state machine that operates on an instance of KVStoreReader.
@@ -220,5 +220,5 @@ type KeyValueStoreStateMachine = OrthogonalStoreStateMachine[KVStoreReader]
 type KeyValueStoreStateMachineFactory interface {
 	// Create creates a new instance of an underlying type that operates on KV Store and is created for a specific candidate block.
 	// No errors are expected during normal operations.
-	Create(view uint64, parentID flow.Identifier, parentState KVStoreReader, mutator KVStoreMutator) (KeyValueStoreStateMachine, error)
+	Create(candidateView uint64, parentID flow.Identifier, parentState KVStoreReader, mutator KVStoreMutator) (KeyValueStoreStateMachine, error)
 }
