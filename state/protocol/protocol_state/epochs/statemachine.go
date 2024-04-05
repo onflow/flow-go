@@ -17,8 +17,9 @@ import (
 // when Epoch-related Service Events are sealed or specific view-thresholds are reached.
 //
 // The StateMachine is fork-aware, in that it starts with the Epoch state of the parent block and
-// consumes a sequence of sealed Service Events from the child block. A separate instance is created for
-// each block that is being processed. Calling `Build()` constructs a snapshot of the resulting Epoch state.
+// evolves the state based on the relevant information in the child block (specifically Service Events
+// sealed in the child block and the child block's view). A separate instance must be created for each
+// block that is being processed. Calling `Build()` constructs a snapshot of the resulting Epoch state.
 type StateMachine interface {
 	// Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
 	// CAUTION:
