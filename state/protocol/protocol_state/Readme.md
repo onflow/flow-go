@@ -40,7 +40,7 @@ Requiring all State Machines to be orthogonal is a deliberate design choice. The
 favouring modularity and strong logical independence. This is very beneficial for managing complexity
 in the long term.
 
-### Key-Value-Store:
+### Key-Value-Store
 The Flow protocol defines the Key-Value-Store's state $\mathcal{P}$ as the composition of disjoint sub-states
 $P_0, P_1, \ldots, P_j$. Formally, we write $\mathcal{P} = P0 \otimes P1 \otimes \ldots \otimes Pj$, where $'\otimes'$ denotes the product state. We
 loosely associate each $P_0, P_1,\ldots$ with one specific key-value entry in the store. Correspondingly,
@@ -60,13 +60,13 @@ Formally we write:
   $\mathcal{S}[\mathcal{P}] = S_0[P_0] \otimes S_1[P_1] \otimes\ldots\otimes S_j[P_j]$.
   Observing the events $\xi$, the output state is
   $\mathcal{P}' = \mathcal{S}[\mathcal{P}] (\xi) = S_0 [P_0] (\xi) \otimes S_1 [P_1] (\xi) \otimes\ldots\otimes S_j [P_j] (\xi) = P'_0 \otimes P'_1 \otimes\ldots\otimes P'_j$,
-  where each state machine $S_i$ individually generated the output state $S_i [P_i] (\xi) = P'_i$
+  where each state machine $S_i$ individually generated the output state $S_i [P_i] (\xi) = P'_i$.
 
-Input $\xi$:
+### Input ξ
 Conceptually, the consensus leader first executes these state machines during their block building
-process. At this point, the ID of the final block is unknown. Nevertheless, some part of the payload
-construction already happened, because at the sealed execution results are used as an input below.
-There is a large degree of freedom what part of the block we permit as possible inputs to the state
+process. At this point, the `ID` of the final block is unknown. Nevertheless, some part of the payload
+construction already happened, because the sealed execution results are used as an input below.
+There is a large degree of freedom what data of the partially-constructed block we permit as possible inputs to the state
 machines. At the moment, the primary purpose is for the execution environment (with results undergone
 verification and sealing) to send Service Events to the protocol layer. Therefore, the current
 convention is:
