@@ -84,7 +84,7 @@ func (m *PSVersionUpgradeStateMachine) ProcessUpdate(orderedUpdates []flow.Servi
 func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.ProtocolStateVersionUpgrade) error {
 	// To switch the protocol version, replica needs to process a block with a candidateView >= activation view.
 	// But we cannot activate a new version till the block containing the seal is finalized, because when
-	// switching between forks with different highest views, we do not want to switch forth and back between versions. 
+	// switching between forks with different highest views, we do not want to switch forth and back between versions.
 	// The problem is that finality is local to each node due to the nature of the consensus algorithm itself.
 	// We would like to guarantee that all nodes switch the protocol version at exactly the same block.
 	// To guarantee that all nodes switch the protocol version at exactly the same block, we require that the
@@ -115,7 +115,7 @@ func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.P
 			}
 
 			// we allow updating pending upgrade iff the new version is the same as the pending upgrade
-			// the activation candidateView may differ, but it has to meet the same threshold.
+			// the activation view may differ, but it has to meet the same threshold.
 			if pendingUpgrade.Data != versionUpgrade.NewProtocolStateVersion {
 				return protocol.NewInvalidServiceEventErrorf("requested to upgrade to %d but pending upgrade with version already stored %d: %w",
 					pendingUpgrade.Data, versionUpgrade.NewProtocolStateVersion, ErrInvalidUpgradeVersion)

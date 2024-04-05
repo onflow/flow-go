@@ -87,7 +87,7 @@ func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
 		require.ErrorIs(s.T(), err, ErrInvalidUpgradeVersion, "has to be expected sentinel")
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err), "has to be expected sentinel")
 	})
-	s.Run("invalid-activation-candidateView", func() {
+	s.Run("invalid-activation-view", func() {
 		unittest.SkipUnless(s.T(), unittest.TEST_TODO,
 			"this needs to be fixed to consume error for consumer, since sentinels are handled internally")
 		upgrade := unittest.ProtocolStateVersionUpgradeFixture()
