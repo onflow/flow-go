@@ -83,6 +83,8 @@ type ProtocolState interface {
 	GlobalParams() GlobalParams
 }
 
+// MutableProtocolState is the read-write interface for protocol state. It allows evolving the protocol state by
+// creating a StateMutator for each block and applying state-changing service events.
 type MutableProtocolState interface {
 	ProtocolState
 
@@ -107,17 +109,19 @@ type MutableProtocolState interface {
 //
 // Not safe for concurrent use.
 type StateMutator interface {
-	// Build returns:
-	//   - hasChanges: flag whether there were any changes; otherwise, `updatedState` and `stateID` equal the parent state
-	//   - updatedState: the ProtocolState after applying all updates.
-	//   - stateID: the hash commitment to the `updatedState`
-	//   - dbUpdates: database updates necessary for persisting the updated protocol state's *dependencies*.
-	//     If hasChanges is false, updatedState is empty. Caution: persisting the `updatedState` itself and adding
-	//     it to the relevant indices is _not_ in `dbUpdates`. Persisting and indexing `updatedState` is the responsibility
-	//     of the calling code (specifically `FollowerState`).
+	// Build constructs the resulting protocol state, *after* applying all the sealed service events in a block (under construction)
+	// via `ApplyServiceEventsFromValidatedSeals(...)`. It returns:
+	//  - stateID: the hash commitment to the updated Protocol State Snapshot
+	//  - dbUpdates: database updates necessary for persisting the State Snapshot itself including all data structures
+	//    that the Snapshot references. In addition, `dbUpdates` also populates the `ProtocolKVStore.ByBlockID`.
+	//    Therefore, even if there are no changes of the Protocol State, `dbUpdates` still contains deferred storage writes
+	//    that must be executed to populate the `ByBlockID` index.
+	//  - err: All error returns indicate potential state corruption and should therefore be treated as fatal.
 	//
-	// updated protocol state entry, state ID and a flag indicating if there were any changes.
-	Build() (hasChanges bool, updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, dbUpdates []transaction.DeferredDBUpdate)
+	// CAUTION:
+	//  - For Consensus Participants that are replicas, the calling code must check that the returned `stateID` matches the
+	//    commitment in the block proposal! If they don't match, the proposal is byzantine and should be slashed.
+	Build() (stateID flow.Identifier, dbUpdates DeferredBlockPersistOps, err error)
 
 	// ApplyServiceEventsFromValidatedSeals applies the state changes that are delivered via
 	// sealed service events:
@@ -176,4 +180,45 @@ type StateMutator interface {
 	//     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 	//     of this function is not nil. If such an exception is returned, continuing is not an option.
 	ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) error
+}
+
+// DeferredBlockPersistOp is a database update function which is dependent on a candidate block ID.
+// Internally to the protocol_state package we don't have access to the candidate block ID yet because
+// we are still determining the protocol state ID for that block.
+type DeferredBlockPersistOp func(tx *transaction.Tx, blockID flow.Identifier) error
+
+// DeferredBlockPersistOps is a wrapper around `transaction.DeferredDBUpdate` which additionally
+// supports deferring database operations which depend on the not-yet-determined candidate block ID.
+// Once the protocol state for the candidate block is built, we can compute the candidate block ID and use
+// `Decorate` to contextualize the deferred operations with the appropriate block ID.
+type DeferredBlockPersistOps struct {
+	innerUpdates []DeferredBlockPersistOp
+}
+
+func (d *DeferredBlockPersistOps) Add(update ...DeferredBlockPersistOp) {
+	d.innerUpdates = append(d.innerUpdates, update...)
+}
+
+func (d *DeferredBlockPersistOps) Merge(other DeferredBlockPersistOps) {
+	d.innerUpdates = append(d.innerUpdates, other.innerUpdates...)
+}
+
+func (d *DeferredBlockPersistOps) AddBadgerUpdate(update ...transaction.DeferredDBUpdate) {
+	for _, u := range update {
+		u := u
+		d.innerUpdates = append(d.innerUpdates, func(tx *transaction.Tx, _ flow.Identifier) error {
+			return u(tx)
+		})
+	}
+}
+
+func (d *DeferredBlockPersistOps) Decorate(blockID flow.Identifier) []transaction.DeferredDBUpdate {
+	updates := make([]transaction.DeferredDBUpdate, 0, len(d.innerUpdates))
+	for _, update := range d.innerUpdates {
+		update := update
+		updates = append(updates, func(tx *transaction.Tx) error {
+			return update(tx, blockID)
+		})
+	}
+	return updates
 }

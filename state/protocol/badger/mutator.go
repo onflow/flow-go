@@ -608,18 +608,14 @@ func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow
 	}
 
 	// verify Protocol State commitment in the candidate block matches the locally-constructed value
-	hasChanges, updatedState, updatedStateID, dbUpdates := stateMutator.Build()
+	updatedStateID, dbUpdates, err := stateMutator.Build()
+	if err != nil {
+		return fmt.Errorf("could not build dynamic protocol state: %w", err)
+	}
 	if updatedStateID != candidate.Payload.ProtocolStateID {
 		return state.NewInvalidExtensionErrorf("invalid protocol state commitment %x in block, which should be %x", candidate.Payload.ProtocolStateID, updatedStateID)
 	}
-
-	// Schedule deferred database operations to index the protocol state by the candidate block's ID
-	// and persist the new protocol state (if there are any changes)
-	deferredDbOps.AddDbOp(m.protocolStateSnapshotsDB.Index(candidate.ID(), updatedStateID))
-	if hasChanges {
-		deferredDbOps.AddDbOp(operation.SkipDuplicatesTx(m.protocolStateSnapshotsDB.StoreTx(updatedStateID, updatedState)))
-		deferredDbOps.AddDbOps(dbUpdates...)
-	}
+	deferredDbOps.AddDbOps(dbUpdates.Decorate(candidate.ID())...)
 	return nil
 }
 

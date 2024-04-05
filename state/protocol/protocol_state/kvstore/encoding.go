@@ -26,9 +26,9 @@ func VersionedDecode(version uint64, bz []byte) (protocol_state.KVStoreAPI, erro
 	var target protocol_state.KVStoreAPI
 	switch version {
 	case 0:
-		target = new(modelv0)
+		target = new(Modelv0)
 	case 1:
-		target = new(modelv1)
+		target = new(Modelv1)
 	default:
 		return nil, ErrUnsupportedVersion
 	}

@@ -67,6 +67,7 @@ func (suite *SnapshotSuite) SetupTest() {
 		all.Setups,
 		all.EpochCommits,
 		all.ProtocolState,
+		all.ProtocolKVStore,
 		all.VersionBeacons,
 		root,
 	)

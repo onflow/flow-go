@@ -136,6 +136,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	refNode := tc.nodes[0]
 	stateMutator := protocol_state.NewMutableProtocolState(
 		refNode.ProtocolStateSnapshots,
+		refNode.ProtocolKVStore,
 		refNode.State.Params(),
 		refNode.Headers,
 		refNode.Results,

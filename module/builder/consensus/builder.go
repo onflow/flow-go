@@ -643,7 +643,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	if err != nil {
 		return nil, fmt.Errorf("could not apply service events as leader: %w", err)
 	}
-	_, _, protocolStateID, _ := stateMutator.Build()
+	protocolStateID, _, err := stateMutator.Build()
 	if err != nil {
 		return nil, fmt.Errorf("could not build updated protocol state: %w", err)
 	}

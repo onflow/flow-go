@@ -397,6 +397,8 @@ func (c *Container) OpenState() (*state.State, error) {
 	commits := storage.NewEpochCommits(metrics, db)
 	protocolState := storage.NewProtocolState(metrics, setups, commits, db,
 		storage.DefaultProtocolStateCacheSize, storage.DefaultProtocolStateByBlockIDCacheSize)
+	protocolKVStates := storage.NewProtocolKVStore(metrics, db,
+		storage.DefaultProtocolKVStoreCacheSize, storage.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeacons := storage.NewVersionBeacons(db)
 
 	return state.OpenState(
@@ -410,6 +412,7 @@ func (c *Container) OpenState() (*state.State, error) {
 		setups,
 		commits,
 		protocolState,
+		protocolKVStates,
 		versionBeacons,
 	)
 }

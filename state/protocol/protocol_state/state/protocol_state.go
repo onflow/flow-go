@@ -6,7 +6,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -50,10 +52,10 @@ func (s *ProtocolState) GlobalParams() protocol.GlobalParams {
 // by acting as factory for protocol.StateMutator which can be used to apply state-changing operations.
 type MutableProtocolState struct {
 	ProtocolState
-	headers storage.Headers
-	results storage.ExecutionResults
-	setups  storage.EpochSetups
-	commits storage.EpochCommits
+	headers          storage.Headers
+	results          storage.ExecutionResults
+	kvStoreSnapshots storage.ProtocolKVStore
+	kvStoreFactories []protocol_state.KeyValueStoreStateMachineFactory
 }
 
 var _ protocol.MutableProtocolState = (*MutableProtocolState)(nil)
@@ -61,18 +63,25 @@ var _ protocol.MutableProtocolState = (*MutableProtocolState)(nil)
 // NewMutableProtocolState creates a new instance of MutableProtocolState.
 func NewMutableProtocolState(
 	protocolStateDB storage.ProtocolState,
+	kvStoreSnapshots storage.ProtocolKVStore,
 	globalParams protocol.GlobalParams,
 	headers storage.Headers,
 	results storage.ExecutionResults,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 ) *MutableProtocolState {
+	// an ordered list of factories to create state machines for different sub-states of the Dynamic Protocol State.
+	// all factories are expected to be called in order defined here.
+	kvStoreFactories := []protocol_state.KeyValueStoreStateMachineFactory{
+		kvstore.NewPSVersionUpgradeStateMachineFactory(globalParams),
+		epochs.NewEpochStateMachineFactory(globalParams, setups, commits, protocolStateDB),
+	}
 	return &MutableProtocolState{
-		ProtocolState: *NewProtocolState(protocolStateDB, globalParams),
-		headers:       headers,
-		results:       results,
-		setups:        setups,
-		commits:       commits,
+		ProtocolState:    *NewProtocolState(protocolStateDB, globalParams),
+		headers:          headers,
+		results:          results,
+		kvStoreSnapshots: kvStoreSnapshots,
+		kvStoreFactories: kvStoreFactories,
 	}
 }
 
@@ -81,23 +90,22 @@ func NewMutableProtocolState(
 // Expected errors during normal operations:
 //   - `storage.ErrNotFound` if no protocol state for parent block is known.
 func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Identifier) (protocol.StateMutator, error) {
-	parentState, err := s.protocolStateDB.ByBlockID(parentID)
+	parentStateData, err := s.kvStoreSnapshots.ByBlockID(parentID)
 	if err != nil {
-		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", parentID, err)
+		return nil, fmt.Errorf("could not query parent KV store at block (%x): %w", parentID, err)
+	}
+	parentState, err := kvstore.VersionedDecode(parentStateData.Version, parentStateData.Data)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode parent protocol state (version=%d) at block (%x): %w",
+			parentStateData.Version, parentID, err)
 	}
 	return newStateMutator(
 		s.headers,
 		s.results,
-		s.setups,
-		s.commits,
-		s.globalParams,
+		s.kvStoreSnapshots,
 		candidateView,
+		parentID,
 		parentState,
-		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.ProtocolStateMachine, error) { // needed for translating from concrete implementation type to interface type
-			return epochs.NewStateMachine(candidateView, parentState)
-		},
-		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.ProtocolStateMachine, error) { // needed for translating from concrete implementation type to interface type
-			return epochs.NewEpochFallbackStateMachine(candidateView, parentState), nil
-		},
+		s.kvStoreFactories...,
 	)
 }

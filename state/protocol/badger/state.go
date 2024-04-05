@@ -13,6 +13,7 @@ import (
 	statepkg "github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -37,10 +38,10 @@ type State struct {
 		setups  storage.EpochSetups
 		commits storage.EpochCommits
 	}
-	params                   protocol.Params
-	protocolStateSnapshotsDB storage.ProtocolState
-	protocolState            protocol.MutableProtocolState
-	versionBeacons           storage.VersionBeacons
+	params                     protocol.Params
+	protocolKVStoreSnapshotsDB storage.ProtocolKVStore
+	protocolState              protocol.MutableProtocolState
+	versionBeacons             storage.VersionBeacons
 
 	// finalizedRootHeight marks the cutoff of the history this node knows about. We cache it in the state
 	// because it cannot change over the lifecycle of a protocol state instance. It is frequently
@@ -94,6 +95,7 @@ func Bootstrap(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	protocolStateSnapshotsDB storage.ProtocolState,
+	protocolKVStoreSnapshots storage.ProtocolKVStore,
 	versionBeacons storage.VersionBeacons,
 	root protocol.Snapshot,
 	options ...BootstrapConfigOptions,
@@ -174,7 +176,7 @@ func Bootstrap(
 		}
 
 		// 6) bootstrap dynamic protocol state
-		err = bootstrapProtocolState(segment, rootProtocolState, protocolStateSnapshotsDB)(tx)
+		err = bootstrapProtocolState(segment, rootProtocolState, protocolStateSnapshotsDB, protocolKVStoreSnapshots)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap protocol state: %w", err)
 		}
@@ -226,6 +228,7 @@ func Bootstrap(
 		setups,
 		commits,
 		protocolStateSnapshotsDB,
+		protocolKVStoreSnapshots,
 		versionBeacons,
 		params,
 	)
@@ -236,7 +239,12 @@ func Bootstrap(
 // dynamic protocol state didn't change in the sealing segment.
 // The root snapshot's sealing segment must not straddle any epoch transitions
 // or epoch phase transitions.
-func bootstrapProtocolState(segment *flow.SealingSegment, rootProtocolState protocol.DynamicProtocolState, protocolState storage.ProtocolState) func(*transaction.Tx) error {
+func bootstrapProtocolState(
+	segment *flow.SealingSegment,
+	rootProtocolState protocol.DynamicProtocolState,
+	protocolState storage.ProtocolState,
+	protocolKVStores storage.ProtocolKVStore,
+) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		rootProtocolStateEntry := rootProtocolState.Entry().ProtocolStateEntry
 		protocolStateID := rootProtocolStateEntry.ID()
@@ -245,15 +253,42 @@ func bootstrapProtocolState(segment *flow.SealingSegment, rootProtocolState prot
 			return fmt.Errorf("could not insert root protocol state: %w", err)
 		}
 
+		// bootstrap KV store
+		// TODO: add proper bootstrapping for the KV store
+		rootKVStore := kvstore.NewLatestKVStore(protocolStateID)
+		version, data, err := rootKVStore.VersionedEncode()
+		if err != nil {
+			return fmt.Errorf("could not encode root KV store: %w", err)
+		}
+		kvStoreStateID := rootKVStore.ID()
+		err = protocolKVStores.StoreTx(kvStoreStateID, &storage.KeyValueStoreData{
+			Version: version,
+			Data:    data,
+		})(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert root kv store: %w", err)
+		}
+
 		// NOTE: as specified in the godoc, this code assumes that each block
-		// in the sealing segment in within the same phase within the same epoch.
+		// in the sealing segment is within the same phase within the same epoch.
 		// the sealing segment.
 		for _, block := range segment.AllBlocks() {
-			err = protocolState.Index(block.ID(), protocolStateID)(tx)
+			// TODO: enable this once the genesis block has state ID from the KV store, not the Epoch Sub-State.
+			//if block.Payload.ProtocolStateID != protocolStateID {
+			//	return fmt.Errorf("block with height %d in sealing segment has mismatching protocol state ID, expecting %x got %x",
+			//		block.Header.Height, protocolStateID, block.Payload.ProtocolStateID)
+			//}
+			blockID := block.ID()
+			err = protocolState.Index(blockID, protocolStateID)(tx)
 			if err != nil {
 				return fmt.Errorf("could not index root protocol state: %w", err)
 			}
+			err = protocolKVStores.IndexTx(blockID, kvStoreStateID)(tx)
+			if err != nil {
+				return fmt.Errorf("could not index root kv store: %w", err)
+			}
 		}
+
 		return nil
 	}
 }
@@ -617,6 +652,7 @@ func OpenState(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	protocolState storage.ProtocolState,
+	protocolKVStoreSnapshots storage.ProtocolKVStore,
 	versionBeacons storage.VersionBeacons,
 ) (*State, error) {
 	isBootstrapped, err := IsBootstrapped(db)
@@ -650,6 +686,7 @@ func OpenState(
 		setups,
 		commits,
 		protocolState,
+		protocolKVStoreSnapshots,
 		versionBeacons,
 		params,
 	)
@@ -761,6 +798,7 @@ func newState(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	protocolStateSnapshots storage.ProtocolState,
+	protocolKVStoreSnapshots storage.ProtocolKVStore,
 	versionBeacons storage.VersionBeacons,
 	params protocol.Params,
 ) (*State, error) {
@@ -779,16 +817,18 @@ func newState(
 			setups:  setups,
 			commits: commits,
 		},
-		params:                   params,
-		protocolStateSnapshotsDB: protocolStateSnapshots,
-		protocolState: protocol_state.NewMutableProtocolState(
-			protocolStateSnapshots,
-			params,
-			headers,
-			results,
-			setups,
-			commits,
-		),
+		params:                     params,
+		protocolKVStoreSnapshotsDB: protocolKVStoreSnapshots,
+		protocolState: protocol_state.
+			NewMutableProtocolState(
+				protocolStateSnapshots,
+				protocolKVStoreSnapshots,
+				params,
+				headers,
+				results,
+				setups,
+				commits,
+			),
 		versionBeacons:     versionBeacons,
 		cachedLatestFinal:  new(atomic.Pointer[cachedHeader]),
 		cachedLatestSealed: new(atomic.Pointer[cachedHeader]),
