@@ -162,12 +162,20 @@ type OrthogonalStoreStateMachine[P any] interface {
 	//   - database updates necessary for persisting the updated protocol sub-state and its *dependencies*.
 	//     It may contain updates for the sub-state itself and for any dependency that is affected by the update.
 	//     Deferred updates must be applied in a transaction to ensure atomicity.
-	Build() protocol.DeferredDBUpdates
+	Build() protocol.DeferredBlockPersistOps
 
-	// ProcessUpdate processes an ordered list of sealed service events.
-	// Usually, each state machine performs filtering of relevant events and ignores all other events.
+	// EvolveState applies the state change(s) on sub-state P for the candidate block (under construction).
+	// Information that potentially changes the Epoch state (compared to the parent block's state):
+	//   - Service Events sealed in the candidate block
+	//   - the candidate block's view (already provided at construction time)
+	//
+	// CAUTION: EvolveState MUST be called for all candidate blocks, even if `sealedServiceEvents` is empty!
+	// This is because also the absence of expected service events by a certain view can also result in the
+	// Epoch state changing. (For example, not having received the EpochCommit event for the next epoch, but
+	// approaching the end of the current epoch.)
+	//
 	// No errors are expected during normal operations.
-	ProcessUpdate(orderedUpdates []flow.ServiceEvent) error
+	EvolveState(sealedServiceEvents []flow.ServiceEvent) error
 
 	// View returns the view associated with this state machine.
 	// The view of the state machine equals the view of the block carrying the respective updates.

@@ -95,7 +95,7 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 	s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState)
 	s.happyPathStateMachine.On("Build").Return(s.parentEpochState.ProtocolStateEntry, s.parentEpochState.ID(), false).Once()
 
-	err := s.stateMachine.ProcessUpdate(nil)
+	err := s.stateMachine.EvolveState(nil)
 	require.NoError(s.T(), err)
 
 	indexTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
@@ -140,7 +140,7 @@ func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	storeEpochCommitTx.On("Execute", mocks.Anything).Return(nil).Once()
 	s.commitsDB.On("StoreTx", epochCommit).Return(storeEpochCommitTx.Execute, nil).Once()
 
-	err := s.stateMachine.ProcessUpdate([]flow.ServiceEvent{epochSetup.ServiceEvent(), epochCommit.ServiceEvent()})
+	err := s.stateMachine.EvolveState([]flow.ServiceEvent{epochSetup.ServiceEvent(), epochCommit.ServiceEvent()})
 	require.NoError(s.T(), err)
 
 	// prepare a DB update for epoch state
@@ -164,11 +164,14 @@ func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 }
 
 // TestEpochStateMachine_Constructor tests the behavior of the EpochStateMachine constructor.
-// We expect the constructor to select the appropriate internal state machine constructor, and
-// to handle (pass-through) exceptions from the internal state machine constructor.
+// Specifically, we test the scenario, where the EpochCommit Service Event is still missing
+// by the time we cross the `EpochCommitSafetyThreshold`. We expect the constructor to select the
+// appropriate internal state machine constructor (HappyPathStateMachine before the threshold
+// and FallbackStateMachine when reaching or exceeding the view threshold).
+// Any exceptions encountered when constructing the internal state machines should be passed up.
 func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 	s.Run("EpochStaking phase", func() {
-		// Since we are before the epoch commitment deadline, we should use the happy-path state machine
+		// Since we are before the epoch commitment deadline, we should instantiate a happy-path state machine
 		s.Run("before commitment deadline", func() {
 			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
 			// expect to be called
@@ -226,7 +229,7 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 		s.parentEpochState.NextEpochCommit = nil
 		s.parentEpochState.NextEpoch.CommitID = flow.ZeroID
 
-		// Since we are before the epoch commitment deadline, we should use the happy-path state machine
+		// Since we are before the epoch commitment deadline, we should instantiate a happy-path state machine
 		s.Run("before commitment deadline", func() {
 			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
 			// don't expect to be called
@@ -281,7 +284,7 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 
 	s.Run("EpochCommitted phase", func() {
 		s.parentEpochState = unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
-		// Since we are before the epoch commitment deadline, we should use the happy-path state machine
+		// Since we are before the epoch commitment deadline, we should instantiate a happy-path state machine
 		s.Run("before commitment deadline", func() {
 			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
 			// expect to be called
@@ -383,9 +386,10 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 	})
 }
 
-// TestProcessUpdate_InvalidEpochSetup tests that hierarchical state machine rejects invalid epoch setup event and
-// replaces the happy path state machine with the fallback state machine.
-func (s *EpochStateMachineSuite) TestProcessUpdate_InvalidEpochSetup() {
+// TestEvolveState_InvalidEpochSetup tests that hierarchical state machine rejects invalid epoch setup events
+// (indicated by `InvalidServiceEventError` sentinel error) and replaces the happy path state machine with the
+// fallback state machine. Errors other than `InvalidServiceEventError` should be bubbled up as exceptions.
+func (s *EpochStateMachineSuite) TestEvolveState_InvalidEpochSetup() {
 	s.Run("invalid-epoch-setup", func() {
 		happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
 		happyPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).Return(s.happyPathStateMachine, nil).Once()
@@ -414,7 +418,7 @@ func (s *EpochStateMachineSuite) TestProcessUpdate_InvalidEpochSetup() {
 		fallbackStateMachine.On("ProcessEpochSetup", epochSetup).Return(false, nil).Once()
 		fallbackPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).Return(fallbackStateMachine, nil).Once()
 
-		err = stateMachine.ProcessUpdate([]flow.ServiceEvent{epochSetup.ServiceEvent()})
+		err = stateMachine.EvolveState([]flow.ServiceEvent{epochSetup.ServiceEvent()})
 		require.NoError(s.T(), err)
 	})
 	s.Run("process-epoch-setup-exception", func() {
@@ -423,15 +427,16 @@ func (s *EpochStateMachineSuite) TestProcessUpdate_InvalidEpochSetup() {
 		exception := errors.New("exception")
 		s.happyPathStateMachine.On("ProcessEpochSetup", epochSetup).Return(false, exception).Once()
 
-		err := s.stateMachine.ProcessUpdate([]flow.ServiceEvent{epochSetup.ServiceEvent()})
+		err := s.stateMachine.EvolveState([]flow.ServiceEvent{epochSetup.ServiceEvent()})
 		require.Error(s.T(), err)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 }
 
-// TestProcessUpdate_InvalidEpochCommit tests that hierarchical state machine rejects invalid epoch commit event and
-// replaces the happy path state machine with the fallback state machine.
-func (s *EpochStateMachineSuite) TestProcessUpdate_InvalidEpochCommit() {
+// TestEvolveState_InvalidEpochCommit tests that hierarchical state machine rejects invalid epoch commit events
+// (indicated by `InvalidServiceEventError` sentinel error) and replaces the happy path state machine with the
+// fallback state machine. Errors other than `InvalidServiceEventError` should be bubbled up as exceptions.
+func (s *EpochStateMachineSuite) TestEvolveState_InvalidEpochCommit() {
 	s.Run("invalid-epoch-commit", func() {
 		happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
 		happyPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).Return(s.happyPathStateMachine, nil).Once()
@@ -460,7 +465,7 @@ func (s *EpochStateMachineSuite) TestProcessUpdate_InvalidEpochCommit() {
 		fallbackStateMachine.On("ProcessEpochCommit", epochCommit).Return(false, nil).Once()
 		fallbackPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).Return(fallbackStateMachine, nil).Once()
 
-		err = stateMachine.ProcessUpdate([]flow.ServiceEvent{epochCommit.ServiceEvent()})
+		err = stateMachine.EvolveState([]flow.ServiceEvent{epochCommit.ServiceEvent()})
 		require.NoError(s.T(), err)
 	})
 	s.Run("process-epoch-commit-exception", func() {
@@ -469,28 +474,28 @@ func (s *EpochStateMachineSuite) TestProcessUpdate_InvalidEpochCommit() {
 		exception := errors.New("exception")
 		s.happyPathStateMachine.On("ProcessEpochCommit", epochCommit).Return(false, exception).Once()
 
-		err := s.stateMachine.ProcessUpdate([]flow.ServiceEvent{epochCommit.ServiceEvent()})
+		err := s.stateMachine.EvolveState([]flow.ServiceEvent{epochCommit.ServiceEvent()})
 		require.Error(s.T(), err)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 }
 
-// TestProcessUpdateTransitionToNextEpoch tests that EpochStateMachine transitions to the next epoch
+// TestEvolveStateTransitionToNextEpoch tests that EpochStateMachine transitions to the next epoch
 // when the epoch has been committed, and we are at the first block of the next epoch.
-func (s *EpochStateMachineSuite) TestProcessUpdateTransitionToNextEpoch() {
+func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch() {
 	parentState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
 	s.happyPathStateMachine.On("ParentState").Unset()
 	s.happyPathStateMachine.On("ParentState").Return(parentState)
 	// we are at the first block of the next epoch
 	s.happyPathStateMachine.On("View").Return(parentState.CurrentEpochSetup.FinalView + 1)
 	s.happyPathStateMachine.On("TransitionToNextEpoch").Return(nil).Once()
-	err := s.stateMachine.ProcessUpdate(nil)
+	err := s.stateMachine.EvolveState(nil)
 	require.NoError(s.T(), err)
 }
 
-// TestProcessUpdateTransitionToNextEpoch_Error tests that error that has been
+// TestEvolveStateTransitionToNextEpoch_Error tests that error that has been
 // observed when transitioning to the next epoch and propagated to the caller.
-func (s *EpochStateMachineSuite) TestProcessUpdateTransitionToNextEpoch_Error() {
+func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_Error() {
 	parentState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
 	s.happyPathStateMachine.On("ParentState").Unset()
 	s.happyPathStateMachine.On("ParentState").Return(parentState)
@@ -498,14 +503,14 @@ func (s *EpochStateMachineSuite) TestProcessUpdateTransitionToNextEpoch_Error() 
 	s.happyPathStateMachine.On("View").Return(parentState.CurrentEpochSetup.FinalView + 1)
 	exception := errors.New("exception")
 	s.happyPathStateMachine.On("TransitionToNextEpoch").Return(exception).Once()
-	err := s.stateMachine.ProcessUpdate(nil)
+	err := s.stateMachine.EvolveState(nil)
 	require.ErrorIs(s.T(), err, exception)
 	require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 }
 
-// TestProcessUpdate_EventsAreFiltered tests that EpochStateMachine filters out all events that are not expected.
-func (s *EpochStateMachineSuite) TestProcessUpdate_EventsAreFiltered() {
-	err := s.stateMachine.ProcessUpdate([]flow.ServiceEvent{
+// TestEvolveState_EventsAreFiltered tests that EpochStateMachine filters out all events that are not expected.
+func (s *EpochStateMachineSuite) TestEvolveState_EventsAreFiltered() {
+	err := s.stateMachine.EvolveState([]flow.ServiceEvent{
 		unittest.ProtocolStateVersionUpgradeFixture().ServiceEvent(),
 	})
 	require.NoError(s.T(), err)

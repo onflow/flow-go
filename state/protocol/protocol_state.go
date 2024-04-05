@@ -121,7 +121,7 @@ type StateMutator interface {
 	// CAUTION:
 	//  - For Consensus Participants that are replicas, the calling code must check that the returned `stateID` matches the
 	//    commitment in the block proposal! If they don't match, the proposal is byzantine and should be slashed.
-	Build() (stateID flow.Identifier, dbUpdates DeferredDBUpdates, err error)
+	Build() (stateID flow.Identifier, dbUpdates DeferredBlockPersistOps, err error)
 
 	// ApplyServiceEventsFromValidatedSeals applies the state changes that are delivered via
 	// sealed service events:
@@ -182,21 +182,28 @@ type StateMutator interface {
 	ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) error
 }
 
-type DeferredDBUpdate func(tx *transaction.Tx, blockID flow.Identifier) error
+// DeferredBlockPersistOp is a database update function which is dependent on a candidate block ID.
+// Internally to the protocol_state package we don't have access to the candidate block ID yet because
+// we are still determining the protocol state ID for that block.
+type DeferredBlockPersistOp func(tx *transaction.Tx, blockID flow.Identifier) error
 
-type DeferredDBUpdates struct {
-	innerUpdates []DeferredDBUpdate
+// DeferredBlockPersistOps is a wrapper around `transaction.DeferredDBUpdate` which additionally
+// supports deferring database operations which depend on the not-yet-determined candidate block ID.
+// Once the protocol state for the candidate block is built, we can compute the candidate block ID and use
+// `Decorate` to contextualize the deferred operations with the appropriate block ID.
+type DeferredBlockPersistOps struct {
+	innerUpdates []DeferredBlockPersistOp
 }
 
-func (d *DeferredDBUpdates) Add(update ...DeferredDBUpdate) {
+func (d *DeferredBlockPersistOps) Add(update ...DeferredBlockPersistOp) {
 	d.innerUpdates = append(d.innerUpdates, update...)
 }
 
-func (d *DeferredDBUpdates) Merge(other DeferredDBUpdates) {
+func (d *DeferredBlockPersistOps) Merge(other DeferredBlockPersistOps) {
 	d.innerUpdates = append(d.innerUpdates, other.innerUpdates...)
 }
 
-func (d *DeferredDBUpdates) AddBadgerUpdate(update ...transaction.DeferredDBUpdate) {
+func (d *DeferredBlockPersistOps) AddBadgerUpdate(update ...transaction.DeferredDBUpdate) {
 	for _, u := range update {
 		u := u
 		d.innerUpdates = append(d.innerUpdates, func(tx *transaction.Tx, _ flow.Identifier) error {
@@ -205,7 +212,7 @@ func (d *DeferredDBUpdates) AddBadgerUpdate(update ...transaction.DeferredDBUpda
 	}
 }
 
-func (d *DeferredDBUpdates) Decorate(blockID flow.Identifier) []transaction.DeferredDBUpdate {
+func (d *DeferredBlockPersistOps) Decorate(blockID flow.Identifier) []transaction.DeferredDBUpdate {
 	updates := make([]transaction.DeferredDBUpdate, 0, len(d.innerUpdates))
 	for _, update := range d.innerUpdates {
 		update := update

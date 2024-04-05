@@ -78,7 +78,7 @@ func (s *StateMutatorSuite) TestBuild_HappyPath() {
 		stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol_state.KVStoreReader](s.T())
 		deferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
 		deferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
-		deferredDBUpdates := protocol.DeferredDBUpdates{}
+		deferredDBUpdates := protocol.DeferredBlockPersistOps{}
 		deferredDBUpdates.AddBadgerUpdate(deferredUpdate.Execute)
 		stateMachine.On("Build").Return(deferredDBUpdates)
 		factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, s.replicatedState).Return(stateMachine, nil)

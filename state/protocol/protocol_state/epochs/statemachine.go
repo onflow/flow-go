@@ -92,7 +92,7 @@ type EpochStateMachine struct {
 	setups           storage.EpochSetups
 	commits          storage.EpochCommits
 	protocolStateDB  storage.ProtocolState
-	pendingDbUpdates protocol.DeferredDBUpdates
+	pendingDbUpdates protocol.DeferredBlockPersistOps
 }
 
 var _ protocol_state.KeyValueStoreStateMachine = (*EpochStateMachine)(nil)
@@ -164,7 +164,7 @@ func NewEpochStateMachine(
 // but the actual epoch state is stored separately, nevertheless, the epoch state ID is used to sanity check if the
 // epoch state is consistent with the KV Store. Using this approach, we commit the epoch sub-state to the KV Store which in
 // affects the Dynamic Protocol State ID which is essentially hash of the KV Store.
-func (e *EpochStateMachine) Build() protocol.DeferredDBUpdates {
+func (e *EpochStateMachine) Build() protocol.DeferredBlockPersistOps {
 	updatedEpochState, updatedStateID, hasChanges := e.activeStateMachine.Build()
 	dbUpdates := e.pendingDbUpdates
 	dbUpdates.Add(func(tx *transaction.Tx, blockID flow.Identifier) error {
@@ -178,17 +178,21 @@ func (e *EpochStateMachine) Build() protocol.DeferredDBUpdates {
 	return dbUpdates
 }
 
-// ProcessUpdate applies the state changes that are delivered via sealed service events.
+// EvolveState applies the state changes that are delivered via sealed service events.
 // The block's payload might contain epoch preparation service events for the next
 // epoch. In this case, we need to update the tentative protocol state.
 // We need to validate whether all information is available in the protocol
 // state to go to the next epoch when needed. In cases where there is a bug
 // in the smart contract, it could be that this happens too late, and we should trigger epoch fallback mode.
 // No errors are expected during normal operations.
-func (e *EpochStateMachine) ProcessUpdate(update []flow.ServiceEvent) error {
+func (e *EpochStateMachine) EvolveState(update []flow.ServiceEvent) error {
 	parentProtocolState := e.activeStateMachine.ParentState()
 
 	// perform protocol state transition to next epoch if next epoch is committed, and we are at first block of epoch
+	// TODO: The current implementation has edge cases for future light clients and can potentially drive consensus
+	//       into an irreconcilable state (not sure). See for details https://github.com/onflow/flow-go/issues/5631
+	//       These edge cases are very unlikely, so this is an acceptable implementation in the short - mid term.
+	//       However, this code will likely need to be changed when working on EFM recovery.
 	phase := parentProtocolState.EpochPhase()
 	if phase == flow.EpochPhaseCommitted {
 		activeSetup := parentProtocolState.CurrentEpochSetup

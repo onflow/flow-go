@@ -93,14 +93,14 @@ func newStateMutator(
 // CAUTION:
 //   - For Consensus Participants that are replicas, the calling code must check that the returned `stateID` matches the
 //     commitment in the block proposal! If they don't match, the proposal is byzantine and should be slashed.
-func (m *stateMutator) Build() (stateID flow.Identifier, dbUpdates protocol.DeferredDBUpdates, err error) {
+func (m *stateMutator) Build() (stateID flow.Identifier, dbUpdates protocol.DeferredBlockPersistOps, err error) {
 	for _, stateMachine := range m.orthoKVStoreMachines {
 		dbUpdates.Merge(stateMachine.Build())
 	}
 	stateID = m.kvMutator.ID()
 	version, data, err := m.kvMutator.VersionedEncode()
 	if err != nil {
-		return flow.ZeroID, protocol.DeferredDBUpdates{}, fmt.Errorf("could not encode protocol state: %w", err)
+		return flow.ZeroID, protocol.DeferredBlockPersistOps{}, fmt.Errorf("could not encode protocol state: %w", err)
 	}
 
 	// Schedule deferred database operations to index the protocol state by the candidate block's ID
@@ -201,9 +201,9 @@ func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) 
 
 	for _, stateMachine := range m.orthoKVStoreMachines {
 		// only exceptions should be propagated
-		err := stateMachine.ProcessUpdate(orderedUpdates)
+		err := stateMachine.EvolveState(orderedUpdates)
 		if err != nil {
-			return fmt.Errorf("could not process service events: %w", err)
+			return fmt.Errorf("could not process protocol state change for candidate block: %w", err)
 		}
 	}
 

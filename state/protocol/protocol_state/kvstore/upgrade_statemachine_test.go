@@ -49,12 +49,12 @@ func (s *StateMachineSuite) TestInitialInvariants() {
 	require.Equal(s.T(), s.parentState, s.stateMachine.ParentState())
 }
 
-// TestProcessUpdate_ProtocolStateVersionUpgrade ensures that state machine can process protocol state version upgrade event.
+// TestEvolveState_ProtocolStateVersionUpgrade ensures that state machine can process protocol state version upgrade event.
 // It checks several cases including
 // * happy path - valid upgrade version and activation view
 // * invalid upgrade version - has to return sentinel error since version is invalid
 // * invalid activation view - has to return sentinel error since activation view doesn't meet threshold.
-func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
+func (s *StateMachineSuite) TestEvolveState_ProtocolStateVersionUpgrade() {
 	s.Run("happy-path", func() {
 		oldVersion := uint64(0)
 		s.parentState.On("GetProtocolStateVersion").Return(oldVersion)
@@ -70,7 +70,7 @@ func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
 			ActivationView: upgrade.ActiveView,
 		}).Return()
 
-		err := s.stateMachine.ProcessUpdate([]flow.ServiceEvent{upgrade.ServiceEvent()})
+		err := s.stateMachine.EvolveState([]flow.ServiceEvent{upgrade.ServiceEvent()})
 		require.NoError(s.T(), err)
 	})
 	s.Run("invalid-protocol-state-version", func() {
@@ -83,7 +83,7 @@ func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
 		upgrade.ActiveView = s.view + s.params.EpochCommitSafetyThreshold() + 1
 		upgrade.NewProtocolStateVersion = oldVersion
 
-		err := s.stateMachine.ProcessUpdate([]flow.ServiceEvent{upgrade.ServiceEvent()})
+		err := s.stateMachine.EvolveState([]flow.ServiceEvent{upgrade.ServiceEvent()})
 		require.ErrorIs(s.T(), err, ErrInvalidUpgradeVersion, "has to be expected sentinel")
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err), "has to be expected sentinel")
 	})
@@ -93,7 +93,7 @@ func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
 		upgrade := unittest.ProtocolStateVersionUpgradeFixture()
 		upgrade.ActiveView = s.view + s.params.EpochCommitSafetyThreshold()
 
-		err := s.stateMachine.ProcessUpdate([]flow.ServiceEvent{upgrade.ServiceEvent()})
+		err := s.stateMachine.EvolveState([]flow.ServiceEvent{upgrade.ServiceEvent()})
 		require.ErrorIs(s.T(), err, ErrInvalidActivationView, "has to be expected sentinel")
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err), "has to be expected sentinel")
 	})

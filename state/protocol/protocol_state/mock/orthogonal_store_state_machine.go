@@ -15,14 +15,28 @@ type OrthogonalStoreStateMachine[P interface{}] struct {
 }
 
 // Build provides a mock function with given fields:
-func (_m *OrthogonalStoreStateMachine[P]) Build() protocol.DeferredDBUpdates {
+func (_m *OrthogonalStoreStateMachine[P]) Build() protocol.DeferredBlockPersistOps {
 	ret := _m.Called()
 
-	var r0 protocol.DeferredDBUpdates
-	if rf, ok := ret.Get(0).(func() protocol.DeferredDBUpdates); ok {
+	var r0 protocol.DeferredBlockPersistOps
+	if rf, ok := ret.Get(0).(func() protocol.DeferredBlockPersistOps); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(protocol.DeferredDBUpdates)
+		r0 = ret.Get(0).(protocol.DeferredBlockPersistOps)
+	}
+
+	return r0
+}
+
+// EvolveState provides a mock function with given fields: sealedServiceEvents
+func (_m *OrthogonalStoreStateMachine[P]) EvolveState(sealedServiceEvents []flow.ServiceEvent) error {
+	ret := _m.Called(sealedServiceEvents)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]flow.ServiceEvent) error); ok {
+		r0 = rf(sealedServiceEvents)
+	} else {
+		r0 = ret.Error(0)
 	}
 
 	return r0
@@ -37,20 +51,6 @@ func (_m *OrthogonalStoreStateMachine[P]) ParentState() P {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(P)
-	}
-
-	return r0
-}
-
-// ProcessUpdate provides a mock function with given fields: orderedUpdates
-func (_m *OrthogonalStoreStateMachine[P]) ProcessUpdate(orderedUpdates []flow.ServiceEvent) error {
-	ret := _m.Called(orderedUpdates)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func([]flow.ServiceEvent) error); ok {
-		r0 = rf(orderedUpdates)
-	} else {
-		r0 = ret.Error(0)
 	}
 
 	return r0
