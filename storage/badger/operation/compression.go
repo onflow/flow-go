@@ -1,6 +1,7 @@
 package operation
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
@@ -24,8 +25,13 @@ func TraverseKeyValues(allKeyVals chan<- *KeyValue, db *badger.DB) error {
 		options := badger.DefaultIteratorOptions
 		it := tx.NewIterator(options)
 		defer it.Close()
+		maxKey := makePrefix(codeMax)
 		for it.Seek(nil); it.Valid(); it.Next() {
 			item := it.Item()
+			if bytes.Equal(item.Key(), maxKey) {
+				continue
+			}
+
 			err := item.Value(func(val []byte) error {
 				allKeyVals <- &KeyValue{
 					key: item.Key(),
@@ -43,6 +49,11 @@ func TraverseKeyValues(allKeyVals chan<- *KeyValue, db *badger.DB) error {
 
 // CompressAndStore takes a channel of key-values and a badger DB and compresses and stores the key-values in the DB
 func CompressAndStore(logger zerolog.Logger, ctx context.Context, keyvals <-chan *KeyValue, db *badger.DB, batchMaxLen int, batchMaxByteSize int) error {
+	err := db.Update(InitMax)
+	if err != nil {
+		return fmt.Errorf("could not initialize max tracker: %w", err)
+	}
+
 	batch := db.NewWriteBatch()
 	batchLen := 0
 	batchByteSize := 0
