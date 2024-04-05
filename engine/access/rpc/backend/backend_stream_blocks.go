@@ -3,11 +3,9 @@ package backend
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -17,16 +15,13 @@ import (
 
 // backendSubscribeBlocks is a struct representing a backend implementation for subscribing to blocks.
 type backendSubscribeBlocks struct {
-	log            zerolog.Logger
-	state          protocol.State
-	blocks         storage.Blocks
-	headers        storage.Headers
-	broadcaster    *engine.Broadcaster
-	sendTimeout    time.Duration
-	responseLimit  float64
-	sendBufferSize int
+	log     zerolog.Logger
+	state   protocol.State
+	blocks  storage.Blocks
+	headers storage.Headers
 
-	blockTracker subscription.BlockTracker
+	subscriptionHandler *subscription.SubscriptionHandler
+	blockTracker        subscription.BlockTracker
 }
 
 // SubscribeBlocksFromStartBlockID subscribes to the finalized or sealed blocks starting at the requested
@@ -201,7 +196,7 @@ func (b *backendSubscribeBlocks) subscribeFromStartBlockID(ctx context.Context, 
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from block id")
 	}
-	return b.subscribe(ctx, nextHeight, getData)
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, getData)
 }
 
 // subscribeFromStartHeight is common method that allows clients to subscribe starting at the requested start block height.
@@ -217,7 +212,7 @@ func (b *backendSubscribeBlocks) subscribeFromStartHeight(ctx context.Context, s
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from block height")
 	}
-	return b.subscribe(ctx, nextHeight, getData)
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, getData)
 }
 
 // subscribeFromLatest is common method that allows clients to subscribe starting at the latest sealed block.
@@ -232,22 +227,7 @@ func (b *backendSubscribeBlocks) subscribeFromLatest(ctx context.Context, getDat
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from latest")
 	}
-	return b.subscribe(ctx, nextHeight, getData)
-}
-
-// subscribe is common method that allows clients to subscribe to different types of data.
-//
-// Parameters:
-// - ctx: The context for the subscription.
-// - nextHeight: The height of the starting block.
-// - getData: The callback used by subscriptions to retrieve data information for the specified height and block status.
-//
-// No errors are expected during normal operation.
-func (b *backendSubscribeBlocks) subscribe(ctx context.Context, nextHeight uint64, getData subscription.GetDataByHeightFunc) subscription.Subscription {
-	sub := subscription.NewHeightBasedSubscription(b.sendBufferSize, nextHeight, getData)
-	go subscription.NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
-
-	return sub
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, getData)
 }
 
 // getBlockResponse returns a GetDataByHeightFunc that retrieves block information for the specified height.
