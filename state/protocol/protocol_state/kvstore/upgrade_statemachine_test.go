@@ -51,9 +51,9 @@ func (s *StateMachineSuite) TestInitialInvariants() {
 
 // TestProcessUpdate_ProtocolStateVersionUpgrade ensures that state machine can process protocol state version upgrade event.
 // It checks several cases including
-// * happy path - valid upgrade version and activation candidateView
+// * happy path - valid upgrade version and activation view
 // * invalid upgrade version - has to return sentinel error since version is invalid
-// * invalid activation candidateView - has to return sentinel error since activation candidateView doesn't meet threshold.
+// * invalid activation view - has to return sentinel error since activation view doesn't meet threshold.
 func (s *StateMachineSuite) TestProcessUpdate_ProtocolStateVersionUpgrade() {
 	s.Run("happy-path", func() {
 		oldVersion := uint64(0)

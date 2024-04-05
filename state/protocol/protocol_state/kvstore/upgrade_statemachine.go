@@ -8,9 +8,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 )
 
-// PSVersionUpgradeStateMachine is a dedicated structure that encapsulates all logic for evolving KV store, based on the content
-// of a new block.
-// PSVersionUpgradeStateMachine processes a subset of service events that are relevant for the KV store, and ignores all other events.
+// PSVersionUpgradeStateMachine encapsulates the logic for evolving the version of the Protocol State.
+// Specifically, it consumes ProtocolStateVersionUpgrade ServiceEvent that are sealed by the candidate block
+// (possibly still under construction) with the given view.
 // Each relevant event is validated before it is applied to the KV store.
 // All updates are applied to a copy of parent KV store, so parent KV store is not modified.
 // A separate instance should be created for each block to process the updates therein.
@@ -24,7 +24,8 @@ type PSVersionUpgradeStateMachine struct {
 var _ protocol_state.KeyValueStoreStateMachine = (*PSVersionUpgradeStateMachine)(nil)
 
 // NewPSVersionUpgradeStateMachine creates a new state machine to update a specific sub-state of the KV Store.
-// It performs
+// It schedules protocol state version upgrades upon receiving a `ProtocolStateVersionUpgrade` event.
+// The actual model upgrade is handled in the upper layer (`ProtocolStateMachine`).
 func NewPSVersionUpgradeStateMachine(
 	candidateView uint64,
 	params protocol.GlobalParams,
@@ -39,7 +40,8 @@ func NewPSVersionUpgradeStateMachine(
 	}
 }
 
-// Build returns updated key-value store model, state ID and a flag indicating if there were any changes.
+// Build is a no-op, because scheduled version upgrades are stored in the KVStore only.
+// (There is no secondary database operations to persist version upgrade data.)
 func (m *PSVersionUpgradeStateMachine) Build() protocol.DeferredDBUpdates {
 	return protocol.DeferredDBUpdates{}
 }
@@ -75,23 +77,24 @@ func (m *PSVersionUpgradeStateMachine) ProcessUpdate(orderedUpdates []flow.Servi
 }
 
 // processSingleEvent performs processing of a single protocol version upgrade event.
-// Expected errors indicating that we have observed and invalid service event from protocol's point of candidateView.
+// Expected errors indicating that we have observed and invalid service event from protocol's point of view.
 //   - `protocol.InvalidServiceEventError` - if the service event is invalid for the current protocol state.
 //
 // All other errors should be treated as exceptions.
 func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.ProtocolStateVersionUpgrade) error {
-	// To switch the protocol version, replica needs to process a block with a candidateView >= activation candidateView.
-	// But we cannot activate a new version till the block containing the seal is finalized because we cannot switch between chain forks.
+	// To switch the protocol version, replica needs to process a block with a candidateView >= activation view.
+	// But we cannot activate a new version till the block containing the seal is finalized, because when
+	// switching between forks with different highest views, we do not want to switch forth and back between versions. 
 	// The problem is that finality is local to each node due to the nature of the consensus algorithm itself.
 	// We would like to guarantee that all nodes switch the protocol version at exactly the same block.
 	// To guarantee that all nodes switch the protocol version at exactly the same block, we require that the
-	// activation candidateView is higher than the sealing candidateView + Δ when accepting the event. Δ represents the finalization lag
+	// activation view is higher than the candidateView + Δ when accepting the event. Δ represents the finalization lag
 	// to give time for replicas to finalize the block containing the seal for the version upgrade event.
-	// When replica reaches activation candidateView and the latest finalized protocol state knows about the version upgrade,
-	// then it's safe to switch the protocol version.
+	// When replica reaches (or exceeds) the activation view *and* the latest finalized protocol state knows
+	// about the version upgrade, only then it's safe to switch the protocol version.
 	if m.candidateView+m.params.EpochCommitSafetyThreshold() >= versionUpgrade.ActiveView {
-		return protocol.NewInvalidServiceEventErrorf("invalid protocol state version upgrade candidateView %d -> %d: %w",
-			m.candidateView+m.params.EpochCommitSafetyThreshold(), versionUpgrade.ActiveView, ErrInvalidActivationView)
+		return protocol.NewInvalidServiceEventErrorf("view %d triggering version upgrade must be at least %d views in the future of current view %d: %w",
+			versionUpgrade.ActiveView, m.params.EpochCommitSafetyThreshold(), m.candidateView, ErrInvalidActivationView)
 	}
 
 	if m.parentState.GetProtocolStateVersion() >= versionUpgrade.NewProtocolStateVersion {
@@ -99,9 +102,9 @@ func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.P
 			m.parentState.GetProtocolStateVersion(), versionUpgrade.NewProtocolStateVersion, ErrInvalidUpgradeVersion)
 	}
 
-	// checkPendingUpgrade checks if there is a pending upgrade in the state and validates if we can set the new upgrade.
-	// We allow setting version upgrade if all the conditions are met:
-	// (i) the activation candidateView is higher than the current candidateView + Δ.
+	// checkPendingUpgrade checks if there is a pending upgrade in the state and validates if we can accept the upgrade request.
+	// We allow setting version upgrade if all of the following conditions are met:
+	// (i) the activation view is bigger than or equal to the current candidate block's view + Δ.
 	// (ii) if there is a pending upgrade, the new version should be the same as the pending upgrade.
 	// Condition (ii) is checked in this function.
 	checkPendingUpgrade := func(store protocol_state.KVStoreReader) error {

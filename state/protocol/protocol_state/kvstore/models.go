@@ -62,7 +62,7 @@ var _ protocol_state.KVStoreMutator = (*Modelv0)(nil)
 func (model *Modelv0) ID() flow.Identifier { return flow.MakeID(model) }
 
 // Replicate instantiates a Protocol State Snapshot of the given `protocolVersion`.
-// It clones existing snapshot if `protocolVersion = 0` and performs a migration if `protocolVersion = 1`.
+// It clones existing snapshot and performs a migration if `protocolVersion = 1`.
 // Expected errors during normal operations:
 //   - ErrIncompatibleVersionChange if replicating the Parent Snapshot into a Snapshot
 //     with the specified `protocolVersion` is not supported.
