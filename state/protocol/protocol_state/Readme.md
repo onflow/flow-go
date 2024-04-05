@@ -29,10 +29,10 @@ There is no information exchange between the state machines; one state machines 
 of another.
 
 We emphasize that this architecture choice does not prevent us of from implementing sequential state
-machines for certain use-cases. For example: state machine A provides its output as input to another
-state machine B. Here, the order of running the state machines matter. This order-dependency is not
-supported by the Protocol State, which executed the state machines in an arbitrary order. Therefore,
-if we need state machines to be executed in some order, we have bundle them into one composite state
+machines for certain use-cases. For example: state machine $A$ provides its output as input to another
+state machine $B$. Here, the order of running the state machines matters. This order-dependency is not
+supported by the Protocol State, which executes the state machines in an arbitrary order. Therefore,
+if we need state machines to be executed in some specific order, we have to bundle them into one composite state
 machine (conceptually a processing pipeline) by hand. The composite state machine's execution as a
 whole can then be managed by the Protocol State, because the composite state machine is orthogonal
 to all other remaining state machines.
@@ -40,7 +40,7 @@ Requiring all State Machines to be orthogonal is a deliberate design choice. The
 favouring modularity and strong logical independence. This is very beneficial for managing complexity
 in the long term.
 
-Key-Value-Store:
+### Key-Value-Store:
 The Flow protocol defines the Key-Value-Store's state $\mathcal{P}$ as the composition of disjoint sub-states
 $P_0, P_1, \ldots, P_j$. Formally, we write $\mathcal{P} = P0 \otimes P1 \otimes \ldots \otimes Pj$, where $'\otimes'$ denotes the product state. We
 loosely associate each $P_0, P_1,\ldots$ with one specific key-value entry in the store. Correspondingly,
