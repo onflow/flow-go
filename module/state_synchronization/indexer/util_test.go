@@ -50,10 +50,10 @@ func TestFindContractUpdates(t *testing.T) {
 
 	assert.Len(t, updates, 2)
 
-	_, ok := updates[expected1.ID()]
+	_, ok := updates[expected1]
 	assert.Truef(t, ok, "could not find %s", expected1.ID())
 
-	_, ok = updates[expected2.ID()]
+	_, ok = updates[expected2]
 	assert.Truef(t, ok, "could not find %s", expected2.ID())
 }
 
