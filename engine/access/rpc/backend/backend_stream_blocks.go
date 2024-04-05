@@ -339,7 +339,7 @@ func (b *backendSubscribeBlocks) getBlock(height uint64, expectedBlockStatus flo
 
 // validateHeight checks if the given block height is valid and available based on the expected block status.
 // Expected errors during normal operation:
-// - subscription.ErrBlockNotReady when unable to retrieve the block by height
+// - subscription.ErrBlockNotReady when unable to retrieve the block by height.
 func (b *backendSubscribeBlocks) validateHeight(height uint64, expectedBlockStatus flow.BlockStatus) error {
 	highestHeight, err := b.blockTracker.GetHighestHeight(expectedBlockStatus)
 	if err != nil {
