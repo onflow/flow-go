@@ -36,15 +36,15 @@ func hasAuthorizedTransaction(collections []*flow.Collection, address flow.Addre
 // findContractUpdates returns a map of common.AddressLocation for all contracts updated within the
 // provided events.
 // No errors are expected during normal operation and indicate an invalid protocol event was encountered
-func findContractUpdates(events []flow.Event) (map[string]struct{}, error) {
-	invalidatedPrograms := make(map[string]struct{})
+func findContractUpdates(events []flow.Event) (map[common.Location]struct{}, error) {
+	invalidatedPrograms := make(map[common.Location]struct{})
 	for _, event := range events {
 		if event.Type == accountContractUpdated {
 			location, err := parseAccountContractUpdated(&event)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse account contract updated event: %w", err)
 			}
-			invalidatedPrograms[location.ID()] = struct{}{}
+			invalidatedPrograms[location] = struct{}{}
 		}
 	}
 	return invalidatedPrograms, nil
@@ -98,7 +98,7 @@ var _ derived.ProgramInvalidator = (*programInvalidator)(nil)
 // this is used to invalidate all programs who's code was updated in a specific block.
 type programInvalidator struct {
 	invalidateAll bool
-	invalidated   map[string]struct{}
+	invalidated   map[common.Location]struct{}
 }
 
 func (inv *programInvalidator) ShouldInvalidateEntries() bool {
@@ -106,7 +106,7 @@ func (inv *programInvalidator) ShouldInvalidateEntries() bool {
 }
 
 func (inv *programInvalidator) ShouldInvalidateEntry(location common.AddressLocation, _ *derived.Program, _ *snapshot.ExecutionSnapshot) bool {
-	_, ok := inv.invalidated[location.ID()]
+	_, ok := inv.invalidated[location]
 	return inv.invalidateAll || ok
 }
 

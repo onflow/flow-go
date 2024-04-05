@@ -22,6 +22,8 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
@@ -35,7 +37,6 @@ import (
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
@@ -251,7 +252,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		scriptExecMaxBlock:           math.MaxUint64,
 		registerCacheType:            pStorage.CacheTypeTwoQueue.String(),
 		registerCacheSize:            0,
-		programCacheSize:             derived.DefaultDerivedDataCacheSize,
+		programCacheSize:             10, // 10 blocks
 	}
 }
 
@@ -1219,7 +1220,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.IntVar(&builder.scriptExecutorConfig.MaxErrorMessageSize,
 			"script-execution-max-error-length",
 			defaultConfig.scriptExecutorConfig.MaxErrorMessageSize,
-			"maximum number characters to include in error message strings. additional characters are truncated. default: 1000")
+			"maximum number characters to include in error message strings. additional characters are truncated. default: 10")
 		flags.DurationVar(&builder.scriptExecutorConfig.LogTimeThreshold,
 			"script-execution-log-time-threshold",
 			defaultConfig.scriptExecutorConfig.LogTimeThreshold,

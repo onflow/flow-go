@@ -69,6 +69,8 @@ func New(
 		batcher:          batcher,
 		registers:        registers,
 		headers:          headers,
+		collections:      collections,
+		transactions:     transactions,
 		events:           events,
 		results:          results,
 		serviceAddress:   chain.ServiceAddress(),
