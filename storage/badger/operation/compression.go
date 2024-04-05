@@ -14,6 +14,7 @@ type KeyValue struct {
 	val []byte
 }
 
+// TraverseKeyValues takes a channel and a badger DB and sends all key-values to the channel
 func TraverseKeyValues(allKeyVals chan<- *KeyValue, db *badger.DB) error {
 	defer func() {
 		close(allKeyVals)
@@ -40,10 +41,12 @@ func TraverseKeyValues(allKeyVals chan<- *KeyValue, db *badger.DB) error {
 	})
 }
 
+// CompressAndStore takes a channel of key-values and a badger DB and compresses and stores the key-values in the DB
 func CompressAndStore(logger zerolog.Logger, ctx context.Context, keyvals <-chan *KeyValue, db *badger.DB, batchMaxLen int, batchMaxByteSize int) error {
 	batch := db.NewWriteBatch()
 	batchLen := 0
 	batchByteSize := 0
+	total := 0
 	for kv := range keyvals {
 		select {
 		case <-ctx.Done():
@@ -53,6 +56,7 @@ func CompressAndStore(logger zerolog.Logger, ctx context.Context, keyvals <-chan
 			if err != nil {
 				return err
 			}
+			total++
 			batchLen++
 			batchByteSize += valSize
 			if batchLen >= batchMaxLen || batchByteSize >= batchMaxByteSize {
@@ -73,6 +77,7 @@ func CompressAndStore(logger zerolog.Logger, ctx context.Context, keyvals <-chan
 			}
 		}
 	}
+	logger.Info().Msgf("finished processing %d key-values", total)
 	return nil
 }
 
