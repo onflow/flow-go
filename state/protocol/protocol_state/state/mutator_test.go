@@ -305,7 +305,7 @@ func (s *StateMutatorSuite) TestApplyServiceEventsFromValidatedSeals() {
 		for i := range factories {
 			factory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
 			stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol_state.KVStoreReader](s.T())
-			stateMachine.On("ProcessUpdate", mock.Anything).Return(nil).Once()
+			stateMachine.On("EvolveState", mock.Anything).Return(nil).Once()
 			factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, s.replicatedState).Return(stateMachine, nil)
 			factories[i] = factory
 		}
@@ -338,7 +338,7 @@ func (s *StateMutatorSuite) TestApplyServiceEventsFromValidatedSeals() {
 		factory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
 		stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol_state.KVStoreReader](s.T())
 		exception := errors.New("exception")
-		stateMachine.On("ProcessUpdate", mock.Anything).Return(exception).Once()
+		stateMachine.On("EvolveState", mock.Anything).Return(exception).Once()
 		factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, s.replicatedState).Return(stateMachine, nil)
 
 		mutator, err := newStateMutator(

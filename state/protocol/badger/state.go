@@ -274,7 +274,8 @@ func bootstrapProtocolState(
 		// the sealing segment.
 		for _, block := range segment.AllBlocks() {
 			if block.Payload.ProtocolStateID != protocolStateID {
-				return fmt.Errorf("block with height %d in sealing segment has mismatching protocol state ID", block.Header.Height)
+				return fmt.Errorf("block with height %d in sealing segment has mismatching protocol state ID",
+					block.Header.Height)
 			}
 			blockID := block.ID()
 			err = protocolState.Index(blockID, protocolStateID)(tx)

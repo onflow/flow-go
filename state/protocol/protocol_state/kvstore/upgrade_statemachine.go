@@ -124,13 +124,12 @@ func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.P
 		return nil
 	}
 
-	// check in case there is a pending upgrade in parent state.
-	err := checkPendingUpgrade(m.parentState)
-	if err != nil {
-		return fmt.Errorf("version upgrade invalid with respect to the parent state: %w", err)
-	}
-	// check in case there are multiple upgrades in the same block.
-	err = checkPendingUpgrade(m.mutator)
+	// There can be multiple `versionUpgrade` Service Events sealed in one block. In case we have _not_
+	// encountered any, `m.mutator` contains the latest `versionUpgrade` as of the parent block, because
+	// we cloned it from the parent state. If we encountered some version upgrades, we already enforced that
+	// they are all upgrades to the same version. So we only need to check that the next `versionUpgrade`
+	// also has the same version.
+	err := checkPendingUpgrade(m.mutator)
 	if err != nil {
 		return fmt.Errorf("version upgrade invalid with respect to the current state: %w", err)
 	}

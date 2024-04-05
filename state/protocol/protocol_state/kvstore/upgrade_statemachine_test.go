@@ -63,7 +63,6 @@ func (s *StateMachineSuite) TestEvolveState_ProtocolStateVersionUpgrade() {
 		upgrade.ActiveView = s.view + s.params.EpochCommitSafetyThreshold() + 1
 		upgrade.NewProtocolStateVersion = oldVersion + 1
 
-		s.parentState.On("GetVersionUpgrade").Return(nil)
 		s.mutator.On("GetVersionUpgrade").Return(nil)
 		s.mutator.On("SetVersionUpgrade", &protocol_state.ViewBasedActivator[uint64]{
 			Data:           upgrade.NewProtocolStateVersion,
