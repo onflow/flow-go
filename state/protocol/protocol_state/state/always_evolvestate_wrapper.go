@@ -22,7 +22,7 @@ type AlwaysEvolveStateWrapper[P any] struct {
 	evolveStateCalled bool
 }
 
-func (a AlwaysEvolveStateWrapper[P]) Build() (*protocol.DeferredBlockPersist, error) {
+func (a *AlwaysEvolveStateWrapper[P]) Build() (*protocol.DeferredBlockPersist, error) {
 	if !a.evolveStateCalled {
 		err := a.OrthogonalStoreStateMachine.EvolveState([]flow.ServiceEvent{})
 		if err != nil {
@@ -33,7 +33,7 @@ func (a AlwaysEvolveStateWrapper[P]) Build() (*protocol.DeferredBlockPersist, er
 	return a.OrthogonalStoreStateMachine.Build()
 }
 
-func (a AlwaysEvolveStateWrapper[P]) EvolveState(sealedServiceEvents []flow.ServiceEvent) error {
+func (a *AlwaysEvolveStateWrapper[P]) EvolveState(sealedServiceEvents []flow.ServiceEvent) error {
 	a.evolveStateCalled = true
 	return a.OrthogonalStoreStateMachine.EvolveState(sealedServiceEvents)
 }

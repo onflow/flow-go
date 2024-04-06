@@ -5,10 +5,10 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
-	ps "github.com/onflow/flow-go/state/protocol"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	ps "github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/utils/unittest"
 )
