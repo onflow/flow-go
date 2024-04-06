@@ -1,14 +1,14 @@
-package protocol_state_test
+package protocol_test
 
 import (
 	"fmt"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	ps "github.com/onflow/flow-go/state/protocol"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	ps "github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/utils/unittest"
 )

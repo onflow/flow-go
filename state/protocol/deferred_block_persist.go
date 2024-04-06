@@ -1,4 +1,4 @@
-package protocol_state
+package protocol
 
 import (
 	"github.com/onflow/flow-go/model/flow"
@@ -8,15 +8,52 @@ import (
 // DeferredBlockPersistOp is a shorthand notation for an anonymous function that takes
 // a fully constructed block and a `transaction.Tx` as inputs and runs some database operations
 // as part of that transaction. It is a "Future Pattern", essentially saying:
-// once we have the completed the block's construction, we populate core
+// once we have the completed the block's construction, we persist data structures that are
+// referenced by the block or populate database indices. This patter is necessary, because
+// internally to the protocol_state package we don't have access to the candidate block ID yet because
+// we are still determining the protocol state ID for that block.
 type DeferredBlockPersistOp func(blockID flow.Identifier, tx *transaction.Tx) error
 
+// WithBlock adds the still missing block ID information to a `DeferredBlockPersistOp`, thereby converting
+// it into a `transaction.DeferredDBUpdate`.
 func (d DeferredBlockPersistOp) WithBlock(blockID flow.Identifier) transaction.DeferredDBUpdate {
 	return func(tx *transaction.Tx) error {
 		return d(blockID, tx)
 	}
 }
 
+// DeferredBlockPersist is a utility for accumulating deferred database interactions that
+// are supposed to be executed in one atomic transaction. It supports:
+//   - Deferred database operations that work directly on Badger transactions.
+//   - Deferred database operations that work on `transaction.Tx`.
+//     Tx is a storage-layer abstraction, with support for callbacks that are executed
+//     after the underlying database transaction completed _successfully_.
+//   - Deferred database operations that depend on the ID of the block under construction
+//     and `transaction.Tx`. Usually, these are operations to populate some `ByBlockID` index.
+//
+// ORDER OF EXECUTION
+// We extend the process in which `transaction.Tx` executes database operations, schedules
+// callbacks, and executed the callbacks. Specifically, DeferredDbOps proceeds as follows:
+//
+//  0. Record functors added via `AddBadgerOp`, `AddDbOp`, `OnSucceed` ...
+//     • some functor's may schedule callbacks (depending on their type), which are executed
+//     after the underlying database transaction completed _successfully_.
+//     • `OnSucceed` is treated exactly the same way:
+//     it schedules a callback during its execution, but it has no database actions.
+//  1. Execute the functors in the order they were added
+//  2. During each functor's execution:
+//     • some functor's may schedule callbacks (depending on their type)
+//     • record those callbacks in the order they are scheduled (no execution yet)
+//  3. If and only if the underlying database transaction succeeds, run the callbacks
+//
+// DESIGN PATTERN
+//   - DeferredDbOps is stateful, i.e. it needs to be passed as pointer variable.
+//   - Do not instantiate Tx directly. Instead, use one of the following
+//     transaction.Update(db, DeferredDbOps.Pending().WithBlock(blockID))
+//     transaction.View(db, DeferredDbOps.Pending().WithBlock(blockID))
+//     operation.RetryOnConflictTx(db, transaction.Update, DeferredDbOps.Pending().WithBlock(blockID))
+//
+// NOT CONCURRENCY SAFE
 type DeferredBlockPersist struct {
 	pending DeferredBlockPersistOp
 }

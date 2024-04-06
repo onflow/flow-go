@@ -22,11 +22,12 @@ type AlwaysEvolveStateWrapper[P any] struct {
 	evolveStateCalled bool
 }
 
-func (a AlwaysEvolveStateWrapper[P]) Build() (protocol.DeferredBlockPersistOps, error) {
+func (a AlwaysEvolveStateWrapper[P]) Build() (protocol.DeferredBlockPersist, error) {
 	if !a.evolveStateCalled {
 		err := a.OrthogonalStoreStateMachine.EvolveState([]flow.ServiceEvent{})
 		if err != nil {
-			return ps.NewDeferredBlockPersist(), fmt.Errorf("attempting to execute EvolveState method with empty list of Service Events failed: %w", err)
+			return *protocol.NewDeferredBlockPersist(),
+				fmt.Errorf("attempting to execute EvolveState method with empty list of Service Events failed: %w", err)
 		}
 	}
 	return a.OrthogonalStoreStateMachine.Build()

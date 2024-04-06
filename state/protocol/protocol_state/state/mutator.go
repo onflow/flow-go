@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
+	ps "github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
@@ -30,9 +30,9 @@ type stateMutator struct {
 	results          storage.ExecutionResults
 	kvStoreSnapshots storage.ProtocolKVStore
 
-	parentState          protocol_state.KVStoreReader
-	kvMutator            protocol_state.KVStoreMutator
-	orthoKVStoreMachines []protocol_state.KeyValueStoreStateMachine
+	parentState          ps.KVStoreReader
+	kvMutator            ps.KVStoreMutator
+	orthoKVStoreMachines []ps.KeyValueStoreStateMachine
 }
 
 var _ protocol.StateMutator = (*stateMutator)(nil)
@@ -46,8 +46,8 @@ func newStateMutator(
 	kvStoreSnapshots storage.ProtocolKVStore,
 	candidateView uint64,
 	parentID flow.Identifier,
-	parentState protocol_state.KVStoreAPI,
-	stateMachineFactories ...protocol_state.KeyValueStoreStateMachineFactory,
+	parentState ps.KVStoreAPI,
+	stateMachineFactories ...ps.KeyValueStoreStateMachineFactory,
 ) (*stateMutator, error) {
 	protocolVersion := parentState.GetProtocolStateVersion()
 	if versionUpgrade := parentState.GetVersionUpgrade(); versionUpgrade != nil {
@@ -62,7 +62,7 @@ func newStateMutator(
 			parentState.GetProtocolStateVersion(), protocolVersion, err)
 	}
 
-	stateMachines := make([]protocol_state.KeyValueStoreStateMachine, 0, len(stateMachineFactories))
+	stateMachines := make([]ps.KeyValueStoreStateMachine, 0, len(stateMachineFactories))
 	for _, factory := range stateMachineFactories {
 		stateMachine, err := factory.Create(candidateView, parentID, parentState, replicatedState)
 		if err != nil {
@@ -93,22 +93,27 @@ func newStateMutator(
 // CAUTION:
 //   - For Consensus Participants that are replicas, the calling code must check that the returned `stateID` matches the
 //     commitment in the block proposal! If they don't match, the proposal is byzantine and should be slashed.
-func (m *stateMutator) Build() (stateID flow.Identifier, dbUpdates protocol.DeferredBlockPersistOps, err error) {
+func (m *stateMutator) Build() (stateID flow.Identifier, dbUpdates *protocol.DeferredBlockPersist, err error) {
+	dbUpdates = protocol.NewDeferredBlockPersist()
 	for _, stateMachine := range m.orthoKVStoreMachines {
-		dbUpdates.Merge(stateMachine.Build())
+		dbOps, err := stateMachine.Build()
+		if err != nil {
+			return flow.ZeroID, protocol.NewDeferredBlockPersist(), fmt.Errorf("unexpected exceptioon building state machine's output state: %w", err)
+		}
+		dbUpdates.AddIndexingOps(dbOps.Pending())
 	}
 	stateID = m.kvMutator.ID()
 	version, data, err := m.kvMutator.VersionedEncode()
 	if err != nil {
-		return flow.ZeroID, protocol.DeferredBlockPersistOps{}, fmt.Errorf("could not encode protocol state: %w", err)
+		return flow.ZeroID, protocol.NewDeferredBlockPersist(), fmt.Errorf("could not encode protocol state: %w", err)
 	}
 
 	// Schedule deferred database operations to index the protocol state by the candidate block's ID
 	// and persist the new protocol state (if there are any changes)
-	dbUpdates.Add(func(tx *transaction.Tx, blockID flow.Identifier) error {
+	dbUpdates.AddIndexingOp(func(blockID flow.Identifier, tx *transaction.Tx) error {
 		return m.kvStoreSnapshots.IndexTx(blockID, stateID)(tx)
 	})
-	dbUpdates.AddBadgerUpdate(operation.SkipDuplicatesTx(m.kvStoreSnapshots.StoreTx(stateID, &storage.KeyValueStoreData{
+	dbUpdates.AddDbOp(operation.SkipDuplicatesTx(m.kvStoreSnapshots.StoreTx(stateID, &storage.KeyValueStoreData{
 		Version: version,
 		Data:    data,
 	})))
@@ -173,7 +178,6 @@ func (m *stateMutator) Build() (stateID flow.Identifier, dbUpdates protocol.Defe
 //     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 //     of this function is not nil. If such an exception is returned, continuing is not an option.
 func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) error {
-
 	// block payload may not specify seals in order, so order them by block height before processing
 	orderedSeals, err := protocol.OrderedSeals(seals, m.headers)
 	if err != nil {
