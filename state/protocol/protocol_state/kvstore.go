@@ -139,13 +139,17 @@ type KVStoreMutator interface {
 //   - implementing the `OrthogonalStoreStateMachine` interface
 //
 // For more details see `./Readme.md`
+//
+// Interface implementations do *not* need to be concurrency safe.
 type OrthogonalStoreStateMachine[P any] interface {
 
 	// Build returns:
 	//   - database updates necessary for persisting the updated protocol sub-state and its *dependencies*.
 	//     It may contain updates for the sub-state itself and for any dependency that is affected by the update.
 	//     Deferred updates must be applied in a transaction to ensure atomicity.
-	Build() protocol.DeferredBlockPersistOps
+	//
+	// No errors are expected during normal operations.
+	Build() (protocol.DeferredBlockPersistOps, error)
 
 	// EvolveState applies the state change(s) on sub-state P for the candidate block (under construction).
 	// Information that potentially changes the Epoch state (compared to the parent block's state):
