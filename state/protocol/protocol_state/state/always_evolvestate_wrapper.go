@@ -1,6 +1,8 @@
 package state
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	ps "github.com/onflow/flow-go/state/protocol/protocol_state"
@@ -24,7 +26,7 @@ func (a AlwaysEvolveStateWrapper[P]) Build() (protocol.DeferredBlockPersistOps, 
 	if !a.evolveStateCalled {
 		err := a.OrthogonalStoreStateMachine.EvolveState([]flow.ServiceEvent{})
 		if err != nil {
-
+			return ps.NewDeferredBlockPersist(), fmt.Errorf("attempting to execute EvolveState method with empty list of Service Events failed: %w", err)
 		}
 	}
 	return a.OrthogonalStoreStateMachine.Build()

@@ -124,13 +124,13 @@ func (d *DeferredBlockPersist) AddDbOps(ops ...transaction.DeferredDBUpdate) *De
 	return d
 }
 
-// AddIndexOp schedules the given DeferredBlockPersistOp to be executed as part of the future transaction.
+// AddIndexingOp schedules the given DeferredBlockPersistOp to be executed as part of the future transaction.
 // Usually, these are operations to populate some `ByBlockID` index.
 // For adding multiple DeferredBlockPersistOps, use `AddIndexingOps(ops ...DeferredBlockPersistOp)` if easily
 // possible, as it reduces the call stack compared to adding the functors individually via
 // `AddIndexOp(op DeferredBlockPersistOp)`.
 // This method returns a self-reference for chaining.
-func (d *DeferredBlockPersist) AddIndexOp(op DeferredBlockPersistOp) *DeferredBlockPersist {
+func (d *DeferredBlockPersist) AddIndexingOp(op DeferredBlockPersistOp) *DeferredBlockPersist {
 	prior := d.pending
 	d.pending = func(blockID flow.Identifier, tx *transaction.Tx) error {
 		err := prior(blockID, tx)
