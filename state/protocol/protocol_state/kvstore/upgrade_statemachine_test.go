@@ -119,5 +119,7 @@ func (s *StateMachineSuite) TestEvolveState_ProtocolStateVersionUpgrade() {
 
 // TestBuild ensures that state machine returns empty list of deferred operations.
 func (s *StateMachineSuite) TestBuild() {
-	require.Empty(s.T(), s.stateMachine.Build())
+	dbOps, err := s.stateMachine.Build()
+	require.NoError(s.T(), err)
+	require.Empty(s.T(), dbOps)
 }

@@ -165,7 +165,7 @@ func NewEpochStateMachine(
 // but the actual epoch state is stored separately, nevertheless, the epoch state ID is used to sanity check if the
 // epoch state is consistent with the KV Store. Using this approach, we commit the epoch sub-state to the KV Store which in
 // affects the Dynamic Protocol State ID which is essentially hash of the KV Store.
-func (e *EpochStateMachine) Build() protocol.DeferredBlockPersistOps {
+func (e *EpochStateMachine) Build() (protocol.DeferredBlockPersistOps, error) {
 	updatedEpochState, updatedStateID, hasChanges := e.activeStateMachine.Build()
 	dbUpdates := e.pendingDbUpdates
 	dbUpdates.Add(func(tx *transaction.Tx, blockID flow.Identifier) error {
@@ -176,7 +176,7 @@ func (e *EpochStateMachine) Build() protocol.DeferredBlockPersistOps {
 	}
 	e.mutator.SetEpochStateID(updatedStateID)
 
-	return dbUpdates
+	return dbUpdates, nil
 }
 
 // EvolveState applies the state change(s) on sub-state P for the candidate block (under construction).

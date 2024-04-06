@@ -104,7 +104,8 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 	s.epochStateDB.On("Index", s.candidate.ID(), s.parentEpochState.ID()).Return(indexTxDeferredUpdate.Execute, nil).Once()
 	s.mutator.On("SetEpochStateID", s.parentEpochState.ID()).Return(nil).Once()
 
-	dbUpdates := s.stateMachine.Build()
+	dbUpdates, err := s.stateMachine.Build()
+	require.NoError(s.T(), err)
 	// in next loop we assert that we have received expected deferred db updates by executing them
 	// and expecting that corresponding mock methods will be called
 	tx := &transaction.Tx{}
@@ -153,7 +154,8 @@ func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	s.epochStateDB.On("StoreTx", updatedStateID, updatedState).Return(storeTxDeferredUpdate.Execute, nil).Once()
 	s.mutator.On("SetEpochStateID", updatedStateID).Return(nil).Once()
 
-	dbUpdates := s.stateMachine.Build()
+	dbUpdates, err := s.stateMachine.Build()
+	require.NoError(s.T(), err)
 	// in next loop we assert that we have received expected deferred db updates by executing them
 	// and expecting that corresponding mock methods will be called
 	tx := &transaction.Tx{}

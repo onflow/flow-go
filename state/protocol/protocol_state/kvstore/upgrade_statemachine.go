@@ -42,8 +42,8 @@ func NewPSVersionUpgradeStateMachine(
 
 // Build is a no-op, because scheduled version upgrades are stored in the KVStore only.
 // (There is no secondary database operations to persist version upgrade data.)
-func (m *PSVersionUpgradeStateMachine) Build() protocol.DeferredBlockPersistOps {
-	return protocol.DeferredBlockPersistOps{}
+func (m *PSVersionUpgradeStateMachine) Build() (protocol.DeferredBlockPersistOps, error) {
+	return protocol.DeferredBlockPersistOps{}, nil
 }
 
 // EvolveState applies the state change(s) on sub-state P for the candidate block (under construction).
