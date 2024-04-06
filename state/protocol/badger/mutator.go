@@ -615,7 +615,8 @@ func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow
 	if updatedStateID != candidate.Payload.ProtocolStateID {
 		return state.NewInvalidExtensionErrorf("invalid protocol state commitment %x in block, which should be %x", candidate.Payload.ProtocolStateID, updatedStateID)
 	}
-	deferredDbOps.AddDbOps(dbUpdates.Decorate(candidate.ID())...)
+
+	deferredDbOps.AddDbOps(dbUpdates.Pending().WithBlock(candidate.ID()))
 	return nil
 }
 

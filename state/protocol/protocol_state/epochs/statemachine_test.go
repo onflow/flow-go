@@ -106,13 +106,10 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 
 	dbUpdates, err := s.stateMachine.Build()
 	require.NoError(s.T(), err)
-	// in next loop we assert that we have received expected deferred db updates by executing them
-	// and expecting that corresponding mock methods will be called
-	tx := &transaction.Tx{}
-	for _, dbUpdate := range dbUpdates.Decorate(s.candidate.ID()) {
-		err := dbUpdate(tx)
-		require.NoError(s.T(), err)
-	}
+	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
+	// the expected mock methods should be called, which is asserted by the testify framework
+	err = dbUpdates.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
+	require.NoError(s.T(), err)
 }
 
 // TestBuild_HappyPath tests that hierarchical epoch state machine maintains index of epoch states and commits
@@ -156,13 +153,10 @@ func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 
 	dbUpdates, err := s.stateMachine.Build()
 	require.NoError(s.T(), err)
-	// in next loop we assert that we have received expected deferred db updates by executing them
-	// and expecting that corresponding mock methods will be called
-	tx := &transaction.Tx{}
-	for _, dbUpdate := range dbUpdates.Decorate(s.candidate.ID()) {
-		err := dbUpdate(tx)
-		require.NoError(s.T(), err)
-	}
+	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
+	// the expected mock methods should be called, which is asserted by the testify framework
+	err = dbUpdates.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
+	require.NoError(s.T(), err)
 }
 
 // TestEpochStateMachine_Constructor tests the behavior of the EpochStateMachine constructor.

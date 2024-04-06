@@ -78,8 +78,8 @@ func (s *StateMutatorSuite) TestBuild_HappyPath() {
 		stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol_state.KVStoreReader](s.T())
 		deferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
 		deferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
-		deferredDBUpdates := protocol.DeferredBlockPersistOps{}
-		deferredDBUpdates.AddBadgerUpdate(deferredUpdate.Execute)
+		deferredDBUpdates := protocol.NewDeferredBlockPersist()
+		deferredDBUpdates.AddDbOp(deferredUpdate.Execute)
 		stateMachine.On("Build").Return(deferredDBUpdates)
 		factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, s.replicatedState).Return(stateMachine, nil)
 		factories[i] = factory
@@ -117,13 +117,10 @@ func (s *StateMutatorSuite) TestBuild_HappyPath() {
 	_, dbUpdates, err := s.mutator.Build()
 	require.NoError(s.T(), err)
 
-	// in next loop we assert that we have received expected deferred db updates by executing them
-	// and expecting that corresponding mock methods will be called
-	tx := &transaction.Tx{}
-	for _, dbUpdate := range dbUpdates.Decorate(s.candidate.ID()) {
-		err := dbUpdate(tx)
-		require.NoError(s.T(), err)
-	}
+	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
+	// the expected mock methods should be called, which is asserted by the testify framework
+	err = dbUpdates.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
+	require.NoError(s.T(), err)
 }
 
 // TestBuild_NoChanges tests that `stateMutator` returns minimal needed updates when building protocol state even if there was no service events applied.
@@ -150,11 +147,10 @@ func (s *StateMutatorSuite) TestBuild_NoChanges() {
 	_, dbUpdates, err := s.mutator.Build()
 	require.NoError(s.T(), err)
 
-	tx := &transaction.Tx{}
-	for _, dbUpdate := range dbUpdates.Decorate(s.candidate.ID()) {
-		err := dbUpdate(tx)
-		require.NoError(s.T(), err)
-	}
+	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
+	// the expected mock methods should be called, which is asserted by the testify framework
+	err = dbUpdates.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
+	require.NoError(s.T(), err)
 }
 
 // TestBuild_EncodeFailed tests that `stateMutator` returns an exception when encoding the resulting state fails.
