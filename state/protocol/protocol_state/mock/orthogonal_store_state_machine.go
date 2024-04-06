@@ -15,17 +15,29 @@ type OrthogonalStoreStateMachine[P interface{}] struct {
 }
 
 // Build provides a mock function with given fields:
-func (_m *OrthogonalStoreStateMachine[P]) Build() protocol.DeferredBlockPersistOps {
+func (_m *OrthogonalStoreStateMachine[P]) Build() (*protocol.DeferredBlockPersist, error) {
 	ret := _m.Called()
 
-	var r0 protocol.DeferredBlockPersistOps
-	if rf, ok := ret.Get(0).(func() protocol.DeferredBlockPersistOps); ok {
+	var r0 *protocol.DeferredBlockPersist
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (*protocol.DeferredBlockPersist, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() *protocol.DeferredBlockPersist); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(protocol.DeferredBlockPersistOps)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*protocol.DeferredBlockPersist)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // EvolveState provides a mock function with given fields: sealedServiceEvents

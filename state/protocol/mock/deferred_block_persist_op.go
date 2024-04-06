@@ -14,13 +14,13 @@ type DeferredBlockPersistOp struct {
 	mock.Mock
 }
 
-// Execute provides a mock function with given fields: tx, blockID
-func (_m *DeferredBlockPersistOp) Execute(tx *transaction.Tx, blockID flow.Identifier) error {
-	ret := _m.Called(tx, blockID)
+// Execute provides a mock function with given fields: blockID, tx
+func (_m *DeferredBlockPersistOp) Execute(blockID flow.Identifier, tx *transaction.Tx) error {
+	ret := _m.Called(blockID, tx)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*transaction.Tx, flow.Identifier) error); ok {
-		r0 = rf(tx, blockID)
+	if rf, ok := ret.Get(0).(func(flow.Identifier, *transaction.Tx) error); ok {
+		r0 = rf(blockID, tx)
 	} else {
 		r0 = ret.Error(0)
 	}
