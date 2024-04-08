@@ -33,10 +33,11 @@ type Core struct {
 	log zerolog.Logger
 
 	// state machine
-	blockQueue  *block_queue.BlockQueue
-	throttle    Throttle // for throttling blocks to be added to the block queue
-	execState   state.ExecutionState
-	stopControl *stop.StopControl // decide whether to execute a block or not
+	processables chan flow.Identifier
+	blockQueue   *block_queue.BlockQueue
+	throttle     Throttle // for throttling blocks to be added to the block queue
+	execState    state.ExecutionState
+	stopControl  *stop.StopControl // decide whether to execute a block or not
 
 	// data storage
 	headers     storage.Headers
@@ -77,7 +78,9 @@ func NewCore(
 	eventConsumer EventConsumer,
 ) *Core {
 	e := &Core{
-		log:               logger.With().Str("engine", "ingestion_core").Logger(),
+		log: logger.With().Str("engine", "ingestion_core").Logger(),
+		// processables are throttled blocks
+		processables:      make(chan flow.Identifier, 10000),
 		throttle:          throttle,
 		execState:         execState,
 		blockQueue:        block_queue.NewBlockQueue(logger),
@@ -89,6 +92,14 @@ func NewCore(
 		collectionFetcher: collectionFetcher,
 		eventConsumer:     eventConsumer,
 	}
+
+	// TODO: make sure Init is able to store all processable blocks
+	err := e.throttle.Init(e.processables)
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("fail to initialize throttle engine")
+	}
+
+	e.log.Info().Msgf("throttle engine initialized")
 
 	e.ComponentManager = component.NewComponentManagerBuilderWithName("IngestionCore").
 		AddWorker(e.launchWorker).
@@ -104,16 +115,14 @@ func (e *Core) launchWorker(ctx irrecoverable.SignalerContext, ready component.R
 
 	e.log.Info().Bool("execution_stopped", executionStopped).Msgf("launching worker")
 
+	e.ctx = ctx
+	ready()
+
 	if executionStopped {
-		ready()
 		return
 	}
 
-	e.ctx = ctx
-
 	e.launchWorkerToConsumeThrottledBlocks(ctx)
-
-	ready()
 }
 
 func (e *Core) OnBlock(header *flow.Header, qc *flow.QuorumCertificate) {
@@ -133,43 +142,29 @@ func (e *Core) OnCollection(col *flow.Collection) {
 }
 
 func (e *Core) launchWorkerToConsumeThrottledBlocks(ctx irrecoverable.SignalerContext) {
-	// processables are throttled blocks
-	processables := make(chan flow.Identifier, 10000)
-
 	// running worker in the background to consume
 	// processables blocks which are throttled,
 	// and forward them to the block queue for processing
-	go func(ctx irrecoverable.SignalerContext, processables <-chan flow.Identifier) {
-		e.log.Info().Msgf("starting worker to consume throttled blocks")
-		defer func() {
-			e.log.Info().Msgf("worker to consume throttled blocks stopped")
-		}()
-		for {
-			select {
-			case <-ctx.Done():
-				e.log.Info().Msgf("irrecoverable.Done() is called")
-				return
+	e.log.Info().Msgf("starting worker to consume throttled blocks")
+	defer func() {
+		e.log.Info().Msgf("worker to consume throttled blocks stopped")
+	}()
+	for {
+		select {
+		case <-ctx.Done():
+			e.log.Info().Msgf("irrecoverable.Done() is called")
+			return
 
-			case blockID := <-processables:
-				e.log.Debug().Hex("block_id", blockID[:]).Msg("ingestion core processing block")
-				err := e.onProcessableBlock(blockID)
-				if err != nil {
-					ctx.Throw(fmt.Errorf("fail to process block: %w", err))
-					return
-				}
+		case blockID := <-e.processables:
+			e.log.Debug().Hex("block_id", blockID[:]).Msg("ingestion core processing block")
+			err := e.onProcessableBlock(blockID)
+			if err != nil {
+				ctx.Throw(fmt.Errorf("fail to process block: %w", err))
+				return
 			}
 		}
-
-	}(ctx, processables)
-
-	e.log.Info().Msg("initializing throttle engine")
-
-	err := e.throttle.Init(processables)
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("fail to initialize throttle engine")
 	}
 
-	e.log.Info().Msgf("throttle engine initialized")
 }
 
 func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
