@@ -1078,7 +1078,7 @@ func VerifyCdcArguments(t *testing.T, expected []cadence.Value, actual []interfa
 		require.NoError(t, err)
 
 		// parse cadence value
-		decoded, err := json2.Decode(nil, bz)
+		decoded, err := jsoncdc.Decode(nil, bz)
 		require.NoError(t, err)
 
 		assert.Equal(t, expected[index], decoded)
