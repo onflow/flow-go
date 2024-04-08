@@ -44,7 +44,6 @@ type EVMContractChange uint8
 
 const (
 	EVMContractChangeNone EVMContractChange = iota
-	EVMContractChangeABIOnly
 	EVMContractChangeFull
 )
 
@@ -214,12 +213,6 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 			systemContracts.ViewResolver,
 			coreContracts.ViewResolver(),
 		),
-
-		// EVM related contracts
-		NewSystemContractChange(
-			systemContracts.EVMContract,
-			evm.ContractCode(systemContracts.FlowToken.Address),
-		),
 	}
 
 	switch chainID {
@@ -237,6 +230,24 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 				},
 			},
 		)
+	}
+
+	// EVM related contracts
+	switch options.EVM {
+	case EVMContractChangeNone:
+		// do nothing
+	case EVMContractChangeFull:
+		contractChanges = append(
+			contractChanges,
+			NewSystemContractChange(
+				systemContracts.EVMContract,
+				evm.ContractCode(
+					flow.HexToAddress(env.FlowTokenAddress),
+				),
+			),
+		)
+	default:
+		panic(fmt.Errorf("unsupported EVM contract change option: %d", options.EVM))
 	}
 
 	// Burner contract
