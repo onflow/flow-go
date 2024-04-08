@@ -37,20 +37,29 @@ func ContractCode(flowTokenAddress flow.Address) []byte {
 }
 
 const ContractName = "EVM"
+
 const evmAddressTypeBytesFieldName = "bytes"
+
 const evmAddressTypeQualifiedIdentifier = "EVM.EVMAddress"
+
 const evmBalanceTypeQualifiedIdentifier = "EVM.Balance"
+
 const evmResultTypeQualifiedIdentifier = "EVM.Result"
+
 const evmStatusTypeQualifiedIdentifier = "EVM.Status"
+
 const evmBlockTypeQualifiedIdentifier = "EVM.EVMBlock"
 
 const abiEncodingByteSize = 32
 
 var EVMTransactionBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.UInt8Type)
+
 var evmTransactionBytesType = sema.NewVariableSizedType(nil, sema.UInt8Type)
 
 var evmAddressBytesType = sema.NewConstantSizedType(nil, sema.UInt8Type, types.AddressLength)
+
 var evmAddressBytesStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, evmAddressBytesType)
+
 var EVMAddressBytesCadenceType = cadence.NewConstantSizedArrayType(types.AddressLength, cadence.UInt8Type)
 
 // abiEncodingError
@@ -275,19 +284,33 @@ func newInternalEVMTypeEncodeABIFunction(
 }
 
 var gethTypeString = gethABI.Type{T: gethABI.StringTy}
+
 var gethTypeBool = gethABI.Type{T: gethABI.BoolTy}
+
 var gethTypeUint8 = gethABI.Type{T: gethABI.UintTy, Size: 8}
+
 var gethTypeUint16 = gethABI.Type{T: gethABI.UintTy, Size: 16}
+
 var gethTypeUint32 = gethABI.Type{T: gethABI.UintTy, Size: 32}
+
 var gethTypeUint64 = gethABI.Type{T: gethABI.UintTy, Size: 64}
+
 var gethTypeUint128 = gethABI.Type{T: gethABI.UintTy, Size: 128}
+
 var gethTypeUint256 = gethABI.Type{T: gethABI.UintTy, Size: 256}
+
 var gethTypeInt8 = gethABI.Type{T: gethABI.IntTy, Size: 8}
+
 var gethTypeInt16 = gethABI.Type{T: gethABI.IntTy, Size: 16}
+
 var gethTypeInt32 = gethABI.Type{T: gethABI.IntTy, Size: 32}
+
 var gethTypeInt64 = gethABI.Type{T: gethABI.IntTy, Size: 64}
+
 var gethTypeInt128 = gethABI.Type{T: gethABI.IntTy, Size: 128}
+
 var gethTypeInt256 = gethABI.Type{T: gethABI.IntTy, Size: 256}
+
 var gethTypeAddress = gethABI.Type{Size: 20, T: gethABI.AddressTy}
 
 func gethABIType(staticType interpreter.StaticType, evmAddressTypeID common.TypeID) (gethABI.Type, bool) {
@@ -2068,15 +2091,15 @@ func NewEVMBlockCadenceType(address common.Address) *cadence.StructType {
 		[]cadence.Field{
 			{
 				Identifier: "height",
-				Type:       cadence.UInt64Type{},
+				Type:       cadence.UInt64Type,
 			},
 			{
 				Identifier: "hash",
-				Type:       cadence.StringType{},
+				Type:       cadence.StringType,
 			},
 			{
 				Identifier: "totalSupply",
-				Type:       cadence.IntType{},
+				Type:       cadence.IntType,
 			},
 		},
 		nil,
