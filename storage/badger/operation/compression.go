@@ -88,6 +88,13 @@ func CompressAndStore(logger zerolog.Logger, ctx context.Context, keyvals <-chan
 			}
 		}
 	}
+
+	// flush the remaining batch
+	err = batch.Flush()
+	if err != nil {
+		return err
+	}
+
 	logger.Info().Msgf("finished processing %d key-values", total)
 	return nil
 }
@@ -106,6 +113,7 @@ func batchWriteCompressed(kv *KeyValue) func(writeBatch *badger.WriteBatch) (int
 		compressed := snappy.Encode(nil, kv.val)
 
 		// persist the entity data into the DB
+		// err := writeBatch.Set(kv.key, compressed)
 		err := writeBatch.Set(kv.key, compressed)
 		if err != nil {
 			return 0, err

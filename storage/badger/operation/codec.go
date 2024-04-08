@@ -24,6 +24,10 @@ func setCompressDisabled() {
 	compressEnabled = false
 }
 
+func SetCompressEnabled() {
+	compressEnabled = true
+}
+
 func SyncCompressionFlag(db *badger.DB) error {
 	err := ensureDBWithType(db, dbMarkerPublic)
 	if isErrUncompressedValue(err) {
