@@ -18,7 +18,6 @@ import (
 
 // should be able to reach consensus when identity table contains nodes which are joining in next epoch.
 func TestUnweightedNode(t *testing.T) {
-	//unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: temporary broken")
 	// stop after building 2 blocks to ensure we can tolerate 0-weight (joining next
 	// epoch) identities, but don't cross an epoch boundary
 	stopper := NewStopper(2, 0)

@@ -1,6 +1,7 @@
 package kvstore
 
 import (
+	"github.com/onflow/flow-go/state/protocol"
 	"math/rand"
 	"reflect"
 	"testing"
@@ -19,7 +20,7 @@ func TestEncodeDecode(t *testing.T) {
 	t.Run("v0", func(t *testing.T) {
 		model := &Modelv0{
 			UpgradableModel: UpgradableModel{
-				VersionUpgrade: &protocol_state.ViewBasedActivator[uint64]{
+				VersionUpgrade: &protocol.ViewBasedActivator[uint64]{
 					Data:           13,
 					ActivationView: 1000,
 				},
@@ -102,7 +103,7 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 	t.Run("v0", func(t *testing.T) {
 		model := &Modelv0{
 			UpgradableModel: UpgradableModel{
-				VersionUpgrade: &protocol_state.ViewBasedActivator[uint64]{
+				VersionUpgrade: &protocol.ViewBasedActivator[uint64]{
 					Data:           13,
 					ActivationView: 1000,
 				},
@@ -118,7 +119,7 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 	t.Run("v0->v1", func(t *testing.T) {
 		model := &Modelv0{
 			UpgradableModel: UpgradableModel{
-				VersionUpgrade: &protocol_state.ViewBasedActivator[uint64]{
+				VersionUpgrade: &protocol.ViewBasedActivator[uint64]{
 					Data:           13,
 					ActivationView: 1000,
 				},
@@ -141,7 +142,7 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 		model := &Modelv1{
 			Modelv0: Modelv0{
 				UpgradableModel: UpgradableModel{
-					VersionUpgrade: &protocol_state.ViewBasedActivator[uint64]{
+					VersionUpgrade: &protocol.ViewBasedActivator[uint64]{
 						Data:           13,
 						ActivationView: 1000,
 					},
@@ -180,7 +181,7 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 func assertModelIsUpgradable(t *testing.T, api protocol_state.KVStoreMutator) {
 	oldVersion := api.GetProtocolStateVersion()
 	activationView := uint64(1000)
-	expected := &protocol_state.ViewBasedActivator[uint64]{
+	expected := &protocol.ViewBasedActivator[uint64]{
 		Data:           oldVersion + 1,
 		ActivationView: activationView,
 	}

@@ -34,7 +34,7 @@ type EpochStateMachineSuite struct {
 	setupsDB                        *storagemock.EpochSetups
 	commitsDB                       *storagemock.EpochCommits
 	globalParams                    *protocolmock.GlobalParams
-	parentState                     *protocol_statemock.KVStoreReader
+	parentState                     *protocolmock.KVStoreReader
 	parentEpochState                *flow.RichProtocolStateEntry
 	mutator                         *protocol_statemock.KVStoreMutator
 	happyPathStateMachine           *mock.StateMachine
@@ -51,7 +51,7 @@ func (s *EpochStateMachineSuite) SetupTest() {
 	s.commitsDB = storagemock.NewEpochCommits(s.T())
 	s.globalParams = protocolmock.NewGlobalParams(s.T())
 	s.globalParams.On("EpochCommitSafetyThreshold").Return(uint64(1_000))
-	s.parentState = protocol_statemock.NewKVStoreReader(s.T())
+	s.parentState = protocolmock.NewKVStoreReader(s.T())
 	s.parentEpochState = unittest.ProtocolStateFixture()
 	s.mutator = protocol_statemock.NewKVStoreMutator(s.T())
 	s.candidate = unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FirstView + 1))

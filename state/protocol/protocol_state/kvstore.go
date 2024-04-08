@@ -5,58 +5,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// This file contains versioned read and read-write interfaces to the Protocol State's
-// key-value store and are used by the Protocol State Machine.
-//
-// When a key is added or removed, this requires a new protocol state version:
-//  - Create a new versioned model in ./kvstore/models.go (eg. modelv3 if latest model is modelv2)
-//  - Update the KVStoreReader and KVStoreAPI interfaces to include any new keys
-
-// KVStoreReader is the latest read-only interface to the Protocol State key-value store
-// at a particular block.
-//
-// Caution:
-// Engineers evolving this interface must ensure that it is backwards-compatible
-// with all versions of Protocol State Snapshots that can be retrieved from the local
-// database, which should exactly correspond to the versioned model types defined in
-// ./kvstore/models.go
-type KVStoreReader interface {
-	// ID returns an identifier for this key-value store snapshot by hashing internal fields.
-	ID() flow.Identifier
-
-	// v0
-
-	VersionedEncodable
-
-	// GetProtocolStateVersion returns the Protocol State Version that created the specific
-	// Snapshot backing this interface instance. Slightly simplified, the Protocol State
-	// Version defines the key-value store's data model (specifically, the set of all keys
-	// and the respective type for each corresponding value).
-	// Generally, changes in the protocol state version correspond to changes in the set
-	// of key-value pairs which are supported, and which model is used for serialization.
-	// The protocol state version is updated by UpdateKVStoreVersion service events.
-	GetProtocolStateVersion() uint64
-
-	// GetVersionUpgrade returns the upgrade version of protocol.
-	// VersionUpgrade is a view-based activator that specifies the version which has to be applied
-	// and the view from which on it has to be applied. It may return the current protocol version
-	// with a past view if the upgrade has already been activated.
-	GetVersionUpgrade() *ViewBasedActivator[uint64]
-
-	// GetEpochStateID returns the state ID of the epoch state.
-	// This is part of the most basic model and is used to commit the epoch state to the KV store.
-	GetEpochStateID() flow.Identifier
-
-	// v1
-
-	// GetInvalidEpochTransitionAttempted returns a flag indicating whether epoch
-	// fallback mode has been tentatively triggered on this fork.
-	// Errors:
-	//  - ErrKeyNotSupported if the respective entry does not exist in the
-	//    Protocol State Snapshot that is backing the `Reader` interface.
-	GetInvalidEpochTransitionAttempted() (bool, error)
-}
-
 // KVStoreAPI is the latest interface to the Protocol State key-value store which implements 'Prototype'
 // pattern for replicating protocol state between versions.
 //
@@ -66,7 +14,7 @@ type KVStoreReader interface {
 // database, which should exactly correspond to the versioned model types defined in
 // ./kvstore/models.go
 type KVStoreAPI interface {
-	KVStoreReader
+	protocol.KVStoreReader
 
 	// Replicate instantiates a Protocol State Snapshot of the given `protocolVersion`.
 	// We reference to the Protocol State Snapshot, whose `Replicate` method is called
@@ -95,14 +43,14 @@ type KVStoreAPI interface {
 // database, which should exactly correspond to the versioned model types defined in
 // ./kvstore/models.go
 type KVStoreMutator interface {
-	KVStoreReader
+	protocol.KVStoreReader
 
 	// v0
 
 	// SetVersionUpgrade sets the protocol upgrade version. This method is used
 	// to update the Protocol State version when a flow.ProtocolStateVersionUpgrade is processed.
 	// It contains the new version and the view at which it has to be applied.
-	SetVersionUpgrade(version *ViewBasedActivator[uint64])
+	SetVersionUpgrade(version *protocol.ViewBasedActivator[uint64])
 
 	// SetEpochStateID sets the state ID of the epoch state.
 	// This method is used to commit the epoch state to the KV store when the state of the epoch is updated.
@@ -187,7 +135,7 @@ type OrthogonalStoreStateMachine[P any] interface {
 
 // KeyValueStoreStateMachine is a type alias for a state machine that operates on an instance of KVStoreReader.
 // StateMutator uses this type to store and perform operations on orthogonal state machines.
-type KeyValueStoreStateMachine = OrthogonalStoreStateMachine[KVStoreReader]
+type KeyValueStoreStateMachine = OrthogonalStoreStateMachine[protocol.KVStoreReader]
 
 // KeyValueStoreStateMachineFactory is an abstract factory interface for creating KeyValueStoreStateMachine instances.
 // It is used separate creation of state machines from their usage, which allows less coupling and superior testability.
@@ -195,5 +143,5 @@ type KeyValueStoreStateMachine = OrthogonalStoreStateMachine[KVStoreReader]
 type KeyValueStoreStateMachineFactory interface {
 	// Create creates a new instance of an underlying type that operates on KV Store and is created for a specific candidate block.
 	// No errors are expected during normal operations.
-	Create(candidateView uint64, parentID flow.Identifier, parentState KVStoreReader, mutator KVStoreMutator) (KeyValueStoreStateMachine, error)
+	Create(candidateView uint64, parentID flow.Identifier, parentState protocol.KVStoreReader, mutator KVStoreMutator) (KeyValueStoreStateMachine, error)
 }

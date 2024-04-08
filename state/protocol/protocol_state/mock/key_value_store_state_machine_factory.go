@@ -6,6 +6,8 @@ import (
 	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 
+	protocol "github.com/onflow/flow-go/state/protocol"
+
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state"
 )
 
@@ -15,23 +17,23 @@ type KeyValueStoreStateMachineFactory struct {
 }
 
 // Create provides a mock function with given fields: candidateView, parentID, parentState, mutator
-func (_m *KeyValueStoreStateMachineFactory) Create(candidateView uint64, parentID flow.Identifier, parentState protocol_state.KVStoreReader, mutator protocol_state.KVStoreMutator) (protocol_state.OrthogonalStoreStateMachine[protocol_state.KVStoreReader], error) {
+func (_m *KeyValueStoreStateMachineFactory) Create(candidateView uint64, parentID flow.Identifier, parentState protocol.KVStoreReader, mutator protocol_state.KVStoreMutator) (protocol_state.OrthogonalStoreStateMachine[protocol.KVStoreReader], error) {
 	ret := _m.Called(candidateView, parentID, parentState, mutator)
 
-	var r0 protocol_state.OrthogonalStoreStateMachine[protocol_state.KVStoreReader]
+	var r0 protocol_state.OrthogonalStoreStateMachine[protocol.KVStoreReader]
 	var r1 error
-	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier, protocol_state.KVStoreReader, protocol_state.KVStoreMutator) (protocol_state.OrthogonalStoreStateMachine[protocol_state.KVStoreReader], error)); ok {
+	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier, protocol.KVStoreReader, protocol_state.KVStoreMutator) (protocol_state.OrthogonalStoreStateMachine[protocol.KVStoreReader], error)); ok {
 		return rf(candidateView, parentID, parentState, mutator)
 	}
-	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier, protocol_state.KVStoreReader, protocol_state.KVStoreMutator) protocol_state.OrthogonalStoreStateMachine[protocol_state.KVStoreReader]); ok {
+	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier, protocol.KVStoreReader, protocol_state.KVStoreMutator) protocol_state.OrthogonalStoreStateMachine[protocol.KVStoreReader]); ok {
 		r0 = rf(candidateView, parentID, parentState, mutator)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(protocol_state.OrthogonalStoreStateMachine[protocol_state.KVStoreReader])
+			r0 = ret.Get(0).(protocol_state.OrthogonalStoreStateMachine[protocol.KVStoreReader])
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(uint64, flow.Identifier, protocol_state.KVStoreReader, protocol_state.KVStoreMutator) error); ok {
+	if rf, ok := ret.Get(1).(func(uint64, flow.Identifier, protocol.KVStoreReader, protocol_state.KVStoreMutator) error); ok {
 		r1 = rf(candidateView, parentID, parentState, mutator)
 	} else {
 		r1 = ret.Error(1)

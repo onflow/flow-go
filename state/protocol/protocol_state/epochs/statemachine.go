@@ -86,7 +86,7 @@ type StateMachineFactoryMethod func(candidateView uint64, parentState *flow.Rich
 // It relies on Key-Value Store to read the parent state and to persist the snapshot of the updated Epoch state.
 type EpochStateMachine struct {
 	activeStateMachine               StateMachine
-	parentState                      protocol_state.KVStoreReader
+	parentState                      protocol.KVStoreReader
 	mutator                          protocol_state.KVStoreMutator
 	epochFallbackStateMachineFactory func() (StateMachine, error)
 
@@ -110,7 +110,7 @@ func NewEpochStateMachine(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	protocolStateDB storage.ProtocolState,
-	parentState protocol_state.KVStoreReader,
+	parentState protocol.KVStoreReader,
 	mutator protocol_state.KVStoreMutator,
 	happyPathStateMachineFactory StateMachineFactoryMethod,
 	epochFallbackStateMachineFactory StateMachineFactoryMethod,
@@ -227,7 +227,7 @@ func (e *EpochStateMachine) View() uint64 {
 }
 
 // ParentState returns parent state associated with this state machine.
-func (e *EpochStateMachine) ParentState() protocol_state.KVStoreReader {
+func (e *EpochStateMachine) ParentState() protocol.KVStoreReader {
 	return e.parentState
 }
 

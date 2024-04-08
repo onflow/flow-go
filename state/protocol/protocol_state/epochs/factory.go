@@ -33,7 +33,7 @@ func NewEpochStateMachineFactory(
 
 // Create creates a new instance of an underlying type that operates on KV Store and is created for a specific candidate block.
 // No errors are expected during normal operations.
-func (f *EpochStateMachineFactory) Create(candidateView uint64, parentID flow.Identifier, parentState protocol_state.KVStoreReader, mutator protocol_state.KVStoreMutator) (protocol_state.KeyValueStoreStateMachine, error) {
+func (f *EpochStateMachineFactory) Create(candidateView uint64, parentID flow.Identifier, parentState protocol.KVStoreReader, mutator protocol_state.KVStoreMutator) (protocol_state.KeyValueStoreStateMachine, error) {
 	return NewEpochStateMachine(
 		candidateView,
 		parentID,
