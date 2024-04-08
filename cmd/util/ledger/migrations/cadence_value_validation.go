@@ -322,12 +322,16 @@ func cadenceCompositeValueEqual(
 		interpreter.EmptyLocationRange,
 	)
 
-	return newValidationErrorf(
-		"composite %s fields differ: %v != %v",
-		v.TypeID(),
-		vFieldNames,
-		otherFieldNames,
-	)
+	if len(vFieldNames) != len(otherFieldNames) {
+		return newValidationErrorf(
+			"composite %s fields differ: %v != %v",
+			v.TypeID(),
+			vFieldNames,
+			otherFieldNames,
+		)
+	}
+
+	return nil
 }
 
 func cadenceDictionaryValueEqual(
