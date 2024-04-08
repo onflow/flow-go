@@ -3,9 +3,10 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"testing"
+
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
-	"testing"
 
 	"github.com/stretchr/testify/require"
 
