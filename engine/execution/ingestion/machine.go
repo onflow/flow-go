@@ -108,6 +108,7 @@ func (e *Machine) BlockProcessable(b *flow.Header, qc *flow.QuorumCertificate) {
 }
 
 // EventConsumer implementation
+// for ingestion Core
 var _ EventConsumer = (*Machine)(nil)
 
 func (e *Machine) BeforeComputationResultSaved(

@@ -1,7 +1,6 @@
 package ingestion
 
 import (
-	"context"
 	"fmt"
 	"sync"
 
@@ -9,8 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -24,78 +21,79 @@ type BlockHandler interface {
 	OnBlock(block *flow.Header) error
 }
 
-// BlockThrottle is a helper struct that throttles the unexecuted blocks to be sent
-func NewThrottleEngine(
-	log zerolog.Logger,
-	handler BlockHandler,
-	state protocol.State,
-	execState state.ExecutionState,
-	headers storage.Headers,
-	catchupThreshold int,
-) (*component.ComponentManager, error) {
-	throttle, err := NewBlockThrottle(log, state, execState, headers, catchupThreshold)
-	if err != nil {
-		return nil, fmt.Errorf("could not create throttle: %w", err)
-	}
-
-	e := component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			// TODO: config the buffer size
-			// since the handler.OnBlock method could be blocking, we need to make sure
-			// the channel has enough buffer space to hold the unprocessed blocks.
-			// if the channel is full, then it will block the follower engine from
-			// delivering new blocks until the channel is not full, which could be
-			// useful because we probably don't want to process too many blocks if
-			// the execution is not fast enough or even stopped.
-			// TODO: wrap the channel so that we can report acurate metrics about the
-			// buffer size
-			processables := make(chan flow.Identifier, 10000)
-
-			go func() {
-				err := forwardProcessableToHandler(ctx, headers, handler, processables)
-				if err != nil {
-					ctx.Throw(err)
-				}
-			}()
-
-			log.Info().Msg("initializing throttle engine")
-
-			err = throttle.Init(processables)
-			if err != nil {
-				ctx.Throw(err)
-			}
-
-			log.Info().Msgf("throttle engine initialized")
-
-			ready()
-		}).
-		Build()
-	return e, nil
-}
-
-func forwardProcessableToHandler(
-	ctx context.Context,
-	headers storage.Headers,
-	handler BlockHandler,
-	processables <-chan flow.Identifier,
-) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case blockID := <-processables:
-			block, err := headers.ByBlockID(blockID)
-			if err != nil {
-				return fmt.Errorf("could not get block: %w", err)
-			}
-
-			err = handler.OnBlock(block)
-			if err != nil {
-				return fmt.Errorf("could not process block: %w", err)
-			}
-		}
-	}
-}
+// // BlockThrottle is a helper struct that throttles the unexecuted blocks to be sent
+// func NewThrottleEngine(
+//
+//	log zerolog.Logger,
+//	handler BlockHandler,
+//	state protocol.State,
+//	execState state.ExecutionState,
+//	headers storage.Headers,
+//	catchupThreshold int,
+//
+//	) (*component.ComponentManager, error) {
+//		throttle, err := NewBlockThrottle(log, state, execState, headers, catchupThreshold)
+//		if err != nil {
+//			return nil, fmt.Errorf("could not create throttle: %w", err)
+//		}
+//
+//		e := component.NewComponentManagerBuilderWithName("ThrottleEngine").
+//			AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+//				// TODO: config the buffer size
+//				// since the handler.OnBlock method could be blocking, we need to make sure
+//				// the channel has enough buffer space to hold the unprocessed blocks.
+//				// if the channel is full, then it will block the follower engine from
+//				// delivering new blocks until the channel is not full, which could be
+//				// useful because we probably don't want to process too many blocks if
+//				// the execution is not fast enough or even stopped.
+//				// TODO: wrap the channel so that we can report acurate metrics about the
+//				// buffer size
+//				processables := make(chan flow.Identifier, 10000)
+//
+//				go func() {
+//					err := forwardProcessableToHandler(ctx, headers, handler, processables)
+//					if err != nil {
+//						ctx.Throw(err)
+//					}
+//				}()
+//
+//				log.Info().Msg("initializing throttle engine")
+//
+//				err = throttle.Init(processables)
+//				if err != nil {
+//					ctx.Throw(err)
+//				}
+//
+//				log.Info().Msgf("throttle engine initialized")
+//
+//				ready()
+//			}).
+//			Build()
+//		return e, nil
+//	}
+// func forwardProcessableToHandler(
+// 	ctx context.Context,
+// 	headers storage.Headers,
+// 	handler BlockHandler,
+// 	processables <-chan flow.Identifier,
+// ) error {
+// 	for {
+// 		select {
+// 		case <-ctx.Done():
+// 			return nil
+// 		case blockID := <-processables:
+// 			block, err := headers.ByBlockID(blockID)
+// 			if err != nil {
+// 				return fmt.Errorf("could not get block: %w", err)
+// 			}
+//
+// 			err = handler.OnBlock(block)
+// 			if err != nil {
+// 				return fmt.Errorf("could not process block: %w", err)
+// 			}
+// 		}
+// 	}
+// }
 
 // Throttle is a helper struct that helps throttle the unexecuted blocks to be sent
 // to the block queue for execution.
@@ -157,6 +155,7 @@ func NewBlockThrottle(
 func (c *BlockThrottle) Init(processables chan<- flow.Identifier) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.log.Info().Msgf("initializing block throttle")
 	if c.inited {
 		return fmt.Errorf("throttle already inited")
 	}
@@ -171,11 +170,13 @@ func (c *BlockThrottle) Init(processables chan<- flow.Identifier) error {
 		if err != nil {
 			return err
 		}
+		c.log.Info().Msgf("loaded %d unexecuted blocks", len(unexecuted))
 	} else {
 		unexecuted, err = findFinalized(c.state, c.headers, c.executed, c.executed+500)
 		if err != nil {
 			return err
 		}
+		c.log.Info().Msgf("loaded %d unexecuted finalized blocks", len(unexecuted))
 	}
 
 	for _, id := range unexecuted {
@@ -230,6 +231,7 @@ func (c *BlockThrottle) OnBlockExecuted(_ flow.Identifier, executed uint64) erro
 func (c *BlockThrottle) OnBlock(blockID flow.Identifier) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.log.Debug().Msgf("recieved block (%v)", blockID)
 
 	if !c.inited {
 		return fmt.Errorf("throttle not inited")
@@ -242,6 +244,7 @@ func (c *BlockThrottle) OnBlock(blockID flow.Identifier) error {
 
 	// if has caught up, then process the block
 	c.processables <- blockID
+	c.log.Debug().Msgf("processed block (%v)", blockID)
 
 	return nil
 }

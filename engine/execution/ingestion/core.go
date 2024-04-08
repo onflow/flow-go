@@ -167,6 +167,7 @@ func (e *Core) launchWorkerToConsumeThrottledBlocks(ctx irrecoverable.SignalerCo
 }
 
 func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
+	e.log.Debug().Hex("block_id", blockID[:]).Msg("processing block")
 	header, err := e.headers.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not get block: %w", err)
@@ -404,7 +405,6 @@ func (e *Core) executeConcurrently(executables []*entity.ExecutableBlock) {
 			default:
 			}
 
-			e.log.Info().Msgf("starting worker to consume throttled blocks")
 			err := e.execute(executable)
 			if err != nil {
 				e.ctx.Throw(fmt.Errorf("failed to execute block %v: %w", executable.Block.ID(), err))
