@@ -17,8 +17,6 @@ import (
 	"github.com/onflow/flow-go/ledger"
 )
 
-var nopMemoryGauge = util.NopMeter{}
-
 // TODO: optimize memory by reusing payloads snapshot created for migration
 func validateCadenceValues(
 	address common.Address,
@@ -99,7 +97,7 @@ func validateStorageDomain(
 			return fmt.Errorf("invalid key type %T, expected interpreter.StringAtreeValue or interpreter.Uint64AtreeValue", key)
 		}
 
-		newValue := newStorageMap.ReadValue(nopMemoryGauge, mapKey)
+		newValue := newStorageMap.ReadValue(nil, mapKey)
 
 		err := cadenceValueEqual(oldRuntime.Interpreter, oldValue, newRuntime.Interpreter, newValue)
 		if err != nil {
