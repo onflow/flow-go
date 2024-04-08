@@ -19,11 +19,20 @@ import (
 // The full epoch data must be generated manually and submitted with this transaction in order for an
 // EpochRecover event to be emitted. This command retrieves the current protocol state identities, computes the cluster assignment using those
 // identities, generates the cluster QC's and retrieves the DKG key vector of the last successful epoch.
+// This recovery process has some constraints:
+//  - The RecoveryEpoch must have exactly the same consensus committee as participated in the most recent successful DKG.
+//  - The RecoveryEpoch must contain enough "internal" collection nodes so that all clusters contain a supermajority of "internal" collection nodes (same constraint as sporks)
 var (
 	generateRecoverEpochTxArgsCmd = &cobra.Command{
 		Use:   "efm-recover-tx-args",
 		Short: "Generates recover epoch transaction arguments",
-		Long:  "Generates transaction arguments for the epoch recovery transaction.",
+		Long:  `
+Generates transaction arguments for the epoch recovery transaction.
+The epoch recovery transaction is used to recover from any failure in the epoch transition process without requiring a spork.
+This recovery process has some constraints:
+- The RecoveryEpoch must have exactly the same consensus committee as participated in the most recent successful DKG.
+- The RecoveryEpoch must contain enough "internal" collection nodes so that all clusters contain a supermajority of "internal" collection nodes (same constraint as sporks)
+`,
 		Run:   generateRecoverEpochTxArgs(getSnapshot),
 	}
 
@@ -46,13 +55,18 @@ func addGenerateRecoverEpochTxArgsCmdFlags() {
 	generateRecoverEpochTxArgsCmd.Flags().IntVar(&flagCollectionClusters, "collection-clusters", 3,
 		"number of collection clusters")
 	// required parameters for network configuration and generation of root node identities
-	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagNodeConfigJson, "node-config", "",
+	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagNodeConfigJson, "config", "",
 		"path to a JSON file containing multiple node configurations (fields Role, Address, Weight)")
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagInternalNodePrivInfoDir, "internal-priv-dir", "", "path to directory "+
 		"containing the output from the `keygen` command for internal nodes")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 4000, "length of each epoch measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 100, "length of the epoch staking phase measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "the epoch counter used to generate the root cluster block")
+	
+	generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-length")
+	generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-staking-phase-length")
+	generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-counter")
+	generateRecoverEpochTxArgsCmd.MarkFlagRequired("collection-clusters")
 }
 
 func getSnapshot() *inmem.Snapshot {
@@ -97,11 +111,11 @@ func generateRecoverEpochTxArgs(getSnapshot func() *inmem.Snapshot) func(cmd *co
 	}
 }
 
-// extractResetEpochArgs extracts the required transaction arguments for the `resetEpoch` transaction
+// extractRecoverEpochArgs extracts the required transaction arguments for the `recoverEpoch` transaction.
 func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 	epoch := snapshot.Epochs().Current()
 
-	ids, err := snapshot.Identities(filter.IsValidProtocolParticipant)
+	currentEpochIdentities, err := snapshot.Identities(filter.IsValidProtocolParticipant)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to get  valid protocol participants from snapshot")
 	}
@@ -158,6 +172,8 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 	dkgPubKeys := make([]cadence.Value, 0)
 	nodeIds := make([]cadence.Value, 0)
 
+	// NOTE: The RecoveryEpoch will re-use the last successful DKG output. This means that the consensus
+	// committee in the RecoveryEpoch must be identical to the committee which participated in that DKG.
 	dkgGroupKeyCdc, cdcErr := cadence.NewString(currentEpochDKG.GroupKey().String())
 	if cdcErr != nil {
 		log.Fatal().Err(cdcErr).Msg("failed to get dkg group key cadence string")

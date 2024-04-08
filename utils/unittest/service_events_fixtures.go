@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	json2 "github.com/onflow/cadence/encoding/json"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
