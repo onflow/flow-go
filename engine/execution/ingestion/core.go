@@ -93,7 +93,6 @@ func NewCore(
 		eventConsumer:     eventConsumer,
 	}
 
-	// TODO: make sure Init is able to store all processable blocks
 	err := e.throttle.Init(e.processables)
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("fail to initialize throttle engine")
