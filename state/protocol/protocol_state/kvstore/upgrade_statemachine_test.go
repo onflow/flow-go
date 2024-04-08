@@ -1,7 +1,8 @@
-package kvstore
+package kvstore_test
 
 import (
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -26,7 +27,7 @@ type StateMachineSuite struct {
 	mutator     *mock.KVStoreMutator
 	params      *mockprotocol.GlobalParams
 
-	stateMachine *PSVersionUpgradeStateMachine
+	stateMachine *kvstore.PSVersionUpgradeStateMachine
 }
 
 func (s *StateMachineSuite) SetupTest() {
@@ -37,7 +38,7 @@ func (s *StateMachineSuite) SetupTest() {
 
 	s.params.On("EpochCommitSafetyThreshold").Return(uint64(100)).Maybe()
 
-	s.stateMachine = NewPSVersionUpgradeStateMachine(s.view, s.params, s.parentState, s.mutator)
+	s.stateMachine = kvstore.NewPSVersionUpgradeStateMachine(s.view, s.params, s.parentState, s.mutator)
 	require.NotNil(s.T(), s.stateMachine)
 }
 
