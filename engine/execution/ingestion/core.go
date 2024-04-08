@@ -141,12 +141,17 @@ func (e *Core) launchWorkerToConsumeThrottledBlocks(ctx irrecoverable.SignalerCo
 	// and forward them to the block queue for processing
 	go func(ctx irrecoverable.SignalerContext, processables <-chan flow.Identifier) {
 		e.log.Info().Msgf("starting worker to consume throttled blocks")
+		defer func() {
+			e.log.Info().Msgf("worker to consume throttled blocks stopped")
+		}()
 		for {
 			select {
 			case <-ctx.Done():
+				e.log.Info().Msgf("irrecoverable.Done() is called")
 				return
 
 			case blockID := <-processables:
+				e.log.Debug().Hex("block_id", blockID[:]).Msg("ingestion core processing block")
 				err := e.onProcessableBlock(blockID)
 				if err != nil {
 					ctx.Throw(fmt.Errorf("fail to process block: %w", err))
@@ -154,6 +159,7 @@ func (e *Core) launchWorkerToConsumeThrottledBlocks(ctx irrecoverable.SignalerCo
 				}
 			}
 		}
+
 	}(ctx, processables)
 
 	e.log.Info().Msg("initializing throttle engine")
@@ -167,7 +173,6 @@ func (e *Core) launchWorkerToConsumeThrottledBlocks(ctx irrecoverable.SignalerCo
 }
 
 func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
-	e.log.Debug().Hex("block_id", blockID[:]).Msg("processing block")
 	header, err := e.headers.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not get block: %w", err)
@@ -355,6 +360,9 @@ func (e *Core) onBlockExecuted(
 }
 
 func (e *Core) onCollection(col *flow.Collection) error {
+	e.log.Info().
+		Hex("collection_id", logging.Entity(col)).
+		Msgf("handle collection")
 	// EN might request a collection from multiple collection nodes,
 	// therefore might receive multiple copies of the same collection.
 	// we only need to store it once.

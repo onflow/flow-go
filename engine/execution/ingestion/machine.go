@@ -91,6 +91,7 @@ func NewMachine(
 
 	protocolEvents.AddConsumer(e)
 	collectionRequester.WithHandle(func(originID flow.Identifier, entity flow.Entity) {
+		e.log.Info().Msgf("collection received")
 		collection, ok := entity.(*flow.Collection)
 		if !ok {
 			e.log.Error().Msgf("invalid entity type (%T)", entity)
