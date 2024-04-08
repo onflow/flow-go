@@ -4,17 +4,15 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/onflow/cadence/runtime/stdlib"
-	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/fvm/evm/testutils"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -131,7 +129,7 @@ func GenerateAccountCreateEvent(t *testing.T, address flow.Address) flow.Event {
 		Fields: []cadence.Field{
 			{
 				Identifier: "address",
-				Type:       cadence.AddressType{},
+				Type:       cadence.AddressType,
 			},
 		},
 	})
@@ -162,7 +160,7 @@ func GenerateAccountContractEvent(t *testing.T, qualifiedIdentifier string, addr
 			cadence.NewAddress(address),
 			cadence.NewArray(
 				testutils.ConvertToCadence([]byte{111, 43, 164, 202, 220, 174, 148, 17, 253, 161, 9, 124, 237, 83, 227, 75, 115, 149, 141, 83, 129, 145, 252, 68, 122, 137, 80, 155, 89, 233, 136, 213}),
-			).WithType(cadence.NewConstantSizedArrayType(32, cadence.TheUInt8Type)),
+			).WithType(cadence.NewConstantSizedArrayType(32, cadence.UInt8Type)),
 			contractName,
 		}).WithType(&cadence.EventType{
 		Location:            stdlib.FlowLocation{},
@@ -170,15 +168,15 @@ func GenerateAccountContractEvent(t *testing.T, qualifiedIdentifier string, addr
 		Fields: []cadence.Field{
 			{
 				Identifier: "address",
-				Type:       cadence.AddressType{},
+				Type:       cadence.AddressType,
 			},
 			{
 				Identifier: "codeHash",
-				Type:       cadence.NewConstantSizedArrayType(32, cadence.TheUInt8Type),
+				Type:       cadence.NewConstantSizedArrayType(32, cadence.UInt8Type),
 			},
 			{
 				Identifier: "contract",
-				Type:       cadence.StringType{},
+				Type:       cadence.StringType,
 			},
 		},
 	})
