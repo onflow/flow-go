@@ -2,6 +2,7 @@ package epochs
 
 import (
 	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
@@ -11,10 +12,14 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// StateMachine implements a low-level interface for state-changing operations on the protocol state.
-// It is used by higher level logic to evolve the protocol state when certain events that are stored in blocks are observed.
-// The StateMachine is stateful and internally tracks the current protocol state. A separate instance is created for
-// each block that is being processed.
+// StateMachine implements a low-level interface for state-changing operations on the Epoch state.
+// It is used by higher level logic to coordinate the Epoch handover, evolving its internal state
+// when Epoch-related Service Events are sealed or specific view-thresholds are reached.
+//
+// The StateMachine is fork-aware, in that it starts with the Epoch state of the parent block and
+// evolves the state based on the relevant information in the child block (specifically Service Events
+// sealed in the child block and the child block's view). A separate instance must be created for each
+// block that is being processed. Calling `Build()` constructs a snapshot of the resulting Epoch state.
 type StateMachine interface {
 	// Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
 	// CAUTION:
@@ -23,20 +28,20 @@ type StateMachine interface {
 	// dysfunctional state and should be discarded.
 	Build() (updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, hasChanges bool)
 
-	// ProcessEpochSetup updates current protocol state with data from epoch setup event.
-	// Processing epoch setup event also affects identity table for current epoch.
-	// Observing an epoch setup event, transitions protocol state from staking to setup phase, we stop returning
+	// ProcessEpochSetup updates the internally-maintained interim Epoch state with data from epoch setup event.
+	// Processing an epoch setup event also affects the identity table for the current epoch.
+	// Specifically, we transition the Epoch state from staking to setup phase, we stop returning
 	// identities from previous+current epochs and start returning identities from current+next epochs.
 	// As a result of this operation protocol state for the next epoch will be created.
 	// Returned boolean indicates if event triggered a transition in the state machine or not.
 	// Implementors must never return (true, error).
 	// Expected errors indicating that we are leaving the happy-path of the epoch transitions
 	//   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
-	//     CAUTION: the HappyPathStateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
-	//     after such error and discard the HappyPathStateMachine!
+	//     CAUTION: the StateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
+	//     after such error and discard the StateMachine!
 	ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error)
 
-	// ProcessEpochCommit updates current protocol state with data from epoch commit event.
+	// ProcessEpochCommit updates the internally-maintained interim Epoch state with data from epoch commit event.
 	// Observing an epoch setup commit, transitions protocol state from setup to commit phase.
 	// At this point, we have finished construction of the next epoch.
 	// As a result of this operation protocol state for next epoch will be committed.
@@ -44,8 +49,8 @@ type StateMachine interface {
 	// Implementors must never return (true, error).
 	// Expected errors indicating that we are leaving the happy-path of the epoch transitions
 	//   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
-	//     CAUTION: the HappyPathStateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
-	//     after such error and discard the HappyPathStateMachine!
+	//     CAUTION: the StateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
+	//     after such error and discard the StateMachine!
 	ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error)
 
 	// EjectIdentity updates identity table by changing the node's participation status to 'ejected'.
@@ -54,24 +59,32 @@ type StateMachine interface {
 	// - `protocol.InvalidServiceEventError` if the updated identity is not found in current and adjacent epochs.
 	EjectIdentity(nodeID flow.Identifier) error
 
-	// TransitionToNextEpoch discards current protocol state and transitions to the next epoch.
+	// TransitionToNextEpoch transitions our reference frame of 'current epoch' to the pending but committed epoch.
 	// Epoch transition is only allowed when:
-	// - next epoch has been set up,
 	// - next epoch has been committed,
 	// - candidate block is in the next epoch.
 	// No errors are expected during normal operations.
 	TransitionToNextEpoch() error
 
-	// View returns the view that is associated with this StateMachine.
-	// The view of the StateMachine equals the view of the block carrying the respective updates.
+	// View returns the view associated with this state machine.
+	// The view of the state machine equals the view of the block carrying the respective updates.
 	View() uint64
 
-	// ParentState returns parent protocol state that is associated with this StateMachine.
+	// ParentState returns parent protocol state associated with this state machine.
 	ParentState() *flow.RichProtocolStateEntry
 }
 
+// StateMachineFactoryMethod is a factory method to create state machines for evolving the protocol's epoch state.
+// Currently, we have `HappyPathStateMachine` and `FallbackStateMachine` as StateMachine
+// implementations, whose constructors both have the same signature as StateMachineFactoryMethod.
+type StateMachineFactoryMethod func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (StateMachine, error)
+
+// EpochStateMachine is a hierarchical state machine that encapsulates the logic for protocol-compliant evolution of Epoch-related sub-state.
+// EpochStateMachine processes a subset of service events that are relevant for the Epoch state, and ignores all other events.
+// EpochStateMachine delegates the processing of service events to an embedded StateMachine,
+// which is either a HappyPathStateMachine or a FallbackStateMachine depending on the operation mode of the protocol.
+// It relies on Key-Value Store to read the parent state and to persist the snapshot of the updated Epoch state.
 type EpochStateMachine struct {
-	candidate                        *flow.Header
 	activeStateMachine               StateMachine
 	parentState                      protocol_state.KVStoreReader
 	mutator                          protocol_state.KVStoreMutator
@@ -80,23 +93,31 @@ type EpochStateMachine struct {
 	setups           storage.EpochSetups
 	commits          storage.EpochCommits
 	protocolStateDB  storage.ProtocolState
-	pendingDbUpdates []transaction.DeferredDBUpdate
+	pendingDbUpdates protocol.DeferredBlockPersistOps
 }
 
 var _ protocol_state.KeyValueStoreStateMachine = (*EpochStateMachine)(nil)
 
+// NewEpochStateMachine creates a new higher-level hierarchical state machine for protocol-compliant evolution of Epoch-related sub-state.
+// NewEpochStateMachine performs initialization of state machine depending on the operation mode of the protocol.
+// - for the happy path, it initializes a HappyPathStateMachine,
+// - for the epoch fallback mode it initializes a FallbackStateMachine.
+// No errors are expected during normal operations.
 func NewEpochStateMachine(
-	candidate *flow.Header,
+	candidateView uint64,
+	parentID flow.Identifier,
 	params protocol.GlobalParams,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	protocolStateDB storage.ProtocolState,
 	parentState protocol_state.KVStoreReader,
 	mutator protocol_state.KVStoreMutator,
+	happyPathStateMachineFactory StateMachineFactoryMethod,
+	epochFallbackStateMachineFactory StateMachineFactoryMethod,
 ) (*EpochStateMachine, error) {
-	parentEpochState, err := protocolStateDB.ByBlockID(candidate.ParentID)
+	parentEpochState, err := protocolStateDB.ByBlockID(parentID)
 	if err != nil {
-		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", candidate.ParentID, err)
+		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", parentID, err)
 	}
 
 	// sanity check: the parent epoch state ID must be set in KV store
@@ -105,10 +126,8 @@ func NewEpochStateMachine(
 			parentState.GetEpochStateID(), parentEpochState.ID())
 	}
 
-	var (
-		stateMachine StateMachine
-	)
-	candidateAttemptsInvalidEpochTransition := epochFallbackTriggeredByIncorporatingCandidate(candidate.View, params, parentEpochState)
+	var stateMachine StateMachine
+	candidateAttemptsInvalidEpochTransition := epochFallbackTriggeredByIncorporatingCandidate(candidateView, params, parentEpochState)
 	if parentEpochState.InvalidEpochTransitionAttempted || candidateAttemptsInvalidEpochTransition {
 		// Case 1: InvalidEpochTransitionAttempted is true, indicating that we have encountered an invalid
 		//         epoch service event or an invalid state transition previously in this fork.
@@ -118,101 +137,63 @@ func NewEpochStateMachine(
 		// and we must use only the `epochFallbackStateMachine` along this fork.
 		//
 		// TODO for 'leaving Epoch Fallback via special service event': this might need to change.
-		stateMachine = NewEpochFallbackStateMachine(candidate.View, parentEpochState)
+		stateMachine, err = epochFallbackStateMachineFactory(candidateView, parentEpochState)
 	} else {
-		stateMachine, err = NewStateMachine(candidate.View, parentEpochState)
+		stateMachine, err = happyPathStateMachineFactory(candidateView, parentEpochState)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize protocol state machine: %w", err)
 	}
 
 	return &EpochStateMachine{
-		candidate:          candidate,
 		activeStateMachine: stateMachine,
 		parentState:        parentState,
 		mutator:            mutator,
 		epochFallbackStateMachineFactory: func() (StateMachine, error) {
-			return NewEpochFallbackStateMachine(candidate.View, parentEpochState), nil
+			return epochFallbackStateMachineFactory(candidateView, parentEpochState)
 		},
-		setups:           setups,
-		commits:          commits,
-		protocolStateDB:  protocolStateDB,
-		pendingDbUpdates: nil,
+		setups:          setups,
+		commits:         commits,
+		protocolStateDB: protocolStateDB,
 	}, nil
 }
 
-func (e *EpochStateMachine) Build() []transaction.DeferredDBUpdate {
+// Build schedules updates to the protocol state by obtaining the updated state from the active state machine,
+// preparing deferred DB updates and committing updated sub-state ID to the KV store.
+// ATTENTION: In mature implementation all parts of the Dynamic Protocol State will rely on the Key-Value Store as storage
+// but to avoid a large refactoring we are using a hybrid approach where only the epoch state ID is stored in the KV Store
+// but the actual epoch state is stored separately, nevertheless, the epoch state ID is used to sanity check if the
+// epoch state is consistent with the KV Store. Using this approach, we commit the epoch sub-state to the KV Store which in
+// affects the Dynamic Protocol State ID which is essentially hash of the KV Store.
+func (e *EpochStateMachine) Build() protocol.DeferredBlockPersistOps {
 	updatedEpochState, updatedStateID, hasChanges := e.activeStateMachine.Build()
 	dbUpdates := e.pendingDbUpdates
-	dbUpdates = append(dbUpdates, e.protocolStateDB.Index(e.candidate.ID(), updatedStateID))
+	dbUpdates.Add(func(tx *transaction.Tx, blockID flow.Identifier) error {
+		return e.protocolStateDB.Index(blockID, updatedStateID)(tx)
+	})
 	if hasChanges {
-		dbUpdates = append(dbUpdates, operation.SkipDuplicatesTx(e.protocolStateDB.StoreTx(updatedStateID, updatedEpochState)))
+		dbUpdates.AddBadgerUpdate(operation.SkipDuplicatesTx(e.protocolStateDB.StoreTx(updatedStateID, updatedEpochState)))
 	}
 	e.mutator.SetEpochStateID(updatedStateID)
 
 	return dbUpdates
 }
 
-// ApplyServiceEventsFromValidatedSeals applies the state changes that are delivered via
-// sealed service events:
-//   - iterating over the sealed service events in order of increasing height
-//   - identifying state-changing service event and calling into the embedded
-//     StateMachine to apply the respective state update
-//   - tracking deferred database updates necessary to persist the updated
-//     protocol state's *dependencies*. Persisting and indexing `updatedState`
-//     is the responsibility of the calling code (specifically `FollowerState`)
-//
-// All updates only mutate the `StateMutator`'s internal in-memory copy of the
-// protocol state, without changing the parent state (i.e. the state we started from).
-//
-// SAFETY REQUIREMENT:
-// The StateMutator assumes that the proposal has passed the following correctness checks!
-//   - The seals in the payload continuously follow the ancestry of this fork. Specifically,
-//     there are no gaps in the seals.
-//   - The seals guarantee correctness of the sealed execution result, including the contained
-//     service events. This is actively checked by the verification node, whose aggregated
-//     approvals in the form of a seal attest to the correctness of the sealed execution result,
-//     including the contained.
-//
-// Consensus nodes actively verify protocol compliance for any block proposal they receive,
-// including integrity of each seal individually as well as the seals continuously following the
-// fork. Light clients only process certified blocks, which guarantees that consensus nodes already
-// ran those checks and found the proposal to be valid.
-//
-// Details on SERVICE EVENTS:
-// Consider a chain where a service event is emitted during execution of block A.
-// Block B contains an execution receipt for A. Block C contains a seal for block
-// A's execution result.
-//
-//	A <- .. <- B(RA) <- .. <- C(SA)
-//
-// Service Events are included within execution results, which are stored
-// opaquely as part of the block payload in block B. We only validate, process and persist
-// the typed service event to storage once we process C, the block containing the
-// seal for block A. This is because we rely on the sealing subsystem to validate
-// correctness of the service event before processing it.
-// Consequently, any change to the protocol state introduced by a service event
-// emitted during execution of block A would only become visible when querying
-// C or its descendants.
-//
-// Error returns:
-//   - Per convention, the input seals from the block payload have already been confirmed to be protocol compliant.
-//     Hence, the service events in the sealed execution results represent the honest execution path.
-//     Therefore, the sealed service events should encode a valid evolution of the protocol state -- provided
-//     the system smart contracts are correct.
-//   - As we can rule out byzantine attacks as the source of failures, the only remaining sources of problems
-//     can be (a) bugs in the system smart contracts or (b) bugs in the node implementation.
-//     A service event not representing a valid state transition despite all consistency checks passing
-//     is interpreted as case (a) and handled internally within the StateMutator. In short, we go into Epoch
-//     Fallback Mode by copying the parent state (a valid state snapshot) and setting the
-//     `InvalidEpochTransitionAttempted` flag. All subsequent Epoch-lifecycle events are ignored.
-//   - A consistency or sanity check failing within the StateMutator is likely the symptom of an internal bug
-//     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
-//     of this function is not nil. If such an exception is returned, continuing is not an option.
-func (e *EpochStateMachine) ProcessUpdate(update []*flow.ServiceEvent) error {
+// EvolveState applies the state changes that are delivered via sealed service events.
+// The block's payload might contain epoch preparation service events for the next
+// epoch. In this case, we need to update the tentative protocol state.
+// We need to validate whether all information is available in the protocol
+// state to go to the next epoch when needed. In cases where there is a bug
+// in the smart contract, it could be that this happens too late, and we should trigger epoch fallback mode.
+// No errors are expected during normal operations.
+func (e *EpochStateMachine) EvolveState(update []flow.ServiceEvent) error {
 	parentProtocolState := e.activeStateMachine.ParentState()
 
-	// perform protocol state transition to next epoch if next epoch is committed and we are at first block of epoch
+	// perform protocol state transition to next epoch if next epoch is committed, and we are at first block of epoch
+	// TODO: The current implementation has edge cases for future light clients and can potentially drive consensus
+	//       into an irreconcilable state (not sure). See for details https://github.com/onflow/flow-go/issues/5631
+	//       These edge cases are very unlikely, so this is an acceptable implementation in the short - mid term.
+	//       However, this code will likely need to be changed when working on EFM recovery.
 	phase := parentProtocolState.EpochPhase()
 	if phase == flow.EpochPhaseCommitted {
 		activeSetup := parentProtocolState.CurrentEpochSetup
@@ -235,14 +216,17 @@ func (e *EpochStateMachine) ProcessUpdate(update []*flow.ServiceEvent) error {
 			return irrecoverable.NewExceptionf("could not apply service events from ordered results: %w", err)
 		}
 	}
-	e.pendingDbUpdates = append(e.pendingDbUpdates, dbUpdates...)
+	e.pendingDbUpdates.AddBadgerUpdate(dbUpdates...)
 	return nil
 }
 
+// View returns the view associated with this state machine.
+// The view of the state machine equals the view of the block carrying the respective updates.
 func (e *EpochStateMachine) View() uint64 {
 	return e.activeStateMachine.View()
 }
 
+// ParentState returns parent state associated with this state machine.
 func (e *EpochStateMachine) ParentState() protocol_state.KVStoreReader {
 	return e.parentState
 }
@@ -253,9 +237,9 @@ func (e *EpochStateMachine) ParentState() protocol_state.KVStoreReader {
 // Results must be ordered by block height.
 // Expected errors during normal operations:
 // - `protocol.InvalidServiceEventError` if any service event is invalid or is not a valid state transition for the current protocol state
-func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(events []*flow.ServiceEvent) ([]func(tx *transaction.Tx) error, error) {
+func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(orderedUpdates []flow.ServiceEvent) ([]transaction.DeferredDBUpdate, error) {
 	var dbUpdates []transaction.DeferredDBUpdate
-	for _, event := range events {
+	for _, event := range orderedUpdates {
 		switch ev := event.Event.(type) {
 		case *flow.EpochSetup:
 			processed, err := e.activeStateMachine.ProcessEpochSetup(ev)
@@ -288,13 +272,13 @@ func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(events []*flow.
 // transitionToEpochFallbackMode transitions the protocol state to Epoch Fallback Mode [EFM].
 // This is implemented by switching to a different state machine implementation, which ignores all service events and epoch transitions.
 // At the moment, this is a one-way transition: once we enter EFM, the only way to return to normal is with a spork.
-func (e *EpochStateMachine) transitionToEpochFallbackMode(events []*flow.ServiceEvent) ([]func(tx *transaction.Tx) error, error) {
+func (e *EpochStateMachine) transitionToEpochFallbackMode(orderedUpdates []flow.ServiceEvent) ([]transaction.DeferredDBUpdate, error) {
 	var err error
 	e.activeStateMachine, err = e.epochFallbackStateMachineFactory()
 	if err != nil {
 		return nil, fmt.Errorf("could not create epoch fallback state machine: %w", err)
 	}
-	dbUpdates, err := e.applyServiceEventsFromOrderedResults(events)
+	dbUpdates, err := e.applyServiceEventsFromOrderedResults(orderedUpdates)
 	if err != nil {
 		return nil, irrecoverable.NewExceptionf("could not apply service events after transition to epoch fallback mode: %w", err)
 	}

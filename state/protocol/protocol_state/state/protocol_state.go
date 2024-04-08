@@ -2,11 +2,13 @@ package state
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -52,9 +54,8 @@ type MutableProtocolState struct {
 	ProtocolState
 	headers          storage.Headers
 	results          storage.ExecutionResults
-	setups           storage.EpochSetups
-	commits          storage.EpochCommits
 	kvStoreSnapshots storage.ProtocolKVStore
+	kvStoreFactories []protocol_state.KeyValueStoreStateMachineFactory
 }
 
 var _ protocol.MutableProtocolState = (*MutableProtocolState)(nil)
@@ -69,13 +70,18 @@ func NewMutableProtocolState(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 ) *MutableProtocolState {
+	// an ordered list of factories to create state machines for different sub-states of the Dynamic Protocol State.
+	// all factories are expected to be called in order defined here.
+	kvStoreFactories := []protocol_state.KeyValueStoreStateMachineFactory{
+		kvstore.NewPSVersionUpgradeStateMachineFactory(globalParams),
+		epochs.NewEpochStateMachineFactory(globalParams, setups, commits, protocolStateDB),
+	}
 	return &MutableProtocolState{
 		ProtocolState:    *NewProtocolState(protocolStateDB, globalParams),
 		headers:          headers,
 		results:          results,
-		setups:           setups,
-		commits:          commits,
 		kvStoreSnapshots: kvStoreSnapshots,
+		kvStoreFactories: kvStoreFactories,
 	}
 }
 
@@ -83,25 +89,23 @@ func NewMutableProtocolState(
 // Has to be called for each block to evolve the protocol state.
 // Expected errors during normal operations:
 //   - `storage.ErrNotFound` if no protocol state for parent block is known.
-func (s *MutableProtocolState) Mutator(candidate *flow.Header) (protocol.StateMutator, error) {
-	parentStateData, err := s.kvStoreSnapshots.ByBlockID(candidate.ParentID)
+func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Identifier) (protocol.StateMutator, error) {
+	parentStateData, err := s.kvStoreSnapshots.ByBlockID(parentID)
 	if err != nil {
-		return nil, fmt.Errorf("could not query parent KV store at block (%x): %w", candidate.ParentID, err)
+		return nil, fmt.Errorf("could not query parent KV store at block (%x): %w", parentID, err)
 	}
 	parentState, err := kvstore.VersionedDecode(parentStateData.Version, parentStateData.Data)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode parent protocol state (version=%d) at block (%x): %w",
-			parentStateData.Version, candidate.ParentID, err)
+			parentStateData.Version, parentID, err)
 	}
 	return newStateMutator(
 		s.headers,
 		s.results,
-		s.setups,
-		s.commits,
-		s.protocolStateDB,
 		s.kvStoreSnapshots,
-		s.globalParams,
-		candidate,
+		candidateView,
+		parentID,
 		parentState,
+		s.kvStoreFactories...,
 	)
 }

@@ -9,6 +9,15 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 )
 
+// This file contains the concrete types that define the structure of the underlying key-value store
+// for a particular Protocol State version.
+// Essentially enumerating the set of keys and values that are supported.
+// When a key is added or removed, this requires a new protocol state version.
+// To use new version of the protocol state, create a new versioned model in models.go (eg. modelv3 if latest model is modelv2)
+// ATTENTION: All models should be public with public fields otherwise the encoding/decoding will not work.
+
+// UpgradableModel is a utility struct that must be embedded in all model versions to provide
+// a common interface for managing protocol version upgrades.
 type UpgradableModel struct {
 	VersionUpgrade *protocol_state.ViewBasedActivator[uint64]
 }
@@ -22,7 +31,7 @@ func (model *UpgradableModel) SetVersionUpgrade(activator *protocol_state.ViewBa
 
 // GetVersionUpgrade returns the upgrade version of protocol.
 // VersionUpgrade is a view-based activator that specifies the version which has to be applied
-// and the view from which on it has to be applied. It may return the current protocol version
+// and the view from which it has to be applied. It may return the current protocol version
 // with a past view if the upgrade has already been activated.
 func (model *UpgradableModel) GetVersionUpgrade() *protocol_state.ViewBasedActivator[uint64] {
 	return model.VersionUpgrade
@@ -53,7 +62,7 @@ var _ protocol_state.KVStoreMutator = (*Modelv0)(nil)
 func (model *Modelv0) ID() flow.Identifier { return flow.MakeID(model) }
 
 // Replicate instantiates a Protocol State Snapshot of the given `protocolVersion`.
-// It clones existing snapshot if `protocolVersion = 0` and performs a migration if `protocolVersion = 1`.
+// It clones existing snapshot and performs a migration if `protocolVersion = 1`.
 // Expected errors during normal operations:
 //   - ErrIncompatibleVersionChange if replicating the Parent Snapshot into a Snapshot
 //     with the specified `protocolVersion` is not supported.
@@ -101,10 +110,14 @@ func (model *Modelv0) SetInvalidEpochTransitionAttempted(_ bool) error {
 	return ErrKeyNotSupported
 }
 
+// GetEpochStateID returns the state ID of the epoch state.
+// This is part of the most basic model and is used to commit the epoch state to the KV store.
 func (model *Modelv0) GetEpochStateID() flow.Identifier {
 	return model.EpochStateID
 }
 
+// SetEpochStateID sets the state ID of the epoch state.
+// This method is used to commit the epoch state to the KV store when the state of the epoch is updated.
 func (model *Modelv0) SetEpochStateID(id flow.Identifier) {
 	model.EpochStateID = id
 }

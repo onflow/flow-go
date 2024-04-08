@@ -9,12 +9,14 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestProtocolState_AtBlockID
+// TestProtocolState_AtBlockID tests different scenarios of retrieving a protocol state by block ID.
+// Happy and unhappy paths are covered.
 func TestProtocolState_AtBlockID(t *testing.T) {
 	entry := unittest.ProtocolStateFixture(unittest.WithValidDKG())
 	otherEntry := unittest.ProtocolStateFixture(unittest.WithValidDKG())
@@ -62,6 +64,7 @@ func TestProtocolState_AtBlockID(t *testing.T) {
 // if the parent protocol state has not been found.
 func TestMutableProtocolState_Mutator(t *testing.T) {
 	protocolStateDB := storagemock.NewProtocolState(t)
+	kvStoreSnapshotsDB := storagemock.NewProtocolKVStore(t)
 	globalParams := mock.NewGlobalParams(t)
 	globalParams.On("EpochCommitSafetyThreshold").Return(uint64(1000))
 	headersDB := storagemock.NewHeaders(t)
@@ -71,6 +74,7 @@ func TestMutableProtocolState_Mutator(t *testing.T) {
 
 	mutableState := NewMutableProtocolState(
 		protocolStateDB,
+		kvStoreSnapshotsDB,
 		globalParams,
 		headersDB,
 		resultsDB,
@@ -78,27 +82,33 @@ func TestMutableProtocolState_Mutator(t *testing.T) {
 		commitsDB)
 
 	t.Run("happy-path", func(t *testing.T) {
-		parentState := unittest.ProtocolStateFixture()
-		candidate := unittest.BlockHeaderFixture()
-		protocolStateDB.On("ByBlockID", candidate.ParentID).Return(parentState, nil)
+		parentEpochState := unittest.ProtocolStateFixture()
+		candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(parentEpochState.CurrentEpochSetup.FirstView + 1))
+		protocolStateDB.On("ByBlockID", candidate.ParentID).Return(parentEpochState, nil).Once()
+
+		version, data, err := (&kvstore.Modelv1{
+			Modelv0: kvstore.Modelv0{
+				UpgradableModel: kvstore.UpgradableModel{},
+				EpochStateID:    parentEpochState.ID(),
+			},
+			InvalidEpochTransitionAttempted: false,
+		}).VersionedEncode()
+		parentState := &storage.KeyValueStoreData{
+			Version: version,
+			Data:    data,
+		}
+		require.NoError(t, err)
+		kvStoreSnapshotsDB.On("ByBlockID", candidate.ParentID).Return(parentState, nil)
+
 		mutator, err := mutableState.Mutator(candidate.View, candidate.ParentID)
 		require.NoError(t, err)
 		require.NotNil(t, mutator)
 	})
 	t.Run("parent-not-found", func(t *testing.T) {
 		candidate := unittest.BlockHeaderFixture()
-		protocolStateDB.On("ByBlockID", candidate.ParentID).Return(nil, storage.ErrNotFound)
+		kvStoreSnapshotsDB.On("ByBlockID", candidate.ParentID).Return(nil, storage.ErrNotFound)
 		mutator, err := mutableState.Mutator(candidate.View, candidate.ParentID)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 		require.Nil(t, mutator)
-	})
-	t.Run("invalid-state-transition-triggered", func(t *testing.T) {
-		parentState := unittest.ProtocolStateFixture()
-		parentState.InvalidEpochTransitionAttempted = true
-		candidate := unittest.BlockHeaderFixture()
-		protocolStateDB.On("ByBlockID", candidate.ParentID).Return(parentState, nil)
-		mutator, err := mutableState.Mutator(candidate.View, candidate.ParentID)
-		require.NoError(t, err)
-		require.NotNil(t, mutator)
 	})
 }

@@ -2,21 +2,15 @@ package state
 
 import (
 	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
-
-// StateMachineFactoryMethod is a factory to create state machines for evolving the protocol state.
-// Currently, we have `protocolStateMachine` and `epochFallbackStateMachine` as StateMachine
-// implementations, whose constructors both have the same signature as StateMachineFactoryMethod.
-type StateMachineFactoryMethod = func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error)
 
 // stateMutator is a stateful object to evolve the protocol state. It is instantiated from the parent block's protocol state.
 // State-changing operations can be iteratively applied and the stateMutator will internally evolve its in-memory state.
@@ -36,7 +30,6 @@ type stateMutator struct {
 	results          storage.ExecutionResults
 	kvStoreSnapshots storage.ProtocolKVStore
 
-	candidate            *flow.Header
 	parentState          protocol_state.KVStoreReader
 	kvMutator            protocol_state.KVStoreMutator
 	orthoKVStoreMachines []protocol_state.KeyValueStoreStateMachine
@@ -50,19 +43,15 @@ var _ protocol.StateMutator = (*stateMutator)(nil)
 func newStateMutator(
 	headers storage.Headers,
 	results storage.ExecutionResults,
-	setups storage.EpochSetups,
-	commits storage.EpochCommits,
-	protocolStateSnapshots storage.ProtocolState,
 	kvStoreSnapshots storage.ProtocolKVStore,
-	params protocol.GlobalParams,
-	candidate *flow.Header,
+	candidateView uint64,
+	parentID flow.Identifier,
 	parentState protocol_state.KVStoreAPI,
+	stateMachineFactories ...protocol_state.KeyValueStoreStateMachineFactory,
 ) (*stateMutator, error) {
-	stateMachines := make([]protocol_state.KeyValueStoreStateMachine, 0)
-
 	protocolVersion := parentState.GetProtocolStateVersion()
 	if versionUpgrade := parentState.GetVersionUpgrade(); versionUpgrade != nil {
-		if candidate.View >= versionUpgrade.ActivationView {
+		if candidateView >= versionUpgrade.ActivationView {
 			protocolVersion = versionUpgrade.Data
 		}
 	}
@@ -73,27 +62,16 @@ func newStateMutator(
 			parentState.GetProtocolStateVersion(), protocolVersion, err)
 	}
 
-	epochsStateMachine, err := epochs.NewEpochStateMachine(
-		candidate,
-		params,
-		setups,
-		commits,
-		protocolStateSnapshots,
-		parentState,
-		replicatedState,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("could not create epoch state machine: %w", err)
+	stateMachines := make([]protocol_state.KeyValueStoreStateMachine, 0, len(stateMachineFactories))
+	for _, factory := range stateMachineFactories {
+		stateMachine, err := factory.Create(candidateView, parentID, parentState, replicatedState)
+		if err != nil {
+			return nil, fmt.Errorf("could not create state machine: %w", err)
+		}
+		stateMachines = append(stateMachines, stateMachine)
 	}
 
-	versionUpgradeStateMachine := kvstore.NewPSVersionUpgradeStateMachine(candidate.View, params, parentState, replicatedState)
-
-	// at this point, we define the order in which state machines process updates
-	stateMachines = append(stateMachines, epochsStateMachine)
-	stateMachines = append(stateMachines, versionUpgradeStateMachine)
-
 	return &stateMutator{
-		candidate:            candidate,
 		headers:              headers,
 		results:              results,
 		kvStoreSnapshots:     kvStoreSnapshots,
@@ -103,31 +81,34 @@ func newStateMutator(
 	}, nil
 }
 
-// Build returns:
-//   - hasChanges: flag whether there were any changes; otherwise, `updatedState` and `stateID` equal the parent state
-//   - updatedState: the ProtocolState after applying all updates.
-//   - stateID: the hash commitment to the `updatedState`
-//   - dbUpdates: database updates necessary for persisting the updated protocol state's *dependencies*.
-//     If hasChanges is false, updatedState is empty. Caution: persisting the `updatedState` itself and adding
-//     it to the relevant indices is _not_ in `dbUpdates`. Persisting and indexing `updatedState` is the responsibility
-//     of the calling code (specifically `FollowerState`).
+// Build constructs the resulting protocol state, *after* applying all the sealed service events in a block (under construction)
+// via `ApplyServiceEventsFromValidatedSeals(...)`. It returns:
+//   - stateID: the hash commitment to the updated Protocol State Snapshot
+//   - dbUpdates: database updates necessary for persisting the State Snapshot itself including all data structures
+//     that the Snapshot references. In addition, `dbUpdates` also populates the `ProtocolKVStore.ByBlockID`.
+//     Therefore, even if there are no changes of the Protocol State, `dbUpdates` still contains deferred storage writes
+//     that must be executed to populate the `ByBlockID` index.
+//   - err: All error returns indicate potential state corruption and should therefore be treated as fatal.
 //
-// updated protocol state entry, state ID and a flag indicating if there were any changes.
-func (m *stateMutator) Build() (flow.Identifier, []transaction.DeferredDBUpdate, error) {
-	var dbUpdates []transaction.DeferredDBUpdate
+// CAUTION:
+//   - For Consensus Participants that are replicas, the calling code must check that the returned `stateID` matches the
+//     commitment in the block proposal! If they don't match, the proposal is byzantine and should be slashed.
+func (m *stateMutator) Build() (stateID flow.Identifier, dbUpdates protocol.DeferredBlockPersistOps, err error) {
 	for _, stateMachine := range m.orthoKVStoreMachines {
-		dbUpdates = append(dbUpdates, stateMachine.Build()...)
+		dbUpdates.Merge(stateMachine.Build())
 	}
-	stateID := m.kvMutator.ID()
+	stateID = m.kvMutator.ID()
+	version, data, err := m.kvMutator.VersionedEncode()
+	if err != nil {
+		return flow.ZeroID, protocol.DeferredBlockPersistOps{}, fmt.Errorf("could not encode protocol state: %w", err)
+	}
 
 	// Schedule deferred database operations to index the protocol state by the candidate block's ID
 	// and persist the new protocol state (if there are any changes)
-	dbUpdates = append(dbUpdates, m.kvStoreSnapshots.IndexTx(m.candidate.ID(), stateID))
-	version, data, err := m.kvMutator.VersionedEncode()
-	if err != nil {
-		return flow.ZeroID, nil, fmt.Errorf("could not encode protocol state: %w", err)
-	}
-	dbUpdates = append(dbUpdates, operation.SkipDuplicatesTx(m.kvStoreSnapshots.StoreTx(stateID, &storage.KeyValueStoreData{
+	dbUpdates.Add(func(tx *transaction.Tx, blockID flow.Identifier) error {
+		return m.kvStoreSnapshots.IndexTx(blockID, stateID)(tx)
+	})
+	dbUpdates.AddBadgerUpdate(operation.SkipDuplicatesTx(m.kvStoreSnapshots.StoreTx(stateID, &storage.KeyValueStoreData{
 		Version: version,
 		Data:    data,
 	})))
@@ -192,12 +173,6 @@ func (m *stateMutator) Build() (flow.Identifier, []transaction.DeferredDBUpdate,
 //     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 //     of this function is not nil. If such an exception is returned, continuing is not an option.
 func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) error {
-	// We apply service events from blocks which are sealed by this candidate block.
-	// The block's payload might contain epoch preparation service events for the next
-	// epoch. In this case, we need to update the tentative protocol state.
-	// We need to validate whether all information is available in the protocol
-	// state to go to the next epoch when needed. In cases where there is a bug
-	// in the smart contract, it could be that this happens too late and we should trigger epoch fallback mode.
 
 	// block payload may not specify seals in order, so order them by block height before processing
 	orderedSeals, err := protocol.OrderedSeals(seals, m.headers)
@@ -217,32 +192,18 @@ func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) 
 	}
 
 	// order all service events in one list
-	orderedUpdates := make([]*flow.ServiceEvent, 0)
+	orderedUpdates := make([]flow.ServiceEvent, 0)
 	for _, result := range results {
 		for _, event := range result.ServiceEvents {
-			orderedUpdates = append(orderedUpdates, &event)
+			orderedUpdates = append(orderedUpdates, event)
 		}
 	}
 
-	/* TODO this is from my previous branch implementation
-	case *flow.ProtocolStateVersionUpgrade:
-					// for now, we will crash when we observe the event
-					// once the state machine is in place, we will need to validate that:
-					//   - upgrades to a version we are compatible with are completed
-					//   - upgrades to a version we are incompatible with cause a crash
-					fmt.Println("TODO DEBUG: found ProtocolStateVersionUpgrade, exiting")
-					return nil, irrecoverable.NewExceptionf("found ProtocolStateVersionUpgrade, exiting")
-	*/
-
 	for _, stateMachine := range m.orthoKVStoreMachines {
-		err := stateMachine.ProcessUpdate(orderedUpdates)
+		// only exceptions should be propagated
+		err := stateMachine.EvolveState(orderedUpdates)
 		if err != nil {
-			if protocol.IsInvalidServiceEventError(err) {
-				// TODO: log, report
-				continue
-			} else {
-				return fmt.Errorf("could not process service events: %w", err)
-			}
+			return fmt.Errorf("could not process protocol state change for candidate block: %w", err)
 		}
 	}
 

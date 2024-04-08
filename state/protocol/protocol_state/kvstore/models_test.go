@@ -1,7 +1,6 @@
 package kvstore
 
 import (
-	"github.com/onflow/flow-go/utils/unittest"
 	"math/rand"
 	"reflect"
 	"testing"
@@ -10,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestEncodeDecode tests encoding and decoding all supported model versions.

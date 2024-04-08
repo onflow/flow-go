@@ -2,20 +2,17 @@ package state
 
 import (
 	"errors"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
-	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
-	epochsmock "github.com/onflow/flow-go/state/protocol/protocol_state/epochs/mock"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/rand"
@@ -26,305 +23,303 @@ func TestProtocolStateMutator(t *testing.T) {
 	suite.Run(t, new(StateMutatorSuite))
 }
 
+// StateMutatorSuite is a test suite for the stateMutator, it holds the minimum mocked state to set up a stateMutator.
+// Tests in this suite are designed to rely on automatic assertions when leaving the scope of the test.
 type StateMutatorSuite struct {
 	suite.Suite
-	protocolStateDB   *storagemock.ProtocolState
-	headersDB         *storagemock.Headers
-	resultsDB         *storagemock.ExecutionResults
-	setupsDB          *storagemock.EpochSetups
-	commitsDB         *storagemock.EpochCommits
-	protocolKVStoreDB *storagemock.ProtocolKVStore
-	globalParams      *protocolmock.GlobalParams
-	parentState       *protocol_statemock.KVStoreAPI
-	stateMachine      *epochsmock.EpochStateMachine
-	candidate         *flow.Header
+
+	headersDB             *storagemock.Headers
+	resultsDB             *storagemock.ExecutionResults
+	protocolKVStoreDB     *storagemock.ProtocolKVStore
+	parentState           *protocol_statemock.KVStoreAPI
+	replicatedState       *protocol_statemock.KVStoreMutator
+	candidate             *flow.Header
+	latestProtocolVersion uint64
 
 	mutator *stateMutator
 }
 
 func (s *StateMutatorSuite) SetupTest() {
-	s.protocolStateDB = storagemock.NewProtocolState(s.T())
 	s.headersDB = storagemock.NewHeaders(s.T())
 	s.resultsDB = storagemock.NewExecutionResults(s.T())
-	s.setupsDB = storagemock.NewEpochSetups(s.T())
-	s.commitsDB = storagemock.NewEpochCommits(s.T())
-	s.globalParams = protocolmock.NewGlobalParams(s.T())
-	s.globalParams.On("EpochCommitSafetyThreshold").Return(uint64(1_000))
+	s.protocolKVStoreDB = storagemock.NewProtocolKVStore(s.T())
 	s.parentState = protocol_statemock.NewKVStoreAPI(s.T())
+	s.replicatedState = protocol_statemock.NewKVStoreMutator(s.T())
 	s.candidate = unittest.BlockHeaderFixture(unittest.HeaderWithView(1000))
-	s.stateMachine = epochsmock.NewEpochStateMachine(s.T())
+
+	s.latestProtocolVersion = 0
+	s.parentState.On("GetProtocolStateVersion").Return(s.latestProtocolVersion)
+	s.parentState.On("GetVersionUpgrade").Return(nil) // no version upgrade by default
+	s.parentState.On("Replicate", s.latestProtocolVersion).Return(s.replicatedState, nil)
 
 	var err error
 	s.mutator, err = newStateMutator(
 		s.headersDB,
 		s.resultsDB,
-		s.setupsDB,
-		s.commitsDB,
-		s.protocolStateDB,
 		s.protocolKVStoreDB,
-		s.globalParams,
-		s.candidate,
+		s.candidate.View,
+		s.candidate.ParentID,
 		s.parentState,
 	)
 	require.NoError(s.T(), err)
 }
 
-// TestOnHappyPathNoDbChanges tests that stateMutator doesn't cache any db updates when there are no changes.
-func (s *StateMutatorSuite) TestOnHappyPathNoDbChanges() {
-	parentState := unittest.ProtocolStateFixture()
-	s.stateMachine.On("ParentState").Return(parentState)
-	s.stateMachine.On("Build").Return(parentState.ProtocolStateEntry, parentState.ID(), false)
-	err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{})
-	require.NoError(s.T(), err)
-	hasChanges, updatedState, updatedStateID, dbUpdates := s.mutator.Build()
-	require.False(s.T(), hasChanges)
-	require.Equal(s.T(), parentState.ProtocolStateEntry, updatedState)
-	require.Equal(s.T(), parentState.ID(), updatedStateID)
-	require.Empty(s.T(), dbUpdates)
-}
+// TestBuild_HappyPath tests that `stateMutator` returns all updates from sub-state state machines and prepares updates to the KV store
+// when building protocol state.
+// In this test, we expect all state machines to return a single deferred db update that will be subsequently returned and executed.
+// We also expect that the resulting state will be indexed and stored in the protocol KV store. To assert that, we mock the corresponding
+// storage methods and expect them to be called when applying deferred updates in caller code.
+func (s *StateMutatorSuite) TestBuild_HappyPath() {
+	resultingStateID := unittest.IdentifierFixture()
+	factories := make([]protocol_state.KeyValueStoreStateMachineFactory, 2)
+	// setup factories, each factory will create a state machine that will return a single deferred db update
+	for i := range factories {
+		factory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
+		stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol_state.KVStoreReader](s.T())
+		deferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
+		deferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
+		deferredDBUpdates := protocol.DeferredBlockPersistOps{}
+		deferredDBUpdates.AddBadgerUpdate(deferredUpdate.Execute)
+		stateMachine.On("Build").Return(deferredDBUpdates)
+		factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, s.replicatedState).Return(stateMachine, nil)
+		factories[i] = factory
+	}
 
-// TestHappyPathWithDbChanges tests that `stateMutator` returns cached db updates when building protocol state after applying service events.
-// Whenever `stateMutator` successfully processes an epoch setup or epoch commit event, it has to create a deferred db update to store the event.
-// Deferred db updates are cached in `stateMutator` and returned when building protocol state when calling `Build`.
-func (s *StateMutatorSuite) TestHappyPathWithDbChanges() {
-	parentState := unittest.ProtocolStateFixture()
-	s.stateMachine.On("ParentState").Return(parentState)
-	s.stateMachine.On("Build").Return(unittest.ProtocolStateFixture().ProtocolStateEntry,
-		unittest.IdentifierFixture(), true)
-
-	epochSetup := unittest.EpochSetupFixture()
-	epochCommit := unittest.EpochCommitFixture()
-	result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
-		result.ServiceEvents = []flow.ServiceEvent{epochSetup.ServiceEvent(), epochCommit.ServiceEvent()}
-	})
-
-	block := unittest.BlockHeaderFixture()
-	seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(block.ID()))
-	s.headersDB.On("ByBlockID", seal.BlockID).Return(block, nil)
-	s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
-
-	epochSetupStored := mock.Mock{}
-	epochSetupStored.On("EpochSetupStored").Return()
-	s.stateMachine.On("ProcessEpochSetup", epochSetup).Return(true, nil).Once()
-	s.setupsDB.On("StoreTx", epochSetup).Return(func(*transaction.Tx) error {
-		epochSetupStored.MethodCalled("EpochSetupStored")
-		return nil
-	}).Once()
-
-	epochCommitStored := mock.Mock{}
-	epochCommitStored.On("EpochCommitStored").Return()
-	s.stateMachine.On("ProcessEpochCommit", epochCommit).Return(true, nil).Once()
-	s.commitsDB.On("StoreTx", epochCommit).Return(func(*transaction.Tx) error {
-		epochCommitStored.MethodCalled("EpochCommitStored")
-		return nil
-	}).Once()
-
-	err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
+	var err error
+	s.mutator, err = newStateMutator(
+		s.headersDB,
+		s.resultsDB,
+		s.protocolKVStoreDB,
+		s.candidate.View,
+		s.candidate.ParentID,
+		s.parentState,
+		factories...,
+	)
 	require.NoError(s.T(), err)
 
-	_, _, _, dbUpdates := s.mutator.Build()
+	// expect actual DB calls that take a badger transaction and apply deferred updates
+	indexTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
+	indexTxDeferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
+	storeTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
+	storeTxDeferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
+
+	s.replicatedState.On("ID").Return(resultingStateID)
+	stateBytes := unittest.RandomBytes(32)
+	s.replicatedState.On("VersionedEncode").Return(s.latestProtocolVersion, stateBytes, nil).Once()
+
+	// expect calls to prepare a deferred update for indexing and storing the resulting state
+	s.protocolKVStoreDB.On("IndexTx", s.candidate.ID(), resultingStateID).Return(indexTxDeferredUpdate.Execute).Once()
+	s.protocolKVStoreDB.On("StoreTx", resultingStateID, &storage.KeyValueStoreData{
+		Version: s.latestProtocolVersion,
+		Data:    stateBytes,
+	}).Return(storeTxDeferredUpdate.Execute).Once()
+
+	_, dbUpdates, err := s.mutator.Build()
+	require.NoError(s.T(), err)
+
 	// in next loop we assert that we have received expected deferred db updates by executing them
 	// and expecting that corresponding mock methods will be called
 	tx := &transaction.Tx{}
-	for _, dbUpdate := range dbUpdates {
+	for _, dbUpdate := range dbUpdates.Decorate(s.candidate.ID()) {
 		err := dbUpdate(tx)
 		require.NoError(s.T(), err)
 	}
-	// make sure that mock methods were indeed called
-	epochSetupStored.AssertExpectations(s.T())
-	epochCommitStored.AssertExpectations(s.T())
 }
 
-// TestStateMutator_Constructor tests the behaviour of the StateMutator constructor.
-// We expect the constructor to select the appropriate state machine constructor, and
-// to handle (pass-through) exceptions from the state machine constructor.
+// TestBuild_NoChanges tests that `stateMutator` returns minimal needed updates when building protocol state even if there was no service events applied.
+// The minimal needed updates are the index and store of the state that was previously replicated and possibly mutated.
+func (s *StateMutatorSuite) TestBuild_NoChanges() {
+	resultingStateID := unittest.IdentifierFixture()
+
+	// expect actual DB calls that take a badger transaction and apply deferred updates
+	indexTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
+	indexTxDeferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
+	storeTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
+	storeTxDeferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
+
+	s.replicatedState.On("ID").Return(resultingStateID)
+	stateBytes := unittest.RandomBytes(32)
+	s.replicatedState.On("VersionedEncode").Return(s.latestProtocolVersion, stateBytes, nil).Once()
+	// expect calls to prepare a deferred update for indexing and storing the resulting state
+	s.protocolKVStoreDB.On("IndexTx", s.candidate.ID(), resultingStateID).Return(indexTxDeferredUpdate.Execute).Once()
+	s.protocolKVStoreDB.On("StoreTx", resultingStateID, &storage.KeyValueStoreData{
+		Version: s.latestProtocolVersion,
+		Data:    stateBytes,
+	}).Return(storeTxDeferredUpdate.Execute).Once()
+
+	_, dbUpdates, err := s.mutator.Build()
+	require.NoError(s.T(), err)
+
+	tx := &transaction.Tx{}
+	for _, dbUpdate := range dbUpdates.Decorate(s.candidate.ID()) {
+		err := dbUpdate(tx)
+		require.NoError(s.T(), err)
+	}
+}
+
+// TestBuild_EncodeFailed tests that `stateMutator` returns an exception when encoding the resulting state fails.
+func (s *StateMutatorSuite) TestBuild_EncodeFailed() {
+	resultingStateID := unittest.IdentifierFixture()
+
+	s.replicatedState.On("ID").Return(resultingStateID)
+	exception := errors.New("exception")
+	s.replicatedState.On("VersionedEncode").Return(uint64(0), []byte{}, exception).Once()
+
+	_, dbUpdates, err := s.mutator.Build()
+	require.ErrorIs(s.T(), err, exception)
+	require.Empty(s.T(), dbUpdates)
+}
+
+// TestStateMutator_Constructor tests the behavior of the stateMutator constructor.
+// The constructor must make a series of operations among them:
+// - Check if there is a version upgrade available.
+// - Replicate the parent state to the actual version.
+// - Create a state machine for each sub-state of the Dynamic Protocol State.
 func (s *StateMutatorSuite) TestStateMutator_Constructor() {
-	s.Run("EpochStaking phase", func() {
-		// Since we are before the epoch commitment deadline, we should use the happy-path state machine
-		s.Run("before commitment deadline", func() {
-			expectedConstructorCalled := false
-			s.candidateView = s.parentState.CurrentEpochSetup.FirstView + 1
-			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-					expectedConstructorCalled = true // expect happy-path constructor
-					return s.stateMachine, nil
-				},
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-					s.T().Fail()
-					return s.stateMachine, nil
-				},
-			)
-			require.NoError(s.T(), err)
-			assert.NotNil(s.T(), mutator)
-			assert.True(s.T(), expectedConstructorCalled)
-		})
-		// Since we are past the epoch commitment deadline, and have not entered the EpochCommitted
-		// phase, we should use the epoch fallback state machine.
-		s.Run("past commitment deadline", func() {
-			expectedConstructorCalled := false
-			s.candidateView = s.parentState.CurrentEpochSetup.FinalView - 1
-			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-					s.T().Fail()
-					return s.stateMachine, nil
-				},
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-					expectedConstructorCalled = true // expect epoch-fallback state machine
-					return s.stateMachine, nil
-				},
-			)
-			require.NoError(s.T(), err)
-			assert.NotNil(s.T(), mutator)
-			assert.True(s.T(), expectedConstructorCalled)
-		})
-	})
-
-	s.Run("EpochSetup phase", func() {
-		s.parentState = unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
-		s.parentState.NextEpochCommit = nil
-		s.parentState.NextEpoch.CommitID = flow.ZeroID
-
-		// Since we are before the epoch commitment deadline, we should use the happy-path state machine
-		s.Run("before commitment deadline", func() {
-			expectedConstructorCalled := false
-			s.candidateView = s.parentState.CurrentEpochSetup.FirstView + 1
-			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-					expectedConstructorCalled = true // expect happy-path constructor
-					return s.stateMachine, nil
-				},
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-					s.T().Fail()
-					return s.stateMachine, nil
-				},
-			)
-			require.NoError(s.T(), err)
-			assert.NotNil(s.T(), mutator)
-			assert.True(s.T(), expectedConstructorCalled)
-		})
-		// Since we are past the epoch commitment deadline, and have not entered the EpochCommitted
-		// phase, we should use the epoch fallback state machine.
-		s.Run("past commitment deadline", func() {
-			expectedConstructorCalled := false
-			s.candidateView = s.parentState.CurrentEpochSetup.FinalView - 1
-			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-					s.T().Fail()
-					return s.stateMachine, nil
-				},
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-					expectedConstructorCalled = true // expect epoch-fallback state machine
-					return s.stateMachine, nil
-				},
-			)
-			require.NoError(s.T(), err)
-			assert.NotNil(s.T(), mutator)
-			assert.True(s.T(), expectedConstructorCalled)
-		})
-	})
-
-	s.Run("EpochCommitted phase", func() {
-		s.parentState = unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
-		// Since we are before the epoch commitment deadline, we should use the happy-path state machine
-		s.Run("before commitment deadline", func() {
-			expectedConstructorCalled := false
-			s.candidateView = s.parentState.CurrentEpochSetup.FirstView + 1
-			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-					expectedConstructorCalled = true // expect happy-path constructor
-					return s.stateMachine, nil
-				},
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-					s.T().Fail()
-					return s.stateMachine, nil
-				},
-			)
-			require.NoError(s.T(), err)
-			assert.NotNil(s.T(), mutator)
-			assert.True(s.T(), expectedConstructorCalled)
-		})
-		// Despite being past the epoch commitment deadline, since we are in the EpochCommitted phase
-		// already, we should proceed with the happy-path state machine
-		s.Run("past commitment deadline", func() {
-			expectedConstructorCalled := false
-			s.candidateView = s.parentState.CurrentEpochSetup.FinalView - 1
-			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-					expectedConstructorCalled = true // expect happy-path constructor
-					return s.stateMachine, nil
-				},
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-					s.T().Fail()
-					return s.stateMachine, nil
-				},
-			)
-			require.NoError(s.T(), err)
-			assert.NotNil(s.T(), mutator)
-			assert.True(s.T(), expectedConstructorCalled)
-		})
-	})
-
-	// if a state machine constructor returns an error, the stateMutator constructor should fail
-	// and propagate the error to the caller
-	s.Run("state machine constructor returns error", func() {
-		s.Run("happy-path", func() {
-			exception := irrecoverable.NewExceptionf("exception")
-			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-					return nil, exception
-				},
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-					s.T().Fail()
-					return s.stateMachine, nil
-				},
-			)
-			assert.Error(s.T(), err)
-			assert.ErrorIs(s.T(), err, exception)
-			assert.Nil(s.T(), mutator)
-		})
-		s.Run("epoch-fallback", func() {
-			s.parentState.InvalidEpochTransitionAttempted = true // ensure we use epoch-fallback state machine
-			exception := irrecoverable.NewExceptionf("exception")
-			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-					s.T().Fail()
-					return s.stateMachine, nil
-				},
-				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-					return nil, exception
-				},
-			)
-			assert.Error(s.T(), err)
-			assert.ErrorIs(s.T(), err, exception)
-			assert.Nil(s.T(), mutator)
-		})
-	})
-}
-
-// TestApplyServiceEvents_InvalidEpochSetup tests that handleServiceEvents rejects invalid epoch setup event and sets
-// InvalidEpochTransitionAttempted flag in protocol.StateMachine.
-func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
-	s.Run("invalid-epoch-setup", func() {
+	s.Run("no-upgrade", func() {
 		mutator, err := newStateMutator(
 			s.headersDB,
 			s.resultsDB,
-			s.setupsDB,
-			s.commitsDB,
-			s.globalParams,
-			s.candidateView,
+			s.protocolKVStoreDB,
+			s.candidate.View,
+			s.candidate.ParentID,
 			s.parentState,
-			func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-				return s.stateMachine, nil
-			},
-			func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-				fallbackStateMachine := epochsmock.NewEpochStateMachine(s.T())
-				fallbackStateMachine.On("ProcessEpochSetup", mock.Anything).Return(false, nil)
-				return fallbackStateMachine, nil
-			},
 		)
 		require.NoError(s.T(), err)
-		parentState := unittest.ProtocolStateFixture()
-		s.stateMachine.On("ParentState").Return(parentState)
+		require.NotNil(s.T(), mutator)
+	})
+	s.Run("upgrade-available", func() {
+		newVersion := s.latestProtocolVersion + 1
+		parentState := protocol_statemock.NewKVStoreAPI(s.T())
+		parentState.On("GetProtocolStateVersion").Return(s.latestProtocolVersion).Once()
+		parentState.On("GetVersionUpgrade").Return(&protocol_state.ViewBasedActivator[uint64]{
+			Data:           newVersion,
+			ActivationView: s.candidate.View,
+		}).Once()
+		replicatedState := protocol_statemock.NewKVStoreMutator(s.T())
+		parentState.On("Replicate", newVersion).Return(replicatedState, nil).Once()
+
+		mutator, err := newStateMutator(
+			s.headersDB,
+			s.resultsDB,
+			s.protocolKVStoreDB,
+			s.candidate.View,
+			s.candidate.ParentID,
+			parentState,
+		)
+		require.NoError(s.T(), err)
+		require.NotNil(s.T(), mutator)
+	})
+	s.Run("outdated-upgrade", func() {
+		parentState := protocol_statemock.NewKVStoreAPI(s.T())
+		parentState.On("GetProtocolStateVersion").Return(s.latestProtocolVersion).Once()
+		parentState.On("GetVersionUpgrade").Return(&protocol_state.ViewBasedActivator[uint64]{
+			Data:           s.latestProtocolVersion,
+			ActivationView: s.candidate.View - 1,
+		}).Once()
+		replicatedState := protocol_statemock.NewKVStoreMutator(s.T())
+		parentState.On("Replicate", s.latestProtocolVersion).Return(replicatedState, nil).Once()
+
+		mutator, err := newStateMutator(
+			s.headersDB,
+			s.resultsDB,
+			s.protocolKVStoreDB,
+			s.candidate.View,
+			s.candidate.ParentID,
+			parentState,
+		)
+		require.NoError(s.T(), err)
+		require.NotNil(s.T(), mutator)
+	})
+	s.Run("replicate-failure", func() {
+		parentState := protocol_statemock.NewKVStoreAPI(s.T())
+		parentState.On("GetProtocolStateVersion").Return(s.latestProtocolVersion)
+		parentState.On("GetVersionUpgrade").Return(nil).Once()
+		exception := errors.New("exception")
+		parentState.On("Replicate", s.latestProtocolVersion).Return(nil, exception).Once()
+
+		mutator, err := newStateMutator(
+			s.headersDB,
+			s.resultsDB,
+			s.protocolKVStoreDB,
+			s.candidate.View,
+			s.candidate.ParentID,
+			parentState,
+		)
+		require.ErrorIs(s.T(), err, exception)
+		require.Nil(s.T(), mutator)
+	})
+	s.Run("multiple-state-machines", func() {
+		factories := make([]protocol_state.KeyValueStoreStateMachineFactory, 2)
+		lastCalledIdx := -1
+		for i := range factories {
+			factory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
+			stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol_state.KVStoreReader](s.T())
+			calledIndex := i
+			factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, s.replicatedState).Run(func(_ mock.Arguments) {
+				if lastCalledIdx >= calledIndex {
+					require.Failf(s.T(), "state machine factories must be called in order",
+						"expected %d, got %d", lastCalledIdx, calledIndex)
+				}
+				lastCalledIdx = calledIndex
+			}).Return(stateMachine, nil)
+			factories[i] = factory
+		}
+
+		mutator, err := newStateMutator(
+			s.headersDB,
+			s.resultsDB,
+			s.protocolKVStoreDB,
+			s.candidate.View,
+			s.candidate.ParentID,
+			s.parentState,
+			factories...,
+		)
+		require.NoError(s.T(), err)
+		require.NotNil(s.T(), mutator)
+	})
+	s.Run("create-state-machine-exception", func() {
+		factory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
+		exception := errors.New("exception")
+		factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, s.replicatedState).Return(nil, exception)
+
+		mutator, err := newStateMutator(
+			s.headersDB,
+			s.resultsDB,
+			s.protocolKVStoreDB,
+			s.candidate.View,
+			s.candidate.ParentID,
+			s.parentState,
+			factory,
+		)
+		require.ErrorIs(s.T(), err, exception)
+		require.Nil(s.T(), mutator)
+	})
+}
+
+// TestApplyServiceEventsFromValidatedSeals tests that stateMutator delivers updates to each of the injected state machines.
+// In case of an exception from a state machine, the exception is propagated to the caller.
+func (s *StateMutatorSuite) TestApplyServiceEventsFromValidatedSeals() {
+	s.Run("happy-path", func() {
+		factories := make([]protocol_state.KeyValueStoreStateMachineFactory, 2)
+		for i := range factories {
+			factory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
+			stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol_state.KVStoreReader](s.T())
+			stateMachine.On("EvolveState", mock.Anything).Return(nil).Once()
+			factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, s.replicatedState).Return(stateMachine, nil)
+			factories[i] = factory
+		}
+
+		mutator, err := newStateMutator(
+			s.headersDB,
+			s.resultsDB,
+			s.protocolKVStoreDB,
+			s.candidate.View,
+			s.candidate.ParentID,
+			s.parentState,
+			factories...,
+		)
+		require.NoError(s.T(), err)
 
 		epochSetup := unittest.EpochSetupFixture()
 		result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
@@ -336,14 +331,26 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
 		s.headersDB.On("ByBlockID", seal.BlockID).Return(block, nil)
 		s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
 
-		s.stateMachine.On("ProcessEpochSetup", epochSetup).Return(false, protocol.NewInvalidServiceEventErrorf("")).Once()
-
 		err = mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
 		require.NoError(s.T(), err)
 	})
-	s.Run("process-epoch-setup-exception", func() {
-		parentState := unittest.ProtocolStateFixture()
-		s.stateMachine.On("ParentState").Return(parentState)
+	s.Run("process-update-exception", func() {
+		factory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
+		stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol_state.KVStoreReader](s.T())
+		exception := errors.New("exception")
+		stateMachine.On("EvolveState", mock.Anything).Return(exception).Once()
+		factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, s.replicatedState).Return(stateMachine, nil)
+
+		mutator, err := newStateMutator(
+			s.headersDB,
+			s.resultsDB,
+			s.protocolKVStoreDB,
+			s.candidate.View,
+			s.candidate.ParentID,
+			s.parentState,
+			factory,
+		)
+		require.NoError(s.T(), err)
 
 		epochSetup := unittest.EpochSetupFixture()
 		result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
@@ -355,84 +362,14 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
 		s.headersDB.On("ByBlockID", seal.BlockID).Return(block, nil)
 		s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
 
-		exception := errors.New("exception")
-		s.stateMachine.On("ProcessEpochSetup", epochSetup).Return(false, exception).Once()
-
-		err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
-		require.Error(s.T(), err)
-		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
-	})
-}
-
-// TestApplyServiceEvents_InvalidEpochCommit tests that handleServiceEvents rejects invalid epoch commit event and sets
-// InvalidEpochTransitionAttempted flag in protocol.StateMachine.
-func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochCommit() {
-	s.Run("invalid-epoch-commit", func() {
-		mutator, err := newStateMutator(
-			s.headersDB,
-			s.resultsDB,
-			s.setupsDB,
-			s.commitsDB,
-			s.globalParams,
-			s.candidateView,
-			s.parentState,
-			func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-				return s.stateMachine, nil
-			},
-			func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (epochs.StateMachine, error) {
-				fallbackStateMachine := epochsmock.NewEpochStateMachine(s.T())
-				fallbackStateMachine.On("ProcessEpochCommit", mock.Anything).Return(false, nil)
-				return fallbackStateMachine, nil
-			},
-		)
-		require.NoError(s.T(), err)
-
-		parentState := unittest.ProtocolStateFixture()
-		s.stateMachine.On("ParentState").Return(parentState)
-
-		epochCommit := unittest.EpochCommitFixture()
-		result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
-			result.ServiceEvents = []flow.ServiceEvent{epochCommit.ServiceEvent()}
-		})
-
-		block := unittest.BlockHeaderFixture()
-		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(block.ID()))
-		s.headersDB.On("ByBlockID", seal.BlockID).Return(block, nil)
-		s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
-
-		s.stateMachine.On("ProcessEpochCommit", epochCommit).Return(false, protocol.NewInvalidServiceEventErrorf("")).Once()
-
 		err = mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
-		require.NoError(s.T(), err)
-	})
-	s.Run("process-epoch-commit-exception", func() {
-		parentState := unittest.ProtocolStateFixture()
-		s.stateMachine.On("ParentState").Return(parentState)
-
-		epochCommit := unittest.EpochCommitFixture()
-		result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
-			result.ServiceEvents = []flow.ServiceEvent{epochCommit.ServiceEvent()}
-		})
-
-		block := unittest.BlockHeaderFixture()
-		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(block.ID()))
-		s.headersDB.On("ByBlockID", seal.BlockID).Return(block, nil)
-		s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
-
-		exception := errors.New("exception")
-		s.stateMachine.On("ProcessEpochCommit", epochCommit).Return(false, exception).Once()
-
-		err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
-		require.Error(s.T(), err)
+		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 }
 
-// TestApplyServiceEventsSealsOrdered tests that handleServiceEvents processes seals in order of block height.
+// TestApplyServiceEventsSealsOrdered tests that ApplyServiceEventsFromValidatedSeals processes seals in order of block height.
 func (s *StateMutatorSuite) TestApplyServiceEventsSealsOrdered() {
-	parentState := unittest.ProtocolStateFixture()
-	s.stateMachine.On("ParentState").Return(parentState)
-
 	blocks := unittest.ChainFixtureFrom(10, unittest.BlockHeaderFixture())
 	var seals []*flow.Seal
 	resultByHeight := make(map[flow.Identifier]uint64)
@@ -461,31 +398,4 @@ func (s *StateMutatorSuite) TestApplyServiceEventsSealsOrdered() {
 		require.True(s.T(), found)
 		require.Less(s.T(), lastExecutedBlockHeight, executedBlockHeight, "seals must be ordered by block height")
 	}
-}
-
-// TestApplyServiceEventsTransitionToNextEpoch tests that handleServiceEvents transitions to the next epoch
-// when epoch has been committed, and we are at the first block of the next epoch.
-func (s *StateMutatorSuite) TestApplyServiceEventsTransitionToNextEpoch() {
-	parentState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
-	s.stateMachine.On("ParentState").Return(parentState)
-	// we are at the first block of the next epoch
-	s.stateMachine.On("View").Return(parentState.CurrentEpochSetup.FinalView + 1)
-	s.stateMachine.On("TransitionToNextEpoch").Return(nil).Once()
-	err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{})
-	require.NoError(s.T(), err)
-}
-
-// TestApplyServiceEventsTransitionToNextEpoch_Error tests that error that has been
-// observed in handleServiceEvents when transitioning to the next epoch is propagated to the caller.
-func (s *StateMutatorSuite) TestApplyServiceEventsTransitionToNextEpoch_Error() {
-	parentState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
-
-	s.stateMachine.On("ParentState").Return(parentState)
-	// we are at the first block of the next epoch
-	s.stateMachine.On("View").Return(parentState.CurrentEpochSetup.FinalView + 1)
-	exception := errors.New("exception")
-	s.stateMachine.On("TransitionToNextEpoch").Return(exception).Once()
-	err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{})
-	require.ErrorIs(s.T(), err, exception)
-	require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 }

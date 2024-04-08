@@ -3,7 +3,6 @@ package badger
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"sync/atomic"
 
 	"github.com/dgraph-io/badger/v2"
@@ -14,6 +13,7 @@ import (
 	statepkg "github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -254,8 +254,12 @@ func bootstrapProtocolState(
 		}
 
 		// bootstrap KV store
-		// TODO: add proper bootstraping for the KV store
+		// TODO: add proper bootstrapping for the KV store
 		rootKVStore := kvstore.NewKVStoreV0(protocolStateID)
+		// TODO: On feature branch we do the following:
+		// 		rootKVStore := kvstore.NewLatestKVStore(protocolStateID)
+		// TODO: Once snapshot contains the protocol state ID, we should allow specifying
+		//       KV Store version when generating a root snapshot fixture.
 		version, data, err := rootKVStore.VersionedEncode()
 		if err != nil {
 			return fmt.Errorf("could not encode root KV store: %w", err)
@@ -270,9 +274,14 @@ func bootstrapProtocolState(
 		}
 
 		// NOTE: as specified in the godoc, this code assumes that each block
-		// in the sealing segment in within the same phase within the same epoch.
+		// in the sealing segment is within the same phase within the same epoch.
 		// the sealing segment.
 		for _, block := range segment.AllBlocks() {
+			// TODO: enable this once the genesis block has state ID from the KV store, not the Epoch Sub-State.
+			//if block.Payload.ProtocolStateID != protocolStateID {
+			//	return fmt.Errorf("block with height %d in sealing segment has mismatching protocol state ID, expecting %x got %x",
+			//		block.Header.Height, protocolStateID, block.Payload.ProtocolStateID)
+			//}
 			blockID := block.ID()
 			err = protocolState.Index(blockID, protocolStateID)(tx)
 			if err != nil {

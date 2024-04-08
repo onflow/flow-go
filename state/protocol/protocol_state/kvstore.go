@@ -2,7 +2,7 @@ package protocol_state
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // This file contains versioned read and read-write interfaces to the Protocol State's
@@ -43,6 +43,8 @@ type KVStoreReader interface {
 	// with a past view if the upgrade has already been activated.
 	GetVersionUpgrade() *ViewBasedActivator[uint64]
 
+	// GetEpochStateID returns the state ID of the epoch state.
+	// This is part of the most basic model and is used to commit the epoch state to the KV store.
 	GetEpochStateID() flow.Identifier
 
 	// v1
@@ -102,6 +104,8 @@ type KVStoreMutator interface {
 	// It contains the new version and the view at which it has to be applied.
 	SetVersionUpgrade(version *ViewBasedActivator[uint64])
 
+	// SetEpochStateID sets the state ID of the epoch state.
+	// This method is used to commit the epoch state to the KV store when the state of the epoch is updated.
 	SetEpochStateID(stateID flow.Identifier)
 
 	// v1
@@ -111,29 +115,6 @@ type KVStoreMutator interface {
 	//  - ErrKeyNotSupported if the key does not exist in the current model version.
 	SetInvalidEpochTransitionAttempted(attempted bool) error
 }
-
-//// KeyValueStoreStateMachine implements a low-level interface for state-changing operations on the key-value store.
-//// It is used by higher level logic to evolve the protocol state when certain events that are stored in blocks are observed.
-//// The KeyValueStoreStateMachine is stateful and internally tracks the current state of key-value store.
-//// A separate instance is created for each block that is being processed.
-//type KeyValueStoreStateMachine interface {
-//	// Build returns updated key-value store model, state ID and a flag indicating if there were any changes.
-//	Build() (updatedState KVStoreReader, stateID flow.Identifier, hasChanges bool)
-//
-//	// ProcessUpdate updates the current state of key-value store.
-//	// KeyValueStoreStateMachine captures only a subset of all service events, those that are relevant for the KV store. All other events are ignored.
-//	// Implementors MUST ensure KeyValueStoreStateMachine is left in functional state if an invalid service event has been supplied.
-//	// Expected errors indicating that we have observed an invalid service event from protocol's point of view.
-//	// 	- `protocol.InvalidServiceEventError` - if the service event is invalid for the current protocol state.
-//	ProcessUpdate(update *flow.ServiceEvent) error
-//
-//	// View returns the view that is associated with this KeyValueStoreStateMachine.
-//	// The view of the KeyValueStoreStateMachine equals the view of the block carrying the respective updates.
-//	View() uint64
-//
-//	// ParentState returns parent state that is associated with this state machine.
-//	ParentState() KVStoreReader
-//}
 
 // OrthogonalStoreStateMachine represents a state machine, that exclusively evolves its state P.
 // The state's specific type P is kept as a generic. Generally, P is the type corresponding
@@ -178,33 +159,41 @@ type KVStoreMutator interface {
 type OrthogonalStoreStateMachine[P any] interface {
 
 	// Build returns:
-	//   - hasChanges: flag whether there were any changes; otherwise, `updatedState` and `stateID` equal the parent state
-	//   - updatedState: the ProtocolState after applying all updates.
-	//   - stateID: the hash commitment to the `updatedState`
-	//   - dbUpdates: database updates necessary for persisting the updated protocol state's *dependencies*.
-	//     If hasChanges is false, updatedState is empty. Caution: persisting the `updatedState` itself and adding
-	//     it to the relevant indices is _not_ in `dbUpdates`. Persisting and indexing `updatedState` is the responsibility
-	//     of the calling code (specifically `FollowerState`).
+	//   - database updates necessary for persisting the updated protocol sub-state and its *dependencies*.
+	//     It may contain updates for the sub-state itself and for any dependency that is affected by the update.
+	//     Deferred updates must be applied in a transaction to ensure atomicity.
+	Build() protocol.DeferredBlockPersistOps
+
+	// EvolveState applies the state change(s) on sub-state P for the candidate block (under construction).
+	// Information that potentially changes the Epoch state (compared to the parent block's state):
+	//   - Service Events sealed in the candidate block
+	//   - the candidate block's view (already provided at construction time)
 	//
-	// updated protocol state entry, state ID and a flag indicating if there were any changes.
-	Build() []transaction.DeferredDBUpdate
+	// CAUTION: EvolveState MUST be called for all candidate blocks, even if `sealedServiceEvents` is empty!
+	// This is because also the absence of expected service events by a certain view can also result in the
+	// Epoch state changing. (For example, not having received the EpochCommit event for the next epoch, but
+	// approaching the end of the current epoch.)
+	//
+	// No errors are expected during normal operations.
+	EvolveState(sealedServiceEvents []flow.ServiceEvent) error
 
-	// Build returns updated key-value store model, state ID and a flag indicating if there were any changes.
-	//Build() (updatedState KVStoreReader, stateID flow.Identifier, hasChanges bool)
-
-	// ProcessUpdate updates the current state of key-value store.
-	// KeyValueStoreStateMachine captures only a subset of all service events, those that are relevant for the KV store. All other events are ignored.
-	// Implementors MUST ensure KeyValueStoreStateMachine is left in functional state if an invalid service event has been supplied.
-	// Expected errors indicating that we have observed an invalid service event from protocol's point of view.
-	// 	- `protocol.InvalidServiceEventError` - if the service event is invalid for the current protocol state.
-	ProcessUpdate(update []*flow.ServiceEvent) error
-
-	// View returns the view that is associated with this KeyValueStoreStateMachine.
-	// The view of the KeyValueStoreStateMachine equals the view of the block carrying the respective updates.
+	// View returns the view associated with this state machine.
+	// The view of the state machine equals the view of the block carrying the respective updates.
 	View() uint64
 
-	// ParentState returns parent state that is associated with this state machine.
+	// ParentState returns parent state associated with this state machine.
 	ParentState() P
 }
 
+// KeyValueStoreStateMachine is a type alias for a state machine that operates on an instance of KVStoreReader.
+// StateMutator uses this type to store and perform operations on orthogonal state machines.
 type KeyValueStoreStateMachine = OrthogonalStoreStateMachine[KVStoreReader]
+
+// KeyValueStoreStateMachineFactory is an abstract factory interface for creating KeyValueStoreStateMachine instances.
+// It is used separate creation of state machines from their usage, which allows less coupling and superior testability.
+// For each concrete type injected in State Mutator a dedicated abstract factory has to be created.
+type KeyValueStoreStateMachineFactory interface {
+	// Create creates a new instance of an underlying type that operates on KV Store and is created for a specific candidate block.
+	// No errors are expected during normal operations.
+	Create(candidateView uint64, parentID flow.Identifier, parentState KVStoreReader, mutator KVStoreMutator) (KeyValueStoreStateMachine, error)
+}

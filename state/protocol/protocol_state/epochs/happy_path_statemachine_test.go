@@ -16,9 +16,9 @@ func TestProtocolStateMachine(t *testing.T) {
 	suite.Run(t, new(ProtocolStateMachineSuite))
 }
 
-// BaseProtocolStateMachineSuite is a base test suite that holds common functionality for testing protocol state machines.
+// BaseStateMachineSuite is a base test suite that holds common functionality for testing protocol state machines.
 // It reflects the portion of data which is present in baseStateMachine.
-type BaseProtocolStateMachineSuite struct {
+type BaseStateMachineSuite struct {
 	suite.Suite
 
 	parentProtocolState *flow.RichProtocolStateEntry
@@ -26,7 +26,7 @@ type BaseProtocolStateMachineSuite struct {
 	candidate           *flow.Header
 }
 
-func (s *BaseProtocolStateMachineSuite) SetupTest() {
+func (s *BaseStateMachineSuite) SetupTest() {
 	s.parentProtocolState = unittest.ProtocolStateFixture()
 	s.parentBlock = unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FirstView + 1))
 	s.candidate = unittest.BlockHeaderWithParentFixture(s.parentBlock)
@@ -34,14 +34,14 @@ func (s *BaseProtocolStateMachineSuite) SetupTest() {
 
 // ProtocolStateMachineSuite is a dedicated test suite for testing happy path state machine.
 type ProtocolStateMachineSuite struct {
-	BaseProtocolStateMachineSuite
+	BaseStateMachineSuite
 	stateMachine *HappyPathStateMachine
 }
 
 func (s *ProtocolStateMachineSuite) SetupTest() {
-	s.BaseProtocolStateMachineSuite.SetupTest()
+	s.BaseStateMachineSuite.SetupTest()
 	var err error
-	s.stateMachine, err = NewStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+	s.stateMachine, err = NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 	require.NoError(s.T(), err)
 }
 
@@ -64,7 +64,7 @@ func (s *ProtocolStateMachineSuite) TestTransitionToNextEpoch() {
 		unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FinalView + 1))
 	var err error
 	// since the candidate block is from next epoch, HappyPathStateMachine should transition to next epoch
-	s.stateMachine, err = NewStateMachine(candidate.View, s.parentProtocolState.Copy())
+	s.stateMachine, err = NewHappyPathStateMachine(candidate.View, s.parentProtocolState.Copy())
 	require.NoError(s.T(), err)
 	err = s.stateMachine.TransitionToNextEpoch()
 	require.NoError(s.T(), err)
@@ -83,7 +83,7 @@ func (s *ProtocolStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
 		protocolState := unittest.ProtocolStateFixture()
 		candidate := unittest.BlockHeaderFixture(
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView + 1))
-		stateMachine, err := NewStateMachine(candidate.View, protocolState)
+		stateMachine, err := NewHappyPathStateMachine(candidate.View, protocolState)
 		require.NoError(s.T(), err)
 		err = stateMachine.TransitionToNextEpoch()
 		require.Error(s.T(), err, "should not allow transition to next epoch if there is no next epoch protocol state")
@@ -95,7 +95,7 @@ func (s *ProtocolStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
 		})
 		candidate := unittest.BlockHeaderFixture(
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView + 1))
-		stateMachine, err := NewStateMachine(candidate.View, protocolState)
+		stateMachine, err := NewHappyPathStateMachine(candidate.View, protocolState)
 		require.NoError(s.T(), err)
 		err = stateMachine.TransitionToNextEpoch()
 		require.Error(s.T(), err, "should not allow transition to next epoch if it is not committed")
@@ -104,7 +104,7 @@ func (s *ProtocolStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
 		protocolState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
 		candidate := unittest.BlockHeaderFixture(
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView))
-		stateMachine, err := NewStateMachine(candidate.View, protocolState)
+		stateMachine, err := NewHappyPathStateMachine(candidate.View, protocolState)
 		require.NoError(s.T(), err)
 		err = stateMachine.TransitionToNextEpoch()
 		require.Error(s.T(), err, "should not allow transition to next epoch if next block is not first block from next epoch")
@@ -136,7 +136,7 @@ func (s *ProtocolStateMachineSuite) TestCreateStateMachineAfterInvalidStateTrans
 	s.parentProtocolState.InvalidEpochTransitionAttempted = true
 	var err error
 	// create new HappyPathStateMachine with next epoch information
-	s.stateMachine, err = NewStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+	s.stateMachine, err = NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 	require.Error(s.T(), err)
 }
 
@@ -145,7 +145,7 @@ func (s *ProtocolStateMachineSuite) TestCreateStateMachineAfterInvalidStateTrans
 func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 	var err error
 	s.Run("invalid counter", func() {
-		s.stateMachine, err = NewStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+		s.stateMachine, err = NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		commit := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 			commit.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 10 // set invalid counter for next epoch
@@ -155,7 +155,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("no next epoch protocol state", func() {
-		s.stateMachine, err = NewStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+		s.stateMachine, err = NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		commit := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 			commit.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
@@ -165,7 +165,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("conflicting epoch commit", func() {
-		s.stateMachine, err = NewStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+		s.stateMachine, err = NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		setup := unittest.EpochSetupFixture(
 			unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
@@ -187,7 +187,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 			nil,
 		)
 		require.NoError(s.T(), err)
-		s.stateMachine, err = NewStateMachine(s.candidate.View+1, parentState)
+		s.stateMachine, err = NewHappyPathStateMachine(s.candidate.View+1, parentState)
 		require.NoError(s.T(), err)
 		commit := unittest.EpochCommitFixture(
 			unittest.CommitWithCounter(setup.Counter),
@@ -206,7 +206,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 		require.Equal(s.T(), commit.ID(), newState.NextEpoch.CommitID, "next epoch should be committed since we have observed, a valid event")
 	})
 	s.Run("happy path processing", func() {
-		s.stateMachine, err = NewStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+		s.stateMachine, err = NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		setup := unittest.EpochSetupFixture(
 			unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
@@ -232,7 +232,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 			nil,
 		)
 		require.NoError(s.T(), err)
-		s.stateMachine, err = NewStateMachine(s.candidate.View+1, parentState.Copy())
+		s.stateMachine, err = NewHappyPathStateMachine(s.candidate.View+1, parentState.Copy())
 		require.NoError(s.T(), err)
 		commit := unittest.EpochCommitFixture(
 			unittest.CommitWithCounter(setup.Counter),
@@ -270,7 +270,7 @@ func (s *ProtocolStateMachineSuite) TestUpdateIdentityHappyPath() {
 	// update protocol state to have next epoch protocol state
 	unittest.WithNextEpochProtocolState()(s.parentProtocolState)
 	var err error
-	s.stateMachine, err = NewStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+	s.stateMachine, err = NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 	require.NoError(s.T(), err)
 
 	currentEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
@@ -319,7 +319,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupInvariants() {
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("processing second epoch setup", func() {
-		stateMachine, err := NewStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+		stateMachine, err := NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		setup := unittest.EpochSetupFixture(
 			unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
@@ -334,7 +334,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupInvariants() {
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("participants not sorted", func() {
-		stateMachine, err := NewStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+		stateMachine, err := NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
@@ -350,7 +350,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupInvariants() {
 		conflictingIdentity := s.parentProtocolState.ProtocolStateEntry.CurrentEpoch.ActiveIdentities[0]
 		conflictingIdentity.Ejected = true
 
-		stateMachine, err := NewStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+		stateMachine, err := NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
@@ -475,7 +475,7 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 
 	// now we can use it to construct HappyPathStateMachine for next block, which will process epoch setup event.
 	nextBlock := unittest.BlockHeaderWithParentFixture(s.candidate)
-	s.stateMachine, err = NewStateMachine(nextBlock.View, updatedRichProtocolState)
+	s.stateMachine, err = NewHappyPathStateMachine(nextBlock.View, updatedRichProtocolState)
 	require.NoError(s.T(), err)
 
 	setup := unittest.EpochSetupFixture(

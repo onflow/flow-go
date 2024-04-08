@@ -16,9 +16,9 @@ type FallbackStateMachine struct {
 
 var _ StateMachine = (*FallbackStateMachine)(nil)
 
-// NewEpochFallbackStateMachine constructs a state machine for epoch fallback, it automatically sets
+// NewFallbackStateMachine constructs a state machine for epoch fallback, it automatically sets
 // InvalidEpochTransitionAttempted to true, thereby recording that we have entered epoch fallback mode.
-func NewEpochFallbackStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) *FallbackStateMachine {
+func NewFallbackStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) *FallbackStateMachine {
 	state := parentState.ProtocolStateEntry.Copy()
 	state.InvalidEpochTransitionAttempted = true
 	return &FallbackStateMachine{

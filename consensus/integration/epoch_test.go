@@ -18,6 +18,7 @@ import (
 
 // should be able to reach consensus when identity table contains nodes which are joining in next epoch.
 func TestUnweightedNode(t *testing.T) {
+	//unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: temporary broken")
 	// stop after building 2 blocks to ensure we can tolerate 0-weight (joining next
 	// epoch) identities, but don't cross an epoch boundary
 	stopper := NewStopper(2, 0)
@@ -257,6 +258,9 @@ func withNextEpoch(
 		CommitID:         convertedEpochCommit.ID(),
 		ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochIdentities),
 	}
+
+	// need to fix genesis block to contain the correct protocol state ID
+	encodableSnapshot.SealingSegment.Blocks[0].Payload.ProtocolStateID = protocolState.ID()
 
 	return inmem.SnapshotFromEncodable(encodableSnapshot)
 }
