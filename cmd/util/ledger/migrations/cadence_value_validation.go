@@ -97,7 +97,7 @@ func validateStorageDomain(
 			return fmt.Errorf("invalid key type %T, expected interpreter.StringAtreeValue or interpreter.Uint64AtreeValue", key)
 		}
 
-		newValue := newStorageMap.ReadValue(nil, mapKey)
+		newValue := newStorageMap.ReadValue(nil, interpreter.StringStorageMapKey(stringKey))
 
 		err := cadenceValueEqual(oldRuntime.Interpreter, oldValue, newRuntime.Interpreter, newValue)
 		if err != nil {
@@ -280,28 +280,45 @@ func cadenceCompositeValueEqual(
 
 	var err *validationError
 	vFieldNames := make([]string, 0, 10) // v's field names
-	v.ForEachField(nil, func(fieldName string, fieldValue interpreter.Value) bool {
-		otherFieldValue := otherComposite.GetField(otherInterpreter, interpreter.EmptyLocationRange, fieldName)
+	v.ForEachField(
+		vInterpreter,
+		func(fieldName string, fieldValue interpreter.Value) bool {
+			otherFieldValue := otherComposite.GetField(
+				otherInterpreter,
+				interpreter.EmptyLocationRange,
+				fieldName,
+			)
 
-		err = cadenceValueEqual(vInterpreter, fieldValue, otherInterpreter, otherFieldValue)
-		if err != nil {
-			err.addTrace(fmt.Sprintf("(%s.%s)", v.TypeID(), fieldName))
-			return false
-		}
+			err = cadenceValueEqual(
+				vInterpreter,
+				fieldValue,
+				otherInterpreter,
+				otherFieldValue,
+			)
+			if err != nil {
+				err.addTrace(fmt.Sprintf("(%s.%s)", v.TypeID(), fieldName))
+				return false
+			}
 
-		vFieldNames = append(vFieldNames, fieldName)
-		return true
-	})
+			vFieldNames = append(vFieldNames, fieldName)
+			return true
+		},
+		interpreter.EmptyLocationRange,
+	)
 	if err != nil {
 		return err
 	}
 
-	if len(vFieldNames) != otherComposite.FieldCount() {
-		otherFieldNames := make([]string, 0, len(vFieldNames)) // otherComposite's field names
-		otherComposite.ForEachField(nil, func(fieldName string, _ interpreter.Value) bool {
+	// TODO: Use CompositeValue.FieldCount() from Cadence after it is merged and available.
+	otherFieldNames := make([]string, 0, len(vFieldNames)) // otherComposite's field names
+	otherComposite.ForEachField(
+		otherInterpreter,
+		func(fieldName string, _ interpreter.Value) bool {
 			otherFieldNames = append(otherFieldNames, fieldName)
 			return true
-		})
+		},
+		interpreter.EmptyLocationRange,
+	)
 
 		return newValidationErrorf(
 			"composite %s fields differ: %v != %v",

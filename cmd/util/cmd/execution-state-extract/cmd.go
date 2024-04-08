@@ -37,6 +37,7 @@ var (
 	flagLogVerboseValidationError          bool
 	flagDiffMigration                      bool
 	flagLogVerboseDiff                     bool
+	flagCheckStorageHealthBeforeMigration bool
 	flagStagedContractsFile                string
 	flagContinueMigrationOnValidationError bool
 	flagInputPayloadFileName               string
@@ -91,6 +92,9 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagLogVerboseDiff, "log-verbose-diff", false,
 		"log entire Cadence values on diff (requires --diff flag)")
+
+	Cmd.Flags().BoolVar(&flagCheckStorageHealthBeforeMigration, "check-storage-health-before", false,
+		"check (atree) storage health before migration")
 
 	Cmd.Flags().StringVar(&flagStagedContractsFile, "staged-contracts", "",
 		"Staged contracts CSV file")
@@ -180,7 +184,7 @@ func run(*cobra.Command, []string) {
 		cache := &metrics.NoopCollector{}
 		commits := badger.NewCommits(cache, db)
 
-		stateCommitment, err = getStateCommitment(commits, blockID)
+		stateCommitment, err = commits.ByBlockID(blockID)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("cannot get state commitment for block %v", blockID)
 		}
@@ -283,6 +287,10 @@ func run(*cobra.Command, []string) {
 		log.Warn().Msgf("--log-verbose-diff flag is enabled which may increase size of log")
 	}
 
+	if flagCheckStorageHealthBeforeMigration {
+		log.Warn().Msgf("--check-storage-health-before flag is enabled and will increase duration of migration")
+	}
+
 	var inputMsg string
 	if len(flagInputPayloadFileName) > 0 {
 		// Input is payloads
@@ -335,6 +343,19 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msgf("error loading staged contracts: %s", err.Error())
 	}
 
+	opts := migrations.Options{
+		NWorker:                           flagNWorker,
+		DiffMigrations:                    flagDiffMigration,
+		LogVerboseDiff:                    flagLogVerboseDiff,
+		CheckStorageHealthBeforeMigration: flagCheckStorageHealthBeforeMigration,
+		ChainID:                           chainID,
+		EVMContractChange:                 evmContractChange,
+		BurnerContractChange:              burnerContractChange,
+		StagedContracts:                   stagedContracts,
+		Prune:                             flagPrune,
+		MaxAccountSize:                    flagMaxAccountSize,
+	}
+
 	if len(flagInputPayloadFileName) > 0 {
 		err = extractExecutionStateFromPayloads(
 			log.Logger,
@@ -342,18 +363,11 @@ func run(*cobra.Command, []string) {
 			flagOutputDir,
 			flagNWorker,
 			!flagNoMigration,
-			flagDiffMigration,
-			flagLogVerboseDiff,
-			chainID,
-			evmContractChange,
-			burnerContractChange,
-			stagedContracts,
 			flagInputPayloadFileName,
 			flagOutputPayloadFileName,
 			exportedAddresses,
 			flagSortPayloads,
-			flagPrune,
-			flagMaxAccountSize,
+			opts,
 		)
 	} else {
 		err = extractExecutionState(
@@ -363,17 +377,10 @@ func run(*cobra.Command, []string) {
 			flagOutputDir,
 			flagNWorker,
 			!flagNoMigration,
-			flagDiffMigration,
-			flagLogVerboseDiff,
-			chainID,
-			evmContractChange,
-			burnerContractChange,
-			stagedContracts,
 			flagOutputPayloadFileName,
 			exportedAddresses,
 			flagSortPayloads,
-			flagPrune,
-			flagMaxAccountSize,
+			opts,
 		)
 	}
 

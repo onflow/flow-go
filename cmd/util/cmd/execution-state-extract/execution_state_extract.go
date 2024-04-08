@@ -23,12 +23,7 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage"
 )
-
-func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flow.StateCommitment, error) {
-	return commits.ByBlockID(blockHash)
-}
 
 func extractExecutionState(
 	log zerolog.Logger,
@@ -37,17 +32,10 @@ func extractExecutionState(
 	outputDir string,
 	nWorker int, // number of concurrent worker to migration payloads
 	runMigrations bool,
-	diffMigrations bool,
-	logVerboseDiff bool,
-	chainID flow.ChainID,
-	evmContractChange migrators.EVMContractChange,
-	burnerContractChange migrators.BurnerContractChange,
-	stagedContracts []migrators.StagedContract,
 	outputPayloadFile string,
 	exportPayloadsByAddresses []common.Address,
 	sortPayloads bool,
-	prune bool,
-	maxAccountSize uint64,
+	opts migrators.Options,
 ) error {
 
 	log.Info().Msg("init WAL")
@@ -110,16 +98,8 @@ func extractExecutionState(
 	migrations := newMigrations(
 		log,
 		dir,
-		nWorker,
 		runMigrations,
-		diffMigrations,
-		logVerboseDiff,
-		chainID,
-		evmContractChange,
-		burnerContractChange,
-		stagedContracts,
-		prune,
-		maxAccountSize,
+		opts,
 	)
 
 	newState := ledger.State(targetHash)
@@ -225,20 +205,13 @@ func extractExecutionStateFromPayloads(
 	log zerolog.Logger,
 	dir string,
 	outputDir string,
-	nWorker int, // number of concurrent worker to migation payloads
+	nWorker int, // number of concurrent worker to migration payloads
 	runMigrations bool,
-	diffMigrations bool,
-	logVerboseDiff bool,
-	chainID flow.ChainID,
-	evmContractChange migrators.EVMContractChange,
-	burnerContractChange migrators.BurnerContractChange,
-	stagedContracts []migrators.StagedContract,
 	inputPayloadFile string,
 	outputPayloadFile string,
 	exportPayloadsByAddresses []common.Address,
 	sortPayloads bool,
-	prune bool,
-	maxAccountSize uint64,
+	opts migrators.Options,
 ) error {
 
 	inputPayloadsFromPartialState, payloads, err := util.ReadPayloadFile(log, inputPayloadFile)
@@ -251,16 +224,8 @@ func extractExecutionStateFromPayloads(
 	migrations := newMigrations(
 		log,
 		dir,
-		nWorker,
 		runMigrations,
-		diffMigrations,
-		logVerboseDiff,
-		chainID,
-		evmContractChange,
-		burnerContractChange,
-		stagedContracts,
-		prune,
-		maxAccountSize,
+		opts,
 	)
 
 	payloads, err = migratePayloads(log, payloads, migrations)
@@ -408,16 +373,8 @@ func createTrieFromPayloads(logger zerolog.Logger, payloads []*ledger.Payload) (
 func newMigrations(
 	log zerolog.Logger,
 	dir string,
-	nWorker int,
 	runMigrations bool,
-	diffMigrations bool,
-	logVerboseDiff bool,
-	chainID flow.ChainID,
-	evmContractChange migrators.EVMContractChange,
-	burnerContractChange migrators.BurnerContractChange,
-	stagedContracts []migrators.StagedContract,
-	prune bool,
-	maxAccountSize uint64,
+	opts migrators.Options,
 ) []ledger.Migration {
 	if !runMigrations {
 		return nil
@@ -430,15 +387,7 @@ func newMigrations(
 	namedMigrations := migrators.NewCadence1Migrations(
 		log,
 		rwf,
-		nWorker,
-		chainID,
-		diffMigrations,
-		logVerboseDiff,
-		evmContractChange,
-		burnerContractChange,
-		stagedContracts,
-		prune,
-		maxAccountSize,
+		opts,
 	)
 
 	migrations := make([]ledger.Migration, 0, len(namedMigrations))

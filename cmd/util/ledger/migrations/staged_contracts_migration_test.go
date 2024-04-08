@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"testing"
@@ -396,7 +397,13 @@ func TestStagedContractsMigration(t *testing.T) {
 			common.Address(address1),
 			nil,
 		)
-		require.ErrorContains(t, err, "failed to find all contract registers that need to be changed")
+		require.NoError(t, err)
+
+		require.Len(t, logWriter.logs, 1)
+		assert.Contains(t,
+			logWriter.logs[0],
+			`"failed to find all contract registers that need to be changed for address"`,
+		)
 	})
 }
 
@@ -878,7 +885,10 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 	addressGenerator := chainID.Chain().NewAddressGenerator()
 
-	address, err := addressGenerator.NextAddress()
+	addressA, err := addressGenerator.NextAddress()
+	require.NoError(t, err)
+
+	addressB, err := addressGenerator.NextAddress()
 	require.NoError(t, err)
 
 	t.Run("FungibleToken.Vault", func(t *testing.T) {
@@ -923,7 +933,7 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 					Name: "A",
 					Code: []byte(newCodeA),
 				},
-				Address: common.Address(address),
+				Address: common.Address(addressA),
 			},
 			{
 				Contract: Contract{
@@ -942,11 +952,11 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 		migration.RegisterContractUpdates(stagedContracts)
 
-		err = migration.InitMigration(log, nil, 0)
+		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
 		payloads1 := []*ledger.Payload{
-			newContractPayload(common.Address(address), "A", []byte(oldCodeA)),
+			newContractPayload(common.Address(addressA), "A", []byte(oldCodeA)),
 		}
 		payloads2 := []*ledger.Payload{
 			newContractPayload(ftAddress, "FungibleToken", []byte(ftContract)),
@@ -954,7 +964,7 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 		payloads1, err = migration.MigrateAccount(
 			context.Background(),
-			common.Address(address),
+			common.Address(addressA),
 			payloads1,
 		)
 		require.NoError(t, err)
@@ -1021,7 +1031,7 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 					Name: "A",
 					Code: []byte(newCodeA),
 				},
-				Address: common.Address(address),
+				Address: common.Address(addressA),
 			},
 		}
 
@@ -1037,7 +1047,7 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 		require.NoError(t, err)
 
 		payloads1 := []*ledger.Payload{
-			newContractPayload(common.Address(address), "A", []byte(oldCodeA)),
+			newContractPayload(common.Address(addressA), "A", []byte(oldCodeA)),
 		}
 
 		payloads2 := []*ledger.Payload{
@@ -1046,7 +1056,7 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 		payloads1, err = migration.MigrateAccount(
 			context.Background(),
-			common.Address(address),
+			common.Address(addressA),
 			payloads1,
 		)
 		require.NoError(t, err)
@@ -1076,11 +1086,6 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 	t.Run("import from other account", func(t *testing.T) {
 		t.Parallel()
-
-		addressA := address
-
-		addressB, err := addressGenerator.NextAddress()
-		require.NoError(t, err)
 
 		oldCodeA := fmt.Sprintf(`
             import B from %s
@@ -1126,7 +1131,7 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 		migration.RegisterContractUpdates(stagedContracts)
 
-		err = migration.InitMigration(log, allPayloads, 0)
+		err := migration.InitMigration(log, allPayloads, 0)
 		require.NoError(t, err)
 
 		accountPayloads, err = migration.MigrateAccount(
@@ -1157,13 +1162,21 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 	address, err := addressGenerator.NextAddress()
 	require.NoError(t, err)
 
-	type testcase struct {
+	type testCase struct {
 		oldContract, oldInterface, newContract, newInterface string
 	}
 
 	test := func(oldContract, oldInterface, newContract, newInterface string) {
 
-		t.Run(fmt.Sprintf("%s.%s to %s.%s", oldContract, oldInterface, newContract, newInterface), func(t *testing.T) {
+		name := fmt.Sprintf(
+			"%s.%s to %s.%s",
+			oldContract,
+			oldInterface,
+			newContract,
+			newInterface,
+		)
+
+		t.Run(name, func(t *testing.T) {
 
 			t.Parallel()
 
@@ -1228,7 +1241,7 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 			accountPayloads := []*ledger.Payload{contractCodePayload}
 			allPayloads := []*ledger.Payload{contractCodePayload, viewResolverCodePayload}
 
-			err = migration.InitMigration(log, allPayloads, 0)
+			err := migration.InitMigration(log, allPayloads, 0)
 			require.NoError(t, err)
 
 			accountPayloads, err = migration.MigrateAccount(
@@ -1248,7 +1261,7 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 		})
 	}
 
-	testCases := []testcase{
+	testCases := []testCase{
 		{
 			oldContract:  "MetadataViews",
 			oldInterface: "Resolver",
@@ -1341,7 +1354,7 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 		accountPayloads := []*ledger.Payload{contractCodePayload}
 		allPayloads := []*ledger.Payload{contractCodePayload, arbitraryContractCodePayload}
 
-		err = migration.InitMigration(log, allPayloads, 0)
+		err := migration.InitMigration(log, allPayloads, 0)
 		require.NoError(t, err)
 
 		accountPayloads, err = migration.MigrateAccount(
@@ -1465,15 +1478,13 @@ func TestConcurrentContractUpdate(t *testing.T) {
 	migrations := NewCadence1Migrations(
 		logger,
 		rwf,
-		nWorker,
-		chainID,
-		false,
-		false,
-		evmContractChange,
-		burnerContractChange,
-		stagedContracts,
-		false,
-		0,
+		Options{
+			NWorker:              nWorker,
+			ChainID:              chainID,
+			EVMContractChange:    evmContractChange,
+			BurnerContractChange: burnerContractChange,
+			StagedContracts:      stagedContracts,
+		},
 	)
 
 	for _, migration := range migrations {
@@ -1497,4 +1508,186 @@ func TestConcurrentContractUpdate(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, allPayloads, 5)
+}
+
+func TestStagedContractsUpdateValidationErrors(t *testing.T) {
+	t.Parallel()
+
+	chainID := flow.Emulator
+	systemContracts := systemcontracts.SystemContractsForChain(chainID)
+
+	addressGenerator := chainID.Chain().NewAddressGenerator()
+
+	address, err := addressGenerator.NextAddress()
+	require.NoError(t, err)
+
+	t.Run("field mismatch", func(t *testing.T) {
+		t.Parallel()
+
+		oldCodeA := `
+            access(all) contract Test {
+                access(all) var a: Int
+                init() {
+                    self.a = 0
+                }
+            }
+        `
+
+		newCodeA := `
+            access(all) contract Test {
+                access(all) var a: String
+                init() {
+                    self.a = "hello"
+                }
+            }
+        `
+
+		stagedContracts := []StagedContract{
+			{
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(newCodeA),
+				},
+				Address: common.Address(address),
+			},
+		}
+
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(chainID, log).
+			WithContractUpdateValidation()
+
+		migration.RegisterContractUpdates(stagedContracts)
+
+		payloads := []*ledger.Payload{
+			newContractPayload(common.Address(address), "A", []byte(oldCodeA)),
+		}
+
+		err = migration.InitMigration(log, payloads, 0)
+		require.NoError(t, err)
+
+		_, err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(address),
+			payloads,
+		)
+		require.NoError(t, err)
+
+		err = migration.Close()
+		require.NoError(t, err)
+
+		require.Len(t, logWriter.logs, 1)
+
+		var jsonObject map[string]any
+
+		err := json.Unmarshal([]byte(logWriter.logs[0]), &jsonObject)
+		require.NoError(t, err)
+
+		assert.Equal(
+			t,
+			"failed to update contract A in account 0xf8d6e0586b0a20c7: error: mismatching field `a` in `Test`\n"+
+				" --> f8d6e0586b0a20c7.A:3:35\n"+
+				"  |\n"+
+				"3 |                 access(all) var a: String\n"+
+				"  |                                    ^^^^^^ incompatible type annotations. expected `Int`, found `String`\n",
+			jsonObject["message"],
+		)
+	})
+
+	t.Run("field mismatch with entitlements", func(t *testing.T) {
+		t.Parallel()
+
+		nftAddress := common.Address(systemContracts.NonFungibleToken.Address)
+
+		oldCodeA := fmt.Sprintf(`
+            import NonFungibleToken from %s
+
+            access(all) contract Test {
+                access(all) var a: Capability<&{NonFungibleToken.Provider}>?
+                init() {
+                    self.a = nil
+                }
+            }
+        `,
+			nftAddress.HexWithPrefix(),
+		)
+
+		newCodeA := fmt.Sprintf(`
+            import NonFungibleToken from %s
+
+            access(all) contract Test {
+                access(all) var a: Capability<auth(NonFungibleToken.E1) &{NonFungibleToken.Provider}>?
+                init() {
+                    self.a = nil
+                }
+            }
+        `,
+			nftAddress.HexWithPrefix(),
+		)
+
+		nftContract := `
+            access(all) contract NonFungibleToken {
+
+                access(all) entitlement E1
+                access(all) entitlement E2
+
+                access(all) resource interface Provider {
+                    access(E1) fun foo()
+                    access(E2) fun bar()
+                }
+		    }
+        `
+
+		stagedContracts := []StagedContract{
+			{
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(newCodeA),
+				},
+				Address: common.Address(address),
+			},
+		}
+
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		migration := NewStagedContractsMigration(chainID, log).
+			WithContractUpdateValidation()
+
+		migration.RegisterContractUpdates(stagedContracts)
+
+		contractACode := newContractPayload(common.Address(address), "A", []byte(oldCodeA))
+		nftCode := newContractPayload(nftAddress, "NonFungibleToken", []byte(nftContract))
+
+		accountPayloads := []*ledger.Payload{contractACode}
+		allPayloads := []*ledger.Payload{contractACode, nftCode}
+
+		err = migration.InitMigration(log, allPayloads, 0)
+		require.NoError(t, err)
+
+		_, err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(address),
+			accountPayloads,
+		)
+		require.NoError(t, err)
+
+		require.Len(t, logWriter.logs, 1)
+
+		var jsonObject map[string]any
+		err := json.Unmarshal([]byte(logWriter.logs[0]), &jsonObject)
+		require.NoError(t, err)
+
+		assert.Equal(
+			t,
+			"failed to update contract A in account 0xf8d6e0586b0a20c7: error: mismatching field `a` in `Test`\n"+
+				" --> f8d6e0586b0a20c7.A:5:35\n"+
+				"  |\n"+
+				"5 |                 access(all) var a: Capability<auth(NonFungibleToken.E1) &{NonFungibleToken.Provider}>?\n"+
+				"  |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ mismatching authorization:"+
+				" the entitlements migration would only grant this value `NonFungibleToken.E1, NonFungibleToken.E2`, but the annotation present is `NonFungibleToken.E1`\n",
+			jsonObject["message"],
+		)
+	})
 }
