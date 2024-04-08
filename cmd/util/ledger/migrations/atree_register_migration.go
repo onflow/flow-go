@@ -8,15 +8,15 @@ import (
 	runtime2 "runtime"
 	"time"
 
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -42,6 +42,7 @@ type AtreeRegisterMigrator struct {
 }
 
 var _ AccountBasedMigration = (*AtreeRegisterMigrator)(nil)
+
 var _ io.Closer = (*AtreeRegisterMigrator)(nil)
 
 func NewAtreeRegisterMigrator(
