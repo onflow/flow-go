@@ -7,10 +7,9 @@ import (
 	"path"
 	"strings"
 
+	runtimeCommon "github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-
-	runtimeCommon "github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
@@ -32,17 +31,18 @@ var (
 	flagNoMigration                        bool
 	flagNoReport                           bool
 	flagValidateMigration                  bool
-	flagAllowPartialStateFromPayloads bool
-	flagSortPayloads                  bool
-	flagPrune                         bool
-	flagLogVerboseValidationError     bool
-	flagDiffMigration                 bool
-	flagLogVerboseDiff                bool
-	flagStagedContractsFile           string
-	flagContinueMigrationOnValidationError boolflagInputPayloadFileName          string
-	flagOutputPayloadFileName         string
-	flagOutputPayloadByAddresses      string
-	flagMaxAccountSize                uint64
+	flagAllowPartialStateFromPayloads      bool
+	flagSortPayloads                       bool
+	flagPrune                              bool
+	flagLogVerboseValidationError          bool
+	flagDiffMigration                      bool
+	flagLogVerboseDiff                     bool
+	flagStagedContractsFile                string
+	flagContinueMigrationOnValidationError bool
+	flagInputPayloadFileName               string
+	flagOutputPayloadFileName              string
+	flagOutputPayloadByAddresses           string
+	flagMaxAccountSize                     uint64
 )
 
 var Cmd = &cobra.Command{

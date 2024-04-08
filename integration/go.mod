@@ -21,7 +21,7 @@ require (
 	github.com/ipfs/go-ipfs-blockstore v1.3.0
 	github.com/libp2p/go-libp2p v0.32.2
 	github.com/onflow/cadence v1.0.0-preview.16
-	github.com/onflow/crypto v0.25.0
+	github.com/onflow/crypto v0.25.1
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.2-0.20240305214031-d81e0c3b42f3
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.2-0.20240305214031-d81e0c3b42f3
 	github.com/onflow/flow-emulator v1.0.0-M2
@@ -29,7 +29,6 @@ require (
 	github.com/onflow/flow-go-sdk v1.0.0-preview.14
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.3.7
-	github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240404170900-c321c1475f1e
 	github.com/onflow/go-ethereum v1.13.4
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.18.0
