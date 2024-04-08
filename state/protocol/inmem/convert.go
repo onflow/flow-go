@@ -76,11 +76,24 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 	}
 	snap.Params = params.enc
 
-	protocolState, err := from.EpochProtocolState()
+	protocolEpochState, err := from.EpochProtocolState()
+	if err != nil {
+		return nil, fmt.Errorf("could not get protocol epoch state: %w", err)
+	}
+	snap.EpochProtocolState = protocolEpochState.Entry().ProtocolStateEntry
+
+	protocolState, err := from.ProtocolState()
 	if err != nil {
 		return nil, fmt.Errorf("could not get protocol state: %w", err)
 	}
-	snap.EpochProtocolState = protocolState.Entry().ProtocolStateEntry
+	kvStoreVersion, kvStoreData, err := protocolState.VersionedEncode()
+	if err != nil {
+		return nil, fmt.Errorf("could not encode kvstore: %w", err)
+	}
+	snap.KVStore = storage.KeyValueStoreData{
+		Version: kvStoreVersion,
+		Data:    kvStoreData,
+	}
 
 	// convert version beacon
 	versionBeacon, err := from.VersionBeacon()

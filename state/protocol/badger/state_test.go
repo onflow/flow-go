@@ -261,7 +261,6 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 // needed otherwise the parent block would not have a valid QC, since the QC
 // is stored in the child.
 func TestBootstrapNonRoot(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: temporary broken")
 	t.Parallel()
 	// start with a regular post-spork root snapshot
 	participants := unittest.CompleteIdentitySet()
