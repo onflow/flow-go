@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
-	"github.com/multiformats/go-multiaddr"
 	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"

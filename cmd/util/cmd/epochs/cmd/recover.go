@@ -20,20 +20,20 @@ import (
 // EpochRecover event to be emitted. This command retrieves the current protocol state identities, computes the cluster assignment using those
 // identities, generates the cluster QC's and retrieves the DKG key vector of the last successful epoch.
 // This recovery process has some constraints:
-//  - The RecoveryEpoch must have exactly the same consensus committee as participated in the most recent successful DKG.
-//  - The RecoveryEpoch must contain enough "internal" collection nodes so that all clusters contain a supermajority of "internal" collection nodes (same constraint as sporks)
+//   - The RecoveryEpoch must have exactly the same consensus committee as participated in the most recent successful DKG.
+//   - The RecoveryEpoch must contain enough "internal" collection nodes so that all clusters contain a supermajority of "internal" collection nodes (same constraint as sporks)
 var (
 	generateRecoverEpochTxArgsCmd = &cobra.Command{
 		Use:   "efm-recover-tx-args",
 		Short: "Generates recover epoch transaction arguments",
-		Long:  `
+		Long: `
 Generates transaction arguments for the epoch recovery transaction.
 The epoch recovery transaction is used to recover from any failure in the epoch transition process without requiring a spork.
 This recovery process has some constraints:
 - The RecoveryEpoch must have exactly the same consensus committee as participated in the most recent successful DKG.
 - The RecoveryEpoch must contain enough "internal" collection nodes so that all clusters contain a supermajority of "internal" collection nodes (same constraint as sporks)
 `,
-		Run:   generateRecoverEpochTxArgs(getSnapshot),
+		Run: generateRecoverEpochTxArgs(getSnapshot),
 	}
 
 	flagAnAddress                string
@@ -62,7 +62,7 @@ func addGenerateRecoverEpochTxArgsCmdFlags() {
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 4000, "length of each epoch measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 100, "length of the epoch staking phase measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "the epoch counter used to generate the root cluster block")
-	
+
 	generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-length")
 	generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-staking-phase-length")
 	generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-counter")
@@ -121,7 +121,7 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 	}
 
 	// separate collector nodes by internal and partner nodes
-	collectors := ids.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
+	collectors := currentEpochIdentities.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 	internalCollectors := make(flow.IdentityList, 0)
 	partnerCollectors := make(flow.IdentityList, 0)
 
@@ -133,7 +133,7 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 
 	internalNodesMap := make(map[flow.Identifier]struct{})
 	for _, node := range internalNodes {
-		if !ids.Exists(node.Identity()) {
+		if !currentEpochIdentities.Exists(node.Identity()) {
 			log.Fatal().Msg(fmt.Sprintf("node ID found in internal node infos missing from protocol snapshot identities: %s", node.NodeID))
 		}
 		internalNodesMap[node.NodeID] = struct{}{}
@@ -179,7 +179,7 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 		log.Fatal().Err(cdcErr).Msg("failed to get dkg group key cadence string")
 	}
 	dkgPubKeys = append(dkgPubKeys, dkgGroupKeyCdc)
-	for _, id := range ids {
+	for _, id := range currentEpochIdentities {
 		if id.GetRole() == flow.RoleConsensus {
 			dkgPubKey, keyShareErr := currentEpochDKG.KeyShare(id.GetNodeID())
 			if keyShareErr != nil {
