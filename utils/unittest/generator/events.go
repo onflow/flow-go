@@ -2,6 +2,12 @@ package generator
 
 import (
 	"fmt"
+	"testing"
+
+	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/fvm/evm/testutils"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
@@ -112,4 +118,83 @@ func GetEventsWithEncoding(n int, version entities.EventEncodingVersion) []flow.
 		events = append(events, eventGenerator.New())
 	}
 	return events
+}
+
+// GenerateAccountCreateEvent returns a mock account creation event.
+func GenerateAccountCreateEvent(t *testing.T, address flow.Address) flow.Event {
+	cadenceEvent := cadence.NewEvent(
+		[]cadence.Value{
+			cadence.NewAddress(address),
+		}).WithType(&cadence.EventType{
+		Location:            stdlib.FlowLocation{},
+		QualifiedIdentifier: "AccountCreated",
+		Fields: []cadence.Field{
+			{
+				Identifier: "address",
+				Type:       cadence.AddressType{},
+			},
+		},
+	})
+
+	payload, err := ccf.Encode(cadenceEvent)
+	require.NoError(t, err)
+
+	event := unittest.EventFixture(
+		flow.EventType(cadenceEvent.EventType.Location.TypeID(nil, cadenceEvent.EventType.QualifiedIdentifier)),
+		0,
+		0,
+		unittest.IdentifierFixture(),
+		0,
+	)
+
+	event.Payload = payload
+
+	return event
+}
+
+// GenerateAccountContractEvent returns a mock account contract event.
+func GenerateAccountContractEvent(t *testing.T, qualifiedIdentifier string, address flow.Address) flow.Event {
+	contractName, err := cadence.NewString("EventContract")
+	require.NoError(t, err)
+
+	cadenceEvent := cadence.NewEvent(
+		[]cadence.Value{
+			cadence.NewAddress(address),
+			cadence.NewArray(
+				testutils.ConvertToCadence([]byte{111, 43, 164, 202, 220, 174, 148, 17, 253, 161, 9, 124, 237, 83, 227, 75, 115, 149, 141, 83, 129, 145, 252, 68, 122, 137, 80, 155, 89, 233, 136, 213}),
+			).WithType(cadence.NewConstantSizedArrayType(32, cadence.TheUInt8Type)),
+			contractName,
+		}).WithType(&cadence.EventType{
+		Location:            stdlib.FlowLocation{},
+		QualifiedIdentifier: qualifiedIdentifier,
+		Fields: []cadence.Field{
+			{
+				Identifier: "address",
+				Type:       cadence.AddressType{},
+			},
+			{
+				Identifier: "codeHash",
+				Type:       cadence.NewConstantSizedArrayType(32, cadence.TheUInt8Type),
+			},
+			{
+				Identifier: "contract",
+				Type:       cadence.StringType{},
+			},
+		},
+	})
+
+	payload, err := ccf.Encode(cadenceEvent)
+	require.NoError(t, err)
+
+	event := unittest.EventFixture(
+		flow.EventType(cadenceEvent.EventType.Location.TypeID(nil, cadenceEvent.EventType.QualifiedIdentifier)),
+		0,
+		0,
+		unittest.IdentifierFixture(),
+		0,
+	)
+
+	event.Payload = payload
+
+	return event
 }

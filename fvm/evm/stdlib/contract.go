@@ -27,16 +27,9 @@ import (
 //go:embed contract.cdc
 var contractCode string
 
-//go:embed abiOnlyContract.cdc
-var abiOnlyContractCode string
-
 var flowTokenImportPattern = regexp.MustCompile(`(?m)^import "FlowToken"\n`)
 
-func ContractCode(flowTokenAddress flow.Address, evmAbiOnly bool) []byte {
-	if evmAbiOnly {
-		return []byte(abiOnlyContractCode)
-	}
-
+func ContractCode(flowTokenAddress flow.Address) []byte {
 	return []byte(flowTokenImportPattern.ReplaceAllString(
 		contractCode,
 		fmt.Sprintf("import FlowToken from %s", flowTokenAddress.HexWithPrefix()),
@@ -49,6 +42,7 @@ const evmAddressTypeQualifiedIdentifier = "EVM.EVMAddress"
 const evmBalanceTypeQualifiedIdentifier = "EVM.Balance"
 const evmResultTypeQualifiedIdentifier = "EVM.Result"
 const evmStatusTypeQualifiedIdentifier = "EVM.Status"
+const evmBlockTypeQualifiedIdentifier = "EVM.EVMBlock"
 
 const abiEncodingByteSize = 32
 
@@ -1744,6 +1738,80 @@ func newInternalEVMTypeCastToFLOWFunction(
 	)
 }
 
+const internalEVMTypeGetLatestBlockFunctionName = "getLatestBlock"
+
+var internalEVMTypeGetLatestBlockFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{},
+	// Actually EVM.Block, but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
+}
+
+func newInternalEVMTypeGetLatestBlockFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		internalEVMTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			latestBlock := handler.LastExecutedBlock()
+			return NewEVMBlockValue(handler, gauge, inter, locationRange, latestBlock)
+		},
+	)
+}
+
+func NewEVMBlockValue(
+	handler types.ContractHandler,
+	gauge common.MemoryGauge,
+	inter *interpreter.Interpreter,
+	locationRange interpreter.LocationRange,
+	block *types.Block,
+) *interpreter.CompositeValue {
+	loc := common.NewAddressLocation(gauge, handler.EVMContractAddress(), ContractName)
+	hash, err := block.Hash()
+	if err != nil {
+		panic(err)
+	}
+
+	return interpreter.NewCompositeValue(
+		inter,
+		locationRange,
+		loc,
+		evmBlockTypeQualifiedIdentifier,
+		common.CompositeKindStructure,
+		[]interpreter.CompositeField{
+			{
+				Name:  "height",
+				Value: interpreter.UInt64Value(block.Height),
+			},
+			{
+				Name: "hash",
+				Value: interpreter.NewStringValue(
+					inter,
+					common.NewStringMemoryUsage(len(hash)),
+					func() string {
+						return hash.Hex()
+					},
+				),
+			},
+			{
+				Name: "totalSupply",
+				Value: interpreter.NewIntValueFromBigInt(
+					inter,
+					common.NewBigIntMemoryUsage(common.BigIntByteLength(block.TotalSupply)),
+					func() *big.Int {
+						return block.TotalSupply
+					},
+				),
+			},
+		},
+		common.ZeroAddress,
+	)
+}
+
 func NewInternalEVMContractValue(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
@@ -1769,6 +1837,7 @@ func NewInternalEVMContractValue(
 			internalEVMTypeDecodeABIFunctionName:                 newInternalEVMTypeDecodeABIFunction(gauge, location),
 			internalEVMTypeCastToAttoFLOWFunctionName:            newInternalEVMTypeCastToAttoFLOWFunction(gauge),
 			internalEVMTypeCastToFLOWFunctionName:                newInternalEVMTypeCastToFLOWFunction(gauge),
+			internalEVMTypeGetLatestBlockFunctionName:            newInternalEVMTypeGetLatestBlockFunction(gauge, handler),
 		},
 		nil,
 		nil,
@@ -1867,6 +1936,12 @@ var InternalEVMContractType = func() *sema.CompositeType {
 			ty,
 			internalEVMTypeDecodeABIFunctionName,
 			internalEVMTypeDecodeABIFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeGetLatestBlockFunctionName,
+			internalEVMTypeGetLatestBlockFunctionType,
 			"",
 		),
 	})
@@ -1984,4 +2059,26 @@ func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, e
 		ReturnedValue: convertedData,
 	}, nil
 
+}
+
+func NewEVMBlockCadenceType(address common.Address) *cadence.StructType {
+	return cadence.NewStructType(
+		common.NewAddressLocation(nil, address, ContractName),
+		evmBlockTypeQualifiedIdentifier,
+		[]cadence.Field{
+			{
+				Identifier: "height",
+				Type:       cadence.UInt64Type{},
+			},
+			{
+				Identifier: "hash",
+				Type:       cadence.StringType{},
+			},
+			{
+				Identifier: "totalSupply",
+				Type:       cadence.IntType{},
+			},
+		},
+		nil,
+	)
 }

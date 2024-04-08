@@ -22,16 +22,16 @@ import (
 )
 
 var (
-	flagExecutionStateDir             string
-	flagOutputDir                     string
-	flagBlockHash                     string
-	flagStateCommitment               string
-	flagDatadir                       string
-	flagChain                         string
-	flagNWorker                       int
-	flagNoMigration                   bool
-	flagNoReport                      bool
-	flagValidateMigration             bool
+	flagExecutionStateDir                  string
+	flagOutputDir                          string
+	flagBlockHash                          string
+	flagStateCommitment                    string
+	flagDatadir                            string
+	flagChain                              string
+	flagNWorker                            int
+	flagNoMigration                        bool
+	flagNoReport                           bool
+	flagValidateMigration                  bool
 	flagAllowPartialStateFromPayloads bool
 	flagSortPayloads                  bool
 	flagPrune                         bool
@@ -39,7 +39,7 @@ var (
 	flagDiffMigration                 bool
 	flagLogVerboseDiff                bool
 	flagStagedContractsFile           string
-	flagInputPayloadFileName          string
+	flagContinueMigrationOnValidationError boolflagInputPayloadFileName          string
 	flagOutputPayloadFileName         string
 	flagOutputPayloadByAddresses      string
 	flagMaxAccountSize                uint64
@@ -97,6 +97,9 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagAllowPartialStateFromPayloads, "allow-partial-state-from-payload-file", false,
 		"allow input payload file containing partial state (e.g. not all accounts)")
+
+	Cmd.Flags().BoolVar(&flagContinueMigrationOnValidationError, "continue-migration-on-validation-errors", false,
+		"continue migration even if validation fails")
 
 	Cmd.Flags().BoolVar(&flagSortPayloads, "sort-payloads", true,
 		"sort payloads (generate deterministic output; disable only for development purposes)")

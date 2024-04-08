@@ -14,14 +14,14 @@ contract EVM {
     access(all)
     event CadenceOwnedAccountCreated(addressBytes: [UInt8; 20])
 
-    /// FLOWTokensDeposited is emitted when FLOW tokens is bridged 
-    /// into the EVM environment. Note that this event is not emitted 
+    /// FLOWTokensDeposited is emitted when FLOW tokens is bridged
+    /// into the EVM environment. Note that this event is not emitted
     /// for transfer of flow tokens between two EVM addresses.
     access(all)
     event FLOWTokensDeposited(addressBytes: [UInt8; 20], amount: UFix64)
 
-    /// FLOWTokensWithdrawn is emitted when FLOW tokens are bridged 
-    /// out of the EVM environment. Note that this event is not emitted 
+    /// FLOWTokensWithdrawn is emitted when FLOW tokens are bridged
+    /// out of the EVM environment. Note that this event is not emitted
     /// for transfer of flow tokens between two EVM addresses.
     access(all)
     event FLOWTokensWithdrawn(addressBytes: [UInt8; 20], amount: UFix64)
@@ -452,7 +452,6 @@ contract EVM {
         }
 
         let coaRef = acc.capabilities.borrow<&EVM.CadenceOwnedAccount>(path)
-
         if coaRef == nil {
              return ValidationResult(
                  isValid: false,
@@ -472,8 +471,33 @@ contract EVM {
         }
 
         return ValidationResult(
-        	isValid: true,
-        	problem: nil
+            isValid: true,
+            problem: nil
         )
+    }
+
+    /// Block returns information about the latest executed block.
+    access(all)
+    struct EVMBlock {
+        access(all)
+        let height: UInt64
+
+        access(all)
+        let hash: String
+
+        access(all)
+        let totalSupply: Int
+
+        init(height: UInt64, hash: String, totalSupply: Int) {
+            self.height = height
+            self.hash = hash
+            self.totalSupply = totalSupply
+        }
+    }
+
+    /// Returns the latest executed block.
+    access(all)
+    fun getLatestBlock(): EVMBlock {
+        return InternalEVM.getLatestBlock() as! EVMBlock
     }
 }

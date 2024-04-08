@@ -80,9 +80,7 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 	}
 
 	// notify backend block is available
-	s.executionDataTracker.On(
-		"GetHighestHeight").
-		Return(s.blocks[len(s.blocks)-1].Header.Height)
+	s.highestBlockHeader = s.blocks[len(s.blocks)-1].Header
 
 	s.Run("All events filter", func() {
 		// create empty event filter

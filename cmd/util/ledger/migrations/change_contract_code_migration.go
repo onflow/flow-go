@@ -214,6 +214,12 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 			systemContracts.ViewResolver,
 			coreContracts.ViewResolver(),
 		),
+
+		// EVM related contracts
+		NewSystemContractChange(
+			systemContracts.EVMContract,
+			evm.ContractCode(systemContracts.FlowToken.Address),
+		),
 	}
 
 	switch chainID {
@@ -231,26 +237,6 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 				},
 			},
 		)
-	}
-
-	// EVM related contracts
-	switch options.EVM {
-	case EVMContractChangeNone:
-		// do nothing
-	case EVMContractChangeABIOnly, EVMContractChangeFull:
-		abiOnly := options.EVM == EVMContractChangeABIOnly
-		contractChanges = append(
-			contractChanges,
-			NewSystemContractChange(
-				systemContracts.EVMContract,
-				evm.ContractCode(
-					flow.HexToAddress(env.FlowTokenAddress),
-					abiOnly,
-				),
-			),
-		)
-	default:
-		panic(fmt.Errorf("unsupported EVM contract change option: %d", options.EVM))
 	}
 
 	// Burner contract

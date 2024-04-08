@@ -43,7 +43,7 @@ func NewMigratorRuntime(
 	accounts := environment.NewAccounts(transactionState)
 
 	accountsAtreeLedger := util.NewAccountsAtreeLedger(accounts)
-	runtimeStorage := runtime.NewStorage(accountsAtreeLedger, util.NopMemoryGauge{})
+	runtimeStorage := runtime.NewStorage(accountsAtreeLedger, nil)
 
 	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
 	if err != nil {
@@ -122,7 +122,7 @@ type migratorRuntime struct {
 var _ stdlib.AccountContractNamesProvider = &migratorRuntime{}
 
 func (mr *migratorRuntime) GetReadOnlyStorage() *runtime.Storage {
-	return runtime.NewStorage(util.NewPayloadsReadonlyLedger(mr.Snapshot), util.NopMemoryGauge{})
+	return runtime.NewStorage(util.NewPayloadsReadonlyLedger(mr.Snapshot), nil)
 }
 
 func (mr *migratorRuntime) GetAccountContractNames(address common.Address) ([]string, error) {

@@ -869,6 +869,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.stateStreamConf.MaxAddresses = value
 				case "Contracts":
 					builder.stateStreamConf.MaxContracts = value
+				case "AccountAddresses":
+					builder.stateStreamConf.MaxAccountAddress = value
 				}
 			}
 			builder.stateStreamConf.RpcMetricsEnabled = builder.rpcMetricsEnabled
@@ -902,17 +904,23 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,
-				builder.stateStreamConf,
 				node.State,
 				node.Storage.Headers,
 				node.Storage.Seals,
 				node.Storage.Results,
 				builder.ExecutionDataStore,
 				executionDataStoreCache,
-				broadcaster,
 				builder.RegistersAsyncStore,
 				builder.EventsIndex,
 				useIndex,
+				int(builder.stateStreamConf.RegisterIDsRequestLimit),
+				subscription.NewSubscriptionHandler(
+					builder.Logger,
+					broadcaster,
+					builder.stateStreamConf.ClientSendTimeout,
+					builder.stateStreamConf.ResponseLimit,
+					builder.stateStreamConf.ClientSendBufferSize,
+				),
 				executionDataTracker,
 			)
 			if err != nil {
@@ -1223,17 +1231,17 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			if builder.stateStreamConf.ClientSendBufferSize == 0 {
 				return errors.New("state-stream-send-buffer-size must be greater than 0")
 			}
-			if len(builder.stateStreamFilterConf) > 3 {
-				return errors.New("state-stream-event-filter-limits must have at most 3 keys (EventTypes, Addresses, Contracts)")
+			if len(builder.stateStreamFilterConf) > 4 {
+				return errors.New("state-stream-event-filter-limits must have at most 3 keys (EventTypes, Addresses, Contracts, AccountAddresses)")
 			}
 			for key, value := range builder.stateStreamFilterConf {
 				switch key {
-				case "EventTypes", "Addresses", "Contracts":
+				case "EventTypes", "Addresses", "Contracts", "AccountAddresses":
 					if value <= 0 {
 						return fmt.Errorf("state-stream-event-filter-limits %s must be greater than 0", key)
 					}
 				default:
-					return errors.New("state-stream-event-filter-limits may only contain the keys EventTypes, Addresses, Contracts")
+					return errors.New("state-stream-event-filter-limits may only contain the keys EventTypes, Addresses, Contracts, AccountAddresses")
 				}
 			}
 			if builder.stateStreamConf.ResponseLimit < 0 {
@@ -1636,12 +1644,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ScriptExecutionMode:       scriptExecMode,
 				EventQueryMode:            eventQueryMode,
 				BlockTracker:              blockTracker,
-				SubscriptionParams: backend.SubscriptionParams{
-					Broadcaster:    broadcaster,
-					SendTimeout:    builder.stateStreamConf.ClientSendTimeout,
-					ResponseLimit:  builder.stateStreamConf.ResponseLimit,
-					SendBufferSize: int(builder.stateStreamConf.ClientSendBufferSize),
-				},
+				SubscriptionHandler: subscription.NewSubscriptionHandler(
+					builder.Logger,
+					broadcaster,
+					builder.stateStreamConf.ClientSendTimeout,
+					builder.stateStreamConf.ResponseLimit,
+					builder.stateStreamConf.ClientSendBufferSize,
+				),
 				EventsIndex:       builder.EventsIndex,
 				TxResultQueryMode: txResultQueryMode,
 				TxResultsIndex:    builder.TxResultsIndex,
