@@ -49,6 +49,9 @@ This recovery process has some constraints:
 func init() {
 	rootCmd.AddCommand(generateRecoverEpochTxArgsCmd)
 	err := addGenerateRecoverEpochTxArgsCmdFlags()
+	if err != nil {
+		panic(err)
+	}
 }
 
 func addGenerateRecoverEpochTxArgsCmdFlags() error {

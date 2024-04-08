@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+
 	"github.com/onflow/crypto"
 	"github.com/spf13/cobra"
 

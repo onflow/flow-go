@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
