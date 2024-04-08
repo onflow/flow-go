@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -14,7 +13,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 
@@ -28,6 +29,7 @@ func TestGrpcBlocksStream(t *testing.T) {
 
 type GrpcBlocksStreamSuite struct {
 	suite.Suite
+	lib.TestnetStateTracker
 
 	log zerolog.Logger
 
@@ -39,6 +41,8 @@ type GrpcBlocksStreamSuite struct {
 
 	// RPC methods to test
 	testedRPCs func() []subscribeBlocksRPCTest
+
+	ghostID flow.Identifier
 }
 
 func (s *GrpcBlocksStreamSuite) TearDownTest() {
@@ -76,6 +80,14 @@ func (s *GrpcBlocksStreamSuite) SetupTest() {
 		testnet.WithLogLevel(zerolog.FatalLevel),
 	}
 
+	// add the ghost (access) node config
+	s.ghostID = unittest.IdentifierFixture()
+	ghostNode := testnet.NewNodeConfig(
+		flow.RoleAccess,
+		testnet.WithID(s.ghostID),
+		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.AsGhost())
+
 	nodeConfigs := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel)),
 		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel)),
@@ -86,6 +98,7 @@ func (s *GrpcBlocksStreamSuite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
 		accessConfig,
+		ghostNode, // access ghost
 	}
 
 	// add the observer node config
@@ -111,6 +124,13 @@ func (s *GrpcBlocksStreamSuite) SetupTest() {
 	s.testedRPCs = s.getRPCs
 
 	s.net.Start(s.ctx)
+	s.Track(s.T(), s.ctx, s.Ghost())
+}
+
+func (s *GrpcBlocksStreamSuite) Ghost() *client.GhostClient {
+	client, err := s.net.ContainerByID(s.ghostID).GhostClient()
+	require.NoError(s.T(), err, "could not get ghost client")
+	return client
 }
 
 // TestRestEventStreaming tests gRPC event streaming
@@ -123,12 +143,19 @@ func (s *GrpcBlocksStreamSuite) TestHappyPath() {
 	observerClient, err := getAccessAPIClient(observerURL)
 	s.Require().NoError(err)
 
+	// get the first block height
+	currentFinalized := s.BlockState.HighestFinalizedHeight()
+	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
+
+	// Let the network run for this many blocks
+	blockCount := uint64(5)
+	// wait for the requested number of sealed blocks
+	s.BlockState.WaitForSealed(s.T(), blockA.Header.Height+blockCount)
+
 	txGenerator, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	s.Require().NoError(err)
 	header, err := txGenerator.GetLatestSealedBlockHeader(s.ctx)
 	s.Require().NoError(err)
-
-	time.Sleep(20 * time.Second)
 
 	var startValue interface{}
 	txCount := 10
@@ -141,14 +168,12 @@ func (s *GrpcBlocksStreamSuite) TestHappyPath() {
 				startValue = header.Height
 			}
 
-			accessStream, err := rpc.call(s.ctx, accessClient, startValue)
-			s.Require().NoError(err)
-			accessBlocks, accessBlockErrs, err := SubscribeHandler(s.ctx, accessStream.Recv, blockResponseHandler)
+			accessRecv := rpc.call(s.ctx, accessClient, startValue)
+			accessBlocks, accessBlockErrs, err := SubscribeHandler(s.ctx, accessRecv, blockResponseHandler)
 			s.Require().NoError(err)
 
-			observerStream, err := rpc.call(s.ctx, observerClient, startValue)
-			s.Require().NoError(err)
-			observerBlocks, observerBlockErrs, err := SubscribeHandler(s.ctx, observerStream.Recv, blockResponseHandler)
+			observerRecv := rpc.call(s.ctx, observerClient, startValue)
+			observerBlocks, observerBlockErrs, err := SubscribeHandler(s.ctx, observerRecv, blockResponseHandler)
 			s.Require().NoError(err)
 
 			foundANTxCount := 0
@@ -211,38 +236,44 @@ func compareBlocks(t *testing.T, accessBlock *flow.Block, observerBlock *flow.Bl
 
 type subscribeBlocksRPCTest struct {
 	name string
-	call func(ctx context.Context, client accessproto.AccessAPIClient, startValue interface{}) (accessproto.AccessAPI_SubscribeBlocksFromLatestClient, error)
+	call func(ctx context.Context, client accessproto.AccessAPIClient, startValue interface{}) func() (*accessproto.SubscribeBlocksResponse, error)
 }
 
 func (s *GrpcBlocksStreamSuite) getRPCs() []subscribeBlocksRPCTest {
 	return []subscribeBlocksRPCTest{
 		{
 			name: "SubscribeBlocksFromLatest",
-			call: func(ctx context.Context, client accessproto.AccessAPIClient, _ interface{}) (accessproto.AccessAPI_SubscribeBlocksFromLatestClient, error) {
-				return client.SubscribeBlocksFromLatest(ctx, &accessproto.SubscribeBlocksFromLatestRequest{
+			call: func(ctx context.Context, client accessproto.AccessAPIClient, _ interface{}) func() (*accessproto.SubscribeBlocksResponse, error) {
+				stream, err := client.SubscribeBlocksFromLatest(ctx, &accessproto.SubscribeBlocksFromLatestRequest{
 					BlockStatus:       entities.BlockStatus_BLOCK_FINALIZED,
 					FullBlockResponse: true,
 				})
+				s.Require().NoError(err)
+				return stream.Recv
 			},
 		},
 		{
 			name: "SubscribeBlocksFromStartBlockID",
-			call: func(ctx context.Context, client accessproto.AccessAPIClient, startValue interface{}) (accessproto.AccessAPI_SubscribeBlocksFromLatestClient, error) {
-				return client.SubscribeBlocksFromStartBlockID(ctx, &accessproto.SubscribeBlocksFromStartBlockIDRequest{
+			call: func(ctx context.Context, client accessproto.AccessAPIClient, startValue interface{}) func() (*accessproto.SubscribeBlocksResponse, error) {
+				stream, err := client.SubscribeBlocksFromStartBlockID(ctx, &accessproto.SubscribeBlocksFromStartBlockIDRequest{
 					StartBlockId:      startValue.([]byte),
 					BlockStatus:       entities.BlockStatus_BLOCK_FINALIZED,
 					FullBlockResponse: true,
 				})
+				s.Require().NoError(err)
+				return stream.Recv
 			},
 		},
 		{
 			name: "SubscribeBlocksFromStartHeight",
-			call: func(ctx context.Context, client accessproto.AccessAPIClient, startValue interface{}) (accessproto.AccessAPI_SubscribeBlocksFromLatestClient, error) {
-				return client.SubscribeBlocksFromStartHeight(ctx, &accessproto.SubscribeBlocksFromStartHeightRequest{
+			call: func(ctx context.Context, client accessproto.AccessAPIClient, startValue interface{}) func() (*accessproto.SubscribeBlocksResponse, error) {
+				stream, err := client.SubscribeBlocksFromStartHeight(ctx, &accessproto.SubscribeBlocksFromStartHeightRequest{
 					StartBlockHeight:  startValue.(uint64),
 					BlockStatus:       entities.BlockStatus_BLOCK_FINALIZED,
 					FullBlockResponse: true,
 				})
+				s.Require().NoError(err)
+				return stream.Recv
 			},
 		},
 	}
