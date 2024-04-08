@@ -66,6 +66,32 @@ func (_m *Snapshot) Descendants() ([]flow.Identifier, error) {
 	return r0, r1
 }
 
+// EpochProtocolState provides a mock function with given fields:
+func (_m *Snapshot) EpochProtocolState() (protocol.DynamicProtocolState, error) {
+	ret := _m.Called()
+
+	var r0 protocol.DynamicProtocolState
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (protocol.DynamicProtocolState, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() protocol.DynamicProtocolState); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(protocol.DynamicProtocolState)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Epochs provides a mock function with given fields:
 func (_m *Snapshot) Epochs() protocol.EpochQuery {
 	ret := _m.Called()
@@ -201,19 +227,19 @@ func (_m *Snapshot) Phase() (flow.EpochPhase, error) {
 }
 
 // ProtocolState provides a mock function with given fields:
-func (_m *Snapshot) ProtocolState() (protocol.DynamicProtocolState, error) {
+func (_m *Snapshot) ProtocolState() (protocol.KVStoreReader, error) {
 	ret := _m.Called()
 
-	var r0 protocol.DynamicProtocolState
+	var r0 protocol.KVStoreReader
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (protocol.DynamicProtocolState, error)); ok {
+	if rf, ok := ret.Get(0).(func() (protocol.KVStoreReader, error)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() protocol.DynamicProtocolState); ok {
+	if rf, ok := ret.Get(0).(func() protocol.KVStoreReader); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(protocol.DynamicProtocolState)
+			r0 = ret.Get(0).(protocol.KVStoreReader)
 		}
 	}
 

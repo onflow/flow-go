@@ -88,7 +88,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		require.NoError(t, err)
 		rootQC, err := rootSnapshot.QuorumCertificate()
 		require.NoError(t, err)
-		rootProtocolState, err := rootSnapshot.ProtocolState()
+		rootProtocolState, err := rootSnapshot.EpochProtocolState()
 		require.NoError(t, err)
 		rootProtocolStateID := rootProtocolState.Entry().ID()
 

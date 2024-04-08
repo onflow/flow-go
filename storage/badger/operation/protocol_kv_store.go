@@ -2,9 +2,9 @@ package operation
 
 import (
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/storage"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage"
 )
 
 // InsertProtocolKVStore inserts a protocol KV store by ID.

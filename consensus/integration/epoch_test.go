@@ -244,7 +244,7 @@ func withNextEpoch(
 	encodableSnapshot.LatestSeal.ResultID = encodableSnapshot.LatestResult.ID()
 
 	// update protocol state
-	protocolState := encodableSnapshot.ProtocolState
+	protocolState := encodableSnapshot.EpochProtocolState
 
 	// setup ID has changed, need to update it
 	convertedEpochSetup, _ := protocol.ToEpochSetup(inmem.NewEpoch(*currEpoch))

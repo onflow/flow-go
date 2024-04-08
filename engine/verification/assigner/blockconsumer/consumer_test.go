@@ -149,7 +149,7 @@ func withConsumer(
 		// hold any guarantees.
 		root, err := s.State.Final().Head()
 		require.NoError(t, err)
-		rootProtocolState, err := s.State.Final().ProtocolState()
+		rootProtocolState, err := s.State.Final().EpochProtocolState()
 		require.NoError(t, err)
 		rootProtocolStateID := rootProtocolState.Entry().ID()
 		clusterCommittee := participants.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))

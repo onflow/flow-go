@@ -65,7 +65,7 @@ func withReader(
 		// hold any guarantees.
 		root, err := s.State.Final().Head()
 		require.NoError(t, err)
-		protocolState, err := s.State.Final().ProtocolState()
+		protocolState, err := s.State.Final().EpochProtocolState()
 		require.NoError(t, err)
 		protocolStateID := protocolState.Entry().ID()
 

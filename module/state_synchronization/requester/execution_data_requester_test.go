@@ -796,12 +796,12 @@ func (m *mockSnapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) 
 func (m *mockSnapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 	return nil, nil, nil
 }
-func (m *mockSnapshot) Commit() (flow.StateCommitment, error)                 { return flow.DummyStateCommitment, nil }
-func (m *mockSnapshot) SealingSegment() (*flow.SealingSegment, error)         { return nil, nil }
-func (m *mockSnapshot) Descendants() ([]flow.Identifier, error)               { return nil, nil }
-func (m *mockSnapshot) RandomSource() ([]byte, error)                         { return nil, nil }
-func (m *mockSnapshot) Phase() (flow.EpochPhase, error)                       { return flow.EpochPhaseUndefined, nil }
-func (m *mockSnapshot) Epochs() protocol.EpochQuery                           { return nil }
-func (m *mockSnapshot) Params() protocol.GlobalParams                         { return nil }
-func (m *mockSnapshot) ProtocolState() (protocol.DynamicProtocolState, error) { return nil, nil }
-func (m *mockSnapshot) VersionBeacon() (*flow.SealedVersionBeacon, error)     { return nil, nil }
+func (m *mockSnapshot) Commit() (flow.StateCommitment, error)                      { return flow.DummyStateCommitment, nil }
+func (m *mockSnapshot) SealingSegment() (*flow.SealingSegment, error)              { return nil, nil }
+func (m *mockSnapshot) Descendants() ([]flow.Identifier, error)                    { return nil, nil }
+func (m *mockSnapshot) RandomSource() ([]byte, error)                              { return nil, nil }
+func (m *mockSnapshot) Phase() (flow.EpochPhase, error)                            { return flow.EpochPhaseUndefined, nil }
+func (m *mockSnapshot) Epochs() protocol.EpochQuery                                { return nil }
+func (m *mockSnapshot) Params() protocol.GlobalParams                              { return nil }
+func (m *mockSnapshot) EpochProtocolState() (protocol.DynamicProtocolState, error) { return nil, nil }
+func (m *mockSnapshot) VersionBeacon() (*flow.SealedVersionBeacon, error)          { return nil, nil }

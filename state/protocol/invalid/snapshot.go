@@ -76,7 +76,11 @@ func (u *Snapshot) Params() protocol.GlobalParams {
 	return Params{u.err}
 }
 
-func (u *Snapshot) ProtocolState() (protocol.DynamicProtocolState, error) {
+func (u *Snapshot) EpochProtocolState() (protocol.DynamicProtocolState, error) {
+	return nil, u.err
+}
+
+func (u *Snapshot) ProtocolState() (protocol.KVStoreReader, error) {
 	return nil, u.err
 }
 

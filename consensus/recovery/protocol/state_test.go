@@ -22,7 +22,7 @@ func TestSaveBlockAsReplica(t *testing.T) {
 	unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: temporary broken")
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	protocolState, err := rootSnapshot.ProtocolState()
+	protocolState, err := rootSnapshot.EpochProtocolState()
 	require.NoError(t, err)
 	rootProtocolStateID := protocolState.Entry().ID()
 	b0, err := rootSnapshot.Head()

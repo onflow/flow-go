@@ -2696,7 +2696,7 @@ func mockMetricsForRootSnapshot(metricsMock *mockmodule.ComplianceMetrics, rootS
 }
 
 func getRootProtocolStateID(t *testing.T, rootSnapshot *inmem.Snapshot) flow.Identifier {
-	rootProtocolState, err := rootSnapshot.ProtocolState()
+	rootProtocolState, err := rootSnapshot.EpochProtocolState()
 	require.NoError(t, err)
 	return rootProtocolState.Entry().ID()
 }

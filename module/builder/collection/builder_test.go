@@ -289,7 +289,7 @@ func (suite *BuilderSuite) TestBuildOn_WithUnfinalizedReferenceBlock() {
 	// add an unfinalized block to the protocol state
 	genesis, err := suite.protoState.Final().Head()
 	suite.Require().NoError(err)
-	protocolState, err := suite.protoState.Final().ProtocolState()
+	protocolState, err := suite.protoState.Final().EpochProtocolState()
 	suite.Require().NoError(err)
 	protocolStateID := protocolState.Entry().ID()
 
@@ -329,7 +329,7 @@ func (suite *BuilderSuite) TestBuildOn_WithOrphanedReferenceBlock() {
 	// add an orphaned block to the protocol state
 	genesis, err := suite.protoState.Final().Head()
 	suite.Require().NoError(err)
-	protocolState, err := suite.protoState.Final().ProtocolState()
+	protocolState, err := suite.protoState.Final().EpochProtocolState()
 	suite.Require().NoError(err)
 	protocolStateID := protocolState.Entry().ID()
 
@@ -643,7 +643,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	// create enough main-chain blocks that an expired transaction is possible
 	genesis, err := suite.protoState.Final().Head()
 	suite.Require().NoError(err)
-	protocolState, err := suite.protoState.Final().ProtocolState()
+	protocolState, err := suite.protoState.Final().EpochProtocolState()
 	suite.Require().NoError(err)
 	protocolStateID := protocolState.Entry().ID()
 

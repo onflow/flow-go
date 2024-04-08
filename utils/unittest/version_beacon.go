@@ -22,7 +22,7 @@ func AddVersionBeacon(t *testing.T, beacon *flow.VersionBeacon, state protocol.F
 	final, err := state.Final().Head()
 	require.NoError(t, err)
 
-	protocolState, err := state.Final().ProtocolState()
+	protocolState, err := state.Final().EpochProtocolState()
 	require.NoError(t, err)
 	protocolStateID := protocolState.Entry().ID()
 

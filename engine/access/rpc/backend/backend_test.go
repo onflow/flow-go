@@ -516,7 +516,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_AtBlockIDInternalError
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHeight() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	rootProtocolState, err := rootSnapshot.ProtocolState()
+	rootProtocolState, err := rootSnapshot.EpochProtocolState()
 	require.NoError(suite.T(), err)
 	rootProtocolStateID := rootProtocolState.Entry().ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
@@ -555,7 +555,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHei
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalizedAtHeight() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	rootProtocolState, err := rootSnapshot.ProtocolState()
+	rootProtocolState, err := rootSnapshot.EpochProtocolState()
 	require.NoError(suite.T(), err)
 	rootProtocolStateID := rootProtocolState.Entry().ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
@@ -606,7 +606,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalize
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnexpectedErrorBlockIDByHeight() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	rootProtocolState, err := rootSnapshot.ProtocolState()
+	rootProtocolState, err := rootSnapshot.EpochProtocolState()
 	require.NoError(suite.T(), err)
 	rootProtocolStateID := rootProtocolState.Entry().ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
@@ -759,7 +759,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight() {
 func (suite *Suite) TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	rootProtocolState, err := rootSnapshot.ProtocolState()
+	rootProtocolState, err := rootSnapshot.EpochProtocolState()
 	require.NoError(suite.T(), err)
 	rootProtocolStateID := rootProtocolState.Entry().ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {

@@ -56,6 +56,32 @@ func (_m *ProtocolState) GlobalParams() protocol.GlobalParams {
 	return r0
 }
 
+// KVStoreAtBlockID provides a mock function with given fields: blockID
+func (_m *ProtocolState) KVStoreAtBlockID(blockID flow.Identifier) (protocol.KVStoreReader, error) {
+	ret := _m.Called(blockID)
+
+	var r0 protocol.KVStoreReader
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (protocol.KVStoreReader, error)); ok {
+		return rf(blockID)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Identifier) protocol.KVStoreReader); ok {
+		r0 = rf(blockID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(protocol.KVStoreReader)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(blockID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 type mockConstructorTestingTNewProtocolState interface {
 	mock.TestingT
 	Cleanup(func())

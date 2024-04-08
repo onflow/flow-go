@@ -139,7 +139,9 @@ type Snapshot interface {
 	// compliance layer guarantees that only valid blocks are appended to the protocol state.
 	// Returns state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
 	// All other errors should be treated as exceptions.
-	ProtocolState() (DynamicProtocolState, error)
+	EpochProtocolState() (DynamicProtocolState, error)
+
+	ProtocolState() (KVStoreReader, error)
 
 	// VersionBeacon returns the latest sealed version beacon.
 	// If no version beacon has been sealed so far during the current spork, returns nil.

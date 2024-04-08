@@ -74,11 +74,11 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 	}
 	snap.Params = params.enc
 
-	protocolState, err := from.ProtocolState()
+	protocolState, err := from.EpochProtocolState()
 	if err != nil {
 		return nil, fmt.Errorf("could not get protocol state: %w", err)
 	}
-	snap.ProtocolState = protocolState.Entry().ProtocolStateEntry
+	snap.EpochProtocolState = protocolState.Entry().ProtocolStateEntry
 
 	// convert version beacon
 	versionBeacon, err := from.VersionBeacon()
@@ -343,7 +343,7 @@ func SnapshotFromBootstrapStateWithParams(
 		QuorumCertificate:   qc,
 		Epochs:              epochs,
 		Params:              params,
-		ProtocolState:       rootProtocolState,
+		EpochProtocolState:  rootProtocolState,
 		SealedVersionBeacon: nil,
 	})
 

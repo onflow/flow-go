@@ -79,6 +79,8 @@ type ProtocolState interface {
 	// - (nil, exception) - any other error should be treated as exception.
 	AtBlockID(blockID flow.Identifier) (DynamicProtocolState, error)
 
+	KVStoreAtBlockID(blockID flow.Identifier) (KVStoreReader, error)
+
 	// GlobalParams returns params that are the same for all nodes in the network.
 	GlobalParams() GlobalParams
 }

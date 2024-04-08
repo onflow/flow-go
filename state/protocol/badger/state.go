@@ -160,7 +160,7 @@ func Bootstrap(
 		}
 
 		// 4) initialize values related to the epoch logic
-		rootProtocolState, err := root.ProtocolState()
+		rootProtocolState, err := root.EpochProtocolState()
 		if err != nil {
 			return fmt.Errorf("could not retrieve protocol state for root snapshot: %w", err)
 		}

@@ -16,16 +16,18 @@ import (
 // on a per-block and per-epoch basis.
 // It is backed by a storage.ProtocolState and an in-memory protocol.GlobalParams.
 type ProtocolState struct {
-	protocolStateDB storage.ProtocolState
-	globalParams    protocol.GlobalParams
+	protocolStateDB  storage.ProtocolState
+	kvStoreSnapshots storage.ProtocolKVStore
+	globalParams     protocol.GlobalParams
 }
 
 var _ protocol.ProtocolState = (*ProtocolState)(nil)
 
-func NewProtocolState(protocolStateDB storage.ProtocolState, globalParams protocol.GlobalParams) *ProtocolState {
+func NewProtocolState(protocolStateDB storage.ProtocolState, kvStoreSnapshots storage.ProtocolKVStore, globalParams protocol.GlobalParams) *ProtocolState {
 	return &ProtocolState{
-		protocolStateDB: protocolStateDB,
-		globalParams:    globalParams,
+		protocolStateDB:  protocolStateDB,
+		kvStoreSnapshots: kvStoreSnapshots,
+		globalParams:     globalParams,
 	}
 }
 
@@ -43,6 +45,23 @@ func (s *ProtocolState) AtBlockID(blockID flow.Identifier) (protocol.DynamicProt
 	return inmem.NewDynamicProtocolStateAdapter(protocolStateEntry, s.globalParams), nil
 }
 
+func (s *ProtocolState) KVStoreAtBlockID(blockID flow.Identifier) (protocol.KVStoreReader, error) {
+	return s.kvStoreAtBlockID(blockID)
+}
+
+func (s *ProtocolState) kvStoreAtBlockID(blockID flow.Identifier) (protocol_state.KVStoreAPI, error) {
+	versionedData, err := s.kvStoreSnapshots.ByBlockID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not query KV store at block (%x): %w", blockID, err)
+	}
+	kvStore, err := kvstore.VersionedDecode(versionedData.Version, versionedData.Data)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode parent protocol state (version=%d) at block (%x): %w",
+			versionedData.Version, blockID, err)
+	}
+	return kvStore, err
+}
+
 // GlobalParams returns an interface which can be used to query global protocol parameters.
 func (s *ProtocolState) GlobalParams() protocol.GlobalParams {
 	return s.globalParams
@@ -54,7 +73,6 @@ type MutableProtocolState struct {
 	ProtocolState
 	headers          storage.Headers
 	results          storage.ExecutionResults
-	kvStoreSnapshots storage.ProtocolKVStore
 	kvStoreFactories []protocol_state.KeyValueStoreStateMachineFactory
 }
 
@@ -77,10 +95,9 @@ func NewMutableProtocolState(
 		epochs.NewEpochStateMachineFactory(globalParams, setups, commits, protocolStateDB),
 	}
 	return &MutableProtocolState{
-		ProtocolState:    *NewProtocolState(protocolStateDB, globalParams),
+		ProtocolState:    *NewProtocolState(protocolStateDB, kvStoreSnapshots, globalParams),
 		headers:          headers,
 		results:          results,
-		kvStoreSnapshots: kvStoreSnapshots,
 		kvStoreFactories: kvStoreFactories,
 	}
 }
@@ -90,14 +107,9 @@ func NewMutableProtocolState(
 // Expected errors during normal operations:
 //   - `storage.ErrNotFound` if no protocol state for parent block is known.
 func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Identifier) (protocol.StateMutator, error) {
-	parentStateData, err := s.kvStoreSnapshots.ByBlockID(parentID)
+	parentState, err := s.kvStoreAtBlockID(parentID)
 	if err != nil {
-		return nil, fmt.Errorf("could not query parent KV store at block (%x): %w", parentID, err)
-	}
-	parentState, err := kvstore.VersionedDecode(parentStateData.Version, parentStateData.Data)
-	if err != nil {
-		return nil, fmt.Errorf("could not decode parent protocol state (version=%d) at block (%x): %w",
-			parentStateData.Version, parentID, err)
+		return nil, fmt.Errorf("could not query kvstore at parent block: %w", err)
 	}
 	return newStateMutator(
 		s.headers,
