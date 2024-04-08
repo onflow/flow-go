@@ -48,10 +48,10 @@ This recovery process has some constraints:
 
 func init() {
 	rootCmd.AddCommand(generateRecoverEpochTxArgsCmd)
-	addGenerateRecoverEpochTxArgsCmdFlags()
+	err := addGenerateRecoverEpochTxArgsCmdFlags()
 }
 
-func addGenerateRecoverEpochTxArgsCmdFlags() {
+func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	generateRecoverEpochTxArgsCmd.Flags().IntVar(&flagCollectionClusters, "collection-clusters", 3,
 		"number of collection clusters")
 	// required parameters for network configuration and generation of root node identities
@@ -63,10 +63,23 @@ func addGenerateRecoverEpochTxArgsCmdFlags() {
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 100, "length of the epoch staking phase measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "the epoch counter used to generate the root cluster block")
 
-	generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-length")
-	generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-staking-phase-length")
-	generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-counter")
-	generateRecoverEpochTxArgsCmd.MarkFlagRequired("collection-clusters")
+	err := generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-length")
+	if err != nil {
+		return fmt.Errorf("failed to mark epoch-length flag as required")
+	}
+	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-staking-phase-length")
+	if err != nil {
+		return fmt.Errorf("failed to mark epoch-staking-phase-length flag as required")
+	}
+	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-counter")
+	if err != nil {
+		return fmt.Errorf("failed to mark epoch-counter flag as required")
+	}
+	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("collection-clusters")
+	if err != nil {
+		return fmt.Errorf("failed to mark collection-clusters flag as required")
+	}
+	return nil
 }
 
 func getSnapshot() *inmem.Snapshot {
