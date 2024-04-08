@@ -94,6 +94,11 @@ func CompressAndStore(logger zerolog.Logger, ctx context.Context, keyvals <-chan
 	if err != nil {
 		return err
 	}
+	logger.Info().
+		Int("batch_count", batchLen).
+		Int("batch_size", batchByteSize).
+		Float64("avg_size", float64(batchByteSize)/float64(batchLen)).
+		Msgf("flushing last batch")
 
 	logger.Info().Msgf("finished processing %d key-values", total)
 	return nil
