@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/module"
@@ -149,12 +150,17 @@ type ComponentManagerBuilder interface {
 }
 
 type componentManagerBuilderImpl struct {
+	name    string
 	workers []ComponentWorker
 }
 
-// NewComponentManagerBuilder returns a new ComponentManagerBuilder
 func NewComponentManagerBuilder() ComponentManagerBuilder {
-	return &componentManagerBuilderImpl{}
+	return &componentManagerBuilderImpl{name: "default"}
+}
+
+// NewComponentManagerBuilder returns a new ComponentManagerBuilder
+func NewComponentManagerBuilderWithName(name string) ComponentManagerBuilder {
+	return &componentManagerBuilderImpl{name: name}
 }
 
 // AddWorker adds a ComponentWorker closure to the ComponentManagerBuilder
@@ -172,6 +178,7 @@ func (c *componentManagerBuilderImpl) AddWorker(worker ComponentWorker) Componen
 // more than once!
 func (c *componentManagerBuilderImpl) Build() *ComponentManager {
 	return &ComponentManager{
+		name:           c.name,
 		started:        atomic.NewBool(false),
 		ready:          make(chan struct{}),
 		done:           make(chan struct{}),
@@ -195,6 +202,7 @@ var _ Component = (*ComponentManager)(nil)
 // is also used by workers to communicate irrecoverable errors. All irrecoverable errors are considered
 // fatal and are propagated to the caller of Start() via the context's Throw method.
 type ComponentManager struct {
+	name           string
 	started        *atomic.Bool
 	ready          chan struct{}
 	done           chan struct{}
@@ -245,6 +253,8 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 	var workersDone sync.WaitGroup
 	workersReady.Add(len(c.workers))
 	workersDone.Add(len(c.workers))
+
+	log.Info().Str("name", c.name).Msgf("component manager is starting %d workers", len(c.workers))
 
 	// launch workers
 	for _, worker := range c.workers {

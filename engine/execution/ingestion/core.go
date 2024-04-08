@@ -90,7 +90,7 @@ func NewCore(
 		eventConsumer:     eventConsumer,
 	}
 
-	e.ComponentManager = component.NewComponentManagerBuilder().
+	e.ComponentManager = component.NewComponentManagerBuilderWithName("IngestionCore").
 		AddWorker(e.launchWorker).
 		Build()
 

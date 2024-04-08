@@ -1085,7 +1085,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 	fetcher := fetcher.NewCollectionFetcher(node.Logger, exeNode.collectionRequester, node.State, exeNode.exeConf.onflowOnlyLNs)
 
 	if exeNode.exeConf.enableNewIngestionEngine {
-		ingestionMachine, err := ingestion.NewMachine(
+		_, core, err := ingestion.NewMachine(
 			node.Logger,
 			node.ProtocolEvents,
 			exeNode.collectionRequester,
@@ -1102,7 +1102,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 			exeNode.stopControl,
 		)
 
-		return ingestionMachine, err
+		return core, err
 	}
 
 	var blockLoader ingestion.BlockLoader

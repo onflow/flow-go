@@ -52,7 +52,7 @@ func NewMachine(
 	broadcaster provider.ProviderEngine,
 	uploader *uploader.Manager,
 	stopControl *stop.StopControl,
-) (*Machine, error) {
+) (*Machine, module.ReadyDoneAware, error) {
 
 	e := &Machine{
 		log:                logger.With().Str("engine", "ingestion_machine").Logger(),
@@ -71,7 +71,7 @@ func NewMachine(
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create block throttle: %w", err)
+		return nil, nil, fmt.Errorf("failed to create block throttle: %w", err)
 	}
 
 	core := NewCore(
@@ -99,18 +99,7 @@ func NewMachine(
 		e.core.OnCollection(collection)
 	})
 
-	return e, nil
-}
-
-var _ module.ReadyDoneAware = (*Machine)(nil)
-
-// ReadyDoneAware implementation
-func (e *Machine) Ready() <-chan struct{} {
-	return e.core.Ready()
-}
-
-func (e *Machine) Done() <-chan struct{} {
-	return e.core.Done()
+	return e, core, nil
 }
 
 // Protocol Events implementation
