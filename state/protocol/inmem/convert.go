@@ -3,6 +3,8 @@ package inmem
 import (
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
+	"github.com/onflow/flow-go/storage"
 
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
@@ -323,10 +325,15 @@ func SnapshotFromBootstrapStateWithParams(
 		EpochCommitSafetyThreshold: epochCommitSafetyThreshold, // see protocol.Params for details
 	}
 
-	rootProtocolState := ProtocolStateFromEpochServiceEvents(setup, commit)
-	if rootProtocolState.ID() != root.Payload.ProtocolStateID {
+	rootEpochState := ProtocolStateFromEpochServiceEvents(setup, commit)
+	rootKvStore := kvstore.NewLatestKVStore(rootEpochState.ID())
+	if rootKvStore.ID() != root.Payload.ProtocolStateID {
 		return nil, fmt.Errorf("incorrect protocol state ID in root block, expected (%x) but got (%x)",
-			root.Payload.ProtocolStateID, rootProtocolState.ID())
+			root.Payload.ProtocolStateID, rootKvStore.ID())
+	}
+	kvStoreVersion, kvStoreData, err := rootKvStore.VersionedEncode()
+	if err != nil {
+		return nil, fmt.Errorf("could not encode kvstore: %w", err)
 	}
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{
@@ -340,10 +347,14 @@ func SnapshotFromBootstrapStateWithParams(
 			FirstSeal:        seal,
 			ExtraBlocks:      make([]*flow.Block, 0),
 		},
-		QuorumCertificate:   qc,
-		Epochs:              epochs,
-		Params:              params,
-		EpochProtocolState:  rootProtocolState,
+		QuorumCertificate:  qc,
+		Epochs:             epochs,
+		Params:             params,
+		EpochProtocolState: rootEpochState,
+		KVStore: storage.KeyValueStoreData{
+			Version: kvStoreVersion,
+			Data:    kvStoreData,
+		},
 		SealedVersionBeacon: nil,
 	})
 

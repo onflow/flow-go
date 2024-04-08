@@ -19,12 +19,11 @@ import (
 // as a consensus follower, when a block is received and saved,
 // if it's not finalized yet, this block should be returned by latest
 func TestSaveBlockAsReplica(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: temporary broken")
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	protocolState, err := rootSnapshot.EpochProtocolState()
+	protocolState, err := rootSnapshot.ProtocolState()
 	require.NoError(t, err)
-	rootProtocolStateID := protocolState.Entry().ID()
+	rootProtocolStateID := protocolState.ID()
 	b0, err := rootSnapshot.Head()
 	require.NoError(t, err)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {

@@ -13,7 +13,6 @@ import (
 	statepkg "github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -160,11 +159,11 @@ func Bootstrap(
 		}
 
 		// 4) initialize values related to the epoch logic
-		rootProtocolState, err := root.EpochProtocolState()
+		rootEpochState, err := root.EpochProtocolState()
 		if err != nil {
-			return fmt.Errorf("could not retrieve protocol state for root snapshot: %w", err)
+			return fmt.Errorf("could not retrieve epoch state for root snapshot: %w", err)
 		}
-		err = bootstrapEpoch(setups, commits, rootProtocolState, !config.SkipNetworkAddressValidation)(tx)
+		err = bootstrapEpoch(setups, commits, rootEpochState, !config.SkipNetworkAddressValidation)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap epoch values: %w", err)
 		}
@@ -176,7 +175,11 @@ func Bootstrap(
 		}
 
 		// 6) bootstrap dynamic protocol state
-		err = bootstrapProtocolState(segment, rootProtocolState, protocolStateSnapshotsDB, protocolKVStoreSnapshots)(tx)
+		rootProtocolState, err := root.ProtocolState()
+		if err != nil {
+			return fmt.Errorf("could not retrieve protocol state for root snapshot: %w", err)
+		}
+		err = bootstrapProtocolState(segment, rootEpochState, rootProtocolState, protocolStateSnapshotsDB, protocolKVStoreSnapshots)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap protocol state: %w", err)
 		}
@@ -241,27 +244,26 @@ func Bootstrap(
 // or epoch phase transitions.
 func bootstrapProtocolState(
 	segment *flow.SealingSegment,
-	rootProtocolState protocol.DynamicProtocolState,
+	rootEpochState protocol.DynamicProtocolState,
+	rootKVStore protocol.KVStoreReader,
 	protocolState storage.ProtocolState,
 	protocolKVStores storage.ProtocolKVStore,
 ) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
-		rootProtocolStateEntry := rootProtocolState.Entry().ProtocolStateEntry
-		protocolStateID := rootProtocolStateEntry.ID()
-		err := protocolState.StoreTx(protocolStateID, rootProtocolStateEntry)(tx)
+		rootProtocolStateEntry := rootEpochState.Entry().ProtocolStateEntry
+		rootEpochStateID := rootProtocolStateEntry.ID()
+		err := protocolState.StoreTx(rootEpochStateID, rootProtocolStateEntry)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root protocol state: %w", err)
 		}
 
 		// bootstrap KV store
-		// TODO: add proper bootstrapping for the KV store
-		rootKVStore := kvstore.NewLatestKVStore(protocolStateID)
 		version, data, err := rootKVStore.VersionedEncode()
 		if err != nil {
 			return fmt.Errorf("could not encode root KV store: %w", err)
 		}
-		kvStoreStateID := rootKVStore.ID()
-		err = protocolKVStores.StoreTx(kvStoreStateID, &storage.KeyValueStoreData{
+		rootKVStoreStateID := rootKVStore.ID()
+		err = protocolKVStores.StoreTx(rootKVStoreStateID, &storage.KeyValueStoreData{
 			Version: version,
 			Data:    data,
 		})(tx)
@@ -273,17 +275,16 @@ func bootstrapProtocolState(
 		// in the sealing segment is within the same phase within the same epoch.
 		// the sealing segment.
 		for _, block := range segment.AllBlocks() {
-			// TODO: enable this once the genesis block has state ID from the KV store, not the Epoch Sub-State.
-			//if block.Payload.ProtocolStateID != protocolStateID {
-			//	return fmt.Errorf("block with height %d in sealing segment has mismatching protocol state ID, expecting %x got %x",
-			//		block.Header.Height, protocolStateID, block.Payload.ProtocolStateID)
-			//}
+			if block.Payload.ProtocolStateID != rootKVStoreStateID {
+				return fmt.Errorf("block with height %d in sealing segment has mismatching protocol state ID, expecting %x got %x",
+					block.Header.Height, rootKVStoreStateID, block.Payload.ProtocolStateID)
+			}
 			blockID := block.ID()
-			err = protocolState.Index(blockID, protocolStateID)(tx)
+			err = protocolState.Index(blockID, rootEpochStateID)(tx)
 			if err != nil {
 				return fmt.Errorf("could not index root protocol state: %w", err)
 			}
-			err = protocolKVStores.IndexTx(blockID, kvStoreStateID)(tx)
+			err = protocolKVStores.IndexTx(blockID, rootKVStoreStateID)(tx)
 			if err != nil {
 				return fmt.Errorf("could not index root kv store: %w", err)
 			}
