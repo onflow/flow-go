@@ -17,7 +17,7 @@ import (
 // blocks until the execution has caught up
 const CatchUpThreshold = 500
 
-// BlockThrottle is a helper struct that throttles the unexecuted blocks to be sent
+// BlockThrottle is a helper struct that helps throttle the unexecuted blocks to be sent
 // to the block queue for execution.
 // It is useful for case when execution is falling far behind the finalization, in which case
 // we want to throttle the blocks to be sent to the block queue for fetching data to execute
@@ -68,7 +68,7 @@ func NewBlockThrottle(
 		executed:  executed,
 		finalized: finalized,
 
-		log:     log.With().Str("component", "throttle").Logger(),
+		log:     log.With().Str("component", "block_throttle").Logger(),
 		state:   state,
 		headers: headers,
 	}, nil
@@ -77,11 +77,13 @@ func NewBlockThrottle(
 func (c *BlockThrottle) Init(processables chan<- flow.Identifier) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.log.Info().Msgf("initializing block throttle")
 	if c.inited {
 		return fmt.Errorf("throttle already inited")
 	}
 
 	c.inited = true
+	c.processables = processables
 
 	var unexecuted []flow.Identifier
 	var err error
@@ -90,16 +92,20 @@ func (c *BlockThrottle) Init(processables chan<- flow.Identifier) error {
 		if err != nil {
 			return err
 		}
+		c.log.Info().Msgf("loaded %d unexecuted blocks", len(unexecuted))
 	} else {
 		unexecuted, err = findFinalized(c.state, c.headers, c.executed, c.executed+500)
 		if err != nil {
 			return err
 		}
+		c.log.Info().Msgf("loaded %d unexecuted finalized blocks", len(unexecuted))
 	}
 
 	for _, id := range unexecuted {
 		c.processables <- id
 	}
+
+	c.log.Info().Msgf("throttle initialized with %d unexecuted blocks", len(unexecuted))
 
 	return nil
 }
@@ -147,6 +153,7 @@ func (c *BlockThrottle) OnBlockExecuted(_ flow.Identifier, executed uint64) erro
 func (c *BlockThrottle) OnBlock(blockID flow.Identifier) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.log.Debug().Msgf("recieved block (%v)", blockID)
 
 	if !c.inited {
 		return fmt.Errorf("throttle not inited")
@@ -159,6 +166,8 @@ func (c *BlockThrottle) OnBlock(blockID flow.Identifier) error {
 
 	// if has caught up, then process the block
 	c.processables <- blockID
+	c.log.Debug().Msgf("processed block (%v)", blockID)
+
 	return nil
 }
 
