@@ -37,7 +37,7 @@ var (
 	flagLogVerboseValidationError          bool
 	flagDiffMigration                      bool
 	flagLogVerboseDiff                     bool
-	flagCheckStorageHealthBeforeMigration bool
+	flagCheckStorageHealthBeforeMigration  bool
 	flagStagedContractsFile                string
 	flagContinueMigrationOnValidationError bool
 	flagInputPayloadFileName               string
