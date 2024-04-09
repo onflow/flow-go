@@ -22,9 +22,9 @@ func AddVersionBeacon(t *testing.T, beacon *flow.VersionBeacon, state protocol.F
 	final, err := state.Final().Head()
 	require.NoError(t, err)
 
-	protocolState, err := state.Final().EpochProtocolState()
+	protocolState, err := state.Final().ProtocolState()
 	require.NoError(t, err)
-	protocolStateID := protocolState.Entry().ID()
+	protocolStateID := protocolState.ID()
 
 	A := BlockWithParentFixture(final)
 	A.SetPayload(PayloadFixture(WithProtocolStateID(protocolStateID)))

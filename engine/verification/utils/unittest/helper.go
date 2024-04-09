@@ -496,9 +496,9 @@ func withConsumers(t *testing.T,
 	// hold any guarantees.
 	root, err := s.State.Final().Head()
 	require.NoError(t, err)
-	protocolState, err := s.State.Final().EpochProtocolState()
+	protocolState, err := s.State.Final().ProtocolState()
 	require.NoError(t, err)
-	protocolStateID := protocolState.Entry().ID()
+	protocolStateID := protocolState.ID()
 
 	chainID := root.ChainID
 	ops = append(ops, WithExecutorIDs(

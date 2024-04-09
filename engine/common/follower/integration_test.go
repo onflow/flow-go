@@ -43,7 +43,6 @@ import (
 // Each worker submits batchesPerWorker*blocksPerBatch blocks
 // In total we will submit workers*batchesPerWorker*blocksPerBatch
 func TestFollowerHappyPath(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: temporary broken")
 	allIdentities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(allIdentities)
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
@@ -88,9 +87,9 @@ func TestFollowerHappyPath(t *testing.T) {
 		require.NoError(t, err)
 		rootQC, err := rootSnapshot.QuorumCertificate()
 		require.NoError(t, err)
-		rootProtocolState, err := rootSnapshot.EpochProtocolState()
+		rootProtocolState, err := rootSnapshot.ProtocolState()
 		require.NoError(t, err)
-		rootProtocolStateID := rootProtocolState.Entry().ID()
+		rootProtocolStateID := rootProtocolState.ID()
 
 		// Hack EFM.
 		// Since root snapshot is created with 1000 views for first epoch, we will forcefully enter EFM to avoid errors

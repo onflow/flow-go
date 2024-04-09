@@ -32,7 +32,6 @@ func TestBlockToJob(t *testing.T) {
 }
 
 func TestProduceConsume(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: temporary broken")
 	// pushing 10 finalized blocks sequentially to block reader, with 3 workers on consumer and the block processor
 	// blocking on the blocks, results in processor only receiving the first three finalized blocks:
 	// 10 blocks sequentially --> block reader --> consumer can read and push 3 blocks at a time to processor --> blocking processor.
@@ -149,9 +148,9 @@ func withConsumer(
 		// hold any guarantees.
 		root, err := s.State.Final().Head()
 		require.NoError(t, err)
-		rootProtocolState, err := s.State.Final().EpochProtocolState()
+		rootProtocolState, err := s.State.Final().ProtocolState()
 		require.NoError(t, err)
-		rootProtocolStateID := rootProtocolState.Entry().ID()
+		rootProtocolStateID := rootProtocolState.ID()
 		clusterCommittee := participants.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 		sources := unittest.RandomSourcesFixture(110)
 		results := vertestutils.CompleteExecutionReceiptChainFixture(

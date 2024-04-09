@@ -3,6 +3,7 @@ package badger
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"math"
 	"math/rand"
 	"os"
@@ -74,10 +75,10 @@ func (suite *MutatorSuite) SetupTest() {
 
 	seal.ResultID = result.ID()
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(genesis.ID()))
-	genesis.Payload.ProtocolStateID = inmem.ProtocolStateFromEpochServiceEvents(
+	genesis.Payload.ProtocolStateID = kvstore.NewLatestKVStore(inmem.ProtocolStateFromEpochServiceEvents(
 		result.ServiceEvents[0].Event.(*flow.EpochSetup),
 		result.ServiceEvents[1].Event.(*flow.EpochCommit),
-	).ID()
+	).ID()).ID()
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(genesis, result, seal, qc)
 	require.NoError(suite.T(), err)
 	suite.epochCounter = rootSnapshot.Encodable().Epochs.Current.Counter
@@ -189,7 +190,6 @@ func (suite *MutatorSuite) Tx(opts ...func(*flow.TransactionBody)) flow.Transact
 }
 
 func TestMutator(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: temporary broken")
 	suite.Run(t, new(MutatorSuite))
 }
 

@@ -19,7 +19,6 @@ import (
 // TestBlockReader evaluates that block reader correctly reads stored finalized blocks from the blocks storage and
 // protocol state.
 func TestBlockReader(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: temporary broken")
 	withReader(t, 10, func(reader *jobqueue.FinalizedBlockReader, blocks []*flow.Block) {
 		// head of block reader should be the same height as the last block on the chain.
 		head, err := reader.Head()
@@ -65,9 +64,9 @@ func withReader(
 		// hold any guarantees.
 		root, err := s.State.Final().Head()
 		require.NoError(t, err)
-		protocolState, err := s.State.Final().EpochProtocolState()
+		protocolState, err := s.State.Final().ProtocolState()
 		require.NoError(t, err)
-		protocolStateID := protocolState.Entry().ID()
+		protocolStateID := protocolState.ID()
 
 		clusterCommittee := participants.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 		sources := unittest.RandomSourcesFixture(10)

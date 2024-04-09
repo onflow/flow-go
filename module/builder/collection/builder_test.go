@@ -2,6 +2,7 @@ package collection_test
 
 import (
 	"context"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"math/rand"
 	"os"
 	"testing"
@@ -86,19 +87,19 @@ func (suite *BuilderSuite) SetupTest() {
 	// ensure we don't enter a new epoch for tests that build many blocks
 	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
 	seal.ResultID = result.ID()
-	root.Payload.ProtocolStateID = inmem.ProtocolStateFromEpochServiceEvents(
+	root.Payload.ProtocolStateID = kvstore.NewLatestKVStore(inmem.ProtocolStateFromEpochServiceEvents(
 		result.ServiceEvents[0].Event.(*flow.EpochSetup),
 		result.ServiceEvents[1].Event.(*flow.EpochCommit),
-	).ID()
+	).ID()).ID()
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID())))
 	require.NoError(suite.T(), err)
 	suite.epochCounter = rootSnapshot.Encodable().Epochs.Current.Counter
 
 	clusterQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
-	root.Payload.ProtocolStateID = inmem.ProtocolStateFromEpochServiceEvents(
+	root.Payload.ProtocolStateID = kvstore.NewLatestKVStore(inmem.ProtocolStateFromEpochServiceEvents(
 		result.ServiceEvents[0].Event.(*flow.EpochSetup),
 		result.ServiceEvents[1].Event.(*flow.EpochCommit),
-	).ID()
+	).ID()).ID()
 	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis, clusterQC, suite.epochCounter)
 	suite.Require().NoError(err)
 	clusterState, err := clusterkv.Bootstrap(suite.db, clusterStateRoot)
@@ -209,7 +210,6 @@ func (suite *BuilderSuite) FillPool(n int, create func() *flow.TransactionBody) 
 }
 
 func TestBuilder(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: temporary broken")
 	suite.Run(t, new(BuilderSuite))
 }
 
@@ -289,9 +289,9 @@ func (suite *BuilderSuite) TestBuildOn_WithUnfinalizedReferenceBlock() {
 	// add an unfinalized block to the protocol state
 	genesis, err := suite.protoState.Final().Head()
 	suite.Require().NoError(err)
-	protocolState, err := suite.protoState.Final().EpochProtocolState()
+	protocolState, err := suite.protoState.Final().ProtocolState()
 	suite.Require().NoError(err)
-	protocolStateID := protocolState.Entry().ID()
+	protocolStateID := protocolState.ID()
 
 	unfinalizedReferenceBlock := unittest.BlockWithParentFixture(genesis)
 	unfinalizedReferenceBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)))
@@ -329,9 +329,9 @@ func (suite *BuilderSuite) TestBuildOn_WithOrphanedReferenceBlock() {
 	// add an orphaned block to the protocol state
 	genesis, err := suite.protoState.Final().Head()
 	suite.Require().NoError(err)
-	protocolState, err := suite.protoState.Final().EpochProtocolState()
+	protocolState, err := suite.protoState.Final().ProtocolState()
 	suite.Require().NoError(err)
-	protocolStateID := protocolState.Entry().ID()
+	protocolStateID := protocolState.ID()
 
 	// create a block extending genesis which will be orphaned
 	orphan := unittest.BlockWithParentFixture(genesis)
@@ -643,9 +643,9 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	// create enough main-chain blocks that an expired transaction is possible
 	genesis, err := suite.protoState.Final().Head()
 	suite.Require().NoError(err)
-	protocolState, err := suite.protoState.Final().EpochProtocolState()
+	protocolState, err := suite.protoState.Final().ProtocolState()
 	suite.Require().NoError(err)
-	protocolStateID := protocolState.Entry().ID()
+	protocolStateID := protocolState.ID()
 
 	head := genesis
 	for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
