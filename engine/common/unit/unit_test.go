@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine/common/unit"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -22,6 +23,24 @@ func TestReadyDone(t *testing.T) {
 
 	cancel()
 	unittest.RequireCloseBefore(t, u.Done(), time.Second, "done did not close")
+}
+
+func TestPreReadyDone(t *testing.T) {
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(t, context.Background())
+
+	counter := atomic.NewInt32(0)
+	u := unit.NewUnitWithReadyDone(func() {
+		require.True(t, counter.CompareAndSwap(0, 1))
+	}, func() {
+		require.True(t, counter.CompareAndSwap(2, 3))
+	})
+	u.Start(ctx)
+	unittest.RequireCloseBefore(t, u.Ready(), time.Second, "ready did not close")
+	require.True(t, counter.CompareAndSwap(1, 2))
+
+	cancel()
+	unittest.RequireCloseBefore(t, u.Done(), time.Second, "done did not close")
+	require.True(t, counter.CompareAndSwap(3, 4))
 }
 
 // Test that if a function is run by LaunchPeriodically and

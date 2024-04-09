@@ -18,9 +18,6 @@ type Unit interface {
 	Launch(f func(context.Context))
 	LaunchAfter(delay time.Duration, f func(context.Context))
 	LaunchPeriodically(f func(context.Context), interval time.Duration, delay time.Duration)
-
-	AddReadyCallbacks(checks ...func())
-	AddDoneCallbacks(actions ...func())
 }
 
 var _ Unit = (*unitImp)(nil)
@@ -40,9 +37,18 @@ type unitImp struct {
 }
 
 func NewUnit() Unit {
+	return NewUnitWithReadyDone(nil, nil)
+}
+
+// NewUnitWithReadyDone returns a new unit with preReadyFn and preDoneFn function
+// preReadyFn is called before ready() is called
+// preDoneFn is called before done() is called
+func NewUnitWithReadyDone(preReadyFn func(), preDoneFn func()) Unit {
 	u := &unitImp{
-		work:    make(chan func(context.Context)),
-		stopped: make(chan struct{}),
+		work:       make(chan func(context.Context)),
+		stopped:    make(chan struct{}),
+		preReadyFn: preReadyFn,
+		preDoneFn:  preDoneFn,
 	}
 
 	u.ComponentManager = component.NewComponentManagerBuilder().
@@ -193,32 +199,4 @@ func (u *unitImp) LaunchPeriodically(f func(context.Context), interval time.Dura
 			}
 		}
 	})
-}
-
-// AddReadyCallbacks adds checks to be executed before the unit is ready.
-// A unit is ready when the series of "check" functions are executed.
-//
-// The engine using the unit is responsible for defining these check functions
-// as required.
-func (u *unitImp) AddReadyCallbacks(checks ...func()) {
-	u.preReadyFn = func() {
-		for _, check := range checks {
-			check()
-		}
-	}
-}
-
-// AddDoneCallbacks adds actions to be executed after the unit has shut down.
-// A unit is done when
-// (i) the series of "action" functions are executed and
-// (ii) all pending functions invoked with `Do` or `Launch` have completed.
-//
-// The engine using the unit is responsible for defining these action functions
-// as required.
-func (u *unitImp) AddDoneCallbacks(actions ...func()) {
-	u.preDoneFn = func() {
-		for _, action := range actions {
-			action()
-		}
-	}
 }
