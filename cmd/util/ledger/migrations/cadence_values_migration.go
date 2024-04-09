@@ -459,14 +459,14 @@ func (t *cadenceValueMigrationReporter) Error(err error) {
 	}
 
 	if t.verboseErrorOutput {
-		t.log.Error().Msgf(
+		t.reportWriter.Write(fmt.Sprintf(
 			"failed to run %s in account %s, domain %s, key %s: %s",
 			migration,
 			storageKey.Address,
 			storageKey.Key,
 			storageMapKey,
 			message,
-		)
+		))
 	}
 }
 
