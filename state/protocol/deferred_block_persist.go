@@ -65,7 +65,7 @@ type DeferredBlockPersist struct {
 func NewDeferredBlockPersist() *DeferredBlockPersist {
 	return &DeferredBlockPersist{
 		isEmpty: true,
-		pending: noOpPersistOp, // initially nothing is pending, i.e. no-op
+		pending: noOpPersist, // initially nothing is pending, i.e. no-op
 	}
 }
 
