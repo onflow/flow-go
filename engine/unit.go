@@ -18,7 +18,6 @@ type Unit struct {
 
 // NewUnit returns a new unit.
 func NewUnit() *Unit {
-
 	ctx, cancel := context.WithCancel(context.Background())
 	unit := &Unit{
 		ctx:    ctx,

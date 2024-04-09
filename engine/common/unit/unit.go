@@ -27,9 +27,13 @@ var _ Unit = (*unitImp)(nil)
 
 type unitImp struct {
 	*component.ComponentManager
+	sync.Mutex // can be used to synchronize the engine
 
-	wg   sync.WaitGroup
-	work chan func(context.Context)
+	wg   sync.WaitGroup             // tracks in-progress functions
+	work chan func(context.Context) // used to pass work from Launch methods
+
+	stopped   chan struct{} // used to signal the unit to stop admitting work
+	admitLock sync.Mutex    // used for synchronizing work admittance with shutdown
 
 	preReadyFn func()
 	preDoneFn  func()
@@ -37,7 +41,8 @@ type unitImp struct {
 
 func NewUnit() Unit {
 	u := &unitImp{
-		work: make(chan func(context.Context)),
+		work:    make(chan func(context.Context)),
+		stopped: make(chan struct{}),
 	}
 
 	u.ComponentManager = component.NewComponentManagerBuilder().
@@ -48,14 +53,44 @@ func NewUnit() Unit {
 	return u
 }
 
+// admit returns true if the unit is still admitting work, and false otherwise.
+//
+// This is used to prevent race conditions when adding new work between the initial check if unit is
+// still accepting new work, and when Wait is called on the waitgroup. The API guarantees that once
+// a callback has started, it will finish before the unit is stopped.
+func (u *unitImp) admit() bool {
+	u.admitLock.Lock()
+	defer u.admitLock.Unlock()
+
+	select {
+	case <-u.stopped:
+		return false
+	default:
+	}
+
+	u.wg.Add(1)
+	return true
+}
+
+// stopAdmitting stops the unit from admitting new work.
+func (u *unitImp) stopAdmitting() {
+	u.admitLock.Lock()
+	defer u.admitLock.Unlock()
+
+	close(u.stopped)
+}
+
 func (u *unitImp) workerFactory(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 	for {
 		select {
-		case <-ctx.Done():
+		case <-u.stopped:
 			return
 		case f := <-u.work:
-			u.wg.Add(1)
+			if !u.admit() {
+				return
+			}
+
 			go func() {
 				defer u.wg.Done()
 				f(ctx)
@@ -71,6 +106,7 @@ func (u *unitImp) lifecycle(ctx irrecoverable.SignalerContext, ready component.R
 
 	ready()
 	<-ctx.Done()
+	u.stopAdmitting()
 
 	if u.preDoneFn != nil {
 		u.preDoneFn()
@@ -96,13 +132,9 @@ func (u *unitImp) ComponentWorker(ctx irrecoverable.SignalerContext, ready compo
 // It returns the result of f. If f is executed, the unit will not shut down
 // until after f returns.
 func (u *unitImp) Do(f func() error) error {
-	select {
-	case <-u.ShutdownSignal():
+	if !u.admit() {
 		return nil
-	default:
 	}
-
-	u.wg.Add(1)
 	defer u.wg.Done()
 
 	return f()
@@ -112,7 +144,8 @@ func (u *unitImp) Do(f func() error) error {
 // down. If f is executed, the unit will not shut down until after f returns.
 func (u *unitImp) Launch(f func(ctx context.Context)) {
 	select {
-	case <-u.ShutdownSignal():
+	// don't admit the work here, to avoid deadlock if the unit is shutting down.
+	case <-u.stopped:
 		return
 	case u.work <- f:
 	}
