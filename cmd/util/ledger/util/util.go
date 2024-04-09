@@ -69,47 +69,6 @@ func (a *AccountsAtreeLedger) AllocateStorageIndex(owner []byte) (atree.StorageI
 	return v, nil
 }
 
-type PayloadSnapshot struct {
-	Payloads map[flow.RegisterID]*ledger.Payload
-}
-
-var _ snapshot.StorageSnapshot = (*PayloadSnapshot)(nil)
-
-func NewPayloadSnapshot(payloads []*ledger.Payload) (*PayloadSnapshot, error) {
-	l := &PayloadSnapshot{
-		Payloads: make(map[flow.RegisterID]*ledger.Payload, len(payloads)),
-	}
-	for _, payload := range payloads {
-		key, err := payload.Key()
-		if err != nil {
-			return nil, err
-		}
-		id, err := convert.LedgerKeyToRegisterID(key)
-		if err != nil {
-			return nil, err
-		}
-		l.Payloads[id] = payload
-	}
-	return l, nil
-}
-
-func (p PayloadSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
-	value, exists := p.Payloads[id]
-	if !exists {
-		return nil, nil
-	}
-	return value.Value(), nil
-}
-
-// NopMemoryGauge is a no-op implementation of the MemoryGauge interface
-type NopMemoryGauge struct{}
-
-func (n NopMemoryGauge) MeterMemory(common.MemoryUsage) error {
-	return nil
-}
-
-var _ common.MemoryGauge = (*NopMemoryGauge)(nil)
-
 type PayloadsReadonlyLedger struct {
 	Snapshot snapshot.MigrationSnapshot
 

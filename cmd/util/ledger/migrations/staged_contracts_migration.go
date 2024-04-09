@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/ledger"
@@ -38,6 +39,7 @@ type StagedContractsMigration struct {
 	elaborations                   map[common.Location]*sema.Elaboration
 	contractAdditionHandler        stdlib.AccountContractAdditionHandler
 	contractNamesProvider          stdlib.AccountContractNamesProvider
+	reporter                       reporters.ReportWriter
 }
 
 type StagedContract struct {
@@ -52,13 +54,18 @@ type Contract struct {
 
 var _ AccountBasedMigration = &StagedContractsMigration{}
 
-func NewStagedContractsMigration(chainID flow.ChainID, log zerolog.Logger) *StagedContractsMigration {
+func NewStagedContractsMigration(
+	chainID flow.ChainID,
+	log zerolog.Logger,
+	rwf reporters.ReportWriterFactory,
+) *StagedContractsMigration {
 	return &StagedContractsMigration{
 		name:                "StagedContractsMigration",
 		log:                 log,
 		chainID:             chainID,
 		stagedContracts:     map[common.Address]map[flow.RegisterID]Contract{},
 		contractsByLocation: map[common.Location][]byte{},
+		reporter:            rwf.ReportWriter("staged-contracts-migrator"),
 	}
 }
 
@@ -68,14 +75,12 @@ func (m *StagedContractsMigration) WithContractUpdateValidation() *StagedContrac
 	return m
 }
 
-func (m *StagedContractsMigration) WithName(name string) *StagedContractsMigration {
-	m.name = name
-	return m
-}
-
 func (m *StagedContractsMigration) Close() error {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
+
+	// Close the report writer so it flushes to file.
+	m.reporter.Close()
 
 	if len(m.stagedContracts) > 0 {
 		dict := zerolog.Dict()
@@ -284,12 +289,23 @@ func (m *StagedContractsMigration) MigrateAccount(
 					address.HexWithPrefix(),
 					errorDetails,
 				)
+
+			m.reporter.Write(contractUpdateFailed{
+				AccountAddressHex: address.HexWithPrefix(),
+				ContractName:      name,
+				Error:             errorDetails,
+			})
 		} else {
 			// change contract code
 			oldPayloads[payloadIndex] = ledger.NewPayload(
 				key,
 				newCode,
 			)
+
+			m.reporter.Write(contractUpdateSuccessful{
+				AccountAddressHex: address.HexWithPrefix(),
+				ContractName:      name,
+			})
 		}
 
 		// remove contract from list of contracts to change
@@ -431,4 +447,15 @@ func NewUserDefinedTypeChangeCheckerFunc(
 		}
 		return false, false
 	}
+}
+
+type contractUpdateSuccessful struct {
+	AccountAddressHex string `json:"address"`
+	ContractName      string `json:"name"`
+}
+
+type contractUpdateFailed struct {
+	AccountAddressHex string `json:"address"`
+	ContractName      string `json:"name"`
+	Error             string `json:"error"`
 }
