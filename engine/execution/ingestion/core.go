@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/storage"
@@ -27,7 +28,8 @@ import (
 // when the block queue decides to fetch missing collections, it forwards to the collection fetcher
 // when a block is executed, it notifies the block queue and forwards to execution state to save them.
 type Core struct {
-	unit.Unit
+	component.Component
+	unit unit.Unit
 
 	log zerolog.Logger
 
@@ -78,8 +80,8 @@ func NewCore(
 ) *Core {
 	var e *Core
 	e = &Core{
-		Unit: unit.NewUnitWithReadyDone(func() {
-			e.Launch(e.launchWorker)
+		unit: unit.NewUnitWithReadyDone(func() {
+			e.unit.Launch(e.launchWorker)
 		}, nil),
 		log: logger.With().Str("engine", "ingestion_core").Logger(),
 		// processables are throttled blocks
@@ -95,6 +97,7 @@ func NewCore(
 		collectionFetcher: collectionFetcher,
 		eventConsumer:     eventConsumer,
 	}
+	e.Component = e.unit
 
 	err := e.throttle.Init(e.processables)
 	if err != nil {
@@ -396,7 +399,7 @@ func storeCollectionIfMissing(collections storage.Collections, col *flow.Collect
 func (e *Core) executeConcurrently(executables []*entity.ExecutableBlock) {
 	for _, executable := range executables {
 		func(executable *entity.ExecutableBlock) {
-			e.Launch(func(ctx context.Context) {
+			e.unit.Launch(func(ctx context.Context) {
 				err := e.execute(ctx, executable)
 				if err != nil {
 					irrecoverable.Throw(ctx, fmt.Errorf("failed to execute block %v: %w", executable.Block.ID(), err))
