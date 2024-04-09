@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
@@ -505,11 +506,47 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 }
 
 func (s *state) GetHighestFinalizedExecuted() uint64 {
-	if !s.enableRegisterStore {
-		// TODO: implement
-		return 0
+	if s.enableRegisterStore {
+		return s.registerStore.LastFinalizedAndExecutedHeight()
 	}
-	return s.registerStore.LastFinalizedAndExecutedHeight()
+
+	lastExecutedHeight, blockID, err := s.GetHighestExecutedBlockID(context.Background())
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not get highest executed blcok ID")
+	}
+	var finalized uint64
+	err = s.db.View(operation.RetrieveFinalizedHeight(&finalized))
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not get last finalized height")
+	}
+
+	if finalized > lastExecutedHeight {
+		finalizedID, err := s.headers.BlockIDByHeight(lastExecutedHeight)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("could not get block ID by height: %v", lastExecutedHeight)
+		}
+		// validate the highest executed block is a finalized block
+		if finalizedID != blockID {
+			log.Fatal().Msgf("last finalized block ID %v does not match the highest executed block ID %v", finalizedID, blockID)
+		}
+		return lastExecutedHeight
+	}
+
+	// double check the finalized block has been executed
+	finalizedID, err := s.headers.BlockIDByHeight(finalized)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not get block ID by height: %v", finalized)
+	}
+	executed, err := s.IsBlockExecuted(finalized, finalizedID)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not check if block is executed (%v)", finalizedID)
+	}
+
+	if !executed {
+		log.Fatal().Msgf("last finalized block is not executed (%v)", finalizedID)
+	}
+
+	return finalized
 }
 
 // IsBlockExecuted returns true if the block is executed, which means registers, events,
