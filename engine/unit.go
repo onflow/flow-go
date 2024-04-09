@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// Deprecated: Use engine/common/unit/unit.go Instead
 // Unit handles synchronization management, startup, and shutdown for engines.
+// Deprecated: Use engine/common/unit/unit.go Instead
 type Unit struct {
 	admitLock sync.Mutex // used for synchronizing context cancellation with work admittance
 
