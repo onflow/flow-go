@@ -826,6 +826,7 @@ func TestProgramParsingError(t *testing.T) {
 			ChainID:              chainID,
 			EVMContractChange:    evmContractChange,
 			BurnerContractChange: burnerContractChange,
+			VerboseErrorOutput:   true,
 		},
 	)
 
