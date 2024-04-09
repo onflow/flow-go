@@ -3,6 +3,8 @@ package migrations
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -105,7 +107,7 @@ func NewMigratorRuntime(
 	*MigratorRuntime,
 	error,
 ) {
-	snapshot, err := snapshot.NewPayloadSnapshot(payloads, snapshotType)
+	snapshot, err := snapshot.NewPayloadSnapshot(zerolog.Nop(), payloads, snapshotType, 1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
 	}

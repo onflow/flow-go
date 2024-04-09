@@ -2,8 +2,11 @@ package snapshot
 
 import (
 	"sort"
+	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
+	"golang.org/x/exp/maps"
 
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
@@ -39,19 +42,20 @@ type MigrationSnapshot interface {
 }
 
 func NewPayloadSnapshot(
+	log zerolog.Logger,
 	payloads []*ledger.Payload,
 	snapshotType MigrationSnapshotType,
+	nWorkers int,
 ) (MigrationSnapshot, error) {
 	switch snapshotType {
 	case LargeChangeSetOrReadonlySnapshot:
-		return newMapSnapshot(payloads)
+		return newMapSnapshot(log, payloads, nWorkers)
 	case SmallChangeSetSnapshot:
-		return newIndexMapSnapshot(payloads)
+		return newIndexMapSnapshot(log, payloads, nWorkers)
 	default:
 		// should never happen
 		panic("unknown snapshot type")
 	}
-
 }
 
 type mapSnapshot struct {
@@ -60,21 +64,16 @@ type mapSnapshot struct {
 
 var _ MigrationSnapshot = (*mapSnapshot)(nil)
 
-func newMapSnapshot(payloads []*ledger.Payload) (*mapSnapshot, error) {
+func newMapSnapshot(log zerolog.Logger, payloads []*ledger.Payload, workers int) (*mapSnapshot, error) {
+	pm, err := createLargeMap(log, payloads, workers)
+	if err != nil {
+		return nil, NewMigrationSnapshotError(err)
+	}
+
 	l := &mapSnapshot{
-		Payloads: make(map[flow.RegisterID]*ledger.Payload, len(payloads)),
+		Payloads: pm,
 	}
-	for _, payload := range payloads {
-		key, err := payload.Key()
-		if err != nil {
-			return nil, err
-		}
-		id, err := convert.LedgerKeyToRegisterID(key)
-		if err != nil {
-			return nil, err
-		}
-		l.Payloads[id] = payload
-	}
+
 	return l, nil
 }
 
@@ -156,24 +155,24 @@ type indexMapSnapshot struct {
 
 var _ MigrationSnapshot = (*indexMapSnapshot)(nil)
 
-func newIndexMapSnapshot(payloads []*ledger.Payload) (*indexMapSnapshot, error) {
+func newIndexMapSnapshot(
+	log zerolog.Logger,
+	payloads []*ledger.Payload,
+	workers int,
+) (*indexMapSnapshot, error) {
 	payloadsCopy := make([]*ledger.Payload, len(payloads))
 	copy(payloadsCopy, payloads)
+
+	im, err := createLargeIndexMap(log, payloadsCopy, workers)
+	if err != nil {
+		return nil, NewMigrationSnapshotError(err)
+	}
+
 	l := &indexMapSnapshot{
-		reverseMap: make(map[flow.RegisterID]int, len(payloads)),
+		reverseMap: im,
 		payloads:   payloadsCopy,
 	}
-	for i, payload := range payloadsCopy {
-		key, err := payload.Key()
-		if err != nil {
-			return nil, err
-		}
-		id, err := convert.LedgerKeyToRegisterID(key)
-		if err != nil {
-			return nil, err
-		}
-		l.reverseMap[id] = i
-	}
+
 	return l, nil
 }
 
@@ -265,4 +264,280 @@ func (p *indexMapSnapshot) ApplyChangesAndGetNewPayloads(
 	p.reverseMap = nil
 
 	return result, nil
+}
+
+func workersToUse(workers int, payloads []*ledger.Payload) int {
+	// limit the number of workers to prevent too many small jobs
+	const minPayloadsPerWorker = 10000
+	if len(payloads)/minPayloadsPerWorker < workers {
+		workers = len(payloads) / minPayloadsPerWorker
+	}
+	if workers < 1 {
+		workers = 1
+	}
+	return workers
+}
+
+func createLargeIndexMap(
+	log zerolog.Logger,
+	payloads []*ledger.Payload,
+	workers int,
+) (map[flow.RegisterID]int, error) {
+
+	workers = workersToUse(workers, payloads)
+
+	if workers == 1 {
+		r := make(map[flow.RegisterID]int, len(payloads))
+		for i, payload := range payloads {
+			key, err := payload.Key()
+			if err != nil {
+				return nil, err
+			}
+			id, err := convert.LedgerKeyToRegisterID(key)
+			if err != nil {
+				return nil, err
+			}
+			r[id] = i
+		}
+
+		return r, nil
+	}
+
+	start := time.Now()
+	log.Info().
+		Int("payloads", len(payloads)).
+		Int("workers", workers).
+		Msgf("Creating payload snapshot")
+
+	defer func() {
+		log.Info().
+			Int("payloads", len(payloads)).
+			Int("workers", workers).
+			Dur("duration", time.Since(start)).
+			Msgf("Created payload snapshot")
+	}()
+
+	type result struct {
+		minimap map[flow.RegisterID]int
+		err     error
+	}
+
+	minimaps := make(chan result, workers)
+	defer close(minimaps)
+
+	// create the minimaps in parallel
+	for i := 0; i < workers; i++ {
+		start := i * len(payloads) / workers
+		end := (i + 1) * len(payloads) / workers
+		if end > len(payloads) {
+			end = len(payloads)
+		}
+
+		go func(startIndex int, payloads []*ledger.Payload) {
+			minimap := make(map[flow.RegisterID]int, len(payloads))
+			for i, payload := range payloads {
+				key, err := payload.Key()
+				if err != nil {
+					minimaps <- result{nil, err}
+					return
+				}
+				id, err := convert.LedgerKeyToRegisterID(key)
+				if err != nil {
+					minimaps <- result{nil, err}
+					return
+				}
+				minimap[id] = startIndex + i
+			}
+			minimaps <- result{minimap, nil}
+		}(start, payloads[start:end])
+
+	}
+
+	// merge the minimaps in parallel
+	pairedMinimaps := make(
+		chan struct {
+			left  result
+			right result
+		}, workers/2)
+
+	go func() {
+		// we have to pair the minimaps to merge them
+		// we have to merge a total of workers-1 times
+		// before we are left with only one map
+		numberOfPairings := workers - 1
+		for i := 0; i < numberOfPairings; i++ {
+			left := <-minimaps
+			right := <-minimaps
+			pairedMinimaps <- struct {
+				left  result
+				right result
+			}{left, right}
+		}
+		close(pairedMinimaps)
+	}()
+
+	// only half of the workers are needed to merge the maps
+	wg := sync.WaitGroup{}
+	wg.Add(workers / 2)
+	for i := 0; i < workers/2; i++ {
+		go func() {
+			defer wg.Done()
+			for pair := range pairedMinimaps {
+				if pair.left.err != nil {
+					minimaps <- result{nil, pair.left.err}
+					return
+				}
+				if pair.right.err != nil {
+					minimaps <- result{nil, pair.right.err}
+					return
+				}
+				// merge the two minimaps
+				maps.Copy(pair.left.minimap, pair.right.minimap)
+				minimaps <- result{pair.left.minimap, nil}
+			}
+		}()
+	}
+
+	// wait for all workers to finish
+	wg.Wait()
+
+	r := <-minimaps
+	if r.err != nil {
+		return nil, r.err
+	}
+
+	return r.minimap, nil
+}
+
+// createLargeMap is the same as createLargeIndexMap, but it returns a map of RegisterID to index in the payloads array
+// Generics are intentionally not used to avoid performance overhead
+func createLargeMap(
+	log zerolog.Logger,
+	payloads []*ledger.Payload,
+	workers int,
+) (map[flow.RegisterID]*ledger.Payload, error) {
+
+	workers = workersToUse(workers, payloads)
+
+	if workers == 1 {
+		r := make(map[flow.RegisterID]*ledger.Payload, len(payloads))
+		for _, payload := range payloads {
+			key, err := payload.Key()
+			if err != nil {
+				return nil, err
+			}
+			id, err := convert.LedgerKeyToRegisterID(key)
+			if err != nil {
+				return nil, err
+			}
+			r[id] = payload
+		}
+
+		return r, nil
+	}
+
+	start := time.Now()
+	log.Info().
+		Int("payloads", len(payloads)).
+		Int("workers", workers).
+		Msgf("Creating payload snapshot")
+
+	defer func() {
+		log.Info().
+			Int("payloads", len(payloads)).
+			Int("workers", workers).
+			Dur("duration", time.Since(start)).
+			Msgf("Created payload snapshot")
+	}()
+
+	type result struct {
+		minimap map[flow.RegisterID]*ledger.Payload
+		err     error
+	}
+
+	minimaps := make(chan result, workers)
+	defer close(minimaps)
+
+	// create the minimaps in parallel
+	for i := 0; i < workers; i++ {
+		start := i * len(payloads) / workers
+		end := (i + 1) * len(payloads) / workers
+		if end > len(payloads) {
+			end = len(payloads)
+		}
+
+		go func(payloads []*ledger.Payload) {
+			minimap := make(map[flow.RegisterID]*ledger.Payload, len(payloads))
+			for _, payload := range payloads {
+				key, err := payload.Key()
+				if err != nil {
+					minimaps <- result{nil, err}
+					return
+				}
+				id, err := convert.LedgerKeyToRegisterID(key)
+				if err != nil {
+					minimaps <- result{nil, err}
+					return
+				}
+				minimap[id] = payload
+			}
+			minimaps <- result{minimap, nil}
+		}(payloads[start:end])
+
+	}
+
+	// merge the minimaps in parallel
+	pairedMinimaps := make(
+		chan struct {
+			left  result
+			right result
+		}, workers/2)
+
+	go func() {
+		// we have to pair the minimaps to merge them
+		// we have to merge a total of workers-1 times
+		// before we are left with only one map
+		numberOfPairings := workers - 1
+		for i := 0; i < numberOfPairings; i++ {
+			left := <-minimaps
+			right := <-minimaps
+			pairedMinimaps <- struct {
+				left  result
+				right result
+			}{left, right}
+		}
+		close(pairedMinimaps)
+	}()
+
+	// only half of the workers are needed to merge the maps
+	wg := sync.WaitGroup{}
+	wg.Add(workers / 2)
+	for i := 0; i < workers/2; i++ {
+		go func() {
+			defer wg.Done()
+			for pair := range pairedMinimaps {
+				if pair.left.err != nil {
+					minimaps <- result{nil, pair.left.err}
+					return
+				}
+				if pair.right.err != nil {
+					minimaps <- result{nil, pair.right.err}
+					return
+				}
+				// merge the two minimaps
+				maps.Copy(pair.left.minimap, pair.right.minimap)
+				minimaps <- result{pair.left.minimap, nil}
+			}
+		}()
+	}
+
+	// wait for all workers to finish
+	wg.Wait()
+
+	r := <-minimaps
+	if r.err != nil {
+		return nil, r.err
+	}
+
+	return r.minimap, nil
 }
