@@ -9,9 +9,50 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-// Unit handles synchronization management
+// Unit handles synchronization management for engines.
+// There are 2 common usage patterns:
+//
+// 1. Unit as the Component implementation for an engine:
+// Unit is used to manage the lifecycle of long-running tasks within an engine. In this case,
+// embed a component.Component interface into the parent struct, then set unit as the implementation
+// e.g.
+//
+//	type Engine struct {
+//		component.Component
+//		unit unit.Unit
+//	}
+//
+//	func NewEngine() *Engine {
+//		u := unit.NewUnit()
+//		return &Engine{
+//			Component: u,
+//			unit: u,
+//		}
+//	}
+//
+// 2. Unit as a worker within a parent ComponentManager:
+// Unit is used to manage work produced by the engine to ensure shutdown is synchronized with all
+// tasks. In this case, add the unit as a worker to the parent ComponentManager.
+// e.g.
+//
+//	type Engine struct {
+//		*component.ComponentManager
+//		unit unit.Unit
+//	}
+//
+//	func NewEngine() *Engine {
+//		e := &Engine{
+//			unit: unit.NewUnit(),
+//		}
+//		e.ComponentManager = component.NewComponentManagerBuilder().
+//			AddWorker(e.unit.ComponentWorker).
+//			Build()
+//		return e
+//	}
 type Unit interface {
 	component.Component
+	sync.Locker
+
 	ShutdownSignal() <-chan struct{}
 
 	Do(f func() error) error
@@ -32,8 +73,8 @@ type unitImp struct {
 	stopped   chan struct{} // used to signal the unit to stop admitting work
 	admitLock sync.Mutex    // used for synchronizing work admittance with shutdown
 
-	preReadyFn func()
-	preDoneFn  func()
+	preReadyFn func() // function called before marking unit as ready
+	preDoneFn  func() // function called before marking unit as done
 }
 
 func NewUnit() Unit {
@@ -109,8 +150,8 @@ func (u *unitImp) lifecycle(ctx irrecoverable.SignalerContext, ready component.R
 	if u.preReadyFn != nil {
 		u.preReadyFn()
 	}
-
 	ready()
+
 	<-ctx.Done()
 	u.stopAdmitting()
 
