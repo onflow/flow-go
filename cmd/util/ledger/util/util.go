@@ -101,12 +101,16 @@ func (p PayloadSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 	return value.Value(), nil
 }
 
+// PayloadsReadonlyLedger is a simple read-only in-memory atree.Ledger implementation
+// that is backed by a payload snapshot.
 type PayloadsReadonlyLedger struct {
 	Snapshot *PayloadSnapshot
 
 	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
 	SetValueFunc             func(owner, key, value []byte) (err error)
 }
+
+var _ atree.Ledger = &PayloadsReadonlyLedger{}
 
 func (p *PayloadsReadonlyLedger) GetValue(owner, key []byte) (value []byte, err error) {
 	v, err := p.Snapshot.Get(flow.NewRegisterID(flow.BytesToAddress(owner), string(key)))
@@ -265,4 +269,54 @@ func registerIDKeyFromString(s string) (flow.RegisterID, common.Address) {
 
 type PayloadMetaInfo struct {
 	Height, Version uint64
+}
+
+// PayloadsLedger is a simple read/write in-memory atree.Ledger implementation
+// that is backed by a payload snapshot.
+type PayloadsLedger struct {
+	Snapshot *PayloadSnapshot
+
+	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
+}
+
+var _ atree.Ledger = &PayloadsLedger{}
+
+func NewPayloadsLedger(snapshot *PayloadSnapshot) *PayloadsLedger {
+	return &PayloadsLedger{
+		Snapshot: snapshot,
+	}
+}
+
+func newRegisterID(owner []byte, key []byte) flow.RegisterID {
+	return flow.NewRegisterID(flow.BytesToAddress(owner), string(key))
+}
+
+func (p *PayloadsLedger) GetValue(owner, key []byte) (value []byte, err error) {
+	registerID := newRegisterID(owner, key)
+	v, err := p.Snapshot.Get(registerID)
+	if err != nil {
+		return nil, fmt.Errorf("getting value failed: %w", err)
+	}
+	return v, nil
+}
+
+func (p *PayloadsLedger) SetValue(owner, key, value []byte) (err error) {
+	registerID := newRegisterID(owner, key)
+	ledgerKey := convert.RegisterIDToLedgerKey(registerID)
+	p.Snapshot.Payloads[registerID] = ledger.NewPayload(ledgerKey, value)
+	return nil
+}
+
+func (p *PayloadsLedger) ValueExists(owner, key []byte) (exists bool, err error) {
+	registerID := newRegisterID(owner, key)
+	_, ok := p.Snapshot.Payloads[registerID]
+	return ok, nil
+}
+
+func (p *PayloadsLedger) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
+	if p.AllocateStorageIndexFunc != nil {
+		return p.AllocateStorageIndexFunc(owner)
+	}
+
+	panic("AllocateStorageIndex not expected to be called")
 }
