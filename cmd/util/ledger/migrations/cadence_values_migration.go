@@ -35,6 +35,7 @@ type CadenceBaseMigrator struct {
 	reporter                          reporters.ReportWriter
 	diffReporter                      reporters.ReportWriter
 	logVerboseDiff                    bool
+	verboseErrorOutput                bool
 	checkStorageHealthBeforeMigration bool
 	valueMigrations                   func(
 		inter *interpreter.Interpreter,
@@ -153,7 +154,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		m.name,
 	)
 
-	reporter := newValueMigrationReporter(m.reporter, m.log, m.errorMessageHandler)
+	reporter := newValueMigrationReporter(m.reporter, m.log, m.errorMessageHandler, m.verboseErrorOutput)
 
 	valueMigrations := m.valueMigrations(
 		migrationRuntime.Interpreter,
@@ -270,6 +271,7 @@ func NewCadence1ValueMigrator(
 		reporter:                          rwf.ReportWriter("cadence-value-migrator"),
 		diffReporter:                      diffReporter,
 		logVerboseDiff:                    opts.LogVerboseDiff,
+		verboseErrorOutput:                opts.VerboseErrorOutput,
 		checkStorageHealthBeforeMigration: opts.CheckStorageHealthBeforeMigration,
 		valueMigrations: func(
 			inter *interpreter.Interpreter,
@@ -309,6 +311,7 @@ func NewCadence1LinkValueMigrator(
 		reporter:                          rwf.ReportWriter("cadence-link-value-migrator"),
 		diffReporter:                      diffReporter,
 		logVerboseDiff:                    opts.LogVerboseDiff,
+		verboseErrorOutput:                opts.VerboseErrorOutput,
 		checkStorageHealthBeforeMigration: opts.CheckStorageHealthBeforeMigration,
 		valueMigrations: func(
 			_ *interpreter.Interpreter,
@@ -354,6 +357,7 @@ func NewCadence1CapabilityValueMigrator(
 		reporter:                          rwf.ReportWriter("cadence-capability-value-migrator"),
 		diffReporter:                      diffReporter,
 		logVerboseDiff:                    opts.LogVerboseDiff,
+		verboseErrorOutput:                opts.VerboseErrorOutput,
 		checkStorageHealthBeforeMigration: opts.CheckStorageHealthBeforeMigration,
 		valueMigrations: func(
 			_ *interpreter.Interpreter,
@@ -403,6 +407,7 @@ type cadenceValueMigrationReporter struct {
 	reportWriter        reporters.ReportWriter
 	log                 zerolog.Logger
 	errorMessageHandler *errorMessageHandler
+	verboseErrorOutput  bool
 }
 
 var _ capcons.LinkMigrationReporter = &cadenceValueMigrationReporter{}
@@ -413,11 +418,13 @@ func newValueMigrationReporter(
 	reportWriter reporters.ReportWriter,
 	log zerolog.Logger,
 	errorMessageHandler *errorMessageHandler,
+	verboseErrorOutput bool,
 ) *cadenceValueMigrationReporter {
 	return &cadenceValueMigrationReporter{
 		reportWriter:        reportWriter,
 		log:                 log,
 		errorMessageHandler: errorMessageHandler,
+		verboseErrorOutput:  verboseErrorOutput,
 	}
 }
 
@@ -451,14 +458,16 @@ func (t *cadenceValueMigrationReporter) Error(err error) {
 		message = fmt.Sprintf("%s\n%s", message, migrationErr.Stack)
 	}
 
-	t.log.Error().Msgf(
-		"failed to run %s in account %s, domain %s, key %s: %s",
-		migration,
-		storageKey.Address,
-		storageKey.Key,
-		storageMapKey,
-		message,
-	)
+	if t.verboseErrorOutput {
+		t.log.Error().Msgf(
+			"failed to run %s in account %s, domain %s, key %s: %s",
+			migration,
+			storageKey.Address,
+			storageKey.Key,
+			storageMapKey,
+			message,
+		)
+	}
 }
 
 func (t *cadenceValueMigrationReporter) MigratedPathCapability(
