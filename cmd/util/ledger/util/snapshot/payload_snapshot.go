@@ -1,4 +1,4 @@
-package util
+package snapshot
 
 import (
 	"sort"
@@ -11,7 +11,18 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type MigrationStorageSnapshot interface {
+type MigrationSnapshotType int
+
+const (
+	// MapBased is more efficient when the number of payloads that are going to change is either 0
+	// or large compared to the total number of payloads (more than 30% of the current number of payloads).
+	MapBased MigrationSnapshotType = iota
+	// IndexMapBased is more efficient when the number of payloads that are going to change is small
+	// compared to the total number of payloads (less than 30% of the current number of payloads).
+	IndexMapBased
+)
+
+type MigrationSnapshot interface {
 	snapshot.StorageSnapshot
 
 	Exists(id flow.RegisterID) bool
@@ -25,14 +36,30 @@ type MigrationStorageSnapshot interface {
 	PayloadMap() map[flow.RegisterID]*ledger.Payload
 }
 
-type PayloadSnapshot struct {
+func NewPayloadSnapshot(
+	payloads []*ledger.Payload,
+	snapshotType MigrationSnapshotType,
+) (MigrationSnapshot, error) {
+	switch snapshotType {
+	case MapBased:
+		return newIndexMapSnapshot(payloads)
+	case IndexMapBased:
+		return newMapSnapshot(payloads)
+	default:
+		// should never happen
+		panic("unknown snapshot type")
+	}
+
+}
+
+type mapSnapshot struct {
 	Payloads map[flow.RegisterID]*ledger.Payload
 }
 
-var _ MigrationStorageSnapshot = PayloadSnapshot{}
+var _ MigrationSnapshot = mapSnapshot{}
 
-func NewPayloadSnapshot(payloads []*ledger.Payload) (*PayloadSnapshot, error) {
-	l := &PayloadSnapshot{
+func newMapSnapshot(payloads []*ledger.Payload) (*mapSnapshot, error) {
+	l := &mapSnapshot{
 		Payloads: make(map[flow.RegisterID]*ledger.Payload, len(payloads)),
 	}
 	for _, payload := range payloads {
@@ -49,7 +76,7 @@ func NewPayloadSnapshot(payloads []*ledger.Payload) (*PayloadSnapshot, error) {
 	return l, nil
 }
 
-func (p PayloadSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+func (p mapSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 	value, exists := p.Payloads[id]
 	if !exists {
 		return nil, nil
@@ -57,22 +84,22 @@ func (p PayloadSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 	return value.Value(), nil
 }
 
-func (p PayloadSnapshot) Exists(id flow.RegisterID) bool {
+func (p mapSnapshot) Exists(id flow.RegisterID) bool {
 	_, exists := p.Payloads[id]
 	return exists
 }
 
-func (p PayloadSnapshot) Len() int {
+func (p mapSnapshot) Len() int {
 	return len(p.Payloads)
 }
 
-func (p PayloadSnapshot) PayloadMap() map[flow.RegisterID]*ledger.Payload {
+func (p mapSnapshot) PayloadMap() map[flow.RegisterID]*ledger.Payload {
 	return p.Payloads
 }
 
 // ApplyChangesAndGetNewPayloads applies the given changes to the snapshot and returns the new payloads.
 // the snapshot is destroyed.
-func (p PayloadSnapshot) ApplyChangesAndGetNewPayloads(
+func (p mapSnapshot) ApplyChangesAndGetNewPayloads(
 	changes map[flow.RegisterID]flow.RegisterValue,
 	expectedChangeAddresses map[flow.Address]struct{},
 	logger zerolog.Logger,
@@ -120,17 +147,17 @@ func (p PayloadSnapshot) ApplyChangesAndGetNewPayloads(
 	return newPayloads, nil
 }
 
-type MapBasedPayloadSnapshot struct {
+type IndexMapSnapshot struct {
 	reverseMap map[flow.RegisterID]int
 	payloads   []*ledger.Payload
 }
 
-var _ MigrationStorageSnapshot = (*MapBasedPayloadSnapshot)(nil)
+var _ MigrationSnapshot = (*IndexMapSnapshot)(nil)
 
-func NewMapBasedPayloadSnapshot(payloads []*ledger.Payload) (*MapBasedPayloadSnapshot, error) {
+func newIndexMapSnapshot(payloads []*ledger.Payload) (*IndexMapSnapshot, error) {
 	payloadsCopy := make([]*ledger.Payload, len(payloads))
 	copy(payloadsCopy, payloads)
-	l := &MapBasedPayloadSnapshot{
+	l := &IndexMapSnapshot{
 		reverseMap: make(map[flow.RegisterID]int, len(payloads)),
 		payloads:   payloadsCopy,
 	}
@@ -148,7 +175,7 @@ func NewMapBasedPayloadSnapshot(payloads []*ledger.Payload) (*MapBasedPayloadSna
 	return l, nil
 }
 
-func (p *MapBasedPayloadSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+func (p *IndexMapSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 	index, exists := p.reverseMap[id]
 	if !exists {
 		return nil, nil
@@ -156,16 +183,16 @@ func (p *MapBasedPayloadSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, e
 	return p.payloads[index].Value(), nil
 }
 
-func (p *MapBasedPayloadSnapshot) Exists(id flow.RegisterID) bool {
+func (p *IndexMapSnapshot) Exists(id flow.RegisterID) bool {
 	_, exists := p.reverseMap[id]
 	return exists
 }
 
-func (p *MapBasedPayloadSnapshot) Len() int {
+func (p *IndexMapSnapshot) Len() int {
 	return len(p.payloads)
 }
 
-func (p *MapBasedPayloadSnapshot) PayloadMap() map[flow.RegisterID]*ledger.Payload {
+func (p *IndexMapSnapshot) PayloadMap() map[flow.RegisterID]*ledger.Payload {
 	result := make(map[flow.RegisterID]*ledger.Payload, len(p.payloads))
 	for id, index := range p.reverseMap {
 		result[id] = p.payloads[index]
@@ -175,7 +202,7 @@ func (p *MapBasedPayloadSnapshot) PayloadMap() map[flow.RegisterID]*ledger.Paylo
 
 // ApplyChangesAndGetNewPayloads applies the given changes to the snapshot and returns the new payloads.
 // the snapshot is destroyed.
-func (p *MapBasedPayloadSnapshot) ApplyChangesAndGetNewPayloads(
+func (p *IndexMapSnapshot) ApplyChangesAndGetNewPayloads(
 	changes map[flow.RegisterID]flow.RegisterValue,
 	expectedChangeAddresses map[flow.Address]struct{},
 	logger zerolog.Logger,

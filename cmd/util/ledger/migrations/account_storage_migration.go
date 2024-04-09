@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -24,6 +25,7 @@ func NewAccountStorageMigration(
 			address,
 			payloads,
 			util.RuntimeInterfaceConfig{},
+			snapshot.IndexMapBased,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create migrator runtime: %w", err)

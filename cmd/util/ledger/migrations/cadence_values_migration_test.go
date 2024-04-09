@@ -19,6 +19,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
@@ -124,6 +125,7 @@ func checkMigratedPayloads(
 		address,
 		newPayloads,
 		util.RuntimeInterfaceConfig{},
+		snapshot.IndexMapBased,
 	)
 	require.NoError(t, err)
 
@@ -381,7 +383,7 @@ func checkMigratedPayloads(
 	}
 }
 
-func checkAccountID(t *testing.T, mr *migratorRuntime, address common.Address) {
+func checkAccountID(t *testing.T, mr *MigratorRuntime, address common.Address) {
 	id := flow.AccountStatusRegisterID(flow.Address(address))
 	statusBytes, err := mr.Accounts.GetValue(id)
 	require.NoError(t, err)
@@ -741,6 +743,7 @@ func TestProgramParsingError(t *testing.T) {
 		testAddress,
 		payloads,
 		util.RuntimeInterfaceConfig{},
+		snapshot.IndexMapBased,
 	)
 	require.NoError(t, err)
 
@@ -882,6 +885,7 @@ func TestCoreContractUsage(t *testing.T) {
 			testAddress,
 			payloads,
 			util.RuntimeInterfaceConfig{},
+			snapshot.IndexMapBased,
 		)
 		require.NoError(t, err)
 
@@ -969,6 +973,7 @@ func TestCoreContractUsage(t *testing.T) {
 			testAddress,
 			payloads,
 			util.RuntimeInterfaceConfig{},
+			snapshot.IndexMapBased,
 		)
 		require.NoError(t, err)
 

@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -110,7 +111,7 @@ func (n NopMemoryGauge) MeterMemory(common.MemoryUsage) error {
 var _ common.MemoryGauge = (*NopMemoryGauge)(nil)
 
 type PayloadsReadonlyLedger struct {
-	Snapshot MigrationStorageSnapshot
+	Snapshot snapshot.MigrationSnapshot
 
 	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
 	SetValueFunc             func(owner, key, value []byte) (err error)
@@ -145,7 +146,7 @@ func (p *PayloadsReadonlyLedger) AllocateStorageIndex(owner []byte) (atree.Stora
 	panic("AllocateStorageIndex not expected to be called")
 }
 
-func NewPayloadsReadonlyLedger(snapshot MigrationStorageSnapshot) *PayloadsReadonlyLedger {
+func NewPayloadsReadonlyLedger(snapshot snapshot.MigrationSnapshot) *PayloadsReadonlyLedger {
 	return &PayloadsReadonlyLedger{Snapshot: snapshot}
 }
 

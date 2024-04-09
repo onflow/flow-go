@@ -1,4 +1,4 @@
-package util_test
+package snapshot_test
 
 import (
 	"crypto/rand"
@@ -9,7 +9,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -130,14 +130,14 @@ func benchmarkMerge(b *testing.B, payloadsNum int, changes []int) {
 			// third of the changes should be new payloads
 			// third of the changes should be existing payloads
 			// third of the changes should be removals
-			change, remove, add := changesNum/3, changesNum/3, changesNum-2*(changesNum/3)
+			change, remove, add := changesNum/2, changesNum/2, changesNum/2
 
 			changes := creatChanges(len(payloads), change, remove, add)
 
-			b.Run("MapBasedPayloadSnapshot", func(b *testing.B) {
+			b.Run("IndexMapSnapshot", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					b.StopTimer()
-					snapshot, err := util.NewMapBasedPayloadSnapshot(payloads)
+					snapshot, err := snapshot.NewPayloadSnapshot(payloads, snapshot.IndexMapBased)
 					require.NoError(b, err)
 					b.StartTimer()
 
@@ -146,10 +146,10 @@ func benchmarkMerge(b *testing.B, payloadsNum int, changes []int) {
 				}
 			})
 
-			b.Run("PayloadSnapshot", func(b *testing.B) {
+			b.Run("mapSnapshot", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					b.StopTimer()
-					snapshot, err := util.NewPayloadSnapshot(payloads)
+					snapshot, err := snapshot.NewPayloadSnapshot(payloads, snapshot.MapBased)
 					require.NoError(b, err)
 					b.StartTimer()
 
@@ -168,16 +168,16 @@ func benchmarkCreate(
 
 	payloads := createPayloads(payloadsNum)
 
-	b.Run("MapBasedPayloadSnapshot", func(b *testing.B) {
+	b.Run("IndexMapSnapshot", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_, err := util.NewMapBasedPayloadSnapshot(payloads)
+			_, err := snapshot.NewPayloadSnapshot(payloads, snapshot.IndexMapBased)
 			require.NoError(b, err)
 		}
 	})
 
-	b.Run("PayloadSnapshot", func(b *testing.B) {
+	b.Run("mapSnapshot", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_, err := util.NewPayloadSnapshot(payloads)
+			_, err := snapshot.NewPayloadSnapshot(payloads, snapshot.MapBased)
 			require.NoError(b, err)
 		}
 	})

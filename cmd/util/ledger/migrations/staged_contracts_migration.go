@@ -18,6 +18,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -131,7 +132,11 @@ func (m *StagedContractsMigration) InitMigration(
 	}
 
 	// Pass empty address. We are only interested in the created `env` object.
-	mr, err := NewMigratorRuntime(common.Address{}, allPayloads, config)
+	mr, err := NewMigratorRuntime(
+		common.Address{},
+		allPayloads,
+		config,
+		snapshot.IndexMapBased)
 	if err != nil {
 		return err
 	}

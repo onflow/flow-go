@@ -18,6 +18,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -87,7 +88,7 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 	oldPayloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
 	// create all the runtime components we need for the migration
-	mr, err := NewMigratorRuntime(address, oldPayloads, util.RuntimeInterfaceConfig{})
+	mr, err := NewMigratorRuntime(address, oldPayloads, util.RuntimeInterfaceConfig{}, snapshot.MapBased)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
 	}
@@ -139,7 +140,7 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 }
 
 func (m *AtreeRegisterMigrator) migrateAccountStorage(
-	mr *migratorRuntime,
+	mr *MigratorRuntime,
 	storageMapIds map[string]struct{},
 ) (map[flow.RegisterID]flow.RegisterValue, error) {
 
@@ -166,7 +167,7 @@ func (m *AtreeRegisterMigrator) migrateAccountStorage(
 }
 
 func (m *AtreeRegisterMigrator) convertStorageDomain(
-	mr *migratorRuntime,
+	mr *MigratorRuntime,
 	storageMapIds map[string]struct{},
 	domain string,
 ) error {
@@ -240,7 +241,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 }
 
 func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
-	mr *migratorRuntime,
+	mr *MigratorRuntime,
 	changes map[flow.RegisterID]flow.RegisterValue,
 	storageMapIds map[string]struct{},
 ) ([]*ledger.Payload, error) {
@@ -375,7 +376,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 }
 
 func (m *AtreeRegisterMigrator) cloneValue(
-	mr *migratorRuntime,
+	mr *MigratorRuntime,
 	value interpreter.Value,
 ) (interpreter.Value, error) {
 

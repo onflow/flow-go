@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	migrationSnapshot "github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/ledger"
 )
 
@@ -378,7 +379,7 @@ func newReadonlyStorageRuntime(payloads []*ledger.Payload) (
 	*readonlyStorageRuntime,
 	error,
 ) {
-	snapshot, err := util.NewMapBasedPayloadSnapshot(payloads)
+	snapshot, err := migrationSnapshot.NewPayloadSnapshot(payloads, migrationSnapshot.MapBased)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
 	}

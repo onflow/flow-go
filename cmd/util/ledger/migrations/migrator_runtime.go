@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
@@ -25,16 +26,18 @@ type migrationTransactionPreparer struct {
 
 var _ storage.TransactionPreparer = migrationTransactionPreparer{}
 
-// migratorRuntime is a runtime that can be used to run a migration on a single account
+// NewMigratorRuntime is a runtime that can be used to run a migration on a single account
 func NewMigratorRuntime(
 	address common.Address,
 	payloads []*ledger.Payload,
 	config util.RuntimeInterfaceConfig,
+	snapshotType snapshot.MigrationSnapshotType,
 ) (
-	*migratorRuntime,
+	*MigratorRuntime,
 	error,
 ) {
-	snapshot, err := util.NewMapBasedPayloadSnapshot(payloads)
+	// TODO: the snapshot type should be a parameter
+	snapshot, err := snapshot.NewPayloadSnapshot(payloads, snapshotType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
 	}
@@ -92,7 +95,7 @@ func NewMigratorRuntime(
 		return nil, err
 	}
 
-	return &migratorRuntime{
+	return &MigratorRuntime{
 		Address:                 address,
 		Payloads:                payloads,
 		Snapshot:                snapshot,
@@ -106,8 +109,8 @@ func NewMigratorRuntime(
 	}, nil
 }
 
-type migratorRuntime struct {
-	Snapshot                util.MigrationStorageSnapshot
+type MigratorRuntime struct {
+	Snapshot                snapshot.MigrationSnapshot
 	TransactionState        state.NestedTransactionPreparer
 	Interpreter             *interpreter.Interpreter
 	Storage                 *runtime.Storage
@@ -119,13 +122,13 @@ type migratorRuntime struct {
 	ContractNamesProvider   stdlib.AccountContractNamesProvider
 }
 
-var _ stdlib.AccountContractNamesProvider = &migratorRuntime{}
+var _ stdlib.AccountContractNamesProvider = &MigratorRuntime{}
 
-func (mr *migratorRuntime) GetReadOnlyStorage() *runtime.Storage {
+func (mr *MigratorRuntime) GetReadOnlyStorage() *runtime.Storage {
 	readonlyLedger := util.NewPayloadsReadonlyLedger(mr.Snapshot)
 	return runtime.NewStorage(readonlyLedger, nil)
 }
 
-func (mr *migratorRuntime) GetAccountContractNames(address common.Address) ([]string, error) {
+func (mr *MigratorRuntime) GetAccountContractNames(address common.Address) ([]string, error) {
 	return mr.Accounts.GetContractNames(flow.Address(address))
 }

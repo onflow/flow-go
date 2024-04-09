@@ -22,6 +22,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/ledger"
@@ -98,6 +99,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		address,
 		oldPayloads,
 		m.runtimeInterfaceConfig,
+		snapshot.IndexMapBased,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)

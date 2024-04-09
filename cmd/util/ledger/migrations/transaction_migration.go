@@ -3,7 +3,7 @@ package migrations
 import (
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	migrationSnapshot "github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/ledger"
@@ -27,7 +27,7 @@ func NewTransactionBasedMigration(
 			fvm.WithTransactionFeesEnabled(false))
 		ctx := fvm.NewContext(options...)
 
-		snapshot, err := util.NewMapBasedPayloadSnapshot(payloads)
+		snapshot, err := migrationSnapshot.NewPayloadSnapshot(payloads, migrationSnapshot.IndexMapBased)
 		if err != nil {
 			return nil, err
 		}
