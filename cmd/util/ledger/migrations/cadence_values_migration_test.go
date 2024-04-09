@@ -438,13 +438,13 @@ func checkReporters(
 		}
 	}
 
-	var accountReportEntries []reportEntry
+	var accountReportEntries []valueMigrationReportEntry
 
 	for _, reportWriter := range rwf.reportWriters {
 		for _, entry := range reportWriter.entries {
 
-			e := entry.(reportEntry)
-			if e.accountAddress() != address {
+			e, ok := entry.(valueMigrationReportEntry)
+			if !ok || e.accountAddress() != address {
 				continue
 			}
 
@@ -460,7 +460,7 @@ func checkReporters(
 	// Order is non-deterministic, so use 'ElementsMatch'.
 	assert.ElementsMatch(
 		t,
-		[]reportEntry{
+		[]valueMigrationReportEntry{
 			newCadenceValueMigrationReportEntry(
 				"StringNormalizingMigration",
 				"string_value_1",
