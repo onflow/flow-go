@@ -2,7 +2,6 @@ package unit
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
+// Unit handles synchronization management
 type Unit interface {
 	component.Component
 	ShutdownSignal() <-chan struct{}
@@ -23,6 +23,8 @@ type Unit interface {
 	AddDoneCallbacks(actions ...func())
 }
 
+var _ Unit = (*unitImp)(nil)
+
 type unitImp struct {
 	*component.ComponentManager
 
@@ -30,7 +32,7 @@ type unitImp struct {
 	work chan func(context.Context)
 
 	preReadyFn func()
-	postDoneFn func()
+	preDoneFn  func()
 }
 
 func NewUnit() Unit {
@@ -70,17 +72,33 @@ func (u *unitImp) lifecycle(ctx irrecoverable.SignalerContext, ready component.R
 	ready()
 	<-ctx.Done()
 
-	if u.postDoneFn != nil {
-		u.postDoneFn()
+	if u.preDoneFn != nil {
+		u.preDoneFn()
 	}
 
 	u.wg.Wait()
 }
 
+// ComponentWorker is helper function to start the unit as a worker within a parent ComponentManager
+func (u *unitImp) ComponentWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	u.Start(ctx)
+
+	select {
+	case <-ctx.Done():
+	case <-u.Ready():
+		ready()
+	}
+
+	<-u.Done()
+}
+
+// Do synchronously executes the input function f unless the unit has shut down.
+// It returns the result of f. If f is executed, the unit will not shut down
+// until after f returns.
 func (u *unitImp) Do(f func() error) error {
 	select {
 	case <-u.ShutdownSignal():
-		return fmt.Errorf("unit is shutting down")
+		return nil
 	default:
 	}
 
@@ -90,6 +108,8 @@ func (u *unitImp) Do(f func() error) error {
 	return f()
 }
 
+// Launch asynchronously executes the input function unless the unit has shut
+// down. If f is executed, the unit will not shut down until after f returns.
 func (u *unitImp) Launch(f func(ctx context.Context)) {
 	select {
 	case <-u.ShutdownSignal():
@@ -98,6 +118,8 @@ func (u *unitImp) Launch(f func(ctx context.Context)) {
 	}
 }
 
+// LaunchAfter asynchronously executes the input function after a certain delay
+// unless the unit has shut down.
 func (u *unitImp) LaunchAfter(delay time.Duration, f func(context.Context)) {
 	u.Launch(func(ctx context.Context) {
 		select {
@@ -109,6 +131,9 @@ func (u *unitImp) LaunchAfter(delay time.Duration, f func(context.Context)) {
 	})
 }
 
+// LaunchPeriodically asynchronously executes the input function on `interval` periods
+// unless the unit has shut down.
+// If f is executed, the unit will not shut down until after f returns.
 func (u *unitImp) LaunchPeriodically(f func(context.Context), interval time.Duration, delay time.Duration) {
 	u.Launch(func(ctx context.Context) {
 		ticker := time.NewTicker(interval)
@@ -138,6 +163,10 @@ func (u *unitImp) LaunchPeriodically(f func(context.Context), interval time.Dura
 }
 
 // AddReadyCallbacks adds checks to be executed before the unit is ready.
+// A unit is ready when the series of "check" functions are executed.
+//
+// The engine using the unit is responsible for defining these check functions
+// as required.
 func (u *unitImp) AddReadyCallbacks(checks ...func()) {
 	u.preReadyFn = func() {
 		for _, check := range checks {
@@ -147,8 +176,14 @@ func (u *unitImp) AddReadyCallbacks(checks ...func()) {
 }
 
 // AddDoneCallbacks adds actions to be executed after the unit has shut down.
+// A unit is done when
+// (i) the series of "action" functions are executed and
+// (ii) all pending functions invoked with `Do` or `Launch` have completed.
+//
+// The engine using the unit is responsible for defining these action functions
+// as required.
 func (u *unitImp) AddDoneCallbacks(actions ...func()) {
-	u.postDoneFn = func() {
+	u.preDoneFn = func() {
 		for _, action := range actions {
 			action()
 		}
