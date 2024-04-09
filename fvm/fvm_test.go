@@ -3119,59 +3119,6 @@ func TestEVM(t *testing.T) {
 		}),
 	)
 
-	// this test makes sure that only ABI encoding/decoding functionality is
-	// available through the EVM contract, when bootstraped with `WithEVMABIOnly`
-	t.Run("with ABI only EVM", newVMTest().
-		withBootstrapProcedureOptions(
-			fvm.WithSetupEVMEnabled(true),
-			fvm.WithEVMABIOnly(true),
-		).
-		withContextOptions(
-			fvm.WithEVMEnabled(true),
-		).
-		run(func(
-			t *testing.T,
-			vm fvm.VM,
-			chain flow.Chain,
-			ctx fvm.Context,
-			snapshotTree snapshot.SnapshotTree,
-		) {
-			txBody := flow.NewTransactionBody().
-				SetScript([]byte(fmt.Sprintf(`
-						import EVM from %s
-
-						transaction {
-							execute {
-								let data = EVM.encodeABI(["John Doe", UInt64(33), false])
-								log(data.length)
-								assert(data.length == 160)
-
-								let acc <- EVM.createCadenceOwnedAccount()
-								destroy acc
-							}
-						}
-					`, chain.ServiceAddress().HexWithPrefix()))).
-				SetProposalKey(chain.ServiceAddress(), 0, 0).
-				SetPayer(chain.ServiceAddress())
-
-			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
-			require.NoError(t, err)
-
-			_, output, err := vm.Run(
-				ctx,
-				fvm.Transaction(txBody, 0),
-				snapshotTree)
-
-			require.NoError(t, err)
-			require.Error(t, output.Err)
-			assert.ErrorContains(
-				t,
-				output.Err,
-				"value of type `EVM` has no member `createCadenceOwnedAccount`",
-			)
-		}),
-	)
-
 	// this test makes sure the execution error is correctly handled and returned as a correct type
 	t.Run("execution reverted", newVMTest().
 		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
@@ -3325,7 +3272,7 @@ func TestEVM(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
-			require.Len(t, output.Events, 6)
+			require.Len(t, output.Events, 7)
 
 			evmLocation := types.EVMLocation{}
 			txExe, blockExe := output.Events[4], output.Events[5]

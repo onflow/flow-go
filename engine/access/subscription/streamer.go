@@ -14,6 +14,12 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// ErrBlockNotReady represents an error indicating that a block is not yet available or ready.
+var ErrBlockNotReady = errors.New("block not ready")
+
+// ErrEndOfData represents an error indicating that no more data available for streaming.
+var ErrEndOfData = errors.New("end of data")
+
 // Streamer represents a streaming subscription that delivers data to clients.
 type Streamer struct {
 	log         zerolog.Logger
@@ -71,6 +77,12 @@ func (s *Streamer) Stream(ctx context.Context) {
 		err := s.sendAllAvailable(ctx)
 
 		if err != nil {
+			//TODO: The functionality to graceful shutdown on demand should be improved with https://github.com/onflow/flow-go/issues/5561
+			if errors.Is(err, ErrEndOfData) {
+				s.sub.Close()
+				return
+			}
+
 			s.log.Err(err).Msg("error sending response")
 			s.sub.Fail(err)
 			return
@@ -88,8 +100,15 @@ func (s *Streamer) sendAllAvailable(ctx context.Context) error {
 
 		response, err := s.sub.Next(ctx)
 
+		if response == nil && err == nil {
+			continue
+		}
+
 		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) || errors.Is(err, storage.ErrHeightNotIndexed) || execution_data.IsBlobNotFoundError(err) {
+			if errors.Is(err, storage.ErrNotFound) ||
+				errors.Is(err, storage.ErrHeightNotIndexed) ||
+				execution_data.IsBlobNotFoundError(err) ||
+				errors.Is(err, ErrBlockNotReady) {
 				// no more available
 				return nil
 			}
