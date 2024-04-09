@@ -315,7 +315,7 @@ func (m *StagedContractsMigration) MigrateAccount(
 		}
 		m.log.Error().
 			Array("contracts", arr).
-			Str("address", address.HexWithPrefix()).
+			Str("account", address.Hex()).
 			Msg("failed to find all contract registers that need to be changed for address")
 	}
 

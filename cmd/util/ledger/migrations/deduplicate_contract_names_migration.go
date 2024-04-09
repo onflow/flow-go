@@ -113,7 +113,7 @@ func (d *DeduplicateContractNamesMigration) MigrateAccount(
 	}
 
 	d.log.Info().
-		Str("address", address.Hex()).
+		Str("account", address.Hex()).
 		Strs("contract_names", contractNames).
 		Msg("removing duplicate contract names")
 
