@@ -121,5 +121,5 @@ func (s *StateMachineSuite) TestEvolveState_ProtocolStateVersionUpgrade() {
 func (s *StateMachineSuite) TestBuild() {
 	dbOps, err := s.stateMachine.Build()
 	require.NoError(s.T(), err)
-	require.Empty(s.T(), dbOps)
+	require.True(s.T(), dbOps.IsEmpty())
 }

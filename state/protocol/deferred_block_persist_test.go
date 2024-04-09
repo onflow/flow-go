@@ -16,6 +16,8 @@ import (
 // TestEmpty verifies that DeferredBlockPersist behaves like a no-op if nothing is scheduled
 func TestEmpty(t *testing.T) {
 	deferredPersistOps := ps.NewDeferredBlockPersist()
+	require.True(t, deferredPersistOps.IsEmpty())
+
 	// NewDeferredBlockPersist.Pending() should be a no-op and therefore not care that transaction.Tx is nil
 	err := deferredPersistOps.Pending()(unittest.IdentifierFixture(), nil)
 	require.NoError(t, err)
@@ -28,6 +30,7 @@ func Test_AddBaderOp(t *testing.T) {
 		t.Run("single DeferredBadgerUpdate", func(t *testing.T) {
 			m := NewCallMonitor(t)
 			deferredPersistOps := ps.NewDeferredBlockPersist().AddBadgerOp(m.MakeBadgerUpdate())
+			require.False(t, deferredPersistOps.IsEmpty())
 			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
@@ -37,6 +40,7 @@ func Test_AddBaderOp(t *testing.T) {
 			deferredPersistOps := ps.NewDeferredBlockPersist().
 				AddBadgerOp(m.MakeBadgerUpdate()).
 				AddBadgerOp(m.MakeBadgerUpdate())
+			require.False(t, deferredPersistOps.IsEmpty())
 			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
@@ -46,6 +50,7 @@ func Test_AddBaderOp(t *testing.T) {
 			deferredPersistOps := ps.NewDeferredBlockPersist().AddBadgerOps(
 				m.MakeBadgerUpdate(),
 				m.MakeBadgerUpdate())
+			require.False(t, deferredPersistOps.IsEmpty())
 			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
@@ -60,6 +65,7 @@ func Test_AddDbOp(t *testing.T) {
 			m := NewCallMonitor(t)
 			deferredPersistOps := ps.NewDeferredBlockPersist().
 				AddDbOp(m.MakeDBUpdate(0))
+			require.False(t, deferredPersistOps.IsEmpty())
 			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
@@ -68,6 +74,7 @@ func Test_AddDbOp(t *testing.T) {
 			m := NewCallMonitor(t)
 			deferredPersistOps := ps.NewDeferredBlockPersist().
 				AddDbOp(m.MakeDBUpdate(1))
+			require.False(t, deferredPersistOps.IsEmpty())
 			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
@@ -76,6 +83,7 @@ func Test_AddDbOp(t *testing.T) {
 			m := NewCallMonitor(t)
 			deferredPersistOps := ps.NewDeferredBlockPersist().
 				AddDbOp(m.MakeDBUpdate(21))
+			require.False(t, deferredPersistOps.IsEmpty())
 			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
@@ -85,6 +93,7 @@ func Test_AddDbOp(t *testing.T) {
 			deferredPersistOps := ps.NewDeferredBlockPersist().
 				AddDbOp(m.MakeDBUpdate(17)).
 				AddDbOp(m.MakeDBUpdate(0))
+			require.False(t, deferredPersistOps.IsEmpty())
 			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
@@ -95,6 +104,7 @@ func Test_AddDbOp(t *testing.T) {
 			deferredPersistOps.AddDbOps(
 				m.MakeDBUpdate(0),
 				m.MakeDBUpdate(17))
+			require.False(t, deferredPersistOps.IsEmpty())
 			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
@@ -109,6 +119,7 @@ func Test_AddIndexingOp(t *testing.T) {
 			m := NewCallMonitor(t)
 			deferredPersistOps := ps.NewDeferredBlockPersist().
 				AddIndexingOp(m.MakeIndexingOp(blockID, 0))
+			require.False(t, deferredPersistOps.IsEmpty())
 			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
@@ -117,6 +128,7 @@ func Test_AddIndexingOp(t *testing.T) {
 			m := NewCallMonitor(t)
 			deferredPersistOps := ps.NewDeferredBlockPersist().
 				AddIndexingOp(m.MakeIndexingOp(blockID, 1))
+			require.False(t, deferredPersistOps.IsEmpty())
 			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
@@ -125,6 +137,7 @@ func Test_AddIndexingOp(t *testing.T) {
 			m := NewCallMonitor(t)
 			deferredPersistOps := ps.NewDeferredBlockPersist().
 				AddIndexingOp(m.MakeIndexingOp(blockID, 21))
+			require.False(t, deferredPersistOps.IsEmpty())
 			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
@@ -134,6 +147,7 @@ func Test_AddIndexingOp(t *testing.T) {
 			deferredPersistOps := ps.NewDeferredBlockPersist().
 				AddIndexingOp(m.MakeIndexingOp(blockID, 17)).
 				AddIndexingOp(m.MakeIndexingOp(blockID, 0))
+			require.False(t, deferredPersistOps.IsEmpty())
 			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
@@ -144,6 +158,7 @@ func Test_AddIndexingOp(t *testing.T) {
 			deferredPersistOps.AddIndexingOps(
 				m.MakeIndexingOp(blockID, 0),
 				m.MakeIndexingOp(blockID, 17))
+			require.False(t, deferredPersistOps.IsEmpty())
 			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
@@ -158,6 +173,7 @@ func Test_AddOnSucceedCallback(t *testing.T) {
 			m := NewCallMonitor(t)
 			deferredPersistOps := ps.NewDeferredBlockPersist().
 				OnSucceed(m.MakeCallback())
+			require.False(t, deferredPersistOps.IsEmpty())
 			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
@@ -167,6 +183,7 @@ func Test_AddOnSucceedCallback(t *testing.T) {
 			deferredPersistOps := ps.NewDeferredBlockPersist().
 				OnSucceed(m.MakeCallback()).
 				OnSucceed(m.MakeCallback())
+			require.False(t, deferredPersistOps.IsEmpty())
 			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
@@ -175,6 +192,7 @@ func Test_AddOnSucceedCallback(t *testing.T) {
 			m := NewCallMonitor(t)
 			deferredPersistOps := ps.NewDeferredBlockPersist().
 				OnSucceeds(m.MakeCallbacks(11)...)
+			require.False(t, deferredPersistOps.IsEmpty())
 			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
@@ -208,6 +226,7 @@ func Test_EverythingMixed(t *testing.T) {
 				m.MakeDBUpdate(0),
 				m.MakeDBUpdate(1)).
 			OnSucceed(m.MakeCallback())
+		require.False(t, deferredPersistOps.IsEmpty())
 		err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 		require.NoError(t, err)
 	})

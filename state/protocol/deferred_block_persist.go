@@ -14,6 +14,8 @@ import (
 // we are still determining the protocol state ID for that block.
 type DeferredBlockPersistOp func(blockID flow.Identifier, tx *transaction.Tx) error
 
+var noOpPersistOp DeferredBlockPersistOp = func(blockID flow.Identifier, tx *transaction.Tx) error { return nil }
+
 // WithBlock adds the still missing block ID information to a `DeferredBlockPersistOp`, thereby converting
 // it into a `transaction.DeferredDBUpdate`.
 func (d DeferredBlockPersistOp) WithBlock(blockID flow.Identifier) transaction.DeferredDBUpdate {
@@ -55,14 +57,21 @@ func (d DeferredBlockPersistOp) WithBlock(blockID flow.Identifier) transaction.D
 //
 // NOT CONCURRENCY SAFE
 type DeferredBlockPersist struct {
+	isEmpty bool
 	pending DeferredBlockPersistOp
 }
 
 // NewDeferredBlockPersist instantiates a DeferredBlockPersist. Initially, it behaves like a no-op until functors are added.
 func NewDeferredBlockPersist() *DeferredBlockPersist {
 	return &DeferredBlockPersist{
-		pending: func(flow.Identifier, *transaction.Tx) error { return nil }, // initially nothing is pending, i.e. no-op
+		isEmpty: true,
+		pending: noOpPersistOp, // initially nothing is pending, i.e. no-op
 	}
+}
+
+// IsEmpty returns true if and only if
+func (d *DeferredBlockPersist) IsEmpty() bool {
+	return d.isEmpty
 }
 
 // Pending returns a DeferredBlockPersistOp that comprises all database operations and callbacks
@@ -90,6 +99,7 @@ func (d *DeferredBlockPersist) AddBadgerOp(op transaction.DeferredBadgerUpdate) 
 		}
 		return nil
 	}
+	d.isEmpty = false
 	return d
 }
 
@@ -114,6 +124,7 @@ func (d *DeferredBlockPersist) AddBadgerOps(ops ...transaction.DeferredBadgerUpd
 		}
 		return nil
 	}
+	d.isEmpty = false
 	return d
 }
 
@@ -134,6 +145,7 @@ func (d *DeferredBlockPersist) AddDbOp(op transaction.DeferredDBUpdate) *Deferre
 		}
 		return nil
 	}
+	d.isEmpty = false
 	return d
 }
 
@@ -158,6 +170,7 @@ func (d *DeferredBlockPersist) AddDbOps(ops ...transaction.DeferredDBUpdate) *De
 		}
 		return nil
 	}
+	d.isEmpty = false
 	return d
 }
 
@@ -180,6 +193,7 @@ func (d *DeferredBlockPersist) AddIndexingOp(op DeferredBlockPersistOp) *Deferre
 		}
 		return nil
 	}
+	d.isEmpty = false
 	return d
 }
 
@@ -205,6 +219,7 @@ func (d *DeferredBlockPersist) AddIndexingOps(ops ...DeferredBlockPersistOp) *De
 		}
 		return nil
 	}
+	d.isEmpty = false
 	return d
 }
 
@@ -222,6 +237,7 @@ func (d *DeferredBlockPersist) OnSucceed(callback func()) *DeferredBlockPersist 
 		tx.OnSucceed(callback)
 		return nil
 	}
+	d.isEmpty = false
 	return d
 }
 
@@ -243,5 +259,6 @@ func (d *DeferredBlockPersist) OnSucceeds(callbacks ...func()) *DeferredBlockPer
 		}
 		return nil
 	}
+	d.isEmpty = false
 	return d
 }

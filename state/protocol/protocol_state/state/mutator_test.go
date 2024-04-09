@@ -80,7 +80,7 @@ func (s *StateMutatorSuite) TestBuild_HappyPath() {
 		deferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
 		deferredDBUpdates := protocol.NewDeferredBlockPersist()
 		deferredDBUpdates.AddDbOp(deferredUpdate.Execute)
-		stateMachine.On("Build").Return(deferredDBUpdates)
+		stateMachine.On("Build").Return(deferredDBUpdates, nil)
 		factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, s.replicatedState).Return(stateMachine, nil)
 		factories[i] = factory
 	}
@@ -163,7 +163,7 @@ func (s *StateMutatorSuite) TestBuild_EncodeFailed() {
 
 	_, dbUpdates, err := s.mutator.Build()
 	require.ErrorIs(s.T(), err, exception)
-	require.Empty(s.T(), dbUpdates)
+	require.True(s.T(), dbUpdates.IsEmpty())
 }
 
 // TestStateMutator_Constructor tests the behavior of the stateMutator constructor.
