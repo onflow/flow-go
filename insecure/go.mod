@@ -213,7 +213,7 @@ require (
 	github.com/onflow/flow-go-sdk v1.0.0-preview.17 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20240402163945-74687e7a5b9d // indirect
 	github.com/onflow/flow-nft/lib/go/templates v0.0.0-20240402163945-74687e7a5b9d // indirect
-	github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240404170900-c321c1475f1e // indirect
+	github.com/onflow/flow/protobuf/go/flow v0.4.0 // indirect
 	github.com/onflow/go-ethereum v1.13.4 // indirect
 	github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba // indirect
 	github.com/onflow/wal v0.0.0-20240208022732-d756cd497d3b // indirect
