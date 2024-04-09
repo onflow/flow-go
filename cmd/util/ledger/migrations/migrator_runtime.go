@@ -99,15 +99,18 @@ func (c MigratorRuntimeConfig) NewRuntimeInterface(
 
 // NewMigratorRuntime returns a runtime that can be used in migrations.
 func NewMigratorRuntime(
+	log zerolog.Logger,
+	address common.Address,
 	payloads []*ledger.Payload,
 	chainID flow.ChainID,
 	config MigratorRuntimeConfig,
 	snapshotType snapshot.MigrationSnapshotType,
+	nWorkers int,
 ) (
 	*MigratorRuntime,
 	error,
 ) {
-	snapshot, err := snapshot.NewPayloadSnapshot(zerolog.Nop(), payloads, snapshotType, 1)
+	snapshot, err := snapshot.NewPayloadSnapshot(log, payloads, snapshotType, nWorkers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
 	}

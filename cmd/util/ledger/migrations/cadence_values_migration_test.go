@@ -123,10 +123,13 @@ func checkMigratedPayloads(
 	chainID flow.ChainID,
 ) {
 	mr, err := NewMigratorRuntime(
+		zerolog.Nop(),
+		address,
 		newPayloads,
 		chainID,
 		MigratorRuntimeConfig{},
 		snapshot.SmallChangeSetSnapshot,
+		1,
 	)
 	require.NoError(t, err)
 
@@ -742,10 +745,13 @@ func TestProgramParsingError(t *testing.T) {
 	require.NoError(t, err)
 
 	runtime, err := NewMigratorRuntime(
+		zerolog.Nop(),
+		testAddress,
 		payloads,
 		chainID,
 		MigratorRuntimeConfig{},
 		snapshot.SmallChangeSetSnapshot,
+		1,
 	)
 	require.NoError(t, err)
 
@@ -886,10 +892,13 @@ func TestCoreContractUsage(t *testing.T) {
 		require.NoError(t, err)
 
 		runtime, err := NewMigratorRuntime(
+			zerolog.Nop(),
+			testAddress,
 			payloads,
 			chainID,
 			MigratorRuntimeConfig{},
 			snapshot.SmallChangeSetSnapshot,
+			1,
 		)
 		require.NoError(t, err)
 
@@ -975,10 +984,13 @@ func TestCoreContractUsage(t *testing.T) {
 		// Get result
 
 		mr, err := NewMigratorRuntime(
+			zerolog.Nop(),
+			testAddress,
 			payloads,
 			chainID,
 			MigratorRuntimeConfig{},
 			snapshot.SmallChangeSetSnapshot,
+			nWorker,
 		)
 		require.NoError(t, err)
 

@@ -48,6 +48,7 @@ type CadenceBaseMigrator struct {
 	errorMessageHandler   *errorMessageHandler
 	programs              map[runtime.Location]*interpreter.Program
 	chainID               flow.ChainID
+	nWorkers               int
 }
 
 var _ AccountBasedMigration = (*CadenceBaseMigrator)(nil)
@@ -67,9 +68,10 @@ func (m *CadenceBaseMigrator) Close() error {
 func (m *CadenceBaseMigrator) InitMigration(
 	log zerolog.Logger,
 	_ []*ledger.Payload,
-	_ int,
+	nWorkers int,
 ) error {
 	m.log = log.With().Str("migration", m.name).Logger()
+	m.nWorkers = nWorkers
 
 	// During the migration, we only provide already checked programs,
 	// no parsing/checking of contracts is expected.
@@ -105,12 +107,14 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 	checkPayloadsOwnership(oldPayloads, address, m.log)
 
 	// Create all the runtime components we need for the migration
-
 	migrationRuntime, err := NewMigratorRuntime(
+		m.log,
+		address,
 		oldPayloads,
 		m.chainID,
 		m.migratorRuntimeConfig,
 		snapshot.SmallChangeSetSnapshot,
+		m.nWorkers,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)

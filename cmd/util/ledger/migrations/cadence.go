@@ -413,7 +413,7 @@ func NewCadence1Migrations(
 	}
 
 	if opts.Prune {
-		migration := NewCadence1PruneMigration(opts.ChainID, log)
+		migration := NewCadence1PruneMigration(opts.ChainID, log, opts.NWorker)
 		if migration != nil {
 			migrations = append(
 				migrations,

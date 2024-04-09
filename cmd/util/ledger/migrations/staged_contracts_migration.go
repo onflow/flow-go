@@ -124,7 +124,7 @@ func (m *StagedContractsMigration) Close() error {
 func (m *StagedContractsMigration) InitMigration(
 	log zerolog.Logger,
 	allPayloads []*ledger.Payload,
-	_ int,
+	nWorkers int,
 ) error {
 	m.log = log.
 		With().
@@ -161,10 +161,14 @@ func (m *StagedContractsMigration) InitMigration(
 
 	// Pass empty address. We are only interested in the created `env` object.
 	mr, err := NewMigratorRuntime(
+		log,
+		common.Address{},
 		allPayloads,
 		m.chainID,
 		config,
-		snapshot.SmallChangeSetSnapshot)
+		snapshot.SmallChangeSetSnapshot,
+		nWorkers,
+	)
 	if err != nil {
 		return err
 	}
