@@ -140,6 +140,12 @@ type KVStoreMutator interface {
 //
 // For more details see `./Readme.md`
 //
+// CAUTION: If your state machine requires EvolveState to be called for all candidate blocks, even
+// if `sealedServiceEvents` is empty, please use the `AlwaysEvolveStateWrapper`. This is because not
+// every block will contain service events, yet reaching or exceeding a threshold view can also result
+// in the Protocol State changing. (For example, not having received the EpochCommit event for the next
+// epoch, but approaching the end of the current epoch.)
+//
 // NOT CONCURRENCY SAFE
 type OrthogonalStoreStateMachine[P any] interface {
 
@@ -155,11 +161,6 @@ type OrthogonalStoreStateMachine[P any] interface {
 	// Information that potentially changes the Epoch state (compared to the parent block's state):
 	//   - Service Events sealed in the candidate block
 	//   - the candidate block's view (already provided at construction time)
-	//
-	// CAUTION: EvolveState MUST be called for all candidate blocks, even if `sealedServiceEvents` is empty!
-	// This is because also the absence of expected service events by a certain view can also result in the
-	// Epoch state changing. (For example, not having received the EpochCommit event for the next epoch, but
-	// approaching the end of the current epoch.)
 	//
 	// No errors are expected during normal operations.
 	EvolveState(sealedServiceEvents []flow.ServiceEvent) error

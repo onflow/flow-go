@@ -1,14 +1,11 @@
-package state
+package protocol_state
 
 import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
-	ps "github.com/onflow/flow-go/state/protocol/protocol_state"
 )
-
-var _ ps.OrthogonalStoreStateMachine[any] = (*AlwaysEvolveStateWrapper[any])(nil)
 
 // AlwaysEvolveStateWrapper wraps a `protocol_state.OrthogonalStoreStateMachine`. The wrapper guarantees that
 // the state machine's `EvolveState(…)` is always called before its `Build()` method. If it hasn't been executed
@@ -16,15 +13,17 @@ var _ ps.OrthogonalStoreStateMachine[any] = (*AlwaysEvolveStateWrapper[any])(nil
 //
 // NOT CONCURRENCY SAFE
 type AlwaysEvolveStateWrapper[P any] struct {
-	ps.OrthogonalStoreStateMachine[P]
+	OrthogonalStoreStateMachine[P]
 	evolveStateCalled bool
 }
+
+var _ OrthogonalStoreStateMachine[any] = (*AlwaysEvolveStateWrapper[any])(nil)
 
 // NewAlwaysEvolveStateWrapper adds a wrapper to the given `stateMachine`, which guarantees that
 // `stateMachine.EvolveState(…)` is always called before `stateMachine.Build()`. When the external logic
 // calls `AlwaysEvolveStateWrapper.Build()`, the wrapper will call `stateMachine.EvolveState( empty )`
 // first, if and only if it hasn't been called before. The input `empty` is an empty list of service events.
-func NewAlwaysEvolveStateWrapper[P any](stateMachine ps.OrthogonalStoreStateMachine[P]) ps.OrthogonalStoreStateMachine[P] {
+func NewAlwaysEvolveStateWrapper[P any](stateMachine OrthogonalStoreStateMachine[P]) OrthogonalStoreStateMachine[P] {
 	return &AlwaysEvolveStateWrapper[P]{
 		OrthogonalStoreStateMachine: stateMachine,
 		evolveStateCalled:           false,

@@ -1,9 +1,10 @@
-package state_test
+package protocol_state_test
 
 import (
 	"fmt"
 	"testing"
 
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -11,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	ps_mock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -21,7 +21,7 @@ func TestView(t *testing.T) {
 	view := uint64(127)
 	stateMachine := ps_mock.NewOrthogonalStoreStateMachine[interface{}](t)
 	stateMachine.On("View").Return(view).Once()
-	wrapper := state.NewAlwaysEvolveStateWrapper[interface{}](stateMachine)
+	wrapper := protocol_state.NewAlwaysEvolveStateWrapper[interface{}](stateMachine)
 	require.Equal(t, view, wrapper.View())
 }
 
@@ -31,7 +31,7 @@ func TestParentState(t *testing.T) {
 	var parentState customType = "some state"
 	stateMachine := ps_mock.NewOrthogonalStoreStateMachine[customType](t)
 	stateMachine.On("ParentState").Return(parentState).Once()
-	wrapper := state.NewAlwaysEvolveStateWrapper[customType](stateMachine)
+	wrapper := protocol_state.NewAlwaysEvolveStateWrapper[customType](stateMachine)
 	require.Equal(t, parentState, wrapper.ParentState())
 }
 
@@ -46,7 +46,7 @@ func TestEvolveState(t *testing.T) {
 	t.Run("Input passed to wrapped state machine", func(t *testing.T) {
 		stateMachine := ps_mock.NewOrthogonalStoreStateMachine[interface{}](t)
 		stateMachine.On("EvolveState", serviceEvents).Return(nil).Once()
-		wrapper := state.NewAlwaysEvolveStateWrapper[interface{}](stateMachine)
+		wrapper := protocol_state.NewAlwaysEvolveStateWrapper[interface{}](stateMachine)
 		require.NoError(t, wrapper.EvolveState(serviceEvents))
 	})
 
@@ -54,7 +54,7 @@ func TestEvolveState(t *testing.T) {
 		customError := fmt.Errorf("custom error")
 		stateMachine := ps_mock.NewOrthogonalStoreStateMachine[interface{}](t)
 		stateMachine.On("EvolveState", serviceEvents).Return(customError).Once()
-		wrapper := state.NewAlwaysEvolveStateWrapper[interface{}](stateMachine)
+		wrapper := protocol_state.NewAlwaysEvolveStateWrapper[interface{}](stateMachine)
 		require.ErrorIs(t, wrapper.EvolveState(serviceEvents), customError, "error should be bubbled up")
 	})
 
@@ -79,7 +79,7 @@ func TestBuild(t *testing.T) {
 
 	t.Run("Happy Path: external logic calls EvolveState before Build", func(t *testing.T) {
 		stateMachine := ps_mock.NewOrthogonalStoreStateMachine[interface{}](t)
-		wrapper := state.NewAlwaysEvolveStateWrapper[interface{}](stateMachine)
+		wrapper := protocol_state.NewAlwaysEvolveStateWrapper[interface{}](stateMachine)
 
 		// external logic calls `EvolveState` first, which returns with no error
 		stateMachine.On("EvolveState", serviceEvents).Return(nil).Once()
@@ -94,7 +94,7 @@ func TestBuild(t *testing.T) {
 
 	t.Run("Happy Path: external logic calls only Build", func(t *testing.T) {
 		stateMachine := ps_mock.NewOrthogonalStoreStateMachine[interface{}](t)
-		wrapper := state.NewAlwaysEvolveStateWrapper[interface{}](stateMachine)
+		wrapper := protocol_state.NewAlwaysEvolveStateWrapper[interface{}](stateMachine)
 
 		// We haven't called `EvolveState` but call `Build` right away. The wrapper should
 		//  (1) execute `EvolveState` on the wrapped state machine with an _empty_ list of service events _first_
@@ -116,7 +116,7 @@ func TestBuild(t *testing.T) {
 	t.Run("Unhappy Path: wrapped state machine errors on EvolveState", func(t *testing.T) {
 		customError := fmt.Errorf("custom error")
 		stateMachine := ps_mock.NewOrthogonalStoreStateMachine[interface{}](t)
-		wrapper := state.NewAlwaysEvolveStateWrapper[interface{}](stateMachine)
+		wrapper := protocol_state.NewAlwaysEvolveStateWrapper[interface{}](stateMachine)
 
 		// We haven't called `EvolveState` but call `Build` right away. The wrapper should execute `EvolveState`
 		// on the wrapped state machine. If this errors, the wrapper should return the error, _without_ calling `Build`
@@ -128,7 +128,7 @@ func TestBuild(t *testing.T) {
 	t.Run("Unhappy Path: wrapped state machine errors on Build", func(t *testing.T) {
 		customError := fmt.Errorf("custom error")
 		stateMachine := ps_mock.NewOrthogonalStoreStateMachine[interface{}](t)
-		wrapper := state.NewAlwaysEvolveStateWrapper[interface{}](stateMachine)
+		wrapper := protocol_state.NewAlwaysEvolveStateWrapper[interface{}](stateMachine)
 
 		// We haven't called `EvolveState` but call `Build` right away. The wrapper should execute `EvolveState` on
 		// the wrapped state machine first and only then `Build`. Errors return by the second step sould be bubbled up.
