@@ -708,9 +708,9 @@ func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *access.
 func (h *Handler) GetExecutionResultByID(ctx context.Context, req *access.GetExecutionResultByIDRequest) (*access.ExecutionResultByIDResponse, error) {
 	metadata := h.buildMetadataResponse()
 
-	blockID := convert.MessageToIdentifier(req.GetId())
+	resultID := convert.MessageToIdentifier(req.GetId())
 
-	result, err := h.api.GetExecutionResultByID(ctx, blockID)
+	result, err := h.api.GetExecutionResultByID(ctx, resultID)
 	if err != nil {
 		return nil, err
 	}
