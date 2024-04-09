@@ -3,10 +3,12 @@ package recover_epoch
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/stretchr/testify/suite"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestRecoverEpoch(t *testing.T) {
