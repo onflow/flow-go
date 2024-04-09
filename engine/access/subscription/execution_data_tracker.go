@@ -123,28 +123,85 @@ func NewExecutionDataTracker(
 // - codes.NotFound        - if a block is provided and does not exist.
 // - codes.Internal        - if there is an internal error.
 func (e *ExecutionDataTrackerImpl) GetStartHeight(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
-	var height uint64 = 0
-	var err error
-
 	if startBlockID != flow.ZeroID && startHeight > 0 {
 		return 0, status.Errorf(codes.InvalidArgument, "only one of start block ID and start height may be provided")
 	}
 
 	// get the start height based on the provided starting block ID
 	if startBlockID != flow.ZeroID {
-		height, err = e.GetStartHeightFromBlockID(startBlockID)
+		return e.GetStartHeightFromBlockID(startBlockID)
 	}
 
 	// get start height based on the provided starting block height
 	if startHeight > 0 {
-		height, err = e.GetStartHeightFromHeight(startHeight)
+		return e.GetStartHeightFromHeight(startHeight)
 	}
 
-	// get start height based latest sealed block when neither startBlockID nor startHeight is provided
-	if startBlockID == flow.ZeroID && startHeight == 0 {
-		height, err = e.GetStartHeightFromLatest(ctx)
+	return e.GetStartHeightFromLatest(ctx)
+}
+
+// GetStartHeightFromBlockID returns the start height based on the provided starting block ID.
+//
+// Parameters:
+// - startBlockID: The identifier of the starting block.
+//
+// Returns:
+// - uint64: The start height associated with the provided block ID.
+// - error: An error indicating any issues with retrieving the start height.
+//
+// Expected errors during normal operation:
+// - codes.NotFound - if the block was not found in storage
+// - codes.InvalidArgument    - if the start height is out of bounds based on indexed heights.
+// - codes.FailedPrecondition - if the index reporter is not ready yet.
+// - codes.Internal           - for any other error during validation.
+func (e *ExecutionDataTrackerImpl) GetStartHeightFromBlockID(startBlockID flow.Identifier) (uint64, error) {
+	// get start height based on the provided starting block id
+	height, err := e.BaseTracker.GetStartHeightFromBlockID(startBlockID)
+	if err != nil {
+		return 0, err
 	}
 
+	// ensure that the resolved start height is available
+	return e.checkStartHeight(height)
+}
+
+// GetStartHeightFromHeight returns the start height based on the provided starting block height.
+//
+// Parameters:
+// - startHeight: The height of the starting block.
+//
+// Returns:
+// - uint64: The start height associated with the provided block height.
+// - error: An error indicating any issues with retrieving the start height.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument    - if the start height is less than the root block height, if the start height is out of bounds based on indexed heights
+// - codes.NotFound           - if the header was not found in storage.
+// - codes.FailedPrecondition - if the index reporter is not ready yet.
+// - codes.Internal           - for any other error during validation.
+func (e *ExecutionDataTrackerImpl) GetStartHeightFromHeight(startHeight uint64) (uint64, error) {
+	// get start height based on the provided starting block height
+	height, err := e.BaseTracker.GetStartHeightFromHeight(startHeight)
+	if err != nil {
+		return 0, err
+	}
+
+	// ensure that the resolved start height is available
+	return e.checkStartHeight(height)
+}
+
+// GetStartHeightFromLatest returns the start height based on the latest sealed block.
+//
+// Parameters:
+// - ctx: Context for the operation.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument    - if the start height is out of bounds based on indexed heights.
+// - codes.FailedPrecondition - if the index reporter is not ready yet.
+// - codes.Internal           - for any other error during validation.
+func (e *ExecutionDataTrackerImpl) GetStartHeightFromLatest(ctx context.Context) (uint64, error) {
+	// get start height based latest sealed block
+	height, err := e.BaseTracker.GetStartHeightFromLatest(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -196,8 +253,7 @@ func (e *ExecutionDataTrackerImpl) OnExecutionData(executionData *execution_data
 // 4. If validation passes, return the adjusted start height.
 //
 // Expected errors during normal operation:
-// - codes.InvalidArgument    - if both startBlockID and startHeight are provided, if the start height is less than the
-// root block height, if the start height is out of bounds based on indexed heights.
+// - codes.InvalidArgument    - if the start height is out of bounds based on indexed heights.
 // - codes.FailedPrecondition - if the index reporter is not ready yet.
 // - codes.Internal           - for any other error during validation.
 func (e *ExecutionDataTrackerImpl) checkStartHeight(height uint64) (uint64, error) {

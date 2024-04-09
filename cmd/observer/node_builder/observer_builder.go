@@ -1408,17 +1408,23 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,
-				builder.stateStreamConf,
 				node.State,
 				node.Storage.Headers,
 				node.Storage.Seals,
 				node.Storage.Results,
 				builder.ExecutionDataStore,
 				executionDataStoreCache,
-				broadcaster,
 				builder.RegistersAsyncStore,
 				builder.EventsIndex,
 				useIndex,
+				int(builder.stateStreamConf.RegisterIDsRequestLimit),
+				subscription.NewSubscriptionHandler(
+					builder.Logger,
+					broadcaster,
+					builder.stateStreamConf.ClientSendTimeout,
+					builder.stateStreamConf.ResponseLimit,
+					builder.stateStreamConf.ClientSendBufferSize,
+				),
 				executionDataTracker,
 			)
 			if err != nil {

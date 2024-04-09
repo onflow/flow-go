@@ -7,6 +7,7 @@ import (
 )
 
 // Unit handles synchronization management, startup, and shutdown for engines.
+// Deprecated: Use engine/common/unit/unit.go Instead
 type Unit struct {
 	admitLock sync.Mutex // used for synchronizing context cancellation with work admittance
 
@@ -18,7 +19,6 @@ type Unit struct {
 
 // NewUnit returns a new unit.
 func NewUnit() *Unit {
-
 	ctx, cancel := context.WithCancel(context.Background())
 	unit := &Unit{
 		ctx:    ctx,

@@ -12,7 +12,6 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -112,18 +111,11 @@ type Params struct {
 	ScriptExecutionMode       IndexQueryMode
 	EventQueryMode            IndexQueryMode
 	BlockTracker              subscription.BlockTracker
-	SubscriptionParams        SubscriptionParams
+	SubscriptionHandler       *subscription.SubscriptionHandler
 
 	EventsIndex       *index.EventsIndex
 	TxResultQueryMode IndexQueryMode
 	TxResultsIndex    *index.TransactionResultsIndex
-}
-
-type SubscriptionParams struct {
-	Broadcaster    *engine.Broadcaster
-	SendTimeout    time.Duration
-	ResponseLimit  float64
-	SendBufferSize int
 }
 
 var _ TransactionErrorMessage = (*Backend)(nil)
@@ -254,24 +246,18 @@ func New(params Params) (*Backend, error) {
 			snapshotHistoryLimit: params.SnapshotHistoryLimit,
 		},
 		backendSubscribeBlocks: backendSubscribeBlocks{
-			log:            params.Log,
-			state:          params.State,
-			headers:        params.Headers,
-			blocks:         params.Blocks,
-			broadcaster:    params.SubscriptionParams.Broadcaster,
-			sendTimeout:    params.SubscriptionParams.SendTimeout,
-			responseLimit:  params.SubscriptionParams.ResponseLimit,
-			sendBufferSize: params.SubscriptionParams.SendBufferSize,
-			blockTracker:   params.BlockTracker,
+			log:                 params.Log,
+			state:               params.State,
+			headers:             params.Headers,
+			blocks:              params.Blocks,
+			subscriptionHandler: params.SubscriptionHandler,
+			blockTracker:        params.BlockTracker,
 		},
 		backendSubscribeTransactions: backendSubscribeTransactions{
 			txLocalDataProvider: transactionsLocalDataProvider,
 			log:                 params.Log,
 			executionResults:    params.ExecutionResults,
-			broadcaster:         params.SubscriptionParams.Broadcaster,
-			sendTimeout:         params.SubscriptionParams.SendTimeout,
-			responseLimit:       params.SubscriptionParams.ResponseLimit,
-			sendBufferSize:      params.SubscriptionParams.SendBufferSize,
+			subscriptionHandler: params.SubscriptionHandler,
 			blockTracker:        params.BlockTracker,
 		},
 		collections:       params.Collections,

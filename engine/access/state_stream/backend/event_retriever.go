@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -14,9 +15,10 @@ import (
 
 // EventsResponse represents the response containing events for a specific block.
 type EventsResponse struct {
-	BlockID flow.Identifier
-	Height  uint64
-	Events  flow.EventsList
+	BlockID        flow.Identifier
+	Height         uint64
+	Events         flow.EventsList
+	BlockTimestamp time.Time
 }
 
 // EventsRetriever retrieves events by block height. It can be configured to retrieve events from
@@ -31,6 +33,7 @@ type EventsRetriever struct {
 
 // GetAllEventsResponse returns a function that retrieves the event response for a given block height.
 // Expected errors:
+// - codes.NotFound: If block header for the specified block height is not found.
 // - error: An error, if any, encountered during getting events from storage or execution data.
 func (b *EventsRetriever) GetAllEventsResponse(ctx context.Context, height uint64) (*EventsResponse, error) {
 	var response *EventsResponse
@@ -41,12 +44,20 @@ func (b *EventsRetriever) GetAllEventsResponse(ctx context.Context, height uint6
 		response, err = b.getEventsFromExecutionData(ctx, height)
 	}
 
-	if err == nil && b.log.GetLevel() == zerolog.TraceLevel {
-		b.log.Trace().
-			Hex("block_id", logging.ID(response.BlockID)).
-			Uint64("height", height).
-			Int("events", len(response.Events)).
-			Msg("sending events")
+	if err == nil {
+		header, err := b.headers.ByHeight(height)
+		if err != nil {
+			return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
+		}
+		response.BlockTimestamp = header.Timestamp
+
+		if b.log.GetLevel() == zerolog.TraceLevel {
+			b.log.Trace().
+				Hex("block_id", logging.ID(response.BlockID)).
+				Uint64("height", height).
+				Int("events", len(response.Events)).
+				Msg("sending events")
+		}
 	}
 
 	return response, err
