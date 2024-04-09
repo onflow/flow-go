@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -39,6 +38,8 @@ type AtreeRegisterMigrator struct {
 	validateMigratedValues             bool
 	logVerboseValidationError          bool
 	continueMigrationOnValidationError bool
+	checkStorageHealthBeforeMigration  bool
+	checkStorageHealthAfterMigration   bool
 }
 
 var _ AccountBasedMigration = (*AtreeRegisterMigrator)(nil)
@@ -49,6 +50,8 @@ func NewAtreeRegisterMigrator(
 	validateMigratedValues bool,
 	logVerboseValidationError bool,
 	continueMigrationOnValidationError bool,
+	checkStorageHealthBeforeMigration bool,
+	checkStorageHealthAfterMigration bool,
 ) *AtreeRegisterMigrator {
 
 	sampler := util2.NewTimedSampler(30 * time.Second)
@@ -60,6 +63,8 @@ func NewAtreeRegisterMigrator(
 		validateMigratedValues:             validateMigratedValues,
 		logVerboseValidationError:          logVerboseValidationError,
 		continueMigrationOnValidationError: continueMigrationOnValidationError,
+		checkStorageHealthBeforeMigration:  checkStorageHealthBeforeMigration,
+		checkStorageHealthAfterMigration:   checkStorageHealthAfterMigration,
 	}
 
 	return migrator
@@ -92,6 +97,17 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 	mr, err := newMigratorRuntime(address, oldPayloads)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
+	}
+
+	// Check storage health before migration, if enabled.
+	if m.checkStorageHealthBeforeMigration {
+		err = checkStorageHealth(address, mr.Storage, oldPayloads)
+		if err != nil {
+			m.log.Warn().
+				Err(err).
+				Str("account", address.Hex()).
+				Msg("storage health check before migration failed")
+		}
 	}
 
 	// keep track of all storage maps that were accessed
@@ -142,6 +158,22 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 			Kind:    "more_registers_after_migration",
 			Msg:     fmt.Sprintf("original: %d, new: %d", originalLen, newLen),
 		})
+	}
+
+	// Check storage health after migration, if enabled.
+	if m.checkStorageHealthAfterMigration {
+		mr, err := newMigratorRuntime(address, newPayloads)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
+		}
+
+		err = checkStorageHealth(address, mr.Storage, newPayloads)
+		if err != nil {
+			m.log.Warn().
+				Err(err).
+				Str("account", address.Hex()).
+				Msg("storage health check after migration failed")
+		}
 	}
 
 	return newPayloads, nil
@@ -424,25 +456,6 @@ func capturePanic(f func()) (err error) {
 	f()
 
 	return
-}
-
-// convert all domains
-var domains = []string{
-	common.PathDomainStorage.Identifier(),
-	common.PathDomainPrivate.Identifier(),
-	common.PathDomainPublic.Identifier(),
-	runtime.StorageDomainContract,
-	stdlib.InboxStorageDomain,
-	stdlib.CapabilityControllerStorageDomain,
-}
-
-var domainsLookupMap = map[string]struct{}{
-	common.PathDomainStorage.Identifier():    {},
-	common.PathDomainPrivate.Identifier():    {},
-	common.PathDomainPublic.Identifier():     {},
-	runtime.StorageDomainContract:            {},
-	stdlib.InboxStorageDomain:                {},
-	stdlib.CapabilityControllerStorageDomain: {},
 }
 
 // migrationProblem is a struct for reporting errors
