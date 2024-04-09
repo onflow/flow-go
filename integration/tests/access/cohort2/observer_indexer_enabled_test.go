@@ -8,23 +8,22 @@ import (
 	"testing"
 	"time"
 
+	sdk "github.com/onflow/flow-go-sdk"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go-sdk/templates"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	sdk "github.com/onflow/flow-go-sdk"
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go-sdk/templates"
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
-
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 var (
@@ -253,9 +252,10 @@ func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCsHappyPath() {
 	for _, eventsInBlock := range eventsByHeight.Results {
 		for _, event := range eventsInBlock.Events {
 			if event.Type == sdk.EventAccountCreated {
-				if bytes.Equal(event.Payload, accountCreatedPayload) {
-					found = true
+				if !bytes.Equal(event.Payload, accountCreatedPayload) {
+					t.Fatalf("event payloads don't match")
 				}
+				found = true
 			}
 		}
 	}
