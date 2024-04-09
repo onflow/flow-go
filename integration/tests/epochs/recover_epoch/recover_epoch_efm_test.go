@@ -26,7 +26,7 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	fmt.Println("in epoch phase setup")
 
 	sns := s.GetContainersByRole(flow.RoleConsensus)
-	sns[0].Pause()
+	_ = sns[0].Pause()
 
 	// @TODO: trigger EFM manually
 }
