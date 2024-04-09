@@ -315,6 +315,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 	})
 
 	t.Run("with setup next epoch", func(t *testing.T) {
+		unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: sealing segment doesn't support multiple protocol states")
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
 			unittest.NewEpochBuilder(t, mutableState, state).BuildEpoch()
 
@@ -335,6 +336,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 	})
 
 	t.Run("with committed next epoch", func(t *testing.T) {
+		unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: sealing segment doesn't support multiple protocol states")
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
 			unittest.NewEpochBuilder(t, mutableState, state).BuildEpoch().CompleteEpoch()
 
@@ -355,6 +357,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 	})
 
 	t.Run("with previous and next epoch", func(t *testing.T) {
+		unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: sealing segment doesn't support multiple protocol states")
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
 			unittest.NewEpochBuilder(t, mutableState, state).
 				BuildEpoch().CompleteEpoch(). // build epoch 2

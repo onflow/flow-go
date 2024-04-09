@@ -75,7 +75,6 @@ type Suite struct {
 }
 
 func TestHandler(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: temporary broken")
 	suite.Run(t, new(Suite))
 }
 
@@ -516,9 +515,9 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_AtBlockIDInternalError
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHeight() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	rootProtocolState, err := rootSnapshot.EpochProtocolState()
+	rootProtocolState, err := rootSnapshot.ProtocolState()
 	require.NoError(suite.T(), err)
-	rootProtocolStateID := rootProtocolState.Entry().ID()
+	rootProtocolStateID := rootProtocolState.ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
@@ -555,9 +554,9 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHei
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalizedAtHeight() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	rootProtocolState, err := rootSnapshot.EpochProtocolState()
+	rootProtocolState, err := rootSnapshot.ProtocolState()
 	require.NoError(suite.T(), err)
-	rootProtocolStateID := rootProtocolState.Entry().ID()
+	rootProtocolStateID := rootProtocolState.ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
@@ -606,9 +605,9 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalize
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnexpectedErrorBlockIDByHeight() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	rootProtocolState, err := rootSnapshot.EpochProtocolState()
+	rootProtocolState, err := rootSnapshot.ProtocolState()
 	require.NoError(suite.T(), err)
-	rootProtocolStateID := rootProtocolState.Entry().ID()
+	rootProtocolStateID := rootProtocolState.ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
@@ -759,9 +758,9 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight() {
 func (suite *Suite) TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	rootProtocolState, err := rootSnapshot.EpochProtocolState()
+	rootProtocolState, err := rootSnapshot.ProtocolState()
 	require.NoError(suite.T(), err)
-	rootProtocolStateID := rootProtocolState.Entry().ID()
+	rootProtocolStateID := rootProtocolState.ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
