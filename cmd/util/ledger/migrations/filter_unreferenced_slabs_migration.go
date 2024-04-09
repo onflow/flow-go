@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -51,7 +51,7 @@ func CheckAccountStorageHealth(
 	}
 
 	// Load storage map.
-	for _, domain := range domains {
+	for _, domain := range allStorageMapDomains {
 		_ = storage.GetStorageMap(address, domain, false)
 	}
 
@@ -59,7 +59,8 @@ func CheckAccountStorageHealth(
 }
 
 type FilterUnreferencedSlabsMigration struct {
-	log zerolog.Logger
+	log     zerolog.Logger
+	chainID flow.ChainID
 }
 
 var _ AccountBasedMigration = &FilterUnreferencedSlabsMigration{}
@@ -83,12 +84,12 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 	oldPayloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
 
-	checkPayloadsOwnership(oldPayloads, address, m.log)
-
 	migrationRuntime, err := NewMigratorRuntime(
-		address,
 		oldPayloads,
-		util.RuntimeInterfaceConfig{},
+		m.chainID,
+		MigratorRuntimeConfig{},
+		// TODO:
+		snapshot.SmallChangeSetSnapshot,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
