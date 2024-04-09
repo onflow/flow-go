@@ -61,4 +61,5 @@ func machineAccountKeyRun(_ *cobra.Command, _ []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}
+	log.Info().Msg(fmt.Sprintf("wrote file %s/%s", flagOutdir, machineAccountKeyPath))
 }

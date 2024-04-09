@@ -72,6 +72,7 @@ func finalList(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathFinallist)
 }
 
 func validateNodes(localNodes []model.NodeInfo, registeredNodes []model.NodeInfo) {

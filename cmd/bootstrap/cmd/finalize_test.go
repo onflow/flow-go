@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"encoding/hex"
-	"fmt"
 	"math/rand"
 	"path/filepath"
 	"regexp"
@@ -93,7 +92,6 @@ func TestFinalize_HappyPath(t *testing.T) {
 		log = log.Hook(hook)
 
 		finalize(nil, nil)
-		fmt.Println(hook.logs.String())
 		assert.Regexp(t, finalizeHappyPathRegex, hook.logs.String())
 		hook.logs.Reset()
 

@@ -43,6 +43,7 @@ func runBeaconKG(nodes []model.NodeInfo) dkg.DKGData {
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to write json")
 		}
+		log.Info().Msgf("wrote file %s/%s", flagOutdir, fmt.Sprintf(model.PathRandomBeaconPriv, nodeID))
 	}
 
 	// write full DKG info that will be used to construct QC
@@ -56,6 +57,7 @@ func runBeaconKG(nodes []model.NodeInfo) dkg.DKGData {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathRootDKGData)
 
 	return dkgData
 }

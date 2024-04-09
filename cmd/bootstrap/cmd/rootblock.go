@@ -169,6 +169,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathNodeInfosPub)
 	log.Info().Msg("")
 
 	log.Info().Msg("running DKG for consensus nodes")
@@ -221,6 +222,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathIntermediaryBootstrappingData)
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root block")
@@ -229,6 +231,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathRootBlockData)
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing and writing votes")

@@ -61,6 +61,7 @@ func genconfigCmdRun(_ *cobra.Command, _ []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, flagConfig)
 }
 
 // genconfigCmd represents the genconfig command

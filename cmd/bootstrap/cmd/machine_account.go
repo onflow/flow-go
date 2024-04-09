@@ -85,6 +85,7 @@ func machineAccountRun(_ *cobra.Command, _ []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, fmt.Sprintf(model.PathNodeMachineAccountInfoPriv, nodeID))
 }
 
 // readMachineAccountPriv reads the machine account private key files in the bootstrap dir

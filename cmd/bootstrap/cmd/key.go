@@ -98,23 +98,26 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write file")
 	}
-	log.Info().Msgf("wrote file %v", model.PathNodeID)
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathNodeID)
 
 	err = common.WriteJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), flagOutdir, private)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathNodeInfoPriv)
 
 	err = common.WriteText(fmt.Sprintf(model.PathSecretsEncryptionKey, nodeInfo.NodeID), flagOutdir, secretsDBKey)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write file")
 	}
-	log.Info().Msgf("wrote file %v", model.PathSecretsEncryptionKey)
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathSecretsEncryptionKey)
 
 	err = common.WriteJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), flagOutdir, nodeInfo.Public())
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathNodeInfoPub)
+
 	// write machine account info
 	if role == flow.RoleCollection || role == flow.RoleConsensus {
 
@@ -131,6 +134,7 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to write json")
 		}
+		log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathNodeMachineAccountPrivateKey)
 	}
 }
 

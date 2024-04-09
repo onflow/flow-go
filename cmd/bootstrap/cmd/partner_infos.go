@@ -207,6 +207,7 @@ func writeNodePubInfoFile(info *bootstrap.NodeInfoPub) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, fileOutputPath)
 }
 
 // writePartnerWeightsFile writes the partner weights file
@@ -215,6 +216,7 @@ func writePartnerWeightsFile(partnerWeights common.PartnerWeights) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, bootstrap.FileNamePartnerWeights)
 }
 
 func printNodeCounts(numOfNodesByType map[flow.Role]int, totalNumOfPartnerNodes, skippedNodes int) {

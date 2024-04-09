@@ -53,5 +53,6 @@ func constructRootVotes(block *flow.Block, allNodes, internalNodes []bootstrap.N
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to write json")
 		}
+		log.Info().Msgf("wrote file %s/%s", flagOutdir, path)
 	}
 }

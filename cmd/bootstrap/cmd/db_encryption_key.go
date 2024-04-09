@@ -56,5 +56,5 @@ func dbEncryptionKeyRun(_ *cobra.Command, _ []string) {
 		log.Fatal().Err(err).Msg("failed to write file")
 	}
 
-	log.Info().Msgf("wrote file %v", dbEncryptionKeyPath)
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, dbEncryptionKeyPath)
 }

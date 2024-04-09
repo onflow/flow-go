@@ -203,6 +203,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathRootProtocolStateSnapshot)
 	log.Info().Msg("")
 
 	// read snapshot and verify consistency

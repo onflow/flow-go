@@ -129,4 +129,5 @@ func genNodePubInfo(nodes []model.NodeInfo) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathInternalNodeInfosPub)
 }
