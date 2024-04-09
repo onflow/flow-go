@@ -94,7 +94,7 @@ func init() {
 	Cmd.Flags().BoolVar(&flagLogVerboseDiff, "log-verbose-diff", false,
 		"log entire Cadence values on diff (requires --diff flag)")
 
-	Cmd.Flags().BoolVar(&flagVerboseErrorOutput, "verbose-error-output", false,
+	Cmd.Flags().BoolVar(&flagVerboseErrorOutput, "verbose-error-output", true,
 		"log verbose output on migration errors")
 
 	Cmd.Flags().BoolVar(&flagCheckStorageHealthBeforeMigration, "check-storage-health-before", false,
