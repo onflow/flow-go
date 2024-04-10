@@ -62,7 +62,3 @@ type migratorRuntime struct {
 	Address          common.Address
 	Accounts         *util.AccountsAtreeLedger
 }
-
-func (mr *migratorRuntime) GetReadOnlyStorage() *runtime.Storage {
-	return runtime.NewStorage(util.NewPayloadsReadonlyLedger(mr.Snapshot), nil)
-}
