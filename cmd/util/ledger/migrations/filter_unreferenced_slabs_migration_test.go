@@ -9,10 +9,12 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -112,9 +114,8 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 
 	// Act
 
-	migration := &FilterUnreferencedSlabsMigration{
-		chainID: chainID,
-	}
+	rwf := &testReportWriterFactory{}
+	migration := NewFilterUnreferencedSlabsMigration(chainID, rwf)
 
 	log := zerolog.New(zerolog.NewTestWriter(t))
 
@@ -126,5 +127,36 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 
 	// Assert
 
-	require.Len(t, newPayloads, totalSlabCount-1)
+	assert.Len(t, newPayloads, totalSlabCount-1)
+
+	writer := rwf.reportWriters[filterUnreferencedSlabsName]
+
+	expectedFilteredPayloads := make([]*ledger.Payload, 0, 1)
+
+	expectedAddress := string(testAddress[:])
+	expectedKey := string([]byte{flow.SlabIndexPrefix, 0, 0, 0, 0, 0, 0, 0, 2})
+
+	for _, payload := range oldPayloads {
+		registerID, _, err := convert.PayloadToRegister(payload)
+		require.NoError(t, err)
+
+		if registerID.Owner != expectedAddress ||
+			registerID.Key != expectedKey {
+
+			continue
+		}
+
+		expectedFilteredPayloads = append(expectedFilteredPayloads, payload)
+		break
+	}
+
+	assert.Equal(t,
+		[]any{
+			unreferencedSlabs{
+				Account:  testAddress,
+				Payloads: expectedFilteredPayloads,
+			},
+		},
+		writer.entries,
+	)
 }

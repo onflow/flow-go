@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -27,9 +28,22 @@ func StorageIDFromRegisterID(registerID flow.RegisterID) atree.StorageID {
 type FilterUnreferencedSlabsMigration struct {
 	log     zerolog.Logger
 	chainID flow.ChainID
+	rw      reporters.ReportWriter
 }
 
 var _ AccountBasedMigration = &FilterUnreferencedSlabsMigration{}
+
+const filterUnreferencedSlabsName = "filter-unreferenced-slabs"
+
+func NewFilterUnreferencedSlabsMigration(
+	chainID flow.ChainID,
+	rwf reporters.ReportWriterFactory,
+) *FilterUnreferencedSlabsMigration {
+	return &FilterUnreferencedSlabsMigration{
+		chainID: chainID,
+		rw:      rwf.ReportWriter(filterUnreferencedSlabsName),
+	}
+}
 
 func (m *FilterUnreferencedSlabsMigration) InitMigration(
 	log zerolog.Logger,
@@ -38,7 +52,7 @@ func (m *FilterUnreferencedSlabsMigration) InitMigration(
 ) error {
 	m.log = log.
 		With().
-		Str("migration", "filter-unreferenced-slabs").
+		Str("migration", filterUnreferencedSlabsName).
 		Logger()
 
 	return nil
@@ -114,12 +128,23 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 			newPayloads = append(newPayloads, payload)
 		}
 
-		// TODO: write filtered payloads to a separate file
+		m.rw.Write(unreferencedSlabs{
+			Account:  address,
+			Payloads: filteredPayloads,
+		})
 	}
 
 	return newPayloads, nil
 }
 
 func (m *FilterUnreferencedSlabsMigration) Close() error {
+	// close the report writer so it flushes to file
+	m.rw.Close()
+
 	return nil
+}
+
+type unreferencedSlabs struct {
+	Account  common.Address    `json:"account"`
+	Payloads []*ledger.Payload `json:"payloads"`
 }
