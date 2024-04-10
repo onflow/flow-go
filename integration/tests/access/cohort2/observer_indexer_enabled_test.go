@@ -235,7 +235,7 @@ func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCsHappyPath() {
 	eventsByBlockID, err := observer.GetEventsForBlockIDs(ctx, &accessproto.GetEventsForBlockIDsRequest{
 		Type:                 sdk.EventAccountCreated,
 		BlockIds:             [][]byte{blockWithAccount.Block.Id},
-		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	})
 	require.NoError(t, err)
 
@@ -243,7 +243,7 @@ func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCsHappyPath() {
 		Type:                 sdk.EventAccountCreated,
 		StartHeight:          blockWithAccount.Block.Height,
 		EndHeight:            blockWithAccount.Block.Height,
-		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	})
 	require.NoError(t, err)
 
