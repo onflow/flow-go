@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"encoding/hex"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"time"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
@@ -10,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 )
 
 // constructRootHeader constructs a header for the root block.

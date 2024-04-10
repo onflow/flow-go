@@ -1,7 +1,6 @@
 package test
 
 import (
-	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"sync"
 	"testing"
 	"time"
@@ -25,6 +24,7 @@ import (
 	bcluster "github.com/onflow/flow-go/state/cluster/badger"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/utils/unittest"
 )
