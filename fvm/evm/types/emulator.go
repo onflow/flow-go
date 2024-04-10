@@ -3,10 +3,10 @@ package types
 import (
 	"math/big"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	gethVM "github.com/ethereum/go-ethereum/core/vm"
-	gethCrypto "github.com/ethereum/go-ethereum/crypto"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethVM "github.com/onflow/go-ethereum/core/vm"
+	gethCrypto "github.com/onflow/go-ethereum/crypto"
 )
 
 var (
@@ -39,7 +39,7 @@ type BlockContext struct {
 // NewDefaultBlockContext returns a new default block context
 func NewDefaultBlockContext(BlockNumber uint64) BlockContext {
 	return BlockContext{
-		ChainID:                FlowEVMTestnetChainID,
+		ChainID:                FlowEVMPreviewNetChainID,
 		BlockNumber:            BlockNumber,
 		DirectCallBaseGasUsage: DefaultDirectCallBaseGasUsage,
 		DirectCallGasPrice:     DefaultDirectCallGasPrice,
@@ -61,12 +61,11 @@ type ReadOnlyBlockView interface {
 	CodeHashOf(address Address) ([]byte, error)
 }
 
-// BlockView facilitates execution of a transaction or a direct evm  call in the context of a block
-// Errors returned by the methods are one of the followings:
-// - Fatal error
-// - Database error (non-fatal)
-// - EVM validation error
-// - EVM execution error
+// BlockView facilitates execution of a transaction or a direct evm call in the context of a block
+// Any error returned by any of the methods (e.g. stateDB errors) if non-fatal stops the outer flow transaction
+// if fatal stops the node.
+// EVM validation errors and EVM execution errors are part of the returned result
+// and should be handled separately.
 type BlockView interface {
 	// executes a direct call
 	DirectCall(call *DirectCall) (*Result, error)

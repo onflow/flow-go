@@ -3,7 +3,7 @@ package precompiles_test
 import (
 	"testing"
 
-	gethCrypto "github.com/ethereum/go-ethereum/crypto"
+	gethCrypto "github.com/onflow/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/precompiles"

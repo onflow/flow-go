@@ -53,7 +53,6 @@ type EVMContractChange uint8
 
 const (
 	EVMContractChangeNone EVMContractChange = iota
-	EVMContractChangeABIOnly
 	EVMContractChangeFull
 )
 
@@ -246,15 +245,13 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 	switch options.EVM {
 	case EVMContractChangeNone:
 		// do nothing
-	case EVMContractChangeABIOnly, EVMContractChangeFull:
-		abiOnly := options.EVM == EVMContractChangeABIOnly
+	case EVMContractChangeFull:
 		contractChanges = append(
 			contractChanges,
 			NewSystemContractChange(
 				systemContracts.EVMContract,
 				evm.ContractCode(
 					flow.HexToAddress(env.FlowTokenAddress),
-					abiOnly,
 				),
 			),
 		)
