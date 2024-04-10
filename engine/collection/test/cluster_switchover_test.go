@@ -1,6 +1,7 @@
 package test
 
 import (
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"sync"
 	"testing"
 	"time"
@@ -98,7 +99,8 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	commit.ClusterQCs = rootClusterQCs
 
 	seal.ResultID = result.ID()
-	root.Payload.ProtocolStateID = inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()
+	root.Payload.ProtocolStateID = kvstore.NewLatestKVStore(
+		inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()).ID()
 	tc.root, err = inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
 
