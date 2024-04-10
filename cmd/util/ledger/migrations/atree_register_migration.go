@@ -94,7 +94,7 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 	oldPayloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
 	// create all the runtime components we need for the migration
-	mr, err := newMigratorRuntime(address, oldPayloads)
+	mr, err := NewAtreeRegisterMigratorRuntime(address, oldPayloads)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
 	}
@@ -162,7 +162,7 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 
 	// Check storage health after migration, if enabled.
 	if m.checkStorageHealthAfterMigration {
-		mr, err := newMigratorRuntime(address, newPayloads)
+		mr, err := NewAtreeRegisterMigratorRuntime(address, newPayloads)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
 		}
@@ -180,7 +180,7 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 }
 
 func (m *AtreeRegisterMigrator) migrateAccountStorage(
-	mr *migratorRuntime,
+	mr *AtreeRegisterMigratorRuntime,
 	storageMapIds map[string]struct{},
 ) (map[flow.RegisterID]flow.RegisterValue, error) {
 
@@ -207,7 +207,7 @@ func (m *AtreeRegisterMigrator) migrateAccountStorage(
 }
 
 func (m *AtreeRegisterMigrator) convertStorageDomain(
-	mr *migratorRuntime,
+	mr *AtreeRegisterMigratorRuntime,
 	storageMapIds map[string]struct{},
 	domain string,
 ) error {
@@ -285,7 +285,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 }
 
 func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
-	mr *migratorRuntime,
+	mr *AtreeRegisterMigratorRuntime,
 	changes map[flow.RegisterID]flow.RegisterValue,
 	storageMapIds map[string]struct{},
 ) ([]*ledger.Payload, error) {
@@ -420,7 +420,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 }
 
 func (m *AtreeRegisterMigrator) cloneValue(
-	mr *migratorRuntime,
+	mr *AtreeRegisterMigratorRuntime,
 	value interpreter.Value,
 ) (interpreter.Value, error) {
 

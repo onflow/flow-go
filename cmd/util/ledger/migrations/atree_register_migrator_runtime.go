@@ -13,12 +13,12 @@ import (
 	"github.com/onflow/flow-go/ledger"
 )
 
-// migratorRuntime is a runtime that can be used to run a migration on a single account
-func newMigratorRuntime(
+// NewAtreeRegisterMigratorRuntime returns a new runtime to be used with the AtreeRegisterMigrator.
+func NewAtreeRegisterMigratorRuntime(
 	address common.Address,
 	payloads []*ledger.Payload,
 ) (
-	*migratorRuntime,
+	*AtreeRegisterMigratorRuntime,
 	error,
 ) {
 	snapshot, err := util.NewPayloadSnapshot(payloads)
@@ -42,23 +42,23 @@ func newMigratorRuntime(
 		return nil, err
 	}
 
-	return &migratorRuntime{
-		Address:          address,
-		Payloads:         payloads,
-		Snapshot:         snapshot,
-		TransactionState: transactionState,
-		Interpreter:      inter,
-		Storage:          storage,
-		Accounts:         accountsAtreeLedger,
+	return &AtreeRegisterMigratorRuntime{
+		Address:             address,
+		Payloads:            payloads,
+		Snapshot:            snapshot,
+		TransactionState:    transactionState,
+		Interpreter:         inter,
+		Storage:             storage,
+		AccountsAtreeLedger: accountsAtreeLedger,
 	}, nil
 }
 
-type migratorRuntime struct {
-	Snapshot         *util.PayloadSnapshot
-	TransactionState state.NestedTransactionPreparer
-	Interpreter      *interpreter.Interpreter
-	Storage          *runtime.Storage
-	Payloads         []*ledger.Payload
-	Address          common.Address
-	Accounts         *util.AccountsAtreeLedger
+type AtreeRegisterMigratorRuntime struct {
+	Snapshot            *util.PayloadSnapshot
+	TransactionState    state.NestedTransactionPreparer
+	Interpreter         *interpreter.Interpreter
+	Storage             *runtime.Storage
+	Payloads            []*ledger.Payload
+	Address             common.Address
+	AccountsAtreeLedger *util.AccountsAtreeLedger
 }
