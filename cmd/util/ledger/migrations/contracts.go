@@ -13,8 +13,11 @@ import (
 
 // NewContractsExtractionMigration returns a migration that extracts the code for contracts from the payloads.
 // The given contracts map must be allocated, and gets populated with the code for the contracts found in the payloads.
+// The given contractNames map must be allocated,
+// and gets populated with the names of the contracts found in the payloads.
 func NewContractsExtractionMigration(
 	contracts map[common.AddressLocation][]byte,
+	contractNames map[common.Address][]string,
 	log zerolog.Logger,
 ) ledger.Migration {
 	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
@@ -43,6 +46,10 @@ func NewContractsExtractionMigration(
 			}
 
 			contracts[addressLocation] = registerValue
+
+			names := contractNames[address]
+			names = append(names, contractName)
+			contractNames[address] = names
 		}
 
 		log.Info().Msgf("extracted %d contracts from payloads", len(contracts))

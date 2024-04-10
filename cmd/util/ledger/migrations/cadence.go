@@ -235,11 +235,12 @@ func NewCadence1ValueMigrations(
 	// before the value migrations are run.
 
 	contracts := make(map[common.AddressLocation][]byte, 1000)
+	contractNames := make(map[common.Address][]string, 1000)
 
 	migrations = []NamedMigration{
 		{
 			Name:    "contracts",
-			Migrate: NewContractsExtractionMigration(contracts, log),
+			Migrate: NewContractsExtractionMigration(contracts, contractNames, log),
 		},
 	}
 
