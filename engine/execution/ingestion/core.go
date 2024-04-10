@@ -100,11 +100,9 @@ func NewCore(
 
 	e.log.Info().Msgf("throttle engine initialized")
 
-	e.ComponentManager = component.NewComponentManagerBuilderWithName("IngestionCore").
+	e.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(e.launchWorker).
 		Build()
-
-	e.log.Info().Msgf("ingestion_core build successfully")
 
 	return e
 }
