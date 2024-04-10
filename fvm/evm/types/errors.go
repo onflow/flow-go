@@ -13,14 +13,6 @@ const ( // code reserved for no error
 
 	// covers all other validation codes that doesn't have an specific code
 	ValidationErrCodeMisc ErrorCode = 100
-	// invalid balance is provided (e.g. negative value)
-	ValidationErrCodeInvalidBalance ErrorCode = 101
-	// insufficient computation is left in the flow transaction
-	ValidationErrCodeInsufficientComputation ErrorCode = 102
-	// unauthroized method call
-	ValidationErrCodeUnAuthroizedMethodCall ErrorCode = 103
-	// withdraw balance is prone to rounding error
-	ValidationErrCodeWithdrawBalanceRounding ErrorCode = 104
 
 	// general execution error returned for cases that don't have an specific code
 	ExecutionErrCodeMisc ErrorCode = 400
@@ -96,21 +88,25 @@ const (
 
 var (
 	// ErrInvalidBalance is returned when an invalid balance is provided for transfer (e.g. negative)
-	ErrInvalidBalance = NewEVMValidationError(errors.New("invalid balance for transfer"))
+	ErrInvalidBalance = errors.New("invalid balance for transfer")
 
 	// ErrInsufficientComputation is returned when not enough computation is
 	// left in the context of flow transaction to execute the evm operation.
-	ErrInsufficientComputation = NewEVMValidationError(errors.New("insufficient computation"))
+	ErrInsufficientComputation = errors.New("insufficient computation")
 
 	// ErrUnAuthroizedMethodCall method call, usually emited when calls are called on EOA accounts
-	ErrUnAuthroizedMethodCall = NewEVMValidationError(errors.New("unauthroized method call"))
+	ErrUnAuthroizedMethodCall = errors.New("unauthroized method call")
+
+	// ErrInternalDirecCallFailed is returned when a withdraw or deposit internal call has failed.
+	ErrInternalDirectCallFailed = errors.New("internal direct call execution failed")
 
 	// ErrWithdrawBalanceRounding is returned when withdraw call has a balance that could
 	// yeild to rounding error, i.e. the balance contains fractions smaller than 10^8 Flow (smallest unit allowed to transfer).
-	ErrWithdrawBalanceRounding = NewEVMValidationError(errors.New("withdraw failed! the balance is susceptible to the rounding error"))
+	ErrWithdrawBalanceRounding = errors.New("withdraw failed! the balance is susceptible to the rounding error")
 
-	// ErrDirectCallExecutionFailed is returned when the direct call execution has failed.
-	ErrDirectCallExecutionFailed = NewEVMValidationError(errors.New("direct call execution failed"))
+	// ErrUnexpectedEmptyResult is returned when a result is expected to be returned by the emulator
+	// but nil has been returned. This should never happen and is a safety error.
+	ErrUnexpectedEmptyResult = errors.New("unexpected empty result has been returned")
 
 	// ErrInsufficientTotalSupply is returned when flow token
 	// is withdraw request is there but not enough balance is on EVM vault
@@ -120,34 +116,6 @@ var (
 	// ErrNotImplemented is a fatal error when something is called that is not implemented
 	ErrNotImplemented = NewFatalError(errors.New("a functionality is called that is not implemented"))
 )
-
-// EVMValidationError is a non-fatal error, returned when validation steps of an EVM transaction
-// or direct call has failed.
-type EVMValidationError struct {
-	err error
-}
-
-// NewEVMValidationError returns a new EVMValidationError
-func NewEVMValidationError(rootCause error) EVMValidationError {
-	return EVMValidationError{
-		err: rootCause,
-	}
-}
-
-// Unwrap unwraps the underlying evm error
-func (err EVMValidationError) Unwrap() error {
-	return err.err
-}
-
-func (err EVMValidationError) Error() string {
-	return fmt.Sprintf("EVM validation error: %v", err.err)
-}
-
-// IsEVMValidationError returns true if the error or any underlying errors
-// is of the type EVM validation error
-func IsEVMValidationError(err error) bool {
-	return errors.As(err, &EVMValidationError{})
-}
 
 // StateError is a non-fatal error, returned when a state operation
 // has failed (e.g. reaching storage interaction limit)

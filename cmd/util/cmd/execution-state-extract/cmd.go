@@ -7,10 +7,9 @@ import (
 	"path"
 	"strings"
 
+	runtimeCommon "github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-
-	runtimeCommon "github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
@@ -22,29 +21,30 @@ import (
 )
 
 var (
-	flagExecutionStateDir                 string
-	flagOutputDir                         string
-	flagBlockHash                         string
-	flagStateCommitment                   string
-	flagDatadir                           string
-	flagChain                             string
-	flagNWorker                           int
-	flagNoMigration                       bool
-	flagNoReport                          bool
-	flagValidateMigration                 bool
-	flagAllowPartialStateFromPayloads     bool
-	flagSortPayloads                      bool
-	flagPrune                             bool
-	flagLogVerboseValidationError         bool
-	flagDiffMigration                     bool
-	flagLogVerboseDiff                    bool
-	flagVerboseErrorOutput                bool
-	flagCheckStorageHealthBeforeMigration bool
-	flagStagedContractsFile               string
-	flagInputPayloadFileName              string
-	flagOutputPayloadFileName             string
-	flagOutputPayloadByAddresses          string
-	flagMaxAccountSize                    uint64
+	flagExecutionStateDir                  string
+	flagOutputDir                          string
+	flagBlockHash                          string
+	flagStateCommitment                    string
+	flagDatadir                            string
+	flagChain                              string
+	flagNWorker                            int
+	flagNoMigration                        bool
+	flagNoReport                           bool
+	flagValidateMigration                  bool
+	flagAllowPartialStateFromPayloads      bool
+	flagSortPayloads                       bool
+	flagPrune                              bool
+	flagLogVerboseValidationError          bool
+	flagDiffMigration                      bool
+	flagLogVerboseDiff                     bool
+	flagVerboseErrorOutput                 bool
+	flagCheckStorageHealthBeforeMigration  bool
+	flagStagedContractsFile                string
+	flagContinueMigrationOnValidationError bool
+	flagInputPayloadFileName               string
+	flagOutputPayloadFileName              string
+	flagOutputPayloadByAddresses           string
+	flagMaxAccountSize                     uint64
 )
 
 var Cmd = &cobra.Command{
@@ -105,6 +105,9 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagAllowPartialStateFromPayloads, "allow-partial-state-from-payload-file", false,
 		"allow input payload file containing partial state (e.g. not all accounts)")
+
+	Cmd.Flags().BoolVar(&flagContinueMigrationOnValidationError, "continue-migration-on-validation-errors", false,
+		"continue migration even if validation fails")
 
 	Cmd.Flags().BoolVar(&flagSortPayloads, "sort-payloads", true,
 		"sort payloads (generate deterministic output; disable only for development purposes)")

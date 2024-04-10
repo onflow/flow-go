@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package chainsync
 
 import "github.com/onflow/flow-go/model/flow"
