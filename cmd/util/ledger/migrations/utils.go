@@ -40,15 +40,14 @@ func checkStorageHealth(
 		}
 	}
 
-	for _, domain := range domains {
+	for _, domain := range allStorageMapDomains {
 		_ = storage.GetStorageMap(address, domain, false)
 	}
 
 	return storage.CheckHealth()
 }
 
-// convert all domains
-var domains = []string{
+var allStorageMapDomains = []string{
 	common.PathDomainStorage.Identifier(),
 	common.PathDomainPrivate.Identifier(),
 	common.PathDomainPublic.Identifier(),
@@ -57,11 +56,10 @@ var domains = []string{
 	stdlib.CapabilityControllerStorageDomain,
 }
 
-var domainsLookupMap = map[string]struct{}{
-	common.PathDomainStorage.Identifier():    {},
-	common.PathDomainPrivate.Identifier():    {},
-	common.PathDomainPublic.Identifier():     {},
-	runtime.StorageDomainContract:            {},
-	stdlib.InboxStorageDomain:                {},
-	stdlib.CapabilityControllerStorageDomain: {},
+var allStorageMapDomainsSet = map[string]struct{}{}
+
+func init() {
+	for _, domain := range allStorageMapDomains {
+		allStorageMapDomainsSet[domain] = struct{}{}
+	}
 }

@@ -9,10 +9,11 @@ import (
 	"time"
 
 	"github.com/onflow/atree"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -183,7 +184,7 @@ func (m *AtreeRegisterMigrator) migrateAccountStorage(
 ) (map[flow.RegisterID]flow.RegisterValue, error) {
 
 	// iterate through all domains and migrate them
-	for _, domain := range domains {
+	for _, domain := range allStorageMapDomains {
 		err := m.convertStorageDomain(mr, storageMapIds, domain)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert storage domain %s : %w", domain, err)
@@ -358,7 +359,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 				continue
 			}
 
-			if _, isADomainKey := domainsLookupMap[id.Key]; isADomainKey {
+			if _, isADomainKey := allStorageMapDomainsSet[id.Key]; isADomainKey {
 				// this is expected. Move it to the new payloads
 				newPayloads = append(newPayloads, value)
 				continue

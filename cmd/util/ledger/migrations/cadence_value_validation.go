@@ -33,7 +33,7 @@ func validateCadenceValues(
 	}
 
 	// Iterate through all domains and compare cadence values.
-	for _, domain := range domains {
+	for _, domain := range allStorageMapDomains {
 		err := validateStorageDomain(address, oldRuntime, newRuntime, domain, log, verboseLogging)
 		if err != nil {
 			return err

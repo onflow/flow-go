@@ -134,7 +134,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		}
 
 		// Load storage map.
-		for _, domain := range domains {
+		for _, domain := range allStorageMapDomains {
 			_ = storage.GetStorageMap(address, domain, false)
 		}
 
@@ -211,7 +211,11 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 
 		accountDiffReporter := NewCadenceValueDiffReporter(address, m.diffReporter, m.logVerboseDiff)
 
-		accountDiffReporter.DiffStates(oldPayloads, newPayloads, domains)
+		accountDiffReporter.DiffStates(
+			oldPayloads,
+			newPayloads,
+			allStorageMapDomains,
+		)
 	}
 
 	return newPayloads, nil
