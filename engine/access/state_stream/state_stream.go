@@ -2,35 +2,13 @@ package state_stream
 
 import (
 	"context"
-	"time"
 
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
 const (
-	// DefaultSendBufferSize is the default buffer size for the subscription's send channel.
-	// The size is chosen to balance memory overhead from each subscription with performance when
-	// streaming existing data.
-	DefaultSendBufferSize = 10
-
-	// DefaultMaxGlobalStreams defines the default max number of streams that can be open at the same time.
-	DefaultMaxGlobalStreams = 1000
-
-	// DefaultCacheSize defines the default max number of objects for the execution data cache.
-	DefaultCacheSize = 100
-
-	// DefaultSendTimeout is the default timeout for sending a message to the client. After the timeout
-	// expires, the connection is closed.
-	DefaultSendTimeout = 30 * time.Second
-
-	// DefaultResponseLimit is default max responses per second allowed on a stream. After exceeding
-	// the limit, the stream is paused until more capacity is available.
-	DefaultResponseLimit = float64(0)
-
-	// DefaultHeartbeatInterval specifies the block interval at which heartbeat messages should be sent.
-	DefaultHeartbeatInterval = 1
-
 	// DefaultRegisterIDsRequestLimit defines the default limit of register IDs for a single request to the get register endpoint
 	DefaultRegisterIDsRequestLimit = 100
 )
@@ -40,31 +18,86 @@ type API interface {
 	// GetExecutionDataByBlockID retrieves execution data for a specific block by its block ID.
 	GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionData, error)
 	// SubscribeExecutionData subscribes to execution data starting from a specific block ID and block height.
-	SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startBlockHeight uint64) Subscription
-	// SubscribeEvents subscribes to events starting from a specific block ID and block height, with an optional event filter.
-	SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter EventFilter) Subscription
+	SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startBlockHeight uint64) subscription.Subscription
+	// SubscribeEvents is deprecated and will be removed in a future version.
+	// Use SubscribeEventsFromStartBlockID, SubscribeEventsFromStartHeight or SubscribeEventsFromLatest.
+	//
+	// SubscribeEvents streams events for all blocks starting at the specified block ID or block height
+	// up until the latest available block. Once the latest is
+	// reached, the stream will remain open and responses are sent for each new
+	// block as it becomes available.
+	//
+	// Only one of startBlockID and startHeight may be set. If neither startBlockID nor startHeight is provided,
+	// the latest sealed block is used.
+	//
+	// Events within each block are filtered by the provided EventFilter, and only
+	// those events that match the filter are returned. If no filter is provided,
+	// all events are returned.
+	//
+	// Parameters:
+	// - ctx: Context for the operation.
+	// - startBlockID: The identifier of the starting block. If provided, startHeight should be 0.
+	// - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
+	// - filter: The event filter used to filter events.
+	//
+	// If invalid parameters will be supplied SubscribeEvents will return a failed subscription.
+	SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter EventFilter) subscription.Subscription
+	// SubscribeEventsFromStartBlockID streams events starting at the specified block ID,
+	// up until the latest available block. Once the latest is
+	// reached, the stream will remain open and responses are sent for each new
+	// block as it becomes available.
+	//
+	// Events within each block are filtered by the provided EventFilter, and only
+	// those events that match the filter are returned. If no filter is provided,
+	// all events are returned.
+	//
+	// Parameters:
+	// - ctx: Context for the operation.
+	// - startBlockID: The identifier of the starting block.
+	// - filter: The event filter used to filter events.
+	//
+	// If invalid parameters will be supplied SubscribeEventsFromStartBlockID will return a failed subscription.
+	SubscribeEventsFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, filter EventFilter) subscription.Subscription
+	// SubscribeEventsFromStartHeight streams events starting at the specified block height,
+	// up until the latest available block. Once the latest is
+	// reached, the stream will remain open and responses are sent for each new
+	// block as it becomes available.
+	//
+	// Events within each block are filtered by the provided EventFilter, and only
+	// those events that match the filter are returned. If no filter is provided,
+	// all events are returned.
+	//
+	// Parameters:
+	// - ctx: Context for the operation.
+	// - startHeight: The height of the starting block.
+	// - filter: The event filter used to filter events.
+	//
+	// If invalid parameters will be supplied SubscribeEventsFromStartHeight will return a failed subscription.
+	SubscribeEventsFromStartHeight(ctx context.Context, startHeight uint64, filter EventFilter) subscription.Subscription
+	// SubscribeEventsFromLatest subscribes to events starting at the latest sealed block,
+	// up until the latest available block. Once the latest is
+	// reached, the stream will remain open and responses are sent for each new
+	// block as it becomes available.
+	//
+	// Events within each block are filtered by the provided EventFilter, and only
+	// those events that match the filter are returned. If no filter is provided,
+	// all events are returned.
+	//
+	// Parameters:
+	// - ctx: Context for the operation.
+	// - filter: The event filter used to filter events.
+	//
+	// If invalid parameters will be supplied SubscribeEventsFromLatest will return a failed subscription.
+	SubscribeEventsFromLatest(ctx context.Context, filter EventFilter) subscription.Subscription
 	// GetRegisterValues returns register values for a set of register IDs at the provided block height.
 	GetRegisterValues(registerIDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error)
-}
-
-// Subscription represents a streaming request, and handles the communication between the grpc handler
-// and the backend implementation.
-type Subscription interface {
-	// ID returns the unique identifier for this subscription used for logging
-	ID() string
-
-	// Channel returns the channel from which subscription data can be read
-	Channel() <-chan interface{}
-
-	// Err returns the error that caused the subscription to fail
-	Err() error
-}
-
-// Streamable represents a subscription that can be streamed.
-type Streamable interface {
-	ID() string
-	Close()
-	Fail(error)
-	Send(context.Context, interface{}, time.Duration) error
-	Next(context.Context) (interface{}, error)
+	// SubscribeAccountStatusesFromStartBlockID subscribes to the streaming of account status changes starting from
+	// a specific block ID with an optional status filter.
+	SubscribeAccountStatusesFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, filter AccountStatusFilter) subscription.Subscription
+	// SubscribeAccountStatusesFromStartHeight subscribes to the streaming of account status changes starting from
+	// a specific block height, with an optional status filter.
+	SubscribeAccountStatusesFromStartHeight(ctx context.Context, startHeight uint64, filter AccountStatusFilter) subscription.Subscription
+	// SubscribeAccountStatusesFromLatestBlock subscribes to the streaming of account status changes starting from a
+	// latest sealed block, with an optional status filter.
+	SubscribeAccountStatusesFromLatestBlock(ctx context.Context, filter AccountStatusFilter) subscription.Subscription
 }

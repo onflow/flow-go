@@ -18,6 +18,7 @@ type Config struct {
 	CircuitBreakerConfig      connection.CircuitBreakerConfig // the configuration for circuit breaker
 	ScriptExecutionMode       string                          // the mode in which scripts are executed
 	EventQueryMode            string                          // the mode in which events are queried
+	TxResultQueryMode         string                          // the mode in which tx results are queried
 }
 
 type IndexQueryMode int

@@ -112,7 +112,7 @@ func NewGossipSubAdapter(ctx context.Context,
 		a.localMeshTracer = tracer
 	}
 
-	if inspectorSuite := gossipSubConfig.InspectorSuiteComponent(); inspectorSuite != nil {
+	if inspectorSuite := gossipSubConfig.RpcInspectorComponent(); inspectorSuite != nil {
 		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			a.logger.Info().Msg("starting inspector suite")
 			inspectorSuite.Start(ctx)

@@ -66,6 +66,10 @@ func TestRootBlock_HappyPath(t *testing.T) {
 		flagNumViewsInDKGPhase = 2_000
 		flagEpochCommitSafetyThreshold = 1_000
 		flagProtocolVersion = 42
+		flagUseDefaultEpochTargetEndTime = true
+		flagEpochTimingRefCounter = 0
+		flagEpochTimingRefTimestamp = 0
+		flagEpochTimingDuration = 0
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)

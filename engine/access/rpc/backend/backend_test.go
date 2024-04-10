@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -35,6 +36,7 @@ import (
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/state/protocol/snapshots"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -63,6 +65,7 @@ type Suite struct {
 	receipts           *storagemock.ExecutionReceipts
 	results            *storagemock.ExecutionResults
 	transactionResults *storagemock.LightTransactionResults
+	events             *storagemock.Events
 
 	colClient              *access.AccessAPIClient
 	execClient             *access.ExecutionAPIClient
@@ -71,7 +74,8 @@ type Suite struct {
 	connectionFactory *connectionmock.ConnectionFactory
 	communicator      *backendmock.Communicator
 
-	chainID flow.ChainID
+	chainID  flow.ChainID
+	systemTx *flow.TransactionBody
 }
 
 func TestHandler(t *testing.T) {
@@ -101,11 +105,16 @@ func (suite *Suite) SetupTest() {
 	suite.colClient = new(access.AccessAPIClient)
 	suite.execClient = new(access.ExecutionAPIClient)
 	suite.transactionResults = storagemock.NewLightTransactionResults(suite.T())
+	suite.events = storagemock.NewEvents(suite.T())
 	suite.chainID = flow.Testnet
 	suite.historicalAccessClient = new(access.AccessAPIClient)
 	suite.connectionFactory = connectionmock.NewConnectionFactory(suite.T())
 
 	suite.communicator = new(backendmock.Communicator)
+
+	var err error
+	suite.systemTx, err = blueprints.SystemChunkTransaction(flow.Testnet.Chain())
+	suite.Require().NoError(err)
 }
 
 func (suite *Suite) TestPing() {
@@ -397,7 +406,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 
 		// the handler should return a snapshot history limit error
 		_, err = backend.GetLatestProtocolStateSnapshot(context.Background())
-		suite.Require().ErrorIs(err, SnapshotHistoryLimitErr)
+		suite.Require().ErrorIs(err, snapshots.ErrSnapshotHistoryLimit)
 	})
 }
 
@@ -684,7 +693,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 			suite.Require().Error(err)
 			suite.Require().Empty(bytes)
 			suite.Require().Equal(status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block, try again with different block: %v",
-				ErrSnapshotPhaseMismatch).Error(),
+				snapshots.ErrSnapshotPhaseMismatch).Error(),
 				err.Error())
 		})
 
@@ -705,7 +714,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 			suite.Require().Error(err)
 			suite.Require().Empty(bytes)
 			suite.Require().Equal(status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block, try again with different block: %v",
-				ErrSnapshotPhaseMismatch).Error(),
+				snapshots.ErrSnapshotPhaseMismatch).Error(),
 				err.Error())
 		})
 	})
@@ -826,7 +835,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight_InvalidSegment() {
 		suite.Require().Error(err)
 		suite.Require().Equal(status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block, try "+
 			"again with different block: %v",
-			ErrSnapshotPhaseMismatch).Error(),
+			snapshots.ErrSnapshotPhaseMismatch).Error(),
 			err.Error())
 	})
 }
@@ -1282,7 +1291,6 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 
 // TestTransactionPendingToFinalizedStatusTransition tests that the status of transaction changes from Finalized to Expired
 func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
-
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
@@ -2139,7 +2147,6 @@ func (suite *Suite) defaultBackendParams() Params {
 		Transactions:             suite.transactions,
 		ExecutionReceipts:        suite.receipts,
 		ExecutionResults:         suite.results,
-		LightTransactionResults:  suite.transactionResults,
 		ChainID:                  suite.chainID,
 		CollectionRPC:            suite.colClient,
 		MaxHeightRange:           DefaultMaxHeightRange,
@@ -2148,5 +2155,7 @@ func (suite *Suite) defaultBackendParams() Params {
 		AccessMetrics:            metrics.NewNoopCollector(),
 		Log:                      suite.log,
 		TxErrorMessagesCacheSize: 1000,
+		BlockTracker:             nil,
+		TxResultQueryMode:        IndexQueryModeExecutionNodesOnly,
 	}
 }

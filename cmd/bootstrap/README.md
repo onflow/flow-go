@@ -129,6 +129,7 @@ go run . rootblock  \
     --epoch-dkg-phase-length 2000 \
     --collection-clusters 1 \
     --protocol-version=0 \
+    --use-default-epoch-timing \
     --epoch-commit-safety-threshold=1000 \
     --config ./bootstrap-example/node-config.json \
     -o ./bootstrap-example \

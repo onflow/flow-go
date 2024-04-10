@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onflow/flow-go/integration/benchmark/load"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/rs/zerolog"
@@ -20,6 +22,7 @@ import (
 
 	"github.com/onflow/flow-go/integration/benchmark"
 	pb "github.com/onflow/flow-go/integration/benchmark/proto"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -30,7 +33,7 @@ type BenchmarkInfo struct {
 
 // Hardcoded CI values
 const (
-	loadType                    = "token-transfer"
+	defaultLoadType             = "token-transfer"
 	metricport                  = uint(8080)
 	accessNodeAddress           = "127.0.0.1:4001"
 	pushgateway                 = "127.0.0.1:9091"
@@ -64,15 +67,12 @@ func main() {
 	bigQueryProjectFlag := flag.String("bigquery-project", "dapperlabs-data", "project name for the bigquery uploader")
 	bigQueryDatasetFlag := flag.String("bigquery-dataset", "dev_src_flow_tps_metrics", "dataset name for the bigquery uploader")
 	bigQueryRawTableFlag := flag.String("bigquery-raw-table", "rawResults", "table name for the bigquery raw results")
+	loadTypeFlag := flag.String("load-type", defaultLoadType, "load type (token-transfer / const-exec / evm)")
 	flag.Parse()
 
-	// parse log level and apply to logger
-	log := zerolog.New(os.Stderr).With().Timestamp().Logger().Output(zerolog.ConsoleWriter{Out: os.Stderr})
-	lvl, err := zerolog.ParseLevel(strings.ToLower(*logLvl))
-	if err != nil {
-		log.Fatal().Err(err).Str("strLevel", *logLvl).Msg("invalid log level")
-	}
-	log = log.Level(lvl)
+	loadType := *loadTypeFlag
+
+	log := setupLogger(logLvl)
 
 	if *gitRepoPathFlag == "" {
 		flag.PrintDefaults()
@@ -148,7 +148,7 @@ func main() {
 	workerStatsTracker := benchmark.NewWorkerStatsTracker(bCtx)
 	defer workerStatsTracker.Stop()
 
-	statsLogger := benchmark.NewPeriodicStatsLogger(workerStatsTracker, log)
+	statsLogger := benchmark.NewPeriodicStatsLogger(ctx, workerStatsTracker, log)
 	statsLogger.Start()
 	defer statsLogger.Stop()
 
@@ -159,26 +159,17 @@ func main() {
 		loaderMetrics,
 		[]access.Client{flowClient},
 		benchmark.NetworkParams{
-			ServAccPrivKeyHex:     serviceAccountPrivateKeyHex,
-			ServiceAccountAddress: &serviceAccountAddress,
-			FungibleTokenAddress:  &fungibleTokenAddress,
-			FlowTokenAddress:      &flowTokenAddress,
+			ServAccPrivKeyHex: serviceAccountPrivateKeyHex,
+			ChainId:           flow.Emulator,
 		},
 		benchmark.LoadParams{
 			NumberOfAccounts: maxInflight,
-			LoadType:         benchmark.LoadType(loadType),
+			LoadType:         load.LoadType(loadType),
 			FeedbackEnabled:  feedbackEnabled,
 		},
-		// We do support only one load type for now.
-		benchmark.ConstExecParams{},
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to create new cont load generator")
-	}
-
-	err = lg.Init()
-	if err != nil {
-		log.Fatal().Err(err).Msg("unable to init loader")
 	}
 
 	// run load
@@ -227,7 +218,7 @@ func main() {
 	// only upload valid data
 	if *bigQueryUpload {
 		repoInfo := MustGetRepoInfo(log, *gitRepoURLFlag, *gitRepoPathFlag)
-		mustUploadData(ctx, log, recorder, repoInfo, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryRawTableFlag)
+		mustUploadData(ctx, log, recorder, repoInfo, *bigQueryProjectFlag, *bigQueryDatasetFlag, *bigQueryRawTableFlag, loadType)
 	} else {
 		log.Info().Int("raw_tps_size", len(recorder.BenchmarkResults.RawTPS)).Msg("logging tps results locally")
 		// log results locally when not uploading to BigQuery
@@ -237,21 +228,43 @@ func main() {
 	}
 }
 
+// setupLogger parses log level and apply to logger
+func setupLogger(logLvl *string) zerolog.Logger {
+	log := zerolog.New(os.Stderr).
+		With().
+		Timestamp().
+		Logger().
+		Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
+	lvl, err := zerolog.ParseLevel(strings.ToLower(*logLvl))
+	if err != nil {
+		log.Fatal().Err(err).Str("strLevel", *logLvl).Msg("invalid log level")
+	}
+	log = log.Level(lvl)
+	return log
+}
+
 func mustUploadData(
 	ctx context.Context,
 	log zerolog.Logger,
-	recorder *tpsRecorder,
+	recorder *TPSRecorder,
 	repoInfo *RepoInfo,
 	bigQueryProject string,
 	bigQueryDataset string,
 	bigQueryRawTable string,
+	loadType string,
 ) {
 	log.Info().Msg("Initializing BigQuery")
 	db, err := NewDB(ctx, log, bigQueryProject)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create bigquery client")
 	}
-	defer db.Close()
+	defer func(db *DB) {
+		err := db.Close()
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to close bigquery client")
+		}
+	}(db)
 
 	err = db.createTable(ctx, bigQueryDataset, bigQueryRawTable, RawRecord{})
 	if err != nil {
@@ -273,7 +286,7 @@ func mustUploadData(
 	}
 }
 
-func mustValidateData(log zerolog.Logger, recorder *tpsRecorder) {
+func mustValidateData(log zerolog.Logger, recorder *TPSRecorder) {
 	log.Info().Msg("Validating data")
 	var totalTPS float64
 	for _, record := range recorder.BenchmarkResults.RawTPS {
