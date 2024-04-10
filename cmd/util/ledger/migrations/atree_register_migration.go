@@ -31,7 +31,6 @@ type AtreeRegisterMigrator struct {
 
 	sampler zerolog.Sampler
 	rw      reporters.ReportWriter
-	rwf     reporters.ReportWriterFactory
 
 	nWorkers int
 
@@ -58,7 +57,6 @@ func NewAtreeRegisterMigrator(
 
 	migrator := &AtreeRegisterMigrator{
 		sampler:                            sampler,
-		rwf:                                rwf,
 		rw:                                 rwf.ReportWriter("atree-register-migrator"),
 		validateMigratedValues:             validateMigratedValues,
 		logVerboseValidationError:          logVerboseValidationError,
