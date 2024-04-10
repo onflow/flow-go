@@ -9,12 +9,13 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/ingestion/block_queue"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -26,7 +27,8 @@ import (
 // when the block queue decides to fetch missing collections, it forwards to the collection fetcher
 // when a block is executed, it notifies the block queue and forwards to execution state to save them.
 type Core struct {
-	unit *engine.Unit // for async block execution
+	*component.ComponentManager
+	ctx irrecoverable.SignalerContext
 
 	log zerolog.Logger
 
@@ -74,9 +76,8 @@ func NewCore(
 	collectionFetcher CollectionFetcher,
 	eventConsumer EventConsumer,
 ) *Core {
-	return &Core{
+	e := &Core{
 		log:               logger.With().Str("engine", "ingestion_core").Logger(),
-		unit:              engine.NewUnit(),
 		throttle:          throttle,
 		execState:         execState,
 		blockQueue:        block_queue.NewBlockQueue(logger),
@@ -88,27 +89,33 @@ func NewCore(
 		collectionFetcher: collectionFetcher,
 		eventConsumer:     eventConsumer,
 	}
+
+	e.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(e.launchWorker).
+		Build()
+
+	return e
 }
 
-func (e *Core) Ready() <-chan struct{} {
+func (e *Core) launchWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	if e.stopControl.IsExecutionStopped() {
-		return e.unit.Ready()
+		ready()
+		return
 	}
 
-	e.launchWorkerToConsumeThrottledBlocks()
+	e.ctx = ctx
 
-	return e.unit.Ready()
-}
+	e.launchWorkerToConsumeThrottledBlocks(ctx)
 
-func (e *Core) Done() <-chan struct{} {
-	return e.unit.Done()
+	ready()
 }
 
 func (e *Core) OnBlock(header *flow.Header, qc *flow.QuorumCertificate) {
 	// qc.Block is equivalent to header.ID()
 	err := e.throttle.OnBlock(qc.BlockID)
 	if err != nil {
-		e.log.Fatal().Err(err).Msgf("error processing block %v (%v)", header.Height, header.ID())
+		e.log.Fatal().Err(err).Msgf("error processing block %v (qc.BlockID: %v, blockID: %v)",
+			header.Height, qc.BlockID, header.ID())
 	}
 }
 
@@ -119,20 +126,29 @@ func (e *Core) OnCollection(col *flow.Collection) {
 	}
 }
 
-func (e *Core) launchWorkerToConsumeThrottledBlocks() {
+func (e *Core) launchWorkerToConsumeThrottledBlocks(ctx irrecoverable.SignalerContext) {
 	// processables are throttled blocks
 	processables := make(chan flow.Identifier, 10000)
 
 	// running worker in the background to consume
 	// processables blocks which are throttled,
 	// and forward them to the block queue for processing
-	e.unit.Launch(func() {
+	go func(ctx irrecoverable.SignalerContext, processables <-chan flow.Identifier) {
 		e.log.Info().Msgf("starting worker to consume throttled blocks")
-		err := e.forwardProcessableToHandler(processables)
-		if err != nil {
-			e.log.Fatal().Err(err).Msg("fail to process block")
+		for {
+			select {
+			case <-ctx.Done():
+				return
+
+			case blockID := <-processables:
+				err := e.onProcessableBlock(blockID)
+				if err != nil {
+					ctx.Throw(fmt.Errorf("fail to process block: %w", err))
+					return
+				}
+			}
 		}
-	})
+	}(ctx, processables)
 
 	e.log.Info().Msg("initializing throttle engine")
 
@@ -142,19 +158,6 @@ func (e *Core) launchWorkerToConsumeThrottledBlocks() {
 	}
 
 	e.log.Info().Msgf("throttle engine initialized")
-}
-
-func (e *Core) forwardProcessableToHandler(
-	processables <-chan flow.Identifier,
-) error {
-	for blockID := range processables {
-		err := e.onProcessableBlock(blockID)
-		if err != nil {
-			return fmt.Errorf("could not process block: %w", err)
-		}
-	}
-
-	return nil
 }
 
 func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
@@ -199,7 +202,10 @@ func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
 }
 
 func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
-	[]*block_queue.MissingCollection, []*entity.ExecutableBlock, error) {
+	[]*block_queue.MissingCollection,
+	[]*entity.ExecutableBlock,
+	error,
+) {
 	lg := e.log.With().
 		Hex("block_id", blockID[:]).
 		Uint64("height", block.Header.Height).
@@ -226,7 +232,8 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 
 	// handle exception
 	if !errors.Is(err, storage.ErrNotFound) {
-		return nil, nil, fmt.Errorf("failed to get parent state commitment for block %v: %w", block.Header.ParentID, err)
+		return nil, nil, fmt.Errorf("failed to get state commitment for parent block %v of block %v (height: %v): %w",
+			block.Header.ParentID, blockID, block.Header.Height, err)
 	}
 
 	// the parent block is an unexecuted block.
@@ -250,13 +257,13 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 		// and before HandleBlock was called, therefore, we should re-enqueue the block with the
 		// parent commit. It's necessary to check again whether the parent block is executed after the call.
 		lg.Warn().Msgf(
-			"block is missing parent block, re-enqueueing %v(parent: %v)",
+			"block is missing parent block, re-enqueueing %v (parent: %v)",
 			blockID, block.Header.ParentID,
 		)
 
 		parentCommitment, err := e.execState.StateCommitmentByBlockID(block.Header.ParentID)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get parent state commitment when re-enqueue block %v (parent:%v): %w",
+			return nil, nil, fmt.Errorf("failed to get parent state commitment when re-enqueue block %v (parent: %v): %w",
 				blockID, block.Header.ParentID, err)
 		}
 
@@ -266,8 +273,8 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 			return nil, nil, fmt.Errorf("unexpected error while reenqueue block to block queue: %w", err)
 		}
 
-		missingColls = deduplicate(append(missingColls, missing...))
-		executables = deduplicate(append(executables, execs...))
+		missingColls = flow.Deduplicate(append(missingColls, missing...))
+		executables = flow.Deduplicate(append(executables, execs...))
 	}
 
 	lg.Info().Bool("parent_is_executed", false).
@@ -291,10 +298,10 @@ func (e *Core) onBlockExecuted(
 
 	go func() {
 		defer wg.Done()
-		e.eventConsumer.BeforeComputationResultSaved(e.unit.Ctx(), computationResult)
+		e.eventConsumer.BeforeComputationResultSaved(e.ctx, computationResult)
 	}()
 
-	err := e.execState.SaveExecutionResults(e.unit.Ctx(), computationResult)
+	err := e.execState.SaveExecutionResults(e.ctx, computationResult)
 	if err != nil {
 		return fmt.Errorf("cannot persist execution state: %w", err)
 	}
@@ -311,7 +318,7 @@ func (e *Core) onBlockExecuted(
 
 	// notify event consumer so that the event consumer can do tasks
 	// such as broadcasting or uploading the result
-	logs := e.eventConsumer.OnComputationResultSaved(e.unit.Ctx(), computationResult)
+	logs := e.eventConsumer.OnComputationResultSaved(e.ctx, computationResult)
 
 	receipt := computationResult.ExecutionReceipt
 	e.log.Info().
@@ -384,14 +391,18 @@ func storeCollectionIfMissing(collections storage.Collections, col *flow.Collect
 // execute block concurrently
 func (e *Core) executeConcurrently(executables []*entity.ExecutableBlock) {
 	for _, executable := range executables {
-		func(executable *entity.ExecutableBlock) {
-			e.unit.Launch(func() {
-				e.log.Info().Msgf("starting worker to consume throttled blocks")
-				err := e.execute(executable)
-				if err != nil {
-					e.log.Error().Err(err).Msgf("failed to execute block %v", executable.Block.ID())
-				}
-			})
+		go func(executable *entity.ExecutableBlock) {
+			select {
+			case <-e.ctx.Done():
+				return
+			default:
+			}
+
+			e.log.Info().Msgf("starting worker to consume throttled blocks")
+			err := e.execute(executable)
+			if err != nil {
+				e.ctx.Throw(fmt.Errorf("failed to execute block %v: %w", executable.Block.ID(), err))
+			}
 		}(executable)
 	}
 }
@@ -409,7 +420,7 @@ func (e *Core) execute(executable *entity.ExecutableBlock) error {
 
 	startedAt := time.Now()
 
-	result, err := e.executor.ExecuteBlock(e.unit.Ctx(), executable)
+	result, err := e.executor.ExecuteBlock(e.ctx, executable)
 	if err != nil {
 		return fmt.Errorf("failed to execute block %v: %w", executable.Block.ID(), err)
 	}
@@ -436,26 +447,4 @@ func (e *Core) fetch(missingColls []*block_queue.MissingCollection) error {
 	}
 
 	return nil
-}
-
-type IDEntity interface {
-	ID() flow.Identifier
-}
-
-// deduplicate entities in a slice by the ID method
-func deduplicate[T IDEntity](entities []T) []T {
-	seen := make(map[flow.Identifier]struct{}, len(entities))
-	result := make([]T, 0, len(entities))
-
-	for _, entity := range entities {
-		id := entity.ID()
-		if _, ok := seen[id]; ok {
-			continue
-		}
-
-		seen[id] = struct{}{}
-		result = append(result, entity)
-	}
-
-	return result
 }
