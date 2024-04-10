@@ -370,9 +370,9 @@ func TestContractInteraction(t *testing.T) {
 							nil,                    // data
 						),
 					)
-					_, err = blk.RunTransaction(tx)
-					require.Error(t, err)
-					require.True(t, types.IsEVMValidationError(err))
+					res, err := blk.RunTransaction(tx)
+					require.NoError(t, err)
+					require.Error(t, res.ValidationError)
 				})
 			})
 
@@ -392,9 +392,9 @@ func TestContractInteraction(t *testing.T) {
 						R:        big.NewInt(2),
 						S:        big.NewInt(3),
 					})
-					_, err = blk.RunTransaction(tx)
-					require.Error(t, err)
-					require.True(t, types.IsEVMValidationError(err))
+					res, err := blk.RunTransaction(tx)
+					require.NoError(t, err)
+					require.Error(t, res.ValidationError)
 				})
 			})
 		})

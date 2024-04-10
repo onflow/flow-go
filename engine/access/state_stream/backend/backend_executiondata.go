@@ -4,13 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
@@ -24,15 +22,13 @@ type ExecutionDataResponse struct {
 }
 
 type ExecutionDataBackend struct {
-	log            zerolog.Logger
-	headers        storage.Headers
-	broadcaster    *engine.Broadcaster
-	sendTimeout    time.Duration
-	responseLimit  float64
-	sendBufferSize int
+	log     zerolog.Logger
+	headers storage.Headers
 
 	getExecutionData GetExecutionDataFunc
-	getStartHeight   subscription.GetStartHeightFunc
+
+	subscriptionHandler  *subscription.SubscriptionHandler
+	executionDataTracker subscription.ExecutionDataTracker
 }
 
 func (b *ExecutionDataBackend) GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionData, error) {
@@ -56,16 +52,12 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(ctx context.Context, bl
 }
 
 func (b *ExecutionDataBackend) SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) subscription.Subscription {
-	nextHeight, err := b.getStartHeight(ctx, startBlockID, startHeight)
+	nextHeight, err := b.executionDataTracker.GetStartHeight(ctx, startBlockID, startHeight)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")
 	}
 
-	sub := subscription.NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getResponse)
-
-	go subscription.NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
-
-	return sub
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponse)
 }
 
 func (b *ExecutionDataBackend) getResponse(ctx context.Context, height uint64) (interface{}, error) {

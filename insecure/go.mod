@@ -10,7 +10,7 @@ require (
 	github.com/libp2p/go-libp2p v0.32.2
 	github.com/libp2p/go-libp2p-pubsub v0.10.0
 	github.com/multiformats/go-multiaddr-dns v0.3.1
-	github.com/onflow/crypto v0.25.0
+	github.com/onflow/crypto v0.25.1
 	github.com/onflow/flow-go v0.32.4-0.20231130134727-3c01c7f8966c
 	github.com/rs/zerolog v1.29.0
 	github.com/spf13/pflag v1.0.5
@@ -210,7 +210,7 @@ require (
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230711213910-baad011d2b13 // indirect
 	github.com/onflow/flow-go-sdk v0.46.0 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.1.0 // indirect
-	github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240305102946-3efec6679252 // indirect
+	github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240404170900-c321c1475f1e // indirect
 	github.com/onflow/go-ethereum v1.13.4 // indirect
 	github.com/onflow/sdks v0.5.0 // indirect
 	github.com/onflow/wal v0.0.0-20240208022732-d756cd497d3b // indirect
