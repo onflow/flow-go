@@ -311,6 +311,9 @@ func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
 		expectedCounter++
 		lastReportedTxStatus = resp.TransactionResults.Status
 	}
+
+	// Check, if the final transaction status is sealed.
+	s.Assert().Equal(entities.TransactionStatus_SEALED, lastReportedTxStatus)
 }
 
 func (s *AccessAPISuite) testGetAccount(client *client.Client) {
