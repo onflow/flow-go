@@ -365,6 +365,8 @@ func newMigrations(
 						flagValidateMigration,
 						flagLogVerboseValidationError,
 						flagContinueMigrationOnValidationError,
+						flagCheckStorageHealthBeforeMigration,
+						flagCheckStorageHealthAfterMigration,
 					),
 
 					&migrators.DeduplicateContractNamesMigration{},
