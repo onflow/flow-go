@@ -250,6 +250,8 @@ func checkPayloadOwnership(payload *ledger.Payload, address common.Address, log 
 	}
 }
 
+const cadenceValueMigrationReporterName = "cadence-value-migration"
+
 // NewCadence1ValueMigrator creates a new CadenceBaseMigrator
 // which runs some of the Cadence value migrations (static types, entitlements, strings)
 func NewCadence1ValueMigrator(
@@ -268,7 +270,7 @@ func NewCadence1ValueMigrator(
 
 	return &CadenceBaseMigrator{
 		name:                              "cadence-value-migration",
-		reporter:                          rwf.ReportWriter("cadence-value-migrator"),
+		reporter:                          rwf.ReportWriter(cadenceValueMigrationReporterName),
 		diffReporter:                      diffReporter,
 		logVerboseDiff:                    opts.LogVerboseDiff,
 		verboseErrorOutput:                opts.VerboseErrorOutput,
@@ -459,14 +461,12 @@ func (t *cadenceValueMigrationReporter) Error(err error) {
 	}
 
 	if t.verboseErrorOutput {
-		t.reportWriter.Write(fmt.Sprintf(
-			"failed to run %s in account %s, domain %s, key %s: %s",
-			migration,
-			storageKey.Address,
-			storageKey.Key,
-			storageMapKey,
-			message,
-		))
+		t.reportWriter.Write(cadenceValueMigrationErrorEntry{
+			StorageKey:    storageKey,
+			StorageMapKey: storageMapKey,
+			Migration:     migration,
+			Message:       message,
+		})
 	}
 }
 
@@ -520,6 +520,13 @@ type cadenceValueMigrationReportEntry struct {
 	StorageKey    interpreter.StorageKey    `json:"storageKey"`
 	StorageMapKey interpreter.StorageMapKey `json:"storageMapKey"`
 	Migration     string                    `json:"migration"`
+}
+
+type cadenceValueMigrationErrorEntry struct {
+	StorageKey    interpreter.StorageKey    `json:"storageKey"`
+	StorageMapKey interpreter.StorageMapKey `json:"storageMapKey"`
+	Migration     string                    `json:"migration"`
+	Message       string                    `json:"message"`
 }
 
 var _ valueMigrationReportEntry = cadenceValueMigrationReportEntry{}

@@ -829,7 +829,7 @@ func TestProgramParsingError(t *testing.T) {
 		},
 	)
 
-	cadenceValueMigratorReporter := rwf.reportWriters["cadence-value-migrator"]
+	cadenceValueMigratorReporter := rwf.reportWriters[cadenceValueMigrationReporterName]
 
 	for _, migration := range migrations {
 		payloads, err = migration.Migrate(payloads)
@@ -842,21 +842,18 @@ func TestProgramParsingError(t *testing.T) {
 		)
 	}
 
-	// Check error logs
-	var errors []string
-
+	var messages []string
 	for _, entry := range cadenceValueMigratorReporter.entries {
-		if stringEntry, isString := entry.(string); isString {
-			errors = append(errors, stringEntry)
+		if errorEntry, isErrorEntry := entry.(cadenceValueMigrationErrorEntry); isErrorEntry {
+			messages = append(messages, errorEntry.Message)
+			break
 		}
 	}
 
-	require.Len(t, errors, 1)
+	require.Len(t, messages, 1)
 
-	log := errors[0]
-
-	assert.Contains(t, log, "`pub` is no longer a valid access keyword")
-	assert.NotContains(t, log, "runtime/debug.Stack()")
+	assert.Contains(t, messages[0], "`pub` is no longer a valid access keyword")
+	assert.NotContains(t, messages[0], "runtime/debug.Stack()")
 }
 
 func TestCoreContractUsage(t *testing.T) {
