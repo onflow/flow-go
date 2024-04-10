@@ -3,6 +3,7 @@ package integration_test
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"os"
 	"sort"
 	"testing"
@@ -280,7 +281,8 @@ func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *fl
 		},
 	)
 
-	root.SetPayload(flow.Payload{ProtocolStateID: inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()})
+	epochProtocolStateID := inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()
+	root.SetPayload(flow.Payload{ProtocolStateID: kvstore.NewLatestKVStore(epochProtocolStateID).ID()})
 	result := unittest.BootstrapExecutionResultFixture(root, unittest.GenesisStateCommitment)
 	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()}
 
