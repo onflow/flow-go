@@ -24,40 +24,6 @@ func StorageIDFromRegisterID(registerID flow.RegisterID) atree.SlabID {
 	return storageID
 }
 
-// TODO: use version from atree register inlining (master)
-func CheckAccountStorageHealth(
-	address common.Address,
-	payloads []*ledger.Payload,
-	storage *runtime.Storage,
-) error {
-	// Retrieve all slabs before migration.
-	for _, payload := range payloads {
-		registerID, _, err := convert.PayloadToRegister(payload)
-		if err != nil {
-			return fmt.Errorf("failed to convert payload to register: %w", err)
-		}
-
-		if !registerID.IsSlabIndex() {
-			continue
-		}
-
-		storageID := StorageIDFromRegisterID(registerID)
-
-		// Retrieve the slab.
-		_, _, err = storage.Retrieve(storageID)
-		if err != nil {
-			return fmt.Errorf("failed to retrieve slab %s: %w", storageID, err)
-		}
-	}
-
-	// Load storage map.
-	for _, domain := range allStorageMapDomains {
-		_ = storage.GetStorageMap(address, domain, false)
-	}
-
-	return storage.CheckHealth()
-}
-
 type FilterUnreferencedSlabsMigration struct {
 	log     zerolog.Logger
 	chainID flow.ChainID
@@ -99,7 +65,7 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 
 	newPayloads := oldPayloads
 
-	err = CheckAccountStorageHealth(address, oldPayloads, storage)
+	err = checkStorageHealth(address, storage, oldPayloads)
 	if err != nil {
 
 		// The storage health check failed.
