@@ -28,16 +28,16 @@ import (
 // when a block is executed, it notifies the block queue and forwards to execution state to save them.
 type Core struct {
 	*component.ComponentManager
-	ctx irrecoverable.SignalerContext
 
 	log zerolog.Logger
 
 	// state machine
-	processables chan flow.Identifier
-	blockQueue   *block_queue.BlockQueue
-	throttle     Throttle // for throttling blocks to be added to the block queue
-	execState    state.ExecutionState
-	stopControl  *stop.StopControl // decide whether to execute a block or not
+	processables   chan flow.Identifier
+	blockExecutors chan func(ctx context.Context)
+	blockQueue     *block_queue.BlockQueue
+	throttle       Throttle // for throttling blocks to be added to the block queue
+	execState      state.ExecutionState
+	stopControl    *stop.StopControl // decide whether to execute a block or not
 
 	// data storage
 	headers     storage.Headers
@@ -81,6 +81,7 @@ func NewCore(
 		log: logger.With().Str("engine", "ingestion_core").Logger(),
 		// processables are throttled blocks
 		processables:      make(chan flow.Identifier, 10000),
+		blockExecutors:    make(chan func(ctx context.Context), 1000),
 		throttle:          throttle,
 		execState:         execState,
 		blockQueue:        block_queue.NewBlockQueue(logger),
@@ -101,18 +102,18 @@ func NewCore(
 	e.log.Info().Msgf("throttle engine initialized")
 
 	e.ComponentManager = component.NewComponentManagerBuilder().
-		AddWorker(e.launchWorker).
+		AddWorker(e.launchWorkerToHandleBlocks).
+		AddWorker(e.launchWorkerToExecuteBlocks).
 		Build()
 
 	return e
 }
 
-func (e *Core) launchWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (e *Core) launchWorkerToHandleBlocks(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	executionStopped := e.stopControl.IsExecutionStopped()
 
 	e.log.Info().Bool("execution_stopped", executionStopped).Msgf("launching worker")
 
-	e.ctx = ctx
 	ready()
 
 	if executionStopped {
@@ -120,6 +121,18 @@ func (e *Core) launchWorker(ctx irrecoverable.SignalerContext, ready component.R
 	}
 
 	e.launchWorkerToConsumeThrottledBlocks(ctx)
+}
+
+func (e *Core) launchWorkerToExecuteBlocks(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case f := <-e.blockExecutors:
+			f(ctx)
+		}
+	}
 }
 
 func (e *Core) OnBlock(header *flow.Header, qc *flow.QuorumCertificate) {
@@ -154,7 +167,7 @@ func (e *Core) launchWorkerToConsumeThrottledBlocks(ctx irrecoverable.SignalerCo
 
 		case blockID := <-e.processables:
 			e.log.Debug().Hex("block_id", blockID[:]).Msg("ingestion core processing block")
-			err := e.onProcessableBlock(blockID)
+			err := e.onProcessableBlock(ctx, blockID)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("fail to process block: %w", err))
 				return
@@ -164,7 +177,7 @@ func (e *Core) launchWorkerToConsumeThrottledBlocks(ctx irrecoverable.SignalerCo
 
 }
 
-func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
+func (e *Core) onProcessableBlock(ctx irrecoverable.SignalerContext, blockID flow.Identifier) error {
 	header, err := e.headers.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not get block: %w", err)
@@ -291,6 +304,7 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 }
 
 func (e *Core) onBlockExecuted(
+	ctx context.Context,
 	block *entity.ExecutableBlock,
 	computationResult *execution.ComputationResult,
 	startedAt time.Time,
@@ -303,10 +317,10 @@ func (e *Core) onBlockExecuted(
 
 	go func() {
 		defer wg.Done()
-		e.eventConsumer.BeforeComputationResultSaved(e.ctx, computationResult)
+		e.eventConsumer.BeforeComputationResultSaved(ctx, computationResult)
 	}()
 
-	err := e.execState.SaveExecutionResults(e.ctx, computationResult)
+	err := e.execState.SaveExecutionResults(ctx, computationResult)
 	if err != nil {
 		return fmt.Errorf("cannot persist execution state: %w", err)
 	}
@@ -325,7 +339,7 @@ func (e *Core) onBlockExecuted(
 
 	// notify event consumer so that the event consumer can do tasks
 	// such as broadcasting or uploading the result
-	logs := e.eventConsumer.OnComputationResultSaved(e.ctx, computationResult)
+	logs := e.eventConsumer.OnComputationResultSaved(ctx, computationResult)
 
 	receipt := computationResult.ExecutionReceipt
 	e.log.Info().
@@ -404,22 +418,16 @@ func storeCollectionIfMissing(collections storage.Collections, col *flow.Collect
 // execute block concurrently
 func (e *Core) executeConcurrently(executables []*entity.ExecutableBlock) {
 	for _, executable := range executables {
-		go func(executable *entity.ExecutableBlock) {
-			select {
-			case <-e.ctx.Done():
-				return
-			default:
-			}
-
-			err := e.execute(executable)
+		e.blockExecutors <- func(ctx context.Context) {
+			err := e.execute(ctx, executable)
 			if err != nil {
-				e.ctx.Throw(fmt.Errorf("failed to execute block %v: %w", executable.Block.ID(), err))
+				irrecoverable.Throw(ctx, fmt.Errorf("failed to execute block %v: %w", executable.Block.ID(), err))
 			}
-		}(executable)
+		}
 	}
 }
 
-func (e *Core) execute(executable *entity.ExecutableBlock) error {
+func (e *Core) execute(ctx context.Context, executable *entity.ExecutableBlock) error {
 	if !e.stopControl.ShouldExecuteBlock(executable.Block.Header) {
 		return nil
 	}
@@ -432,12 +440,12 @@ func (e *Core) execute(executable *entity.ExecutableBlock) error {
 
 	startedAt := time.Now()
 
-	result, err := e.executor.ExecuteBlock(e.ctx, executable)
+	result, err := e.executor.ExecuteBlock(ctx, executable)
 	if err != nil {
 		return fmt.Errorf("failed to execute block %v: %w", executable.Block.ID(), err)
 	}
 
-	err = e.onBlockExecuted(executable, result, startedAt)
+	err = e.onBlockExecuted(ctx, executable, result, startedAt)
 	if err != nil {
 		return fmt.Errorf("failed to handle execution result of block %v: %w", executable.Block.ID(), err)
 	}
