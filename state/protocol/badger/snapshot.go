@@ -147,7 +147,7 @@ func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 //   - protocol.UnfinalizedSealingSegmentError if sealing segment would contain unfinalized blocks (including orphaned blocks)
 func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	// Lets denote the highest block in the sealing segment `head` (initialized below).
-	// Based on the tech spec `flow/sealing_segment.md`, the Sealing Segment must contain contain
+	// Based on the tech spec `flow/sealing_segment.md`, the Sealing Segment must contain
 	//  enough history to satisfy _all_ of the following conditions:
 	//   (i) The highest sealed block as of `head` needs to be included in the sealing segment.
 	//       This is relevant if `head` does not contain any seals.

@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// TODO(5120): remove this error type
 var SnapshotHistoryLimitErr = fmt.Errorf("reached the snapshot history limit")
 
 type backendNetwork struct {
@@ -185,6 +186,7 @@ func (b *backendNetwork) isEpochOrPhaseDifferent(counter1, counter2 uint64, phas
 }
 
 // getValidSnapshot will return a valid snapshot that has a sealing segment which
+// TODO(5120): remove this constraint
 // 1. does not contain any blocks that span an epoch transition
 // 2. does not contain any blocks that span an epoch phase transition
 // If a snapshot does contain an invalid sealing segment query the state

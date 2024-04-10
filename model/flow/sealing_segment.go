@@ -2,7 +2,7 @@ package flow
 
 import (
 	"fmt"
-
+	storage "github.com/onflow/flow-go/storage"
 	"golang.org/x/exp/slices"
 )
 
@@ -59,6 +59,10 @@ type SealingSegment struct {
 	// This information is needed for the `Commit` method of protocol snapshot
 	// to return the sealed state, when the first block contains no seal.
 	FirstSeal *Seal
+
+	ProtocolStateKVStoreEntries []storage.KeyValueStoreData
+
+	EpochEntries []RichProtocolStateEntry
 }
 
 // Highest is the highest block in the sealing segment and the reference block from snapshot that was
@@ -110,6 +114,7 @@ func (segment *SealingSegment) FinalizedSeal() (*Seal, error) {
 // The node logic requires a valid sealing segment to bootstrap.
 // No errors are expected during normal operation.
 func (segment *SealingSegment) Validate() error {
+	// TODO(5120) must have an entry for each unique protocol state ID among blocks
 
 	// populate lookup of seals and results in the segment to satisfy builder
 	seals := make(map[Identifier]*Seal)
@@ -427,6 +432,7 @@ func (builder *SealingSegmentBuilder) lowest() *Block {
 
 // NewSealingSegmentBuilder returns *SealingSegmentBuilder
 func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBlockIDFunc) *SealingSegmentBuilder {
+	// TODO(5120): pass in getEpochEntry, getKVStoreEntry here?
 	return &SealingSegmentBuilder{
 		resultLookup:        resultLookup,
 		sealByBlockIDLookup: sealLookup,

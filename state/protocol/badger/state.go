@@ -242,6 +242,7 @@ func Bootstrap(
 // dynamic protocol state didn't change in the sealing segment.
 // The root snapshot's sealing segment must not straddle any epoch transitions
 // or epoch phase transitions.
+// TODO(5120): insert epoch entries and kvstore entries here.
 func bootstrapProtocolState(
 	segment *flow.SealingSegment,
 	rootEpochState protocol.DynamicProtocolState,
@@ -271,6 +272,7 @@ func bootstrapProtocolState(
 			return fmt.Errorf("could not insert root kv store: %w", err)
 		}
 
+		// TODO: remove assumption
 		// NOTE: as specified in the godoc, this code assumes that each block
 		// in the sealing segment is within the same phase within the same epoch.
 		// the sealing segment.
