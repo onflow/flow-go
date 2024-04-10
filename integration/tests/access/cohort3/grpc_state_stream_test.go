@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
@@ -189,8 +190,6 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 
 	txGenerator, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	s.Require().NoError(err)
-	header, err := txGenerator.GetLatestSealedBlockHeader(s.ctx)
-	s.Require().NoError(err)
 
 	var startValue interface{}
 	txCount := 10
@@ -198,9 +197,9 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 	for _, rpc := range s.testedRPCs() {
 		s.T().Run(rpc.name, func(t *testing.T) {
 			if rpc.name == "SubscribeEventsFromStartBlockID" {
-				startValue = header.ID.Bytes()
+				startValue = convert.IdentifierToMessage(blockA.ID())
 			} else {
-				startValue = header.Height
+				startValue = blockA.Header.Height
 			}
 
 			testANRecv := rpc.call(s.ctx, sdkClientTestAN, startValue, &executiondata.EventFilter{})
@@ -237,7 +236,7 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 			foundONTxCount := 0
 			messageIndex := counters.NewMonotonousCounter(0)
 
-			r := NewResponseTracker(compareEventsResponse)
+			r := NewResponseTracker(compareEventsResponse, 3)
 
 			for {
 				select {
@@ -274,6 +273,8 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 					break
 				}
 			}
+
+			r.AssertAllResponsesHandled(t, txCount)
 		})
 	}
 }
@@ -364,19 +365,37 @@ func (s *GrpcStateStreamSuite) getRPCs() []subscribeEventsRPCTest {
 
 // ResponseTracker is a generic tracker for responses.
 type ResponseTracker[T any] struct {
-	r       map[uint64]map[string]T
-	mu      sync.RWMutex
-	compare func(t *testing.T, responses map[uint64]map[string]T, blockHeight uint64) error
+	r                       map[uint64]map[string]T
+	mu                      sync.RWMutex
+	compare                 func(t *testing.T, responses map[uint64]map[string]T, blockHeight uint64) error
+	checkCount              int // actual common count of responses we want to check
+	responsesCountToCompare int // count of responses that we want to compare with each other
 }
 
 // NewResponseTracker creates a new ResponseTracker.
 func NewResponseTracker[T any](
 	compare func(t *testing.T, responses map[uint64]map[string]T, blockHeight uint64) error,
+	responsesCountToCompare int,
 ) *ResponseTracker[T] {
 	return &ResponseTracker[T]{
-		r:       make(map[uint64]map[string]T),
-		compare: compare,
+		r:                       make(map[uint64]map[string]T),
+		compare:                 compare,
+		responsesCountToCompare: responsesCountToCompare,
 	}
+}
+
+func (r *ResponseTracker[T]) AssertAllResponsesHandled(t *testing.T, expectedCheckCount int) {
+	assert.Equal(t, expectedCheckCount, r.checkCount)
+
+	// we check if response tracker has some responses which were not checked, but should be checked
+	hasNotComparedResponses := false
+	for _, valueMap := range r.r {
+		if len(valueMap) == r.responsesCountToCompare {
+			hasNotComparedResponses = true
+			break
+		}
+	}
+	assert.False(t, hasNotComparedResponses)
 }
 
 func (r *ResponseTracker[T]) Add(t *testing.T, blockHeight uint64, name string, response T) {
@@ -388,6 +407,11 @@ func (r *ResponseTracker[T]) Add(t *testing.T, blockHeight uint64, name string, 
 	}
 	r.r[blockHeight][name] = response
 
+	if len(r.r[blockHeight]) != r.responsesCountToCompare {
+		return
+	}
+
+	r.checkCount += 1
 	err := r.compare(t, r.r, blockHeight)
 	if err != nil {
 		log.Fatalf("comparison error at block height %d: %v", blockHeight, err)
@@ -411,29 +435,21 @@ func eventsResponseHandler(msg *executiondata.SubscribeEventsResponse) (*Subscri
 }
 
 func compareEventsResponse(t *testing.T, responses map[uint64]map[string]*SubscribeEventsResponse, blockHeight uint64) error {
-	if len(responses[blockHeight]) != 3 {
-		return nil
-	}
+
 	accessControlData := responses[blockHeight]["access_control"]
 	accessTestData := responses[blockHeight]["access_test"]
 	observerTestData := responses[blockHeight]["observer_test"]
 
 	// Compare access_control with access_test
-	err := compareEvents(t, accessControlData, accessTestData)
-	if err != nil {
-		return fmt.Errorf("failure comparing access and access data: %d: %v", blockHeight, err)
-	}
+	compareEvents(t, accessControlData, accessTestData)
 
 	// Compare access_control with observer_test
-	err = compareEvents(t, accessControlData, observerTestData)
-	if err != nil {
-		return fmt.Errorf("failure comparing access and observer data: %d: %v", blockHeight, err)
-	}
+	compareEvents(t, accessControlData, observerTestData)
 
 	return nil
 }
 
-func compareEvents(t *testing.T, controlData, testData *SubscribeEventsResponse) error {
+func compareEvents(t *testing.T, controlData, testData *SubscribeEventsResponse) {
 	require.Equal(t, controlData.BlockID, testData.BlockID)
 	require.Equal(t, controlData.Height, testData.Height)
 	require.Equal(t, controlData.BlockTimestamp, testData.BlockTimestamp)
@@ -447,8 +463,6 @@ func compareEvents(t *testing.T, controlData, testData *SubscribeEventsResponse)
 		require.Equal(t, controlData.Events[i].EventIndex, testData.Events[i].EventIndex)
 		require.True(t, bytes.Equal(controlData.Events[i].Payload, testData.Events[i].Payload))
 	}
-
-	return nil
 }
 
 // TODO: switch to SDK versions once crypto library is fixed to support the latest SDK version

@@ -152,20 +152,15 @@ func (s *GrpcBlocksStreamSuite) TestHappyPath() {
 	// wait for the requested number of sealed blocks
 	s.BlockState.WaitForSealed(s.T(), blockA.Header.Height+blockCount)
 
-	txGenerator, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
-	s.Require().NoError(err)
-	header, err := txGenerator.GetLatestSealedBlockHeader(s.ctx)
-	s.Require().NoError(err)
-
 	var startValue interface{}
 	txCount := 10
 
 	for _, rpc := range s.testedRPCs() {
 		s.T().Run(rpc.name, func(t *testing.T) {
 			if rpc.name == "SubscribeBlocksFromStartBlockID" {
-				startValue = header.ID.Bytes()
+				startValue = convert.IdentifierToMessage(blockA.ID())
 			} else {
-				startValue = header.Height
+				startValue = blockA.Header.Height
 			}
 
 			accessRecv := rpc.call(s.ctx, accessClient, startValue)
@@ -179,7 +174,7 @@ func (s *GrpcBlocksStreamSuite) TestHappyPath() {
 			foundANTxCount := 0
 			foundONTxCount := 0
 
-			r := NewResponseTracker(compareBlocksResponse)
+			r := NewResponseTracker(compareBlocksResponse, 2)
 
 			for {
 				select {
@@ -201,6 +196,8 @@ func (s *GrpcBlocksStreamSuite) TestHappyPath() {
 					break
 				}
 			}
+
+			r.AssertAllResponsesHandled(t, txCount)
 		})
 	}
 }
@@ -210,28 +207,20 @@ func blockResponseHandler(msg *accessproto.SubscribeBlocksResponse) (*flow.Block
 }
 
 func compareBlocksResponse(t *testing.T, responses map[uint64]map[string]*flow.Block, blockHeight uint64) error {
-	if len(responses[blockHeight]) != 2 {
-		return nil
-	}
 	accessData := responses[blockHeight]["access"]
 	observerData := responses[blockHeight]["observer"]
 
 	// Compare access with observer
-	err := compareBlocks(t, accessData, observerData)
-	if err != nil {
-		return fmt.Errorf("failure comparing access and observer data: %d: %v", blockHeight, err)
-	}
+	compareBlocks(t, accessData, observerData)
 
 	return nil
 }
 
-func compareBlocks(t *testing.T, accessBlock *flow.Block, observerBlock *flow.Block) error {
+func compareBlocks(t *testing.T, accessBlock *flow.Block, observerBlock *flow.Block) {
 	require.Equal(t, accessBlock.ID(), observerBlock.ID())
 	require.Equal(t, accessBlock.Header.Height, observerBlock.Header.Height)
 	require.Equal(t, accessBlock.Header.Timestamp, observerBlock.Header.Timestamp)
 	require.Equal(t, accessBlock.Payload.Hash(), observerBlock.Payload.Hash())
-
-	return nil
 }
 
 type subscribeBlocksRPCTest struct {
