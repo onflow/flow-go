@@ -28,7 +28,6 @@ import (
 // when a block is executed, it notifies the block queue and forwards to execution state to save them.
 type Core struct {
 	*component.ComponentManager
-	ctx context.Context
 
 	log zerolog.Logger
 
@@ -115,7 +114,6 @@ func (e *Core) launchWorkerToHandleBlocks(ctx irrecoverable.SignalerContext, rea
 
 	e.log.Info().Bool("execution_stopped", executionStopped).Msgf("launching worker")
 
-	e.ctx = ctx
 	ready()
 
 	if executionStopped {
@@ -132,7 +130,7 @@ func (e *Core) launchWorkerToExecuteBlocks(ctx irrecoverable.SignalerContext, re
 		case <-ctx.Done():
 			return
 		case f := <-e.blockExecutors:
-			f(e.ctx)
+			f(ctx)
 		}
 	}
 }
