@@ -121,11 +121,6 @@ type migratorRuntime struct {
 
 var _ stdlib.AccountContractNamesProvider = &migratorRuntime{}
 
-func (mr *migratorRuntime) GetReadOnlyStorage() *runtime.Storage {
-	readonlyLedger := util.NewPayloadsReadonlyLedger(mr.Snapshot)
-	return runtime.NewStorage(readonlyLedger, nil)
-}
-
 func (mr *migratorRuntime) GetAccountContractNames(address common.Address) ([]string, error) {
 	return mr.Accounts.GetContractNames(flow.Address(address))
 }
