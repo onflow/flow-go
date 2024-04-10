@@ -118,9 +118,3 @@ type migratorRuntime struct {
 	ContractAdditionHandler stdlib.AccountContractAdditionHandler
 	ContractNamesProvider   stdlib.AccountContractNamesProvider
 }
-
-var _ stdlib.AccountContractNamesProvider = &migratorRuntime{}
-
-func (mr *migratorRuntime) GetAccountContractNames(address common.Address) ([]string, error) {
-	return mr.Accounts.GetContractNames(flow.Address(address))
-}
