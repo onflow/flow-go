@@ -3,7 +3,6 @@ package badger
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"math"
 	"math/rand"
 	"os"
@@ -25,6 +24,7 @@ import (
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	protocolutil "github.com/onflow/flow-go/state/protocol/util"
 	storage "github.com/onflow/flow-go/storage/badger"

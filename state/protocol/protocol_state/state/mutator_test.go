@@ -2,7 +2,6 @@ package state
 
 import (
 	"errors"
-	"github.com/onflow/flow-go/storage"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -13,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/rand"

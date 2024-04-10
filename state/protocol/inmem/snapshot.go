@@ -3,12 +3,12 @@ package inmem
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 )
 
 // Snapshot is a memory-backed implementation of protocol.Snapshot. The snapshot

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	crand "crypto/rand"
 	"fmt"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"math/rand"
 	"net"
 	"testing"
@@ -48,6 +47,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/utils/dsl"
 )
 

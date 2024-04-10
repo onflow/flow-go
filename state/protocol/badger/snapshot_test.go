@@ -3,7 +3,6 @@ package badger_test
 import (
 	"context"
 	"errors"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"math/rand"
 	"testing"
 
@@ -20,6 +19,7 @@ import (
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/prg"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"

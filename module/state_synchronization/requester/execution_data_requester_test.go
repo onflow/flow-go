@@ -804,4 +804,5 @@ func (m *mockSnapshot) Phase() (flow.EpochPhase, error)                         
 func (m *mockSnapshot) Epochs() protocol.EpochQuery                                { return nil }
 func (m *mockSnapshot) Params() protocol.GlobalParams                              { return nil }
 func (m *mockSnapshot) EpochProtocolState() (protocol.DynamicProtocolState, error) { return nil, nil }
+func (m *mockSnapshot) ProtocolState() (protocol.KVStoreReader, error)             { return nil, nil }
 func (m *mockSnapshot) VersionBeacon() (*flow.SealedVersionBeacon, error)          { return nil, nil }

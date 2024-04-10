@@ -3,14 +3,14 @@ package inmem
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
-	"github.com/onflow/flow-go/storage"
 
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
+	"github.com/onflow/flow-go/storage"
 )
 
 // FromSnapshot generates a memory-backed snapshot from the input snapshot.

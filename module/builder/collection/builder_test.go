@@ -2,7 +2,6 @@ package collection_test
 
 import (
 	"context"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"math/rand"
 	"os"
 	"testing"
@@ -26,6 +25,7 @@ import (
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
