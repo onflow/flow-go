@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/hex"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"time"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
@@ -32,7 +33,7 @@ func constructRootBlock(rootHeader *flow.Header, setup *flow.EpochSetup, commit 
 		Seals:           nil,
 		Receipts:        nil,
 		Results:         nil,
-		ProtocolStateID: inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID(),
+		ProtocolStateID: kvstore.NewLatestKVStore(inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()).ID(),
 	})
 	return block
 }
