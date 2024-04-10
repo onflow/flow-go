@@ -34,6 +34,8 @@ var (
 	flagLogVerboseValidationError          bool
 	flagAllowPartialStateFromPayloads      bool
 	flagContinueMigrationOnValidationError bool
+	flagCheckStorageHealthBeforeMigration  bool
+	flagCheckStorageHealthAfterMigration   bool
 	flagInputPayloadFileName               string
 	flagOutputPayloadFileName              string
 	flagOutputPayloadByAddresses           string
@@ -81,6 +83,12 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagAllowPartialStateFromPayloads, "allow-partial-state-from-payload-file", false,
 		"allow input payload file containing partial state (e.g. not all accounts)")
+
+	Cmd.Flags().BoolVar(&flagCheckStorageHealthBeforeMigration, "check-storage-health-before", false,
+		"check (atree) storage health before migration")
+
+	Cmd.Flags().BoolVar(&flagCheckStorageHealthAfterMigration, "check-storage-health-after", false,
+		"check (atree) storage health after migration")
 
 	Cmd.Flags().BoolVar(&flagContinueMigrationOnValidationError, "continue-migration-on-validation-errors", false,
 		"continue migration even if validation fails")
@@ -246,6 +254,14 @@ func run(*cobra.Command, []string) {
 
 	if flagLogVerboseValidationError {
 		log.Warn().Msgf("atree migration has verbose validation error logging enabled which may increase size of log")
+	}
+
+	if flagCheckStorageHealthBeforeMigration {
+		log.Warn().Msgf("--check-storage-health-before flag is enabled and will increase duration of migration")
+	}
+
+	if flagCheckStorageHealthAfterMigration {
+		log.Warn().Msgf("--check-storage-health-after flag is enabled and will increase duration of migration")
 	}
 
 	var inputMsg string
