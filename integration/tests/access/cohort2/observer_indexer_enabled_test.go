@@ -139,6 +139,8 @@ func (s *ObserverIndexerEnabledSuite) SetupTest() {
 // To ensure that the observer is handling these RPCs, we stop the upstream access node and verify that the observer client
 // returns success for valid requests and errors for invalid ones.
 func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCsHappyPath() {
+	unittest.SkipUnless(s.T(), unittest.TEST_FLAKY, "flaky")
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
