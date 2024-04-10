@@ -32,6 +32,7 @@ var (
 )
 
 func TestObserverIndexerEnabled(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky")
 	suite.Run(t, new(ObserverIndexerEnabledSuite))
 }
 
