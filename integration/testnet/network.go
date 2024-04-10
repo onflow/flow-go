@@ -5,6 +5,7 @@ import (
 	crand "crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	gonet "net"
 	"net/http"
 	"os"
@@ -1149,7 +1150,10 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		Header: rootHeader,
 	}
 	root.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(
-		inmem.ProtocolStateFromEpochServiceEvents(epochSetup, epochCommit).ID())))
+		kvstore.NewLatestKVStore(
+			inmem.ProtocolStateFromEpochServiceEvents(epochSetup, epochCommit).ID(),
+		).ID(),
+	)))
 
 	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
 	if err != nil {
