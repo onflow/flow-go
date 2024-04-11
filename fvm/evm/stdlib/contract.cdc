@@ -176,18 +176,21 @@ contract EVM {
         /// returns the newly deployed contract address
         /// if the transaction caused such a deployment
         /// otherwise the value is empty.
+        access(all)
         let deployedContractAddress: [UInt8; 20]
 
         init(
             status: Status,
             errorCode: UInt64,
             gasUsed: UInt64,
-            data: [UInt8]
+            data: [UInt8],
+            contractAddress: [UInt8; 20]
         ) {
             self.status = status
             self.errorCode = errorCode
             self.gasUsed = gasUsed
             self.data = data
+            self.deployedContractAddress = contractAddress
         }
     }
 
