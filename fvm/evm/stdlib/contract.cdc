@@ -168,10 +168,15 @@ contract EVM {
 
         /// returns the data that is returned from
         /// the evm for the call. For coa.deploy
-        /// calls it returns the address bytes of the
-        /// newly deployed contract.
+        /// calls it returns the code deployed to
+        /// the address provided in the contractAddress field.
         access(all)
         let data: [UInt8]
+
+        /// returns the newly deployed contract address
+        /// if the transaction caused such a deployment
+        /// otherwise the value is empty.
+        let contractAddress: [UInt8; 20]
 
         init(
             status: Status,
