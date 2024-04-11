@@ -189,7 +189,7 @@ func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads
 
 		address := flow.BytesToAddress(key.KeyParts[0].Value)
 
-		if stagingAccountAddress == common.Address(address) {
+		if common.Address(address) == stagingAccountAddress {
 			stagingAccountPayloads = append(stagingAccountPayloads, payload)
 		}
 	}

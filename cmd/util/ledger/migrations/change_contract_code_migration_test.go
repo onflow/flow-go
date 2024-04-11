@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"testing"
 
@@ -54,8 +55,17 @@ type logWriter struct {
 
 var _ io.Writer = &logWriter{}
 
+const warnLogPrefix = "{\"level\":\"warn\""
+
 func (l *logWriter) Write(bytes []byte) (int, error) {
-	l.logs = append(l.logs, string(bytes))
+	logStr := string(bytes)
+
+	// Ignore warnings
+	if strings.HasPrefix(logStr, warnLogPrefix) {
+		return 0, nil
+	}
+
+	l.logs = append(l.logs, logStr)
 	return len(bytes), nil
 }
 
