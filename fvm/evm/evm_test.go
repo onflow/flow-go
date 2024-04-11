@@ -603,7 +603,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					import FlowToken from %s
 	
 					access(all)
-					fun main(): EVM.Result {
+					fun main(code: [UInt8]): EVM.Result {
 						let admin = getAuthAccount(%s)
 							.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
 						let minter <- admin.createNewMinter(allowedAmount: 2.34)
@@ -614,8 +614,8 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 						cadenceOwnedAccount.deposit(from: <-vault)
 	
 						let res = cadenceOwnedAccount.deploy(
-							code: [],
-							gasLimit: 53000,
+							code: code,
+							gasLimit: 1000000,
 							value: EVM.Balance(attoflow: 1230000000000000000)
 						)
 						destroy cadenceOwnedAccount
@@ -627,7 +627,12 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					sc.FlowServiceAccount.Address.HexWithPrefix(),
 				))
 
-				script := fvm.Script(code)
+				script := fvm.Script(code).
+					WithArguments(json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(testContract.ByteCode),
+						).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type{})),
+					))
 
 				_, output, err := vm.Run(
 					ctx,
@@ -641,6 +646,8 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 				require.NotNil(t, res.DeployedContractAddress)
+				// we strip away first few bytes because they contain deploy code
+				require.Equal(t, testContract.ByteCode[17:], []byte(res.ReturnedValue))
 			})
 	})
 }
