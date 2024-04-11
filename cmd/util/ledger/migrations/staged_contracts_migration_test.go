@@ -398,11 +398,10 @@ func TestStagedContractsMigration(t *testing.T) {
 		rwf := &testReportWriterFactory{}
 
 		migration := NewStagedContractsMigration(chainID, log, rwf)
+		migration.RegisterContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
-
-		migration.RegisterContractUpdates(stagedContracts)
 
 		payloads, err := migration.MigrateAccount(
 			context.Background(),
@@ -448,11 +447,10 @@ func TestStagedContractsMigration(t *testing.T) {
 		rwf := &testReportWriterFactory{}
 
 		migration := NewStagedContractsMigration(chainID, log, rwf)
+		migration.RegisterContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
-
-		migration.RegisterContractUpdates(stagedContracts)
 
 		// NOTE: no payloads
 		_, err = migration.MigrateAccount(

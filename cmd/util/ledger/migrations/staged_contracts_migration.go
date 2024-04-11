@@ -159,7 +159,6 @@ func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads
 
 	// If the contracts are already passed as an input to the migration
 	// then no need to scan the storage.
-	// TODO: Maybe do this anyway?
 	if len(m.contractsByLocation) > 0 {
 		return nil
 	}
@@ -173,14 +172,30 @@ func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads
 		stagingAccount = "0x56100d46aa9b0212"
 	default:
 		// For other networks such as emulator etc. no need to scan for staged contracts.
+		m.log.Warn().Msgf("staged contracts are not collected for %s state", m.chainID)
 		return nil
 	}
 
 	stagingAccountAddress := common.Address(flow.HexToAddress(stagingAccount))
 
+	// Filter-in only the payloads belong to the staging account.
+	stagingAccountPayloads := make([]*ledger.Payload, 0)
+	for _, payload := range allPayloads {
+		key, err := payload.Key()
+		if err != nil {
+			return err
+		}
+
+		address := flow.BytesToAddress(key.KeyParts[0].Value)
+
+		if stagingAccountAddress == common.Address(address) {
+			stagingAccountPayloads = append(stagingAccountPayloads, payload)
+		}
+	}
+
 	mr, err := NewMigratorRuntime(
 		stagingAccountAddress,
-		allPayloads,
+		stagingAccountPayloads,
 		util.RuntimeInterfaceConfig{},
 	)
 	if err != nil {
