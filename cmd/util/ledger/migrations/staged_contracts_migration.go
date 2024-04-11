@@ -111,6 +111,11 @@ func (m *StagedContractsMigration) InitMigration(
 		Str("migration", m.name).
 		Logger()
 
+	err := m.collectAndRegisterStagedContractsFromPayloads(allPayloads)
+	if err != nil {
+		return err
+	}
+
 	// Manually register burner contract
 	burnerLocation := common.AddressLocation{
 		Name:    "Burner",
@@ -144,6 +149,123 @@ func (m *StagedContractsMigration) InitMigration(
 	m.elaborations = elaborations
 	m.contractAdditionHandler = mr.ContractAdditionHandler
 	m.contractNamesProvider = mr.ContractNamesProvider
+
+	return nil
+}
+
+// collectAndRegisterStagedContractsFromPayloads scan through the payloads and collects the contracts
+// staged through the `MigrationContractStaging` contract.
+func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads(allPayloads []*ledger.Payload) error {
+	var stagingAccount string
+
+	// If the contracts are already passed as an input to the migration
+	// then no need to scan the storage.
+	// TODO: Maybe do this anyway?
+	if len(m.contractsByLocation) > 0 {
+		return nil
+	}
+
+	switch m.chainID {
+	case flow.Testnet:
+		stagingAccount = "0x2ceae959ed1a7e7a"
+	case flow.Mainnet:
+		// TODO:
+		stagingAccount = "0x2ceae959ed1a7e7a"
+	default:
+		// For other networks such as emulator etc. no need to scan for staged contracts.
+		return nil
+	}
+
+	stagingAccountAddress := common.Address(flow.HexToAddress(stagingAccount))
+
+	mr, err := NewMigratorRuntime(
+		stagingAccountAddress,
+		allPayloads,
+		util.RuntimeInterfaceConfig{},
+	)
+	if err != nil {
+		return err
+	}
+
+	inter := mr.Interpreter
+	locationRange := interpreter.EmptyLocationRange
+
+	storageMap := mr.Storage.GetStorageMap(stagingAccountAddress, common.PathDomainStorage.Identifier(), false)
+	iterator := storageMap.Iterator(inter)
+
+	stagedContractCapsuleStaticType := interpreter.NewCompositeStaticTypeComputeTypeID(
+		nil,
+		common.AddressLocation{
+			Name:    "MigrationContractStaging",
+			Address: stagingAccountAddress,
+		},
+		"Capsule",
+	)
+
+	stagedContracts := make([]StagedContract, 0)
+
+	for key, value := iterator.Next(); key != nil; key, value = iterator.Next() {
+		stringAtreeValue, ok := key.(interpreter.StringAtreeValue)
+		if !ok {
+			continue
+		}
+
+		storagePath := string(stringAtreeValue)
+
+		// Only consider paths that starts with "MigrationContractStagingCapsule_".
+		if !strings.HasPrefix(storagePath, "MigrationContractStagingCapsule_") {
+			continue
+		}
+
+		staticType := value.StaticType(inter)
+		if !staticType.Equal(stagedContractCapsuleStaticType) {
+			// This shouldn't occur, but technically possible.
+			// e.g: accidentally storing other values under the same storage path pattern.
+			// So skip such values. We are not interested in those.
+			continue
+		}
+
+		stagedContractCapsule := value.(*interpreter.CompositeValue)
+
+		// The stored value should take the form of:
+		//
+		// resource Capsule {
+		//     let update: ContractUpdate
+		// }
+		//
+		// struct ContractUpdate {
+		//     let address: Address
+		//     let name: String
+		//     var code: String
+		//     var lastUpdated: UFix64
+		// }
+
+		contractUpdate := stagedContractCapsule.GetField(
+			inter,
+			locationRange,
+			"update",
+		).(*interpreter.CompositeValue)
+
+		address := contractUpdate.GetField(inter, locationRange, "address").(interpreter.AddressValue)
+		name := contractUpdate.GetField(inter, locationRange, "name").(*interpreter.StringValue)
+		code := contractUpdate.GetField(inter, locationRange, "code").(*interpreter.StringValue)
+
+		stagedContracts = append(
+			stagedContracts,
+			StagedContract{
+				Contract: Contract{
+					Name: name.Str,
+					Code: []byte(code.Str),
+				},
+				Address: common.Address(address),
+			},
+		)
+	}
+
+	m.log.Info().
+		Msgf("found %d staged contracts from payloads", len(stagedContracts))
+
+	m.RegisterContractUpdates(stagedContracts)
 
 	return nil
 }
