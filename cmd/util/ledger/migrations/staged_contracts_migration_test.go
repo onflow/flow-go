@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,13 +31,22 @@ func newContractPayload(address common.Address, contractName string, contract []
 }
 
 type logWriter struct {
-	logs []string
+	logs           []string
+	enableInfoLogs bool
 }
 
 var _ io.Writer = &logWriter{}
 
+const infoLogPrefix = "{\"level\":\"info\""
+
 func (l *logWriter) Write(bytes []byte) (int, error) {
-	l.logs = append(l.logs, string(bytes))
+	logStr := string(bytes)
+
+	if !l.enableInfoLogs && strings.HasPrefix(logStr, infoLogPrefix) {
+		return 0, nil
+	}
+
+	l.logs = append(l.logs, logStr)
 	return len(bytes), nil
 }
 
@@ -219,7 +229,10 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		logWriter := &logWriter{}
+		logWriter := &logWriter{
+			enableInfoLogs: true,
+		}
+
 		log := zerolog.New(logWriter)
 
 		rwf := &testReportWriterFactory{}
@@ -244,8 +257,9 @@ func TestStagedContractsMigration(t *testing.T) {
 		err = migration.Close()
 		require.NoError(t, err)
 
-		require.Len(t, logWriter.logs, 1)
-		require.Contains(t, logWriter.logs[0], `error: expected token '{'`)
+		require.Len(t, logWriter.logs, 2)
+		require.Contains(t, logWriter.logs[0], `{"level":"info","message":"total of 2 unique contracts are staged for all accounts"}`)
+		require.Contains(t, logWriter.logs[1], `error: expected token '{'`)
 
 		require.Len(t, payloads, 2)
 		// First payload should still have the old code

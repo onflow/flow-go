@@ -153,6 +153,9 @@ func (m *StagedContractsMigration) RegisterContractUpdates(stagedContracts []Sta
 	for _, contractChange := range stagedContracts {
 		m.RegisterContractChange(contractChange)
 	}
+
+	m.log.Info().
+		Msgf("total of %d unique contracts are staged for all accounts", len(m.contractsByLocation))
 }
 
 func (m *StagedContractsMigration) RegisterContractChange(change StagedContract) {
