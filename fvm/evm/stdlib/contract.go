@@ -2019,7 +2019,7 @@ func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, e
 	if !ok {
 		return nil, fmt.Errorf("invalid input: unexpected value type")
 	}
-	if len(str.Fields) != 4 {
+	if len(str.Fields) != 5 {
 		return nil, fmt.Errorf("invalid input: field count mismatch")
 	}
 
@@ -2048,16 +2048,27 @@ func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, e
 		return nil, fmt.Errorf("invalid input: unexpected type for data field")
 	}
 
+	deployedAddress, ok := str.Fields[4].(cadence.Array)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for deployed adddress field")
+	}
+
 	convertedData := make([]byte, len(data.Values))
 	for i, value := range data.Values {
 		convertedData[i] = value.(cadence.UInt8).ToGoValue().(uint8)
 	}
 
+	convertedAddress := make([]byte, len(deployedAddress.Values))
+	for i, val := range deployedAddress.Values {
+		convertedAddress[i] = val.(cadence.UInt8).ToGoValue().(uint8)
+	}
+
 	return &types.ResultSummary{
-		Status:        types.Status(status),
-		ErrorCode:     types.ErrorCode(errorCode),
-		GasConsumed:   uint64(gasUsed),
-		ReturnedValue: convertedData,
+		Status:                  types.Status(status),
+		ErrorCode:               types.ErrorCode(errorCode),
+		GasConsumed:             uint64(gasUsed),
+		ReturnedValue:           convertedData,
+		DeployedContractAddress: types.Address(convertedAddress),
 	}, nil
 
 }
