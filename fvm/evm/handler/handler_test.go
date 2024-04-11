@@ -592,8 +592,9 @@ func TestHandler_COA(t *testing.T) {
 				testContract := testutils.GetStorageTestContract(t)
 				result := foa.Deploy(testContract.ByteCode, math.MaxUint64, types.NewBalanceFromUFix64(0))
 				addr := result.DeployedContractAddress
+				// skip first few bytes as they are deploy codes
+				assert.Equal(t, testContract.ByteCode[17:], []byte(result.ReturnedValue))
 				require.NotNil(t, addr)
-				assert.Equal(t, addr.Bytes(), []byte(result.ReturnedValue))
 
 				num := big.NewInt(22)
 				_ = foa.Call(
