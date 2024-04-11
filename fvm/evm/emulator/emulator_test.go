@@ -302,6 +302,64 @@ func TestContractInteraction(t *testing.T) {
 				})
 			})
 
+			t.Run("test batch running transactions", func(t *testing.T) {
+				account := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
+				fAddr := account.Address()
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						_, err := blk.DirectCall(types.NewDepositCall(bridgeAccount, fAddr, amount, account.Nonce()))
+						require.NoError(t, err)
+					})
+				})
+
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
+					ctx.GasFeeCollector = types.NewAddressFromString("coinbase")
+					coinbaseOrgBalance := gethCommon.Big1
+					// small amount of money to create account
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						_, err := blk.DirectCall(types.NewDepositCall(bridgeAccount, ctx.GasFeeCollector, coinbaseOrgBalance, 0))
+						require.NoError(t, err)
+					})
+
+					blk, err := env.NewBlockView(ctx)
+					require.NoError(t, err)
+
+					const batchSize = 3
+					txs := make([]*gethTypes.Transaction, batchSize)
+					for i := range txs {
+						txs[i] = account.PrepareAndSignTx(
+							t,
+							testAccount.ToCommon(), // to
+							nil,                    // data
+							big.NewInt(1000),       // amount
+							gethParams.TxGas,       // gas limit
+							gethCommon.Big1,        // gas fee
+
+						)
+					}
+
+					results, err := blk.BatchRunTransactions(txs)
+					require.NoError(t, err)
+					for _, res := range results {
+						require.NoError(t, res.VMError)
+						require.Greater(t, res.GasConsumed, uint64(0))
+					}
+
+					// check the balance of coinbase
+					RunWithNewReadOnlyBlockView(t, env, func(blk2 types.ReadOnlyBlockView) {
+						bal, err := blk2.BalanceOf(ctx.GasFeeCollector)
+						require.NoError(t, err)
+						expected := gethParams.TxGas*gethCommon.Big1.Uint64()*batchSize + gethCommon.Big1.Uint64()
+						require.Equal(t, expected, bal.Uint64())
+
+						nonce, err := blk2.NonceOf(fAddr)
+						require.NoError(t, err)
+						require.Equal(t, batchSize, int(nonce))
+					})
+				})
+			})
+
 			t.Run("test runing transactions with dynamic fees (happy case)", func(t *testing.T) {
 				account := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
 				fAddr := account.Address()
