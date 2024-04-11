@@ -28,7 +28,6 @@ import (
 // when a block is executed, it notifies the block queue and forwards to execution state to save them.
 type Core struct {
 	*component.ComponentManager
-	ctx context.Context
 
 	log zerolog.Logger
 
@@ -116,7 +115,6 @@ func (e *Core) launchWorkerToHandleBlocks(ctx irrecoverable.SignalerContext, rea
 	e.log.Info().Bool("execution_stopped", executionStopped).Msgf("launching worker")
 
 	ready()
-	e.ctx = ctx
 
 	if executionStopped {
 		return
@@ -171,7 +169,7 @@ func (e *Core) launchWorkerToConsumeThrottledBlocks(ctx irrecoverable.SignalerCo
 			e.log.Debug().Hex("block_id", blockID[:]).Msg("ingestion core processing block")
 			err := e.onProcessableBlock(ctx, blockID)
 			if err != nil {
-				ctx.Throw(fmt.Errorf("fail to process block: %w", err))
+				ctx.Throw(fmt.Errorf("fail to process block %v: %w", blockID, err))
 				return
 			}
 		}
@@ -415,7 +413,7 @@ func storeCollectionIfMissing(collections storage.Collections, col *flow.Collect
 func (e *Core) executeConcurrently(executables []*entity.ExecutableBlock) {
 	for _, executable := range executables {
 		e.blockExecutors <- func(ctx irrecoverable.SignalerContext) {
-			err := e.execute(e.ctx, executable)
+			err := e.execute(ctx, executable)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("failed to execute block %v: %w", executable.Block.ID(), err))
 			}
@@ -436,12 +434,12 @@ func (e *Core) execute(ctx context.Context, executable *entity.ExecutableBlock) 
 
 	startedAt := time.Now()
 
-	result, err := e.executor.ExecuteBlock(e.ctx, executable)
+	result, err := e.executor.ExecuteBlock(ctx, executable)
 	if err != nil {
 		return fmt.Errorf("failed to execute block %v: %w", executable.Block.ID(), err)
 	}
 
-	err = e.onBlockExecuted(e.ctx, executable, result, startedAt)
+	err = e.onBlockExecuted(ctx, executable, result, startedAt)
 	if err != nil {
 		return fmt.Errorf("failed to handle execution result of block %v: %w", executable.Block.ID(), err)
 	}
