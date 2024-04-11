@@ -273,6 +273,13 @@ func bootstrapProtocolState(
 			return fmt.Errorf("could not insert root kv store: %w", err)
 		}
 
+		for protocolStateID, stateEntry := range segment.ProtocolStateEntries {
+			// todo error handling
+			protocolKVStores.StoreTx(protocolStateID, stateEntry.KVStoreEntry)
+			protocolState.StoreTx(stateEntry.EpochEntry.ID(), stateEntry.EpochEntry.ProtocolStateEntry)
+			// todo store service events as well... need to pass in more storage modules
+		}
+
 		// TODO: remove assumption
 		// NOTE: as specified in the godoc, this code assumes that each block
 		// in the sealing segment is within the same phase within the same epoch.
