@@ -171,14 +171,15 @@ func TestDiffCadenceValues(t *testing.T) {
 			)
 
 			mr, err := NewMigratorRuntime(
-				address,
-				[]*ledger.Payload{accountStatusPayload},
+				[]*ledger.Payload{
+					accountStatusPayload,
+				},
 				util.RuntimeInterfaceConfig{},
 			)
 			require.NoError(t, err)
 
 			// Create new storage map
-			storageMap := mr.Storage.GetStorageMap(mr.Address, domain, true)
+			storageMap := mr.Storage.GetStorageMap(address, domain, true)
 
 			nestedArray := interpreter.NewArrayValue(
 				mr.Interpreter,
@@ -271,14 +272,15 @@ func TestDiffCadenceValues(t *testing.T) {
 			)
 
 			mr, err := NewMigratorRuntime(
-				address,
-				[]*ledger.Payload{accountStatusPayload},
+				[]*ledger.Payload{
+					accountStatusPayload,
+				},
 				util.RuntimeInterfaceConfig{},
 			)
 			require.NoError(t, err)
 
 			// Create new storage map
-			storageMap := mr.Storage.GetStorageMap(mr.Address, domain, true)
+			storageMap := mr.Storage.GetStorageMap(address, domain, true)
 
 			nestedDict := interpreter.NewDictionaryValueWithAddress(
 				mr.Interpreter,
@@ -378,14 +380,15 @@ func TestDiffCadenceValues(t *testing.T) {
 			)
 
 			mr, err := NewMigratorRuntime(
-				address,
-				[]*ledger.Payload{accountStatusPayload},
+				[]*ledger.Payload{
+					accountStatusPayload,
+				},
 				util.RuntimeInterfaceConfig{},
 			)
 			require.NoError(t, err)
 
 			// Create new storage map
-			storageMap := mr.Storage.GetStorageMap(mr.Address, domain, true)
+			storageMap := mr.Storage.GetStorageMap(address, domain, true)
 
 			var fields []interpreter.CompositeField
 
@@ -496,14 +499,15 @@ func TestDiffCadenceValues(t *testing.T) {
 			)
 
 			mr, err := NewMigratorRuntime(
-				address,
-				[]*ledger.Payload{accountStatusPayload},
+				[]*ledger.Payload{
+					accountStatusPayload,
+				},
 				util.RuntimeInterfaceConfig{},
 			)
 			require.NoError(t, err)
 
 			// Create new storage map
-			storageMap := mr.Storage.GetStorageMap(mr.Address, domain, true)
+			storageMap := mr.Storage.GetStorageMap(address, domain, true)
 
 			var fields []interpreter.CompositeField
 
@@ -621,14 +625,15 @@ func createStorageMapPayloads(t *testing.T, address common.Address, domain strin
 	)
 
 	mr, err := NewMigratorRuntime(
-		address,
-		[]*ledger.Payload{accountStatusPayload},
+		[]*ledger.Payload{
+			accountStatusPayload,
+		},
 		util.RuntimeInterfaceConfig{},
 	)
 	require.NoError(t, err)
 
 	// Create new storage map
-	storageMap := mr.Storage.GetStorageMap(mr.Address, domain, true)
+	storageMap := mr.Storage.GetStorageMap(address, domain, true)
 
 	for i, k := range keys {
 		storageMap.WriteValue(

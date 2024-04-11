@@ -121,7 +121,6 @@ func checkMigratedPayloads(
 	newPayloads []*ledger.Payload,
 ) {
 	mr, err := NewMigratorRuntime(
-		address,
 		newPayloads,
 		util.RuntimeInterfaceConfig{},
 	)
@@ -381,7 +380,7 @@ func checkMigratedPayloads(
 	}
 }
 
-func checkAccountID(t *testing.T, mr *migratorRuntime, address common.Address) {
+func checkAccountID(t *testing.T, mr *MigratorRuntime, address common.Address) {
 	id := flow.AccountStatusRegisterID(flow.Address(address))
 	statusBytes, err := mr.Accounts.GetValue(id)
 	require.NoError(t, err)
@@ -738,7 +737,6 @@ func TestProgramParsingError(t *testing.T) {
 	require.NoError(t, err)
 
 	runtime, err := NewMigratorRuntime(
-		testAddress,
 		payloads,
 		util.RuntimeInterfaceConfig{},
 	)
@@ -881,7 +879,6 @@ func TestCoreContractUsage(t *testing.T) {
 		require.NoError(t, err)
 
 		runtime, err := NewMigratorRuntime(
-			testAddress,
 			payloads,
 			util.RuntimeInterfaceConfig{},
 		)
@@ -970,7 +967,6 @@ func TestCoreContractUsage(t *testing.T) {
 		// Get result
 
 		mr, err := NewMigratorRuntime(
-			testAddress,
 			payloads,
 			util.RuntimeInterfaceConfig{},
 		)

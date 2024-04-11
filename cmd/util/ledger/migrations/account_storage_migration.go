@@ -21,7 +21,6 @@ func NewAccountStorageMigration(
 	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
 
 		migrationRuntime, err := NewMigratorRuntime(
-			address,
 			payloads,
 			util.RuntimeInterfaceConfig{},
 		)

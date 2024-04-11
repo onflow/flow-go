@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/stdlib"
 
@@ -25,13 +24,24 @@ type migrationTransactionPreparer struct {
 
 var _ storage.TransactionPreparer = migrationTransactionPreparer{}
 
-// migratorRuntime is a runtime that can be used to run a migration on a single account
+type MigratorRuntime struct {
+	Snapshot                *util.PayloadSnapshot
+	TransactionState        state.NestedTransactionPreparer
+	Interpreter             *interpreter.Interpreter
+	Storage                 *runtime.Storage
+	Payloads                []*ledger.Payload
+	AccountsLedger          *util.AccountsAtreeLedger
+	Accounts                environment.Accounts
+	ContractAdditionHandler stdlib.AccountContractAdditionHandler
+	ContractNamesProvider   stdlib.AccountContractNamesProvider
+}
+
+// NewMigratorRuntime returns a runtime that can be used in migrations.
 func NewMigratorRuntime(
-	address common.Address,
 	payloads []*ledger.Payload,
 	config util.RuntimeInterfaceConfig,
 ) (
-	*migratorRuntime,
+	*MigratorRuntime,
 	error,
 ) {
 	snapshot, err := util.NewPayloadSnapshot(payloads)
@@ -55,9 +65,10 @@ func NewMigratorRuntime(
 		NewDerivedBlockDataForScript(flow.Identifier{}).
 		NewSnapshotReadDerivedTransactionData()
 
-	ri := &util.MigrationRuntimeInterface{
-		Accounts: accounts,
-		Programs: environment.NewPrograms(
+	ri := util.NewMigrationRuntimeInterface(
+		config,
+		accounts,
+		environment.NewPrograms(
 			tracing.NewTracerSpan(),
 			util.NopMeter{},
 			environment.NoopMetricsReporter{},
@@ -67,9 +78,7 @@ func NewMigratorRuntime(
 			},
 			accounts,
 		),
-		RuntimeInterfaceConfig: config,
-		ProgramErrors:          map[common.Location]error{},
-	}
+	)
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{
 		// Attachments are enabled everywhere except for Mainnet
@@ -92,8 +101,7 @@ func NewMigratorRuntime(
 		return nil, err
 	}
 
-	return &migratorRuntime{
-		Address:                 address,
+	return &MigratorRuntime{
 		Payloads:                payloads,
 		Snapshot:                snapshot,
 		TransactionState:        transactionState,
@@ -104,17 +112,4 @@ func NewMigratorRuntime(
 		ContractAdditionHandler: env,
 		ContractNamesProvider:   env,
 	}, nil
-}
-
-type migratorRuntime struct {
-	Snapshot                *util.PayloadSnapshot
-	TransactionState        state.NestedTransactionPreparer
-	Interpreter             *interpreter.Interpreter
-	Storage                 *runtime.Storage
-	Payloads                []*ledger.Payload
-	Address                 common.Address
-	AccountsLedger          *util.AccountsAtreeLedger
-	Accounts                environment.Accounts
-	ContractAdditionHandler stdlib.AccountContractAdditionHandler
-	ContractNamesProvider   stdlib.AccountContractNamesProvider
 }
