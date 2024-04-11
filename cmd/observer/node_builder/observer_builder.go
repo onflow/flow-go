@@ -1660,6 +1660,19 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			),
 		}
 
+		broadcaster := engine.NewBroadcaster()
+		// create BlockTracker that will track for new blocks (finalized and sealed) and
+		// handles block-related operations.
+		blockTracker, err := subscription.NewBlockTracker(
+			node.State,
+			builder.FinalizedRootBlock.Header.Height,
+			node.Storage.Headers,
+			broadcaster,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize block tracker: %w", err)
+		}
+
 		backendParams := backend.Params{
 			State:                     node.State,
 			Blocks:                    node.Storage.Blocks,
@@ -1678,6 +1691,14 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			Log:                       node.Logger,
 			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
 			Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+			BlockTracker:              blockTracker,
+			SubscriptionHandler: subscription.NewSubscriptionHandler(
+				builder.Logger,
+				broadcaster,
+				builder.stateStreamConf.ClientSendTimeout,
+				builder.stateStreamConf.ResponseLimit,
+				builder.stateStreamConf.ClientSendBufferSize,
+			),
 		}
 
 		if builder.localServiceAPIEnabled {
