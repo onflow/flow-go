@@ -156,7 +156,6 @@ func (m *StagedContractsMigration) InitMigration(
 // collectAndRegisterStagedContractsFromPayloads scan through the payloads and collects the contracts
 // staged through the `MigrationContractStaging` contract.
 func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads(allPayloads []*ledger.Payload) error {
-	var stagingAccount string
 
 	// If the contracts are already passed as an input to the migration
 	// then no need to scan the storage.
@@ -164,6 +163,8 @@ func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads
 	if len(m.contractsByLocation) > 0 {
 		return nil
 	}
+
+	var stagingAccount string
 
 	switch m.chainID {
 	case flow.Testnet:
