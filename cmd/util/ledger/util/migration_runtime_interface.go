@@ -17,11 +17,25 @@ import (
 )
 
 // MigrationRuntimeInterface is a runtime interface that can be used in migrations.
+// It only allows parsing and checking of contracts, given Accounts and Programs.
 type MigrationRuntimeInterface struct {
 	RuntimeInterfaceConfig
 	Accounts      environment.Accounts
 	Programs      *environment.Programs
 	ProgramErrors map[common.Location]error
+}
+
+func NewMigrationRuntimeInterface(
+	config RuntimeInterfaceConfig,
+	accounts environment.Accounts,
+	programs *environment.Programs,
+) *MigrationRuntimeInterface {
+	return &MigrationRuntimeInterface{
+		RuntimeInterfaceConfig: config,
+		Accounts:               accounts,
+		Programs:               programs,
+		ProgramErrors:          make(map[common.Location]error),
+	}
 }
 
 func (m *MigrationRuntimeInterface) ResolveLocation(
