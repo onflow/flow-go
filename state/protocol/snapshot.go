@@ -135,12 +135,16 @@ type Snapshot interface {
 	// Returns invalid.Params with state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
 	Params() GlobalParams
 
-	// ProtocolState returns the dynamic protocol state that the Head block commits to. The
-	// compliance layer guarantees that only valid blocks are appended to the protocol state.
+	// EpochProtocolState returns the epoch part of dynamic protocol state that the Head block commits to.
+	// The compliance layer guarantees that only valid blocks are appended to the protocol state.
 	// Returns state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
 	// All other errors should be treated as exceptions.
 	EpochProtocolState() (DynamicProtocolState, error)
 
+	// ProtocolState returns the dynamic protocol state that the Head block commits to.
+	// The compliance layer guarantees that only valid blocks are appended to the protocol state.
+	// Returns state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
+	// All other errors should be treated as exceptions.
 	ProtocolState() (KVStoreReader, error)
 
 	// VersionBeacon returns the latest sealed version beacon.

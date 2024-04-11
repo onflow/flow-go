@@ -31,24 +31,37 @@ func NewProtocolState(protocolStateDB storage.ProtocolState, kvStoreSnapshots st
 	}
 }
 
-// AtBlockID returns protocol state at block ID.
-// Resulting protocol state is returned AFTER applying updates that are contained in block.
+// AtBlockID returns epoch protocol state at block ID.
+// The resulting epoch protocol state is returned AFTER applying updates that are contained in block.
+// Can be queried for any block that has been added to the block tree.
 // Returns:
-// - (DynamicProtocolState, nil) - if there is a protocol state associated with given block ID.
-// - (nil, storage.ErrNotFound) - if there is no protocol state associated with given block ID.
+// - (DynamicProtocolState, nil) - if there is an epoch protocol state associated with given block ID.
+// - (nil, storage.ErrNotFound) - if there is no epoch protocol state associated with given block ID.
 // - (nil, exception) - any other error should be treated as exception.
 func (s *ProtocolState) AtBlockID(blockID flow.Identifier) (protocol.DynamicProtocolState, error) {
 	protocolStateEntry, err := s.protocolStateDB.ByBlockID(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not query protocol state at block (%x): %w", blockID, err)
+		return nil, fmt.Errorf("could not query epoch protocol state at block (%x): %w", blockID, err)
 	}
 	return inmem.NewDynamicProtocolStateAdapter(protocolStateEntry, s.globalParams), nil
 }
 
+// KVStoreAtBlockID returns protocol state at block ID.
+// The resulting protocol state is returned AFTER applying updates that are contained in block.
+// Can be queried for any block that has been added to the block tree.
+// Returns:
+// - (KVStoreReader, nil) - if there is a protocol state associated with given block ID.
+// - (nil, storage.ErrNotFound) - if there is no protocol state associated with given block ID.
+// - (nil, exception) - any other error should be treated as exception.
 func (s *ProtocolState) KVStoreAtBlockID(blockID flow.Identifier) (protocol.KVStoreReader, error) {
 	return s.kvStoreAtBlockID(blockID)
 }
 
+// kvStoreAtBlockID queries KV store by block ID and decodes it from binary data to a typed interface.
+// Returns:
+// - (protocol_state.KVStoreAPI, nil) - if there is a protocol state associated with given block ID.
+// - (nil, storage.ErrNotFound) - if there is no protocol state associated with given block ID.
+// - (nil, exception) - any other error should be treated as exception.
 func (s *ProtocolState) kvStoreAtBlockID(blockID flow.Identifier) (protocol_state.KVStoreAPI, error) {
 	versionedData, err := s.kvStoreSnapshots.ByBlockID(blockID)
 	if err != nil {
@@ -56,7 +69,7 @@ func (s *ProtocolState) kvStoreAtBlockID(blockID flow.Identifier) (protocol_stat
 	}
 	kvStore, err := kvstore.VersionedDecode(versionedData.Version, versionedData.Data)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode parent protocol state (version=%d) at block (%x): %w",
+		return nil, fmt.Errorf("could not decode protocol state (version=%d) at block (%x): %w",
 			versionedData.Version, blockID, err)
 	}
 	return kvStore, err

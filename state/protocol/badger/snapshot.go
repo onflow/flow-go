@@ -323,13 +323,20 @@ func (s *Snapshot) Params() protocol.GlobalParams {
 	return s.state.Params()
 }
 
-// EpochProtocolState returns the dynamic protocol state that the Head block commits to. The
-// compliance layer guarantees that only valid blocks are appended to the protocol state.
+// EpochProtocolState returns the epoch part of dynamic protocol state that the Head block commits to.
+// The compliance layer guarantees that only valid blocks are appended to the protocol state.
+// Returns state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
+// All other errors should be treated as exceptions.
 // For each block stored there should be a protocol state stored.
 func (s *Snapshot) EpochProtocolState() (protocol.DynamicProtocolState, error) {
 	return s.state.protocolState.AtBlockID(s.blockID)
 }
 
+// ProtocolState returns the dynamic protocol state that the Head block commits to.
+// The compliance layer guarantees that only valid blocks are appended to the protocol state.
+// Returns state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
+// All other errors should be treated as exceptions.
+// For each block stored there should be a protocol state stored.
 func (s *Snapshot) ProtocolState() (protocol.KVStoreReader, error) {
 	return s.state.protocolState.KVStoreAtBlockID(s.blockID)
 }

@@ -70,15 +70,22 @@ type ProtocolState interface {
 	//  epoch counter -> block ID. It gets worse if we consider that we need a way to get the epoch counter itself at caller side.
 	//ByEpoch(epoch uint64) (InitialProtocolState, error)
 
-	// AtBlockID returns protocol state at block ID.
-	// The resulting protocol state is returned AFTER applying updates that are contained in block.
+	// AtBlockID returns epoch protocol state at block ID.
+	// The resulting epoch protocol state is returned AFTER applying updates that are contained in block.
 	// Can be queried for any block that has been added to the block tree.
 	// Returns:
-	// - (DynamicProtocolState, nil) - if there is a protocol state associated with given block ID.
-	// - (nil, storage.ErrNotFound) - if there is no protocol state associated with given block ID.
+	// - (DynamicProtocolState, nil) - if there is an epoch protocol state associated with given block ID.
+	// - (nil, storage.ErrNotFound) - if there is no epoch protocol state associated with given block ID.
 	// - (nil, exception) - any other error should be treated as exception.
 	AtBlockID(blockID flow.Identifier) (DynamicProtocolState, error)
 
+	// KVStoreAtBlockID returns protocol state at block ID.
+	// The resulting protocol state is returned AFTER applying updates that are contained in block.
+	// Can be queried for any block that has been added to the block tree.
+	// Returns:
+	// - (KVStoreReader, nil) - if there is a protocol state associated with given block ID.
+	// - (nil, storage.ErrNotFound) - if there is no protocol state associated with given block ID.
+	// - (nil, exception) - any other error should be treated as exception.
 	KVStoreAtBlockID(blockID flow.Identifier) (KVStoreReader, error)
 
 	// GlobalParams returns params that are the same for all nodes in the network.
