@@ -1,3 +1,6 @@
+// Unused import. But keep it here for testing the import resolving.
+import NonFungibleToken from 0xf8d6e0586b0a20c7
+
 access(all) contract Test {
 
 	access(all) struct interface Foo {}

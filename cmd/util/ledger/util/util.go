@@ -101,15 +101,6 @@ func (p PayloadSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 	return value.Value(), nil
 }
 
-// NopMemoryGauge is a no-op implementation of the MemoryGauge interface
-type NopMemoryGauge struct{}
-
-func (n NopMemoryGauge) MeterMemory(common.MemoryUsage) error {
-	return nil
-}
-
-var _ common.MemoryGauge = (*NopMemoryGauge)(nil)
-
 type PayloadsReadonlyLedger struct {
 	Snapshot *PayloadSnapshot
 

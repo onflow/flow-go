@@ -17,8 +17,6 @@ import (
 	"github.com/onflow/flow-go/ledger"
 )
 
-var nopMemoryGauge = util.NopMemoryGauge{}
-
 // TODO: optimize memory by reusing payloads snapshot created for migration
 func validateCadenceValues(
 	address common.Address,
@@ -79,19 +77,27 @@ func validateStorageDomain(
 		return fmt.Errorf("old storage map count %d, new storage map count %d", oldStorageMap.Count(), newStorageMap.Count())
 	}
 
-	oldIterator := oldStorageMap.Iterator(nopMemoryGauge)
+	oldIterator := oldStorageMap.Iterator(nil)
 	for {
 		key, oldValue := oldIterator.Next()
 		if key == nil {
 			break
 		}
 
-		stringKey, ok := key.(interpreter.StringAtreeValue)
-		if !ok {
-			return fmt.Errorf("invalid key type %T, expected interpreter.StringAtreeValue", key)
+		var mapKey interpreter.StorageMapKey
+
+		switch key := key.(type) {
+		case interpreter.StringAtreeValue:
+			mapKey = interpreter.StringStorageMapKey(key)
+
+		case interpreter.Uint64AtreeValue:
+			mapKey = interpreter.Uint64StorageMapKey(key)
+
+		default:
+			return fmt.Errorf("invalid key type %T, expected interpreter.StringAtreeValue or interpreter.Uint64AtreeValue", key)
 		}
 
-		newValue := newStorageMap.ReadValue(nopMemoryGauge, interpreter.StringStorageMapKey(stringKey))
+		newValue := newStorageMap.ReadValue(nil, mapKey)
 
 		err := cadenceValueEqual(oldRuntime.Interpreter, oldValue, newRuntime.Interpreter, newValue)
 		if err != nil {
@@ -99,7 +105,7 @@ func validateStorageDomain(
 				log.Info().
 					Str("address", address.Hex()).
 					Str("domain", domain).
-					Str("key", string(stringKey)).
+					Str("key", fmt.Sprintf("%v (%T)", mapKey, mapKey)).
 					Str("trace", err.Error()).
 					Str("old value", oldValue.String()).
 					Str("new value", newValue.String()).
@@ -274,27 +280,46 @@ func cadenceCompositeValueEqual(
 
 	var err *validationError
 	vFieldNames := make([]string, 0, 10) // v's field names
-	v.ForEachField(nopMemoryGauge, func(fieldName string, fieldValue interpreter.Value) bool {
-		otherFieldValue := otherComposite.GetField(otherInterpreter, interpreter.EmptyLocationRange, fieldName)
+	v.ForEachField(
+		vInterpreter,
+		func(fieldName string, fieldValue interpreter.Value) bool {
+			otherFieldValue := otherComposite.GetField(
+				otherInterpreter,
+				interpreter.EmptyLocationRange,
+				fieldName,
+			)
 
-		err = cadenceValueEqual(vInterpreter, fieldValue, otherInterpreter, otherFieldValue)
-		if err != nil {
-			err.addTrace(fmt.Sprintf("(%s.%s)", v.TypeID(), fieldName))
-			return false
-		}
+			err = cadenceValueEqual(
+				vInterpreter,
+				fieldValue,
+				otherInterpreter,
+				otherFieldValue,
+			)
+			if err != nil {
+				err.addTrace(fmt.Sprintf("(%s.%s)", v.TypeID(), fieldName))
+				return false
+			}
 
-		vFieldNames = append(vFieldNames, fieldName)
-		return true
-	})
+			vFieldNames = append(vFieldNames, fieldName)
+			return true
+		},
+		interpreter.EmptyLocationRange,
+	)
+	if err != nil {
+		return err
+	}
 
-	// TODO: Use CompositeValue.FieldCount() from Cadence after it is merged and available.
-	otherFieldNames := make([]string, 0, len(vFieldNames)) // otherComposite's field names
-	otherComposite.ForEachField(nopMemoryGauge, func(fieldName string, _ interpreter.Value) bool {
-		otherFieldNames = append(otherFieldNames, fieldName)
-		return true
-	})
+	if len(vFieldNames) != otherComposite.FieldCount() {
+		otherFieldNames := make([]string, 0, len(vFieldNames)) // otherComposite's field names
+		otherComposite.ForEachField(
+			otherInterpreter,
+			func(fieldName string, _ interpreter.Value) bool {
+				otherFieldNames = append(otherFieldNames, fieldName)
+				return true
+			},
+			interpreter.EmptyLocationRange,
+		)
 
-	if len(vFieldNames) != len(otherFieldNames) {
 		return newValidationErrorf(
 			"composite %s fields differ: %v != %v",
 			v.TypeID(),
@@ -303,7 +328,7 @@ func cadenceCompositeValueEqual(
 		)
 	}
 
-	return err
+	return nil
 }
 
 func cadenceDictionaryValueEqual(
@@ -327,7 +352,7 @@ func cadenceDictionaryValueEqual(
 
 	oldIterator := v.Iterator()
 	for {
-		key := oldIterator.NextKey(nopMemoryGauge)
+		key := oldIterator.NextKey(nil)
 		if key == nil {
 			break
 		}
@@ -370,7 +395,7 @@ func newReadonlyStorageRuntime(payloads []*ledger.Payload) (
 
 	readonlyLedger := util.NewPayloadsReadonlyLedger(snapshot)
 
-	storage := runtime.NewStorage(readonlyLedger, nopMemoryGauge)
+	storage := runtime.NewStorage(readonlyLedger, nil)
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{
 		// Attachments are enabled everywhere except for Mainnet

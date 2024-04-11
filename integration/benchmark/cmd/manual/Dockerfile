@@ -39,7 +39,7 @@ RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=ssh \
     cd integration && \
-    CGO_ENABLED=1 CGO_FLAGS="${CGO_FLAG}" go build -ldflags "-extldflags -static" -o ./app ./${TARGET}
+    CGO_ENABLED=1 CGO_CFLAGS="${CGO_FLAG}" go build -ldflags "-extldflags -static" -o ./app ./${TARGET}
 
 RUN mv /app/integration/app /app/app
 

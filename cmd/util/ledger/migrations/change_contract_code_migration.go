@@ -7,6 +7,7 @@ import (
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	evm "github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
@@ -18,12 +19,20 @@ type ChangeContractCodeMigration struct {
 
 var _ AccountBasedMigration = (*ChangeContractCodeMigration)(nil)
 
-func NewChangeContractCodeMigration(chainID flow.ChainID, log zerolog.Logger) *ChangeContractCodeMigration {
+func NewChangeContractCodeMigration(
+	chainID flow.ChainID,
+	log zerolog.Logger,
+	rwf reporters.ReportWriterFactory,
+) *ChangeContractCodeMigration {
 	return &ChangeContractCodeMigration{
-		StagedContractsMigration: NewStagedContractsMigration(chainID, log).
-			// TODO:
-			//WithContractUpdateValidation().
-			WithName("ChangeContractCodeMigration"),
+		StagedContractsMigration: &StagedContractsMigration{
+			name:                "ChangeContractCodeMigration",
+			log:                 log,
+			chainID:             chainID,
+			stagedContracts:     map[common.Address]map[flow.RegisterID]Contract{},
+			contractsByLocation: map[common.Location][]byte{},
+			reporter:            rwf.ReportWriter("system-contracts-migrator"),
+		},
 	}
 }
 
@@ -44,7 +53,6 @@ type EVMContractChange uint8
 
 const (
 	EVMContractChangeNone EVMContractChange = iota
-	EVMContractChangeABIOnly
 	EVMContractChangeFull
 )
 
@@ -237,15 +245,13 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 	switch options.EVM {
 	case EVMContractChangeNone:
 		// do nothing
-	case EVMContractChangeABIOnly, EVMContractChangeFull:
-		abiOnly := options.EVM == EVMContractChangeABIOnly
+	case EVMContractChangeFull:
 		contractChanges = append(
 			contractChanges,
 			NewSystemContractChange(
 				systemContracts.EVMContract,
 				evm.ContractCode(
 					flow.HexToAddress(env.FlowTokenAddress),
-					abiOnly,
 				),
 			),
 		)
@@ -273,9 +279,10 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 func NewSystemContractsMigration(
 	chainID flow.ChainID,
 	log zerolog.Logger,
+	rwf reporters.ReportWriterFactory,
 	options SystemContractChangesOptions,
 ) *ChangeContractCodeMigration {
-	migration := NewChangeContractCodeMigration(chainID, log)
+	migration := NewChangeContractCodeMigration(chainID, log, rwf)
 	for _, change := range SystemContractChanges(chainID, options) {
 		migration.RegisterContractChange(change)
 	}

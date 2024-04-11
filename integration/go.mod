@@ -11,7 +11,6 @@ require (
 	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/docker/docker v24.0.6+incompatible
 	github.com/docker/go-connections v0.4.0
-	github.com/ethereum/go-ethereum v1.13.5
 	github.com/go-git/go-git/v5 v5.5.2
 	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/gorilla/websocket v1.5.0
@@ -22,14 +21,15 @@ require (
 	github.com/ipfs/go-ipfs-blockstore v1.3.0
 	github.com/libp2p/go-libp2p v0.32.2
 	github.com/onflow/cadence v1.0.0-preview.19.0.20240411132841-5de6f1c865b7
-	github.com/onflow/crypto v0.25.0
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.2-0.20240305214031-d81e0c3b42f3
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.2-0.20240305214031-d81e0c3b42f3
-	github.com/onflow/flow-emulator v1.0.0-M7.0.20240227020422-2ec59747f9be
-	github.com/onflow/flow-go v0.34.0-crescendo-preview.2.0.20240227001756-cb6311412b78
-	github.com/onflow/flow-go-sdk v1.0.0-M8
+	github.com/onflow/crypto v0.25.1
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.2-0.20240402184019-90048578066e
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.2-0.20240402184019-90048578066e
+	github.com/onflow/flow-emulator v1.0.0-preview.17
+	github.com/onflow/flow-go v0.34.0-crescendo-preview.9.0.20240409075958-ccbe91096438
+	github.com/onflow/flow-go-sdk v1.0.0-preview.17
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
-	github.com/onflow/flow/protobuf/go/flow v0.3.7
+	github.com/onflow/flow/protobuf/go/flow v0.4.0
+	github.com/onflow/go-ethereum v1.13.4
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.18.0
 	github.com/prometheus/client_model v0.5.0
@@ -79,7 +79,7 @@ require (
 	github.com/aws/smithy-go v1.17.0 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/bits-and-blooms/bitset v1.7.0 // indirect
+	github.com/bits-and-blooms/bitset v1.10.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.2.1 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
@@ -116,6 +116,7 @@ require (
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/ethereum/c-kzg-4844 v0.4.0 // indirect
+	github.com/ethereum/go-ethereum v1.13.10 // indirect
 	github.com/flynn/noise v1.0.1 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
@@ -167,7 +168,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
-	github.com/holiman/uint256 v1.2.3 // indirect
+	github.com/holiman/uint256 v1.2.4 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/imdario/mergo v0.3.13 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -252,10 +253,10 @@ require (
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.6.1-0.20240405171204-c6c951de7189 // indirect
-	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20240305212555-29d91e18f0c1 // indirect
-	github.com/onflow/flow-ft/lib/go/templates v0.7.1-0.20240305212555-29d91e18f0c1 // indirect
-	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20240305213046-9026973838d7 // indirect
-	github.com/onflow/flow-nft/lib/go/templates v0.0.0-20240305213046-9026973838d7 // indirect
+	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20240402160548-a9c331660956 // indirect
+	github.com/onflow/flow-ft/lib/go/templates v0.7.1-0.20240402160548-a9c331660956 // indirect
+	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20240402163945-74687e7a5b9d // indirect
+	github.com/onflow/flow-nft/lib/go/templates v0.0.0-20240402163945-74687e7a5b9d // indirect
 	github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba // indirect
 	github.com/onflow/wal v0.0.0-20240208022732-d756cd497d3b // indirect
 	github.com/onsi/ginkgo/v2 v2.13.2 // indirect

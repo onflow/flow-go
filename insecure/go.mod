@@ -10,7 +10,7 @@ require (
 	github.com/libp2p/go-libp2p v0.32.2
 	github.com/libp2p/go-libp2p-pubsub v0.10.0
 	github.com/multiformats/go-multiaddr-dns v0.3.1
-	github.com/onflow/crypto v0.25.0
+	github.com/onflow/crypto v0.25.1
 	github.com/onflow/flow-go v0.33.2-0.20240122190738-254af677b873
 	github.com/rs/zerolog v1.29.0
 	github.com/spf13/pflag v1.0.5
@@ -50,7 +50,7 @@ require (
 	github.com/aws/smithy-go v1.17.0 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/bits-and-blooms/bitset v1.7.0 // indirect
+	github.com/bits-and-blooms/bitset v1.10.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.2.1 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
@@ -81,7 +81,7 @@ require (
 	github.com/ef-ds/deque v1.0.4 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/ethereum/c-kzg-4844 v0.4.0 // indirect
-	github.com/ethereum/go-ethereum v1.13.5 // indirect
+	github.com/ethereum/go-ethereum v1.13.10 // indirect
 	github.com/flynn/noise v1.0.1 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
@@ -126,7 +126,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
-	github.com/holiman/uint256 v1.2.3 // indirect
+	github.com/holiman/uint256 v1.2.4 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/improbable-eng/grpc-web v0.15.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -206,14 +206,15 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.6.1-0.20240405171204-c6c951de7189 // indirect
 	github.com/onflow/cadence v1.0.0-preview.19.0.20240411132841-5de6f1c865b7 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.2-0.20240305214031-d81e0c3b42f3 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.2-0.20240305214031-d81e0c3b42f3 // indirect
-	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20240305212555-29d91e18f0c1 // indirect
-	github.com/onflow/flow-ft/lib/go/templates v0.7.1-0.20240305212555-29d91e18f0c1 // indirect
-	github.com/onflow/flow-go-sdk v1.0.0-M8 // indirect
-	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20240305213046-9026973838d7 // indirect
-	github.com/onflow/flow-nft/lib/go/templates v0.0.0-20240305213046-9026973838d7 // indirect
-	github.com/onflow/flow/protobuf/go/flow v0.3.7 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.2-0.20240402184019-90048578066e // indirect
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.2-0.20240402184019-90048578066e // indirect
+	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20240402160548-a9c331660956 // indirect
+	github.com/onflow/flow-ft/lib/go/templates v0.7.1-0.20240402160548-a9c331660956 // indirect
+	github.com/onflow/flow-go-sdk v1.0.0-preview.17 // indirect
+	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20240402163945-74687e7a5b9d // indirect
+	github.com/onflow/flow-nft/lib/go/templates v0.0.0-20240402163945-74687e7a5b9d // indirect
+	github.com/onflow/flow/protobuf/go/flow v0.4.0 // indirect
+	github.com/onflow/go-ethereum v1.13.4 // indirect
 	github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba // indirect
 	github.com/onflow/wal v0.0.0-20240208022732-d756cd497d3b // indirect
 	github.com/onsi/ginkgo/v2 v2.13.2 // indirect

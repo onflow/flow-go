@@ -8,6 +8,7 @@ import (
 
 	"errors"
 
+	"github.com/onflow/atree"
 	"github.com/onflow/cadence/migrations"
 	"github.com/onflow/cadence/migrations/capcons"
 	"github.com/onflow/cadence/migrations/entitlements"
@@ -29,12 +30,13 @@ import (
 )
 
 type CadenceBaseMigrator struct {
-	name            string
-	log             zerolog.Logger
-	reporter        reporters.ReportWriter
-	diffReporter    reporters.ReportWriter
-	logVerboseDiff  bool
-	valueMigrations func(
+	name                              string
+	log                               zerolog.Logger
+	reporter                          reporters.ReportWriter
+	diffReporter                      reporters.ReportWriter
+	logVerboseDiff                    bool
+	checkStorageHealthBeforeMigration bool
+	valueMigrations                   func(
 		inter *interpreter.Interpreter,
 		accounts environment.Accounts,
 		reporter *cadenceValueMigrationReporter,
@@ -103,9 +105,52 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 
 	storage := migrationRuntime.Storage
 
+	// Check storage health before migration, if enabled.
+	var storageHealthErrorBefore error
+	if m.checkStorageHealthBeforeMigration {
+
+		// Retrieve all slabs before migration.
+		for _, payload := range oldPayloads {
+			registerID, _, err := convert.PayloadToRegister(payload)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert payload to register: %w", err)
+			}
+
+			if !registerID.IsSlabIndex() {
+				continue
+			}
+
+			// Convert the register ID to a storage ID.
+			storageID := atree.NewSlabID(
+				atree.Address([]byte(registerID.Owner)),
+				atree.SlabIndex([]byte(registerID.Key[1:])),
+			)
+
+			// Retrieve the slab.
+			_, _, err = storage.Retrieve(storageID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to retrieve slab %s: %w", storageID, err)
+			}
+		}
+
+		// Load storage map.
+		for _, domain := range domains {
+			_ = storage.GetStorageMap(address, domain, false)
+		}
+
+		storageHealthErrorBefore = storage.CheckHealth()
+		if storageHealthErrorBefore != nil {
+			m.log.Warn().
+				Err(storageHealthErrorBefore).
+				Str("account", address.Hex()).
+				Msg("storage health check before migration failed")
+		}
+	}
+
 	migration := migrations.NewStorageMigration(
 		migrationRuntime.Interpreter,
 		storage,
+		m.name,
 	)
 
 	reporter := newValueMigrationReporter(m.reporter, m.log, m.errorMessageHandler)
@@ -129,9 +174,15 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		return nil, fmt.Errorf("failed to commit changes: %w", err)
 	}
 
-	err = storage.CheckHealth()
-	if err != nil {
-		m.log.Err(err).Msg("storage health check failed")
+	// Check storage health after migration.
+	// If the storage health check failed before the migration, we don't need to check it again.
+	if storageHealthErrorBefore == nil {
+		storageHealthErrorAfter := storage.CheckHealth()
+		if storageHealthErrorAfter != nil {
+			m.log.Err(storageHealthErrorAfter).
+				Str("account", address.Hex()).
+				Msg("storage health check after migration failed")
+		}
 	}
 
 	// finalize the transaction
@@ -202,24 +253,24 @@ func checkPayloadOwnership(payload *ledger.Payload, address common.Address, log 
 // which runs some of the Cadence value migrations (static types, entitlements, strings)
 func NewCadence1ValueMigrator(
 	rwf reporters.ReportWriterFactory,
-	diffMigrations bool,
-	logVerboseDiff bool,
 	errorMessageHandler *errorMessageHandler,
 	contracts map[common.AddressLocation][]byte,
 	compositeTypeConverter statictypes.CompositeTypeConverterFunc,
 	interfaceTypeConverter statictypes.InterfaceTypeConverterFunc,
+	opts Options,
 ) *CadenceBaseMigrator {
 
 	var diffReporter reporters.ReportWriter
-	if diffMigrations {
+	if opts.DiffMigrations {
 		diffReporter = rwf.ReportWriter("cadence-value-migration-diff")
 	}
 
 	return &CadenceBaseMigrator{
-		name:           "cadence-value-migration",
-		reporter:       rwf.ReportWriter("cadence-value-migrator"),
-		diffReporter:   diffReporter,
-		logVerboseDiff: logVerboseDiff,
+		name:                              "cadence-value-migration",
+		reporter:                          rwf.ReportWriter("cadence-value-migrator"),
+		diffReporter:                      diffReporter,
+		logVerboseDiff:                    opts.LogVerboseDiff,
+		checkStorageHealthBeforeMigration: opts.CheckStorageHealthBeforeMigration,
 		valueMigrations: func(
 			inter *interpreter.Interpreter,
 			_ environment.Accounts,
@@ -243,22 +294,22 @@ func NewCadence1ValueMigrator(
 // It populates the given map with the IDs of the capability controller it issues.
 func NewCadence1LinkValueMigrator(
 	rwf reporters.ReportWriterFactory,
-	diffMigrations bool,
-	logVerboseDiff bool,
 	errorMessageHandler *errorMessageHandler,
 	contracts map[common.AddressLocation][]byte,
 	capabilityMapping *capcons.CapabilityMapping,
+	opts Options,
 ) *CadenceBaseMigrator {
 	var diffReporter reporters.ReportWriter
-	if diffMigrations {
+	if opts.DiffMigrations {
 		diffReporter = rwf.ReportWriter("cadence-link-value-migration-diff")
 	}
 
 	return &CadenceBaseMigrator{
-		name:           "cadence-link-value-migration",
-		reporter:       rwf.ReportWriter("cadence-link-value-migrator"),
-		diffReporter:   diffReporter,
-		logVerboseDiff: logVerboseDiff,
+		name:                              "cadence-link-value-migration",
+		reporter:                          rwf.ReportWriter("cadence-link-value-migrator"),
+		diffReporter:                      diffReporter,
+		logVerboseDiff:                    opts.LogVerboseDiff,
+		checkStorageHealthBeforeMigration: opts.CheckStorageHealthBeforeMigration,
 		valueMigrations: func(
 			_ *interpreter.Interpreter,
 			accounts environment.Accounts,
@@ -288,22 +339,22 @@ func NewCadence1LinkValueMigrator(
 // generated by the link value migration.
 func NewCadence1CapabilityValueMigrator(
 	rwf reporters.ReportWriterFactory,
-	diffMigrations bool,
-	logVerboseDiff bool,
 	errorMessageHandler *errorMessageHandler,
 	contracts map[common.AddressLocation][]byte,
 	capabilityMapping *capcons.CapabilityMapping,
+	opts Options,
 ) *CadenceBaseMigrator {
 	var diffReporter reporters.ReportWriter
-	if diffMigrations {
+	if opts.DiffMigrations {
 		diffReporter = rwf.ReportWriter("cadence-capability-value-migration-diff")
 	}
 
 	return &CadenceBaseMigrator{
-		name:           "cadence-capability-value-migration",
-		reporter:       rwf.ReportWriter("cadence-capability-value-migrator"),
-		diffReporter:   diffReporter,
-		logVerboseDiff: logVerboseDiff,
+		name:                              "cadence-capability-value-migration",
+		reporter:                          rwf.ReportWriter("cadence-capability-value-migrator"),
+		diffReporter:                      diffReporter,
+		logVerboseDiff:                    opts.LogVerboseDiff,
+		checkStorageHealthBeforeMigration: opts.CheckStorageHealthBeforeMigration,
 		valueMigrations: func(
 			_ *interpreter.Interpreter,
 			_ environment.Accounts,
@@ -452,7 +503,7 @@ func (t *cadenceValueMigrationReporter) MissingTarget(accountAddressPath interpr
 	})
 }
 
-type reportEntry interface {
+type valueMigrationReportEntry interface {
 	accountAddress() common.Address
 }
 
@@ -462,7 +513,7 @@ type cadenceValueMigrationReportEntry struct {
 	Migration     string                    `json:"migration"`
 }
 
-var _ reportEntry = cadenceValueMigrationReportEntry{}
+var _ valueMigrationReportEntry = cadenceValueMigrationReportEntry{}
 
 func (e cadenceValueMigrationReportEntry) accountAddress() common.Address {
 	return e.StorageKey.Address
@@ -473,7 +524,7 @@ type capConsLinkMigrationEntry struct {
 	CapabilityID       interpreter.UInt64Value `json:"capabilityID"`
 }
 
-var _ reportEntry = capConsLinkMigrationEntry{}
+var _ valueMigrationReportEntry = capConsLinkMigrationEntry{}
 
 func (e capConsLinkMigrationEntry) accountAddress() common.Address {
 	return e.AccountAddressPath.Address
@@ -485,7 +536,7 @@ type capConsPathCapabilityMigrationEntry struct {
 	BorrowType     *interpreter.ReferenceStaticType `json:"borrowType"`
 }
 
-var _ reportEntry = capConsPathCapabilityMigrationEntry{}
+var _ valueMigrationReportEntry = capConsPathCapabilityMigrationEntry{}
 
 func (e capConsPathCapabilityMigrationEntry) accountAddress() common.Address {
 	return e.AccountAddress
@@ -496,7 +547,7 @@ type capConsMissingCapabilityIDEntry struct {
 	AddressPath    interpreter.AddressPath `json:"addressPath"`
 }
 
-var _ reportEntry = capConsMissingCapabilityIDEntry{}
+var _ valueMigrationReportEntry = capConsMissingCapabilityIDEntry{}
 
 type capConsMissingTargetEntry struct {
 	AddressPath interpreter.AddressPath `json:"addressPath"`
@@ -506,7 +557,7 @@ func (e capConsMissingTargetEntry) accountAddress() common.Address {
 	return e.AddressPath.Address
 }
 
-var _ reportEntry = capConsMissingTargetEntry{}
+var _ valueMigrationReportEntry = capConsMissingTargetEntry{}
 
 func (e capConsMissingCapabilityIDEntry) accountAddress() common.Address {
 	return e.AccountAddress

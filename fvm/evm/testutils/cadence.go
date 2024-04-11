@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"testing"
 	"time"
 
 	"github.com/onflow/atree"
@@ -20,6 +21,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 	cadenceStdlib "github.com/onflow/cadence/runtime/stdlib"
+	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -714,4 +716,11 @@ func (i *TestRuntimeInterface) InteractionUsed() (uint64, error) {
 	}
 
 	return i.OnInteractionUsed()
+}
+
+func CheckCadenceEventTypes(t testing.TB, events []cadence.Event, expectedTypes []string) {
+	require.Equal(t, len(events), len(expectedTypes))
+	for i, ev := range events {
+		require.Equal(t, expectedTypes[i], ev.EventType.QualifiedIdentifier)
+	}
 }

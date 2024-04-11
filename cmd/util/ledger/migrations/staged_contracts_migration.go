@@ -3,21 +3,21 @@ package migrations
 import (
 	"context"
 	"encoding/csv"
-	"fmt"
 	"io"
 	"os"
 	"strings"
 	"sync"
 
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/old_parser"
+	"github.com/onflow/cadence/runtime/pretty"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -35,6 +35,10 @@ type StagedContractsMigration struct {
 	contractsByLocation            map[common.Location][]byte
 	enableUpdateValidation         bool
 	userDefinedTypeChangeCheckFunc func(oldTypeID common.TypeID, newTypeID common.TypeID) (checked bool, valid bool)
+	elaborations                   map[common.Location]*sema.Elaboration
+	contractAdditionHandler        stdlib.AccountContractAdditionHandler
+	contractNamesProvider          stdlib.AccountContractNamesProvider
+	reporter                       reporters.ReportWriter
 }
 
 type StagedContract struct {
@@ -49,24 +53,24 @@ type Contract struct {
 
 var _ AccountBasedMigration = &StagedContractsMigration{}
 
-func NewStagedContractsMigration(chainID flow.ChainID, log zerolog.Logger) *StagedContractsMigration {
+func NewStagedContractsMigration(
+	chainID flow.ChainID,
+	log zerolog.Logger,
+	rwf reporters.ReportWriterFactory,
+) *StagedContractsMigration {
 	return &StagedContractsMigration{
 		name:                "StagedContractsMigration",
 		log:                 log,
 		chainID:             chainID,
 		stagedContracts:     map[common.Address]map[flow.RegisterID]Contract{},
 		contractsByLocation: map[common.Location][]byte{},
+		reporter:            rwf.ReportWriter("staged-contracts-migrator"),
 	}
 }
 
 func (m *StagedContractsMigration) WithContractUpdateValidation() *StagedContractsMigration {
 	m.enableUpdateValidation = true
-	m.userDefinedTypeChangeCheckFunc = newUserDefinedTypeChangeCheckerFunc(m.chainID)
-	return m
-}
-
-func (m *StagedContractsMigration) WithName(name string) *StagedContractsMigration {
-	m.name = name
+	m.userDefinedTypeChangeCheckFunc = NewUserDefinedTypeChangeCheckerFunc(m.chainID)
 	return m
 }
 
@@ -74,17 +78,24 @@ func (m *StagedContractsMigration) Close() error {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	if len(m.stagedContracts) > 0 {
-		var sb strings.Builder
-		sb.WriteString("failed to find all contract registers that need to be changed:\n")
-		for address, contracts := range m.stagedContracts {
-			_, _ = fmt.Fprintf(&sb, "- address: %s\n", address.HexWithPrefix())
-			for registerID := range contracts {
-				_, _ = fmt.Fprintf(&sb, "  - %s\n", flow.RegisterIDContractName(registerID))
-			}
-		}
-		return fmt.Errorf(sb.String())
+	// Close the report writer so it flushes to file.
+	m.reporter.Close()
 
+	if len(m.stagedContracts) > 0 {
+		dict := zerolog.Dict()
+		for address, contracts := range m.stagedContracts {
+			arr := zerolog.Arr()
+			for registerID := range contracts {
+				arr = arr.Str(flow.RegisterIDContractName(registerID))
+			}
+			dict = dict.Array(
+				address.HexWithPrefix(),
+				arr,
+			)
+		}
+		m.log.Error().
+			Dict("contracts", dict).
+			Msg("failed to find all contract registers that need to be changed")
 	}
 
 	return nil
@@ -92,7 +103,7 @@ func (m *StagedContractsMigration) Close() error {
 
 func (m *StagedContractsMigration) InitMigration(
 	log zerolog.Logger,
-	_ []*ledger.Payload,
+	allPayloads []*ledger.Payload,
 	_ int,
 ) error {
 	m.log = log.
@@ -106,6 +117,33 @@ func (m *StagedContractsMigration) InitMigration(
 		Address: common.Address(BurnerAddressForChain(m.chainID)),
 	}
 	m.contractsByLocation[burnerLocation] = coreContracts.Burner()
+
+	// Initialize elaborations, ContractAdditionHandler and ContractNamesProvider.
+	// These needs to be initialized using **ALL** payloads, not just the payloads of the account.
+
+	elaborations := map[common.Location]*sema.Elaboration{}
+
+	config := util.RuntimeInterfaceConfig{
+		GetContractCodeFunc: func(location runtime.Location) ([]byte, error) {
+			// TODO: also consider updated system contracts
+			return m.contractsByLocation[location], nil
+		},
+		GetOrLoadProgramListener: func(location runtime.Location, program *interpreter.Program, err error) {
+			if err == nil {
+				elaborations[location] = program.Elaboration
+			}
+		},
+	}
+
+	// Pass empty address. We are only interested in the created `env` object.
+	mr, err := NewMigratorRuntime(common.Address{}, allPayloads, config)
+	if err != nil {
+		return err
+	}
+
+	m.elaborations = elaborations
+	m.contractAdditionHandler = mr.ContractAdditionHandler
+	m.contractNamesProvider = mr.ContractNamesProvider
 
 	return nil
 }
@@ -191,25 +229,6 @@ func (m *StagedContractsMigration) MigrateAccount(
 		return oldPayloads, nil
 	}
 
-	elaborations := map[common.Location]*sema.Elaboration{}
-
-	config := util.RuntimeInterfaceConfig{
-		GetContractCodeFunc: func(location runtime.Location) ([]byte, error) {
-			// TODO: also consider updated system contracts
-			return m.contractsByLocation[location], nil
-		},
-		GetOrLoadProgramListener: func(location runtime.Location, program *interpreter.Program, err error) {
-			if err == nil {
-				elaborations[location] = program.Elaboration
-			}
-		},
-	}
-
-	mr, err := NewMigratorRuntime(address, oldPayloads, config)
-	if err != nil {
-		return nil, err
-	}
-
 	for payloadIndex, payload := range oldPayloads {
 		key, err := payload.Key()
 		if err != nil {
@@ -234,28 +253,54 @@ func (m *StagedContractsMigration) MigrateAccount(
 
 		if m.enableUpdateValidation {
 			err = m.checkContractUpdateValidity(
-				mr,
 				address,
 				name,
 				newCode,
 				oldCode,
-				elaborations,
 			)
 		}
 
 		if err != nil {
-			m.log.Err(err).
+			var builder strings.Builder
+			errorPrinter := pretty.NewErrorPrettyPrinter(&builder, false)
+
+			location := common.AddressLocation{
+				Name:    name,
+				Address: address,
+			}
+			printErr := errorPrinter.PrettyPrintError(err, location, m.contractsByLocation)
+
+			var errorDetails string
+			if printErr == nil {
+				errorDetails = builder.String()
+			} else {
+				errorDetails = err.Error()
+			}
+
+			m.log.Error().
 				Msgf(
-					"failed to update contract %s in account %s",
+					"failed to update contract %s in account %s: %s",
 					name,
 					address.HexWithPrefix(),
+					errorDetails,
 				)
+
+			m.reporter.Write(contractUpdateFailed{
+				AccountAddressHex: address.HexWithPrefix(),
+				ContractName:      name,
+				Error:             errorDetails,
+			})
 		} else {
 			// change contract code
 			oldPayloads[payloadIndex] = ledger.NewPayload(
 				key,
 				newCode,
 			)
+
+			m.reporter.Write(contractUpdateSuccessful{
+				AccountAddressHex: address.HexWithPrefix(),
+				ContractName:      name,
+			})
 		}
 
 		// remove contract from list of contracts to change
@@ -264,29 +309,29 @@ func (m *StagedContractsMigration) MigrateAccount(
 	}
 
 	if len(contractUpdates) > 0 {
-		var sb strings.Builder
-		_, _ = fmt.Fprintf(
-			&sb,
-			"failed to find all contract registers that need to be changed for address %s:\n",
-			address.HexWithPrefix(),
-		)
+		arr := zerolog.Arr()
 		for registerID := range contractUpdates {
-			_, _ = fmt.Fprintf(&sb, "  - %s\n", flow.RegisterIDContractName(registerID))
+			arr = arr.Str(flow.RegisterIDContractName(registerID))
 		}
-		return nil, fmt.Errorf(sb.String())
+		m.log.Error().
+			Array("contracts", arr).
+			Str("address", address.HexWithPrefix()).
+			Msg("failed to find all contract registers that need to be changed for address")
 	}
 
 	return oldPayloads, nil
 }
 
 func (m *StagedContractsMigration) checkContractUpdateValidity(
-	mr *migratorRuntime,
 	address common.Address,
 	contractName string,
 	newCode []byte,
 	oldCode ledger.Value,
-	elaborations map[common.Location]*sema.Elaboration,
 ) error {
+	// Parsing and checking of programs has to be done synchronously.
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
 	location := common.AddressLocation{
 		Name:    contractName,
 		Address: address,
@@ -298,7 +343,7 @@ func (m *StagedContractsMigration) checkContractUpdateValidity(
 	// should not be effective during the execution
 	const getAndSetProgram = false
 
-	newProgram, err := mr.ContractAdditionHandler.ParseAndCheckProgram(newCode, location, getAndSetProgram)
+	newProgram, err := m.contractAdditionHandler.ParseAndCheckProgram(newCode, location, getAndSetProgram)
 	if err != nil {
 		return err
 	}
@@ -311,10 +356,10 @@ func (m *StagedContractsMigration) checkContractUpdateValidity(
 	validator := stdlib.NewCadenceV042ToV1ContractUpdateValidator(
 		location,
 		contractName,
-		mr.ContractNamesProvider,
+		m.contractNamesProvider,
 		oldProgram,
-		newProgram.Program,
-		elaborations,
+		newProgram,
+		m.elaborations,
 	)
 
 	validator.WithUserDefinedTypeChangeChecker(
@@ -374,7 +419,7 @@ func StagedContractsFromCSV(path string) ([]StagedContract, error) {
 	return contracts, nil
 }
 
-func newUserDefinedTypeChangeCheckerFunc(
+func NewUserDefinedTypeChangeCheckerFunc(
 	chainID flow.ChainID,
 ) func(oldTypeID common.TypeID, newTypeID common.TypeID) (checked, valid bool) {
 
@@ -397,4 +442,15 @@ func newUserDefinedTypeChangeCheckerFunc(
 		}
 		return false, false
 	}
+}
+
+type contractUpdateSuccessful struct {
+	AccountAddressHex string `json:"address"`
+	ContractName      string `json:"name"`
+}
+
+type contractUpdateFailed struct {
+	AccountAddressHex string `json:"address"`
+	ContractName      string `json:"name"`
+	Error             string `json:"error"`
 }

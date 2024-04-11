@@ -8,13 +8,12 @@ import (
 	runtime2 "runtime"
 	"time"
 
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
@@ -37,27 +36,31 @@ type AtreeRegisterMigrator struct {
 
 	nWorkers int
 
-	validateMigratedValues    bool
-	logVerboseValidationError bool
+	validateMigratedValues             bool
+	logVerboseValidationError          bool
+	continueMigrationOnValidationError bool
 }
 
 var _ AccountBasedMigration = (*AtreeRegisterMigrator)(nil)
+
 var _ io.Closer = (*AtreeRegisterMigrator)(nil)
 
 func NewAtreeRegisterMigrator(
 	rwf reporters.ReportWriterFactory,
 	validateMigratedValues bool,
 	logVerboseValidationError bool,
+	continueMigrationOnValidationError bool,
 ) *AtreeRegisterMigrator {
 
 	sampler := util2.NewTimedSampler(30 * time.Second)
 
 	migrator := &AtreeRegisterMigrator{
-		sampler:                   sampler,
-		rwf:                       rwf,
-		rw:                        rwf.ReportWriter("atree-register-migrator"),
-		validateMigratedValues:    validateMigratedValues,
-		logVerboseValidationError: logVerboseValidationError,
+		sampler:                            sampler,
+		rwf:                                rwf,
+		rw:                                 rwf.ReportWriter("atree-register-migrator"),
+		validateMigratedValues:             validateMigratedValues,
+		logVerboseValidationError:          logVerboseValidationError,
+		continueMigrationOnValidationError: continueMigrationOnValidationError,
 	}
 
 	return migrator
@@ -118,7 +121,14 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 	if m.validateMigratedValues {
 		err = validateCadenceValues(address, oldPayloads, newPayloads, m.log, m.logVerboseValidationError)
 		if err != nil {
-			return nil, err
+			if !m.continueMigrationOnValidationError {
+				return nil, err
+			}
+
+			m.log.Error().
+				Err(err).
+				Hex("address", address[:]).
+				Msg("failed not validate atree migration")
 		}
 	}
 
@@ -178,8 +188,8 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 	}
 	storageMapIds[string(atree.SlabIndexToLedgerKey(storageMap.SlabID().Index()))] = struct{}{}
 
-	iterator := storageMap.Iterator(util.NopMemoryGauge{})
-	keys := make([]interpreter.StringStorageMapKey, 0, storageMap.Count())
+	iterator := storageMap.Iterator(nil)
+	keys := make([]interpreter.StorageMapKey, 0, storageMap.Count())
 	// to be safe avoid modifying the map while iterating
 	for {
 		key := iterator.NextKey()
@@ -187,12 +197,16 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 			break
 		}
 
-		stringKey, ok := key.(interpreter.StringAtreeValue)
-		if !ok {
-			return fmt.Errorf("invalid key type %T, expected interpreter.StringAtreeValue", key)
-		}
+		switch key := key.(type) {
+		case interpreter.StringAtreeValue:
+			keys = append(keys, interpreter.StringStorageMapKey(key))
 
-		keys = append(keys, interpreter.StringStorageMapKey(stringKey))
+		case interpreter.Uint64AtreeValue:
+			keys = append(keys, interpreter.Uint64StorageMapKey(key))
+
+		default:
+			return fmt.Errorf("invalid key type %T, expected interpreter.StringAtreeValue or interpreter.Uint64AtreeValue", key)
+		}
 	}
 
 	for _, key := range keys {
@@ -200,7 +214,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 			var value interpreter.Value
 
 			err := capturePanic(func() {
-				value = storageMap.ReadValue(util.NopMemoryGauge{}, key)
+				value = storageMap.ReadValue(nil, key)
 			})
 			if err != nil {
 				return fmt.Errorf("failed to read value for key %s: %w", key, err)
@@ -228,7 +242,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 			m.rw.Write(migrationProblem{
 				Address: mr.Address.Hex(),
 				Size:    len(mr.Snapshot.Payloads),
-				Key:     string(key),
+				Key:     fmt.Sprintf("%v (%T)", key, key),
 				Kind:    "migration_failure",
 				Msg:     err.Error(),
 			})

@@ -52,9 +52,6 @@ func TestDKGClient(t *testing.T) {
 func (s *ClientSuite) SetupTest() {
 	blockchain, err := emulator.New(
 		emulator.WithStorageLimitEnabled(false),
-		// This will not be necessary once the emulator is updated to have EVM enabled
-		// by default
-		emulator.WithEVMEnabled(true),
 	)
 	require.NoError(s.T(), err)
 
