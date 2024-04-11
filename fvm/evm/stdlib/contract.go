@@ -1049,6 +1049,10 @@ func NewResultValue(
 				Name:  "data",
 				Value: interpreter.ByteSliceToByteArrayValue(inter, result.ReturnedValue),
 			},
+			{
+				Name:  "deployedContractAddress",
+				Value: EVMAddressToAddressBytesArrayValue(inter, result.DeployedContractAddress),
+			},
 		},
 		common.ZeroAddress,
 	)
