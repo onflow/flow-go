@@ -60,9 +60,22 @@ type SealingSegment struct {
 	// to return the sealed state, when the first block contains no seal.
 	FirstSeal *Seal
 
-	ProtocolStateKVStoreEntries []storage.KeyValueStoreData
+	// TODO(5120) docs
+	ProtocolStateEntries map[Identifier]ProtocolStateEntryWrapper
+}
 
-	EpochEntries []RichProtocolStateEntry
+// ProtocolStateEntryWrapper is a wrapper coupling two data sources.
+// Conceptually, the SealingSegment stores one Protocol State Entry (aka `KVStoreEntry`)
+// per unique ProtocolStateID field within the segment's blocks.
+// Currently, although epoch data is conceptually a part of the protocol data entry associated
+// with each block, it is stored separately as a matter of technical debt (only a hash commitment
+// `RichProtocolStateEntry.ID()` is stored within the `KVStoreEntry`.
+//
+// Deprecated: avoid using this in new code; this is a temporary measure until epoch data is moved into protocol KV store
+// TODO: move epoch data into the KVStore as part of a future upgrade
+type ProtocolStateEntryWrapper struct {
+	KVStoreEntry *storage.KeyValueStoreData
+	EpochEntry   *RichProtocolStateEntry
 }
 
 // Highest is the highest block in the sealing segment and the reference block from snapshot that was
@@ -150,8 +163,15 @@ func (segment *SealingSegment) Validate() error {
 		}
 		return seal, nil
 	}
+	getProtocolStateEntry := func(protocolStateID Identifier) (*ProtocolStateEntryWrapper, error) {
+		entry, ok := segment.ProtocolStateEntries[protocolStateID]
+		if !ok {
+			return nil, fmt.Errorf("protocol state (id=%x) not found in segment", protocolStateID)
+		}
+		return &entry, nil
+	}
 
-	builder := NewSealingSegmentBuilder(getResult, getSeal)
+	builder := NewSealingSegmentBuilder(getResult, getSeal, getProtocolStateEntry)
 	for _, block := range segment.Blocks {
 		err := builder.AddBlock(block)
 		if err != nil {
@@ -191,24 +211,31 @@ type GetResultFunc func(resultID Identifier) (*ExecutionResult, error)
 // No errors are expected during normal operation.
 type GetSealByBlockIDFunc func(blockID Identifier) (*Seal, error)
 
+// GetProtocolStateEntryFunc  is a getter function for protocol state entries
+// No errors are expected during normal operation.
+type GetProtocolStateEntryFunc func(protocolStateID Identifier) (*ProtocolStateEntryWrapper, error)
+
 // SealingSegmentBuilder is a utility for incrementally building a sealing segment.
 type SealingSegmentBuilder struct {
 	// access to storage to read referenced by not included resources
 	resultLookup        GetResultFunc
 	sealByBlockIDLookup GetSealByBlockIDFunc
+	protocolStateLookup GetProtocolStateEntryFunc
 	// keep track of resources included in payloads
 	includedResults map[Identifier]struct{}
 	// resources to include in the sealing segment
-	blocks      []*Block
-	results     []*ExecutionResult
-	latestSeals map[Identifier]Identifier
-	firstSeal   *Seal
+	blocks               []*Block
+	results              []*ExecutionResult
+	protocolStateEntries []ProtocolStateEntryWrapper
+	latestSeals          map[Identifier]Identifier
+	firstSeal            *Seal
 	// extraBlocks included in sealing segment, must connect to the lowest block of segment
 	// stored in descending order for simpler population logic
 	extraBlocks []*Block
 }
 
 // AddBlock appends a block to the sealing segment under construction.
+// TODO check whether need to add new protocol state entry
 // No errors are expected during normal operation.
 func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 	// sanity check: all blocks have to be added before adding extra blocks
@@ -284,6 +311,7 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 // AddExtraBlock appends an extra block to sealing segment under construction.
 // Extra blocks needs to be added in descending order and the first block must connect to the lowest block
 // of sealing segment, this way they form a continuous chain.
+// TODO check whether need to add new protocol state entry
 // No errors are expected during normal operation.
 func (builder *SealingSegmentBuilder) AddExtraBlock(block *Block) error {
 	if len(builder.extraBlocks) == 0 {
@@ -385,6 +413,7 @@ func (builder *SealingSegmentBuilder) validateRootSegment() error {
 }
 
 // validateSegment will validate if builder satisfies conditions for a valid sealing segment.
+// TODO check whether all protocol state entries are present
 // No errors are expected during normal operation.
 func (builder *SealingSegmentBuilder) validateSegment() error {
 	// sealing cannot be empty
@@ -431,16 +460,17 @@ func (builder *SealingSegmentBuilder) lowest() *Block {
 }
 
 // NewSealingSegmentBuilder returns *SealingSegmentBuilder
-func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBlockIDFunc) *SealingSegmentBuilder {
-	// TODO(5120): pass in getEpochEntry, getKVStoreEntry here?
+func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBlockIDFunc, protocolStateLookup GetProtocolStateEntryFunc) *SealingSegmentBuilder {
 	return &SealingSegmentBuilder{
-		resultLookup:        resultLookup,
-		sealByBlockIDLookup: sealLookup,
-		includedResults:     make(map[Identifier]struct{}),
-		latestSeals:         make(map[Identifier]Identifier),
-		blocks:              make([]*Block, 0),
-		extraBlocks:         make([]*Block, 0),
-		results:             make(ExecutionResultList, 0),
+		resultLookup:         resultLookup,
+		sealByBlockIDLookup:  sealLookup,
+		protocolStateLookup:  protocolStateLookup,
+		includedResults:      make(map[Identifier]struct{}),
+		latestSeals:          make(map[Identifier]Identifier),
+		blocks:               make([]*Block, 10),
+		extraBlocks:          make([]*Block, DefaultTransactionExpiry),
+		protocolStateEntries: make([]ProtocolStateEntryWrapper, 3),
+		results:              make(ExecutionResultList, 3),
 	}
 }
 

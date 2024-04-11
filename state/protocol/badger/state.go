@@ -39,6 +39,7 @@ type State struct {
 	}
 	params                     protocol.Params
 	protocolKVStoreSnapshotsDB storage.ProtocolKVStore
+	protocolStateSnapshotsDB   storage.ProtocolState // TODO remove when ProtocolStateEntry is stored in KVStore
 	protocolState              protocol.MutableProtocolState
 	versionBeacons             storage.VersionBeacons
 
@@ -822,6 +823,7 @@ func newState(
 		},
 		params:                     params,
 		protocolKVStoreSnapshotsDB: protocolKVStoreSnapshots,
+		protocolStateSnapshotsDB:   protocolStateSnapshots,
 		protocolState: protocol_state.
 			NewMutableProtocolState(
 				protocolStateSnapshots,

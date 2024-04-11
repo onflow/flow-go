@@ -338,6 +338,7 @@ func SnapshotFromBootstrapStateWithParams(
 		EpochCommitSafetyThreshold: epochCommitSafetyThreshold, // see protocol.Params for details
 	}
 
+	// TODO(5120)
 	rootEpochState := ProtocolStateFromEpochServiceEvents(setup, commit)
 	rootKvStore := kvstore.NewLatestKVStore(rootEpochState.ID())
 	if rootKvStore.ID() != root.Payload.ProtocolStateID {
