@@ -36,33 +36,25 @@ func ContractCode(flowTokenAddress flow.Address) []byte {
 	))
 }
 
-const ContractName = "EVM"
+const (
+	ContractName                      = "EVM"
+	evmAddressTypeBytesFieldName      = "bytes"
+	evmAddressTypeQualifiedIdentifier = "EVM.EVMAddress"
+	evmBalanceTypeQualifiedIdentifier = "EVM.Balance"
+	evmResultTypeQualifiedIdentifier  = "EVM.Result"
+	evmStatusTypeQualifiedIdentifier  = "EVM.Status"
+	evmBlockTypeQualifiedIdentifier   = "EVM.EVMBlock"
+	abiEncodingByteSize               = 32
+)
 
-const evmAddressTypeBytesFieldName = "bytes"
-
-const evmAddressTypeQualifiedIdentifier = "EVM.EVMAddress"
-
-const evmBalanceTypeQualifiedIdentifier = "EVM.Balance"
-
-const evmResultTypeQualifiedIdentifier = "EVM.Result"
-
-const evmStatusTypeQualifiedIdentifier = "EVM.Status"
-
-const evmBlockTypeQualifiedIdentifier = "EVM.EVMBlock"
-
-const abiEncodingByteSize = 32
-
-var EVMTransactionBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.TheUInt8Type)
-
-var evmTransactionBytesType = sema.NewVariableSizedType(nil, sema.UInt8Type)
-
-var evmTransactionsBatchBytesType = sema.NewVariableSizedType(nil, evmTransactionBytesType)
-
-var evmAddressBytesType = sema.NewConstantSizedType(nil, sema.UInt8Type, types.AddressLength)
-
-var evmAddressBytesStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, evmAddressBytesType)
-
-var EVMAddressBytesCadenceType = cadence.NewConstantSizedArrayType(types.AddressLength, cadence.TheUInt8Type)
+var (
+	EVMTransactionBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.TheUInt8Type)
+	evmTransactionBytesType        = sema.NewVariableSizedType(nil, sema.UInt8Type)
+	evmTransactionsBatchBytesType  = sema.NewVariableSizedType(nil, evmTransactionBytesType)
+	evmAddressBytesType            = sema.NewConstantSizedType(nil, sema.UInt8Type, types.AddressLength)
+	evmAddressBytesStaticType      = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, evmAddressBytesType)
+	EVMAddressBytesCadenceType     = cadence.NewConstantSizedArrayType(types.AddressLength, cadence.TheUInt8Type)
+)
 
 // abiEncodingError
 type abiEncodingError struct {
