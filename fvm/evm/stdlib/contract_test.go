@@ -2892,6 +2892,139 @@ func TestEVMRun(t *testing.T) {
 	assert.True(t, runCalled)
 }
 
+func TestEVMBatchRun(t *testing.T) {
+
+	t.Parallel()
+
+	evmTxs := cadence.NewArray([]cadence.Value{
+		cadence.NewArray([]cadence.Value{cadence.UInt8(1), cadence.UInt8(2), cadence.UInt8(3)}),
+		cadence.NewArray([]cadence.Value{cadence.UInt8(4), cadence.UInt8(5), cadence.UInt8(6)}),
+		cadence.NewArray([]cadence.Value{cadence.UInt8(7), cadence.UInt8(8), cadence.UInt8(9)}),
+	}).WithType(cadence.NewVariableSizedArrayType(cadence.NewVariableSizedArrayType(cadence.UInt8Type{})))
+
+	coinbase := cadence.NewArray([]cadence.Value{
+		cadence.UInt8(1), cadence.UInt8(1),
+		cadence.UInt8(2), cadence.UInt8(2),
+		cadence.UInt8(3), cadence.UInt8(3),
+		cadence.UInt8(4), cadence.UInt8(4),
+		cadence.UInt8(5), cadence.UInt8(5),
+		cadence.UInt8(6), cadence.UInt8(6),
+		cadence.UInt8(7), cadence.UInt8(7),
+		cadence.UInt8(8), cadence.UInt8(8),
+		cadence.UInt8(9), cadence.UInt8(9),
+		cadence.UInt8(10), cadence.UInt8(10),
+	}).WithType(stdlib.EVMAddressBytesCadenceType)
+
+	runCalled := false
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+	handler := &testContractHandler{
+		evmContractAddress: common.Address(contractsAddress),
+		batchRun: func(txs [][]byte, coinbase types.Address) []*types.ResultSummary {
+			runCalled = true
+
+			assert.EqualValues(t, [][]byte{
+				{1, 2, 3}, {4, 5, 6}, {7, 8, 9},
+			}, txs)
+			assert.Equal(t,
+				types.Address{
+					1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10,
+				},
+				coinbase,
+			)
+
+			results := make([]*types.ResultSummary, 3)
+			for i := range results {
+				results[i] = &types.ResultSummary{
+					Status: types.StatusSuccessful,
+				}
+			}
+
+			return results
+		},
+	}
+
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(txs: [[UInt8]], coinbaseBytes: [UInt8; 20]): [EVM.Result] {
+          let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+          return EVM.batchRun(txs: txs, coinbase: coinbase)
+      }
+    `)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: LocationResolver,
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
+
+	// Run script
+
+	val, err := rt.ExecuteScript(
+		runtime.Script{
+			Source:    script,
+			Arguments: EncodeArgs([]cadence.Value{evmTxs, coinbase}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	resultsCadence, ok := val.(cadence.Array)
+	require.True(t, ok)
+
+	for _, v := range resultsCadence.Values {
+		res, err := stdlib.ResultSummaryFromEVMResultValue(v)
+		require.NoError(t, err)
+		assert.Equal(t, types.StatusSuccessful, res.Status)
+	}
+	assert.True(t, runCalled)
+}
+
 func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 
 	t.Parallel()
