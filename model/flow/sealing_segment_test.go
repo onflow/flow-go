@@ -440,113 +440,122 @@ func (suite *SealingSegmentSuite) TestAddBlock_InvalidHeight() {
 	require.ErrorIs(suite.T(), err, flow.ErrSegmentInvalidBlockHeight)
 }
 
-//
-//// TestAddBlock_StorageError tests that errors in the resource getters bubble up.
-//func TestAddBlock_StorageError(t *testing.T) {
-//
-//	t.Run("missing result", func(t *testing.T) {
-//		// create a receipt to include in the first block, whose result is not in storage
-//		missingReceipt := unittest.ExecutionReceiptFixture()
-//		block1 := suite.BlockFixture()
-//		sealLookup := func(flow.Identifier) (*flow.Seal, error) { return unittest.Seal.Fixture(), nil }
-//		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, fmt.Errorf("not found") }
-//		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup)
-//
-//		block1.SetPayload(suite.PayloadFixture(
-//			unittest.WithReceiptsAndNoResults(missingReceipt),
-//			unittest.WithSeals(unittest.Seal.Fixture(unittest.Seal.WithResult(&missingReceipt.ExecutionResult))),
-//		))
-//
-//		err := builder.AddBlock(&block1)
-//		require.ErrorIs(t, err, flow.ErrSegmentResultLookup)
-//	})
-//
-//	// create a first block which contains no seal, and the seal isn't in storage
-//	t.Run("missing seal", func(t *testing.T) {
-//		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return unittest.ExecutionResultFixture(), nil }
-//		sealLookup := func(flow.Identifier) (*flow.Seal, error) { return nil, fmt.Errorf("not found") }
-//		block1 := suite.BlockFixture()
-//		block1.SetPayload(flow.EmptyPayload())
-//		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup)
-//
-//		err := builder.AddBlock(&block1)
-//		require.ErrorIs(t, err, flow.ErrSegmentSealLookup)
-//	})
-//}
-//
-//// TestAddExtraBlock tests different scenarios for adding extra blocks, covers happy and unhappy path scenarios.
-//func (suite *SealingSegmentSuite) TestAddExtraBlock() {
-//	// populate sealing segment with one block
-//	firstBlock := suite.FirstBlock()
-//	firstBlock.Header.Height += 100
-//	suite.AddBlocks(firstBlock)
-//
-//	suite.T().Run("empty-segment", func(t *testing.T) {
-//		builder := flow.NewSealingSegmentBuilder(nil, nil)
-//		block := suite.BlockFixture()
-//		err := builder.AddExtraBlock(&block)
-//		require.Error(t, err)
-//	})
-//	suite.T().Run("extra-block-does-not-connect", func(t *testing.T) {
-//		// adding extra block that doesn't connect to the lowest is an error
-//		extraBlock := suite.BlockFixture()
-//		extraBlock.Header.Height = firstBlock.Header.Height + 10 // make sure it doesn't connect by height
-//		err := suite.builder.AddExtraBlock(&extraBlock)
-//		require.ErrorIs(t, err, flow.ErrSegmentInvalidBlockHeight)
-//	})
-//	suite.T().Run("extra-block-not-continuous", func(t *testing.T) {
-//		builder := flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID)
-//		err := builder.AddBlock(firstBlock)
-//		require.NoError(t, err)
-//		extraBlock := suite.BlockFixture()
-//		extraBlock.Header.Height = firstBlock.Header.Height - 1 // make it connect
-//		err = builder.AddExtraBlock(&extraBlock)
-//		require.NoError(t, err)
-//		extraBlockWithSkip := suite.BlockFixture()
-//		extraBlockWithSkip.Header.Height = extraBlock.Header.Height - 2 // skip one height
-//		err = builder.AddExtraBlock(&extraBlockWithSkip)
-//		require.ErrorIs(t, err, flow.ErrSegmentInvalidBlockHeight)
-//	})
-//	suite.T().Run("root-segment-extra-blocks", func(t *testing.T) {
-//		builder := flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID)
-//		err := builder.AddBlock(firstBlock)
-//		require.NoError(t, err)
-//
-//		extraBlock := suite.BlockFixture()
-//		extraBlock.Header.Height = firstBlock.Header.Height - 1
-//		err = builder.AddExtraBlock(&extraBlock)
-//		require.NoError(t, err)
-//		_, err = builder.SealingSegment()
-//		// root segment cannot have extra blocks
-//		require.Error(t, err)
-//	})
-//	suite.T().Run("happy-path", func(t *testing.T) {
-//		// add a few blocks with results and seals to form a valid sealing segment
-//		// B1(S*) <- B2(R1) <- B3(S1)
-//
-//		receipt, seal := unittest.ReceiptAndSealForBlock(firstBlock)
-//		blockWithER := suite.BlockWithParentFixture(firstBlock.Header)
-//		blockWithER.SetPayload(suite.PayloadFixture(unittest.WithReceipts(receipt)))
-//
-//		// add one more block, with seal to the ER
-//		highestBlock := suite.BlockWithParentFixture(blockWithER.Header)
-//		highestBlock.SetPayload(suite.PayloadFixture(unittest.WithSeals(seal)))
-//
-//		suite.AddBlocks(blockWithER, highestBlock)
-//
-//		// construct two extra blocks that connect to the lowest block and add them to builder
-//		// EB2 <- EB1 <- B1(S*) <- B2(R1) <- B3(S1)
-//		extraBlock := suite.BlockFixture()
-//		extraBlock.Header.Height = firstBlock.Header.Height - 1
-//		err := suite.builder.AddExtraBlock(&extraBlock)
-//		require.NoError(t, err)
-//		secondExtraBlock := suite.BlockFixture()
-//		secondExtraBlock.Header.Height = extraBlock.Header.Height - 1
-//		err = suite.builder.AddExtraBlock(&secondExtraBlock)
-//		require.NoError(t, err)
-//		segment, err := suite.builder.SealingSegment()
-//		require.NoError(t, err)
-//		err = segment.Validate()
-//		require.NoError(t, err)
-//	})
-//}
+// TestAddBlock_StorageError tests that errors in the resource getters bubble up.
+func TestAddBlock_StorageError(t *testing.T) {
+
+	t.Run("missing result", func(t *testing.T) {
+		// create a receipt to include in the first block, whose result is not in storage
+		missingReceipt := unittest.ExecutionReceiptFixture()
+		block1 := unittest.BlockFixture()
+		sealLookup := func(flow.Identifier) (*flow.Seal, error) { return unittest.Seal.Fixture(), nil }
+		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, fmt.Errorf("not found") }
+		protocolStateEntryLookup := func(flow.Identifier) (*flow.ProtocolStateEntryWrapper, error) {
+			return &flow.ProtocolStateEntryWrapper{}, nil
+		}
+		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup)
+
+		block1.SetPayload(unittest.PayloadFixture(
+			unittest.WithReceiptsAndNoResults(missingReceipt),
+			unittest.WithSeals(unittest.Seal.Fixture(unittest.Seal.WithResult(&missingReceipt.ExecutionResult))),
+		))
+
+		err := builder.AddBlock(&block1)
+		require.ErrorIs(t, err, flow.ErrSegmentResultLookup)
+	})
+
+	// create a first block which contains no seal, and the seal isn't in storage
+	t.Run("missing seal", func(t *testing.T) {
+		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return unittest.ExecutionResultFixture(), nil }
+		sealLookup := func(flow.Identifier) (*flow.Seal, error) { return nil, fmt.Errorf("not found") }
+		protocolStateEntryLookup := func(flow.Identifier) (*flow.ProtocolStateEntryWrapper, error) {
+			return &flow.ProtocolStateEntryWrapper{}, nil
+		}
+		block1 := unittest.BlockFixture()
+		block1.SetPayload(flow.EmptyPayload())
+		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup)
+
+		err := builder.AddBlock(&block1)
+		require.ErrorIs(t, err, flow.ErrSegmentSealLookup)
+	})
+
+	t.Run("missing protocol state entry", func(t *testing.T) {
+		// TODO(5120)
+	})
+}
+
+// TestAddExtraBlock tests different scenarios for adding extra blocks, covers happy and unhappy path scenarios.
+func (suite *SealingSegmentSuite) TestAddExtraBlock() {
+	// populate sealing segment with one block
+	firstBlock := suite.FirstBlock()
+	firstBlock.Header.Height += 100
+	suite.AddBlocks(firstBlock)
+
+	suite.T().Run("empty-segment", func(t *testing.T) {
+		builder := flow.NewSealingSegmentBuilder(nil, nil, nil)
+		block := suite.BlockFixture()
+		err := builder.AddExtraBlock(&block)
+		require.Error(t, err)
+	})
+	suite.T().Run("extra-block-does-not-connect", func(t *testing.T) {
+		// adding extra block that doesn't connect to the lowest is an error
+		extraBlock := suite.BlockFixture()
+		extraBlock.Header.Height = firstBlock.Header.Height + 10 // make sure it doesn't connect by height
+		err := suite.builder.AddExtraBlock(&extraBlock)
+		require.ErrorIs(t, err, flow.ErrSegmentInvalidBlockHeight)
+	})
+	suite.T().Run("extra-block-not-continuous", func(t *testing.T) {
+		builder := flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID, suite.GetProtocolStateEntry)
+		err := builder.AddBlock(firstBlock)
+		require.NoError(t, err)
+		extraBlock := suite.BlockFixture()
+		extraBlock.Header.Height = firstBlock.Header.Height - 1 // make it connect
+		err = builder.AddExtraBlock(&extraBlock)
+		require.NoError(t, err)
+		extraBlockWithSkip := suite.BlockFixture()
+		extraBlockWithSkip.Header.Height = extraBlock.Header.Height - 2 // skip one height
+		err = builder.AddExtraBlock(&extraBlockWithSkip)
+		require.ErrorIs(t, err, flow.ErrSegmentInvalidBlockHeight)
+	})
+	suite.T().Run("root-segment-extra-blocks", func(t *testing.T) {
+		builder := flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID, suite.GetProtocolStateEntry)
+		err := builder.AddBlock(firstBlock)
+		require.NoError(t, err)
+
+		extraBlock := suite.BlockFixture()
+		extraBlock.Header.Height = firstBlock.Header.Height - 1
+		err = builder.AddExtraBlock(&extraBlock)
+		require.NoError(t, err)
+		_, err = builder.SealingSegment()
+		// root segment cannot have extra blocks
+		require.Error(t, err)
+	})
+	suite.T().Run("happy-path", func(t *testing.T) {
+		// add a few blocks with results and seals to form a valid sealing segment
+		// B1(S*) <- B2(R1) <- B3(S1)
+
+		receipt, seal := unittest.ReceiptAndSealForBlock(firstBlock)
+		blockWithER := suite.BlockWithParentFixture(firstBlock.Header)
+		blockWithER.SetPayload(suite.PayloadFixture(unittest.WithReceipts(receipt)))
+
+		// add one more block, with seal to the ER
+		highestBlock := suite.BlockWithParentFixture(blockWithER.Header)
+		highestBlock.SetPayload(suite.PayloadFixture(unittest.WithSeals(seal)))
+
+		suite.AddBlocks(blockWithER, highestBlock)
+
+		// construct two extra blocks that connect to the lowest block and add them to builder
+		// EB2 <- EB1 <- B1(S*) <- B2(R1) <- B3(S1)
+		extraBlock := suite.BlockFixture()
+		extraBlock.Header.Height = firstBlock.Header.Height - 1
+		err := suite.builder.AddExtraBlock(&extraBlock)
+		require.NoError(t, err)
+		secondExtraBlock := suite.BlockFixture()
+		secondExtraBlock.Header.Height = extraBlock.Header.Height - 1
+		err = suite.builder.AddExtraBlock(&secondExtraBlock)
+		require.NoError(t, err)
+		segment, err := suite.builder.SealingSegment()
+		require.NoError(t, err)
+		err = segment.Validate()
+		require.NoError(t, err)
+	})
+}
