@@ -176,7 +176,7 @@ contract EVM {
         /// returns the newly deployed contract address
         /// if the transaction caused such a deployment
         /// otherwise the value is empty.
-        let contractAddress: [UInt8; 20]
+        let deployedContractAddress: [UInt8; 20]
 
         init(
             status: Status,
