@@ -61,7 +61,7 @@ type SealingSegment struct {
 	FirstSeal *Seal
 
 	// TODO(5120) docs
-	ProtocolStateEntries map[Identifier]ProtocolStateEntryWrapper
+	ProtocolStateEntries map[Identifier]*ProtocolStateEntryWrapper
 }
 
 // ProtocolStateEntryWrapper is a wrapper coupling two data sources.
@@ -168,7 +168,7 @@ func (segment *SealingSegment) Validate() error {
 		if !ok {
 			return nil, fmt.Errorf("protocol state (id=%x) not found in segment", protocolStateID)
 		}
-		return &entry, nil
+		return entry, nil
 	}
 
 	builder := NewSealingSegmentBuilder(getResult, getSeal, getProtocolStateEntry)
@@ -194,12 +194,14 @@ func (segment *SealingSegment) Validate() error {
 	return nil
 }
 
+// TODO(5120) consolidate these. None are actually used outside tests, error docs do not reflect possible error conditions
 var (
-	ErrSegmentMissingSeal        = fmt.Errorf("sealing segment failed sanity check: missing seal referenced by segment")
-	ErrSegmentBlocksWrongLen     = fmt.Errorf("sealing segment failed sanity check: non-root sealing segment must have at least 2 blocks")
-	ErrSegmentInvalidBlockHeight = fmt.Errorf("sealing segment failed sanity check: blocks must be in ascending order")
-	ErrSegmentResultLookup       = fmt.Errorf("failed to lookup execution result")
-	ErrSegmentSealLookup         = fmt.Errorf("failed to lookup seal")
+	ErrSegmentMissingSeal              = fmt.Errorf("sealing segment failed sanity check: missing seal referenced by segment")
+	ErrSegmentBlocksWrongLen           = fmt.Errorf("sealing segment failed sanity check: non-root sealing segment must have at least 2 blocks")
+	ErrSegmentInvalidBlockHeight       = fmt.Errorf("sealing segment failed sanity check: blocks must be in ascending order")
+	ErrSegmentResultLookup             = fmt.Errorf("failed to lookup execution result")
+	ErrSegmentSealLookup               = fmt.Errorf("failed to lookup seal")
+	ErrSegmentProtocolStateEntryLookup = fmt.Errorf("failed to lookup protocol state entry")
 )
 
 // GetResultFunc is a getter function for results by ID.
@@ -226,8 +228,8 @@ type SealingSegmentBuilder struct {
 	// resources to include in the sealing segment
 	blocks               []*Block
 	results              []*ExecutionResult
-	protocolStateEntries []ProtocolStateEntryWrapper
 	latestSeals          map[Identifier]Identifier
+	protocolStateEntries map[Identifier]*ProtocolStateEntryWrapper
 	firstSeal            *Seal
 	// extraBlocks included in sealing segment, must connect to the lowest block of segment
 	// stored in descending order for simpler population logic
@@ -235,7 +237,6 @@ type SealingSegmentBuilder struct {
 }
 
 // AddBlock appends a block to the sealing segment under construction.
-// TODO check whether need to add new protocol state entry
 // No errors are expected during normal operation.
 func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 	// sanity check: all blocks have to be added before adding extra blocks
@@ -304,7 +305,31 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 		builder.includedResults[resultID] = struct{}{}
 	}
 
+	// if the block commits to an unseen ProtocolStateID, add the corresponding data entry
+	err = builder.addProtocolStateEntryIfUnseen(block.Payload.ProtocolStateID)
+	if err != nil {
+		return fmt.Errorf("could not check or add protocol state entry: %w", err)
+	}
+
 	builder.blocks = append(builder.blocks, block)
+	return nil
+}
+
+// addProtocolStateEntryIfUnseen checks whether the given protocolStateID corresponds
+// to a previously unseen protocol state entry. If it does, retrieves the state entry
+// and persists it for inclusion in the resulting SealingSegment.
+// TODO error docs
+func (builder *SealingSegmentBuilder) addProtocolStateEntryIfUnseen(protocolStateID Identifier) error {
+	_, exists := builder.protocolStateEntries[protocolStateID]
+	if exists {
+		return nil
+	}
+
+	protocolStateEntry, err := builder.protocolStateLookup(protocolStateID)
+	if err != nil {
+		return fmt.Errorf("%w: (%x) %v", ErrSegmentProtocolStateEntryLookup, protocolStateID, err)
+	}
+	builder.protocolStateEntries[protocolStateID] = protocolStateEntry
 	return nil
 }
 
@@ -324,6 +349,12 @@ func (builder *SealingSegmentBuilder) AddExtraBlock(block *Block) error {
 		}
 	} else if (block.Header.Height + 1) != builder.extraBlocks[len(builder.extraBlocks)-1].Header.Height {
 		return fmt.Errorf("invalid extra block height (%d), doesn't connect to last extra block: %w", block.Header.Height, ErrSegmentInvalidBlockHeight)
+	}
+
+	// if the block commits to an unseen ProtocolStateID, add the corresponding data entry
+	err := builder.addProtocolStateEntryIfUnseen(block.Payload.ProtocolStateID)
+	if err != nil {
+		return fmt.Errorf("could not check or add protocol state entry: %w", err)
 	}
 
 	builder.extraBlocks = append(builder.extraBlocks, block)
@@ -353,11 +384,12 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 	})
 
 	return &SealingSegment{
-		Blocks:           builder.blocks,
-		ExtraBlocks:      builder.extraBlocks,
-		ExecutionResults: builder.results,
-		LatestSeals:      builder.latestSeals,
-		FirstSeal:        builder.firstSeal,
+		Blocks:               builder.blocks,
+		ExtraBlocks:          builder.extraBlocks,
+		ExecutionResults:     builder.results,
+		ProtocolStateEntries: builder.protocolStateEntries,
+		LatestSeals:          builder.latestSeals,
+		FirstSeal:            builder.firstSeal,
 	}, nil
 }
 
@@ -413,7 +445,7 @@ func (builder *SealingSegmentBuilder) validateRootSegment() error {
 }
 
 // validateSegment will validate if builder satisfies conditions for a valid sealing segment.
-// TODO check whether all protocol state entries are present
+// TODO check whether all protocol state entries are present?
 // No errors are expected during normal operation.
 func (builder *SealingSegmentBuilder) validateSegment() error {
 	// sealing cannot be empty
@@ -467,9 +499,9 @@ func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBl
 		protocolStateLookup:  protocolStateLookup,
 		includedResults:      make(map[Identifier]struct{}),
 		latestSeals:          make(map[Identifier]Identifier),
+		protocolStateEntries: make(map[Identifier]*ProtocolStateEntryWrapper),
 		blocks:               make([]*Block, 10),
 		extraBlocks:          make([]*Block, DefaultTransactionExpiry),
-		protocolStateEntries: make([]ProtocolStateEntryWrapper, 3),
 		results:              make(ExecutionResultList, 3),
 	}
 }
