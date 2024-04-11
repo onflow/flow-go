@@ -21,6 +21,9 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+const MaxProcessableBlocks = 10000
+const MaxConcurrentBlockExecutor = 10
+
 // Core connects the execution components
 // when it receives blocks and collections, it forwards them to the block queue.
 // when the block queue decides to execute blocks, it forwards to the executor for execution
@@ -33,7 +36,7 @@ type Core struct {
 
 	// state machine
 	processables   chan flow.Identifier
-	blockExecutors chan func(ctx irrecoverable.SignalerContext)
+	blockExecutors chan *entity.ExecutableBlock
 	blockQueue     *block_queue.BlockQueue
 	throttle       Throttle // for throttling blocks to be added to the block queue
 	execState      state.ExecutionState
@@ -80,8 +83,8 @@ func NewCore(
 	e := &Core{
 		log: logger.With().Str("engine", "ingestion_core").Logger(),
 		// processables are throttled blocks
-		processables:      make(chan flow.Identifier, 10000),
-		blockExecutors:    make(chan func(ctx irrecoverable.SignalerContext), 1000),
+		processables:      make(chan flow.Identifier, MaxProcessableBlocks),
+		blockExecutors:    make(chan *entity.ExecutableBlock),
 		throttle:          throttle,
 		execState:         execState,
 		blockQueue:        block_queue.NewBlockQueue(logger),
@@ -101,10 +104,13 @@ func NewCore(
 
 	e.log.Info().Msgf("throttle engine initialized")
 
-	e.ComponentManager = component.NewComponentManagerBuilder().
-		AddWorker(e.launchWorkerToHandleBlocks).
-		AddWorker(e.launchWorkerToExecuteBlocks).
-		Build()
+	builder := component.NewComponentManagerBuilder().AddWorker(e.launchWorkerToHandleBlocks)
+
+	for w := 0; w < MaxConcurrentBlockExecutor; w++ {
+		builder.AddWorker(e.launchWorkerToExecuteBlocks)
+	}
+
+	e.ComponentManager = builder.Build()
 
 	return e
 }
@@ -129,8 +135,11 @@ func (e *Core) launchWorkerToExecuteBlocks(ctx irrecoverable.SignalerContext, re
 		select {
 		case <-ctx.Done():
 			return
-		case f := <-e.blockExecutors:
-			f(ctx)
+		case executable := <-e.blockExecutors:
+			err := e.execute(ctx, executable)
+			if err != nil {
+				ctx.Throw(fmt.Errorf("failed to execute block %v: %w", executable.Block.ID(), err))
+			}
 		}
 	}
 }
@@ -167,7 +176,7 @@ func (e *Core) launchWorkerToConsumeThrottledBlocks(ctx irrecoverable.SignalerCo
 
 		case blockID := <-e.processables:
 			e.log.Debug().Hex("block_id", blockID[:]).Msg("ingestion core processing block")
-			err := e.onProcessableBlock(ctx, blockID)
+			err := e.onProcessableBlock(blockID)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("fail to process block %v: %w", blockID, err))
 				return
@@ -177,7 +186,7 @@ func (e *Core) launchWorkerToConsumeThrottledBlocks(ctx irrecoverable.SignalerCo
 
 }
 
-func (e *Core) onProcessableBlock(ctx irrecoverable.SignalerContext, blockID flow.Identifier) error {
+func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
 	header, err := e.headers.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not get block: %w", err)
@@ -412,12 +421,7 @@ func storeCollectionIfMissing(collections storage.Collections, col *flow.Collect
 // execute block concurrently
 func (e *Core) executeConcurrently(executables []*entity.ExecutableBlock) {
 	for _, executable := range executables {
-		e.blockExecutors <- func(ctx irrecoverable.SignalerContext) {
-			err := e.execute(ctx, executable)
-			if err != nil {
-				ctx.Throw(fmt.Errorf("failed to execute block %v: %w", executable.Block.ID(), err))
-			}
-		}
+		e.blockExecutors <- executable
 	}
 }
 
