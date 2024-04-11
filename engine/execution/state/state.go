@@ -67,7 +67,7 @@ func IsParentExecuted(state ReadOnlyExecutionState, header *flow.Header) (bool, 
 
 // FinalizedExecutionState is an interface used to access the finalized execution state
 type FinalizedExecutionState interface {
-	GetHighestFinalizedExecuted() uint64
+	GetHighestFinalizedExecuted() (uint64, error)
 }
 
 // TODO Many operations here are should be transactional, so we need to refactor this
@@ -87,7 +87,7 @@ type ExecutionState interface {
 
 	// only available with storehouse enabled
 	// panic when called with storehouse disabled (which should be a bug)
-	GetHighestFinalizedExecuted() uint64
+	GetHighestFinalizedExecuted() (uint64, error)
 }
 
 type state struct {
@@ -486,7 +486,11 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 	if s.enableRegisterStore {
 		// when storehouse is enabled, the highest executed block is consisted as
 		// the highest finalized and executed block
-		height := s.GetHighestFinalizedExecuted()
+		height, err := s.GetHighestFinalizedExecuted()
+		if err != nil {
+			return 0, flow.ZeroID, fmt.Errorf("could not get highest finalized executed: %w", err)
+		}
+
 		finalizedID, err := s.headers.BlockIDByHeight(height)
 		if err != nil {
 			return 0, flow.ZeroID, fmt.Errorf("could not get header by height %v: %w", height, err)
@@ -504,12 +508,43 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 	return height, blockID, nil
 }
 
-func (s *state) GetHighestFinalizedExecuted() uint64 {
-	if !s.enableRegisterStore {
-		// TODO: implement
-		return 0
+func (s *state) GetHighestFinalizedExecuted() (uint64, error) {
+	if s.enableRegisterStore {
+		return s.registerStore.LastFinalizedAndExecutedHeight(), nil
 	}
-	return s.registerStore.LastFinalizedAndExecutedHeight()
+
+	var finalizedHeight uint64
+	err := s.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
+	if err != nil {
+		return 0, fmt.Errorf("could not retrieve finalized height: %w", err)
+	}
+
+	executedHeight, executedID, err := s.GetHighestExecutedBlockID(context.Background())
+	if err != nil {
+		return 0, fmt.Errorf("could not get highest executed block: %w", err)
+	}
+
+	var finalizedID flow.Identifier
+	var highest uint64
+	if finalizedHeight >= executedHeight {
+		finalizedID, err = s.headers.BlockIDByHeight(executedHeight)
+		if err != nil {
+			return 0, fmt.Errorf("could not get header by height %v: %w", executedHeight, err)
+		}
+		highest = executedHeight
+	} else {
+		finalizedID, err = s.headers.BlockIDByHeight(finalizedHeight)
+		if err != nil {
+			return 0, fmt.Errorf("could not get header by height %v: %w", executedHeight, err)
+		}
+		highest = finalizedHeight
+	}
+
+	if finalizedID != executedID {
+		return 0, fmt.Errorf("finalized block %v does not match executed block %v", finalizedID, executedID)
+	}
+
+	return highest, nil
 }
 
 // IsBlockExecuted returns true if the block is executed, which means registers, events,
