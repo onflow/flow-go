@@ -3,6 +3,7 @@ package migrations
 import (
 	"context"
 	"encoding/csv"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -240,41 +241,12 @@ func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads
 			continue
 		}
 
-		stagedContractCapsule := value.(*interpreter.CompositeValue)
+		stagedContract, err := m.getStagedContractFromValue(value, inter, locationRange)
+		if err != nil {
+			return err
+		}
 
-		// The stored value should take the form of:
-		//
-		// resource Capsule {
-		//     let update: ContractUpdate
-		// }
-		//
-		// struct ContractUpdate {
-		//     let address: Address
-		//     let name: String
-		//     var code: String
-		//     var lastUpdated: UFix64
-		// }
-
-		contractUpdate := stagedContractCapsule.GetField(
-			inter,
-			locationRange,
-			"update",
-		).(*interpreter.CompositeValue)
-
-		address := contractUpdate.GetField(inter, locationRange, "address").(interpreter.AddressValue)
-		name := contractUpdate.GetField(inter, locationRange, "name").(*interpreter.StringValue)
-		code := contractUpdate.GetField(inter, locationRange, "code").(*interpreter.StringValue)
-
-		stagedContracts = append(
-			stagedContracts,
-			StagedContract{
-				Contract: Contract{
-					Name: name.Str,
-					Code: []byte(code.Str),
-				},
-				Address: common.Address(address),
-			},
-		)
+		stagedContracts = append(stagedContracts, stagedContract)
 	}
 
 	m.log.Info().
@@ -283,6 +255,68 @@ func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads
 	m.RegisterContractUpdates(stagedContracts)
 
 	return nil
+}
+
+func (m *StagedContractsMigration) getStagedContractFromValue(
+	value interpreter.Value,
+	inter *interpreter.Interpreter,
+	locationRange interpreter.LocationRange,
+) (StagedContract, error) {
+
+	stagedContractCapsule, ok := value.(*interpreter.CompositeValue)
+	if !ok {
+		return StagedContract{},
+			fmt.Errorf("unexpected value of type %T", value)
+	}
+
+	// The stored value should take the form of:
+	//
+	// resource Capsule {
+	//     let update: ContractUpdate
+	// }
+	//
+	// struct ContractUpdate {
+	//     let address: Address
+	//     let name: String
+	//     var code: String
+	//     var lastUpdated: UFix64
+	// }
+
+	updateField := stagedContractCapsule.GetField(inter, locationRange, "update")
+	contractUpdate, ok := updateField.(*interpreter.CompositeValue)
+	if !ok {
+		return StagedContract{},
+			fmt.Errorf("unexpected value: expected `CompositeValue`, found `%T`", updateField)
+	}
+
+	addressField := contractUpdate.GetField(inter, locationRange, "address")
+	address, ok := addressField.(interpreter.AddressValue)
+	if !ok {
+		return StagedContract{},
+			fmt.Errorf("unexpected value: expected `AddressValue`, found `%T`", addressField)
+	}
+
+	nameField := contractUpdate.GetField(inter, locationRange, "name")
+	name, ok := nameField.(*interpreter.StringValue)
+	if !ok {
+		return StagedContract{},
+			fmt.Errorf("unexpected value: expected `StringValue`, found `%T`", nameField)
+	}
+
+	codeField := contractUpdate.GetField(inter, locationRange, "code")
+	code, ok := codeField.(*interpreter.StringValue)
+	if !ok {
+		return StagedContract{},
+			fmt.Errorf("unexpected value: expected `StringValue`, found `%T`", codeField)
+	}
+
+	return StagedContract{
+		Contract: Contract{
+			Name: name.Str,
+			Code: []byte(code.Str),
+		},
+		Address: common.Address(address),
+	}, nil
 }
 
 // RegisterContractUpdates prepares the contract updates as a map for easy lookup.
