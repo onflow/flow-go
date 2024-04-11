@@ -251,8 +251,11 @@ func TestEVMRun(t *testing.T) {
 
 func TestEVMBatchRun(t *testing.T) {
 	chain := flow.Emulator.Chain()
-	t.Run("Batch run multiple valid transactions", func(t *testing.T) {
 
+	// run a batch of valid transactions which update a value on the contract
+	// after the batch is run check that the value updated on the contract matches
+	// the last transaction update in the batch.
+	t.Run("Batch run multiple valid transactions", func(t *testing.T) {
 		t.Parallel()
 		RunWithNewEnvironment(t,
 			chain, func(
@@ -375,6 +378,9 @@ func TestEVMBatchRun(t *testing.T) {
 			})
 	})
 
+	// run batch with one invalid transaction that has an invalid nonce
+	// this should produce invalid result on that specific transaction
+	// but other transaction should successfuly update the value on the contract
 	t.Run("Batch run with one invalid transaction", func(t *testing.T) {
 		t.Parallel()
 		RunWithNewEnvironment(t,
@@ -511,7 +517,10 @@ func TestEVMBatchRun(t *testing.T) {
 			})
 	})
 
-	t.Run("Batch run with with failed transaction", func(t *testing.T) {
+	// fail every other transaction with gas set too low for execution to succeed
+	// but high enough to pass intristic gas check, then check the updated values on the
+	// contract to match the last successful transaction execution
+	t.Run("Batch run with with failed transactions", func(t *testing.T) {
 		t.Parallel()
 		RunWithNewEnvironment(t,
 			chain, func(
@@ -521,44 +530,46 @@ func TestEVMBatchRun(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				const failedTxIndex = 3
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 				batchRunCode := []byte(fmt.Sprintf(
 					`
 					import EVM from %s
 
 					transaction(txs: [[UInt8]], coinbaseBytes: [UInt8; 20]) {
-						prepare(account: AuthAccount) {
+						execute {
 							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
 							let batchResults = EVM.batchRun(txs: txs, coinbase: coinbase)
-							
+
+							log("results")
+							log(batchResults)
 							assert(batchResults.length == txs.length, message: "invalid result length")
+
 							for i, res in batchResults {
-								if i != %d {
-									assert(res.status == EVM.Status.successful, message: "unexpected status")
+								if i %% 2 != 0 {
+									assert(res.status == EVM.Status.successful, message: "unexpected success status")
 									assert(res.errorCode == 0, message: "unexpected error code")
 								} else {
-									assert(res.status == EVM.Status.invalid, message: "unexpected status")
-									assert(res.errorCode == 201, message: "unexpected error code")
+									assert(res.status == EVM.Status.failed, message: "unexpected failed status")
+									assert(res.errorCode == 301, message: "unexpected error code")
 								}
 							}
 						}
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-					failedTxIndex,
 				))
 
-				batchCount := 5
+				batchCount := 6
 				var num int64
 				txBytes := make([]cadence.Value, batchCount)
 				for i := 0; i < batchCount; i++ {
-					num = int64(i)
-
 					gas := uint64(100_000)
-					if i == failedTxIndex {
+					if i%2 == 0 {
 						// fail with too low gas limit
-						gas = uint64(100)
+						gas = 22_000
+					} else {
+						// update number with only valid transactions
+						num = int64(i)
 					}
 
 					// prepare batch of transaction payloads
@@ -588,14 +599,14 @@ func TestEVMBatchRun(t *testing.T) {
 				tx := fvm.Transaction(
 					flow.NewTransactionBody().
 						SetScript(batchRunCode).
-						AddAuthorizer(sc.FlowServiceAccount.Address).
 						AddArgument(json.MustEncode(txs)).
 						AddArgument(json.MustEncode(coinbase)),
 					0)
 
 				state, output, err := vm.Run(ctx, tx, snapshot)
+
 				require.NoError(t, err)
-				require.Error(t, output.Err)
+				require.NoError(t, output.Err)
 				//require.NotEmpty(t, state.WriteSet)
 
 				// append the state
@@ -640,11 +651,11 @@ func TestEVMBatchRun(t *testing.T) {
 
 				// make sure the retrieved value is the same as the last value
 				// that was stored by transaction batch
-				//			res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
-				//			require.NoError(t, err)
-				//				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
-				//				require.Equal(t, types.StatusSuccessful, res.Status)
-				//				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue).Int64())
+				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				require.Equal(t, types.StatusSuccessful, res.Status)
+				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue).Int64())
 			})
 	})
 }
@@ -1458,6 +1469,7 @@ func RunWithNewEnvironment(
 					fvm.WithAuthorizationChecksEnabled(false),
 					fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 					fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
+					fvm.WithCadenceLogging(true),
 				}
 				ctx := fvm.NewContext(opts...)
 
