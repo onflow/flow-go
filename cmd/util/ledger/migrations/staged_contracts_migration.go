@@ -169,8 +169,7 @@ func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads
 	case flow.Testnet:
 		stagingAccount = "0x2ceae959ed1a7e7a"
 	case flow.Mainnet:
-		// TODO:
-		stagingAccount = "0x2ceae959ed1a7e7a"
+		stagingAccount = "0x56100d46aa9b0212"
 	default:
 		// For other networks such as emulator etc. no need to scan for staged contracts.
 		return nil
