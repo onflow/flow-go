@@ -286,6 +286,7 @@ func TestContractInteraction(t *testing.T) {
 					res, err := blk.RunTransaction(tx)
 					require.NoError(t, err)
 					require.NoError(t, res.VMError)
+					require.NoError(t, res.ValidationError)
 					require.Greater(t, res.GasConsumed, uint64(0))
 
 					// check the balance of coinbase
@@ -304,6 +305,7 @@ func TestContractInteraction(t *testing.T) {
 
 			t.Run("test batch running transactions", func(t *testing.T) {
 				account := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
+				account.SetNonce(account.Nonce() + 1)
 				fAddr := account.Address()
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
@@ -314,7 +316,7 @@ func TestContractInteraction(t *testing.T) {
 
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
-					ctx.GasFeeCollector = types.NewAddressFromString("coinbase")
+					ctx.GasFeeCollector = types.NewAddressFromString("coinbase-collector")
 					coinbaseOrgBalance := gethCommon.Big1
 					// small amount of money to create account
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
@@ -343,6 +345,7 @@ func TestContractInteraction(t *testing.T) {
 					require.NoError(t, err)
 					for _, res := range results {
 						require.NoError(t, res.VMError)
+						require.NoError(t, res.ValidationError)
 						require.Greater(t, res.GasConsumed, uint64(0))
 					}
 
@@ -350,12 +353,12 @@ func TestContractInteraction(t *testing.T) {
 					RunWithNewReadOnlyBlockView(t, env, func(blk2 types.ReadOnlyBlockView) {
 						bal, err := blk2.BalanceOf(ctx.GasFeeCollector)
 						require.NoError(t, err)
-						expected := gethParams.TxGas*gethCommon.Big1.Uint64()*batchSize + gethCommon.Big1.Uint64()
+						expected := gethParams.TxGas*batchSize + gethCommon.Big1.Uint64()
 						require.Equal(t, expected, bal.Uint64())
 
 						nonce, err := blk2.NonceOf(fAddr)
 						require.NoError(t, err)
-						require.Equal(t, batchSize, int(nonce))
+						require.Equal(t, batchSize+1, int(nonce))
 					})
 				})
 			})
@@ -369,7 +372,7 @@ func TestContractInteraction(t *testing.T) {
 						require.NoError(t, err)
 					})
 				})
-				account.SetNonce(account.Nonce() + 1)
+				account.SetNonce(account.Nonce() + 4)
 
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
@@ -400,6 +403,7 @@ func TestContractInteraction(t *testing.T) {
 					res, err := blk.RunTransaction(tx)
 					require.NoError(t, err)
 					require.NoError(t, res.VMError)
+					require.NoError(t, res.ValidationError)
 					require.Greater(t, res.GasConsumed, uint64(0))
 				})
 			})
