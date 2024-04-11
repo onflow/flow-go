@@ -382,9 +382,9 @@ func (proc *procedure) deployAt(
 		return res, nil
 	}
 
-	proc.state.SetCode(addr, ret)
 	res.DeployedContractAddress = to
-	res.ReturnedValue = to[:] // assign address to return value since it's the only returned value
+
+	proc.state.SetCode(addr, ret)
 	return res, proc.commitAndFinalize()
 }
 
@@ -444,10 +444,8 @@ func (proc *procedure) run(
 		if !execResult.Failed() { // collect vm errors
 			res.ReturnedValue = execResult.ReturnData
 			// If the transaction created a contract, store the creation address in the receipt,
-			// and overwrite the return value with the contract address.
 			if msg.To == nil {
 				res.DeployedContractAddress = types.NewAddress(gethCrypto.CreateAddress(msg.From, msg.Nonce))
-				res.ReturnedValue = res.DeployedContractAddress[:]
 			}
 			// replace tx index and tx hash
 			res.Logs = proc.state.Logs(
