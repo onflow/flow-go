@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"crypto/md5" //nolint:gosec
-	"errors"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -19,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -354,26 +352,5 @@ func convertScriptExecutionError(err error, height uint64) error {
 		}
 	}
 
-	return convertIndexError(err, height, "failed to execute script")
-}
-
-// convertIndexError converts errors related to index to a gRPC error
-func convertIndexError(err error, height uint64, defaultMsg string) error {
-	if err == nil {
-		return nil
-	}
-
-	if errors.Is(err, indexer.ErrIndexNotInitialized) {
-		return status.Errorf(codes.FailedPrecondition, "data for block is not available: %v", err)
-	}
-
-	if errors.Is(err, storage.ErrHeightNotIndexed) {
-		return status.Errorf(codes.OutOfRange, "data for block height %d is not available", height)
-	}
-
-	if errors.Is(err, storage.ErrNotFound) {
-		return status.Errorf(codes.NotFound, "data not found: %v", err)
-	}
-
-	return rpc.ConvertError(err, defaultMsg, codes.Internal)
+	return rpc.ConvertIndexError(err, height, "failed to execute script")
 }

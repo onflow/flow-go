@@ -50,11 +50,11 @@ func TestCheckSum(t *testing.T) {
 // is able to extract the same data as the encoder.
 func TestPrefixCheckSum(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		committeeSize := rapid.IntRange(0, 300).Draw(t, "committeeSize").(int)
+		committeeSize := rapid.IntRange(0, 300).Draw(t, "committeeSize")
 		committee := unittest.IdentifierListFixture(committeeSize)
-		data := rapid.IntRange(0, 200).Map(func(count int) []byte {
+		data := rapid.Map(rapid.IntRange(0, 200), func(count int) []byte {
 			return unittest.RandomBytes(count)
-		}).Draw(t, "data").([]byte)
+		}).Draw(t, "data")
 		extracted, err := msig.CompareAndExtract(committee, msig.PrefixCheckSum(committee, data))
 		require.NoError(t, err)
 		require.Equal(t, data, extracted)

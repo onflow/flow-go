@@ -211,6 +211,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	// from joining the mesh. As this test simulates the scenario where a node is moved from the old chain to the new chain, we disable peer scoring
 	// to allow the node to join the mesh on the new chain, otherwise the node will be disconnected from the mesh due to peer scoring penalty for unknown identifiers.
 	cfg.NetworkConfig.GossipSub.PeerScoringEnabled = false
+	cfg.NetworkConfig.GossipSub.RpcInspector.Validation.InspectionProcess.Inspect.RejectUnstakedPeers = false
 	node1, id1 := p2ptest.NodeFixture(t,
 		previousSporkId,
 		"test_one_to_k_crosstalk_prevention",

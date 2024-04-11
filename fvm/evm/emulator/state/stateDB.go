@@ -7,12 +7,11 @@ import (
 	"math/big"
 	"sort"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/atree"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethParams "github.com/onflow/go-ethereum/params"
 
-	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -264,7 +263,6 @@ func (db *StateDB) Snapshot() int {
 // Logs returns the list of logs
 // it also update each log with the block and tx info
 func (db *StateDB) Logs(
-	blockHash gethCommon.Hash,
 	blockNumber uint64,
 	txHash gethCommon.Hash,
 	txIndex uint,
@@ -273,7 +271,6 @@ func (db *StateDB) Logs(
 	for _, view := range db.views {
 		for _, log := range view.Logs() {
 			log.BlockNumber = blockNumber
-			log.BlockHash = blockHash
 			log.TxHash = txHash
 			log.TxIndex = txIndex
 			allLogs = append(allLogs, log)
@@ -294,7 +291,7 @@ func (db *StateDB) Preimages() map[gethCommon.Hash][]byte {
 }
 
 // Commit commits state changes back to the underlying
-func (db *StateDB) Commit() error {
+func (db *StateDB) Commit(finalize bool) error {
 	// return error if any has been acumulated
 	if db.cachedError != nil {
 		return wrapError(db.cachedError)
@@ -391,11 +388,17 @@ func (db *StateDB) Commit() error {
 	}
 
 	// don't purge views yet, people might call the logs etc
-	err = db.baseView.Commit()
-	if err != nil {
-		return wrapError(err)
+	if finalize {
+		return db.Finalize()
 	}
 	return nil
+}
+
+// Finalize flushes all the changes
+// to the permanent storage
+func (db *StateDB) Finalize() error {
+	err := db.baseView.Commit()
+	return wrapError(err)
 }
 
 // Prepare is a highlevel logic that sadly is considered to be part of the
@@ -422,6 +425,14 @@ func (db *StateDB) Prepare(rules gethParams.Rules, sender, coinbase gethCommon.A
 			db.AddAddressToAccessList(coinbase)
 		}
 	}
+}
+
+// Reset resets uncommitted changes and transient artifacts such as error, logs,
+// preimages, access lists, ...
+// The method is often called between execution of different transactions
+func (db *StateDB) Reset() {
+	db.views = []*DeltaView{NewDeltaView(db.baseView)}
+	db.cachedError = nil
 }
 
 // Error returns the memorized database failure occurred earlier.
@@ -460,9 +471,9 @@ func wrapError(err error) error {
 		return types.NewFatalError(err)
 	}
 
-	// if is fvm fatal error
-	if errors.IsFailure(err) {
-		return types.NewFatalError(err)
+	// if is a fatal error
+	if types.IsAFatalError(err) {
+		return err
 	}
 
 	return types.NewStateError(err)

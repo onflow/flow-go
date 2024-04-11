@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"testing"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/handler"
@@ -17,8 +17,7 @@ func TestBlockStore(t *testing.T) {
 
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(root flow.Address) {
-			bs, err := handler.NewBlockStore(backend, root)
-			require.NoError(t, err)
+			bs := handler.NewBlockStore(backend, root)
 
 			// check gensis block
 			b, err := bs.LatestBlock()

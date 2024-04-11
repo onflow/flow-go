@@ -397,21 +397,16 @@ func (executor *transactionExecutor) normalExecution() (
 
 	// Check if all account storage limits are ok
 	//
-	// disable the computation/memory limit checks on storage checks,
-	// so we don't error from computation/memory limits on this part.
-	//
 	// The storage limit check is performed for all accounts that were touched during the transaction.
 	// The storage capacity of an account depends on its balance and should be higher than the accounts storage used.
 	// The payer account is special cased in this check and its balance is considered max_fees lower than its
 	// actual balance, for the purpose of calculating storage capacity, because the payer will have to pay for this tx.
-	executor.txnState.RunWithAllLimitsDisabled(func() {
-		err = executor.CheckStorageLimits(
-			executor.ctx,
-			executor.env,
-			bodySnapshot,
-			executor.proc.Transaction.Payer,
-			maxTxFees)
-	})
+	err = executor.CheckStorageLimits(
+		executor.ctx,
+		executor.env,
+		bodySnapshot,
+		executor.proc.Transaction.Payer,
+		maxTxFees)
 
 	if err != nil {
 		return
