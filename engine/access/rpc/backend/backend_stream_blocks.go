@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -293,6 +294,9 @@ func (b *backendSubscribeBlocks) getBlockHeader(height uint64, expectedBlockStat
 	// since we are querying a finalized or sealed block header, we can use the height index and save an ID computation
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, fmt.Errorf("failed to retrieve block ID for height %d: %w", height, subscription.ErrBlockNotReady)
+		}
 		return nil, err
 	}
 
@@ -311,6 +315,9 @@ func (b *backendSubscribeBlocks) getBlock(height uint64, expectedBlockStatus flo
 	// since we are querying a finalized or sealed block, we can use the height index and save an ID computation
 	block, err := b.blocks.ByHeight(height)
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, fmt.Errorf("failed to retrieve block ID for height %d: %w", height, subscription.ErrBlockNotReady)
+		}
 		return nil, err
 	}
 

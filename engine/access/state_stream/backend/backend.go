@@ -144,7 +144,7 @@ func New(
 
 // getExecutionData returns the execution data for the given block height.
 // Expected errors during normal operation:
-// - subscription.ErrBlockNotReady or execution_data.BlobNotFoundError: execution data for the given block height is not available.
+// - subscription.ErrBlockNotReady: execution data for the given block height is not available.
 func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64) (*execution_data.BlockExecutionDataEntity, error) {
 	highestHeight := b.ExecutionDataTracker.GetHighestHeight()
 	// fail early if no notification has been received for the given block height.
@@ -158,7 +158,6 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64
 	if err != nil {
 		var errMsg error
 		if errors.Is(err, storage.ErrNotFound) ||
-			errors.Is(err, storage.ErrHeightNotIndexed) ||
 			execution_data.IsBlobNotFoundError(err) {
 			errMsg = subscription.ErrBlockNotReady
 		} else {

@@ -34,6 +34,9 @@ type ExecutionDataBackend struct {
 func (b *ExecutionDataBackend) GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionData, error) {
 	header, err := b.headers.ByBlockID(blockID)
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, fmt.Errorf("could not get block header for %s: %w", blockID, subscription.ErrBlockNotReady)
+		}
 		return nil, fmt.Errorf("could not get block header for %s: %w", blockID, err)
 	}
 
@@ -41,8 +44,8 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(ctx context.Context, bl
 
 	if err != nil {
 		// need custom not found handler due to blob not found error
-		if errors.Is(err, storage.ErrNotFound) || execution_data.IsBlobNotFoundError(err) {
-			return nil, status.Errorf(codes.NotFound, "could not find execution data: %v", err)
+		if errors.Is(err, subscription.ErrBlockNotReady) {
+			return nil, status.Errorf(codes.NotFound, "could not find execution data: %v", subscription.ErrBlockNotReady)
 		}
 
 		return nil, rpc.ConvertError(err, "could not get execution data", codes.Internal)

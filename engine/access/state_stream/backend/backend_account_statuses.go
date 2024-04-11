@@ -2,12 +2,15 @@ package backend
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 type AccountStatusesResponse struct {
@@ -90,6 +93,10 @@ func (b *AccountStatusesBackend) getAccountStatusResponseFactory(
 	return func(ctx context.Context, height uint64) (interface{}, error) {
 		eventsResponse, err := b.eventsRetriever.GetAllEventsResponse(ctx, height)
 		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) ||
+				errors.Is(err, storage.ErrHeightNotIndexed) {
+				return nil, fmt.Errorf("block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
+			}
 			return nil, err
 		}
 		filteredProtocolEvents := filter.Filter(eventsResponse.Events)
