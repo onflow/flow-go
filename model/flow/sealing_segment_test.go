@@ -21,12 +21,14 @@ import (
 type SealingSegmentSuite struct {
 	suite.Suite
 
-	results        map[flow.Identifier]*flow.ExecutionResult
-	sealsByBlockID map[flow.Identifier]*flow.Seal
+	results              map[flow.Identifier]*flow.ExecutionResult
+	sealsByBlockID       map[flow.Identifier]*flow.Seal
+	protocolStateEntries map[flow.Identifier]*flow.ProtocolStateEntryWrapper
 	// bootstrap each test case with a block which is before, and receipt+seal for the block
-	priorBlock   *flow.Block
-	priorReceipt *flow.ExecutionReceipt
-	priorSeal    *flow.Seal
+	priorBlock             *flow.Block
+	priorReceipt           *flow.ExecutionReceipt
+	priorSeal              *flow.Seal
+	defaultProtocolStateID flow.Identifier
 
 	builder *flow.SealingSegmentBuilder
 }
@@ -43,6 +45,10 @@ func (suite *SealingSegmentSuite) addResult(result *flow.ExecutionResult) {
 // addSeal adds the seal as being the latest w.r.t. the block ID.
 func (suite *SealingSegmentSuite) addSeal(blockID flow.Identifier, seal *flow.Seal) {
 	suite.sealsByBlockID[blockID] = seal
+}
+
+func (suite *SealingSegmentSuite) addProtocolStateEntry(protocolStateID flow.Identifier, entry *flow.ProtocolStateEntryWrapper) {
+	suite.protocolStateEntries[protocolStateID] = entry
 }
 
 // GetResult gets a result by ID from the map in the suite.
@@ -63,13 +69,26 @@ func (suite *SealingSegmentSuite) GetSealByBlockID(blockID flow.Identifier) (*fl
 	return seal, nil
 }
 
+// GetProtocolStateEntry gets a protocol state entry from the map in the suite.
+func (suite *SealingSegmentSuite) GetProtocolStateEntry(protocolStateID flow.Identifier) (*flow.ProtocolStateEntryWrapper, error) {
+	entry, ok := suite.protocolStateEntries[protocolStateID]
+	if !ok {
+		return nil, fmt.Errorf("not found")
+	}
+	return entry, nil
+}
+
 // SetupTest resets maps and creates a new builder for a new test case.
 func (suite *SealingSegmentSuite) SetupTest() {
 	suite.results = make(map[flow.Identifier]*flow.ExecutionResult)
 	suite.sealsByBlockID = make(map[flow.Identifier]*flow.Seal)
-	suite.builder = flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID)
+	suite.protocolStateEntries = make(map[flow.Identifier]*flow.ProtocolStateEntryWrapper)
+	suite.builder = flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID, suite.GetProtocolStateEntry)
 
-	priorBlock := unittest.BlockFixture()
+	suite.defaultProtocolStateID = unittest.IdentifierFixture()
+	suite.protocolStateEntries[suite.defaultProtocolStateID] = suite.ProtocolStateEntryWrapperFixture()
+
+	priorBlock := suite.BlockFixture()
 	priorReceipt, priorSeal := unittest.ReceiptAndSealForBlock(&priorBlock)
 	suite.results[priorReceipt.ExecutionResult.ID()] = &priorReceipt.ExecutionResult
 	suite.priorBlock = &priorBlock
@@ -77,11 +96,37 @@ func (suite *SealingSegmentSuite) SetupTest() {
 	suite.priorSeal = priorSeal
 }
 
+// BlockFixture returns a Block fixture with the default protocol state ID.
+func (suite *SealingSegmentSuite) BlockFixture() flow.Block {
+	block := unittest.BlockFixture()
+	block.SetPayload(suite.PayloadFixture())
+	return block
+}
+
+// PayloadFixture returns a Payload fixture with the default protocol state ID.
+func (suite *SealingSegmentSuite) PayloadFixture(opts ...func(payload *flow.Payload)) flow.Payload {
+	opts = append(opts, unittest.WithProtocolStateID(suite.defaultProtocolStateID))
+	return unittest.PayloadFixture(opts...)
+}
+
+// BlockWithParentFixture todo
+func (suite *SealingSegmentSuite) BlockWithParentFixture(parent *flow.Header) *flow.Block {
+	block := unittest.BlockWithParentFixture(parent)
+	block.SetPayload(suite.PayloadFixture())
+	return block
+}
+
+// ProtocolStateEntryWrapperFixture returns a ProtocolStateEntryWrapper.
+// For these tests, only the ID matters, so we can just return an empty struct.
+func (suite *SealingSegmentSuite) ProtocolStateEntryWrapperFixture() *flow.ProtocolStateEntryWrapper {
+	return &flow.ProtocolStateEntryWrapper{}
+}
+
 // FirstBlock returns a first block which contains a seal and receipt referencing
 // priorBlock (this is the simplest case for a sealing segment).
 func (suite *SealingSegmentSuite) FirstBlock() *flow.Block {
-	block := unittest.BlockFixture()
-	block.SetPayload(unittest.PayloadFixture(
+	block := suite.BlockFixture()
+	block.SetPayload(suite.PayloadFixture(
 		unittest.WithSeals(suite.priorSeal),
 		unittest.WithReceipts(suite.priorReceipt),
 	))
@@ -112,8 +157,8 @@ func (suite *SealingSegmentSuite) AddBlocks(blocks ...*flow.Block) {
 func (suite *SealingSegmentSuite) TestBuild_MissingResultFromReceipt() {
 
 	// B1 contains a receipt (but no result) and seal for a prior block
-	block1 := unittest.BlockFixture()
-	block1.SetPayload(unittest.PayloadFixture(unittest.WithReceiptsAndNoResults(suite.priorReceipt), unittest.WithSeals(suite.priorSeal)))
+	block1 := suite.BlockFixture()
+	block1.SetPayload(suite.PayloadFixture(unittest.WithReceiptsAndNoResults(suite.priorReceipt), unittest.WithSeals(suite.priorSeal)))
 
 	block2 := unittest.BlockWithParentFixture(block1.Header)
 	receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)

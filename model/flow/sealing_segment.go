@@ -445,7 +445,7 @@ func (builder *SealingSegmentBuilder) validateRootSegment() error {
 }
 
 // validateSegment will validate if builder satisfies conditions for a valid sealing segment.
-// TODO check whether all protocol state entries are present?
+// TODO(5120) check whether all protocol state entries are present?
 // No errors are expected during normal operation.
 func (builder *SealingSegmentBuilder) validateSegment() error {
 	// sealing cannot be empty
