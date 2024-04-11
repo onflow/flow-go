@@ -2,7 +2,6 @@ package flow
 
 import (
 	"fmt"
-	storage "github.com/onflow/flow-go/storage"
 	"golang.org/x/exp/slices"
 )
 
@@ -74,8 +73,9 @@ type SealingSegment struct {
 // Deprecated: avoid using this in new code; this is a temporary measure until epoch data is moved into protocol KV store
 // TODO: move epoch data into the KVStore as part of a future upgrade
 type ProtocolStateEntryWrapper struct {
-	KVStoreEntry *storage.KeyValueStoreData
-	EpochEntry   *RichProtocolStateEntry
+	KVStoreVersion uint64
+	KVStoreData    []byte
+	EpochEntry     *RichProtocolStateEntry
 }
 
 // Highest is the highest block in the sealing segment and the reference block from snapshot that was
@@ -500,9 +500,9 @@ func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBl
 		includedResults:      make(map[Identifier]struct{}),
 		latestSeals:          make(map[Identifier]Identifier),
 		protocolStateEntries: make(map[Identifier]*ProtocolStateEntryWrapper),
-		blocks:               make([]*Block, 10),
-		extraBlocks:          make([]*Block, DefaultTransactionExpiry),
-		results:              make(ExecutionResultList, 3),
+		blocks:               make([]*Block, 0, 10),
+		extraBlocks:          make([]*Block, 0, DefaultTransactionExpiry),
+		results:              make(ExecutionResultList, 0, 3),
 	}
 }
 

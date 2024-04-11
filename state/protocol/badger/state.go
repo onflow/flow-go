@@ -275,7 +275,10 @@ func bootstrapProtocolState(
 
 		for protocolStateID, stateEntry := range segment.ProtocolStateEntries {
 			// todo error handling
-			protocolKVStores.StoreTx(protocolStateID, stateEntry.KVStoreEntry)
+			protocolKVStores.StoreTx(protocolStateID, &storage.KeyValueStoreData{
+				Version: stateEntry.KVStoreVersion,
+				Data:    stateEntry.KVStoreData,
+			})
 			protocolState.StoreTx(stateEntry.EpochEntry.ID(), stateEntry.EpochEntry.ProtocolStateEntry)
 			// todo store service events as well... need to pass in more storage modules
 		}
