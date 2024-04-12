@@ -1,6 +1,7 @@
 package migrations
 
 import (
+	"context"
 	"encoding/binary"
 	"testing"
 
@@ -122,7 +123,9 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 	err = migration.InitMigration(log, nil, 0)
 	require.NoError(t, err)
 
-	newPayloads, err := migration.MigrateAccount(nil, testAddress, oldPayloads)
+	ctx := context.Background()
+
+	newPayloads, err := migration.MigrateAccount(ctx, testAddress, oldPayloads)
 	require.NoError(t, err)
 
 	// Assert
