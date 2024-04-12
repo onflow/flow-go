@@ -346,9 +346,9 @@ func SnapshotFromBootstrapStateWithParams(
 		EpochCommitSafetyThreshold: epochCommitSafetyThreshold, // see protocol.Params for details
 	}
 
-	// TODO(5120)
 	rootEpochState := ProtocolStateFromEpochServiceEvents(setup, commit)
-	rootKvStore := kvstore.NewLatestKVStore(rootEpochState.ID())
+	rootEpochStateID := rootEpochState.ID()
+	rootKvStore := kvstore.NewLatestKVStore(rootEpochStateID)
 	if rootKvStore.ID() != root.Payload.ProtocolStateID {
 		return nil, fmt.Errorf("incorrect protocol state ID in root block, expected (%x) but got (%x)",
 			root.Payload.ProtocolStateID, rootKvStore.ID())
@@ -356,6 +356,17 @@ func SnapshotFromBootstrapStateWithParams(
 	kvStoreVersion, kvStoreData, err := rootKvStore.VersionedEncode()
 	if err != nil {
 		return nil, fmt.Errorf("could not encode kvstore: %w", err)
+	}
+
+	richRootEpochState, err := flow.NewRichProtocolStateEntry(rootEpochState, nil, nil, setup, commit, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct root rich epoch state entry: %w", err)
+	}
+
+	rootProtocolStateEntryWrapper := &flow.ProtocolStateEntryWrapper{
+		KVStoreVersion: kvStoreVersion,
+		KVStoreData:    kvStoreData,
+		EpochEntry:     richRootEpochState,
 	}
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{
@@ -366,8 +377,11 @@ func SnapshotFromBootstrapStateWithParams(
 			Blocks:           []*flow.Block{root},
 			ExecutionResults: flow.ExecutionResultList{result},
 			LatestSeals:      map[flow.Identifier]flow.Identifier{root.ID(): seal.ID()},
-			FirstSeal:        seal,
-			ExtraBlocks:      make([]*flow.Block, 0),
+			ProtocolStateEntries: map[flow.Identifier]*flow.ProtocolStateEntryWrapper{
+				rootEpochStateID: rootProtocolStateEntryWrapper,
+			},
+			FirstSeal:   seal,
+			ExtraBlocks: make([]*flow.Block, 0),
 		},
 		QuorumCertificate:  qc,
 		Epochs:             epochs,
