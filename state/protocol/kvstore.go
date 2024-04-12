@@ -2,28 +2,12 @@ package protocol
 
 import "github.com/onflow/flow-go/model/flow"
 
-// VersionedEncodable defines the interface for a versioned key-value store independent
-// of the set of keys which are supported. This allows the storage layer to support
-// storing different key-value model versions within the same software version.
-type VersionedEncodable interface {
-	// VersionedEncode encodes the key-value store, returning the version separately
-	// from the encoded bytes.
-	// No errors are expected during normal operation.
-	VersionedEncode() (uint64, []byte, error)
-}
-
-// ViewBasedActivator allows setting value that will be active from specific view.
-type ViewBasedActivator[T any] struct {
-	Data           T
-	ActivationView uint64 // first view at which Data will take effect
-}
-
-// This file contains versioned read and read-write interfaces to the Protocol State's
+// This file contains versioned read interface to the Protocol State's
 // key-value store and are used by the Protocol State Machine.
 //
 // When a key is added or removed, this requires a new protocol state version:
-//  - Create a new versioned model in ./kvstore/models.go (eg. modelv3 if latest model is modelv2)
-//  - Update the KVStoreReader and KVStoreAPI interfaces to include any new keys
+//  - Create a new versioned model in ./protocol_state/kvstore/models.go (eg. modelv3 if latest model is modelv2)
+//  - Update the KVStoreReader and protocol_state.KVStoreAPI interfaces to include any new keys
 
 // KVStoreReader is the latest read-only interface to the Protocol State key-value store
 // at a particular block.
@@ -68,4 +52,20 @@ type KVStoreReader interface {
 	//  - ErrKeyNotSupported if the respective entry does not exist in the
 	//    Protocol State Snapshot that is backing the `Reader` interface.
 	GetInvalidEpochTransitionAttempted() (bool, error)
+}
+
+// VersionedEncodable defines the interface for a versioned key-value store independent
+// of the set of keys which are supported. This allows the storage layer to support
+// storing different key-value model versions within the same software version.
+type VersionedEncodable interface {
+	// VersionedEncode encodes the key-value store, returning the version separately
+	// from the encoded bytes.
+	// No errors are expected during normal operation.
+	VersionedEncode() (uint64, []byte, error)
+}
+
+// ViewBasedActivator allows setting value that will be active from specific view.
+type ViewBasedActivator[T any] struct {
+	Data           T
+	ActivationView uint64 // first view at which Data will take effect
 }
