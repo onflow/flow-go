@@ -10,10 +10,10 @@ import (
 // EpochStateMachineFactory is a factory for creating EpochStateMachine instances.
 // It holds all the necessary data to create a new instance of EpochStateMachine.
 type EpochStateMachineFactory struct {
-	params          protocol.GlobalParams
-	setups          storage.EpochSetups
-	commits         storage.EpochCommits
-	protocolStateDB storage.ProtocolState
+	params               protocol.GlobalParams
+	setups               storage.EpochSetups
+	commits              storage.EpochCommits
+	epochProtocolStateDB storage.ProtocolState
 }
 
 var _ protocol_state.KeyValueStoreStateMachineFactory = (*EpochStateMachineFactory)(nil)
@@ -22,12 +22,12 @@ func NewEpochStateMachineFactory(
 	params protocol.GlobalParams,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	protocolStateDB storage.ProtocolState) *EpochStateMachineFactory {
+	epochProtocolStateDB storage.ProtocolState) *EpochStateMachineFactory {
 	return &EpochStateMachineFactory{
-		params:          params,
-		setups:          setups,
-		commits:         commits,
-		protocolStateDB: protocolStateDB,
+		params:               params,
+		setups:               setups,
+		commits:              commits,
+		epochProtocolStateDB: epochProtocolStateDB,
 	}
 }
 
@@ -40,7 +40,7 @@ func (f *EpochStateMachineFactory) Create(candidateView uint64, parentID flow.Id
 		f.params,
 		f.setups,
 		f.commits,
-		f.protocolStateDB,
+		f.epochProtocolStateDB,
 		parentState,
 		mutator,
 		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (StateMachine, error) {

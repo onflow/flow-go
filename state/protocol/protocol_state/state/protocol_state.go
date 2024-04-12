@@ -16,18 +16,18 @@ import (
 // on a per-block and per-epoch basis.
 // It is backed by a storage.ProtocolState and an in-memory protocol.GlobalParams.
 type ProtocolState struct {
-	protocolStateDB  storage.ProtocolState
-	kvStoreSnapshots storage.ProtocolKVStore
-	globalParams     protocol.GlobalParams
+	epochProtocolStateDB storage.ProtocolState
+	kvStoreSnapshots     storage.ProtocolKVStore
+	globalParams         protocol.GlobalParams
 }
 
 var _ protocol.ProtocolState = (*ProtocolState)(nil)
 
 func NewProtocolState(protocolStateDB storage.ProtocolState, kvStoreSnapshots storage.ProtocolKVStore, globalParams protocol.GlobalParams) *ProtocolState {
 	return &ProtocolState{
-		protocolStateDB:  protocolStateDB,
-		kvStoreSnapshots: kvStoreSnapshots,
-		globalParams:     globalParams,
+		epochProtocolStateDB: protocolStateDB,
+		kvStoreSnapshots:     kvStoreSnapshots,
+		globalParams:         globalParams,
 	}
 }
 
@@ -39,7 +39,7 @@ func NewProtocolState(protocolStateDB storage.ProtocolState, kvStoreSnapshots st
 // - (nil, storage.ErrNotFound) - if there is no epoch protocol state associated with given block ID.
 // - (nil, exception) - any other error should be treated as exception.
 func (s *ProtocolState) AtBlockID(blockID flow.Identifier) (protocol.DynamicProtocolState, error) {
-	protocolStateEntry, err := s.protocolStateDB.ByBlockID(blockID)
+	protocolStateEntry, err := s.epochProtocolStateDB.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not query epoch protocol state at block (%x): %w", blockID, err)
 	}
@@ -93,7 +93,7 @@ var _ protocol.MutableProtocolState = (*MutableProtocolState)(nil)
 
 // NewMutableProtocolState creates a new instance of MutableProtocolState.
 func NewMutableProtocolState(
-	protocolStateDB storage.ProtocolState,
+	epochProtocolStateDB storage.ProtocolState,
 	kvStoreSnapshots storage.ProtocolKVStore,
 	globalParams protocol.GlobalParams,
 	headers storage.Headers,
@@ -105,10 +105,10 @@ func NewMutableProtocolState(
 	// all factories are expected to be called in order defined here.
 	kvStoreFactories := []protocol_state.KeyValueStoreStateMachineFactory{
 		kvstore.NewPSVersionUpgradeStateMachineFactory(globalParams),
-		epochs.NewEpochStateMachineFactory(globalParams, setups, commits, protocolStateDB),
+		epochs.NewEpochStateMachineFactory(globalParams, setups, commits, epochProtocolStateDB),
 	}
 	return &MutableProtocolState{
-		ProtocolState:    *NewProtocolState(protocolStateDB, kvStoreSnapshots, globalParams),
+		ProtocolState:    *NewProtocolState(epochProtocolStateDB, kvStoreSnapshots, globalParams),
 		headers:          headers,
 		results:          results,
 		kvStoreFactories: kvStoreFactories,

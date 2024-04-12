@@ -90,10 +90,10 @@ type EpochStateMachine struct {
 	mutator                          protocol_state.KVStoreMutator
 	epochFallbackStateMachineFactory func() (StateMachine, error)
 
-	setups           storage.EpochSetups
-	commits          storage.EpochCommits
-	protocolStateDB  storage.ProtocolState
-	pendingDbUpdates protocol.DeferredBlockPersistOps
+	setups               storage.EpochSetups
+	commits              storage.EpochCommits
+	epochProtocolStateDB storage.ProtocolState
+	pendingDbUpdates     protocol.DeferredBlockPersistOps
 }
 
 var _ protocol_state.KeyValueStoreStateMachine = (*EpochStateMachine)(nil)
@@ -109,13 +109,13 @@ func NewEpochStateMachine(
 	params protocol.GlobalParams,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	protocolStateDB storage.ProtocolState,
+	epochProtocolStateDB storage.ProtocolState,
 	parentState protocol.KVStoreReader,
 	mutator protocol_state.KVStoreMutator,
 	happyPathStateMachineFactory StateMachineFactoryMethod,
 	epochFallbackStateMachineFactory StateMachineFactoryMethod,
 ) (*EpochStateMachine, error) {
-	parentEpochState, err := protocolStateDB.ByBlockID(parentID)
+	parentEpochState, err := epochProtocolStateDB.ByBlockID(parentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", parentID, err)
 	}
@@ -152,9 +152,9 @@ func NewEpochStateMachine(
 		epochFallbackStateMachineFactory: func() (StateMachine, error) {
 			return epochFallbackStateMachineFactory(candidateView, parentEpochState)
 		},
-		setups:          setups,
-		commits:         commits,
-		protocolStateDB: protocolStateDB,
+		setups:               setups,
+		commits:              commits,
+		epochProtocolStateDB: epochProtocolStateDB,
 	}, nil
 }
 
@@ -169,10 +169,10 @@ func (e *EpochStateMachine) Build() protocol.DeferredBlockPersistOps {
 	updatedEpochState, updatedStateID, hasChanges := e.activeStateMachine.Build()
 	dbUpdates := e.pendingDbUpdates
 	dbUpdates.Add(func(tx *transaction.Tx, blockID flow.Identifier) error {
-		return e.protocolStateDB.Index(blockID, updatedStateID)(tx)
+		return e.epochProtocolStateDB.Index(blockID, updatedStateID)(tx)
 	})
 	if hasChanges {
-		dbUpdates.AddBadgerUpdate(operation.SkipDuplicatesTx(e.protocolStateDB.StoreTx(updatedStateID, updatedEpochState)))
+		dbUpdates.AddBadgerUpdate(operation.SkipDuplicatesTx(e.epochProtocolStateDB.StoreTx(updatedStateID, updatedEpochState)))
 	}
 	e.mutator.SetEpochStateID(updatedStateID)
 

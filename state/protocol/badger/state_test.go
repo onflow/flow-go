@@ -71,7 +71,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.ProtocolState,
+			all.EpochProtocolState,
 			all.ProtocolKVStore,
 			all.VersionBeacons,
 		)
@@ -154,7 +154,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.ProtocolState,
+			all.EpochProtocolState,
 			all.ProtocolKVStore,
 			all.VersionBeacons,
 		)
@@ -557,7 +557,7 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 		all.QuorumCertificates,
 		all.Setups,
 		all.EpochCommits,
-		all.ProtocolState,
+		all.EpochProtocolState,
 		all.ProtocolKVStore,
 		all.VersionBeacons,
 		rootSnapshot,

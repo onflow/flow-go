@@ -1193,7 +1193,7 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		Setups:             setups,
 		EpochCommits:       epochCommits,
 		VersionBeacons:     versionBeacons,
-		ProtocolState:      protocolState,
+		EpochProtocolState: protocolState,
 		ProtocolKVStore:    protocolKVStores,
 		Commits:            commits,
 	}
@@ -1284,7 +1284,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.QuorumCertificates,
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
-			fnb.Storage.ProtocolState,
+			fnb.Storage.EpochProtocolState,
 			fnb.Storage.ProtocolKVStore,
 			fnb.Storage.VersionBeacons,
 		)
@@ -1333,7 +1333,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.QuorumCertificates,
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
-			fnb.Storage.ProtocolState,
+			fnb.Storage.EpochProtocolState,
 			fnb.Storage.ProtocolKVStore,
 			fnb.Storage.VersionBeacons,
 			fnb.RootSnapshot,

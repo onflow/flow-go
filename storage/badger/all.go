@@ -41,7 +41,7 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 		QuorumCertificates: qcs,
 		Setups:             setups,
 		EpochCommits:       epochCommits,
-		ProtocolState:      protocolState,
+		EpochProtocolState: protocolState,
 		ProtocolKVStore:    protocolKVStore,
 		VersionBeacons:     versionBeacons,
 		Results:            results,

@@ -93,7 +93,7 @@ func Bootstrap(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	protocolStateSnapshotsDB storage.ProtocolState,
+	epochProtocolStateSnapshots storage.ProtocolState,
 	protocolKVStoreSnapshots storage.ProtocolKVStore,
 	versionBeacons storage.VersionBeacons,
 	root protocol.Snapshot,
@@ -179,7 +179,13 @@ func Bootstrap(
 		if err != nil {
 			return fmt.Errorf("could not retrieve protocol state for root snapshot: %w", err)
 		}
-		err = bootstrapProtocolState(segment, rootEpochState, rootProtocolState, protocolStateSnapshotsDB, protocolKVStoreSnapshots)(tx)
+		err = bootstrapProtocolState(
+			segment,
+			rootEpochState,
+			rootProtocolState,
+			epochProtocolStateSnapshots,
+			protocolKVStoreSnapshots,
+		)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap protocol state: %w", err)
 		}
@@ -230,7 +236,7 @@ func Bootstrap(
 		qcs,
 		setups,
 		commits,
-		protocolStateSnapshotsDB,
+		epochProtocolStateSnapshots,
 		protocolKVStoreSnapshots,
 		versionBeacons,
 		params,
@@ -246,13 +252,13 @@ func bootstrapProtocolState(
 	segment *flow.SealingSegment,
 	rootEpochState protocol.DynamicProtocolState,
 	rootKVStore protocol.KVStoreReader,
-	protocolState storage.ProtocolState,
+	epochProtocolState storage.ProtocolState,
 	protocolKVStores storage.ProtocolKVStore,
 ) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		rootProtocolStateEntry := rootEpochState.Entry().ProtocolStateEntry
 		rootEpochStateID := rootProtocolStateEntry.ID()
-		err := protocolState.StoreTx(rootEpochStateID, rootProtocolStateEntry)(tx)
+		err := epochProtocolState.StoreTx(rootEpochStateID, rootProtocolStateEntry)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root protocol state: %w", err)
 		}
@@ -280,7 +286,7 @@ func bootstrapProtocolState(
 					block.Header.Height, rootKVStoreStateID, block.Payload.ProtocolStateID)
 			}
 			blockID := block.ID()
-			err = protocolState.Index(blockID, rootEpochStateID)(tx)
+			err = epochProtocolState.Index(blockID, rootEpochStateID)(tx)
 			if err != nil {
 				return fmt.Errorf("could not index root protocol state: %w", err)
 			}
@@ -652,7 +658,7 @@ func OpenState(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	protocolState storage.ProtocolState,
+	epochProtocolState storage.ProtocolState,
 	protocolKVStoreSnapshots storage.ProtocolKVStore,
 	versionBeacons storage.VersionBeacons,
 ) (*State, error) {
@@ -686,7 +692,7 @@ func OpenState(
 		qcs,
 		setups,
 		commits,
-		protocolState,
+		epochProtocolState,
 		protocolKVStoreSnapshots,
 		versionBeacons,
 		params,
@@ -798,7 +804,7 @@ func newState(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	protocolStateSnapshots storage.ProtocolState,
+	epochProtocolStateSnapshots storage.ProtocolState,
 	protocolKVStoreSnapshots storage.ProtocolKVStore,
 	versionBeacons storage.VersionBeacons,
 	params protocol.Params,
@@ -822,7 +828,7 @@ func newState(
 		protocolKVStoreSnapshotsDB: protocolKVStoreSnapshots,
 		protocolState: protocol_state.
 			NewMutableProtocolState(
-				protocolStateSnapshots,
+				epochProtocolStateSnapshots,
 				protocolKVStoreSnapshots,
 				params,
 				headers,
