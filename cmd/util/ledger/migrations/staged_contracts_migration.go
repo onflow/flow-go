@@ -40,6 +40,7 @@ type StagedContractsMigration struct {
 	contractAdditionHandler        stdlib.AccountContractAdditionHandler
 	contractNamesProvider          stdlib.AccountContractNamesProvider
 	reporter                       reporters.ReportWriter
+	verboseErrorOutput             bool
 }
 
 type StagedContract struct {
@@ -54,18 +55,26 @@ type Contract struct {
 
 var _ AccountBasedMigration = &StagedContractsMigration{}
 
+type StagedContractsMigrationOptions struct {
+	ChainID            flow.ChainID
+	VerboseErrorOutput bool
+}
+
 func NewStagedContractsMigration(
-	chainID flow.ChainID,
+	name string,
+	reporterName string,
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
+	options StagedContractsMigrationOptions,
 ) *StagedContractsMigration {
 	return &StagedContractsMigration{
-		name:                "StagedContractsMigration",
+		name:                name,
 		log:                 log,
-		chainID:             chainID,
+		chainID:             options.ChainID,
 		stagedContracts:     map[common.Address]map[flow.RegisterID]Contract{},
 		contractsByLocation: map[common.Location][]byte{},
-		reporter:            rwf.ReportWriter("staged-contracts-migrator"),
+		reporter:            rwf.ReportWriter(reporterName),
+		verboseErrorOutput:  options.VerboseErrorOutput,
 	}
 }
 
@@ -464,13 +473,15 @@ func (m *StagedContractsMigration) MigrateAccount(
 				errorDetails = err.Error()
 			}
 
-			m.log.Error().
-				Msgf(
-					"failed to update contract %s in account %s: %s",
-					name,
-					address.HexWithPrefix(),
-					errorDetails,
-				)
+			if m.verboseErrorOutput {
+				m.log.Error().
+					Msgf(
+						"failed to update contract %s in account %s: %s",
+						name,
+						address.HexWithPrefix(),
+						errorDetails,
+					)
+			}
 
 			m.reporter.Write(contractUpdateFailed{
 				AccountAddressHex: address.HexWithPrefix(),

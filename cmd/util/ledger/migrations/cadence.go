@@ -303,18 +303,30 @@ func NewCadence1ContractsMigrations(
 	opts Options,
 ) []NamedMigration {
 
+	stagedContractsMigrationOptions := StagedContractsMigrationOptions{
+		ChainID:            opts.ChainID,
+		VerboseErrorOutput: opts.VerboseErrorOutput,
+	}
+
+	systemContractsMigrationOptions := SystemContractsMigrationOptions{
+		StagedContractsMigrationOptions: stagedContractsMigrationOptions,
+		EVM:                             opts.EVMContractChange,
+		Burner:                          opts.BurnerContractChange,
+	}
+
 	systemContractsMigration := NewSystemContractsMigration(
-		opts.ChainID,
 		log,
 		rwf,
-		SystemContractChangesOptions{
-			EVM:    opts.EVMContractChange,
-			Burner: opts.BurnerContractChange,
-		},
+		systemContractsMigrationOptions,
 	)
 
-	stagedContractsMigration := NewStagedContractsMigration(opts.ChainID, log, rwf).
-		WithContractUpdateValidation().
+	stagedContractsMigration := NewStagedContractsMigration(
+		"StagedContractsMigration",
+		"staged-contracts-migrator",
+		log,
+		rwf,
+		stagedContractsMigrationOptions,
+	).WithContractUpdateValidation().
 		WithStagedContractUpdates(opts.StagedContracts)
 
 	toAccountBasedMigration := func(migration AccountBasedMigration) ledger.Migration {

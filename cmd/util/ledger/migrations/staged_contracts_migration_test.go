@@ -86,7 +86,12 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
 			WithStagedContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
@@ -131,7 +136,12 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
 			WithContractUpdateValidation()
 		migration.WithStagedContractUpdates(stagedContracts)
 
@@ -179,7 +189,12 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
@@ -240,7 +255,13 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		const reporterName = "test"
+		migration := NewStagedContractsMigration("test", reporterName, log, rwf, options).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
@@ -270,7 +291,7 @@ func TestStagedContractsMigration(t *testing.T) {
 		// Second payload should have the updated code
 		require.Equal(t, newCode2, string(payloads[1].Value()))
 
-		reportWriter := rwf.reportWriters["staged-contracts-migrator"]
+		reportWriter := rwf.reportWriters[reporterName]
 		require.Len(t, reportWriter.entries, 2)
 		assert.Equal(
 			t,
@@ -313,7 +334,13 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		const reporterName = "test"
+		migration := NewStagedContractsMigration("test", reporterName, log, rwf, options).
 			WithStagedContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
@@ -356,7 +383,7 @@ func TestStagedContractsMigration(t *testing.T) {
 		// No errors.
 		require.Empty(t, logWriter.logs)
 
-		reportWriter := rwf.reportWriters["staged-contracts-migrator"]
+		reportWriter := rwf.reportWriters[reporterName]
 		require.Len(t, reportWriter.entries, 1)
 		assert.Equal(
 			t,
@@ -397,7 +424,12 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
 			WithStagedContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
@@ -446,7 +478,12 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
 			WithStagedContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
@@ -589,7 +626,13 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		// Important: Do not stage contracts externally.
 		// Should be scanned and collected from the storage.
-		migration := NewStagedContractsMigration(chainID, log, rwf)
+
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options)
 
 		accountPayloads := []*ledger.Payload{
 			newContractPayload(common.Address(accountAddress), "A", []byte(oldCode)),
@@ -684,7 +727,12 @@ func TestStagedContractsWithImports(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
 			WithStagedContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
@@ -761,7 +809,12 @@ func TestStagedContractsWithImports(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
@@ -854,7 +907,12 @@ func TestStagedContractsWithImports(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
@@ -952,7 +1010,12 @@ func TestStagedContractsWithImports(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
@@ -1172,7 +1235,12 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
@@ -1264,7 +1332,12 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
@@ -1353,7 +1426,12 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
@@ -1454,7 +1532,12 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 
 			rwf := &testReportWriterFactory{}
 
-			migration := NewStagedContractsMigration(chainID, log, rwf).
+			options := StagedContractsMigrationOptions{
+				ChainID:            chainID,
+				VerboseErrorOutput: true,
+			}
+
+			migration := NewStagedContractsMigration("test", "test", log, rwf, options).
 				WithContractUpdateValidation().
 				WithStagedContractUpdates(stagedContracts)
 
@@ -1568,7 +1651,12 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
@@ -1785,7 +1873,12 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
@@ -1883,7 +1976,12 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
