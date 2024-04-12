@@ -85,6 +85,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 			EVMContractChange:    evmContractChange,
 			BurnerContractChange: burnerContractChange,
 			StagedContracts:      stagedContracts,
+			VerboseErrorOutput:   true,
 		},
 	)
 
@@ -699,6 +700,7 @@ func TestBootstrappedStateMigration(t *testing.T) {
 			ChainID:              chainID,
 			EVMContractChange:    evmContractChange,
 			BurnerContractChange: burnerContractChange,
+			VerboseErrorOutput:   true,
 		},
 	)
 
@@ -947,6 +949,7 @@ func TestCoreContractUsage(t *testing.T) {
 				ChainID:              chainID,
 				EVMContractChange:    evmContractChange,
 				BurnerContractChange: burnerContractChange,
+				VerboseErrorOutput:   true,
 			},
 		)
 

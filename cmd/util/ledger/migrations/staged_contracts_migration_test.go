@@ -1800,6 +1800,7 @@ func TestConcurrentContractUpdate(t *testing.T) {
 			EVMContractChange:    evmContractChange,
 			BurnerContractChange: burnerContractChange,
 			StagedContracts:      stagedContracts,
+			VerboseErrorOutput:   true,
 		},
 	)
 
