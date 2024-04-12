@@ -284,7 +284,7 @@ func NewSystemContractsMigration(
 ) *ChangeContractCodeMigration {
 	migration := NewChangeContractCodeMigration(chainID, log, rwf)
 	for _, change := range SystemContractChanges(chainID, options) {
-		migration.RegisterContractChange(change)
+		migration.registerContractChange(change)
 	}
 	return migration
 }

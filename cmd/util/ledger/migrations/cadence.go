@@ -314,9 +314,8 @@ func NewCadence1ContractsMigrations(
 	)
 
 	stagedContractsMigration := NewStagedContractsMigration(opts.ChainID, log, rwf).
-		WithContractUpdateValidation()
-
-	stagedContractsMigration.RegisterContractUpdates(opts.StagedContracts)
+		WithContractUpdateValidation().
+		WithStagedContractUpdates(opts.StagedContracts)
 
 	toAccountBasedMigration := func(migration AccountBasedMigration) ledger.Migration {
 		return NewAccountBasedMigration(
