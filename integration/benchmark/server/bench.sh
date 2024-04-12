@@ -12,9 +12,12 @@ cd flow-go/integration/localnet
 git fetch
 git fetch --tags
 
-while read -r branch_hash; do
-    hash="${branch_hash##*:}"
-    branch="${branch_hash%%:*}"
+while read -r input; do
+
+    remainder="$input"
+    branch="${remainder%%:*}"; remainder="${remainder#*:}"
+    hash="${remainder%%:*}"; remainder="${remainder#*:}"
+    load="${remainder%%:*}"; remainder="${remainder#*:}"
 
     git checkout "$branch" || continue
     git reset --hard "$hash"  || continue
@@ -34,7 +37,7 @@ while read -r branch_hash; do
 
     # sleep is workaround for slow initialization of some node types, so that benchmark does not quit immediately with "connection refused"
     sleep 30;
-    go run ../benchmark/cmd/ci -log-level debug -git-repo-path ../../ -tps-initial 800 -tps-min 1 -tps-max 1200 -duration 30m
+    go run ../benchmark/cmd/ci -log-level debug -git-repo-path ../../ -tps-initial 800 -tps-min 1 -tps-max 1200 -duration 30m -load-type "$load"
 
     # instead of running "make stop" which uses docker-compose for a lot of older versions,
     # we explicitly run the command here with "docker compose"
@@ -42,4 +45,5 @@ while read -r branch_hash; do
 
     docker system prune -a -f
     make clean-data
-done </opt/master.recent
+done </opt/commits.recent
+

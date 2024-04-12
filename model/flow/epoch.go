@@ -70,8 +70,10 @@ type EpochSetup struct {
 	DKGPhase3FinalView uint64               // the final view of DKG phase 3
 	FinalView          uint64               // the final view of the epoch
 	Participants       IdentitySkeletonList // all participants of the epoch in canonical order
-	Assignments        AssignmentList       // cluster assignment for the epoch with node IDs for each cluster in canonical order
+	Assignments        AssignmentList       // cluster assignment for the epoch
 	RandomSource       []byte               // source of randomness for epoch-specific setup tasks
+	TargetDuration     uint64               // desired real-world duration for the epoch [seconds]
+	TargetEndTime      uint64               // desired real-world end time for the epoch in UNIX time [seconds]
 }
 
 func (setup *EpochSetup) ServiceEvent() ServiceEvent {
@@ -103,6 +105,12 @@ func (setup *EpochSetup) EqualTo(other *EpochSetup) bool {
 		return false
 	}
 	if setup.FinalView != other.FinalView {
+		return false
+	}
+	if setup.TargetDuration != other.TargetDuration {
+		return false
+	}
+	if setup.TargetEndTime != other.TargetEndTime {
 		return false
 	}
 	if !IdentitySkeletonListEqualTo(setup.Participants, other.Participants) {

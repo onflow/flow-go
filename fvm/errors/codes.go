@@ -26,6 +26,7 @@ const (
 	FailureCodePayerBalanceCheckFailure                FailureCode = 2007
 	FailureCodeDerivedDataCacheImplementationFailure   FailureCode = 2008
 	FailureCodeRandomSourceFailure                     FailureCode = 2009
+	FailureCodeEVMFailure                              FailureCode = 2010
 	// Deprecated: No longer used.
 	FailureCodeMetaTransactionFailure FailureCode = 2100
 )
@@ -59,6 +60,7 @@ const (
 	ErrCodeAccountAuthorizationError   ErrorCode = 1055
 	ErrCodeOperationAuthorizationError ErrorCode = 1056
 	ErrCodeOperationNotSupportedError  ErrorCode = 1057
+	ErrCodeBlockHeightOutOfRangeError  ErrorCode = 1058
 
 	// execution errors 1100 - 1200
 	// Deprecated: No longer used.

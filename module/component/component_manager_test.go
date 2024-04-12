@@ -345,7 +345,7 @@ func StartStateTransition() (func(t func()), func(*rapid.T)) {
 
 	executeTransitions := func(t *rapid.T) {
 		for i := 0; i < len(transitions); i++ {
-			j := rapid.IntRange(0, len(transitions)-i-1).Draw(t, "").(int)
+			j := rapid.IntRange(0, len(transitions)-i-1).Draw(t, "")
 			transitions[i], transitions[j+i] = transitions[j+i], transitions[i]
 			transitions[i]()
 		}
@@ -390,35 +390,34 @@ type ComponentManagerMachine struct {
 	assertErrorThrownMatches func(t *rapid.T, err error, msgAndArgs ...interface{})
 	assertErrorNotThrown     func(t *rapid.T)
 
-	cancelGenerator     *rapid.Generator
+	cancelGenerator     *rapid.Generator[bool]
 	drawStateTransition func(t *rapid.T) *StateTransition
 }
 
-func (c *ComponentManagerMachine) Init(t *rapid.T) {
-	numWorkers := rapid.IntRange(0, 5).Draw(t, "num_workers").(int)
-	pCancel := rapid.Float64Range(0, 100).Draw(t, "p_cancel").(float64)
+func (c *ComponentManagerMachine) init(t *rapid.T) {
+	numWorkers := rapid.IntRange(0, 5).Draw(t, "num_workers")
+	pCancel := rapid.Float64Range(0, 100).Draw(t, "p_cancel")
 
-	c.cancelGenerator = rapid.Float64Range(0, 100).
-		Map(func(n float64) bool {
-			return pCancel == 100 || n < pCancel
-		})
+	c.cancelGenerator = rapid.Map(rapid.Float64Range(0, 100), func(n float64) bool {
+		return pCancel == 100 || n < pCancel
+	})
 
 	c.drawStateTransition = func(t *rapid.T) *StateTransition {
 		st := &StateTransition{}
 
 		if !c.canceled {
-			st.cancel = c.cancelGenerator.Draw(t, "cancel").(bool)
+			st.cancel = c.cancelGenerator.Draw(t, "cancel")
 		}
 
 		for workerId, state := range c.workerStates {
 			if allowedTransitions, ok := WorkerStateTransitions[state]; ok {
 				label := fmt.Sprintf("worker_transition_%v", workerId)
 				st.workerIDs = append(st.workerIDs, workerId)
-				st.workerTransitions = append(st.workerTransitions, rapid.SampledFrom(allowedTransitions).Draw(t, label).(WorkerStateTransition))
+				st.workerTransitions = append(st.workerTransitions, rapid.SampledFrom(allowedTransitions).Draw(t, label))
 			}
 		}
 
-		return rapid.Just(st).Draw(t, "state_transition").(*StateTransition)
+		return rapid.Just(st).Draw(t, "state_transition")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -625,7 +624,11 @@ func (c *ComponentManagerMachine) Check(t *rapid.T) {
 func TestComponentManager(t *testing.T) {
 	unittest.SkipUnless(t, unittest.TEST_LONG_RUNNING, "skip because this test takes too long")
 
-	rapid.Check(t, rapid.Run(&ComponentManagerMachine{}))
+	rapid.Check(t, func(t *rapid.T) {
+		sm := new(ComponentManagerMachine)
+		sm.init(t)
+		t.Repeat(rapid.StateMachineActions(sm))
+	})
 }
 
 func TestComponentManagerShutdown(t *testing.T) {

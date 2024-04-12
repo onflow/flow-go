@@ -76,13 +76,7 @@ type BootstrapParams struct {
 	minimumStorageReservation        cadence.UFix64
 	storagePerFlow                   cadence.UFix64
 	restrictedAccountCreationEnabled cadence.Bool
-
-	// `setupEVMEnabled` == true && `evmAbiOnly` == true will enable the ABI-only EVM
-	// `setupEVMEnabled` == true && `evmAbiOnly` == false will enable the full EVM functionality
-	// `setupEVMEnabled` == false will disable EVM
-	// This will allow to quickly disable the ABI-only EVM, in case there's a bug or something.
-	setupEVMEnabled cadence.Bool
-	evmAbiOnly      cadence.Bool
+	setupEVMEnabled                  cadence.Bool
 
 	// versionFreezePeriod is the number of blocks in the future where the version
 	// changes are frozen. The Node version beacon manages the freeze period,
@@ -225,13 +219,6 @@ func WithSetupEVMEnabled(enabled cadence.Bool) BootstrapProcedureOption {
 	}
 }
 
-func WithEVMABIOnly(evmAbiOnly cadence.Bool) BootstrapProcedureOption {
-	return func(bp *BootstrapProcedure) *BootstrapProcedure {
-		bp.evmAbiOnly = evmAbiOnly
-		return bp
-	}
-}
-
 func WithRestrictedContractDeployment(restricted *bool) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.restrictedContractDeployment = restricted
@@ -329,7 +316,9 @@ func (b *bootstrapExecutor) Preprocess() error {
 }
 
 func (b *bootstrapExecutor) Execute() error {
-	b.rootBlock = flow.Genesis(flow.ChainID(b.ctx.Chain.String())).Header
+	if b.rootBlock == nil {
+		b.rootBlock = flow.Genesis(b.ctx.Chain.ChainID()).Header
+	}
 
 	// initialize the account addressing state
 	b.accountCreator = environment.NewBootstrapAccountCreator(
@@ -828,7 +817,7 @@ func (b *bootstrapExecutor) setupEVM(serviceAddress, fungibleTokenAddress, flowT
 		// deploy the EVM contract to the service account
 		tx := blueprints.DeployContractTransaction(
 			serviceAddress,
-			stdlib.ContractCode(flowTokenAddress, bool(b.evmAbiOnly)),
+			stdlib.ContractCode(flowTokenAddress),
 			stdlib.ContractName,
 		)
 		// WithEVMEnabled should only be used after we create an account for storage

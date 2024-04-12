@@ -93,7 +93,7 @@ func run(*cobra.Command, []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot create ledger from write-a-head logs and checkpoints")
 	}
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), complete.DefaultCacheSize, math.MaxInt, 1, atomic.NewBool(false))
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), complete.DefaultCacheSize, math.MaxInt, 1, atomic.NewBool(false), &metrics.NoopCollector{})
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot create compactor")
 	}

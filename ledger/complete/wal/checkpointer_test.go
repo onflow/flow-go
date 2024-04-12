@@ -59,7 +59,7 @@ func Test_WAL(t *testing.T) {
 		led, err := complete.NewLedger(diskWal, size*10, metricsCollector, logger, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
-		compactor, err := complete.NewCompactor(led, diskWal, unittest.Logger(), size, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+		compactor, err := complete.NewCompactor(led, diskWal, unittest.Logger(), size, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metrics.NewNoopCollector())
 		require.NoError(t, err)
 
 		<-compactor.Ready()

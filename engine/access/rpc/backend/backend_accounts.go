@@ -353,5 +353,5 @@ func convertAccountError(err error, address flow.Address, height uint64) error {
 		return status.Errorf(codes.NotFound, "account not found")
 	}
 
-	return convertIndexError(err, height, "failed to get account")
+	return rpc.ConvertIndexError(err, height, "failed to get account")
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -256,7 +257,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 	bootstrappedVMTest, err := newVMTest().withBootstrapProcedureOptions(
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithExecutionMemoryLimit(math.MaxUint32),
-		fvm.WithExecutionEffortWeights(mainnetExecutionEffortWeights),
+		fvm.WithExecutionEffortWeights(environment.MainnetExecutionEffortWeights),
 		fvm.WithExecutionMemoryWeights(meter.DefaultMemoryWeights),
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),

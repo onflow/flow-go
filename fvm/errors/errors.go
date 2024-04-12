@@ -340,6 +340,7 @@ func NewEventEncodingError(err error) CodedError {
 // in order for Cadence to correctly handle the error
 var _ errors.UserError = &(EVMError{})
 
+// EVMError captures any non-fatal EVM error
 type EVMError struct {
 	CodedError
 }

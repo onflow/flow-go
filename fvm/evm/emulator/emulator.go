@@ -1,23 +1,20 @@
 package emulator
 
 import (
-	"errors"
 	"math/big"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethCore "github.com/ethereum/go-ethereum/core"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	gethVM "github.com/ethereum/go-ethereum/core/vm"
-	gethCrypto "github.com/ethereum/go-ethereum/crypto"
-	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/atree"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethCore "github.com/onflow/go-ethereum/core"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethVM "github.com/onflow/go-ethereum/core/vm"
+	gethCrypto "github.com/onflow/go-ethereum/crypto"
+	gethParams "github.com/onflow/go-ethereum/params"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-var ErrInvalidBalance = errors.New("invalid balance for transfer")
 
 // Emulator handles operations against evm runtime
 type Emulator struct {
@@ -40,6 +37,7 @@ func NewEmulator(
 
 func newConfig(ctx types.BlockContext) *Config {
 	return NewConfig(
+		WithChainID(ctx.ChainID),
 		WithBlockNumber(new(big.Int).SetUint64(ctx.BlockNumber)),
 		WithCoinbase(ctx.GasFeeCollector.ToCommon()),
 		WithDirectCallBaseGasUsage(ctx.DirectCallBaseGasUsage),
@@ -60,7 +58,6 @@ func (em *Emulator) NewReadOnlyBlockView(ctx types.BlockContext) (types.ReadOnly
 // NewBlockView constructs a new block view (mutable)
 func (em *Emulator) NewBlockView(ctx types.BlockContext) (types.BlockView, error) {
 	cfg := newConfig(ctx)
-	SetupPrecompile(cfg)
 	return &BlockView{
 		config:   cfg,
 		rootAddr: em.rootAddr,
@@ -110,18 +107,24 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	txHash, err := call.Hash()
+	if err != nil {
+		return nil, err
+	}
 	switch call.SubType {
 	case types.DepositCallSubType:
-		return proc.mintTo(call.To, call.Value)
+		return proc.mintTo(call, txHash)
 	case types.WithdrawCallSubType:
-		return proc.withdrawFrom(call.From, call.Value)
+		return proc.withdrawFrom(call, txHash)
 	case types.DeployCallSubType:
 		if !call.EmptyToField() {
-			return proc.deployAt(call.From, call.To, call.Data, call.GasLimit, call.Value)
+			return proc.deployAt(call.From, call.To, call.Data, call.GasLimit, call.Value, txHash)
 		}
 		fallthrough
 	default:
-		return proc.runDirect(call.Message(), types.DirectCallTxType)
+		// TODO: when we support mutiple calls per block, we need
+		// to update the value zero here for tx index
+		return proc.runDirect(call.Message(), txHash, 0)
 	}
 }
 
@@ -129,23 +132,36 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 func (bl *BlockView) RunTransaction(
 	tx *gethTypes.Transaction,
 ) (*types.Result, error) {
+	var res *types.Result
 	var err error
 	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
 	}
-
-	msg, err := gethCore.TransactionToMessage(tx, GetSigner(bl.config), proc.config.BlockContext.BaseFee)
+	txHash := tx.Hash()
+	msg, err := gethCore.TransactionToMessage(
+		tx,
+		GetSigner(bl.config),
+		proc.config.BlockContext.BaseFee)
 	if err != nil {
-		// note that this is not a fatal error (e.g. due to bad signature)
+		// this is not a fatal error (e.g. due to bad signature)
 		// not a valid transaction
-		return nil, types.NewEVMValidationError(err)
+		res = &types.Result{
+			TxType: tx.Type(),
+			TxHash: txHash,
+		}
+		res.SetValidationError(err)
+		return res, nil
 	}
 
 	// update tx context origin
 	proc.evm.TxContext.Origin = msg.From
-	res, err := proc.run(msg, tx.Type())
-	return res, err
+	res, err = proc.run(msg, txHash, 0, tx.Type())
+	if err != nil {
+		return nil, err
+	}
+	// all commmit errors (StateDB errors) has to be returned
+	return res, proc.commitAndFinalize()
 }
 
 func (bl *BlockView) newProcedure() (*procedure, error) {
@@ -173,74 +189,84 @@ type procedure struct {
 	state  types.StateDB
 }
 
-// commit commits the changes to the state.
-func (proc *procedure) commit() error {
-	return handleCommitError(proc.state.Commit())
+// commit commits the changes to the state (with finalization)
+func (proc *procedure) commitAndFinalize() error {
+	err := proc.state.Commit(true)
+	if err != nil {
+		// if known types (state errors) don't do anything and return
+		if types.IsAFatalError(err) || types.IsAStateError(err) {
+			return err
+		}
+
+		// else is a new fatal error
+		return types.NewFatalError(err)
+	}
+	return nil
 }
 
-func handleCommitError(err error) error {
-	if err == nil {
-		return nil
-	}
-	// if known types (state errors) don't do anything and return
-	if types.IsAFatalError(err) || types.IsAStateError(err) {
-		return err
+func (proc *procedure) mintTo(
+	call *types.DirectCall,
+	txHash gethCommon.Hash,
+) (*types.Result, error) {
+	bridge := call.From.ToCommon()
+
+	// create bridge account if not exist
+	if !proc.state.Exist(bridge) {
+		proc.state.CreateAccount(bridge)
 	}
 
-	// else is a new fatal error
-	return types.NewFatalError(err)
+	// add balance to the bridge account before transfer
+	proc.state.AddBalance(bridge, call.Value)
+
+	msg := call.Message()
+	proc.evm.TxContext.Origin = msg.From
+	// withdraw the amount and move it to the bridge account
+	res, err := proc.run(msg, txHash, 0, types.DirectCallTxType)
+	if err != nil {
+		return res, err
+	}
+
+	// if any error (invalid or vm) on the internal call, revert and don't commit any change
+	// this prevents having cases that we add balance to the bridge but the transfer
+	// fails due to gas, etc.
+	// TODO: in the future we might just return without error and handle everything on higher level
+	if res.Invalid() || res.Failed() {
+		return res, types.ErrInternalDirectCallFailed
+	}
+
+	// all commmit errors (StateDB errors) has to be returned
+	return res, proc.commitAndFinalize()
 }
 
-func (proc *procedure) mintTo(address types.Address, amount *big.Int) (*types.Result, error) {
-	addr := address.ToCommon()
-	res := &types.Result{
-		GasConsumed: proc.config.DirectCallBaseGasUsage,
-		TxType:      types.DirectCallTxType,
+func (proc *procedure) withdrawFrom(
+	call *types.DirectCall,
+	txHash gethCommon.Hash,
+) (*types.Result, error) {
+	bridge := call.To.ToCommon()
+
+	// create bridge account if not exist
+	if !proc.state.Exist(bridge) {
+		proc.state.CreateAccount(bridge)
 	}
 
-	// create account if not exist
-	if !proc.state.Exist(addr) {
-		proc.state.CreateAccount(addr)
+	// withdraw the amount and move it to the bridge account
+	msg := call.Message()
+	proc.evm.TxContext.Origin = msg.From
+	res, err := proc.run(msg, txHash, 0, types.DirectCallTxType)
+	if err != nil {
+		return res, err
 	}
 
-	// add balance
-	proc.state.AddBalance(addr, amount)
-
-	// we don't need to increment any nonce, given the origin doesn't exist
-	return res, proc.commit()
-}
-
-func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*types.Result, error) {
-
-	addr := address.ToCommon()
-	res := &types.Result{
-		GasConsumed: proc.config.DirectCallBaseGasUsage,
-		TxType:      types.DirectCallTxType,
+	// if any error (invalid or vm) on the internal call, revert and don't commit any change
+	// TODO: in the future we might just return without error and handle everything on higher level
+	if res.Invalid() || res.Failed() {
+		return res, types.ErrInternalDirectCallFailed
 	}
 
-	// check if account exists
-	// while this method is only called for COAs
-	// it might be the case that someone creates a COA
-	// and never transfer tokens to and call for withdraw
-	if !proc.state.Exist(addr) {
-		proc.state.CreateAccount(addr)
-	}
-
-	// check the source account balance
-	// if balance is lower than amount needed for withdrawal, error out
-	if proc.state.GetBalance(addr).Cmp(amount) < 0 {
-		return res, types.ErrInsufficientBalance
-	}
-
-	// sub balance
-	proc.state.SubBalance(addr, amount)
-
-	// we increment the nonce for source account cause
-	// withdraw counts as a transaction
-	nonce := proc.state.GetNonce(addr)
-	proc.state.SetNonce(addr, nonce+1)
-
-	return res, proc.commit()
+	// now deduct the balance from the bridge
+	proc.state.SubBalance(bridge, call.Value)
+	// all commmit errors (StateDB errors) has to be returned
+	return res, proc.commitAndFinalize()
 }
 
 // deployAt deploys a contract at the given target address
@@ -256,23 +282,32 @@ func (proc *procedure) deployAt(
 	data types.Code,
 	gasLimit uint64,
 	value *big.Int,
+	txHash gethCommon.Hash,
 ) (*types.Result, error) {
+	if value.Sign() < 0 {
+		return nil, types.ErrInvalidBalance
+	}
+
 	res := &types.Result{
 		TxType: types.DirectCallTxType,
+		TxHash: txHash,
 	}
+
 	addr := to.ToCommon()
 
 	// precheck 1 - check balance of the source
 	if value.Sign() != 0 &&
 		!proc.evm.Context.CanTransfer(proc.state, caller.ToCommon(), value) {
-		return res, gethVM.ErrInsufficientBalance
+		res.SetValidationError(gethCore.ErrInsufficientFundsForTransfer)
+		return res, nil
 	}
 
-	// precheck 2 - ensure there's no existing contract is deployed at the address
+	// precheck 2 - ensure there's no existing eoa or contract is deployed at the address
 	contractHash := proc.state.GetCodeHash(addr)
 	if proc.state.GetNonce(addr) != 0 ||
 		(contractHash != (gethCommon.Hash{}) && contractHash != gethTypes.EmptyCodeHash) {
-		return res, gethVM.ErrContractAddressCollision
+		res.VMError = gethVM.ErrContractAddressCollision
+		return res, nil
 	}
 
 	callerCommon := caller.ToCommon()
@@ -283,9 +318,6 @@ func (proc *procedure) deployAt(
 	// increment the nonce for the caller
 	proc.state.SetNonce(callerCommon, proc.state.GetNonce(callerCommon)+1)
 
-	if value.Sign() < 0 {
-		return res, ErrInvalidBalance
-	}
 	// setup account
 	proc.state.CreateAccount(addr)
 	proc.state.SetNonce(addr, 1) // (EIP-158)
@@ -322,49 +354,69 @@ func (proc *procedure) deployAt(
 		if err != gethVM.ErrExecutionReverted {
 			res.GasConsumed = gasLimit
 		}
-		res.Failed = true
-		return res, err
+		res.VMError = err
+		return res, nil
 	}
 
 	// update gas usage
 	if gasCost > gasLimit {
 		// consume all the remaining gas (Homestead)
 		res.GasConsumed = gasLimit
-		res.Failed = true
-		return res, gethVM.ErrCodeStoreOutOfGas
+		res.VMError = gethVM.ErrCodeStoreOutOfGas
+		return res, nil
 	}
 
 	// check max code size (EIP-158)
 	if len(ret) > gethParams.MaxCodeSize {
 		// consume all the remaining gas (Homestead)
 		res.GasConsumed = gasLimit
-		res.Failed = true
-		return res, gethVM.ErrMaxCodeSizeExceeded
+		res.VMError = gethVM.ErrMaxCodeSizeExceeded
+		return res, nil
 	}
 
 	// reject code starting with 0xEF (EIP-3541)
 	if len(ret) >= 1 && ret[0] == 0xEF {
 		// consume all the remaining gas (Homestead)
 		res.GasConsumed = gasLimit
-		res.Failed = true
-		return res, gethVM.ErrInvalidCode
+		res.VMError = gethVM.ErrInvalidCode
+		return res, nil
 	}
 
 	proc.state.SetCode(addr, ret)
 	res.DeployedContractAddress = to
-	return res, proc.commit()
+	return res, proc.commitAndFinalize()
 }
 
-func (proc *procedure) runDirect(msg *gethCore.Message, txType uint8) (*types.Result, error) {
+func (proc *procedure) runDirect(
+	msg *gethCore.Message,
+	txHash gethCommon.Hash,
+	txIndex uint,
+) (*types.Result, error) {
 	// set the nonce for the message (needed for some opeartions like deployment)
 	msg.Nonce = proc.state.GetNonce(msg.From)
 	proc.evm.TxContext.Origin = msg.From
-	return proc.run(msg, types.DirectCallTxType)
+	res, err := proc.run(msg, txHash, txIndex, types.DirectCallTxType)
+	if err != nil {
+		return nil, err
+	}
+	// all commmit errors (StateDB errors) has to be returned
+	return res, proc.commitAndFinalize()
 }
 
-func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, error) {
+// run runs a geth core.message and returns the
+// results, any validation or execution errors
+// are captured inside the result, the remaining
+// return errors are errors requires extra handling
+// on upstream (e.g. backend errors).
+func (proc *procedure) run(
+	msg *gethCore.Message,
+	txHash gethCommon.Hash,
+	txIndex uint,
+	txType uint8,
+) (*types.Result, error) {
 	res := types.Result{
 		TxType: txType,
+		TxHash: txHash,
 	}
 
 	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
@@ -374,14 +426,15 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 		gasPool,
 	).TransitionDb()
 	if err != nil {
-		res.Failed = true
-		// if the error is a fatal error or a non-fatal state error return it
-		if types.IsAFatalError(err) || types.IsAStateError(err) {
-			return &res, err
+		// if the error is a fatal error or a non-fatal state error or a backend err return it
+		// this condition should never happen given all StateDB errors are withheld for the commit time.
+		if types.IsAFatalError(err) || types.IsAStateError(err) || types.IsABackendError(err) {
+			return nil, err
 		}
 		// otherwise is a validation error (pre-check failure)
 		// no state change, wrap the error and return
-		return &res, types.NewEVMValidationError(err)
+		res.SetValidationError(err)
+		return &res, nil
 	}
 
 	// if prechecks are passed, the exec result won't be nil
@@ -393,43 +446,16 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 			if msg.To == nil {
 				res.DeployedContractAddress = types.NewAddress(gethCrypto.CreateAddress(msg.From, msg.Nonce))
 			}
+			// replace tx index and tx hash
 			res.Logs = proc.state.Logs(
-				// TODO pass proper hash values
-				gethCommon.Hash{},
 				proc.config.BlockContext.BlockNumber.Uint64(),
-				gethCommon.Hash{},
-				0,
+				txHash,
+				txIndex,
 			)
 		} else {
-			res.Failed = true
-			err = types.NewEVMExecutionError(execResult.Err)
+			// execResult.Err is VM errors (we don't return it as error)
+			res.VMError = execResult.Err
 		}
 	}
-	commitErr := proc.commit()
-	if commitErr != nil {
-		return &res, commitErr
-	}
-	return &res, err
-}
-
-func SetupPrecompile(cfg *Config) {
-	rules := cfg.ChainRules()
-	// captures the pointer to the map that has to be augmented
-	var precompiles map[gethCommon.Address]gethVM.PrecompiledContract
-	switch {
-	case rules.IsCancun:
-		precompiles = gethVM.PrecompiledContractsCancun
-	case rules.IsBerlin:
-		precompiles = gethVM.PrecompiledContractsBerlin
-	case rules.IsIstanbul:
-		precompiles = gethVM.PrecompiledContractsIstanbul
-	case rules.IsByzantium:
-		precompiles = gethVM.PrecompiledContractsByzantium
-	default:
-		precompiles = gethVM.PrecompiledContractsHomestead
-	}
-	for addr, contract := range cfg.ExtraPrecompiles {
-		// we override if exist since we call this method on every block
-		precompiles[addr] = contract
-	}
+	return &res, nil
 }

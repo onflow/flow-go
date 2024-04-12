@@ -1,4 +1,3 @@
-// (c) 2020 Dapper Labs - ALL RIGHTS RESERVED
 package committees
 
 import (

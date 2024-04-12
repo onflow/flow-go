@@ -14,7 +14,7 @@ type benchmarkServer struct {
 	pb.UnimplementedBenchmarkServer
 }
 
-func (s *benchmarkServer) StartMacroBenchmark(req *pb.StartMacroBenchmarkRequest, stream pb.Benchmark_StartMacroBenchmarkServer) error {
+func (s *benchmarkServer) StartMacroBenchmark(*pb.StartMacroBenchmarkRequest, pb.Benchmark_StartMacroBenchmarkServer) error {
 	return status.Errorf(codes.Unimplemented, "method StartMacroBenchmark not implemented")
 }
 func (s *benchmarkServer) GetMacroBenchmark(context.Context, *pb.GetMacroBenchmarkRequest) (*pb.GetMacroBenchmarkResponse, error) {

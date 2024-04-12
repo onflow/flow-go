@@ -75,9 +75,9 @@ func runBenchmark(b *testing.B, compressorName string) {
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 	connectionFactory.Manager = NewManager(
-		nil,
 		unittest.Logger(),
 		connectionFactory.AccessMetrics,
+		nil,
 		grpcutils.DefaultMaxMsgSize,
 		CircuitBreakerConfig{},
 		compressorName,
