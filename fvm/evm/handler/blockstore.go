@@ -62,7 +62,7 @@ func (bs *BlockStore) BlockProposal() (*types.Block, error) {
 	bs.blockProposal = types.NewBlock(
 		parentHash,
 		lastExecutedBlock.Height+1,
-		cadenceBlock.Timestamp,
+		uint64(cadenceBlock.Timestamp),
 		lastExecutedBlock.TotalSupply,
 		gethCommon.Hash{},
 		make([]gethCommon.Hash, 0),

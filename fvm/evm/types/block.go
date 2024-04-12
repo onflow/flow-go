@@ -21,7 +21,7 @@ type Block struct {
 
 	// Timestamp represents the time at which the block was created
 	// Note that this value must be provided from the FVM Block
-	Timestamp int64
+	Timestamp uint64
 
 	// holds the total amount of the native token deposited in the evm side. (in attoflow)
 	TotalSupply *big.Int
@@ -70,7 +70,7 @@ func (b *Block) AppendTxHash(txHash gethCommon.Hash) {
 func NewBlock(
 	parentBlockHash gethCommon.Hash,
 	height uint64,
-	timestamp int64,
+	timestamp uint64,
 	totalSupply *big.Int,
 	receiptRoot gethCommon.Hash,
 	txHashes []gethCommon.Hash,

@@ -205,7 +205,7 @@ func (p *BlockExecutedEventPayload) CadenceEvent() (cadence.Event, error) {
 	fields := []cadence.Value{
 		cadence.NewUInt64(p.Block.Height),
 		cadence.String(blockHash.String()),
-		cadence.NewInt64(p.Block.Timestamp),
+		cadence.NewUInt64(p.Block.Timestamp),
 		cadence.NewIntFromBig(p.Block.TotalSupply),
 		cadence.String(p.Block.ParentBlockHash.String()),
 		cadence.String(p.Block.ReceiptRoot.String()),
