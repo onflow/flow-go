@@ -3,6 +3,7 @@ package migrations
 import (
 	"context"
 	"encoding/csv"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -83,6 +84,15 @@ func (m *StagedContractsMigration) WithContractUpdateValidation() *StagedContrac
 	return m
 }
 
+// WithStagedContractUpdates prepares the contract updates as a map for easy lookup.
+func (m *StagedContractsMigration) WithStagedContractUpdates(stagedContracts []StagedContract) *StagedContractsMigration {
+	m.registerContractUpdates(stagedContracts)
+	m.log.Info().
+		Msgf("total of %d staged contracts are provided externally", len(m.contractsByLocation))
+
+	return m
+}
+
 func (m *StagedContractsMigration) Close() error {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
@@ -119,6 +129,11 @@ func (m *StagedContractsMigration) InitMigration(
 		With().
 		Str("migration", m.name).
 		Logger()
+
+	err := m.collectAndRegisterStagedContractsFromPayloads(allPayloads)
+	if err != nil {
+		return err
+	}
 
 	// Manually register burner contract
 	burnerLocation := common.AddressLocation{
@@ -157,14 +172,186 @@ func (m *StagedContractsMigration) InitMigration(
 	return nil
 }
 
-// RegisterContractUpdates prepares the contract updates as a map for easy lookup.
-func (m *StagedContractsMigration) RegisterContractUpdates(stagedContracts []StagedContract) {
+// collectAndRegisterStagedContractsFromPayloads scan through the payloads and collects the contracts
+// staged through the `MigrationContractStaging` contract.
+func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads(allPayloads []*ledger.Payload) error {
+
+	// If the contracts are already passed as an input to the migration
+	// then no need to scan the storage.
+	if len(m.contractsByLocation) > 0 {
+		return nil
+	}
+
+	var stagingAccount string
+
+	switch m.chainID {
+	case flow.Testnet:
+		stagingAccount = "0x2ceae959ed1a7e7a"
+	case flow.Mainnet:
+		stagingAccount = "0x56100d46aa9b0212"
+	default:
+		// For other networks such as emulator etc. no need to scan for staged contracts.
+		m.log.Warn().Msgf("staged contracts are not collected for %s state", m.chainID)
+		return nil
+	}
+
+	stagingAccountAddress := common.Address(flow.HexToAddress(stagingAccount))
+
+	// Filter-in only the payloads belong to the staging account.
+	stagingAccountPayloads := make([]*ledger.Payload, 0)
+	for _, payload := range allPayloads {
+		key, err := payload.Key()
+		if err != nil {
+			return err
+		}
+
+		address := flow.BytesToAddress(key.KeyParts[0].Value)
+
+		if common.Address(address) == stagingAccountAddress {
+			stagingAccountPayloads = append(stagingAccountPayloads, payload)
+		}
+	}
+
+	m.log.Info().
+		Msgf("found %d payloads in account %s", len(stagingAccountPayloads), stagingAccount)
+
+	mr, err := NewMigratorRuntime(
+		stagingAccountAddress,
+		stagingAccountPayloads,
+		util.RuntimeInterfaceConfig{},
+	)
+	if err != nil {
+		return err
+	}
+
+	inter := mr.Interpreter
+	locationRange := interpreter.EmptyLocationRange
+
+	storageMap := mr.Storage.GetStorageMap(stagingAccountAddress, common.PathDomainStorage.Identifier(), false)
+	iterator := storageMap.Iterator(inter)
+
+	stagedContractCapsuleStaticType := interpreter.NewCompositeStaticTypeComputeTypeID(
+		nil,
+		common.AddressLocation{
+			Name:    "MigrationContractStaging",
+			Address: stagingAccountAddress,
+		},
+		"MigrationContractStaging.Capsule",
+	)
+
+	stagedContracts := make([]StagedContract, 0)
+
+	for key, value := iterator.Next(); key != nil; key, value = iterator.Next() {
+		stringAtreeValue, ok := key.(interpreter.StringAtreeValue)
+		if !ok {
+			continue
+		}
+
+		storagePath := string(stringAtreeValue)
+
+		// Only consider paths that starts with "MigrationContractStagingCapsule_".
+		if !strings.HasPrefix(storagePath, "MigrationContractStagingCapsule_") {
+			continue
+		}
+
+		staticType := value.StaticType(inter)
+		if !staticType.Equal(stagedContractCapsuleStaticType) {
+			// This shouldn't occur, but technically possible.
+			// e.g: accidentally storing other values under the same storage path pattern.
+			// So skip such values. We are not interested in those.
+			m.log.Debug().
+				Msgf("found a value with an unexpected type `%s`", staticType)
+			continue
+		}
+
+		stagedContract, err := m.getStagedContractFromValue(value, inter, locationRange)
+		if err != nil {
+			return err
+		}
+
+		stagedContracts = append(stagedContracts, stagedContract)
+	}
+
+	m.log.Info().
+		Msgf("found %d staged contracts from payloads", len(stagedContracts))
+
+	m.registerContractUpdates(stagedContracts)
+	m.log.Info().
+		Msgf("total of %d unique contracts are staged for all accounts", len(m.contractsByLocation))
+
+	return nil
+}
+
+func (m *StagedContractsMigration) getStagedContractFromValue(
+	value interpreter.Value,
+	inter *interpreter.Interpreter,
+	locationRange interpreter.LocationRange,
+) (StagedContract, error) {
+
+	stagedContractCapsule, ok := value.(*interpreter.CompositeValue)
+	if !ok {
+		return StagedContract{},
+			fmt.Errorf("unexpected value of type %T", value)
+	}
+
+	// The stored value should take the form of:
+	//
+	// resource Capsule {
+	//     let update: ContractUpdate
+	// }
+	//
+	// struct ContractUpdate {
+	//     let address: Address
+	//     let name: String
+	//     var code: String
+	//     var lastUpdated: UFix64
+	// }
+
+	updateField := stagedContractCapsule.GetField(inter, locationRange, "update")
+	contractUpdate, ok := updateField.(*interpreter.CompositeValue)
+	if !ok {
+		return StagedContract{},
+			fmt.Errorf("unexpected value: expected `CompositeValue`, found `%T`", updateField)
+	}
+
+	addressField := contractUpdate.GetField(inter, locationRange, "address")
+	address, ok := addressField.(interpreter.AddressValue)
+	if !ok {
+		return StagedContract{},
+			fmt.Errorf("unexpected value: expected `AddressValue`, found `%T`", addressField)
+	}
+
+	nameField := contractUpdate.GetField(inter, locationRange, "name")
+	name, ok := nameField.(*interpreter.StringValue)
+	if !ok {
+		return StagedContract{},
+			fmt.Errorf("unexpected value: expected `StringValue`, found `%T`", nameField)
+	}
+
+	codeField := contractUpdate.GetField(inter, locationRange, "code")
+	code, ok := codeField.(*interpreter.StringValue)
+	if !ok {
+		return StagedContract{},
+			fmt.Errorf("unexpected value: expected `StringValue`, found `%T`", codeField)
+	}
+
+	return StagedContract{
+		Contract: Contract{
+			Name: name.Str,
+			Code: []byte(code.Str),
+		},
+		Address: common.Address(address),
+	}, nil
+}
+
+// registerContractUpdates prepares the contract updates as a map for easy lookup.
+func (m *StagedContractsMigration) registerContractUpdates(stagedContracts []StagedContract) {
 	for _, contractChange := range stagedContracts {
-		m.RegisterContractChange(contractChange)
+		m.registerContractChange(contractChange)
 	}
 }
 
-func (m *StagedContractsMigration) RegisterContractChange(change StagedContract) {
+func (m *StagedContractsMigration) registerContractChange(change StagedContract) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 

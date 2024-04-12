@@ -267,7 +267,7 @@ func NewSystemContractsMigration(
 		options.StagedContractsMigrationOptions,
 	)
 	for _, change := range SystemContractChanges(options.ChainID, options) {
-		migration.RegisterContractChange(change)
+		migration.registerContractChange(change)
 	}
 	return migration
 }
