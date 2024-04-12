@@ -22,6 +22,7 @@ const contractCheckingReporterName = "contract-checking"
 func NewContractCheckingMigration(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
+	verboseErrorOutput bool,
 	programs map[common.Location]*interpreter.Program,
 ) ledger.Migration {
 	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
@@ -95,6 +96,14 @@ func NewContractCheckingMigration(
 				}
 
 				addressLocation := location.(common.AddressLocation)
+
+				if verboseErrorOutput {
+					log.Error().Msgf(
+						"error checking contract %s: %s",
+						location,
+						errorDetails,
+					)
+				}
 
 				reporter.Write(contractCheckingFailure{
 					AccountAddressHex: addressLocation.Address.HexWithPrefix(),
