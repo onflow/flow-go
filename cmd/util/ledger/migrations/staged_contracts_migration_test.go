@@ -508,7 +508,7 @@ func TestStagedContractsMigration(t *testing.T) {
 					Address: stagingAccountAddress,
 					Name:    "MigrationContractStaging",
 				},
-				"ContractUpdate",
+				"MigrationContractStaging.ContractUpdate",
 				common.CompositeKindStructure,
 				[]interpreter.CompositeField{
 					{
@@ -534,7 +534,7 @@ func TestStagedContractsMigration(t *testing.T) {
 					Address: stagingAccountAddress,
 					Name:    "MigrationContractStaging",
 				},
-				"Capsule",
+				"MigrationContractStaging.Capsule",
 				common.CompositeKindResource,
 				[]interpreter.CompositeField{
 					{
@@ -611,9 +611,11 @@ func TestStagedContractsMigration(t *testing.T) {
 		err = migration.Close()
 		require.NoError(t, err)
 
-		require.Len(t, logWriter.logs, 2)
-		require.Contains(t, logWriter.logs[0], "found 1 staged contracts from payloads")
-		require.Contains(t, logWriter.logs[1], "total of 1 unique contracts are staged for all accounts")
+		require.Len(t, logWriter.logs, 4)
+		require.Contains(t, logWriter.logs[0], "found 6 payloads in account 0x2ceae959ed1a7e7a")
+		require.Contains(t, logWriter.logs[1], "found a value with an unexpected type `String`")
+		require.Contains(t, logWriter.logs[2], "found 1 staged contracts from payloads")
+		require.Contains(t, logWriter.logs[3], "total of 1 unique contracts are staged for all accounts")
 
 		require.Len(t, payloads, 1)
 		require.Equal(t, newCode, string(payloads[0].Value()))

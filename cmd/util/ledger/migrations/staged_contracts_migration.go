@@ -194,6 +194,9 @@ func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads
 		}
 	}
 
+	m.log.Debug().
+		Msgf("found %d payloads in account %s", len(stagingAccountPayloads), stagingAccount)
+
 	mr, err := NewMigratorRuntime(
 		stagingAccountAddress,
 		stagingAccountPayloads,
@@ -215,7 +218,7 @@ func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads
 			Name:    "MigrationContractStaging",
 			Address: stagingAccountAddress,
 		},
-		"Capsule",
+		"MigrationContractStaging.Capsule",
 	)
 
 	stagedContracts := make([]StagedContract, 0)
@@ -238,6 +241,8 @@ func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads
 			// This shouldn't occur, but technically possible.
 			// e.g: accidentally storing other values under the same storage path pattern.
 			// So skip such values. We are not interested in those.
+			m.log.Debug().
+				Msgf("found a value with an unexpected type `%s`", staticType)
 			continue
 		}
 
