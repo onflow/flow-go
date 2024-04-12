@@ -60,7 +60,8 @@ type SealingSegment struct {
 	// to return the sealed state, when the first block contains no seal.
 	FirstSeal *Seal
 
-	// TODO(5120) docs
+	// ProtocolStateEntries contains every protocol state entry committed to
+	// by any block in the SealingSegment (including ExtraBlocks).
 	ProtocolStateEntries map[Identifier]*ProtocolStateEntryWrapper
 }
 
@@ -128,7 +129,6 @@ func (segment *SealingSegment) FinalizedSeal() (*Seal, error) {
 // The node logic requires a valid sealing segment to bootstrap.
 // No errors are expected during normal operation.
 func (segment *SealingSegment) Validate() error {
-	// TODO(5120) must have an entry for each unique protocol state ID among blocks
 
 	// populate lookup of seals and results in the segment to satisfy builder
 	seals := make(map[Identifier]*Seal)
@@ -337,7 +337,6 @@ func (builder *SealingSegmentBuilder) addProtocolStateEntryIfUnseen(protocolStat
 // AddExtraBlock appends an extra block to sealing segment under construction.
 // Extra blocks needs to be added in descending order and the first block must connect to the lowest block
 // of sealing segment, this way they form a continuous chain.
-// TODO check whether need to add new protocol state entry
 // No errors are expected during normal operation.
 func (builder *SealingSegmentBuilder) AddExtraBlock(block *Block) error {
 	if len(builder.extraBlocks) == 0 {
@@ -446,7 +445,6 @@ func (builder *SealingSegmentBuilder) validateRootSegment() error {
 }
 
 // validateSegment will validate if builder satisfies conditions for a valid sealing segment.
-// TODO(5120) check whether all protocol state entries are present?
 // No errors are expected during normal operation.
 func (builder *SealingSegmentBuilder) validateSegment() error {
 	// sealing cannot be empty
