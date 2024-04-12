@@ -18,7 +18,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -123,8 +122,8 @@ func (m *StagedContractsMigration) InitMigration(
 
 	elaborations := map[common.Location]*sema.Elaboration{}
 
-	config := util.RuntimeInterfaceConfig{
-		GetContractCodeFunc: func(location runtime.Location) ([]byte, error) {
+	config := MigratorRuntimeConfig{
+		GetCode: func(location common.AddressLocation) ([]byte, error) {
 			return m.contractsByLocation[location], nil
 		},
 		GetOrLoadProgramListener: func(location runtime.Location, program *interpreter.Program, err error) {
@@ -134,7 +133,10 @@ func (m *StagedContractsMigration) InitMigration(
 		},
 	}
 
-	mr, err := NewMigratorRuntime(allPayloads, config)
+	mr, err := NewMigratorRuntime(
+		allPayloads,
+		config,
+	)
 	if err != nil {
 		return err
 	}

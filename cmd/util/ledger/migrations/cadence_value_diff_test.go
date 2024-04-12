@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -174,7 +173,7 @@ func TestDiffCadenceValues(t *testing.T) {
 				[]*ledger.Payload{
 					accountStatusPayload,
 				},
-				util.RuntimeInterfaceConfig{},
+				MigratorRuntimeConfig{},
 			)
 			require.NoError(t, err)
 
@@ -275,7 +274,7 @@ func TestDiffCadenceValues(t *testing.T) {
 				[]*ledger.Payload{
 					accountStatusPayload,
 				},
-				util.RuntimeInterfaceConfig{},
+				MigratorRuntimeConfig{},
 			)
 			require.NoError(t, err)
 
@@ -383,7 +382,7 @@ func TestDiffCadenceValues(t *testing.T) {
 				[]*ledger.Payload{
 					accountStatusPayload,
 				},
-				util.RuntimeInterfaceConfig{},
+				MigratorRuntimeConfig{},
 			)
 			require.NoError(t, err)
 
@@ -502,7 +501,7 @@ func TestDiffCadenceValues(t *testing.T) {
 				[]*ledger.Payload{
 					accountStatusPayload,
 				},
-				util.RuntimeInterfaceConfig{},
+				MigratorRuntimeConfig{},
 			)
 			require.NoError(t, err)
 
@@ -602,7 +601,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			}
 		}
 
-		// Test storge map value diff log (only with verbose logging)
+		// Test storage map value diff log (only with verbose logging)
 		diff := writer.entries[2].(difference)
 		require.Equal(t, diffKindString[storageMapValueDiffKind], diff.Kind)
 		require.Equal(t, address.Hex(), diff.Address)
@@ -628,7 +627,7 @@ func createStorageMapPayloads(t *testing.T, address common.Address, domain strin
 		[]*ledger.Payload{
 			accountStatusPayload,
 		},
-		util.RuntimeInterfaceConfig{},
+		MigratorRuntimeConfig{},
 	)
 	require.NoError(t, err)
 

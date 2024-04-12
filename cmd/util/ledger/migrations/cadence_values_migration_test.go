@@ -122,7 +122,7 @@ func checkMigratedPayloads(
 ) {
 	mr, err := NewMigratorRuntime(
 		newPayloads,
-		util.RuntimeInterfaceConfig{},
+		MigratorRuntimeConfig{},
 	)
 	require.NoError(t, err)
 
@@ -738,7 +738,7 @@ func TestProgramParsingError(t *testing.T) {
 
 	runtime, err := NewMigratorRuntime(
 		payloads,
-		util.RuntimeInterfaceConfig{},
+		MigratorRuntimeConfig{},
 	)
 	require.NoError(t, err)
 
@@ -880,7 +880,7 @@ func TestCoreContractUsage(t *testing.T) {
 
 		runtime, err := NewMigratorRuntime(
 			payloads,
-			util.RuntimeInterfaceConfig{},
+			MigratorRuntimeConfig{},
 		)
 		require.NoError(t, err)
 
@@ -968,7 +968,7 @@ func TestCoreContractUsage(t *testing.T) {
 
 		mr, err := NewMigratorRuntime(
 			payloads,
-			util.RuntimeInterfaceConfig{},
+			MigratorRuntimeConfig{},
 		)
 		require.NoError(t, err)
 

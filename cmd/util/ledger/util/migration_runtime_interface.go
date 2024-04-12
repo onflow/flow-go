@@ -1,6 +1,7 @@
 package util
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,29 +13,40 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type GetContractCodeFunc func(location common.AddressLocation) ([]byte, error)
+
+type GetContractNamesFunc func(address flow.Address) ([]string, error)
+
+type GetOrLoadProgramFunc func(
+	location runtime.Location,
+	load func() (*interpreter.Program, error),
+) (
+	*interpreter.Program,
+	error,
+)
+
 // MigrationRuntimeInterface is a runtime interface that can be used in migrations.
-// It only allows parsing and checking of contracts, given Accounts and Programs.
+// It only allows parsing and checking of contracts.
 type MigrationRuntimeInterface struct {
-	RuntimeInterfaceConfig
-	Accounts      environment.Accounts
-	Programs      *environment.Programs
-	ProgramErrors map[common.Location]error
+	GetContractCodeFunc  GetContractCodeFunc
+	GetContractNamesFunc GetContractNamesFunc
+	GetOrLoadProgramFunc GetOrLoadProgramFunc
 }
 
 func NewMigrationRuntimeInterface(
-	config RuntimeInterfaceConfig,
-	accounts environment.Accounts,
-	programs *environment.Programs,
+	getCodeFunc GetContractCodeFunc,
+	getContractNamesFunc GetContractNamesFunc,
+	getOrLoadProgramFunc GetOrLoadProgramFunc,
 ) *MigrationRuntimeInterface {
 	return &MigrationRuntimeInterface{
-		RuntimeInterfaceConfig: config,
-		Accounts:               accounts,
-		Programs:               programs,
-		ProgramErrors:          make(map[common.Location]error),
+		GetContractCodeFunc:  getCodeFunc,
+		GetContractNamesFunc: getContractNamesFunc,
+		GetOrLoadProgramFunc: getOrLoadProgramFunc,
 	}
 }
 
@@ -62,7 +74,12 @@ func (m *MigrationRuntimeInterface) ResolveLocation(
 	if len(identifiers) == 0 {
 		address := flow.Address(addressLocation.Address)
 
-		contractNames, err := m.Accounts.GetContractNames(address)
+		getContractNames := m.GetContractNamesFunc
+		if getContractNames == nil {
+			return nil, errors.New("GetContractNamesFunc missing")
+		}
+
+		contractNames, err := getContractNames(address)
 		if err != nil {
 			return nil, fmt.Errorf("ResolveLocation failed: %w", err)
 		}
@@ -102,31 +119,21 @@ func (m *MigrationRuntimeInterface) ResolveLocation(
 func (m *MigrationRuntimeInterface) GetCode(location runtime.Location) ([]byte, error) {
 	contractLocation, ok := location.(common.AddressLocation)
 	if !ok {
-		return nil, fmt.Errorf("GetCode failed: expected AddressLocation")
+		return nil, fmt.Errorf("GetCode failed: expected AddressLocation, got %T", location)
 	}
 
-	add, err := m.Accounts.GetContract(contractLocation.Name, flow.Address(contractLocation.Address))
-	if err != nil {
-		return nil, fmt.Errorf("GetCode failed: %w", err)
-	}
-
-	return add, nil
+	return m.GetAccountContractCode(contractLocation)
 }
 
 func (m *MigrationRuntimeInterface) GetAccountContractCode(
 	location common.AddressLocation,
 ) (code []byte, err error) {
-	// First look for staged contracts.
-	// If not found, then fall back to getting the code from storage.
-	if m.GetContractCodeFunc != nil {
-		code, err := m.GetContractCodeFunc(location)
-		if err != nil || code != nil {
-			// If the code was found, or if an error occurred, then return.
-			return code, err
-		}
+	getContractCode := m.GetContractCodeFunc
+	if getContractCode == nil {
+		return nil, fmt.Errorf("GetCodeFunc missing")
 	}
 
-	return m.Accounts.GetContract(location.Name, flow.Address(location.Address))
+	return getContractCode(location)
 }
 
 func (m *MigrationRuntimeInterface) GetOrLoadProgram(
@@ -136,33 +143,11 @@ func (m *MigrationRuntimeInterface) GetOrLoadProgram(
 	program *interpreter.Program,
 	err error,
 ) {
-
-	defer func() {
-		if m.GetOrLoadProgramListener != nil {
-			m.GetOrLoadProgramListener(location, program, err)
-		}
-	}()
-
-	return m.Programs.GetOrLoadProgram(
-		location,
-		func() (*interpreter.Program, error) {
-			// If the program is already known to be invalid,
-			// then return the error immediately,
-			// without attempting to load the program again
-			if err, ok := m.ProgramErrors[location]; ok {
-				return nil, err
-			}
-
-			// Otherwise, load the program.
-			// If an error occurs, then record it for subsequent calls
-			program, err := load()
-			if err != nil {
-				m.ProgramErrors[location] = err
-			}
-
-			return program, err
-		},
-	)
+	getOrLoadProgram := m.GetOrLoadProgramFunc
+	if getOrLoadProgram == nil {
+		return nil, errors.New("GetOrLoadProgramFunc missing")
+	}
+	return getOrLoadProgram(location, load)
 }
 
 func (m *MigrationRuntimeInterface) MeterMemory(_ common.MemoryUsage) error {
@@ -362,9 +347,7 @@ func (m *MigrationRuntimeInterface) RecordTrace(_ string, _ runtime.Location, _ 
 	panic("unexpected RecordTrace call")
 }
 
-type RuntimeInterfaceConfig struct {
-	GetOrLoadProgramListener func(runtime.Location, *interpreter.Program, error)
-
-	// GetContractCodeFunc allows for injecting extra logic for code lookup
-	GetContractCodeFunc func(location runtime.Location) ([]byte, error)
+type migrationTransactionPreparer struct {
+	state.NestedTransactionPreparer
+	derived.DerivedTransactionPreparer
 }

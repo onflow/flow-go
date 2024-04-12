@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/ledger"
@@ -11,50 +12,99 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// NewContractsExtractionMigration returns a migration that extracts the code for contracts from the payloads.
-// The given contracts map must be allocated, and gets populated with the code for the contracts found in the payloads.
-// The given contractNames map must be allocated,
-// and gets populated with the names of the contracts found in the payloads.
-func NewContractsExtractionMigration(
-	contracts map[common.AddressLocation][]byte,
-	contractNames map[common.Address][]string,
+// NewContractCheckingMigration returns a migration that checks all contracts.
+func NewContractCheckingMigration(
 	log zerolog.Logger,
+	programs map[common.Location]*interpreter.Program,
 ) ledger.Migration {
 	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
 
-		log.Info().Msg("extracting contracts from payloads ...")
+		// Extract payloads that have contract code or contract names,
+		// we don't need a payload snapshot with all payloads,
+		// because all we do is parse and check all contracts.
 
-		for _, payload := range payloads {
+		contractPayloads, err := extractContractPayloads(payloads, log)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract contract payloads: %w", err)
+		}
+
+		mr, err := NewMigratorRuntime(
+			contractPayloads,
+			MigratorRuntimeConfig{},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
+		}
+
+		// Check all contracts
+
+		for _, payload := range contractPayloads {
 			registerID, registerValue, err := convert.PayloadToRegister(payload)
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert payload to register: %w", err)
 			}
 
+			// Skip payloads that are not contract code
 			contractName := flow.RegisterIDContractName(registerID)
 			if contractName == "" {
 				continue
 			}
 
-			address, err := common.BytesToAddress([]byte(registerID.Owner))
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert register owner to address: %w", err)
-			}
-
-			addressLocation := common.AddressLocation{
-				Address: address,
+			owner := common.Address([]byte(registerID.Owner))
+			code := registerValue
+			location := common.AddressLocation{
+				Address: owner,
 				Name:    contractName,
 			}
 
-			contracts[addressLocation] = registerValue
+			log.Info().Msgf("checking contract %s ...", location)
 
-			names := contractNames[address]
-			names = append(names, contractName)
-			contractNames[address] = names
+			// Check contract code
+			const getAndSetProgram = true
+			program, err := mr.ContractAdditionHandler.ParseAndCheckProgram(code, location, getAndSetProgram)
+			if err != nil {
+				// TODO: report, pretty printed. like in StageContractsMigration
+				log.Error().Err(err).Msgf("failed to check contract %s", location)
+				continue
+			}
+
+			programs[location] = program
 		}
-
-		log.Info().Msgf("extracted %d contracts from payloads", len(contracts))
 
 		// Return the payloads as-is
 		return payloads, nil
 	}
+}
+
+// extractContractPayloads extracts payloads that contain contract code or contract names
+func extractContractPayloads(payloads []*ledger.Payload, log zerolog.Logger) (
+	contractPayloads []*ledger.Payload,
+	err error,
+) {
+	log.Info().Msg("extracting contract payloads ...")
+
+	var contractCount int
+
+	for _, payload := range payloads {
+		registerID, _, err := convert.PayloadToRegister(payload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert payload to register: %w", err)
+		}
+
+		// Include payloads which contain contract code
+		if flow.IsContractCodeRegisterID(registerID) {
+			contractPayloads = append(contractPayloads, payload)
+
+			contractCount++
+		}
+
+		// Include payloads which contain contract names
+		if flow.IsContractNamesRegisterID(registerID) {
+			contractPayloads = append(contractPayloads, payload)
+		}
+	}
+
+	log.Info().Msgf("extracted %d contracts from payloads", contractCount)
+
+	return contractPayloads, nil
 }

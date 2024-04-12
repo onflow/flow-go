@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -22,7 +21,7 @@ func NewAccountStorageMigration(
 
 		migrationRuntime, err := NewMigratorRuntime(
 			payloads,
-			util.RuntimeInterfaceConfig{},
+			MigratorRuntimeConfig{},
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
