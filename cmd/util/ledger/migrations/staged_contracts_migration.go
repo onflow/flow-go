@@ -75,6 +75,15 @@ func (m *StagedContractsMigration) WithContractUpdateValidation() *StagedContrac
 	return m
 }
 
+// WithStagedContractUpdates prepares the contract updates as a map for easy lookup.
+func (m *StagedContractsMigration) WithStagedContractUpdates(stagedContracts []StagedContract) *StagedContractsMigration {
+	m.registerContractUpdates(stagedContracts)
+	m.log.Info().
+		Msgf("total of %d staged contracts are provided externally", len(m.contractsByLocation))
+
+	return m
+}
+
 func (m *StagedContractsMigration) Close() error {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
@@ -241,7 +250,7 @@ func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads
 			// This shouldn't occur, but technically possible.
 			// e.g: accidentally storing other values under the same storage path pattern.
 			// So skip such values. We are not interested in those.
-			m.log.Info().
+			m.log.Debug().
 				Msgf("found a value with an unexpected type `%s`", staticType)
 			continue
 		}
@@ -257,7 +266,9 @@ func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads
 	m.log.Info().
 		Msgf("found %d staged contracts from payloads", len(stagedContracts))
 
-	m.RegisterContractUpdates(stagedContracts)
+	m.registerContractUpdates(stagedContracts)
+	m.log.Info().
+		Msgf("total of %d unique contracts are staged for all accounts", len(m.contractsByLocation))
 
 	return nil
 }
@@ -324,17 +335,14 @@ func (m *StagedContractsMigration) getStagedContractFromValue(
 	}, nil
 }
 
-// RegisterContractUpdates prepares the contract updates as a map for easy lookup.
-func (m *StagedContractsMigration) RegisterContractUpdates(stagedContracts []StagedContract) {
+// registerContractUpdates prepares the contract updates as a map for easy lookup.
+func (m *StagedContractsMigration) registerContractUpdates(stagedContracts []StagedContract) {
 	for _, contractChange := range stagedContracts {
-		m.RegisterContractChange(contractChange)
+		m.registerContractChange(contractChange)
 	}
-
-	m.log.Info().
-		Msgf("total of %d unique contracts are staged for all accounts", len(m.contractsByLocation))
 }
 
-func (m *StagedContractsMigration) RegisterContractChange(change StagedContract) {
+func (m *StagedContractsMigration) registerContractChange(change StagedContract) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 

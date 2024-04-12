@@ -55,13 +55,13 @@ type logWriter struct {
 
 var _ io.Writer = &logWriter{}
 
-const warnLogPrefix = "{\"level\":\"warn\""
+const errorLogPrefix = "{\"level\":\"error\""
 
 func (l *logWriter) Write(bytes []byte) (int, error) {
 	logStr := string(bytes)
 
-	// Ignore warnings
-	if strings.HasPrefix(logStr, warnLogPrefix) {
+	// Ignore non-error logs
+	if !strings.HasPrefix(logStr, errorLogPrefix) {
 		return 0, nil
 	}
 
@@ -152,20 +152,19 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
+		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf).
+			WithStagedContractUpdates([]migrations.StagedContract{
+				{
+					Address: common.Address(address1),
+					Contract: migrations.Contract{
+						Name: "A",
+						Code: []byte(updatedContractA),
+					},
+				},
+			})
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
-
-		migration.RegisterContractChange(
-			migrations.StagedContract{
-				Address: common.Address(address1),
-				Contract: migrations.Contract{
-					Name: "A",
-					Code: []byte(updatedContractA),
-				},
-			},
-		)
 
 		payloads, err := migration.MigrateAccount(
 			ctx,
@@ -197,20 +196,19 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
+		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf).
+			WithStagedContractUpdates([]migrations.StagedContract{
+				{
+					Address: common.Address(address1),
+					Contract: migrations.Contract{
+						Name: "A",
+						Code: []byte(updatedContractA),
+					},
+				},
+			})
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
-
-		migration.RegisterContractChange(
-			migrations.StagedContract{
-				Address: common.Address(address1),
-				Contract: migrations.Contract{
-					Name: "A",
-					Code: []byte(updatedContractA),
-				},
-			},
-		)
 
 		payloads, err := migration.MigrateAccount(
 			ctx,
@@ -240,29 +238,26 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
+		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf).
+			WithStagedContractUpdates([]migrations.StagedContract{
+				{
+					Address: common.Address(address1),
+					Contract: migrations.Contract{
+						Name: "A",
+						Code: []byte(updatedContractA),
+					},
+				},
+				{
+					Address: common.Address(address1),
+					Contract: migrations.Contract{
+						Name: "B",
+						Code: []byte(updatedContractB),
+					},
+				},
+			})
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
-
-		migration.RegisterContractChange(
-			migrations.StagedContract{
-				Address: common.Address(address1),
-				Contract: migrations.Contract{
-					Name: "A",
-					Code: []byte(updatedContractA),
-				},
-			},
-		)
-		migration.RegisterContractChange(
-			migrations.StagedContract{
-				Address: common.Address(address1),
-				Contract: migrations.Contract{
-					Name: "B",
-					Code: []byte(updatedContractB),
-				},
-			},
-		)
 
 		payloads, err := migration.MigrateAccount(
 			ctx,
@@ -292,20 +287,19 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
+		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf).
+			WithStagedContractUpdates([]migrations.StagedContract{
+				{
+					Address: common.Address(address1),
+					Contract: migrations.Contract{
+						Name: "A",
+						Code: []byte(updatedContractA),
+					},
+				},
+			})
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
-
-		migration.RegisterContractChange(
-			migrations.StagedContract{
-				Address: common.Address(address1),
-				Contract: migrations.Contract{
-					Name: "A",
-					Code: []byte(updatedContractA),
-				},
-			},
-		)
 
 		payloads, err := migration.MigrateAccount(
 			ctx,
@@ -339,29 +333,26 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
+		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf).
+			WithStagedContractUpdates([]migrations.StagedContract{
+				{
+					Address: common.Address(address1),
+					Contract: migrations.Contract{
+						Name: "A",
+						Code: []byte(updatedContractA),
+					},
+				},
+				{
+					Address: common.Address(address1),
+					Contract: migrations.Contract{
+						Name: "B",
+						Code: []byte(updatedContractB),
+					},
+				},
+			})
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
-
-		migration.RegisterContractChange(
-			migrations.StagedContract{
-				Address: common.Address(address1),
-				Contract: migrations.Contract{
-					Name: "A",
-					Code: []byte(updatedContractA),
-				},
-			},
-		)
-		migration.RegisterContractChange(
-			migrations.StagedContract{
-				Address: common.Address(address1),
-				Contract: migrations.Contract{
-					Name: "B",
-					Code: []byte(updatedContractB),
-				},
-			},
-		)
 
 		_, err = migration.MigrateAccount(
 			ctx,
@@ -388,20 +379,19 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
+		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf).
+			WithStagedContractUpdates([]migrations.StagedContract{
+				{
+					Address: common.Address(address2),
+					Contract: migrations.Contract{
+						Name: "A",
+						Code: []byte(updatedContractA),
+					},
+				},
+			})
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
-
-		migration.RegisterContractChange(
-			migrations.StagedContract{
-				Address: common.Address(address2),
-				Contract: migrations.Contract{
-					Name: "A",
-					Code: []byte(updatedContractA),
-				},
-			},
-		)
 
 		_, err = migration.MigrateAccount(
 			ctx,
