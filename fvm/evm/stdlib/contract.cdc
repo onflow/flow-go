@@ -252,12 +252,6 @@ contract EVM {
             return self.address()
         }
 
-        /// The EVM address of the cadence owned account behind an entitlement, acting as proof of access
-        access(Owner | Validate)
-        view fun protectedAddress(): EVMAddress {
-            return self.address()
-        }
-
         /// Withdraws the balance from the cadence owned account's balance
         /// Note that amounts smaller than 10nF (10e-8) can't be withdrawn
         /// given that Flow Token Vaults use UFix64s to store balances.
