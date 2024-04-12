@@ -276,10 +276,12 @@ func withNextEpoch(
 		Data:    data,
 	}
 	encodableSnapshot.SealingSegment.Blocks[0].Payload.ProtocolStateID = updatedKVStore.ID()
-	encodableSnapshot.SealingSegment.ProtocolStateEntries[updatedKVStore.ID()] = &flow.ProtocolStateEntryWrapper{
-		KVStoreVersion: version,
-		KVStoreData:    data,
-		EpochEntry:     richEpochStateEntry,
+	encodableSnapshot.SealingSegment.ProtocolStateEntries = map[flow.Identifier]*flow.ProtocolStateEntryWrapper{
+		updatedKVStore.ID(): {
+			KVStoreVersion: version,
+			KVStoreData:    data,
+			EpochEntry:     richEpochStateEntry,
+		},
 	}
 
 	return inmem.SnapshotFromEncodable(encodableSnapshot)
