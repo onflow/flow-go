@@ -13,29 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type ChangeContractCodeMigration struct {
-	*StagedContractsMigration
-}
-
-var _ AccountBasedMigration = (*ChangeContractCodeMigration)(nil)
-
-func NewChangeContractCodeMigration(
-	chainID flow.ChainID,
-	log zerolog.Logger,
-	rwf reporters.ReportWriterFactory,
-) *ChangeContractCodeMigration {
-	return &ChangeContractCodeMigration{
-		StagedContractsMigration: &StagedContractsMigration{
-			name:                "ChangeContractCodeMigration",
-			log:                 log,
-			chainID:             chainID,
-			stagedContracts:     map[common.Address]map[flow.RegisterID]Contract{},
-			contractsByLocation: map[common.Location][]byte{},
-			reporter:            rwf.ReportWriter("system-contracts-migrator"),
-		},
-	}
-}
-
 func NewSystemContractChange(
 	systemContract systemcontracts.SystemContract,
 	newContractCode []byte,
@@ -64,11 +41,6 @@ const (
 	BurnerContractChangeUpdate
 )
 
-type SystemContractChangesOptions struct {
-	EVM    EVMContractChange
-	Burner BurnerContractChange
-}
-
 func BurnerAddressForChain(chainID flow.ChainID) flow.Address {
 
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
@@ -87,7 +59,7 @@ func BurnerAddressForChain(chainID flow.ChainID) flow.Address {
 	}
 }
 
-func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOptions) []StagedContract {
+func SystemContractChanges(chainID flow.ChainID, options SystemContractsMigrationOptions) []StagedContract {
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
 	env := systemContracts.AsTemplateEnv()
@@ -276,14 +248,25 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractChangesOp
 	return contractChanges
 }
 
+type SystemContractsMigrationOptions struct {
+	StagedContractsMigrationOptions
+	EVM    EVMContractChange
+	Burner BurnerContractChange
+}
+
 func NewSystemContractsMigration(
-	chainID flow.ChainID,
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
-	options SystemContractChangesOptions,
-) *ChangeContractCodeMigration {
-	migration := NewChangeContractCodeMigration(chainID, log, rwf)
-	for _, change := range SystemContractChanges(chainID, options) {
+	options SystemContractsMigrationOptions,
+) *StagedContractsMigration {
+	migration := NewStagedContractsMigration(
+		"SystemContractsMigration",
+		"system-contracts-migrator",
+		log,
+		rwf,
+		options.StagedContractsMigrationOptions,
+	)
+	for _, change := range SystemContractChanges(options.ChainID, options) {
 		migration.RegisterContractChange(change)
 	}
 	return migration

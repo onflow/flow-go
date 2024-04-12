@@ -81,7 +81,11 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
+		options := migrations.StagedContractsMigrationOptions{
+			ChainID:            flow.Emulator,
+			VerboseErrorOutput: true,
+		}
+		migration := migrations.NewStagedContractsMigration("test", "test", log, rwf, options)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -107,7 +111,11 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
+		options := migrations.StagedContractsMigrationOptions{
+			ChainID:            flow.Emulator,
+			VerboseErrorOutput: true,
+		}
+		migration := migrations.NewStagedContractsMigration("test", "test", log, rwf, options)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -142,7 +150,11 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
+		options := migrations.StagedContractsMigrationOptions{
+			ChainID:            flow.Emulator,
+			VerboseErrorOutput: true,
+		}
+		migration := migrations.NewStagedContractsMigration("test", "test", log, rwf, options)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -187,7 +199,11 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
+		options := migrations.StagedContractsMigrationOptions{
+			ChainID:            flow.Emulator,
+			VerboseErrorOutput: true,
+		}
+		migration := migrations.NewStagedContractsMigration("test", "test", log, rwf, options)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -230,7 +246,11 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
+		options := migrations.StagedContractsMigrationOptions{
+			ChainID:            flow.Emulator,
+			VerboseErrorOutput: true,
+		}
+		migration := migrations.NewStagedContractsMigration("test", "test", log, rwf, options)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -282,7 +302,11 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
+		options := migrations.StagedContractsMigrationOptions{
+			ChainID:            flow.Emulator,
+			VerboseErrorOutput: true,
+		}
+		migration := migrations.NewStagedContractsMigration("test", "test", log, rwf, options)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -329,7 +353,11 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
+		options := migrations.StagedContractsMigrationOptions{
+			ChainID:            flow.Emulator,
+			VerboseErrorOutput: true,
+		}
+		migration := migrations.NewStagedContractsMigration("test", "test", log, rwf, options)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -378,7 +406,11 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := migrations.NewChangeContractCodeMigration(flow.Emulator, log, rwf)
+		options := migrations.StagedContractsMigrationOptions{
+			ChainID:            flow.Emulator,
+			VerboseErrorOutput: true,
+		}
+		migration := migrations.NewStagedContractsMigration("test", "test", log, rwf, options)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
