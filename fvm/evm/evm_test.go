@@ -1058,6 +1058,7 @@ func RunWithNewEnvironment(
 					fvm.WithAuthorizationChecksEnabled(false),
 					fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 					fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
+					fvm.WithBlocks(blocks),
 				}
 				ctx := fvm.NewContext(opts...)
 
@@ -1077,7 +1078,13 @@ func RunWithNewEnvironment(
 
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
-				f(fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true)), vm, snapshotTree, testContract, testAccount)
+				f(
+					fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true)),
+					vm,
+					snapshotTree,
+					testContract,
+					testAccount,
+				)
 			})
 		})
 	})
