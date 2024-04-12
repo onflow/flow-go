@@ -25,8 +25,8 @@ func populatedBlockStore(t *rapid.T) []*flow.Header {
 	store := []*flow.Header{unittest.BlockHeaderFixture()}
 	for i := 1; i < NUM_BLOCKS; i++ {
 		// we sample from the store 2/3 times to get deeper trees
-		b := rapid.OneOf(rapid.Just(unittest.BlockHeaderFixture()), rapid.SampledFrom(store), rapid.SampledFrom(store)).Draw(t, "parent").(flow.Header)
-		store = append(store, unittest.BlockHeaderWithParentFixture(&b))
+		b := rapid.OneOf(rapid.Just(unittest.BlockHeaderFixture()), rapid.SampledFrom(store), rapid.SampledFrom(store)).Draw(t, "parent")
+		store = append(store, unittest.BlockHeaderWithParentFixture(b))
 	}
 	return store
 }
@@ -38,8 +38,8 @@ type rapidSync struct {
 	heightRequests map[uint64]bool          // depth 1 pushdown automaton to track height requests
 }
 
-// Init is an action for initializing a rapidSync instance.
-func (r *rapidSync) Init(t *rapid.T) {
+// init is an action for initializing a rapidSync instance.
+func (r *rapidSync) init(t *rapid.T) {
 	var err error
 
 	r.core, err = New(zerolog.New(io.Discard), DefaultConfig(), metrics.NewNoopCollector(), flow.Localnet)
@@ -52,7 +52,7 @@ func (r *rapidSync) Init(t *rapid.T) {
 
 // RequestByID is an action that requests a block by its ID.
 func (r *rapidSync) RequestByID(t *rapid.T) {
-	b := rapid.SampledFrom(r.store).Draw(t, "id_request").(*flow.Header)
+	b := rapid.SampledFrom(r.store).Draw(t, "id_request")
 	r.core.RequestBlock(b.ID(), b.Height)
 	// Re-queueing by ID should always succeed
 	r.idRequests[b.ID()] = true
@@ -62,7 +62,7 @@ func (r *rapidSync) RequestByID(t *rapid.T) {
 
 // RequestByHeight is an action that requests a specific height
 func (r *rapidSync) RequestByHeight(t *rapid.T) {
-	b := rapid.SampledFrom(r.store).Draw(t, "height_request").(*flow.Header)
+	b := rapid.SampledFrom(r.store).Draw(t, "height_request")
 	r.core.RequestHeight(b.Height)
 	// Re-queueing by height should always succeed
 	r.heightRequests[b.Height] = true
@@ -71,8 +71,8 @@ func (r *rapidSync) RequestByHeight(t *rapid.T) {
 // HandleHeight is an action that requests a heights
 // upon receiving an argument beyond a certain tolerance
 func (r *rapidSync) HandleHeight(t *rapid.T) {
-	b := rapid.SampledFrom(r.store).Draw(t, "height_hint_request").(*flow.Header)
-	incr := rapid.IntRange(0, (int)(DefaultConfig().Tolerance)+1).Draw(t, "height increment").(int)
+	b := rapid.SampledFrom(r.store).Draw(t, "height_hint_request")
+	incr := rapid.IntRange(0, (int)(DefaultConfig().Tolerance)+1).Draw(t, "height increment")
 	requestHeight := b.Height + (uint64)(incr)
 	r.core.HandleHeight(b, requestHeight)
 	// Re-queueing by height should always succeed if beyond tolerance
@@ -85,7 +85,7 @@ func (r *rapidSync) HandleHeight(t *rapid.T) {
 
 // HandleByID is an action that provides a block header to the sync engine
 func (r *rapidSync) HandleByID(t *rapid.T) {
-	b := rapid.SampledFrom(r.store).Draw(t, "id_handling").(*flow.Header)
+	b := rapid.SampledFrom(r.store).Draw(t, "id_handling")
 	success := r.core.HandleBlock(b)
 	assert.True(t, success || r.idRequests[b.ID()] == false)
 
@@ -174,7 +174,11 @@ func (r *rapidSync) Check(t *rapid.T) {
 func TestRapidSync(t *testing.T) {
 	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
 
-	rapid.Check(t, rapid.Run(&rapidSync{}))
+	rapid.Check(t, func(t *rapid.T) {
+		sm := new(rapidSync)
+		sm.init(t)
+		t.Repeat(rapid.StateMachineActions(sm))
+	})
 }
 
 // utility functions

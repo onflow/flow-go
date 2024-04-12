@@ -1,0 +1,33 @@
+{
+  "includeOthers": true,
+  "packages": [
+    {"name": "admin"},
+    {"name":  "cmd"},
+    {"name":  "consensus"},
+    {"name":  "fvm"},
+    {"name":  "ledger"},
+    {"name":  "state"},
+    {"name":  "storage"},
+    {"name":  "utils"},
+    {"name":  "engine", "runner":  "buildjet-4vcpu-ubuntu-2004" ,"subpackages": [
+      {"name": "engine/access"},
+      {"name": "engine/collection"},
+      {"name": "engine/common"},
+      {"name": "engine/consensus"},
+      {"name": "engine/execution/computation"},
+      {"name": "engine/execution"},
+      {"name": "engine/verification"},
+      {"name": "engine/execution/ingestion", "runner":  "buildjet-8vcpu-ubuntu-2004"}
+    ]},
+    {"name":  "module", "runner":  "buildjet-4vcpu-ubuntu-2004" ,"subpackages": [{"name": "module/dkg"}]},
+    {"name":  "network", "subpackages": [
+      {"name": "network/alsp"},
+      {"name": "network/p2p/connection"},
+      {"name": "network/p2p/scoring"},
+      {"name": "network/p2p", "runner":  "buildjet-16vcpu-ubuntu-2004"},
+      {"name": "network/test/cohort1", "runner":  "buildjet-16vcpu-ubuntu-2004"},
+      {"name": "network/test/cohort2", "runner":  "buildjet-4vcpu-ubuntu-2004"},
+      {"name": "network/p2p/node", "runner":  "buildjet-4vcpu-ubuntu-2004"}
+    ]}
+  ]
+}

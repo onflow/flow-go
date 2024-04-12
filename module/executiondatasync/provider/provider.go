@@ -51,6 +51,10 @@ func NewProvider(
 	storage tracker.Storage,
 	opts ...ProviderOption,
 ) *ExecutionDataProvider {
+	if storage == nil {
+		storage = &tracker.NoopStorage{}
+	}
+
 	p := &ExecutionDataProvider{
 		logger:       logger.With().Str("component", "execution_data_provider").Logger(),
 		metrics:      metrics,

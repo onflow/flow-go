@@ -12,15 +12,6 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-// ContractFunctionSpec specify all the information, except the function's
-// address and arguments, needed to invoke the contract function.
-type ContractFunctionSpec struct {
-	AddressFromChain func(flow.Chain) flow.Address
-	LocationName     string
-	FunctionName     string
-	ArgumentTypes    []sema.Type
-}
-
 // SystemContracts provides methods for invoking system contract functions as
 // service account.
 type SystemContracts struct {

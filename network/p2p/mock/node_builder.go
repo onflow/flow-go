@@ -53,13 +53,29 @@ func (_m *NodeBuilder) Build() (p2p.LibP2PNode, error) {
 	return r0, r1
 }
 
-// OverrideDefaultRpcInspectorSuiteFactory provides a mock function with given fields: _a0
-func (_m *NodeBuilder) OverrideDefaultRpcInspectorSuiteFactory(_a0 p2p.GossipSubRpcInspectorSuiteFactoryFunc) p2p.NodeBuilder {
+// OverrideDefaultRpcInspectorFactory provides a mock function with given fields: _a0
+func (_m *NodeBuilder) OverrideDefaultRpcInspectorFactory(_a0 p2p.GossipSubRpcInspectorFactoryFunc) p2p.NodeBuilder {
 	ret := _m.Called(_a0)
 
 	var r0 p2p.NodeBuilder
-	if rf, ok := ret.Get(0).(func(p2p.GossipSubRpcInspectorSuiteFactoryFunc) p2p.NodeBuilder); ok {
+	if rf, ok := ret.Get(0).(func(p2p.GossipSubRpcInspectorFactoryFunc) p2p.NodeBuilder); ok {
 		r0 = rf(_a0)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(p2p.NodeBuilder)
+		}
+	}
+
+	return r0
+}
+
+// OverrideGossipSubFactory provides a mock function with given fields: _a0, _a1
+func (_m *NodeBuilder) OverrideGossipSubFactory(_a0 p2p.GossipSubFactoryFunc, _a1 p2p.GossipSubAdapterConfigFunc) p2p.NodeBuilder {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 p2p.NodeBuilder
+	if rf, ok := ret.Get(0).(func(p2p.GossipSubFactoryFunc, p2p.GossipSubAdapterConfigFunc) p2p.NodeBuilder); ok {
+		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(p2p.NodeBuilder)
@@ -140,22 +156,6 @@ func (_m *NodeBuilder) SetConnectionManager(_a0 connmgr.ConnManager) p2p.NodeBui
 	var r0 p2p.NodeBuilder
 	if rf, ok := ret.Get(0).(func(connmgr.ConnManager) p2p.NodeBuilder); ok {
 		r0 = rf(_a0)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(p2p.NodeBuilder)
-		}
-	}
-
-	return r0
-}
-
-// SetGossipSubFactory provides a mock function with given fields: _a0, _a1
-func (_m *NodeBuilder) SetGossipSubFactory(_a0 p2p.GossipSubFactoryFunc, _a1 p2p.GossipSubAdapterConfigFunc) p2p.NodeBuilder {
-	ret := _m.Called(_a0, _a1)
-
-	var r0 p2p.NodeBuilder
-	if rf, ok := ret.Get(0).(func(p2p.GossipSubFactoryFunc, p2p.GossipSubAdapterConfigFunc) p2p.NodeBuilder); ok {
-		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(p2p.NodeBuilder)

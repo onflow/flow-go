@@ -9,6 +9,11 @@ type WALMetrics struct {
 	mock.Mock
 }
 
+// ExecutionCheckpointSize provides a mock function with given fields: bytes
+func (_m *WALMetrics) ExecutionCheckpointSize(bytes uint64) {
+	_m.Called(bytes)
+}
+
 type mockConstructorTestingTNewWALMetrics interface {
 	mock.TestingT
 	Cleanup(func())

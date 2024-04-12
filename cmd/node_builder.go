@@ -141,6 +141,7 @@ type BaseConfig struct {
 	AdminMaxMsgSize             uint
 	BindAddr                    string
 	NodeRole                    string
+	ObserverMode                bool
 	DynamicStartupANAddress     string
 	DynamicStartupANPubkey      string
 	DynamicStartupEpochPhase    string
@@ -255,6 +256,7 @@ func DefaultBaseConfig() *BaseConfig {
 		AdminClientCAs:   NotSet,
 		AdminMaxMsgSize:  grpcutils.DefaultMaxMsgSize,
 		BindAddr:         NotSet,
+		ObserverMode:     false,
 		BootstrapDir:     "bootstrap",
 		datadir:          datadir,
 		secretsdir:       NotSet,

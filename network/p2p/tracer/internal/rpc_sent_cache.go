@@ -1,8 +1,6 @@
 package internal
 
 import (
-	"fmt"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -79,5 +77,5 @@ func (r *rpcSentCache) size() uint {
 // Returns:
 // - flow.Identifier: the entity ID.
 func (r *rpcSentCache) rpcSentEntityID(messageId string, controlMsgType p2pmsg.ControlMessageType) flow.Identifier {
-	return flow.MakeIDFromFingerPrint([]byte(fmt.Sprintf("%s%s", messageId, controlMsgType)))
+	return flow.MakeIDFromFingerPrint([]byte(messageId + string(controlMsgType)))
 }

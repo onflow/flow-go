@@ -1,8 +1,9 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package flow
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 func Genesis(chainID ChainID) *Block {
 
@@ -110,4 +111,29 @@ func (b *CertifiedBlock) View() uint64 {
 // Height returns height of the block.
 func (b *CertifiedBlock) Height() uint64 {
 	return b.Block.Header.Height
+}
+
+// BlockDigest holds lightweight block information which includes only block id, block height and block timestamp
+type BlockDigest struct {
+	id        Identifier
+	Height    uint64
+	Timestamp time.Time
+}
+
+// NewBlockDigest constructs a new block digest.
+func NewBlockDigest(
+	id Identifier,
+	height uint64,
+	timestamp time.Time,
+) *BlockDigest {
+	return &BlockDigest{
+		id:        id,
+		Height:    height,
+		Timestamp: timestamp,
+	}
+}
+
+// ID returns the id of the BlockDigest.
+func (b *BlockDigest) ID() Identifier {
+	return b.id
 }

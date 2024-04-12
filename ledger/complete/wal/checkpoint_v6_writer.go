@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/docker/go-units"
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
@@ -79,8 +80,10 @@ func storeCheckpointV6(
 	lg.Info().
 		Str("first_hash", first.RootHash().String()).
 		Uint64("first_reg_count", first.AllocatedRegCount()).
+		Str("first_reg_size", units.BytesSize(float64(first.AllocatedRegSize()))).
 		Str("last_hash", last.RootHash().String()).
 		Uint64("last_reg_count", last.AllocatedRegCount()).
+		Str("last_reg_size", units.BytesSize(float64(last.AllocatedRegSize()))).
 		Msg("storing checkpoint")
 
 	// make sure a checkpoint file with same name doesn't exist
