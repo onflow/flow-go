@@ -192,6 +192,15 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		AdminCommand("get-transactions", func(conf *NodeConfig) commands.AdminCommand {
 			return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, conf.Storage.Collections)
 		}).
+		AdminCommand("protocol-snapshot", func(conf *NodeConfig) commands.AdminCommand {
+			return storageCommands.NewProtocolSnapshotCommand(
+				conf.Logger,
+				conf.State,
+				conf.Storage.Headers,
+				conf.Storage.Seals,
+				exeNode.exeConf.triedir,
+			)
+		}).
 		Module("mutable follower state", exeNode.LoadMutableFollowerState).
 		Module("system specs", exeNode.LoadSystemSpecs).
 		Module("execution metrics", exeNode.LoadExecutionMetrics).
