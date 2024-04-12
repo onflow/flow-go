@@ -29,11 +29,12 @@ func constructRootBlock(rootHeader *flow.Header, setup *flow.EpochSetup, commit 
 		Payload: nil,
 	}
 	block.SetPayload(flow.Payload{
-		Guarantees:      nil,
-		Seals:           nil,
-		Receipts:        nil,
-		Results:         nil,
-		ProtocolStateID: kvstore.NewLatestKVStore(inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()).ID(),
+		Guarantees: nil,
+		Seals:      nil,
+		Receipts:   nil,
+		Results:    nil,
+		// TODO: shortcut in bootstrapping; we will probably have to start with a non-empty KV store in the future
+		ProtocolStateID: kvstore.NewDefaultKVStore(inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()).ID(),
 	})
 	return block
 }

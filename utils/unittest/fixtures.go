@@ -2225,7 +2225,7 @@ func BootstrapFixtureWithChainID(
 	)
 
 	rootEpochState := inmem.ProtocolStateFromEpochServiceEvents(setup, commit)
-	rootProtocolStateID := kvstore.NewLatestKVStore(rootEpochState.ID()).ID()
+	rootProtocolStateID := kvstore.NewDefaultKVStore(rootEpochState.ID()).ID()
 	root.SetPayload(flow.Payload{ProtocolStateID: rootProtocolStateID})
 	stateCommit := GenesisStateCommitmentByChainID(chainID)
 

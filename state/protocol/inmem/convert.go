@@ -347,7 +347,7 @@ func SnapshotFromBootstrapStateWithParams(
 	}
 
 	rootEpochState := ProtocolStateFromEpochServiceEvents(setup, commit)
-	rootKvStore := kvstore.NewLatestKVStore(rootEpochState.ID())
+	rootKvStore := kvstore.NewDefaultKVStore(rootEpochState.ID())
 	if rootKvStore.ID() != root.Payload.ProtocolStateID {
 		return nil, fmt.Errorf("incorrect protocol state ID in root block, expected (%x) but got (%x)",
 			root.Payload.ProtocolStateID, rootKvStore.ID())

@@ -261,7 +261,7 @@ func withNextEpoch(
 	}
 
 	// need to fix genesis block to contain the correct protocol state ID
-	updatedKVStore := kvstore.NewLatestKVStore(epochProtocolState.ID())
+	updatedKVStore := kvstore.NewDefaultKVStore(epochProtocolState.ID())
 	version, data, err := updatedKVStore.VersionedEncode()
 	if err != nil {
 		panic(err)
