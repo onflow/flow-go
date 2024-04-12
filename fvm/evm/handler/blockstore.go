@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	gethCommon "github.com/onflow/go-ethereum/common"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -35,6 +36,19 @@ func (bs *BlockStore) BlockProposal() (*types.Block, error) {
 		return bs.blockProposal, nil
 	}
 
+	cadenceHeight, err := bs.backend.GetCurrentBlockHeight()
+	if err != nil {
+		return nil, err
+	}
+
+	cadenceBlock, found, err := bs.backend.GetBlockAtHeight(cadenceHeight)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("cadence block not found")
+	}
+
 	lastExecutedBlock, err := bs.LatestBlock()
 	if err != nil {
 		return nil, err
@@ -45,8 +59,10 @@ func (bs *BlockStore) BlockProposal() (*types.Block, error) {
 		return nil, err
 	}
 
-	bs.blockProposal = types.NewBlock(parentHash,
+	bs.blockProposal = types.NewBlock(
+		parentHash,
 		lastExecutedBlock.Height+1,
+		cadenceBlock.Timestamp,
 		lastExecutedBlock.TotalSupply,
 		gethCommon.Hash{},
 		make([]gethCommon.Hash, 0),
