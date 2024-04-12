@@ -265,7 +265,7 @@ func (suite *SealingSegmentSuite) TestBuild_WrongLatestSeal() {
 	suite.AddBlocks(block1, block2, block3, block4)
 
 	_, err := suite.builder.SealingSegment()
-	require.ErrorIs(suite.T(), err, flow.ErrSegmentMissingSeal)
+	require.True(suite.T(), flow.IsInvalidSealingSegmentError(err))
 }
 
 // Tests the case where the final block in the segment seals multiple
@@ -365,7 +365,7 @@ func (suite *SealingSegmentSuite) TestBuild_HighestContainsNoSeals() {
 	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{block1, block2, block3, block4}, segment.Blocks)
 }
 
-// Test that we should return ErrSegmentMissingSeal if highest block contains
+// Test that we should return InvalidSealingSegmentError if highest block contains
 // seals but does not contain seal for lowest, when sealing segment is built.
 //
 // B1(S*) <- B2(R1) <- B3(S1,R2) <- B4(S2)
@@ -387,10 +387,10 @@ func (suite *SealingSegmentSuite) TestBuild_HighestContainsWrongSeal() {
 	suite.AddBlocks(block1, block2, block3, block4)
 
 	_, err := suite.builder.SealingSegment()
-	require.ErrorIs(suite.T(), err, flow.ErrSegmentMissingSeal)
+	require.True(suite.T(), flow.IsInvalidSealingSegmentError(err))
 }
 
-// Test that we should return ErrSegmentMissingSeal if highest block contains
+// Test that we should return InvalidSealingSegmentError if highest block contains
 // no seals and first ancestor with seals does not seal lowest, when sealing
 // segment is built
 //
@@ -415,11 +415,14 @@ func (suite *SealingSegmentSuite) TestBuild_HighestAncestorContainsWrongSeal() {
 	suite.AddBlocks(block1, block2, block3, block4, block5)
 
 	_, err := suite.builder.SealingSegment()
-	require.ErrorIs(suite.T(), err, flow.ErrSegmentMissingSeal)
+	require.True(suite.T(), flow.IsInvalidSealingSegmentError(err))
 }
 
-// TestBuild_ChangingProtocolStateID ...
-// B1(R*,S*) <- B2(R1) <- B4(S1,PS2)
+// TestBuild_ChangingProtocolStateID_Blocks tests constructing a sealing segment where
+// the primary segment (`Blocks`) contains blocks with different protocol state entries.
+// In this test, B1 commits to the default protocol state ID, and blocks B2 and B3
+// commit to a different protocol state ID (PS2).
+// B1(R*,S*) <- B2(R1,PS2) <- B3(S1,PS2)
 func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_Blocks() {
 	block1 := suite.BlockFixture()
 	block1.SetPayload(suite.PayloadFixture(unittest.WithReceipts(suite.priorReceipt), unittest.WithSeals(suite.priorSeal)))
@@ -449,7 +452,11 @@ func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_Blocks() {
 	assert.True(suite.T(), ok)
 }
 
-// EB2(PS2) <- EB1 <- B1(S*) <- B2(R1) <- B3(S1)
+// TestBuild_ChangingProtocolStateID_ExtraBlocks tests constructing a sealing segment where
+// `ExtraBlocks` contains blocks with different protocol state entries.
+// In this test, blocks B1, B2, and B3 commits to the default protocol state ID.
+// Extra blocks EB1 and EB2 commit to a different protocol state ID (PS2).
+// EB2(PS2) <- EB1 <- B1(R*,S*) <- B2(R1) <- B3(S1)
 func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_ExtraBlocks() {
 	block1 := suite.BlockFixture()
 	block1.SetPayload(suite.PayloadFixture(unittest.WithReceipts(suite.priorReceipt), unittest.WithSeals(suite.priorSeal)))
@@ -493,15 +500,15 @@ func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_ExtraBlocks(
 	assert.True(suite.T(), ok)
 }
 
-// Test that we should return ErrSegmentBlocksWrongLen if sealing segment is
+// Test that we should return InvalidSealingSegmentError if sealing segment is
 // built with no blocks.
 func (suite *SealingSegmentSuite) TestBuild_NoBlocks() {
 	builder := flow.NewSealingSegmentBuilder(nil, nil, nil)
 	_, err := builder.SealingSegment()
-	require.ErrorIs(suite.T(), err, flow.ErrSegmentBlocksWrongLen)
+	require.True(suite.T(), flow.IsInvalidSealingSegmentError(err))
 }
 
-// should return ErrSegmentInvalidBlockHeight if block has invalid height
+// should return InvalidSealingSegmentError if block has invalid height
 func (suite *SealingSegmentSuite) TestAddBlock_InvalidHeight() {
 
 	block1 := suite.FirstBlock()
@@ -513,7 +520,7 @@ func (suite *SealingSegmentSuite) TestAddBlock_InvalidHeight() {
 	require.NoError(suite.T(), err)
 
 	err = suite.builder.AddBlock(&block2)
-	require.ErrorIs(suite.T(), err, flow.ErrSegmentInvalidBlockHeight)
+	require.True(suite.T(), flow.IsInvalidSealingSegmentError(err))
 }
 
 // TestAddBlock_StorageError tests that errors in the resource getters bubble up.
@@ -523,8 +530,9 @@ func TestAddBlock_StorageError(t *testing.T) {
 		// create a receipt to include in the first block, whose result is not in storage
 		missingReceipt := unittest.ExecutionReceiptFixture()
 		block1 := unittest.BlockFixture()
+		exception := fmt.Errorf("")
 		sealLookup := func(flow.Identifier) (*flow.Seal, error) { return unittest.Seal.Fixture(), nil }
-		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, fmt.Errorf("not found") }
+		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, exception }
 		protocolStateEntryLookup := func(flow.Identifier) (*flow.ProtocolStateEntryWrapper, error) {
 			return &flow.ProtocolStateEntryWrapper{}, nil
 		}
@@ -536,13 +544,14 @@ func TestAddBlock_StorageError(t *testing.T) {
 		))
 
 		err := builder.AddBlock(&block1)
-		require.ErrorIs(t, err, flow.ErrSegmentResultLookup)
+		require.ErrorIs(t, err, exception)
 	})
 
 	// create a first block which contains no seal, and the seal isn't in storage
 	t.Run("missing seal", func(t *testing.T) {
+		exception := fmt.Errorf("")
 		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return unittest.ExecutionResultFixture(), nil }
-		sealLookup := func(flow.Identifier) (*flow.Seal, error) { return nil, fmt.Errorf("not found") }
+		sealLookup := func(flow.Identifier) (*flow.Seal, error) { return nil, exception }
 		protocolStateEntryLookup := func(flow.Identifier) (*flow.ProtocolStateEntryWrapper, error) {
 			return &flow.ProtocolStateEntryWrapper{}, nil
 		}
@@ -551,11 +560,20 @@ func TestAddBlock_StorageError(t *testing.T) {
 		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup)
 
 		err := builder.AddBlock(&block1)
-		require.ErrorIs(t, err, flow.ErrSegmentSealLookup)
+		require.ErrorIs(t, err, exception)
 	})
 
 	t.Run("missing protocol state entry", func(t *testing.T) {
-		// TODO(5120)
+		exception := fmt.Errorf("")
+		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return unittest.ExecutionResultFixture(), nil }
+		sealLookup := func(flow.Identifier) (*flow.Seal, error) { return unittest.Seal.Fixture(), nil }
+		protocolStateEntryLookup := func(flow.Identifier) (*flow.ProtocolStateEntryWrapper, error) { return nil, exception }
+		block1 := unittest.BlockFixture()
+		block1.SetPayload(flow.EmptyPayload())
+		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup, protocolStateEntryLookup)
+
+		err := builder.AddBlock(&block1)
+		require.ErrorIs(t, err, exception)
 	})
 }
 
@@ -577,7 +595,7 @@ func (suite *SealingSegmentSuite) TestAddExtraBlock() {
 		extraBlock := suite.BlockFixture()
 		extraBlock.Header.Height = firstBlock.Header.Height + 10 // make sure it doesn't connect by height
 		err := suite.builder.AddExtraBlock(&extraBlock)
-		require.ErrorIs(t, err, flow.ErrSegmentInvalidBlockHeight)
+		require.True(suite.T(), flow.IsInvalidSealingSegmentError(err))
 	})
 	suite.T().Run("extra-block-not-continuous", func(t *testing.T) {
 		builder := flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID, suite.GetProtocolStateEntry)
@@ -590,7 +608,7 @@ func (suite *SealingSegmentSuite) TestAddExtraBlock() {
 		extraBlockWithSkip := suite.BlockFixture()
 		extraBlockWithSkip.Header.Height = extraBlock.Header.Height - 2 // skip one height
 		err = builder.AddExtraBlock(&extraBlockWithSkip)
-		require.ErrorIs(t, err, flow.ErrSegmentInvalidBlockHeight)
+		require.True(suite.T(), flow.IsInvalidSealingSegmentError(err))
 	})
 	suite.T().Run("root-segment-extra-blocks", func(t *testing.T) {
 		builder := flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID, suite.GetProtocolStateEntry)
