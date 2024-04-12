@@ -2,6 +2,7 @@ package flow_test
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -109,7 +110,7 @@ func (suite *SealingSegmentSuite) PayloadFixture(opts ...func(payload *flow.Payl
 	return unittest.PayloadFixture(opts...)
 }
 
-// BlockWithParentFixture todo
+// BlockWithParentFixture returns a Block fixtures with the default protocol state.
 func (suite *SealingSegmentSuite) BlockWithParentFixture(parent *flow.Header) *flow.Block {
 	block := unittest.BlockWithParentFixture(parent)
 	block.SetPayload(suite.PayloadFixture())
@@ -415,6 +416,81 @@ func (suite *SealingSegmentSuite) TestBuild_HighestAncestorContainsWrongSeal() {
 
 	_, err := suite.builder.SealingSegment()
 	require.ErrorIs(suite.T(), err, flow.ErrSegmentMissingSeal)
+}
+
+// TestBuild_ChangingProtocolStateID ...
+// B1(R*,S*) <- B2(R1) <- B4(S1,PS2)
+func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_Blocks() {
+	block1 := suite.BlockFixture()
+	block1.SetPayload(suite.PayloadFixture(unittest.WithReceipts(suite.priorReceipt), unittest.WithSeals(suite.priorSeal)))
+
+	protocolStateID2 := unittest.IdentifierFixture()
+	suite.addProtocolStateEntry(protocolStateID2, suite.ProtocolStateEntryWrapperFixture())
+
+	block2 := suite.BlockWithParentFixture(block1.Header)
+	receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+	block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1), unittest.WithProtocolStateID(protocolStateID2)))
+
+	block3 := suite.BlockWithParentFixture(block2.Header)
+	block3.SetPayload(suite.PayloadFixture(unittest.WithSeals(seal1), unittest.WithProtocolStateID(protocolStateID2)))
+
+	suite.AddBlocks(&block1, block2, block3)
+
+	segment, err := suite.builder.SealingSegment()
+	require.NoError(suite.T(), err)
+	require.NoError(suite.T(), segment.Validate())
+
+	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{&block1, block2, block3}, segment.Blocks)
+	// resulting segment must contain both protocol state IDs
+	assert.Len(suite.T(), segment.ProtocolStateEntries, 2)
+	_, ok := segment.ProtocolStateEntries[suite.defaultProtocolStateID]
+	assert.True(suite.T(), ok)
+	_, ok = segment.ProtocolStateEntries[protocolStateID2]
+	assert.True(suite.T(), ok)
+}
+
+// EB2(PS2) <- EB1 <- B1(S*) <- B2(R1) <- B3(S1)
+func (suite *SealingSegmentSuite) TestBuild_ChangingProtocolStateID_ExtraBlocks() {
+	block1 := suite.BlockFixture()
+	block1.SetPayload(suite.PayloadFixture(unittest.WithReceipts(suite.priorReceipt), unittest.WithSeals(suite.priorSeal)))
+
+	block2 := suite.BlockWithParentFixture(block1.Header)
+	receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+	block2.SetPayload(suite.PayloadFixture(unittest.WithReceipts(receipt1)))
+
+	block3 := suite.BlockWithParentFixture(block2.Header)
+	block3.SetPayload(suite.PayloadFixture(unittest.WithSeals(seal1)))
+
+	suite.AddBlocks(&block1, block2, block3)
+
+	// construct two extra blocks that connect to the lowest block and add them to builder
+	protocolStateID2 := unittest.IdentifierFixture()
+	suite.addProtocolStateEntry(protocolStateID2, suite.ProtocolStateEntryWrapperFixture())
+
+	extraBlock1 := suite.BlockFixture()
+	extraBlock1.Header.Height = block1.Header.Height - 1
+	extraBlock1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID2)))
+	err := suite.builder.AddExtraBlock(&extraBlock1)
+	require.NoError(suite.T(), err)
+
+	extraBlock2 := suite.BlockFixture()
+	extraBlock2.Header.Height = extraBlock1.Header.Height - 1
+	err = suite.builder.AddExtraBlock(&extraBlock2)
+	require.NoError(suite.T(), err)
+
+	segment, err := suite.builder.SealingSegment()
+	require.NoError(suite.T(), err)
+	err = segment.Validate()
+	require.NoError(suite.T(), err)
+
+	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{&block1, block2, block3}, segment.Blocks)
+	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{&extraBlock2, &extraBlock1}, segment.ExtraBlocks)
+	// resulting segment must contain both protocol state IDs
+	assert.Len(suite.T(), segment.ProtocolStateEntries, 2)
+	_, ok := segment.ProtocolStateEntries[suite.defaultProtocolStateID]
+	assert.True(suite.T(), ok)
+	_, ok = segment.ProtocolStateEntries[protocolStateID2]
+	assert.True(suite.T(), ok)
 }
 
 // Test that we should return ErrSegmentBlocksWrongLen if sealing segment is
