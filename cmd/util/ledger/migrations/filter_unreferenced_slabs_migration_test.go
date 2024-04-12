@@ -115,7 +115,7 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 	// Act
 
 	rwf := &testReportWriterFactory{}
-	migration := NewFilterUnreferencedSlabsMigration(chainID, rwf)
+	migration := NewFilterUnreferencedSlabsMigration(rwf)
 
 	log := zerolog.New(zerolog.NewTestWriter(t))
 

@@ -11,7 +11,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
-	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -27,7 +26,6 @@ func StorageIDFromRegisterID(registerID flow.RegisterID) atree.StorageID {
 
 type FilterUnreferencedSlabsMigration struct {
 	log     zerolog.Logger
-	chainID flow.ChainID
 	rw      reporters.ReportWriter
 }
 
@@ -36,11 +34,9 @@ var _ AccountBasedMigration = &FilterUnreferencedSlabsMigration{}
 const filterUnreferencedSlabsName = "filter-unreferenced-slabs"
 
 func NewFilterUnreferencedSlabsMigration(
-	chainID flow.ChainID,
 	rwf reporters.ReportWriterFactory,
 ) *FilterUnreferencedSlabsMigration {
 	return &FilterUnreferencedSlabsMigration{
-		chainID: chainID,
 		rw:      rwf.ReportWriter(filterUnreferencedSlabsName),
 	}
 }
@@ -62,77 +58,78 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 	_ context.Context,
 	address common.Address,
 	oldPayloads []*ledger.Payload,
-) ([]*ledger.Payload, error) {
-
-	migrationRuntime, err := NewMigratorRuntime(
-		oldPayloads,
-		m.chainID,
-		MigratorRuntimeConfig{},
-		// TODO:
-		snapshot.SmallChangeSetSnapshot,
-	)
+) (
+	newPayloads []*ledger.Payload,
+	err error,
+) {
+	migrationRuntime, err := NewAtreeRegisterMigratorRuntime(address, oldPayloads)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
 	}
 
 	storage := migrationRuntime.Storage
 
-	newPayloads := oldPayloads
+	newPayloads = oldPayloads
 
 	err = checkStorageHealth(address, storage, oldPayloads)
-	if err != nil {
-
-		// The storage health check failed.
-		// This can happen if there are unreferenced root slabs.
-		// In this case, we filter out the unreferenced root slabs from the payloads.
-
-		var unreferencedRootSlabsErr runtime.UnreferencedRootSlabsError
-		if !errors.As(err, &unreferencedRootSlabsErr) {
-			return nil, fmt.Errorf("storage health check failed: %w", err)
-		}
-
-		m.log.Warn().
-			Err(err).
-			Str("account", address.Hex()).
-			Msg("filtering unreferenced root slabs")
-
-		// Create a set of unreferenced root slabs.
-
-		unreferencedRootSlabIDs := map[atree.StorageID]struct{}{}
-		for _, storageID := range unreferencedRootSlabsErr.UnreferencedRootSlabIDs {
-			unreferencedRootSlabIDs[storageID] = struct{}{}
-		}
-
-		// Filter out unreferenced root slabs.
-
-		newCount := len(oldPayloads) - len(unreferencedRootSlabIDs)
-		newPayloads = make([]*ledger.Payload, 0, newCount)
-
-		filteredPayloads := make([]*ledger.Payload, 0, len(unreferencedRootSlabIDs))
-
-		for _, payload := range oldPayloads {
-			registerID, _, err := convert.PayloadToRegister(payload)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert payload to register: %w", err)
-			}
-
-			// Filter unreferenced slabs.
-			if registerID.IsSlabIndex() {
-				storageID := StorageIDFromRegisterID(registerID)
-				if _, ok := unreferencedRootSlabIDs[storageID]; ok {
-					filteredPayloads = append(filteredPayloads, payload)
-					continue
-				}
-			}
-
-			newPayloads = append(newPayloads, payload)
-		}
-
-		m.rw.Write(unreferencedSlabs{
-			Account:  address,
-			Payloads: filteredPayloads,
-		})
+	if err == nil {
+		return
 	}
+
+	// The storage health check failed.
+	// This can happen if there are unreferenced root slabs.
+	// In this case, we filter out the unreferenced root slabs from the payloads.
+
+	var unreferencedRootSlabsErr runtime.UnreferencedRootSlabsError
+	if !errors.As(err, &unreferencedRootSlabsErr) {
+		return nil, fmt.Errorf("storage health check failed: %w", err)
+	}
+
+	m.log.Warn().
+		Err(err).
+		Str("account", address.Hex()).
+		Msg("filtering unreferenced root slabs")
+
+	// Create a set of unreferenced root slabs.
+
+	unreferencedRootSlabIDs := map[atree.StorageID]struct{}{}
+	for _, storageID := range unreferencedRootSlabsErr.UnreferencedRootSlabIDs {
+		unreferencedRootSlabIDs[storageID] = struct{}{}
+	}
+
+	// Filter out unreferenced root slabs.
+
+	newCount := len(oldPayloads) - len(unreferencedRootSlabIDs)
+	newPayloads = make([]*ledger.Payload, 0, newCount)
+
+	filteredPayloads := make([]*ledger.Payload, 0, len(unreferencedRootSlabIDs))
+
+	for _, payload := range oldPayloads {
+		registerID, _, err := convert.PayloadToRegister(payload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert payload to register: %w", err)
+		}
+
+		// Filter unreferenced slabs.
+		if registerID.IsSlabIndex() {
+			storageID := StorageIDFromRegisterID(registerID)
+			if _, ok := unreferencedRootSlabIDs[storageID]; ok {
+				filteredPayloads = append(filteredPayloads, payload)
+				continue
+			}
+		}
+
+		newPayloads = append(newPayloads, payload)
+	}
+
+	m.rw.Write(unreferencedSlabs{
+		Account:  address,
+		Payloads: filteredPayloads,
+	})
+
+	// Do NOT report the health check error here.
+	// The health check error is only reported if it is not due to unreferenced slabs.
+	// If it is due to unreferenced slabs, we filter them out and continue.
 
 	return newPayloads, nil
 }
