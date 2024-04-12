@@ -3,7 +3,6 @@ package badger
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/state/protocol/inmem"
 	"sync/atomic"
 
 	"github.com/dgraph-io/badger/v2"
@@ -13,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	statepkg "github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/storage"

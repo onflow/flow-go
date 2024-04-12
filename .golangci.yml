@@ -18,6 +18,9 @@ linters-settings:
       - G503
       - G505
 
+  staticcheck:
+    checks: ["all", "-SA1019"]
+
 linters:
   enable:
     - goimports
