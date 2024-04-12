@@ -21,8 +21,7 @@ commits_file="/opt/commits.recent"
 load_types=("token-transfer" "create-account" "ledger-heavy" "evm-transfer")
 
 # get the merge commits from the last week from master ordered by author date
-# TEMPORARY: DO NOT MERGE!!
-for commit in $(git log  --first-parent  --format="%S:%H" origin/janez/improve-tps-metering --since '1 week' --author-date-order | head -1)
+for commit in $(git log  --merges --first-parent  --format="%S:%H" origin/master --since '1 week' --author-date-order )
 do
   for load in "${load_types[@]}"
   do
