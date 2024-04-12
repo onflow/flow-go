@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/crypto"
+	"github.com/onflow/go-ethereum/rlp"
 	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/model/encodable"

@@ -3,7 +3,7 @@ package rlp
 import (
 	"io"
 
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/onflow/go-ethereum/rlp"
 
 	"github.com/onflow/flow-go/model/encoding"
 )
