@@ -249,15 +249,20 @@ func withNextEpoch(
 	epochProtocolState := encodableSnapshot.EpochProtocolState
 
 	// setup ID has changed, need to update it
-	convertedEpochSetup, _ := protocol.ToEpochSetup(inmem.NewEpoch(*currEpoch))
-	epochProtocolState.CurrentEpoch.SetupID = convertedEpochSetup.ID()
+	convertedCurrentEpochSetup, _ := protocol.ToEpochSetup(inmem.NewEpoch(*currEpoch))
+	currentEpochCommit, _ := protocol.ToEpochCommit(inmem.NewEpoch(*currEpoch))
+	epochProtocolState.CurrentEpoch.SetupID = convertedCurrentEpochSetup.ID()
 	// create next epoch protocol state
-	convertedEpochSetup, _ = protocol.ToEpochSetup(inmem.NewEpoch(*encodableSnapshot.Epochs.Next))
-	convertedEpochCommit, _ := protocol.ToEpochCommit(inmem.NewEpoch(*encodableSnapshot.Epochs.Next))
+	convertedNextEpochSetup, _ := protocol.ToEpochSetup(inmem.NewEpoch(*encodableSnapshot.Epochs.Next))
+	convertedNextEpochCommit, _ := protocol.ToEpochCommit(inmem.NewEpoch(*encodableSnapshot.Epochs.Next))
 	epochProtocolState.NextEpoch = &flow.EpochStateContainer{
-		SetupID:          convertedEpochSetup.ID(),
-		CommitID:         convertedEpochCommit.ID(),
+		SetupID:          convertedNextEpochSetup.ID(),
+		CommitID:         convertedNextEpochCommit.ID(),
 		ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochIdentities),
+	}
+	richEpochStateEntry, err := flow.NewRichProtocolStateEntry(epochProtocolState, nil, nil, convertedCurrentEpochSetup, currentEpochCommit, convertedNextEpochSetup, convertedNextEpochCommit)
+	if err != nil {
+		panic(err)
 	}
 
 	// need to fix genesis block to contain the correct protocol state ID
@@ -271,6 +276,11 @@ func withNextEpoch(
 		Data:    data,
 	}
 	encodableSnapshot.SealingSegment.Blocks[0].Payload.ProtocolStateID = updatedKVStore.ID()
+	encodableSnapshot.SealingSegment.ProtocolStateEntries[updatedKVStore.ID()] = &flow.ProtocolStateEntryWrapper{
+		KVStoreVersion: version,
+		KVStoreData:    data,
+		EpochEntry:     richEpochStateEntry,
+	}
 
 	return inmem.SnapshotFromEncodable(encodableSnapshot)
 }

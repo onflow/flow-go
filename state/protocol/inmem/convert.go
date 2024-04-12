@@ -378,7 +378,7 @@ func SnapshotFromBootstrapStateWithParams(
 			ExecutionResults: flow.ExecutionResultList{result},
 			LatestSeals:      map[flow.Identifier]flow.Identifier{root.ID(): seal.ID()},
 			ProtocolStateEntries: map[flow.Identifier]*flow.ProtocolStateEntryWrapper{
-				rootEpochStateID: rootProtocolStateEntryWrapper,
+				rootKvStore.ID(): rootProtocolStateEntryWrapper,
 			},
 			FirstSeal:   seal,
 			ExtraBlocks: make([]*flow.Block, 0),
