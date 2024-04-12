@@ -12,10 +12,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// CatchUpThreshold is the number of blocks that if the execution is far behind
+// DefaultCatchUpThreshold is the number of blocks that if the execution is far behind
 // the finalization then we will only lazy load the next unexecuted finalized
 // blocks until the execution has caught up
-const CatchUpThreshold = 500
+const DefaultCatchUpThreshold = 500
 
 // Throttle is a helper struct that helps throttle the unexecuted blocks to be sent
 // to the block queue for execution.
@@ -31,7 +31,6 @@ type BlockThrottle struct {
 	mu        sync.Mutex
 	executed  uint64
 	finalized uint64
-	inited    bool
 
 	// notifier
 	processables chan<- flow.Identifier
@@ -75,14 +74,18 @@ func NewBlockThrottle(
 	}, nil
 }
 
+// inited returns true if the throttle has been inited
+func (c *BlockThrottle) inited() bool {
+	return c.processables != nil
+}
+
 func (c *BlockThrottle) Init(processables chan<- flow.Identifier) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.inited {
+	if c.inited() {
 		return fmt.Errorf("throttle already inited")
 	}
 
-	c.inited = true
 	c.processables = processables
 
 	var unexecuted []flow.Identifier
@@ -93,12 +96,17 @@ func (c *BlockThrottle) Init(processables chan<- flow.Identifier) error {
 			return err
 		}
 	} else {
-		unexecuted, err = findFinalized(c.state, c.headers, c.executed, c.executed+500)
+		unexecuted, err = findFinalized(c.state, c.headers, c.executed, c.executed+uint64(c.threshold))
 		if err != nil {
 			return err
 		}
 	}
 
+	c.log.Info().Msgf("throttle initializing with %d unexecuted blocks", len(unexecuted))
+
+	// the ingestion core engine must have initialized the 'processables' with 10000 (default) buffer size,
+	// and the 'unexecuted' will only contain up to DefaultCatchUpThreshold (500) blocks,
+	// so pushing all the unexecuted to processables won't be blocked.
 	for _, id := range unexecuted {
 		c.processables <- id
 	}
@@ -112,7 +120,7 @@ func (c *BlockThrottle) OnBlockExecuted(_ flow.Identifier, executed uint64) erro
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if !c.inited {
+	if !c.inited() {
 		return fmt.Errorf("throttle not inited")
 	}
 
@@ -152,7 +160,7 @@ func (c *BlockThrottle) OnBlock(blockID flow.Identifier) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if !c.inited {
+	if !c.inited() {
 		return fmt.Errorf("throttle not inited")
 	}
 
@@ -170,7 +178,7 @@ func (c *BlockThrottle) OnBlock(blockID flow.Identifier) error {
 func (c *BlockThrottle) OnBlockFinalized(lastFinalized *flow.Header) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if !c.inited {
+	if !c.inited() {
 		return
 	}
 
@@ -212,11 +220,12 @@ func findFinalized(state protocol.State, headers storage.Headers, lastExecuted, 
 	for height := lastExecuted + 1; height <= final.Height; height++ {
 		finalizedID, err := headers.BlockIDByHeight(height)
 		if err != nil {
-			return nil, fmt.Errorf("could not get header at height: %v, %w", height, err)
+			return nil, fmt.Errorf("could not get block ID by height %v: %w", height, err)
 		}
 
 		unexecutedFinalized = append(unexecutedFinalized, finalizedID)
 	}
+
 	return unexecutedFinalized, nil
 }
 
