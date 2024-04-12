@@ -1373,6 +1373,8 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 }
 
 func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
+	var processedBlockHeight storage.ConsumerProgress
+
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()
 	}
@@ -1553,6 +1555,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Storage.LightTransactionResults)
 			return nil
 		}).
+		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
+			processedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressIngestionEngineBlockHeight)
+			return nil
+		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			config := builder.rpcConf
 			backendConfig := config.BackendConfig
@@ -1708,7 +1714,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			builder.IngestEng, err = ingestion.New(
 				node.Logger,
-				node.EngineRegistry,
 				node.State,
 				node.Me,
 				builder.RequestEng,
@@ -1719,6 +1724,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Results,
 				node.Storage.Receipts,
 				builder.collectionExecutedMetric,
+				processedBlockHeight,
 			)
 			if err != nil {
 				return nil, err

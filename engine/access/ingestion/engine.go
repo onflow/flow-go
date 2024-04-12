@@ -10,15 +10,14 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
-	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -46,6 +45,9 @@ const (
 
 	// default queue capacity
 	defaultQueueCapacity = 10_000
+
+	workersCount = 1 // how many workers will concurrently process the tasks in the jobqueue
+	searchAhead  = 1 // how many block heights ahead of the current will be requested and tasked for jobqueue
 )
 
 var (
@@ -61,16 +63,17 @@ var (
 // to a centralized location that can be queried by a user
 type Engine struct {
 	*component.ComponentManager
-	messageHandler            *engine.MessageHandler
-	executionReceiptsNotifier engine.Notifier
-	executionReceiptsQueue    engine.MessageStore
-	finalizedBlockNotifier    engine.Notifier
-	finalizedBlockQueue       engine.MessageStore
 
 	log     zerolog.Logger   // used to log relevant actions with context
 	state   protocol.State   // used to access the  protocol state
 	me      module.Local     // used to access local node information
 	request module.Requester // used to request collections
+
+	// Job queue
+	finalizedBlockConsumer *jobqueue.ComponentConsumer
+
+	// Notifier for queue consumer
+	finalizedBlockNotifier engine.Notifier
 
 	// storage
 	// FIX: remove direct DB access by substituting indexer module
@@ -89,7 +92,6 @@ type Engine struct {
 // New creates a new access ingestion engine
 func New(
 	log zerolog.Logger,
-	net network.EngineRegistry,
 	state protocol.State,
 	me module.Local,
 	request module.Requester,
@@ -100,40 +102,8 @@ func New(
 	executionResults storage.ExecutionResults,
 	executionReceipts storage.ExecutionReceipts,
 	collectionExecutedMetric module.CollectionExecutedMetric,
+	processedHeight storage.ConsumerProgress,
 ) (*Engine, error) {
-	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
-	if err != nil {
-		return nil, fmt.Errorf("could not create execution receipts queue: %w", err)
-	}
-
-	executionReceiptsQueue := &engine.FifoMessageStore{FifoQueue: executionReceiptsRawQueue}
-
-	finalizedBlocksRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
-	if err != nil {
-		return nil, fmt.Errorf("could not create finalized block queue: %w", err)
-	}
-
-	finalizedBlocksQueue := &engine.FifoMessageStore{FifoQueue: finalizedBlocksRawQueue}
-
-	messageHandler := engine.NewMessageHandler(
-		log,
-		engine.NewNotifier(),
-		engine.Pattern{
-			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*model.Block)
-				return ok
-			},
-			Store: finalizedBlocksQueue,
-		},
-		engine.Pattern{
-			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*flow.ExecutionReceipt)
-				return ok
-			},
-			Store: executionReceiptsQueue,
-		},
-	)
-
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		log:                      log.With().Str("engine", "ingestion").Logger(),
@@ -148,32 +118,55 @@ func New(
 		executionReceipts:        executionReceipts,
 		maxReceiptHeight:         0,
 		collectionExecutedMetric: collectionExecutedMetric,
-
-		// queue / notifier for execution receipts
-		executionReceiptsNotifier: engine.NewNotifier(),
-		executionReceiptsQueue:    executionReceiptsQueue,
-
-		// queue / notifier for finalized blocks
-		finalizedBlockNotifier: engine.NewNotifier(),
-		finalizedBlockQueue:    finalizedBlocksQueue,
-
-		messageHandler: messageHandler,
+		finalizedBlockNotifier:   engine.NewNotifier(),
 	}
+
+	// jobqueue Jobs object that tracks finalized blocks by height. This is used by the finalizedBlockConsumer
+	// to get a sequential list of finalized blocks.
+	finalizedBlockReader := jobqueue.NewFinalizedBlockReader(state, blocks)
+
+	defaultIndex, err := e.defaultProcessedIndex()
+	if err != nil {
+		return nil, fmt.Errorf("could not read default processed index: %w", err)
+	}
+
+	// create a jobqueue that will process new available finalized block. The `finalizedBlockNotifier` is used to
+	// signal new work, which is being triggered on the `processFinalizedBlockJob` handler.
+	finalizedBlockConsumer, err := jobqueue.NewComponentConsumer(
+		e.log,
+		e.finalizedBlockNotifier.Channel(),
+		processedHeight,
+		finalizedBlockReader,
+		defaultIndex,
+		e.processFinalizedBlockJob,
+		workersCount,
+		searchAhead,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating finalizedBlock jobqueue: %w", err)
+	}
+
+	e.finalizedBlockConsumer = finalizedBlockConsumer
 
 	// Add workers
 	e.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(e.processBackground).
-		AddWorker(e.processExecutionReceipts).
-		AddWorker(e.processFinalizedBlocks).
+		AddWorker(e.runFinalizedBlockConsumer).
 		Build()
 
-	// register engine with the execution receipt provider
-	_, err = net.Register(channels.ReceiveReceipts, e)
-	if err != nil {
-		return nil, fmt.Errorf("could not register for results: %w", err)
-	}
-
 	return e, nil
+}
+
+// defaultProcessedIndex returns the last finalized block height from the protocol state.
+//
+// The BlockConsumer utilizes this return height to fetch and consume block jobs from
+// jobs queue the first time it initializes.
+func (e *Engine) defaultProcessedIndex() (uint64, error) {
+	final, err := e.state.Final().Head()
+	if err != nil {
+		return 0, fmt.Errorf("could not get finalized height: %w", err)
+	}
+	return final.Height, nil
 }
 
 func (e *Engine) Start(parent irrecoverable.SignalerContext) {
@@ -206,6 +199,33 @@ func (e *Engine) initLastFullBlockHeightIndex() error {
 	e.collectionExecutedMetric.UpdateLastFullBlockHeight(lastFullHeight)
 
 	return nil
+}
+
+// runFinalizedBlockConsumer runs the finalizedBlockConsumer component
+func (e *Engine) runFinalizedBlockConsumer(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	e.finalizedBlockConsumer.Start(ctx)
+
+	err := util.WaitClosed(ctx, e.finalizedBlockConsumer.Ready())
+	if err == nil {
+		ready()
+	}
+
+	<-e.finalizedBlockConsumer.Done()
+}
+
+func (e *Engine) processFinalizedBlockJob(ctx irrecoverable.SignalerContext, job module.Job, done func()) {
+	header, err := jobqueue.JobToBlockHeader(job)
+	if err != nil {
+		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
+	}
+
+	err = e.processFinalizedBlock(header.ID())
+	if err != nil {
+		e.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during finalized block processing job")
+		//ctx.Throw(err)
+	}
+
+	done()
 }
 
 func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -248,144 +268,14 @@ func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready comp
 	}
 }
 
-func (e *Engine) processExecutionReceipts(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
-	notifier := e.executionReceiptsNotifier.Channel()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-notifier:
-			err := e.processAvailableExecutionReceipts(ctx)
-			if err != nil {
-				// if an error reaches this point, it is unexpected
-				ctx.Throw(err)
-				return
-			}
-		}
-	}
-}
-
-func (e *Engine) processAvailableExecutionReceipts(ctx context.Context) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-		}
-		msg, ok := e.executionReceiptsQueue.Get()
-		if !ok {
-			return nil
-		}
-
-		receipt := msg.Payload.(*flow.ExecutionReceipt)
-
-		if err := e.handleExecutionReceipt(msg.OriginID, receipt); err != nil {
-			return err
-		}
-	}
-
-}
-
-func (e *Engine) processFinalizedBlocks(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
-	notifier := e.finalizedBlockNotifier.Channel()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-notifier:
-			_ = e.processAvailableFinalizedBlocks(ctx)
-		}
-	}
-}
-
-func (e *Engine) processAvailableFinalizedBlocks(ctx context.Context) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-		}
-
-		msg, ok := e.finalizedBlockQueue.Get()
-		if !ok {
-			return nil
-		}
-
-		hb := msg.Payload.(*model.Block)
-		blockID := hb.BlockID
-
-		if err := e.processFinalizedBlock(blockID); err != nil {
-			e.log.Error().Err(err).Hex("block_id", blockID[:]).Msg("failed to process block")
-			continue
-		}
-	}
-}
-
-// process processes the given ingestion engine event. Events that are given
-// to this function originate within the expulsion engine on the node with the
-// given origin ID.
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	select {
-	case <-e.ComponentManager.ShutdownSignal():
-		return component.ErrComponentShutdown
-	default:
-	}
-
-	switch event.(type) {
-	case *flow.ExecutionReceipt:
-		err := e.messageHandler.Process(originID, event)
-		e.executionReceiptsNotifier.Notify()
-		return err
-	case *model.Block:
-		err := e.messageHandler.Process(originID, event)
-		e.finalizedBlockNotifier.Notify()
-		return err
-	default:
-		return fmt.Errorf("invalid event type (%T)", event)
-	}
-}
-
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	err := e.process(e.me.NodeID(), event)
-	if err != nil {
-		engine.LogError(e.log, err)
-	}
-}
-
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(_ channels.Channel, originID flow.Identifier, event interface{}) {
-	err := e.process(originID, event)
-	if err != nil {
-		engine.LogError(e.log, err)
-	}
-}
-
-// ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.process(e.me.NodeID(), event)
-}
-
-// Process processes the given event from the node with the given origin ID in
-// a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(_ channels.Channel, originID flow.Identifier, event interface{}) error {
-	return e.process(originID, event)
-}
-
-// OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated
+// OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
+// Receives block finalized events from the finalization distributor and forwards them to the finalizedBlockConsumer.
 func (e *Engine) OnFinalizedBlock(hb *model.Block) {
-	_ = e.ProcessLocal(hb)
+	e.finalizedBlockNotifier.Notify()
 }
 
 // processBlock handles an incoming finalized block.
 func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
-
 	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	block, err := e.blocks.ByID(blockID)
 	if err != nil {
@@ -429,17 +319,6 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 
 	e.collectionExecutedMetric.BlockFinalized(block)
 
-	return nil
-}
-
-func (e *Engine) handleExecutionReceipt(_ flow.Identifier, r *flow.ExecutionReceipt) error {
-	// persist the execution receipt locally, storing will also index the receipt
-	err := e.executionReceipts.Store(r)
-	if err != nil {
-		return fmt.Errorf("failed to store execution receipt: %w", err)
-	}
-
-	e.collectionExecutedMetric.ExecutionReceiptReceived(r)
 	return nil
 }
 
