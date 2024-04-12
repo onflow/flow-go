@@ -99,7 +99,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	commit.ClusterQCs = rootClusterQCs
 
 	seal.ResultID = result.ID()
-	root.Payload.ProtocolStateID = kvstore.NewLatestKVStore(
+	root.Payload.ProtocolStateID = kvstore.NewDefaultKVStore(
 		inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()).ID()
 	tc.root, err = inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
@@ -137,7 +137,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	// take first collection node and use its storage as data source for stateMutator
 	refNode := tc.nodes[0]
 	stateMutator := protocol_state.NewMutableProtocolState(
-		refNode.ProtocolStateSnapshots,
+		refNode.EpochProtocolState,
 		refNode.ProtocolKVStore,
 		refNode.State.Params(),
 		refNode.Headers,

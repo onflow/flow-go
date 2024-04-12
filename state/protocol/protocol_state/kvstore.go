@@ -5,6 +5,13 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+// This file contains versioned read-write interfaces to the Protocol State's
+// key-value store and are used by the Protocol State Machine.
+//
+// When a key is added or removed, this requires a new protocol state version:
+//  - Create a new versioned model in ./kvstore/models.go (eg. modelv3 if latest model is modelv2)
+//  - Update the protocol.KVStoreReader and KVStoreAPI interfaces to include any new keys
+
 // KVStoreAPI is the latest interface to the Protocol State key-value store which implements 'Prototype'
 // pattern for replicating protocol state between versions.
 //

@@ -190,8 +190,11 @@ func (model *Modelv1) SetInvalidEpochTransitionAttempted(attempted bool) error {
 	return nil
 }
 
-// TODO: this is temporary, only for testing bootstrapping
-func NewLatestKVStore(epochStateID flow.Identifier) protocol_state.KVStoreAPI {
+// NewDefaultKVStore constructs a default Key-Value Store of the *latest* protocol version for bootstrapping.
+// Currently, the KV store is largely empty.
+// TODO: Shortcut in bootstrapping; we will probably have to start with a non-empty KV store in the future;
+// Potentially we may need to carry over the KVStore during a spork (with possible migrations).
+func NewDefaultKVStore(epochStateID flow.Identifier) protocol_state.KVStoreAPI {
 	return &Modelv1{
 		Modelv0: Modelv0{
 			UpgradableModel: UpgradableModel{},

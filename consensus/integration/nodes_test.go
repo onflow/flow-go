@@ -282,7 +282,7 @@ func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *fl
 	)
 
 	epochProtocolStateID := inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()
-	root.SetPayload(flow.Payload{ProtocolStateID: kvstore.NewLatestKVStore(epochProtocolStateID).ID()})
+	root.SetPayload(flow.Payload{ProtocolStateID: kvstore.NewDefaultKVStore(epochProtocolStateID).ID()})
 	result := unittest.BootstrapExecutionResultFixture(root, unittest.GenesisStateCommitment)
 	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()}
 

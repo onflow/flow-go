@@ -63,7 +63,7 @@ func TestFollowerHappyPath(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.ProtocolState,
+			all.EpochProtocolState,
 			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
