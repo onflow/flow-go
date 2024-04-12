@@ -2,7 +2,6 @@ package migrations
 
 import (
 	_ "embed"
-	"encoding/json"
 	"fmt"
 	"io"
 	"sync"
@@ -824,8 +823,11 @@ func TestProgramParsingError(t *testing.T) {
 			ChainID:              chainID,
 			EVMContractChange:    evmContractChange,
 			BurnerContractChange: burnerContractChange,
+			VerboseErrorOutput:   true,
 		},
 	)
+
+	cadenceValueMigratorReporter := rwf.reportWriters[cadenceValueMigrationReporterName]
 
 	for _, migration := range migrations {
 		payloads, err = migration.Migrate(payloads)
@@ -838,20 +840,18 @@ func TestProgramParsingError(t *testing.T) {
 		)
 	}
 
-	// Check error logs
-	require.Len(t, logWriter.logs, 1)
-
-	log := logWriter.logs[0]
-
-	var entry struct {
-		Message string `json:"message"`
+	var messages []string
+	for _, entry := range cadenceValueMigratorReporter.entries {
+		if errorEntry, isErrorEntry := entry.(cadenceValueMigrationErrorEntry); isErrorEntry {
+			messages = append(messages, errorEntry.Message)
+			break
+		}
 	}
 
-	err = json.Unmarshal([]byte(log), &entry)
-	require.NoError(t, err)
+	require.Len(t, messages, 1)
 
-	assert.Contains(t, entry.Message, "`pub` is no longer a valid access keyword")
-	assert.NotContains(t, entry.Message, "runtime/debug.Stack()")
+	assert.Contains(t, messages[0], "`pub` is no longer a valid access keyword")
+	assert.NotContains(t, messages[0], "runtime/debug.Stack()")
 }
 
 func TestCoreContractUsage(t *testing.T) {
