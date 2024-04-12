@@ -37,6 +37,7 @@ var (
 	flagLogVerboseValidationError          bool
 	flagDiffMigration                      bool
 	flagLogVerboseDiff                     bool
+	flagVerboseErrorOutput                 bool
 	flagCheckStorageHealthBeforeMigration  bool
 	flagStagedContractsFile                string
 	flagContinueMigrationOnValidationError bool
@@ -92,6 +93,9 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagLogVerboseDiff, "log-verbose-diff", false,
 		"log entire Cadence values on diff (requires --diff flag)")
+
+	Cmd.Flags().BoolVar(&flagVerboseErrorOutput, "verbose-error-output", true,
+		"log verbose output on migration errors")
 
 	Cmd.Flags().BoolVar(&flagCheckStorageHealthBeforeMigration, "check-storage-health-before", false,
 		"check (atree) storage health before migration")
@@ -287,6 +291,10 @@ func run(*cobra.Command, []string) {
 		log.Warn().Msgf("--log-verbose-diff flag is enabled which may increase size of log")
 	}
 
+	if flagVerboseErrorOutput {
+		log.Warn().Msgf("--verbose-error-output flag is enabled which may increase size of log")
+	}
+
 	if flagCheckStorageHealthBeforeMigration {
 		log.Warn().Msgf("--check-storage-health-before flag is enabled and will increase duration of migration")
 	}
@@ -354,6 +362,7 @@ func run(*cobra.Command, []string) {
 		StagedContracts:                   stagedContracts,
 		Prune:                             flagPrune,
 		MaxAccountSize:                    flagMaxAccountSize,
+		VerboseErrorOutput:                flagVerboseErrorOutput,
 	}
 
 	if len(flagInputPayloadFileName) > 0 {
