@@ -107,9 +107,11 @@ func unsafeTraverse(headers storage.Headers, block *flow.Header, visitor onVisit
 			return block, nil
 		}
 
-		block, err = headers.ByBlockID(block.ParentID)
+		parent, err := headers.ByBlockID(block.ParentID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to revtrieve block header %x: %w", block.ParentID, err)
+			return nil, fmt.Errorf("failed to revtrieve block header %v (%x): %w", block.Height, block.ParentID, err)
 		}
+
+		block = parent
 	}
 }
