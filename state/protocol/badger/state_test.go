@@ -71,7 +71,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.ProtocolState,
+			all.EpochProtocolState,
 			all.ProtocolKVStore,
 			all.VersionBeacons,
 		)
@@ -154,7 +154,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.ProtocolState,
+			all.EpochProtocolState,
 			all.ProtocolKVStore,
 			all.VersionBeacons,
 		)
@@ -261,7 +261,6 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 // needed otherwise the parent block would not have a valid QC, since the QC
 // is stored in the child.
 func TestBootstrapNonRoot(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: temporary broken")
 	t.Parallel()
 	// start with a regular post-spork root snapshot
 	participants := unittest.CompleteIdentitySet()
@@ -316,6 +315,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 	})
 
 	t.Run("with setup next epoch", func(t *testing.T) {
+		unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: sealing segment doesn't support multiple protocol states")
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
 			unittest.NewEpochBuilder(t, mutableState, state).BuildEpoch()
 
@@ -336,6 +336,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 	})
 
 	t.Run("with committed next epoch", func(t *testing.T) {
+		unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: sealing segment doesn't support multiple protocol states")
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
 			unittest.NewEpochBuilder(t, mutableState, state).BuildEpoch().CompleteEpoch()
 
@@ -356,6 +357,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 	})
 
 	t.Run("with previous and next epoch", func(t *testing.T) {
+		unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: sealing segment doesn't support multiple protocol states")
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
 			unittest.NewEpochBuilder(t, mutableState, state).
 				BuildEpoch().CompleteEpoch(). // build epoch 2
@@ -555,7 +557,7 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 		all.QuorumCertificates,
 		all.Setups,
 		all.EpochCommits,
-		all.ProtocolState,
+		all.EpochProtocolState,
 		all.ProtocolKVStore,
 		all.VersionBeacons,
 		rootSnapshot,

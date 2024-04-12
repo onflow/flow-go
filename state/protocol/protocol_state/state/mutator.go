@@ -30,7 +30,7 @@ type stateMutator struct {
 	results          storage.ExecutionResults
 	kvStoreSnapshots storage.ProtocolKVStore
 
-	parentState          protocol_state.KVStoreReader
+	parentState          protocol.KVStoreReader
 	kvMutator            protocol_state.KVStoreMutator
 	orthoKVStoreMachines []protocol_state.KeyValueStoreStateMachine
 }

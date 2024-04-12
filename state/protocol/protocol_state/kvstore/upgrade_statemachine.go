@@ -16,7 +16,7 @@ import (
 // A separate instance should be created for each block to process the updates therein.
 type PSVersionUpgradeStateMachine struct {
 	candidateView uint64
-	parentState   protocol_state.KVStoreReader
+	parentState   protocol.KVStoreReader
 	mutator       protocol_state.KVStoreMutator
 	params        protocol.GlobalParams
 }
@@ -29,7 +29,7 @@ var _ protocol_state.KeyValueStoreStateMachine = (*PSVersionUpgradeStateMachine)
 func NewPSVersionUpgradeStateMachine(
 	candidateView uint64,
 	params protocol.GlobalParams,
-	parentState protocol_state.KVStoreReader,
+	parentState protocol.KVStoreReader,
 	mutator protocol_state.KVStoreMutator,
 ) *PSVersionUpgradeStateMachine {
 	return &PSVersionUpgradeStateMachine{
@@ -107,7 +107,7 @@ func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.P
 	// (i) the activation view is bigger than or equal to the current candidate block's view + Δ.
 	// (ii) if there is a pending upgrade, the new version should be the same as the pending upgrade.
 	// Condition (ii) is checked in this function.
-	checkPendingUpgrade := func(store protocol_state.KVStoreReader) error {
+	checkPendingUpgrade := func(store protocol.KVStoreReader) error {
 		if pendingUpgrade := store.GetVersionUpgrade(); pendingUpgrade != nil {
 			if pendingUpgrade.ActivationView < m.candidateView {
 				// pending upgrade has been activated, we can ignore it.
@@ -134,7 +134,7 @@ func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.P
 		return fmt.Errorf("version upgrade invalid with respect to the current state: %w", err)
 	}
 
-	activator := &protocol_state.ViewBasedActivator[uint64]{
+	activator := &protocol.ViewBasedActivator[uint64]{
 		Data:           versionUpgrade.NewProtocolStateVersion,
 		ActivationView: versionUpgrade.ActiveView,
 	}
@@ -149,6 +149,6 @@ func (m *PSVersionUpgradeStateMachine) View() uint64 {
 }
 
 // ParentState returns parent state associated with this state machine.
-func (m *PSVersionUpgradeStateMachine) ParentState() protocol_state.KVStoreReader {
+func (m *PSVersionUpgradeStateMachine) ParentState() protocol.KVStoreReader {
 	return m.parentState
 }

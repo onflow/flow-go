@@ -13,12 +13,13 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // should be able to reach consensus when identity table contains nodes which are joining in next epoch.
 func TestUnweightedNode(t *testing.T) {
-	//unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: temporary broken")
 	// stop after building 2 blocks to ensure we can tolerate 0-weight (joining next
 	// epoch) identities, but don't cross an epoch boundary
 	stopper := NewStopper(2, 0)
@@ -245,22 +246,31 @@ func withNextEpoch(
 	encodableSnapshot.LatestSeal.ResultID = encodableSnapshot.LatestResult.ID()
 
 	// update protocol state
-	protocolState := encodableSnapshot.ProtocolState
+	epochProtocolState := encodableSnapshot.EpochProtocolState
 
 	// setup ID has changed, need to update it
 	convertedEpochSetup, _ := protocol.ToEpochSetup(inmem.NewEpoch(*currEpoch))
-	protocolState.CurrentEpoch.SetupID = convertedEpochSetup.ID()
+	epochProtocolState.CurrentEpoch.SetupID = convertedEpochSetup.ID()
 	// create next epoch protocol state
 	convertedEpochSetup, _ = protocol.ToEpochSetup(inmem.NewEpoch(*encodableSnapshot.Epochs.Next))
 	convertedEpochCommit, _ := protocol.ToEpochCommit(inmem.NewEpoch(*encodableSnapshot.Epochs.Next))
-	protocolState.NextEpoch = &flow.EpochStateContainer{
+	epochProtocolState.NextEpoch = &flow.EpochStateContainer{
 		SetupID:          convertedEpochSetup.ID(),
 		CommitID:         convertedEpochCommit.ID(),
 		ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochIdentities),
 	}
 
 	// need to fix genesis block to contain the correct protocol state ID
-	encodableSnapshot.SealingSegment.Blocks[0].Payload.ProtocolStateID = protocolState.ID()
+	updatedKVStore := kvstore.NewDefaultKVStore(epochProtocolState.ID())
+	version, data, err := updatedKVStore.VersionedEncode()
+	if err != nil {
+		panic(err)
+	}
+	encodableSnapshot.KVStore = storage.KeyValueStoreData{
+		Version: version,
+		Data:    data,
+	}
+	encodableSnapshot.SealingSegment.Blocks[0].Payload.ProtocolStateID = updatedKVStore.ID()
 
 	return inmem.SnapshotFromEncodable(encodableSnapshot)
 }

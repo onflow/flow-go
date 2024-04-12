@@ -26,7 +26,6 @@ import (
 )
 
 func TestConsensusBuilder(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: temporary broken")
 	suite.Run(t, new(BuilderSuite))
 }
 
@@ -421,7 +420,7 @@ func (bs *BuilderSuite) SetupTest() {
 		func(_ uint64, _ flow.Identifier) realproto.StateMutator {
 			stateMutator := protocol.NewStateMutator(bs.T())
 			stateMutator.On("ApplyServiceEventsFromValidatedSeals", mock.Anything).Return(nil)
-			stateMutator.On("Build").Return(false, nil, flow.Identifier{}, nil, nil)
+			stateMutator.On("Build").Return(flow.Identifier{}, realproto.DeferredBlockPersistOps{}, nil)
 			return stateMutator
 		}, func(_ uint64, _ flow.Identifier) error {
 			return nil

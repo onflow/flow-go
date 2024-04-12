@@ -79,7 +79,6 @@ type Suite struct {
 }
 
 func TestHandler(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: temporary broken")
 	suite.Run(t, new(Suite))
 }
 
@@ -527,7 +526,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHei
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 	rootProtocolState, err := rootSnapshot.ProtocolState()
 	require.NoError(suite.T(), err)
-	rootProtocolStateID := rootProtocolState.Entry().ID()
+	rootProtocolStateID := rootProtocolState.ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
@@ -566,7 +565,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalize
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 	rootProtocolState, err := rootSnapshot.ProtocolState()
 	require.NoError(suite.T(), err)
-	rootProtocolStateID := rootProtocolState.Entry().ID()
+	rootProtocolStateID := rootProtocolState.ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
@@ -617,7 +616,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnexpectedErrorBlockID
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 	rootProtocolState, err := rootSnapshot.ProtocolState()
 	require.NoError(suite.T(), err)
-	rootProtocolStateID := rootProtocolState.Entry().ID()
+	rootProtocolStateID := rootProtocolState.ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
@@ -770,7 +769,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks() {
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 	rootProtocolState, err := rootSnapshot.ProtocolState()
 	require.NoError(suite.T(), err)
-	rootProtocolStateID := rootProtocolState.Entry().ID()
+	rootProtocolStateID := rootProtocolState.ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
