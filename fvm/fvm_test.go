@@ -4,10 +4,11 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"math"
 	"strings"
 	"testing"
+
+	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"

@@ -4,8 +4,9 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
-	"github.com/onflow/cadence/runtime/stdlib"
 	"testing"
+
+	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"

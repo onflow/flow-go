@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+
 	gethCommon "github.com/onflow/go-ethereum/common"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
