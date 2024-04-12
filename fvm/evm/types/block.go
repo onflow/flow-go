@@ -19,7 +19,7 @@ type Block struct {
 	// Height returns the height of this block
 	Height uint64
 
-	// Timestamp represents the time at which the block was created
+	// Timestamp is a Unix timestamp in seconds at which the block was created
 	// Note that this value must be provided from the FVM Block
 	Timestamp uint64
 

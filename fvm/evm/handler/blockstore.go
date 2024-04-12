@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"time"
 
 	gethCommon "github.com/onflow/go-ethereum/common"
 
@@ -60,10 +61,14 @@ func (bs *BlockStore) BlockProposal() (*types.Block, error) {
 		return nil, err
 	}
 
+	// cadence block timestamp is unix nanoseconds but evm blocks
+	// expect timestamps in unix seconds so we convert here
+	timestamp := uint64(cadenceBlock.Timestamp / int64(time.Second))
+
 	bs.blockProposal = types.NewBlock(
 		parentHash,
 		lastExecutedBlock.Height+1,
-		uint64(cadenceBlock.Timestamp),
+		timestamp,
 		lastExecutedBlock.TotalSupply,
 		gethCommon.Hash{},
 		make([]gethCommon.Hash, 0),
