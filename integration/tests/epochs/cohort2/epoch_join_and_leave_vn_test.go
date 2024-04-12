@@ -8,11 +8,9 @@ import (
 
 	"github.com/onflow/flow-go/integration/tests/epochs"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestEpochJoinAndLeaveVN(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: sealing segment doesn't support multiple protocol states")
 	suite.Run(t, new(EpochJoinAndLeaveVNSuite))
 }
 
