@@ -508,7 +508,7 @@ func TestStagedContractsMigration(t *testing.T) {
 					Address: stagingAccountAddress,
 					Name:    "MigrationContractStaging",
 				},
-				"ContractUpdate",
+				"MigrationContractStaging.ContractUpdate",
 				common.CompositeKindStructure,
 				[]interpreter.CompositeField{
 					{
@@ -534,7 +534,7 @@ func TestStagedContractsMigration(t *testing.T) {
 					Address: stagingAccountAddress,
 					Name:    "MigrationContractStaging",
 				},
-				"Capsule",
+				"MigrationContractStaging.Capsule",
 				common.CompositeKindResource,
 				[]interpreter.CompositeField{
 					{
