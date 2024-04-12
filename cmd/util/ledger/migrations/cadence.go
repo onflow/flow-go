@@ -239,7 +239,7 @@ func NewCadence1ValueMigrations(
 	migrations = []NamedMigration{
 		{
 			Name:    "check-contracts",
-			Migrate: NewContractCheckingMigration(log, programs),
+			Migrate: NewContractCheckingMigration(log, rwf, programs),
 		},
 	}
 
