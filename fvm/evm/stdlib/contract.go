@@ -1773,6 +1773,10 @@ func NewEVMBlockValue(
 					},
 				),
 			},
+			{
+				Name:  "timestamp",
+				Value: interpreter.UInt64Value(block.Timestamp),
+			},
 		},
 		common.ZeroAddress,
 	)
@@ -2043,6 +2047,10 @@ func NewEVMBlockCadenceType(address common.Address) *cadence.StructType {
 			{
 				Identifier: "totalSupply",
 				Type:       cadence.IntType{},
+			},
+			{
+				Identifier: "timestamp",
+				Type:       cadence.UInt64Type{},
 			},
 		},
 		nil,

@@ -4131,6 +4131,7 @@ func TestEVMGetLatestBlock(t *testing.T) {
 	latestBlock := &types.Block{
 		Height:      uint64(2),
 		TotalSupply: big.NewInt(1500000000000000000),
+		Timestamp:   uint64(1337),
 	}
 	handler := &testContractHandler{
 		evmContractAddress: common.Address(contractsAddress),
@@ -4158,6 +4159,7 @@ func TestEVMGetLatestBlock(t *testing.T) {
 	blockHash, err := cadence.NewString(hash.Hex())
 	require.NoError(t, err)
 	blockTotalSupply := cadence.NewIntFromBig(latestBlock.TotalSupply)
+	timestamp := cadence.NewUInt64(latestBlock.Timestamp)
 
 	expectedEVMBlock := cadence.Struct{
 		StructType: evmBlockCadenceType,
@@ -4165,6 +4167,7 @@ func TestEVMGetLatestBlock(t *testing.T) {
 			blockHeight,
 			blockHash,
 			blockTotalSupply,
+			timestamp,
 		},
 	}
 
