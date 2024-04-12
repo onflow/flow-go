@@ -360,6 +360,7 @@ type Options struct {
 	DiffMigrations                    bool
 	LogVerboseDiff                    bool
 	CheckStorageHealthBeforeMigration bool
+	VerboseErrorOutput                bool
 	ChainID                           flow.ChainID
 	EVMContractChange                 EVMContractChange
 	BurnerContractChange              BurnerContractChange
