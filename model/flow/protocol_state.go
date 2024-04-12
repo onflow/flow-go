@@ -124,36 +124,6 @@ type RichProtocolStateEntry struct {
 	NextEpochIdentityTable    IdentityList
 }
 
-// AllEpochSetups returns a list of all underlying EpochSetup events that are non-nil.
-func (e *RichProtocolStateEntry) AllEpochSetups() []*EpochSetup {
-	setups := make([]*EpochSetup, 0, 3)
-	if e.PreviousEpochSetup != nil {
-		setups = append(setups, e.PreviousEpochSetup)
-	}
-	if e.CurrentEpochSetup != nil {
-		setups = append(setups, e.CurrentEpochSetup)
-	}
-	if e.NextEpochSetup != nil {
-		setups = append(setups, e.NextEpochSetup)
-	}
-	return setups
-}
-
-// AllEpochCommits returns a list of all underlying EpochCommit events that are non-nil.
-func (e *RichProtocolStateEntry) AllEpochCommits() []*EpochCommit {
-	commits := make([]*EpochCommit, 0, 3)
-	if e.PreviousEpochCommit != nil {
-		commits = append(commits, e.PreviousEpochCommit)
-	}
-	if e.CurrentEpochCommit != nil {
-		commits = append(commits, e.CurrentEpochCommit)
-	}
-	if e.NextEpochCommit != nil {
-		commits = append(commits, e.NextEpochCommit)
-	}
-	return commits
-}
-
 // NewRichProtocolStateEntry constructs a rich protocol state entry from a protocol state entry and additional data.
 // No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
 func NewRichProtocolStateEntry(
