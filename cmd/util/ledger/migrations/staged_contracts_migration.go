@@ -159,6 +159,7 @@ func (m *StagedContractsMigration) InitMigration(
 
 	mr, err := NewMigratorRuntime(
 		allPayloads,
+		m.chainID,
 		config,
 	)
 	if err != nil {
@@ -217,6 +218,7 @@ func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads
 
 	mr, err := NewMigratorRuntime(
 		stagingAccountPayloads,
+		m.chainID,
 		MigratorRuntimeConfig{},
 	)
 	if err != nil {

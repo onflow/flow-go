@@ -22,6 +22,7 @@ const contractCheckingReporterName = "contract-checking"
 func NewContractCheckingMigration(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
+	chainID flow.ChainID,
 	verboseErrorOutput bool,
 	programs map[common.Location]*interpreter.Program,
 ) ledger.Migration {
@@ -40,6 +41,7 @@ func NewContractCheckingMigration(
 
 		mr, err := NewMigratorRuntime(
 			contractPayloads,
+			chainID,
 			MigratorRuntimeConfig{},
 		)
 		if err != nil {
@@ -117,6 +119,8 @@ func NewContractCheckingMigration(
 				programs[location] = program
 			}
 		}
+
+		reporter.Close()
 
 		// Return the payloads as-is
 		return payloads, nil

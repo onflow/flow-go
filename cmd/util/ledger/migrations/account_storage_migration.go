@@ -15,12 +15,14 @@ import (
 func NewAccountStorageMigration(
 	address common.Address,
 	log zerolog.Logger,
+	chainID flow.ChainID,
 	migrate func(*runtime.Storage, *interpreter.Interpreter) error,
 ) ledger.Migration {
 	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
 
 		migrationRuntime, err := NewMigratorRuntime(
 			payloads,
+			chainID,
 			MigratorRuntimeConfig{},
 		)
 		if err != nil {

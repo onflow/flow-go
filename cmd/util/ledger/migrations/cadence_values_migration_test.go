@@ -101,7 +101,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 	}
 
 	// Assert the migrated payloads
-	checkMigratedPayloads(t, address, payloads)
+	checkMigratedPayloads(t, address, payloads, chainID)
 
 	// Check reporters
 	checkReporters(t, rwf, address)
@@ -119,9 +119,11 @@ func checkMigratedPayloads(
 	t *testing.T,
 	address common.Address,
 	newPayloads []*ledger.Payload,
+	chainID flow.ChainID,
 ) {
 	mr, err := NewMigratorRuntime(
 		newPayloads,
+		chainID,
 		MigratorRuntimeConfig{},
 	)
 	require.NoError(t, err)
@@ -739,6 +741,7 @@ func TestProgramParsingError(t *testing.T) {
 
 	runtime, err := NewMigratorRuntime(
 		payloads,
+		chainID,
 		MigratorRuntimeConfig{},
 	)
 	require.NoError(t, err)
@@ -882,6 +885,7 @@ func TestCoreContractUsage(t *testing.T) {
 
 		runtime, err := NewMigratorRuntime(
 			payloads,
+			chainID,
 			MigratorRuntimeConfig{},
 		)
 		require.NoError(t, err)
@@ -971,6 +975,7 @@ func TestCoreContractUsage(t *testing.T) {
 
 		mr, err := NewMigratorRuntime(
 			payloads,
+			chainID,
 			MigratorRuntimeConfig{},
 		)
 		require.NoError(t, err)

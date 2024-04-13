@@ -173,6 +173,7 @@ func TestDiffCadenceValues(t *testing.T) {
 				[]*ledger.Payload{
 					accountStatusPayload,
 				},
+				flow.Emulator,
 				MigratorRuntimeConfig{},
 			)
 			require.NoError(t, err)
@@ -274,6 +275,7 @@ func TestDiffCadenceValues(t *testing.T) {
 				[]*ledger.Payload{
 					accountStatusPayload,
 				},
+				flow.Emulator,
 				MigratorRuntimeConfig{},
 			)
 			require.NoError(t, err)
@@ -382,6 +384,7 @@ func TestDiffCadenceValues(t *testing.T) {
 				[]*ledger.Payload{
 					accountStatusPayload,
 				},
+				flow.Emulator,
 				MigratorRuntimeConfig{},
 			)
 			require.NoError(t, err)
@@ -501,6 +504,7 @@ func TestDiffCadenceValues(t *testing.T) {
 				[]*ledger.Payload{
 					accountStatusPayload,
 				},
+				flow.Emulator,
 				MigratorRuntimeConfig{},
 			)
 			require.NoError(t, err)
@@ -627,6 +631,7 @@ func createStorageMapPayloads(t *testing.T, address common.Address, domain strin
 		[]*ledger.Payload{
 			accountStatusPayload,
 		},
+		flow.Emulator,
 		MigratorRuntimeConfig{},
 	)
 	require.NoError(t, err)

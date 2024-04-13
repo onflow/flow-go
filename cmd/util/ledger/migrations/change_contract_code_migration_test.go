@@ -72,7 +72,7 @@ func (l *logWriter) Write(bytes []byte) (int, error) {
 func TestChangeContractCodeMigration(t *testing.T) {
 	t.Parallel()
 
-	chainID := flow.Emulator
+	const chainID = flow.Emulator
 	addressGenerator := chainID.Chain().NewAddressGenerator()
 
 	address1, err := addressGenerator.NextAddress()

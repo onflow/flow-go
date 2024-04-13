@@ -242,6 +242,7 @@ func NewCadence1ValueMigrations(
 			Migrate: NewContractCheckingMigration(
 				log,
 				rwf,
+				opts.ChainID,
 				opts.VerboseErrorOutput,
 				programs,
 			),

@@ -45,6 +45,7 @@ type CadenceBaseMigrator struct {
 	migratorRuntimeConfig MigratorRuntimeConfig
 	errorMessageHandler   *errorMessageHandler
 	programs              map[runtime.Location]*interpreter.Program
+	chainID               flow.ChainID
 }
 
 var _ AccountBasedMigration = (*CadenceBaseMigrator)(nil)
@@ -105,6 +106,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 
 	migrationRuntime, err := NewMigratorRuntime(
 		oldPayloads,
+		m.chainID,
 		m.migratorRuntimeConfig,
 	)
 	if err != nil {
@@ -308,6 +310,7 @@ func NewCadence1ValueMigrator(
 		},
 		errorMessageHandler: errorMessageHandler,
 		programs:            programs,
+		chainID:             opts.ChainID,
 	}
 }
 
@@ -353,6 +356,7 @@ func NewCadence1LinkValueMigrator(
 		},
 		errorMessageHandler: errorMessageHandler,
 		programs:            programs,
+		chainID:             opts.ChainID,
 	}
 }
 
@@ -393,6 +397,7 @@ func NewCadence1CapabilityValueMigrator(
 		},
 		errorMessageHandler: errorMessageHandler,
 		programs:            programs,
+		chainID:             opts.ChainID,
 	}
 }
 

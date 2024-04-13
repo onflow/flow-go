@@ -10,6 +10,8 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm"
+	evmStdlib "github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -95,6 +97,7 @@ func (c MigratorRuntimeConfig) NewRuntimeInterface(
 // NewMigratorRuntime returns a runtime that can be used in migrations.
 func NewMigratorRuntime(
 	payloads []*ledger.Payload,
+	chainID flow.ChainID,
 	config MigratorRuntimeConfig,
 ) (
 	*MigratorRuntime,
@@ -119,6 +122,13 @@ func NewMigratorRuntime(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runtime interface: %w", err)
 	}
+
+	evmContractAccountAddress, err := evm.ContractAccountAddress(chainID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get EVM contract account address for chain %s: %w", chainID, err)
+	}
+
+	evmStdlib.SetupEnvironment(env, nil, evmContractAccountAddress)
 
 	env.Configure(
 		runtimeInterface,
