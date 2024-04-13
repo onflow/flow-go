@@ -829,8 +829,6 @@ func TestProgramParsingError(t *testing.T) {
 		},
 	)
 
-	cadenceValueMigratorReporter := rwf.reportWriters[cadenceValueMigrationReporterName]
-
 	for _, migration := range migrations {
 		payloads, err = migration.Migrate(payloads)
 		require.NoError(
@@ -842,10 +840,12 @@ func TestProgramParsingError(t *testing.T) {
 		)
 	}
 
+	reporter := rwf.reportWriters[contractCheckingReporterName]
+
 	var messages []string
-	for _, entry := range cadenceValueMigratorReporter.entries {
-		if errorEntry, isErrorEntry := entry.(cadenceValueMigrationErrorEntry); isErrorEntry {
-			messages = append(messages, errorEntry.Message)
+	for _, entry := range reporter.entries {
+		if errorEntry, isErrorEntry := entry.(contractCheckingFailure); isErrorEntry {
+			messages = append(messages, errorEntry.Error)
 			break
 		}
 	}
