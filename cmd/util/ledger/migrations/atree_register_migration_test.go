@@ -35,6 +35,8 @@ func TestAtreeRegisterMigration(t *testing.T) {
 						true,
 						false,
 						false,
+						false,
+						false,
 					),
 				},
 			),
