@@ -238,7 +238,7 @@ func deployContracts(
 		},
 		{
 			name: stdlib.ContractName,
-			code: stdlib.ContractCode(contractsAddress),
+			code: stdlib.ContractCode(contractsAddress, contractsAddress, contractsAddress),
 		},
 	}
 

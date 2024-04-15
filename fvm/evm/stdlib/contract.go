@@ -27,13 +27,24 @@ import (
 //go:embed contract.cdc
 var contractCode string
 
-var flowTokenImportPattern = regexp.MustCompile(`(?m)^import "FlowToken"\n`)
+var nftImportPattern = regexp.MustCompile(`(?m)^import "NonFungibleToken"`)
+var fungibleTokenImportPattern = regexp.MustCompile(`(?m)^import "FungibleToken"`)
+var flowTokenImportPattern = regexp.MustCompile(`(?m)^import "FlowToken"`)
 
-func ContractCode(flowTokenAddress flow.Address) []byte {
-	return []byte(flowTokenImportPattern.ReplaceAllString(
+func ContractCode(nonFungibleTokenAddress, fungibleTokenAddress, flowTokenAddress flow.Address) []byte {
+	contractCode = nftImportPattern.ReplaceAllString(
+		contractCode,
+		fmt.Sprintf("import NonFungibleToken from %s", nonFungibleTokenAddress.HexWithPrefix()),
+	)
+	contractCode = fungibleTokenImportPattern.ReplaceAllString(
+		contractCode,
+		fmt.Sprintf("import FungibleToken from %s", fungibleTokenAddress.HexWithPrefix()),
+	)
+	contractCode = flowTokenImportPattern.ReplaceAllString(
 		contractCode,
 		fmt.Sprintf("import FlowToken from %s", flowTokenAddress.HexWithPrefix()),
-	))
+	)
+	return []byte(contractCode)
 }
 
 const ContractName = "EVM"
