@@ -21,6 +21,13 @@ const DefaultProtocolVersion uint = 0
 // * R.height < B.height <= R.height+E
 const DefaultTransactionExpiry = 10 * 60
 
+// ExtraBlocksInRootSealingSegment is the default number of extra blocks to be included
+// in the the root sealing segment.
+// "- 10" is to be backward compatible, since some dynamically bootstrapped execution nodes
+// are using previously generated root snapshot which has about 6-7 blocks less than DefaultTransactionExpiry
+// number of extra blocks in the sealing segment.
+const ExtraBlocksInRootSealingSegment = DefaultTransactionExpiry - 10
+
 // DefaultTransactionExpiryBuffer is the default buffer time between a transaction being ingested by a
 // collection node and being included in a collection and block.
 const DefaultTransactionExpiryBuffer = 30
