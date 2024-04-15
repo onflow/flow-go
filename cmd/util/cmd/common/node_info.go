@@ -173,7 +173,7 @@ func ReadFullInternalNodeInfos(log zerolog.Logger, internalNodePrivInfoDir, inte
 // Args:
 // - internalNodePrivInfoDir: path to internal nodes  private info.
 // Returns:
-// - []bootstrap.NodeInfo: the generated private node info list.
+// - []bootstrap.NodeInfo: the generated private node info list. Caution: contains private keys!
 // - error: if any error occurs. Any error returned from this function is irrecoverable.
 func ReadInternalNodeInfos(internalNodePrivInfoDir string) ([]bootstrap.NodeInfoPriv, error) {
 	var internalPrivInfos []bootstrap.NodeInfoPriv
