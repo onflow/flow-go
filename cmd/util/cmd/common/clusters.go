@@ -71,13 +71,16 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 	}
 	// sanity check ^ enforces that there is at least one internal node, hence `internalNodes[0].InitialWeight` is always a valid reference weight
 	refWeight := internalNodes[0].InitialWeight
-	
+
 	identifierLists := make([]flow.IdentifierList, numCollectionClusters)
 	// array to track the 2/3 internal-nodes constraint (internal_nodes > 2 * partner_nodes)
 	constraint := make([]int, numCollectionClusters)
 
 	// first, round-robin internal nodes into each cluster
 	for i, node := range internals {
+		if node.InitialWeight != refWeight {
+			return nil, nil, fmt.Errorf("current implementation requires all collectors (partner & interal nodes) to have equal weight")
+		}
 		clusterIndex := i % numCollectionClusters
 		identifierLists[clusterIndex] = append(identifierLists[clusterIndex], node.NodeID)
 		constraint[clusterIndex] += 1
@@ -85,6 +88,9 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 
 	// next, round-robin partner nodes into each cluster
 	for i, node := range partners {
+		if node.InitialWeight != refWeight {
+			return nil, nil, fmt.Errorf("current implementation requires all collectors (partner & interal nodes) to have equal weight")
+		}
 		clusterIndex := i % numCollectionClusters
 		identifierLists[clusterIndex] = append(identifierLists[clusterIndex], node.NodeID)
 		constraint[clusterIndex] -= 2
