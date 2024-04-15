@@ -42,6 +42,7 @@ type StagedContractsMigration struct {
 	contractNamesProvider          stdlib.AccountContractNamesProvider
 	reporter                       reporters.ReportWriter
 	verboseErrorOutput             bool
+	nWorkers                       int
 }
 
 type StagedContract struct {
@@ -176,6 +177,7 @@ func (m *StagedContractsMigration) InitMigration(
 	m.elaborations = elaborations
 	m.contractAdditionHandler = mr.ContractAdditionHandler
 	m.contractNamesProvider = mr.ContractNamesProvider
+	m.nWorkers = nWorkers
 
 	return nil
 }
@@ -224,10 +226,13 @@ func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads
 		Msgf("found %d payloads in account %s", len(stagingAccountPayloads), stagingAccount)
 
 	mr, err := NewMigratorRuntime(
+		m.log,
+		stagingAccountAddress,
 		stagingAccountPayloads,
 		m.chainID,
 		MigratorRuntimeConfig{},
 		snapshot.SmallChangeSetSnapshot,
+		m.nWorkers,
 	)
 	if err != nil {
 		return err

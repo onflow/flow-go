@@ -529,12 +529,14 @@ func TestStagedContractsMigration(t *testing.T) {
 			)
 
 			mr, err := NewMigratorRuntime(
+				zerolog.Nop(),
 				[]*ledger.Payload{
 					accountStatusPayload,
 				},
 				chainID,
 				MigratorRuntimeConfig{},
 				snapshot.SmallChangeSetSnapshot,
+				2,
 			)
 			require.NoError(t, err)
 
@@ -1891,6 +1893,7 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 			newContractPayload(common.Address(address), "A", []byte(oldCodeA)),
 		}
 
+		var err error
 		err = migration.InitMigration(log, payloads, 0)
 		require.NoError(t, err)
 
