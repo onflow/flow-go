@@ -9,7 +9,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -67,6 +66,7 @@ type StateStreamBackend struct {
 
 	ExecutionDataBackend
 	EventsBackend
+	AccountStatusesBackend
 
 	log                  zerolog.Logger
 	state                protocol.State
@@ -75,24 +75,23 @@ type StateStreamBackend struct {
 	results              storage.ExecutionResults
 	execDataStore        execution_data.ExecutionDataStore
 	execDataCache        *cache.ExecutionDataCache
-	broadcaster          *engine.Broadcaster
 	registers            *execution.RegistersAsyncStore
 	registerRequestLimit int
 }
 
 func New(
 	log zerolog.Logger,
-	config Config,
 	state protocol.State,
 	headers storage.Headers,
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	execDataStore execution_data.ExecutionDataStore,
 	execDataCache *cache.ExecutionDataCache,
-	broadcaster *engine.Broadcaster,
 	registers *execution.RegistersAsyncStore,
 	eventsIndex *index.EventsIndex,
 	useEventsIndex bool,
+	registerIDsRequestLimit int,
+	subscriptionHandler *subscription.SubscriptionHandler,
 	executionDataTracker subscription.ExecutionDataTracker,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
@@ -106,33 +105,38 @@ func New(
 		results:              results,
 		execDataStore:        execDataStore,
 		execDataCache:        execDataCache,
-		broadcaster:          broadcaster,
 		registers:            registers,
-		registerRequestLimit: int(config.RegisterIDsRequestLimit),
+		registerRequestLimit: registerIDsRequestLimit,
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
+		log:                  logger,
+		headers:              headers,
+		subscriptionHandler:  subscriptionHandler,
+		getExecutionData:     b.getExecutionData,
+		executionDataTracker: executionDataTracker,
+	}
+
+	eventsRetriever := EventsRetriever{
 		log:              logger,
 		headers:          headers,
-		broadcaster:      broadcaster,
-		sendTimeout:      config.ClientSendTimeout,
-		responseLimit:    config.ResponseLimit,
-		sendBufferSize:   int(config.ClientSendBufferSize),
 		getExecutionData: b.getExecutionData,
-		getStartHeight:   b.GetStartHeight,
+		useEventsIndex:   useEventsIndex,
+		eventsIndex:      eventsIndex,
 	}
 
 	b.EventsBackend = EventsBackend{
-		log:              logger,
-		headers:          headers,
-		broadcaster:      broadcaster,
-		sendTimeout:      config.ClientSendTimeout,
-		responseLimit:    config.ResponseLimit,
-		sendBufferSize:   int(config.ClientSendBufferSize),
-		getExecutionData: b.getExecutionData,
-		getStartHeight:   b.GetStartHeight,
-		useIndex:         useEventsIndex,
-		eventsIndex:      eventsIndex,
+		log:                  logger,
+		subscriptionHandler:  subscriptionHandler,
+		executionDataTracker: executionDataTracker,
+		eventsRetriever:      eventsRetriever,
+	}
+
+	b.AccountStatusesBackend = AccountStatusesBackend{
+		log:                  logger,
+		subscriptionHandler:  subscriptionHandler,
+		executionDataTracker: b.ExecutionDataTracker,
+		eventsRetriever:      eventsRetriever,
 	}
 
 	return b, nil

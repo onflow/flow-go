@@ -6,12 +6,12 @@ import (
 	"math/big"
 	"testing"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	cdcCommon "github.com/onflow/cadence/runtime/common"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	"github.com/onflow/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 

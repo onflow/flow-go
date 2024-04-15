@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package flow
 
 // Canonical is a function that defines a weak strict ordering "<" for identities.

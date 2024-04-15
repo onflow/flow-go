@@ -132,13 +132,6 @@ func (s *BaseSuite) TimedLogf(msg string, args ...interface{}) {
 	s.T().Logf("%s - "+msg, args...)
 }
 
-//func (s *BaseSuite) TearDownTest() {
-//	s.log.Info().Msg("================> Start TearDownTest")
-//	s.net.Remove()
-//	s.cancel()
-//	s.log.Info().Msg("================> Finish TearDownTest")
-//}
-
 // AwaitEpochPhase waits for the given phase, in the given epoch.
 func (s *BaseSuite) AwaitEpochPhase(ctx context.Context, expectedEpoch uint64, expectedPhase flow.EpochPhase, waitFor, tick time.Duration) {
 	var actualEpoch uint64

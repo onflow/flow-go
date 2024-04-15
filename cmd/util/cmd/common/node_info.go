@@ -17,7 +17,7 @@ import (
 // - partnerWeightsPath: path to partner weights configuration file.
 // - partnerNodeInfoDir: path to partner nodes configuration file.
 // Returns:
-// - []bootstrap.NodeInfo: the generated node info list.
+// - []bootstrap.NodeInfo: the generated node info list. (public information, private keys not set)
 // - error: if any error occurs. Any error returned from this function is irrecoverable.
 func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNodeInfoDir string) ([]bootstrap.NodeInfo, error) {
 	partners, err := ReadPartnerNodeInfos(partnerNodeInfoDir)
@@ -75,7 +75,7 @@ func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNod
 // Args:
 // - partnerWeightsPath: path to partner weights configuration file.
 // Returns:
-// - PartnerWeights: the generated partner weights list.
+// - PartnerWeights: map from NodeID → node's weight 
 // - error: if any error occurs. Any error returned from this function is irrecoverable.
 func ReadPartnerWeights(partnerWeightsPath string) (PartnerWeights, error) {
 	var weights PartnerWeights
@@ -122,7 +122,7 @@ func ReadPartnerNodeInfos(partnerNodeInfoDir string) ([]bootstrap.NodeInfoPub, e
 // - internalNodePrivInfoDir: path to internal nodes  private info.
 // - internalWeightsConfig: path to internal weights configuration file.
 // Returns:
-// - []bootstrap.NodeInfo: the generated node info list.
+// - []bootstrap.NodeInfo: the generated node info list. Caution: contains private keys!
 // - error: if any error occurs. Any error returned from this function is irrecoverable.
 func ReadFullInternalNodeInfos(log zerolog.Logger, internalNodePrivInfoDir, internalWeightsConfig string) ([]bootstrap.NodeInfo, error) {
 	privInternals, err := ReadInternalNodeInfos(internalNodePrivInfoDir)
@@ -173,7 +173,7 @@ func ReadFullInternalNodeInfos(log zerolog.Logger, internalNodePrivInfoDir, inte
 // Args:
 // - internalNodePrivInfoDir: path to internal nodes  private info.
 // Returns:
-// - []bootstrap.NodeInfo: the generated private node info list.
+// - []bootstrap.NodeInfo: the generated private node info list. Caution: contains private keys!
 // - error: if any error occurs. Any error returned from this function is irrecoverable.
 func ReadInternalNodeInfos(internalNodePrivInfoDir string) ([]bootstrap.NodeInfoPriv, error) {
 	var internalPrivInfos []bootstrap.NodeInfoPriv

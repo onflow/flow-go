@@ -1086,9 +1086,41 @@ func (h *Handler) getSubscriptionDataFromStartBlockID(msgBlockId []byte, msgBloc
 	return startBlockID, blockStatus, nil
 }
 
-func (h *Handler) SendAndSubscribeTransactionStatuses(_ *access.SendAndSubscribeTransactionStatusesRequest, _ access.AccessAPI_SendAndSubscribeTransactionStatusesServer) error {
-	// not implemented
-	return nil
+// SendAndSubscribeTransactionStatuses streams transaction statuses starting from the reference block saved in the
+// transaction itself until the block containing the transaction becomes sealed or expired. When the transaction
+// status becomes TransactionStatusSealed or TransactionStatusExpired, the subscription will automatically shut down.
+func (h *Handler) SendAndSubscribeTransactionStatuses(
+	request *access.SendAndSubscribeTransactionStatusesRequest,
+	stream access.AccessAPI_SendAndSubscribeTransactionStatusesServer,
+) error {
+	ctx := stream.Context()
+
+	// check if the maximum number of streams is reached
+	if h.StreamCount.Load() >= h.MaxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
+
+	tx, err := convert.MessageToTransaction(request.GetTransaction(), h.chain)
+	if err != nil {
+		return status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	err = h.api.SendTransaction(ctx, &tx)
+	if err != nil {
+		return err
+	}
+
+	sub := h.api.SubscribeTransactionStatuses(ctx, &tx)
+	return subscription.HandleSubscription(sub, func(txSubInfo *convert.TransactionSubscribeInfo) error {
+		err = stream.Send(convert.TransactionSubscribeInfoToMessage(txSubInfo))
+		if err != nil {
+			return rpc.ConvertError(err, "could not send response", codes.Internal)
+		}
+
+		return nil
+	})
 }
 
 func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flow.BlockStatus) (*access.BlockResponse, error) {

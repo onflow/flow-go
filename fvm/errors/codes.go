@@ -60,6 +60,7 @@ const (
 	ErrCodeAccountAuthorizationError   ErrorCode = 1055
 	ErrCodeOperationAuthorizationError ErrorCode = 1056
 	ErrCodeOperationNotSupportedError  ErrorCode = 1057
+	ErrCodeBlockHeightOutOfRangeError  ErrorCode = 1058
 
 	// execution errors 1100 - 1200
 	// Deprecated: No longer used.

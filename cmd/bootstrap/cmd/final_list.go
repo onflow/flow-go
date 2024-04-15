@@ -240,7 +240,6 @@ func assembleInternalNodesWithoutWeight() []model.NodeInfo {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to read internal node infos")
 	}
-
 	log.Info().Msgf("read %v internal private node-info files", len(privInternals))
 
 	var nodes []model.NodeInfo
@@ -306,7 +305,7 @@ func createPublicNodeInfo(nodes []model.NodeInfoPub) []model.NodeInfo {
 			log.Fatal().Err(err).Msg(fmt.Sprintf("invalid staking public key: %s", n.StakingPubKey))
 		}
 
-		// all nodes should have equal weight
+		// all nodes should have equal weight (this might change in the future)
 		node := model.NewPublicNodeInfo(
 			n.NodeID,
 			n.Role,

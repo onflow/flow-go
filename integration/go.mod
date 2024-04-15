@@ -11,7 +11,6 @@ require (
 	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/docker/docker v24.0.6+incompatible
 	github.com/docker/go-connections v0.4.0
-	github.com/ethereum/go-ethereum v1.13.5
 	github.com/go-git/go-git/v5 v5.5.2
 	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/gorilla/websocket v1.5.0
@@ -22,14 +21,15 @@ require (
 	github.com/ipfs/go-ipfs-blockstore v1.3.0
 	github.com/libp2p/go-libp2p v0.32.2
 	github.com/onflow/cadence v0.42.9
-	github.com/onflow/crypto v0.25.0
+	github.com/onflow/crypto v0.25.1
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1
-	github.com/onflow/flow-emulator v0.58.1-0.20240313174529-1d05170401b6
-	github.com/onflow/flow-go v0.33.2-0.20240306234901-64ab8d27ea30
+	github.com/onflow/flow-emulator v0.61.2-0.20240404201132-f53137a8e4cb
+	github.com/onflow/flow-go v0.33.2-0.20240404171354-0b0592cc5bba
 	github.com/onflow/flow-go-sdk v0.46.0
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
-	github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240305102946-3efec6679252
+	github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240404170900-c321c1475f1e
+	github.com/onflow/go-ethereum v1.13.4
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.18.0
 	github.com/prometheus/client_model v0.5.0
@@ -78,7 +78,7 @@ require (
 	github.com/aws/smithy-go v1.17.0 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/bits-and-blooms/bitset v1.7.0 // indirect
+	github.com/bits-and-blooms/bitset v1.10.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.2.1 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
@@ -115,6 +115,7 @@ require (
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/ethereum/c-kzg-4844 v0.4.0 // indirect
+	github.com/ethereum/go-ethereum v1.13.10 // indirect
 	github.com/flynn/noise v1.0.1 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
@@ -166,7 +167,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
-	github.com/holiman/uint256 v1.2.3 // indirect
+	github.com/holiman/uint256 v1.2.4 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/imdario/mergo v0.3.13 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect

@@ -26,7 +26,7 @@ import (
 )
 
 type backendTransactions struct {
-	TransactionsLocalDataProvider
+	*TransactionsLocalDataProvider
 	staticCollectionRPC  accessproto.AccessAPIClient // rpc client tied to a fixed collection node
 	transactions         storage.Transactions
 	executionReceipts    storage.ExecutionReceipts
@@ -285,7 +285,7 @@ func (b *backendTransactions) GetTransactionResult(
 		}
 
 		// an additional check to ensure the correctness of the collection ID.
-		expectedCollectionID, err := b.lookupCollectionIDInBlock(block, txID)
+		expectedCollectionID, err := b.LookupCollectionIDInBlock(block, txID)
 		if err != nil {
 			// if the collection has not been indexed yet, the lookup will return a not found error.
 			// if the request included a blockID or collectionID in its the search criteria, not found
@@ -311,9 +311,9 @@ func (b *backendTransactions) GetTransactionResult(
 		var txStatus flow.TransactionStatus
 		// Derive the status of the transaction.
 		if block == nil {
-			txStatus, err = b.deriveUnknownTransactionStatus(tx.ReferenceBlockID)
+			txStatus, err = b.DeriveUnknownTransactionStatus(tx.ReferenceBlockID)
 		} else {
-			txStatus, err = b.deriveTransactionStatus(blockID, blockHeight, false)
+			txStatus, err = b.DeriveTransactionStatus(blockID, blockHeight, false)
 		}
 
 		if err != nil {
@@ -439,7 +439,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromExecutionNode(
 			txResult := resp.TransactionResults[i]
 
 			// tx body is irrelevant to status if it's in an executed block
-			txStatus, err := b.deriveTransactionStatus(blockID, block.Header.Height, true)
+			txStatus, err := b.DeriveTransactionStatus(blockID, block.Header.Height, true)
 			if err != nil {
 				if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 					irrecoverable.Throw(ctx, err)
@@ -488,7 +488,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromExecutionNode(
 		}
 
 		systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
-		systemTxStatus, err := b.deriveTransactionStatus(blockID, block.Header.Height, true)
+		systemTxStatus, err := b.DeriveTransactionStatus(blockID, block.Header.Height, true)
 		if err != nil {
 			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 				irrecoverable.Throw(ctx, err)
@@ -573,7 +573,7 @@ func (b *backendTransactions) getTransactionResultByIndexFromExecutionNode(
 	}
 
 	// tx body is irrelevant to status if it's in an executed block
-	txStatus, err := b.deriveTransactionStatus(blockID, block.Header.Height, true)
+	txStatus, err := b.DeriveTransactionStatus(blockID, block.Header.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
@@ -626,7 +626,7 @@ func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, bl
 	}
 
 	systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
-	systemTxStatus, err := b.deriveTransactionStatus(blockID, block.Header.Height, true)
+	systemTxStatus, err := b.DeriveTransactionStatus(blockID, block.Header.Height, true)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
@@ -793,7 +793,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 	}
 
 	// tx body is irrelevant to status if it's in an executed block
-	txStatus, err := b.deriveTransactionStatus(blockID, block.Header.Height, true)
+	txStatus, err := b.DeriveTransactionStatus(blockID, block.Header.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
