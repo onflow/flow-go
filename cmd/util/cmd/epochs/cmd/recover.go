@@ -57,15 +57,15 @@ func init() {
 }
 
 func addGenerateRecoverEpochTxArgsCmdFlags() error {
-	generateRecoverEpochTxArgsCmd.Flags().IntVar(&flagCollectionClusters, "collection-clusters", 3,
+	generateRecoverEpochTxArgsCmd.Flags().IntVar(&flagCollectionClusters, "collection-clusters", 0,
 		"number of collection clusters")
 	// required parameters for network configuration and generation of root node identities
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagNodeConfigJson, "config", "",
 		"path to a JSON file containing multiple node configurations (fields Role, Address, Weight)")
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagInternalNodePrivInfoDir, "internal-priv-dir", "", "path to directory "+
 		"containing the output from the `keygen` command for internal nodes")
-	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 4000, "length of each epoch measured in views")
-	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 100, "length of the epoch staking phase measured in views")
+	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 0, "length of each epoch measured in views")
+	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 0, "length of the epoch staking phase measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "the epoch counter used to generate the root cluster block")
 
 	err := generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-length")
