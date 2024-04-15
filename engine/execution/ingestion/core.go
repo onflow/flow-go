@@ -145,9 +145,9 @@ func (e *Core) launchWorkerToExecuteBlocks(ctx irrecoverable.SignalerContext, re
 		case executable := <-e.blockExecutors:
 			err := e.execute(ctx, executable)
 			if err != nil {
-				ctx.Throw(fmt.Errorf("execution ingestion engine failed to execute block %v (%v): %w",
+				e.log.Error().Err(fmt.Errorf("execution ingestion engine failed to execute block %v (%v): %w",
 					executable.Block.Header.Height,
-					executable.Block.ID(), err))
+					executable.Block.ID(), err)).Msgf("error executing block")
 			}
 		}
 	}
@@ -188,7 +188,7 @@ func (e *Core) launchWorkerToConsumeThrottledBlocks(ctx irrecoverable.SignalerCo
 			e.log.Debug().Hex("block_id", blockID[:]).Msg("ingestion core processing block")
 			err := e.onProcessableBlock(blockID)
 			if err != nil {
-				ctx.Throw(fmt.Errorf("execution ingestion engine fail to process block %v: %w", blockID, err))
+				e.log.Error().Err(fmt.Errorf("execution ingestion engine fail to process block %v: %w", blockID, err)).Msgf("error processing block")
 				return
 			}
 		}
