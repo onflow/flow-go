@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 )
 
-// ConstructClusterAssignment random cluster assignment with internal and partner nodes.
+// ConstructClusterAssignment generates a partially randomized collector cluster assignment with internal and partner nodes.
 // The number of nodes in each cluster is deterministic and only depends on the number of clusters
 // and the number of nodes. The repartition of internal and partner nodes is also deterministic
 // and only depends on the number of clusters and nodes.

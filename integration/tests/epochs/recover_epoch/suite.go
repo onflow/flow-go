@@ -10,10 +10,7 @@ type Suite struct {
 }
 
 func (s *Suite) SetupTest() {
-	// use a longer staking auction length to accommodate staking operations for joining/leaving nodes
-	// NOTE: this value is set fairly aggressively to ensure shorter test times.
-	// If flakiness due to failure to complete staking operations in time is observed,
-	// try increasing (by 10-20 views).
+	// use a shorter staking auction because we don't have staking operations in this case
 	s.StakingAuctionLen = 2
 	s.DKGPhaseLen = 50
 	s.EpochLen = 250
