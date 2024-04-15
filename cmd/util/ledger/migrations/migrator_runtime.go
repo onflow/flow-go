@@ -80,7 +80,6 @@ func (c MigratorRuntimeConfig) NewRuntimeInterface(
 		getOrLoadProgram, err = util.NewProgramsGetOrLoadProgramFunc(
 			transactionState,
 			accounts,
-			c.GetOrLoadProgramListener,
 		)
 		if err != nil {
 			return nil, err
@@ -91,6 +90,7 @@ func (c MigratorRuntimeConfig) NewRuntimeInterface(
 		getCodeFunc,
 		getContractNames,
 		getOrLoadProgram,
+		c.GetOrLoadProgramListener,
 	), nil
 }
 

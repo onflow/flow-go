@@ -30,23 +30,32 @@ type GetOrLoadProgramFunc func(
 	error,
 )
 
+type GerOrLoadProgramListenerFunc func(
+	location runtime.Location,
+	program *interpreter.Program,
+	err error,
+)
+
 // MigrationRuntimeInterface is a runtime interface that can be used in migrations.
 // It only allows parsing and checking of contracts.
 type MigrationRuntimeInterface struct {
-	GetContractCodeFunc  GetContractCodeFunc
-	GetContractNamesFunc GetContractNamesFunc
-	GetOrLoadProgramFunc GetOrLoadProgramFunc
+	GetContractCodeFunc          GetContractCodeFunc
+	GetContractNamesFunc         GetContractNamesFunc
+	GetOrLoadProgramFunc         GetOrLoadProgramFunc
+	GetOrLoadProgramListenerFunc GerOrLoadProgramListenerFunc
 }
 
 func NewMigrationRuntimeInterface(
 	getCodeFunc GetContractCodeFunc,
 	getContractNamesFunc GetContractNamesFunc,
 	getOrLoadProgramFunc GetOrLoadProgramFunc,
+	getOrLoadProgramListenerFunc GerOrLoadProgramListenerFunc,
 ) *MigrationRuntimeInterface {
 	return &MigrationRuntimeInterface{
-		GetContractCodeFunc:  getCodeFunc,
-		GetContractNamesFunc: getContractNamesFunc,
-		GetOrLoadProgramFunc: getOrLoadProgramFunc,
+		GetContractCodeFunc:          getCodeFunc,
+		GetContractNamesFunc:         getContractNamesFunc,
+		GetOrLoadProgramFunc:         getOrLoadProgramFunc,
+		GetOrLoadProgramListenerFunc: getOrLoadProgramListenerFunc,
 	}
 }
 
@@ -147,6 +156,14 @@ func (m *MigrationRuntimeInterface) GetOrLoadProgram(
 	if getOrLoadProgram == nil {
 		return nil, errors.New("GetOrLoadProgramFunc missing")
 	}
+
+	listener := m.GetOrLoadProgramListenerFunc
+	if listener != nil {
+		defer func() {
+			listener(location, program, err)
+		}()
+	}
+
 	return getOrLoadProgram(location, load)
 }
 

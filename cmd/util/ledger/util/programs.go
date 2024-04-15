@@ -17,12 +17,9 @@ import (
 
 var _ storage.TransactionPreparer = migrationTransactionPreparer{}
 
-type GerOrLoadProgramListenerFunc func(location runtime.Location, program *interpreter.Program, err error)
-
 func NewProgramsGetOrLoadProgramFunc(
 	nestedTransactionPreparer state.NestedTransactionPreparer,
 	accounts environment.Accounts,
-	listener GerOrLoadProgramListenerFunc,
 ) (GetOrLoadProgramFunc, error) {
 
 	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
@@ -55,13 +52,6 @@ func NewProgramsGetOrLoadProgramFunc(
 		program *interpreter.Program,
 		err error,
 	) {
-
-		defer func() {
-			if listener != nil {
-				listener(location, program, err)
-			}
-		}()
-
 		return programs.GetOrLoadProgram(
 			location,
 			func() (*interpreter.Program, error) {
