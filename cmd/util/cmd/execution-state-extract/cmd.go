@@ -98,9 +98,6 @@ func init() {
 	Cmd.Flags().BoolVar(&flagVerboseErrorOutput, "verbose-error-output", true,
 		"log verbose output on migration errors")
 
-	Cmd.Flags().BoolVar(&flagCheckStorageHealthBeforeMigration, "check-storage-health-before", false,
-		"check (atree) storage health before migration")
-
 	Cmd.Flags().StringVar(&flagStagedContractsFile, "staged-contracts", "",
 		"Staged contracts CSV file")
 
@@ -300,10 +297,6 @@ func run(*cobra.Command, []string) {
 
 	if flagVerboseErrorOutput {
 		log.Warn().Msgf("--verbose-error-output flag is enabled which may increase size of log")
-	}
-
-	if flagCheckStorageHealthBeforeMigration {
-		log.Warn().Msgf("--check-storage-health-before flag is enabled and will increase duration of migration")
 	}
 
 	if flagCheckStorageHealthBeforeMigration {
