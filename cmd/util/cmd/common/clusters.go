@@ -61,6 +61,17 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 		log.Fatal().Err(err).Msg("could not shuffle internals")
 	}
 
+	// The following is a heuristic for distributing the internal collector nodes (private staking key available
+	// to generate QC for cluster root block) and partner nodes (private staking unknown). We need internal nodes
+	// to control strictly more than 2/3 of the cluster's total weight.
+	// The following is a heuristic that distributes collectors round-robbin across the specified number of clusters.
+	// This heuristic only works when all collectors have equal weight! The following sanity check enforces this:
+	if !(0 < len(partnerNodes) && len(partnerNodes) < 2*len(internalNodes)) {
+		return nil, nil, fmt.Errorf("requiring at least x>0 number of partner nodes and y > 2x number of internal nodes, but got x,y=%d,%d", len(partnerNodes), len(internalNodes))
+	}
+	// sanity check ^ enforces that there is at least one internal node, hence `internalNodes[0].InitialWeight` is always a valid reference weight
+	refWeight := internalNodes[0].InitialWeight
+	
 	identifierLists := make([]flow.IdentifierList, numCollectionClusters)
 	// array to track the 2/3 internal-nodes constraint (internal_nodes > 2 * partner_nodes)
 	constraint := make([]int, numCollectionClusters)

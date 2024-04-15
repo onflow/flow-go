@@ -122,7 +122,7 @@ func ReadPartnerNodeInfos(partnerNodeInfoDir string) ([]bootstrap.NodeInfoPub, e
 // - internalNodePrivInfoDir: path to internal nodes  private info.
 // - internalWeightsConfig: path to internal weights configuration file.
 // Returns:
-// - []bootstrap.NodeInfo: the generated node info list.
+// - []bootstrap.NodeInfo: the generated node info list. Caution: contains private keys!
 // - error: if any error occurs. Any error returned from this function is irrecoverable.
 func ReadFullInternalNodeInfos(log zerolog.Logger, internalNodePrivInfoDir, internalWeightsConfig string) ([]bootstrap.NodeInfo, error) {
 	privInternals, err := ReadInternalNodeInfos(internalNodePrivInfoDir)
