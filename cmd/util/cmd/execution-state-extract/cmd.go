@@ -98,9 +98,6 @@ func init() {
 	Cmd.Flags().BoolVar(&flagVerboseErrorOutput, "verbose-error-output", true,
 		"log verbose output on migration errors")
 
-	Cmd.Flags().BoolVar(&flagCheckStorageHealthBeforeMigration, "check-storage-health-before", false,
-		"check (atree) storage health before migration")
-
 	Cmd.Flags().StringVar(&flagStagedContractsFile, "staged-contracts", "",
 		"Staged contracts CSV file")
 
