@@ -17,7 +17,7 @@ import (
 // - partnerWeightsPath: path to partner weights configuration file.
 // - partnerNodeInfoDir: path to partner nodes configuration file.
 // Returns:
-// - []bootstrap.NodeInfo: the generated node info list.
+// - []bootstrap.NodeInfo: the generated node info list. (public information, private keys not set)
 // - error: if any error occurs. Any error returned from this function is irrecoverable.
 func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNodeInfoDir string) ([]bootstrap.NodeInfo, error) {
 	partners, err := ReadPartnerNodeInfos(partnerNodeInfoDir)
