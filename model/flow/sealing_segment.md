@@ -85,9 +85,9 @@ ExtraBlocks []*Block
   of the sealed block. The seals don't contain the block's height information, hence we need to resolve the block.
 
 **Extended history to check for duplicated collection guarantees in blocks** is required by nodes that _validate_ block
-payloads (e.g. consensus nodes). Also Access Nodes require these blocks. Collections expire after `flow.DefaultTransactionExpiry` blocks.
-Hence, we desire a history of `flow.DefaultTransactionExpiry` blocks. However, there is the edge case of a recent spork (or genesis),
-where the history is simply less that `flow.DefaultTransactionExpiry`.
+payloads (e.g. consensus nodes). Also Access Nodes require these blocks. Collections expire after `flow.ExtraBlocksInRootSealingSegment` blocks.
+Hence, we desire a history of `flow.ExtraBlocksInRootSealingSegment` blocks. However, there is the edge case of a recent spork (or genesis),
+where the history is simply less that `flow.ExtraBlocksInRootSealingSegment`.
 
 ### Formal definition
 
@@ -98,7 +98,7 @@ The descriptions from the previous section can be formalized as follows
 * (ii) All blocks that are sealed by `head`. This is relevant if `head` contains _multiple_ seals.
 * (iii) The sealing segment should contain the history back to (including):
   ```
-  limitHeight := max(blockSealedAtHead.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
+  limitHeight := max(blockSealedAtHead.Height - flow.ExtraBlocksInRootSealingSegment, SporkRootBlockHeight)
   ```
    where blockSealedAtHead is the block sealed by `head` block.
 Note that all three conditions have to be satisfied by a sealing segment. Therefore, it must contain the longest history
@@ -110,7 +110,7 @@ additional blocks for (ii) and optionally (iii) are contained in as `SealingSegm
 
 Condition (i) and (ii) are necessary for the sealing segment for _any node_. In contrast, (iii) is
 necessary to bootstrap nodes that _validate_ block payloads (e.g. consensus nodes), to verify that
-collection guarantees are not duplicated (collections expire after `flow.DefaultTransactionExpiry` blocks).
+collection guarantees are not duplicated (collections expire after `flow.ExtraBlocksInRootSealingSegment` blocks).
 
 ## Special case: Root Sealing Segment
 

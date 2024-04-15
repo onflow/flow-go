@@ -142,7 +142,9 @@ func (info *blockInfo) GetBlockAtHeight(
 		return runtimeBlockFromHeader(info.blockHeader), true, nil
 	}
 
-	if height+uint64(flow.DefaultTransactionExpiry) < info.blockHeader.Height {
+	// Check if the requested block height is within the range of the current
+	// block height and the extra blocks in the root sealing segment.
+	if height+uint64(flow.ExtraBlocksInRootSealingSegment) < info.blockHeader.Height {
 		return runtime.Block{}, false, errors.NewBlockHeightOutOfRangeError(height)
 	}
 
