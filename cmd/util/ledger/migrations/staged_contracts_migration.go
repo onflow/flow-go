@@ -224,6 +224,7 @@ func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads
 		stagingAccountAddress,
 		stagingAccountPayloads,
 		util.RuntimeInterfaceConfig{},
+		snapshot.IndexMapBased,
 	)
 	if err != nil {
 		return err

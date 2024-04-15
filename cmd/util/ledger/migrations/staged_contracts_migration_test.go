@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -531,6 +533,7 @@ func TestStagedContractsMigration(t *testing.T) {
 				stagingAccountAddress,
 				[]*ledger.Payload{accountStatusPayload},
 				util.RuntimeInterfaceConfig{},
+				snapshot.IndexMapBased,
 			)
 			require.NoError(t, err)
 
