@@ -154,6 +154,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		migrationRuntime.Interpreter,
 		storage,
 		m.name,
+		address,
 	)
 
 	reporter := newValueMigrationReporter(m.reporter, m.log, m.errorMessageHandler, m.verboseErrorOutput)
@@ -164,8 +165,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		reporter,
 	)
 
-	migration.MigrateAccount(
-		address,
+	migration.Migrate(
 		migration.NewValueMigrationsPathMigrator(
 			reporter,
 			valueMigrations...,
@@ -512,6 +512,12 @@ func (t *cadenceValueMigrationReporter) MissingTarget(accountAddressPath interpr
 	})
 }
 
+func (t *cadenceValueMigrationReporter) DictionaryKeyConflict(key interpreter.StringStorageMapKey) {
+	t.reportWriter.Write(dictionaryKeyConflictEntry{
+		Key: string(key),
+	})
+}
+
 type valueMigrationReportEntry interface {
 	accountAddress() common.Address
 }
@@ -577,4 +583,8 @@ var _ valueMigrationReportEntry = capConsMissingTargetEntry{}
 
 func (e capConsMissingCapabilityIDEntry) accountAddress() common.Address {
 	return e.AccountAddress
+}
+
+type dictionaryKeyConflictEntry struct {
+	Key string `json:"key"`
 }
