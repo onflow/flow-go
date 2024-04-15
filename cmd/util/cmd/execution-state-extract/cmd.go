@@ -306,10 +306,6 @@ func run(*cobra.Command, []string) {
 		log.Warn().Msgf("--check-storage-health-before flag is enabled and will increase duration of migration")
 	}
 
-	if flagCheckStorageHealthBeforeMigration {
-		log.Warn().Msgf("--check-storage-health-before flag is enabled and will increase duration of migration")
-	}
-
 	if flagCheckStorageHealthAfterMigration {
 		log.Warn().Msgf("--check-storage-health-after flag is enabled and will increase duration of migration")
 	}
