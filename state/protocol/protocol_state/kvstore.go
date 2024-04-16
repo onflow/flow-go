@@ -66,7 +66,7 @@ type KVStoreMutator interface {
 	// v1
 
 	// SetInvalidEpochTransitionAttempted sets the epoch fallback mode flag.
-	// TODO remove this as it is not used
+	// TODO(5326) remove this as it is not used
 	// Errors:
 	//  - ErrKeyNotSupported if the key does not exist in the current model version.
 	SetInvalidEpochTransitionAttempted(attempted bool) error
