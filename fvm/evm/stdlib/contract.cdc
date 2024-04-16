@@ -308,7 +308,7 @@ contract EVM {
         /// the bridge request
         access(all)
         fun depositNFT(
-            nft: @{NonFungibleToken.NFT},
+            nft: @NonFungibleToken.NFT,
             feeProvider: &{FungibleToken.Provider}
         ) {
             EVM.borrowBridgeAccessor().depositNFT(nft: <-nft, to: self.address(), feeProvider: feeProvider)
@@ -321,7 +321,7 @@ contract EVM {
             type: Type,
             id: UInt256,
             feeProvider: &{FungibleToken.Provider}
-        ): @{NonFungibleToken.NFT} {
+        ): @NonFungibleToken.NFT {
             return <- EVM.borrowBridgeAccessor().withdrawNFT(
                 caller: &self as &CadenceOwnedAccount,
                 type: type,
@@ -334,7 +334,7 @@ contract EVM {
         /// the bridge request
         access(all)
         fun depositTokens(
-            vault: @{FungibleToken.Vault},
+            vault: @FungibleToken.Vault,
             feeProvider: &{FungibleToken.Provider}
         ) {
             EVM.borrowBridgeAccessor().depositTokens(vault: <-vault, to: self.address(), feeProvider: feeProvider)
@@ -348,7 +348,7 @@ contract EVM {
             type: Type,
             amount: UInt256,
             feeProvider: &{FungibleToken.Provider}
-        ): @{FungibleToken.Vault} {
+        ): @FungibleToken.Vault {
             return <- EVM.borrowBridgeAccessor().withdrawTokens(
                 caller: &self as &CadenceOwnedAccount,
                 type: type,
@@ -563,7 +563,7 @@ contract EVM {
         /// Endpoint enabling the bridging of an NFT to EVM
         access(all)
         fun depositNFT(
-            nft: @{NonFungibleToken.NFT},
+            nft: @NonFungibleToken.NFT,
             to: EVMAddress,
             feeProvider: &{FungibleToken.Provider}
         )
@@ -575,12 +575,12 @@ contract EVM {
             type: Type,
             id: UInt256,
             feeProvider: &{FungibleToken.Provider}
-        ): @{NonFungibleToken.NFT}
+        ): @NonFungibleToken.NFT
 
         /// Endpoint enabling the bridging of a fungible token vault to EVM
         access(all)
         fun depositTokens(
-            vault: @{FungibleToken.Vault},
+            vault: @FungibleToken.Vault,
             to: EVMAddress,
             feeProvider: &{FungibleToken.Provider}
         )
@@ -592,7 +592,7 @@ contract EVM {
             type: Type,
             amount: UInt256,
             feeProvider: &{FungibleToken.Provider}
-        ): @{FungibleToken.Vault}
+        ): @FungibleToken.Vault
     }
 
     /// Interface which captures a Capability to the bridge Accessor, saving it within the BridgeRouter resource
