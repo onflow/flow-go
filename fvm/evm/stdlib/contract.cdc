@@ -310,7 +310,7 @@ contract EVM {
             feeProvider: &{FungibleToken.Provider}
         ): @{NonFungibleToken.NFT} {
             return <- EVM.borrowBridgeAccessor().withdrawNFT(
-                caller: &self,
+                caller: &self as &CadenceOwnedAccount,
                 type: type,
                 id: id,
                 feeProvider: feeProvider
@@ -337,7 +337,7 @@ contract EVM {
             feeProvider: &{FungibleToken.Provider}
         ): @{FungibleToken.Vault} {
             return <- EVM.borrowBridgeAccessor().withdrawTokens(
-                caller: &self,
+                caller: &self as &CadenceOwnedAccount,
                 type: type,
                 amount: amount,
                 feeProvider: feeProvider
