@@ -75,7 +75,7 @@ func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNod
 // Args:
 // - partnerWeightsPath: path to partner weights configuration file.
 // Returns:
-// - PartnerWeights: map from NodeID → node's weight 
+// - PartnerWeights: map from NodeID → node's weight
 // - error: if any error occurs. Any error returned from this function is irrecoverable.
 func ReadPartnerWeights(partnerWeightsPath string) (PartnerWeights, error) {
 	var weights PartnerWeights
