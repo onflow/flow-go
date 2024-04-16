@@ -226,7 +226,7 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 			builder := unittest.NewEpochBuilder(t, mutableState, state)
 			builder.
 				BuildEpoch().CompleteEpoch(). // build epoch 2
-				BuildEpoch()                  // build epoch 3
+				BuildEpoch() // build epoch 3
 			heights, ok := builder.EpochHeights(2)
 			epoch2FirstHeight = heights.FirstHeight()
 			epoch1FinalHeight = epoch2FirstHeight - 1
@@ -380,7 +380,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
 			unittest.NewEpochBuilder(t, mutableState, state).
 				BuildEpoch().CompleteEpoch(). // build epoch 2
-				BuildEpoch()                  // build epoch 3
+				BuildEpoch() // build epoch 3
 
 			// find a snapshot from epoch setup phase in epoch 2
 			epoch1Counter, err := rootSnapshot.Epochs().Current().Counter()
@@ -467,13 +467,20 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 
 	t.Run("non-canonical ordering", func(t *testing.T) {
 		participants := unittest.IdentityListFixture(20, unittest.WithAllRoles())
+		// randomly shuffle the identities so they are not canonically ordered
+		unorderedParticipants, err := participants.ToSkeleton().Shuffle()
+		require.NoError(t, err)
 
 		root := unittest.RootSnapshotFixture(participants)
-		// randomly shuffle the identities so they are not canonically ordered
 		encodable := root.Encodable()
-		var err error
-		encodable.Epochs.Current.InitialIdentities, err = participants.ToSkeleton().Shuffle()
-		require.NoError(t, err)
+
+		// modify EpochSetup participants, making them unordered
+		latestProtocolStateEntry := encodable.SealingSegment.LatestProtocolStateEntry()
+		currentEpochSetup := latestProtocolStateEntry.EpochEntry.CurrentEpochSetup
+		currentEpochSetup.Participants = unorderedParticipants
+		currentEpochSetup.Participants = unorderedParticipants
+		latestProtocolStateEntry.EpochEntry.CurrentEpoch.SetupID = currentEpochSetup.ID()
+
 		root = inmem.SnapshotFromEncodable(encodable)
 		bootstrap(t, root, func(state *bprotocol.State, err error) {
 			assert.Error(t, err)
