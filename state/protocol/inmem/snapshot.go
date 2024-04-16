@@ -1,8 +1,8 @@
 package inmem
 
 import (
-	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/module/irrecoverable"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
@@ -88,67 +88,21 @@ func (s Snapshot) Encodable() EncodableSnapshot {
 }
 
 func (s Snapshot) EpochProtocolState() (protocol.DynamicProtocolState, error) {
-	epochs := s.Epochs()
-	previous := epochs.Previous()
-	current := epochs.Current()
-	next := epochs.Next()
-	var (
-		err                                                      error
-		previousEpochSetup, currentEpochSetup, nextEpochSetup    *flow.EpochSetup
-		previousEpochCommit, currentEpochCommit, nextEpochCommit *flow.EpochCommit
-	)
-
-	if _, err := previous.Counter(); err == nil {
-		// if there is a previous epoch, both setup and commit events must exist
-		previousEpochSetup, err = protocol.ToEpochSetup(previous)
-		if err != nil {
-			return nil, fmt.Errorf("could not get previous epoch setup event: %w", err)
-		}
-		previousEpochCommit, err = protocol.ToEpochCommit(previous)
-		if err != nil {
-			return nil, fmt.Errorf("could not get previous epoch commit event: %w", err)
-		}
+	head := s.enc.SealingSegment.Highest()
+	entry, ok := s.enc.SealingSegment.ProtocolStateEntries[head.Payload.ProtocolStateID]
+	if !ok {
+		return nil, irrecoverable.NewExceptionf("sanity check failed: unknown protocol state entry for snapshot head")
 	}
-
-	// insert current epoch - both setup and commit events must exist
-	currentEpochSetup, err = protocol.ToEpochSetup(current)
-	if err != nil {
-		return nil, fmt.Errorf("could not get current epoch setup event: %w", err)
-	}
-	currentEpochCommit, err = protocol.ToEpochCommit(current)
-	if err != nil {
-		return nil, fmt.Errorf("could not get current epoch commit event: %w", err)
-	}
-
-	if _, err := next.Counter(); err == nil {
-		// if there is a next epoch, both setup event should exist, but commit event may not
-		nextEpochSetup, err = protocol.ToEpochSetup(next)
-		if err != nil {
-			return nil, fmt.Errorf("could not get next epoch setup event: %w", err)
-		}
-		nextEpochCommit, err = protocol.ToEpochCommit(next)
-		if err != nil && !errors.Is(err, protocol.ErrNextEpochNotCommitted) {
-			return nil, fmt.Errorf("could not get next epoch commit event: %w", err)
-		}
-	}
-
-	protocolStateEntry, err := flow.NewRichProtocolStateEntry(
-		s.enc.EpochProtocolState,
-		previousEpochSetup,
-		previousEpochCommit,
-		currentEpochSetup,
-		currentEpochCommit,
-		nextEpochSetup,
-		nextEpochCommit)
-	if err != nil {
-		return nil, fmt.Errorf("could not create protocol state entry: %w", err)
-	}
-
-	return NewDynamicProtocolStateAdapter(protocolStateEntry, s.Params()), nil
+	return NewDynamicProtocolStateAdapter(entry.EpochEntry, s.Params()), nil
 }
 
 func (s Snapshot) ProtocolState() (protocol.KVStoreReader, error) {
-	return kvstore.VersionedDecode(s.enc.KVStore.Version, s.enc.KVStore.Data)
+	head := s.enc.SealingSegment.Highest()
+	entry, ok := s.enc.SealingSegment.ProtocolStateEntries[head.Payload.ProtocolStateID]
+	if !ok {
+		return nil, irrecoverable.NewExceptionf("sanity check failed: unknown protocol state entry for snapshot head")
+	}
+	return kvstore.VersionedDecode(entry.KVStoreVersion, entry.KVStoreData)
 }
 
 func (s Snapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) {
