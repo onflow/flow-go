@@ -204,9 +204,11 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 			return nil, fmt.Errorf("could not get epoch data: %w", err)
 		}
 		return &flow.ProtocolStateEntryWrapper{
-			KVStoreVersion: kvStoreEntry.Version,
-			KVStoreData:    kvStoreEntry.Data,
-			EpochEntry:     epochDataEntry,
+			KVStore: flow.PSKeyValueStoreData{
+				Version: kvStoreEntry.Version,
+				Data:    kvStoreEntry.Data,
+			},
+			EpochEntry: epochDataEntry,
 		}, nil
 	}
 

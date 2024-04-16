@@ -106,7 +106,7 @@ func (s Snapshot) ProtocolState() (protocol.KVStoreReader, error) {
 	if !ok {
 		return nil, irrecoverable.NewExceptionf("sanity check failed: unknown protocol state entry for snapshot head")
 	}
-	return kvstore.VersionedDecode(entry.KVStoreVersion, entry.KVStoreData)
+	return kvstore.VersionedDecode(entry.KVStore.Version, entry.KVStore.Data)
 }
 
 func (s Snapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) {

@@ -344,9 +344,11 @@ func SnapshotFromBootstrapStateWithParams(
 	}
 
 	rootProtocolStateEntryWrapper := &flow.ProtocolStateEntryWrapper{
-		KVStoreVersion: kvStoreVersion,
-		KVStoreData:    kvStoreData,
-		EpochEntry:     richRootEpochState,
+		KVStore: flow.PSKeyValueStoreData{
+			Version: kvStoreVersion,
+			Data:    kvStoreData,
+		},
+		EpochEntry: richRootEpochState,
 	}
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{

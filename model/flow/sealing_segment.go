@@ -77,9 +77,8 @@ type SealingSegment struct {
 // Deprecated: avoid using this in new code; this is a temporary measure until epoch data is moved into protocol KV store
 // TODO: move epoch data into the KVStore as part of a future upgrade
 type ProtocolStateEntryWrapper struct {
-	KVStoreVersion uint64
-	KVStoreData    []byte
-	EpochEntry     *RichProtocolStateEntry
+	KVStore    PSKeyValueStoreData
+	EpochEntry *RichProtocolStateEntry
 }
 
 // Highest is the highest block in the sealing segment and the reference block from snapshot that was
