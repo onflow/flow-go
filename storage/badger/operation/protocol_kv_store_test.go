@@ -8,14 +8,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestInsertProtocolKVStore tests if basic badger operations on ProtocolKVStore work as expected.
 func TestInsertProtocolKVStore(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		expected := &storage.KeyValueStoreData{
+		expected := &flow.PSKeyValueStoreData{
 			Version: 2,
 			Data:    unittest.RandomBytes(32),
 		}
@@ -24,7 +23,7 @@ func TestInsertProtocolKVStore(t *testing.T) {
 		err := db.Update(InsertProtocolKVStore(kvStoreStateID, expected))
 		require.Nil(t, err)
 
-		var actual storage.KeyValueStoreData
+		var actual flow.PSKeyValueStoreData
 		err = db.View(RetrieveProtocolKVStore(kvStoreStateID, &actual))
 		require.Nil(t, err)
 

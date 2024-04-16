@@ -95,7 +95,7 @@ func TestMutableProtocolState_Mutator(t *testing.T) {
 			},
 			InvalidEpochTransitionAttempted: false,
 		}).VersionedEncode()
-		parentState := &storage.KeyValueStoreData{
+		parentState := &flow.PSKeyValueStoreData{
 			Version: version,
 			Data:    data,
 		}

@@ -248,7 +248,7 @@ func bootstrapProtocolState(
 		// The sealing segment contains a protocol state entry for every block in the segment, including the root block.
 		for protocolStateID, stateEntry := range segment.ProtocolStateEntries {
 			// Store the protocol KV Store entry
-			err := protocolKVStoreSnapshots.StoreTx(protocolStateID, &storage.KeyValueStoreData{
+			err := protocolKVStoreSnapshots.StoreTx(protocolStateID, &flow.PSKeyValueStoreData{
 				Version: stateEntry.KVStoreVersion,
 				Data:    stateEntry.KVStoreData,
 			})(tx)

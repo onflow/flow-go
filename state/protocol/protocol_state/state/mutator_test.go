@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
-	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/rand"
@@ -109,7 +108,7 @@ func (s *StateMutatorSuite) TestBuild_HappyPath() {
 
 	// expect calls to prepare a deferred update for indexing and storing the resulting state
 	s.protocolKVStoreDB.On("IndexTx", s.candidate.ID(), resultingStateID).Return(indexTxDeferredUpdate.Execute).Once()
-	s.protocolKVStoreDB.On("StoreTx", resultingStateID, &storage.KeyValueStoreData{
+	s.protocolKVStoreDB.On("StoreTx", resultingStateID, &flow.PSKeyValueStoreData{
 		Version: s.latestProtocolVersion,
 		Data:    stateBytes,
 	}).Return(storeTxDeferredUpdate.Execute).Once()
@@ -142,7 +141,7 @@ func (s *StateMutatorSuite) TestBuild_NoChanges() {
 	s.replicatedState.On("VersionedEncode").Return(s.latestProtocolVersion, stateBytes, nil).Once()
 	// expect calls to prepare a deferred update for indexing and storing the resulting state
 	s.protocolKVStoreDB.On("IndexTx", s.candidate.ID(), resultingStateID).Return(indexTxDeferredUpdate.Execute).Once()
-	s.protocolKVStoreDB.On("StoreTx", resultingStateID, &storage.KeyValueStoreData{
+	s.protocolKVStoreDB.On("StoreTx", resultingStateID, &flow.PSKeyValueStoreData{
 		Version: s.latestProtocolVersion,
 		Data:    stateBytes,
 	}).Return(storeTxDeferredUpdate.Execute).Once()

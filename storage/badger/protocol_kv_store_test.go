@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"github.com/onflow/flow-go/model/flow"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -19,7 +20,7 @@ func TestKeyValueStoreStorage(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		store := NewProtocolKVStore(metrics, db, DefaultProtocolKVStoreCacheSize, DefaultProtocolKVStoreByBlockIDCacheSize)
 
-		expected := &storage.KeyValueStoreData{
+		expected := &flow.PSKeyValueStoreData{
 			Version: 2,
 			Data:    unittest.RandomBytes(32),
 		}
@@ -53,7 +54,7 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 		store := NewProtocolKVStore(metrics, db, DefaultProtocolKVStoreCacheSize, DefaultProtocolKVStoreByBlockIDCacheSize)
 
 		stateID := unittest.IdentifierFixture()
-		expected := &storage.KeyValueStoreData{
+		expected := &flow.PSKeyValueStoreData{
 			Version: 2,
 			Data:    unittest.RandomBytes(32),
 		}
