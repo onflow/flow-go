@@ -32,19 +32,19 @@ var fungibleTokenImportPattern = regexp.MustCompile(`(?m)^import "FungibleToken"
 var flowTokenImportPattern = regexp.MustCompile(`(?m)^import "FlowToken"`)
 
 func ContractCode(nonFungibleTokenAddress, fungibleTokenAddress, flowTokenAddress flow.Address) []byte {
-	contractCode = nftImportPattern.ReplaceAllString(
+	evmContract := nftImportPattern.ReplaceAllString(
 		contractCode,
 		fmt.Sprintf("import NonFungibleToken from %s", nonFungibleTokenAddress.HexWithPrefix()),
 	)
-	contractCode = fungibleTokenImportPattern.ReplaceAllString(
-		contractCode,
+	evmContract = fungibleTokenImportPattern.ReplaceAllString(
+		evmContract,
 		fmt.Sprintf("import FungibleToken from %s", fungibleTokenAddress.HexWithPrefix()),
 	)
-	contractCode = flowTokenImportPattern.ReplaceAllString(
-		contractCode,
+	evmContract = flowTokenImportPattern.ReplaceAllString(
+		evmContract,
 		fmt.Sprintf("import FlowToken from %s", flowTokenAddress.HexWithPrefix()),
 	)
-	return []byte(contractCode)
+	return []byte(evmContract)
 }
 
 const ContractName = "EVM"
