@@ -392,7 +392,7 @@ func (b *bootstrapExecutor) Execute() error {
 	b.setStakingAllowlist(service, b.identities.NodeIDs())
 
 	// sets up the EVM environment
-	b.setupEVM(service, fungibleToken, flowToken)
+	b.setupEVM(service, nonFungibleToken, fungibleToken, flowToken)
 
 	return nil
 }
