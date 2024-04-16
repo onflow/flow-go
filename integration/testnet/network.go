@@ -49,6 +49,7 @@ import (
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -108,6 +109,9 @@ const (
 
 	// PrimaryAN is the container name for the primary access node to use for API requests
 	PrimaryAN = "access_1"
+
+	// PrimaryON is the container name for the primary observer node to use for API requests
+	PrimaryON = "observer_1"
 
 	DefaultViewsInStakingAuction      uint64 = 5
 	DefaultViewsInDKGPhase            uint64 = 50
@@ -727,7 +731,7 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 	accessPublicKey := hex.EncodeToString(accessNode.Config.NetworkPubKey().Encode())
 	require.NotEmptyf(t, accessPublicKey, "failed to find the staked conf for access node with container name '%s'", conf.BootstrapAccessName)
 
-	err = WriteObserverPrivateKey(conf.ContainerName, nodeBootstrapDir)
+	_, err = WriteObserverPrivateKey(conf.ContainerName, nodeBootstrapDir)
 	require.NoError(t, err)
 
 	containerOpts := testingdock.ContainerOpts{
@@ -779,6 +783,9 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 
 	nodeContainer.exposePort(RESTPort, testingdock.RandomPort(t))
 	nodeContainer.AddFlag("rest-addr", nodeContainer.ContainerAddr(RESTPort))
+
+	nodeContainer.exposePort(ExecutionStatePort, testingdock.RandomPort(t))
+	nodeContainer.AddFlag("state-stream-addr", nodeContainer.ContainerAddr(ExecutionStatePort))
 
 	nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(nodeContainer.HealthcheckCallback())
 
@@ -1137,6 +1144,8 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		Participants:       participants.ToSkeleton(),
 		Assignments:        clusterAssignments,
 		RandomSource:       randomSource,
+		TargetDuration:     networkConf.ViewsInEpoch, // 1view/s
+		TargetEndTime:      uint64(time.Now().Unix()) + networkConf.ViewsInEpoch,
 	}
 
 	epochCommit := &flow.EpochCommit{
@@ -1149,7 +1158,10 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		Header: rootHeader,
 	}
 	root.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(
-		inmem.ProtocolStateFromEpochServiceEvents(epochSetup, epochCommit).ID())))
+		kvstore.NewDefaultKVStore(
+			inmem.ProtocolStateFromEpochServiceEvents(epochSetup, epochCommit).ID(),
+		).ID(),
+	)))
 
 	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
 	if err != nil {
@@ -1175,6 +1187,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		trieDir,
 		unittest.ServiceAccountPublicKey,
 		chain,
+		fvm.WithRootBlock(root.Header),
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),

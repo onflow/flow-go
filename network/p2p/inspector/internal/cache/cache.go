@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -65,11 +66,11 @@ func NewRecordCache(config *RecordCacheConfig, recordEntityFactory recordEntityF
 // Returns number of cluster prefix control messages received after the adjustment. The record is initialized before
 // the adjustment func is applied that will increment the Gauge.
 // Args:
-// - nodeID: the node ID of the sender of the control message.
+// - pid: the peer ID of the sender of the control message.
 // Returns:
 //   - The cluster prefix control messages received gauge value after the adjustment.
 //   - exception only in cases of internal data inconsistency or bugs. No errors are expected.
-func (r *RecordCache) ReceivedClusterPrefixedMessage(nodeID flow.Identifier) (float64, error) {
+func (r *RecordCache) ReceivedClusterPrefixedMessage(pid peer.ID) (float64, error) {
 	var err error
 	adjustFunc := func(entity flow.Entity) flow.Entity {
 		entity, err = r.decayAdjustment(entity) // first decay the record
@@ -78,17 +79,17 @@ func (r *RecordCache) ReceivedClusterPrefixedMessage(nodeID flow.Identifier) (fl
 		}
 		return r.incrementAdjustment(entity) // then increment the record
 	}
-
-	adjustedEntity, adjusted := r.c.AdjustWithInit(nodeID, adjustFunc, func() flow.Entity {
-		return r.recordEntityFactory(nodeID)
+	entityID := r.MakeId(pid)
+	adjustedEntity, adjusted := r.c.AdjustWithInit(entityID, adjustFunc, func() flow.Entity {
+		return r.recordEntityFactory(entityID)
 	})
 
 	if err != nil {
-		return 0, fmt.Errorf("unexpected error while applying decay and increment adjustments for node %s: %w", nodeID, err)
+		return 0, fmt.Errorf("unexpected error while applying decay and increment adjustments for peer %s: %w", pid, err)
 	}
 
 	if !adjusted {
-		return 0, fmt.Errorf("adjustment failed for node %s", nodeID)
+		return 0, fmt.Errorf("adjustment failed for peer %s", pid)
 	}
 
 	record := mustBeClusterPrefixedMessageReceivedRecordEntity(adjustedEntity)
@@ -101,25 +102,26 @@ func (r *RecordCache) ReceivedClusterPrefixedMessage(nodeID flow.Identifier) (fl
 // Before the control messages received gauge value is returned it is decayed using the configured decay function.
 // Returns the record and true if the record exists, nil and false otherwise.
 // Args:
-// - nodeID: the node ID of the sender of the control message.
+// - pid: the peer ID of the sender of the control message.
 // Returns:
 // - The cluster prefixed control messages received gauge value after the decay and true if the record exists, 0 and false otherwise.
 // No errors are expected during normal operation.
-func (r *RecordCache) GetWithInit(nodeID flow.Identifier) (float64, bool, error) {
+func (r *RecordCache) GetWithInit(pid peer.ID) (float64, bool, error) {
 	var err error
 	adjustLogic := func(entity flow.Entity) flow.Entity {
 		// perform decay on gauge value
 		entity, err = r.decayAdjustment(entity)
 		return entity
 	}
-	adjustedEntity, adjusted := r.c.AdjustWithInit(nodeID, adjustLogic, func() flow.Entity {
-		return r.recordEntityFactory(nodeID)
+	entityID := r.MakeId(pid)
+	adjustedEntity, adjusted := r.c.AdjustWithInit(entityID, adjustLogic, func() flow.Entity {
+		return r.recordEntityFactory(entityID)
 	})
 	if err != nil {
-		return 0, false, fmt.Errorf("unexpected error while applying decay adjustment for node %s: %w", nodeID, err)
+		return 0, false, fmt.Errorf("unexpected error while applying decay adjustment for peer %s: %w", pid, err)
 	}
 	if !adjusted {
-		return 0, false, fmt.Errorf("decay adjustment failed for node %s", nodeID)
+		return 0, false, fmt.Errorf("decay adjustment failed for peer %s", pid)
 	}
 
 	record := mustBeClusterPrefixedMessageReceivedRecordEntity(adjustedEntity)
@@ -127,24 +129,31 @@ func (r *RecordCache) GetWithInit(nodeID flow.Identifier) (float64, bool, error)
 	return record.Gauge, true, nil
 }
 
+// Remove removes the record of the given peer id from the cache.
+// Returns true if the record is removed, false otherwise (i.e., the record does not exist).
+// Args:
+// - pid: the peer ID of the sender of the control message.
+// Returns:
+// - true if the record is removed, false otherwise (i.e., the record does not exist).
+func (r *RecordCache) Remove(pid peer.ID) bool {
+	return r.c.Remove(r.MakeId(pid))
+}
+
 // NodeIDs returns the list of identities of the nodes that have a spam record in the cache.
 func (r *RecordCache) NodeIDs() []flow.Identifier {
 	return flow.GetIDs(r.c.All())
 }
 
-// Remove removes the record of the given peer id from the cache.
-// Returns true if the record is removed, false otherwise (i.e., the record does not exist).
-// Args:
-// - nodeID: the node ID of the sender of the control message.
-// Returns:
-// - true if the record is removed, false otherwise (i.e., the record does not exist).
-func (r *RecordCache) Remove(nodeID flow.Identifier) bool {
-	return r.c.Remove(nodeID)
-}
-
 // Size returns the number of records in the cache.
 func (r *RecordCache) Size() uint {
 	return r.c.Size()
+}
+
+// MakeId is a helper function for creating the id field of the duplicateMessagesCounterEntity by hashing the peerID.
+// Returns:
+// - the hash of the peerID as a flow.Identifier.
+func (r *RecordCache) MakeId(peerID peer.ID) flow.Identifier {
+	return flow.MakeID([]byte(peerID))
 }
 
 func (r *RecordCache) incrementAdjustment(entity flow.Entity) flow.Entity {

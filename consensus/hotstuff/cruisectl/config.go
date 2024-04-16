@@ -10,11 +10,10 @@ import (
 func DefaultConfig() *Config {
 	return &Config{
 		TimingConfig{
-			TargetTransition:      DefaultEpochTransitionTime(),
 			FallbackProposalDelay: atomic.NewDuration(250 * time.Millisecond),
 			MinViewDuration:       atomic.NewDuration(600 * time.Millisecond),
 			MaxViewDuration:       atomic.NewDuration(1600 * time.Millisecond),
-			Enabled:               atomic.NewBool(false),
+			Enabled:               atomic.NewBool(true),
 		},
 		ControllerParams{
 			N_ewma: 5,
@@ -34,9 +33,6 @@ type Config struct {
 
 // TimingConfig specifies the BlockTimeController's limits of authority.
 type TimingConfig struct {
-	// TargetTransition defines the target time to transition epochs each week.
-	TargetTransition EpochTransitionTime
-
 	// FallbackProposalDelay is the minimal block construction delay. When used, it behaves like the
 	// old command line flag `block-rate-delay`. Specifically, the primary measures the duration from
 	// starting to construct its proposal to the proposal being ready to be published. If this
@@ -94,33 +90,46 @@ func (c *ControllerParams) beta() float64 {
 	return 1.0 / float64(c.N_itg)
 }
 
-func (ctl *TimingConfig) GetFallbackProposalDuration() time.Duration {
+// GetFallbackProposalDuration returns the proposal duration used when Cruise Control is not active.
+func (ctl TimingConfig) GetFallbackProposalDuration() time.Duration {
 	return ctl.FallbackProposalDelay.Load()
 }
-func (ctl *TimingConfig) GetMaxViewDuration() time.Duration {
+
+// GetMaxViewDuration returns the max view duration returned by the controller.
+func (ctl TimingConfig) GetMaxViewDuration() time.Duration {
 	return ctl.MaxViewDuration.Load()
 }
-func (ctl *TimingConfig) GetMinViewDuration() time.Duration {
+
+// GetMinViewDuration returns the min view duration returned by the controller.
+func (ctl TimingConfig) GetMinViewDuration() time.Duration {
 	return ctl.MinViewDuration.Load()
 }
-func (ctl *TimingConfig) GetEnabled() bool {
+
+// GetEnabled returns whether the controller is enabled.
+func (ctl TimingConfig) GetEnabled() bool {
 	return ctl.Enabled.Load()
 }
 
-func (ctl *TimingConfig) SetFallbackProposalDuration(dur time.Duration) error {
+// SetFallbackProposalDuration sets the proposal duration used when Cruise Control is not active.
+func (ctl TimingConfig) SetFallbackProposalDuration(dur time.Duration) error {
 	ctl.FallbackProposalDelay.Store(dur)
 	return nil
 }
-func (ctl *TimingConfig) SetMaxViewDuration(dur time.Duration) error {
+
+// SetMaxViewDuration sets the max view duration returned by the controller.
+func (ctl TimingConfig) SetMaxViewDuration(dur time.Duration) error {
 	ctl.MaxViewDuration.Store(dur)
 	return nil
 }
-func (ctl *TimingConfig) SetMinViewDuration(dur time.Duration) error {
+
+// SetMinViewDuration sets the min view duration returned by the controller.
+func (ctl TimingConfig) SetMinViewDuration(dur time.Duration) error {
 	ctl.MinViewDuration.Store(dur)
 	return nil
-
 }
-func (ctl *TimingConfig) SetEnabled(enabled bool) error {
+
+// SetEnabled sets whether the controller is enabled.
+func (ctl TimingConfig) SetEnabled(enabled bool) error {
 	ctl.Enabled.Store(enabled)
 	return nil
 }

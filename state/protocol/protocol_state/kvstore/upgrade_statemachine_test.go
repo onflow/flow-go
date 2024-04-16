@@ -1,4 +1,4 @@
-package kvstore
+package kvstore_test
 
 import (
 	"testing"
@@ -7,8 +7,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -22,22 +23,22 @@ type StateMachineSuite struct {
 	suite.Suite
 
 	view        uint64
-	parentState *mock.KVStoreReader
+	parentState *mockprotocol.KVStoreReader
 	mutator     *mock.KVStoreMutator
 	params      *mockprotocol.GlobalParams
 
-	stateMachine *PSVersionUpgradeStateMachine
+	stateMachine *kvstore.PSVersionUpgradeStateMachine
 }
 
 func (s *StateMachineSuite) SetupTest() {
-	s.parentState = mock.NewKVStoreReader(s.T())
+	s.parentState = mockprotocol.NewKVStoreReader(s.T())
 	s.mutator = mock.NewKVStoreMutator(s.T())
 	s.params = mockprotocol.NewGlobalParams(s.T())
 	s.view = 1000
 
 	s.params.On("EpochCommitSafetyThreshold").Return(uint64(100)).Maybe()
 
-	s.stateMachine = NewPSVersionUpgradeStateMachine(s.view, s.params, s.parentState, s.mutator)
+	s.stateMachine = kvstore.NewPSVersionUpgradeStateMachine(s.view, s.params, s.parentState, s.mutator)
 	require.NotNil(s.T(), s.stateMachine)
 }
 
@@ -63,7 +64,7 @@ func (s *StateMachineSuite) TestEvolveState_ProtocolStateVersionUpgrade() {
 		upgrade.NewProtocolStateVersion = oldVersion + 1
 
 		s.mutator.On("GetVersionUpgrade").Return(nil)
-		s.mutator.On("SetVersionUpgrade", &protocol_state.ViewBasedActivator[uint64]{
+		s.mutator.On("SetVersionUpgrade", &protocol.ViewBasedActivator[uint64]{
 			Data:           upgrade.NewProtocolStateVersion,
 			ActivationView: upgrade.ActiveView,
 		}).Return()

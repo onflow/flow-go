@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 )
 
 // constructRootHeader constructs a header for the root block.
@@ -28,11 +29,12 @@ func constructRootBlock(rootHeader *flow.Header, setup *flow.EpochSetup, commit 
 		Payload: nil,
 	}
 	block.SetPayload(flow.Payload{
-		Guarantees:      nil,
-		Seals:           nil,
-		Receipts:        nil,
-		Results:         nil,
-		ProtocolStateID: inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID(),
+		Guarantees: nil,
+		Seals:      nil,
+		Receipts:   nil,
+		Results:    nil,
+		// TODO: shortcut in bootstrapping; we will probably have to start with a non-empty KV store in the future
+		ProtocolStateID: kvstore.NewDefaultKVStore(inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()).ID(),
 	})
 	return block
 }
@@ -54,6 +56,8 @@ func constructRootEpochEvents(
 		Participants:       participants.Sort(flow.Canonical[flow.Identity]).ToSkeleton(),
 		Assignments:        assignments,
 		RandomSource:       GenerateRandomSeed(flow.EpochSetupRandomSourceLength),
+		TargetDuration:     flagEpochTimingDuration,
+		TargetEndTime:      rootEpochTargetEndTime(),
 	}
 
 	qcsWithSignerIDs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(clusterQCs))

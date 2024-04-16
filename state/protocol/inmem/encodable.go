@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 // EncodableSnapshot is the encoding format for protocol.Snapshot
@@ -15,7 +16,8 @@ type EncodableSnapshot struct {
 	QuorumCertificate   *flow.QuorumCertificate
 	Epochs              EncodableEpochs
 	Params              EncodableParams
-	ProtocolState       *flow.ProtocolStateEntry
+	EpochProtocolState  *flow.ProtocolStateEntry
+	KVStore             storage.KeyValueStoreData
 	SealedVersionBeacon *flow.SealedVersionBeacon
 }
 
@@ -35,6 +37,8 @@ type EncodableEpoch struct {
 	DKGPhase3FinalView uint64
 	FinalView          uint64
 	RandomSource       []byte
+	TargetDuration     uint64 // desired real-world duration for the epoch, in seconds
+	TargetEndTime      uint64 // desired real-world end time for the epoch, in UNIX time [seconds]
 	InitialIdentities  flow.IdentitySkeletonList
 	Clustering         flow.ClusterList
 	Clusters           []EncodableCluster

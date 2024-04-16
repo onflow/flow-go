@@ -33,6 +33,14 @@ func ToEpochSetup(epoch Epoch) (*flow.EpochSetup, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch dkg final views: %w", err)
 	}
+	targetDuration, err := epoch.TargetDuration()
+	if err != nil {
+		return nil, fmt.Errorf("could not get target duration: %w", err)
+	}
+	targetEndTime, err := epoch.TargetEndTime()
+	if err != nil {
+		return nil, fmt.Errorf("could not get target end time: %w", err)
+	}
 	participants, err := epoch.InitialIdentities()
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch participants: %w", err)
@@ -57,6 +65,8 @@ func ToEpochSetup(epoch Epoch) (*flow.EpochSetup, error) {
 		Participants:       participants,
 		Assignments:        assignments,
 		RandomSource:       randomSource,
+		TargetDuration:     targetDuration,
+		TargetEndTime:      targetEndTime,
 	}
 	return setup, nil
 }

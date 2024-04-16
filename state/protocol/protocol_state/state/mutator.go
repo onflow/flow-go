@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
-	ps "github.com/onflow/flow-go/state/protocol/protocol_state"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
@@ -30,9 +30,9 @@ type stateMutator struct {
 	results          storage.ExecutionResults
 	kvStoreSnapshots storage.ProtocolKVStore
 
-	parentState          ps.KVStoreReader
-	kvMutator            ps.KVStoreMutator
-	orthoKVStoreMachines []ps.KeyValueStoreStateMachine
+	parentState          protocol.KVStoreReader
+	kvMutator            protocol_state.KVStoreMutator
+	orthoKVStoreMachines []protocol_state.KeyValueStoreStateMachine
 }
 
 var _ protocol.StateMutator = (*stateMutator)(nil)
@@ -46,8 +46,8 @@ func newStateMutator(
 	kvStoreSnapshots storage.ProtocolKVStore,
 	candidateView uint64,
 	parentID flow.Identifier,
-	parentState ps.KVStoreAPI,
-	stateMachineFactories ...ps.KeyValueStoreStateMachineFactory,
+	parentState protocol_state.KVStoreAPI,
+	stateMachineFactories ...protocol_state.KeyValueStoreStateMachineFactory,
 ) (*stateMutator, error) {
 	protocolVersion := parentState.GetProtocolStateVersion()
 	if versionUpgrade := parentState.GetVersionUpgrade(); versionUpgrade != nil {
@@ -62,7 +62,7 @@ func newStateMutator(
 			parentState.GetProtocolStateVersion(), protocolVersion, err)
 	}
 
-	stateMachines := make([]ps.KeyValueStoreStateMachine, 0, len(stateMachineFactories))
+	stateMachines := make([]protocol_state.KeyValueStoreStateMachine, 0, len(stateMachineFactories))
 	for _, factory := range stateMachineFactories {
 		stateMachine, err := factory.Create(candidateView, parentID, parentState, replicatedState)
 		if err != nil {
@@ -98,7 +98,7 @@ func (m *stateMutator) Build() (stateID flow.Identifier, dbUpdates *protocol.Def
 	for _, stateMachine := range m.orthoKVStoreMachines {
 		dbOps, err := stateMachine.Build()
 		if err != nil {
-			return flow.ZeroID, protocol.NewDeferredBlockPersist(), fmt.Errorf("unexpected exceptioon building state machine's output state: %w", err)
+			return flow.ZeroID, protocol.NewDeferredBlockPersist(), fmt.Errorf("unexpected exception building state machine's output state: %w", err)
 		}
 		dbUpdates.AddIndexingOps(dbOps.Pending())
 	}

@@ -9,6 +9,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/addresses"
+	bootstrap_execution_state_payloads "github.com/onflow/flow-go/cmd/util/cmd/bootstrap-execution-state-payloads"
 	checkpoint_collect_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-collect-stats"
 	checkpoint_list_tries "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-list-tries"
 	checkpoint_trie_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-trie-stats"
@@ -18,6 +20,7 @@ import (
 	extract "github.com/onflow/flow-go/cmd/util/cmd/execution-state-extract"
 	ledger_json_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-json-execution-state"
 	export_json_transactions "github.com/onflow/flow-go/cmd/util/cmd/export-json-transactions"
+	extractpayloads "github.com/onflow/flow-go/cmd/util/cmd/extract-payloads-by-address"
 	read_badger "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd"
 	read_execution_state "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
 	read_hotstuff "github.com/onflow/flow-go/cmd/util/cmd/read-hotstuff/cmd"
@@ -80,6 +83,9 @@ func addCommands() {
 	rootCmd.AddCommand(snapshot.Cmd)
 	rootCmd.AddCommand(export_json_transactions.Cmd)
 	rootCmd.AddCommand(read_hotstuff.RootCmd)
+	rootCmd.AddCommand(addresses.Cmd)
+	rootCmd.AddCommand(bootstrap_execution_state_payloads.Cmd)
+	rootCmd.AddCommand(extractpayloads.Cmd)
 }
 
 func initConfig() {

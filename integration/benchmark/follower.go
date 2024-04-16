@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/onflow/flow-go/integration/benchmark/common"
+
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/access"
 	"github.com/onflow/flow-go/module/metrics"
@@ -14,6 +16,7 @@ import (
 )
 
 type TxFollower interface {
+	common.ReferenceBlockProvider
 	// Follow returns a channel that is closed when the transaction is complete.
 	Follow(ID flowsdk.Identifier) <-chan flowsdk.TransactionResult
 
@@ -27,17 +30,17 @@ type TxFollower interface {
 	Stop()
 }
 
-type followerOption func(f *txFollowerImpl)
+type FollowerOption func(f *txFollowerImpl)
 
-func WithLogger(logger zerolog.Logger) followerOption {
+func WithLogger(logger zerolog.Logger) FollowerOption {
 	return func(f *txFollowerImpl) { f.logger = logger }
 }
 
-func WithInteval(interval time.Duration) followerOption {
+func WithInteval(interval time.Duration) FollowerOption {
 	return func(f *txFollowerImpl) { f.interval = interval }
 }
 
-func WithMetrics(m *metrics.LoaderCollector) followerOption {
+func WithMetrics(m *metrics.LoaderCollector) FollowerOption {
 	return func(f *txFollowerImpl) { f.metrics = m }
 }
 
@@ -72,7 +75,7 @@ type txInfo struct {
 
 // NewTxFollower creates a new follower that tracks the current block height
 // and can notify on transaction completion.
-func NewTxFollower(ctx context.Context, client access.Client, opts ...followerOption) (TxFollower, error) {
+func NewTxFollower(ctx context.Context, client access.Client, opts ...FollowerOption) (TxFollower, error) {
 	newCtx, cancel := context.WithCancel(ctx)
 
 	f := &txFollowerImpl{
@@ -282,13 +285,17 @@ func (f *txFollowerImpl) Stop() {
 	f.txToChan = make(map[flowsdk.Identifier]txInfo)
 }
 
+func (f *txFollowerImpl) ReferenceBlockID() flowsdk.Identifier {
+	return f.BlockID()
+}
+
 type nopTxFollower struct {
 	*txFollowerImpl
 }
 
 // NewNopTxFollower creates a new follower that tracks the current block height and ID
 // but does not notify on transaction completion.
-func NewNopTxFollower(ctx context.Context, client access.Client, opts ...followerOption) (TxFollower, error) {
+func NewNopTxFollower(ctx context.Context, client access.Client, opts ...FollowerOption) (TxFollower, error) {
 	f, err := NewTxFollower(ctx, client, opts...)
 	if err != nil {
 		return nil, err

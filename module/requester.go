@@ -26,3 +26,16 @@ type Requester interface {
 	// the cost of additional network messages.
 	Force()
 }
+
+type NoopRequester struct{}
+
+func (n NoopRequester) EntityByID(entityID flow.Identifier, selector flow.IdentityFilter[flow.Identity]) {
+}
+
+func (n NoopRequester) Query(key flow.Identifier, selector flow.IdentityFilter[flow.Identity]) {}
+
+func (n NoopRequester) Force() {}
+
+func (n NoopRequester) WithHandle(func(flow.Identifier, flow.Entity)) Requester {
+	return n
+}

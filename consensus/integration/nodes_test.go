@@ -55,6 +55,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/state/protocol/util"
 	storage "github.com/onflow/flow-go/storage/badger"
@@ -280,7 +281,8 @@ func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *fl
 		},
 	)
 
-	root.SetPayload(flow.Payload{ProtocolStateID: inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()})
+	epochProtocolStateID := inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()
+	root.SetPayload(flow.Payload{ProtocolStateID: kvstore.NewDefaultKVStore(epochProtocolStateID).ID()})
 	result := unittest.BootstrapExecutionResultFixture(root, unittest.GenesisStateCommitment)
 	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()}
 

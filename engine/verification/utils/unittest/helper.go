@@ -498,7 +498,7 @@ func withConsumers(t *testing.T,
 	require.NoError(t, err)
 	protocolState, err := s.State.Final().ProtocolState()
 	require.NoError(t, err)
-	protocolStateID := protocolState.Entry().ID()
+	protocolStateID := protocolState.ID()
 
 	chainID := root.ChainID
 	ops = append(ops, WithExecutorIDs(
@@ -654,7 +654,7 @@ func bootstrapSystem(
 		identities = append(identities, verID.Identity())
 
 		mutableProtocolState := protocol_state.NewMutableProtocolState(
-			stateFixture.Storage.ProtocolState,
+			stateFixture.Storage.EpochProtocolState,
 			stateFixture.Storage.ProtocolKVStore,
 			stateFixture.State.Params(),
 			stateFixture.Storage.Headers,

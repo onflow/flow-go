@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 )
 
 // Snapshot is a memory-backed implementation of protocol.Snapshot. The snapshot
@@ -28,7 +29,7 @@ func (s Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 }
 
 func (s Snapshot) Identities(selector flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
-	protocolState, err := s.ProtocolState()
+	protocolState, err := s.EpochProtocolState()
 	if err != nil {
 		return nil, fmt.Errorf("could not access protocol state: %w", err)
 	}
@@ -67,7 +68,7 @@ func (s Snapshot) Descendants() ([]flow.Identifier, error) {
 }
 
 func (s Snapshot) Phase() (flow.EpochPhase, error) {
-	return s.enc.ProtocolState.EpochPhase(), nil
+	return s.enc.EpochProtocolState.EpochPhase(), nil
 }
 
 func (s Snapshot) RandomSource() ([]byte, error) {
@@ -86,7 +87,7 @@ func (s Snapshot) Encodable() EncodableSnapshot {
 	return s.enc
 }
 
-func (s Snapshot) ProtocolState() (protocol.DynamicProtocolState, error) {
+func (s Snapshot) EpochProtocolState() (protocol.DynamicProtocolState, error) {
 	epochs := s.Epochs()
 	previous := epochs.Previous()
 	current := epochs.Current()
@@ -132,7 +133,7 @@ func (s Snapshot) ProtocolState() (protocol.DynamicProtocolState, error) {
 	}
 
 	protocolStateEntry, err := flow.NewRichProtocolStateEntry(
-		s.enc.ProtocolState,
+		s.enc.EpochProtocolState,
 		previousEpochSetup,
 		previousEpochCommit,
 		currentEpochSetup,
@@ -144,6 +145,10 @@ func (s Snapshot) ProtocolState() (protocol.DynamicProtocolState, error) {
 	}
 
 	return NewDynamicProtocolStateAdapter(protocolStateEntry, s.Params()), nil
+}
+
+func (s Snapshot) ProtocolState() (protocol.KVStoreReader, error) {
+	return kvstore.VersionedDecode(s.enc.KVStore.Version, s.enc.KVStore.Data)
 }
 
 func (s Snapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) {

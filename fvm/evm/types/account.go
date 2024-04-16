@@ -24,6 +24,9 @@ type Account interface {
 	// Returns the code hash of this account
 	CodeHash() []byte
 
+	// Returns the nonce of this account
+	Nonce() uint64
+
 	// Deposit deposits the token from the given vault into this account
 	Deposit(*FLOWTokenVault)
 
@@ -49,5 +52,5 @@ type Account interface {
 	// if no data is provided it would behave as transfering tokens to the
 	// target address
 	// works only for COAs
-	Call(Address, Data, GasLimit, Balance) Data
+	Call(Address, Data, GasLimit, Balance) *ResultSummary
 }

@@ -86,14 +86,14 @@ type StateMachineFactoryMethod func(candidateView uint64, parentState *flow.Rich
 // It relies on Key-Value Store to read the parent state and to persist the snapshot of the updated Epoch state.
 type EpochStateMachine struct {
 	activeStateMachine               StateMachine
-	parentState                      protocol_state.KVStoreReader
+	parentState                      protocol.KVStoreReader
 	mutator                          protocol_state.KVStoreMutator
 	epochFallbackStateMachineFactory func() (StateMachine, error)
 
-	setups           storage.EpochSetups
-	commits          storage.EpochCommits
-	protocolStateDB  storage.ProtocolState
-	pendingDbUpdates *protocol.DeferredBlockPersist
+	setups               storage.EpochSetups
+	commits              storage.EpochCommits
+	epochProtocolStateDB storage.ProtocolState
+	pendingDbUpdates     *protocol.DeferredBlockPersist
 }
 
 var _ protocol_state.KeyValueStoreStateMachine = (*EpochStateMachine)(nil)
@@ -109,13 +109,13 @@ func NewEpochStateMachine(
 	params protocol.GlobalParams,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	protocolStateDB storage.ProtocolState,
-	parentState protocol_state.KVStoreReader,
+	epochProtocolStateDB storage.ProtocolState,
+	parentState protocol.KVStoreReader,
 	mutator protocol_state.KVStoreMutator,
 	happyPathStateMachineFactory StateMachineFactoryMethod,
 	epochFallbackStateMachineFactory StateMachineFactoryMethod,
 ) (*EpochStateMachine, error) {
-	parentEpochState, err := protocolStateDB.ByBlockID(parentID)
+	parentEpochState, err := epochProtocolStateDB.ByBlockID(parentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", parentID, err)
 	}
@@ -152,10 +152,10 @@ func NewEpochStateMachine(
 		epochFallbackStateMachineFactory: func() (StateMachine, error) {
 			return epochFallbackStateMachineFactory(candidateView, parentEpochState)
 		},
-		setups:           setups,
-		commits:          commits,
-		protocolStateDB:  protocolStateDB,
-		pendingDbUpdates: protocol.NewDeferredBlockPersist(),
+		setups:               setups,
+		commits:              commits,
+		epochProtocolStateDB: epochProtocolStateDB,
+		pendingDbUpdates:     protocol.NewDeferredBlockPersist(),
 	}, nil
 }
 
@@ -169,18 +169,18 @@ func NewEpochStateMachine(
 func (e *EpochStateMachine) Build() (*protocol.DeferredBlockPersist, error) {
 	updatedEpochState, updatedStateID, hasChanges := e.activeStateMachine.Build()
 	e.pendingDbUpdates.AddIndexingOp(func(blockID flow.Identifier, tx *transaction.Tx) error {
-		return e.protocolStateDB.Index(blockID, updatedStateID)(tx)
+		return e.epochProtocolStateDB.Index(blockID, updatedStateID)(tx)
 	})
 	if hasChanges {
-		e.pendingDbUpdates.AddDbOp(operation.SkipDuplicatesTx(e.protocolStateDB.StoreTx(updatedStateID, updatedEpochState)))
+		e.pendingDbUpdates.AddDbOp(operation.SkipDuplicatesTx(e.epochProtocolStateDB.StoreTx(updatedStateID, updatedEpochState)))
 	}
 	e.mutator.SetEpochStateID(updatedStateID)
 
 	return e.pendingDbUpdates, nil
 }
 
-// EvolveState applies the state change(s) on sub-state P for the candidate block (under construction).
-// Information that potentially changes the Epoch state (compared to the parent block's state):
+// EvolveState applies the state change(s) on the Epoch sub-state based on information from the candidate block
+// (under construction). Information that potentially changes the state (compared to the parent block's state):
 //   - Service Events sealed in the candidate block
 //   - the candidate block's view (already provided at construction time)
 //
@@ -235,7 +235,7 @@ func (e *EpochStateMachine) View() uint64 {
 }
 
 // ParentState returns parent state associated with this state machine.
-func (e *EpochStateMachine) ParentState() protocol_state.KVStoreReader {
+func (e *EpochStateMachine) ParentState() protocol.KVStoreReader {
 	return e.parentState
 }
 

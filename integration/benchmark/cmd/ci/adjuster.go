@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/integration/benchmark"
 )
 
-type adjuster struct {
+type Adjuster struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	done   chan struct{}
@@ -47,9 +48,9 @@ func NewTPSAdjuster(
 	lg *benchmark.ContLoadGenerator,
 	workerStatsTracker *benchmark.WorkerStatsTracker,
 	params AdjusterParams,
-) *adjuster {
+) *Adjuster {
 	ctx, cancel := context.WithCancel(ctx)
-	a := &adjuster{
+	a := &Adjuster{
 		ctx:    ctx,
 		cancel: cancel,
 		done:   make(chan struct{}),
@@ -77,29 +78,29 @@ func NewTPSAdjuster(
 	go func() {
 		defer close(a.done)
 
-		log.Info().Dur("delayInMS", params.Delay).Msg("Waiting before starting TPS adjuster")
+		log.Info().Dur("delayInMS", params.Delay).Msg("Waiting before starting TPS Adjuster")
 		select {
 		case <-time.After(params.Delay):
-			log.Info().Msg("starting TPS adjuster")
+			log.Info().Msg("starting TPS Adjuster")
 		case <-ctx.Done():
 			return
 		}
 
 		err := a.adjustTPSForever()
-		if err != nil && err != context.Canceled {
-			log.Error().Err(err).Msg("adjuster failed")
+		if err != nil && !errors.Is(err, context.Canceled) {
+			log.Error().Err(err).Msg("Adjuster failed")
 		}
 	}()
 
 	return a
 }
 
-func (a *adjuster) Stop() {
+func (a *Adjuster) Stop() {
 	a.cancel()
 	<-a.done
 }
 
-func (a *adjuster) adjustTPSForever() (err error) {
+func (a *Adjuster) adjustTPSForever() (err error) {
 	initialStats := a.workerStatsTracker.GetStats()
 	lastState := adjusterState{
 		timestamp: time.Now(),
@@ -133,7 +134,7 @@ func (a *adjuster) adjustTPSForever() (err error) {
 // compared to the last round.
 //
 // Target TPS is always bounded by [minTPS, maxTPS].
-func (a *adjuster) adjustOnce(nowTs time.Time, lastState adjusterState) (adjusterState, error) {
+func (a *Adjuster) adjustOnce(nowTs time.Time, lastState adjusterState) (adjusterState, error) {
 	timeDiff := nowTs.Sub(lastState.timestamp)
 	currentStats := a.workerStatsTracker.GetStats()
 

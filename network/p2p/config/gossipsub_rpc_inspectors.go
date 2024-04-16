@@ -45,11 +45,12 @@ type InspectionProcess struct {
 }
 
 const (
-	InspectionKey = "inspection"
-	TruncationKey = "truncation"
-	EnableKey     = "enable"
-	DisabledKey   = "disabled"
-	MessageIDKey  = "message-id"
+	InspectionKey       = "inspection"
+	TruncationKey       = "truncation"
+	EnableKey           = "enable"
+	DisabledKey         = "disabled"
+	MessageIDKey        = "message-id"
+	RejectUnstakedPeers = "reject-unstaked-peers"
 )
 
 // Inspect configuration to enable/disable RPC inspection for a particular control message type.
@@ -70,6 +71,8 @@ type Inspect struct {
 	EnableIWant bool `mapstructure:"enable-iwant"`
 	// EnablePublish enable publish message inspection.
 	EnablePublish bool `mapstructure:"enable-publish"`
+	// RejectUnstakedPeers when set to true RPC's will be rejected from unstaked peers.
+	RejectUnstakedPeers bool `mapstructure:"reject-unstaked-peers"`
 }
 
 // Truncate configuration to enable/disable RPC truncation for a particular control message type.
@@ -138,6 +141,10 @@ type GraftPruneRpcInspectionParameters struct {
 	// Ideally, a GRAFT or PRUNE message should not have any duplicate topics, hence a topic ID is counted as a duplicate only if it is repeated more than once.
 	// When the total number of duplicate topic ids in a single GRAFT or PRUNE message exceeds this threshold, the inspection of message will fail.
 	DuplicateTopicIdThreshold int `validate:"gte=0" mapstructure:"duplicate-topic-id-threshold"`
+
+	// InvalidTopicIdThreshold Maximum number of total invalid topic ids in a single GRAFT or PRUNE message, ideally this should be 0 but we allow for some tolerance
+	// to avoid penalizing peers that are not malicious but are misbehaving due to bugs or other issues.
+	InvalidTopicIdThreshold int `validate:"gte=0" mapstructure:"invalid-topic-id-threshold"`
 }
 
 const (
@@ -145,6 +152,7 @@ const (
 	MessageIdCountThreshold    = "message-id-count-threshold"
 	CacheMissThresholdKey      = "cache-miss-threshold"
 	DuplicateMsgIDThresholdKey = "duplicate-message-id-threshold"
+	InvalidTopicIdThresholdKey = "invalid-topic-id-threshold"
 )
 
 // IWantRpcInspectionParameters contains the "numerical values" for iwant rpc control inspection.
@@ -207,6 +215,10 @@ type IHaveRpcInspectionParameters struct {
 	// Ideally, an iHave message should not have any duplicate message IDs, hence a message id is considered duplicate when it is repeated more than once
 	// within the same iHave message. When the total number of duplicate message ids in a single iHave message exceeds this threshold, the inspection of message will fail.
 	DuplicateMessageIdThreshold int `validate:"gte=0" mapstructure:"duplicate-message-id-threshold"`
+
+	// InvalidTopicIdThreshold Maximum number of total invalid topic ids in a single IHAVE message, ideally this should be 0 but we allow for some tolerance
+	// to avoid penalizing peers that are not malicious but are misbehaving due to bugs or other issues.
+	InvalidTopicIdThreshold int `validate:"gte=0" mapstructure:"invalid-topic-id-threshold"`
 }
 
 const (

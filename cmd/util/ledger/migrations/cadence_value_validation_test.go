@@ -103,7 +103,7 @@ func TestValidateCadenceValues(t *testing.T) {
 		oldPayloads := createPayloads(interpreter.NewUnmeteredUInt64Value(1))
 		newPayloads := createPayloads(interpreter.NewUnmeteredUInt64Value(2))
 		wantErrorMsg := "failed to validate value for address 0000000000000001, domain storage, key 0: failed to validate ([AnyStruct][0]).([UInt64][1]): values differ: 1 (interpreter.UInt64Value) != 2 (interpreter.UInt64Value)"
-		wantVerboseMsg := "{\"level\":\"info\",\"address\":\"0000000000000001\",\"domain\":\"storage\",\"key\":\"0\",\"trace\":\"failed to validate ([AnyStruct][0]).([UInt64][1]): values differ: 1 (interpreter.UInt64Value) != 2 (interpreter.UInt64Value)\",\"old value\":\"[[0, 1]]\",\"new value\":\"[[0, 2]]\",\"message\":\"failed to validate value\"}\n"
+		wantVerboseMsg := "{\"level\":\"info\",\"address\":\"0000000000000001\",\"domain\":\"storage\",\"key\":\"0 (interpreter.StringStorageMapKey)\",\"trace\":\"failed to validate ([AnyStruct][0]).([UInt64][1]): values differ: 1 (interpreter.UInt64Value) != 2 (interpreter.UInt64Value)\",\"old value\":\"[[0, 1]]\",\"new value\":\"[[0, 2]]\",\"message\":\"failed to validate value\"}\n"
 
 		// Disable verbose logging
 		err := validateCadenceValues(
