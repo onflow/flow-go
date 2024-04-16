@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
-	"github.com/onflow/flow-go/storage"
 )
 
 // FromSnapshot generates a memory-backed snapshot from the input snapshot.
@@ -75,25 +74,6 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 		return nil, fmt.Errorf("could not get params: %w", err)
 	}
 	snap.Params = params.enc
-
-	protocolEpochState, err := from.EpochProtocolState()
-	if err != nil {
-		return nil, fmt.Errorf("could not get protocol epoch state: %w", err)
-	}
-	snap.EpochProtocolState = protocolEpochState.Entry().ProtocolStateEntry
-
-	protocolState, err := from.ProtocolState()
-	if err != nil {
-		return nil, fmt.Errorf("could not get protocol state: %w", err)
-	}
-	kvStoreVersion, kvStoreData, err := protocolState.VersionedEncode()
-	if err != nil {
-		return nil, fmt.Errorf("could not encode kvstore: %w", err)
-	}
-	snap.KVStore = storage.KeyValueStoreData{
-		Version: kvStoreVersion,
-		Data:    kvStoreData,
-	}
 
 	// convert version beacon
 	versionBeacon, err := from.VersionBeacon()
@@ -383,14 +363,9 @@ func SnapshotFromBootstrapStateWithParams(
 			FirstSeal:   seal,
 			ExtraBlocks: make([]*flow.Block, 0),
 		},
-		QuorumCertificate:  qc,
-		Epochs:             epochs,
-		Params:             params,
-		EpochProtocolState: rootEpochState,
-		KVStore: storage.KeyValueStoreData{
-			Version: kvStoreVersion,
-			Data:    kvStoreData,
-		},
+		QuorumCertificate:   qc,
+		Epochs:              epochs,
+		Params:              params,
 		SealedVersionBeacon: nil,
 	})
 

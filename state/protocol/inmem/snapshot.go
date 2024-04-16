@@ -68,7 +68,11 @@ func (s Snapshot) Descendants() ([]flow.Identifier, error) {
 }
 
 func (s Snapshot) Phase() (flow.EpochPhase, error) {
-	return s.enc.EpochProtocolState.EpochPhase(), nil
+	epochProtocolState, err := s.EpochProtocolState()
+	if err != nil {
+		return flow.EpochPhaseUndefined, fmt.Errorf("could not get epoch protocol state: %w", err)
+	}
+	return epochProtocolState.EpochPhase(), nil
 }
 
 func (s Snapshot) RandomSource() ([]byte, error) {

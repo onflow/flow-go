@@ -3,7 +3,6 @@ package flow
 import (
 	"errors"
 	"fmt"
-
 	"golang.org/x/exp/slices"
 )
 
@@ -123,6 +122,15 @@ func (segment *SealingSegment) FinalizedSeal() (*Seal, error) {
 			segment.Sealed().ID(), seal.BlockID)
 	}
 	return seal, nil
+}
+
+// LatestProtocolStateEntry returns the Protocol State entry corresponding to
+// the highest block in the sealing segment. This represents the Dynamic Protocol State
+// after applying all state changes in `SealingSegment.Highest().Payload`.
+// Caution: `segment` must be a valid SealingSegment.
+func (segment *SealingSegment) LatestProtocolStateEntry() *ProtocolStateEntryWrapper {
+	highest := segment.Highest()
+	return segment.ProtocolStateEntries[highest.Payload.ProtocolStateID]
 }
 
 // Validate validates the sealing segment structure and returns an error if
