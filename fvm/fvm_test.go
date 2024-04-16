@@ -3065,6 +3065,7 @@ func TestEVM(t *testing.T) {
 		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
 		withContextOptions(
 			fvm.WithEVMEnabled(true),
+			fvm.WithChain(flow.Emulator.Chain()),
 			fvm.WithCadenceLogging(true),
 		).
 		run(func(
@@ -3226,6 +3227,7 @@ func TestEVM(t *testing.T) {
 			// so we have to use emulator here so that the EVM storage contract is deployed
 			// to the 5th address
 			fvm.WithChain(flow.Emulator.Chain()),
+			fvm.WithEVMEnabled(true),
 		).
 		run(func(
 			t *testing.T,
