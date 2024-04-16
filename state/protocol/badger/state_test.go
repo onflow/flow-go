@@ -226,7 +226,7 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 			builder := unittest.NewEpochBuilder(t, mutableState, state)
 			builder.
 				BuildEpoch().CompleteEpoch(). // build epoch 2
-				BuildEpoch() // build epoch 3
+				BuildEpoch()                  // build epoch 3
 			heights, ok := builder.EpochHeights(2)
 			epoch2FirstHeight = heights.FirstHeight()
 			epoch1FinalHeight = epoch2FirstHeight - 1
@@ -380,7 +380,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
 			unittest.NewEpochBuilder(t, mutableState, state).
 				BuildEpoch().CompleteEpoch(). // build epoch 2
-				BuildEpoch() // build epoch 3
+				BuildEpoch()                  // build epoch 3
 
 			// find a snapshot from epoch setup phase in epoch 2
 			epoch1Counter, err := rootSnapshot.Epochs().Current().Counter()
