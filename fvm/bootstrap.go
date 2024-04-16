@@ -434,7 +434,7 @@ func (b *bootstrapExecutor) Execute() error {
 	b.deployStakingCollection(service, &env)
 
 	// sets up the EVM environment
-	b.setupEVM(service, fungibleToken, flowToken)
+	b.setupEVM(service, nonFungibleToken, fungibleToken, flowToken)
 
 	err = expectAccounts(systemcontracts.EVMStorageAccountIndex)
 	if err != nil {

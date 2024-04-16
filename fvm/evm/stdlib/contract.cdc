@@ -316,7 +316,7 @@ contract EVM {
 
         /// Bridges the given NFT from the EVM environment, requiring a Provider from which to withdraw a fee to fulfill
         /// the bridge request. Note: the caller should own the requested NFT in EVM
-        access(Owner | Bridge)
+        access(all)
         fun withdrawNFT(
             type: Type,
             id: UInt256,
@@ -343,7 +343,7 @@ contract EVM {
         /// Bridges the given fungible tokens from the EVM environment, requiring a Provider from which to withdraw a
         /// fee to fulfill the bridge request. Note: the caller should own the requested tokens & sufficient balance of
         /// requested tokens in EVM
-        access(Owner | Bridge)
+        access(all)
         fun withdrawTokens(
             type: Type,
             amount: UInt256,
