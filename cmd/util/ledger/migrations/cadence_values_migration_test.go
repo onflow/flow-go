@@ -422,11 +422,11 @@ func checkReporters(
 		)
 	}
 
-	newCadenceValueMigrationReportEntry := func(
+	newCadenceValueMigrationEntry := func(
 		migration, key string,
 		domain common.PathDomain,
-	) cadenceValueMigrationReportEntry {
-		return cadenceValueMigrationReportEntry{
+	) cadenceValueMigrationEntry {
+		return cadenceValueMigrationEntry{
 			StorageMapKey: interpreter.StringStorageMapKey(key),
 			StorageKey: interpreter.NewStorageKey(
 				nil,
@@ -451,7 +451,7 @@ func checkReporters(
 		}
 	}
 
-	acctTypedDictKeyMigrationReportEntry := newCadenceValueMigrationReportEntry(
+	acctTypedDictKeyMigrationReportEntry := newCadenceValueMigrationEntry(
 		"StaticTypeMigration",
 		"dictionary_with_account_type_keys",
 		common.PathDomainStorage)
@@ -460,38 +460,38 @@ func checkReporters(
 	assert.ElementsMatch(
 		t,
 		[]valueMigrationReportEntry{
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"StringNormalizingMigration",
 				"string_value_1",
 				common.PathDomainStorage,
 			),
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"StaticTypeMigration",
 				"type_value",
 				common.PathDomainStorage,
 			),
 
 			// String keys in dictionary
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"StringNormalizingMigration",
 				"dictionary_with_string_keys",
 				common.PathDomainStorage,
 			),
 
 			// Restricted typed keys in dictionary
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"StaticTypeMigration",
 				"dictionary_with_restricted_typed_keys",
 				common.PathDomainStorage,
 			),
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"StaticTypeMigration",
 				"dictionary_with_restricted_typed_keys",
 				common.PathDomainStorage,
 			),
 
 			// Capabilities and links
-			cadenceValueMigrationReportEntry{
+			cadenceValueMigrationEntry{
 				StorageMapKey: interpreter.StringStorageMapKey("capability"),
 				StorageKey: interpreter.NewStorageKey(
 					nil,
@@ -500,7 +500,7 @@ func checkReporters(
 				),
 				Migration: "CapabilityValueMigration",
 			},
-			capConsPathCapabilityMigrationEntry{
+			capabilityMigrationEntry{
 				AccountAddress: address,
 				AddressPath: interpreter.AddressPath{
 					Address: address,
@@ -515,19 +515,19 @@ func checkReporters(
 					rResourceType,
 				),
 			},
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"EntitlementsMigration",
 				"capability",
 				common.PathDomainStorage,
 			),
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"EntitlementsMigration",
 				"linkR",
 				common.PathDomainPublic,
 			),
 
 			// untyped capability
-			capConsPathCapabilityMigrationEntry{
+			capabilityMigrationEntry{
 				AccountAddress: address,
 				AddressPath: interpreter.AddressPath{
 					Address: address,
@@ -542,7 +542,7 @@ func checkReporters(
 					rResourceType,
 				),
 			},
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"CapabilityValueMigration",
 				"untyped_capability",
 				common.PathDomainStorage,
@@ -560,24 +560,24 @@ func checkReporters(
 			acctTypedDictKeyMigrationReportEntry,
 
 			// Entitled typed keys in dictionary
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"EntitlementsMigration",
 				"dictionary_with_auth_reference_typed_key",
 				common.PathDomainStorage,
 			),
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"EntitlementsMigration",
 				"dictionary_with_reference_typed_key",
 				common.PathDomainStorage,
 			),
 
 			// Entitlements in links
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"EntitlementsMigration",
 				"flowTokenReceiver",
 				common.PathDomainPublic,
 			),
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"EntitlementsMigration",
 				"flowTokenBalance",
 				common.PathDomainPublic,
@@ -585,7 +585,7 @@ func checkReporters(
 
 			// Cap cons
 
-			capConsLinkMigrationEntry{
+			linkMigrationEntry{
 				AccountAddressPath: interpreter.AddressPath{
 					Address: address,
 					Path: interpreter.PathValue{
@@ -595,13 +595,13 @@ func checkReporters(
 				},
 				CapabilityID: 1,
 			},
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"LinkValueMigration",
 				"flowTokenReceiver",
 				common.PathDomainPublic,
 			),
 
-			capConsLinkMigrationEntry{
+			linkMigrationEntry{
 				AccountAddressPath: interpreter.AddressPath{
 					Address: address,
 					Path: interpreter.PathValue{
@@ -611,13 +611,13 @@ func checkReporters(
 				},
 				CapabilityID: 2,
 			},
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"LinkValueMigration",
 				"linkR",
 				common.PathDomainPublic,
 			),
 
-			capConsLinkMigrationEntry{
+			linkMigrationEntry{
 				AccountAddressPath: interpreter.AddressPath{
 					Address: address,
 					Path: interpreter.PathValue{
@@ -627,7 +627,7 @@ func checkReporters(
 				},
 				CapabilityID: 3,
 			},
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"LinkValueMigration",
 				"flowTokenBalance",
 				common.PathDomainPublic,
@@ -844,7 +844,7 @@ func TestProgramParsingError(t *testing.T) {
 
 	var messages []string
 	for _, entry := range cadenceValueMigratorReporter.entries {
-		if errorEntry, isErrorEntry := entry.(cadenceValueMigrationErrorEntry); isErrorEntry {
+		if errorEntry, isErrorEntry := entry.(cadenceValueMigrationFailureEntry); isErrorEntry {
 			messages = append(messages, errorEntry.Message)
 			break
 		}
@@ -1391,4 +1391,209 @@ func TestCoreContractUsage(t *testing.T) {
 		require.Equal(t, expected, actual)
 	})
 
+}
+
+func TestDictionaryKeyConflictEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := dictionaryKeyConflictEntry{
+		Key: interpreter.StringStorageMapKey("test"),
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "dictionary-key-conflict",
+          "key": "test"
+        }`,
+		string(actual),
+	)
+}
+
+func TestLinkMissingTargetEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := linkMissingTargetEntry{
+		AddressPath: interpreter.AddressPath{
+			Address: common.MustBytesToAddress([]byte{0x1}),
+			Path: interpreter.PathValue{
+				Domain:     common.PathDomainPublic,
+				Identifier: "test",
+			},
+		},
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "link-missing-target",
+          "account_address": "0x0000000000000001",
+          "path": "/public/test"
+        }`,
+		string(actual),
+	)
+}
+
+func TestCapabilityMissingCapabilityIDEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := capabilityMissingCapabilityIDEntry{
+		AccountAddress: common.MustBytesToAddress([]byte{0x2}),
+		AddressPath: interpreter.AddressPath{
+			Address: common.MustBytesToAddress([]byte{0x1}),
+			Path: interpreter.PathValue{
+				Domain:     common.PathDomainPublic,
+				Identifier: "test",
+			},
+		},
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "capability-missing-capability-id",
+          "account_address": "0x0000000000000002",
+          "address": "0x0000000000000001",
+          "path": "/public/test"
+        }`,
+		string(actual),
+	)
+}
+
+func TestCapabilityMigrationEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := capabilityMigrationEntry{
+		AccountAddress: common.MustBytesToAddress([]byte{0x2}),
+		AddressPath: interpreter.AddressPath{
+			Address: common.MustBytesToAddress([]byte{0x1}),
+			Path: interpreter.PathValue{
+				Domain:     common.PathDomainPublic,
+				Identifier: "test",
+			},
+		},
+		BorrowType: interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.UnauthorizedAccess,
+			interpreter.PrimitiveStaticTypeInt,
+		),
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "capability-migration-success",
+          "account_address": "0x0000000000000002",
+          "address": "0x0000000000000001",
+          "path": "/public/test",
+          "borrow_type": "&Int"
+        }`,
+		string(actual),
+	)
+}
+
+func TestLinkMigrationEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := linkMigrationEntry{
+		AccountAddressPath: interpreter.AddressPath{
+			Address: common.MustBytesToAddress([]byte{0x1}),
+			Path: interpreter.PathValue{
+				Domain:     common.PathDomainPublic,
+				Identifier: "test",
+			},
+		},
+		CapabilityID: 42,
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "link-migration-success",
+          "account_address": "0x0000000000000001",
+          "path": "/public/test",
+          "capability_id": 42
+        }`,
+		string(actual),
+	)
+}
+
+func TestCadenceValueMigrationFailureEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := cadenceValueMigrationFailureEntry{
+		StorageKey: interpreter.StorageKey{
+			Address: common.MustBytesToAddress([]byte{0x1}),
+			Key:     "storage",
+		},
+		StorageMapKey: interpreter.StringStorageMapKey("test"),
+		Migration:     "test-migration",
+		Message:       "unknown",
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "cadence-value-migration-failure",
+          "account_address": "0x0000000000000001",
+          "domain": "storage",
+          "key": "test",
+          "migration": "test-migration",
+          "message": "unknown"
+        }`,
+		string(actual),
+	)
+}
+
+func TestCadenceValueMigrationEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := cadenceValueMigrationEntry{
+		StorageKey: interpreter.StorageKey{
+			Address: common.MustBytesToAddress([]byte{0x1}),
+			Key:     "storage",
+		},
+		StorageMapKey: interpreter.StringStorageMapKey("test"),
+		Migration:     "test-migration",
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "cadence-value-migration-success",
+          "account_address": "0x0000000000000001",
+          "domain": "storage",
+          "key": "test",
+          "migration": "test-migration"
+        }`,
+		string(actual),
+	)
 }
