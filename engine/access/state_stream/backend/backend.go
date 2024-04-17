@@ -155,11 +155,14 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64
 	}
 
 	execData, err := b.execDataCache.ByHeight(ctx, height)
-	if errors.Is(err, storage.ErrNotFound) ||
-		execution_data.IsBlobNotFoundError(err) {
-		err = errors.Join(err, subscription.ErrBlockNotReady)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) ||
+			execution_data.IsBlobNotFoundError(err) {
+			err = errors.Join(err, subscription.ErrBlockNotReady)
+			return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
+		}
+		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
 	}
-	return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
 
 	return execData, nil
 }
