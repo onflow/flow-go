@@ -294,19 +294,19 @@ func TestStagedContractsMigration(t *testing.T) {
 		require.Len(t, reportWriter.entries, 2)
 		assert.Equal(
 			t,
-			contractUpdateFailed{
-				AccountAddressHex: address1.HexWithPrefix(),
-				ContractName:      "A",
-				Error:             "error: expected token '{'\n --> f8d6e0586b0a20c7.A:1:46\n  |\n1 | access(all) contract A { access(all) struct C () }\n  |                                               ^\n",
+			contractUpdateFailureEntry{
+				AccountAddress: common.Address(address1),
+				ContractName:   "A",
+				Error:          "error: expected token '{'\n --> f8d6e0586b0a20c7.A:1:46\n  |\n1 | access(all) contract A { access(all) struct C () }\n  |                                               ^\n",
 			},
 			reportWriter.entries[0],
 		)
 
 		assert.Equal(
 			t,
-			contractUpdateSuccessful{
-				AccountAddressHex: address1.HexWithPrefix(),
-				ContractName:      "B",
+			contractUpdateEntry{
+				AccountAddress: common.Address(address1),
+				ContractName:   "B",
 			},
 			reportWriter.entries[1],
 		)
@@ -386,9 +386,9 @@ func TestStagedContractsMigration(t *testing.T) {
 		require.Len(t, reportWriter.entries, 1)
 		assert.Equal(
 			t,
-			contractUpdateSuccessful{
-				AccountAddressHex: address2.HexWithPrefix(),
-				ContractName:      "A",
+			contractUpdateEntry{
+				AccountAddress: common.Address(address2),
+				ContractName:   "A",
 			},
 			reportWriter.entries[0],
 		)
@@ -2020,4 +2020,52 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 			jsonObject["message"],
 		)
 	})
+}
+
+func TestContractUpdateEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := contractUpdateEntry{
+		AccountAddress: common.MustBytesToAddress([]byte{0x1}),
+		ContractName:   "Test",
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "contract-update-success",
+          "account_address": "0x0000000000000001",
+          "contract_name": "Test"
+        }`,
+		string(actual),
+	)
+}
+
+func TestContractUpdateFailureEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := contractUpdateFailureEntry{
+		AccountAddress: common.MustBytesToAddress([]byte{0x1}),
+		ContractName:   "Test",
+		Error:          "unknown",
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "contract-update-failure",
+          "account_address": "0x0000000000000001",
+          "contract_name": "Test",
+          "error": "unknown"
+        }`,
+		string(actual),
+	)
 }

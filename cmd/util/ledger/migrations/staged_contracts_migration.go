@@ -3,6 +3,7 @@ package migrations
 import (
 	"context"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -484,10 +485,10 @@ func (m *StagedContractsMigration) MigrateAccount(
 					)
 			}
 
-			m.reporter.Write(contractUpdateFailed{
-				AccountAddressHex: address.HexWithPrefix(),
-				ContractName:      name,
-				Error:             errorDetails,
+			m.reporter.Write(contractUpdateFailureEntry{
+				AccountAddress: address,
+				ContractName:   name,
+				Error:          errorDetails,
 			})
 		} else {
 			// change contract code
@@ -496,9 +497,9 @@ func (m *StagedContractsMigration) MigrateAccount(
 				newCode,
 			)
 
-			m.reporter.Write(contractUpdateSuccessful{
-				AccountAddressHex: address.HexWithPrefix(),
-				ContractName:      name,
+			m.reporter.Write(contractUpdateEntry{
+				AccountAddress: address,
+				ContractName:   name,
 			})
 		}
 
@@ -643,13 +644,47 @@ func NewUserDefinedTypeChangeCheckerFunc(
 	}
 }
 
-type contractUpdateSuccessful struct {
-	AccountAddressHex string `json:"address"`
-	ContractName      string `json:"name"`
+// contractUpdateFailureEntry
+
+type contractUpdateEntry struct {
+	AccountAddress common.Address
+	ContractName   string
 }
 
-type contractUpdateFailed struct {
-	AccountAddressHex string `json:"address"`
-	ContractName      string `json:"name"`
-	Error             string `json:"error"`
+var _ json.Marshaler = contractUpdateEntry{}
+
+func (e contractUpdateEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		ContractName   string `json:"contract_name"`
+	}{
+		Kind:           "contract-update-success",
+		AccountAddress: e.AccountAddress.HexWithPrefix(),
+		ContractName:   e.ContractName,
+	})
+}
+
+// contractUpdateFailureEntry
+
+type contractUpdateFailureEntry struct {
+	AccountAddress common.Address
+	ContractName   string
+	Error          string
+}
+
+var _ json.Marshaler = contractUpdateFailureEntry{}
+
+func (e contractUpdateFailureEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		ContractName   string `json:"contract_name"`
+		Error          string `json:"error"`
+	}{
+		Kind:           "contract-update-failure",
+		AccountAddress: e.AccountAddress.HexWithPrefix(),
+		ContractName:   e.ContractName,
+		Error:          e.Error,
+	})
 }

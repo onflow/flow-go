@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"sync"
@@ -458,7 +459,7 @@ func (t *cadenceValueMigrationReporter) Migrated(
 	storageMapKey interpreter.StorageMapKey,
 	migration string,
 ) {
-	t.reportWriter.Write(cadenceValueMigrationReportEntry{
+	t.reportWriter.Write(cadenceValueMigrationEntry{
 		StorageKey:    storageKey,
 		StorageMapKey: storageMapKey,
 		Migration:     migration,
@@ -484,7 +485,7 @@ func (t *cadenceValueMigrationReporter) Error(err error) {
 	}
 
 	if t.verboseErrorOutput {
-		t.reportWriter.Write(cadenceValueMigrationErrorEntry{
+		t.reportWriter.Write(cadenceValueMigrationFailureEntry{
 			StorageKey:    storageKey,
 			StorageMapKey: storageMapKey,
 			Migration:     migration,
@@ -498,7 +499,7 @@ func (t *cadenceValueMigrationReporter) MigratedPathCapability(
 	addressPath interpreter.AddressPath,
 	borrowType *interpreter.ReferenceStaticType,
 ) {
-	t.reportWriter.Write(capConsPathCapabilityMigrationEntry{
+	t.reportWriter.Write(capabilityMigrationEntry{
 		AccountAddress: accountAddress,
 		AddressPath:    addressPath,
 		BorrowType:     borrowType,
@@ -509,7 +510,7 @@ func (t *cadenceValueMigrationReporter) MissingCapabilityID(
 	accountAddress common.Address,
 	addressPath interpreter.AddressPath,
 ) {
-	t.reportWriter.Write(capConsMissingCapabilityIDEntry{
+	t.reportWriter.Write(capabilityMissingCapabilityIDEntry{
 		AccountAddress: accountAddress,
 		AddressPath:    addressPath,
 	})
@@ -519,9 +520,9 @@ func (t *cadenceValueMigrationReporter) MigratedLink(
 	accountAddressPath interpreter.AddressPath,
 	capabilityID interpreter.UInt64Value,
 ) {
-	t.reportWriter.Write(capConsLinkMigrationEntry{
+	t.reportWriter.Write(linkMigrationEntry{
 		AccountAddressPath: accountAddressPath,
-		CapabilityID:       capabilityID,
+		CapabilityID:       uint64(capabilityID),
 	})
 }
 
@@ -530,14 +531,14 @@ func (t *cadenceValueMigrationReporter) CyclicLink(err capcons.CyclicLinkError) 
 }
 
 func (t *cadenceValueMigrationReporter) MissingTarget(accountAddressPath interpreter.AddressPath) {
-	t.reportWriter.Write(capConsMissingTargetEntry{
+	t.reportWriter.Write(linkMissingTargetEntry{
 		AddressPath: accountAddressPath,
 	})
 }
 
 func (t *cadenceValueMigrationReporter) DictionaryKeyConflict(key interpreter.StringStorageMapKey) {
 	t.reportWriter.Write(dictionaryKeyConflictEntry{
-		Key: string(key),
+		Key: key,
 	})
 }
 
@@ -545,69 +546,203 @@ type valueMigrationReportEntry interface {
 	accountAddress() common.Address
 }
 
-type cadenceValueMigrationReportEntry struct {
-	StorageKey    interpreter.StorageKey    `json:"storageKey"`
-	StorageMapKey interpreter.StorageMapKey `json:"storageMapKey"`
-	Migration     string                    `json:"migration"`
+// cadenceValueMigrationReportEntry
+
+type cadenceValueMigrationEntry struct {
+	StorageKey    interpreter.StorageKey
+	StorageMapKey interpreter.StorageMapKey
+	Migration     string
 }
 
-type cadenceValueMigrationErrorEntry struct {
-	StorageKey    interpreter.StorageKey    `json:"storageKey"`
-	StorageMapKey interpreter.StorageMapKey `json:"storageMapKey"`
-	Migration     string                    `json:"migration"`
-	Message       string                    `json:"message"`
-}
+var _ valueMigrationReportEntry = cadenceValueMigrationEntry{}
 
-var _ valueMigrationReportEntry = cadenceValueMigrationReportEntry{}
-
-func (e cadenceValueMigrationReportEntry) accountAddress() common.Address {
+func (e cadenceValueMigrationEntry) accountAddress() common.Address {
 	return e.StorageKey.Address
 }
 
-type capConsLinkMigrationEntry struct {
-	AccountAddressPath interpreter.AddressPath `json:"address"`
-	CapabilityID       interpreter.UInt64Value `json:"capabilityID"`
+var _ json.Marshaler = cadenceValueMigrationEntry{}
+
+func (e cadenceValueMigrationEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		StorageDomain  string `json:"domain"`
+		Key            string `json:"key"`
+		Migration      string `json:"migration"`
+	}{
+		Kind:           "cadence-value-migration-success",
+		AccountAddress: e.StorageKey.Address.HexWithPrefix(),
+		StorageDomain:  e.StorageKey.Key,
+		Key:            fmt.Sprintf("%s", e.StorageMapKey),
+		Migration:      e.Migration,
+	})
 }
 
-var _ valueMigrationReportEntry = capConsLinkMigrationEntry{}
+// cadenceValueMigrationFailureEntry
 
-func (e capConsLinkMigrationEntry) accountAddress() common.Address {
+type cadenceValueMigrationFailureEntry struct {
+	StorageKey    interpreter.StorageKey
+	StorageMapKey interpreter.StorageMapKey
+	Migration     string
+	Message       string
+}
+
+var _ valueMigrationReportEntry = cadenceValueMigrationFailureEntry{}
+
+func (e cadenceValueMigrationFailureEntry) accountAddress() common.Address {
+	return e.StorageKey.Address
+}
+
+var _ json.Marshaler = cadenceValueMigrationFailureEntry{}
+
+func (e cadenceValueMigrationFailureEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		StorageDomain  string `json:"domain"`
+		Key            string `json:"key"`
+		Migration      string `json:"migration"`
+		Message        string `json:"message"`
+	}{
+		Kind:           "cadence-value-migration-failure",
+		AccountAddress: e.StorageKey.Address.HexWithPrefix(),
+		StorageDomain:  e.StorageKey.Key,
+		Key:            fmt.Sprintf("%s", e.StorageMapKey),
+		Migration:      e.Migration,
+		Message:        e.Message,
+	})
+}
+
+// linkMigrationEntry
+
+type linkMigrationEntry struct {
+	AccountAddressPath interpreter.AddressPath
+	CapabilityID       uint64
+}
+
+var _ valueMigrationReportEntry = linkMigrationEntry{}
+
+func (e linkMigrationEntry) accountAddress() common.Address {
 	return e.AccountAddressPath.Address
 }
 
-type capConsPathCapabilityMigrationEntry struct {
-	AccountAddress common.Address                   `json:"address"`
-	AddressPath    interpreter.AddressPath          `json:"addressPath"`
-	BorrowType     *interpreter.ReferenceStaticType `json:"borrowType"`
+var _ json.Marshaler = linkMigrationEntry{}
+
+func (e linkMigrationEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		Path           string `json:"path"`
+		CapabilityID   uint64 `json:"capability_id"`
+	}{
+		Kind:           "link-migration-success",
+		AccountAddress: e.AccountAddressPath.Address.HexWithPrefix(),
+		Path:           e.AccountAddressPath.Path.String(),
+		CapabilityID:   e.CapabilityID,
+	})
 }
 
-var _ valueMigrationReportEntry = capConsPathCapabilityMigrationEntry{}
+// capabilityMigrationEntry
 
-func (e capConsPathCapabilityMigrationEntry) accountAddress() common.Address {
+type capabilityMigrationEntry struct {
+	AccountAddress common.Address
+	AddressPath    interpreter.AddressPath
+	BorrowType     *interpreter.ReferenceStaticType
+}
+
+var _ valueMigrationReportEntry = capabilityMigrationEntry{}
+
+func (e capabilityMigrationEntry) accountAddress() common.Address {
 	return e.AccountAddress
 }
 
-type capConsMissingCapabilityIDEntry struct {
-	AccountAddress common.Address          `json:"address"`
-	AddressPath    interpreter.AddressPath `json:"addressPath"`
+var _ json.Marshaler = capabilityMigrationEntry{}
+
+func (e capabilityMigrationEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		Address        string `json:"address"`
+		Path           string `json:"path"`
+		BorrowType     string `json:"borrow_type"`
+	}{
+		Kind:           "capability-migration-success",
+		AccountAddress: e.AccountAddress.HexWithPrefix(),
+		Address:        e.AddressPath.Address.HexWithPrefix(),
+		Path:           e.AddressPath.Path.String(),
+		BorrowType:     string(e.BorrowType.ID()),
+	})
 }
 
-var _ valueMigrationReportEntry = capConsMissingCapabilityIDEntry{}
+// capabilityMissingCapabilityIDEntry
 
-type capConsMissingTargetEntry struct {
-	AddressPath interpreter.AddressPath `json:"addressPath"`
+type capabilityMissingCapabilityIDEntry struct {
+	AccountAddress common.Address
+	AddressPath    interpreter.AddressPath
 }
 
-func (e capConsMissingTargetEntry) accountAddress() common.Address {
+var _ valueMigrationReportEntry = capabilityMissingCapabilityIDEntry{}
+
+func (e capabilityMissingCapabilityIDEntry) accountAddress() common.Address {
+	return e.AccountAddress
+}
+
+var _ json.Marshaler = capabilityMissingCapabilityIDEntry{}
+
+func (e capabilityMissingCapabilityIDEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		Address        string `json:"address"`
+		Path           string `json:"path"`
+	}{
+		Kind:           "capability-missing-capability-id",
+		AccountAddress: e.AccountAddress.HexWithPrefix(),
+		Address:        e.AddressPath.Address.HexWithPrefix(),
+		Path:           e.AddressPath.Path.String(),
+	})
+}
+
+// linkMissingTargetEntry
+
+type linkMissingTargetEntry struct {
+	AddressPath interpreter.AddressPath
+}
+
+var _ valueMigrationReportEntry = linkMissingTargetEntry{}
+
+func (e linkMissingTargetEntry) accountAddress() common.Address {
 	return e.AddressPath.Address
 }
 
-var _ valueMigrationReportEntry = capConsMissingTargetEntry{}
+var _ json.Marshaler = linkMissingTargetEntry{}
 
-func (e capConsMissingCapabilityIDEntry) accountAddress() common.Address {
-	return e.AccountAddress
+func (e linkMissingTargetEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		Path           string `json:"path"`
+	}{
+		Kind:           "link-missing-target",
+		AccountAddress: e.AddressPath.Address.HexWithPrefix(),
+		Path:           e.AddressPath.Path.String(),
+	})
 }
 
+// dictionaryKeyConflictEntry
+
 type dictionaryKeyConflictEntry struct {
-	Key string `json:"key"`
+	Key interpreter.StringStorageMapKey
+}
+
+var _ json.Marshaler = dictionaryKeyConflictEntry{}
+
+func (e dictionaryKeyConflictEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind string `json:"kind"`
+		Key  string `json:"key"`
+	}{
+		Kind: "dictionary-key-conflict",
+		Key:  string(e.Key),
+	})
 }
