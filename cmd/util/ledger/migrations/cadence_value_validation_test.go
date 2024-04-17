@@ -52,7 +52,12 @@ func TestValidateCadenceValues(t *testing.T) {
 				accountStatus.ToBytes(),
 			)
 
-			mr, err := NewAtreeRegisterMigratorRuntime(address, []*ledger.Payload{accountStatusPayload})
+			mr, err := NewAtreeRegisterMigratorRuntime(
+				address,
+				[]*ledger.Payload{
+					accountStatusPayload,
+				},
+			)
 			require.NoError(t, err)
 
 			// Create new storage map
@@ -140,7 +145,12 @@ func createTestPayloads(t *testing.T, address common.Address, domain string) []*
 		accountStatus.ToBytes(),
 	)
 
-	mr, err := NewAtreeRegisterMigratorRuntime(address, []*ledger.Payload{accountStatusPayload})
+	mr, err := NewAtreeRegisterMigratorRuntime(
+		address,
+		[]*ledger.Payload{
+			accountStatusPayload,
+		},
+	)
 	require.NoError(t, err)
 
 	// Create new storage map

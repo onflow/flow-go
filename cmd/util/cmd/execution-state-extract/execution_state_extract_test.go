@@ -71,6 +71,7 @@ func TestExtractExecutionState(t *testing.T) {
 				ChainID:              flow.Emulator,
 				EVMContractChange:    migrations.EVMContractChangeNone,
 				BurnerContractChange: migrations.BurnerContractChangeDeploy,
+				VerboseErrorOutput:   true,
 			}
 
 			err := extractExecutionState(

@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
@@ -172,15 +171,17 @@ func TestDiffCadenceValues(t *testing.T) {
 			)
 
 			mr, err := NewMigratorRuntime(
-				address,
-				[]*ledger.Payload{accountStatusPayload},
-				util.RuntimeInterfaceConfig{},
+				[]*ledger.Payload{
+					accountStatusPayload,
+				},
+				flow.Emulator,
+				MigratorRuntimeConfig{},
 				snapshot.LargeChangeSetOrReadonlySnapshot,
 			)
 			require.NoError(t, err)
 
 			// Create new storage map
-			storageMap := mr.Storage.GetStorageMap(mr.Address, domain, true)
+			storageMap := mr.Storage.GetStorageMap(address, domain, true)
 
 			nestedArray := interpreter.NewArrayValue(
 				mr.Interpreter,
@@ -273,15 +274,17 @@ func TestDiffCadenceValues(t *testing.T) {
 			)
 
 			mr, err := NewMigratorRuntime(
-				address,
-				[]*ledger.Payload{accountStatusPayload},
-				util.RuntimeInterfaceConfig{},
+				[]*ledger.Payload{
+					accountStatusPayload,
+				},
+				flow.Emulator,
+				MigratorRuntimeConfig{},
 				snapshot.LargeChangeSetOrReadonlySnapshot,
 			)
 			require.NoError(t, err)
 
 			// Create new storage map
-			storageMap := mr.Storage.GetStorageMap(mr.Address, domain, true)
+			storageMap := mr.Storage.GetStorageMap(address, domain, true)
 
 			nestedDict := interpreter.NewDictionaryValueWithAddress(
 				mr.Interpreter,
@@ -381,15 +384,17 @@ func TestDiffCadenceValues(t *testing.T) {
 			)
 
 			mr, err := NewMigratorRuntime(
-				address,
-				[]*ledger.Payload{accountStatusPayload},
-				util.RuntimeInterfaceConfig{},
+				[]*ledger.Payload{
+					accountStatusPayload,
+				},
+				flow.Emulator,
+				MigratorRuntimeConfig{},
 				snapshot.LargeChangeSetOrReadonlySnapshot,
 			)
 			require.NoError(t, err)
 
 			// Create new storage map
-			storageMap := mr.Storage.GetStorageMap(mr.Address, domain, true)
+			storageMap := mr.Storage.GetStorageMap(address, domain, true)
 
 			var fields []interpreter.CompositeField
 
@@ -500,15 +505,17 @@ func TestDiffCadenceValues(t *testing.T) {
 			)
 
 			mr, err := NewMigratorRuntime(
-				address,
-				[]*ledger.Payload{accountStatusPayload},
-				util.RuntimeInterfaceConfig{},
+				[]*ledger.Payload{
+					accountStatusPayload,
+				},
+				flow.Emulator,
+				MigratorRuntimeConfig{},
 				snapshot.LargeChangeSetOrReadonlySnapshot,
 			)
 			require.NoError(t, err)
 
 			// Create new storage map
-			storageMap := mr.Storage.GetStorageMap(mr.Address, domain, true)
+			storageMap := mr.Storage.GetStorageMap(address, domain, true)
 
 			var fields []interpreter.CompositeField
 
@@ -603,7 +610,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			}
 		}
 
-		// Test storge map value diff log (only with verbose logging)
+		// Test storage map value diff log (only with verbose logging)
 		diff := writer.entries[2].(difference)
 		require.Equal(t, diffKindString[storageMapValueDiffKind], diff.Kind)
 		require.Equal(t, address.Hex(), diff.Address)
@@ -626,15 +633,17 @@ func createStorageMapPayloads(t *testing.T, address common.Address, domain strin
 	)
 
 	mr, err := NewMigratorRuntime(
-		address,
-		[]*ledger.Payload{accountStatusPayload},
-		util.RuntimeInterfaceConfig{},
+		[]*ledger.Payload{
+			accountStatusPayload,
+		},
+		flow.Emulator,
+		MigratorRuntimeConfig{},
 		snapshot.LargeChangeSetOrReadonlySnapshot,
 	)
 	require.NoError(t, err)
 
 	// Create new storage map
-	storageMap := mr.Storage.GetStorageMap(mr.Address, domain, true)
+	storageMap := mr.Storage.GetStorageMap(address, domain, true)
 
 	for i, k := range keys {
 		storageMap.WriteValue(

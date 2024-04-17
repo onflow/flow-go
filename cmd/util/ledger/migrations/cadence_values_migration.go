@@ -44,9 +44,10 @@ type CadenceBaseMigrator struct {
 		accounts environment.Accounts,
 		reporter *cadenceValueMigrationReporter,
 	) []migrations.ValueMigration
-	runtimeInterfaceConfig util.RuntimeInterfaceConfig
-	errorMessageHandler    *errorMessageHandler
-	contracts              map[common.AddressLocation][]byte
+	migratorRuntimeConfig MigratorRuntimeConfig
+	errorMessageHandler   *errorMessageHandler
+	programs              map[runtime.Location]*interpreter.Program
+	chainID               flow.ChainID
 }
 
 var _ AccountBasedMigration = (*CadenceBaseMigrator)(nil)
@@ -70,18 +71,26 @@ func (m *CadenceBaseMigrator) InitMigration(
 ) error {
 	m.log = log.With().Str("migration", m.name).Logger()
 
-	m.runtimeInterfaceConfig.GetContractCodeFunc = func(location runtime.Location) ([]byte, error) {
-		addressLocation, ok := location.(common.AddressLocation)
-		if !ok {
-			return nil, nil
-		}
+	// During the migration, we only provide already checked programs,
+	// no parsing/checking of contracts is expected.
 
-		contract, ok := m.contracts[addressLocation]
-		if !ok {
-			return nil, fmt.Errorf("failed to get contract code for location %s", location)
-		}
-
-		return contract, nil
+	m.migratorRuntimeConfig = MigratorRuntimeConfig{
+		GetOrLoadProgram: func(
+			location runtime.Location,
+			_ func() (*interpreter.Program, error),
+		) (*interpreter.Program, error) {
+			program, ok := m.programs[location]
+			if !ok {
+				return nil, fmt.Errorf("program not found: %s", location)
+			}
+			return program, nil
+		},
+		GetCode: func(_ common.AddressLocation) ([]byte, error) {
+			return nil, fmt.Errorf("unexpected call to GetCode")
+		},
+		GetContractNames: func(address flow.Address) ([]string, error) {
+			return nil, fmt.Errorf("unexpected call to GetContractNames")
+		},
 	}
 
 	return nil
@@ -98,9 +107,9 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 	// Create all the runtime components we need for the migration
 
 	migrationRuntime, err := NewMigratorRuntime(
-		address,
 		oldPayloads,
-		m.runtimeInterfaceConfig,
+		m.chainID,
+		m.migratorRuntimeConfig,
 		snapshot.SmallChangeSetSnapshot,
 	)
 	if err != nil {
@@ -112,6 +121,8 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 	// Check storage health before migration, if enabled.
 	var storageHealthErrorBefore error
 	if m.checkStorageHealthBeforeMigration {
+
+		// TODO: use checkStorageHealth
 
 		// Retrieve all slabs before migration.
 		for _, payload := range oldPayloads {
@@ -138,7 +149,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		}
 
 		// Load storage map.
-		for _, domain := range domains {
+		for _, domain := range allStorageMapDomains {
 			_ = storage.GetStorageMap(address, domain, false)
 		}
 
@@ -158,7 +169,12 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		address,
 	)
 
-	reporter := newValueMigrationReporter(m.reporter, m.log, m.errorMessageHandler, m.verboseErrorOutput)
+	reporter := newValueMigrationReporter(
+		m.reporter,
+		m.log,
+		m.errorMessageHandler,
+		m.verboseErrorOutput,
+	)
 
 	valueMigrations := m.valueMigrations(
 		migrationRuntime.Interpreter,
@@ -213,7 +229,11 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 
 		accountDiffReporter := NewCadenceValueDiffReporter(address, m.diffReporter, m.logVerboseDiff)
 
-		accountDiffReporter.DiffStates(oldPayloads, newPayloads, domains)
+		accountDiffReporter.DiffStates(
+			oldPayloads,
+			newPayloads,
+			allStorageMapDomains,
+		)
 	}
 
 	return newPayloads, nil
@@ -258,7 +278,7 @@ const cadenceValueMigrationReporterName = "cadence-value-migration"
 func NewCadence1ValueMigrator(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
-	contracts map[common.AddressLocation][]byte,
+	programs map[runtime.Location]*interpreter.Program,
 	compositeTypeConverter statictypes.CompositeTypeConverterFunc,
 	interfaceTypeConverter statictypes.InterfaceTypeConverterFunc,
 	opts Options,
@@ -290,7 +310,8 @@ func NewCadence1ValueMigrator(
 			}
 		},
 		errorMessageHandler: errorMessageHandler,
-		contracts:           contracts,
+		programs:            programs,
+		chainID:             opts.ChainID,
 	}
 }
 
@@ -300,7 +321,7 @@ func NewCadence1ValueMigrator(
 func NewCadence1LinkValueMigrator(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
-	contracts map[common.AddressLocation][]byte,
+	programs map[runtime.Location]*interpreter.Program,
 	capabilityMapping *capcons.CapabilityMapping,
 	opts Options,
 ) *CadenceBaseMigrator {
@@ -335,7 +356,8 @@ func NewCadence1LinkValueMigrator(
 			}
 		},
 		errorMessageHandler: errorMessageHandler,
-		contracts:           contracts,
+		programs:            programs,
+		chainID:             opts.ChainID,
 	}
 }
 
@@ -346,7 +368,7 @@ func NewCadence1LinkValueMigrator(
 func NewCadence1CapabilityValueMigrator(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
-	contracts map[common.AddressLocation][]byte,
+	programs map[runtime.Location]*interpreter.Program,
 	capabilityMapping *capcons.CapabilityMapping,
 	opts Options,
 ) *CadenceBaseMigrator {
@@ -375,7 +397,8 @@ func NewCadence1CapabilityValueMigrator(
 			}
 		},
 		errorMessageHandler: errorMessageHandler,
-		contracts:           contracts,
+		programs:            programs,
+		chainID:             opts.ChainID,
 	}
 }
 

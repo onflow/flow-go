@@ -15,7 +15,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
@@ -58,7 +57,7 @@ func (l *logWriter) Write(bytes []byte) (int, error) {
 func TestStagedContractsMigration(t *testing.T) {
 	t.Parallel()
 
-	chainID := flow.Emulator
+	const chainID = flow.Emulator
 	addressGenerator := chainID.Chain().NewAddressGenerator()
 
 	address1, err := addressGenerator.NextAddress()
@@ -512,7 +511,7 @@ func TestStagedContractsMigration(t *testing.T) {
 		oldCode := "access(all) contract A {}"
 		newCode := "access(all) contract A { access(all) struct B {} }"
 
-		chainID := flow.Testnet
+		const chainID = flow.Testnet
 		addressGenerator := chainID.Chain().NewAddressGenerator()
 		accountAddress, err := addressGenerator.NextAddress()
 		require.NoError(t, err)
@@ -530,9 +529,11 @@ func TestStagedContractsMigration(t *testing.T) {
 			)
 
 			mr, err := NewMigratorRuntime(
-				stagingAccountAddress,
-				[]*ledger.Payload{accountStatusPayload},
-				util.RuntimeInterfaceConfig{},
+				[]*ledger.Payload{
+					accountStatusPayload,
+				},
+				chainID,
+				MigratorRuntimeConfig{},
 				snapshot.SmallChangeSetSnapshot,
 			)
 			require.NoError(t, err)
@@ -671,7 +672,7 @@ func TestStagedContractsMigration(t *testing.T) {
 func TestStagedContractsWithImports(t *testing.T) {
 	t.Parallel()
 
-	chainID := flow.Emulator
+	const chainID = flow.Emulator
 
 	addressGenerator := chainID.Chain().NewAddressGenerator()
 
@@ -1169,7 +1170,7 @@ contract MultilineContract{
 func TestStagedContractsWithUpdateValidator(t *testing.T) {
 	t.Parallel()
 
-	chainID := flow.Emulator
+	const chainID = flow.Emulator
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
 	addressGenerator := chainID.Chain().NewAddressGenerator()
@@ -1461,7 +1462,7 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 func TestStagedContractConformanceChanges(t *testing.T) {
 	t.Parallel()
 
-	chainID := flow.Emulator
+	const chainID = flow.Emulator
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
 	addressGenerator := chainID.Chain().NewAddressGenerator()
@@ -1698,7 +1699,7 @@ func TestConcurrentContractUpdate(t *testing.T) {
 
 	t.Parallel()
 
-	chainID := flow.Emulator
+	const chainID = flow.Emulator
 	addressGenerator := chainID.Chain().NewAddressGenerator()
 
 	addressA, err := addressGenerator.NextAddress()
@@ -1803,6 +1804,7 @@ func TestConcurrentContractUpdate(t *testing.T) {
 			EVMContractChange:    evmContractChange,
 			BurnerContractChange: burnerContractChange,
 			StagedContracts:      stagedContracts,
+			VerboseErrorOutput:   true,
 		},
 	)
 
@@ -1832,7 +1834,7 @@ func TestConcurrentContractUpdate(t *testing.T) {
 func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 	t.Parallel()
 
-	chainID := flow.Emulator
+	const chainID = flow.Emulator
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
 	addressGenerator := chainID.Chain().NewAddressGenerator()

@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -17,14 +16,15 @@ import (
 func NewAccountStorageMigration(
 	address common.Address,
 	log zerolog.Logger,
+	chainID flow.ChainID,
 	migrate func(*runtime.Storage, *interpreter.Interpreter) error,
 ) ledger.Migration {
 	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
 
 		migrationRuntime, err := NewMigratorRuntime(
-			address,
 			payloads,
-			util.RuntimeInterfaceConfig{},
+			chainID,
+			MigratorRuntimeConfig{},
 			snapshot.SmallChangeSetSnapshot,
 		)
 		if err != nil {

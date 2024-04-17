@@ -20,7 +20,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -149,9 +148,8 @@ func (m *StagedContractsMigration) InitMigration(
 
 	elaborations := map[common.Location]*sema.Elaboration{}
 
-	config := util.RuntimeInterfaceConfig{
-		GetContractCodeFunc: func(location runtime.Location) ([]byte, error) {
-			// TODO: also consider updated system contracts
+	config := MigratorRuntimeConfig{
+		GetCode: func(location common.AddressLocation) ([]byte, error) {
 			return m.contractsByLocation[location], nil
 		},
 		GetOrLoadProgramListener: func(location runtime.Location, program *interpreter.Program, err error) {
@@ -163,8 +161,8 @@ func (m *StagedContractsMigration) InitMigration(
 
 	// Pass empty address. We are only interested in the created `env` object.
 	mr, err := NewMigratorRuntime(
-		common.Address{},
 		allPayloads,
+		m.chainID,
 		config,
 		snapshot.SmallChangeSetSnapshot)
 	if err != nil {
@@ -222,9 +220,9 @@ func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads
 		Msgf("found %d payloads in account %s", len(stagingAccountPayloads), stagingAccount)
 
 	mr, err := NewMigratorRuntime(
-		stagingAccountAddress,
 		stagingAccountPayloads,
-		util.RuntimeInterfaceConfig{},
+		m.chainID,
+		MigratorRuntimeConfig{},
 		snapshot.SmallChangeSetSnapshot,
 	)
 	if err != nil {

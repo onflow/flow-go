@@ -234,12 +234,18 @@ func NewCadence1ValueMigrations(
 	// To achieve this, the contracts are extracted from the payloads once,
 	// before the value migrations are run.
 
-	contracts := make(map[common.AddressLocation][]byte, 1000)
+	programs := make(map[common.Location]*interpreter.Program, 1000)
 
 	migrations = []NamedMigration{
 		{
-			Name:    "contracts",
-			Migrate: NewContractsExtractionMigration(contracts, log),
+			Name: "check-contracts",
+			Migrate: NewContractCheckingMigration(
+				log,
+				rwf,
+				opts.ChainID,
+				opts.VerboseErrorOutput,
+				programs,
+			),
 		},
 	}
 
@@ -248,7 +254,7 @@ func NewCadence1ValueMigrations(
 			return NewCadence1ValueMigrator(
 				rwf,
 				errorMessageHandler,
-				contracts,
+				programs,
 				NewCadence1CompositeStaticTypeConverter(opts.ChainID),
 				NewCadence1InterfaceStaticTypeConverter(opts.ChainID),
 				opts,
@@ -258,7 +264,7 @@ func NewCadence1ValueMigrations(
 			return NewCadence1LinkValueMigrator(
 				rwf,
 				errorMessageHandler,
-				contracts,
+				programs,
 				capabilityMapping,
 				opts,
 			)
@@ -267,7 +273,7 @@ func NewCadence1ValueMigrations(
 			return NewCadence1CapabilityValueMigrator(
 				rwf,
 				errorMessageHandler,
-				contracts,
+				programs,
 				capabilityMapping,
 				opts,
 			)
