@@ -2,10 +2,12 @@ package backend
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
@@ -38,6 +40,9 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(ctx context.Context, bl
 	executionData, err := b.getExecutionData(ctx, header.Height)
 
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) || execution_data.IsBlobNotFoundError(err) {
+			return nil, status.Errorf(codes.NotFound, "could not find execution data: %v", err)
+		}
 		return nil, rpc.ConvertError(err, "could not get execution data", codes.Internal)
 	}
 
