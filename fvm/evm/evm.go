@@ -27,7 +27,6 @@ func SetupEnvironment(
 	chainID flow.ChainID,
 	fvmEnv environment.Environment,
 	runtimeEnv runtime.Environment,
-	service flow.Address,
 	flowToken flow.Address,
 ) error {
 	evmStorageAccountAddress, err := StorageAccountAddress(chainID)
@@ -42,15 +41,27 @@ func SetupEnvironment(
 
 	backend := backends.NewWrappedEnvironment(fvmEnv)
 
-	em := evm.NewEmulator(backend, evmStorageAccountAddress)
+	emulator := evm.NewEmulator(backend, evmStorageAccountAddress)
 
-	bs := handler.NewBlockStore(backend, evmStorageAccountAddress)
+	blockStore := handler.NewBlockStore(backend, evmStorageAccountAddress)
 
-	aa := handler.NewAddressAllocator()
+	addressAllocator := handler.NewAddressAllocator()
 
-	contractHandler := handler.NewContractHandler(chainID, evmContractAccountAddress, common.Address(flowToken), bs, aa, backend, em)
+	contractHandler := handler.NewContractHandler(
+		chainID,
+		evmContractAccountAddress,
+		common.Address(flowToken),
+		blockStore,
+		addressAllocator,
+		backend,
+		emulator,
+	)
 
-	stdlib.SetupEnvironment(runtimeEnv, contractHandler, evmContractAccountAddress)
+	stdlib.SetupEnvironment(
+		runtimeEnv,
+		contractHandler,
+		evmContractAccountAddress,
+	)
 
 	return nil
 }
