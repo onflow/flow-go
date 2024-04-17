@@ -1057,12 +1057,7 @@ func newInternalEVMTypeBatchRunFunction(
 			cb := types.NewAddressFromBytes(coinbase)
 			batchResults := handler.BatchRun(transactionBatch, cb)
 
-			// Convert batch run result summary type to cadence array of structs
-			values := make([]interpreter.Value, 0)
-			for _, result := range batchResults {
-				res := NewResultValue(handler, gauge, inter, locationRange, result)
-				values = append(values, res)
-			}
+			values := newResultValues(handler, gauge, inter, locationRange, batchResults)
 
 			loc := common.NewAddressLocation(gauge, handler.EVMContractAddress(), ContractName)
 			evmResultType := interpreter.NewVariableSizedStaticType(
@@ -1088,6 +1083,22 @@ func newInternalEVMTypeBatchRunFunction(
 			)
 		},
 	)
+}
+
+// newResultValues converts batch run result summary type to cadence array of structs
+func newResultValues(
+	handler types.ContractHandler,
+	gauge common.MemoryGauge,
+	inter *interpreter.Interpreter,
+	locationRange interpreter.LocationRange,
+	results []*types.ResultSummary,
+) []interpreter.Value {
+	values := make([]interpreter.Value, 0)
+	for _, result := range results {
+		res := NewResultValue(handler, gauge, inter, locationRange, result)
+		values = append(values, res)
+	}
+	return values
 }
 
 func NewResultValue(

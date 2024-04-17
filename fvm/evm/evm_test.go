@@ -364,8 +364,6 @@ func TestEVMBatchRun(t *testing.T) {
 					require.Len(t, logs, 1)
 
 					log := logs[0]
-					b, _ := log.MarshalJSON()
-					fmt.Println(string(b))
 					last := log.Topics[len(log.Topics)-1] // last topic is the value set in the store method
 					assert.Equal(t, storedValues[i], last.Big().Int64())
 					assert.Equal(t, event.TransactionHash, log.TxHash.String())
