@@ -295,7 +295,7 @@ func (b *backendSubscribeBlocks) getBlockHeader(height uint64, expectedBlockStat
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, fmt.Errorf("failed to retrieve block ID for height %d: %w", height, subscription.ErrBlockNotReady)
+			return nil, fmt.Errorf("failed to retrieve block header for height %d: %w", height, subscription.ErrBlockNotReady)
 		}
 		return nil, err
 	}
@@ -316,7 +316,7 @@ func (b *backendSubscribeBlocks) getBlock(height uint64, expectedBlockStatus flo
 	block, err := b.blocks.ByHeight(height)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, fmt.Errorf("failed to retrieve block ID for height %d: %w", height, subscription.ErrBlockNotReady)
+			return nil, fmt.Errorf("failed to retrieve block for height %d: %w", height, subscription.ErrBlockNotReady)
 		}
 		return nil, err
 	}

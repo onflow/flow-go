@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
-	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -155,16 +155,11 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64
 	}
 
 	execData, err := b.execDataCache.ByHeight(ctx, height)
-	if err != nil {
-		var errMsg error
-		if errors.Is(err, storage.ErrNotFound) ||
-			execution_data.IsBlobNotFoundError(err) {
-			errMsg = subscription.ErrBlockNotReady
-		} else {
-			errMsg = err
-		}
-		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, errMsg)
+	if errors.Is(err, storage.ErrNotFound) ||
+		execution_data.IsBlobNotFoundError(err) {
+		err = errors.Join(err, subscription.ErrBlockNotReady)
 	}
+	return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
 
 	return execData, nil
 }

@@ -2,18 +2,15 @@ package backend
 
 import (
 	"context"
-	"errors"
 	"fmt"
-
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
 )
 
 type ExecutionDataResponse struct {
@@ -34,20 +31,13 @@ type ExecutionDataBackend struct {
 func (b *ExecutionDataBackend) GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionData, error) {
 	header, err := b.headers.ByBlockID(blockID)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, fmt.Errorf("could not get block header for %s: %w", blockID, subscription.ErrBlockNotReady)
-		}
 		return nil, fmt.Errorf("could not get block header for %s: %w", blockID, err)
 	}
 
 	executionData, err := b.getExecutionData(ctx, header.Height)
 
 	if err != nil {
-		if !errors.Is(err, subscription.ErrBlockNotReady) {
-			return nil, rpc.ConvertError(err, "could not get execution data", codes.Internal)
-		}
-
-		return nil, status.Errorf(codes.NotFound, "could not find execution data: %v", subscription.ErrBlockNotReady)
+		return nil, rpc.ConvertError(err, "could not get execution data", codes.Internal)
 	}
 
 	return executionData.BlockExecutionData, nil

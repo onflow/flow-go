@@ -146,7 +146,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, bl
 // The block must be finalized (otherwise the by-height query is ambiguous).
 // Expected errors during normal operation:
 //   - status.Error[codes.NotFound] - No block with the given height was found.
-//     The block height may or may not be finalized in the future; the client can retry later.
+//     The block height may or may not be finalized in the future; the client can r etry later.
 //   - status.Error[codes.InvalidArgument] - A block was found, however its sealing segment spans an epoch phase transition,
 //     yielding an invalid snapshot. Therefore we will never return a snapshot for this block height.
 func (b *backendNetwork) GetProtocolStateSnapshotByHeight(_ context.Context, blockHeight uint64) ([]byte, error) {
