@@ -1899,6 +1899,7 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 		)
 		require.NoError(t, err)
 
+		var err error
 		err = migration.Close()
 		require.NoError(t, err)
 
@@ -1906,7 +1907,7 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 
 		var jsonObject map[string]any
 
-		err := json.Unmarshal([]byte(logWriter.logs[0]), &jsonObject)
+		err = json.Unmarshal([]byte(logWriter.logs[0]), &jsonObject)
 		require.NoError(t, err)
 
 		assert.Equal(
@@ -1994,6 +1995,7 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 		accountPayloads := []*ledger.Payload{contractACode}
 		allPayloads := []*ledger.Payload{contractACode, nftCode}
 
+		var err error
 		err = migration.InitMigration(log, allPayloads, 0)
 		require.NoError(t, err)
 
@@ -2007,7 +2009,7 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 		require.Len(t, logWriter.logs, 1)
 
 		var jsonObject map[string]any
-		err := json.Unmarshal([]byte(logWriter.logs[0]), &jsonObject)
+		err = json.Unmarshal([]byte(logWriter.logs[0]), &jsonObject)
 		require.NoError(t, err)
 
 		assert.Equal(

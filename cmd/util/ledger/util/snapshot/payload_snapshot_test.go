@@ -137,11 +137,11 @@ func benchmarkMerge(b *testing.B, payloadsNum int, changes []int) {
 			b.Run("IndexMapSnapshot", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					b.StopTimer()
-					snapshot, err := snapshot.NewPayloadSnapshot(payloads, snapshot.IndexMapBased)
+					snap, err := snapshot.NewPayloadSnapshot(payloads, snapshot.SmallChangeSetSnapshot)
 					require.NoError(b, err)
 					b.StartTimer()
 
-					_, err = snapshot.ApplyChangesAndGetNewPayloads(changes, nil, zerolog.Nop())
+					_, err = snap.ApplyChangesAndGetNewPayloads(changes, nil, zerolog.Nop())
 					require.NoError(b, err)
 				}
 			})
@@ -149,11 +149,11 @@ func benchmarkMerge(b *testing.B, payloadsNum int, changes []int) {
 			b.Run("mapSnapshot", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					b.StopTimer()
-					snapshot, err := snapshot.NewPayloadSnapshot(payloads, snapshot.MapBased)
+					snap, err := snapshot.NewPayloadSnapshot(payloads, snapshot.LargeChangeSetOrReadonlySnapshot)
 					require.NoError(b, err)
 					b.StartTimer()
 
-					_, err = snapshot.ApplyChangesAndGetNewPayloads(changes, nil, zerolog.Nop())
+					_, err = snap.ApplyChangesAndGetNewPayloads(changes, nil, zerolog.Nop())
 					require.NoError(b, err)
 				}
 			})
@@ -170,14 +170,14 @@ func benchmarkCreate(
 
 	b.Run("IndexMapSnapshot", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_, err := snapshot.NewPayloadSnapshot(payloads, snapshot.IndexMapBased)
+			_, err := snapshot.NewPayloadSnapshot(payloads, snapshot.SmallChangeSetSnapshot)
 			require.NoError(b, err)
 		}
 	})
 
 	b.Run("mapSnapshot", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_, err := snapshot.NewPayloadSnapshot(payloads, snapshot.MapBased)
+			_, err := snapshot.NewPayloadSnapshot(payloads, snapshot.LargeChangeSetOrReadonlySnapshot)
 			require.NoError(b, err)
 		}
 	})
