@@ -45,6 +45,7 @@ func NewCadence1PruneMigration(chainID flow.ChainID, log zerolog.Logger) ledger.
 	return NewAccountStorageMigration(
 		serviceAccountAddress,
 		log,
+		chainID,
 		migrate,
 	)
 }

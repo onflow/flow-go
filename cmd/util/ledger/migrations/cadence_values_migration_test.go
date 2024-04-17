@@ -85,6 +85,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 			EVMContractChange:    evmContractChange,
 			BurnerContractChange: burnerContractChange,
 			StagedContracts:      stagedContracts,
+			VerboseErrorOutput:   true,
 		},
 	)
 
@@ -100,7 +101,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 	}
 
 	// Assert the migrated payloads
-	checkMigratedPayloads(t, address, payloads)
+	checkMigratedPayloads(t, address, payloads, chainID)
 
 	// Check reporters
 	checkReporters(t, rwf, address)
@@ -118,11 +119,12 @@ func checkMigratedPayloads(
 	t *testing.T,
 	address common.Address,
 	newPayloads []*ledger.Payload,
+	chainID flow.ChainID,
 ) {
 	mr, err := NewMigratorRuntime(
-		address,
 		newPayloads,
-		util.RuntimeInterfaceConfig{},
+		chainID,
+		MigratorRuntimeConfig{},
 	)
 	require.NoError(t, err)
 
@@ -380,7 +382,7 @@ func checkMigratedPayloads(
 	}
 }
 
-func checkAccountID(t *testing.T, mr *migratorRuntime, address common.Address) {
+func checkAccountID(t *testing.T, mr *MigratorRuntime, address common.Address) {
 	id := flow.AccountStatusRegisterID(flow.Address(address))
 	statusBytes, err := mr.Accounts.GetValue(id)
 	require.NoError(t, err)
@@ -700,6 +702,7 @@ func TestBootstrappedStateMigration(t *testing.T) {
 			ChainID:              chainID,
 			EVMContractChange:    evmContractChange,
 			BurnerContractChange: burnerContractChange,
+			VerboseErrorOutput:   true,
 		},
 	)
 
@@ -737,9 +740,9 @@ func TestProgramParsingError(t *testing.T) {
 	require.NoError(t, err)
 
 	runtime, err := NewMigratorRuntime(
-		testAddress,
 		payloads,
-		util.RuntimeInterfaceConfig{},
+		chainID,
+		MigratorRuntimeConfig{},
 	)
 	require.NoError(t, err)
 
@@ -829,8 +832,6 @@ func TestProgramParsingError(t *testing.T) {
 		},
 	)
 
-	cadenceValueMigratorReporter := rwf.reportWriters[cadenceValueMigrationReporterName]
-
 	for _, migration := range migrations {
 		payloads, err = migration.Migrate(payloads)
 		require.NoError(
@@ -842,10 +843,13 @@ func TestProgramParsingError(t *testing.T) {
 		)
 	}
 
+	reporter := rwf.reportWriters[contractCheckingReporterName]
+
 	var messages []string
-	for _, entry := range cadenceValueMigratorReporter.entries {
-		if errorEntry, isErrorEntry := entry.(cadenceValueMigrationFailureEntry); isErrorEntry {
-			messages = append(messages, errorEntry.Message)
+
+	for _, entry := range reporter.entries {
+		if errorEntry, isErrorEntry := entry.(contractCheckingFailure); isErrorEntry {
+			messages = append(messages, errorEntry.Error)
 			break
 		}
 	}
@@ -881,9 +885,9 @@ func TestCoreContractUsage(t *testing.T) {
 		require.NoError(t, err)
 
 		runtime, err := NewMigratorRuntime(
-			testAddress,
 			payloads,
-			util.RuntimeInterfaceConfig{},
+			chainID,
+			MigratorRuntimeConfig{},
 		)
 		require.NoError(t, err)
 
@@ -950,6 +954,7 @@ func TestCoreContractUsage(t *testing.T) {
 				ChainID:              chainID,
 				EVMContractChange:    evmContractChange,
 				BurnerContractChange: burnerContractChange,
+				VerboseErrorOutput:   true,
 			},
 		)
 
@@ -970,9 +975,9 @@ func TestCoreContractUsage(t *testing.T) {
 		// Get result
 
 		mr, err := NewMigratorRuntime(
-			testAddress,
 			payloads,
-			util.RuntimeInterfaceConfig{},
+			chainID,
+			MigratorRuntimeConfig{},
 		)
 		require.NoError(t, err)
 

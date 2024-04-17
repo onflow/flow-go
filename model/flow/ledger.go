@@ -79,11 +79,19 @@ func ContractRegisterID(address Address, contractName string) RegisterID {
 	}
 }
 
+func IsContractCodeRegisterID(registerID RegisterID) bool {
+	return strings.HasPrefix(registerID.Key, CodeKeyPrefix)
+}
+
 func RegisterIDContractName(registerID RegisterID) string {
-	if !strings.HasPrefix(registerID.Key, CodeKeyPrefix) {
+	if !IsContractCodeRegisterID(registerID) {
 		return ""
 	}
 	return registerID.Key[len(CodeKeyPrefix):]
+}
+
+func IsContractNamesRegisterID(registerID RegisterID) bool {
+	return registerID.Key == ContractNamesKey
 }
 
 func CadenceRegisterID(owner []byte, key []byte) RegisterID {
