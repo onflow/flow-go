@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
-	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -54,12 +53,7 @@ func TestValidateCadenceValues(t *testing.T) {
 				accountStatus.ToBytes(),
 			)
 
-			mr, err := NewMigratorRuntime(
-				address,
-				[]*ledger.Payload{accountStatusPayload},
-				util.RuntimeInterfaceConfig{},
-				snapshot.LargeChangeSetOrReadonlySnapshot,
-			)
+			mr, err := NewAtreeRegisterMigratorRuntime(address, []*ledger.Payload{accountStatusPayload})
 			require.NoError(t, err)
 
 			// Create new storage map
@@ -147,12 +141,7 @@ func createTestPayloads(t *testing.T, address common.Address, domain string) []*
 		accountStatus.ToBytes(),
 	)
 
-	mr, err := NewMigratorRuntime(
-		address,
-		[]*ledger.Payload{accountStatusPayload},
-		util.RuntimeInterfaceConfig{},
-		snapshot.LargeChangeSetOrReadonlySnapshot,
-	)
+	mr, err := NewAtreeRegisterMigratorRuntime(address, []*ledger.Payload{accountStatusPayload})
 	require.NoError(t, err)
 
 	// Create new storage map
