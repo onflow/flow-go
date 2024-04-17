@@ -22,6 +22,7 @@ func preparePrecompiles(
 		archAddress,
 		blockHeightProvider(backend),
 		coaOwnershipProofValidator(evmContractAddress, backend),
+		revertibleRandomnessProvider(backend),
 	)
 	return []types.Precompile{archContract}
 }
@@ -36,14 +37,16 @@ func blockHeightProvider(backend types.Backend) func() (uint64, error) {
 	}
 }
 
-func revertibleRandomnessProvider(backend types.Backend) ([]byte, error) {
-	rand := make([]byte, 128)
-	err := backend.ReadRandom(rand)
-	if err != nil {
-		return nil, err
-	}
+func revertibleRandomnessProvider(backend types.Backend) func() ([]byte, error) {
+	return func() ([]byte, error) {
+		rand := make([]byte, 128)
+		err := backend.ReadRandom(rand)
+		if err != nil {
+			return nil, err
+		}
 
-	return rand, nil
+		return rand, nil
+	}
 }
 
 func coaOwnershipProofValidator(contractAddress flow.Address, backend types.Backend) func(proof *types.COAOwnershipProofInContext) (bool, error) {
