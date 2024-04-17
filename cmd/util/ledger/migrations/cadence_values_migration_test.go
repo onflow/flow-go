@@ -124,7 +124,6 @@ func checkMigratedPayloads(
 ) {
 	mr, err := NewMigratorRuntime(
 		zerolog.Nop(),
-		address,
 		newPayloads,
 		chainID,
 		MigratorRuntimeConfig{},
@@ -746,7 +745,6 @@ func TestProgramParsingError(t *testing.T) {
 
 	runtime, err := NewMigratorRuntime(
 		zerolog.Nop(),
-		testAddress,
 		payloads,
 		chainID,
 		MigratorRuntimeConfig{},
@@ -893,7 +891,6 @@ func TestCoreContractUsage(t *testing.T) {
 
 		runtime, err := NewMigratorRuntime(
 			zerolog.Nop(),
-			testAddress,
 			payloads,
 			chainID,
 			MigratorRuntimeConfig{},
@@ -985,7 +982,6 @@ func TestCoreContractUsage(t *testing.T) {
 
 		mr, err := NewMigratorRuntime(
 			zerolog.Nop(),
-			testAddress,
 			payloads,
 			chainID,
 			MigratorRuntimeConfig{},

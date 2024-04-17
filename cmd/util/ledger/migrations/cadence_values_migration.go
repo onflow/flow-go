@@ -48,7 +48,7 @@ type CadenceBaseMigrator struct {
 	errorMessageHandler   *errorMessageHandler
 	programs              map[runtime.Location]*interpreter.Program
 	chainID               flow.ChainID
-	nWorkers               int
+	nWorkers              int
 }
 
 var _ AccountBasedMigration = (*CadenceBaseMigrator)(nil)
@@ -109,7 +109,6 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 	// Create all the runtime components we need for the migration
 	migrationRuntime, err := NewMigratorRuntime(
 		m.log,
-		address,
 		oldPayloads,
 		m.chainID,
 		m.migratorRuntimeConfig,

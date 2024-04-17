@@ -100,7 +100,6 @@ func (c MigratorRuntimeConfig) NewRuntimeInterface(
 // NewMigratorRuntime returns a runtime that can be used in migrations.
 func NewMigratorRuntime(
 	log zerolog.Logger,
-	address common.Address,
 	payloads []*ledger.Payload,
 	chainID flow.ChainID,
 	config MigratorRuntimeConfig,

@@ -245,6 +245,7 @@ func NewCadence1ValueMigrations(
 				opts.ChainID,
 				opts.VerboseErrorOutput,
 				programs,
+				opts.NWorker,
 			),
 		},
 	}

@@ -24,7 +24,6 @@ func NewAccountStorageMigration(
 
 		migrationRuntime, err := NewMigratorRuntime(
 			log,
-			address,
 			payloads,
 			chainID,
 			MigratorRuntimeConfig{},

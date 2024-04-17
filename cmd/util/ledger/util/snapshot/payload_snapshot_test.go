@@ -37,11 +37,11 @@ func Test_PayloadSnapshot(t *testing.T) {
 	}
 
 	t.Run("IndexMapBased", func(t *testing.T) {
-		f(t, snapshot.IndexMapBased)
+		f(t, snapshot.SmallChangeSetSnapshot)
 	})
 
 	t.Run("MapBased", func(t *testing.T) {
-		f(t, snapshot.MapBased)
+		f(t, snapshot.LargeChangeSetOrReadonlySnapshot)
 	})
 }
 
@@ -168,7 +168,7 @@ func benchmarkMerge(b *testing.B, payloadsNum int, changes []int) {
 			f := func(b *testing.B, ty snapshot.MigrationSnapshotType) {
 				for i := 0; i < b.N; i++ {
 					b.StopTimer()
-					snapshot, err := snapshot.NewPayloadSnapshot(zerolog.Nop(), payloads, ty, 1)
+					snap, err := snapshot.NewPayloadSnapshot(zerolog.Nop(), payloads, ty, 1)
 					require.NoError(b, err)
 					b.StartTimer()
 
@@ -178,11 +178,11 @@ func benchmarkMerge(b *testing.B, payloadsNum int, changes []int) {
 			}
 
 			b.Run("IndexMapBased", func(b *testing.B) {
-				f(b, snapshot.IndexMapBased)
+				f(b, snapshot.SmallChangeSetSnapshot)
 			})
 
 			b.Run("MapBased", func(b *testing.B) {
-				f(b, snapshot.MapBased)
+				f(b, snapshot.LargeChangeSetOrReadonlySnapshot)
 			})
 		})
 	}

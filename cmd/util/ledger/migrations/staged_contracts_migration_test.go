@@ -1904,7 +1904,6 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		var err error
 		err = migration.Close()
 		require.NoError(t, err)
 

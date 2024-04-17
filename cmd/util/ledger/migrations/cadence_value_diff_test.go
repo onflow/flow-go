@@ -180,7 +180,7 @@ func TestDiffCadenceValues(t *testing.T) {
 				flow.Emulator,
 				MigratorRuntimeConfig{},
 				snapshot.LargeChangeSetOrReadonlySnapshot,
-				1
+				1,
 			)
 			require.NoError(t, err)
 
@@ -397,7 +397,7 @@ func TestDiffCadenceValues(t *testing.T) {
 				flow.Emulator,
 				MigratorRuntimeConfig{},
 				snapshot.LargeChangeSetOrReadonlySnapshot,
-				1
+				1,
 			)
 			require.NoError(t, err)
 
@@ -650,7 +650,7 @@ func createStorageMapPayloads(t *testing.T, address common.Address, domain strin
 		flow.Emulator,
 		MigratorRuntimeConfig{},
 		snapshot.LargeChangeSetOrReadonlySnapshot,
-		1
+		1,
 	)
 	require.NoError(t, err)
 
