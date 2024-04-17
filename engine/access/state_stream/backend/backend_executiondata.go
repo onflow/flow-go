@@ -40,9 +40,11 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(ctx context.Context, bl
 	executionData, err := b.getExecutionData(ctx, header.Height)
 
 	if err != nil {
+		// need custom not found handler due to blob not found error
 		if errors.Is(err, storage.ErrNotFound) || execution_data.IsBlobNotFoundError(err) {
 			return nil, status.Errorf(codes.NotFound, "could not find execution data: %v", err)
 		}
+
 		return nil, rpc.ConvertError(err, "could not get execution data", codes.Internal)
 	}
 
