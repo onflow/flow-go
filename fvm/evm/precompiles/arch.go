@@ -14,6 +14,8 @@ var (
 		[]string{"address", "bytes32", "bytes"},
 	)
 
+	RevertibleRandomFuncSig = ComputeFunctionSelector("revertibleRandom", nil)
+
 	// FlowBlockHeightFixedGas is set to match the `number` opCode (0x43)
 	FlowBlockHeightFixedGas = uint64(2)
 	// ProofVerifierBaseGas covers the cost of decoding, checking capability the resource
@@ -22,6 +24,13 @@ var (
 	// ProofVerifierGasMultiplerPerSignature is set to match `ECRECOVER`
 	// but we might increase this in the future
 	ProofVerifierGasMultiplerPerSignature = uint64(3_000)
+
+	// RevertibleRandomGas covers the cost of calculating a revertible random bytes
+	RevertibleRandomGas = uint64(1_000) // todo define
+
+	// errUnexpectedInput is returned when the function that doesn't expect an input
+	// argument, receives one
+	errUnexpectedInput = fmt.Errorf("unexpected input is provided")
 )
 
 // ArchContract return a procompile for the Cadence Arch contract
@@ -58,7 +67,7 @@ func (c *flowBlockHeight) ComputeGas(input []byte) uint64 {
 
 func (c *flowBlockHeight) Run(input []byte) ([]byte, error) {
 	if len(input) > 0 {
-		return nil, fmt.Errorf("unexpected input is provided")
+		return nil, errUnexpectedInput
 	}
 	bh, err := c.flowBlockHeightLookUp()
 	if err != nil {
@@ -117,6 +126,28 @@ func (f *proofVerifier) Run(input []byte) ([]byte, error) {
 
 	buffer := make([]byte, EncodedBoolSize)
 	return buffer, EncodeBool(verified, buffer, 0)
+}
+
+var _ Function = &revertibleRandomness{}
+
+type revertibleRandomness struct {
+	revertibleRandomnessProvider func() ([]byte, error)
+}
+
+func (r *revertibleRandomness) FunctionSelector() FunctionSelector {
+	return RevertibleRandomFuncSig
+}
+
+func (r *revertibleRandomness) ComputeGas(input []byte) uint64 {
+	return RevertibleRandomGas
+}
+
+func (r *revertibleRandomness) Run(input []byte) ([]byte, error) {
+	if len(input) > 0 {
+		return nil, errUnexpectedInput
+	}
+
+	return r.revertibleRandomnessProvider()
 }
 
 func DecodeABIEncodedProof(input []byte) (*types.COAOwnershipProofInContext, error) {
