@@ -3071,6 +3071,9 @@ func TestEVM(t *testing.T) {
 	).Return(block1.Header, nil)
 
 	ctxOpts := []fvm.Option{
+		// default is testnet, but testnet has a special EVM storage contract location
+		// so we have to use emulator here so that the EVM storage contract is deployed
+		// to the 5th address
 		fvm.WithChain(flow.Emulator.Chain()),
 		fvm.WithEVMEnabled(true),
 		fvm.WithBlocks(blocks),
@@ -3226,15 +3229,8 @@ func TestEVM(t *testing.T) {
 	)
 
 	t.Run("deploy contract code", newVMTest().
-		withBootstrapProcedureOptions(
-			fvm.WithSetupEVMEnabled(true),
-		).
-		withContextOptions(
-			// default is testnet, but testnet has a special EVM storage contract location
-			// so we have to use emulator here so that the EVM storage contract is deployed
-			// to the 5th address
-			fvm.WithChain(flow.Emulator.Chain()),
-		).
+		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
+		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
 			vm fvm.VM,
