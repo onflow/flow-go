@@ -28,7 +28,7 @@ var (
 	// but the output of the execution was an error
 	// for this case a block is formed and receipts are available
 	StatusFailed Status = 2
-	// StatusFailed shows that the transaction has been executed and the execution has returned success
+	// StatusSuccessful shows that the transaction has been executed and the execution has returned success
 	// for this case a block is formed and receipts are available
 	StatusSuccessful Status = 3
 )
