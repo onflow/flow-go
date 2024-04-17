@@ -151,6 +151,7 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *Tran
 // Possible orders of transaction statuses:
 // 1. pending(1) -> finalized(2) -> executed(3) -> sealed(4)
 // 2. pending(1) -> expired(5)
+// No errors expected during normal operations.
 func (b *backendSubscribeTransactions) generateResultsWithMissingStatuses(
 	txInfo *TransactionSubscriptionMetadata,
 	prevTxStatus flow.TransactionStatus,
@@ -200,6 +201,9 @@ func (b *backendSubscribeTransactions) generateResultsWithMissingStatuses(
 	return results, nil
 }
 
+// checkBlockReady checks if the given block height is valid and available based on the expected block status.
+// Expected errors during normal operation:
+// - subscription.ErrBlockNotReady: block for the given block height is not available.
 func (b *backendSubscribeTransactions) checkBlockReady(height uint64) error {
 	// Get the highest available finalized block height
 	highestHeight, err := b.blockTracker.GetHighestHeight(flow.BlockStatusFinalized)

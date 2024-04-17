@@ -262,6 +262,7 @@ func New(params Params) (*Backend, error) {
 		systemTxID:                    systemTxID,
 	}
 
+	// TODO: The TransactionErrorMessage interface should be reorganized in future, as it is implemented in backendTransactions but used in TransactionsLocalDataProvider, and its initialization is somewhat quirky.
 	b.backendTransactions.txErrorMessages = b
 
 	b.backendSubscribeTransactions = backendSubscribeTransactions{
