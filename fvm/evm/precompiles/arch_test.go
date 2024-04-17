@@ -21,6 +21,7 @@ func TestArchContract(t *testing.T) {
 				return height, nil
 			},
 			nil,
+			nil,
 		)
 
 		input := precompiles.FlowBlockHeightFuncSig.Bytes()
@@ -46,6 +47,7 @@ func TestArchContract(t *testing.T) {
 				require.Equal(t, proof, p)
 				return true, nil
 			},
+			nil,
 		)
 
 		abiEncodedData, err := precompiles.ABIEncodeProof(proof)
