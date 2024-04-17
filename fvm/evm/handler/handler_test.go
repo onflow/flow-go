@@ -827,11 +827,12 @@ func TestHandler_TransactionRun(t *testing.T) {
 					aa := handler.NewAddressAllocator()
 
 					gasConsumed := testutils.RandomGas(1000)
-					result := func() *types.Result {
+					result := func(tx *gethTypes.Transaction) *types.Result {
 						return &types.Result{
 							DeployedContractAddress: testutils.RandomAddress(t),
 							ReturnedValue:           testutils.RandomData(t),
 							GasConsumed:             gasConsumed,
+							TxHash:                  tx.Hash(),
 							Logs: []*gethTypes.Log{
 								testutils.GetRandomLogFixture(t),
 								testutils.GetRandomLogFixture(t),
@@ -839,13 +840,14 @@ func TestHandler_TransactionRun(t *testing.T) {
 						}
 					}
 
+					var runResults []*types.Result
 					em := &testutils.TestEmulator{
 						BatchRunTransactionFunc: func(txs []*gethTypes.Transaction) ([]*types.Result, error) {
-							res := make([]*types.Result, len(txs))
-							for i := range res {
-								res[i] = result()
+							runResults = make([]*types.Result, len(txs))
+							for i, tx := range txs {
+								runResults[i] = result(tx)
 							}
-							return res, nil
+							return runResults, nil
 						},
 					}
 					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, bs, aa, backend, em)
@@ -872,6 +874,35 @@ func TestHandler_TransactionRun(t *testing.T) {
 						require.Equal(t, types.StatusSuccessful, rs.Status)
 						require.Equal(t, gasConsumed, rs.GasConsumed)
 						require.Equal(t, types.ErrCodeNoError, rs.ErrorCode)
+					}
+
+					events := backend.Events()
+					require.Len(t, events, batchSize+1) // +1 block event
+
+					for i, event := range events {
+						if i == batchSize {
+							continue // don't check last block event
+						}
+						assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
+						ev, err := jsoncdc.Decode(nil, event.Payload)
+						require.NoError(t, err)
+						cadenceEvent, ok := ev.(cadence.Event)
+						require.True(t, ok)
+						for j, f := range cadenceEvent.GetFields() {
+							if f.Identifier == "logs" {
+								cadenceLogs := cadenceEvent.GetFieldValues()[j]
+								encodedLogs, err := hex.DecodeString(strings.ReplaceAll(cadenceLogs.String(), "\"", ""))
+								require.NoError(t, err)
+
+								var logs []*gethTypes.Log
+								err = rlp.DecodeBytes(encodedLogs, &logs)
+								require.NoError(t, err)
+
+								for k, l := range runResults[i].Logs {
+									assert.Equal(t, l, logs[k])
+								}
+							}
+						}
 					}
 
 					// run single transaction passed in as batch
