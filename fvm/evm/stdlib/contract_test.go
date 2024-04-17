@@ -253,25 +253,25 @@ func deployContracts(
 
 }
 
-func newEVMTransactionEnvironment(handler types.ContractHandler, service flow.Address) runtime.Environment {
+func newEVMTransactionEnvironment(handler types.ContractHandler, contractAddress flow.Address) runtime.Environment {
 	transactionEnvironment := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
 	stdlib.SetupEnvironment(
 		transactionEnvironment,
 		handler,
-		service,
+		contractAddress,
 	)
 
 	return transactionEnvironment
 }
 
-func newEVMScriptEnvironment(handler types.ContractHandler, service flow.Address) runtime.Environment {
+func newEVMScriptEnvironment(handler types.ContractHandler, contractAddress flow.Address) runtime.Environment {
 	scriptEnvironment := runtime.NewScriptInterpreterEnvironment(runtime.Config{})
 
 	stdlib.SetupEnvironment(
 		scriptEnvironment,
 		handler,
-		service,
+		contractAddress,
 	)
 
 	return scriptEnvironment

@@ -1942,8 +1942,12 @@ var internalEVMStandardLibraryType = stdlib.StandardLibraryType{
 	Kind: common.DeclarationKindContract,
 }
 
-func SetupEnvironment(env runtime.Environment, handler types.ContractHandler, service flow.Address) {
-	location := common.NewAddressLocation(nil, common.Address(service), ContractName)
+func SetupEnvironment(
+	env runtime.Environment,
+	handler types.ContractHandler,
+	contractAddress flow.Address,
+) {
+	location := common.NewAddressLocation(nil, common.Address(contractAddress), ContractName)
 
 	env.DeclareType(
 		internalEVMStandardLibraryType,
