@@ -46,8 +46,11 @@ const (
 	// default queue capacity
 	defaultQueueCapacity = 10_000
 
-	workersCount = 1 // how many workers will concurrently process the tasks in the jobqueue
-	searchAhead  = 1 // how many block heights ahead of the current will be requested and tasked for jobqueue
+	// how many workers will concurrently process the tasks in the jobqueue
+	workersCount = 1
+
+	// how many block heights ahead of the current will be requested and tasked for jobqueue
+	searchAhead = 1
 )
 
 var (
@@ -61,6 +64,8 @@ var (
 
 // Engine represents the ingestion engine, used to funnel data from other nodes
 // to a centralized location that can be queried by a user
+//
+// No errors are expected during normal operation.
 type Engine struct {
 	*component.ComponentManager
 
@@ -77,19 +82,20 @@ type Engine struct {
 
 	// storage
 	// FIX: remove direct DB access by substituting indexer module
-	blocks            storage.Blocks
-	headers           storage.Headers
-	collections       storage.Collections
-	transactions      storage.Transactions
-	executionReceipts storage.ExecutionReceipts
-	maxReceiptHeight  uint64
-	executionResults  storage.ExecutionResults
+	blocks           storage.Blocks
+	headers          storage.Headers
+	collections      storage.Collections
+	transactions     storage.Transactions
+	maxReceiptHeight uint64
+	executionResults storage.ExecutionResults
 
 	// metrics
 	collectionExecutedMetric module.CollectionExecutedMetric
 }
 
 // New creates a new access ingestion engine
+//
+// No errors are expected during normal operation.
 func New(
 	log zerolog.Logger,
 	state protocol.State,
@@ -100,7 +106,6 @@ func New(
 	collections storage.Collections,
 	transactions storage.Transactions,
 	executionResults storage.ExecutionResults,
-	executionReceipts storage.ExecutionReceipts,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	processedHeight storage.ConsumerProgress,
 ) (*Engine, error) {
@@ -115,7 +120,6 @@ func New(
 		collections:              collections,
 		transactions:             transactions,
 		executionResults:         executionResults,
-		executionReceipts:        executionReceipts,
 		maxReceiptHeight:         0,
 		collectionExecutedMetric: collectionExecutedMetric,
 		finalizedBlockNotifier:   engine.NewNotifier(),
@@ -133,7 +137,7 @@ func New(
 	// create a jobqueue that will process new available finalized block. The `finalizedBlockNotifier` is used to
 	// signal new work, which is being triggered on the `processFinalizedBlockJob` handler.
 	finalizedBlockConsumer, err := jobqueue.NewComponentConsumer(
-		e.log,
+		e.log.With().Str("module", "finalized_block_consumer").Logger(),
 		e.finalizedBlockNotifier.Channel(),
 		processedHeight,
 		finalizedBlockReader,
@@ -161,6 +165,8 @@ func New(
 //
 // The BlockConsumer utilizes this return height to fetch and consume block jobs from
 // jobs queue the first time it initializes.
+//
+// No errors are expected during normal operation.
 func (e *Engine) defaultProcessedIndex() (uint64, error) {
 	final, err := e.state.Final().Head()
 	if err != nil {
@@ -169,6 +175,8 @@ func (e *Engine) defaultProcessedIndex() (uint64, error) {
 	return final.Height, nil
 }
 
+// Start starts the ingestion engine and initializes necessary components.
+// It initializes the LastFullBlockReceived index and starts the component manager.
 func (e *Engine) Start(parent irrecoverable.SignalerContext) {
 	err := e.initLastFullBlockHeightIndex()
 	if err != nil {
@@ -183,6 +191,7 @@ func (e *Engine) Start(parent irrecoverable.SignalerContext) {
 // This means that the Access Node will ingest all collections for all blocks
 // ingested after state bootstrapping is complete (all blocks received from the network).
 // If the index has already been initialized, this is a no-op.
+//
 // No errors are expected during normal operation.
 func (e *Engine) initLastFullBlockHeightIndex() error {
 	rootBlock := e.state.Params().FinalizedRoot()
@@ -213,21 +222,28 @@ func (e *Engine) runFinalizedBlockConsumer(ctx irrecoverable.SignalerContext, re
 	<-e.finalizedBlockConsumer.Done()
 }
 
+// processFinalizedBlockJob is a handler function for processing finalized block jobs.
+// It converts the job to a block, processes the block, and logs any errors encountered during processing.
 func (e *Engine) processFinalizedBlockJob(ctx irrecoverable.SignalerContext, job module.Job, done func()) {
-	header, err := jobqueue.JobToBlockHeader(job)
+	header, err := jobqueue.JobToBlock(job)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
 	}
 
 	err = e.processFinalizedBlock(header.ID())
-	if err != nil {
-		e.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during finalized block processing job")
-		//ctx.Throw(err)
+	if err == nil {
+		done()
+		return
 	}
 
-	done()
+	e.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during finalized block processing job")
 }
 
+// processBackground is a background routine responsible for executing periodic tasks related to block processing and collection retrieval.
+// It performs tasks such as updating indexes of processed blocks and requesting missing collections from the network.
+// This function runs indefinitely until the context is canceled.
+// Periodically, it checks for updates in the last fully processed block index and requests missing collections if necessary.
+// Additionally, it checks for missing collections across a range of blocks and requests them if certain thresholds are met.
 func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	// context with timeout
 	requestCtx, cancel := context.WithTimeout(ctx, defaultCollectionCatchupTimeout)
@@ -270,11 +286,17 @@ func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready comp
 
 // OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
 // Receives block finalized events from the finalization distributor and forwards them to the finalizedBlockConsumer.
-func (e *Engine) OnFinalizedBlock(hb *model.Block) {
+func (e *Engine) OnFinalizedBlock(*model.Block) {
 	e.finalizedBlockNotifier.Notify()
 }
 
-// processBlock handles an incoming finalized block.
+// processFinalizedBlock handles an incoming finalized block.
+// It processes the block, indexes it for further processing, and requests missing collections if necessary.
+//
+// Expected errors during normal operation:
+//   - storage.ErrNotFound - if the block or ast full block height do not exist in the database.
+//   - generic error in case of unexpected failure from the database layer, or failure
+//     to decode an existing database value.
 func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	block, err := e.blocks.ByID(blockID)
@@ -322,7 +344,7 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 	return nil
 }
 
-// OnCollection handles the response of the a collection request made earlier when a block was received.
+// OnCollection handles the response of the collection request made earlier when a block was received.
 // No errors expected during normal operations.
 func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 	collection, ok := entity.(*flow.Collection)

@@ -1722,7 +1722,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Collections,
 				node.Storage.Transactions,
 				node.Storage.Results,
-				node.Storage.Receipts,
 				builder.collectionExecutedMetric,
 				processedBlockHeight,
 			)
