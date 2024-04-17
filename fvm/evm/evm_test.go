@@ -1,7 +1,12 @@
 package evm_test
 
 import (
+	"encoding/hex"
 	"fmt"
+	"github.com/onflow/cadence/encoding/ccf"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	"github.com/onflow/go-ethereum/rlp"
+	"github.com/stretchr/testify/assert"
 	"math/big"
 	"testing"
 
@@ -287,14 +292,15 @@ func TestEVMBatchRun(t *testing.T) {
 				))
 
 				batchCount := 5
-				var num int64
+				var storedValues []int64
 				txBytes := make([]cadence.Value, batchCount)
 				for i := 0; i < batchCount; i++ {
-					num = int64(i)
+					num := int64(i)
+					storedValues = append(storedValues, num)
 					// prepare batch of transaction payloads
 					tx := testAccount.PrepareSignAndEncodeTx(t,
 						testContract.DeployedAt.ToCommon(),
-						testContract.MakeCallData(t, "store", big.NewInt(num)),
+						testContract.MakeCallData(t, "storeWithLog", big.NewInt(num)),
 						big.NewInt(0),
 						uint64(100_000),
 						big.NewInt(0),
@@ -327,6 +333,43 @@ func TestEVMBatchRun(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 				require.NotEmpty(t, state.WriteSet)
+
+				type txEvent struct {
+					BlockHeight     uint64 `cadence:"blockHeight"`
+					TransactionHash string `cadence:"transactionHash"`
+					Logs            string `cadence:"logs"`
+				}
+
+				require.Len(t, output.Events, batchCount+1) // +1 block executed
+				for i, event := range output.Events {
+					if i == batchCount { // last one is block executed
+						continue
+					}
+
+					ev, err := ccf.Decode(nil, event.Payload)
+					require.NoError(t, err)
+					cadenceEvent, ok := ev.(cadence.Event)
+					require.True(t, ok)
+
+					event := txEvent{}
+					require.NoError(t, cadence.DecodeFields(cadenceEvent, &event))
+
+					encodedLogs, err := hex.DecodeString(event.Logs)
+					require.NoError(t, err)
+
+					var logs []*gethTypes.Log
+					err = rlp.DecodeBytes(encodedLogs, &logs)
+					require.NoError(t, err)
+
+					require.Len(t, logs, 1)
+
+					log := logs[0]
+					b, _ := log.MarshalJSON()
+					fmt.Println(string(b))
+					last := log.Topics[len(log.Topics)-1] // last topic is the value set in the store method
+					assert.Equal(t, storedValues[i], last.Big().Int64())
+					assert.Equal(t, event.TransactionHash, log.TxHash.String())
+				}
 
 				// append the state
 				snapshot = snapshot.Append(state)
@@ -374,7 +417,7 @@ func TestEVMBatchRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
-				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue).Int64())
+				require.Equal(t, storedValues[len(storedValues)-1], new(big.Int).SetBytes(res.ReturnedValue).Int64())
 			})
 	})
 
