@@ -515,3 +515,46 @@ func (s *EpochStateMachineSuite) TestEvolveState_EventsAreFiltered() {
 	})
 	require.NoError(s.T(), err)
 }
+
+// TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition tests that EpochStateMachine transitions to the next epoch
+// if an invalid state transition has been detected in a block which triggers transition to the next epoch.
+// In such situation we still need to enter the next epoch but with the fallback state machine.
+// This test ensures that we don't drop previously committed next epoch.
+func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition() {
+	unittest.SkipUnless(s.T(), unittest.TEST_TODO,
+		"This test is broken with current implementation but must pass when EFM recovery has been implemented."+
+			"See for details https://github.com/onflow/flow-go/issues/5631.")
+	s.parentEpochState = unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
+	s.candidate.View = s.parentEpochState.NextEpochSetup.FirstView
+	stateMachine, err := epochs.NewEpochStateMachineFactory(
+		s.globalParams,
+		s.setupsDB,
+		s.commitsDB,
+		s.epochStateDB,
+	).Create(s.candidate.View, s.candidate.ParentID, s.parentState, s.mutator)
+	require.NoError(s.T(), err)
+
+	invalidServiceEvent := unittest.EpochSetupFixture()
+	err = stateMachine.EvolveState([]flow.ServiceEvent{invalidServiceEvent.ServiceEvent()})
+	require.NoError(s.T(), err)
+
+	indexTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
+	indexTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
+	s.epochStateDB.On("Index", s.candidate.ID(), mocks.Anything).Return(indexTxDeferredUpdate.Execute, nil).Once()
+
+	storeTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
+	storeTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
+	s.epochStateDB.On("StoreTx", mocks.Anything, mocks.Anything).Run(func(args mocks.Arguments) {
+		updatedState := args[1].(*flow.ProtocolStateEntry)
+		require.Equal(s.T(), flow.EpochPhaseStaking, updatedState.EpochPhase())
+	}).Return(storeTxDeferredUpdate.Execute, nil).Once()
+
+	s.mutator.On("SetEpochStateID", mocks.Anything).Return().Once()
+
+	dbOps := stateMachine.Build()
+	tx := &transaction.Tx{}
+	for _, op := range dbOps.Decorate(s.candidate.ID()) {
+		err := op(tx)
+		require.NoError(s.T(), err)
+	}
+}
