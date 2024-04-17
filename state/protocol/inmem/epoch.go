@@ -93,6 +93,15 @@ func (e Epoch) ClusterByChainID(chainID flow.ChainID) (protocol.Cluster, error) 
 	return nil, fmt.Errorf("no cluster with the given chain ID %v, available chainIDs %v: %w", chainID, chainIDs, protocol.ErrClusterNotFound)
 }
 
+// TODO: we want to remove the duplication in the EncodableEpochs API (see https://github.com/onflow/flow-go/pull/5656#issuecomment-2058714768)
+// However the First/Final height fields of the Epoch API are not part of the protocol state.
+// Rather, they are indexed separately by each node, after finalizing an epoch transition.
+// Previously, we included these in the EncodableEpoch of a snapshot, which allowed a node
+// to bootstrap with these indices in place.
+// We could:
+//   - remove EncodableEpoch but add a field for supplemental epoch data (height indices)
+//   - remove EncodableEpoch and make it clear that height indices are not supported for
+//     blocks below the root height
 func (e Epoch) FinalHeight() (uint64, error) {
 	if e.enc.FinalHeight != nil {
 		return *e.enc.FinalHeight, nil
@@ -108,14 +117,16 @@ func (e Epoch) FirstHeight() (uint64, error) {
 }
 
 type Epochs struct {
-	enc EncodableEpochs
+	//enc   EncodableEpochs // TODO remove
+	entry *flow.RichProtocolStateEntry
 }
 
 var _ protocol.EpochQuery = (*Epochs)(nil)
 
 func (eq Epochs) Previous() protocol.Epoch {
-	if eq.enc.Previous != nil {
-		return Epoch{*eq.enc.Previous}
+	if eq.entry.PreviousEpoch != nil {
+		return
+		return setupEpoch{*eq.enc.Previous}
 	}
 	return invalid.NewEpoch(protocol.ErrNoPreviousEpoch)
 }

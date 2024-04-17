@@ -9,11 +9,11 @@ import (
 // EncodableSnapshot is the encoding format for protocol.Snapshot
 type EncodableSnapshot struct {
 	Head                *flow.Header
-	LatestSeal          *flow.Seal
-	LatestResult        *flow.ExecutionResult
+	LatestSeal          *flow.Seal            // TODO replace with same info from sealing segment
+	LatestResult        *flow.ExecutionResult // TODO replace with same info from sealing segment
 	SealingSegment      *flow.SealingSegment
 	QuorumCertificate   *flow.QuorumCertificate
-	Epochs              EncodableEpochs
+	Epochs              EncodableEpochs // TODO replace with same info from sealing segment
 	Params              EncodableParams
 	SealedVersionBeacon *flow.SealedVersionBeacon
 }
