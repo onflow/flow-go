@@ -2835,7 +2835,10 @@ func TestEVM(t *testing.T) {
 	t.Run("successful transaction", newVMTest().
 		withContextOptions(
 			fvm.WithEVMEnabled(true),
-			fvm.WithChain(flow.Emulator.Chain()),
+			// default is testnet, but testnet has a special EVM storage contract location
+		// so we have to use emulator here so that the EVM storage contract is deployed
+		// to the 5th address
+		fvm.WithChain(flow.Emulator.Chain()),
 			fvm.WithCadenceLogging(true),
 		).
 		run(func(
@@ -2989,13 +2992,8 @@ func TestEVM(t *testing.T) {
 	)
 
 	t.Run("deploy contract code", newVMTest().
-		withContextOptions(
-			// default is testnet, but testnet has a special EVM storage contract location
-			// so we have to use emulator here so that the EVM storage contract is deployed
-			// to the 5th address
-			fvm.WithChain(flow.Emulator.Chain()),
-			fvm.WithEVMEnabled(true),
-		).
+		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
+		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
 			vm fvm.VM,
