@@ -118,7 +118,7 @@ type MutableProtocolState interface {
 // Not safe for concurrent use.
 type StateMutator interface {
 	// Build constructs the resulting protocol state, *after* applying all the sealed service events in a block (under construction)
-	// via `ApplyServiceEventsFromValidatedSeals(...)`. It returns:
+	// via `EvolveState(...)`. It returns:
 	//  - stateID: the hash commitment to the updated Protocol State Snapshot
 	//  - dbUpdates: database updates necessary for persisting the State Snapshot itself including all data structures
 	//    that the Snapshot references. In addition, `dbUpdates` also populates the `ProtocolKVStore.ByBlockID`.
@@ -131,8 +131,7 @@ type StateMutator interface {
 	//    commitment in the block proposal! If they don't match, the proposal is byzantine and should be slashed.
 	Build() (stateID flow.Identifier, dbUpdates *DeferredBlockPersist, err error)
 
-	// ApplyServiceEventsFromValidatedSeals applies the state changes that are delivered via
-	// sealed service events:
+	// EvolveState applies the state changes that are delivered via sealed service events:
 	//   - iterating over the sealed service events in order of increasing height
 	//   - identifying state-changing service event and calling into the embedded
 	//     ProtocolStateMachine to apply the respective state update
@@ -187,5 +186,5 @@ type StateMutator interface {
 	//   - A consistency or sanity check failing within the StateMutator is likely the symptom of an internal bug
 	//     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 	//     of this function is not nil. If such an exception is returned, continuing is not an option.
-	ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) error
+	EvolveState(seals []*flow.Seal) error
 }

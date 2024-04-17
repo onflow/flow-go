@@ -2680,7 +2680,7 @@ func calculateExpectedStateId(t *testing.T, mutableProtocolState realprotocol.Mu
 		stateMutator, err := mutableProtocolState.Mutator(header.View, header.ParentID)
 		require.NoError(t, err)
 
-		err = stateMutator.ApplyServiceEventsFromValidatedSeals(seals)
+		err = stateMutator.EvolveState(seals)
 		require.NoError(t, err)
 
 		expectedStateID, _, err := stateMutator.Build()

@@ -82,7 +82,7 @@ func newStateMutator(
 }
 
 // Build constructs the resulting protocol state, *after* applying all the sealed service events in a block (under construction)
-// via `ApplyServiceEventsFromValidatedSeals(...)`. It returns:
+// via `EvolveState(...)`. It returns:
 //   - stateID: the hash commitment to the updated Protocol State Snapshot
 //   - dbUpdates: database updates necessary for persisting the State Snapshot itself including all data structures
 //     that the Snapshot references. In addition, `dbUpdates` also populates the `ProtocolKVStore.ByBlockID`.
@@ -121,8 +121,8 @@ func (m *stateMutator) Build() (stateID flow.Identifier, dbUpdates *protocol.Def
 	return stateID, dbUpdates, nil
 }
 
-// ApplyServiceEventsFromValidatedSeals applies the state changes that are delivered via
-// sealed service events:
+// EvolveState updates the state
+// applies the state changes that are delivered via sealed service events:
 //   - iterating over the sealed service events in order of increasing height
 //   - identifying state-changing service event and calling into the embedded
 //     StateMachine to apply the respective state update
@@ -177,7 +177,7 @@ func (m *stateMutator) Build() (stateID flow.Identifier, dbUpdates *protocol.Def
 //   - A consistency or sanity check failing within the StateMutator is likely the symptom of an internal bug
 //     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 //     of this function is not nil. If such an exception is returned, continuing is not an option.
-func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) error {
+func (m *stateMutator) EvolveState(seals []*flow.Seal) error {
 	// block payload may not specify seals in order, so order them by block height before processing
 	orderedSeals, err := protocol.OrderedSeals(seals, m.headers)
 	if err != nil {

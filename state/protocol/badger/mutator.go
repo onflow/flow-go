@@ -602,7 +602,7 @@ func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow
 	if err != nil {
 		return fmt.Errorf("could not create protocol state mutator for view %d: %w", candidate.Header.View, err)
 	}
-	err = stateMutator.ApplyServiceEventsFromValidatedSeals(candidate.Payload.Seals)
+	err = stateMutator.EvolveState(candidate.Payload.Seals)
 	if err != nil {
 		return fmt.Errorf("could not process service events: %w", err)
 	}

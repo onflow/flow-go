@@ -293,9 +293,9 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 	})
 }
 
-// TestApplyServiceEventsFromValidatedSeals tests that stateMutator delivers updates to each of the injected state machines.
+// TestEvolveState tests that stateMutator delivers updates to each of the injected state machines.
 // In case of an exception from a state machine, the exception is propagated to the caller.
-func (s *StateMutatorSuite) TestApplyServiceEventsFromValidatedSeals() {
+func (s *StateMutatorSuite) TestEvolveState() {
 	s.Run("happy-path", func() {
 		factories := make([]protocol_state.KeyValueStoreStateMachineFactory, 2)
 		for i := range factories {
@@ -327,7 +327,7 @@ func (s *StateMutatorSuite) TestApplyServiceEventsFromValidatedSeals() {
 		s.headersDB.On("ByBlockID", seal.BlockID).Return(block, nil)
 		s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
 
-		err = mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
+		err = mutator.EvolveState([]*flow.Seal{seal})
 		require.NoError(s.T(), err)
 	})
 	s.Run("process-update-exception", func() {
@@ -358,13 +358,13 @@ func (s *StateMutatorSuite) TestApplyServiceEventsFromValidatedSeals() {
 		s.headersDB.On("ByBlockID", seal.BlockID).Return(block, nil)
 		s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
 
-		err = mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
+		err = mutator.EvolveState([]*flow.Seal{seal})
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 }
 
-// TestApplyServiceEventsSealsOrdered tests that ApplyServiceEventsFromValidatedSeals processes seals in order of block height.
+// TestApplyServiceEventsSealsOrdered tests that EvolveState processes seals in order of block height.
 func (s *StateMutatorSuite) TestApplyServiceEventsSealsOrdered() {
 	blocks := unittest.ChainFixtureFrom(10, unittest.BlockHeaderFixture())
 	var seals []*flow.Seal
@@ -377,12 +377,12 @@ func (s *StateMutatorSuite) TestApplyServiceEventsSealsOrdered() {
 		seals = append(seals, seal)
 	}
 
-	// shuffle seals to make sure they are not ordered in the payload, so `ApplyServiceEventsFromValidatedSeals` needs to explicitly sort them.
+	// shuffle seals to make sure they are not ordered in the payload, so `EvolveState` needs to explicitly sort them.
 	require.NoError(s.T(), rand.Shuffle(uint(len(seals)), func(i, j uint) {
 		seals[i], seals[j] = seals[j], seals[i]
 	}))
 
-	err := s.mutator.ApplyServiceEventsFromValidatedSeals(seals)
+	err := s.mutator.EvolveState(seals)
 	require.NoError(s.T(), err)
 
 	// assert that results were queried in order of executed block height

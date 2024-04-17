@@ -88,7 +88,7 @@ func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState 
 	stateMutator, err := mutableProtocolState.Mutator(block3.Header.View, block3.Header.ParentID)
 	require.NoError(t, err)
 	seals := []*flow.Seal{seal}
-	err = stateMutator.ApplyServiceEventsFromValidatedSeals(seals)
+	err = stateMutator.EvolveState(seals)
 	require.NoError(t, err)
 	updatedStateId, _, err := stateMutator.Build()
 	require.NoError(t, err)

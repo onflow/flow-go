@@ -371,7 +371,7 @@ func (builder *EpochBuilder) addBlock(block *flow.Block) {
 	stateMutator, err := builder.mutableProtocolState.Mutator(block.Header.View, block.Header.ParentID)
 	require.NoError(builder.t, err)
 
-	err = stateMutator.ApplyServiceEventsFromValidatedSeals(block.Payload.Seals)
+	err = stateMutator.EvolveState(block.Payload.Seals)
 	require.NoError(builder.t, err)
 
 	updatedStateId, _, err := stateMutator.Build()

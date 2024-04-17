@@ -14,20 +14,6 @@ type StateMutator struct {
 	mock.Mock
 }
 
-// ApplyServiceEventsFromValidatedSeals provides a mock function with given fields: seals
-func (_m *StateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) error {
-	ret := _m.Called(seals)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func([]*flow.Seal) error); ok {
-		r0 = rf(seals)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // Build provides a mock function with given fields:
 func (_m *StateMutator) Build() (flow.Identifier, *protocol.DeferredBlockPersist, error) {
 	ret := _m.Called()
@@ -61,6 +47,20 @@ func (_m *StateMutator) Build() (flow.Identifier, *protocol.DeferredBlockPersist
 	}
 
 	return r0, r1, r2
+}
+
+// EvolveState provides a mock function with given fields: seals
+func (_m *StateMutator) EvolveState(seals []*flow.Seal) error {
+	ret := _m.Called(seals)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]*flow.Seal) error); ok {
+		r0 = rf(seals)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 type mockConstructorTestingTNewStateMutator interface {
