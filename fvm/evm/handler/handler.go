@@ -1,19 +1,16 @@
 package handler
 
 import (
-	"bytes"
 	"math/big"
 
 	"github.com/onflow/cadence/runtime/common"
-	gethCommon "github.com/onflow/go-ethereum/common"
-	gethTypes "github.com/onflow/go-ethereum/core/types"
-	"github.com/onflow/go-ethereum/rlp"
-
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/handler/coa"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
 )
 
 // ContractHandler is responsible for triggering calls to emulator, metering,
@@ -246,17 +243,7 @@ func (h *ContractHandler) run(
 	coinbase types.Address,
 ) (*types.Result, error) {
 	// step 1 - transaction decoding
-	encodedLen := uint(len(rlpEncodedTx))
-	err := h.backend.MeterComputation(environment.ComputationKindRLPDecoding, encodedLen)
-	if err != nil {
-		return nil, err
-	}
-
-	tx := gethTypes.Transaction{}
-	err = tx.DecodeRLP(
-		rlp.NewStream(
-			bytes.NewReader(rlpEncodedTx),
-			uint64(encodedLen)))
+	tx, err := h.decodeTransaction(rlpEncodedTx)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +264,7 @@ func (h *ContractHandler) run(
 		return nil, err
 	}
 
-	res, err := blk.RunTransaction(&tx)
+	res, err := blk.RunTransaction(tx)
 	if err != nil {
 		return nil, err
 	}
