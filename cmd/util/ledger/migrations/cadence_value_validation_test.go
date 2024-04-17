@@ -58,7 +58,7 @@ func TestValidateCadenceValues(t *testing.T) {
 				address,
 				[]*ledger.Payload{accountStatusPayload},
 				util.RuntimeInterfaceConfig{},
-				snapshot.IndexMapBased,
+				snapshot.LargeChangeSetOrReadonlySnapshot,
 			)
 			require.NoError(t, err)
 
@@ -151,7 +151,7 @@ func createTestPayloads(t *testing.T, address common.Address, domain string) []*
 		address,
 		[]*ledger.Payload{accountStatusPayload},
 		util.RuntimeInterfaceConfig{},
-		snapshot.IndexMapBased,
+		snapshot.LargeChangeSetOrReadonlySnapshot,
 	)
 	require.NoError(t, err)
 

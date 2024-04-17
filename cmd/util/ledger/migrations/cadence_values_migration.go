@@ -100,7 +100,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		address,
 		oldPayloads,
 		m.runtimeInterfaceConfig,
-		snapshot.IndexMapBased,
+		snapshot.SmallChangeSetSnapshot,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)

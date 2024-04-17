@@ -165,7 +165,7 @@ func (m *StagedContractsMigration) InitMigration(
 		common.Address{},
 		allPayloads,
 		config,
-		snapshot.IndexMapBased)
+		snapshot.SmallChangeSetSnapshot)
 	if err != nil {
 		return err
 	}
@@ -224,7 +224,7 @@ func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads
 		stagingAccountAddress,
 		stagingAccountPayloads,
 		util.RuntimeInterfaceConfig{},
-		snapshot.IndexMapBased,
+		snapshot.SmallChangeSetSnapshot,
 	)
 	if err != nil {
 		return err

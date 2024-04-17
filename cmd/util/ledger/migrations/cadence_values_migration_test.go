@@ -124,7 +124,7 @@ func checkMigratedPayloads(
 		address,
 		newPayloads,
 		util.RuntimeInterfaceConfig{},
-		snapshot.IndexMapBased,
+		snapshot.SmallChangeSetSnapshot,
 	)
 	require.NoError(t, err)
 
@@ -742,7 +742,7 @@ func TestProgramParsingError(t *testing.T) {
 		testAddress,
 		payloads,
 		util.RuntimeInterfaceConfig{},
-		snapshot.IndexMapBased,
+		snapshot.SmallChangeSetSnapshot,
 	)
 	require.NoError(t, err)
 
@@ -885,7 +885,7 @@ func TestCoreContractUsage(t *testing.T) {
 			testAddress,
 			payloads,
 			util.RuntimeInterfaceConfig{},
-			snapshot.IndexMapBased,
+			snapshot.SmallChangeSetSnapshot,
 		)
 		require.NoError(t, err)
 
@@ -973,7 +973,7 @@ func TestCoreContractUsage(t *testing.T) {
 			testAddress,
 			payloads,
 			util.RuntimeInterfaceConfig{},
-			snapshot.IndexMapBased,
+			snapshot.SmallChangeSetSnapshot,
 		)
 		require.NoError(t, err)
 

@@ -36,7 +36,6 @@ func NewMigratorRuntime(
 	*MigratorRuntime,
 	error,
 ) {
-	// TODO: the snapshot type should be a parameter
 	snapshot, err := snapshot.NewPayloadSnapshot(payloads, snapshotType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)

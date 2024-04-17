@@ -27,7 +27,7 @@ func NewTransactionBasedMigration(
 			fvm.WithTransactionFeesEnabled(false))
 		ctx := fvm.NewContext(options...)
 
-		snapshot, err := migrationSnapshot.NewPayloadSnapshot(payloads, migrationSnapshot.IndexMapBased)
+		snapshot, err := migrationSnapshot.NewPayloadSnapshot(payloads, migrationSnapshot.SmallChangeSetSnapshot)
 		if err != nil {
 			return nil, err
 		}

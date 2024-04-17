@@ -533,7 +533,7 @@ func TestStagedContractsMigration(t *testing.T) {
 				stagingAccountAddress,
 				[]*ledger.Payload{accountStatusPayload},
 				util.RuntimeInterfaceConfig{},
-				snapshot.IndexMapBased,
+				snapshot.SmallChangeSetSnapshot,
 			)
 			require.NoError(t, err)
 

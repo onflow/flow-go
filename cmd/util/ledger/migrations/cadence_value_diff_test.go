@@ -175,7 +175,7 @@ func TestDiffCadenceValues(t *testing.T) {
 				address,
 				[]*ledger.Payload{accountStatusPayload},
 				util.RuntimeInterfaceConfig{},
-				snapshot.IndexMapBased,
+				snapshot.LargeChangeSetOrReadonlySnapshot,
 			)
 			require.NoError(t, err)
 
@@ -276,7 +276,7 @@ func TestDiffCadenceValues(t *testing.T) {
 				address,
 				[]*ledger.Payload{accountStatusPayload},
 				util.RuntimeInterfaceConfig{},
-				snapshot.IndexMapBased,
+				snapshot.LargeChangeSetOrReadonlySnapshot,
 			)
 			require.NoError(t, err)
 
@@ -384,7 +384,7 @@ func TestDiffCadenceValues(t *testing.T) {
 				address,
 				[]*ledger.Payload{accountStatusPayload},
 				util.RuntimeInterfaceConfig{},
-				snapshot.IndexMapBased,
+				snapshot.LargeChangeSetOrReadonlySnapshot,
 			)
 			require.NoError(t, err)
 
@@ -503,7 +503,7 @@ func TestDiffCadenceValues(t *testing.T) {
 				address,
 				[]*ledger.Payload{accountStatusPayload},
 				util.RuntimeInterfaceConfig{},
-				snapshot.IndexMapBased,
+				snapshot.LargeChangeSetOrReadonlySnapshot,
 			)
 			require.NoError(t, err)
 
@@ -629,7 +629,7 @@ func createStorageMapPayloads(t *testing.T, address common.Address, domain strin
 		address,
 		[]*ledger.Payload{accountStatusPayload},
 		util.RuntimeInterfaceConfig{},
-		snapshot.IndexMapBased,
+		snapshot.LargeChangeSetOrReadonlySnapshot,
 	)
 	require.NoError(t, err)
 

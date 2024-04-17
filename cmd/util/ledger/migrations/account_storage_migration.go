@@ -25,7 +25,7 @@ func NewAccountStorageMigration(
 			address,
 			payloads,
 			util.RuntimeInterfaceConfig{},
-			snapshot.IndexMapBased,
+			snapshot.SmallChangeSetSnapshot,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
