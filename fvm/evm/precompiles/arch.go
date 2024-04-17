@@ -31,6 +31,7 @@ func ArchContract(
 	address types.Address,
 	heightProvider func() (uint64, error),
 	proofVer func(*types.COAOwnershipProofInContext) (bool, error),
+	revertibleRandomProvider func() ([]byte, error),
 ) types.Precompile {
 	return MultiFunctionPrecompileContract(
 		address,
