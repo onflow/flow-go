@@ -43,9 +43,6 @@ const (
 	// this is to ensure that if a collection is missing for a long time (in terms of block height) it is eventually re-requested
 	missingCollsForAgeThreshold = 100
 
-	// default queue capacity
-	defaultQueueCapacity = 10_000
-
 	// how many workers will concurrently process the tasks in the jobqueue
 	workersCount = 1
 
