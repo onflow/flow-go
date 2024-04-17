@@ -70,13 +70,14 @@ func runSnapshot(*cobra.Command, []string) {
 		var protocolSnapshot protocol.Snapshot
 		var sealedHeight uint64
 		var sealedCommit flow.StateCommitment
+		var checkpointFile string
 		if flagCheckpointScanEndHeight < 0 {
 			// using default end height which is the last sealed height
-			protocolSnapshot, sealedHeight, sealedCommit, err = commonFuncs.GenerateProtocolSnapshotForCheckpoint(
+			protocolSnapshot, sealedHeight, sealedCommit, checkpointFile, err = commonFuncs.GenerateProtocolSnapshotForCheckpoint(
 				log.Logger, state, storages.Headers, storages.Seals, flagCheckpointDir, flagCheckpointScanStep)
 		} else {
 			// using customized end height
-			protocolSnapshot, sealedHeight, sealedCommit, err = commonFuncs.GenerateProtocolSnapshotForCheckpointWithHeights(
+			protocolSnapshot, sealedHeight, sealedCommit, checkpointFile, err = commonFuncs.GenerateProtocolSnapshotForCheckpointWithHeights(
 				log.Logger, state, storages.Headers, storages.Seals, flagCheckpointDir, flagCheckpointScanStep, uint64(flagCheckpointScanEndHeight))
 		}
 
@@ -85,7 +86,7 @@ func runSnapshot(*cobra.Command, []string) {
 		}
 
 		snapshot = protocolSnapshot
-		log.Info().Msgf("snapshot found, sealed height %v, commit %x", sealedHeight, sealedCommit)
+		log.Info().Msgf("snapshot found for checkpoint file %v, sealed height %v, commit %x", checkpointFile, sealedHeight, sealedCommit)
 	}
 
 	head, err := snapshot.Head()
