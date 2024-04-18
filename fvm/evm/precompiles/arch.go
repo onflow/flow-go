@@ -47,6 +47,7 @@ func ArchContract(
 		[]Function{
 			&flowBlockHeight{heightProvider},
 			&proofVerifier{proofVer},
+			&revertibleRandomness{revertibleRandomProvider},
 		},
 	)
 }
