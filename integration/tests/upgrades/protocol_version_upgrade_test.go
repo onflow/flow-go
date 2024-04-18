@@ -6,10 +6,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	sdk "github.com/onflow/flow-go-sdk"
@@ -19,6 +18,10 @@ import (
 
 type ProtocolVersionUpgradeSuite struct {
 	Suite
+}
+
+func TestProtocolVersionUpgrade(t *testing.T) {
+	suite.Run(t, new(ProtocolVersionUpgradeSuite))
 }
 
 func (suite *ProtocolVersionUpgradeSuite) SetupTest() {
@@ -100,6 +103,10 @@ func (s *ProtocolVersionUpgradeSuite) TestProtocolStateVersionUpgradeServiceEven
 	require.LessOrEqual(s.T(), s.BlockState.HighestProposedView(), v2ActiveView)
 }
 
+// sendUpgradeProtocolVersionTx sends a governance transaction to upgrade the protocol state version.
+// This causes a corresponding flow.ProtocolStateVersionUpgrade service event to be emitted.
+// For these tests we use a special transaction which chooses the activation view for the
+// new version relative to the execution view, to remove a potential source of flakiness.
 func (s *ProtocolVersionUpgradeSuite) sendUpgradeProtocolVersionTx(
 	ctx context.Context,
 	env templates.Environment,
@@ -126,8 +133,4 @@ func (s *ProtocolVersionUpgradeSuite) sendUpgradeProtocolVersionTx(
 	s.AccessClient().Account().Keys[0].SequenceNumber++
 
 	return result
-}
-
-func TestProtocolVersionUpgrade(t *testing.T) {
-	suite.Run(t, new(ProtocolVersionUpgradeSuite))
 }
