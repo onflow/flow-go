@@ -147,7 +147,6 @@ func New(
 		return nil, fmt.Errorf("error creating finalizedBlock jobqueue: %w", err)
 	}
 
-
 	// Add workers
 	e.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(e.processBackground).
