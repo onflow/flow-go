@@ -235,7 +235,6 @@ func (c *Container) Name() string {
 func (c *Container) DB() (*badger.DB, error) {
 	opts := badger.
 		DefaultOptions(c.DBPath()).
-		WithReadOnly(true).
 		WithKeepL0InMemory(true).
 		WithLogger(nil)
 

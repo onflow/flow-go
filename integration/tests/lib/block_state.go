@@ -33,6 +33,7 @@ func NewBlockState() *BlockState {
 	}
 }
 
+// ByBlockID returns the block by ID if it is known by BlockState.
 func (bs *BlockState) ByBlockID(id flow.Identifier) (*flow.Block, bool) {
 	block, ok := bs.blocksByID[id]
 	return block, ok
@@ -287,8 +288,9 @@ func (bs *BlockState) HighestFinalizedHeight() uint64 {
 	return bs.highestFinalized
 }
 
-// WaitForSealed returns the sealed block after a certain height has been sealed.
-func (bs *BlockState) WaitForSealed(t *testing.T, height uint64) *flow.Block {
+// WaitForSealedHeight returns the highest sealed block once the sealed height reaches
+// or exceeds `height`. The returned block may have height equal to or greater than `height`.
+func (bs *BlockState) WaitForSealedHeight(t *testing.T, height uint64) *flow.Block {
 	require.Eventually(t,
 		func() bool {
 			bs.RLock()
@@ -308,6 +310,8 @@ func (bs *BlockState) WaitForSealed(t *testing.T, height uint64) *flow.Block {
 	return bs.highestSealed
 }
 
+// WaitForSealedView returns the highest sealed block once the sealed view reaches
+// or exceeds `view`. The returned block may have view equal to or greater than `view`.
 func (bs *BlockState) WaitForSealedView(t *testing.T, view uint64) *flow.Block {
 	require.Eventually(t,
 		func() bool {

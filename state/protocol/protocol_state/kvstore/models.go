@@ -170,6 +170,8 @@ func NewDefaultKVStore(epochStateID flow.Identifier) protocol_state.KVStoreAPI {
 	}
 }
 
+// NewKVStoreV0 constructs a KVStore using the v0 model. This is used to test
+// version upgrades, from v0 to v1.
 func NewKVStoreV0(epochStateID flow.Identifier) protocol_state.KVStoreAPI {
 	return &Modelv0{
 		UpgradableModel: UpgradableModel{},

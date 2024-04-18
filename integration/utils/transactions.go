@@ -183,6 +183,8 @@ func MakeAdminRemoveNodeTx(
 	return tx, nil
 }
 
+// MakeSetProtocolStateVersionTx makes an admin transaction to set the protocol state version.
+// See the Cadence transaction file for detailed documentation.
 func MakeSetProtocolStateVersionTx(
 	env templates.Environment,
 	adminAccount *sdk.Account,
