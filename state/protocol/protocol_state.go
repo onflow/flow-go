@@ -135,7 +135,8 @@ type StateMutator interface {
 	// CAUTION:
 	//  - For Consensus Participants that are replicas, the calling code must check that the returned `stateID` matches the
 	//    commitment in the block proposal! If they don't match, the proposal is byzantine and should be slashed.
-	//  - `EvolveState(..)` must have been called before
+	//  - `EvolveState(..)` must have been called before `Build`
+	//  - repeated `Build` calls are not allowed
 	//
 	// Return values
 	//  - stateID: the hash commitment to the updated Protocol State Snapshot

@@ -420,7 +420,7 @@ func (bs *BuilderSuite) SetupTest() {
 		func(_ uint64, _ flow.Identifier) realproto.StateMutator {
 			stateMutator := protocol.NewStateMutator(bs.T())
 			stateMutator.On("EvolveState", mock.Anything).Return(nil)
-			stateMutator.On("Build").Return(flow.Identifier{}, realproto.DeferredBlockPersistOps{}, nil)
+			stateMutator.On("Build").Return(flow.Identifier{}, realproto.NewDeferredBlockPersist(), nil)
 			return stateMutator
 		}, func(_ uint64, _ flow.Identifier) error {
 			return nil

@@ -76,11 +76,13 @@ func (s *StateMutatorSuite) TestBuild_HappyPath() {
 	for i := range factories {
 		factory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
 		stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
+		// State Machine's
+		emptyEventsSlice := mock.MatchedBy(func(arg interface{}) bool { return len(arg.([]flow.ServiceEvent)) == 0 })
+		stateMachine.On("EvolveState", emptyEventsSlice).Return(nil).Once()
 		deferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
 		deferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
-		deferredDBUpdates := protocol.NewDeferredBlockPersist()
-		deferredDBUpdates.AddDbOp(deferredUpdate.Execute)
-		stateMachine.On("Build").Return(deferredDBUpdates, nil)
+		deferredDBUpdates := protocol.NewDeferredBlockPersist().AddDbOp(deferredUpdate.Execute)
+		stateMachine.On("Build").Return(deferredDBUpdates, nil).Once()
 		factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, s.replicatedState).Return(stateMachine, nil)
 		factories[i] = factory
 	}
@@ -114,6 +116,7 @@ func (s *StateMutatorSuite) TestBuild_HappyPath() {
 		Data:    stateBytes,
 	}).Return(storeTxDeferredUpdate.Execute).Once()
 
+	require.NoError(s.T(), s.mutator.EvolveState(nil))
 	_, dbUpdates, err := s.mutator.Build()
 	require.NoError(s.T(), err)
 
@@ -362,6 +365,32 @@ func (s *StateMutatorSuite) TestEvolveState() {
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
+}
+
+// TestEnforceEvolveState verifies that stateMutator is enforcing `EvolveState` call before `Build`
+// TODO: This is a temporary shortcut until `EvolveState` and `Build` are merged. Then, this test can be removed
+func (s *StateMutatorSuite) TestEnforceEvolveState() {
+	factories := make([]protocol_state.KeyValueStoreStateMachineFactory, 2)
+	for i := range factories {
+		factory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
+		stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
+		stateMachine.On("EvolveState", mock.Anything).Return(nil).Once()
+		factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, s.replicatedState).Return(stateMachine, nil)
+		factories[i] = factory
+	}
+	mutator, err := newStateMutator(
+		s.headersDB,
+		s.resultsDB,
+		s.protocolKVStoreDB,
+		s.candidate.View,
+		s.candidate.ParentID,
+		s.parentState,
+		factories...,
+	)
+	require.NoError(s.T(), err)
+
+	_, _, err = mutator.Build()
+	require.Error(s.T(), err)
 }
 
 // TestApplyServiceEventsSealsOrdered tests that EvolveState processes seals in order of block height.
