@@ -573,11 +573,10 @@ func bootstrapEpochForProtocolStateEntry(
 		}
 
 		// insert epoch protocol state entry, which references above service events
-		err := epochProtocolStateSnapshots.StoreTx(richEntry.ID(), richEntry.ProtocolStateEntry)(tx)
-		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+		err := operation.SkipDuplicatesTx(epochProtocolStateSnapshots.StoreTx(richEntry.ID(), richEntry.ProtocolStateEntry))(tx)
+		if err != nil {
 			return fmt.Errorf("could not store epoch protocol state entry: %w", err)
 		}
-
 		return nil
 	}
 }

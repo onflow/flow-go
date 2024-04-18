@@ -348,8 +348,7 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 // addProtocolStateEntryIfUnseen checks whether the given protocolStateID corresponds
 // to a previously unseen protocol state entry. If it does, retrieves the state entry
 // and persists it for inclusion in the resulting SealingSegment.
-// Errors expected during normal operation:
-//   - InvalidSealingSegmentError if the added block would cause an invalid resulting segment
+// No errors expected during normal operation.
 func (builder *SealingSegmentBuilder) addProtocolStateEntryIfUnseen(protocolStateID Identifier) error {
 	_, exists := builder.protocolStateEntries[protocolStateID]
 	if exists {
