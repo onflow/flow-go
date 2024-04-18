@@ -3,6 +3,8 @@ package upgrades
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/inmem"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -51,19 +53,8 @@ func (s *Suite) SetupTest() {
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=500ms"),
-		// TODO remove these? They tend to make tests flaky
-		testnet.WithAdditionalFlag(
-			fmt.Sprintf(
-				"--required-verification-seal-approvals=%d",
-				1,
-			),
-		),
-		testnet.WithAdditionalFlag(
-			fmt.Sprintf(
-				"--required-construction-seal-approvals=%d",
-				1,
-			),
-		),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=0")),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=0")),
 		testnet.WithLogLevel(zerolog.InfoLevel),
 	}
 
@@ -107,7 +98,7 @@ func (s *Suite) SetupTest() {
 		// set long staking phase to avoid QC/DKG transactions during test run
 		testnet.WithViewsInStakingAuction(10_000),
 		testnet.WithViewsInEpoch(100_000),
-		testnet.WithEpochCommitSafetyThreshold(10),
+		testnet.WithEpochCommitSafetyThreshold(10), // TODO try making this shorter
 	)
 	// initialize the network
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig, flow.Localnet)
@@ -119,6 +110,24 @@ func (s *Suite) SetupTest() {
 
 	// start tracking blocks
 	s.Track(s.T(), ctx, s.Ghost())
+}
+
+func (s *Suite) LatestProtocolStateSnapshot() *inmem.Snapshot {
+	snap, err := s.AccessClient().GetLatestProtocolSnapshot(context.Background())
+	require.NoError(s.T(), err)
+	return snap
+}
+
+// AwaitSnapshotAtView polls until it observes a finalized snapshot with a reference
+// block greater than or equal to the input target view.
+func (s *Suite) AwaitSnapshotAtView(view uint64, waitFor, tick time.Duration) (snapshot *inmem.Snapshot) {
+	require.Eventually(s.T(), func() bool {
+		snapshot = s.LatestProtocolStateSnapshot()
+		head, err := snapshot.Head()
+		require.NoError(s.T(), err)
+		return head.View >= view
+	}, waitFor, tick)
+	return
 }
 
 func (s *Suite) TearDownTest() {
