@@ -64,7 +64,7 @@ func populatePartnerInfosRun(_ *cobra.Command, _ []string) {
 
 	flowClient := getFlowClient()
 
-	partnerWeights := make(PartnerWeights)
+	partnerWeights := make(common.PartnerWeights)
 	skippedNodes := 0
 	numOfPartnerNodesByRole := map[flow.Role]int{
 		flow.RoleCollection:   0,
@@ -203,12 +203,20 @@ func validateANNetworkKey(key string) error {
 // writeNodePubInfoFile writes the node-pub-info file
 func writeNodePubInfoFile(info *bootstrap.NodeInfoPub) {
 	fileOutputPath := fmt.Sprintf(bootstrap.PathNodeInfoPub, info.NodeID)
-	writeJSON(fileOutputPath, info)
+	err := common.WriteJSON(fileOutputPath, flagOutdir, info)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, fileOutputPath)
 }
 
 // writePartnerWeightsFile writes the partner weights file
-func writePartnerWeightsFile(partnerWeights PartnerWeights) {
-	writeJSON(bootstrap.FileNamePartnerWeights, partnerWeights)
+func writePartnerWeightsFile(partnerWeights common.PartnerWeights) {
+	err := common.WriteJSON(bootstrap.FileNamePartnerWeights, flagOutdir, partnerWeights)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, bootstrap.FileNamePartnerWeights)
 }
 
 func printNodeCounts(numOfNodesByType map[flow.Role]int, totalNumOfPartnerNodes, skippedNodes int) {

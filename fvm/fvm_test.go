@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	envMock "github.com/onflow/flow-go/fvm/environment/mock"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -3061,12 +3063,24 @@ func TestTransientNetworkCoreContractAddresses(t *testing.T) {
 }
 
 func TestEVM(t *testing.T) {
+	blocks := new(envMock.Blocks)
+	block1 := unittest.BlockFixture()
+	blocks.On("ByHeightFrom",
+		block1.Header.Height,
+		block1.Header,
+	).Return(block1.Header, nil)
+
+	ctxOpts := []fvm.Option{
+		fvm.WithChain(flow.Emulator.Chain()),
+		fvm.WithEVMEnabled(true),
+		fvm.WithBlocks(blocks),
+		fvm.WithBlockHeader(block1.Header),
+		fvm.WithCadenceLogging(true),
+	}
+
 	t.Run("successful transaction", newVMTest().
 		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
-		withContextOptions(
-			fvm.WithEVMEnabled(true),
-			fvm.WithCadenceLogging(true),
-		).
+		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
 			vm fvm.VM,
@@ -3122,10 +3136,7 @@ func TestEVM(t *testing.T) {
 	// this test makes sure the execution error is correctly handled and returned as a correct type
 	t.Run("execution reverted", newVMTest().
 		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
-		withContextOptions(
-			fvm.WithChain(flow.Emulator.Chain()),
-			fvm.WithEVMEnabled(true),
-		).
+		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
 			vm fvm.VM,
@@ -3162,10 +3173,7 @@ func TestEVM(t *testing.T) {
 	// we have implemented a snapshot wrapper to return an error from the EVM
 	t.Run("internal evm error handling", newVMTest().
 		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
-		withContextOptions(
-			fvm.WithChain(flow.Emulator.Chain()),
-			fvm.WithEVMEnabled(true),
-		).
+		withContextOptions(ctxOpts...).
 		run(func(
 			t *testing.T,
 			vm fvm.VM,
@@ -3226,6 +3234,8 @@ func TestEVM(t *testing.T) {
 			// so we have to use emulator here so that the EVM storage contract is deployed
 			// to the 5th address
 			fvm.WithChain(flow.Emulator.Chain()),
+			fvm.WithBlocks(blocks),
+			fvm.WithBlockHeader(block1.Header),
 		).
 		run(func(
 			t *testing.T,
