@@ -154,6 +154,19 @@
 		"type": "function"
 	},
 	{
+		"inputs": [],
+		"name": "verifyArchCallToRevertibleRandom",
+		"outputs": [
+			{
+				"internalType": "uint64",
+				"name": "",
+				"type": "uint64"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
 		"inputs": [
 			{
 				"internalType": "bool",
