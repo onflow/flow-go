@@ -57,7 +57,7 @@ func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartBlockID(
 // SubscribeAccountStatusesFromStartHeight subscribes to the streaming of account status changes starting from
 // a specific block height, with an optional status filter.
 // Errors:
-// - codes.ErrNotFound if could not get block by  start height.
+// - codes.ErrNotFound if could not get block by start height.
 // - codes.Internal if there is an internal error.
 func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartHeight(
 	ctx context.Context,
@@ -87,6 +87,10 @@ func (b *AccountStatusesBackend) SubscribeAccountStatusesFromLatestBlock(
 }
 
 // getAccountStatusResponseFactory returns a function that returns the account statuses response for a given height.
+//
+// Errors:
+// - subscription.ErrBlockNotReady: If block header for the specified block height is not found.
+// - error: An error, if any, encountered during getting events from storage or execution data.
 func (b *AccountStatusesBackend) getAccountStatusResponseFactory(
 	filter state_stream.AccountStatusFilter,
 ) subscription.GetDataByHeightFunc {
