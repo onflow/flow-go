@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 )
@@ -94,20 +93,12 @@ func (s Snapshot) Encodable() EncodableSnapshot {
 }
 
 func (s Snapshot) EpochProtocolState() (protocol.DynamicProtocolState, error) {
-	head := s.enc.SealingSegment.Highest()
-	entry, ok := s.enc.SealingSegment.ProtocolStateEntries[head.Payload.ProtocolStateID]
-	if !ok {
-		return nil, irrecoverable.NewExceptionf("sanity check failed: unknown protocol state entry for snapshot head")
-	}
+	entry := s.enc.SealingSegment.LatestProtocolStateEntry()
 	return NewDynamicProtocolStateAdapter(entry.EpochEntry, s.Params()), nil
 }
 
 func (s Snapshot) ProtocolState() (protocol.KVStoreReader, error) {
-	head := s.enc.SealingSegment.Highest()
-	entry, ok := s.enc.SealingSegment.ProtocolStateEntries[head.Payload.ProtocolStateID]
-	if !ok {
-		return nil, irrecoverable.NewExceptionf("sanity check failed: unknown protocol state entry for snapshot head")
-	}
+	entry := s.enc.SealingSegment.LatestProtocolStateEntry()
 	return kvstore.VersionedDecode(entry.KVStore.Version, entry.KVStore.Data)
 }
 
