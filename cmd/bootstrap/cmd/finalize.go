@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"path/filepath"
 	"strings"
 	"time"
@@ -176,7 +177,7 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	// construct serializable root protocol snapshot
 	log.Info().Msg("constructing root protocol snapshot")
-	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(block, result, seal, rootQC, intermediaryData.ProtocolVersion, intermediaryData.EpochCommitSafetyThreshold)
+	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(block, result, seal, rootQC, intermediaryData.ProtocolVersion, intermediaryData.EpochCommitSafetyThreshold, kvstore.NewDefaultKVStore)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate root protocol snapshot")
 	}

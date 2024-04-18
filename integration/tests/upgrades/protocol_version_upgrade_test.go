@@ -3,6 +3,7 @@ package upgrades
 import (
 	"context"
 	"github.com/onflow/flow-go/integration/utils"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -18,6 +19,13 @@ import (
 
 type ProtocolVersionUpgradeSuite struct {
 	Suite
+}
+
+func (suite *ProtocolVersionUpgradeSuite) SetupTest() {
+	// Begin the test with a v0 kvstore, rather than the default v1.
+	// This lets us test upgrading v0->v1
+	suite.KVStoreFactory = kvstore.NewKVStoreV0
+	suite.Suite.SetupTest()
 }
 
 // TestProtocolStateVersionUpgradeServiceEvent tests the process of upgrading the protocol

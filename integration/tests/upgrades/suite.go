@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -25,6 +26,9 @@ type Suite struct {
 	net     *testnet.FlowNetwork
 	ghostID flow.Identifier
 	exe1ID  flow.Identifier
+
+	// Determines which kvstore version is used for root state
+	KVStoreFactory func(flow.Identifier) protocol_state.KVStoreAPI
 }
 
 func (s *Suite) Ghost() *client.GhostClient {
@@ -92,14 +96,16 @@ func (s *Suite) SetupTest() {
 		ghostNode,
 	}
 
-	netConfig := testnet.NewNetworkConfig(
-		"upgrade_tests",
-		confs,
+	netConfigOpts := []testnet.NetworkConfigOpt{
 		// set long staking phase to avoid QC/DKG transactions during test run
 		testnet.WithViewsInStakingAuction(10_000),
 		testnet.WithViewsInEpoch(100_000),
 		testnet.WithEpochCommitSafetyThreshold(10), // TODO try making this shorter
-	)
+	}
+	if s.KVStoreFactory != nil {
+		netConfigOpts = append(netConfigOpts, testnet.WithKVStoreFactory(s.KVStoreFactory))
+	}
+	netConfig := testnet.NewNetworkConfig("upgrade_tests", confs, netConfigOpts...)
 	// initialize the network
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig, flow.Localnet)
 
