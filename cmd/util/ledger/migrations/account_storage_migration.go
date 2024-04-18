@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -24,6 +25,7 @@ func NewAccountStorageMigration(
 			payloads,
 			chainID,
 			MigratorRuntimeConfig{},
+			snapshot.SmallChangeSetSnapshot,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
@@ -58,11 +60,9 @@ func NewAccountStorageMigration(
 			flow.Address(address): {},
 		}
 
-		newPayloads, err := MergeRegisterChanges(
-			migrationRuntime.Snapshot.Payloads,
+		newPayloads, err := migrationRuntime.Snapshot.ApplyChangesAndGetNewPayloads(
 			result.WriteSet,
 			expectedAddresses,
-			nil,
 			log,
 		)
 		if err != nil {

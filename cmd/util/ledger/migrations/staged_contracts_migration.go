@@ -20,6 +20,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -158,11 +159,12 @@ func (m *StagedContractsMigration) InitMigration(
 		},
 	}
 
+	// Pass empty address. We are only interested in the created `env` object.
 	mr, err := NewMigratorRuntime(
 		allPayloads,
 		m.chainID,
 		config,
-	)
+		snapshot.SmallChangeSetSnapshot)
 	if err != nil {
 		return err
 	}
@@ -221,6 +223,7 @@ func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads
 		stagingAccountPayloads,
 		m.chainID,
 		MigratorRuntimeConfig{},
+		snapshot.SmallChangeSetSnapshot,
 	)
 	if err != nil {
 		return err

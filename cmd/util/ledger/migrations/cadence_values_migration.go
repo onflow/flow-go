@@ -23,6 +23,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/ledger"
@@ -109,6 +110,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		oldPayloads,
 		m.chainID,
 		m.migratorRuntimeConfig,
+		snapshot.SmallChangeSetSnapshot,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
@@ -214,10 +216,8 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		flow.Address(address): {},
 	}
 
-	newPayloads, err := MergeRegisterChanges(
-		migrationRuntime.Snapshot.Payloads,
+	newPayloads, err := migrationRuntime.Snapshot.ApplyChangesAndGetNewPayloads(
 		result.WriteSet,
-		expectedAddresses,
 		expectedAddresses,
 		m.log,
 	)

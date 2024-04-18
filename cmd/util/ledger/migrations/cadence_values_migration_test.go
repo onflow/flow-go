@@ -18,6 +18,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
@@ -125,6 +126,7 @@ func checkMigratedPayloads(
 		newPayloads,
 		chainID,
 		MigratorRuntimeConfig{},
+		snapshot.SmallChangeSetSnapshot,
 	)
 	require.NoError(t, err)
 
@@ -743,6 +745,7 @@ func TestProgramParsingError(t *testing.T) {
 		payloads,
 		chainID,
 		MigratorRuntimeConfig{},
+		snapshot.SmallChangeSetSnapshot,
 	)
 	require.NoError(t, err)
 
@@ -793,11 +796,9 @@ func TestProgramParsingError(t *testing.T) {
 		flow.Address(testAddress): {},
 	}
 
-	payloads, err = MergeRegisterChanges(
-		runtime.Snapshot.Payloads,
+	payloads, err = runtime.Snapshot.ApplyChangesAndGetNewPayloads(
 		result.WriteSet,
 		expectedAddresses,
-		nil,
 		logger,
 	)
 	require.NoError(t, err)
@@ -888,6 +889,7 @@ func TestCoreContractUsage(t *testing.T) {
 			payloads,
 			chainID,
 			MigratorRuntimeConfig{},
+			snapshot.SmallChangeSetSnapshot,
 		)
 		require.NoError(t, err)
 
@@ -930,11 +932,9 @@ func TestCoreContractUsage(t *testing.T) {
 			flow.Address(testAddress): {},
 		}
 
-		payloads, err = MergeRegisterChanges(
-			runtime.Snapshot.Payloads,
+		payloads, err = runtime.Snapshot.ApplyChangesAndGetNewPayloads(
 			result.WriteSet,
 			expectedAddresses,
-			nil,
 			logger,
 		)
 		require.NoError(t, err)
@@ -978,6 +978,7 @@ func TestCoreContractUsage(t *testing.T) {
 			payloads,
 			chainID,
 			MigratorRuntimeConfig{},
+			snapshot.SmallChangeSetSnapshot,
 		)
 		require.NoError(t, err)
 

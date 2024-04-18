@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	migrationSnapshot "github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
@@ -21,7 +22,7 @@ func NewAtreeRegisterMigratorRuntime(
 	*AtreeRegisterMigratorRuntime,
 	error,
 ) {
-	snapshot, err := util.NewPayloadSnapshot(payloads)
+	snapshot, err := migrationSnapshot.NewPayloadSnapshot(payloads, migrationSnapshot.LargeChangeSetOrReadonlySnapshot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
 	}
@@ -54,7 +55,7 @@ func NewAtreeRegisterMigratorRuntime(
 }
 
 type AtreeRegisterMigratorRuntime struct {
-	Snapshot            *util.PayloadSnapshot
+	Snapshot            migrationSnapshot.MigrationSnapshot
 	TransactionState    state.NestedTransactionPreparer
 	Interpreter         *interpreter.Interpreter
 	Storage             *runtime.Storage

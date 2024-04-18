@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -43,6 +44,7 @@ func NewContractCheckingMigration(
 			contractPayloads,
 			chainID,
 			MigratorRuntimeConfig{},
+			snapshot.LargeChangeSetOrReadonlySnapshot,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create migrator runtime: %w", err)

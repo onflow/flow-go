@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm"
 	evmStdlib "github.com/onflow/flow-go/fvm/evm/stdlib"
@@ -18,7 +19,7 @@ import (
 )
 
 type MigratorRuntime struct {
-	Snapshot                *util.PayloadSnapshot
+	Snapshot                snapshot.MigrationSnapshot
 	TransactionState        state.NestedTransactionPreparer
 	Interpreter             *interpreter.Interpreter
 	Storage                 *runtime.Storage
@@ -99,11 +100,12 @@ func NewMigratorRuntime(
 	payloads []*ledger.Payload,
 	chainID flow.ChainID,
 	config MigratorRuntimeConfig,
+	snapshotType snapshot.MigrationSnapshotType,
 ) (
 	*MigratorRuntime,
 	error,
 ) {
-	snapshot, err := util.NewPayloadSnapshot(payloads)
+	snapshot, err := snapshot.NewPayloadSnapshot(payloads, snapshotType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
 	}
