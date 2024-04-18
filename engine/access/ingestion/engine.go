@@ -133,7 +133,7 @@ func New(
 
 	// create a jobqueue that will process new available finalized block. The `finalizedBlockNotifier` is used to
 	// signal new work, which is being triggered on the `processFinalizedBlockJob` handler.
-	finalizedBlockConsumer, err := jobqueue.NewComponentConsumer(
+	e.finalizedBlockConsumer, err = jobqueue.NewComponentConsumer(
 		e.log.With().Str("module", "finalized_block_consumer").Logger(),
 		e.finalizedBlockNotifier.Channel(),
 		processedHeight,
@@ -147,7 +147,6 @@ func New(
 		return nil, fmt.Errorf("error creating finalizedBlock jobqueue: %w", err)
 	}
 
-	e.finalizedBlockConsumer = finalizedBlockConsumer
 
 	// Add workers
 	e.ComponentManager = component.NewComponentManagerBuilder().

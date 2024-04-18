@@ -165,7 +165,7 @@ func (s *Suite) initIngestionEngine() {
 	s.blocks.On("GetLastFullBlockHeight").Once().Return(uint64(0), errors.New("do nothing"))
 
 	eng.ComponentManager.Start(s.irrecoverableCtx)
-	unittest.RequireCloseBefore(s.T(), eng.Ready(), time.Second*3, "timed out waiting for ingestion engine to be ready")
+	unittest.RequireCloseBefore(s.T(), eng.Ready(), 3*time.Second, "timed out waiting for ingestion engine to be ready")
 
 	s.eng = eng
 }
