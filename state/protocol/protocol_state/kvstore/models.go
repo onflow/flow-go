@@ -79,8 +79,7 @@ func (model *Modelv0) Replicate(protocolVersion uint64) (protocol_state.KVStoreM
 
 	// perform actual replication to the next version
 	v1 := &Modelv1{
-		Modelv0:                         clone.Clone(*model),
-		InvalidEpochTransitionAttempted: false,
+		Modelv0: clone.Clone(*model),
 	}
 	return v1, nil
 }
@@ -101,16 +100,6 @@ func (model *Modelv0) GetProtocolStateVersion() uint64 {
 	return 0
 }
 
-// GetInvalidEpochTransitionAttempted returns ErrKeyNotSupported.
-func (model *Modelv0) GetInvalidEpochTransitionAttempted() (bool, error) {
-	return false, ErrKeyNotSupported
-}
-
-// SetInvalidEpochTransitionAttempted returns ErrKeyNotSupported.
-func (model *Modelv0) SetInvalidEpochTransitionAttempted(_ bool) error {
-	return ErrKeyNotSupported
-}
-
 // GetEpochStateID returns the state ID of the epoch state.
 // This is part of the most basic model and is used to commit the epoch state to the KV store.
 func (model *Modelv0) GetEpochStateID() flow.Identifier {
@@ -128,14 +117,6 @@ func (model *Modelv0) SetEpochStateID(id flow.Identifier) {
 // deployed software version.
 type Modelv1 struct {
 	Modelv0
-
-	// InvalidEpochTransitionAttempted encodes whether an invalid epoch transition
-	// has been detected in this fork. Under normal operations, this value is false.
-	// Node-internally, the EpochFallback notification is emitted when a block is
-	// finalized that changes this flag from false to true.
-	//
-	// Currently, the only possible state transition is false → true.
-	InvalidEpochTransitionAttempted bool
 }
 
 var _ protocol_state.KVStoreAPI = (*Modelv1)(nil)
@@ -176,20 +157,6 @@ func (model *Modelv1) GetProtocolStateVersion() uint64 {
 	return 1
 }
 
-// GetInvalidEpochTransitionAttempted returns the InvalidEpochTransitionAttempted flag.
-// This key must have a value set and will never return ErrKeyNotSet.
-// No errors are expected during normal operation.
-func (model *Modelv1) GetInvalidEpochTransitionAttempted() (bool, error) {
-	return model.InvalidEpochTransitionAttempted, nil
-}
-
-// SetInvalidEpochTransitionAttempted sets the InvalidEpochTransitionAttempted flag.
-// No errors are expected during normal operation.
-func (model *Modelv1) SetInvalidEpochTransitionAttempted(attempted bool) error {
-	model.InvalidEpochTransitionAttempted = attempted
-	return nil
-}
-
 // NewDefaultKVStore constructs a default Key-Value Store of the *latest* protocol version for bootstrapping.
 // Currently, the KV store is largely empty.
 // TODO: Shortcut in bootstrapping; we will probably have to start with a non-empty KV store in the future;
@@ -200,7 +167,6 @@ func NewDefaultKVStore(epochStateID flow.Identifier) protocol_state.KVStoreAPI {
 			UpgradableModel: UpgradableModel{},
 			EpochStateID:    epochStateID,
 		},
-		InvalidEpochTransitionAttempted: false,
 	}
 }
 

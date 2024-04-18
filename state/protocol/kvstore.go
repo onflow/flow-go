@@ -21,7 +21,7 @@ type KVStoreReader interface {
 	// ID returns an identifier for this key-value store snapshot by hashing internal fields.
 	ID() flow.Identifier
 
-	// v0
+	// v0/v1
 
 	VersionedEncodable
 
@@ -43,15 +43,6 @@ type KVStoreReader interface {
 	// GetEpochStateID returns the state ID of the epoch state.
 	// This is part of the most basic model and is used to commit the epoch state to the KV store.
 	GetEpochStateID() flow.Identifier
-
-	// v1
-
-	// GetInvalidEpochTransitionAttempted returns a flag indicating whether epoch
-	// fallback mode has been tentatively triggered on this fork.
-	// Errors:
-	//  - ErrKeyNotSupported if the respective entry does not exist in the
-	//    Protocol State Snapshot that is backing the `Reader` interface.
-	GetInvalidEpochTransitionAttempted() (bool, error)
 }
 
 // VersionedEncodable defines the interface for a versioned key-value store independent

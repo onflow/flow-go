@@ -93,7 +93,6 @@ func TestMutableProtocolState_Mutator(t *testing.T) {
 				UpgradableModel: kvstore.UpgradableModel{},
 				EpochStateID:    parentEpochState.ID(),
 			},
-			InvalidEpochTransitionAttempted: false,
 		}).VersionedEncode()
 		parentState := &flow.PSKeyValueStoreData{
 			Version: version,

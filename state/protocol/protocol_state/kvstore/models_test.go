@@ -1,7 +1,6 @@
 package kvstore_test
 
 import (
-	"math/rand"
 	"reflect"
 	"testing"
 
@@ -39,9 +38,7 @@ func TestEncodeDecode(t *testing.T) {
 	})
 
 	t.Run("v1", func(t *testing.T) {
-		model := &kvstore.Modelv1{
-			InvalidEpochTransitionAttempted: rand.Int()%2 == 0,
-		}
+		model := &kvstore.Modelv1{}
 
 		version, encoded, err := model.VersionedEncode()
 		require.NoError(t, err)
@@ -65,13 +62,6 @@ func TestKVStoreAPI(t *testing.T) {
 
 		version := model.GetProtocolStateVersion()
 		assert.Equal(t, uint64(0), version)
-
-		// v1
-		err := model.SetInvalidEpochTransitionAttempted(true)
-		assert.ErrorIs(t, err, kvstore.ErrKeyNotSupported)
-
-		_, err = model.GetInvalidEpochTransitionAttempted()
-		assert.ErrorIs(t, err, kvstore.ErrKeyNotSupported)
 	})
 
 	t.Run("v1", func(t *testing.T) {
@@ -82,14 +72,6 @@ func TestKVStoreAPI(t *testing.T) {
 
 		version := model.GetProtocolStateVersion()
 		assert.Equal(t, uint64(1), version)
-
-		// v1
-		err := model.SetInvalidEpochTransitionAttempted(true)
-		assert.NoError(t, err)
-
-		invalidEpochTransitionAttempted, err := model.GetInvalidEpochTransitionAttempted()
-		assert.NoError(t, err)
-		assert.Equal(t, true, invalidEpochTransitionAttempted)
 	})
 }
 
@@ -150,7 +132,6 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 				},
 				EpochStateID: unittest.IdentifierFixture(),
 			},
-			InvalidEpochTransitionAttempted: false,
 		}
 		cpy, err := model.Replicate(model.GetProtocolStateVersion())
 		require.NoError(t, err)
