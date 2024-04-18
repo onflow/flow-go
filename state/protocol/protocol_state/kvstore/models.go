@@ -6,6 +6,7 @@ import (
 	"github.com/huandu/go-clone/generic" //nolint:goimports
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 )
 
@@ -19,13 +20,13 @@ import (
 // UpgradableModel is a utility struct that must be embedded in all model versions to provide
 // a common interface for managing protocol version upgrades.
 type UpgradableModel struct {
-	VersionUpgrade *protocol_state.ViewBasedActivator[uint64]
+	VersionUpgrade *protocol.ViewBasedActivator[uint64]
 }
 
 // SetVersionUpgrade sets the protocol upgrade version. This method is used
 // to update the Protocol State version when a flow.ProtocolStateVersionUpgrade is processed.
 // It contains the new version and the view at which it has to be applied.
-func (model *UpgradableModel) SetVersionUpgrade(activator *protocol_state.ViewBasedActivator[uint64]) {
+func (model *UpgradableModel) SetVersionUpgrade(activator *protocol.ViewBasedActivator[uint64]) {
 	model.VersionUpgrade = activator
 }
 
@@ -33,7 +34,7 @@ func (model *UpgradableModel) SetVersionUpgrade(activator *protocol_state.ViewBa
 // VersionUpgrade is a view-based activator that specifies the version which has to be applied
 // and the view from which it has to be applied. It may return the current protocol version
 // with a past view if the upgrade has already been activated.
-func (model *UpgradableModel) GetVersionUpgrade() *protocol_state.ViewBasedActivator[uint64] {
+func (model *UpgradableModel) GetVersionUpgrade() *protocol.ViewBasedActivator[uint64] {
 	return model.VersionUpgrade
 }
 
@@ -189,8 +190,11 @@ func (model *Modelv1) SetInvalidEpochTransitionAttempted(attempted bool) error {
 	return nil
 }
 
-// TODO: this is temporary, only for testing bootstrapping
-func NewLatestKVStore(epochStateID flow.Identifier) protocol_state.KVStoreAPI {
+// NewDefaultKVStore constructs a default Key-Value Store of the *latest* protocol version for bootstrapping.
+// Currently, the KV store is largely empty.
+// TODO: Shortcut in bootstrapping; we will probably have to start with a non-empty KV store in the future;
+// Potentially we may need to carry over the KVStore during a spork (with possible migrations).
+func NewDefaultKVStore(epochStateID flow.Identifier) protocol_state.KVStoreAPI {
 	return &Modelv1{
 		Modelv0: Modelv0{
 			UpgradableModel: UpgradableModel{},

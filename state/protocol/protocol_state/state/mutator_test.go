@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
-	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/rand"
@@ -75,7 +74,7 @@ func (s *StateMutatorSuite) TestBuild_HappyPath() {
 	// setup factories, each factory will create a state machine that will return a single deferred db update
 	for i := range factories {
 		factory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
-		stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol_state.KVStoreReader](s.T())
+		stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
 		deferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
 		deferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
 		deferredDBUpdates := protocol.DeferredBlockPersistOps{}
@@ -109,7 +108,7 @@ func (s *StateMutatorSuite) TestBuild_HappyPath() {
 
 	// expect calls to prepare a deferred update for indexing and storing the resulting state
 	s.protocolKVStoreDB.On("IndexTx", s.candidate.ID(), resultingStateID).Return(indexTxDeferredUpdate.Execute).Once()
-	s.protocolKVStoreDB.On("StoreTx", resultingStateID, &storage.KeyValueStoreData{
+	s.protocolKVStoreDB.On("StoreTx", resultingStateID, &flow.PSKeyValueStoreData{
 		Version: s.latestProtocolVersion,
 		Data:    stateBytes,
 	}).Return(storeTxDeferredUpdate.Execute).Once()
@@ -142,7 +141,7 @@ func (s *StateMutatorSuite) TestBuild_NoChanges() {
 	s.replicatedState.On("VersionedEncode").Return(s.latestProtocolVersion, stateBytes, nil).Once()
 	// expect calls to prepare a deferred update for indexing and storing the resulting state
 	s.protocolKVStoreDB.On("IndexTx", s.candidate.ID(), resultingStateID).Return(indexTxDeferredUpdate.Execute).Once()
-	s.protocolKVStoreDB.On("StoreTx", resultingStateID, &storage.KeyValueStoreData{
+	s.protocolKVStoreDB.On("StoreTx", resultingStateID, &flow.PSKeyValueStoreData{
 		Version: s.latestProtocolVersion,
 		Data:    stateBytes,
 	}).Return(storeTxDeferredUpdate.Execute).Once()
@@ -192,7 +191,7 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 		newVersion := s.latestProtocolVersion + 1
 		parentState := protocol_statemock.NewKVStoreAPI(s.T())
 		parentState.On("GetProtocolStateVersion").Return(s.latestProtocolVersion).Once()
-		parentState.On("GetVersionUpgrade").Return(&protocol_state.ViewBasedActivator[uint64]{
+		parentState.On("GetVersionUpgrade").Return(&protocol.ViewBasedActivator[uint64]{
 			Data:           newVersion,
 			ActivationView: s.candidate.View,
 		}).Once()
@@ -213,7 +212,7 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 	s.Run("outdated-upgrade", func() {
 		parentState := protocol_statemock.NewKVStoreAPI(s.T())
 		parentState.On("GetProtocolStateVersion").Return(s.latestProtocolVersion).Once()
-		parentState.On("GetVersionUpgrade").Return(&protocol_state.ViewBasedActivator[uint64]{
+		parentState.On("GetVersionUpgrade").Return(&protocol.ViewBasedActivator[uint64]{
 			Data:           s.latestProtocolVersion,
 			ActivationView: s.candidate.View - 1,
 		}).Once()
@@ -254,7 +253,7 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 		lastCalledIdx := -1
 		for i := range factories {
 			factory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
-			stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol_state.KVStoreReader](s.T())
+			stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
 			calledIndex := i
 			factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, s.replicatedState).Run(func(_ mock.Arguments) {
 				if lastCalledIdx >= calledIndex {
@@ -304,7 +303,7 @@ func (s *StateMutatorSuite) TestApplyServiceEventsFromValidatedSeals() {
 		factories := make([]protocol_state.KeyValueStoreStateMachineFactory, 2)
 		for i := range factories {
 			factory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
-			stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol_state.KVStoreReader](s.T())
+			stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
 			stateMachine.On("EvolveState", mock.Anything).Return(nil).Once()
 			factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, s.replicatedState).Return(stateMachine, nil)
 			factories[i] = factory
@@ -336,7 +335,7 @@ func (s *StateMutatorSuite) TestApplyServiceEventsFromValidatedSeals() {
 	})
 	s.Run("process-update-exception", func() {
 		factory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
-		stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol_state.KVStoreReader](s.T())
+		stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
 		exception := errors.New("exception")
 		stateMachine.On("EvolveState", mock.Anything).Return(exception).Once()
 		factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, s.replicatedState).Return(stateMachine, nil)

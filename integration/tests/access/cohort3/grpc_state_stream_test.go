@@ -10,27 +10,37 @@ import (
 	"testing"
 	"time"
 
-	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/test"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 
+	"github.com/onflow/flow-go-sdk/test"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/utils/unittest"
+
+	sdk "github.com/onflow/flow-go-sdk"
+
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 )
 
 var (
 	jsonOptions = []jsoncdc.Option{jsoncdc.WithAllowUnstructuredStaticTypes(true)}
 )
+
+// SubscribeEventsResponse represents the subscription response containing events for a specific block and messageIndex
+type SubscribeEventsResponse struct {
+	backend.EventsResponse
+	MessageIndex uint64
+}
 
 func TestGrpcStateStream(t *testing.T) {
 	suite.Run(t, new(GrpcStateStreamSuite))
@@ -46,6 +56,9 @@ type GrpcStateStreamSuite struct {
 	cancel context.CancelFunc
 
 	net *testnet.FlowNetwork
+
+	// RPC methods to test
+	testedRPCs func() []RPCTest
 }
 
 func (s *GrpcStateStreamSuite) TearDownTest() {
@@ -72,6 +85,8 @@ func (s *GrpcStateStreamSuite) SetupTest() {
 		testnet.WithAdditionalFlag("--execution-data-indexing-enabled=true"),
 		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
 		testnet.WithAdditionalFlag("--event-query-mode=local-only"),
+		testnet.WithAdditionalFlag("--supports-observer=true"),
+		testnet.WithAdditionalFlagf("--public-network-execution-data-sync-enabled=true"),
 	)
 	controlANConfig := testnet.NewNodeConfig(
 		flow.RoleAccess,
@@ -104,17 +119,32 @@ func (s *GrpcStateStreamSuite) SetupTest() {
 		controlANConfig, // access_2
 	}
 
-	conf := testnet.NewNetworkConfig("access_event_streaming_test", nodeConfigs)
+	// add the observer node config
+	observers := []testnet.ObserverConfig{{
+		ContainerName: testnet.PrimaryON,
+		LogLevel:      zerolog.DebugLevel,
+		AdditionalFlags: []string{
+			fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
+			fmt.Sprintf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
+			"--execution-data-sync-enabled=true",
+			"--event-query-mode=execution-nodes-only",
+			"--execution-data-indexing-enabled=true",
+		},
+	}}
+
+	conf := testnet.NewNetworkConfig("access_event_streaming_test", nodeConfigs, testnet.WithObservers(observers...))
 	s.net = testnet.PrepareFlowNetwork(s.T(), conf, flow.Localnet)
 
 	// start the network
 	s.T().Logf("starting flow network with docker containers")
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
+	s.testedRPCs = s.getRPCs
+
 	s.net.Start(s.ctx)
 }
 
-// TestRestEventStreaming tests event streaming route on REST
+// TestRestEventStreaming tests gRPC event streaming
 func (s *GrpcStateStreamSuite) TestHappyPath() {
 	testANURL := fmt.Sprintf("localhost:%s", s.net.ContainerByName(testnet.PrimaryAN).Port(testnet.ExecutionStatePort))
 	sdkClientTestAN, err := getClient(testANURL)
@@ -124,107 +154,224 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 	sdkClientControlAN, err := getClient(controlANURL)
 	s.Require().NoError(err)
 
+	testONURL := fmt.Sprintf("localhost:%s", s.net.ContainerByName(testnet.PrimaryON).Port(testnet.ExecutionStatePort))
+	sdkClientTestON, err := getClient(testONURL)
+	s.Require().NoError(err)
+
+	txGenerator, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
+	s.Require().NoError(err)
+	header, err := txGenerator.GetLatestSealedBlockHeader(s.ctx)
+	s.Require().NoError(err)
+
 	time.Sleep(20 * time.Second)
 
-	testEvents, testErrs, err := SubscribeEventsByBlockHeight(s.ctx, sdkClientTestAN, 0, &executiondata.EventFilter{})
-	s.Require().NoError(err)
-
-	controlEvents, controlErrs, err := SubscribeEventsByBlockHeight(s.ctx, sdkClientControlAN, 0, &executiondata.EventFilter{})
-	s.Require().NoError(err)
-
+	var startValue interface{}
 	txCount := 10
 
-	// generate events
-	go func() {
-		txGenerator, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
-		s.Require().NoError(err)
+	for _, rpc := range s.testedRPCs() {
+		s.T().Run(rpc.name, func(t *testing.T) {
+			if rpc.name == "SubscribeEventsFromStartBlockID" {
+				startValue = header.ID.Bytes()
+			} else {
+				startValue = header.Height
+			}
 
-		refBlockID, err := txGenerator.GetLatestBlockID(s.ctx)
-		s.Require().NoError(err)
-
-		for i := 0; i < txCount; i++ {
-			accountKey := test.AccountKeyGenerator().New()
-			address, err := txGenerator.CreateAccount(s.ctx, accountKey, sdk.HexToID(refBlockID.String()))
+			testANStream, err := rpc.call(s.ctx, sdkClientTestAN, startValue, &executiondata.EventFilter{})
 			s.Require().NoError(err)
-			s.T().Logf("created account: %s", address)
-		}
-	}()
+			testANEvents, testANErrs, err := SubscribeEventsHandler(s.ctx, testANStream)
+			s.Require().NoError(err)
 
-	has := func(events []flow.Event, eventType flow.EventType) bool {
-		for _, event := range events {
-			if event.Type == eventType {
-				return true
+			controlANStream, err := rpc.call(s.ctx, sdkClientControlAN, startValue, &executiondata.EventFilter{})
+			s.Require().NoError(err)
+			controlANEvents, controlANErrs, err := SubscribeEventsHandler(s.ctx, controlANStream)
+			s.Require().NoError(err)
+
+			testONStream, err := rpc.call(s.ctx, sdkClientTestON, startValue, &executiondata.EventFilter{})
+			s.Require().NoError(err)
+			testONEvents, testONErrs, err := SubscribeEventsHandler(s.ctx, testONStream)
+			s.Require().NoError(err)
+
+			if rpc.generateEvents {
+				// generate events
+				go func() {
+					s.generateEvents(txGenerator, txCount)
+				}()
 			}
-		}
-		return false
+
+			has := func(events []flow.Event, eventType flow.EventType) bool {
+				for _, event := range events {
+					if event.Type == eventType {
+						return true
+					}
+				}
+				return false
+			}
+
+			targetEvent := flow.EventType("flow.AccountCreated")
+
+			foundANTxCount := 0
+			foundONTxCount := 0
+			messageIndex := counters.NewMonotonousCounter(0)
+
+			r := newResponseTracker()
+
+			for {
+				select {
+				case err := <-testANErrs:
+					s.Require().NoErrorf(err, "unexpected test AN error")
+				case err := <-controlANErrs:
+					s.Require().NoErrorf(err, "unexpected control AN error")
+				case err := <-testONErrs:
+					s.Require().NoErrorf(err, "unexpected test ON error")
+				case event := <-testANEvents:
+					if has(event.Events, targetEvent) {
+						s.T().Logf("adding access test events: %d %d %v", event.Height, len(event.Events), event.Events)
+						r.Add(s.T(), event.Height, "access_test", &event)
+						foundANTxCount++
+					}
+				case event := <-controlANEvents:
+					if has(event.Events, targetEvent) {
+						if ok := messageIndex.Set(event.MessageIndex); !ok {
+							s.Require().NoErrorf(err, "messageIndex isn`t sequential")
+						}
+
+						s.T().Logf("adding control events: %d %d %v", event.Height, len(event.Events), event.Events)
+						r.Add(s.T(), event.Height, "access_control", &event)
+					}
+				case event := <-testONEvents:
+					if has(event.Events, targetEvent) {
+						s.T().Logf("adding observer test events: %d %d %v", event.Height, len(event.Events), event.Events)
+						r.Add(s.T(), event.Height, "observer_test", &event)
+						foundONTxCount++
+					}
+				}
+
+				if foundANTxCount >= txCount && foundONTxCount >= txCount {
+					break
+				}
+			}
+		})
 	}
+}
 
-	targetEvent := flow.EventType("flow.AccountCreated")
+// generateEvents is a helper function for generating AccountCreated events
+func (s *GrpcStateStreamSuite) generateEvents(client *testnet.Client, txCount int) {
+	refBlockID, err := client.GetLatestBlockID(s.ctx)
+	s.Require().NoError(err)
 
-	foundTxCount := 0
-	r := newResponseTracker()
-	for {
-		select {
-		case err := <-testErrs:
-			s.Require().NoErrorf(err, "unexpected test AN error")
-		case err := <-controlErrs:
-			s.Require().NoErrorf(err, "unexpected control AN error")
-		case event := <-testEvents:
-			if has(event.Events, targetEvent) {
-				s.T().Logf("adding test events: %d %d %v", event.BlockHeight, len(event.Events), event.Events)
-				r.Add(s.T(), event.BlockHeight, "test", &event)
-				foundTxCount++
-			}
-		case event := <-controlEvents:
-			if has(event.Events, targetEvent) {
-				s.T().Logf("adding control events: %d %d %v", event.BlockHeight, len(event.Events), event.Events)
-				r.Add(s.T(), event.BlockHeight, "control", &event)
-			}
+	for i := 0; i < txCount; i++ {
+		accountKey := test.AccountKeyGenerator().New()
+		address, err := client.CreateAccount(s.ctx, accountKey, sdk.HexToID(refBlockID.String()))
+		if err != nil {
+			i--
+			continue
 		}
+		s.T().Logf("created account: %s", address)
+	}
+}
 
-		if foundTxCount >= txCount {
-			break
-		}
+type RPCTest struct {
+	name           string
+	call           func(ctx context.Context, client executiondata.ExecutionDataAPIClient, startValue interface{}, filter *executiondata.EventFilter) (executiondata.ExecutionDataAPI_SubscribeEventsClient, error)
+	generateEvents bool // add ability to integration test generate new events or use old events to decrease running test time
+}
+
+func (s *GrpcStateStreamSuite) getRPCs() []RPCTest {
+	return []RPCTest{
+		{
+			name: "SubscribeEventsFromLatest",
+			call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, _ interface{}, filter *executiondata.EventFilter) (executiondata.ExecutionDataAPI_SubscribeEventsClient, error) {
+				return client.SubscribeEventsFromLatest(ctx, &executiondata.SubscribeEventsFromLatestRequest{
+					EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+					Filter:               filter,
+					HeartbeatInterval:    1,
+				})
+			},
+			generateEvents: true,
+		},
+		{
+			name: "SubscribeEvents",
+			call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, _ interface{}, filter *executiondata.EventFilter) (executiondata.ExecutionDataAPI_SubscribeEventsClient, error) {
+				//nolint: staticcheck
+				return client.SubscribeEvents(ctx, &executiondata.SubscribeEventsRequest{
+					StartBlockId:         convert.IdentifierToMessage(flow.ZeroID),
+					StartBlockHeight:     0,
+					EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+					Filter:               filter,
+					HeartbeatInterval:    1,
+				})
+			},
+			generateEvents: true,
+		},
+		{
+			name: "SubscribeEventsFromStartBlockID",
+			call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, startValue interface{}, filter *executiondata.EventFilter) (executiondata.ExecutionDataAPI_SubscribeEventsClient, error) {
+				return client.SubscribeEventsFromStartBlockID(ctx, &executiondata.SubscribeEventsFromStartBlockIDRequest{
+					StartBlockId:         startValue.([]byte),
+					EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+					Filter:               filter,
+					HeartbeatInterval:    1,
+				})
+			},
+			generateEvents: false, // use previous events
+		},
+		{
+			name: "SubscribeEventsFromStartHeight",
+			call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, startValue interface{}, filter *executiondata.EventFilter) (executiondata.ExecutionDataAPI_SubscribeEventsClient, error) {
+				return client.SubscribeEventsFromStartHeight(ctx, &executiondata.SubscribeEventsFromStartHeightRequest{
+					StartBlockHeight:     startValue.(uint64),
+					EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+					Filter:               filter,
+					HeartbeatInterval:    1,
+				})
+			},
+			generateEvents: false, // use previous events
+		},
 	}
 }
 
 type ResponseTracker struct {
-	r  map[uint64]map[string]flow.BlockEvents
+	r  map[uint64]map[string]SubscribeEventsResponse
 	mu sync.RWMutex
 }
 
 func newResponseTracker() *ResponseTracker {
 	return &ResponseTracker{
-		r: make(map[uint64]map[string]flow.BlockEvents),
+		r: make(map[uint64]map[string]SubscribeEventsResponse),
 	}
 }
 
-func (r *ResponseTracker) Add(t *testing.T, blockHeight uint64, name string, events *flow.BlockEvents) {
+func (r *ResponseTracker) Add(t *testing.T, blockHeight uint64, name string, events *SubscribeEventsResponse) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if _, ok := r.r[blockHeight]; !ok {
-		r.r[blockHeight] = make(map[string]flow.BlockEvents)
+		r.r[blockHeight] = make(map[string]SubscribeEventsResponse)
 	}
 	r.r[blockHeight][name] = *events
 
-	if len(r.r[blockHeight]) != 2 {
+	if len(r.r[blockHeight]) != 3 {
 		return
 	}
 
-	err := r.compare(t, r.r[blockHeight])
+	err := r.compare(t, r.r[blockHeight]["access_control"], r.r[blockHeight]["access_test"])
 	if err != nil {
-		log.Fatalf("failure comparing %d: %v", blockHeight, err)
+		log.Fatalf("failure comparing access and access data %d: %v", blockHeight, err)
 	}
+
+	err = r.compare(t, r.r[blockHeight]["access_control"], r.r[blockHeight]["observer_test"])
+	if err != nil {
+		log.Fatalf("failure comparing access and observer data %d: %v", blockHeight, err)
+	}
+
 	delete(r.r, blockHeight)
 }
 
-func (r *ResponseTracker) compare(t *testing.T, data map[string]flow.BlockEvents) error {
-	controlData := data["control"]
-	testData := data["test"]
-
+func (r *ResponseTracker) compare(t *testing.T, controlData SubscribeEventsResponse, testData SubscribeEventsResponse) error {
 	require.Equal(t, controlData.BlockID, testData.BlockID)
-	require.Equal(t, controlData.BlockHeight, testData.BlockHeight)
+	require.Equal(t, controlData.Height, testData.Height)
+	require.Equal(t, controlData.BlockTimestamp, testData.BlockTimestamp)
+	require.Equal(t, controlData.MessageIndex, testData.MessageIndex)
 	require.Equal(t, len(controlData.Events), len(testData.Events))
 
 	for i := range controlData.Events {
@@ -249,25 +396,11 @@ func getClient(address string) (executiondata.ExecutionDataAPIClient, error) {
 	return executiondata.NewExecutionDataAPIClient(conn), nil
 }
 
-func SubscribeEventsByBlockHeight(
+func SubscribeEventsHandler(
 	ctx context.Context,
-	client executiondata.ExecutionDataAPIClient,
-	startHeight uint64,
-	filter *executiondata.EventFilter,
-) (<-chan flow.BlockEvents, <-chan error, error) {
-	req := &executiondata.SubscribeEventsRequest{
-		StartBlockHeight:     startHeight,
-		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
-		Filter:               filter,
-		HeartbeatInterval:    1,
-	}
-
-	stream, err := client.SubscribeEvents(ctx, req)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	sub := make(chan flow.BlockEvents)
+	stream executiondata.ExecutionDataAPI_SubscribeEventsClient,
+) (<-chan SubscribeEventsResponse, <-chan error, error) {
+	sub := make(chan SubscribeEventsResponse)
 	errChan := make(chan error)
 
 	sendErr := func(err error) {
@@ -294,11 +427,14 @@ func SubscribeEventsByBlockHeight(
 
 			events := convert.MessagesToEvents(resp.GetEvents())
 
-			response := flow.BlockEvents{
-				BlockHeight:    resp.GetBlockHeight(),
-				BlockID:        convert.MessageToIdentifier(resp.GetBlockId()),
-				Events:         events,
-				BlockTimestamp: resp.GetBlockTimestamp().AsTime(),
+			response := SubscribeEventsResponse{
+				EventsResponse: backend.EventsResponse{
+					Height:         resp.GetBlockHeight(),
+					BlockID:        convert.MessageToIdentifier(resp.GetBlockId()),
+					Events:         events,
+					BlockTimestamp: resp.GetBlockTimestamp().AsTime(),
+				},
+				MessageIndex: resp.MessageIndex,
 			}
 
 			select {

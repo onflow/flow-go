@@ -152,9 +152,9 @@ func TestNewFlowCachedAccessAPIProxy(t *testing.T) {
 		AccessMetrics:             metrics,
 		CollectionNodeGRPCTimeout: time.Second,
 		Manager: connection.NewManager(
-			nil,
 			unittest.Logger(),
 			metrics,
+			nil,
 			grpcutils.DefaultMaxMsgSize,
 			connection.CircuitBreakerConfig{},
 			grpcutils.NoCompressor,

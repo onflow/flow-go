@@ -75,7 +75,7 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string, networkPubKe
 // The networkPubKey is the public key used for secure gRPC connection. Can be nil for an unsecured connection.
 // The returned io.Closer should close the connection after the call if no error occurred during client creation.
 func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
-	conn, closer, err := cf.Manager.GetConnection(address, cf.CollectionNodeGRPCTimeout, AccessClient, networkPubKey)
+	conn, closer, err := cf.Manager.GetConnection(address, cf.CollectionNodeGRPCTimeout, networkPubKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -91,7 +91,7 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 		return nil, nil, err
 	}
 
-	conn, closer, err := cf.Manager.GetConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout, ExecutionClient, nil)
+	conn, closer, err := cf.Manager.GetConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout, nil)
 	if err != nil {
 		return nil, nil, err
 	}

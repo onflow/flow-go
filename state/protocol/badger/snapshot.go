@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/invalid"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
@@ -147,13 +148,13 @@ func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 //   - protocol.UnfinalizedSealingSegmentError if sealing segment would contain unfinalized blocks (including orphaned blocks)
 func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	// Lets denote the highest block in the sealing segment `head` (initialized below).
-	// Based on the tech spec `flow/sealing_segment.md`, the Sealing Segment must contain contain
+	// Based on the tech spec `flow/sealing_segment.md`, the Sealing Segment must contain
 	//  enough history to satisfy _all_ of the following conditions:
 	//   (i) The highest sealed block as of `head` needs to be included in the sealing segment.
 	//       This is relevant if `head` does not contain any seals.
 	//  (ii) All blocks that are sealed by `head`. This is relevant if head` contains _multiple_ seals.
 	// (iii) The sealing segment should contain the history back to (including):
-	//       limitHeight := max(head.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
+	//       limitHeight := max(blockSealedAtHead.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
 	// Per convention, we include the blocks for (i) in the `SealingSegment.Blocks`, while the
 	// additional blocks for (ii) and optionally (iii) are contained in as `SealingSegment.ExtraBlocks`.
 	head, err := s.state.blocks.ByID(s.blockID)
@@ -186,9 +187,34 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 		return nil, fmt.Errorf("could not get block: %w", err)
 	}
 
+	// TODO this is a temporary measure resulting from epoch data being stored outside the
+	//  protocol KV Store, once epoch data is in the KV Store, we can pass protocolKVStoreSnapshotsDB.ByID
+	//  directly to NewSealingSegmentBuilder (similar to other getters)
+	getProtocolStateEntry := func(protocolStateID flow.Identifier) (*flow.ProtocolStateEntryWrapper, error) {
+		kvStoreEntry, err := s.state.protocolKVStoreSnapshotsDB.ByID(protocolStateID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get kv store entry: %w", err)
+		}
+		kvStoreReader, err := kvstore.VersionedDecode(kvStoreEntry.Version, kvStoreEntry.Data)
+		if err != nil {
+			return nil, fmt.Errorf("could not decode kv store entry: %w", err)
+		}
+		epochDataEntry, err := s.state.protocolStateSnapshotsDB.ByID(kvStoreReader.GetEpochStateID())
+		if err != nil {
+			return nil, fmt.Errorf("could not get epoch data: %w", err)
+		}
+		return &flow.ProtocolStateEntryWrapper{
+			KVStore: flow.PSKeyValueStoreData{
+				Version: kvStoreEntry.Version,
+				Data:    kvStoreEntry.Data,
+			},
+			EpochEntry: epochDataEntry,
+		}, nil
+	}
+
 	// walk through the chain backward until we reach the block referenced by
 	// the latest seal - the returned segment includes this block
-	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID, s.state.seals.HighestInFork)
+	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID, s.state.seals.HighestInFork, getProtocolStateEntry)
 	scraper := func(header *flow.Header) error {
 		blockID := header.ID()
 		block, err := s.state.blocks.ByID(blockID)
@@ -221,10 +247,10 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	}
 
 	// STEP (iii): extended history to allow checking for duplicated collections, i.e.
-	// limitHeight = max(head.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
+	// limitHeight = max(blockSealedAtHead.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
 	limitHeight := s.state.sporkRootBlockHeight
-	if head.Header.Height > s.state.sporkRootBlockHeight+flow.DefaultTransactionExpiry {
-		limitHeight = head.Header.Height - flow.DefaultTransactionExpiry
+	if blockSealedAtHead.Height > s.state.sporkRootBlockHeight+flow.DefaultTransactionExpiry {
+		limitHeight = blockSealedAtHead.Height - flow.DefaultTransactionExpiry
 	}
 
 	// As we have to satisfy (ii) _and_ (iii), we have to take the longest history, i.e. the lowest height.
@@ -323,11 +349,22 @@ func (s *Snapshot) Params() protocol.GlobalParams {
 	return s.state.Params()
 }
 
-// ProtocolState returns the dynamic protocol state that the Head block commits to. The
-// compliance layer guarantees that only valid blocks are appended to the protocol state.
+// EpochProtocolState returns the epoch part of dynamic protocol state that the Head block commits to.
+// The compliance layer guarantees that only valid blocks are appended to the protocol state.
+// Returns state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
+// All other errors should be treated as exceptions.
 // For each block stored there should be a protocol state stored.
-func (s *Snapshot) ProtocolState() (protocol.DynamicProtocolState, error) {
+func (s *Snapshot) EpochProtocolState() (protocol.DynamicProtocolState, error) {
 	return s.state.protocolState.AtBlockID(s.blockID)
+}
+
+// ProtocolState returns the dynamic protocol state that the Head block commits to.
+// The compliance layer guarantees that only valid blocks are appended to the protocol state.
+// Returns state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
+// All other errors should be treated as exceptions.
+// For each block stored there should be a protocol state stored.
+func (s *Snapshot) ProtocolState() (protocol.KVStoreReader, error) {
+	return s.state.protocolState.KVStoreAtBlockID(s.blockID)
 }
 
 func (s *Snapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) {

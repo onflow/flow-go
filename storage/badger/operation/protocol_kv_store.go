@@ -4,14 +4,13 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage"
 )
 
 // InsertProtocolKVStore inserts a protocol KV store by ID.
 // Error returns:
 //   - storage.ErrAlreadyExists if the key already exists in the database.
 //   - generic error in case of unexpected failure from the database layer or encoding failure.
-func InsertProtocolKVStore(protocolKVStoreID flow.Identifier, kvStore *storage.KeyValueStoreData) func(*badger.Txn) error {
+func InsertProtocolKVStore(protocolKVStoreID flow.Identifier, kvStore *flow.PSKeyValueStoreData) func(*badger.Txn) error {
 	return insert(makePrefix(codeProtocolKVStore, protocolKVStoreID), kvStore)
 }
 
@@ -19,7 +18,7 @@ func InsertProtocolKVStore(protocolKVStoreID flow.Identifier, kvStore *storage.K
 // Error returns:
 //   - storage.ErrNotFound if the key does not exist in the database
 //   - generic error in case of unexpected failure from the database layer
-func RetrieveProtocolKVStore(protocolKVStoreID flow.Identifier, kvStore *storage.KeyValueStoreData) func(*badger.Txn) error {
+func RetrieveProtocolKVStore(protocolKVStoreID flow.Identifier, kvStore *flow.PSKeyValueStoreData) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeProtocolKVStore, protocolKVStoreID), kvStore)
 }
 

@@ -3,6 +3,7 @@ CONSENSUS = 2
 VALID_CONSENSUS := $(shell test $(CONSENSUS) -ge 2; echo $$?)
 EXECUTION = 2
 VALID_EXECUTION := $(shell test $(EXECUTION) -ge 2; echo $$?)
+TEST_EXECUTION = 0
 VERIFICATION = 1
 ACCESS = 1
 OBSERVER = 0
@@ -59,6 +60,7 @@ else
 		-verification=$(VERIFICATION) \
 		-access=$(ACCESS) \
 		-observer=$(OBSERVER) \
+		-test-execution=$(TEST_EXECUTION) \
 		-nclusters=$(NCLUSTERS) \
 		-epoch-length=$(EPOCHLEN) \
 		-epoch-staking-phase-length=$(STAKINGLEN) \
@@ -78,6 +80,9 @@ endif
 .PHONY: bootstrap-light
 bootstrap-light:
 	$(MAKE) -e COLLECTION=1 CONSENSUS=2 EXECUTION=2 VERIFICATION=1 ACCESS=1 NCLUSTERS=1 bootstrap
+
+bootstrap-test-en:
+	$(MAKE) -e COLLECTION=1 CONSENSUS=2 EXECUTION=2 VERIFICATION=1 ACCESS=1 NCLUSTERS=1 TEST_EXECUTION=1 bootstrap
 
 # CI tests have a larger number of nodes
 .PHONY: bootstrap-ci

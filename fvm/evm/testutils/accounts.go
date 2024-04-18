@@ -8,9 +8,9 @@ import (
 	"sync"
 	"testing"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	gethCrypto "github.com/ethereum/go-ethereum/crypto"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethCrypto "github.com/onflow/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/atree"
@@ -97,6 +97,10 @@ func (a *EOATestAccount) signTx(
 	return tx
 }
 
+func (a *EOATestAccount) Nonce() uint64 {
+	return a.nonce
+}
+
 func (a *EOATestAccount) SetNonce(nonce uint64) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
@@ -132,8 +136,10 @@ func FundAndGetEOATestAccount(t testing.TB, led atree.Ledger, flowEVMRootAddress
 
 	_, err = blk.DirectCall(
 		types.NewDepositCall(
+			RandomAddress(t), // any random non-empty address works here
 			account.Address(),
 			new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)),
+			account.nonce,
 		),
 	)
 	require.NoError(t, err)

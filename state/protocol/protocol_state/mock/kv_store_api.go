@@ -6,6 +6,8 @@ import (
 	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 
+	protocol "github.com/onflow/flow-go/state/protocol"
+
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state"
 )
 
@@ -69,15 +71,15 @@ func (_m *KVStoreAPI) GetProtocolStateVersion() uint64 {
 }
 
 // GetVersionUpgrade provides a mock function with given fields:
-func (_m *KVStoreAPI) GetVersionUpgrade() *protocol_state.ViewBasedActivator[uint64] {
+func (_m *KVStoreAPI) GetVersionUpgrade() *protocol.ViewBasedActivator[uint64] {
 	ret := _m.Called()
 
-	var r0 *protocol_state.ViewBasedActivator[uint64]
-	if rf, ok := ret.Get(0).(func() *protocol_state.ViewBasedActivator[uint64]); ok {
+	var r0 *protocol.ViewBasedActivator[uint64]
+	if rf, ok := ret.Get(0).(func() *protocol.ViewBasedActivator[uint64]); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*protocol_state.ViewBasedActivator[uint64])
+			r0 = ret.Get(0).(*protocol.ViewBasedActivator[uint64])
 		}
 	}
 

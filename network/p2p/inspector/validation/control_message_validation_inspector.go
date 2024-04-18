@@ -62,8 +62,6 @@ type ControlMsgValidationInspector struct {
 	metrics module.GossipSubRpcValidationInspectorMetrics
 	// config control message validation configurations.
 	config *p2pconfig.RpcValidationInspector
-	// distributor used to disseminate invalid RPC message notifications.
-	distributor p2p.GossipSubInspectorNotifDistributor
 	// workerPool queue that stores *InspectRPCRequest that will be processed by component workers.
 	workerPool *worker.Pool[*InspectRPCRequest]
 	// tracker is a map that associates the hash of a peer's ID with the
@@ -81,6 +79,10 @@ type ControlMsgValidationInspector struct {
 	networkingType network.NetworkingType
 	// topicOracle callback used to retrieve the current subscribed topics of the libp2p node.
 	topicOracle func() p2p.TopicProvider
+	// notificationConsumer the consumer that will be notified when a misbehavior is detected upon inspection of an RPC.
+	// For each RPC, at most one notification is sent to the consumer.
+	// Each notification acts as a penalty to the peer's score.
+	notificationConsumer p2p.GossipSubInvCtrlMsgNotifConsumer
 }
 
 type InspectorParams struct {
@@ -90,8 +92,6 @@ type InspectorParams struct {
 	SporkID flow.Identifier `validate:"required"`
 	// Config inspector configuration.
 	Config *p2pconfig.RpcValidationInspector `validate:"required"`
-	// Distributor gossipsub inspector notification distributor.
-	Distributor p2p.GossipSubInspectorNotifDistributor `validate:"required"`
 	// HeroCacheMetricsFactory the metrics factory.
 	HeroCacheMetricsFactory metrics.HeroCacheMetricsFactory `validate:"required"`
 	// IdProvider identity provider is used to get the flow identifier for a peer.
@@ -105,10 +105,15 @@ type InspectorParams struct {
 	// TopicOracle callback used to retrieve the current subscribed topics of the libp2p node.
 	// It is set as a callback to avoid circular dependencies between the topic oracle and the inspector.
 	TopicOracle func() p2p.TopicProvider `validate:"required"`
+
+	// InvalidControlMessageNotificationConsumer the consumer that will be notified when a misbehavior is detected upon inspection of an RPC.
+	// For each RPC, at most one notification is sent to the consumer.
+	// Each notification acts as a penalty to the peer's score.
+	InvalidControlMessageNotificationConsumer p2p.GossipSubInvCtrlMsgNotifConsumer `validate:"required"`
 }
 
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
-var _ p2p.GossipSubMsgValidationRpcInspector = (*ControlMsgValidationInspector)(nil)
+var _ p2p.GossipSubRPCInspector = (*ControlMsgValidationInspector)(nil)
 var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 
 // NewControlMsgValidationInspector returns new ControlMsgValidationInspector
@@ -143,16 +148,16 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 	}
 
 	c := &ControlMsgValidationInspector{
-		logger:         lg,
-		sporkID:        params.SporkID,
-		config:         params.Config,
-		distributor:    params.Distributor,
-		tracker:        clusterPrefixedTracker,
-		rpcTracker:     params.RpcTracker,
-		idProvider:     params.IdProvider,
-		metrics:        params.InspectorMetrics,
-		networkingType: params.NetworkingType,
-		topicOracle:    params.TopicOracle,
+		logger:               lg,
+		sporkID:              params.SporkID,
+		config:               params.Config,
+		tracker:              clusterPrefixedTracker,
+		rpcTracker:           params.RpcTracker,
+		idProvider:           params.IdProvider,
+		metrics:              params.InspectorMetrics,
+		networkingType:       params.NetworkingType,
+		topicOracle:          params.TopicOracle,
+		notificationConsumer: params.InvalidControlMessageNotificationConsumer,
 	}
 
 	store := queue.NewHeroStore(params.Config.InspectionQueue.Size, params.Logger, inspectMsgQueueCacheCollector)
@@ -162,22 +167,6 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 	c.workerPool = pool
 
 	builder := component.NewComponentManagerBuilder()
-	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		c.logger.Debug().Msg("starting rpc inspector distributor")
-		c.ctx = ctx
-		c.distributor.Start(ctx)
-		select {
-		case <-ctx.Done():
-			c.logger.Debug().Msg("rpc inspector distributor startup aborted; context cancelled")
-		case <-c.distributor.Ready():
-			c.logger.Debug().Msg("rpc inspector distributor started")
-			ready()
-		}
-		<-ctx.Done()
-		c.logger.Debug().Msg("rpc inspector distributor stopped")
-		<-c.distributor.Done()
-		c.logger.Debug().Msg("rpc inspector distributor shutdown complete")
-	})
 	for i := 0; i < c.config.InspectionQueue.NumberOfWorkers; i++ {
 		builder.AddWorker(pool.WorkerLogic())
 	}
@@ -220,6 +209,24 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 		return nil
 	}
 
+	// check peer identity when running private network
+	// sanity check: rpc inspection should be disabled on public networks
+	if c.networkingType == network.PrivateNetwork && c.config.InspectionProcess.Inspect.RejectUnstakedPeers {
+		_, err := c.checkSenderIdentity(from)
+		if err != nil {
+			c.notificationConsumer.OnInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(from, p2pmsg.CtrlMsgRPC, err, 1, p2p.CtrlMsgNonClusterTopicType))
+			c.logger.
+				Error().
+				Err(err).
+				Str("peer_id", p2plogging.PeerId(from)).
+				Bool(logging.KeyNetworkingSecurity, true).
+				Msg("rpc received from unstaked peer")
+			c.metrics.OnInvalidControlMessageNotificationSent()
+			c.metrics.OnRpcRejectedFromUnknownSender()
+			return err
+		}
+	}
+
 	// first truncate the rpc to the configured max sample size; if needed
 	c.truncateRPC(from, rpc)
 
@@ -234,7 +241,6 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 		return fmt.Errorf("failed to get inspect RPC request: %w", err)
 	}
 	c.workerPool.Submit(req)
-
 	return nil
 }
 
@@ -322,27 +328,26 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 	return nil
 }
 
-// checkPubsubMessageSender checks the sender of the sender of pubsub message to ensure they are not unstaked, or ejected.
+// checkSenderIdentity checks the identity of the peer with pid and ensures they are not unstaked, or ejected.
 // This check is only required on private networks.
 // Args:
-//   - message: the pubsub message.
+//   - pid : the peer ID.
 //
 // Returns:
-//   - error: if the peer ID cannot be created from bytes, sender is unknown or the identity is ejected.
+//   - error: sender is unknown or the identity is ejected.
 //
 // All errors returned from this function can be considered benign.
-func (c *ControlMsgValidationInspector) checkPubsubMessageSender(message *pubsub_pb.Message) error {
-	pid, err := peer.IDFromBytes(message.GetFrom())
-	if err != nil {
-		return fmt.Errorf("failed to get peer ID from bytes: %w", err)
-	}
-	if id, ok := c.idProvider.ByPeerID(pid); !ok {
-		return fmt.Errorf("received rpc publish message from unstaked peer: %s", pid)
-	} else if id.IsEjected() {
-		return fmt.Errorf("received rpc publish message from ejected peer: %s", pid)
+func (c *ControlMsgValidationInspector) checkSenderIdentity(pid peer.ID) (*flow.Identity, error) {
+	id, ok := c.idProvider.ByPeerID(pid)
+	if !ok {
+		return nil, NewUnstakedPeerErr(pid)
 	}
 
-	return nil
+	if id.IsEjected() {
+		return nil, NewEjectedPeerErr(pid)
+	}
+
+	return id, nil
 }
 
 // inspectGraftMessages performs topic validation on all grafts in the control message using the provided validateTopic func while tracking duplicates.
@@ -366,9 +371,10 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 
 	duplicateTopicTracker := make(duplicateStrTracker)
 	totalDuplicateTopicIds := 0
+	totalInvalidTopicIdErrs := 0
 	defer func() {
 		// regardless of inspection result, update metrics
-		c.metrics.OnGraftMessageInspected(totalDuplicateTopicIds)
+		c.metrics.OnGraftMessageInspected(totalDuplicateTopicIds, totalInvalidTopicIdErrs)
 	}()
 
 	for _, graft := range grafts {
@@ -379,14 +385,16 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 			// check if the total number of duplicates exceeds the configured threshold.
 			if totalDuplicateTopicIds > c.config.GraftPrune.DuplicateTopicIdThreshold {
 				c.metrics.OnGraftDuplicateTopicIdsExceedThreshold()
-				return NewDuplicateTopicErr(topic.String(), totalDuplicateTopicIds, p2pmsg.CtrlMsgGraft), p2p.CtrlMsgNonClusterTopicType
+				return NewDuplicateTopicIDThresholdExceeded(totalDuplicateTopicIds, len(grafts), c.config.GraftPrune.DuplicateTopicIdThreshold), p2p.CtrlMsgNonClusterTopicType
 			}
 		}
 		err, ctrlMsgType := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
-			// TODO: consider adding a threshold for this error similar to the duplicate topic id threshold.
+			totalInvalidTopicIdErrs++
 			c.metrics.OnInvalidTopicIdDetectedForControlMessage(p2pmsg.CtrlMsgGraft)
-			return err, ctrlMsgType
+			if totalInvalidTopicIdErrs > c.config.GraftPrune.InvalidTopicIdThreshold {
+				return NewInvalidTopicIDThresholdExceeded(totalInvalidTopicIdErrs, c.config.GraftPrune.InvalidTopicIdThreshold), ctrlMsgType
+			}
 		}
 	}
 	return nil, p2p.CtrlMsgNonClusterTopicType
@@ -413,9 +421,10 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 	}
 	tracker := make(duplicateStrTracker)
 	totalDuplicateTopicIds := 0
+	totalInvalidTopicIdErrs := 0
 	defer func() {
 		// regardless of inspection result, update metrics
-		c.metrics.OnPruneMessageInspected(totalDuplicateTopicIds)
+		c.metrics.OnPruneMessageInspected(totalDuplicateTopicIds, totalInvalidTopicIdErrs)
 	}()
 	for _, prune := range prunes {
 		topic := channels.Topic(prune.GetTopicID())
@@ -425,14 +434,16 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 			// check if the total number of duplicates exceeds the configured threshold.
 			if totalDuplicateTopicIds > c.config.GraftPrune.DuplicateTopicIdThreshold {
 				c.metrics.OnPruneDuplicateTopicIdsExceedThreshold()
-				return NewDuplicateTopicErr(topic.String(), totalDuplicateTopicIds, p2pmsg.CtrlMsgPrune), p2p.CtrlMsgNonClusterTopicType
+				return NewDuplicateTopicIDThresholdExceeded(totalDuplicateTopicIds, len(prunes), c.config.GraftPrune.DuplicateTopicIdThreshold), p2p.CtrlMsgNonClusterTopicType
 			}
 		}
 		err, ctrlMsgType := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
-			// TODO: consider adding a threshold for this error similar to the duplicate topic id threshold.
+			totalInvalidTopicIdErrs++
 			c.metrics.OnInvalidTopicIdDetectedForControlMessage(p2pmsg.CtrlMsgPrune)
-			return err, ctrlMsgType
+			if totalInvalidTopicIdErrs > c.config.GraftPrune.InvalidTopicIdThreshold {
+				return NewInvalidTopicIDThresholdExceeded(totalInvalidTopicIdErrs, c.config.GraftPrune.InvalidTopicIdThreshold), ctrlMsgType
+			}
 		}
 	}
 	return nil, p2p.CtrlMsgNonClusterTopicType
@@ -471,9 +482,10 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 	totalMessageIds := 0
 	totalDuplicateTopicIds := 0
 	totalDuplicateMessageIds := 0
+	totalInvalidTopicIdErrs := 0
 	defer func() {
 		// regardless of inspection result, update metrics
-		c.metrics.OnIHaveMessagesInspected(totalDuplicateTopicIds, totalDuplicateMessageIds)
+		c.metrics.OnIHaveMessagesInspected(totalDuplicateTopicIds, totalDuplicateMessageIds, totalInvalidTopicIdErrs)
 	}()
 	for _, ihave := range ihaves {
 		messageIds := ihave.GetMessageIDs()
@@ -483,9 +495,11 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 		// first check if the topic is valid, fail fast if it is not
 		err, ctrlMsgType := c.validateTopic(from, channels.Topic(topic), activeClusterIDS)
 		if err != nil {
-			// TODO: consider adding a threshold for this error similar to the duplicate topic id threshold.
+			totalInvalidTopicIdErrs++
 			c.metrics.OnInvalidTopicIdDetectedForControlMessage(p2pmsg.CtrlMsgIHave)
-			return err, ctrlMsgType
+			if totalInvalidTopicIdErrs > c.config.IHave.InvalidTopicIdThreshold {
+				return NewInvalidTopicIDThresholdExceeded(totalInvalidTopicIdErrs, c.config.IHave.InvalidTopicIdThreshold), ctrlMsgType
+			}
 		}
 
 		// then track the topic ensuring it is not beyond a duplicate threshold.
@@ -494,7 +508,7 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 			// the topic is duplicated, check if the total number of duplicates exceeds the configured threshold
 			if totalDuplicateTopicIds > c.config.IHave.DuplicateTopicIdThreshold {
 				c.metrics.OnIHaveDuplicateTopicIdsExceedThreshold()
-				return NewDuplicateTopicErr(topic, totalDuplicateTopicIds, p2pmsg.CtrlMsgIHave), p2p.CtrlMsgNonClusterTopicType
+				return NewDuplicateTopicIDThresholdExceeded(totalDuplicateTopicIds, len(ihaves), c.config.IHave.DuplicateTopicIdThreshold), p2p.CtrlMsgNonClusterTopicType
 			}
 		}
 
@@ -619,11 +633,11 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 			Msg(PublishInspectionDisabledWarning)
 		return nil, 0
 	}
-
 	totalMessages := len(messages)
 	if totalMessages == 0 {
 		return nil, 0
 	}
+
 	sampleSize := c.config.PublishMessages.MaxSampleSize
 	if sampleSize > totalMessages {
 		sampleSize = totalMessages
@@ -653,15 +667,9 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		}
 		c.metrics.OnPublishMessageInspected(errCnt, invalidTopicIdsCount, invalidSubscriptionsCount, invalidSendersCount)
 	}()
+
+	idCheckCache := make(map[peer.ID]error)
 	for _, message := range messages[:sampleSize] {
-		if c.networkingType == network.PrivateNetwork {
-			err := c.checkPubsubMessageSender(message)
-			if err != nil {
-				invalidSendersCount++
-				errs = multierror.Append(errs, err)
-				continue
-			}
-		}
 		topic := channels.Topic(message.GetTopic())
 		// The boolean value returned when validating a topic, indicating whether the topic is cluster-prefixed or not, is intentionally ignored.
 		// This is because we have already set a threshold for errors allowed on publish messages. Reducing the penalty further based on
@@ -677,9 +685,35 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		if !hasSubscription(topic.String()) {
 			invalidSubscriptionsCount++
 			errs = multierror.Append(errs, fmt.Errorf("subscription for topic %s not found", topic))
+			continue
+		}
+
+		if c.networkingType == network.PrivateNetwork {
+			pid, err := peer.IDFromBytes(message.GetFrom())
+			if err != nil {
+				invalidSendersCount++
+				errs = multierror.Append(errs, fmt.Errorf("failed to get peer ID from bytes: %w", err))
+				continue
+			}
+
+			if idCheckErr, ok := idCheckCache[pid]; ok {
+				if idCheckErr != nil {
+					errs = multierror.Append(errs, idCheckErr)
+					continue
+				}
+			}
+
+			_, idErr := c.checkSenderIdentity(pid)
+			if idErr != nil {
+				invalidSendersCount++
+				errs = multierror.Append(errs, idErr)
+				idCheckCache[pid] = idErr
+				continue
+			}
+
+			idCheckCache[pid] = nil
 		}
 	}
-
 	// return an error when we exceed the error threshold
 	if errs != nil && errs.Len() > c.config.PublishMessages.ErrorThreshold {
 		c.metrics.OnPublishMessagesInspectionErrorExceedsThreshold()
@@ -980,23 +1014,17 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 		Str("from", p2plogging.PeerId(from)).
 		Logger()
 
-	// only staked nodes are expected to participate on cluster prefixed topics
-	nodeID, err := c.getFlowIdentifier(from)
-	if err != nil {
-		return err
-	}
 	if len(activeClusterIds) == 0 {
 		// cluster IDs have not been updated yet
-		_, incErr := c.tracker.Inc(nodeID)
+		_, incErr := c.tracker.Inc(from)
 		if incErr != nil {
 			// irrecoverable error encountered
-			c.logAndThrowError(fmt.Errorf("error encountered while incrementing the cluster prefixed control message gauge %s: %w", nodeID, err))
+			c.logAndThrowError(fmt.Errorf("error encountered while incrementing the cluster prefixed control message gauge %s: %w", from, incErr))
 		}
 
 		// if the amount of messages received is below our hard threshold log the error and return nil.
-		if ok := c.checkClusterPrefixHardThreshold(nodeID); ok {
+		if ok := c.checkClusterPrefixHardThreshold(from); ok {
 			lg.Warn().
-				Err(err).
 				Str("topic", topic.String()).
 				Msg("failed to validate cluster prefixed control message with cluster pre-fixed topic active cluster ids not set")
 			return nil
@@ -1005,17 +1033,17 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 		return NewActiveClusterIdsNotSetErr(topic)
 	}
 
-	err = channels.IsValidFlowClusterTopic(topic, activeClusterIds)
+	err := channels.IsValidFlowClusterTopic(topic, activeClusterIds)
 	if err != nil {
 		if channels.IsUnknownClusterIDErr(err) {
 			// unknown cluster ID error could indicate that a node has fallen
 			// behind and needs to catchup increment to topics received cache.
-			_, incErr := c.tracker.Inc(nodeID)
+			_, incErr := c.tracker.Inc(from)
 			if incErr != nil {
-				c.logAndThrowError(fmt.Errorf("error encountered while incrementing the cluster prefixed control message gauge %s: %w", nodeID, err))
+				c.logAndThrowError(fmt.Errorf("error encountered while incrementing the cluster prefixed control message gauge %s: %w", from, err))
 			}
 			// if the amount of messages received is below our hard threshold log the error and return nil.
-			if c.checkClusterPrefixHardThreshold(nodeID) {
+			if c.checkClusterPrefixHardThreshold(from) {
 				lg.Warn().
 					Err(err).
 					Str("topic", topic.String()).
@@ -1029,28 +1057,15 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 	return nil
 }
 
-// getFlowIdentifier returns the flow identity identifier for a peer.
-// Args:
-//   - peerID: the peer id of the sender.
-//
-// The returned error indicates that the peer is un-staked.
-func (c *ControlMsgValidationInspector) getFlowIdentifier(peerID peer.ID) (flow.Identifier, error) {
-	id, ok := c.idProvider.ByPeerID(peerID)
-	if !ok {
-		return flow.ZeroID, NewUnstakedPeerErr(fmt.Errorf("failed to get flow identity for peer: %s", peerID))
-	}
-	return id.ID(), nil
-}
-
 // checkClusterPrefixHardThreshold returns true if the cluster prefix received tracker count is less than
 // the configured HardThreshold, false otherwise.
 // If any error is encountered while loading from the tracker this func will throw an error on the signaler context, these errors
 // are unexpected and irrecoverable indicating a bug.
-func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID flow.Identifier) bool {
-	gauge, err := c.tracker.Load(nodeID)
+func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(pid peer.ID) bool {
+	gauge, err := c.tracker.Load(pid)
 	if err != nil {
 		// irrecoverable error encountered
-		c.logAndThrowError(fmt.Errorf("cluster prefixed control message gauge during hard threshold check failed for node %s: %w", nodeID, err))
+		c.logAndThrowError(fmt.Errorf("cluster prefixed control message gauge during hard threshold check failed for peer %s: %w", pid, err))
 	}
 	return gauge <= c.config.ClusterPrefixedMessage.HardThreshold
 }
@@ -1081,14 +1096,8 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *In
 		c.metrics.OnUnstakedPeerInspectionFailed()
 		lg.Warn().Msg("control message received from unstaked peer")
 	default:
-		distErr := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, err, count, topicType))
-		if distErr != nil {
-			lg.Error().
-				Err(distErr).
-				Msg("failed to distribute invalid control message notification")
-			return
-		}
-		lg.Error().Msg("rpc control message async inspection failed")
+		c.notificationConsumer.OnInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, err, count, topicType))
+		lg.Error().Msg("rpc control message async inspection failed, notification sent")
 		c.metrics.OnInvalidControlMessageNotificationSent()
 	}
 }

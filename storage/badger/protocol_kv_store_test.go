@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/transaction"
@@ -19,7 +20,7 @@ func TestKeyValueStoreStorage(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		store := NewProtocolKVStore(metrics, db, DefaultProtocolKVStoreCacheSize, DefaultProtocolKVStoreByBlockIDCacheSize)
 
-		expected := &storage.KeyValueStoreData{
+		expected := &flow.PSKeyValueStoreData{
 			Version: 2,
 			Data:    unittest.RandomBytes(32),
 		}
@@ -53,7 +54,7 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 		store := NewProtocolKVStore(metrics, db, DefaultProtocolKVStoreCacheSize, DefaultProtocolKVStoreByBlockIDCacheSize)
 
 		stateID := unittest.IdentifierFixture()
-		expected := &storage.KeyValueStoreData{
+		expected := &flow.PSKeyValueStoreData{
 			Version: 2,
 			Data:    unittest.RandomBytes(32),
 		}

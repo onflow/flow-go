@@ -68,3 +68,12 @@ func NewParseRestrictedModeInvalidAccessFailure(
 		"cannot access %s while cadence is in parse restricted mode",
 		spanName)
 }
+
+// NewEVMFailure constructs a new CodedFailure which captures a fatal
+// caused by the EVM.
+func NewEVMFailure(err error) CodedFailure {
+	return WrapCodedFailure(
+		FailureCodeEVMFailure,
+		err,
+		"evm failure")
+}

@@ -24,6 +24,7 @@ import (
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	protocolutil "github.com/onflow/flow-go/state/protocol/util"
 	storage "github.com/onflow/flow-go/storage/badger"
@@ -74,10 +75,10 @@ func (suite *MutatorSuite) SetupTest() {
 
 	seal.ResultID = result.ID()
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(genesis.ID()))
-	genesis.Payload.ProtocolStateID = inmem.ProtocolStateFromEpochServiceEvents(
+	genesis.Payload.ProtocolStateID = kvstore.NewDefaultKVStore(inmem.ProtocolStateFromEpochServiceEvents(
 		result.ServiceEvents[0].Event.(*flow.EpochSetup),
 		result.ServiceEvents[1].Event.(*flow.EpochCommit),
-	).ID()
+	).ID()).ID()
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(genesis, result, seal, qc)
 	require.NoError(suite.T(), err)
 	suite.epochCounter = rootSnapshot.Encodable().Epochs.Current.Counter
@@ -93,7 +94,7 @@ func (suite *MutatorSuite) SetupTest() {
 		all.QuorumCertificates,
 		all.Setups,
 		all.EpochCommits,
-		all.ProtocolState,
+		all.EpochProtocolState,
 		all.ProtocolKVStore,
 		all.VersionBeacons,
 		rootSnapshot,
@@ -103,7 +104,7 @@ func (suite *MutatorSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	suite.mutableProtocolState = protocol_state.NewMutableProtocolState(
-		all.ProtocolState,
+		all.EpochProtocolState,
 		all.ProtocolKVStore,
 		state.Params(),
 		all.Headers,
@@ -189,7 +190,6 @@ func (suite *MutatorSuite) Tx(opts ...func(*flow.TransactionBody)) flow.Transact
 }
 
 func TestMutator(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: temporary broken")
 	suite.Run(t, new(MutatorSuite))
 }
 

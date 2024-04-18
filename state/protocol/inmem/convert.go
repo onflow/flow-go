@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 )
 
 // FromSnapshot generates a memory-backed snapshot from the input snapshot.
@@ -74,12 +75,6 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 	}
 	snap.Params = params.enc
 
-	protocolState, err := from.ProtocolState()
-	if err != nil {
-		return nil, fmt.Errorf("could not get protocol state: %w", err)
-	}
-	snap.ProtocolState = protocolState.Entry().ProtocolStateEntry
-
 	// convert version beacon
 	versionBeacon, err := from.VersionBeacon()
 	if err != nil {
@@ -135,6 +130,14 @@ func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 	epoch.RandomSource, err = from.RandomSource()
 	if err != nil {
 		return nil, fmt.Errorf("could not get random source: %w", err)
+	}
+	epoch.TargetDuration, err = from.TargetDuration()
+	if err != nil {
+		return nil, fmt.Errorf("could not get target epoch duration: %w", err)
+	}
+	epoch.TargetEndTime, err = from.TargetEndTime()
+	if err != nil {
+		return nil, fmt.Errorf("could not get target end time: %w", err)
 	}
 	epoch.DKGPhase1FinalView, epoch.DKGPhase2FinalView, epoch.DKGPhase3FinalView, err = protocol.DKGPhaseViews(from)
 	if err != nil {
@@ -323,10 +326,29 @@ func SnapshotFromBootstrapStateWithParams(
 		EpochCommitSafetyThreshold: epochCommitSafetyThreshold, // see protocol.Params for details
 	}
 
-	rootProtocolState := ProtocolStateFromEpochServiceEvents(setup, commit)
-	if rootProtocolState.ID() != root.Payload.ProtocolStateID {
+	rootEpochState := ProtocolStateFromEpochServiceEvents(setup, commit)
+	rootEpochStateID := rootEpochState.ID()
+	rootKvStore := kvstore.NewDefaultKVStore(rootEpochStateID)
+	if rootKvStore.ID() != root.Payload.ProtocolStateID {
 		return nil, fmt.Errorf("incorrect protocol state ID in root block, expected (%x) but got (%x)",
-			root.Payload.ProtocolStateID, rootProtocolState.ID())
+			root.Payload.ProtocolStateID, rootKvStore.ID())
+	}
+	kvStoreVersion, kvStoreData, err := rootKvStore.VersionedEncode()
+	if err != nil {
+		return nil, fmt.Errorf("could not encode kvstore: %w", err)
+	}
+
+	richRootEpochState, err := flow.NewRichProtocolStateEntry(rootEpochState, nil, nil, setup, commit, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct root rich epoch state entry: %w", err)
+	}
+
+	rootProtocolStateEntryWrapper := &flow.ProtocolStateEntryWrapper{
+		KVStore: flow.PSKeyValueStoreData{
+			Version: kvStoreVersion,
+			Data:    kvStoreData,
+		},
+		EpochEntry: richRootEpochState,
 	}
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{
@@ -337,13 +359,15 @@ func SnapshotFromBootstrapStateWithParams(
 			Blocks:           []*flow.Block{root},
 			ExecutionResults: flow.ExecutionResultList{result},
 			LatestSeals:      map[flow.Identifier]flow.Identifier{root.ID(): seal.ID()},
-			FirstSeal:        seal,
-			ExtraBlocks:      make([]*flow.Block, 0),
+			ProtocolStateEntries: map[flow.Identifier]*flow.ProtocolStateEntryWrapper{
+				rootKvStore.ID(): rootProtocolStateEntryWrapper,
+			},
+			FirstSeal:   seal,
+			ExtraBlocks: make([]*flow.Block, 0),
 		},
 		QuorumCertificate:   qc,
 		Epochs:              epochs,
 		Params:              params,
-		ProtocolState:       rootProtocolState,
 		SealedVersionBeacon: nil,
 	})
 

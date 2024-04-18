@@ -30,7 +30,7 @@ type stateMutator struct {
 	results          storage.ExecutionResults
 	kvStoreSnapshots storage.ProtocolKVStore
 
-	parentState          protocol_state.KVStoreReader
+	parentState          protocol.KVStoreReader
 	kvMutator            protocol_state.KVStoreMutator
 	orthoKVStoreMachines []protocol_state.KeyValueStoreStateMachine
 }
@@ -108,7 +108,7 @@ func (m *stateMutator) Build() (stateID flow.Identifier, dbUpdates protocol.Defe
 	dbUpdates.Add(func(tx *transaction.Tx, blockID flow.Identifier) error {
 		return m.kvStoreSnapshots.IndexTx(blockID, stateID)(tx)
 	})
-	dbUpdates.AddBadgerUpdate(operation.SkipDuplicatesTx(m.kvStoreSnapshots.StoreTx(stateID, &storage.KeyValueStoreData{
+	dbUpdates.AddBadgerUpdate(operation.SkipDuplicatesTx(m.kvStoreSnapshots.StoreTx(stateID, &flow.PSKeyValueStoreData{
 		Version: version,
 		Data:    data,
 	})))

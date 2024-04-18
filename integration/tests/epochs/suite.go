@@ -92,6 +92,7 @@ func (s *Suite) SetupTest() {
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
 		testnet.WithAdditionalFlag(fmt.Sprintf("--cruise-ctl-fallback-proposal-duration=%s", s.ConsensusProposalDuration)),
+		testnet.WithAdditionalFlag("--cruise-ctl-enabled=false"), // disable cruise control for integration tests
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", s.RequiredSealApprovals)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", s.RequiredSealApprovals)),
 		testnet.WithLogLevel(zerolog.WarnLevel)}
@@ -377,10 +378,6 @@ func (s *Suite) getTestContainerName(role flow.Role) string {
 // assertNodeApprovedAndProposed executes the read approved nodes list and get proposed table scripts
 // and checks that the info.NodeID is in both list
 func (s *Suite) assertNodeApprovedAndProposed(ctx context.Context, env templates.Environment, info *StakedNodeOperationInfo) {
-	// ensure node ID in approved list
-	//approvedNodes := s.ExecuteReadApprovedNodesScript(Ctx, env)
-	//require.Containsf(s.T(), approvedNodes.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected new node to be in approved nodes list: %x", info.NodeID)
-
 	// Access Nodes go through a separate selection process, so they do not immediately
 	// appear on the proposed table -- skip checking for them here.
 	if info.Role == flow.RoleAccess {
@@ -506,18 +503,35 @@ func (s *Suite) AssertNodeNotParticipantInEpoch(epoch protocol.Epoch, nodeID flo
 	require.NotContains(s.T(), identities.NodeIDs(), nodeID)
 }
 
-// AwaitSealedBlockHeightExceedsSnapshot polls until it observes that the latest
-// sealed block height has exceeded the snapshot height by numOfBlocks
-// the snapshot height and latest finalized height is greater than numOfBlocks.
-func (s *Suite) AwaitSealedBlockHeightExceedsSnapshot(ctx context.Context, snapshot *inmem.Snapshot, threshold uint64, waitFor, tick time.Duration) {
+// AwaitSealedHeightExceedsSnapshotByBuffer polls until it observes that the latest
+// sealed block height has exceeded the snapshot height by `buffer` blocks.
+func (s *Suite) AwaitSealedHeightExceedsSnapshotByBuffer(ctx context.Context, snapshot *inmem.Snapshot, buffer uint64, waitFor, tick time.Duration) {
 	header, err := snapshot.Head()
 	require.NoError(s.T(), err)
 	snapshotHeight := header.Height
+	thresholdHeight := snapshotHeight + buffer
 
+	s.AwaitSealedHeight(ctx, thresholdHeight, waitFor, tick)
+}
+
+// AwaitSealedHeight polls until it observes that the latest finalized block has a height
+// greater than or equal to the input height.
+func (s *Suite) AwaitSealedHeight(ctx context.Context, thresholdHeight uint64, waitFor, tick time.Duration) {
 	require.Eventually(s.T(), func() bool {
-		latestSealed := s.getLatestSealedHeader(ctx)
-		s.TimedLogf("waiting for sealed block height: %d+%d < %d", snapshotHeight, threshold, latestSealed.Height)
-		return snapshotHeight+threshold < latestSealed.Height
+		latestSealed := s.LatestSealedBlockHeader(ctx)
+		s.TimedLogf("waiting for sealed height: %d < %d", latestSealed.Height, thresholdHeight)
+		return latestSealed.Height >= thresholdHeight
+	}, waitFor, tick)
+}
+
+// AwaitSealedView polls until it observes that the latest sealed block has a view
+// greater than or equal to the input view. This is used to wait until when an epoch
+// transition must have happened.
+func (s *Suite) AwaitSealedView(ctx context.Context, thresholdView uint64, waitFor, tick time.Duration) {
+	require.Eventually(s.T(), func() bool {
+		latestSealed := s.LatestSealedBlockHeader(ctx)
+		s.TimedLogf("waiting for sealed view: %d < %d", latestSealed.View, thresholdView)
+		return latestSealed.View >= thresholdView
 	}, waitFor, tick)
 }
 
@@ -531,8 +545,8 @@ func (s *Suite) AwaitFinalizedView(ctx context.Context, view uint64, waitFor, ti
 	}, waitFor, tick)
 }
 
-// getLatestSealedHeader retrieves the latest sealed block, as reported in LatestSnapshot.
-func (s *Suite) getLatestSealedHeader(ctx context.Context) *flow.Header {
+// LatestSealedBlockHeader retrieves the latest sealed block, as reported in LatestSnapshot.
+func (s *Suite) LatestSealedBlockHeader(ctx context.Context) *flow.Header {
 	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(s.T(), err)
 	segment, err := snapshot.SealingSegment()
@@ -562,8 +576,6 @@ func (s *Suite) SubmitSmokeTestTransaction(ctx context.Context) {
 //  2. Check that the chain moved at least 20 blocks from when the node was bootstrapped by comparing
 //     head of the rootSnapshot with the head of the snapshot we retrieved directly from the AN
 //  3. Check that we can execute a script on the AN
-//
-// TODO test sending and observing result of a transaction via the new AN (blocked by https://github.com/onflow/flow-go/issues/3642)
 func (s *Suite) AssertNetworkHealthyAfterANChange(ctx context.Context, env templates.Environment, snapshotInSecondEpoch *inmem.Snapshot, info *StakedNodeOperationInfo) {
 
 	// get snapshot directly from new AN and compare head with head from the
@@ -574,7 +586,7 @@ func (s *Suite) AssertNetworkHealthyAfterANChange(ctx context.Context, env templ
 	// overwrite Client to point to the new AN (since we have stopped the initial AN at this point)
 	s.Client = client
 	// assert atleast 20 blocks have been finalized since the node replacement
-	s.AwaitSealedBlockHeightExceedsSnapshot(ctx, snapshotInSecondEpoch, 10, 30*time.Second, time.Millisecond*100)
+	s.AwaitSealedHeightExceedsSnapshotByBuffer(ctx, snapshotInSecondEpoch, 10, 30*time.Second, time.Millisecond*100)
 
 	// execute script directly on new AN to ensure it's functional
 	proposedTable, err := client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
@@ -586,7 +598,7 @@ func (s *Suite) AssertNetworkHealthyAfterANChange(ctx context.Context, env templ
 //  1. Ensure sealing continues into the second epoch (post-replacement) by observing
 //     at least 10 blocks of sealing progress within the epoch
 func (s *Suite) AssertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, snapshotInSecondEpoch *inmem.Snapshot, _ *StakedNodeOperationInfo) {
-	s.AwaitSealedBlockHeightExceedsSnapshot(ctx, snapshotInSecondEpoch, 10, 30*time.Second, time.Millisecond*100)
+	s.AwaitSealedHeightExceedsSnapshotByBuffer(ctx, snapshotInSecondEpoch, 10, 30*time.Second, time.Millisecond*100)
 }
 
 // AssertNetworkHealthyAfterLNChange performs a basic network health check after replacing a collection node.
@@ -683,6 +695,10 @@ func (s *Suite) RunTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	// if counter is still 0, epoch emergency fallback was triggered and we can fail early
 	s.AssertInEpoch(s.Ctx, 1)
 
+	// wait until we have sealed all blocks in epoch 1 before stopping the replaced container
+	// in particular, this avoids an edge case where sealing halts if we stop the single VN
+	// assigned in epoch 1 between finalizing and sealing the transition into epoch 2
+	s.AwaitSealedView(s.Ctx, epoch1FinalView+1, time.Minute, 500*time.Millisecond)
 	err = containerToReplace.Pause()
 	require.NoError(s.T(), err)
 

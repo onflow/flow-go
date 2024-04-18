@@ -6,8 +6,6 @@ import (
 	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 
-	storage "github.com/onflow/flow-go/storage"
-
 	transaction "github.com/onflow/flow-go/storage/badger/transaction"
 )
 
@@ -17,19 +15,19 @@ type ProtocolKVStore struct {
 }
 
 // ByBlockID provides a mock function with given fields: blockID
-func (_m *ProtocolKVStore) ByBlockID(blockID flow.Identifier) (*storage.KeyValueStoreData, error) {
+func (_m *ProtocolKVStore) ByBlockID(blockID flow.Identifier) (*flow.PSKeyValueStoreData, error) {
 	ret := _m.Called(blockID)
 
-	var r0 *storage.KeyValueStoreData
+	var r0 *flow.PSKeyValueStoreData
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (*storage.KeyValueStoreData, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.PSKeyValueStoreData, error)); ok {
 		return rf(blockID)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *storage.KeyValueStoreData); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.PSKeyValueStoreData); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*storage.KeyValueStoreData)
+			r0 = ret.Get(0).(*flow.PSKeyValueStoreData)
 		}
 	}
 
@@ -43,19 +41,19 @@ func (_m *ProtocolKVStore) ByBlockID(blockID flow.Identifier) (*storage.KeyValue
 }
 
 // ByID provides a mock function with given fields: id
-func (_m *ProtocolKVStore) ByID(id flow.Identifier) (*storage.KeyValueStoreData, error) {
+func (_m *ProtocolKVStore) ByID(id flow.Identifier) (*flow.PSKeyValueStoreData, error) {
 	ret := _m.Called(id)
 
-	var r0 *storage.KeyValueStoreData
+	var r0 *flow.PSKeyValueStoreData
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (*storage.KeyValueStoreData, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.PSKeyValueStoreData, error)); ok {
 		return rf(id)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *storage.KeyValueStoreData); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.PSKeyValueStoreData); ok {
 		r0 = rf(id)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*storage.KeyValueStoreData)
+			r0 = ret.Get(0).(*flow.PSKeyValueStoreData)
 		}
 	}
 
@@ -85,11 +83,11 @@ func (_m *ProtocolKVStore) IndexTx(blockID flow.Identifier, stateID flow.Identif
 }
 
 // StoreTx provides a mock function with given fields: stateID, data
-func (_m *ProtocolKVStore) StoreTx(stateID flow.Identifier, data *storage.KeyValueStoreData) func(*transaction.Tx) error {
+func (_m *ProtocolKVStore) StoreTx(stateID flow.Identifier, data *flow.PSKeyValueStoreData) func(*transaction.Tx) error {
 	ret := _m.Called(stateID, data)
 
 	var r0 func(*transaction.Tx) error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, *storage.KeyValueStoreData) func(*transaction.Tx) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, *flow.PSKeyValueStoreData) func(*transaction.Tx) error); ok {
 		r0 = rf(stateID, data)
 	} else {
 		if ret.Get(0) != nil {

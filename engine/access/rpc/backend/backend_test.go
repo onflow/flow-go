@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -63,6 +64,7 @@ type Suite struct {
 	receipts           *storagemock.ExecutionReceipts
 	results            *storagemock.ExecutionResults
 	transactionResults *storagemock.LightTransactionResults
+	events             *storagemock.Events
 
 	colClient              *access.AccessAPIClient
 	execClient             *access.ExecutionAPIClient
@@ -71,11 +73,11 @@ type Suite struct {
 	connectionFactory *connectionmock.ConnectionFactory
 	communicator      *backendmock.Communicator
 
-	chainID flow.ChainID
+	chainID  flow.ChainID
+	systemTx *flow.TransactionBody
 }
 
 func TestHandler(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: temporary broken")
 	suite.Run(t, new(Suite))
 }
 
@@ -101,11 +103,16 @@ func (suite *Suite) SetupTest() {
 	suite.colClient = new(access.AccessAPIClient)
 	suite.execClient = new(access.ExecutionAPIClient)
 	suite.transactionResults = storagemock.NewLightTransactionResults(suite.T())
+	suite.events = storagemock.NewEvents(suite.T())
 	suite.chainID = flow.Testnet
 	suite.historicalAccessClient = new(access.AccessAPIClient)
 	suite.connectionFactory = connectionmock.NewConnectionFactory(suite.T())
 
 	suite.communicator = new(backendmock.Communicator)
+
+	var err error
+	suite.systemTx, err = blueprints.SystemChunkTransaction(flow.Testnet.Chain())
+	suite.Require().NoError(err)
 }
 
 func (suite *Suite) TestPing() {
@@ -230,9 +237,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 		}
 
 		// Take snapshot at height of the first block of epoch2, the sealing segment of this snapshot
-		// will have contain block spanning an epoch transition as well as an epoch phase transition.
-		// This will cause our GetLatestProtocolStateSnapshot func to return a snapshot
-		// at block with height 3, the first block of the staking phase of epoch1.
+		// will contain a block spanning an epoch transition as well as an epoch phase transition.
 
 		snap := state.AtHeight(epoch2.Range()[0])
 		suite.state.On("Final").Return(snap).Once()
@@ -248,8 +253,8 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 		suite.Require().NoError(err)
 		fmt.Println()
 
-		// we expect the endpoint to return last valid snapshot which is the snapshot at block C (height 2)
-		expectedSnapshotBytes, err := convert.SnapshotToBytes(state.AtHeight(epoch1.Range()[2]))
+		// we expect the endpoint to return the latest snapshot, even though it spans an epoch transition
+		expectedSnapshotBytes, err := convert.SnapshotToBytes(snap)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedSnapshotBytes, bytes)
 	})
@@ -296,15 +301,15 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 		bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
 		suite.Require().NoError(err)
 
-		// we expect the endpoint to return last valid snapshot which is the snapshot at block C (height 2)
-		expectedSnapshotBytes, err := convert.SnapshotToBytes(state.AtHeight(epoch1.Range()[2]))
+		// we expect the endpoint to return latest snapshot, even though it spans an epoch phase transition
+		expectedSnapshotBytes, err := convert.SnapshotToBytes(snap)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedSnapshotBytes, bytes)
 	})
 }
 
 // TestGetLatestProtocolStateSnapshot_EpochTransitionSpan tests our GetLatestProtocolStateSnapshot RPC endpoint
-// where the sealing segment for the State requested at latest finalized  block contains a Blocks that
+// where the sealing segment for the State requested at latest finalized block contains a Blocks that
 // spans an epoch transition.
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 	identities := unittest.CompleteIdentitySet()
@@ -356,48 +361,10 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 		bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
 		suite.Require().NoError(err)
 
-		// we expect the endpoint to return last valid snapshot which is the snapshot at the final block
-		// of the previous epoch
-		expectedSnapshotBytes, err := convert.SnapshotToBytes(state.AtHeight(epoch1.Range()[len(epoch1.Range())-1]))
+		// we expect endpoint to return the latest snapshot, even though it spans an epoch transition
+		expectedSnapshotBytes, err := convert.SnapshotToBytes(snap)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedSnapshotBytes, bytes)
-	})
-}
-
-// TestGetLatestProtocolStateSnapshot_EpochTransitionSpan tests our GetLatestProtocolStateSnapshot RPC endpoint
-// where the length of the sealing segment is greater than the configured SnapshotHistoryLimit.
-func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
-	identities := unittest.CompleteIdentitySet()
-	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state).BuildEpoch().CompleteEpoch()
-
-		// get heights of each phase in built epochs
-		epoch1, ok := epochBuilder.EpochHeights(1)
-		require.True(suite.T(), ok)
-
-		// setup AtBlockID mock returns for State
-		for _, height := range epoch1.Range() {
-			suite.state.On("AtHeight", height).Return(state.AtHeight(height))
-		}
-
-		// Take snapshot at height of block E (epoch1.heights[4]) the sealing segment for this snapshot
-		// is C(S_A) <- D(S_B) |setup| <- E(S_C) which spans the epoch setup phase. This will force
-		// our RPC endpoint to return a snapshot at block D which is the snapshot at the boundary where a phase
-		// transition happens.
-		snap := state.AtHeight(epoch1.Range()[4])
-		suite.state.On("Final").Return(snap).Once()
-
-		params := suite.defaultBackendParams()
-		// very short history limit, any segment with any Blocks spanning any transition should force the endpoint to return a history limit error
-		params.SnapshotHistoryLimit = 1
-
-		backend, err := New(params)
-		suite.Require().NoError(err)
-
-		// the handler should return a snapshot history limit error
-		_, err = backend.GetLatestProtocolStateSnapshot(context.Background())
-		suite.Require().ErrorIs(err, SnapshotHistoryLimitErr)
 	})
 }
 
@@ -518,7 +485,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHei
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 	rootProtocolState, err := rootSnapshot.ProtocolState()
 	require.NoError(suite.T(), err)
-	rootProtocolStateID := rootProtocolState.Entry().ID()
+	rootProtocolStateID := rootProtocolState.ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
@@ -557,7 +524,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalize
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 	rootProtocolState, err := rootSnapshot.ProtocolState()
 	require.NoError(suite.T(), err)
-	rootProtocolStateID := rootProtocolState.Entry().ID()
+	rootProtocolStateID := rootProtocolState.ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
@@ -608,7 +575,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnexpectedErrorBlockID
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 	rootProtocolState, err := rootSnapshot.ProtocolState()
 	require.NoError(suite.T(), err)
-	rootProtocolStateID := rootProtocolState.Entry().ID()
+	rootProtocolStateID := rootProtocolState.ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
@@ -643,7 +610,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnexpectedErrorBlockID
 }
 
 // TestGetProtocolStateSnapshotByBlockID_InvalidSegment tests our GetProtocolStateSnapshotByBlockID RPC endpoint
-// for invalid segment between phases and between epochs
+// for segments between phases and between epochs. We should return a valid snapshot in these edge cases.
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
@@ -680,12 +647,19 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 			block, err := snap.Head()
 			suite.Require().NoError(err)
 
-			bytes, err := backend.GetProtocolStateSnapshotByBlockID(context.Background(), block.ID())
-			suite.Require().Error(err)
-			suite.Require().Empty(bytes)
-			suite.Require().Equal(status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block, try again with different block: %v",
-				ErrSnapshotPhaseMismatch).Error(),
-				err.Error())
+			expectedSnapshotBytes, err := convert.SnapshotToBytes(snap)
+			suite.Require().NoError(err)
+
+			suite.T().Run("ByBlockID", func(t *testing.T) {
+				bytes, err := backend.GetProtocolStateSnapshotByBlockID(context.Background(), block.ID())
+				suite.Require().NoError(err)
+				suite.Require().Equal(expectedSnapshotBytes, bytes)
+			})
+			suite.T().Run("ByHeight", func(t *testing.T) {
+				bytes, err := backend.GetProtocolStateSnapshotByHeight(context.Background(), block.Height)
+				suite.Require().NoError(err)
+				suite.Require().Equal(expectedSnapshotBytes, bytes)
+			})
 		})
 
 		suite.T().Run("sealing segment between epochs", func(t *testing.T) {
@@ -701,12 +675,19 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 			suite.state.On("AtHeight", block.Height).Return(snap)
 			suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil)
 
-			bytes, err := backend.GetProtocolStateSnapshotByBlockID(context.Background(), block.ID())
-			suite.Require().Error(err)
-			suite.Require().Empty(bytes)
-			suite.Require().Equal(status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block, try again with different block: %v",
-				ErrSnapshotPhaseMismatch).Error(),
-				err.Error())
+			expectedSnapshotBytes, err := convert.SnapshotToBytes(snap)
+			suite.Require().NoError(err)
+
+			suite.T().Run("ByBlockID", func(t *testing.T) {
+				bytes, err := backend.GetProtocolStateSnapshotByBlockID(context.Background(), block.ID())
+				suite.Require().NoError(err)
+				suite.Require().Equal(expectedSnapshotBytes, bytes)
+			})
+			suite.T().Run("ByHeight", func(t *testing.T) {
+				bytes, err := backend.GetProtocolStateSnapshotByHeight(context.Background(), block.Height)
+				suite.Require().NoError(err)
+				suite.Require().Equal(expectedSnapshotBytes, bytes)
+			})
 		})
 	})
 }
@@ -761,7 +742,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks() {
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 	rootProtocolState, err := rootSnapshot.ProtocolState()
 	require.NoError(suite.T(), err)
-	rootProtocolStateID := rootProtocolState.Entry().ID()
+	rootProtocolStateID := rootProtocolState.ID()
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
@@ -789,44 +770,6 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks() {
 		suite.Require().Error(err)
 		suite.Require().Equal(status.Errorf(codes.NotFound, "failed to find snapshot: %v",
 			realstate.ErrUnknownSnapshotReference).Error(),
-			err.Error())
-	})
-}
-
-// TestGetProtocolStateSnapshotByHeight_InvalidSegment tests our GetProtocolStateSnapshotByHeight RPC endpoint
-// for invalid segment
-func (suite *Suite) TestGetProtocolStateSnapshotByHeight_InvalidSegment() {
-	identities := unittest.CompleteIdentitySet()
-	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolStateAndMutator(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), mutableState, state)
-		// build epoch 1
-		// Blocks in current State
-		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
-		epochBuilder.
-			BuildEpoch().
-			CompleteEpoch()
-
-		// get heights of each phase in built epochs
-		epoch1, ok := epochBuilder.EpochHeights(1)
-		require.True(suite.T(), ok)
-
-		// setup AtHeight mock returns for State
-		for _, height := range epoch1.Range() {
-			suite.state.On("AtHeight", height).Return(state.AtHeight(height))
-		}
-
-		backend, err := New(suite.defaultBackendParams())
-		suite.Require().NoError(err)
-
-		// query the handler for the snapshot with invalid segment
-		bytes, err := backend.GetProtocolStateSnapshotByHeight(context.Background(), epoch1.SetupRange()[0])
-
-		suite.Require().Nil(bytes)
-		suite.Require().Error(err)
-		suite.Require().Equal(status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block, try "+
-			"again with different block: %v",
-			ErrSnapshotPhaseMismatch).Error(),
 			err.Error())
 	})
 }
@@ -1282,7 +1225,6 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 
 // TestTransactionPendingToFinalizedStatusTransition tests that the status of transaction changes from Finalized to Expired
 func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
-
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
@@ -2139,7 +2081,6 @@ func (suite *Suite) defaultBackendParams() Params {
 		Transactions:             suite.transactions,
 		ExecutionReceipts:        suite.receipts,
 		ExecutionResults:         suite.results,
-		LightTransactionResults:  suite.transactionResults,
 		ChainID:                  suite.chainID,
 		CollectionRPC:            suite.colClient,
 		MaxHeightRange:           DefaultMaxHeightRange,
@@ -2148,5 +2089,7 @@ func (suite *Suite) defaultBackendParams() Params {
 		AccessMetrics:            metrics.NewNoopCollector(),
 		Log:                      suite.log,
 		TxErrorMessagesCacheSize: 1000,
+		BlockTracker:             nil,
+		TxResultQueryMode:        IndexQueryModeExecutionNodesOnly,
 	}
 }

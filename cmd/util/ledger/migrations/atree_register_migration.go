@@ -14,10 +14,8 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -37,8 +35,11 @@ type AtreeRegisterMigrator struct {
 
 	nWorkers int
 
-	validateMigratedValues    bool
-	logVerboseValidationError bool
+	validateMigratedValues             bool
+	logVerboseValidationError          bool
+	continueMigrationOnValidationError bool
+	checkStorageHealthBeforeMigration  bool
+	checkStorageHealthAfterMigration   bool
 }
 
 var _ AccountBasedMigration = (*AtreeRegisterMigrator)(nil)
@@ -48,16 +49,22 @@ func NewAtreeRegisterMigrator(
 	rwf reporters.ReportWriterFactory,
 	validateMigratedValues bool,
 	logVerboseValidationError bool,
+	continueMigrationOnValidationError bool,
+	checkStorageHealthBeforeMigration bool,
+	checkStorageHealthAfterMigration bool,
 ) *AtreeRegisterMigrator {
 
 	sampler := util2.NewTimedSampler(30 * time.Second)
 
 	migrator := &AtreeRegisterMigrator{
-		sampler:                   sampler,
-		rwf:                       rwf,
-		rw:                        rwf.ReportWriter("atree-register-migrator"),
-		validateMigratedValues:    validateMigratedValues,
-		logVerboseValidationError: logVerboseValidationError,
+		sampler:                            sampler,
+		rwf:                                rwf,
+		rw:                                 rwf.ReportWriter("atree-register-migrator"),
+		validateMigratedValues:             validateMigratedValues,
+		logVerboseValidationError:          logVerboseValidationError,
+		continueMigrationOnValidationError: continueMigrationOnValidationError,
+		checkStorageHealthBeforeMigration:  checkStorageHealthBeforeMigration,
+		checkStorageHealthAfterMigration:   checkStorageHealthAfterMigration,
 	}
 
 	return migrator
@@ -92,6 +99,17 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
 	}
 
+	// Check storage health before migration, if enabled.
+	if m.checkStorageHealthBeforeMigration {
+		err = checkStorageHealth(address, mr.Storage, oldPayloads)
+		if err != nil {
+			m.log.Warn().
+				Err(err).
+				Str("account", address.Hex()).
+				Msg("storage health check before migration failed")
+		}
+	}
+
 	// keep track of all storage maps that were accessed
 	// if they are empty they won't be changed, but we still need to copy them over
 	storageMapIds := make(map[string]struct{})
@@ -118,7 +136,14 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 	if m.validateMigratedValues {
 		err = validateCadenceValues(address, oldPayloads, newPayloads, m.log, m.logVerboseValidationError)
 		if err != nil {
-			return nil, err
+			if !m.continueMigrationOnValidationError {
+				return nil, err
+			}
+
+			m.log.Error().
+				Err(err).
+				Hex("address", address[:]).
+				Msg("failed not validate atree migration")
 		}
 	}
 
@@ -133,6 +158,22 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 			Kind:    "more_registers_after_migration",
 			Msg:     fmt.Sprintf("original: %d, new: %d", originalLen, newLen),
 		})
+	}
+
+	// Check storage health after migration, if enabled.
+	if m.checkStorageHealthAfterMigration {
+		mr, err := newMigratorRuntime(address, newPayloads)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
+		}
+
+		err = checkStorageHealth(address, mr.Storage, newPayloads)
+		if err != nil {
+			m.log.Warn().
+				Err(err).
+				Str("account", address.Hex()).
+				Msg("storage health check after migration failed")
+		}
 	}
 
 	return newPayloads, nil
@@ -178,8 +219,8 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 	}
 	storageMapIds[string(atree.SlabIndexToLedgerKey(storageMap.StorageID().Index))] = struct{}{}
 
-	iterator := storageMap.Iterator(util.NopMemoryGauge{})
-	keys := make([]interpreter.StringStorageMapKey, 0, storageMap.Count())
+	iterator := storageMap.Iterator(nil)
+	keys := make([]interpreter.StorageMapKey, 0, storageMap.Count())
 	// to be safe avoid modifying the map while iterating
 	for {
 		key := iterator.NextKey()
@@ -187,12 +228,16 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 			break
 		}
 
-		stringKey, ok := key.(interpreter.StringAtreeValue)
-		if !ok {
-			return fmt.Errorf("invalid key type %T, expected interpreter.StringAtreeValue", key)
-		}
+		switch key := key.(type) {
+		case interpreter.StringAtreeValue:
+			keys = append(keys, interpreter.StringStorageMapKey(key))
 
-		keys = append(keys, interpreter.StringStorageMapKey(stringKey))
+		case interpreter.Uint64AtreeValue:
+			keys = append(keys, interpreter.Uint64StorageMapKey(key))
+
+		default:
+			return fmt.Errorf("invalid key type %T, expected interpreter.StringAtreeValue or interpreter.Uint64AtreeValue", key)
+		}
 	}
 
 	for _, key := range keys {
@@ -200,7 +245,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 			var value interpreter.Value
 
 			err := capturePanic(func() {
-				value = storageMap.ReadValue(util.NopMemoryGauge{}, key)
+				value = storageMap.ReadValue(nil, key)
 			})
 			if err != nil {
 				return fmt.Errorf("failed to read value for key %s: %w", key, err)
@@ -228,7 +273,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 			m.rw.Write(migrationProblem{
 				Address: mr.Address.Hex(),
 				Size:    len(mr.Snapshot.Payloads),
-				Key:     string(key),
+				Key:     fmt.Sprintf("%v (%T)", key, key),
 				Kind:    "migration_failure",
 				Msg:     err.Error(),
 			})
@@ -411,25 +456,6 @@ func capturePanic(f func()) (err error) {
 	f()
 
 	return
-}
-
-// convert all domains
-var domains = []string{
-	common.PathDomainStorage.Identifier(),
-	common.PathDomainPrivate.Identifier(),
-	common.PathDomainPublic.Identifier(),
-	runtime.StorageDomainContract,
-	stdlib.InboxStorageDomain,
-	stdlib.CapabilityControllerStorageDomain,
-}
-
-var domainsLookupMap = map[string]struct{}{
-	common.PathDomainStorage.Identifier():    {},
-	common.PathDomainPrivate.Identifier():    {},
-	common.PathDomainPublic.Identifier():     {},
-	runtime.StorageDomainContract:            {},
-	stdlib.InboxStorageDomain:                {},
-	stdlib.CapabilityControllerStorageDomain: {},
 }
 
 // migrationProblem is a struct for reporting errors

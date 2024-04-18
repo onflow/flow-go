@@ -20,6 +20,7 @@ import (
 // ErrEOFNotReached for indicating end of file not reached error
 var ErrEOFNotReached = errors.New("expect to reach EOF, but actually didn't")
 
+// TODO: validate the header file and the sub file that contains the root hashes
 var ReadTriesRootHash = readTriesRootHash
 var CheckpointHasRootHash = checkpointHasRootHash
 
@@ -103,6 +104,34 @@ func OpenAndReadCheckpointV6(dir string, fileName string, logger zerolog.Logger)
 	})
 
 	return triesToReturn, errToReturn
+}
+
+// ReadCheckpointFileSize returns the total size of the checkpoint file
+func ReadCheckpointFileSize(dir string, fileName string) (uint64, error) {
+	paths := allFilePaths(dir, fileName)
+	totalSize := uint64(0)
+	for _, path := range paths {
+		fileInfo, err := os.Stat(path)
+		if err != nil {
+			return 0, fmt.Errorf("could not get file info for %v: %w", path, err)
+		}
+
+		totalSize += uint64(fileInfo.Size())
+	}
+
+	return totalSize, nil
+}
+
+func allFilePaths(dir string, fileName string) []string {
+	paths := make([]string, 0, 1+subtrieCount+1)
+	paths = append(paths, filePathCheckpointHeader(dir, fileName))
+	for i := 0; i < subtrieCount; i++ {
+		subTriePath, _, _ := filePathSubTries(dir, fileName, i)
+		paths = append(paths, subTriePath)
+	}
+	topTriePath, _ := filePathTopTries(dir, fileName)
+	paths = append(paths, topTriePath)
+	return paths
 }
 
 func filePathCheckpointHeader(dir string, fileName string) string {

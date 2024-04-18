@@ -27,8 +27,10 @@ func TestProtocolState_AtBlockID(t *testing.T) {
 	protocolStateDB.On("ByBlockID", blockID).Return(entry, nil).Once()
 	protocolStateDB.On("ByBlockID", otherBlockID).Return(otherEntry, nil).Once()
 
+	protocolKVStoreDB := storagemock.NewProtocolKVStore(t)
+
 	globalParams := mock.NewGlobalParams(t)
-	protocolState := NewProtocolState(protocolStateDB, globalParams)
+	protocolState := NewProtocolState(protocolStateDB, protocolKVStoreDB, globalParams)
 	t.Run("retrieve state for existing blocks", func(t *testing.T) {
 		dynamicProtocolState, err := protocolState.AtBlockID(blockID)
 		require.NoError(t, err)
@@ -93,7 +95,7 @@ func TestMutableProtocolState_Mutator(t *testing.T) {
 			},
 			InvalidEpochTransitionAttempted: false,
 		}).VersionedEncode()
-		parentState := &storage.KeyValueStoreData{
+		parentState := &flow.PSKeyValueStoreData{
 			Version: version,
 			Data:    data,
 		}

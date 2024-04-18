@@ -448,3 +448,14 @@ func ComposeFullIdentities(
 	}
 	return result, nil
 }
+
+// PSKeyValueStoreData is a binary blob with a version attached, specifying the format
+// of the marshaled data. In a nutshell, it serves as a binary snapshot of a ProtocolKVStore.
+// This structure is useful for version-agnostic storage, where snapshots with different versions
+// can co-exist. The PSKeyValueStoreData is a generic format that can be later decoded to
+// potentially different strongly typed structures based on version. When reading from the store,
+// callers must know how to deal with the binary representation.
+type PSKeyValueStoreData struct {
+	Version uint64
+	Data    []byte
+}
