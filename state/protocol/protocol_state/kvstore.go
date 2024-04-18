@@ -95,12 +95,6 @@ type KVStoreMutator interface {
 //
 // For more details see `./Readme.md`
 //
-// CAUTION: If your state machine requires EvolveState to be called for all candidate blocks, even
-// if `sealedServiceEvents` is empty, please use the `AlwaysEvolveStateWrapper`. This is because not
-// every block will contain service events, yet reaching or exceeding a threshold view can also result
-// in the Protocol State changing. (For example, not having received the EpochCommit event for the next
-// epoch, but approaching the end of the current epoch.)
-//
 // NOT CONCURRENCY SAFE
 type OrthogonalStoreStateMachine[P any] interface {
 
@@ -116,6 +110,27 @@ type OrthogonalStoreStateMachine[P any] interface {
 	// Information that potentially changes the Epoch state (compared to the parent block's state):
 	//   - Service Events sealed in the candidate block
 	//   - the candidate block's view (already provided at construction time)
+	//
+	// SAFETY REQUIREMENTS:
+	//   - The seals for the execution results, from which the `sealedServiceEvents` originate,
+	//     must be protocol compliant.
+	//   - `sealedServiceEvents` must list the service Events in chronological order. This can be
+	//      achieved by arranging the sealed execution results in order of increasing block height.
+	//      Within each execution result, the service events are in chronological order.
+	//
+	// CAUTION:
+	// Per convention, the input seals from the block payload have already been confirmed to be protocol compliant.
+	// Hence, the service events in the sealed execution results represent the *honest* execution path. Therefore,
+	// the sealed service events should encode a valid evolution of the protocol state -- provided the system smart
+	// contracts are correct. As we can rule out byzantine attacks as the source of failures, the only remaining
+	// sources of problems can be (a) bugs in the system smart contracts or (b) bugs in the node implementation.
+	//   - A service event not representing a valid state transition despite all consistency checks passing is
+	//     indicative of case (a) and _should be handled_ internally by the respective state machine. Otherwise,
+	//     any bug or unforeseen edge cases in the system smart contracts would in consensus halt, due to errors
+	//     while evolving the protocol state.
+	//   - Consistency or sanity checks failing within the OrthogonalStoreStateMachine is likely the symptom of an
+	//     internal bug in the node software or state corruption, i.e. case (b). This is the only scenario where the
+	//     error return of this function is not nil. If such an exception is returned, continuing is not an option.
 	//
 	// No errors are expected during normal operations.
 	EvolveState(sealedServiceEvents []flow.ServiceEvent) error

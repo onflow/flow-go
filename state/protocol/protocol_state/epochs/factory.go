@@ -1,8 +1,6 @@
 package epochs
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
@@ -37,7 +35,7 @@ func NewEpochStateMachineFactory(
 // Create creates a new instance of an underlying type that operates on KV Store and is created for a specific candidate block.
 // No errors are expected during normal operations.
 func (f *EpochStateMachineFactory) Create(candidateView uint64, parentID flow.Identifier, parentState protocol.KVStoreReader, mutator protocol_state.KVStoreMutator) (protocol_state.KeyValueStoreStateMachine, error) {
-	stateMachine, err := NewEpochStateMachine(
+	return NewEpochStateMachine(
 		candidateView,
 		parentID,
 		f.params,
@@ -53,8 +51,4 @@ func (f *EpochStateMachineFactory) Create(candidateView uint64, parentID flow.Id
 			return NewFallbackStateMachine(candidateView, parentState), nil
 		},
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create EpochStateMachine: %w", err)
-	}
-	return protocol_state.NewAlwaysEvolveStateWrapper(stateMachine), nil
 }

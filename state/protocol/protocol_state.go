@@ -99,7 +99,7 @@ type MutableProtocolState interface {
 	// Mutator instantiates a `StateMutator` based on the previous protocol state.
 	// Has to be called for each block to evolve the protocol state.
 	// Expected errors during normal operations:
-	//  * `storage.ErrNotFound` if no protocol state for parent block is known.
+	//  - `storage.ErrNotFound` if no protocol state for parent block is known.
 	Mutator(candidateView uint64, parentID flow.Identifier) (StateMutator, error)
 }
 
@@ -116,31 +116,43 @@ type MutableProtocolState interface {
 // Therefore, the leader instantiates a StateMutator, applies the service events to it and builds the updated protocol state ID.
 //
 // Not safe for concurrent use.
+//
+// TODO: merge methods `EvolveState` and `Build` into one, as they must be always called in this succession (improves API's safety & clarity)
 type StateMutator interface {
-	// Build constructs the resulting protocol state, *after* applying all the sealed service events in a block (under construction)
-	// via `EvolveState(...)`. It returns:
+
+	// Build assembles the resulting Protocol State, *after* evolving it based on information from the
+	// candidate block (potentially still under construction) via the `EvolveState(..)` method call.
+	// Information that may change the state is
+	//   - the candidate block's view (already provided at construction time of `StateMutator`)
+	//   - Service Events from execution results sealed by the candidate block
+	//
+	// During the execution of `EvolveState(..)` and the subsequent `Build()` step, we collect deferred
+	// database updates for persisting the resulting Protocol State, including all of its dependencies
+	// and respective indices. Though, the resulting batch of deferred database updates still depends
+	// on the candidate block's ID, which is still unknown at the time of block construction.
+	// Executing the deferred database updates is the responsibility of the calling code.
+	//
+	// CAUTION:
+	//  - For Consensus Participants that are replicas, the calling code must check that the returned `stateID` matches the
+	//    commitment in the block proposal! If they don't match, the proposal is byzantine and should be slashed.
+	//  - `EvolveState(..)` must have been called before
+	//
+	// Return values
 	//  - stateID: the hash commitment to the updated Protocol State Snapshot
 	//  - dbUpdates: database updates necessary for persisting the State Snapshot itself including all data structures
 	//    that the Snapshot references. In addition, `dbUpdates` also populates the `ProtocolKVStore.ByBlockID`.
 	//    Therefore, even if there are no changes of the Protocol State, `dbUpdates` still contains deferred storage writes
 	//    that must be executed to populate the `ByBlockID` index.
 	//  - err: All error returns indicate potential state corruption and should therefore be treated as fatal.
-	//
-	// CAUTION:
-	//  - For Consensus Participants that are replicas, the calling code must check that the returned `stateID` matches the
-	//    commitment in the block proposal! If they don't match, the proposal is byzantine and should be slashed.
 	Build() (stateID flow.Identifier, dbUpdates *DeferredBlockPersist, err error)
 
-	// EvolveState applies the state changes that are delivered via sealed service events:
-	//   - iterating over the sealed service events in order of increasing height
-	//   - identifying state-changing service event and calling into the embedded
-	//     ProtocolStateMachine to apply the respective state update
-	//   - tracking deferred database updates necessary to persist the updated
-	//     protocol state's *dependencies*. Persisting and indexing `updatedState`
-	//     is the responsibility of the calling code (specifically `FollowerState`)
+	// EvolveState updates the overall Protocol State based on information from the candidate block
+	// (potentially still under construction). Information that may change the state is:
+	//   - the candidate block's view (already provided at construction time)
+	//   - Service Events sealed in the candidate block
 	//
-	// All updates only mutate the `StateMutator`'s internal in-memory copy of the
-	// protocol state, without changing the parent state (i.e. the state we started from).
+	// We only mutate the `StateMutator`'s internal in-memory copy of the protocol state, without
+	// changing the parent state (i.e. the state we started from).
 	//
 	// SAFETY REQUIREMENT:
 	// The StateMutator assumes that the proposal has passed the following correctness checks!
@@ -148,41 +160,40 @@ type StateMutator interface {
 	//     there are no gaps in the seals.
 	//   - The seals guarantee correctness of the sealed execution result, including the contained
 	//     service events. This is actively checked by the verification node, whose aggregated
-	//     approvals in the form of a seal attest to the correctness of the sealed execution result,
-	//     including the contained.
+	//     approvals in the form of a seal attest to the correctness of the sealed execution result
+	//     (specifically the Service Events contained in the result and their order).
+	//   - `EvolveState` must be called before `Build`
 	//
 	// Consensus nodes actively verify protocol compliance for any block proposal they receive,
-	// including integrity of each seal individually as well as the seals continuously following the
-	// fork. Light clients only process certified blocks, which guarantees that consensus nodes already
-	// ran those checks and found the proposal to be valid.
+	// including integrity of each seal individually as well as the seals continuously following
+	// the fork. Light clients only process certified blocks, which guarantees that consensus nodes
+	// already ran those checks and found the proposal to be valid.
 	//
 	// Details on SERVICE EVENTS:
-	// Consider a chain where a service event is emitted during execution of block A.
-	// Block B contains an execution receipt for A. Block C contains a seal for block
-	// A's execution result.
+	// Consider a chain where a service event is emitted during execution of block A. Block B contains
+	// an execution receipt `RA` for A. Block C contains a seal `SA` for A's execution result.
 	//
 	//	A <- .. <- B(RA) <- .. <- C(SA)
 	//
-	// Service Events are included within execution results, which are stored
-	// opaquely as part of the block payload in block B. We only validate, process and persist
-	// the typed service event to storage once we process C, the block containing the
-	// seal for block A. This is because we rely on the sealing subsystem to validate
-	// correctness of the service event before processing it.
-	// Consequently, any change to the protocol state introduced by a service event
-	// emitted during execution of block A would only become visible when querying
-	// C or its descendants.
+	// Service Events are included within execution results, which are stored opaquely as part of the
+	// block payload (block B in our example). We only validate, process and persist the typed service
+	// event to storage once we process C, the block containing the seal for block A. This is because
+	// we rely on the sealing subsystem to validate correctness of the service event before processing
+	// it. Consequently, any change to the protocol state introduced by a service event emitted during
+	// execution of block A would only become visible when querying C or its descendants.
 	//
 	// Error returns:
-	//   - Per convention, the input seals from the block payload have already confirmed to be protocol compliant.
+	// [TLDR] All error returns indicate potential state corruption and should therefore be treated as fatal.
+	//   - Per convention, the input seals from the block payload have already been confirmed to be protocol compliant.
 	//     Hence, the service events in the sealed execution results represent the honest execution path.
 	//     Therefore, the sealed service events should encode a valid evolution of the protocol state -- provided
 	//     the system smart contracts are correct.
 	//   - As we can rule out byzantine attacks as the source of failures, the only remaining sources of problems
-	//     can be (a) bugs in the system smart contracts or (b) bugs in the node implementation.
-	//     A service event not representing a valid state transition despite all consistency checks passing
-	//     is interpreted as case (a) and handled internally within the StateMutator. In short, we go into Epoch
-	//     Fallback Mode by copying the parent state (a valid state snapshot) and setting the
-	//     `InvalidEpochTransitionAttempted` flag. All subsequent Epoch-lifecycle events are ignored.
+	//     can be (a) bugs in the system smart contracts or (b) bugs in the node implementation. A service event
+	//     not representing a valid state transition despite all consistency checks passing is interpreted as
+	//     case (a) and _should be_ handled internally by the respective state machine. Otherwise, any bug or
+	//     unforeseen edge cases in the system smart contracts would in consensus halt, due to errors while
+	//     evolving the protocol state.
 	//   - A consistency or sanity check failing within the StateMutator is likely the symptom of an internal bug
 	//     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 	//     of this function is not nil. If such an exception is returned, continuing is not an option.
