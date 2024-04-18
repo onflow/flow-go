@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/binary"
 	"fmt"
 
 	"github.com/onflow/cadence"
@@ -37,15 +38,15 @@ func blockHeightProvider(backend types.Backend) func() (uint64, error) {
 	}
 }
 
-func revertibleRandomnessProvider(backend types.Backend) func() ([]byte, error) {
-	return func() ([]byte, error) {
-		rand := make([]byte, 128)
+func revertibleRandomnessProvider(backend types.Backend) func() (uint64, error) {
+	return func() (uint64, error) {
+		rand := make([]byte, 8)
 		err := backend.ReadRandom(rand)
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 
-		return rand, nil
+		return binary.BigEndian.Uint64(rand), nil
 	}
 }
 

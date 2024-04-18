@@ -40,7 +40,7 @@ func ArchContract(
 	address types.Address,
 	heightProvider func() (uint64, error),
 	proofVer func(*types.COAOwnershipProofInContext) (bool, error),
-	revertibleRandomProvider func() ([]byte, error),
+	revertibleRandomProvider func() (uint64, error),
 ) types.Precompile {
 	return MultiFunctionPrecompileContract(
 		address,
@@ -132,7 +132,7 @@ func (f *proofVerifier) Run(input []byte) ([]byte, error) {
 var _ Function = &revertibleRandomness{}
 
 type revertibleRandomness struct {
-	revertibleRandomnessProvider func() ([]byte, error)
+	revertibleRandomnessProvider func() (uint64, error)
 }
 
 func (r *revertibleRandomness) FunctionSelector() FunctionSelector {
@@ -148,7 +148,13 @@ func (r *revertibleRandomness) Run(input []byte) ([]byte, error) {
 		return nil, errUnexpectedInput
 	}
 
-	return r.revertibleRandomnessProvider()
+	rand, err := r.revertibleRandomnessProvider()
+	if err != nil {
+		return nil, err
+	}
+
+	buffer := make([]byte, EncodedUint64Size)
+	return buffer, EncodeUint64(rand, buffer, 0)
 }
 
 func DecodeABIEncodedProof(input []byte) (*types.COAOwnershipProofInContext, error) {
