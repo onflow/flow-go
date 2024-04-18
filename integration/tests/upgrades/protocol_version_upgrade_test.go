@@ -41,8 +41,7 @@ func (s *ProtocolVersionUpgradeSuite) TestProtocolStateVersionUpgradeServiceEven
 		NodeVersionBeaconAddress: serviceAddress.String(),
 	}
 
-	// TODO try making this shorter
-	const ACTIVE_VIEW_DIFF = 25 // active view is 25 above execution block view
+	const ACTIVE_VIEW_DIFF = 20 // active view is 20 above execution block view
 	const INITIAL_PROTOCOL_VERSION = uint64(0)
 	const NEXT_PROTOCOL_VERSION = uint64(1)    // valid version to upgrade to
 	const UNKNOWN_PROTOCOL_VERSION = uint64(2) // invalid version to upgrade to
