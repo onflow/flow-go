@@ -151,7 +151,7 @@ func New(
 
 	// Add workers
 	e.ComponentManager = component.NewComponentManagerBuilder().
-		//AddWorker(e.processBackground).
+		AddWorker(e.processBackground).
 		AddWorker(e.runFinalizedBlockConsumer).
 		Build()
 
