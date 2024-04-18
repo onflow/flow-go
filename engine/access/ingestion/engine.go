@@ -151,7 +151,7 @@ func New(
 
 	// Add workers
 	e.ComponentManager = component.NewComponentManagerBuilder().
-		AddWorker(e.processBackground).
+		//AddWorker(e.processBackground).
 		AddWorker(e.runFinalizedBlockConsumer).
 		Build()
 
@@ -359,7 +359,6 @@ func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 
 // requestMissingCollections requests missing collections for all blocks in the local db storage once at startup
 func (e *Engine) requestMissingCollections(ctx context.Context) error {
-
 	var startHeight, endHeight uint64
 
 	// get the height of the last block for which all collections were received
