@@ -14,7 +14,7 @@ var (
 		[]string{"address", "bytes32", "bytes"},
 	)
 
-	RevertibleRandomFuncSig = ComputeFunctionSelector("revertibleRandom", nil)
+	RandomSourceFuncSig = ComputeFunctionSelector("getRandomSource", []string{"uint64"})
 
 	// FlowBlockHeightFixedGas is set to match the `number` opCode (0x43)
 	FlowBlockHeightFixedGas = uint64(2)
@@ -25,8 +25,8 @@ var (
 	// but we might increase this in the future
 	ProofVerifierGasMultiplerPerSignature = uint64(3_000)
 
-	// RevertibleRandomGas covers the cost of calculating a revertible random bytes
-	RevertibleRandomGas = uint64(1_000) // todo define
+	// RandomSourceGas covers the cost of calculating a revertible random bytes
+	RandomSourceGas = uint64(1_000) // todo define
 
 	// errUnexpectedInput is returned when the function that doesn't expect an input
 	// argument, receives one
@@ -40,14 +40,14 @@ func ArchContract(
 	address types.Address,
 	heightProvider func() (uint64, error),
 	proofVer func(*types.COAOwnershipProofInContext) (bool, error),
-	revertibleRandomProvider func() (uint64, error),
+	randomSourceProvider func(uint64) (uint64, error),
 ) types.Precompile {
 	return MultiFunctionPrecompileContract(
 		address,
 		[]Function{
 			&flowBlockHeight{heightProvider},
 			&proofVerifier{proofVer},
-			&revertibleRandomness{revertibleRandomProvider},
+			&randomnessSource{randomSourceProvider},
 		},
 	)
 }
@@ -129,32 +129,37 @@ func (f *proofVerifier) Run(input []byte) ([]byte, error) {
 	return buffer, EncodeBool(verified, buffer, 0)
 }
 
-var _ Function = &revertibleRandomness{}
+var _ Function = &randomnessSource{}
 
-type revertibleRandomness struct {
-	revertibleRandomnessProvider func() (uint64, error)
+type randomnessSource struct {
+	randomSourceProvider func(uint64) (uint64, error)
 }
 
-func (r *revertibleRandomness) FunctionSelector() FunctionSelector {
-	return RevertibleRandomFuncSig
+func (r *randomnessSource) FunctionSelector() FunctionSelector {
+	return RandomSourceFuncSig
 }
 
-func (r *revertibleRandomness) ComputeGas(input []byte) uint64 {
-	return RevertibleRandomGas
+func (r *randomnessSource) ComputeGas(input []byte) uint64 {
+	return RandomSourceGas
 }
 
-func (r *revertibleRandomness) Run(input []byte) ([]byte, error) {
-	if len(input) > 0 {
-		return nil, errUnexpectedInput
+func (r *randomnessSource) Run(input []byte) ([]byte, error) {
+	height, err := ReadUint64(input, 0)
+	if err != nil {
+		return nil, err
 	}
-
-	rand, err := r.revertibleRandomnessProvider()
+	rand, err := r.randomSourceProvider(height)
 	if err != nil {
 		return nil, err
 	}
 
-	buffer := make([]byte, EncodedUint64Size)
-	return buffer, EncodeUint64(rand, buffer, 0)
+	buf := make([]byte, EncodedUint64Size)
+	err = EncodeUint64(rand, buf, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf, nil
 }
 
 func DecodeABIEncodedProof(input []byte) (*types.COAOwnershipProofInContext, error) {
