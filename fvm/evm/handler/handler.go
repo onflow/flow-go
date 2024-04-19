@@ -43,6 +43,7 @@ func NewContractHandler(
 	flowChainID flow.ChainID,
 	evmContractAddress flow.Address,
 	flowTokenAddress common.Address,
+	randomBeaconAddress flow.Address,
 	blockStore types.BlockStore,
 	addressAllocator types.AddressAllocator,
 	backend types.Backend,
@@ -56,7 +57,7 @@ func NewContractHandler(
 		addressAllocator:   addressAllocator,
 		backend:            backend,
 		emulator:           emulator,
-		precompiles:        preparePrecompiles(evmContractAddress, addressAllocator, backend),
+		precompiles:        preparePrecompiles(evmContractAddress, randomBeaconAddress, addressAllocator, backend),
 	}
 }
 
