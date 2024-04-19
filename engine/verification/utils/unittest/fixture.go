@@ -193,6 +193,7 @@ func ExecutionResultFixture(t *testing.T,
 	chunkCount int,
 	chain flow.Chain,
 	refBlkHeader *flow.Header,
+	protocolStateID flow.Identifier,
 	clusterCommittee flow.IdentityList,
 	source []byte,
 ) (*flow.ExecutionResult, *ExecutionReceiptData) {
@@ -330,7 +331,8 @@ func ExecutionResultFixture(t *testing.T,
 		}
 
 		payload := flow.Payload{
-			Guarantees: guarantees,
+			Guarantees:      guarantees,
+			ProtocolStateID: protocolStateID,
 		}
 		referenceBlock = flow.Block{
 			Header: refBlkHeader,
@@ -375,6 +377,7 @@ func ExecutionResultFixture(t *testing.T,
 // It returns a slice of complete execution receipt fixtures that contains a container block as well as all data to verify its contained receipts.
 func CompleteExecutionReceiptChainFixture(t *testing.T,
 	root *flow.Header,
+	rootProtocolStateID flow.Identifier,
 	count int,
 	sources [][]byte,
 	opts ...CompleteExecutionReceiptBuilderOpt,
@@ -404,9 +407,9 @@ func CompleteExecutionReceiptChainFixture(t *testing.T,
 	for i := 0; i < count; i++ {
 		// Generates two blocks as parent <- R <- C where R is a reference block containing guarantees,
 		// and C is a container block containing execution receipt for R.
-		receipts, allData, head := ExecutionReceiptsFromParentBlockFixture(t, parent, builder, sources[sourcesIndex:])
+		receipts, allData, head := ExecutionReceiptsFromParentBlockFixture(t, parent, rootProtocolStateID, builder, sources[sourcesIndex:])
 		sourcesIndex += builder.resultsCount
-		containerBlock := ContainerBlockFixture(head, receipts, sources[sourcesIndex])
+		containerBlock := ContainerBlockFixture(head, rootProtocolStateID, receipts, sources[sourcesIndex])
 		sourcesIndex++
 		completeERs = append(completeERs, &CompleteExecutionReceipt{
 			ContainerBlock: containerBlock,
@@ -427,6 +430,7 @@ func CompleteExecutionReceiptChainFixture(t *testing.T,
 // Each result may appear in more than one receipt depending on the builder parameters.
 func ExecutionReceiptsFromParentBlockFixture(t *testing.T,
 	parent *flow.Header,
+	protocolStateID flow.Identifier,
 	builder *CompleteExecutionReceiptBuilder,
 	sources [][]byte) (
 	[]*flow.ExecutionReceipt,
@@ -436,7 +440,7 @@ func ExecutionReceiptsFromParentBlockFixture(t *testing.T,
 	allReceipts := make([]*flow.ExecutionReceipt, 0, builder.resultsCount*builder.executorCount)
 
 	for i := 0; i < builder.resultsCount; i++ {
-		result, data := ExecutionResultFromParentBlockFixture(t, parent, builder, sources[i:])
+		result, data := ExecutionResultFromParentBlockFixture(t, parent, protocolStateID, builder, sources[i:])
 
 		// makes several copies of the same result
 		for cp := 0; cp < builder.executorCount; cp++ {
@@ -456,21 +460,25 @@ func ExecutionReceiptsFromParentBlockFixture(t *testing.T,
 // ExecutionResultFromParentBlockFixture is a test helper that creates a child (reference) block from the parent, as well as an execution for it.
 func ExecutionResultFromParentBlockFixture(t *testing.T,
 	parent *flow.Header,
+	protocolStateID flow.Identifier,
 	builder *CompleteExecutionReceiptBuilder,
 	sources [][]byte,
 ) (*flow.ExecutionResult, *ExecutionReceiptData) {
 	// create the block header including a QC with source a index `i`
 	refBlkHeader := unittest.BlockHeaderWithParentWithSoRFixture(parent, sources[0])
 	// execute the block with the source a index `i+1` (which will be included later in the child block)
-	return ExecutionResultFixture(t, builder.chunksCount, builder.chain, refBlkHeader, builder.clusterCommittee, sources[1])
+	return ExecutionResultFixture(t, builder.chunksCount, builder.chain, refBlkHeader, protocolStateID, builder.clusterCommittee, sources[1])
 }
 
 // ContainerBlockFixture builds and returns a block that contains input execution receipts.
-func ContainerBlockFixture(parent *flow.Header, receipts []*flow.ExecutionReceipt, source []byte) *flow.Block {
+func ContainerBlockFixture(parent *flow.Header, protocolStateID flow.Identifier, receipts []*flow.ExecutionReceipt, source []byte) *flow.Block {
 	// container block is the block that contains the execution receipt of reference block
 	containerBlock := unittest.BlockWithParentFixture(parent)
 	containerBlock.Header.ParentVoterSigData = unittest.QCSigDataWithSoRFixture(source)
-	containerBlock.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipts...)))
+	containerBlock.SetPayload(unittest.PayloadFixture(
+		unittest.WithReceipts(receipts...),
+		unittest.WithProtocolStateID(protocolStateID),
+	))
 
 	return containerBlock
 }

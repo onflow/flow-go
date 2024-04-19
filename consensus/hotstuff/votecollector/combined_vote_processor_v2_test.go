@@ -118,7 +118,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignatureFormat() 
 	rapid.Check(s.T(), func(t *rapid.T) {
 		// create a signature with invalid length
 		vote := unittest.VoteForBlockFixture(s.proposal.Block, func(vote *model.Vote) {
-			vote.SigData = unittest.RandomBytes(generator.Draw(t, "sig-size").(int))
+			vote.SigData = unittest.RandomBytes(generator.Draw(t, "sig-size"))
 		})
 		err := s.processor.Process(vote)
 		require.Error(s.T(), err)
@@ -434,8 +434,8 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 
 	rapid.Check(testifyT, func(t *rapid.T) {
 		// draw participants in range 1 <= participants <= maxParticipants
-		participants := rapid.Uint64Range(1, maxParticipants).Draw(t, "participants").(uint64)
-		beaconSignersCount := rapid.Uint64Range(participants/2+1, participants).Draw(t, "beaconSigners").(uint64)
+		participants := rapid.Uint64Range(1, maxParticipants).Draw(t, "participants")
+		beaconSignersCount := rapid.Uint64Range(participants/2+1, participants).Draw(t, "beaconSigners")
 		stakingSignersCount := participants - beaconSignersCount
 		require.Equal(t, participants, stakingSignersCount+beaconSignersCount)
 
@@ -638,21 +638,21 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T) {
 	rapid.Check(testifyT, func(t *rapid.T) {
 		// draw beacon signers in range 1 <= beaconSignersCount <= 53
-		beaconSignersCount := rapid.Uint64Range(1, 53).Draw(t, "beaconSigners").(uint64)
+		beaconSignersCount := rapid.Uint64Range(1, 53).Draw(t, "beaconSigners")
 		// draw staking signers in range 0 <= stakingSignersCount <= 10
-		stakingSignersCount := rapid.Uint64Range(0, 10).Draw(t, "stakingSigners").(uint64)
+		stakingSignersCount := rapid.Uint64Range(0, 10).Draw(t, "stakingSigners")
 
 		stakingWeightRange, beaconWeightRange := rapid.Uint64Range(1, 10), rapid.Uint64Range(1, 10)
 
 		minRequiredWeight := uint64(0)
 		// draw weight for each signer randomly
 		stakingSigners := unittest.IdentityListFixture(int(stakingSignersCount), func(identity *flow.Identity) {
-			identity.Weight = stakingWeightRange.Draw(t, identity.String()).(uint64)
-			minRequiredWeight += identity.Weight
+			identity.InitialWeight = stakingWeightRange.Draw(t, identity.String())
+			minRequiredWeight += identity.InitialWeight
 		})
 		beaconSigners := unittest.IdentityListFixture(int(beaconSignersCount), func(identity *flow.Identity) {
-			identity.Weight = beaconWeightRange.Draw(t, identity.String()).(uint64)
-			minRequiredWeight += identity.Weight
+			identity.InitialWeight = beaconWeightRange.Draw(t, identity.String())
+			minRequiredWeight += identity.InitialWeight
 		})
 
 		// proposing block
@@ -726,13 +726,13 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 		for _, signer := range stakingSigners {
 			vote := unittest.VoteForBlockFixture(processor.Block(), VoteWithStakingSig())
 			vote.SignerID = signer.ID()
-			expectStakingAggregatorCalls(vote, signer.Weight)
+			expectStakingAggregatorCalls(vote, signer.InitialWeight)
 			votes = append(votes, vote)
 		}
 		for _, signer := range beaconSigners {
 			vote := unittest.VoteForBlockFixture(processor.Block(), VoteWithDoubleSig())
 			vote.SignerID = signer.ID()
-			expectStakingAggregatorCalls(vote, signer.Weight)
+			expectStakingAggregatorCalls(vote, signer.InitialWeight)
 			expectedSig := crypto.Signature(vote.SigData[msig.SigLen:])
 			reconstructor.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
 			reconstructor.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
@@ -816,7 +816,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 
 		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
-		me, err := local.New(identity, stakingPriv)
+		me, err := local.New(identity.IdentitySkeleton, stakingPriv)
 		require.NoError(t, err)
 
 		signers[identity.NodeID] = verification.NewCombinedSigner(me, beaconSignerStore)
@@ -838,7 +838,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 
 		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
-		me, err := local.New(identity, stakingPriv)
+		me, err := local.New(identity.IdentitySkeleton, stakingPriv)
 		require.NoError(t, err)
 
 		signers[identity.NodeID] = verification.NewCombinedSigner(me, beaconSignerStore)
@@ -858,8 +858,8 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	require.NoError(t, err)
 
 	committee := &mockhotstuff.DynamicCommittee{}
-	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(allIdentities.TotalWeight()), nil)
-	committee.On("IdentitiesByEpoch", block.View).Return(allIdentities, nil)
+	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(allIdentities.ToSkeleton().TotalWeight()), nil)
+	committee.On("IdentitiesByEpoch", block.View).Return(allIdentities.ToSkeleton(), nil)
 	committee.On("IdentitiesByBlock", block.BlockID).Return(allIdentities, nil)
 	committee.On("DKG", block.View).Return(inmemDKG, nil)
 
@@ -938,7 +938,7 @@ func TestReadRandomSourceFromPackedQCV2(t *testing.T) {
 	// create a packer
 	committee := &mockhotstuff.DynamicCommittee{}
 	committee.On("IdentitiesByBlock", block.BlockID).Return(allSigners, nil)
-	committee.On("IdentitiesByEpoch", block.View).Return(allSigners, nil)
+	committee.On("IdentitiesByEpoch", block.View).Return(allSigners.ToSkeleton(), nil)
 	packer := signature.NewConsensusSigDataPacker(committee)
 
 	qc, err := buildQCWithPackerAndSigData(packer, block, blockSigData)

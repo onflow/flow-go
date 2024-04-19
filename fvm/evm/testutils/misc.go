@@ -6,8 +6,8 @@ import (
 	"math/rand"
 	"testing"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -59,7 +59,23 @@ func GetRandomLogFixture(t testing.TB) *gethTypes.Log {
 	}
 }
 
-// MakeABalanceInFlow makes a balance object that has `amount` Flow Token in it
-func MakeABalanceInFlow(amount uint64) types.Balance {
-	return types.Balance(uint64(100_000_000) * amount)
+func COAOwnershipProofFixture(t testing.TB) *types.COAOwnershipProof {
+	return &types.COAOwnershipProof{
+		Address:        types.FlowAddress{1, 2, 3},
+		CapabilityPath: "path",
+		KeyIndices:     types.KeyIndices{1, 2},
+		Signatures: types.Signatures{
+			types.Signature("sig1"),
+			types.Signature("sig2"),
+		},
+	}
+}
+
+func COAOwnershipProofInContextFixture(t testing.TB) *types.COAOwnershipProofInContext {
+	signedMsg := RandomCommonHash(t)
+	return &types.COAOwnershipProofInContext{
+		COAOwnershipProof: *COAOwnershipProofFixture(t),
+		SignedData:        types.SignedData(signedMsg[:]),
+		EVMAddress:        RandomAddress(t),
+	}
 }

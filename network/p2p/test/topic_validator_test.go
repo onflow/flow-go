@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -74,7 +75,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 		return nil
 	}
 
-	pInfo2, err := utils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2.IdentitySkeleton)
 	require.NoError(t, err)
 
 	// node1 is connected to node2
@@ -135,7 +136,7 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	channel := channels.PublicSyncCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
 
-	pInfo2, err := utils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2.IdentitySkeleton)
 	require.NoError(t, err)
 
 	// node1 is connected to node2
@@ -204,7 +205,7 @@ func TestTopicValidator_TopicMismatch(t *testing.T) {
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
 
-	pInfo2, err := utils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2.IdentitySkeleton)
 	require.NoError(t, err)
 
 	// node1 is connected to node2
@@ -265,7 +266,7 @@ func TestTopicValidator_InvalidTopic(t *testing.T) {
 
 	topic := channels.Topic("invalid-topic")
 
-	pInfo2, err := utils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2.IdentitySkeleton)
 	require.NoError(t, err)
 
 	// node1 is connected to node2
@@ -362,10 +363,10 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	authorizedSenderValidator := validator.NewAuthorizedSenderValidator(logger, violationsConsumer, getIdentity)
 	pubsubMessageValidator := authorizedSenderValidator.PubSubMessageValidator(channel)
 
-	pInfo1, err := utils.PeerAddressInfo(identity1)
+	pInfo1, err := utils.PeerAddressInfo(identity1.IdentitySkeleton)
 	require.NoError(t, err)
 
-	pInfo2, err := utils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2.IdentitySkeleton)
 	require.NoError(t, err)
 
 	// node1 is connected to node2, and the an1 is connected to node1
@@ -490,7 +491,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	authorizedSenderValidator := validator.NewAuthorizedSenderValidator(logger, violationsConsumer, getIdentity)
 	pubsubMessageValidator := authorizedSenderValidator.PubSubMessageValidator(channel)
 
-	pInfo2, err := utils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2.IdentitySkeleton)
 	require.NoError(t, err)
 
 	// node1 is connected to node2
@@ -540,9 +541,13 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 
 	sporkId := unittest.IdentifierFixture()
 
-	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, "consensus_1", idProvider, p2ptest.WithRole(flow.RoleConsensus))
-	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, "consensus_2", idProvider, p2ptest.WithRole(flow.RoleConsensus))
-	an1, identity3 := p2ptest.NodeFixture(t, sporkId, "access_1", idProvider, p2ptest.WithRole(flow.RoleAccess))
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+	// turn off unstaked peer rejection so that nodes can connect
+	cfg.NetworkConfig.GossipSub.RpcInspector.Validation.InspectionProcess.Inspect.RejectUnstakedPeers = false
+	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, "consensus_1", idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.OverrideFlowConfig(cfg))
+	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, "consensus_2", idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.OverrideFlowConfig(cfg))
+	an1, identity3 := p2ptest.NodeFixture(t, sporkId, "access_1", idProvider, p2ptest.WithRole(flow.RoleAccess), p2ptest.OverrideFlowConfig(cfg))
 	idProvider.On("ByPeerID", sn1.ID()).Return(&identity1, true).Maybe()
 	idProvider.On("ByPeerID", sn2.ID()).Return(&identity2, true).Maybe()
 	idProvider.On("ByPeerID", an1.ID()).Return(&identity3, true).Maybe()
@@ -573,10 +578,10 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	authorizedSenderValidator := validator.NewAuthorizedSenderValidator(logger, violationsConsumer, getIdentity)
 	pubsubMessageValidator := authorizedSenderValidator.PubSubMessageValidator(channel)
 
-	pInfo1, err := utils.PeerAddressInfo(identity1)
+	pInfo1, err := utils.PeerAddressInfo(identity1.IdentitySkeleton)
 	require.NoError(t, err)
 
-	pInfo2, err := utils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2.IdentitySkeleton)
 	require.NoError(t, err)
 
 	// node1 is connected to node2, and the an1 is connected to node1
@@ -624,7 +629,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	p2pfixtures.SubMustReceiveMessage(t, timedCtx, expectedReceivedData1, sub3)
 
 	// "eject" sn2 to ensure messages published by ejected nodes get rejected
-	identity2.Ejected = true
+	identity2.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 
 	outgoingMessageScope3, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
@@ -687,10 +692,10 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	authorizedSenderValidator := validator.NewAuthorizedSenderValidator(logger, violationsConsumer, getIdentity)
 	pubsubMessageValidator := authorizedSenderValidator.PubSubMessageValidator(channel)
 
-	pInfo1, err := utils.PeerAddressInfo(identity1)
+	pInfo1, err := utils.PeerAddressInfo(identity1.IdentitySkeleton)
 	require.NoError(t, err)
 
-	pInfo2, err := utils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2.IdentitySkeleton)
 	require.NoError(t, err)
 
 	// ln3 <-> sn1 <-> sn2

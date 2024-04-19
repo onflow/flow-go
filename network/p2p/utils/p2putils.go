@@ -19,7 +19,7 @@ import (
 //	flow.Identity        ---> peer.AddrInfo
 //	|-- Address          --->   |-- []multiaddr.Multiaddr
 //	|-- NetworkPublicKey --->   |-- ID
-func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
+func PeerAddressInfo(identity flow.IdentitySkeleton) (peer.AddrInfo, error) {
 	ip, port, key, err := p2putils.NetworkingInfo(identity)
 	if err != nil {
 		return peer.AddrInfo{}, fmt.Errorf("could not translate identity to networking info %s: %w", identity.NodeID.String(), err)
@@ -39,14 +39,14 @@ func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
 	return pInfo, err
 }
 
-// PeerInfosFromIDs converts the given flow.Identities to peer.AddrInfo.
+// PeerInfosFromIDs converts the given flow.Identity to peer.AddrInfo.
 // For each identity, if the conversion succeeds, the peer.AddrInfo is included in the result else it is
 // included in the error map with the corresponding error
 func PeerInfosFromIDs(ids flow.IdentityList) ([]peer.AddrInfo, map[flow.Identifier]error) {
 	validIDs := make([]peer.AddrInfo, 0, len(ids))
 	invalidIDs := make(map[flow.Identifier]error)
 	for _, id := range ids {
-		peerInfo, err := PeerAddressInfo(*id)
+		peerInfo, err := PeerAddressInfo(id.IdentitySkeleton)
 		if err != nil {
 			invalidIDs[id.NodeID] = err
 			continue

@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package module
 
 import (
@@ -24,7 +22,7 @@ type Local interface {
 	Sign([]byte, hash.Hasher) (crypto.Signature, error)
 
 	// NotMeFilter returns handy not-me filter for searching identity
-	NotMeFilter() flow.IdentityFilter
+	NotMeFilter() flow.IdentityFilter[flow.Identity]
 
 	// SignFunc provides a signature oracle that given a message, a hasher, and a signing function, it
 	// generates and returns a signature over the message using the node's private key

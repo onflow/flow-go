@@ -12,25 +12,25 @@ type Builder struct {
 	mock.Mock
 }
 
-// BuildOn provides a mock function with given fields: parentID, setter
-func (_m *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
-	ret := _m.Called(parentID, setter)
+// BuildOn provides a mock function with given fields: parentID, setter, sign
+func (_m *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) (*flow.Header, error) {
+	ret := _m.Called(parentID, setter, sign)
 
 	var r0 *flow.Header
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, func(*flow.Header) error) (*flow.Header, error)); ok {
-		return rf(parentID, setter)
+	if rf, ok := ret.Get(0).(func(flow.Identifier, func(*flow.Header) error, func(*flow.Header) error) (*flow.Header, error)); ok {
+		return rf(parentID, setter, sign)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier, func(*flow.Header) error) *flow.Header); ok {
-		r0 = rf(parentID, setter)
+	if rf, ok := ret.Get(0).(func(flow.Identifier, func(*flow.Header) error, func(*flow.Header) error) *flow.Header); ok {
+		r0 = rf(parentID, setter, sign)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Header)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(flow.Identifier, func(*flow.Header) error) error); ok {
-		r1 = rf(parentID, setter)
+	if rf, ok := ret.Get(1).(func(flow.Identifier, func(*flow.Header) error, func(*flow.Header) error) error); ok {
+		r1 = rf(parentID, setter, sign)
 	} else {
 		r1 = ret.Error(1)
 	}

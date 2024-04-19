@@ -94,7 +94,6 @@ func TestGossipSubInvalidMessageDelivery_Integration(t *testing.T) {
 // - t: the test instance.
 // - spamMsgFactory: a function that creates unique invalid messages to spam the victim with.
 func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory func(peer.ID, peer.ID, channels.Topic) *pubsub_pb.Message) {
-
 	role := flow.RoleConsensus
 	sporkId := unittest.IdentifierFixture()
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
@@ -108,6 +107,8 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 	require.NoError(t, err)
 	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
 	cfg.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
+	cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.TopicParameters.InvalidMessageDeliveriesDecay = .99
+
 	victimNode, victimIdentity := p2ptest.NodeFixture(
 		t,
 		sporkId,
@@ -131,15 +132,15 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 		return unittest.ProposalFixture()
 	})
 
-	// generates 2000 spam messages to send to the victim node; based on default-config.yaml, ~1400 of these messages are enough to
+	// generates 3000 spam messages to send to the victim node; based on default-config.yaml, ~1400 of these messages are enough to
 	// penalize the spammer node to disconnect from the victim node.
-	totalSpamMessages := 2000
+	totalSpamMessages := 3000
 	msgs := make([]*pubsub_pb.Message, 0)
 	for i := 0; i <= totalSpamMessages; i++ {
 		msgs = append(msgs, spamMsgFactory(spammer.SpammerNode.ID(), victimNode.ID(), blockTopic))
 	}
 
-	// sends all 2000 spam messages to the victim node over 1 RPC.
+	// sends all 3000 spam messages to the victim node over 1 RPC.
 	spammer.SpamControlMessage(t, victimNode,
 		spammer.GenerateCtlMessages(1), msgs...)
 
@@ -167,7 +168,7 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 		}
 
 		return true
-	}, 3*time.Second, 100*time.Millisecond)
+	}, 5*time.Second, 100*time.Millisecond)
 
 	topicsSnapshot, ok := victimNode.PeerScoreExposer().GetTopicScores(spammer.SpammerNode.ID())
 	require.True(t, ok)
@@ -446,7 +447,8 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
 	blockTopicOverrideParams := defaultTopicScoreParams(t)
 	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
-	thisNode, thisId := p2ptest.NodeFixture(                                   // this node is the one that will be penalizing the under-performer node.
+	// this node is the one that will be penalizing the under-performer node.
+	thisNode, thisId := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),

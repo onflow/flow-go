@@ -25,9 +25,10 @@ type ScoringRegistryParameters struct {
 }
 
 const (
-	ScoreUpdateWorkerNumKey        = "score-update-worker-num"
-	ScoreUpdateRequestQueueSizeKey = "score-update-request-queue-size"
-	ScoreTTLKey                    = "score-ttl"
+	ScoreUpdateWorkerNumKey                       = "score-update-worker-num"
+	ScoreUpdateRequestQueueSizeKey                = "score-update-request-queue-size"
+	ScoreTTLKey                                   = "score-ttl"
+	InvalidControlMessageNotificationQueueSizeKey = "invalid-control-message-notification-queue-size"
 )
 
 // AppSpecificScoreParameters is the parameters for the GossipSubAppSpecificScoreRegistry.
@@ -38,6 +39,9 @@ type AppSpecificScoreParameters struct {
 
 	// ScoreUpdateRequestQueueSize is the size of the worker pool for handling the application specific score update of peers in a non-blocking way.
 	ScoreUpdateRequestQueueSize uint32 `validate:"gt=0" mapstructure:"score-update-request-queue-size"`
+
+	// InvalidControlMessageNotificationQueueSize is the size of the queue for handling invalid control message notifications in a non-blocking way.
+	InvalidControlMessageNotificationQueueSize uint32 `validate:"gt=0" mapstructure:"invalid-control-message-notification-queue-size"`
 
 	// ScoreTTL is the time to live of the application specific score of a peer; the registry keeps a cached copy of the
 	// application specific score of a peer for this duration. When the duration expires, the application specific score
@@ -85,11 +89,11 @@ type SpamRecordCacheDecay struct {
 
 const (
 	MisbehaviourPenaltiesKey          = "misbehaviour-penalties"
-	GraftMisbehaviourKey              = "graft"
-	PruneMisbehaviourKey              = "prune"
-	IHaveMisbehaviourKey              = "ihave"
-	IWantMisbehaviourKey              = "iwant"
-	PublishMisbehaviourKey            = "publish"
+	GraftKey                          = "graft"
+	PruneKey                          = "prune"
+	IWantKey                          = "iwant"
+	IHaveKey                          = "ihave"
+	PublishKey                        = "publish"
 	ClusterPrefixedReductionFactorKey = "cluster-prefixed-reduction-factor"
 )
 

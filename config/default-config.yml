@@ -160,6 +160,9 @@ network-config:
           # to avoid penalizing peers that are not malicious but are misbehaving due to bugs or other issues.
           # A topic id is considered duplicate if it appears more than once in a single GRAFT or PRUNE message.
           duplicate-topic-id-threshold: 50
+          # Maximum number of total invalid topic ids in GRAFTs/PRUNEs of a single RPC, ideally this should be 0 but we allow for some tolerance
+          # to avoid penalizing peers that are not malicious but are misbehaving due to bugs or other issues. Exceeding this threshold causes RPC inspection failure with an invalid control message notification (penalty).
+          invalid-topic-id-threshold: 50
         ihave:
           # The maximum allowed number of iHave messages in a single RPC message.
           #	Each iHave message represents the list of message ids. When the total number of iHave messages
@@ -181,6 +184,9 @@ network-config:
           # Ideally, an iHave message should not have any duplicate message IDs, hence a message id is considered duplicate when it is repeated more than once
           # within the same iHave message. When the total number of duplicate message ids in a single iHave message exceeds this threshold, the inspection of message will fail.
           duplicate-message-id-threshold: 100
+          # Maximum number of total invalid topic ids in an IHAVE message on a single RPC, ideally this should be 0 but we allow for some tolerance
+          # to avoid penalizing peers that are not malicious but are misbehaving due to bugs or other issues.  Exceeding this threshold causes RPC inspection failure with an invalid control message notification (penalty).
+          invalid-topic-id-threshold: 50
         iwant:
           # The maximum allowed number of iWant messages in a single RPC message.
           #	Each iWant message represents the list of message ids. When the total number of iWant messages
@@ -208,6 +214,45 @@ network-config:
           tracker-cache-decay: 0.99
           # The upper bound on the amount of cluster prefixed control messages that will be processed
           hard-threshold: 100
+        process:
+          inspection:
+            # Serves as a fail-safe mechanism to globally deactivate inspection logic. When this fail-safe is activated it disables all
+            # aspects of the inspection logic, irrespective of individual configurations like inspection.enable-graft, inspection.enable-prune, etc.
+            # Consequently, all metrics collection and logging related to the rpc and inspection will also be disabled.
+            # It is important to note that activating this fail-safe results in a comprehensive deactivation inspection features.
+            # Please use this setting judiciously, considering its broad impact on the behavior of control message handling.
+            disabled: false
+            # Enables graft control message inspection.
+            enable-graft: true
+            # Enables prune control message inspection.
+            enable-prune: true
+            # Enables ihave control message inspection.
+            enable-ihave: true
+            # Enables iwant control message inspection.
+            enable-iwant: true
+            # Enables publish message inspection.
+            enable-publish: true
+            # When set to true RPC's will be rejected from unstaked peers
+            reject-unstaked-peers: true
+          truncation:
+            # Serves as a fail-safe mechanism to globally deactivate truncation logic. When this fail-safe is activated it disables all
+            # aspects of the truncation logic, irrespective of individual configurations like truncation.enable-graft, truncation.enable-prune, etc.
+            # Consequently, all metrics collection and logging related to the rpc and inspection will also be disabled.
+            # It is important to note that activating this fail-safe results in a comprehensive deactivation truncation features.
+            # Please use this setting judiciously, considering its broad impact on the behavior of control message handling.
+            disabled: false
+            # Enables graft control message truncation.
+            enable-graft: true
+            # Enables prune control message truncation.
+            enable-prune: true
+            # Enables ihave control message truncation.
+            enable-ihave: true
+            # Enables ihave message id truncation.
+            enable-ihave-message-id: true
+            # Enables iwant control message truncation.
+            enable-iwant: true
+            # Enables iwant message id truncation.
+            enable-iwant-message-id: true
     rpc-tracer:
       # The default interval at which the mesh tracer logs the mesh topology. This is used for debugging and forensics purposes.
       #	Note that we purposefully choose this logging interval high enough to avoid spamming the logs. Moreover, the
@@ -224,7 +269,14 @@ network-config:
       rpc-sent-tracker-queue-cache-size: 100_000
       # Number of workers for rpc sent tracker worker pool.
       rpc-sent-tracker-workers: 5
-      # Peer scoring is the default value for enabling peer scoring
+      # Cache size of the gossipsub duplicate message tracker.
+      duplicate-message-tracker:
+         cache-size: 10_000
+         decay: .5
+         # The threshold for which when the counter is below this value, the decay function will not be called.
+         # instead, the counter will be set to 0. This is to prevent the counter from becoming a large number over time.
+         skip-decay-threshold: 0.1
+    # Peer scoring is the default value for enabling peer scoring
     peer-scoring-enabled: true
     scoring-parameters:
       peer-scoring:
@@ -468,6 +520,11 @@ network-config:
             # It is applied to the peer's score when the peer subscribes to a topic that it is
             # not authorized to subscribe to.
             invalid-subscription-penalty: -100
+            # The penalty for duplicate messages detected by the gossipsub tracer for a peer.
+            # The penalty is multiplied by the current duplicate message count for a peer before it is applied to the application specific score.
+            duplicate-message-penalty: -10e-4
+            # The threshold at which the duplicate message count for a peer will result in the peer being penalized
+            duplicate-message-threshold: 10e+4
             # This is the reward for well-behaving staked peers.
             # If a peer does not have any misbehavior record, e.g., invalid subscription,
             # invalid message, etc., it will be rewarded with this score.
@@ -489,12 +546,14 @@ network-config:
           # number of workers that asynchronously update the app specific score requests when they are expired.
           score-update-worker-num: 5
           # size of the queue used by the worker pool for the app specific score update requests. The queue is used to buffer the app specific score update requests
-          # before they are processed by the worker pool. The queue size must be larger than total number of peers in the network.
+          # before they are processed by the worker pool. The queue size must be larger than 10x total number of peers in the network.
           # The queue is deduplicated based on the peer ids ensuring that there is only one app specific score update request per peer in the queue.
           score-update-request-queue-size: 10_000
           # score ttl is the time to live for the app specific score. Once the score is expired; a new request will be sent to the app specific score provider to update the score.
           # until the score is updated, the previous score will be used.
           score-ttl: 1m
+          # size of the queue used by the score registry to buffer the invalid control message notifications before they are processed by the worker pool. The queue size must be larger than 10x total number of peers in the network.
+          invalid-control-message-notification-queue-size: 10_000
         spam-record-cache:
           # size of cache used to track spam records at gossipsub. Each peer id is mapped to a spam record that keeps track of the spam score for that peer.
           # cache should be big enough to keep track of the entire network's size. Otherwise, the local node's view of the network will be incomplete due to cache eviction.

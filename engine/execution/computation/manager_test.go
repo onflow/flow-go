@@ -280,7 +280,7 @@ func TestExecuteScript(t *testing.T) {
 	require.NoError(t, err)
 
 	header := unittest.BlockHeaderFixture()
-	_, err = engine.ExecuteScript(
+	_, _, err = engine.ExecuteScript(
 		context.Background(),
 		script,
 		nil,
@@ -347,7 +347,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 	require.NoError(t, err)
 
 	header := unittest.BlockHeaderFixture()
-	_, err = engine.ExecuteScript(
+	_, _, err = engine.ExecuteScript(
 		context.Background(),
 		script,
 		nil,
@@ -395,7 +395,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = manager.ExecuteScript(
+	_, _, err = manager.ExecuteScript(
 		context.Background(),
 		[]byte("whatever"),
 		nil,
@@ -403,7 +403,6 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 		nil)
 
 	require.Error(t, err)
-
 	require.Contains(t, buffer.String(), "Verunsicherung")
 }
 
@@ -449,7 +448,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = manager.ExecuteScript(
+	_, _, err = manager.ExecuteScript(
 		context.Background(),
 		[]byte("whatever"),
 		nil,
@@ -457,7 +456,6 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 		nil)
 
 	require.NoError(t, err)
-
 	require.Contains(t, buffer.String(), "exceeded threshold")
 }
 
@@ -503,7 +501,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = manager.ExecuteScript(
+	_, _, err = manager.ExecuteScript(
 		context.Background(),
 		[]byte("whatever"),
 		nil,
@@ -511,7 +509,6 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 		nil)
 
 	require.NoError(t, err)
-
 	require.NotContains(t, buffer.String(), "exceeded threshold")
 }
 
@@ -680,7 +677,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 	`)
 
 	header := unittest.BlockHeaderFixture()
-	value, err := manager.ExecuteScript(
+	value, _, err := manager.ExecuteScript(
 		context.Background(),
 		script,
 		nil,
@@ -734,7 +731,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		header := unittest.BlockHeaderFixture()
-		value, err = manager.ExecuteScript(
+		value, _, err = manager.ExecuteScript(
 			reqCtx,
 			script,
 			nil,
@@ -950,7 +947,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	`)
 
 	header := unittest.BlockHeaderFixture()
-	_, err = manager.ExecuteScript(
+	_, compUsed, err := manager.ExecuteScript(
 		context.Background(),
 		script,
 		[][]byte{jsoncdc.MustEncode(address)},
@@ -958,6 +955,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		snapshotTree)
 
 	require.NoError(t, err)
+	require.Greater(t, compUsed, uint64(0))
 
 	env := environment.NewScriptEnvironmentFromStorageSnapshot(
 		ctx.EnvironmentParams,

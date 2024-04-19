@@ -86,7 +86,7 @@ type MessageHub struct {
 	ownOutboundVotes           *fifoqueue.FifoQueue // queue for handling outgoing vote transmissions
 	ownOutboundProposals       *fifoqueue.FifoQueue // queue for handling outgoing proposal transmissions
 	ownOutboundTimeouts        *fifoqueue.FifoQueue // queue for handling outgoing timeout transmissions
-	clusterIdentityFilter      flow.IdentityFilter
+	clusterIdentityFilter      flow.IdentityFilter[flow.Identity]
 
 	// injected dependencies
 	compliance        collection.Compliance      // handler of incoming block proposals
@@ -150,16 +150,13 @@ func NewMessageHub(log zerolog.Logger,
 		ownOutboundProposals:       ownOutboundProposals,
 		ownOutboundTimeouts:        ownOutboundTimeouts,
 		clusterIdentityFilter: filter.And(
-			filter.In(currentCluster),
-			filter.Not(filter.HasNodeID(me.NodeID())),
+			filter.Adapt(filter.In(currentCluster)),
+			filter.Not(filter.HasNodeID[flow.Identity](me.NodeID())),
 		),
 	}
 
 	// register network conduit
-	chainID, err := clusterState.Params().ChainID()
-	if err != nil {
-		return nil, fmt.Errorf("could not get chain ID: %w", err)
-	}
+	chainID := clusterState.Params().ChainID()
 	conduit, err := net.Register(channels.ConsensusCluster(chainID), hub)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)

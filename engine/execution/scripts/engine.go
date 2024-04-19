@@ -48,11 +48,11 @@ func (e *Engine) ExecuteScriptAtBlockID(
 	script []byte,
 	arguments [][]byte,
 	blockID flow.Identifier,
-) ([]byte, error) {
+) ([]byte, uint64, error) {
 
 	blockSnapshot, header, err := e.execState.CreateStorageSnapshot(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create storage snapshot: %w", err)
+		return nil, 0, fmt.Errorf("failed to create storage snapshot: %w", err)
 	}
 
 	return e.queryExecutor.ExecuteScript(

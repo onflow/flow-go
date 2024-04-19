@@ -244,6 +244,7 @@ func (collector *resultCollector) processTransactionResult(
 		Uint64("computation_used", output.ComputationUsed).
 		Uint64("memory_used", output.MemoryEstimate).
 		Int64("time_spent_in_ms", timeSpent.Milliseconds()).
+		Float64("normalized_time_per_computation", flow.NormalizedExecutionTimePerComputationUnit(timeSpent, output.ComputationUsed)).
 		Logger()
 
 	if output.Err != nil {

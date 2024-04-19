@@ -44,7 +44,7 @@ func NewControllerFactory(
 // is capable of communicating with other nodes.
 func (f *ControllerFactory) Create(
 	dkgInstanceID string,
-	participants flow.IdentityList,
+	participants flow.IdentitySkeletonList,
 	seed []byte) (module.DKGController, error) {
 
 	myIndex, ok := participants.GetIndex(f.me.NodeID())

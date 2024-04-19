@@ -18,7 +18,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
@@ -408,7 +408,7 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	suite.downloader = mockDownloader(cfg.executionDataEntries)
 	suite.distributor = requester.NewExecutionDataDistributor()
 
-	heroCache := herocache.NewBlockExecutionData(state_stream.DefaultCacheSize, logger, metrics)
+	heroCache := herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metrics)
 	cache := cache.NewExecutionDataCache(suite.downloader, headers, seals, results, heroCache)
 
 	followerDistributor := pubsub.NewFollowerDistributor()
@@ -789,18 +789,19 @@ func (m *mockSnapshot) Head() (*flow.Header, error) {
 
 // none of these are used in this test
 func (m *mockSnapshot) QuorumCertificate() (*flow.QuorumCertificate, error) { return nil, nil }
-func (m *mockSnapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (m *mockSnapshot) Identities(selector flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
 	return nil, nil
 }
 func (m *mockSnapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) { return nil, nil }
 func (m *mockSnapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 	return nil, nil, nil
 }
-func (m *mockSnapshot) Commit() (flow.StateCommitment, error)             { return flow.DummyStateCommitment, nil }
-func (m *mockSnapshot) SealingSegment() (*flow.SealingSegment, error)     { return nil, nil }
-func (m *mockSnapshot) Descendants() ([]flow.Identifier, error)           { return nil, nil }
-func (m *mockSnapshot) RandomSource() ([]byte, error)                     { return nil, nil }
-func (m *mockSnapshot) Phase() (flow.EpochPhase, error)                   { return flow.EpochPhaseUndefined, nil }
-func (m *mockSnapshot) Epochs() protocol.EpochQuery                       { return nil }
-func (m *mockSnapshot) Params() protocol.GlobalParams                     { return nil }
-func (m *mockSnapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) { return nil, nil }
+func (m *mockSnapshot) Commit() (flow.StateCommitment, error)                 { return flow.DummyStateCommitment, nil }
+func (m *mockSnapshot) SealingSegment() (*flow.SealingSegment, error)         { return nil, nil }
+func (m *mockSnapshot) Descendants() ([]flow.Identifier, error)               { return nil, nil }
+func (m *mockSnapshot) RandomSource() ([]byte, error)                         { return nil, nil }
+func (m *mockSnapshot) Phase() (flow.EpochPhase, error)                       { return flow.EpochPhaseUndefined, nil }
+func (m *mockSnapshot) Epochs() protocol.EpochQuery                           { return nil }
+func (m *mockSnapshot) Params() protocol.GlobalParams                         { return nil }
+func (m *mockSnapshot) ProtocolState() (protocol.DynamicProtocolState, error) { return nil, nil }
+func (m *mockSnapshot) VersionBeacon() (*flow.SealedVersionBeacon, error)     { return nil, nil }

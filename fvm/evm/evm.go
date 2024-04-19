@@ -4,10 +4,11 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm/backends"
 	evm "github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
-	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -24,9 +25,8 @@ func StorageAccountAddress(chainID flow.ChainID) (flow.Address, error) {
 
 func SetupEnvironment(
 	chainID flow.ChainID,
-	backend types.Backend,
-	env runtime.Environment,
-	service flow.Address,
+	fvmEnv environment.Environment,
+	runtimeEnv runtime.Environment,
 	flowToken flow.Address,
 ) error {
 	evmStorageAccountAddress, err := StorageAccountAddress(chainID)
@@ -39,21 +39,29 @@ func SetupEnvironment(
 		return err
 	}
 
-	em := evm.NewEmulator(backend, evmStorageAccountAddress)
+	backend := backends.NewWrappedEnvironment(fvmEnv)
 
-	bs, err := handler.NewBlockStore(backend, evmStorageAccountAddress)
-	if err != nil {
-		return err
-	}
+	emulator := evm.NewEmulator(backend, evmStorageAccountAddress)
 
-	aa, err := handler.NewAddressAllocator(backend, evmStorageAccountAddress)
-	if err != nil {
-		return err
-	}
+	blockStore := handler.NewBlockStore(backend, evmStorageAccountAddress)
 
-	contractHandler := handler.NewContractHandler(common.Address(flowToken), bs, aa, backend, em)
+	addressAllocator := handler.NewAddressAllocator()
 
-	stdlib.SetupEnvironment(env, contractHandler, evmContractAccountAddress)
+	contractHandler := handler.NewContractHandler(
+		chainID,
+		evmContractAccountAddress,
+		common.Address(flowToken),
+		blockStore,
+		addressAllocator,
+		backend,
+		emulator,
+	)
+
+	stdlib.SetupEnvironment(
+		runtimeEnv,
+		contractHandler,
+		evmContractAccountAddress,
+	)
 
 	return nil
 }

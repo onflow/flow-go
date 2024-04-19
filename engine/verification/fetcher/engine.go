@@ -587,7 +587,7 @@ func (e *Engine) requestChunkDataPack(chunkIndex uint64, chunkID flow.Identifier
 		return fmt.Errorf("could not get header for block: %x", blockID)
 	}
 
-	allExecutors, err := e.state.AtBlockID(blockID).Identities(filter.HasRole(flow.RoleExecution))
+	allExecutors, err := e.state.AtBlockID(blockID).Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return fmt.Errorf("could not fetch execution node ids at block %x: %w", blockID, err)
 	}

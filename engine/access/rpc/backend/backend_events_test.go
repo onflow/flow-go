@@ -1,8 +1,10 @@
 package backend
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"sort"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -16,11 +18,13 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 
+	"github.com/onflow/flow-go/engine/access/index"
 	access "github.com/onflow/flow-go/engine/access/mock"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -44,6 +48,7 @@ type BackendEventsSuite struct {
 	params     *protocol.Params
 	rootHeader *flow.Header
 
+	eventsIndex       *index.EventsIndex
 	events            *storagemock.Events
 	headers           *storagemock.Headers
 	receipts          *storagemock.ExecutionReceipts
@@ -79,6 +84,7 @@ func (s *BackendEventsSuite) SetupTest() {
 
 	s.execClient = access.NewExecutionAPIClient(s.T())
 	s.executionNodes = unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+	s.eventsIndex = index.NewEventsIndex(s.events)
 
 	blockCount := 5
 	s.blocks = make([]*flow.Block, blockCount)
@@ -112,10 +118,19 @@ func (s *BackendEventsSuite) SetupTest() {
 	s.blockEvents = generator.GetEventsWithEncoding(10, entities.EventEncodingVersion_CCF_V0)
 	targetEvent = string(s.blockEvents[0].Type)
 
+	// events returned from the db are sorted by txID, txIndex, then eventIndex.
+	// reproduce that here to ensure output order works as expected
+	returnBlockEvents := make([]flow.Event, len(s.blockEvents))
+	copy(returnBlockEvents, s.blockEvents)
+
+	sort.Slice(returnBlockEvents, func(i, j int) bool {
+		return bytes.Compare(returnBlockEvents[i].TransactionID[:], returnBlockEvents[j].TransactionID[:]) < 0
+	})
+
 	s.events.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) ([]flow.Event, error) {
 		for _, headerID := range s.blockIDs {
 			if blockID == headerID {
-				return s.blockEvents, nil
+				return returnBlockEvents, nil
 			}
 		}
 		return nil, storage.ErrNotFound
@@ -163,13 +178,13 @@ func (s *BackendEventsSuite) defaultBackend() *backendEvents {
 		log:               s.log,
 		chain:             s.chainID.Chain(),
 		state:             s.state,
-		events:            s.events,
 		headers:           s.headers,
 		executionReceipts: s.receipts,
 		connFactory:       s.connectionFactory,
 		nodeCommunicator:  NewNodeCommunicator(false),
 		maxHeightRange:    DefaultMaxHeightRange,
 		queryMode:         IndexQueryModeExecutionNodesOnly,
+		eventsIndex:       s.eventsIndex,
 	}
 }
 
@@ -250,6 +265,12 @@ func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
 	startHeight := s.blocks[0].Header.Height
 	endHeight := s.sealedHead.Height
 
+	reporter := syncmock.NewIndexReporter(s.T())
+	reporter.On("LowestIndexedHeight").Return(startHeight, nil)
+	reporter.On("HighestIndexedHeight").Return(endHeight+10, nil)
+	err := s.eventsIndex.Initialize(reporter)
+	s.Require().NoError(err)
+
 	s.state.On("Sealed").Return(s.snapshot)
 	s.snapshot.On("Head").Return(s.sealedHead, nil)
 
@@ -289,6 +310,7 @@ func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
 
 		s.Run(fmt.Sprintf("all from en - %s - %s", tt.encoding.String(), tt.queryMode), func() {
 			events := storagemock.NewEvents(s.T())
+			eventsIndex := index.NewEventsIndex(events)
 
 			switch tt.queryMode {
 			case IndexQueryModeLocalOnly:
@@ -298,12 +320,12 @@ func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
 				// only calls to EN, no calls to storage
 			case IndexQueryModeFailover:
 				// all calls to storage fail
-				events.On("ByBlockID", mock.Anything).Return(nil, storage.ErrNotFound)
+				// simulated by not initializing the eventIndex so all calls return ErrIndexNotInitialized
 			}
 
 			backend := s.defaultBackend()
 			backend.queryMode = tt.queryMode
-			backend.events = events
+			backend.eventsIndex = eventsIndex
 
 			s.setupENSuccessResponse(targetEvent, s.blocks)
 
@@ -318,6 +340,7 @@ func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
 
 		s.Run(fmt.Sprintf("mixed storage & en - %s - %s", tt.encoding.String(), tt.queryMode), func() {
 			events := storagemock.NewEvents(s.T())
+			eventsIndex := index.NewEventsIndex(events)
 
 			switch tt.queryMode {
 			case IndexQueryModeLocalOnly, IndexQueryModeExecutionNodesOnly:
@@ -325,19 +348,24 @@ func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
 				return
 			case IndexQueryModeFailover:
 				// only failing blocks queried from EN
-				s.setupENSuccessResponse(targetEvent, s.blocks[0:2])
+				s.setupENSuccessResponse(targetEvent, []*flow.Block{s.blocks[0], s.blocks[4]})
 			}
 
-			// the first 2 blocks are not available from storage, and should be fetched from the EN
-			events.On("ByBlockID", s.blockIDs[0]).Return(nil, storage.ErrNotFound)
-			events.On("ByBlockID", s.blockIDs[1]).Return(nil, storage.ErrNotFound)
+			// the first and last blocks are not available from storage, and should be fetched from the EN
+			reporter := syncmock.NewIndexReporter(s.T())
+			reporter.On("LowestIndexedHeight").Return(s.blocks[1].Header.Height, nil)
+			reporter.On("HighestIndexedHeight").Return(s.blocks[3].Header.Height, nil)
+
+			events.On("ByBlockID", s.blockIDs[1]).Return(s.blockEvents, nil)
 			events.On("ByBlockID", s.blockIDs[2]).Return(s.blockEvents, nil)
 			events.On("ByBlockID", s.blockIDs[3]).Return(s.blockEvents, nil)
-			events.On("ByBlockID", s.blockIDs[4]).Return(s.blockEvents, nil)
+
+			err := eventsIndex.Initialize(reporter)
+			s.Require().NoError(err)
 
 			backend := s.defaultBackend()
 			backend.queryMode = tt.queryMode
-			backend.events = events
+			backend.eventsIndex = eventsIndex
 
 			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding)
 			s.Require().NoError(err)

@@ -311,19 +311,19 @@ func (_m *Epoch) FirstView() (uint64, error) {
 }
 
 // InitialIdentities provides a mock function with given fields:
-func (_m *Epoch) InitialIdentities() (flow.IdentityList, error) {
+func (_m *Epoch) InitialIdentities() (flow.GenericIdentityList[flow.IdentitySkeleton], error) {
 	ret := _m.Called()
 
-	var r0 flow.IdentityList
+	var r0 flow.GenericIdentityList[flow.IdentitySkeleton]
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (flow.IdentityList, error)); ok {
+	if rf, ok := ret.Get(0).(func() (flow.GenericIdentityList[flow.IdentitySkeleton], error)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() flow.IdentityList); ok {
+	if rf, ok := ret.Get(0).(func() flow.GenericIdentityList[flow.IdentitySkeleton]); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.IdentityList)
+			r0 = ret.Get(0).(flow.GenericIdentityList[flow.IdentitySkeleton])
 		}
 	}
 
@@ -351,6 +351,54 @@ func (_m *Epoch) RandomSource() ([]byte, error) {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
 		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// TargetDuration provides a mock function with given fields:
+func (_m *Epoch) TargetDuration() (uint64, error) {
+	ret := _m.Called()
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// TargetEndTime provides a mock function with given fields:
+func (_m *Epoch) TargetEndTime() (uint64, error) {
+	ret := _m.Called()
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
 	}
 
 	if rf, ok := ret.Get(1).(func() error); ok {

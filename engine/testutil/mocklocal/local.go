@@ -44,8 +44,8 @@ func (m *MockLocal) MockNodeID(id flow.Identifier) {
 	m.id = id
 }
 
-func (m *MockLocal) NotMeFilter() flow.IdentityFilter {
-	return filter.Not(filter.HasNodeID(m.id))
+func (m *MockLocal) NotMeFilter() flow.IdentityFilter[flow.Identity] {
+	return filter.Not(filter.HasNodeID[flow.Identity](m.id))
 }
 
 func (m *MockLocal) SignFunc(data []byte, hasher hash.Hasher, f func(crypto.PrivateKey, []byte, hash.Hasher) (crypto.Signature,

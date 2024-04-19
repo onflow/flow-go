@@ -162,7 +162,7 @@ func (b *backendAccounts) getAccountFromAnyExeNode(
 	var resp *execproto.GetAccountAtBlockIDResponse
 	errToReturn := b.nodeCommunicator.CallAvailableNode(
 		execNodes,
-		func(node *flow.Identity) error {
+		func(node *flow.IdentitySkeleton) error {
 			var err error
 			start := time.Now()
 
@@ -203,7 +203,7 @@ func (b *backendAccounts) getAccountFromAnyExeNode(
 // tryGetAccount attempts to get the account from the given execution node.
 func (b *backendAccounts) tryGetAccount(
 	ctx context.Context,
-	execNode *flow.Identity,
+	execNode *flow.IdentitySkeleton,
 	req *execproto.GetAccountAtBlockIDRequest,
 ) (*execproto.GetAccountAtBlockIDResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
@@ -353,5 +353,5 @@ func convertAccountError(err error, address flow.Address, height uint64) error {
 		return status.Errorf(codes.NotFound, "account not found")
 	}
 
-	return convertIndexError(err, height, "failed to get account")
+	return rpc.ConvertIndexError(err, height, "failed to get account")
 }

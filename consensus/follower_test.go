@@ -75,7 +75,7 @@ type HotStuffFollowerSuite struct {
 // SetupTest initializes all the components needed for the Follower.
 // The follower itself is instantiated in method BeforeTest
 func (s *HotStuffFollowerSuite) SetupTest() {
-	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
+	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical[flow.Identity])
 	s.mockConsensus = &MockConsensus{identities: identities}
 
 	// mock storage headers

@@ -3,9 +3,11 @@ package types
 import (
 	"math/big"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rlp"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethCrypto "github.com/onflow/go-ethereum/crypto"
+	gethRLP "github.com/onflow/go-ethereum/rlp"
+	gethTrie "github.com/onflow/go-ethereum/trie"
 )
 
 // Block represents a evm block.
@@ -17,10 +19,17 @@ type Block struct {
 	// Height returns the height of this block
 	Height uint64
 
+	// Timestamp is a Unix timestamp in seconds at which the block was created
+	// Note that this value must be provided from the FVM Block
+	Timestamp uint64
+
 	// holds the total amount of the native token deposited in the evm side. (in attoflow)
 	TotalSupply *big.Int
 
 	// ReceiptRoot returns the root hash of the receipts emitted in this block
+	// Note that this value won't be unique to each block, for example for the
+	// case of empty trie of receipts or a single receipt with no logs and failed state
+	// the same receipt root would be reported for block.
 	ReceiptRoot gethCommon.Hash
 
 	// transaction hashes
@@ -29,13 +38,27 @@ type Block struct {
 
 // ToBytes encodes the block into bytes
 func (b *Block) ToBytes() ([]byte, error) {
-	return rlp.EncodeToBytes(b)
+	return gethRLP.EncodeToBytes(b)
 }
 
 // Hash returns the hash of the block
 func (b *Block) Hash() (gethCommon.Hash, error) {
 	data, err := b.ToBytes()
-	return gethCommon.BytesToHash(data), err
+	return gethCrypto.Keccak256Hash(data), err
+}
+
+// PopulateReceiptRoot populates receipt root with the given results
+func (b *Block) PopulateReceiptRoot(results []Result) {
+	if len(results) == 0 {
+		b.ReceiptRoot = gethTypes.EmptyReceiptsHash
+		return
+	}
+
+	receipts := make(gethTypes.Receipts, len(results))
+	for i, res := range results {
+		receipts[i] = res.Receipt()
+	}
+	b.ReceiptRoot = gethTypes.DeriveSha(receipts, gethTrie.NewStackTrie(nil))
 }
 
 // AppendTxHash appends a transaction hash to the list of transaction hashes of the block
@@ -44,12 +67,18 @@ func (b *Block) AppendTxHash(txHash gethCommon.Hash) {
 }
 
 // NewBlock constructs a new block
-func NewBlock(height, uuidIndex uint64, totalSupply *big.Int,
-	stateRoot, receiptRoot gethCommon.Hash,
+func NewBlock(
+	parentBlockHash gethCommon.Hash,
+	height uint64,
+	timestamp uint64,
+	totalSupply *big.Int,
+	receiptRoot gethCommon.Hash,
 	txHashes []gethCommon.Hash,
 ) *Block {
 	return &Block{
+		ParentBlockHash:   parentBlockHash,
 		Height:            height,
+		Timestamp:         timestamp,
 		TotalSupply:       totalSupply,
 		ReceiptRoot:       receiptRoot,
 		TransactionHashes: txHashes,
@@ -59,7 +88,7 @@ func NewBlock(height, uuidIndex uint64, totalSupply *big.Int,
 // NewBlockFromBytes constructs a new block from encoded data
 func NewBlockFromBytes(encoded []byte) (*Block, error) {
 	res := &Block{}
-	err := rlp.DecodeBytes(encoded, res)
+	err := gethRLP.DecodeBytes(encoded, res)
 	return res, err
 }
 
@@ -70,3 +99,5 @@ var GenesisBlock = &Block{
 	TotalSupply:     new(big.Int),
 	ReceiptRoot:     gethTypes.EmptyRootHash,
 }
+
+var GenesisBlockHash, _ = GenesisBlock.Hash()

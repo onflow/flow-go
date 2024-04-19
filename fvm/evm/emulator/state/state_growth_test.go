@@ -10,7 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/utils/io"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/onflow/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
@@ -64,7 +64,7 @@ func (s *storageTest) run(runner func(state types.StateDB)) error {
 
 	runner(state)
 
-	err = state.Commit()
+	err = state.Commit(true)
 	if err != nil {
 		return err
 	}

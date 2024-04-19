@@ -46,16 +46,19 @@ func ComputationResultForBlockFixture(
 
 	numberOfChunks := len(collections) + 1
 	ceds := make([]*execution_data.ChunkExecutionData, numberOfChunks)
+	startState := *completeBlock.StartState
 	for i := 0; i < numberOfChunks; i++ {
 		ceds[i] = unittest.ChunkExecutionDataFixture(t, 1024)
+		endState := unittest.StateCommitmentFixture()
 		computationResult.CollectionExecutionResultAt(i).UpdateExecutionSnapshot(StateInteractionsFixture())
 		computationResult.AppendCollectionAttestationResult(
-			*completeBlock.StartState,
-			*completeBlock.StartState,
+			startState,
+			endState,
 			nil,
 			unittest.IdentifierFixture(),
 			ceds[i],
 		)
+		startState = endState
 	}
 	bed := unittest.BlockExecutionDataFixture(
 		unittest.WithBlockExecutionDataBlockID(completeBlock.Block.ID()),

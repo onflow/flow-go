@@ -11,9 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
-
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -50,7 +47,7 @@ func TestReset_LocalSnapshot(t *testing.T) {
 
 			// compare to expected values
 			expectedArgs := extractResetEpochArgs(rootSnapshot)
-			verifyArguments(t, expectedArgs, outputTxArgs)
+			unittest.VerifyCdcArguments(t, expectedArgs, outputTxArgs)
 		})
 	})
 
@@ -98,7 +95,7 @@ func TestReset_BucketSnapshot(t *testing.T) {
 		rootSnapshot, err := getSnapshotFromBucket(fmt.Sprintf(rootSnapshotBucketURL, flagBucketNetworkName))
 		require.NoError(t, err)
 		expectedArgs := extractResetEpochArgs(rootSnapshot)
-		verifyArguments(t, expectedArgs, outputTxArgs)
+		unittest.VerifyCdcArguments(t, expectedArgs, outputTxArgs)
 	})
 
 	// should output arguments to stdout, including specified payout
@@ -120,7 +117,7 @@ func TestReset_BucketSnapshot(t *testing.T) {
 		rootSnapshot, err := getSnapshotFromBucket(fmt.Sprintf(rootSnapshotBucketURL, flagBucketNetworkName))
 		require.NoError(t, err)
 		expectedArgs := extractResetEpochArgs(rootSnapshot)
-		verifyArguments(t, expectedArgs, outputTxArgs)
+		unittest.VerifyCdcArguments(t, expectedArgs, outputTxArgs)
 	})
 
 	// with a missing snapshot, should log an error
@@ -137,22 +134,6 @@ func TestReset_BucketSnapshot(t *testing.T) {
 
 		assert.Regexp(t, "failed to retrieve root snapshot from bucket", hook.Logs())
 	})
-}
-
-func verifyArguments(t *testing.T, expected []cadence.Value, actual []interface{}) {
-
-	for index, arg := range actual {
-
-		// marshal to bytes
-		bz, err := json.Marshal(arg)
-		require.NoError(t, err)
-
-		// parse cadence value
-		decoded, err := jsoncdc.Decode(nil, bz)
-		require.NoError(t, err)
-
-		assert.Equal(t, expected[index], decoded)
-	}
 }
 
 func writeRootSnapshot(bootDir string, snapshot *inmem.Snapshot) error {

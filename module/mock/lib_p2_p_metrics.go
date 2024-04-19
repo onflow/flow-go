@@ -107,6 +107,16 @@ func (_m *LibP2PMetrics) DNSLookupDuration(duration time.Duration) {
 	_m.Called(duration)
 }
 
+// DuplicateMessagePenalties provides a mock function with given fields: penalty
+func (_m *LibP2PMetrics) DuplicateMessagePenalties(penalty float64) {
+	_m.Called(penalty)
+}
+
+// DuplicateMessagesCounts provides a mock function with given fields: count
+func (_m *LibP2PMetrics) DuplicateMessagesCounts(count float64) {
+	_m.Called(count)
+}
+
 // InboundConnections provides a mock function with given fields: connectionCount
 func (_m *LibP2PMetrics) InboundConnections(connectionCount uint) {
 	_m.Called(connectionCount)
@@ -177,9 +187,14 @@ func (_m *LibP2PMetrics) OnGraftDuplicateTopicIdsExceedThreshold() {
 	_m.Called()
 }
 
-// OnGraftMessageInspected provides a mock function with given fields: duplicateTopicIds
-func (_m *LibP2PMetrics) OnGraftMessageInspected(duplicateTopicIds int) {
-	_m.Called(duplicateTopicIds)
+// OnGraftInvalidTopicIdsExceedThreshold provides a mock function with given fields:
+func (_m *LibP2PMetrics) OnGraftInvalidTopicIdsExceedThreshold() {
+	_m.Called()
+}
+
+// OnGraftMessageInspected provides a mock function with given fields: duplicateTopicIds, invalidTopicIds
+func (_m *LibP2PMetrics) OnGraftMessageInspected(duplicateTopicIds int, invalidTopicIds int) {
+	_m.Called(duplicateTopicIds, invalidTopicIds)
 }
 
 // OnIHaveControlMessageIdsTruncated provides a mock function with given fields: diff
@@ -197,14 +212,19 @@ func (_m *LibP2PMetrics) OnIHaveDuplicateTopicIdsExceedThreshold() {
 	_m.Called()
 }
 
+// OnIHaveInvalidTopicIdsExceedThreshold provides a mock function with given fields:
+func (_m *LibP2PMetrics) OnIHaveInvalidTopicIdsExceedThreshold() {
+	_m.Called()
+}
+
 // OnIHaveMessageIDsReceived provides a mock function with given fields: channel, msgIdCount
 func (_m *LibP2PMetrics) OnIHaveMessageIDsReceived(channel string, msgIdCount int) {
 	_m.Called(channel, msgIdCount)
 }
 
-// OnIHaveMessagesInspected provides a mock function with given fields: duplicateTopicIds, duplicateMessageIds
-func (_m *LibP2PMetrics) OnIHaveMessagesInspected(duplicateTopicIds int, duplicateMessageIds int) {
-	_m.Called(duplicateTopicIds, duplicateMessageIds)
+// OnIHaveMessagesInspected provides a mock function with given fields: duplicateTopicIds, duplicateMessageIds, invalidTopicIds
+func (_m *LibP2PMetrics) OnIHaveMessagesInspected(duplicateTopicIds int, duplicateMessageIds int, invalidTopicIds int) {
+	_m.Called(duplicateTopicIds, duplicateMessageIds, invalidTopicIds)
 }
 
 // OnIPColocationFactorUpdated provides a mock function with given fields: _a0
@@ -347,9 +367,14 @@ func (_m *LibP2PMetrics) OnPruneDuplicateTopicIdsExceedThreshold() {
 	_m.Called()
 }
 
-// OnPruneMessageInspected provides a mock function with given fields: duplicateTopicIds
-func (_m *LibP2PMetrics) OnPruneMessageInspected(duplicateTopicIds int) {
-	_m.Called(duplicateTopicIds)
+// OnPruneInvalidTopicIdsExceedThreshold provides a mock function with given fields:
+func (_m *LibP2PMetrics) OnPruneInvalidTopicIdsExceedThreshold() {
+	_m.Called()
+}
+
+// OnPruneMessageInspected provides a mock function with given fields: duplicateTopicIds, invalidTopicIds
+func (_m *LibP2PMetrics) OnPruneMessageInspected(duplicateTopicIds int, invalidTopicIds int) {
+	_m.Called(duplicateTopicIds, invalidTopicIds)
 }
 
 // OnPublishMessageInspected provides a mock function with given fields: totalErrCount, invalidTopicIdsCount, invalidSubscriptionsCount, invalidSendersCount
@@ -365,6 +390,11 @@ func (_m *LibP2PMetrics) OnPublishMessagesInspectionErrorExceedsThreshold() {
 // OnRpcReceived provides a mock function with given fields: msgCount, iHaveCount, iWantCount, graftCount, pruneCount
 func (_m *LibP2PMetrics) OnRpcReceived(msgCount int, iHaveCount int, iWantCount int, graftCount int, pruneCount int) {
 	_m.Called(msgCount, iHaveCount, iWantCount, graftCount, pruneCount)
+}
+
+// OnRpcRejectedFromUnknownSender provides a mock function with given fields:
+func (_m *LibP2PMetrics) OnRpcRejectedFromUnknownSender() {
+	_m.Called()
 }
 
 // OnRpcSent provides a mock function with given fields: msgCount, iHaveCount, iWantCount, graftCount, pruneCount

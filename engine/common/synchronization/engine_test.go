@@ -367,7 +367,7 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 func (ss *SyncSuite) TestPollHeight() {
 
 	// check that we send to three nodes from our total list
-	others := ss.participants.Filter(filter.HasNodeID(ss.participants[1:].NodeIDs()...))
+	others := ss.participants.Filter(filter.HasNodeID[flow.Identity](ss.participants[1:].NodeIDs()...))
 	ss.con.On("Multicast", mock.Anything, synccore.DefaultPollNodes, others[0].NodeID, others[1].NodeID).Return(nil).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.SyncRequest)

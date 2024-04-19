@@ -97,16 +97,61 @@ Each input is a config file specified as a command line parameter:
 
 #### Example
 ```bash
-go run ./cmd/bootstrap finalize \
-  --root-chain main \
-  --root-height 0 \
-  --root-parent 0000000000000000000000000000000000000000000000000000000000000000 \
-  --root-commit 4b8d01975cf0cd23e046b1fae36518e542f92a6e35bedd627c43da30f4ae761a \
-  --config ./cmd/bootstrap/example_files/node-config.json \
-  --partner-dir ./cmd/bootstrap/example_files/partner-node-infos \
-  --partner-weights ./cmd/bootstrap/example_files/partner-weights.json \
-  --epoch-counter 1 \
-  -o ./bootstrap/root-infos
+go run . genconfig \
+    --address-format "%s%d-example.onflow.org:3569" \
+    --access 2 \
+    --collection 4 \
+    --consensus 3 \
+    --execution 2 \
+    --verification 3 \
+    --weight 100 \
+    -o ./ \
+    --config ./bootstrap-example/node-config.json
+
+```
+
+```bash
+go run . keygen \
+    --machine-account \
+    --config ./bootstrap-example/node-config.json \
+    -o ./bootstrap-example/keys
+
+```
+
+```bash
+go run . rootblock  \
+    --root-chain bench \
+    --root-height 0 \
+    --root-parent 0000000000000000000000000000000000000000000000000000000000000000 \
+    --epoch-counter 0 \
+    --epoch-length 30000 \
+    --epoch-staking-phase-length 20000 \
+    --epoch-dkg-phase-length 2000 \
+    --collection-clusters 1 \
+    --protocol-version=0 \
+    --use-default-epoch-timing \
+    --epoch-commit-safety-threshold=1000 \
+    --config ./bootstrap-example/node-config.json \
+    -o ./bootstrap-example \
+    --partner-dir ./example_files/partner-node-infos \
+    --partner-weights ./example_files/partner-weights.json \
+    --internal-priv-dir ./bootstrap-example/keys
+```
+
+```bash
+go run . finalize \
+    --config ./bootstrap-example/node-config.json \
+    --partner-dir ./example_files/partner-node-infos \
+    --partner-weights ./example_files/partner-weights.json \
+    --internal-priv-dir ./bootstrap-example/keys/private-root-information \
+    --dkg-data ./bootstrap-example/private-root-information/root-dkg-data.priv.json \
+    --root-block ./bootstrap-example/public-root-information/root-block.json \
+    --intermediary-bootstrapping-data ./bootstrap-example/public-root-information/intermediary-bootstrapping-data.json \
+    --root-block-votes-dir ./bootstrap-example/public-root-information/root-block-votes/ \
+    --root-commit 0000000000000000000000000000000000000000000000000000000000000000 \
+    --genesis-token-supply="1000000000.0" \
+    --service-account-public-key-json "{\"PublicKey\":\"R7MTEDdLclRLrj2MI1hcp4ucgRTpR15PCHAWLM5nks6Y3H7+PGkfZTP2di2jbITooWO4DD1yqaBSAVK8iQ6i0A==\",\"SignAlgo\":2,\"HashAlgo\":1,\"SeqNumber\":0,\"Weight\":1000}" \
+    -o ./bootstrap-example
 ```
 
 #### Generated output files

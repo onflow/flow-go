@@ -40,11 +40,11 @@ func TestCombinedSignWithBeaconKeyV3(t *testing.T) {
 	beaconKeyStore.On("ByView", view).Return(beaconKey, nil)
 
 	stakingPriv := unittest.StakingPrivKeyFixture()
-	nodeID := unittest.IdentityFixture()
+	nodeID := &unittest.IdentityFixture().IdentitySkeleton
 	nodeID.NodeID = signerID
 	nodeID.StakingPubKey = stakingPriv.PublicKey()
 
-	me, err := local.New(nodeID, stakingPriv)
+	me, err := local.New(*nodeID, stakingPriv)
 	require.NoError(t, err)
 	signer := NewCombinedSignerV3(me, beaconKeyStore)
 
@@ -100,11 +100,11 @@ func TestCombinedSignWithNoBeaconKeyV3(t *testing.T) {
 	beaconKeyStore.On("ByView", view).Return(nil, module.ErrNoBeaconKeyForEpoch)
 
 	stakingPriv := unittest.StakingPrivKeyFixture()
-	nodeID := unittest.IdentityFixture()
+	nodeID := &unittest.IdentityFixture().IdentitySkeleton
 	nodeID.NodeID = signerID
 	nodeID.StakingPubKey = stakingPriv.PublicKey()
 
-	me, err := local.New(nodeID, stakingPriv)
+	me, err := local.New(*nodeID, stakingPriv)
 	require.NoError(t, err)
 	signer := NewCombinedSignerV3(me, beaconKeyStore)
 
@@ -161,7 +161,7 @@ func Test_VerifyQCV3(t *testing.T) {
 	stakingSigners := generateIdentitiesForPrivateKeys(t, privStakingKeys)
 	rbSigners := generateIdentitiesForPrivateKeys(t, privRbKeyShares)
 	registerPublicRbKeys(t, dkg, rbSigners.NodeIDs(), privRbKeyShares)
-	allSigners := append(append(flow.IdentityList{}, stakingSigners...), rbSigners...)
+	allSigners := append(append(flow.IdentityList{}, stakingSigners...), rbSigners...).ToSkeleton()
 
 	packedSigData := unittest.RandomBytes(1021)
 	unpackedSigData := hotstuff.BlockSignatureData{
@@ -272,7 +272,7 @@ func Test_VerifyQC_EmptySignersV3(t *testing.T) {
 	sigData, err := encoder.Encode(&emptySignersInput)
 	require.NoError(t, err)
 
-	err = verifier.VerifyQC([]*flow.Identity{}, sigData, block.View, block.BlockID)
+	err = verifier.VerifyQC(flow.IdentitySkeletonList{}, sigData, block.View, block.BlockID)
 	require.True(t, model.IsInsufficientSignaturesError(err))
 
 	err = verifier.VerifyQC(nil, sigData, block.View, block.BlockID)
@@ -290,7 +290,7 @@ func TestCombinedSign_BeaconKeyStore_ViewForUnknownEpochv3(t *testing.T) {
 	nodeID := unittest.IdentityFixture()
 	nodeID.StakingPubKey = stakingPriv.PublicKey()
 
-	me, err := local.New(nodeID, stakingPriv)
+	me, err := local.New(nodeID.IdentitySkeleton, stakingPriv)
 	require.NoError(t, err)
 	signer := NewCombinedSigner(me, beaconKeyStore)
 

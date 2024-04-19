@@ -13,6 +13,10 @@ type DKG struct {
 
 var _ protocol.DKG = (*DKG)(nil)
 
+func NewDKG(enc EncodableDKG) *DKG {
+	return &DKG{enc: enc}
+}
+
 func (d DKG) Size() uint                 { return uint(len(d.enc.Participants)) }
 func (d DKG) GroupKey() crypto.PublicKey { return d.enc.GroupKey.PublicKey }
 

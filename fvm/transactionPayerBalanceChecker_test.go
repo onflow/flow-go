@@ -52,7 +52,7 @@ func TestTransactionPayerBalanceChecker(t *testing.T) {
 		d := fvm.TransactionPayerBalanceChecker{}
 		maxFees, err := d.CheckPayerBalanceAndReturnMaxFees(proc, txnState, env)
 		require.Error(t, err)
-		require.True(t, errors.HasErrorCode(err, errors.FailureCodePayerBalanceCheckFailure))
+		require.True(t, errors.HasFailureCode(err, errors.FailureCodePayerBalanceCheckFailure))
 		require.ErrorIs(t, err, someError)
 		require.Equal(t, uint64(0), maxFees)
 	})
@@ -73,7 +73,7 @@ func TestTransactionPayerBalanceChecker(t *testing.T) {
 		d := fvm.TransactionPayerBalanceChecker{}
 		maxFees, err := d.CheckPayerBalanceAndReturnMaxFees(proc, txnState, env)
 		require.Error(t, err)
-		require.True(t, errors.HasErrorCode(err, errors.FailureCodePayerBalanceCheckFailure))
+		require.True(t, errors.HasFailureCode(err, errors.FailureCodePayerBalanceCheckFailure))
 		require.Equal(t, uint64(0), maxFees)
 	})
 

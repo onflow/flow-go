@@ -33,17 +33,19 @@ type ScoreOption struct {
 	defaultTopicScoreParams *pubsub.TopicScoreParams
 	validator               p2p.SubscriptionValidator
 	appScoreFunc            func(peer.ID) float64
+	appScoreRegistry        *GossipSubAppSpecificScoreRegistry
 }
 
 type ScoreOptionConfig struct {
-	logger                           zerolog.Logger
-	params                           p2pconfig.ScoringParameters
-	provider                         module.IdentityProvider
-	heroCacheMetricsFactory          metrics.HeroCacheMetricsFactory
-	appScoreFunc                     func(peer.ID) float64
-	topicParams                      []func(map[string]*pubsub.TopicScoreParams)
-	registerNotificationConsumerFunc func(p2p.GossipSubInvCtrlMsgNotifConsumer)
-	networkingType                   network.NetworkingType
+	logger                          zerolog.Logger
+	params                          p2pconfig.ScoringParameters
+	provider                        module.IdentityProvider
+	heroCacheMetricsFactory         metrics.HeroCacheMetricsFactory
+	appScoreFunc                    func(peer.ID) float64
+	topicParams                     []func(map[string]*pubsub.TopicScoreParams)
+	getDuplicateMessageCount        func(id peer.ID) float64
+	scoringRegistryMetricsCollector module.GossipSubScoringRegistryMetrics
+	networkingType                  network.NetworkingType
 }
 
 // NewScoreOptionConfig creates a new configuration for the GossipSub peer scoring option.
@@ -57,15 +59,19 @@ type ScoreOptionConfig struct {
 func NewScoreOptionConfig(logger zerolog.Logger,
 	params p2pconfig.ScoringParameters,
 	hcMetricsFactory metrics.HeroCacheMetricsFactory,
+	scoringRegistryMetricsCollector module.GossipSubScoringRegistryMetrics,
 	idProvider module.IdentityProvider,
+	getDuplicateMessageCount func(id peer.ID) float64,
 	networkingType network.NetworkingType) *ScoreOptionConfig {
 	return &ScoreOptionConfig{
-		logger:                  logger.With().Str("module", "pubsub_score_option").Logger(),
-		provider:                idProvider,
-		params:                  params,
-		heroCacheMetricsFactory: hcMetricsFactory,
-		topicParams:             make([]func(map[string]*pubsub.TopicScoreParams), 0),
-		networkingType:          networkingType,
+		logger:                          logger.With().Str("module", "pubsub_score_option").Logger(),
+		provider:                        idProvider,
+		params:                          params,
+		heroCacheMetricsFactory:         hcMetricsFactory,
+		topicParams:                     make([]func(map[string]*pubsub.TopicScoreParams), 0),
+		networkingType:                  networkingType,
+		getDuplicateMessageCount:        getDuplicateMessageCount,
+		scoringRegistryMetricsCollector: scoringRegistryMetricsCollector,
 	}
 }
 
@@ -85,13 +91,6 @@ func (c *ScoreOptionConfig) OverrideTopicScoreParams(topic channels.Topic, topic
 	c.topicParams = append(c.topicParams, func(topics map[string]*pubsub.TopicScoreParams) {
 		topics[topic.String()] = topicScoreParams
 	})
-}
-
-// SetRegisterNotificationConsumerFunc sets the function to register the notification consumer for the penalty option.
-// ScoreOption uses this function to register the notification consumer for the pubsub system so that it can receive
-// notifications of invalid control messages.
-func (c *ScoreOptionConfig) SetRegisterNotificationConsumerFunc(f func(p2p.GossipSubInvCtrlMsgNotifConsumer)) {
-	c.registerNotificationConsumerFunc = f
 }
 
 // NewScoreOption creates a new penalty option with the given configuration.
@@ -122,9 +121,14 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 				InitAppScoreRecordStateFunc(cfg.params.ScoringRegistryParameters.SpamRecordCache.Decay.MaximumSpamPenaltyDecayFactor),
 				DefaultDecayFunction(cfg.params.ScoringRegistryParameters.SpamRecordCache.Decay))
 		},
-		Parameters:             cfg.params.ScoringRegistryParameters.AppSpecificScore,
-		NetworkingType:         cfg.networkingType,
-		AppSpecificScoreParams: cfg.params.PeerScoring.Protocol.AppSpecificScore,
+		GetDuplicateMessageCount: func(id peer.ID) float64 {
+			return cfg.getDuplicateMessageCount(id)
+		},
+		Parameters:                cfg.params.ScoringRegistryParameters.AppSpecificScore,
+		NetworkingType:            cfg.networkingType,
+		AppSpecificScoreParams:    cfg.params.PeerScoring.Protocol.AppSpecificScore,
+		DuplicateMessageThreshold: cfg.params.PeerScoring.Protocol.AppSpecificScore.DuplicateMessageThreshold,
+		Collector:                 cfg.scoringRegistryMetricsCollector,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossipsub app specific score registry: %w", err)
@@ -176,7 +180,8 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 			MeshMessageDeliveriesWindow:     cfg.params.PeerScoring.Internal.TopicParameters.MeshMessageDeliveriesWindow,
 			MeshMessageDeliveriesActivation: cfg.params.PeerScoring.Internal.TopicParameters.MeshMessageDeliveryActivation,
 		},
-		appScoreFunc: scoreRegistry.AppSpecificScoreFunc(),
+		appScoreFunc:     scoreRegistry.AppSpecificScoreFunc(),
+		appScoreRegistry: scoreRegistry,
 	}
 
 	// set the app specific penalty function for the penalty option
@@ -197,11 +202,6 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 			Str(logging.KeyNetworkingSecurity, "true").
 			Dur("decay_interval_ms", cfg.params.PeerScoring.Internal.DecayInterval).
 			Msg("decay interval is overridden, should never happen in production")
-	}
-
-	// registers the score registry as the consumer of the invalid control message notifications
-	if cfg.registerNotificationConsumerFunc != nil {
-		cfg.registerNotificationConsumerFunc(scoreRegistry)
 	}
 
 	s.peerScoreParams.AppSpecificScore = s.appScoreFunc
@@ -264,4 +264,12 @@ func (s *ScoreOption) TopicScoreParams(topic *pubsub.Topic) *pubsub.TopicScorePa
 		return s.defaultTopicScoreParams
 	}
 	return params
+}
+
+// OnInvalidControlMessageNotification is called when a new invalid control message notification is distributed.
+// Any error on consuming event must handle internally.
+// The implementation must be concurrency safe and non-blocking.
+// Note: there is no real-time guarantee on processing the notification.
+func (s *ScoreOption) OnInvalidControlMessageNotification(notif *p2p.InvCtrlMsgNotif) {
+	s.appScoreRegistry.OnInvalidControlMessageNotification(notif)
 }
