@@ -60,7 +60,7 @@ var findEmptyEvents = &cobra.Command{
 		for height := flagStartHeight; height <= flagEndHeight; height++ {
 			logging(1)
 			// just fetch events for block
-			blockID, err := storages.Headers.BlockIDByHeight(height)
+			blockID, err := storages2.Headers.BlockIDByHeight(height)
 			if err != nil {
 				log.Error().Err(err).Msgf("could not get block id for height: %v", height)
 				continue
