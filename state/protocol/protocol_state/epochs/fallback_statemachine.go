@@ -21,7 +21,14 @@ var _ StateMachine = (*FallbackStateMachine)(nil)
 // InvalidEpochTransitionAttempted to true, thereby recording that we have entered epoch fallback mode.
 func NewFallbackStateMachine(params protocol.GlobalParams, view uint64, parentState *flow.RichProtocolStateEntry) *FallbackStateMachine {
 	state := parentState.ProtocolStateEntry.Copy()
-	state.InvalidEpochTransitionAttempted = true
+	if !state.InvalidEpochTransitionAttempted {
+		// we are entering fallback mode for the first time
+		// if the next epoch is not committed, we need to drop it.
+		if state.EpochPhase() != flow.EpochPhaseCommitted {
+			state.NextEpoch = nil
+		}
+		state.InvalidEpochTransitionAttempted = true
+	}
 
 	if view+params.EpochCommitSafetyThreshold() >= parentState.CurrentEpochFinalView() {
 		// we have reached safety threshold and we are still in the fallback mode
