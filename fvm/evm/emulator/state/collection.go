@@ -51,10 +51,14 @@ func (cp *CollectionProvider) CollectionByID(collectionID []byte) (*Collection, 
 	if err != nil {
 		return nil, err
 	}
-	// TODO: sanity check the slab ID address
-	// if slabID.Address != cp.rootAddr {
-	// return nil, fmt.Errorf("root address mismatch %x != %x", storageID.Address, cp.rootAddr)
-	// }
+
+	// sanity check the slab ID address
+	var address atree.Address
+	binary.BigEndian.PutUint64(address[:], slabID.AddressAsUint64())
+
+	if address != cp.rootAddr {
+		return nil, fmt.Errorf("root address mismatch %x != %x", address, cp.rootAddr)
+	}
 
 	omap, err := atree.NewMapWithRootID(cp.storage, slabID, atree.NewDefaultDigesterBuilder())
 	if err != nil {
