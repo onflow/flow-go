@@ -48,9 +48,9 @@ contract Storage {
         selfdestruct(payable(msg.sender));
     }
 
-    function verifyArchCallToRevertibleRandom() public view returns (uint64) {
-        (bool ok, bytes memory data) = cadenceArch.staticcall(abi.encodeWithSignature("revertibleRandom()"));
-        require(ok, "unsuccessful call to arch ");
+    function verifyArchCallToRandomSource(uint64 height) public view returns (uint64) {
+        (bool ok, bytes memory data) = cadenceArch.staticcall(abi.encodeWithSignature("getRandomSource(uint64)", height));
+        //require(ok, "unsuccessful call to arch ");
         uint64 output = abi.decode(data, (uint64));
         return output;
     }
