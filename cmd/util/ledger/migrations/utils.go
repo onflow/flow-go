@@ -29,9 +29,9 @@ func checkStorageHealth(
 		}
 
 		// Convert the register ID to a storage ID.
-		slabID := atree.NewStorageID(
+		slabID := atree.NewSlabID(
 			atree.Address([]byte(registerID.Owner)),
-			atree.StorageIndex([]byte(registerID.Key[1:])))
+			atree.SlabIndex([]byte(registerID.Key[1:])))
 
 		// Retrieve the slab.
 		_, _, err = storage.Retrieve(slabID)
