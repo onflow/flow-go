@@ -293,7 +293,7 @@ func NewCadence1ValueMigrator(
 	}
 
 	return &CadenceBaseMigrator{
-		name:                              "cadence-value-migration",
+		name:                              "cadence_value_migration",
 		reporter:                          rwf.ReportWriter(cadenceValueMigrationReporterName),
 		diffReporter:                      diffReporter,
 		logVerboseDiff:                    opts.LogVerboseDiff,
@@ -334,7 +334,7 @@ func NewCadence1LinkValueMigrator(
 	}
 
 	return &CadenceBaseMigrator{
-		name:                              "cadence-link-value-migration",
+		name:                              "cadence_link_value_migration",
 		reporter:                          rwf.ReportWriter("cadence-link-value-migrator"),
 		diffReporter:                      diffReporter,
 		logVerboseDiff:                    opts.LogVerboseDiff,
@@ -381,7 +381,7 @@ func NewCadence1CapabilityValueMigrator(
 	}
 
 	return &CadenceBaseMigrator{
-		name:                              "cadence-capability-value-migration",
+		name:                              "cadence_capability_value_migration",
 		reporter:                          rwf.ReportWriter("cadence-capability-value-migrator"),
 		diffReporter:                      diffReporter,
 		logVerboseDiff:                    opts.LogVerboseDiff,
