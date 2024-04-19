@@ -30,7 +30,6 @@ import (
 )
 
 func TestLoadTypes(t *testing.T) {
-	t.Fail()
 	log := zerolog.New(zerolog.NewTestWriter(t))
 
 	evmLoad := load.NewEVMTransferLoad(log)
