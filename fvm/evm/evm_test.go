@@ -855,6 +855,94 @@ func TestCadenceArch(t *testing.T) {
 			})
 	})
 
+	t.Run("testing calling Cadence arch - random source (failed due to incorrect height)", func(t *testing.T) {
+		chain := flow.Emulator.Chain()
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				// we must record a new heartbeat with a fixed block, we manually execute a transaction to do so,
+				// since doing this automatically would require a block computer and whole execution setup
+				height := uint64(1)
+				block1 := unittest.BlockFixture()
+				block1.Header.Height = height
+				ctx.BlockHeader = block1.Header
+
+				txBody := flow.NewTransactionBody().
+					SetScript([]byte(fmt.Sprintf(`
+						import RandomBeaconHistory from %s
+
+						transaction {
+							prepare(serviceAccount: AuthAccount) {
+								let randomBeaconHistoryHeartbeat = serviceAccount.borrow<&RandomBeaconHistory.Heartbeat>(
+									from: RandomBeaconHistory.HeartbeatStoragePath)
+										?? panic("Couldn't borrow RandomBeaconHistory.Heartbeat Resource")
+								randomBeaconHistoryHeartbeat.heartbeat(randomSourceHistory: randomSourceHistory())
+							}
+						}`, sc.RandomBeaconHistory.Address.HexWithPrefix())),
+					).
+					AddAuthorizer(sc.FlowServiceAccount.Address)
+
+				s, out, err := vm.Run(ctx, fvm.Transaction(txBody, 0), snapshot)
+				require.NoError(t, err)
+				require.NoError(t, out.Err)
+
+				snapshot = snapshot.Append(s)
+
+				height = 1337 // invalid
+				// we make sure the transaction fails, due to requested height being invalid
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					access(all)
+					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
+						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+						let res = EVM.run(tx: tx, coinbase: coinbase)
+					}
+                    `,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				// we fake progressing to new block height since random beacon does the check the
+				// current height (2) is bigger than the height requested (1)
+				block1.Header.Height = 2
+				ctx.BlockHeader = block1.Header
+
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "verifyArchCallToRandomSource", height),
+					big.NewInt(0),
+					uint64(10_000_000),
+					big.NewInt(0),
+				)
+				script := fvm.Script(code).WithArguments(
+					json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(innerTxBytes),
+						).WithType(stdlib.EVMTransactionBytesCadenceType),
+					),
+					json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(testAccount.Address().Bytes()),
+						).WithType(stdlib.EVMAddressBytesCadenceType),
+					),
+				)
+				_, output, err := vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				// make sure the error is correct
+				require.ErrorContains(t, output.Err, "Source of randomness not yet recorded")
+			})
+	})
+
 	t.Run("testing calling Cadence arch - COA ownership proof (happy case)", func(t *testing.T) {
 		chain := flow.Emulator.Chain()
 		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
