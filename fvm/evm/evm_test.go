@@ -756,7 +756,7 @@ func TestCadenceArch(t *testing.T) {
 			})
 	})
 
-	t.Run("testing calling Cadence arch - revertible random (happy case)", func(t *testing.T) {
+	t.Run("testing calling Cadence arch - random source (happy case)", func(t *testing.T) {
 		chain := flow.Emulator.Chain()
 		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 		RunWithNewEnvironment(t,
@@ -767,22 +767,61 @@ func TestCadenceArch(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
+				entropy := []byte{13, 37}
+				source := []byte{91, 161, 206, 171, 100, 17, 141, 44} // coresponding out to the above entropy
+
+				// we must record a new heartbeat with a fixed block, we manually execute a transaction to do so,
+				// since doing this automatically would require a block computer and whole execution setup
+				height := uint64(1)
+				block1 := unittest.BlockFixture()
+				block1.Header.Height = height
+				ctx.BlockHeader = block1.Header
+				ctx.EntropyProvider = testutil.EntropyProviderFixture(entropy) // fix the entropy
+
+				txBody := flow.NewTransactionBody().
+					SetScript([]byte(fmt.Sprintf(`
+						import RandomBeaconHistory from %s
+
+						transaction {
+							prepare(serviceAccount: AuthAccount) {
+								let randomBeaconHistoryHeartbeat = serviceAccount.borrow<&RandomBeaconHistory.Heartbeat>(
+									from: RandomBeaconHistory.HeartbeatStoragePath)
+										?? panic("Couldn't borrow RandomBeaconHistory.Heartbeat Resource")
+								randomBeaconHistoryHeartbeat.heartbeat(randomSourceHistory: randomSourceHistory())
+							}
+						}`, sc.RandomBeaconHistory.Address.HexWithPrefix())),
+					).
+					AddAuthorizer(sc.FlowServiceAccount.Address)
+
+				s, out, err := vm.Run(ctx, fvm.Transaction(txBody, 0), snapshot)
+				require.NoError(t, err)
+				require.NoError(t, out.Err)
+
+				snapshot = snapshot.Append(s)
+
 				code := []byte(fmt.Sprintf(
 					`
 					import EVM from %s
 
 					access(all)
-					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
+					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): [UInt8] {
 						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-						return EVM.run(tx: tx, coinbase: coinbase)
+						let res = EVM.run(tx: tx, coinbase: coinbase)
+						assert(res.status == EVM.Status.successful, message: "evm tx wrong status")
+						return res.data
 					}
                     `,
 					sc.EVMContract.Address.HexWithPrefix(),
 				))
 
+				// we fake progressing to new block height since random beacon does the check the
+				// current height (2) is bigger than the height requested (1)
+				block1.Header.Height = 2
+				ctx.BlockHeader = block1.Header
+
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
-					testContract.MakeCallData(t, "verifyArchCallToRevertibleRandom"),
+					testContract.MakeCallData(t, "verifyArchCallToRandomSource", height),
 					big.NewInt(0),
 					uint64(10_000_000),
 					big.NewInt(0),
@@ -805,6 +844,14 @@ func TestCadenceArch(t *testing.T) {
 					snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
+
+				res := make([]byte, 8)
+				vals := output.Value.(cadence.Array).Values
+				vals = vals[len(vals)-8:] // only last 8 bytes is the value
+				for i := range res {
+					res[i] = vals[i].ToGoValue().(byte)
+				}
+				require.Equal(t, source, res)
 			})
 	})
 
@@ -1173,6 +1220,7 @@ func RunWithNewEnvironment(
 					fvm.WithAuthorizationChecksEnabled(false),
 					fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 					fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
+					fvm.WithRandomSourceHistoryCallAllowed(true),
 					fvm.WithBlocks(blocks),
 				}
 				ctx := fvm.NewContext(opts...)
