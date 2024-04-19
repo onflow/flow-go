@@ -2,6 +2,7 @@ package epochs
 
 import (
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // FallbackStateMachine is a special structure that encapsulates logic for processing service events
@@ -18,9 +19,20 @@ var _ StateMachine = (*FallbackStateMachine)(nil)
 
 // NewFallbackStateMachine constructs a state machine for epoch fallback, it automatically sets
 // InvalidEpochTransitionAttempted to true, thereby recording that we have entered epoch fallback mode.
-func NewFallbackStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) *FallbackStateMachine {
+func NewFallbackStateMachine(params protocol.GlobalParams, view uint64, parentState *flow.RichProtocolStateEntry) *FallbackStateMachine {
 	state := parentState.ProtocolStateEntry.Copy()
 	state.InvalidEpochTransitionAttempted = true
+
+	if view+params.EpochCommitSafetyThreshold() >= parentState.CurrentEpochFinalView() {
+		// we have reached safety threshold and we are still in the fallback mode
+		// prepare a new extension for the current epoch.
+		state.CurrentEpoch.EpochExtensions = append(state.CurrentEpoch.EpochExtensions, flow.EpochExtension{
+			FirstView:     parentState.CurrentEpochFinalView() + 1,
+			FinalView:     parentState.CurrentEpochFinalView() + 1 + 1_000, // TODO: replace with EpochExtensionLength
+			TargetEndTime: 0,                                               // TODO: calculate and set target end time
+		})
+	}
+
 	return &FallbackStateMachine{
 		baseStateMachine: baseStateMachine{
 			parentState: parentState,

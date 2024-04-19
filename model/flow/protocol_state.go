@@ -2,6 +2,7 @@ package flow
 
 import (
 	"fmt"
+	clone "github.com/huandu/go-clone/generic"
 
 	"golang.org/x/exp/slices"
 )
@@ -59,6 +60,20 @@ type EpochStateContainer struct {
 	// epoch are only allowed to listen to the network but not actively contribute. Such
 	// nodes are _not_ part of `Identities`.
 	ActiveIdentities DynamicIdentityEntryList
+
+	// EpochExtensions represents extensions to the last successful epoch in EFM. In the happy path it is nil.
+	// Epochs in which EFM is triggered will have at least one EpochExtension.
+	// Extensions is an ordered list, such that for each consecutive pair of
+	// EpochExtensions e1, e2, e1.FinalView+1 = e2.FirstView.
+	EpochExtensions []EpochExtension
+}
+
+// EpochExtension represents a range of views, which contiguously extends the
+// current epoch E.
+type EpochExtension struct {
+	FirstView     uint64
+	FinalView     uint64
+	TargetEndTime uint64
 }
 
 // ID returns an identifier for this EpochStateContainer by hashing internal fields.
@@ -90,6 +105,7 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 		SetupID:          c.SetupID,
 		CommitID:         c.CommitID,
 		ActiveIdentities: c.ActiveIdentities.Copy(),
+		EpochExtensions:  clone.Clone(c.EpochExtensions),
 	}
 }
 
@@ -278,6 +294,13 @@ func (e *RichProtocolStateEntry) Copy() *RichProtocolStateEntry {
 		CurrentEpochIdentityTable: e.CurrentEpochIdentityTable.Copy(),
 		NextEpochIdentityTable:    e.NextEpochIdentityTable.Copy(),
 	}
+}
+
+func (e *RichProtocolStateEntry) CurrentEpochFinalView() uint64 {
+	if len(e.CurrentEpoch.EpochExtensions) > 1 {
+		return e.CurrentEpoch.EpochExtensions[len(e.CurrentEpoch.EpochExtensions)-1].FinalView
+	}
+	return e.CurrentEpochSetup.FinalView
 }
 
 // EpochPhase returns the current epoch phase.
