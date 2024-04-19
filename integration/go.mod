@@ -361,5 +361,3 @@ require (
 replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/insecure => ../insecure
-
-replace github.com/onflow/flow-emulator v0.61.2-0.20240404201132-f53137a8e4cb => github.com/The-K-R-O-K/flow-emulator v0.61.2-0.20240405094817-617a62ed021c
