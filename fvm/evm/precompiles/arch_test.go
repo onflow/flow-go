@@ -38,6 +38,34 @@ func TestArchContract(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("test get random source", func(t *testing.T) {
+		address := testutils.RandomAddress(t)
+		rand := uint64(1337)
+		pc := precompiles.ArchContract(
+			address,
+			nil,
+			nil,
+			func(u uint64) (uint64, error) {
+				return rand, nil
+			},
+		)
+
+		require.Equal(t, address, pc.Address())
+
+		height := make([]byte, 32)
+		require.NoError(t, precompiles.EncodeUint64(13, height, 0))
+
+		input := append(precompiles.RandomSourceFuncSig.Bytes(), height...)
+		require.Equal(t, precompiles.RandomSourceGas, pc.RequiredGas(input))
+
+		ret, err := pc.Run(input)
+		require.NoError(t, err)
+
+		resultRand, err := precompiles.ReadUint64(ret, 0)
+		require.NoError(t, err)
+		require.Equal(t, rand, resultRand)
+	})
+
 	t.Run("test proof verification", func(t *testing.T) {
 		proof := testutils.COAOwnershipProofInContextFixture(t)
 		pc := precompiles.ArchContract(
