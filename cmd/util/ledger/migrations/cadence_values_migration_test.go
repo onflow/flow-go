@@ -1404,7 +1404,13 @@ func TestDictionaryKeyConflictEntry_MarshalJSON(t *testing.T) {
 	t.Parallel()
 
 	e := dictionaryKeyConflictEntry{
-		Key: interpreter.StringStorageMapKey("test"),
+		AddressPath: interpreter.AddressPath{
+			Address: common.MustBytesToAddress([]byte{0x1}),
+			Path: interpreter.PathValue{
+				Domain:     common.PathDomainPublic,
+				Identifier: "test",
+			},
+		},
 	}
 
 	actual, err := e.MarshalJSON()
@@ -1414,7 +1420,8 @@ func TestDictionaryKeyConflictEntry_MarshalJSON(t *testing.T) {
 		//language=JSON
 		`{
           "kind": "dictionary-key-conflict",
-          "key": "test"
+          "account_address": "0x0000000000000001",
+          "path": "/public/test"
         }`,
 		string(actual),
 	)
