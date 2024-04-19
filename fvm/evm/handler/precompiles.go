@@ -15,6 +15,7 @@ import (
 
 func preparePrecompiles(
 	evmContractAddress flow.Address,
+	randomBeaconAddress flow.Address,
 	addressAllocator types.AddressAllocator,
 	backend types.Backend,
 ) []types.Precompile {
@@ -23,7 +24,7 @@ func preparePrecompiles(
 		archAddress,
 		blockHeightProvider(backend),
 		coaOwnershipProofValidator(evmContractAddress, backend),
-		revertibleRandomnessProvider(backend),
+		randomSourceProvider(randomBeaconAddress, backend),
 	)
 	return []types.Precompile{archContract}
 }
@@ -38,15 +39,41 @@ func blockHeightProvider(backend types.Backend) func() (uint64, error) {
 	}
 }
 
-func revertibleRandomnessProvider(backend types.Backend) func() (uint64, error) {
-	return func() (uint64, error) {
-		rand := make([]byte, 8)
-		err := backend.ReadRandom(rand)
+func randomSourceProvider(contractAddress flow.Address, backend types.Backend) func(uint64) (uint64, error) {
+	return func(blockHeight uint64) (uint64, error) {
+		value, err := backend.Invoke(
+			environment.ContractFunctionSpec{
+				AddressFromChain: func(_ flow.Chain) flow.Address {
+					return contractAddress
+				},
+				LocationName: "RandomBeaconHistory",
+				FunctionName: "sourceOfRandomness",
+				ArgumentTypes: []sema.Type{
+					sema.UInt64Type,
+				},
+			},
+			[]cadence.Value{
+				cadence.NewUInt64(blockHeight),
+			},
+		)
 		if err != nil {
+			if types.IsAFatalError(err) || types.IsABackendError(err) {
+				panic(err)
+			}
 			return 0, err
 		}
 
-		return binary.BigEndian.Uint64(rand), nil
+		data, ok := value.(cadence.Struct)
+		if !ok {
+			return 0, fmt.Errorf("invalid output data received from getRandomSource")
+		}
+
+		cadenceArray := data.Fields[1].(cadence.Array)
+		source := make([]byte, 8)
+		for i := range source {
+			source[i] = cadenceArray.Values[i].ToGoValue().(byte)
+		}
+		return binary.BigEndian.Uint64(source), nil
 	}
 }
 
