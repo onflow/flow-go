@@ -81,7 +81,7 @@ func (s *StateMutatorSuite) TestBuild_HappyPath() {
 		stateMachine.On("EvolveState", emptyEventsSlice).Return(nil).Once()
 		deferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
 		deferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
-		deferredDBUpdates := protocol.NewDeferredBlockPersist().AddDbOp(deferredUpdate.Execute)
+		deferredDBUpdates := transaction.NewDeferredBlockPersist().AddDbOp(deferredUpdate.Execute)
 		stateMachine.On("Build").Return(deferredDBUpdates, nil).Once()
 		factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, s.replicatedState).Return(stateMachine, nil)
 		factories[i] = factory

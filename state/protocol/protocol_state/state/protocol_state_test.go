@@ -64,6 +64,60 @@ func TestProtocolState_AtBlockID(t *testing.T) {
 
 // TestMutableProtocolState_Mutator tests happy path of creating a state mutator, and that `Mutator` returns an error
 // if the parent protocol state has not been found.
+// TODO: remove
+func TestMutableProtocolState_Mutator_old(t *testing.T) {
+	protocolStateDB := storagemock.NewProtocolState(t)
+	kvStoreSnapshotsDB := storagemock.NewProtocolKVStore(t)
+	globalParams := mock.NewGlobalParams(t)
+	globalParams.On("EpochCommitSafetyThreshold").Return(uint64(1000))
+	headersDB := storagemock.NewHeaders(t)
+	resultsDB := storagemock.NewExecutionResults(t)
+	setupsDB := storagemock.NewEpochSetups(t)
+	commitsDB := storagemock.NewEpochCommits(t)
+
+	NewMutableProtocolState(
+		protocolStateDB,
+		kvStoreSnapshotsDB,
+		globalParams,
+		headersDB,
+		resultsDB,
+		setupsDB,
+		commitsDB)
+
+	t.Run("happy-path", func(t *testing.T) {
+		parentEpochState := unittest.ProtocolStateFixture()
+		candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(parentEpochState.CurrentEpochSetup.FirstView + 1))
+		protocolStateDB.On("ByBlockID", candidate.ParentID).Return(parentEpochState, nil).Once()
+
+		version, data, err := (&kvstore.Modelv1{
+			Modelv0: kvstore.Modelv0{
+				UpgradableModel: kvstore.UpgradableModel{},
+				EpochStateID:    parentEpochState.ID(),
+			},
+			InvalidEpochTransitionAttempted: false,
+		}).VersionedEncode()
+		parentState := &storage.KeyValueStoreData{
+			Version: version,
+			Data:    data,
+		}
+		require.NoError(t, err)
+		kvStoreSnapshotsDB.On("ByBlockID", candidate.ParentID).Return(parentState, nil)
+		//
+		//mutator, err := mutableState.Mutator(candidate.View, candidate.ParentID)
+		//require.NoError(t, err)
+		//require.NotNil(t, mutator)
+	})
+	t.Run("parent-not-found", func(t *testing.T) {
+		candidate := unittest.BlockHeaderFixture()
+		kvStoreSnapshotsDB.On("ByBlockID", candidate.ParentID).Return(nil, storage.ErrNotFound)
+		//mutator, err := mutableState.Mutator(candidate.View, candidate.ParentID)
+		//require.ErrorIs(t, err, storage.ErrNotFound)
+		//require.Nil(t, mutator)
+	})
+}
+
+// TestMutableProtocolState_Mutator tests happy path of creating a state mutator, and that `Mutator` returns an error
+// if the parent protocol state has not been found.
 func TestMutableProtocolState_Mutator(t *testing.T) {
 	protocolStateDB := storagemock.NewProtocolState(t)
 	kvStoreSnapshotsDB := storagemock.NewProtocolKVStore(t)
@@ -102,15 +156,16 @@ func TestMutableProtocolState_Mutator(t *testing.T) {
 		require.NoError(t, err)
 		kvStoreSnapshotsDB.On("ByBlockID", candidate.ParentID).Return(parentState, nil)
 
-		mutator, err := mutableState.Mutator(candidate.View, candidate.ParentID)
+		stateID, dbUpdates, err := mutableState.EvolveState(candidate.ParentID, candidate.View, []*flow.Seal{})
 		require.NoError(t, err)
-		require.NotNil(t, mutator)
+		require.False(t, dbUpdates.IsEmpty())
+		require.False(t, stateID != flow.ZeroID)
 	})
 	t.Run("parent-not-found", func(t *testing.T) {
 		candidate := unittest.BlockHeaderFixture()
 		kvStoreSnapshotsDB.On("ByBlockID", candidate.ParentID).Return(nil, storage.ErrNotFound)
-		mutator, err := mutableState.Mutator(candidate.View, candidate.ParentID)
+		_, dbUpdates, err := mutableState.EvolveState(candidate.ParentID, candidate.View, []*flow.Seal{})
 		require.ErrorIs(t, err, storage.ErrNotFound)
-		require.Nil(t, mutator)
+		require.True(t, dbUpdates.IsEmpty())
 	})
 }

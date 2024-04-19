@@ -1,9 +1,10 @@
-package protocol
+package transaction
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
+
+// TODO: maybe move this into the package `storage/badger/transaction` (?)
 
 // DeferredBlockPersistOp is a shorthand notation for an anonymous function that takes
 // a fully constructed block and a `transaction.Tx` as inputs and runs some database operations
@@ -12,14 +13,14 @@ import (
 // referenced by the block or populate database indices. This patter is necessary, because
 // internally to the protocol_state package we don't have access to the candidate block ID yet because
 // we are still determining the protocol state ID for that block.
-type DeferredBlockPersistOp func(blockID flow.Identifier, tx *transaction.Tx) error
+type DeferredBlockPersistOp func(blockID flow.Identifier, tx *Tx) error
 
-var noOpPersist DeferredBlockPersistOp = func(blockID flow.Identifier, tx *transaction.Tx) error { return nil }
+var noOpPersist DeferredBlockPersistOp = func(blockID flow.Identifier, tx *Tx) error { return nil }
 
 // WithBlock adds the still missing block ID information to a `DeferredBlockPersistOp`, thereby converting
 // it into a `transaction.DeferredDBUpdate`.
-func (d DeferredBlockPersistOp) WithBlock(blockID flow.Identifier) transaction.DeferredDBUpdate {
-	return func(tx *transaction.Tx) error {
+func (d DeferredBlockPersistOp) WithBlock(blockID flow.Identifier) DeferredDBUpdate {
+	return func(tx *Tx) error {
 		return d(blockID, tx)
 	}
 }
@@ -86,9 +87,9 @@ func (d *DeferredBlockPersist) Pending() DeferredBlockPersistOp {
 // For adding multiple DeferredBadgerUpdates, use `AddBadgerOps(ops ...DeferredBadgerUpdate)` if easily possible, as
 // it reduces the call stack compared to adding the functors individually via `AddBadgerOp(op DeferredBadgerUpdate)`.
 // This method returns a self-reference for chaining.
-func (d *DeferredBlockPersist) AddBadgerOp(op transaction.DeferredBadgerUpdate) *DeferredBlockPersist {
+func (d *DeferredBlockPersist) AddBadgerOp(op DeferredBadgerUpdate) *DeferredBlockPersist {
 	prior := d.pending
-	d.pending = func(blockID flow.Identifier, tx *transaction.Tx) error {
+	d.pending = func(blockID flow.Identifier, tx *Tx) error {
 		err := prior(blockID, tx)
 		if err != nil {
 			return err
@@ -105,13 +106,13 @@ func (d *DeferredBlockPersist) AddBadgerOp(op transaction.DeferredBadgerUpdate) 
 
 // AddBadgerOps schedules the given DeferredBadgerUpdates to be executed as part of the future transaction.
 // This method returns a self-reference for chaining.
-func (d *DeferredBlockPersist) AddBadgerOps(ops ...transaction.DeferredBadgerUpdate) *DeferredBlockPersist {
+func (d *DeferredBlockPersist) AddBadgerOps(ops ...DeferredBadgerUpdate) *DeferredBlockPersist {
 	if len(ops) < 1 {
 		return d
 	}
 
 	prior := d.pending
-	d.pending = func(blockID flow.Identifier, tx *transaction.Tx) error {
+	d.pending = func(blockID flow.Identifier, tx *Tx) error {
 		err := prior(blockID, tx)
 		if err != nil {
 			return err
@@ -132,9 +133,9 @@ func (d *DeferredBlockPersist) AddBadgerOps(ops ...transaction.DeferredBadgerUpd
 // For adding multiple DeferredBadgerUpdates, use `AddDbOps(ops ...DeferredDBUpdate)` if easily possible, as
 // it reduces the call stack compared to adding the functors individually via `AddDbOp(op DeferredDBUpdate)`.
 // This method returns a self-reference for chaining.
-func (d *DeferredBlockPersist) AddDbOp(op transaction.DeferredDBUpdate) *DeferredBlockPersist {
+func (d *DeferredBlockPersist) AddDbOp(op DeferredDBUpdate) *DeferredBlockPersist {
 	prior := d.pending
-	d.pending = func(blockID flow.Identifier, tx *transaction.Tx) error {
+	d.pending = func(blockID flow.Identifier, tx *Tx) error {
 		err := prior(blockID, tx)
 		if err != nil {
 			return err
@@ -151,13 +152,13 @@ func (d *DeferredBlockPersist) AddDbOp(op transaction.DeferredDBUpdate) *Deferre
 
 // AddDbOps schedules the given DeferredDBUpdates to be executed as part of the future transaction.
 // This method returns a self-reference for chaining.
-func (d *DeferredBlockPersist) AddDbOps(ops ...transaction.DeferredDBUpdate) *DeferredBlockPersist {
+func (d *DeferredBlockPersist) AddDbOps(ops ...DeferredDBUpdate) *DeferredBlockPersist {
 	if len(ops) < 1 {
 		return d
 	}
 
 	prior := d.pending
-	d.pending = func(blockID flow.Identifier, tx *transaction.Tx) error {
+	d.pending = func(blockID flow.Identifier, tx *Tx) error {
 		err := prior(blockID, tx)
 		if err != nil {
 			return err
@@ -182,7 +183,7 @@ func (d *DeferredBlockPersist) AddDbOps(ops ...transaction.DeferredDBUpdate) *De
 // This method returns a self-reference for chaining.
 func (d *DeferredBlockPersist) AddIndexingOp(op DeferredBlockPersistOp) *DeferredBlockPersist {
 	prior := d.pending
-	d.pending = func(blockID flow.Identifier, tx *transaction.Tx) error {
+	d.pending = func(blockID flow.Identifier, tx *Tx) error {
 		err := prior(blockID, tx)
 		if err != nil {
 			return err
@@ -206,7 +207,7 @@ func (d *DeferredBlockPersist) AddIndexingOps(ops ...DeferredBlockPersistOp) *De
 	}
 
 	prior := d.pending
-	d.pending = func(blockID flow.Identifier, tx *transaction.Tx) error {
+	d.pending = func(blockID flow.Identifier, tx *Tx) error {
 		err := prior(blockID, tx)
 		if err != nil {
 			return err
@@ -229,7 +230,7 @@ func (d *DeferredBlockPersist) AddIndexingOps(ops ...DeferredBlockPersistOp) *De
 // This method returns a self-reference for chaining.
 func (d *DeferredBlockPersist) OnSucceed(callback func()) *DeferredBlockPersist {
 	prior := d.pending
-	d.pending = func(blockID flow.Identifier, tx *transaction.Tx) error {
+	d.pending = func(blockID flow.Identifier, tx *Tx) error {
 		err := prior(blockID, tx)
 		if err != nil {
 			return err
@@ -249,7 +250,7 @@ func (d *DeferredBlockPersist) OnSucceeds(callbacks ...func()) *DeferredBlockPer
 	}
 
 	prior := d.pending
-	d.pending = func(blockID flow.Identifier, tx *transaction.Tx) error {
+	d.pending = func(blockID flow.Identifier, tx *Tx) error {
 		err := prior(blockID, tx)
 		if err != nil {
 			return err

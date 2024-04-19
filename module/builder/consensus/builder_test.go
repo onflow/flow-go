@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -420,7 +421,7 @@ func (bs *BuilderSuite) SetupTest() {
 		func(_ uint64, _ flow.Identifier) realproto.StateMutator {
 			stateMutator := protocol.NewStateMutator(bs.T())
 			stateMutator.On("EvolveState", mock.Anything).Return(nil)
-			stateMutator.On("Build").Return(flow.Identifier{}, realproto.NewDeferredBlockPersist(), nil)
+			stateMutator.On("Build").Return(flow.Identifier{}, transaction.NewDeferredBlockPersist(), nil)
 			return stateMutator
 		}, func(_ uint64, _ flow.Identifier) error {
 			return nil

@@ -34,16 +34,11 @@ type stateMutator struct {
 	results          storage.ExecutionResults
 	kvStoreSnapshots storage.ProtocolKVStore
 
-	parentState          protocol.KVStoreReader
 	kvMutator            protocol_state.KVStoreMutator
 	orthoKVStoreMachines []protocol_state.KeyValueStoreStateMachine
-
-	// TODO: temporary shortcut until `EvolveState` and `Build` are merged
-	evolveStateCalled bool
-	buildCalled       bool
 }
 
-var _ protocol.StateMutator = (*stateMutator)(nil)
+var _ StateMutator = (*stateMutator)(nil)
 
 // newStateMutator creates a new instance of stateMutator.
 // stateMutator performs initialization of state machine depending on the operation mode of the protocol.
@@ -84,9 +79,7 @@ func newStateMutator(
 		results:              results,
 		kvStoreSnapshots:     kvStoreSnapshots,
 		orthoKVStoreMachines: stateMachines,
-		parentState:          parentState,
 		kvMutator:            replicatedState,
-		evolveStateCalled:    false,
 	}, nil
 }
 
@@ -102,27 +95,19 @@ func newStateMutator(
 // CAUTION:
 //   - For Consensus Participants that are replicas, the calling code must check that the returned `stateID` matches the
 //     commitment in the block proposal! If they don't match, the proposal is byzantine and should be slashed.
-func (m *stateMutator) Build() (stateID flow.Identifier, dbUpdates *protocol.DeferredBlockPersist, err error) {
-	if !m.evolveStateCalled { // TODO: temporary shortcut until `EvolveState` and `Build` are merged
-		return flow.ZeroID, protocol.NewDeferredBlockPersist(), irrecoverable.NewExceptionf("cannot build Protocol State without prior call of EvolveState method")
-	}
-	if m.buildCalled {
-		return flow.ZeroID, protocol.NewDeferredBlockPersist(), irrecoverable.NewExceptionf("repeated Build calls are not allowed")
-	}
-	m.buildCalled = true
-
-	dbUpdates = protocol.NewDeferredBlockPersist()
+func (m *stateMutator) Build() (stateID flow.Identifier, dbUpdates *transaction.DeferredBlockPersist, err error) {
+	dbUpdates = transaction.NewDeferredBlockPersist()
 	for _, stateMachine := range m.orthoKVStoreMachines {
 		dbOps, err := stateMachine.Build()
 		if err != nil {
-			return flow.ZeroID, protocol.NewDeferredBlockPersist(), fmt.Errorf("unexpected exception building state machine's output state: %w", err)
+			return flow.ZeroID, transaction.NewDeferredBlockPersist(), fmt.Errorf("unexpected exception building state machine's output state: %w", err)
 		}
 		dbUpdates.AddIndexingOps(dbOps.Pending())
 	}
 	stateID = m.kvMutator.ID()
 	version, data, err := m.kvMutator.VersionedEncode()
 	if err != nil {
-		return flow.ZeroID, protocol.NewDeferredBlockPersist(), fmt.Errorf("could not encode protocol state: %w", err)
+		return flow.ZeroID, transaction.NewDeferredBlockPersist(), fmt.Errorf("could not encode protocol state: %w", err)
 	}
 
 	// Schedule deferred database operations to index the protocol state by the candidate block's ID
@@ -203,11 +188,6 @@ func (m *stateMutator) Build() (stateID flow.Identifier, dbUpdates *protocol.Def
 //     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 //     of this function is not nil. If such an exception is returned, continuing is not an option.
 func (m *stateMutator) EvolveState(seals []*flow.Seal) error {
-	if m.evolveStateCalled { // TODO: temporary shortcut until `EvolveState` and `Build` are merged
-		return irrecoverable.NewExceptionf("repeated calls of EvolveState are not allowed")
-	}
-	m.evolveStateCalled = true
-
 	// block payload may not specify seals in order, so order them by block height before processing
 	orderedSeals, err := protocol.OrderedSeals(seals, m.headers)
 	if err != nil {

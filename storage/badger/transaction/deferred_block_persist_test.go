@@ -1,15 +1,14 @@
-package protocol_test
+package transaction_test
 
 import (
 	"fmt"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	ps "github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	ps "github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -31,7 +30,7 @@ func Test_AddBaderOp(t *testing.T) {
 			m := NewCallMonitor(t)
 			deferredPersistOps := ps.NewDeferredBlockPersist().AddBadgerOp(m.MakeBadgerUpdate())
 			require.False(t, deferredPersistOps.IsEmpty())
-			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
 
@@ -41,7 +40,7 @@ func Test_AddBaderOp(t *testing.T) {
 				AddBadgerOp(m.MakeBadgerUpdate()).
 				AddBadgerOp(m.MakeBadgerUpdate())
 			require.False(t, deferredPersistOps.IsEmpty())
-			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
 
@@ -51,7 +50,7 @@ func Test_AddBaderOp(t *testing.T) {
 				m.MakeBadgerUpdate(),
 				m.MakeBadgerUpdate())
 			require.False(t, deferredPersistOps.IsEmpty())
-			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
 	})
@@ -66,7 +65,7 @@ func Test_AddDbOp(t *testing.T) {
 			deferredPersistOps := ps.NewDeferredBlockPersist().
 				AddDbOp(m.MakeDBUpdate(0))
 			require.False(t, deferredPersistOps.IsEmpty())
-			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
 
@@ -75,7 +74,7 @@ func Test_AddDbOp(t *testing.T) {
 			deferredPersistOps := ps.NewDeferredBlockPersist().
 				AddDbOp(m.MakeDBUpdate(1))
 			require.False(t, deferredPersistOps.IsEmpty())
-			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
 
@@ -84,7 +83,7 @@ func Test_AddDbOp(t *testing.T) {
 			deferredPersistOps := ps.NewDeferredBlockPersist().
 				AddDbOp(m.MakeDBUpdate(21))
 			require.False(t, deferredPersistOps.IsEmpty())
-			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
 
@@ -94,7 +93,7 @@ func Test_AddDbOp(t *testing.T) {
 				AddDbOp(m.MakeDBUpdate(17)).
 				AddDbOp(m.MakeDBUpdate(0))
 			require.False(t, deferredPersistOps.IsEmpty())
-			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
 
@@ -105,7 +104,7 @@ func Test_AddDbOp(t *testing.T) {
 				m.MakeDBUpdate(0),
 				m.MakeDBUpdate(17))
 			require.False(t, deferredPersistOps.IsEmpty())
-			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
 	})
@@ -120,7 +119,7 @@ func Test_AddIndexingOp(t *testing.T) {
 			deferredPersistOps := ps.NewDeferredBlockPersist().
 				AddIndexingOp(m.MakeIndexingOp(blockID, 0))
 			require.False(t, deferredPersistOps.IsEmpty())
-			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
 
@@ -129,7 +128,7 @@ func Test_AddIndexingOp(t *testing.T) {
 			deferredPersistOps := ps.NewDeferredBlockPersist().
 				AddIndexingOp(m.MakeIndexingOp(blockID, 1))
 			require.False(t, deferredPersistOps.IsEmpty())
-			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
 
@@ -138,7 +137,7 @@ func Test_AddIndexingOp(t *testing.T) {
 			deferredPersistOps := ps.NewDeferredBlockPersist().
 				AddIndexingOp(m.MakeIndexingOp(blockID, 21))
 			require.False(t, deferredPersistOps.IsEmpty())
-			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
 
@@ -148,7 +147,7 @@ func Test_AddIndexingOp(t *testing.T) {
 				AddIndexingOp(m.MakeIndexingOp(blockID, 17)).
 				AddIndexingOp(m.MakeIndexingOp(blockID, 0))
 			require.False(t, deferredPersistOps.IsEmpty())
-			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
 
@@ -159,7 +158,7 @@ func Test_AddIndexingOp(t *testing.T) {
 				m.MakeIndexingOp(blockID, 0),
 				m.MakeIndexingOp(blockID, 17))
 			require.False(t, deferredPersistOps.IsEmpty())
-			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
 	})
@@ -174,7 +173,7 @@ func Test_AddOnSucceedCallback(t *testing.T) {
 			deferredPersistOps := ps.NewDeferredBlockPersist().
 				OnSucceed(m.MakeCallback())
 			require.False(t, deferredPersistOps.IsEmpty())
-			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
 
@@ -184,7 +183,7 @@ func Test_AddOnSucceedCallback(t *testing.T) {
 				OnSucceed(m.MakeCallback()).
 				OnSucceed(m.MakeCallback())
 			require.False(t, deferredPersistOps.IsEmpty())
-			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
 
@@ -193,7 +192,7 @@ func Test_AddOnSucceedCallback(t *testing.T) {
 			deferredPersistOps := ps.NewDeferredBlockPersist().
 				OnSucceeds(m.MakeCallbacks(11)...)
 			require.False(t, deferredPersistOps.IsEmpty())
-			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 			require.NoError(t, err)
 		})
 	})
@@ -227,7 +226,7 @@ func Test_EverythingMixed(t *testing.T) {
 				m.MakeDBUpdate(1)).
 			OnSucceed(m.MakeCallback())
 		require.False(t, deferredPersistOps.IsEmpty())
-		err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+		err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
 		require.NoError(t, err)
 	})
 }
@@ -273,7 +272,7 @@ func NewCallMonitor(t *testing.T) *CallMonitor {
 func (cm *CallMonitor) MakeIndexingOp(expectedBlockID flow.Identifier, withCallbacks int) ps.DeferredBlockPersistOp {
 	myFunctorIdx := cm.generatedTxFunctors       // copy into local scope. Determined when we construct functor
 	callbacks := cm.MakeCallbacks(withCallbacks) // pre-generate callback functors
-	functor := func(blockID flow.Identifier, tx *transaction.Tx) error {
+	functor := func(blockID flow.Identifier, tx *Tx) error {
 		if expectedBlockID != blockID {
 			cm.T.Errorf("expected block ID %v but got %v", expectedBlockID, blockID)
 			return fmt.Errorf("expected block ID %v but got %v", expectedBlockID, blockID)
@@ -297,10 +296,10 @@ func (cm *CallMonitor) MakeIndexingOp(expectedBlockID flow.Identifier, withCallb
 	return functor
 }
 
-func (cm *CallMonitor) MakeDBUpdate(withCallbacks int) transaction.DeferredDBUpdate {
+func (cm *CallMonitor) MakeDBUpdate(withCallbacks int) DeferredDBUpdate {
 	myFunctorIdx := cm.generatedTxFunctors       // copy into local scope. Determined when we construct functor
 	callbacks := cm.MakeCallbacks(withCallbacks) // pre-generate callback functors
-	functor := func(tx *transaction.Tx) error {
+	functor := func(tx *Tx) error {
 		for _, c := range callbacks {
 			tx.OnSucceed(c) // schedule callback
 		}
@@ -320,7 +319,7 @@ func (cm *CallMonitor) MakeDBUpdate(withCallbacks int) transaction.DeferredDBUpd
 	return functor
 }
 
-func (cm *CallMonitor) MakeBadgerUpdate() transaction.DeferredBadgerUpdate {
+func (cm *CallMonitor) MakeBadgerUpdate() DeferredBadgerUpdate {
 	myFunctorIdx := cm.generatedTxFunctors // copy into local scope. Determined when we construct functor
 	functor := func(tx *badger.Txn) error {
 		if cm.nextExpectedTxFunctorIdx != myFunctorIdx {
