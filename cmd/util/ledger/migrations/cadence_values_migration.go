@@ -136,10 +136,10 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 			}
 
 			// Convert the register ID to a storage ID.
-			storageID := atree.StorageID{
-				Address: atree.Address([]byte(registerID.Owner)),
-			}
-			copy(storageID.Index[:], registerID.Key[1:])
+			storageID := atree.NewSlabID(
+				atree.Address([]byte(registerID.Owner)),
+				atree.SlabIndex([]byte(registerID.Key[1:])),
+			)
 
 			// Retrieve the slab.
 			_, _, err = storage.Retrieve(storageID)

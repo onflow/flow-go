@@ -60,11 +60,11 @@ func (a *AccountsAtreeLedger) ValueExists(owner, key []byte) (exists bool, err e
 	return len(v) > 0, nil
 }
 
-// AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
-func (a *AccountsAtreeLedger) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	v, err := a.Accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
+// AllocateSlabIndex allocates new storage index under the owner accounts to store a new register
+func (a *AccountsAtreeLedger) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
+	v, err := a.Accounts.AllocateSlabIndex(flow.BytesToAddress(owner))
 	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf("storage index allocation failed: %w", err)
+		return atree.SlabIndex{}, fmt.Errorf("storage index allocation failed: %w", err)
 	}
 	return v, nil
 }
@@ -72,7 +72,7 @@ func (a *AccountsAtreeLedger) AllocateStorageIndex(owner []byte) (atree.StorageI
 type PayloadsReadonlyLedger struct {
 	Snapshot snapshot.MigrationSnapshot
 
-	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
+	AllocateStorageIndexFunc func(owner []byte) (atree.SlabIndex, error)
 	SetValueFunc             func(owner, key, value []byte) (err error)
 }
 
@@ -97,12 +97,12 @@ func (p *PayloadsReadonlyLedger) ValueExists(owner, key []byte) (bool, error) {
 	return exists, nil
 }
 
-func (p *PayloadsReadonlyLedger) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
+func (p *PayloadsReadonlyLedger) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
 	if p.AllocateStorageIndexFunc != nil {
 		return p.AllocateStorageIndexFunc(owner)
 	}
 
-	panic("AllocateStorageIndex not expected to be called")
+	panic("AllocateSlabIndex not expected to be called")
 }
 
 func NewPayloadsReadonlyLedger(snapshot snapshot.MigrationSnapshot) *PayloadsReadonlyLedger {

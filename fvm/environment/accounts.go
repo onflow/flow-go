@@ -36,7 +36,7 @@ type Accounts interface {
 	GetValue(id flow.RegisterID) (flow.RegisterValue, error)
 	GetStorageUsed(address flow.Address) (uint64, error)
 	SetValue(id flow.RegisterID, value flow.RegisterValue) error
-	AllocateStorageIndex(address flow.Address) (atree.StorageIndex, error)
+	AllocateSlabIndex(address flow.Address) (atree.SlabIndex, error)
 	GenerateAccountLocalID(address flow.Address) (uint64, error)
 }
 
@@ -52,16 +52,16 @@ func NewAccounts(txnState state.NestedTransactionPreparer) *StatefulAccounts {
 	}
 }
 
-func (a *StatefulAccounts) AllocateStorageIndex(
+func (a *StatefulAccounts) AllocateSlabIndex(
 	address flow.Address,
 ) (
-	atree.StorageIndex,
+	atree.SlabIndex,
 	error,
 ) {
 	// get status
 	status, err := a.getAccountStatus(address)
 	if err != nil {
-		return atree.StorageIndex{}, err
+		return atree.SlabIndex{}, err
 	}
 
 	// get and increment the index
@@ -79,7 +79,7 @@ func (a *StatefulAccounts) AllocateStorageIndex(
 			[]byte{})
 	})
 	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf(
+		return atree.SlabIndex{}, fmt.Errorf(
 			"failed to allocate an storage index: %w",
 			err)
 	}
@@ -88,7 +88,7 @@ func (a *StatefulAccounts) AllocateStorageIndex(
 	status.SetStorageIndex(newIndexBytes)
 	err = a.setAccountStatus(address, status)
 	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf(
+		return atree.SlabIndex{}, fmt.Errorf(
 			"failed to allocate an storage index: %w",
 			err)
 	}

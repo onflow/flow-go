@@ -215,7 +215,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 		// no storage for this domain
 		return nil
 	}
-	storageMapIds[string(atree.SlabIndexToLedgerKey(storageMap.StorageID().Index))] = struct{}{}
+	storageMapIds[string(atree.SlabIndexToLedgerKey(storageMap.SlabID().Index()))] = struct{}{}
 
 	iterator := storageMap.Iterator(nil)
 	keys := make([]interpreter.StorageMapKey, 0, storageMap.Count())
