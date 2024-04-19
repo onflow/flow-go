@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -53,10 +52,11 @@ func TestValidateCadenceValues(t *testing.T) {
 				accountStatus.ToBytes(),
 			)
 
-			mr, err := NewMigratorRuntime(
+			mr, err := NewAtreeRegisterMigratorRuntime(
 				address,
-				[]*ledger.Payload{accountStatusPayload},
-				util.RuntimeInterfaceConfig{},
+				[]*ledger.Payload{
+					accountStatusPayload,
+				},
 			)
 			require.NoError(t, err)
 
@@ -145,10 +145,11 @@ func createTestPayloads(t *testing.T, address common.Address, domain string) []*
 		accountStatus.ToBytes(),
 	)
 
-	mr, err := NewMigratorRuntime(
+	mr, err := NewAtreeRegisterMigratorRuntime(
 		address,
-		[]*ledger.Payload{accountStatusPayload},
-		util.RuntimeInterfaceConfig{},
+		[]*ledger.Payload{
+			accountStatusPayload,
+		},
 	)
 	require.NoError(t, err)
 

@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"sync"
@@ -22,6 +23,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/ledger"
@@ -35,15 +37,17 @@ type CadenceBaseMigrator struct {
 	reporter                          reporters.ReportWriter
 	diffReporter                      reporters.ReportWriter
 	logVerboseDiff                    bool
+	verboseErrorOutput                bool
 	checkStorageHealthBeforeMigration bool
 	valueMigrations                   func(
 		inter *interpreter.Interpreter,
 		accounts environment.Accounts,
 		reporter *cadenceValueMigrationReporter,
 	) []migrations.ValueMigration
-	runtimeInterfaceConfig util.RuntimeInterfaceConfig
-	errorMessageHandler    *errorMessageHandler
-	contracts              map[common.AddressLocation][]byte
+	migratorRuntimeConfig MigratorRuntimeConfig
+	errorMessageHandler   *errorMessageHandler
+	programs              map[runtime.Location]*interpreter.Program
+	chainID               flow.ChainID
 }
 
 var _ AccountBasedMigration = (*CadenceBaseMigrator)(nil)
@@ -67,18 +71,26 @@ func (m *CadenceBaseMigrator) InitMigration(
 ) error {
 	m.log = log.With().Str("migration", m.name).Logger()
 
-	m.runtimeInterfaceConfig.GetContractCodeFunc = func(location runtime.Location) ([]byte, error) {
-		addressLocation, ok := location.(common.AddressLocation)
-		if !ok {
-			return nil, nil
-		}
+	// During the migration, we only provide already checked programs,
+	// no parsing/checking of contracts is expected.
 
-		contract, ok := m.contracts[addressLocation]
-		if !ok {
-			return nil, fmt.Errorf("failed to get contract code for location %s", location)
-		}
-
-		return contract, nil
+	m.migratorRuntimeConfig = MigratorRuntimeConfig{
+		GetOrLoadProgram: func(
+			location runtime.Location,
+			_ func() (*interpreter.Program, error),
+		) (*interpreter.Program, error) {
+			program, ok := m.programs[location]
+			if !ok {
+				return nil, fmt.Errorf("program not found: %s", location)
+			}
+			return program, nil
+		},
+		GetCode: func(_ common.AddressLocation) ([]byte, error) {
+			return nil, fmt.Errorf("unexpected call to GetCode")
+		},
+		GetContractNames: func(address flow.Address) ([]string, error) {
+			return nil, fmt.Errorf("unexpected call to GetContractNames")
+		},
 	}
 
 	return nil
@@ -95,9 +107,10 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 	// Create all the runtime components we need for the migration
 
 	migrationRuntime, err := NewMigratorRuntime(
-		address,
 		oldPayloads,
-		m.runtimeInterfaceConfig,
+		m.chainID,
+		m.migratorRuntimeConfig,
+		snapshot.SmallChangeSetSnapshot,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
@@ -108,6 +121,8 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 	// Check storage health before migration, if enabled.
 	var storageHealthErrorBefore error
 	if m.checkStorageHealthBeforeMigration {
+
+		// TODO: use checkStorageHealth
 
 		// Retrieve all slabs before migration.
 		for _, payload := range oldPayloads {
@@ -134,7 +149,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		}
 
 		// Load storage map.
-		for _, domain := range domains {
+		for _, domain := range allStorageMapDomains {
 			_ = storage.GetStorageMap(address, domain, false)
 		}
 
@@ -147,13 +162,22 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		}
 	}
 
-	migration := migrations.NewStorageMigration(
+	migration, err := migrations.NewStorageMigration(
 		migrationRuntime.Interpreter,
 		storage,
 		m.name,
+		address,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create storage migration: %w", err)
+	}
 
-	reporter := newValueMigrationReporter(m.reporter, m.log, m.errorMessageHandler)
+	reporter := newValueMigrationReporter(
+		m.reporter,
+		m.log,
+		m.errorMessageHandler,
+		m.verboseErrorOutput,
+	)
 
 	valueMigrations := m.valueMigrations(
 		migrationRuntime.Interpreter,
@@ -161,8 +185,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		reporter,
 	)
 
-	migration.MigrateAccount(
-		address,
+	migration.Migrate(
 		migration.NewValueMigrationsPathMigrator(
 			reporter,
 			valueMigrations...,
@@ -196,10 +219,8 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		flow.Address(address): {},
 	}
 
-	newPayloads, err := MergeRegisterChanges(
-		migrationRuntime.Snapshot.Payloads,
+	newPayloads, err := migrationRuntime.Snapshot.ApplyChangesAndGetNewPayloads(
 		result.WriteSet,
-		expectedAddresses,
 		expectedAddresses,
 		m.log,
 	)
@@ -211,7 +232,11 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 
 		accountDiffReporter := NewCadenceValueDiffReporter(address, m.diffReporter, m.logVerboseDiff)
 
-		accountDiffReporter.DiffStates(oldPayloads, newPayloads, domains)
+		accountDiffReporter.DiffStates(
+			oldPayloads,
+			newPayloads,
+			allStorageMapDomains,
+		)
 	}
 
 	return newPayloads, nil
@@ -249,12 +274,14 @@ func checkPayloadOwnership(payload *ledger.Payload, address common.Address, log 
 	}
 }
 
+const cadenceValueMigrationReporterName = "cadence-value-migration"
+
 // NewCadence1ValueMigrator creates a new CadenceBaseMigrator
 // which runs some of the Cadence value migrations (static types, entitlements, strings)
 func NewCadence1ValueMigrator(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
-	contracts map[common.AddressLocation][]byte,
+	programs map[runtime.Location]*interpreter.Program,
 	compositeTypeConverter statictypes.CompositeTypeConverterFunc,
 	interfaceTypeConverter statictypes.InterfaceTypeConverterFunc,
 	opts Options,
@@ -266,10 +293,11 @@ func NewCadence1ValueMigrator(
 	}
 
 	return &CadenceBaseMigrator{
-		name:                              "cadence-value-migration",
-		reporter:                          rwf.ReportWriter("cadence-value-migrator"),
+		name:                              "cadence_value_migration",
+		reporter:                          rwf.ReportWriter(cadenceValueMigrationReporterName),
 		diffReporter:                      diffReporter,
 		logVerboseDiff:                    opts.LogVerboseDiff,
+		verboseErrorOutput:                opts.VerboseErrorOutput,
 		checkStorageHealthBeforeMigration: opts.CheckStorageHealthBeforeMigration,
 		valueMigrations: func(
 			inter *interpreter.Interpreter,
@@ -285,7 +313,8 @@ func NewCadence1ValueMigrator(
 			}
 		},
 		errorMessageHandler: errorMessageHandler,
-		contracts:           contracts,
+		programs:            programs,
+		chainID:             opts.ChainID,
 	}
 }
 
@@ -295,7 +324,7 @@ func NewCadence1ValueMigrator(
 func NewCadence1LinkValueMigrator(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
-	contracts map[common.AddressLocation][]byte,
+	programs map[runtime.Location]*interpreter.Program,
 	capabilityMapping *capcons.CapabilityMapping,
 	opts Options,
 ) *CadenceBaseMigrator {
@@ -305,10 +334,11 @@ func NewCadence1LinkValueMigrator(
 	}
 
 	return &CadenceBaseMigrator{
-		name:                              "cadence-link-value-migration",
+		name:                              "cadence_link_value_migration",
 		reporter:                          rwf.ReportWriter("cadence-link-value-migrator"),
 		diffReporter:                      diffReporter,
 		logVerboseDiff:                    opts.LogVerboseDiff,
+		verboseErrorOutput:                opts.VerboseErrorOutput,
 		checkStorageHealthBeforeMigration: opts.CheckStorageHealthBeforeMigration,
 		valueMigrations: func(
 			_ *interpreter.Interpreter,
@@ -329,7 +359,8 @@ func NewCadence1LinkValueMigrator(
 			}
 		},
 		errorMessageHandler: errorMessageHandler,
-		contracts:           contracts,
+		programs:            programs,
+		chainID:             opts.ChainID,
 	}
 }
 
@@ -340,7 +371,7 @@ func NewCadence1LinkValueMigrator(
 func NewCadence1CapabilityValueMigrator(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
-	contracts map[common.AddressLocation][]byte,
+	programs map[runtime.Location]*interpreter.Program,
 	capabilityMapping *capcons.CapabilityMapping,
 	opts Options,
 ) *CadenceBaseMigrator {
@@ -350,10 +381,11 @@ func NewCadence1CapabilityValueMigrator(
 	}
 
 	return &CadenceBaseMigrator{
-		name:                              "cadence-capability-value-migration",
+		name:                              "cadence_capability_value_migration",
 		reporter:                          rwf.ReportWriter("cadence-capability-value-migrator"),
 		diffReporter:                      diffReporter,
 		logVerboseDiff:                    opts.LogVerboseDiff,
+		verboseErrorOutput:                opts.VerboseErrorOutput,
 		checkStorageHealthBeforeMigration: opts.CheckStorageHealthBeforeMigration,
 		valueMigrations: func(
 			_ *interpreter.Interpreter,
@@ -368,7 +400,8 @@ func NewCadence1CapabilityValueMigrator(
 			}
 		},
 		errorMessageHandler: errorMessageHandler,
-		contracts:           contracts,
+		programs:            programs,
+		chainID:             opts.ChainID,
 	}
 }
 
@@ -403,6 +436,7 @@ type cadenceValueMigrationReporter struct {
 	reportWriter        reporters.ReportWriter
 	log                 zerolog.Logger
 	errorMessageHandler *errorMessageHandler
+	verboseErrorOutput  bool
 }
 
 var _ capcons.LinkMigrationReporter = &cadenceValueMigrationReporter{}
@@ -413,11 +447,13 @@ func newValueMigrationReporter(
 	reportWriter reporters.ReportWriter,
 	log zerolog.Logger,
 	errorMessageHandler *errorMessageHandler,
+	verboseErrorOutput bool,
 ) *cadenceValueMigrationReporter {
 	return &cadenceValueMigrationReporter{
 		reportWriter:        reportWriter,
 		log:                 log,
 		errorMessageHandler: errorMessageHandler,
+		verboseErrorOutput:  verboseErrorOutput,
 	}
 }
 
@@ -426,7 +462,7 @@ func (t *cadenceValueMigrationReporter) Migrated(
 	storageMapKey interpreter.StorageMapKey,
 	migration string,
 ) {
-	t.reportWriter.Write(cadenceValueMigrationReportEntry{
+	t.reportWriter.Write(cadenceValueMigrationEntry{
 		StorageKey:    storageKey,
 		StorageMapKey: storageMapKey,
 		Migration:     migration,
@@ -451,14 +487,14 @@ func (t *cadenceValueMigrationReporter) Error(err error) {
 		message = fmt.Sprintf("%s\n%s", message, migrationErr.Stack)
 	}
 
-	t.log.Error().Msgf(
-		"failed to run %s in account %s, domain %s, key %s: %s",
-		migration,
-		storageKey.Address,
-		storageKey.Key,
-		storageMapKey,
-		message,
-	)
+	if t.verboseErrorOutput {
+		t.reportWriter.Write(cadenceValueMigrationFailureEntry{
+			StorageKey:    storageKey,
+			StorageMapKey: storageMapKey,
+			Migration:     migration,
+			Message:       message,
+		})
+	}
 }
 
 func (t *cadenceValueMigrationReporter) MigratedPathCapability(
@@ -466,7 +502,7 @@ func (t *cadenceValueMigrationReporter) MigratedPathCapability(
 	addressPath interpreter.AddressPath,
 	borrowType *interpreter.ReferenceStaticType,
 ) {
-	t.reportWriter.Write(capConsPathCapabilityMigrationEntry{
+	t.reportWriter.Write(capabilityMigrationEntry{
 		AccountAddress: accountAddress,
 		AddressPath:    addressPath,
 		BorrowType:     borrowType,
@@ -477,7 +513,7 @@ func (t *cadenceValueMigrationReporter) MissingCapabilityID(
 	accountAddress common.Address,
 	addressPath interpreter.AddressPath,
 ) {
-	t.reportWriter.Write(capConsMissingCapabilityIDEntry{
+	t.reportWriter.Write(capabilityMissingCapabilityIDEntry{
 		AccountAddress: accountAddress,
 		AddressPath:    addressPath,
 	})
@@ -487,9 +523,9 @@ func (t *cadenceValueMigrationReporter) MigratedLink(
 	accountAddressPath interpreter.AddressPath,
 	capabilityID interpreter.UInt64Value,
 ) {
-	t.reportWriter.Write(capConsLinkMigrationEntry{
+	t.reportWriter.Write(linkMigrationEntry{
 		AccountAddressPath: accountAddressPath,
-		CapabilityID:       capabilityID,
+		CapabilityID:       uint64(capabilityID),
 	})
 }
 
@@ -498,7 +534,13 @@ func (t *cadenceValueMigrationReporter) CyclicLink(err capcons.CyclicLinkError) 
 }
 
 func (t *cadenceValueMigrationReporter) MissingTarget(accountAddressPath interpreter.AddressPath) {
-	t.reportWriter.Write(capConsMissingTargetEntry{
+	t.reportWriter.Write(linkMissingTargetEntry{
+		AddressPath: accountAddressPath,
+	})
+}
+
+func (t *cadenceValueMigrationReporter) DictionaryKeyConflict(accountAddressPath interpreter.AddressPath) {
+	t.reportWriter.Write(dictionaryKeyConflictEntry{
 		AddressPath: accountAddressPath,
 	})
 }
@@ -507,58 +549,205 @@ type valueMigrationReportEntry interface {
 	accountAddress() common.Address
 }
 
-type cadenceValueMigrationReportEntry struct {
-	StorageKey    interpreter.StorageKey    `json:"storageKey"`
-	StorageMapKey interpreter.StorageMapKey `json:"storageMapKey"`
-	Migration     string                    `json:"migration"`
+// cadenceValueMigrationReportEntry
+
+type cadenceValueMigrationEntry struct {
+	StorageKey    interpreter.StorageKey
+	StorageMapKey interpreter.StorageMapKey
+	Migration     string
 }
 
-var _ valueMigrationReportEntry = cadenceValueMigrationReportEntry{}
+var _ valueMigrationReportEntry = cadenceValueMigrationEntry{}
 
-func (e cadenceValueMigrationReportEntry) accountAddress() common.Address {
+func (e cadenceValueMigrationEntry) accountAddress() common.Address {
 	return e.StorageKey.Address
 }
 
-type capConsLinkMigrationEntry struct {
-	AccountAddressPath interpreter.AddressPath `json:"address"`
-	CapabilityID       interpreter.UInt64Value `json:"capabilityID"`
+var _ json.Marshaler = cadenceValueMigrationEntry{}
+
+func (e cadenceValueMigrationEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		StorageDomain  string `json:"domain"`
+		Key            string `json:"key"`
+		Migration      string `json:"migration"`
+	}{
+		Kind:           "cadence-value-migration-success",
+		AccountAddress: e.StorageKey.Address.HexWithPrefix(),
+		StorageDomain:  e.StorageKey.Key,
+		Key:            fmt.Sprintf("%s", e.StorageMapKey),
+		Migration:      e.Migration,
+	})
 }
 
-var _ valueMigrationReportEntry = capConsLinkMigrationEntry{}
+// cadenceValueMigrationFailureEntry
 
-func (e capConsLinkMigrationEntry) accountAddress() common.Address {
+type cadenceValueMigrationFailureEntry struct {
+	StorageKey    interpreter.StorageKey
+	StorageMapKey interpreter.StorageMapKey
+	Migration     string
+	Message       string
+}
+
+var _ valueMigrationReportEntry = cadenceValueMigrationFailureEntry{}
+
+func (e cadenceValueMigrationFailureEntry) accountAddress() common.Address {
+	return e.StorageKey.Address
+}
+
+var _ json.Marshaler = cadenceValueMigrationFailureEntry{}
+
+func (e cadenceValueMigrationFailureEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		StorageDomain  string `json:"domain"`
+		Key            string `json:"key"`
+		Migration      string `json:"migration"`
+		Message        string `json:"message"`
+	}{
+		Kind:           "cadence-value-migration-failure",
+		AccountAddress: e.StorageKey.Address.HexWithPrefix(),
+		StorageDomain:  e.StorageKey.Key,
+		Key:            fmt.Sprintf("%s", e.StorageMapKey),
+		Migration:      e.Migration,
+		Message:        e.Message,
+	})
+}
+
+// linkMigrationEntry
+
+type linkMigrationEntry struct {
+	AccountAddressPath interpreter.AddressPath
+	CapabilityID       uint64
+}
+
+var _ valueMigrationReportEntry = linkMigrationEntry{}
+
+func (e linkMigrationEntry) accountAddress() common.Address {
 	return e.AccountAddressPath.Address
 }
 
-type capConsPathCapabilityMigrationEntry struct {
-	AccountAddress common.Address                   `json:"address"`
-	AddressPath    interpreter.AddressPath          `json:"addressPath"`
-	BorrowType     *interpreter.ReferenceStaticType `json:"borrowType"`
+var _ json.Marshaler = linkMigrationEntry{}
+
+func (e linkMigrationEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		Path           string `json:"path"`
+		CapabilityID   uint64 `json:"capability_id"`
+	}{
+		Kind:           "link-migration-success",
+		AccountAddress: e.AccountAddressPath.Address.HexWithPrefix(),
+		Path:           e.AccountAddressPath.Path.String(),
+		CapabilityID:   e.CapabilityID,
+	})
 }
 
-var _ valueMigrationReportEntry = capConsPathCapabilityMigrationEntry{}
+// capabilityMigrationEntry
 
-func (e capConsPathCapabilityMigrationEntry) accountAddress() common.Address {
+type capabilityMigrationEntry struct {
+	AccountAddress common.Address
+	AddressPath    interpreter.AddressPath
+	BorrowType     *interpreter.ReferenceStaticType
+}
+
+var _ valueMigrationReportEntry = capabilityMigrationEntry{}
+
+func (e capabilityMigrationEntry) accountAddress() common.Address {
 	return e.AccountAddress
 }
 
-type capConsMissingCapabilityIDEntry struct {
-	AccountAddress common.Address          `json:"address"`
-	AddressPath    interpreter.AddressPath `json:"addressPath"`
+var _ json.Marshaler = capabilityMigrationEntry{}
+
+func (e capabilityMigrationEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		Address        string `json:"address"`
+		Path           string `json:"path"`
+		BorrowType     string `json:"borrow_type"`
+	}{
+		Kind:           "capability-migration-success",
+		AccountAddress: e.AccountAddress.HexWithPrefix(),
+		Address:        e.AddressPath.Address.HexWithPrefix(),
+		Path:           e.AddressPath.Path.String(),
+		BorrowType:     string(e.BorrowType.ID()),
+	})
 }
 
-var _ valueMigrationReportEntry = capConsMissingCapabilityIDEntry{}
+// capabilityMissingCapabilityIDEntry
 
-type capConsMissingTargetEntry struct {
-	AddressPath interpreter.AddressPath `json:"addressPath"`
+type capabilityMissingCapabilityIDEntry struct {
+	AccountAddress common.Address
+	AddressPath    interpreter.AddressPath
 }
 
-func (e capConsMissingTargetEntry) accountAddress() common.Address {
+var _ valueMigrationReportEntry = capabilityMissingCapabilityIDEntry{}
+
+func (e capabilityMissingCapabilityIDEntry) accountAddress() common.Address {
+	return e.AccountAddress
+}
+
+var _ json.Marshaler = capabilityMissingCapabilityIDEntry{}
+
+func (e capabilityMissingCapabilityIDEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		Address        string `json:"address"`
+		Path           string `json:"path"`
+	}{
+		Kind:           "capability-missing-capability-id",
+		AccountAddress: e.AccountAddress.HexWithPrefix(),
+		Address:        e.AddressPath.Address.HexWithPrefix(),
+		Path:           e.AddressPath.Path.String(),
+	})
+}
+
+// linkMissingTargetEntry
+
+type linkMissingTargetEntry struct {
+	AddressPath interpreter.AddressPath
+}
+
+var _ valueMigrationReportEntry = linkMissingTargetEntry{}
+
+func (e linkMissingTargetEntry) accountAddress() common.Address {
 	return e.AddressPath.Address
 }
 
-var _ valueMigrationReportEntry = capConsMissingTargetEntry{}
+var _ json.Marshaler = linkMissingTargetEntry{}
 
-func (e capConsMissingCapabilityIDEntry) accountAddress() common.Address {
-	return e.AccountAddress
+func (e linkMissingTargetEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		Path           string `json:"path"`
+	}{
+		Kind:           "link-missing-target",
+		AccountAddress: e.AddressPath.Address.HexWithPrefix(),
+		Path:           e.AddressPath.Path.String(),
+	})
+}
+
+// dictionaryKeyConflictEntry
+
+type dictionaryKeyConflictEntry struct {
+	AddressPath interpreter.AddressPath
+}
+
+var _ json.Marshaler = dictionaryKeyConflictEntry{}
+
+func (e dictionaryKeyConflictEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		Path           string `json:"path"`
+	}{
+		Kind:           "dictionary-key-conflict",
+		AccountAddress: e.AddressPath.Address.HexWithPrefix(),
+		Path:           e.AddressPath.Path.String(),
+	})
 }

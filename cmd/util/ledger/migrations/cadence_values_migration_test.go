@@ -2,7 +2,6 @@ package migrations
 
 import (
 	_ "embed"
-	"encoding/json"
 	"fmt"
 	"io"
 	"sync"
@@ -19,6 +18,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
@@ -86,6 +86,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 			EVMContractChange:    evmContractChange,
 			BurnerContractChange: burnerContractChange,
 			StagedContracts:      stagedContracts,
+			VerboseErrorOutput:   true,
 		},
 	)
 
@@ -101,7 +102,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 	}
 
 	// Assert the migrated payloads
-	checkMigratedPayloads(t, address, payloads)
+	checkMigratedPayloads(t, address, payloads, chainID)
 
 	// Check reporters
 	checkReporters(t, rwf, address)
@@ -119,11 +120,13 @@ func checkMigratedPayloads(
 	t *testing.T,
 	address common.Address,
 	newPayloads []*ledger.Payload,
+	chainID flow.ChainID,
 ) {
 	mr, err := NewMigratorRuntime(
-		address,
 		newPayloads,
-		util.RuntimeInterfaceConfig{},
+		chainID,
+		MigratorRuntimeConfig{},
+		snapshot.SmallChangeSetSnapshot,
 	)
 	require.NoError(t, err)
 
@@ -381,7 +384,7 @@ func checkMigratedPayloads(
 	}
 }
 
-func checkAccountID(t *testing.T, mr *migratorRuntime, address common.Address) {
+func checkAccountID(t *testing.T, mr *MigratorRuntime, address common.Address) {
 	id := flow.AccountStatusRegisterID(flow.Address(address))
 	statusBytes, err := mr.Accounts.GetValue(id)
 	require.NoError(t, err)
@@ -423,11 +426,11 @@ func checkReporters(
 		)
 	}
 
-	newCadenceValueMigrationReportEntry := func(
+	newCadenceValueMigrationEntry := func(
 		migration, key string,
 		domain common.PathDomain,
-	) cadenceValueMigrationReportEntry {
-		return cadenceValueMigrationReportEntry{
+	) cadenceValueMigrationEntry {
+		return cadenceValueMigrationEntry{
 			StorageMapKey: interpreter.StringStorageMapKey(key),
 			StorageKey: interpreter.NewStorageKey(
 				nil,
@@ -452,7 +455,7 @@ func checkReporters(
 		}
 	}
 
-	acctTypedDictKeyMigrationReportEntry := newCadenceValueMigrationReportEntry(
+	acctTypedDictKeyMigrationReportEntry := newCadenceValueMigrationEntry(
 		"StaticTypeMigration",
 		"dictionary_with_account_type_keys",
 		common.PathDomainStorage)
@@ -461,38 +464,38 @@ func checkReporters(
 	assert.ElementsMatch(
 		t,
 		[]valueMigrationReportEntry{
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"StringNormalizingMigration",
 				"string_value_1",
 				common.PathDomainStorage,
 			),
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"StaticTypeMigration",
 				"type_value",
 				common.PathDomainStorage,
 			),
 
 			// String keys in dictionary
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"StringNormalizingMigration",
 				"dictionary_with_string_keys",
 				common.PathDomainStorage,
 			),
 
 			// Restricted typed keys in dictionary
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"StaticTypeMigration",
 				"dictionary_with_restricted_typed_keys",
 				common.PathDomainStorage,
 			),
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"StaticTypeMigration",
 				"dictionary_with_restricted_typed_keys",
 				common.PathDomainStorage,
 			),
 
 			// Capabilities and links
-			cadenceValueMigrationReportEntry{
+			cadenceValueMigrationEntry{
 				StorageMapKey: interpreter.StringStorageMapKey("capability"),
 				StorageKey: interpreter.NewStorageKey(
 					nil,
@@ -501,7 +504,7 @@ func checkReporters(
 				),
 				Migration: "CapabilityValueMigration",
 			},
-			capConsPathCapabilityMigrationEntry{
+			capabilityMigrationEntry{
 				AccountAddress: address,
 				AddressPath: interpreter.AddressPath{
 					Address: address,
@@ -516,19 +519,19 @@ func checkReporters(
 					rResourceType,
 				),
 			},
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"EntitlementsMigration",
 				"capability",
 				common.PathDomainStorage,
 			),
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"EntitlementsMigration",
 				"linkR",
 				common.PathDomainPublic,
 			),
 
 			// untyped capability
-			capConsPathCapabilityMigrationEntry{
+			capabilityMigrationEntry{
 				AccountAddress: address,
 				AddressPath: interpreter.AddressPath{
 					Address: address,
@@ -543,7 +546,7 @@ func checkReporters(
 					rResourceType,
 				),
 			},
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"CapabilityValueMigration",
 				"untyped_capability",
 				common.PathDomainStorage,
@@ -561,24 +564,24 @@ func checkReporters(
 			acctTypedDictKeyMigrationReportEntry,
 
 			// Entitled typed keys in dictionary
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"EntitlementsMigration",
 				"dictionary_with_auth_reference_typed_key",
 				common.PathDomainStorage,
 			),
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"EntitlementsMigration",
 				"dictionary_with_reference_typed_key",
 				common.PathDomainStorage,
 			),
 
 			// Entitlements in links
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"EntitlementsMigration",
 				"flowTokenReceiver",
 				common.PathDomainPublic,
 			),
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"EntitlementsMigration",
 				"flowTokenBalance",
 				common.PathDomainPublic,
@@ -586,7 +589,7 @@ func checkReporters(
 
 			// Cap cons
 
-			capConsLinkMigrationEntry{
+			linkMigrationEntry{
 				AccountAddressPath: interpreter.AddressPath{
 					Address: address,
 					Path: interpreter.PathValue{
@@ -596,13 +599,13 @@ func checkReporters(
 				},
 				CapabilityID: 1,
 			},
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"LinkValueMigration",
 				"flowTokenReceiver",
 				common.PathDomainPublic,
 			),
 
-			capConsLinkMigrationEntry{
+			linkMigrationEntry{
 				AccountAddressPath: interpreter.AddressPath{
 					Address: address,
 					Path: interpreter.PathValue{
@@ -612,13 +615,13 @@ func checkReporters(
 				},
 				CapabilityID: 2,
 			},
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"LinkValueMigration",
 				"linkR",
 				common.PathDomainPublic,
 			),
 
-			capConsLinkMigrationEntry{
+			linkMigrationEntry{
 				AccountAddressPath: interpreter.AddressPath{
 					Address: address,
 					Path: interpreter.PathValue{
@@ -628,7 +631,7 @@ func checkReporters(
 				},
 				CapabilityID: 3,
 			},
-			newCadenceValueMigrationReportEntry(
+			newCadenceValueMigrationEntry(
 				"LinkValueMigration",
 				"flowTokenBalance",
 				common.PathDomainPublic,
@@ -701,6 +704,7 @@ func TestBootstrappedStateMigration(t *testing.T) {
 			ChainID:              chainID,
 			EVMContractChange:    evmContractChange,
 			BurnerContractChange: burnerContractChange,
+			VerboseErrorOutput:   true,
 		},
 	)
 
@@ -738,9 +742,10 @@ func TestProgramParsingError(t *testing.T) {
 	require.NoError(t, err)
 
 	runtime, err := NewMigratorRuntime(
-		testAddress,
 		payloads,
-		util.RuntimeInterfaceConfig{},
+		chainID,
+		MigratorRuntimeConfig{},
+		snapshot.SmallChangeSetSnapshot,
 	)
 	require.NoError(t, err)
 
@@ -791,11 +796,9 @@ func TestProgramParsingError(t *testing.T) {
 		flow.Address(testAddress): {},
 	}
 
-	payloads, err = MergeRegisterChanges(
-		runtime.Snapshot.Payloads,
+	payloads, err = runtime.Snapshot.ApplyChangesAndGetNewPayloads(
 		result.WriteSet,
 		expectedAddresses,
-		nil,
 		logger,
 	)
 	require.NoError(t, err)
@@ -826,6 +829,7 @@ func TestProgramParsingError(t *testing.T) {
 			ChainID:              chainID,
 			EVMContractChange:    evmContractChange,
 			BurnerContractChange: burnerContractChange,
+			VerboseErrorOutput:   true,
 		},
 	)
 
@@ -840,20 +844,21 @@ func TestProgramParsingError(t *testing.T) {
 		)
 	}
 
-	// Check error logs
-	require.Len(t, logWriter.logs, 1)
+	reporter := rwf.reportWriters[contractCheckingReporterName]
 
-	log := logWriter.logs[0]
+	var messages []string
 
-	var entry struct {
-		Message string `json:"message"`
+	for _, entry := range reporter.entries {
+		if errorEntry, isErrorEntry := entry.(contractCheckingFailure); isErrorEntry {
+			messages = append(messages, errorEntry.Error)
+			break
+		}
 	}
 
-	err = json.Unmarshal([]byte(log), &entry)
-	require.NoError(t, err)
+	require.Len(t, messages, 1)
 
-	assert.Contains(t, entry.Message, "`pub` is no longer a valid access keyword")
-	assert.NotContains(t, entry.Message, "runtime/debug.Stack()")
+	assert.Contains(t, messages[0], "`pub` is no longer a valid access keyword")
+	assert.NotContains(t, messages[0], "runtime/debug.Stack()")
 }
 
 func TestCoreContractUsage(t *testing.T) {
@@ -881,9 +886,10 @@ func TestCoreContractUsage(t *testing.T) {
 		require.NoError(t, err)
 
 		runtime, err := NewMigratorRuntime(
-			testAddress,
 			payloads,
-			util.RuntimeInterfaceConfig{},
+			chainID,
+			MigratorRuntimeConfig{},
+			snapshot.SmallChangeSetSnapshot,
 		)
 		require.NoError(t, err)
 
@@ -926,11 +932,9 @@ func TestCoreContractUsage(t *testing.T) {
 			flow.Address(testAddress): {},
 		}
 
-		payloads, err = MergeRegisterChanges(
-			runtime.Snapshot.Payloads,
+		payloads, err = runtime.Snapshot.ApplyChangesAndGetNewPayloads(
 			result.WriteSet,
 			expectedAddresses,
-			nil,
 			logger,
 		)
 		require.NoError(t, err)
@@ -950,6 +954,7 @@ func TestCoreContractUsage(t *testing.T) {
 				ChainID:              chainID,
 				EVMContractChange:    evmContractChange,
 				BurnerContractChange: burnerContractChange,
+				VerboseErrorOutput:   true,
 			},
 		)
 
@@ -970,9 +975,10 @@ func TestCoreContractUsage(t *testing.T) {
 		// Get result
 
 		mr, err := NewMigratorRuntime(
-			testAddress,
 			payloads,
-			util.RuntimeInterfaceConfig{},
+			chainID,
+			MigratorRuntimeConfig{},
+			snapshot.SmallChangeSetSnapshot,
 		)
 		require.NoError(t, err)
 
@@ -1391,4 +1397,216 @@ func TestCoreContractUsage(t *testing.T) {
 		require.Equal(t, expected, actual)
 	})
 
+}
+
+func TestDictionaryKeyConflictEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := dictionaryKeyConflictEntry{
+		AddressPath: interpreter.AddressPath{
+			Address: common.MustBytesToAddress([]byte{0x1}),
+			Path: interpreter.PathValue{
+				Domain:     common.PathDomainPublic,
+				Identifier: "test",
+			},
+		},
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "dictionary-key-conflict",
+          "account_address": "0x0000000000000001",
+          "path": "/public/test"
+        }`,
+		string(actual),
+	)
+}
+
+func TestLinkMissingTargetEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := linkMissingTargetEntry{
+		AddressPath: interpreter.AddressPath{
+			Address: common.MustBytesToAddress([]byte{0x1}),
+			Path: interpreter.PathValue{
+				Domain:     common.PathDomainPublic,
+				Identifier: "test",
+			},
+		},
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "link-missing-target",
+          "account_address": "0x0000000000000001",
+          "path": "/public/test"
+        }`,
+		string(actual),
+	)
+}
+
+func TestCapabilityMissingCapabilityIDEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := capabilityMissingCapabilityIDEntry{
+		AccountAddress: common.MustBytesToAddress([]byte{0x2}),
+		AddressPath: interpreter.AddressPath{
+			Address: common.MustBytesToAddress([]byte{0x1}),
+			Path: interpreter.PathValue{
+				Domain:     common.PathDomainPublic,
+				Identifier: "test",
+			},
+		},
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "capability-missing-capability-id",
+          "account_address": "0x0000000000000002",
+          "address": "0x0000000000000001",
+          "path": "/public/test"
+        }`,
+		string(actual),
+	)
+}
+
+func TestCapabilityMigrationEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := capabilityMigrationEntry{
+		AccountAddress: common.MustBytesToAddress([]byte{0x2}),
+		AddressPath: interpreter.AddressPath{
+			Address: common.MustBytesToAddress([]byte{0x1}),
+			Path: interpreter.PathValue{
+				Domain:     common.PathDomainPublic,
+				Identifier: "test",
+			},
+		},
+		BorrowType: interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.UnauthorizedAccess,
+			interpreter.PrimitiveStaticTypeInt,
+		),
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "capability-migration-success",
+          "account_address": "0x0000000000000002",
+          "address": "0x0000000000000001",
+          "path": "/public/test",
+          "borrow_type": "&Int"
+        }`,
+		string(actual),
+	)
+}
+
+func TestLinkMigrationEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := linkMigrationEntry{
+		AccountAddressPath: interpreter.AddressPath{
+			Address: common.MustBytesToAddress([]byte{0x1}),
+			Path: interpreter.PathValue{
+				Domain:     common.PathDomainPublic,
+				Identifier: "test",
+			},
+		},
+		CapabilityID: 42,
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "link-migration-success",
+          "account_address": "0x0000000000000001",
+          "path": "/public/test",
+          "capability_id": 42
+        }`,
+		string(actual),
+	)
+}
+
+func TestCadenceValueMigrationFailureEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := cadenceValueMigrationFailureEntry{
+		StorageKey: interpreter.StorageKey{
+			Address: common.MustBytesToAddress([]byte{0x1}),
+			Key:     "storage",
+		},
+		StorageMapKey: interpreter.StringStorageMapKey("test"),
+		Migration:     "test-migration",
+		Message:       "unknown",
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "cadence-value-migration-failure",
+          "account_address": "0x0000000000000001",
+          "domain": "storage",
+          "key": "test",
+          "migration": "test-migration",
+          "message": "unknown"
+        }`,
+		string(actual),
+	)
+}
+
+func TestCadenceValueMigrationEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := cadenceValueMigrationEntry{
+		StorageKey: interpreter.StorageKey{
+			Address: common.MustBytesToAddress([]byte{0x1}),
+			Key:     "storage",
+		},
+		StorageMapKey: interpreter.StringStorageMapKey("test"),
+		Migration:     "test-migration",
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "cadence-value-migration-success",
+          "account_address": "0x0000000000000001",
+          "domain": "storage",
+          "key": "test",
+          "migration": "test-migration"
+        }`,
+		string(actual),
+	)
 }

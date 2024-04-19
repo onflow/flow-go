@@ -18,6 +18,7 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
@@ -42,8 +43,8 @@ type ObserverIndexerEnabledSuite struct {
 	ObserverSuite
 }
 
-// SetupTest sets up the test suite by starting the network and preparing the observer client.
-// By overriding this function, we can ensure that the observer is started with correct parameters and select
+// SetupTest sets up the test suite by starting the network and preparing the observers client.
+// By overriding this function, we can ensure that the observers are started with correct parameters and select
 // the RPCs and REST endpoints that are tested.
 func (s *ObserverIndexerEnabledSuite) SetupTest() {
 	s.localRpc = map[string]struct{}{
@@ -110,17 +111,23 @@ func (s *ObserverIndexerEnabledSuite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
 	}
 
-	observers := []testnet.ObserverConfig{{
-		LogLevel: zerolog.InfoLevel,
-		AdditionalFlags: []string{
-			fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
-			fmt.Sprintf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
-			"--execution-data-sync-enabled=true",
-			"--execution-data-indexing-enabled=true",
-			"--local-service-api-enabled=true",
-			"--event-query-mode=execution-nodes-only",
+	observers := []testnet.ObserverConfig{
+		{
+			LogLevel: zerolog.InfoLevel,
+			AdditionalFlags: []string{
+				fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
+				fmt.Sprintf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
+				"--execution-data-sync-enabled=true",
+				"--execution-data-indexing-enabled=true",
+				"--local-service-api-enabled=true",
+				"--event-query-mode=execution-nodes-only",
+			},
 		},
-	}}
+		{
+			ContainerName: "observer_2",
+			LogLevel:      zerolog.InfoLevel,
+		},
+	}
 
 	// prepare the network
 	conf := testnet.NewNetworkConfig("observer_indexing_enabled_test", nodeConfigs, testnet.WithObservers(observers...))
@@ -134,9 +141,6 @@ func (s *ObserverIndexerEnabledSuite) SetupTest() {
 }
 
 // TestObserverIndexedRPCsHappyPath tests RPCs that are handled by the observer by using a dedicated indexer for the events.
-// For now the observer only supports the following RPCs:
-// - GetEventsForHeightRange
-// - GetEventsForBlockIDs
 // To ensure that the observer is handling these RPCs, we stop the upstream access node and verify that the observer client
 // returns success for valid requests and errors for invalid ones.
 func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCsHappyPath() {
@@ -264,7 +268,277 @@ func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCsHappyPath() {
 		}
 	}
 	require.True(t, found)
+}
 
+// TestAllObserverIndexedRPCsHappyPath tests the observer with the indexer enabled,
+// observer configured to proxy requests to an access node and access node itself. All responses are compared
+// to ensure all of the endpoints are working as expected.
+// For now the observer only supports the following RPCs:
+// -GetAccountAtBlockHeight
+// -GetEventsForHeightRange
+// -GetEventsForBlockIDs
+// -GetSystemTransaction
+// -GetTransactionsByBlockID
+// -GetTransactionResultsByBlockID
+// -ExecuteScriptAtBlockID
+// -ExecuteScriptAtBlockHeight
+// -GetExecutionResultByID
+// -GetCollectionByID
+// -GetTransaction
+// -GetTransactionResult
+// -GetTransactionResultByIndex
+func (s *ObserverIndexerEnabledSuite) TestAllObserverIndexedRPCsHappyPath() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	t := s.T()
+
+	// prepare environment to create a new account
+	serviceAccountClient, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
+	require.NoError(t, err)
+
+	latestBlockID, err := serviceAccountClient.GetLatestBlockID(ctx)
+	require.NoError(t, err)
+
+	// create new account to deploy Counter to
+	accountPrivateKey := lib.RandomPrivateKey()
+
+	accountKey := sdk.NewAccountKey().
+		FromPrivateKey(accountPrivateKey).
+		SetHashAlgo(sdkcrypto.SHA3_256).
+		SetWeight(sdk.AccountKeyWeightThreshold)
+
+	serviceAddress := sdk.Address(serviceAccountClient.Chain.ServiceAddress())
+
+	// Generate the account creation transaction
+	createAccountTx, err := templates.CreateAccount(
+		[]*sdk.AccountKey{accountKey},
+		[]templates.Contract{
+			{
+				Name:   lib.CounterContract.Name,
+				Source: lib.CounterContract.ToCadence(),
+			},
+		}, serviceAddress)
+	require.NoError(t, err)
+
+	createAccountTx.
+		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
+		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
+		SetPayer(serviceAddress).
+		SetComputeLimit(9999)
+
+	// send the create account tx
+	childCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	err = serviceAccountClient.SignAndSendTransaction(childCtx, createAccountTx)
+	require.NoError(t, err)
+
+	cancel()
+
+	// wait for account to be created
+	var accountCreationTxRes *sdk.TransactionResult
+	unittest.RequireReturnsBefore(t, func() {
+		accountCreationTxRes, err = serviceAccountClient.WaitForSealed(context.Background(), createAccountTx.ID())
+		require.NoError(t, err)
+	}, 20*time.Second, "has to seal before timeout")
+
+	// obtain the account address
+	var accountCreatedPayload []byte
+	var newAccountAddress sdk.Address
+	for _, event := range accountCreationTxRes.Events {
+		if event.Type == sdk.EventAccountCreated {
+			accountCreatedEvent := sdk.AccountCreatedEvent(event)
+			accountCreatedPayload = accountCreatedEvent.Payload
+			newAccountAddress = accountCreatedEvent.Address()
+			break
+		}
+	}
+	require.NotEqual(t, sdk.EmptyAddress, newAccountAddress)
+
+	// now we can query events using observerLocal to data which has to be locally indexed
+
+	// get an access node client
+	accessNode, err := s.getClient(s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCPort))
+	require.NoError(t, err)
+
+	// get an observer with indexer enabled client
+	observerLocal, err := s.getObserverClient()
+	require.NoError(t, err)
+
+	// get an upstream observer client
+	observerUpstream, err := s.getClient(s.net.ContainerByName("observer_2").Addr(testnet.GRPCPort))
+	require.NoError(t, err)
+
+	// wait for data to be synced by observerLocal
+	require.Eventually(t, func() bool {
+		_, err := observerLocal.GetAccountAtBlockHeight(ctx, &accessproto.GetAccountAtBlockHeightRequest{
+			Address:     newAccountAddress.Bytes(),
+			BlockHeight: accountCreationTxRes.BlockHeight,
+		})
+		statusErr, ok := status.FromError(err)
+		if !ok || err == nil {
+			return true
+		}
+		return statusErr.Code() != codes.OutOfRange
+	}, 30*time.Second, 1*time.Second)
+
+	blockWithAccount, err := observerLocal.GetBlockByID(ctx, &accessproto.GetBlockByIDRequest{
+		Id:                accountCreationTxRes.BlockID[:],
+		FullBlockResponse: true,
+	})
+	require.NoError(t, err)
+
+	checkRPC := func(rpcCall func(client accessproto.AccessAPIClient) (any, error)) {
+		observerRes, err := rpcCall(observerLocal)
+		require.NoError(s.T(), err)
+		observerUpstreamRes, err := rpcCall(observerUpstream)
+		require.NoError(s.T(), err)
+		accessRes, err := rpcCall(accessNode)
+		require.NoError(s.T(), err)
+
+		require.Equal(s.T(), observerRes, observerUpstreamRes)
+		require.Equal(s.T(), observerRes, accessRes)
+	}
+
+	// GetEventsForBlockIDs
+	checkRPC(func(client accessproto.AccessAPIClient) (any, error) {
+		res, err := client.GetEventsForBlockIDs(ctx, &accessproto.GetEventsForBlockIDsRequest{
+			Type:                 sdk.EventAccountCreated,
+			BlockIds:             [][]byte{blockWithAccount.Block.Id},
+			EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+		})
+		return res.Results, err
+	})
+
+	var txIndex uint32
+	found := false
+
+	// GetEventsForHeightRange
+	checkRPC(func(client accessproto.AccessAPIClient) (any, error) {
+		res, err := client.GetEventsForHeightRange(ctx, &accessproto.GetEventsForHeightRangeRequest{
+			Type:                 sdk.EventAccountCreated,
+			StartHeight:          blockWithAccount.Block.Height,
+			EndHeight:            blockWithAccount.Block.Height,
+			EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+		})
+
+		// Iterating through response Results to get txIndex of event
+		for _, eventsInBlock := range res.Results {
+			for _, event := range eventsInBlock.Events {
+				if event.Type == sdk.EventAccountCreated {
+					if bytes.Equal(event.Payload, accountCreatedPayload) {
+						found = true
+						txIndex = event.TransactionIndex
+					}
+				}
+			}
+		}
+		require.True(t, found)
+		return res.Results, err
+	})
+
+	// GetSystemTransaction
+	checkRPC(func(client accessproto.AccessAPIClient) (any, error) {
+		res, err := client.GetSystemTransaction(ctx, &accessproto.GetSystemTransactionRequest{
+			BlockId: blockWithAccount.Block.Id,
+		})
+		return res.Transaction, err
+	})
+
+	// GetExecutionResultByID
+	checkRPC(func(client accessproto.AccessAPIClient) (any, error) {
+		converted, err := convert.MessageToBlock(blockWithAccount.Block)
+		require.NoError(t, err)
+
+		resultId := converted.Payload.Results[0].ID()
+		res, err := client.GetExecutionResultByID(ctx, &accessproto.GetExecutionResultByIDRequest{
+			Id: convert.IdentifierToMessage(resultId),
+		})
+		return res.ExecutionResult, err
+	})
+
+	// GetTransaction
+	checkRPC(func(client accessproto.AccessAPIClient) (any, error) {
+		res, err := client.GetTransaction(ctx, &accessproto.GetTransactionRequest{
+			Id:           accountCreationTxRes.TransactionID.Bytes(),
+			BlockId:      blockWithAccount.Block.Id,
+			CollectionId: nil,
+		})
+		return res.Transaction, err
+	})
+
+	// GetTransactionResult
+	checkRPC(func(client accessproto.AccessAPIClient) (any, error) {
+		res, err := client.GetTransactionResult(ctx, &accessproto.GetTransactionRequest{
+			Id:           accountCreationTxRes.TransactionID.Bytes(),
+			BlockId:      blockWithAccount.Block.Id,
+			CollectionId: accountCreationTxRes.CollectionID.Bytes(),
+		})
+		return res.Events, err
+	})
+
+	// GetTransactionResultByIndex
+	checkRPC(func(client accessproto.AccessAPIClient) (any, error) {
+		res, err := client.GetTransactionResultByIndex(ctx, &accessproto.GetTransactionByIndexRequest{
+			BlockId:              blockWithAccount.Block.Id,
+			Index:                txIndex,
+			EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+		})
+		return res.Events, err
+	})
+
+	// GetTransactionResultsByBlockID
+	checkRPC(func(client accessproto.AccessAPIClient) (any, error) {
+		res, err := client.GetTransactionResultsByBlockID(ctx, &accessproto.GetTransactionsByBlockIDRequest{
+			BlockId:              blockWithAccount.Block.Id,
+			EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+		})
+		return res.TransactionResults, err
+	})
+
+	// GetTransactionsByBlockID
+	checkRPC(func(client accessproto.AccessAPIClient) (any, error) {
+		res, err := client.GetTransactionsByBlockID(ctx, &accessproto.GetTransactionsByBlockIDRequest{
+			BlockId: blockWithAccount.Block.Id,
+		})
+		return res.Transactions, err
+	})
+
+	// GetCollectionByID
+	checkRPC(func(client accessproto.AccessAPIClient) (any, error) {
+		res, err := client.GetCollectionByID(ctx, &accessproto.GetCollectionByIDRequest{
+			Id: accountCreationTxRes.CollectionID.Bytes(),
+		})
+		return res.Collection, err
+	})
+
+	// ExecuteScriptAtBlockHeight
+	checkRPC(func(client accessproto.AccessAPIClient) (any, error) {
+		res, err := client.ExecuteScriptAtBlockHeight(ctx, &accessproto.ExecuteScriptAtBlockHeightRequest{
+			BlockHeight: blockWithAccount.Block.Height,
+			Script:      []byte(simpleScript),
+			Arguments:   make([][]byte, 0),
+		})
+		return res.Value, err
+	})
+
+	// ExecuteScriptAtBlockID
+	checkRPC(func(client accessproto.AccessAPIClient) (any, error) {
+		res, err := client.ExecuteScriptAtBlockID(ctx, &accessproto.ExecuteScriptAtBlockIDRequest{
+			BlockId:   blockWithAccount.Block.Id,
+			Script:    []byte(simpleScript),
+			Arguments: make([][]byte, 0),
+		})
+		return res.Value, err
+	})
+
+	// GetAccountAtBlockHeight
+	checkRPC(func(client accessproto.AccessAPIClient) (any, error) {
+		res, err := client.GetAccountAtBlockHeight(ctx, &accessproto.GetAccountAtBlockHeightRequest{
+			Address:     newAccountAddress.Bytes(),
+			BlockHeight: accountCreationTxRes.BlockHeight,
+		})
+		return res.Account, err
+	})
 }
 
 func (s *ObserverIndexerEnabledSuite) getRPCs() []RPCTest {

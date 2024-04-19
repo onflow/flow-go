@@ -11,8 +11,8 @@ import (
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -69,40 +69,8 @@ func (a *AccountsAtreeLedger) AllocateSlabIndex(owner []byte) (atree.SlabIndex, 
 	return v, nil
 }
 
-type PayloadSnapshot struct {
-	Payloads map[flow.RegisterID]*ledger.Payload
-}
-
-var _ snapshot.StorageSnapshot = (*PayloadSnapshot)(nil)
-
-func NewPayloadSnapshot(payloads []*ledger.Payload) (*PayloadSnapshot, error) {
-	l := &PayloadSnapshot{
-		Payloads: make(map[flow.RegisterID]*ledger.Payload, len(payloads)),
-	}
-	for _, payload := range payloads {
-		key, err := payload.Key()
-		if err != nil {
-			return nil, err
-		}
-		id, err := convert.LedgerKeyToRegisterID(key)
-		if err != nil {
-			return nil, err
-		}
-		l.Payloads[id] = payload
-	}
-	return l, nil
-}
-
-func (p PayloadSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
-	value, exists := p.Payloads[id]
-	if !exists {
-		return nil, nil
-	}
-	return value.Value(), nil
-}
-
 type PayloadsReadonlyLedger struct {
-	Snapshot *PayloadSnapshot
+	Snapshot snapshot.MigrationSnapshot
 
 	AllocateStorageIndexFunc func(owner []byte) (atree.SlabIndex, error)
 	SetValueFunc             func(owner, key, value []byte) (err error)
@@ -124,9 +92,9 @@ func (p *PayloadsReadonlyLedger) SetValue(owner, key, value []byte) (err error) 
 	panic("SetValue not expected to be called")
 }
 
-func (p *PayloadsReadonlyLedger) ValueExists(owner, key []byte) (exists bool, err error) {
-	_, ok := p.Snapshot.Payloads[flow.NewRegisterID(flow.BytesToAddress(owner), string(key))]
-	return ok, nil
+func (p *PayloadsReadonlyLedger) ValueExists(owner, key []byte) (bool, error) {
+	exists := p.Snapshot.Exists(flow.NewRegisterID(flow.BytesToAddress(owner), string(key)))
+	return exists, nil
 }
 
 func (p *PayloadsReadonlyLedger) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
@@ -137,7 +105,7 @@ func (p *PayloadsReadonlyLedger) AllocateSlabIndex(owner []byte) (atree.SlabInde
 	panic("AllocateSlabIndex not expected to be called")
 }
 
-func NewPayloadsReadonlyLedger(snapshot *PayloadSnapshot) *PayloadsReadonlyLedger {
+func NewPayloadsReadonlyLedger(snapshot snapshot.MigrationSnapshot) *PayloadsReadonlyLedger {
 	return &PayloadsReadonlyLedger{Snapshot: snapshot}
 }
 
@@ -165,7 +133,7 @@ func PayloadsAndAccountsFromEmulatorSnapshot(db *sql.DB) (
 	[]common.Address,
 	error,
 ) {
-	rows, err := db.Query("SELECT key, value, version, height FROM ledger")
+	rows, err := db.Query("SELECT key, value, version, height FROM ledger ORDER BY height DESC")
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -208,6 +176,10 @@ func PayloadsAndAccountsFromEmulatorSnapshot(db *sql.DB) (
 			ledgerKey,
 			value,
 		)
+
+		if _, ok := payloadSet[registerId]; ok {
+			continue
+		}
 
 		payloads = append(payloads, payload)
 		payloadSet[registerId] = PayloadMetaInfo{

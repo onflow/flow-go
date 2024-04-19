@@ -395,6 +395,18 @@ func newMigrations(
 		migrations = append(migrations, migration.Migrate)
 	}
 
+	// At the end, fix up storage-used discrepancies
+	migrations = append(
+		migrations,
+		migrators.NewAccountBasedMigration(
+			log,
+			opts.NWorker,
+			[]migrators.AccountBasedMigration{
+				&migrators.AccountUsageMigrator{},
+			},
+		),
+	)
+
 	log.Info().Msgf("initialized migrations")
 
 	return migrations

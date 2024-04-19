@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onflow/flow-go/integration/benchmark/load"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -132,8 +130,14 @@ func main() {
 		},
 		benchmark.LoadParams{
 			NumberOfAccounts: int(maxTPS) * *accountMultiplierFlag,
-			LoadType:         load.LoadType(*loadTypeFlag),
-			FeedbackEnabled:  *feedbackEnabled,
+			LoadConfig: benchmark.LoadConfig{
+				LoadName:   *loadTypeFlag,
+				LoadType:   *loadTypeFlag,
+				TpsMax:     int(maxTPS),
+				TpsMin:     int(maxTPS),
+				TPSInitial: int(maxTPS),
+			},
+			FeedbackEnabled: *feedbackEnabled,
 		},
 	)
 	if err != nil {

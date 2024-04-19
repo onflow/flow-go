@@ -37,9 +37,11 @@ var (
 	flagLogVerboseValidationError          bool
 	flagDiffMigration                      bool
 	flagLogVerboseDiff                     bool
-	flagCheckStorageHealthBeforeMigration  bool
+	flagVerboseErrorOutput                 bool
 	flagStagedContractsFile                string
 	flagContinueMigrationOnValidationError bool
+	flagCheckStorageHealthBeforeMigration  bool
+	flagCheckStorageHealthAfterMigration   bool
 	flagInputPayloadFileName               string
 	flagOutputPayloadFileName              string
 	flagOutputPayloadByAddresses           string
@@ -93,14 +95,20 @@ func init() {
 	Cmd.Flags().BoolVar(&flagLogVerboseDiff, "log-verbose-diff", false,
 		"log entire Cadence values on diff (requires --diff flag)")
 
-	Cmd.Flags().BoolVar(&flagCheckStorageHealthBeforeMigration, "check-storage-health-before", false,
-		"check (atree) storage health before migration")
+	Cmd.Flags().BoolVar(&flagVerboseErrorOutput, "verbose-error-output", true,
+		"log verbose output on migration errors")
 
 	Cmd.Flags().StringVar(&flagStagedContractsFile, "staged-contracts", "",
 		"Staged contracts CSV file")
 
 	Cmd.Flags().BoolVar(&flagAllowPartialStateFromPayloads, "allow-partial-state-from-payload-file", false,
 		"allow input payload file containing partial state (e.g. not all accounts)")
+
+	Cmd.Flags().BoolVar(&flagCheckStorageHealthBeforeMigration, "check-storage-health-before", false,
+		"check (atree) storage health before migration")
+
+	Cmd.Flags().BoolVar(&flagCheckStorageHealthAfterMigration, "check-storage-health-after", false,
+		"check (atree) storage health after migration")
 
 	Cmd.Flags().BoolVar(&flagContinueMigrationOnValidationError, "continue-migration-on-validation-errors", false,
 		"continue migration even if validation fails")
@@ -287,8 +295,16 @@ func run(*cobra.Command, []string) {
 		log.Warn().Msgf("--log-verbose-diff flag is enabled which may increase size of log")
 	}
 
+	if flagVerboseErrorOutput {
+		log.Warn().Msgf("--verbose-error-output flag is enabled which may increase size of log")
+	}
+
 	if flagCheckStorageHealthBeforeMigration {
 		log.Warn().Msgf("--check-storage-health-before flag is enabled and will increase duration of migration")
+	}
+
+	if flagCheckStorageHealthAfterMigration {
+		log.Warn().Msgf("--check-storage-health-after flag is enabled and will increase duration of migration")
 	}
 
 	var inputMsg string
@@ -354,6 +370,7 @@ func run(*cobra.Command, []string) {
 		StagedContracts:                   stagedContracts,
 		Prune:                             flagPrune,
 		MaxAccountSize:                    flagMaxAccountSize,
+		VerboseErrorOutput:                flagVerboseErrorOutput,
 	}
 
 	if len(flagInputPayloadFileName) > 0 {

@@ -5,19 +5,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
+
+	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
 )
 
 func newContractPayload(address common.Address, contractName string, contract []byte) *ledger.Payload {
@@ -30,20 +35,29 @@ func newContractPayload(address common.Address, contractName string, contract []
 }
 
 type logWriter struct {
-	logs []string
+	logs           []string
+	enableInfoLogs bool
 }
 
 var _ io.Writer = &logWriter{}
 
+const infoLogPrefix = "{\"level\":\"info\""
+
 func (l *logWriter) Write(bytes []byte) (int, error) {
-	l.logs = append(l.logs, string(bytes))
+	logStr := string(bytes)
+
+	if !l.enableInfoLogs && strings.HasPrefix(logStr, infoLogPrefix) {
+		return 0, nil
+	}
+
+	l.logs = append(l.logs, logStr)
 	return len(bytes), nil
 }
 
 func TestStagedContractsMigration(t *testing.T) {
 	t.Parallel()
 
-	chainID := flow.Emulator
+	const chainID = flow.Emulator
 	addressGenerator := chainID.Chain().NewAddressGenerator()
 
 	address1, err := addressGenerator.NextAddress()
@@ -73,8 +87,13 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf)
-		migration.RegisterContractUpdates(stagedContracts)
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithStagedContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -118,9 +137,14 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
 			WithContractUpdateValidation()
-		migration.RegisterContractUpdates(stagedContracts)
+		migration.WithStagedContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -166,9 +190,14 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
-			WithContractUpdateValidation()
-		migration.RegisterContractUpdates(stagedContracts)
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithContractUpdateValidation().
+			WithStagedContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -219,14 +248,23 @@ func TestStagedContractsMigration(t *testing.T) {
 			},
 		}
 
-		logWriter := &logWriter{}
+		logWriter := &logWriter{
+			enableInfoLogs: true,
+		}
+
 		log := zerolog.New(logWriter)
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
-			WithContractUpdateValidation()
-		migration.RegisterContractUpdates(stagedContracts)
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		const reporterName = "test"
+		migration := NewStagedContractsMigration("test", reporterName, log, rwf, options).
+			WithContractUpdateValidation().
+			WithStagedContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -244,8 +282,9 @@ func TestStagedContractsMigration(t *testing.T) {
 		err = migration.Close()
 		require.NoError(t, err)
 
-		require.Len(t, logWriter.logs, 1)
-		require.Contains(t, logWriter.logs[0], `error: expected token '{'`)
+		require.Len(t, logWriter.logs, 2)
+		require.Contains(t, logWriter.logs[0], `{"level":"info","message":"total of 2 staged contracts are provided externally"}`)
+		require.Contains(t, logWriter.logs[1], `error: expected token '{'`)
 
 		require.Len(t, payloads, 2)
 		// First payload should still have the old code
@@ -253,23 +292,23 @@ func TestStagedContractsMigration(t *testing.T) {
 		// Second payload should have the updated code
 		require.Equal(t, newCode2, string(payloads[1].Value()))
 
-		reportWriter := rwf.reportWriters["staged-contracts-migrator"]
+		reportWriter := rwf.reportWriters[reporterName]
 		require.Len(t, reportWriter.entries, 2)
 		assert.Equal(
 			t,
-			contractUpdateFailed{
-				AccountAddressHex: address1.HexWithPrefix(),
-				ContractName:      "A",
-				Error:             "error: expected token '{'\n --> f8d6e0586b0a20c7.A:1:46\n  |\n1 | access(all) contract A { access(all) struct C () }\n  |                                               ^\n",
+			contractUpdateFailureEntry{
+				AccountAddress: common.Address(address1),
+				ContractName:   "A",
+				Error:          "error: expected token '{'\n --> f8d6e0586b0a20c7.A:1:46\n  |\n1 | access(all) contract A { access(all) struct C () }\n  |                                               ^\n",
 			},
 			reportWriter.entries[0],
 		)
 
 		assert.Equal(
 			t,
-			contractUpdateSuccessful{
-				AccountAddressHex: address1.HexWithPrefix(),
-				ContractName:      "B",
+			contractUpdateEntry{
+				AccountAddress: common.Address(address1),
+				ContractName:   "B",
 			},
 			reportWriter.entries[1],
 		)
@@ -296,8 +335,14 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf)
-		migration.RegisterContractUpdates(stagedContracts)
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		const reporterName = "test"
+		migration := NewStagedContractsMigration("test", reporterName, log, rwf, options).
+			WithStagedContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -339,13 +384,13 @@ func TestStagedContractsMigration(t *testing.T) {
 		// No errors.
 		require.Empty(t, logWriter.logs)
 
-		reportWriter := rwf.reportWriters["staged-contracts-migrator"]
+		reportWriter := rwf.reportWriters[reporterName]
 		require.Len(t, reportWriter.entries, 1)
 		assert.Equal(
 			t,
-			contractUpdateSuccessful{
-				AccountAddressHex: address2.HexWithPrefix(),
-				ContractName:      "A",
+			contractUpdateEntry{
+				AccountAddress: common.Address(address2),
+				ContractName:   "A",
 			},
 			reportWriter.entries[0],
 		)
@@ -380,12 +425,16 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf)
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithStagedContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
-
-		migration.RegisterContractUpdates(stagedContracts)
 
 		payloads, err := migration.MigrateAccount(
 			context.Background(),
@@ -430,12 +479,16 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf)
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithStagedContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
-
-		migration.RegisterContractUpdates(stagedContracts)
 
 		// NOTE: no payloads
 		_, err = migration.MigrateAccount(
@@ -451,12 +504,175 @@ func TestStagedContractsMigration(t *testing.T) {
 			`"failed to find all contract registers that need to be changed for address"`,
 		)
 	})
+
+	t.Run("staged contract in storage", func(t *testing.T) {
+		t.Parallel()
+
+		oldCode := "access(all) contract A {}"
+		newCode := "access(all) contract A { access(all) struct B {} }"
+
+		const chainID = flow.Testnet
+		addressGenerator := chainID.Chain().NewAddressGenerator()
+		accountAddress, err := addressGenerator.NextAddress()
+		require.NoError(t, err)
+
+		stagingAccountAddress := common.Address(flow.HexToAddress("0x2ceae959ed1a7e7a"))
+
+		createStagedContractPayloads := func() []*ledger.Payload {
+			// Create account status payload
+			accountStatus := environment.NewAccountStatus()
+			accountStatusPayload := ledger.NewPayload(
+				convert.RegisterIDToLedgerKey(
+					flow.AccountStatusRegisterID(flow.ConvertAddress(stagingAccountAddress)),
+				),
+				accountStatus.ToBytes(),
+			)
+
+			mr, err := NewMigratorRuntime(
+				[]*ledger.Payload{
+					accountStatusPayload,
+				},
+				chainID,
+				MigratorRuntimeConfig{},
+				snapshot.SmallChangeSetSnapshot,
+			)
+			require.NoError(t, err)
+
+			// Create new storage map
+			domain := common.PathDomainStorage.Identifier()
+			storageMap := mr.Storage.GetStorageMap(stagingAccountAddress, domain, true)
+
+			contractUpdateValue := interpreter.NewCompositeValue(
+				mr.Interpreter,
+				interpreter.EmptyLocationRange,
+				common.AddressLocation{
+					Address: stagingAccountAddress,
+					Name:    "MigrationContractStaging",
+				},
+				"MigrationContractStaging.ContractUpdate",
+				common.CompositeKindStructure,
+				[]interpreter.CompositeField{
+					{
+						Name:  "address",
+						Value: interpreter.AddressValue(accountAddress),
+					},
+					{
+						Name:  "name",
+						Value: interpreter.NewUnmeteredStringValue("A"),
+					},
+					{
+						Name:  "code",
+						Value: interpreter.NewUnmeteredStringValue(newCode),
+					},
+				},
+				stagingAccountAddress,
+			)
+
+			capsuleValue := interpreter.NewCompositeValue(
+				mr.Interpreter,
+				interpreter.EmptyLocationRange,
+				common.AddressLocation{
+					Address: stagingAccountAddress,
+					Name:    "MigrationContractStaging",
+				},
+				"MigrationContractStaging.Capsule",
+				common.CompositeKindResource,
+				[]interpreter.CompositeField{
+					{
+						Name:  "update",
+						Value: contractUpdateValue,
+					},
+				},
+				stagingAccountAddress,
+			)
+
+			// Write the staged contract capsule value.
+			storageMap.WriteValue(
+				mr.Interpreter,
+				interpreter.StringStorageMapKey("MigrationContractStagingCapsule_some_random_suffix"),
+				capsuleValue,
+			)
+
+			// Write some random values as well.
+			storageMap.WriteValue(
+				mr.Interpreter,
+				interpreter.StringStorageMapKey("some_key"),
+				interpreter.NewUnmeteredStringValue("Also in the same account"),
+			)
+
+			storageMap.WriteValue(
+				mr.Interpreter,
+				interpreter.StringStorageMapKey("MigrationContractStagingCapsule_some_garbage_value"),
+				interpreter.NewUnmeteredStringValue("Also in the same storage path prefix"),
+			)
+
+			err = mr.Storage.Commit(mr.Interpreter, false)
+			require.NoError(t, err)
+
+			result, err := mr.TransactionState.FinalizeMainTransaction()
+			require.NoError(t, err)
+
+			payloads := make([]*ledger.Payload, 0, len(result.WriteSet))
+			for id, value := range result.WriteSet {
+				key := convert.RegisterIDToLedgerKey(id)
+				payloads = append(payloads, ledger.NewPayload(key, value))
+			}
+
+			return payloads
+		}
+
+		logWriter := &logWriter{
+			enableInfoLogs: true,
+		}
+		log := zerolog.New(logWriter)
+
+		rwf := &testReportWriterFactory{}
+
+		// Important: Do not stage contracts externally.
+		// Should be scanned and collected from the storage.
+
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options)
+
+		accountPayloads := []*ledger.Payload{
+			newContractPayload(common.Address(accountAddress), "A", []byte(oldCode)),
+		}
+
+		allPayloads := createStagedContractPayloads()
+		allPayloads = append(allPayloads, accountPayloads...)
+
+		err = migration.InitMigration(log, allPayloads, 0)
+		require.NoError(t, err)
+
+		payloads, err := migration.MigrateAccount(
+			context.Background(),
+			common.Address(accountAddress),
+			accountPayloads,
+		)
+		require.NoError(t, err)
+
+		err = migration.Close()
+		require.NoError(t, err)
+
+		require.Len(t, logWriter.logs, 4)
+		require.Contains(t, logWriter.logs[0], "found 6 payloads in account 0x2ceae959ed1a7e7a")
+		require.Contains(t, logWriter.logs[1], "found a value with an unexpected type `String`")
+		require.Contains(t, logWriter.logs[2], "found 1 staged contracts from payloads")
+		require.Contains(t, logWriter.logs[3], "total of 1 unique contracts are staged for all accounts")
+
+		require.Len(t, payloads, 1)
+		require.Equal(t, newCode, string(payloads[0].Value()))
+	})
 }
 
 func TestStagedContractsWithImports(t *testing.T) {
 	t.Parallel()
 
-	chainID := flow.Emulator
+	const chainID = flow.Emulator
 
 	addressGenerator := chainID.Chain().NewAddressGenerator()
 
@@ -515,8 +731,13 @@ func TestStagedContractsWithImports(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf)
-		migration.RegisterContractUpdates(stagedContracts)
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithStagedContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -592,9 +813,14 @@ func TestStagedContractsWithImports(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
-			WithContractUpdateValidation()
-		migration.RegisterContractUpdates(stagedContracts)
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithContractUpdateValidation().
+			WithStagedContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -685,9 +911,14 @@ func TestStagedContractsWithImports(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
-			WithContractUpdateValidation()
-		migration.RegisterContractUpdates(stagedContracts)
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithContractUpdateValidation().
+			WithStagedContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -783,9 +1014,14 @@ func TestStagedContractsWithImports(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
-			WithContractUpdateValidation()
-		migration.RegisterContractUpdates(stagedContracts)
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithContractUpdateValidation().
+			WithStagedContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -934,7 +1170,7 @@ contract MultilineContract{
 func TestStagedContractsWithUpdateValidator(t *testing.T) {
 	t.Parallel()
 
-	chainID := flow.Emulator
+	const chainID = flow.Emulator
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
 	addressGenerator := chainID.Chain().NewAddressGenerator()
@@ -1003,10 +1239,14 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
-			WithContractUpdateValidation()
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
 
-		migration.RegisterContractUpdates(stagedContracts)
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithContractUpdateValidation().
+			WithStagedContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -1096,10 +1336,14 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
-			WithContractUpdateValidation()
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
 
-		migration.RegisterContractUpdates(stagedContracts)
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithContractUpdateValidation().
+			WithStagedContractUpdates(stagedContracts)
 
 		err = migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
@@ -1186,10 +1430,14 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
-			WithContractUpdateValidation()
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
 
-		migration.RegisterContractUpdates(stagedContracts)
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithContractUpdateValidation().
+			WithStagedContractUpdates(stagedContracts)
 
 		err := migration.InitMigration(log, allPayloads, 0)
 		require.NoError(t, err)
@@ -1214,7 +1462,7 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 func TestStagedContractConformanceChanges(t *testing.T) {
 	t.Parallel()
 
-	chainID := flow.Emulator
+	const chainID = flow.Emulator
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
 	addressGenerator := chainID.Chain().NewAddressGenerator()
@@ -1288,10 +1536,14 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 
 			rwf := &testReportWriterFactory{}
 
-			migration := NewStagedContractsMigration(chainID, log, rwf).
-				WithContractUpdateValidation()
+			options := StagedContractsMigrationOptions{
+				ChainID:            chainID,
+				VerboseErrorOutput: true,
+			}
 
-			migration.RegisterContractUpdates(stagedContracts)
+			migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+				WithContractUpdateValidation().
+				WithStagedContractUpdates(stagedContracts)
 
 			contractCodePayload := newContractPayload(common.Address(address), "A", []byte(oldCode))
 			viewResolverCodePayload := newContractPayload(
@@ -1403,10 +1655,14 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
-			WithContractUpdateValidation()
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
 
-		migration.RegisterContractUpdates(stagedContracts)
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithContractUpdateValidation().
+			WithStagedContractUpdates(stagedContracts)
 
 		contractCodePayload := newContractPayload(common.Address(address), "A", []byte(oldCode))
 		arbitraryContractCodePayload := newContractPayload(
@@ -1443,7 +1699,7 @@ func TestConcurrentContractUpdate(t *testing.T) {
 
 	t.Parallel()
 
-	chainID := flow.Emulator
+	const chainID = flow.Emulator
 	addressGenerator := chainID.Chain().NewAddressGenerator()
 
 	addressA, err := addressGenerator.NextAddress()
@@ -1548,6 +1804,7 @@ func TestConcurrentContractUpdate(t *testing.T) {
 			EVMContractChange:    evmContractChange,
 			BurnerContractChange: burnerContractChange,
 			StagedContracts:      stagedContracts,
+			VerboseErrorOutput:   true,
 		},
 	)
 
@@ -1577,7 +1834,7 @@ func TestConcurrentContractUpdate(t *testing.T) {
 func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 	t.Parallel()
 
-	chainID := flow.Emulator
+	const chainID = flow.Emulator
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
 	addressGenerator := chainID.Chain().NewAddressGenerator()
@@ -1621,10 +1878,14 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
-			WithContractUpdateValidation()
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
 
-		migration.RegisterContractUpdates(stagedContracts)
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithContractUpdateValidation().
+			WithStagedContractUpdates(stagedContracts)
 
 		payloads := []*ledger.Payload{
 			newContractPayload(common.Address(address), "A", []byte(oldCodeA)),
@@ -1640,6 +1901,7 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 		)
 		require.NoError(t, err)
 
+		var err error
 		err = migration.Close()
 		require.NoError(t, err)
 
@@ -1647,7 +1909,7 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 
 		var jsonObject map[string]any
 
-		err := json.Unmarshal([]byte(logWriter.logs[0]), &jsonObject)
+		err = json.Unmarshal([]byte(logWriter.logs[0]), &jsonObject)
 		require.NoError(t, err)
 
 		assert.Equal(
@@ -1720,10 +1982,14 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 
 		rwf := &testReportWriterFactory{}
 
-		migration := NewStagedContractsMigration(chainID, log, rwf).
-			WithContractUpdateValidation()
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
 
-		migration.RegisterContractUpdates(stagedContracts)
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithContractUpdateValidation().
+			WithStagedContractUpdates(stagedContracts)
 
 		contractACode := newContractPayload(common.Address(address), "A", []byte(oldCodeA))
 		nftCode := newContractPayload(nftAddress, "NonFungibleToken", []byte(nftContract))
@@ -1731,6 +1997,7 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 		accountPayloads := []*ledger.Payload{contractACode}
 		allPayloads := []*ledger.Payload{contractACode, nftCode}
 
+		var err error
 		err = migration.InitMigration(log, allPayloads, 0)
 		require.NoError(t, err)
 
@@ -1744,7 +2011,7 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 		require.Len(t, logWriter.logs, 1)
 
 		var jsonObject map[string]any
-		err := json.Unmarshal([]byte(logWriter.logs[0]), &jsonObject)
+		err = json.Unmarshal([]byte(logWriter.logs[0]), &jsonObject)
 		require.NoError(t, err)
 
 		assert.Equal(
@@ -1758,4 +2025,52 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 			jsonObject["message"],
 		)
 	})
+}
+
+func TestContractUpdateEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := contractUpdateEntry{
+		AccountAddress: common.MustBytesToAddress([]byte{0x1}),
+		ContractName:   "Test",
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "contract-update-success",
+          "account_address": "0x0000000000000001",
+          "contract_name": "Test"
+        }`,
+		string(actual),
+	)
+}
+
+func TestContractUpdateFailureEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := contractUpdateFailureEntry{
+		AccountAddress: common.MustBytesToAddress([]byte{0x1}),
+		ContractName:   "Test",
+		Error:          "unknown",
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "contract-update-failure",
+          "account_address": "0x0000000000000001",
+          "contract_name": "Test",
+          "error": "unknown"
+        }`,
+		string(actual),
+	)
 }
