@@ -353,6 +353,23 @@ func createLargeIndexMap(
 
 	}
 
+	// special case for 2 workers
+	// we can merge the two minimaps directly
+	if workers == 2 {
+		left := <-minimaps
+		if left.err != nil {
+			return nil, left.err
+		}
+
+		right := <-minimaps
+		if right.err != nil {
+			return nil, right.err
+		}
+
+		maps.Copy(left.minimap, right.minimap)
+		return left.minimap, nil
+	}
+
 	// merge the minimaps in parallel
 	pairedMinimaps := make(
 		chan struct {
@@ -484,6 +501,23 @@ func createLargeMap(
 			minimaps <- result{minimap, nil}
 		}(payloads[start:end])
 
+	}
+
+	// special case for 2 workers
+	// we can merge the two minimaps directly
+	if workers == 2 {
+		left := <-minimaps
+		if left.err != nil {
+			return nil, left.err
+		}
+
+		right := <-minimaps
+		if right.err != nil {
+			return nil, right.err
+		}
+
+		maps.Copy(left.minimap, right.minimap)
+		return left.minimap, nil
 	}
 
 	// merge the minimaps in parallel

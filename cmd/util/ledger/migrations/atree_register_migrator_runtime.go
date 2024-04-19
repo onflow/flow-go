@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"fmt"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence/runtime"
