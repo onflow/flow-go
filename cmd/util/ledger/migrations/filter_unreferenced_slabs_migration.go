@@ -78,7 +78,7 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 
 	// The storage health check failed.
 	// This can happen if there are unreferenced root slabs.
-	// In this case, we filter out the unreferenced root slabs from the payloads.
+	// In this case, we filter out the unreferenced root slabs and all slabs they reference from the payloads.
 
 	var unreferencedRootSlabsErr runtime.UnreferencedRootSlabsError
 	if !errors.As(err, &unreferencedRootSlabsErr) {
@@ -90,19 +90,32 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 		Str("account", address.Hex()).
 		Msg("filtering unreferenced root slabs")
 
-	// Create a set of unreferenced root slabs.
+	// Create a set of unreferenced slabs: root slabs, and all slabs they reference.
 
-	unreferencedRootSlabIDs := map[atree.SlabID]struct{}{}
-	for _, storageID := range unreferencedRootSlabsErr.UnreferencedRootSlabIDs {
-		unreferencedRootSlabIDs[storageID] = struct{}{}
+	unreferencedSlabIDs := map[atree.SlabID]struct{}{}
+	for _, rootSlabID := range unreferencedRootSlabsErr.UnreferencedRootSlabIDs {
+		unreferencedSlabIDs[rootSlabID] = struct{}{}
+
+		childReferences, _, err := storage.GetAllChildReferences(rootSlabID)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"failed to get all child references for root slab %s: %w",
+				rootSlabID,
+				err,
+			)
+		}
+
+		for _, childSlabID := range childReferences {
+			unreferencedSlabIDs[childSlabID] = struct{}{}
+		}
 	}
 
-	// Filter out unreferenced root slabs.
+	// Filter out unreferenced slabs.
 
-	newCount := len(oldPayloads) - len(unreferencedRootSlabIDs)
+	newCount := len(oldPayloads) - len(unreferencedSlabIDs)
 	newPayloads = make([]*ledger.Payload, 0, newCount)
 
-	filteredPayloads := make([]*ledger.Payload, 0, len(unreferencedRootSlabIDs))
+	filteredPayloads := make([]*ledger.Payload, 0, len(unreferencedSlabIDs))
 
 	for _, payload := range oldPayloads {
 		registerID, _, err := convert.PayloadToRegister(payload)
@@ -113,7 +126,7 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 		// Filter unreferenced slabs.
 		if registerID.IsSlabIndex() {
 			storageID := StorageIDFromRegisterID(registerID)
-			if _, ok := unreferencedRootSlabIDs[storageID]; ok {
+			if _, ok := unreferencedSlabIDs[storageID]; ok {
 				filteredPayloads = append(filteredPayloads, payload)
 				continue
 			}
