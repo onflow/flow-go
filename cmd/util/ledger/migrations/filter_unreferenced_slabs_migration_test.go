@@ -53,7 +53,7 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 	storage := runtime.NewStorage(payloadsLedger, nil)
 
 	// {Int: Int}
-	dictionaryStaticType := interpreter.NewDictionaryStaticType(
+	dict1StaticType := interpreter.NewDictionaryStaticType(
 		nil,
 		interpreter.PrimitiveStaticTypeInt,
 		interpreter.PrimitiveStaticTypeInt,
@@ -71,18 +71,38 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 	dict1 := interpreter.NewDictionaryValueWithAddress(
 		inter,
 		interpreter.EmptyLocationRange,
-		dictionaryStaticType,
+		dict1StaticType,
 		testAddress,
 	)
 
-	// Storage another dictionary in the account.
+	// Storage another dictionary, with a nested array, in the account.
 	// It is not referenced through a storage map though.
 
-	interpreter.NewDictionaryValueWithAddress(
+	arrayStaticType := interpreter.NewVariableSizedStaticType(nil, interpreter.PrimitiveStaticTypeInt)
+
+	dict2StaticType := interpreter.NewDictionaryStaticType(
+		nil,
+		interpreter.PrimitiveStaticTypeInt,
+		arrayStaticType,
+	)
+
+	dict2 := interpreter.NewDictionaryValueWithAddress(
 		inter,
 		interpreter.EmptyLocationRange,
-		dictionaryStaticType,
+		dict2StaticType,
 		testAddress,
+	)
+
+	dict2.InsertWithoutTransfer(
+		inter, interpreter.EmptyLocationRange,
+		interpreter.NewUnmeteredIntValueFromInt64(2),
+		interpreter.NewArrayValue(
+			inter,
+			interpreter.EmptyLocationRange,
+			arrayStaticType,
+			testAddress,
+			interpreter.NewUnmeteredIntValueFromInt64(3),
+		),
 	)
 
 	storageMap := storage.GetStorageMap(
@@ -109,7 +129,7 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 		oldPayloads = append(oldPayloads, payload)
 	}
 
-	const totalSlabCount = 4
+	const totalSlabCount = 5
 
 	require.Len(t, oldPayloads, totalSlabCount)
 
@@ -130,27 +150,31 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 
 	// Assert
 
-	assert.Len(t, newPayloads, totalSlabCount-1)
-
 	writer := rwf.reportWriters[filterUnreferencedSlabsName]
 
-	expectedFilteredPayloads := make([]*ledger.Payload, 0, 1)
-
 	expectedAddress := string(testAddress[:])
-	expectedKey := string([]byte{flow.SlabIndexPrefix, 0, 0, 0, 0, 0, 0, 0, 2})
+	expectedKeys := map[string]struct{}{
+		string([]byte{flow.SlabIndexPrefix, 0, 0, 0, 0, 0, 0, 0, 2}): {},
+		string([]byte{flow.SlabIndexPrefix, 0, 0, 0, 0, 0, 0, 0, 3}): {},
+	}
+
+	assert.Len(t, newPayloads, totalSlabCount-len(expectedKeys))
+
+	expectedFilteredPayloads := make([]*ledger.Payload, 0, len(expectedKeys))
 
 	for _, payload := range oldPayloads {
 		registerID, _, err := convert.PayloadToRegister(payload)
 		require.NoError(t, err)
 
-		if registerID.Owner != expectedAddress ||
-			registerID.Key != expectedKey {
+		if registerID.Owner != expectedAddress {
+			continue
+		}
 
+		if _, ok := expectedKeys[registerID.Key]; !ok {
 			continue
 		}
 
 		expectedFilteredPayloads = append(expectedFilteredPayloads, payload)
-		break
 	}
 
 	assert.Equal(t,
