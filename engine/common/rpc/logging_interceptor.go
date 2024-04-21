@@ -20,9 +20,6 @@ func customClientCodeToLevel(c codes.Code) logging.Level {
 
 // LoggingInterceptor creates the logging interceptors to log incoming GRPC request and response (minus the payload body)
 func LoggingInterceptor(log zerolog.Logger) []grpc.UnaryServerInterceptor {
-	//this code gen extractor was removed, is this needed? if it is we need to use context for passing these along or so they say
-	//
-	//tagsInterceptor := tags.UnaryServerInterceptor(tags.WithFieldExtractor(tags.CodeGenRequestFieldExtractor))
 	loggingInterceptor := logging.UnaryServerInterceptor(InterceptorLogger(log), logging.WithLevels(customClientCodeToLevel))
 	return []grpc.UnaryServerInterceptor{loggingInterceptor}
 }
