@@ -13,7 +13,7 @@ import (
 func customClientCodeToLevel(c codes.Code) logging.Level {
 	if c == codes.OK {
 		// log successful returns as Debug to avoid excessive logging in info mode
-		return logging.DEBUG
+		return logging.LevelDebug
 	}
 	return logging.DefaultServerCodeToLevel(c)
 }
@@ -27,7 +27,7 @@ func LoggingInterceptor(log zerolog.Logger) []grpc.UnaryServerInterceptor {
 // InterceptorLogger adapts zerolog logger to interceptor logger.
 // This code is simple enough to be copied and not imported.
 func InterceptorLogger(l zerolog.Logger) logging.Logger {
-	return logging.LoggerFunc(func(ctx context.Context, lvl logging.Level, msg string, fields ...any) {
+	return logging.LoggerFunc(func(_ context.Context, lvl logging.Level, msg string, fields ...any) {
 		l := l.With().Fields(fields).Logger()
 
 		switch lvl {
