@@ -96,7 +96,8 @@ func init() {
 	)
 }
 
-// we might break this event into two (tx included /tx executed) if size becomes an issue
+// todo we might have to break this event into two (tx included /tx executed) if size becomes an issue
+
 type TransactionExecutedPayload struct {
 	BlockHeight uint64
 	TxEncoded   []byte
@@ -175,6 +176,7 @@ var blockExecutedEventCadenceType = &cadence.EventType{
 	Fields: []cadence.Field{
 		cadence.NewField("height", cadence.UInt64Type{}),
 		cadence.NewField("hash", cadence.StringType{}),
+		cadence.NewField("timestamp", cadence.UInt64Type{}),
 		cadence.NewField("totalSupply", cadence.IntType{}),
 		cadence.NewField("parentHash", cadence.StringType{}),
 		cadence.NewField("receiptRoot", cadence.StringType{}),
@@ -203,6 +205,7 @@ func (p *BlockExecutedEventPayload) CadenceEvent() (cadence.Event, error) {
 	fields := []cadence.Value{
 		cadence.NewUInt64(p.Block.Height),
 		cadence.String(blockHash.String()),
+		cadence.NewUInt64(p.Block.Timestamp),
 		cadence.NewIntFromBig(p.Block.TotalSupply),
 		cadence.String(p.Block.ParentBlockHash.String()),
 		cadence.String(p.Block.ReceiptRoot.String()),

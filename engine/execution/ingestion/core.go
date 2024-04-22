@@ -145,9 +145,9 @@ func (e *Core) launchWorkerToExecuteBlocks(ctx irrecoverable.SignalerContext, re
 		case executable := <-e.blockExecutors:
 			err := e.execute(ctx, executable)
 			if err != nil {
-				e.log.Error().Err(fmt.Errorf("execution ingestion engine failed to execute block %v (%v): %w",
+				ctx.Throw(fmt.Errorf("execution ingestion engine failed to execute block %v (%v): %w",
 					executable.Block.Header.Height,
-					executable.Block.ID(), err)).Msgf("error executing block")
+					executable.Block.ID(), err))
 			}
 		}
 	}
@@ -155,6 +155,7 @@ func (e *Core) launchWorkerToExecuteBlocks(ctx irrecoverable.SignalerContext, re
 
 func (e *Core) OnBlock(header *flow.Header, qc *flow.QuorumCertificate) {
 	e.log.Debug().Msgf("received block %v (%v)", header.Height, qc.BlockID)
+
 	// qc.Block is equivalent to header.ID()
 	err := e.throttle.OnBlock(qc.BlockID)
 	if err != nil {
@@ -188,7 +189,7 @@ func (e *Core) launchWorkerToConsumeThrottledBlocks(ctx irrecoverable.SignalerCo
 			e.log.Debug().Hex("block_id", blockID[:]).Msg("ingestion core processing block")
 			err := e.onProcessableBlock(blockID)
 			if err != nil {
-				e.log.Error().Err(fmt.Errorf("execution ingestion engine fail to process block %v: %w", blockID, err)).Msgf("error processing block")
+				ctx.Throw(fmt.Errorf("execution ingestion engine fail to process block %v: %w", blockID, err))
 				return
 			}
 		}
@@ -227,6 +228,7 @@ func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
 		return fmt.Errorf("failed to enqueue block %v: %w", blockID, err)
 	}
 
+	e.log.Debug().Int("executables", len(executables)).Msgf("executeConcurrently block is executable")
 	e.executeConcurrently(executables)
 
 	err = e.fetch(missingColls)
@@ -343,6 +345,8 @@ func (e *Core) onBlockExecuted(
 		return fmt.Errorf("cannot persist execution state: %w", err)
 	}
 
+	e.log.Debug().Uint64("height", block.Block.Header.Height).Msgf("execution state saved")
+
 	// must call OnBlockExecuted AFTER saving the execution result to storage
 	// because when enqueuing a block, we rely on execState.StateCommitmentByBlockID
 	// to determine whether a block has been executed or not.
@@ -379,6 +383,8 @@ func (e *Core) onBlockExecuted(
 	// its parent block has been successfully saved to storage.
 	// this ensures OnBlockExecuted would not be called with blocks in a wrong order, such as
 	// OnBlockExecuted(childBlock) being called before OnBlockExecuted(parentBlock).
+
+	e.log.Debug().Int("executables", len(executables)).Msgf("executeConcurrently: parent block is executed")
 	e.executeConcurrently(executables)
 
 	return nil
@@ -407,6 +413,7 @@ func (e *Core) onCollection(col *flow.Collection) error {
 		return fmt.Errorf("unexpected error while adding collection to block queue")
 	}
 
+	e.log.Debug().Int("executables", len(executables)).Msgf("executeConcurrently: collection is handled, ready to execute block")
 	e.executeConcurrently(executables)
 
 	return nil
@@ -431,7 +438,12 @@ func storeCollectionIfMissing(collections storage.Collections, col *flow.Collect
 // execute block concurrently
 func (e *Core) executeConcurrently(executables []*entity.ExecutableBlock) {
 	for _, executable := range executables {
-		e.blockExecutors <- executable
+		select {
+		case <-e.ShutdownSignal():
+			// if the engine has shut down, then stop executing the block
+			return
+		case e.blockExecutors <- executable:
+		}
 	}
 }
 

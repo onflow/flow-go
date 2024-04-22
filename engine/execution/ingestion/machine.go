@@ -67,7 +67,7 @@ func NewMachine(
 		state,
 		execState,
 		headers,
-		CatchUpThreshold,
+		DefaultCatchUpThreshold,
 	)
 
 	if err != nil {

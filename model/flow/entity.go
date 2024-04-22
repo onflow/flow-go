@@ -29,7 +29,12 @@ func EntitiesToIDs[T Entity](entities []T) []Identifier {
 }
 
 // Deduplicate entities in a slice by the ID method
+// The original order of the entities is preserved.
 func Deduplicate[T IDEntity](entities []T) []T {
+	if entities == nil {
+		return nil
+	}
+
 	seen := make(map[Identifier]struct{}, len(entities))
 	result := make([]T, 0, len(entities))
 

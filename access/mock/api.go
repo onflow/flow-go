@@ -977,13 +977,13 @@ func (_m *API) SubscribeBlocksFromStartHeight(ctx context.Context, startHeight u
 	return r0
 }
 
-// SubscribeTransactionStatuses provides a mock function with given fields: ctx, tx
-func (_m *API) SubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody) subscription.Subscription {
-	ret := _m.Called(ctx, tx)
+// SubscribeTransactionStatuses provides a mock function with given fields: ctx, tx, requiredEventEncodingVersion
+func (_m *API) SubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription {
+	ret := _m.Called(ctx, tx, requiredEventEncodingVersion)
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.TransactionBody) subscription.Subscription); ok {
-		r0 = rf(ctx, tx)
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.TransactionBody, entities.EventEncodingVersion) subscription.Subscription); ok {
+		r0 = rf(ctx, tx, requiredEventEncodingVersion)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)

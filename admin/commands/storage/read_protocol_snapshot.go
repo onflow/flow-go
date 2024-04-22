@@ -57,7 +57,7 @@ func (s *ProtocolSnapshotCommand) Handler(_ context.Context, req *admin.CommandR
 
 	s.logger.Info().Uint("blocksToSkip", blocksToSkip).Msgf("admintool: generating protocol snapshot")
 
-	snapshot, sealedHeight, commit, err := common.GenerateProtocolSnapshotForCheckpoint(
+	snapshot, sealedHeight, commit, checkpointFile, err := common.GenerateProtocolSnapshotForCheckpoint(
 		s.logger, s.state, s.headers, s.seals, s.checkpointDir, blocksToSkip)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate protocol snapshot for checkpoint, checkpointDir %v: %w",
@@ -79,10 +79,19 @@ func (s *ProtocolSnapshotCommand) Handler(_ context.Context, req *admin.CommandR
 		Hex("finalized_block_id", logging.Entity(header)).
 		Uint64("sealed_height", sealedHeight).
 		Hex("sealed_commit", commit[:]). // not the commit for the finalized height, but for the sealed height
+		Str("checkpoint_file", checkpointFile).
 		Uint("blocks_to_skip", blocksToSkip).
 		Msgf("admintool: protocol snapshot generated successfully")
 
-	return commands.ConvertToMap(serializable.Encodable())
+	return commands.ConvertToMap(protocolSnapshotResponse{
+		Snapshot:   serializable.Encodable(),
+		Checkpoint: checkpointFile,
+	})
+}
+
+type protocolSnapshotResponse struct {
+	Snapshot   inmem.EncodableSnapshot `json:"snapshot"`
+	Checkpoint string                  `json:"checkpoint"`
 }
 
 func (s *ProtocolSnapshotCommand) Validator(req *admin.CommandRequest) error {
