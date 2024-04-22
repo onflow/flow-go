@@ -175,22 +175,27 @@ contract EVM {
 
         /// returns the newly deployed contract address
         /// if the transaction caused such a deployment
-        /// otherwise the value is empty.
+        /// otherwise the value is nil.
         access(all)
-        let deployedContractAddress: [UInt8; 20]
+        let deployedContract: EVMAddress?
 
         init(
             status: Status,
             errorCode: UInt64,
             gasUsed: UInt64,
             data: [UInt8],
-            contractAddress: [UInt8; 20]
+            contractAddress: [UInt8; 20]?
         ) {
             self.status = status
             self.errorCode = errorCode
             self.gasUsed = gasUsed
             self.data = data
-            self.deployedContractAddress = contractAddress
+
+            if let addressBytes = contractAddress {
+                self.deployedContract = EVMAddress(bytes: addressBytes)
+            } else {
+                self.deployedContract = nil
+            }
         }
     }
 

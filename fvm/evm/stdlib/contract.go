@@ -1010,50 +1010,57 @@ func NewResultValue(
 	result *types.ResultSummary,
 ) *interpreter.CompositeValue {
 	loc := common.NewAddressLocation(gauge, handler.EVMContractAddress(), ContractName)
+
+	fields := []interpreter.CompositeField{
+		{
+			Name: "status",
+			Value: interpreter.NewEnumCaseValue(
+				inter,
+				locationRange,
+				&sema.CompositeType{
+					Location:   loc,
+					Identifier: evmStatusTypeQualifiedIdentifier,
+					Kind:       common.CompositeKindEnum,
+				},
+				interpreter.NewUInt8Value(gauge, func() uint8 {
+					return uint8(result.Status)
+				}),
+				nil,
+			),
+		},
+		{
+			Name: "errorCode",
+			Value: interpreter.NewUInt64Value(gauge, func() uint64 {
+				return uint64(result.ErrorCode)
+			}),
+		},
+		{
+			Name: "gasUsed",
+			Value: interpreter.NewUInt64Value(gauge, func() uint64 {
+				return result.GasConsumed
+			}),
+		},
+		{
+			Name:  "data",
+			Value: interpreter.ByteSliceToByteArrayValue(inter, result.ReturnedValue),
+		},
+	}
+
+	// we made the deployed contract address optional
+	if result.DeployedContractAddress != nil {
+		fields = append(fields, interpreter.CompositeField{
+			Name:  "deployedContractAddress",
+			Value: EVMAddressToAddressBytesArrayValue(inter, *result.DeployedContractAddress),
+		})
+	}
+
 	return interpreter.NewCompositeValue(
 		inter,
 		locationRange,
 		loc,
 		evmResultTypeQualifiedIdentifier,
 		common.CompositeKindStructure,
-		[]interpreter.CompositeField{
-			{
-				Name: "status",
-				Value: interpreter.NewEnumCaseValue(
-					inter,
-					locationRange,
-					&sema.CompositeType{
-						Location:   loc,
-						Identifier: evmStatusTypeQualifiedIdentifier,
-						Kind:       common.CompositeKindEnum,
-					},
-					interpreter.NewUInt8Value(gauge, func() uint8 {
-						return uint8(result.Status)
-					}),
-					nil,
-				),
-			},
-			{
-				Name: "errorCode",
-				Value: interpreter.NewUInt64Value(gauge, func() uint64 {
-					return uint64(result.ErrorCode)
-				}),
-			},
-			{
-				Name: "gasUsed",
-				Value: interpreter.NewUInt64Value(gauge, func() uint64 {
-					return result.GasConsumed
-				}),
-			},
-			{
-				Name:  "data",
-				Value: interpreter.ByteSliceToByteArrayValue(inter, result.ReturnedValue),
-			},
-			{
-				Name:  "deployedContractAddress",
-				Value: EVMAddressToAddressBytesArrayValue(inter, result.DeployedContractAddress),
-			},
-		},
+		fields,
 		common.ZeroAddress,
 	)
 }
@@ -1669,7 +1676,8 @@ func newInternalEVMTypeDeployFunction(
 			account := handler.AccountByAddress(fromAddress, isAuthorized)
 			result := account.Deploy(code, gasLimit, amount)
 
-			return NewResultValue(handler, gauge, inter, locationRange, result)
+			res := NewResultValue(handler, gauge, inter, locationRange, result)
+			return res
 		},
 	)
 }
@@ -2062,13 +2070,14 @@ func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, e
 	for i, val := range deployedAddress.Values {
 		convertedAddress[i] = val.(cadence.UInt8).ToGoValue().(uint8)
 	}
+	convertedDeployedAddress := types.Address(convertedAddress)
 
 	return &types.ResultSummary{
 		Status:                  types.Status(status),
 		ErrorCode:               types.ErrorCode(errorCode),
 		GasConsumed:             uint64(gasUsed),
 		ReturnedValue:           convertedData,
-		DeployedContractAddress: types.Address(convertedAddress),
+		DeployedContractAddress: &convertedDeployedAddress,
 	}, nil
 
 }

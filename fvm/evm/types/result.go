@@ -38,7 +38,7 @@ type ResultSummary struct {
 	Status                  Status
 	ErrorCode               ErrorCode
 	GasConsumed             uint64
-	DeployedContractAddress Address
+	DeployedContractAddress *Address
 	ReturnedValue           Data
 }
 
@@ -127,7 +127,12 @@ func (res *Result) ResultSummary() *ResultSummary {
 	rs := &ResultSummary{}
 
 	rs.GasConsumed = res.GasConsumed
-	rs.DeployedContractAddress = res.DeployedContractAddress
+
+	// don't include the deployed address in the result if empty
+	if res.DeployedContractAddress != EmptyAddress {
+		rs.DeployedContractAddress = &res.DeployedContractAddress
+	}
+
 	rs.ReturnedValue = res.ReturnedValue
 
 	if res.Invalid() {
