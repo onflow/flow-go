@@ -163,16 +163,6 @@ func New(params Params) (*Backend, error) {
 	// initialize node version info
 	nodeInfo := getNodeVersionInfo(params.State.Params())
 
-	transactionsLocalDataProvider := &TransactionsLocalDataProvider{
-		state:               params.State,
-		collections:         params.Collections,
-		blocks:              params.Blocks,
-		eventsIndex:         params.EventsIndex,
-		txResultsIndex:      params.TxResultsIndex,
-		systemTxID:          systemTxID,
-		lastFullBlockHeight: params.LastFullBlockHeight,
-	}
-
 	b := &Backend{
 		state:        params.State,
 		BlockTracker: params.BlockTracker,
@@ -188,25 +178,6 @@ func New(params Params) (*Backend, error) {
 			nodeCommunicator:  params.Communicator,
 			scriptExecutor:    params.ScriptExecutor,
 			scriptExecMode:    params.ScriptExecutionMode,
-		},
-		backendTransactions: backendTransactions{
-			TransactionsLocalDataProvider: transactionsLocalDataProvider,
-			log:                           params.Log,
-			staticCollectionRPC:           params.CollectionRPC,
-			chainID:                       params.ChainID,
-			transactions:                  params.Transactions,
-			executionReceipts:             params.ExecutionReceipts,
-			transactionValidator:          configureTransactionValidator(params.State, params.ChainID),
-			transactionMetrics:            params.AccessMetrics,
-			retry:                         retry,
-			connFactory:                   params.ConnFactory,
-			previousAccessNodes:           params.HistoricalAccessNodes,
-			nodeCommunicator:              params.Communicator,
-			txResultCache:                 txResCache,
-			txErrorMessagesCache:          txErrorMessagesCache,
-			txResultQueryMode:             params.TxResultQueryMode,
-			systemTx:                      systemTx,
-			systemTxID:                    systemTxID,
 		},
 		backendEvents: backendEvents{
 			log:               params.Log,
@@ -255,13 +226,7 @@ func New(params Params) (*Backend, error) {
 			subscriptionHandler: params.SubscriptionHandler,
 			blockTracker:        params.BlockTracker,
 		},
-		backendSubscribeTransactions: backendSubscribeTransactions{
-			txLocalDataProvider: transactionsLocalDataProvider,
-			log:                 params.Log,
-			executionResults:    params.ExecutionResults,
-			subscriptionHandler: params.SubscriptionHandler,
-			blockTracker:        params.BlockTracker,
-		},
+
 		collections:       params.Collections,
 		executionReceipts: params.ExecutionReceipts,
 		connFactory:       params.ConnFactory,
@@ -269,7 +234,47 @@ func New(params Params) (*Backend, error) {
 		nodeInfo:          nodeInfo,
 	}
 
+	transactionsLocalDataProvider := &TransactionsLocalDataProvider{
+		state:               params.State,
+		collections:         params.Collections,
+		blocks:              params.Blocks,
+		eventsIndex:         params.EventsIndex,
+		txResultsIndex:      params.TxResultsIndex,
+		systemTxID:          systemTxID,
+		lastFullBlockHeight: params.LastFullBlockHeight,
+	}
+
+	b.backendTransactions = backendTransactions{
+		TransactionsLocalDataProvider: transactionsLocalDataProvider,
+		log:                           params.Log,
+		staticCollectionRPC:           params.CollectionRPC,
+		chainID:                       params.ChainID,
+		transactions:                  params.Transactions,
+		executionReceipts:             params.ExecutionReceipts,
+		transactionValidator:          configureTransactionValidator(params.State, params.ChainID),
+		transactionMetrics:            params.AccessMetrics,
+		retry:                         retry,
+		connFactory:                   params.ConnFactory,
+		previousAccessNodes:           params.HistoricalAccessNodes,
+		nodeCommunicator:              params.Communicator,
+		txResultCache:                 txResCache,
+		txErrorMessagesCache:          txErrorMessagesCache,
+		txResultQueryMode:             params.TxResultQueryMode,
+		systemTx:                      systemTx,
+		systemTxID:                    systemTxID,
+	}
+
+	// TODO: The TransactionErrorMessage interface should be reorganized in future, as it is implemented in backendTransactions but used in TransactionsLocalDataProvider, and its initialization is somewhat quirky.
 	b.backendTransactions.txErrorMessages = b
+
+	b.backendSubscribeTransactions = backendSubscribeTransactions{
+		txLocalDataProvider: transactionsLocalDataProvider,
+		backendTransactions: &b.backendTransactions,
+		log:                 params.Log,
+		executionResults:    params.ExecutionResults,
+		subscriptionHandler: params.SubscriptionHandler,
+		blockTracker:        params.BlockTracker,
+	}
 
 	retry.SetBackend(b)
 

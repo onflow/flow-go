@@ -58,14 +58,15 @@ type Suite struct {
 	snapshot *protocol.Snapshot
 	log      zerolog.Logger
 
-	blocks             *storagemock.Blocks
-	headers            *storagemock.Headers
-	collections        *storagemock.Collections
-	transactions       *storagemock.Transactions
-	receipts           *storagemock.ExecutionReceipts
-	results            *storagemock.ExecutionResults
-	transactionResults *storagemock.LightTransactionResults
-	events             *storagemock.Events
+	blocks              *storagemock.Blocks
+	headers             *storagemock.Headers
+	collections         *storagemock.Collections
+	transactions        *storagemock.Transactions
+	receipts            *storagemock.ExecutionReceipts
+	results             *storagemock.ExecutionResults
+	transactionResults  *storagemock.LightTransactionResults
+	events              *storagemock.Events
+	lastFullBlockHeight *storagemock.ConsumerProgress
 
 	colClient              *access.AccessAPIClient
 	execClient             *access.ExecutionAPIClient
@@ -114,6 +115,8 @@ func (suite *Suite) SetupTest() {
 	var err error
 	suite.systemTx, err = blueprints.SystemChunkTransaction(flow.Testnet.Chain())
 	suite.Require().NoError(err)
+
+	suite.lastFullBlockHeight = new(storagemock.ConsumerProgress)
 }
 
 func (suite *Suite) TestPing() {
@@ -1203,10 +1206,10 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 
 	// set up GetLastFullBlockHeight mock
 	fullHeight := headBlock.Header.Height
-	suite.blocks.On("GetLastFullBlockHeight").Return(
-		func() uint64 { return fullHeight },
-		func() error { return nil },
-	)
+
+	suite.lastFullBlockHeight.On("ProcessedIndex").Return(func() (uint64, error) {
+		return fullHeight, nil
+	}, nil)
 
 	suite.snapshot.
 		On("Head").
@@ -2156,5 +2159,6 @@ func (suite *Suite) defaultBackendParams() Params {
 		TxErrorMessagesCacheSize: 1000,
 		BlockTracker:             nil,
 		TxResultQueryMode:        IndexQueryModeExecutionNodesOnly,
+		LastFullBlockHeight:      suite.lastFullBlockHeight,
 	}
 }
