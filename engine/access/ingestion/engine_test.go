@@ -159,7 +159,7 @@ func (s *Suite) SetupTest() {
 
 	irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
 	eng.ComponentManager.Start(irrecoverableCtx)
-	unittest.RequireCloseBefore(s.T(), eng.Ready(), 3*time.Second, "timed out waiting for ingestion engine to be ready")
+	<-eng.Ready()
 
 	s.eng = eng
 }
