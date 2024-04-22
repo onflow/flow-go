@@ -384,6 +384,7 @@ type Options struct {
 	StagedContracts                   []StagedContract
 	Prune                             bool
 	MaxAccountSize                    uint64
+	FixSlabWithBrokenReferences       bool
 }
 
 func NewCadence1Migrations(
@@ -410,6 +411,22 @@ func NewCadence1Migrations(
 				Migrate: NewAccountSizeFilterMigration(opts.MaxAccountSize, maxSizeExceptions, log),
 			},
 		)
+	}
+
+	if opts.FixSlabWithBrokenReferences {
+		migrations = append(migrations, NamedMigration{
+			Name: "clean-state",
+			Migrate: NewAccountBasedMigration(
+				log,
+				opts.NWorker,
+				[]AccountBasedMigration{
+					NewFixBrokenReferencesInSlabsMigration(rwf, knownProblematicAccounts),
+					// TODO: add migration to filter unreferenced slabs here.
+					// NOTE: migration to filter unreferenced slabs should happen
+					// after migration to fix slabs with references to nonexistent slabs.
+				},
+			),
+		})
 	}
 
 	if opts.Prune {
