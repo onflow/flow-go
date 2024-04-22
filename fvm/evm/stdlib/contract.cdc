@@ -326,6 +326,11 @@ contract EVM {
     }
 
     access(all)
+    fun estimateGas(tx [UInt8]): UInt {
+        return InternalEVM.estimateGas(tx)
+    }
+
+    access(all)
     fun encodeABI(_ values: [AnyStruct]): [UInt8] {
         return InternalEVM.encodeABI(values)
     }

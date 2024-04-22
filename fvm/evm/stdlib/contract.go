@@ -972,6 +972,55 @@ func newInternalEVMTypeRunFunction(
 	)
 }
 
+// estimate gas
+
+const internalEVMTypeEstimateGasFunctionName = "estimateGas"
+
+var internalEVMTypeEstimateGasFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "tx",
+			TypeAnnotation: sema.NewTypeAnnotation(evmTransactionBytesType),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
+}
+
+func newInternalEVMTypeEstimateGasFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		internalEVMTypeEstimateGasFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			// Get transaction argument
+
+			transactionValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			transaction, err := interpreter.ByteArrayValueToByteSlice(inter, transactionValue, locationRange)
+			if err != nil {
+				panic(err)
+			}
+
+			// Estiamte
+
+			val, err := handler.EstimateGas(transaction)
+			if err != nil {
+				panic(err) // todo change
+			}
+
+			return interpreter.NewUnmeteredUInt64Value(val)
+		},
+	)
+}
+
 func NewResultValue(
 	handler types.ContractHandler,
 	gauge common.MemoryGauge,
@@ -1808,6 +1857,7 @@ func NewInternalEVMContractValue(
 			internalEVMTypeCastToAttoFLOWFunctionName:            newInternalEVMTypeCastToAttoFLOWFunction(gauge, handler),
 			internalEVMTypeCastToFLOWFunctionName:                newInternalEVMTypeCastToFLOWFunction(gauge, handler),
 			internalEVMTypeGetLatestBlockFunctionName:            newInternalEVMTypeGetLatestBlockFunction(gauge, handler),
+			internalEVMTypeEstimateGasFunctionName:               newInternalEVMTypeEstimateGasFunction(gauge, handler),
 		},
 		nil,
 		nil,
@@ -1828,6 +1878,12 @@ var InternalEVMContractType = func() *sema.CompositeType {
 			ty,
 			internalEVMTypeRunFunctionName,
 			internalEVMTypeRunFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeEstimateGasFunctionName,
+			internalEVMTypeEstimateGasFunctionType,
 			"",
 		),
 		sema.NewUnmeteredPublicFunctionMember(
