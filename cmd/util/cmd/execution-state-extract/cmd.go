@@ -39,6 +39,7 @@ var (
 	flagInputPayloadFileName               string
 	flagOutputPayloadFileName              string
 	flagOutputPayloadByAddresses           string
+	flagFixSlabWithBrokenReferences        bool
 )
 
 var Cmd = &cobra.Command{
@@ -122,6 +123,9 @@ func init() {
 		"",
 		"extract payloads of addresses (comma separated hex-encoded addresses) to file specified by output-payload-filename",
 	)
+
+	Cmd.Flags().BoolVar(&flagFixSlabWithBrokenReferences, "fix-testnet-slabs-with-broken-references", false,
+		"fix slabs with broken references in testnet")
 }
 
 func run(*cobra.Command, []string) {
@@ -299,6 +303,10 @@ func run(*cobra.Command, []string) {
 
 	log.Info().Msgf("state extraction plan: %s, %s", inputMsg, outputMsg)
 
+
+	chainID := flow.ChainID(flagChain)
+	fixSlabWithBrokenReferences := chainID == flow.Testnet && flagFixSlabWithBrokenReferences
+
 	var err error
 	if len(flagInputPayloadFileName) > 0 {
 		err = extractExecutionStateFromPayloads(
@@ -310,6 +318,7 @@ func run(*cobra.Command, []string) {
 			flagInputPayloadFileName,
 			flagOutputPayloadFileName,
 			exportedAddresses,
+			fixSlabWithBrokenReferences,
 		)
 	} else {
 		err = extractExecutionState(
@@ -321,6 +330,7 @@ func run(*cobra.Command, []string) {
 			!flagNoMigration,
 			flagOutputPayloadFileName,
 			exportedAddresses,
+			fixSlabWithBrokenReferences,
 		)
 	}
 

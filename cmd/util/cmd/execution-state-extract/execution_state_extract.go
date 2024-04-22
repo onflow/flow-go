@@ -39,6 +39,7 @@ func extractExecutionState(
 	runMigrations bool,
 	outputPayloadFile string,
 	exportPayloadsByAddresses []common.Address,
+	fixSlabWithBrokenReferences bool,
 ) error {
 
 	log.Info().Msg("init WAL")
@@ -213,6 +214,7 @@ func extractExecutionStateFromPayloads(
 	inputPayloadFile string,
 	outputPayloadFile string,
 	exportPayloadsByAddresses []common.Address,
+	fixSlabWithBrokenReferences bool,
 ) error {
 
 	inputPayloadsFromPartialState, payloads, err := util.ReadPayloadFile(log, inputPayloadFile)
