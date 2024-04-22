@@ -5,6 +5,10 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+// DefaultEpochExtensionLength is a default length of epoch extension.
+// TODO: replace this with value from KV store or protocol.GlobalParams
+const DefaultEpochExtensionLength = 1_000
+
 // FallbackStateMachine is a special structure that encapsulates logic for processing service events
 // when protocol is in epoch fallback mode. The FallbackStateMachine ignores EpochSetup and EpochCommit
 // events but still processes ejection events.
@@ -21,22 +25,22 @@ var _ StateMachine = (*FallbackStateMachine)(nil)
 // InvalidEpochTransitionAttempted to true, thereby recording that we have entered epoch fallback mode.
 func NewFallbackStateMachine(params protocol.GlobalParams, view uint64, parentState *flow.RichProtocolStateEntry) *FallbackStateMachine {
 	state := parentState.ProtocolStateEntry.Copy()
+	nextEpochCommitted := state.EpochPhase() == flow.EpochPhaseCommitted
 	if !state.InvalidEpochTransitionAttempted {
-		// we are entering fallback mode for the first time
-		// if the next epoch is not committed, we need to drop it.
-		if state.EpochPhase() != flow.EpochPhaseCommitted {
+		// we are entering fallback mode, this logic needs to be executed only once
+		if !nextEpochCommitted {
 			state.NextEpoch = nil
 		}
 		state.InvalidEpochTransitionAttempted = true
 	}
 
-	if view+params.EpochCommitSafetyThreshold() >= parentState.CurrentEpochFinalView() {
+	if !nextEpochCommitted && view+params.EpochCommitSafetyThreshold() >= parentState.CurrentEpochFinalView() {
 		// we have reached safety threshold and we are still in the fallback mode
 		// prepare a new extension for the current epoch.
 		state.CurrentEpoch.EpochExtensions = append(state.CurrentEpoch.EpochExtensions, flow.EpochExtension{
 			FirstView:     parentState.CurrentEpochFinalView() + 1,
-			FinalView:     parentState.CurrentEpochFinalView() + 1 + 1_000, // TODO: replace with EpochExtensionLength
-			TargetEndTime: 0,                                               // TODO: calculate and set target end time
+			FinalView:     parentState.CurrentEpochFinalView() + 1 + DefaultEpochExtensionLength, // TODO: replace with EpochExtensionLength
+			TargetEndTime: 0,                                                                     // TODO: calculate and set target end time
 		})
 	}
 
