@@ -46,6 +46,7 @@ var (
 	flagOutputPayloadFileName              string
 	flagOutputPayloadByAddresses           string
 	flagMaxAccountSize                     uint64
+	flagFilterUnreferencedSlabs            bool
 )
 
 var Cmd = &cobra.Command{
@@ -151,6 +152,9 @@ func init() {
 
 	Cmd.Flags().Uint64Var(&flagMaxAccountSize, "max-account-size", 0,
 		"max account size")
+
+	Cmd.Flags().BoolVar(&flagFilterUnreferencedSlabs, "filter-unreferenced-slabs", false,
+		"filter unreferenced slabs")
 }
 
 func run(*cobra.Command, []string) {
@@ -371,6 +375,7 @@ func run(*cobra.Command, []string) {
 		Prune:                             flagPrune,
 		MaxAccountSize:                    flagMaxAccountSize,
 		VerboseErrorOutput:                flagVerboseErrorOutput,
+		FilterUnreferencedSlabs:           flagFilterUnreferencedSlabs,
 	}
 
 	if len(flagInputPayloadFileName) > 0 {
