@@ -117,6 +117,8 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 		return proc.mintTo(call, txHash)
 	case types.WithdrawCallSubType:
 		return proc.withdrawFrom(call, txHash)
+	case types.EstimateGasSubType:
+		return proc.estimateGas(call)
 	case types.DeployCallSubType:
 		if !call.EmptyToField() {
 			return proc.deployAt(call.From, call.To, call.Data, call.GasLimit, call.Value, txHash)
@@ -268,6 +270,24 @@ func (proc *procedure) withdrawFrom(
 	proc.state.SubBalance(bridge, call.Value)
 	// all commmit errors (StateDB errors) has to be returned
 	return res, proc.commitAndFinalize()
+}
+
+func (proc *procedure) estimateGas(call *types.DirectCall) (*types.Result, error) {
+
+	// run the procedure, hash and index don't matter since it won't be emitted anywhere
+	res, err := proc.run(
+		call.Message(),
+		gethCommon.Hash{},
+		0,
+		types.EstimateGasSubType,
+	)
+	if err != nil {
+		return nil, err
+	}
+	// we never commit the state, but still can reset for sake of safety
+	proc.state.Reset()
+
+	return res, nil
 }
 
 // deployAt deploys a contract at the given target address
