@@ -436,7 +436,12 @@ func storeCollectionIfMissing(collections storage.Collections, col *flow.Collect
 // execute block concurrently
 func (e *Core) executeConcurrently(executables []*entity.ExecutableBlock) {
 	for _, executable := range executables {
-		e.blockExecutors <- executable
+		select {
+		case <-e.ShutdownSignal():
+			// if the engine has shut down, then stop executing the block
+			return
+		case e.blockExecutors <- executable:
+		}
 	}
 }
 
