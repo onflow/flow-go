@@ -165,12 +165,15 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		}
 	}
 
-	migration := migrations.NewStorageMigration(
+	migration, err := migrations.NewStorageMigration(
 		migrationRuntime.Interpreter,
 		storage,
 		m.name,
 		address,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create storage migration: %w", err)
+	}
 
 	reporter := newValueMigrationReporter(
 		m.reporter,
@@ -293,7 +296,7 @@ func NewCadence1ValueMigrator(
 	}
 
 	return &CadenceBaseMigrator{
-		name:                              "cadence-value-migration",
+		name:                              "cadence_value_migration",
 		reporter:                          rwf.ReportWriter(cadenceValueMigrationReporterName),
 		diffReporter:                      diffReporter,
 		logVerboseDiff:                    opts.LogVerboseDiff,
@@ -334,7 +337,7 @@ func NewCadence1LinkValueMigrator(
 	}
 
 	return &CadenceBaseMigrator{
-		name:                              "cadence-link-value-migration",
+		name:                              "cadence_link_value_migration",
 		reporter:                          rwf.ReportWriter("cadence-link-value-migrator"),
 		diffReporter:                      diffReporter,
 		logVerboseDiff:                    opts.LogVerboseDiff,
@@ -381,7 +384,7 @@ func NewCadence1CapabilityValueMigrator(
 	}
 
 	return &CadenceBaseMigrator{
-		name:                              "cadence-capability-value-migration",
+		name:                              "cadence_capability_value_migration",
 		reporter:                          rwf.ReportWriter("cadence-capability-value-migrator"),
 		diffReporter:                      diffReporter,
 		logVerboseDiff:                    opts.LogVerboseDiff,
@@ -539,9 +542,9 @@ func (t *cadenceValueMigrationReporter) MissingTarget(accountAddressPath interpr
 	})
 }
 
-func (t *cadenceValueMigrationReporter) DictionaryKeyConflict(key interpreter.StringStorageMapKey) {
+func (t *cadenceValueMigrationReporter) DictionaryKeyConflict(accountAddressPath interpreter.AddressPath) {
 	t.reportWriter.Write(dictionaryKeyConflictEntry{
-		Key: key,
+		AddressPath: accountAddressPath,
 	})
 }
 
@@ -735,17 +738,19 @@ func (e linkMissingTargetEntry) MarshalJSON() ([]byte, error) {
 // dictionaryKeyConflictEntry
 
 type dictionaryKeyConflictEntry struct {
-	Key interpreter.StringStorageMapKey
+	AddressPath interpreter.AddressPath
 }
 
 var _ json.Marshaler = dictionaryKeyConflictEntry{}
 
 func (e dictionaryKeyConflictEntry) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Kind string `json:"kind"`
-		Key  string `json:"key"`
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		Path           string `json:"path"`
 	}{
-		Kind: "dictionary-key-conflict",
-		Key:  string(e.Key),
+		Kind:           "dictionary-key-conflict",
+		AccountAddress: e.AddressPath.Address.HexWithPrefix(),
+		Path:           e.AddressPath.Path.String(),
 	})
 }
