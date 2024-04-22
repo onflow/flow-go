@@ -721,18 +721,19 @@ func TestGasEstimation(t *testing.T) {
 					import EVM from %s
 
 					access(all)
-					fun main(tx: [UInt8]): Uint {
+					fun main(tx: [UInt8]): UInt64 {
 						return EVM.estimateGas(tx: tx)
 					}
                     `,
 					sc.EVMContract.Address.HexWithPrefix(),
 				))
+
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
 					testContract.MakeCallData(t, "store", big.NewInt(1337)),
 					big.NewInt(0),
 					uint64(10_000_000),
-					big.NewInt(20), // todo check price
+					big.NewInt(500000), // todo check price
 				)
 				script := fvm.Script(code).WithArguments(
 					json.MustEncode(
