@@ -26,6 +26,7 @@ type Precompile interface {
 type BlockContext struct {
 	ChainID                *big.Int
 	BlockNumber            uint64
+	BlockTimestamp         uint64
 	DirectCallBaseGasUsage uint64
 	DirectCallGasPrice     uint64
 	GasFeeCollector        Address

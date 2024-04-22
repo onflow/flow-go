@@ -18,7 +18,7 @@ func TestEpochStaticTransition(t *testing.T) {
 // StaticEpochTransitionSuite is the suite used for epoch transition tests
 // with a static identity table.
 type StaticEpochTransitionSuite struct {
-	epochs.Suite
+	epochs.DynamicEpochTransitionSuite
 }
 
 func (s *StaticEpochTransitionSuite) SetupTest() {
@@ -30,7 +30,7 @@ func (s *StaticEpochTransitionSuite) SetupTest() {
 	s.EpochCommitSafetyThreshold = 50
 
 	// run the generic setup, which starts up the network
-	s.Suite.SetupTest()
+	s.BaseSuite.SetupTest()
 }
 
 // TestStaticEpochTransition asserts epoch state transitions over full epoch

@@ -376,6 +376,7 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 	return types.BlockContext{
 		ChainID:                types.EVMChainIDFromFlowChainID(h.flowChainID),
 		BlockNumber:            bp.Height,
+		BlockTimestamp:         bp.Timestamp,
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
 		GetHashFunc: func(n uint64) gethCommon.Hash {
 			hash, err := h.blockStore.BlockHash(n)
