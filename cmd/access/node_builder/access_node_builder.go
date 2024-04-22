@@ -1379,6 +1379,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 	ingestionDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(ingestionDependable)
+	var lastFullBlockHeight *bstorage.MonotonousConsumerProgress
 
 	builder.
 		BuildConsensusFollower().
@@ -1553,6 +1554,15 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Storage.LightTransactionResults)
 			return nil
 		}).
+		Module("processed last full block height consumer progress", func(node *cmd.NodeConfig) error {
+			lastFullBlockHeight = bstorage.NewMonotonousConsumerProgress(builder.DB, module.ConsumeProgressLastFullBlockHeight)
+			rootBlock := node.State.Params().FinalizedRoot()
+			err := lastFullBlockHeight.InitProcessedIndex(rootBlock.Height)
+			if err != nil {
+				return fmt.Errorf("failed to init last full block height: %w", err)
+			}
+			return nil
+		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			config := builder.rpcConf
 			backendConfig := config.BackendConfig
@@ -1651,9 +1661,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					builder.stateStreamConf.ResponseLimit,
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
-				EventsIndex:       builder.EventsIndex,
-				TxResultQueryMode: txResultQueryMode,
-				TxResultsIndex:    builder.TxResultsIndex,
+				EventsIndex:         builder.EventsIndex,
+				TxResultQueryMode:   txResultQueryMode,
+				TxResultsIndex:      builder.TxResultsIndex,
+				LastFullBlockHeight: lastFullBlockHeight,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
@@ -1719,6 +1730,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Results,
 				node.Storage.Receipts,
 				builder.collectionExecutedMetric,
+				lastFullBlockHeight,
 			)
 			if err != nil {
 				return nil, err

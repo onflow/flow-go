@@ -113,9 +113,10 @@ type Params struct {
 	BlockTracker              subscription.BlockTracker
 	SubscriptionHandler       *subscription.SubscriptionHandler
 
-	EventsIndex       *index.EventsIndex
-	TxResultQueryMode IndexQueryMode
-	TxResultsIndex    *index.TransactionResultsIndex
+	EventsIndex         *index.EventsIndex
+	TxResultQueryMode   IndexQueryMode
+	TxResultsIndex      *index.TransactionResultsIndex
+	LastFullBlockHeight storage.ConsumerProgress
 }
 
 var _ TransactionErrorMessage = (*Backend)(nil)
@@ -163,12 +164,13 @@ func New(params Params) (*Backend, error) {
 	nodeInfo := getNodeVersionInfo(params.State.Params())
 
 	transactionsLocalDataProvider := &TransactionsLocalDataProvider{
-		state:          params.State,
-		collections:    params.Collections,
-		blocks:         params.Blocks,
-		eventsIndex:    params.EventsIndex,
-		txResultsIndex: params.TxResultsIndex,
-		systemTxID:     systemTxID,
+		state:               params.State,
+		collections:         params.Collections,
+		blocks:              params.Blocks,
+		eventsIndex:         params.EventsIndex,
+		txResultsIndex:      params.TxResultsIndex,
+		systemTxID:          systemTxID,
+		lastFullBlockHeight: params.LastFullBlockHeight,
 	}
 
 	b := &Backend{

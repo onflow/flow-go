@@ -49,13 +49,14 @@ type TransactionErrorMessage interface {
 
 // TransactionsLocalDataProvider provides functionality for retrieving transaction results and error messages from local storages
 type TransactionsLocalDataProvider struct {
-	state           protocol.State
-	collections     storage.Collections
-	blocks          storage.Blocks
-	eventsIndex     *index.EventsIndex
-	txResultsIndex  *index.TransactionResultsIndex
-	txErrorMessages TransactionErrorMessage
-	systemTxID      flow.Identifier
+	state               protocol.State
+	collections         storage.Collections
+	blocks              storage.Blocks
+	eventsIndex         *index.EventsIndex
+	txResultsIndex      *index.TransactionResultsIndex
+	txErrorMessages     TransactionErrorMessage
+	systemTxID          flow.Identifier
+	lastFullBlockHeight storage.ConsumerProgress
 }
 
 // GetTransactionResultFromStorage retrieves a transaction result from storage by block ID and transaction ID.
@@ -322,7 +323,7 @@ func (t *TransactionsLocalDataProvider) DeriveUnknownTransactionStatus(refBlockI
 
 	// the last full height is the height where we have received all
 	// collections  for all blocks with a lower height
-	fullHeight, err := t.blocks.GetLastFullBlockHeight()
+	fullHeight, err := t.lastFullBlockHeight.ProcessedIndex()
 	if err != nil {
 		return flow.TransactionStatusUnknown, err
 	}

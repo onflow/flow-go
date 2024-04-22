@@ -82,6 +82,8 @@ type Engine struct {
 	maxReceiptHeight  uint64
 	executionResults  storage.ExecutionResults
 
+	lastFullBlockHeight storage.ConsumerProgress
+
 	// metrics
 	collectionExecutedMetric module.CollectionExecutedMetric
 }
@@ -100,6 +102,7 @@ func New(
 	executionResults storage.ExecutionResults,
 	executionReceipts storage.ExecutionReceipts,
 	collectionExecutedMetric module.CollectionExecutedMetric,
+	lastFullBlockHeight storage.ConsumerProgress,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
@@ -148,6 +151,7 @@ func New(
 		executionReceipts:        executionReceipts,
 		maxReceiptHeight:         0,
 		collectionExecutedMetric: collectionExecutedMetric,
+		lastFullBlockHeight:      lastFullBlockHeight,
 
 		// queue / notifier for execution receipts
 		executionReceiptsNotifier: engine.NewNotifier(),
@@ -192,13 +196,7 @@ func (e *Engine) Start(parent irrecoverable.SignalerContext) {
 // If the index has already been initialized, this is a no-op.
 // No errors are expected during normal operation.
 func (e *Engine) initLastFullBlockHeightIndex() error {
-	rootBlock := e.state.Params().FinalizedRoot()
-	err := e.blocks.InsertLastFullBlockHeightIfNotExists(rootBlock.Height)
-	if err != nil {
-		return fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err)
-	}
-
-	lastFullHeight, err := e.blocks.GetLastFullBlockHeight()
+	lastFullHeight, err := e.lastFullBlockHeight.ProcessedIndex()
 	if err != nil {
 		return fmt.Errorf("failed to get last full block height during ingestion engine startup: %w", err)
 	}
@@ -414,7 +412,7 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 	// skip requesting collections, if this block is below the last full block height
 	// this means that either we have already received these collections, or the block
 	// may contain unverifiable guarantees (in case this node has just joined the network)
-	lastFullBlockHeight, err := e.blocks.GetLastFullBlockHeight()
+	lastFullBlockHeight, err := e.lastFullBlockHeight.ProcessedIndex()
 	if err != nil {
 		return fmt.Errorf("could not get last full block height: %w", err)
 	}
@@ -465,7 +463,7 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 	var startHeight, endHeight uint64
 
 	// get the height of the last block for which all collections were received
-	lastFullHeight, err := e.blocks.GetLastFullBlockHeight()
+	lastFullHeight, err := e.lastFullBlockHeight.ProcessedIndex()
 	if err != nil {
 		return fmt.Errorf("failed to complete requests for missing collections: %w", err)
 	}
@@ -564,7 +562,7 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 // updateLastFullBlockReceivedIndex finds the next highest height where all previous collections
 // have been indexed, and updates the LastFullBlockReceived index to that height
 func (e *Engine) updateLastFullBlockReceivedIndex() error {
-	lastFullHeight, err := e.blocks.GetLastFullBlockHeight()
+	lastFullHeight, err := e.lastFullBlockHeight.ProcessedIndex()
 	if err != nil {
 		return fmt.Errorf("failed to get last full block height: %w", err)
 	}
@@ -583,9 +581,9 @@ func (e *Engine) updateLastFullBlockReceivedIndex() error {
 
 	// if more contiguous blocks are now complete, update db
 	if newLastFullHeight > lastFullHeight {
-		err = e.blocks.UpdateLastFullBlockHeight(newLastFullHeight)
+		err = e.lastFullBlockHeight.SetProcessedIndex(newLastFullHeight)
 		if err != nil {
-			return fmt.Errorf("failed to update last full block height")
+			return fmt.Errorf("failed to update last full block height: %w", err)
 		}
 
 		e.collectionExecutedMetric.UpdateLastFullBlockHeight(newLastFullHeight)
@@ -622,7 +620,7 @@ func (e *Engine) lowestHeightWithMissingCollection(lastFullHeight, finalizedHeig
 // checkMissingCollections requests missing collections if the number of blocks missing collections
 // have reached the defaultMissingCollsForBlkThreshold value.
 func (e *Engine) checkMissingCollections() error {
-	lastFullHeight, err := e.blocks.GetLastFullBlockHeight()
+	lastFullHeight, err := e.lastFullBlockHeight.ProcessedIndex()
 	if err != nil {
 		return err
 	}
