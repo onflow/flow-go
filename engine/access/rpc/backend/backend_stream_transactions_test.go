@@ -6,14 +6,6 @@ import (
 	"testing"
 	"time"
 
-	protocolint "github.com/onflow/flow-go/state/protocol"
-
-	"github.com/onflow/flow-go/engine/access/index"
-
-	"github.com/onflow/flow-go/utils/unittest/mocks"
-
-	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
-
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -21,6 +13,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/index"
 	access "github.com/onflow/flow-go/engine/access/mock"
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
@@ -30,9 +23,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/metrics"
+	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
+	protocolint "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 type TransactionStatusSuite struct {
@@ -75,6 +71,8 @@ type TransactionStatusSuite struct {
 	resultsMap map[flow.Identifier]*flow.ExecutionResult
 
 	backend *Backend
+
+	lastFullBlockHeight *storagemock.ConsumerProgress
 }
 
 func TestTransactionStatusSuite(t *testing.T) {
@@ -117,6 +115,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.broadcaster = engine.NewBroadcaster()
 	s.blockTracker = subscriptionmock.NewBlockTracker(s.T())
 	s.resultsMap = map[flow.Identifier]*flow.ExecutionResult{}
+	s.lastFullBlockHeight = new(storagemock.ConsumerProgress)
 
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	s.rootBlock = unittest.BlockFixture()
@@ -172,7 +171,6 @@ func (s *TransactionStatusSuite) SetupTest() {
 
 	s.backend, err = New(backendParams)
 	require.NoError(s.T(), err)
-
 }
 
 // backendParams returns the Params configuration for the backend.
@@ -201,8 +199,9 @@ func (s *TransactionStatusSuite) backendParams() Params {
 			subscription.DefaultResponseLimit,
 			subscription.DefaultSendBufferSize,
 		),
-		TxResultsIndex: index.NewTransactionResultsIndex(s.transactionResults),
-		EventsIndex:    index.NewEventsIndex(s.events),
+		TxResultsIndex:      index.NewTransactionResultsIndex(s.transactionResults),
+		EventsIndex:         index.NewEventsIndex(s.events),
+		LastFullBlockHeight: s.lastFullBlockHeight,
 	}
 }
 
@@ -306,7 +305,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	s.blocks.On("GetLastFullBlockHeight").Return(func() (uint64, error) {
+	s.lastFullBlockHeight.On("ProcessedIndex").Return(func() (uint64, error) {
 		return s.sealedBlock.Header.Height, nil
 	}, nil)
 

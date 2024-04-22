@@ -59,6 +59,7 @@ type Suite struct {
 	log            zerolog.Logger
 
 	collectionExecutedMetric *indexer.CollectionExecutedMetricImpl
+	lastFullBlockHeight      *storage.ConsumerProgress
 
 	eng    *Engine
 	cancel context.CancelFunc
@@ -117,6 +118,7 @@ func (s *Suite) SetupTest() {
 	require.NoError(s.T(), err)
 	blocksToMarkExecuted, err := stdmap.NewTimes(100)
 	require.NoError(s.T(), err)
+	s.lastFullBlockHeight = new(storage.ConsumerProgress)
 
 	s.collectionExecutedMetric, err = indexer.NewCollectionExecutedMetricImpl(
 		s.log,
@@ -129,11 +131,11 @@ func (s *Suite) SetupTest() {
 	)
 	require.NoError(s.T(), err)
 
-	eng, err := New(s.log, net, s.proto.state, s.me, s.request, s.blocks, s.headers, s.collections,
-		s.transactions, s.results, s.receipts, s.collectionExecutedMetric)
-	require.NoError(s.T(), err)
+	s.lastFullBlockHeight.On("ProcessedIndex").Return(uint64(0), errors.New("do nothing")).Once()
 
-	s.blocks.On("GetLastFullBlockHeight").Once().Return(uint64(0), errors.New("do nothing"))
+	eng, err := New(s.log, net, s.proto.state, s.me, s.request, s.blocks, s.headers, s.collections,
+		s.transactions, s.results, s.receipts, s.collectionExecutedMetric, s.lastFullBlockHeight)
+	require.NoError(s.T(), err)
 
 	irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
 	eng.ComponentManager.Start(irrecoverableCtx)
@@ -144,7 +146,7 @@ func (s *Suite) SetupTest() {
 
 // TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
 func (s *Suite) TestOnFinalizedBlock() {
-	s.blocks.On("GetLastFullBlockHeight").Return(uint64(0), nil).Once()
+	s.lastFullBlockHeight.On("ProcessedIndex").Return(uint64(0), nil).Once()
 
 	block := unittest.BlockFixture()
 	block.SetPayload(unittest.PayloadFixture(
@@ -253,7 +255,6 @@ func (s *Suite) TestOnCollection() {
 
 // TestExecutionReceiptsAreIndexed checks that execution receipts are properly indexed
 func (s *Suite) TestExecutionReceiptsAreIndexed() {
-
 	originID := unittest.IdentifierFixture()
 	collection := unittest.CollectionFixture(5)
 	light := collection.Light()
@@ -379,7 +380,7 @@ func (s *Suite) TestRequestMissingCollections() {
 			return storerr.ErrNotFound
 		})
 	// consider collections are missing for all blocks
-	s.blocks.On("GetLastFullBlockHeight").Return(startHeight-1, nil)
+	s.lastFullBlockHeight.On("ProcessedIndex").Return(startHeight-1, nil)
 	// consider the last test block as the head
 	s.finalizedBlock = blocks[blkCnt-1].Header
 
@@ -563,8 +564,8 @@ func (s *Suite) TestProcessBackgroundCalls() {
 
 	s.Run("full block height index is advanced if newer full blocks are discovered", func() {
 		block := blocks[1]
-		s.blocks.On("UpdateLastFullBlockHeight", finalizedHeight).Return(nil).Once()
-		s.blocks.On("GetLastFullBlockHeight").Return(func() (uint64, error) {
+		s.lastFullBlockHeight.On("SetProcessedIndex", finalizedHeight).Return(nil).Once()
+		s.lastFullBlockHeight.On("ProcessedIndex").Return(func() (uint64, error) {
 			return block.Header.Height, nil
 		}).Once()
 
@@ -575,7 +576,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 	})
 
 	s.Run("full block height index is not advanced beyond finalized blocks", func() {
-		s.blocks.On("GetLastFullBlockHeight").Return(func() (uint64, error) {
+		s.lastFullBlockHeight.On("ProcessedIndex").Return(func() (uint64, error) {
 			return finalizedHeight, nil
 		}).Once()
 
@@ -587,7 +588,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 
 	s.Run("missing collections are requested when count exceeds defaultMissingCollsForBlkThreshold", func() {
 		// root block is the last complete block
-		s.blocks.On("GetLastFullBlockHeight").Return(func() (uint64, error) {
+		s.lastFullBlockHeight.On("ProcessedIndex").Return(func() (uint64, error) {
 			return rootBlkHeight, nil
 		}).Once()
 
@@ -615,7 +616,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 
 	s.Run("missing collections are requested when count exceeds defaultMissingCollsForAgeThreshold", func() {
 		// root block is the last complete block
-		s.blocks.On("GetLastFullBlockHeight").Return(func() (uint64, error) {
+		s.lastFullBlockHeight.On("ProcessedIndex").Return(func() (uint64, error) {
 			return rootBlkHeight, nil
 		}).Once()
 
@@ -646,7 +647,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 
 	s.Run("missing collections are not requested if defaultMissingCollsForBlkThreshold not reached", func() {
 		// root block is the last complete block
-		s.blocks.On("GetLastFullBlockHeight").Return(func() (uint64, error) {
+		s.lastFullBlockHeight.On("ProcessedIndex").Return(func() (uint64, error) {
 			return rootBlkHeight, nil
 		}).Once()
 
