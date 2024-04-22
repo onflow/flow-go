@@ -39,6 +39,7 @@ var (
 	flagInputPayloadFileName               string
 	flagOutputPayloadFileName              string
 	flagOutputPayloadByAddresses           string
+	flagFilterUnreferencedSlabs            bool
 )
 
 var Cmd = &cobra.Command{
@@ -122,6 +123,9 @@ func init() {
 		"",
 		"extract payloads of addresses (comma separated hex-encoded addresses) to file specified by output-payload-filename",
 	)
+
+	Cmd.Flags().BoolVar(&flagFilterUnreferencedSlabs, "filter-unreferenced-slabs", false,
+		"filter unreferenced slabs")
 }
 
 func run(*cobra.Command, []string) {
