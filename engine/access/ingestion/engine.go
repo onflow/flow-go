@@ -180,32 +180,6 @@ func New(
 	return e, nil
 }
 
-func (e *Engine) Start(parent irrecoverable.SignalerContext) {
-	err := e.initLastFullBlockHeightIndex()
-	if err != nil {
-		parent.Throw(fmt.Errorf("unexpected error initializing full block index: %w", err))
-	}
-
-	e.ComponentManager.Start(parent)
-}
-
-// initializeLastFullBlockHeightIndex initializes the index of full blocks
-// (blocks for which we have ingested all collections) to the root block height.
-// This means that the Access Node will ingest all collections for all blocks
-// ingested after state bootstrapping is complete (all blocks received from the network).
-// If the index has already been initialized, this is a no-op.
-// No errors are expected during normal operation.
-func (e *Engine) initLastFullBlockHeightIndex() error {
-	lastFullHeight, err := e.lastFullBlockHeight.ProcessedIndex()
-	if err != nil {
-		return fmt.Errorf("failed to get last full block height during ingestion engine startup: %w", err)
-	}
-
-	e.collectionExecutedMetric.UpdateLastFullBlockHeight(lastFullHeight)
-
-	return nil
-}
-
 func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	// context with timeout
 	requestCtx, cancel := context.WithTimeout(ctx, defaultCollectionCatchupTimeout)

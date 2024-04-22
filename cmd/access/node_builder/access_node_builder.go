@@ -1379,7 +1379,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 	ingestionDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(ingestionDependable)
-	var lastFullBlockHeight *bstorage.MonotonousConsumerProgress
+	var lastFullBlockHeight storage.ConsumerProgress
 
 	builder.
 		BuildConsensusFollower().
@@ -1554,13 +1554,15 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Storage.LightTransactionResults)
 			return nil
 		}).
-		Module("processed last full block height consumer progress", func(node *cmd.NodeConfig) error {
+		Module("processed last full block height monotonous consumer progress", func(node *cmd.NodeConfig) error {
 			lastFullBlockHeight = bstorage.NewMonotonousConsumerProgress(builder.DB, module.ConsumeProgressLastFullBlockHeight)
-			rootBlock := node.State.Params().FinalizedRoot()
-			err := lastFullBlockHeight.InitProcessedIndex(rootBlock.Height)
+			// initializes the index of full blocks to the root block height
+			rootBlockHeight := node.State.Params().FinalizedRoot().Height
+			err := lastFullBlockHeight.InitProcessedIndex(rootBlockHeight)
 			if err != nil {
 				return fmt.Errorf("failed to init last full block height: %w", err)
 			}
+			builder.collectionExecutedMetric.UpdateLastFullBlockHeight(rootBlockHeight)
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
