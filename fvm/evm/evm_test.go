@@ -702,6 +702,56 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 	})
 }
 
+func TestGasEstimation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("test successful gas estimation", func(t *testing.T) {
+		chain := flow.Emulator.Chain()
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					access(all)
+					fun main(tx: [UInt8]): Uint {
+						return EVM.estimateGas(tx: tx)
+					}
+                    `,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "store", big.NewInt(1337)),
+					big.NewInt(0),
+					uint64(10_000_000),
+					big.NewInt(20), // todo check price
+				)
+				script := fvm.Script(code).WithArguments(
+					json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(innerTxBytes),
+						).WithType(stdlib.EVMTransactionBytesCadenceType),
+					),
+				)
+				_, output, err := vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				fmt.Println("val", output.Value)
+			})
+	})
+}
+
 func TestCadenceArch(t *testing.T) {
 	t.Parallel()
 
