@@ -219,6 +219,51 @@ func (h *ContractHandler) run(
 	return res, nil
 }
 
+func (h *ContractHandler) EstimateGas(rlpEncodedTx []byte) (*types.Result, error) {
+	// step 1 - transaction decoding
+	encodedLen := uint(len(rlpEncodedTx))
+	err := h.backend.MeterComputation(environment.ComputationKindRLPDecoding, encodedLen)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := gethTypes.Transaction{}
+	err = tx.DecodeRLP(
+		rlp.NewStream(
+			bytes.NewReader(rlpEncodedTx),
+			uint64(encodedLen)))
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, err := h.getBlockContext()
+	if err != nil {
+		return nil, err
+	}
+
+	blk, err := h.emulator.NewBlockView(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := blk.RunTransaction(&tx)
+	if err != nil {
+		return nil, err
+	}
+
+	// saftey check for result
+	if res == nil {
+		return nil, types.ErrUnexpectedEmptyResult
+	}
+
+	// if is invalid tx skip the next steps (forming block, ...)
+	if res.Invalid() {
+		return res, nil
+	}
+
+	return res, nil
+}
+
 func (h *ContractHandler) checkGasLimit(limit types.GasLimit) error {
 	// check gas limit against what has been left on the transaction side
 	if !h.backend.ComputationAvailable(environment.ComputationKindEVMGasUsage, uint(limit)) {
