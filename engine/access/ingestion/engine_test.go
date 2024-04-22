@@ -66,9 +66,7 @@ type Suite struct {
 
 	eng *Engine
 
-	cancel           context.CancelFunc
-	ctx              context.Context
-	irrecoverableCtx irrecoverable.SignalerContext
+	cancel context.CancelFunc
 }
 
 func TestIngestEngine(t *testing.T) {
@@ -80,10 +78,10 @@ func (s *Suite) TearDownTest() {
 }
 
 func (s *Suite) SetupTest() {
-	s.ctx, s.cancel = context.WithCancel(context.Background())
-	s.irrecoverableCtx, _ = irrecoverable.WithSignaler(s.ctx)
-
 	s.log = zerolog.New(os.Stderr)
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancel = cancel
+	s.db, _ = unittest.TempBadgerDB(s.T())
 
 	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 
@@ -150,12 +148,7 @@ func (s *Suite) SetupTest() {
 		s.blocks,
 	)
 	require.NoError(s.T(), err)
-}
 
-// initIngestionEngine initializes the ingestion engine by creating an instance of Engine and setting up necessary components.
-// It sets up the protocol state, local module, requester, block storage, collection storage, and other dependencies.
-// It also starts the engine and waits for it to be ready before returning.
-func (s *Suite) initIngestionEngine() {
 	processedHeight := bstorage.NewConsumerProgress(s.db, module.ConsumeProgressIngestionEngineBlockHeight)
 
 	eng, err := New(s.log, s.proto.state, s.me, s.request, s.blocks, s.headers, s.collections,
@@ -164,7 +157,8 @@ func (s *Suite) initIngestionEngine() {
 
 	s.blocks.On("GetLastFullBlockHeight").Once().Return(uint64(0), errors.New("do nothing"))
 
-	eng.ComponentManager.Start(s.irrecoverableCtx)
+	irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
+	eng.ComponentManager.Start(irrecoverableCtx)
 	unittest.RequireCloseBefore(s.T(), eng.Ready(), 3*time.Second, "timed out waiting for ingestion engine to be ready")
 
 	s.eng = eng
@@ -172,291 +166,271 @@ func (s *Suite) initIngestionEngine() {
 
 // TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
 func (s *Suite) TestOnFinalizedBlock() {
-	unittest.RunWithBadgerDB(s.T(), func(db *badger.DB) {
-		s.db = db
-		lastFinalizedHeight := s.finalizedBlock.Height
-		s.blocks.On("GetLastFullBlockHeight").Return(lastFinalizedHeight, nil).Maybe()
+	lastFinalizedHeight := s.finalizedBlock.Height
+	s.blocks.On("GetLastFullBlockHeight").Return(lastFinalizedHeight, nil).Maybe()
 
-		s.initIngestionEngine()
+	block := unittest.BlockFixture()
+	block.Header.Height = s.finalizedBlock.Height + 1
 
-		block := unittest.BlockFixture()
-		block.Header.Height = s.finalizedBlock.Height + 1
+	block.SetPayload(unittest.PayloadFixture(
+		unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
+		unittest.WithExecutionResults(unittest.ExecutionResultFixture()),
+	))
 
-		block.SetPayload(unittest.PayloadFixture(
-			unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
-			unittest.WithExecutionResults(unittest.ExecutionResultFixture()),
-		))
+	// prepare cluster committee members
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
+	refBlockID := unittest.IdentifierFixture()
+	for _, guarantee := range block.Payload.Guarantees {
+		guarantee.ReferenceBlockID = refBlockID
+		// guarantee signers must be cluster committee members, so that access will fetch collection from
+		// the signers that are specified by guarantee.SignerIndices
+		indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
+		require.NoError(s.T(), err)
+		guarantee.SignerIndices = indices
+	}
+	s.blockMap[block.Header.Height] = &block
+	s.finalizedBlock = block.Header
 
-		// prepare cluster committee members
-		clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
-		refBlockID := unittest.IdentifierFixture()
-		for _, guarantee := range block.Payload.Guarantees {
-			guarantee.ReferenceBlockID = refBlockID
-			// guarantee signers must be cluster committee members, so that access will fetch collection from
-			// the signers that are specified by guarantee.SignerIndices
-			indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
-			require.NoError(s.T(), err)
-			guarantee.SignerIndices = indices
-		}
-		s.blockMap[block.Header.Height] = &block
-		s.finalizedBlock = block.Header
+	hotstuffBlock := hotmodel.Block{
+		BlockID: block.ID(),
+	}
 
-		hotstuffBlock := hotmodel.Block{
-			BlockID: block.ID(),
-		}
+	// we should query the block once and index the guarantee payload once
+	s.blocks.On("ByID", block.ID()).Return(&block, nil).Twice()
+	for _, g := range block.Payload.Guarantees {
+		collection := unittest.CollectionFixture(1)
+		light := collection.Light()
+		s.collections.On("LightByID", g.CollectionID).Return(&light, nil).Twice()
+	}
 
-		// we should query the block once and index the guarantee payload once
-		s.blocks.On("ByID", block.ID()).Return(&block, nil).Twice()
-		for _, g := range block.Payload.Guarantees {
-			collection := unittest.CollectionFixture(1)
-			light := collection.Light()
-			s.collections.On("LightByID", g.CollectionID).Return(&light, nil).Twice()
-		}
+	// expect that the block storage is indexed with each of the collection guarantee
+	s.blocks.On("IndexBlockForCollections", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
 
-		// expect that the block storage is indexed with each of the collection guarantee
-		s.blocks.On("IndexBlockForCollections", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
+	cluster := new(protocol.Cluster)
+	cluster.On("Members").Return(clusterCommittee, nil)
+	epoch := new(protocol.Epoch)
+	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
+	epochs := new(protocol.EpochQuery)
+	epochs.On("Current").Return(epoch)
+	snap := new(protocol.Snapshot)
+	snap.On("Epochs").Return(epochs)
+	s.proto.state.On("AtBlockID", refBlockID).Return(snap)
+	s.results.On("Index", mock.Anything, mock.Anything).Return(nil)
 
-		cluster := new(protocol.Cluster)
-		cluster.On("Members").Return(clusterCommittee, nil)
-		epoch := new(protocol.Epoch)
-		epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
-		epochs := new(protocol.EpochQuery)
-		epochs.On("Current").Return(epoch)
-		snap := new(protocol.Snapshot)
-		snap.On("Epochs").Return(epochs)
-		s.proto.state.On("AtBlockID", refBlockID).Return(snap)
-		s.results.On("Index", mock.Anything, mock.Anything).Return(nil)
+	// for each of the guarantees, we should request the corresponding collection once
+	needed := make(map[flow.Identifier]struct{})
+	for _, guarantee := range block.Payload.Guarantees {
+		needed[guarantee.ID()] = struct{}{}
+	}
 
-		// for each of the guarantees, we should request the corresponding collection once
-		needed := make(map[flow.Identifier]struct{})
-		for _, guarantee := range block.Payload.Guarantees {
-			needed[guarantee.ID()] = struct{}{}
-		}
+	wg := sync.WaitGroup{}
+	wg.Add(4)
 
-		wg := sync.WaitGroup{}
-		wg.Add(4)
+	s.request.On("EntityByID", mock.Anything, mock.Anything).Run(
+		func(args mock.Arguments) {
+			collID := args.Get(0).(flow.Identifier)
+			_, pending := needed[collID]
+			s.Assert().True(pending, "collection should be pending (%x)", collID)
+			delete(needed, collID)
+			wg.Done()
+		},
+	)
+	s.blocks.On("UpdateLastFullBlockHeight", s.finalizedBlock.Height).Return(nil).Once()
 
-		s.request.On("EntityByID", mock.Anything, mock.Anything).Run(
-			func(args mock.Arguments) {
-				collID := args.Get(0).(flow.Identifier)
-				_, pending := needed[collID]
-				s.Assert().True(pending, "collection should be pending (%x)", collID)
-				delete(needed, collID)
-				wg.Done()
-			},
-		)
-		s.blocks.On("UpdateLastFullBlockHeight", s.finalizedBlock.Height).Return(nil).Once()
+	// process the block through the finalized callback
+	s.eng.OnFinalizedBlock(&hotstuffBlock)
 
-		// process the block through the finalized callback
-		s.eng.OnFinalizedBlock(&hotstuffBlock)
+	s.Assertions.Eventually(func() bool {
+		wg.Wait()
+		return true
+	}, 2*time.Second, time.Second)
 
-		s.Assertions.Eventually(func() bool {
-			wg.Wait()
-			return true
-		}, 2*time.Second, time.Second)
-
-		// assert that the block was retrieved and all collections were requested
-		s.headers.AssertExpectations(s.T())
-		s.request.AssertNumberOfCalls(s.T(), "EntityByID", len(block.Payload.Guarantees))
-		s.request.AssertNumberOfCalls(s.T(), "Index", len(block.Payload.Seals))
-	})
+	// assert that the block was retrieved and all collections were requested
+	s.headers.AssertExpectations(s.T())
+	s.request.AssertNumberOfCalls(s.T(), "EntityByID", len(block.Payload.Guarantees))
+	s.request.AssertNumberOfCalls(s.T(), "Index", len(block.Payload.Seals))
 }
 
 // TestOnCollection checks that when a Collection is received, it is persisted
 func (s *Suite) TestOnCollection() {
-	unittest.RunWithBadgerDB(s.T(), func(db *badger.DB) {
-		s.db = db
-		s.initIngestionEngine()
+	collection := unittest.CollectionFixture(5)
+	light := collection.Light()
 
-		collection := unittest.CollectionFixture(5)
-		light := collection.Light()
+	// we should store the light collection and index its transactions
+	s.collections.On("StoreLightAndIndexByTransaction", &light).Return(nil).Once()
 
-		// we should store the light collection and index its transactions
-		s.collections.On("StoreLightAndIndexByTransaction", &light).Return(nil).Once()
+	// for each transaction in the collection, we should store it
+	needed := make(map[flow.Identifier]struct{})
+	for _, txID := range light.Transactions {
+		needed[txID] = struct{}{}
+	}
+	s.transactions.On("Store", mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			tx := args.Get(0).(*flow.TransactionBody)
+			_, pending := needed[tx.ID()]
+			s.Assert().True(pending, "tx not pending (%x)", tx.ID())
+		},
+	)
 
-		// for each transaction in the collection, we should store it
-		needed := make(map[flow.Identifier]struct{})
-		for _, txID := range light.Transactions {
-			needed[txID] = struct{}{}
-		}
-		s.transactions.On("Store", mock.Anything).Return(nil).Run(
-			func(args mock.Arguments) {
-				tx := args.Get(0).(*flow.TransactionBody)
-				_, pending := needed[tx.ID()]
-				s.Assert().True(pending, "tx not pending (%x)", tx.ID())
-			},
-		)
+	err := indexer.HandleCollection(&collection, s.collections, s.transactions, s.log, s.collectionExecutedMetric)
+	require.NoError(s.T(), err)
 
-		err := indexer.HandleCollection(&collection, s.collections, s.transactions, s.log, s.collectionExecutedMetric)
-		require.NoError(s.T(), err)
-
-		// check that the collection was stored and indexed, and we stored all transactions
-		s.collections.AssertExpectations(s.T())
-		s.transactions.AssertNumberOfCalls(s.T(), "Store", len(collection.Transactions))
-	})
+	// check that the collection was stored and indexed, and we stored all transactions
+	s.collections.AssertExpectations(s.T())
+	s.transactions.AssertNumberOfCalls(s.T(), "Store", len(collection.Transactions))
 }
 
 // TestOnCollectionDuplicate checks that when a duplicate collection is received, the node doesn't
 // crash but just ignores its transactions.
 func (s *Suite) TestOnCollectionDuplicate() {
-	unittest.RunWithBadgerDB(s.T(), func(db *badger.DB) {
-		s.db = db
-		s.initIngestionEngine()
+	collection := unittest.CollectionFixture(5)
+	light := collection.Light()
 
-		collection := unittest.CollectionFixture(5)
-		light := collection.Light()
+	// we should store the light collection and index its transactions
+	s.collections.On("StoreLightAndIndexByTransaction", &light).Return(storerr.ErrAlreadyExists).Once()
 
-		// we should store the light collection and index its transactions
-		s.collections.On("StoreLightAndIndexByTransaction", &light).Return(storerr.ErrAlreadyExists).Once()
+	// for each transaction in the collection, we should store it
+	needed := make(map[flow.Identifier]struct{})
+	for _, txID := range light.Transactions {
+		needed[txID] = struct{}{}
+	}
+	s.transactions.On("Store", mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			tx := args.Get(0).(*flow.TransactionBody)
+			_, pending := needed[tx.ID()]
+			s.Assert().True(pending, "tx not pending (%x)", tx.ID())
+		},
+	)
 
-		// for each transaction in the collection, we should store it
-		needed := make(map[flow.Identifier]struct{})
-		for _, txID := range light.Transactions {
-			needed[txID] = struct{}{}
-		}
-		s.transactions.On("Store", mock.Anything).Return(nil).Run(
-			func(args mock.Arguments) {
-				tx := args.Get(0).(*flow.TransactionBody)
-				_, pending := needed[tx.ID()]
-				s.Assert().True(pending, "tx not pending (%x)", tx.ID())
-			},
-		)
+	err := indexer.HandleCollection(&collection, s.collections, s.transactions, s.log, s.collectionExecutedMetric)
+	require.NoError(s.T(), err)
 
-		err := indexer.HandleCollection(&collection, s.collections, s.transactions, s.log, s.collectionExecutedMetric)
-		require.NoError(s.T(), err)
-
-		// check that the collection was stored and indexed, and we stored all transactions
-		s.collections.AssertExpectations(s.T())
-		s.transactions.AssertNotCalled(s.T(), "Store", "should not store any transactions")
-	})
+	// check that the collection was stored and indexed, and we stored all transactions
+	s.collections.AssertExpectations(s.T())
+	s.transactions.AssertNotCalled(s.T(), "Store", "should not store any transactions")
 }
 
 // TestRequestMissingCollections tests that the all missing collections are requested on the call to requestMissingCollections
 func (s *Suite) TestRequestMissingCollections() {
-	unittest.RunWithBadgerDB(s.T(), func(db *badger.DB) {
-		s.db = db
-		s.initIngestionEngine()
+	blkCnt := 3
+	startHeight := uint64(1000)
 
-		blkCnt := 3
-		startHeight := uint64(1000)
+	// prepare cluster committee members
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 
-		// prepare cluster committee members
-		clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
+	// generate the test blocks and collections
+	var collIDs []flow.Identifier
+	refBlockID := unittest.IdentifierFixture()
+	for i := 0; i < blkCnt; i++ {
+		block := unittest.BlockFixture()
+		block.SetPayload(unittest.PayloadFixture(
+			unittest.WithGuarantees(
+				unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(refBlockID))...),
+		))
+		// some blocks may not be present hence add a gap
+		height := startHeight + uint64(i)
+		block.Header.Height = height
+		s.blockMap[block.Header.Height] = &block
+		s.finalizedBlock = block.Header
 
-		// generate the test blocks and collections
-		var collIDs []flow.Identifier
-		refBlockID := unittest.IdentifierFixture()
-		for i := 0; i < blkCnt; i++ {
-			block := unittest.BlockFixture()
-			block.SetPayload(unittest.PayloadFixture(
-				unittest.WithGuarantees(
-					unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(refBlockID))...),
-			))
-			// some blocks may not be present hence add a gap
-			height := startHeight + uint64(i)
-			block.Header.Height = height
-			s.blockMap[block.Header.Height] = &block
-			s.finalizedBlock = block.Header
+		for _, c := range block.Payload.Guarantees {
+			collIDs = append(collIDs, c.CollectionID)
+			c.ReferenceBlockID = refBlockID
 
-			for _, c := range block.Payload.Guarantees {
-				collIDs = append(collIDs, c.CollectionID)
-				c.ReferenceBlockID = refBlockID
-
-				// guarantee signers must be cluster committee members, so that access will fetch collection from
-				// the signers that are specified by guarantee.SignerIndices
-				indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
-				require.NoError(s.T(), err)
-				c.SignerIndices = indices
-			}
-		}
-
-		// consider collections are missing for all blocks
-		s.blocks.On("GetLastFullBlockHeight").Return(startHeight-1, nil)
-		// consider the last test block as the head
-
-		// p is the probability of not receiving the collection before the next poll and it
-		// helps simulate the slow trickle of the requested collections being received
-		var p float32
-
-		// rcvdColl is the map simulating the collection storage key-values
-		rcvdColl := make(map[flow.Identifier]struct{})
-
-		// for the first lookup call for each collection, it will be reported as missing from db
-		// for the subsequent calls, it will be reported as present with the probability p
-		s.collections.On("LightByID", mock.Anything).Return(
-			func(cID flow.Identifier) *flow.LightCollection {
-				return nil // the actual collection object return is never really read
-			},
-			func(cID flow.Identifier) error {
-				if _, ok := rcvdColl[cID]; ok {
-					return nil
-				}
-				if rand.Float32() >= p {
-					rcvdColl[cID] = struct{}{}
-				}
-				return storerr.ErrNotFound
-			}).
-			// simulate some db i/o contention
-			After(time.Millisecond * time.Duration(rand.Intn(5)))
-
-		// setup the requester engine mock
-		// entityByID should be called once per collection
-		for _, c := range collIDs {
-			s.request.On("EntityByID", c, mock.Anything).Return()
-		}
-		// force should be called once
-		s.request.On("Force").Return()
-
-		cluster := new(protocol.Cluster)
-		cluster.On("Members").Return(clusterCommittee, nil)
-		epoch := new(protocol.Epoch)
-		epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
-		epochs := new(protocol.EpochQuery)
-		epochs.On("Current").Return(epoch)
-		snap := new(protocol.Snapshot)
-		snap.On("Epochs").Return(epochs)
-		s.proto.state.On("AtBlockID", refBlockID).Return(snap)
-
-		assertExpectations := func() {
-			s.request.AssertExpectations(s.T())
-			s.collections.AssertExpectations(s.T())
-			s.proto.snapshot.AssertExpectations(s.T())
-			s.blocks.AssertExpectations(s.T())
-		}
-
-		// test 1 - collections are not received before timeout
-		s.Run("timeout before all missing collections are received", func() {
-
-			// simulate that collection are never received
-			p = 1
-
-			// timeout after 3 db polls
-			ctx, cancel := context.WithTimeout(context.Background(), 100*defaultCollectionCatchupDBPollInterval)
-			defer cancel()
-
-			err := s.eng.requestMissingCollections(ctx)
-
-			require.Error(s.T(), err)
-			require.Contains(s.T(), err.Error(), "context deadline exceeded")
-
-			assertExpectations()
-		})
-		// test 2 - all collections are eventually received before the deadline
-		s.Run("all missing collections are received", func() {
-
-			// 90% of the time, collections are reported as not received when the collection storage is queried
-			p = 0.9
-
-			ctx, cancel := context.WithTimeout(context.Background(), defaultCollectionCatchupTimeout)
-			defer cancel()
-
-			err := s.eng.requestMissingCollections(ctx)
-
+			// guarantee signers must be cluster committee members, so that access will fetch collection from
+			// the signers that are specified by guarantee.SignerIndices
+			indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
 			require.NoError(s.T(), err)
-			require.Len(s.T(), rcvdColl, len(collIDs))
+			c.SignerIndices = indices
+		}
+	}
 
-			assertExpectations()
-		})
+	// consider collections are missing for all blocks
+	s.blocks.On("GetLastFullBlockHeight").Return(startHeight-1, nil)
+	// consider the last test block as the head
+
+	// p is the probability of not receiving the collection before the next poll and it
+	// helps simulate the slow trickle of the requested collections being received
+	var p float32
+
+	// rcvdColl is the map simulating the collection storage key-values
+	rcvdColl := make(map[flow.Identifier]struct{})
+
+	// for the first lookup call for each collection, it will be reported as missing from db
+	// for the subsequent calls, it will be reported as present with the probability p
+	s.collections.On("LightByID", mock.Anything).Return(
+		func(cID flow.Identifier) *flow.LightCollection {
+			return nil // the actual collection object return is never really read
+		},
+		func(cID flow.Identifier) error {
+			if _, ok := rcvdColl[cID]; ok {
+				return nil
+			}
+			if rand.Float32() >= p {
+				rcvdColl[cID] = struct{}{}
+			}
+			return storerr.ErrNotFound
+		}).
+		// simulate some db i/o contention
+		After(time.Millisecond * time.Duration(rand.Intn(5)))
+
+	// setup the requester engine mock
+	// entityByID should be called once per collection
+	for _, c := range collIDs {
+		s.request.On("EntityByID", c, mock.Anything).Return()
+	}
+	// force should be called once
+	s.request.On("Force").Return()
+
+	cluster := new(protocol.Cluster)
+	cluster.On("Members").Return(clusterCommittee, nil)
+	epoch := new(protocol.Epoch)
+	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
+	epochs := new(protocol.EpochQuery)
+	epochs.On("Current").Return(epoch)
+	snap := new(protocol.Snapshot)
+	snap.On("Epochs").Return(epochs)
+	s.proto.state.On("AtBlockID", refBlockID).Return(snap)
+
+	assertExpectations := func() {
+		s.request.AssertExpectations(s.T())
+		s.collections.AssertExpectations(s.T())
+		s.proto.snapshot.AssertExpectations(s.T())
+		s.blocks.AssertExpectations(s.T())
+	}
+
+	// test 1 - collections are not received before timeout
+	s.Run("timeout before all missing collections are received", func() {
+
+		// simulate that collection are never received
+		p = 1
+
+		// timeout after 3 db polls
+		ctx, cancel := context.WithTimeout(context.Background(), 100*defaultCollectionCatchupDBPollInterval)
+		defer cancel()
+
+		err := s.eng.requestMissingCollections(ctx)
+
+		require.Error(s.T(), err)
+		require.Contains(s.T(), err.Error(), "context deadline exceeded")
+
+		assertExpectations()
+	})
+	// test 2 - all collections are eventually received before the deadline
+	s.Run("all missing collections are received", func() {
+
+		// 90% of the time, collections are reported as not received when the collection storage is queried
+		p = 0.9
+
+		ctx, cancel := context.WithTimeout(context.Background(), defaultCollectionCatchupTimeout)
+		defer cancel()
+
+		err := s.eng.requestMissingCollections(ctx)
+
+		require.NoError(s.T(), err)
+		require.Len(s.T(), rcvdColl, len(collIDs))
+
+		assertExpectations()
 	})
 }
 
@@ -464,186 +438,181 @@ func (s *Suite) TestRequestMissingCollections() {
 // function calls keep the FullBlockIndex up-to-date and request collections if blocks with missing
 // collections exceed the threshold.
 func (s *Suite) TestProcessBackgroundCalls() {
-	unittest.RunWithBadgerDB(s.T(), func(db *badger.DB) {
-		s.db = db
-		s.initIngestionEngine()
+	blkCnt := 3
+	collPerBlk := 10
+	startHeight := uint64(1000)
+	blocks := make([]flow.Block, blkCnt)
+	collMap := make(map[flow.Identifier]*flow.LightCollection, blkCnt*collPerBlk)
 
-		blkCnt := 3
-		collPerBlk := 10
-		startHeight := uint64(1000)
-		blocks := make([]flow.Block, blkCnt)
-		collMap := make(map[flow.Identifier]*flow.LightCollection, blkCnt*collPerBlk)
+	// prepare cluster committee members
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 
-		// prepare cluster committee members
-		clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
+	refBlockID := unittest.IdentifierFixture()
+	// generate the test blocks, cgs and collections
+	for i := 0; i < blkCnt; i++ {
+		guarantees := make([]*flow.CollectionGuarantee, collPerBlk)
+		for j := 0; j < collPerBlk; j++ {
+			coll := unittest.CollectionFixture(2).Light()
+			collMap[coll.ID()] = &coll
+			cg := unittest.CollectionGuaranteeFixture(func(cg *flow.CollectionGuarantee) {
+				cg.CollectionID = coll.ID()
+				cg.ReferenceBlockID = refBlockID
+			})
 
-		refBlockID := unittest.IdentifierFixture()
-		// generate the test blocks, cgs and collections
-		for i := 0; i < blkCnt; i++ {
-			guarantees := make([]*flow.CollectionGuarantee, collPerBlk)
-			for j := 0; j < collPerBlk; j++ {
-				coll := unittest.CollectionFixture(2).Light()
-				collMap[coll.ID()] = &coll
-				cg := unittest.CollectionGuaranteeFixture(func(cg *flow.CollectionGuarantee) {
-					cg.CollectionID = coll.ID()
-					cg.ReferenceBlockID = refBlockID
+			// guarantee signers must be cluster committee members, so that access will fetch collection from
+			// the signers that are specified by guarantee.SignerIndices
+			indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
+			require.NoError(s.T(), err)
+			cg.SignerIndices = indices
+			guarantees[j] = cg
+		}
+		block := unittest.BlockFixture()
+		block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantees...)))
+		// set the height
+		height := startHeight + uint64(i)
+		block.Header.Height = height
+		s.blockMap[block.Header.Height] = &block
+		blocks[i] = block
+		s.finalizedBlock = block.Header
+	}
+
+	lastCompleteBlockBlkHeight := blocks[0].Header.Height
+	finalizedHeight := s.finalizedBlock.Height
+
+	cluster := new(protocol.Cluster)
+	cluster.On("Members").Return(clusterCommittee, nil)
+	epoch := new(protocol.Epoch)
+	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
+	epochs := new(protocol.EpochQuery)
+	epochs.On("Current").Return(epoch)
+	snap := new(protocol.Snapshot)
+	snap.On("Epochs").Return(epochs)
+	s.proto.state.On("AtBlockID", refBlockID).Return(snap)
+
+	// blkMissingColl controls which collections are reported as missing by the collections storage mock
+	blkMissingColl := make([]bool, blkCnt)
+	for i := 0; i < blkCnt; i++ {
+		blkMissingColl[i] = false
+		for _, cg := range blocks[i].Payload.Guarantees {
+			j := i
+			s.collections.On("LightByID", cg.CollectionID).Return(
+				func(cID flow.Identifier) *flow.LightCollection {
+					return collMap[cID]
+				},
+				func(cID flow.Identifier) error {
+					if blkMissingColl[j] {
+						return storerr.ErrNotFound
+					}
+					return nil
 				})
-
-				// guarantee signers must be cluster committee members, so that access will fetch collection from
-				// the signers that are specified by guarantee.SignerIndices
-				indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
-				require.NoError(s.T(), err)
-				cg.SignerIndices = indices
-				guarantees[j] = cg
-			}
-			block := unittest.BlockFixture()
-			block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantees...)))
-			// set the height
-			height := startHeight + uint64(i)
-			block.Header.Height = height
-			s.blockMap[block.Header.Height] = &block
-			blocks[i] = block
-			s.finalizedBlock = block.Header
 		}
+	}
 
-		lastCompleteBlockBlkHeight := blocks[0].Header.Height
-		finalizedHeight := s.finalizedBlock.Height
+	s.Run("full block height index is advanced if newer full blocks are discovered", func() {
+		block := blocks[1]
+		s.blocks.On("UpdateLastFullBlockHeight", finalizedHeight).Return(nil).Once()
+		s.blocks.On("GetLastFullBlockHeight").Return(func() (uint64, error) {
+			return block.Header.Height, nil
+		}).Once()
 
-		cluster := new(protocol.Cluster)
-		cluster.On("Members").Return(clusterCommittee, nil)
-		epoch := new(protocol.Epoch)
-		epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
-		epochs := new(protocol.EpochQuery)
-		epochs.On("Current").Return(epoch)
-		snap := new(protocol.Snapshot)
-		snap.On("Epochs").Return(epochs)
-		s.proto.state.On("AtBlockID", refBlockID).Return(snap)
+		err := s.eng.updateLastFullBlockReceivedIndex()
+		s.Require().NoError(err)
 
-		// blkMissingColl controls which collections are reported as missing by the collections storage mock
-		blkMissingColl := make([]bool, blkCnt)
-		for i := 0; i < blkCnt; i++ {
-			blkMissingColl[i] = false
+		s.blocks.AssertExpectations(s.T())
+	})
+
+	s.Run("full block height index is not advanced beyond finalized blocks", func() {
+		s.blocks.On("GetLastFullBlockHeight").Return(func() (uint64, error) {
+			return finalizedHeight, nil
+		}).Once()
+
+		err := s.eng.updateLastFullBlockReceivedIndex()
+		s.Require().NoError(err)
+
+		s.blocks.AssertExpectations(s.T()) // not new call to UpdateLastFullBlockHeight should be made
+	})
+
+	s.Run("missing collections are requested when count exceeds defaultMissingCollsForBlkThreshold", func() {
+		// root block is the last complete block
+		s.blocks.On("GetLastFullBlockHeight").Return(func() (uint64, error) {
+			return lastCompleteBlockBlkHeight, nil
+		}).Once()
+
+		// lower the block threshold to request missing collections
+		defaultMissingCollsForBlkThreshold = 2
+
+		// mark all blocks beyond the root block as incomplete
+		for i := 1; i < blkCnt; i++ {
+			blkMissingColl[i] = true
+			// setup receive engine expectations
 			for _, cg := range blocks[i].Payload.Guarantees {
-				j := i
-				s.collections.On("LightByID", cg.CollectionID).Return(
-					func(cID flow.Identifier) *flow.LightCollection {
-						return collMap[cID]
-					},
-					func(cID flow.Identifier) error {
-						if blkMissingColl[j] {
-							return storerr.ErrNotFound
-						}
-						return nil
-					})
+				s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Once()
 			}
 		}
 
-		s.Run("full block height index is advanced if newer full blocks are discovered", func() {
-			block := blocks[1]
-			s.blocks.On("UpdateLastFullBlockHeight", finalizedHeight).Return(nil).Once()
-			s.blocks.On("GetLastFullBlockHeight").Return(func() (uint64, error) {
-				return block.Header.Height, nil
-			}).Once()
+		err := s.eng.checkMissingCollections()
+		s.Require().NoError(err)
 
-			err := s.eng.updateLastFullBlockReceivedIndex()
-			s.Require().NoError(err)
+		// assert that missing collections are requested
+		s.request.AssertExpectations(s.T())
 
-			s.blocks.AssertExpectations(s.T())
-		})
+		// last full blk index is not advanced
+		s.blocks.AssertExpectations(s.T()) // no new call to UpdateLastFullBlockHeight should be made
+	})
 
-		s.Run("full block height index is not advanced beyond finalized blocks", func() {
-			s.blocks.On("GetLastFullBlockHeight").Return(func() (uint64, error) {
-				return finalizedHeight, nil
-			}).Once()
+	s.Run("missing collections are requested when count exceeds defaultMissingCollsForAgeThreshold", func() {
+		// root block is the last complete block
+		s.blocks.On("GetLastFullBlockHeight").Return(func() (uint64, error) {
+			return lastCompleteBlockBlkHeight, nil
+		}).Once()
 
-			err := s.eng.updateLastFullBlockReceivedIndex()
-			s.Require().NoError(err)
+		// lower the height threshold to request missing collections
+		defaultMissingCollsForAgeThreshold = 1
 
-			s.blocks.AssertExpectations(s.T()) // not new call to UpdateLastFullBlockHeight should be made
-		})
+		// raise the block threshold to ensure it does not trigger missing collection request
+		defaultMissingCollsForBlkThreshold = blkCnt + 1
 
-		s.Run("missing collections are requested when count exceeds defaultMissingCollsForBlkThreshold", func() {
-			// root block is the last complete block
-			s.blocks.On("GetLastFullBlockHeight").Return(func() (uint64, error) {
-				return lastCompleteBlockBlkHeight, nil
-			}).Once()
-
-			// lower the block threshold to request missing collections
-			defaultMissingCollsForBlkThreshold = 2
-
-			// mark all blocks beyond the root block as incomplete
-			for i := 1; i < blkCnt; i++ {
-				blkMissingColl[i] = true
-				// setup receive engine expectations
-				for _, cg := range blocks[i].Payload.Guarantees {
-					s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Once()
-				}
+		// mark all blocks beyond the root block as incomplete
+		for i := 1; i < blkCnt; i++ {
+			blkMissingColl[i] = true
+			// setup receive engine expectations
+			for _, cg := range blocks[i].Payload.Guarantees {
+				s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Once()
 			}
+		}
 
-			err := s.eng.checkMissingCollections()
-			s.Require().NoError(err)
+		err := s.eng.checkMissingCollections()
+		s.Require().NoError(err)
 
-			// assert that missing collections are requested
-			s.request.AssertExpectations(s.T())
+		// assert that missing collections are requested
+		s.request.AssertExpectations(s.T())
 
-			// last full blk index is not advanced
-			s.blocks.AssertExpectations(s.T()) // no new call to UpdateLastFullBlockHeight should be made
-		})
+		// last full blk index is not advanced
+		s.blocks.AssertExpectations(s.T()) // not new call to UpdateLastFullBlockHeight should be made
+	})
 
-		s.Run("missing collections are requested when count exceeds defaultMissingCollsForAgeThreshold", func() {
-			// root block is the last complete block
-			s.blocks.On("GetLastFullBlockHeight").Return(func() (uint64, error) {
-				return lastCompleteBlockBlkHeight, nil
-			}).Once()
+	s.Run("missing collections are not requested if defaultMissingCollsForBlkThreshold not reached", func() {
+		// root block is the last complete block
+		s.blocks.On("GetLastFullBlockHeight").Return(func() (uint64, error) {
+			return lastCompleteBlockBlkHeight, nil
+		}).Once()
 
-			// lower the height threshold to request missing collections
-			defaultMissingCollsForAgeThreshold = 1
+		// raise the thresholds to avoid requesting missing collections
+		defaultMissingCollsForAgeThreshold = 3
+		defaultMissingCollsForBlkThreshold = 3
 
-			// raise the block threshold to ensure it does not trigger missing collection request
-			defaultMissingCollsForBlkThreshold = blkCnt + 1
+		// mark all blocks beyond the root block as incomplete
+		for i := 1; i < blkCnt; i++ {
+			blkMissingColl[i] = true
+		}
 
-			// mark all blocks beyond the root block as incomplete
-			for i := 1; i < blkCnt; i++ {
-				blkMissingColl[i] = true
-				// setup receive engine expectations
-				for _, cg := range blocks[i].Payload.Guarantees {
-					s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Once()
-				}
-			}
+		err := s.eng.checkMissingCollections()
+		s.Require().NoError(err)
 
-			err := s.eng.checkMissingCollections()
-			s.Require().NoError(err)
+		// assert that missing collections are not requested even though there are collections missing
+		s.request.AssertExpectations(s.T())
 
-			// assert that missing collections are requested
-			s.request.AssertExpectations(s.T())
-
-			// last full blk index is not advanced
-			s.blocks.AssertExpectations(s.T()) // not new call to UpdateLastFullBlockHeight should be made
-		})
-
-		s.Run("missing collections are not requested if defaultMissingCollsForBlkThreshold not reached", func() {
-			// root block is the last complete block
-			s.blocks.On("GetLastFullBlockHeight").Return(func() (uint64, error) {
-				return lastCompleteBlockBlkHeight, nil
-			}).Once()
-
-			// raise the thresholds to avoid requesting missing collections
-			defaultMissingCollsForAgeThreshold = 3
-			defaultMissingCollsForBlkThreshold = 3
-
-			// mark all blocks beyond the root block as incomplete
-			for i := 1; i < blkCnt; i++ {
-				blkMissingColl[i] = true
-			}
-
-			err := s.eng.checkMissingCollections()
-			s.Require().NoError(err)
-
-			// assert that missing collections are not requested even though there are collections missing
-			s.request.AssertExpectations(s.T())
-
-			// last full blk index is not advanced
-			s.blocks.AssertExpectations(s.T()) // not new call to UpdateLastFullBlockHeight should be made
-		})
+		// last full blk index is not advanced
+		s.blocks.AssertExpectations(s.T()) // not new call to UpdateLastFullBlockHeight should be made
 	})
 }
