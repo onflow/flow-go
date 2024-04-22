@@ -721,24 +721,29 @@ func TestGasEstimation(t *testing.T) {
 					import EVM from %s
 
 					access(all)
-					fun main(tx: [UInt8]): UInt64 {
-						return EVM.estimateGas(tx: tx)
+					fun main(contract: [UInt8; 20], data: [UInt8]): UInt64 {
+						return EVM.estimateGas(
+							from: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], // random address 
+							to: contract, 
+							gasLimit: 25216, 
+							gasPrice: 100, 
+							value: EVM.Balance(attoflow: 0), 
+							data: data
+						)
 					}
                     `,
 					sc.EVMContract.Address.HexWithPrefix(),
 				))
 
-				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
-					testContract.DeployedAt.ToCommon(),
-					testContract.MakeCallData(t, "store", big.NewInt(1337)),
-					big.NewInt(0),
-					uint64(10_000_000),
-					big.NewInt(500000), // todo check price
-				)
 				script := fvm.Script(code).WithArguments(
 					json.MustEncode(
 						cadence.NewArray(
-							ConvertToCadence(innerTxBytes),
+							ConvertToCadence(testContract.DeployedAt.ToCommon().Bytes()),
+						).WithType(stdlib.EVMAddressBytesCadenceType),
+					),
+					json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(testContract.MakeCallData(t, "store", big.NewInt(1337))),
 						).WithType(stdlib.EVMTransactionBytesCadenceType),
 					),
 				)
