@@ -219,12 +219,12 @@ func (h *ContractHandler) run(
 	return res, nil
 }
 
-func (h *ContractHandler) EstimateGas(rlpEncodedTx []byte) (*types.Result, error) {
+func (h *ContractHandler) EstimateGas(rlpEncodedTx []byte) (uint64, error) {
 	// step 1 - transaction decoding
 	encodedLen := uint(len(rlpEncodedTx))
 	err := h.backend.MeterComputation(environment.ComputationKindRLPDecoding, encodedLen)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	tx := gethTypes.Transaction{}
@@ -233,35 +233,35 @@ func (h *ContractHandler) EstimateGas(rlpEncodedTx []byte) (*types.Result, error
 			bytes.NewReader(rlpEncodedTx),
 			uint64(encodedLen)))
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	ctx, err := h.getBlockContext()
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	blk, err := h.emulator.NewBlockView(ctx)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	res, err := blk.RunTransaction(&tx)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	// saftey check for result
 	if res == nil {
-		return nil, types.ErrUnexpectedEmptyResult
+		return 0, types.ErrUnexpectedEmptyResult
 	}
 
-	// if is invalid tx skip the next steps (forming block, ...)
+	// if invalid return the invalid error
 	if res.Invalid() {
-		return res, nil
+		return 0, res.ValidationError
 	}
 
-	return res, nil
+	return res.GasConsumed, nil
 }
 
 func (h *ContractHandler) checkGasLimit(limit types.GasLimit) error {
