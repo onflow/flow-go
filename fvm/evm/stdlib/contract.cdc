@@ -326,8 +326,22 @@ contract EVM {
     }
 
     access(all)
-    fun estimateGas(tx [UInt8]): UInt {
-        return InternalEVM.estimateGas(tx)
+    fun estimateGas(
+        from: [UInt8; 20],
+        to: [UInt8; 20],
+        gasLimit: UInt64,
+        gasPrice: UInt64,
+        value: Balance,
+        data: [UInt8]
+    ): UInt64 {
+        return InternalEVM.estimateGas(
+            from: from,
+            to: to,
+            gasLimit: gasLimit,
+            gasPrice: gasPrice,
+            value: value.attoflow,
+            data: data
+        )
     }
 
     access(all)

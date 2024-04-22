@@ -979,8 +979,28 @@ const internalEVMTypeEstimateGasFunctionName = "estimateGas"
 var internalEVMTypeEstimateGasFunctionType = &sema.FunctionType{
 	Parameters: []sema.Parameter{
 		{
-			Label:          "tx",
-			TypeAnnotation: sema.NewTypeAnnotation(evmTransactionBytesType),
+			Label:          "from",
+			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+		},
+		{
+			Label:          "to",
+			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+		},
+		{
+			Label:          "gasLimit",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
+		},
+		{
+			Label:          "gasPrice",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
+		},
+		{
+			Label:          "value",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
+		},
+		{
+			Label:          "data",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
 		},
 	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
@@ -997,21 +1017,72 @@ func newInternalEVMTypeEstimateGasFunction(
 			inter := invocation.Interpreter
 			locationRange := invocation.LocationRange
 
-			// Get transaction argument
+			// Get from address
 
-			transactionValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			fromAddressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			transaction, err := interpreter.ByteArrayValueToByteSlice(inter, transactionValue, locationRange)
+			fromAddress, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, fromAddressValue)
 			if err != nil {
 				panic(err)
 			}
 
-			// Estiamte
+			// Get to address
 
-			val, err := handler.EstimateGas(transaction)
+			toAddressValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			toAddress, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, toAddressValue)
+			if err != nil {
+				panic(err)
+			}
+
+			// Get gas
+
+			gasLimitValue, ok := invocation.Arguments[2].(interpreter.UInt64Value)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			gasLimit := types.GasLimit(gasLimitValue)
+
+			// Get gas price
+
+			gasPriceValue, ok := invocation.Arguments[3].(interpreter.UInt64Value)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			gasPrice := uint64(gasPriceValue)
+
+			// Get balance
+
+			balanceValue, ok := invocation.Arguments[4].(interpreter.UIntValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			balance := types.NewBalance(balanceValue.BigInt)
+
+			// Get data
+
+			dataValue, ok := invocation.Arguments[5].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			data, err := interpreter.ByteArrayValueToByteSlice(inter, dataValue, locationRange)
+			if err != nil {
+				panic(err)
+			}
+
+			// call estimate
+
+			val, err := handler.EstimateGas(fromAddress, toAddress, gasLimit, gasPrice, balance, data)
 			if err != nil {
 				panic(err) // todo change
 			}
