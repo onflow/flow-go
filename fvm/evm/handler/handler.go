@@ -219,22 +219,14 @@ func (h *ContractHandler) run(
 	return res, nil
 }
 
-func (h *ContractHandler) EstimateGas(rlpEncodedTx []byte) (uint64, error) {
-	// step 1 - transaction decoding
-	encodedLen := uint(len(rlpEncodedTx))
-	err := h.backend.MeterComputation(environment.ComputationKindRLPDecoding, encodedLen)
-	if err != nil {
-		return 0, err
-	}
-
-	tx := gethTypes.Transaction{}
-	err = tx.DecodeRLP(
-		rlp.NewStream(
-			bytes.NewReader(rlpEncodedTx),
-			uint64(encodedLen)))
-	if err != nil {
-		return 0, err
-	}
+func (h *ContractHandler) EstimateGas(
+	from types.Address,
+	to types.Address,
+	gasLimit types.GasLimit,
+	gasPrice uint64,
+	value types.Balance,
+	data []byte,
+) (uint64, error) {
 
 	ctx, err := h.getBlockContext()
 	if err != nil {
@@ -246,7 +238,18 @@ func (h *ContractHandler) EstimateGas(rlpEncodedTx []byte) (uint64, error) {
 		return 0, err
 	}
 
-	res, err := blk.RunTransaction(&tx)
+	// todo create a factory
+	call := &types.DirectCall{
+		Type:     types.DirectCallTxType,
+		SubType:  types.EstimateGasSubType,
+		From:     from,
+		To:       to,
+		Data:     data,
+		Value:    value,
+		GasLimit: uint64(gasLimit), // todo gas price
+	}
+
+	res, err := blk.DirectCall(call)
 	if err != nil {
 		return 0, err
 	}

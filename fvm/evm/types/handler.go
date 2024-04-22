@@ -46,10 +46,17 @@ type ContractHandler interface {
 	// GenerateResourceUUID generates a new UUID for a resource
 	GenerateResourceUUID() uint64
 
-	// EstimateGas takes an RLP encoded transaction and estimates how much gas it takes
-	// for the transaction to execute.
+	// EstimateGas estimates gas requires for the transaction to succesfully execute.
+	// No changes are persisted to the state.
 	// Error is returned if transaction is not valid or unexpected error happens.
-	EstimateGas(tx []byte) (uint64, error)
+	EstimateGas(
+		from Address,
+		to Address,
+		gasLimit GasLimit,
+		gasPrice uint64,
+		value Balance,
+		data []byte,
+	) (uint64, error)
 }
 
 // AddressAllocator allocates addresses, used by the handler
