@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"fmt"
 	"runtime"
-	"sync"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -16,7 +14,6 @@ import (
 
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/ledger"
 )
 
@@ -188,39 +185,3 @@ func mustDecodeHex(s string) []byte {
 	}
 	return b
 }
-
-type testReportWriterFactory struct {
-	lock          sync.Mutex
-	reportWriters map[string]*testReportWriter
-}
-
-func (f *testReportWriterFactory) ReportWriter(dataNamespace string) reporters.ReportWriter {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-
-	if f.reportWriters == nil {
-		f.reportWriters = make(map[string]*testReportWriter)
-	}
-	reportWriter := &testReportWriter{}
-	if _, ok := f.reportWriters[dataNamespace]; ok {
-		panic(fmt.Sprintf("report writer already exists for namespace %s", dataNamespace))
-	}
-	f.reportWriters[dataNamespace] = reportWriter
-	return reportWriter
-}
-
-type testReportWriter struct {
-	lock    sync.Mutex
-	entries []any
-}
-
-var _ reporters.ReportWriter = &testReportWriter{}
-
-func (r *testReportWriter) Write(entry any) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	r.entries = append(r.entries, entry)
-}
-
-func (r *testReportWriter) Close() {}

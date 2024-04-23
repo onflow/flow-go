@@ -362,14 +362,13 @@ func createTrieFromPayloads(logger zerolog.Logger, payloads []*ledger.Payload) (
 
 func newMigrations(
 	log zerolog.Logger,
-	dir string,
+	outputDir string,
 	nWorker int, // number of concurrent worker to migation payloads
 	runMigrations bool,
 	fixSlabsWithBrokenReferences bool,
 ) []ledger.Migration {
 	if runMigrations {
-
-		rwf := reporters.NewReportFileWriterFactory(dir, log)
+		rwf := reporters.NewReportFileWriterFactory(outputDir, log)
 
 		var accountBasedMigrations []migrators.AccountBasedMigration
 
@@ -379,6 +378,16 @@ func newMigrations(
 				migrators.NewFixBrokenReferencesInSlabsMigration(
 					rwf,
 					migrators.TestnetAccountsWithBrokenSlabReferences,
+				),
+			)
+		}
+
+		if flagFilterUnreferencedSlabs {
+			accountBasedMigrations = append(
+				accountBasedMigrations,
+				migrators.NewFilterUnreferencedSlabsMigration(
+					outputDir,
+					rwf,
 				),
 			)
 		}

@@ -40,6 +40,7 @@ var (
 	flagOutputPayloadFileName              string
 	flagOutputPayloadByAddresses           string
 	flagFixSlabsWithBrokenReferences       bool
+	flagFilterUnreferencedSlabs            bool
 )
 
 var Cmd = &cobra.Command{
@@ -126,6 +127,9 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagFixSlabsWithBrokenReferences, "fix-testnet-slabs-with-broken-references", false,
 		"fix slabs with broken references in testnet")
+
+	Cmd.Flags().BoolVar(&flagFilterUnreferencedSlabs, "filter-unreferenced-slabs", false,
+		"filter unreferenced slabs")
 }
 
 func run(*cobra.Command, []string) {
