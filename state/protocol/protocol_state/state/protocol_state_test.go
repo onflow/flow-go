@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	psmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
+	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -29,7 +30,7 @@ func TestProtocolState_AtBlockID(t *testing.T) {
 	protocolStateDB.On("ByBlockID", blockID).Return(entry, nil).Once()
 	protocolStateDB.On("ByBlockID", otherBlockID).Return(otherEntry, nil).Once()
 
-	protocolKVStoreDB := storagemock.NewProtocolKVStore(t)
+	protocolKVStoreDB := protocol_statemock.NewProtocolKVStore(t)
 
 	globalParams := psmock.NewGlobalParams(t)
 	protocolState := NewProtocolState(protocolStateDB, protocolKVStoreDB, globalParams)
@@ -68,7 +69,7 @@ func TestProtocolState_AtBlockID(t *testing.T) {
 // if the parent protocol state has not been found.
 func TestMutableProtocolState_Mutator(t *testing.T) {
 	protocolStateDB := storagemock.NewProtocolState(t)
-	kvStoreSnapshotsDB := storagemock.NewProtocolKVStore(t)
+	kvStoreSnapshotsDB := protocol_statemock.NewProtocolKVStore(t)
 	globalParams := psmock.NewGlobalParams(t)
 	globalParams.On("EpochCommitSafetyThreshold").Return(uint64(1000))
 	headersDB := storagemock.NewHeaders(t)

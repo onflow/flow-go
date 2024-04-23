@@ -11,9 +11,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	psmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
-	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -29,144 +27,227 @@ type StateMutatorSuite struct {
 	suite.Suite
 
 	// sub-components injected into MutableProtocolState
-	epochProtocolStateDB    *storagemock.ProtocolState
-	protocolKVStoreDB       *storagemock.ProtocolKVStore
-	globalParams            *psmock.GlobalParams
-	headersDB               *storagemock.Headers
-	resultsDB               *storagemock.ExecutionResults
+	headersDB               storagemock.Headers
+	resultsDB               storagemock.ExecutionResults
+	protocolKVStoreDB       protocol_statemock.ProtocolKVStore
+	epochProtocolStateDB    storagemock.ProtocolState
+	globalParams            psmock.GlobalParams
 	kvStateMachines         []protocol_statemock.OrthogonalStoreStateMachine[protocol.KVStoreReader]
 	kvStateMachineFactories []protocol_state.KeyValueStoreStateMachineFactory
 
 	// basic setup for happy path test
-	parentState   protocol_state.KVStoreAPI // Protocol state of `candidate`s parent block
-	parentStateID flow.Identifier
-	candidate     *flow.Header // candidate block, potentially still under construction
-	//replicatedState       *protocol_statemock.KVStoreMutator //
+	parentState           protocol_statemock.KVStoreAPI // Protocol state of `candidate`s parent block
+	candidate             flow.Header                   // candidate block, potentially still under construction
+	evolvingState         protocol_statemock.KVStoreMutator
 	latestProtocolVersion uint64
 
 	mutableState *MutableProtocolState
 }
 
 func (s *StateMutatorSuite) SetupTest() {
-	s.epochProtocolStateDB = storagemock.NewProtocolState(s.T())
-	s.protocolKVStoreDB = storagemock.NewProtocolKVStore(s.T())
-	s.globalParams = psmock.NewGlobalParams(s.T())
-	s.headersDB = storagemock.NewHeaders(s.T())
-	s.resultsDB = storagemock.NewExecutionResults(s.T())
+	s.epochProtocolStateDB = *storagemock.NewProtocolState(s.T())
+	s.protocolKVStoreDB = *protocol_statemock.NewProtocolKVStore(s.T())
+	s.globalParams = *psmock.NewGlobalParams(s.T())
+	s.headersDB = *storagemock.NewHeaders(s.T())
+	s.resultsDB = *storagemock.NewExecutionResults(s.T())
 
 	// Basic happy-path test scenario:
 	// - candidate block:
 	s.latestProtocolVersion = 1
-	s.candidate = unittest.BlockHeaderFixture(unittest.HeaderWithView(1000))
+	s.candidate = *unittest.BlockHeaderFixture(unittest.HeaderWithView(1000))
 
 	// - protocol state as of `candidate`s parent
-	s.parentState = &kvstore.Modelv1{
-		Modelv0: kvstore.Modelv0{
-			UpgradableModel: kvstore.UpgradableModel{},
-			EpochStateID:    unittest.IdentifierFixture(),
-		},
-		InvalidEpochTransitionAttempted: false,
-	}
-	s.parentStateID = s.parentState.ID()
-	parentProtocolStateVersion, parentProtocolStateEnc, err := s.parentState.VersionedEncode()
-	require.NoError(s.T(), err)
-	parentKvSnapshot := &storage.KeyValueStoreData{
-		Version: parentProtocolStateVersion,
-		Data:    parentProtocolStateEnc,
-	}
-	s.protocolKVStoreDB.On("ByBlockID", s.candidate.ParentID).Return(parentKvSnapshot, nil)
+	s.parentState = *protocol_statemock.NewKVStoreAPI(s.T())
+	s.protocolKVStoreDB.On("ByBlockID", s.candidate.ParentID).Return(&s.parentState, nil)
+	s.parentState.On("GetProtocolStateVersion").Return(s.latestProtocolVersion)
+	s.parentState.On("GetVersionUpgrade").Return(nil) // no version upgrade by default
+	s.parentState.On("ID").Return(unittest.IdentifierFixture(), nil)
+	s.parentState.On("Replicate", s.latestProtocolVersion).Return(&s.evolvingState, nil)
 
-	// factories will instantiate state machines that
-	//  - use `s.parentState` and write their output state into `s.replicatedState`
-	//  - expect an empty list of Service Events as inouts
-	//  - produce one deferred database update
+	// state replicated from the parent state; by default exactly the same as the parent state
+	s.evolvingState = *protocol_statemock.NewKVStoreMutator(s.T())
+	s.evolvingState.On("ID").Return(s.parentState.ID(), nil)
+
+	// Factories for the state machines expect `s.parentState` as parent state and `s.replicatedState` as target state.
+	// CAUTION: the behaviour of each state machine has to be defined by the tests.
 	s.kvStateMachines = make([]protocol_statemock.OrthogonalStoreStateMachine[protocol.KVStoreReader], 2)
 	s.kvStateMachineFactories = make([]protocol_state.KeyValueStoreStateMachineFactory, len(s.kvStateMachines))
 	for i := range s.kvStateMachines {
-		stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
-		stateMachine.On("EvolveState", mock.MatchedBy(emptySlice[flow.ServiceEvent]())).Return(nil).Once()
-		deferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
-		deferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
-		deferredDBUpdates := transaction.NewDeferredBlockPersist().AddDbOp(deferredUpdate.Execute)
-		stateMachine.On("Build").Return(deferredDBUpdates, nil).Once()
-		s.kvStateMachines[i] = *stateMachine
-		// Factory:
 		factory := protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
-		factory.On("Create", s.candidate.View, s.candidate.ParentID, s.parentState, mock.MatchedBy(hasID(s.parentStateID))).Return(&s.kvStateMachines[i], nil)
+		factory.On("Create", s.candidate.View, s.candidate.ParentID, &s.parentState, &s.evolvingState).Return(&s.kvStateMachines[i], nil)
 		s.kvStateMachineFactories[i] = factory
 	}
 
 	s.mutableState = newMutableProtocolState(
-		s.epochProtocolStateDB,
-		s.protocolKVStoreDB,
-		s.globalParams,
-		s.headersDB,
-		s.resultsDB,
+		&s.epochProtocolStateDB,
+		&s.protocolKVStoreDB,
+		&s.globalParams,
+		&s.headersDB,
+		&s.resultsDB,
 		s.kvStateMachineFactories,
 	)
 }
 
-// TestBuild_HappyPath tests that `stateMutator` returns all updates from sub-state state machines and prepares updates to the KV store
-// when building protocol state.
-// In this test, we expect all state machines to return a single deferred db update that will be subsequently returned and executed.
-// We also expect that the resulting state will be indexed and stored in the protocol KV store. To assert that, we mock the corresponding
-// storage methods and expect them to be called when applying deferred updates in caller code.
-func (s *StateMutatorSuite) TestBuild_HappyPath() {
+// Test_HappyPath_StateInvariant tests that `MutableProtocolState.EvolveState` returns all updates from sub-state state machines and
+// prepares updates to the KV store, when building protocol state. Here, we focus on the path, where the *state remains invariant*.
+//
+// All mocked state machines return a single deferred db update that will be subsequently returned and executed.
+// We also expect that the resulting state will be indexed but *not* stored in the protocol KV store (as there are no changes). To
+// assert that, we mock the corresponding storage methods and expect them to be called when applying deferred updates in caller code.
+func (s *StateMutatorSuite) Test_HappyPath_StateInvariant() {
+	parentProtocolStateID := s.parentState.ID()
 
-	// expect actual DB calls that take a badger transaction and apply deferred updates
-	indexTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
-	indexTxDeferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
-	//storeTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
-	//storeTxDeferredUpdate.On("Execute", mock.Anything).Return(nil).Maybe()
+	// this is the main logic of the test, which essentially tests that `EvolveState`
+	//  - indexes the protocol state for the new candidate block, but does not persist it, because it is the same as for the parent
+	testEvolveState := func(seals []*flow.Seal) {
+		// expect actual DB calls that take a badger transaction and apply deferred updates
+		indexTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
+		indexTxDeferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
 
-	// expect calls to prepare a deferred update for indexing and storing the resulting state
-	s.protocolKVStoreDB.On("IndexTx", s.candidate.ID(), s.parentStateID).Return(indexTxDeferredUpdate.Execute).Once()
+		// expect calls to prepare a deferred update for indexing the resulting state:
+		// as state has not changed, we expect the parent blocks protocol state ID
+		s.protocolKVStoreDB.On("IndexTx", s.candidate.ID(), parentProtocolStateID).Return(indexTxDeferredUpdate.Execute).Once()
 
-	resultingStateID, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
-	require.NoError(s.T(), err)
-	require.Equal(s.T(), s.parentStateID, resultingStateID)
+		resultingStateID, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, seals)
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), parentProtocolStateID, resultingStateID)
 
-	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
-	// the expected mock methods should be called, which is asserted by the testify framework
-	err = dbUpdates.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
-	require.NoError(s.T(), err)
+		// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
+		// the expected mock methods should be called, which is asserted by the testify framework
+		err = dbUpdates.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
+		require.NoError(s.T(), err)
+
+		s.protocolKVStoreDB.AssertExpectations(s.T())
+		indexTxDeferredUpdate.AssertExpectations(s.T())
+	}
+
+	s.Run("no seals, hence no service events", func() {
+		for i := range s.kvStateMachines {
+			s.kvStateMachines[i] = s.stateMachine().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).Mock()
+		}
+
+		testEvolveState([]*flow.Seal{})
+	})
+
+	s.Run("seals without service events", func() {
+		sealedBlock := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(s.candidate.View - 10))
+		sealedResult := unittest.ExecutionResultFixture()
+		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(sealedBlock.ID()))
+		s.headersDB.On("ByBlockID", seal.BlockID).Return(sealedBlock, nil)
+		s.resultsDB.On("ByID", seal.ResultID).Return(sealedResult, nil)
+
+		for i := range s.kvStateMachines {
+			s.kvStateMachines[i] = s.stateMachine().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).Mock()
+		}
+
+		testEvolveState([]*flow.Seal{seal})
+	})
+
+	s.Run("seals with service events", func() {
+		sealedBlock := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(s.candidate.View - 10))
+		serviceEvents := []flow.ServiceEvent{unittest.EpochSetupFixture().ServiceEvent()}
+		sealedResult := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
+			result.ServiceEvents = serviceEvents
+		})
+		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(sealedBlock.ID()))
+		s.headersDB.On("ByBlockID", seal.BlockID).Return(sealedBlock, nil)
+		s.resultsDB.On("ByID", seal.ResultID).Return(sealedResult, nil)
+
+		for i := range s.kvStateMachines {
+			s.kvStateMachines[i] = s.stateMachine().ExpectedServiceEvents(serviceEvents).Mock()
+		}
+
+		testEvolveState([]*flow.Seal{seal})
+	})
 }
 
-//// TestBuild_NoChanges tests that `stateMutator` returns minimal needed updates when building protocol state even if there was no service events applied.
-//// The minimal needed updates are the index and store of the state that was previously replicated and possibly mutated.
-//func (s *StateMutatorSuite) TestBuild_NoChanges() {
-//	resultingStateID := unittest.IdentifierFixture()
-//	_, parentProtocolStateEnc, err := s.parentState.VersionedEncode()
+// Test_HappyPath_StateChange tests that `MutableProtocolState.EvolveState` returns all updates from sub-state state machines and
+// prepares updates to the KV store, when building protocol state. Here, we focus on the path, where the *state is modified*.
 //
-//	stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
-//	stateMachine.On("EvolveState", mock.MatchedBy(emptySlice[flow.ServiceEvent]())).Return(nil).Once()
-//	deferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
-//	deferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
-//	deferredDBUpdates := transaction.NewDeferredBlockPersist().AddDbOp(deferredUpdate.Execute)
-//	stateMachine.On("Build").Return(deferredDBUpdates, nil).Once()
-//	s.kvStateMachines[i] = stateMachine
-//
-//	// expect actual DB calls that take a badger transaction and apply deferred updates
-//	indexTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
-//	indexTxDeferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
-//	storeTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
-//	storeTxDeferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
-//
-//	// expect calls to prepare a deferred update for indexing and storing the resulting state
-//	s.protocolKVStoreDB.On("IndexTx", s.candidate.ID(), resultingStateID).Return(indexTxDeferredUpdate.Execute).Once()
-//	s.protocolKVStoreDB.On("StoreTx", resultingStateID, &storage.KeyValueStoreData{
-//		Version: s.latestProtocolVersion,
-//		Data:    stateBytes,
-//	}).Return(storeTxDeferredUpdate.Execute).Once()
-//
-//	_, dbUpdates, err := s.mutator.Build()
-//	require.NoError(s.T(), err)
-//
-//	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
-//	// the expected mock methods should be called, which is asserted by the testify framework
-//	err = dbUpdates.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
-//	require.NoError(s.T(), err)
-//}
+// All mocked state machines return a single deferred db update that will be subsequently returned and executed.
+// We also expect that the resulting state will be indexed but *not* stored in the protocol KV store (as there are no changes). To
+// assert that, we mock the corresponding storage methods and expect them to be called when applying deferred updates in caller code.
+func (s *StateMutatorSuite) Test_HappyPath_StateChange() {
+
+	// this is the main logic of the test, which essentially tests that `EvolveState`
+	//  - indexes the protocol state for the new candidate block and persists it (as the state changed)
+	testEvolveState := func(seals []*flow.Seal, expectedResultingStateID flow.Identifier) {
+		// expect actual DB calls that take a badger transaction and apply deferred updates
+		indexTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
+		indexTxDeferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
+		storeTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
+		storeTxDeferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
+
+		// expect calls to prepare a deferred update for indexing and storing the resulting state:
+		// as state has not changed, we expect the parent blocks protocol state ID
+		s.protocolKVStoreDB.On("IndexTx", s.candidate.ID(), expectedResultingStateID).Return(indexTxDeferredUpdate.Execute).Once()
+		s.protocolKVStoreDB.On("StoreTx", expectedResultingStateID, &s.evolvingState).Return(storeTxDeferredUpdate.Execute).Once()
+
+		resultingStateID, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, seals)
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), expectedResultingStateID, resultingStateID)
+
+		// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
+		// the expected mock methods should be called, which is asserted by the testify framework
+		err = dbUpdates.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
+		require.NoError(s.T(), err)
+
+		s.protocolKVStoreDB.AssertExpectations(s.T())
+		indexTxDeferredUpdate.AssertExpectations(s.T())
+		storeTxDeferredUpdate.AssertExpectations(s.T())
+	}
+
+	s.Run("no seals, hence no service events", func() {
+		s.evolvingState = *protocol_statemock.NewKVStoreMutator(s.T())
+		expectedResultingStateID := unittest.IdentifierFixture()
+		modifyState := func(_ mock.Arguments) {
+			s.evolvingState.On("ID").Return(expectedResultingStateID, nil).Once()
+		}
+		s.kvStateMachines[0] = s.stateMachine().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).DuringEvolveState(modifyState).Mock()
+		s.kvStateMachines[1] = s.stateMachine().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).Mock()
+
+		testEvolveState([]*flow.Seal{}, expectedResultingStateID)
+	})
+
+	s.Run("seals without service events", func() {
+		sealedBlock := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(s.candidate.View - 10))
+		sealedResult := unittest.ExecutionResultFixture()
+		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(sealedBlock.ID()))
+		s.headersDB.On("ByBlockID", seal.BlockID).Return(sealedBlock, nil)
+		s.resultsDB.On("ByID", seal.ResultID).Return(sealedResult, nil)
+
+		expectedResultingStateID := unittest.IdentifierFixture()
+		modifyState := func(_ mock.Arguments) {
+			s.evolvingState.On("ID").Return(expectedResultingStateID, nil).Once()
+		}
+		s.kvStateMachines[0] = s.stateMachine().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).DuringEvolveState(modifyState).Mock()
+		s.kvStateMachines[1] = s.stateMachine().ServiceEventsMatch(emptySlice[flow.ServiceEvent]()).Mock()
+
+		testEvolveState([]*flow.Seal{seal}, expectedResultingStateID)
+	})
+
+	s.Run("seals with service events", func() {
+		sealedBlock := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(s.candidate.View - 10))
+		serviceEvents := []flow.ServiceEvent{unittest.EpochSetupFixture().ServiceEvent()}
+		sealedResult := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
+			result.ServiceEvents = serviceEvents
+		})
+		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(sealedBlock.ID()))
+		s.headersDB.On("ByBlockID", seal.BlockID).Return(sealedBlock, nil)
+		s.resultsDB.On("ByID", seal.ResultID).Return(sealedResult, nil)
+
+		expectedResultingStateID := unittest.IdentifierFixture()
+		modifyState := func(_ mock.Arguments) {
+			s.evolvingState.On("ID").Return(expectedResultingStateID, nil).Once()
+		}
+		s.kvStateMachines[0] = s.stateMachine().ExpectedServiceEvents(serviceEvents).DuringEvolveState(modifyState).Mock()
+		s.kvStateMachines[1] = s.stateMachine().ExpectedServiceEvents(serviceEvents).Mock()
+
+		testEvolveState([]*flow.Seal{seal}, expectedResultingStateID)
+	})
+}
+
+// TODO: add tests that service events are ordered (if needed)
 
 //// TestBuild_EncodeFailed tests that `stateMutator` returns an exception when encoding the resulting state fails.
 //func (s *StateMutatorSuite) TestBuild_EncodeFailed() {
@@ -437,6 +518,8 @@ func (s *StateMutatorSuite) TestBuild_HappyPath() {
 //	}
 //}
 
+/* *************************************************** utility methods *************************************************** */
+
 func hasID(id flow.Identifier) func(arg interface{}) bool {
 	type IDable interface {
 		ID() flow.Identifier
@@ -453,10 +536,44 @@ func emptySlice[T any]() func(arg interface{}) bool {
 	}
 }
 
-func foo(stateMachine protocol_statemock.OrthogonalStoreStateMachine[protocol.KVStoreReader]) {
-	stateMachine.On("EvolveState", mock.MatchedBy(emptySlice[flow.ServiceEvent]())).Return(nil).Once()
-	deferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
+func (s *StateMutatorSuite) stateMachine() *stateMachineMocker {
+	return &stateMachineMocker{t: s.T()}
+}
+
+type stateMachineMocker struct {
+	t                     *testing.T
+	expectedServiceEvents interface{}
+	runInEvolveState      func(_ mock.Arguments)
+}
+
+func (m *stateMachineMocker) ExpectedServiceEvents(es []flow.ServiceEvent) *stateMachineMocker {
+	m.expectedServiceEvents = es
+	return m
+}
+
+func (m *stateMachineMocker) DuringEvolveState(fn func(mock.Arguments)) *stateMachineMocker {
+	m.runInEvolveState = fn
+	return m
+}
+
+func (m *stateMachineMocker) ServiceEventsMatch(fn func(arg interface{}) bool) *stateMachineMocker {
+	m.expectedServiceEvents = mock.MatchedBy(fn)
+	return m
+}
+
+func (m *stateMachineMocker) Mock() protocol_statemock.OrthogonalStoreStateMachine[protocol.KVStoreReader] {
+	stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](m.t)
+	if m.runInEvolveState == nil {
+		m.runInEvolveState = func(mock.Arguments) {}
+	}
+	if m.expectedServiceEvents == nil {
+		stateMachine.On("EvolveState", mock.Anything).Return(nil).Run(m.runInEvolveState).Once()
+	} else {
+		stateMachine.On("EvolveState", m.expectedServiceEvents).Return(nil).Run(m.runInEvolveState).Once()
+	}
+	deferredUpdate := storagemock.NewDeferredDBUpdate(m.t)
 	deferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
 	deferredDBUpdates := transaction.NewDeferredBlockPersist().AddDbOp(deferredUpdate.Execute)
 	stateMachine.On("Build").Return(deferredDBUpdates, nil).Once()
+	return *stateMachine
 }

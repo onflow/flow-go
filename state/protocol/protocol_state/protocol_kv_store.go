@@ -11,7 +11,8 @@ import (
 // decoding the state snapshots into abstract representation `protocol_state.KVStoreAPI`.
 type ProtocolKVStore interface {
 	// StoreTx returns an anonymous function (intended to be executed as part of a badger transaction),
-	// which persists the given KV-store snapshot as part of a DB tx.
+	// which persists the given KV-store snapshot as part of a DB tx. Per convention, all implementations
+	// of `protocol.KVStoreReader` should be able to successfully  encode their state into a data blob.
 	// Expected errors of the returned anonymous function:
 	//   - storage.ErrAlreadyExists if a KV-store snapshot with the given id is already stored.
 	StoreTx(stateID flow.Identifier, kvStore protocol.KVStoreReader) func(*transaction.Tx) error
@@ -34,6 +35,7 @@ type ProtocolKVStore interface {
 	// ByID retrieves the KV store snapshot with the given ID.
 	// Expected errors during normal operations:
 	//   - storage.ErrNotFound if no snapshot with the given Identifier is known.
+	//   - ErrUnsupportedVersion if input version is not supported
 	ByID(id flow.Identifier) (KVStoreAPI, error)
 
 	// ByBlockID retrieves the kv-store snapshot that the block with the given ID proposes.
@@ -48,5 +50,6 @@ type ProtocolKVStore interface {
 	//
 	// Expected errors during normal operations:
 	//   - storage.ErrNotFound if no snapshot has been indexed for the given block.
+	//   - ErrUnsupportedVersion if input version is not supported
 	ByBlockID(blockID flow.Identifier) (KVStoreAPI, error)
 }

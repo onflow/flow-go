@@ -20,13 +20,13 @@ import (
 // It is backed by a storage.ProtocolState and an in-memory protocol.GlobalParams.
 type ProtocolState struct {
 	epochProtocolStateDB storage.ProtocolState
-	kvStoreSnapshots     storage.ProtocolKVStore
+	kvStoreSnapshots     protocol_state.ProtocolKVStore
 	globalParams         protocol.GlobalParams
 }
 
 var _ protocol.ProtocolState = (*ProtocolState)(nil)
 
-func NewProtocolState(protocolStateDB storage.ProtocolState, kvStoreSnapshots storage.ProtocolKVStore, globalParams protocol.GlobalParams) *ProtocolState {
+func NewProtocolState(protocolStateDB storage.ProtocolState, kvStoreSnapshots protocol_state.ProtocolKVStore, globalParams protocol.GlobalParams) *ProtocolState {
 	return &ProtocolState{
 		epochProtocolStateDB: protocolStateDB,
 		kvStoreSnapshots:     kvStoreSnapshots,
@@ -57,25 +57,7 @@ func (s *ProtocolState) AtBlockID(blockID flow.Identifier) (protocol.DynamicProt
 // - (nil, storage.ErrNotFound) - if there is no protocol state associated with given block ID.
 // - (nil, exception) - any other error should be treated as exception.
 func (s *ProtocolState) KVStoreAtBlockID(blockID flow.Identifier) (protocol.KVStoreReader, error) {
-	return s.kvStoreAtBlockID(blockID)
-}
-
-// kvStoreAtBlockID queries KV store by block ID and decodes it from binary data to a typed interface.
-// Returns:
-// - (protocol_state.KVStoreAPI, nil) - if there is a protocol state associated with given block ID.
-// - (nil, storage.ErrNotFound) - if there is no protocol state associated with given block ID.
-// - (nil, exception) - any other error should be treated as exception.
-func (s *ProtocolState) kvStoreAtBlockID(blockID flow.Identifier) (protocol_state.KVStoreAPI, error) {
-	versionedData, err := s.kvStoreSnapshots.ByBlockID(blockID)
-	if err != nil {
-		return nil, fmt.Errorf("could not query KV store at block (%x): %w", blockID, err)
-	}
-	kvStore, err := kvstore.VersionedDecode(versionedData.Version, versionedData.Data)
-	if err != nil {
-		return nil, fmt.Errorf("could not decode protocol state (version=%d) at block (%x): %w",
-			versionedData.Version, blockID, err)
-	}
-	return kvStore, err
+	return s.kvStoreSnapshots.ByBlockID(blockID)
 }
 
 // GlobalParams returns an interface which can be used to query global protocol parameters.
@@ -97,7 +79,7 @@ var _ protocol.MutableProtocolState = (*MutableProtocolState)(nil)
 // NewMutableProtocolState creates a new instance of MutableProtocolState.
 func NewMutableProtocolState(
 	epochProtocolStateDB storage.ProtocolState,
-	kvStoreSnapshots storage.ProtocolKVStore,
+	kvStoreSnapshots protocol_state.ProtocolKVStore,
 	globalParams protocol.GlobalParams,
 	headers storage.Headers,
 	results storage.ExecutionResults,
@@ -120,7 +102,7 @@ func NewMutableProtocolState(
 // constructor `NewMutableProtocolState` is intended for production use, where the list of state machines is hard-coded.
 func newMutableProtocolState(
 	epochProtocolStateDB storage.ProtocolState,
-	kvStoreSnapshots storage.ProtocolKVStore,
+	kvStoreSnapshots protocol_state.ProtocolKVStore,
 	globalParams protocol.GlobalParams,
 	headers storage.Headers,
 	results storage.ExecutionResults,
@@ -165,7 +147,7 @@ func (s *MutableProtocolState) initializeOrthogonalStateMachines(
 	parentBlockID flow.Identifier,
 	candidateView uint64,
 ) (flow.Identifier, []protocol_state.KeyValueStoreStateMachine, protocol_state.KVStoreMutator, error) {
-	parentState, err := s.kvStoreAtBlockID(parentBlockID)
+	parentState, err := s.kvStoreSnapshots.ByBlockID(parentBlockID)
 	if err != nil {
 		return flow.ZeroID, nil, nil, fmt.Errorf("failed to retrieve Protocol State at parent block %v: %w", parentBlockID, err)
 	}
@@ -259,15 +241,8 @@ func (s *MutableProtocolState) build(
 		return s.kvStoreSnapshots.IndexTx(blockID, resultingStateID)(tx)
 	})
 	if parentStateID != resultingStateID {
-		version, data, err := evolvingState.VersionedEncode()
-		if err != nil {
-			return flow.ZeroID, transaction.NewDeferredBlockPersist(), fmt.Errorf("could not encode resutling protocol state: %w", err)
-		}
-		// note that `SkipDuplicatesTx` is still required, because the result might equal a state much
-		dbUpdates.AddDbOp(operation.SkipDuplicatesTx(s.kvStoreSnapshots.StoreTx(resultingStateID, &storage.KeyValueStoreData{
-			Version: version,
-			Data:    data,
-		})))
+		// note that `SkipDuplicatesTx` is still required, because the result might equal to an earlier known state (we explicitly want to do-duplicate)
+		dbUpdates.AddDbOp(operation.SkipDuplicatesTx(s.kvStoreSnapshots.StoreTx(resultingStateID, evolvingState)))
 	}
 
 	return resultingStateID, dbUpdates, nil
