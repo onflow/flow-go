@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/counters"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -708,9 +709,9 @@ func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *access.
 func (h *Handler) GetExecutionResultByID(ctx context.Context, req *access.GetExecutionResultByIDRequest) (*access.ExecutionResultByIDResponse, error) {
 	metadata := h.buildMetadataResponse()
 
-	blockID := convert.MessageToIdentifier(req.GetId())
+	resultID := convert.MessageToIdentifier(req.GetId())
 
-	result, err := h.api.GetExecutionResultByID(ctx, blockID)
+	result, err := h.api.GetExecutionResultByID(ctx, resultID)
 	if err != nil {
 		return nil, err
 	}
@@ -1112,11 +1113,23 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 		return err
 	}
 
-	sub := h.api.SubscribeTransactionStatuses(ctx, &tx)
-	return subscription.HandleSubscription(sub, func(txSubInfo *convert.TransactionSubscribeInfo) error {
-		err = stream.Send(convert.TransactionSubscribeInfoToMessage(txSubInfo))
-		if err != nil {
-			return rpc.ConvertError(err, "could not send response", codes.Internal)
+	sub := h.api.SubscribeTransactionStatuses(ctx, &tx, request.GetEventEncodingVersion())
+
+	messageIndex := counters.NewMonotonousCounter(0)
+	return subscription.HandleSubscription(sub, func(txResults []*TransactionResult) error {
+		for i := range txResults {
+			value := messageIndex.Value()
+			if ok := messageIndex.Set(value + 1); !ok {
+				return status.Errorf(codes.Internal, "the message index has already been incremented to %d", messageIndex.Value())
+			}
+
+			err = stream.Send(&access.SendAndSubscribeTransactionStatusesResponse{
+				TransactionResults: TransactionResultToMessage(txResults[i]),
+				MessageIndex:       value,
+			})
+			if err != nil {
+				return rpc.ConvertError(err, "could not send response", codes.Internal)
+			}
 		}
 
 		return nil

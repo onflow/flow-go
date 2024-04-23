@@ -364,12 +364,14 @@ func newMigrations(
 						rwf,
 						flagValidateMigration,
 						flagLogVerboseValidationError,
+						flagContinueMigrationOnValidationError,
+						flagCheckStorageHealthBeforeMigration,
+						flagCheckStorageHealthAfterMigration,
 					),
 
 					&migrators.DeduplicateContractNamesMigration{},
 
-					// This will fix storage used discrepancies caused by the
-					// DeduplicateContractNamesMigration.
+					// This will fix storage used discrepancies caused by the previous migrations
 					&migrators.AccountUsageMigrator{},
 				}),
 		}

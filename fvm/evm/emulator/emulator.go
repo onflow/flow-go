@@ -39,6 +39,7 @@ func newConfig(ctx types.BlockContext) *Config {
 	return NewConfig(
 		WithChainID(ctx.ChainID),
 		WithBlockNumber(new(big.Int).SetUint64(ctx.BlockNumber)),
+		WithBlockTime(ctx.BlockTimestamp),
 		WithCoinbase(ctx.GasFeeCollector.ToCommon()),
 		WithDirectCallBaseGasUsage(ctx.DirectCallBaseGasUsage),
 		WithExtraPrecompiles(ctx.ExtraPrecompiles),
