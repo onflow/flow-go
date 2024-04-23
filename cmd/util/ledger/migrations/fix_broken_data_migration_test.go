@@ -132,8 +132,8 @@ func TestFixSlabsWithBrokenReferences(t *testing.T) {
 
 	log := zerolog.New(zerolog.NewTestWriter(t))
 
-	accountsToFix := map[common.Address]string{
-		address: "Broken contract FanTopPermission",
+	accountsToFix := map[common.Address]struct{}{
+		address: struct{}{},
 	}
 
 	migration := NewFixBrokenReferencesInSlabsMigration(rwf, accountsToFix)
@@ -172,7 +172,6 @@ func TestFixSlabsWithBrokenReferences(t *testing.T) {
 			fixedSlabsWithBrokenReferences{
 				Account:  address,
 				Payloads: []*ledger.Payload{fixedSlabWithBrokenReferences},
-				Msg:      accountsToFix[address],
 			},
 		},
 		writer.entries,
