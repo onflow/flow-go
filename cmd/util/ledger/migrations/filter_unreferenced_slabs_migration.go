@@ -33,7 +33,6 @@ type FilterUnreferencedSlabsMigration struct {
 	rw               reporters.ReportWriter
 	outputDir        string
 	mutex            sync.Mutex
-	filteredAccounts []common.Address
 	filteredPayloads []*ledger.Payload
 	payloadsFile     string
 }
@@ -151,10 +150,7 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 		PayloadCount: len(filteredPayloads),
 	})
 
-	m.mergeFilteredPayloads(
-		address,
-		filteredPayloads,
-	)
+	m.mergeFilteredPayloads(filteredPayloads)
 
 	// Do NOT report the health check error here.
 	// The health check error is only reported if it is not due to unreferenced slabs.
@@ -163,14 +159,10 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 	return newPayloads, nil
 }
 
-func (m *FilterUnreferencedSlabsMigration) mergeFilteredPayloads(
-	address common.Address,
-	payloads []*ledger.Payload,
-) {
+func (m *FilterUnreferencedSlabsMigration) mergeFilteredPayloads(payloads []*ledger.Payload) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	m.filteredAccounts = append(m.filteredAccounts, address)
 	m.filteredPayloads = append(m.filteredPayloads, payloads...)
 }
 
@@ -197,7 +189,7 @@ func (m *FilterUnreferencedSlabsMigration) writeFilteredPayloads() error {
 		m.log,
 		m.payloadsFile,
 		m.filteredPayloads,
-		m.filteredAccounts,
+		nil,
 		true,
 	)
 

@@ -193,10 +193,6 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 		expectedFilteredPayloads,
 		migration.filteredPayloads,
 	)
-	assert.Equal(t,
-		[]common.Address{testAddress},
-		migration.filteredAccounts,
-	)
 
 	readIsPartial, readFilteredPayloads, err := util.ReadPayloadFile(log, migration.payloadsFile)
 	require.NoError(t, err)
