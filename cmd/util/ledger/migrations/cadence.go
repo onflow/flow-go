@@ -420,7 +420,7 @@ func NewCadence1Migrations(
 				log,
 				opts.NWorker,
 				[]AccountBasedMigration{
-					NewFixBrokenReferencesInSlabsMigration(rwf, knownProblematicAccounts),
+					NewFixBrokenReferencesInSlabsMigration(rwf, testnetAccountsWithBrokenSlabReferences),
 					// TODO: add migration to filter unreferenced slabs here.
 					// NOTE: migration to filter unreferenced slabs should happen
 					// after migration to fix slabs with references to nonexistent slabs.
