@@ -353,7 +353,7 @@ func newMigrations(
 	runMigrations bool,
 ) []ledger.Migration {
 	if runMigrations {
-		rwf := reporters.NewReportFileWriterFactory(dir, log)
+		rwf := reporters.NewReportFileWriterFactory(outputDir, log)
 
 		migrations := []ledger.Migration{
 			migrators.CreateAccountBasedMigration(
