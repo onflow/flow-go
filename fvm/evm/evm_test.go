@@ -95,6 +95,16 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, output.Err)
 				require.NotEmpty(t, state.WriteSet)
 
+				txEvent := output.Events[0]
+				ev, err := ccf.Decode(nil, txEvent.Payload)
+				require.NoError(t, err)
+				cadenceEvent, ok := ev.(cadence.Event)
+				require.True(t, ok)
+
+				event := txEventType{}
+				require.NoError(t, cadence.DecodeFields(cadenceEvent, &event))
+				require.NotEmpty(t, event.TransactionHash)
+
 				// append the state
 				snapshot = snapshot.Append(state)
 
@@ -252,6 +262,90 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, int64(0), new(big.Int).SetBytes(res.ReturnedValue).Int64())
 			})
 	})
+
+	t.Run("testing EVM.run (with event emitted)", func(t *testing.T) {
+		t.Parallel()
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: AuthAccount) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let res = EVM.run(tx: tx, coinbase: coinbase)
+
+							assert(res.status == EVM.Status.successful, message: "unexpected status")
+							assert(res.errorCode == 0, message: "unexpected error code")
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				num := int64(12)
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "storeWithLog", big.NewInt(num)),
+					big.NewInt(0),
+					uint64(100_000),
+					big.NewInt(0),
+				)
+
+				innerTx := cadence.NewArray(
+					ConvertToCadence(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					ConvertToCadence(testAccount.Address().Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				tx := fvm.Transaction(
+					flow.NewTransactionBody().
+						SetScript(code).
+						AddAuthorizer(sc.FlowServiceAccount.Address).
+						AddArgument(json.MustEncode(innerTx)).
+						AddArgument(json.MustEncode(coinbase)),
+					0)
+
+				state, output, err := vm.Run(
+					ctx,
+					tx,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				require.NotEmpty(t, state.WriteSet)
+
+				txEvent := output.Events[0]
+				ev, err := ccf.Decode(nil, txEvent.Payload)
+				require.NoError(t, err)
+				cadenceEvent, ok := ev.(cadence.Event)
+				require.True(t, ok)
+
+				event := txEventType{}
+				require.NoError(t, cadence.DecodeFields(cadenceEvent, &event))
+				require.NotEmpty(t, event.TransactionHash)
+
+				encodedLogs, err := hex.DecodeString(event.Logs)
+				require.NoError(t, err)
+
+				var logs []*gethTypes.Log
+				err = rlp.DecodeBytes(encodedLogs, &logs)
+				require.NoError(t, err)
+				require.Len(t, logs, 1)
+				log := logs[0]
+				last := log.Topics[len(log.Topics)-1] // last topic is the value set in the store method
+				assert.Equal(t, num, last.Big().Int64())
+			})
+	})
 }
 
 func TestEVMBatchRun(t *testing.T) {
@@ -334,12 +428,6 @@ func TestEVMBatchRun(t *testing.T) {
 				require.NoError(t, output.Err)
 				require.NotEmpty(t, state.WriteSet)
 
-				type txEvent struct {
-					BlockHeight     uint64 `cadence:"blockHeight"`
-					TransactionHash string `cadence:"transactionHash"`
-					Logs            string `cadence:"logs"`
-				}
-
 				require.Len(t, output.Events, batchCount+1) // +1 block executed
 				for i, event := range output.Events {
 					if i == batchCount { // last one is block executed
@@ -351,7 +439,7 @@ func TestEVMBatchRun(t *testing.T) {
 					cadenceEvent, ok := ev.(cadence.Event)
 					require.True(t, ok)
 
-					event := txEvent{}
+					event := txEventType{}
 					require.NoError(t, cadence.DecodeFields(cadenceEvent, &event))
 
 					encodedLogs, err := hex.DecodeString(event.Logs)
@@ -366,7 +454,6 @@ func TestEVMBatchRun(t *testing.T) {
 					log := logs[0]
 					last := log.Topics[len(log.Topics)-1] // last topic is the value set in the store method
 					assert.Equal(t, storedValues[i], last.Big().Int64())
-					assert.Equal(t, event.TransactionHash, log.TxHash.String())
 				}
 
 				// append the state
@@ -1604,4 +1691,9 @@ func RunWithNewEnvironment(
 			})
 		})
 	})
+}
+
+type txEventType struct {
+	TransactionHash string `cadence:"transactionHash"`
+	Logs            string `cadence:"logs"`
 }
