@@ -372,7 +372,7 @@ func createTrieFromPayloads(logger zerolog.Logger, payloads []*ledger.Payload) (
 
 func newMigrations(
 	log zerolog.Logger,
-	dir string,
+	outputDir string,
 	runMigrations bool,
 	opts migrators.Options,
 ) []ledger.Migration {
@@ -382,10 +382,11 @@ func newMigrations(
 
 	log.Info().Msgf("initializing migrations")
 
-	rwf := reporters.NewReportFileWriterFactory(dir, log)
+	rwf := reporters.NewReportFileWriterFactory(outputDir, log)
 
 	namedMigrations := migrators.NewCadence1Migrations(
 		log,
+		outputDir,
 		rwf,
 		opts,
 	)

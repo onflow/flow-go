@@ -384,10 +384,12 @@ type Options struct {
 	StagedContracts                   []StagedContract
 	Prune                             bool
 	MaxAccountSize                    uint64
+	FilterUnreferencedSlabs           bool
 }
 
 func NewCadence1Migrations(
 	log zerolog.Logger,
+	outputDir string,
 	rwf reporters.ReportWriterFactory,
 	opts Options,
 ) []NamedMigration {
@@ -410,6 +412,19 @@ func NewCadence1Migrations(
 				Migrate: NewAccountSizeFilterMigration(opts.MaxAccountSize, maxSizeExceptions, log),
 			},
 		)
+	}
+
+	if opts.FilterUnreferencedSlabs {
+		migrations = append(migrations, NamedMigration{
+			Name: "filter-unreferenced-slabs-migration",
+			Migrate: NewAccountBasedMigration(
+				log,
+				opts.NWorker,
+				[]AccountBasedMigration{
+					NewFilterUnreferencedSlabsMigration(outputDir, rwf),
+				},
+			),
+		})
 	}
 
 	if opts.Prune {
