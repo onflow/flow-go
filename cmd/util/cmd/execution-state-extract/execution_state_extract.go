@@ -385,10 +385,6 @@ func newMigrations(
 
 		accountBasedMigrations = append(
 			accountBasedMigrations,
-			migrators.NewFixBrokenReferencesInSlabsMigration(
-				rwf,
-				migrators.TestnetAccountsWithBrokenSlabReferences,
-			),
 			migrators.NewAtreeRegisterMigrator(
 				rwf,
 				flagValidateMigration,
