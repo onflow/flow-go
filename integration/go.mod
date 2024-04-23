@@ -20,15 +20,15 @@ require (
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v1.3.0
 	github.com/libp2p/go-libp2p v0.32.2
-	github.com/onflow/cadence v0.42.9
+	github.com/onflow/cadence v0.42.10
 	github.com/onflow/crypto v0.25.1
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1
-	github.com/onflow/flow-emulator v0.61.2-0.20240404201132-f53137a8e4cb
-	github.com/onflow/flow-go v0.33.2-0.20240404171354-0b0592cc5bba
-	github.com/onflow/flow-go-sdk v0.46.0
+	github.com/onflow/flow-emulator v0.62.2-0.20240418140508-d969ff66d9cd
+	github.com/onflow/flow-go v0.33.2-0.20240412174857-015156b297b5
+	github.com/onflow/flow-go-sdk v0.46.2
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
-	github.com/onflow/flow/protobuf/go/flow v0.3.7-0.20240404170900-c321c1475f1e
+	github.com/onflow/flow/protobuf/go/flow v0.4.1-0.20240412170550-911321113030
 	github.com/onflow/go-ethereum v1.13.4
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.18.0
@@ -42,6 +42,7 @@ require (
 	golang.org/x/sync v0.6.0
 	google.golang.org/grpc v1.60.1
 	google.golang.org/protobuf v1.32.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -349,7 +350,6 @@ require (
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.2.1 // indirect
 	modernc.org/libc v1.22.3 // indirect
 	modernc.org/mathutil v1.5.0 // indirect

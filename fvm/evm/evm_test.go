@@ -249,6 +249,69 @@ func TestEVMRun(t *testing.T) {
 	})
 }
 
+func TestEVMBlockData(t *testing.T) {
+	t.Parallel()
+	chain := flow.Emulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	RunWithNewEnvironment(t,
+		chain, func(
+			ctx fvm.Context,
+			vm fvm.VM,
+			snapshot snapshot.SnapshotTree,
+			testContract *TestContract,
+			testAccount *EOATestAccount,
+		) {
+
+			// query the block timestamp
+			code := []byte(fmt.Sprintf(
+				`
+					import EVM from %s
+					access(all)
+					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
+						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+						return EVM.run(tx: tx, coinbase: coinbase)
+					}
+				`,
+				sc.EVMContract.Address.HexWithPrefix(),
+			))
+
+			innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+				testContract.DeployedAt.ToCommon(),
+				testContract.MakeCallData(t, "blockTime"),
+				big.NewInt(0),
+				uint64(100_000),
+				big.NewInt(0),
+			)
+
+			coinbase := cadence.NewArray(
+				ConvertToCadence(testAccount.Address().Bytes()),
+			).WithType(stdlib.EVMAddressBytesCadenceType)
+
+			innerTx := cadence.NewArray(
+				ConvertToCadence(innerTxBytes),
+			).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+			script := fvm.Script(code).WithArguments(
+				json.MustEncode(innerTx),
+				json.MustEncode(coinbase),
+			)
+
+			_, output, err := vm.Run(
+				ctx,
+				script,
+				snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+			require.NoError(t, err)
+			require.Equal(t, types.StatusSuccessful, res.Status)
+			require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+			require.Equal(t, ctx.BlockHeader.Timestamp.Unix(), new(big.Int).SetBytes(res.ReturnedValue).Int64())
+
+		})
+}
+
 func TestEVMAddressDeposit(t *testing.T) {
 
 	t.Parallel()
@@ -1058,6 +1121,7 @@ func RunWithNewEnvironment(
 					fvm.WithAuthorizationChecksEnabled(false),
 					fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 					fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
+					fvm.WithBlocks(blocks),
 				}
 				ctx := fvm.NewContext(opts...)
 
@@ -1077,7 +1141,13 @@ func RunWithNewEnvironment(
 
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
-				f(fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true)), vm, snapshotTree, testContract, testAccount)
+				f(
+					fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true)),
+					vm,
+					snapshotTree,
+					testContract,
+					testAccount,
+				)
 			})
 		})
 	})
