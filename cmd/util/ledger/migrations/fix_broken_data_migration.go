@@ -19,7 +19,7 @@ import (
 type FixSlabsWithBrokenReferencesMigration struct {
 	log           zerolog.Logger
 	rw            reporters.ReportWriter
-	accountsToFix map[common.Address]string
+	accountsToFix map[common.Address]struct{}
 	nWorkers      int
 }
 
@@ -29,7 +29,7 @@ const fixSlabsWithBrokenReferencesName = "fix-slabs-with-broken-references"
 
 func NewFixBrokenReferencesInSlabsMigration(
 	rwf reporters.ReportWriterFactory,
-	accountsToFix map[common.Address]string,
+	accountsToFix map[common.Address]struct{},
 ) *FixSlabsWithBrokenReferencesMigration {
 	return &FixSlabsWithBrokenReferencesMigration{
 		rw:            rwf.ReportWriter(fixSlabsWithBrokenReferencesName),
@@ -171,7 +171,6 @@ func (m *FixSlabsWithBrokenReferencesMigration) MigrateAccount(
 	m.rw.Write(fixedSlabsWithBrokenReferences{
 		Account:  address,
 		Payloads: fixedPayloads,
-		Msg:      m.accountsToFix[address],
 	})
 
 	return newPayloads, nil
@@ -187,5 +186,4 @@ func (m *FixSlabsWithBrokenReferencesMigration) Close() error {
 type fixedSlabsWithBrokenReferences struct {
 	Account  common.Address    `json:"account"`
 	Payloads []*ledger.Payload `json:"payloads"`
-	Msg      string            `json:"msg"`
 }
