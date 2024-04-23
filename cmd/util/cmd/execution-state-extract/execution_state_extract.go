@@ -355,25 +355,35 @@ func newMigrations(
 	if runMigrations {
 		rwf := reporters.NewReportFileWriterFactory(outputDir, log)
 
+		var acctBasedMigrations []migrators.AccountBasedMigration
+
+		if flagFilterUnreferencedSlabs {
+			acctBasedMigrations = append(acctBasedMigrations, migrators.NewFilterUnreferencedSlabsMigration(
+				outputDir,
+				rwf,
+			))
+		}
+
+		acctBasedMigrations = append(acctBasedMigrations, migrators.NewAtreeRegisterMigrator(
+			rwf,
+			flagValidateMigration,
+			flagLogVerboseValidationError,
+			flagContinueMigrationOnValidationError,
+			flagCheckStorageHealthBeforeMigration,
+			flagCheckStorageHealthAfterMigration,
+		))
+
+		acctBasedMigrations = append(acctBasedMigrations, &migrators.DeduplicateContractNamesMigration{})
+
+		// This will fix storage used discrepancies caused by the previous migrations
+		acctBasedMigrations = append(acctBasedMigrations, &migrators.AccountUsageMigrator{})
+
 		migrations := []ledger.Migration{
 			migrators.CreateAccountBasedMigration(
 				log,
 				nWorker,
-				[]migrators.AccountBasedMigration{
-					migrators.NewAtreeRegisterMigrator(
-						rwf,
-						flagValidateMigration,
-						flagLogVerboseValidationError,
-						flagContinueMigrationOnValidationError,
-						flagCheckStorageHealthBeforeMigration,
-						flagCheckStorageHealthAfterMigration,
-					),
-
-					&migrators.DeduplicateContractNamesMigration{},
-
-					// This will fix storage used discrepancies caused by the previous migrations
-					&migrators.AccountUsageMigrator{},
-				}),
+				acctBasedMigrations,
+			),
 		}
 
 		return migrations
