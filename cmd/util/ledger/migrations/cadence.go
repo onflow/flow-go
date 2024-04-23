@@ -385,10 +385,12 @@ type Options struct {
 	Prune                             bool
 	MaxAccountSize                    uint64
 	FixSlabsWithBrokenReferences      bool
+	FilterUnreferencedSlabs           bool
 }
 
 func NewCadence1Migrations(
 	log zerolog.Logger,
+	outputDir string,
 	rwf reporters.ReportWriterFactory,
 	opts Options,
 ) []NamedMigration {
@@ -413,18 +415,32 @@ func NewCadence1Migrations(
 		)
 	}
 
-	if opts.FixSlabsWithBrokenReferences {
+	if opts.FixSlabsWithBrokenReferences || opts.FilterUnreferencedSlabs {
+
+		var accountBasedMigrations []AccountBasedMigration
+
+		if opts.FixSlabsWithBrokenReferences {
+			accountBasedMigrations = append(
+				accountBasedMigrations,
+				NewFixBrokenReferencesInSlabsMigration(rwf, testnetAccountsWithBrokenSlabReferences),
+			)
+		}
+
+		if opts.FilterUnreferencedSlabs {
+			accountBasedMigrations = append(
+				accountBasedMigrations,
+				// NOTE: migration to filter unreferenced slabs should happen
+				// after migration to fix slabs with references to nonexistent slabs.
+				NewFilterUnreferencedSlabsMigration(outputDir, rwf),
+			)
+		}
+
 		migrations = append(migrations, NamedMigration{
-			Name: "clean-state",
+			Name: "fix-slabs-migration",
 			Migrate: NewAccountBasedMigration(
 				log,
 				opts.NWorker,
-				[]AccountBasedMigration{
-					NewFixBrokenReferencesInSlabsMigration(rwf, testnetAccountsWithBrokenSlabReferences),
-					// TODO: add migration to filter unreferenced slabs here.
-					// NOTE: migration to filter unreferenced slabs should happen
-					// after migration to fix slabs with references to nonexistent slabs.
-				},
+				accountBasedMigrations,
 			),
 		})
 	}
