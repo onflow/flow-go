@@ -78,7 +78,7 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 		testAddress,
 	)
 
-	// Storage another dictionary, with a nested array, in the account.
+	// Store another dictionary, with a nested array, in the account.
 	// It is not referenced through a storage map though.
 
 	arrayStaticType := interpreter.NewVariableSizedStaticType(nil, interpreter.PrimitiveStaticTypeInt)
@@ -96,6 +96,7 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 		testAddress,
 	)
 
+	// Ensure the array is large enough to be stored in a separate slab
 	arrayCount := 100
 	arrayValues := make([]interpreter.Value, arrayCount)
 	for i := 0; i < arrayCount; i++ {
