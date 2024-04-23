@@ -96,7 +96,9 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 		testAddress,
 	)
 
-	dict2.InsertWithoutTransfer(
+	// NOTE: InsertWithoutTransfer isn't available in Cadence v0.42.
+	//       Number of payloads is increased by 1 by using Insert().
+	dict2.Insert(
 		inter, interpreter.EmptyLocationRange,
 		interpreter.NewUnmeteredIntValueFromInt64(2),
 		interpreter.NewArrayValue(
@@ -132,7 +134,9 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 		oldPayloads = append(oldPayloads, payload)
 	}
 
-	const totalSlabCount = 5
+	// NOTE: InsertWithoutTransfer isn't available in Cadence v0.42.
+	//       Number of payloads is increased by 1 by using Insert().
+	const totalSlabCount = 6
 
 	require.Len(t, oldPayloads, totalSlabCount)
 
