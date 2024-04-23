@@ -389,6 +389,7 @@ type Options struct {
 
 func NewCadence1Migrations(
 	log zerolog.Logger,
+	outputDir string,
 	rwf reporters.ReportWriterFactory,
 	opts Options,
 ) []NamedMigration {
@@ -420,7 +421,7 @@ func NewCadence1Migrations(
 				log,
 				opts.NWorker,
 				[]AccountBasedMigration{
-					NewFilterUnreferencedSlabsMigration(rwf),
+					NewFilterUnreferencedSlabsMigration(outputDir, rwf),
 				},
 			),
 		})

@@ -136,7 +136,7 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 	// Act
 
 	rwf := &testReportWriterFactory{}
-	migration := NewFilterUnreferencedSlabsMigration(rwf)
+	migration := NewFilterUnreferencedSlabsMigration(t.TempDir(), rwf)
 
 	log := zerolog.New(zerolog.NewTestWriter(t))
 
@@ -146,6 +146,9 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 	ctx := context.Background()
 
 	newPayloads, err := migration.MigrateAccount(ctx, testAddress, oldPayloads)
+	require.NoError(t, err)
+
+	err = migration.Close()
 	require.NoError(t, err)
 
 	// Assert
@@ -180,10 +183,23 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 	assert.Equal(t,
 		[]any{
 			unreferencedSlabs{
-				Account:  testAddress,
-				Payloads: expectedFilteredPayloads,
+				Account:      testAddress,
+				PayloadCount: len(expectedFilteredPayloads),
 			},
 		},
 		writer.entries,
 	)
+	assert.Equal(t,
+		expectedFilteredPayloads,
+		migration.filteredPayloads,
+	)
+	assert.Equal(t,
+		[]common.Address{testAddress},
+		migration.filteredAccounts,
+	)
+
+	readIsPartial, readFilteredPayloads, err := util.ReadPayloadFile(log, migration.payloadsFile)
+	require.NoError(t, err)
+	assert.True(t, readIsPartial)
+	assert.Equal(t, expectedFilteredPayloads, readFilteredPayloads)
 }
