@@ -1049,7 +1049,7 @@ func NewResultValue(
 	// we made the deployed contract address optional
 	if result.DeployedContractAddress != nil {
 		fields = append(fields, interpreter.CompositeField{
-			Name:  "deployedContractAddress",
+			Name:  "deployedContract",
 			Value: EVMAddressToAddressBytesArrayValue(inter, *result.DeployedContractAddress),
 		})
 	}
