@@ -83,18 +83,6 @@ func newStateMutator(
 	}, nil
 }
 
-// Build constructs the resulting protocol state, *after* applying all the sealed service events in a block (under construction)
-// via `EvolveState(...)`. It returns:
-//   - stateID: the hash commitment to the updated Protocol State Snapshot
-//   - dbUpdates: database updates necessary for persisting the State Snapshot itself including all data structures
-//     that the Snapshot references. In addition, `dbUpdates` also populates the `ProtocolKVStore.ByBlockID`.
-//     Therefore, even if there are no changes of the Protocol State, `dbUpdates` still contains deferred storage writes
-//     that must be executed to populate the `ByBlockID` index.
-//   - err: All error returns indicate potential state corruption and should therefore be treated as fatal.
-//
-// CAUTION:
-//   - For Consensus Participants that are replicas, the calling code must check that the returned `stateID` matches the
-//     commitment in the block proposal! If they don't match, the proposal is byzantine and should be slashed.
 func (m *stateMutator) Build() (stateID flow.Identifier, dbUpdates *transaction.DeferredBlockPersist, err error) {
 	dbUpdates = transaction.NewDeferredBlockPersist()
 	for _, stateMachine := range m.orthoKVStoreMachines {
@@ -123,70 +111,6 @@ func (m *stateMutator) Build() (stateID flow.Identifier, dbUpdates *transaction.
 	return stateID, dbUpdates, nil
 }
 
-// EvolveState updates the overall Protocol State based on information from the candidate block
-// (potentially still under construction). Information that may change the state is:
-//   - the candidate block's view (already provided at construction time)
-//   - Service Events sealed in the candidate block
-//
-// We only mutate the `StateMutator`'s internal in-memory copy of the protocol state, without
-// changing the parent state (i.e. the state we started from).
-//
-// In a nutshell, we proceed as follows:
-//   - If there are any, we arrange the sealed service events in chronologically order. This
-//     can be achieved by ordering the sealed execution results by increasing block height.
-//     Within each execution result, the service events are in chronological order.
-//   - We call `KeyValueStoreStateMachine.EvolveState(..)` for each of the
-//     `OrthogonalStoreStateMachine`s and provide the sealed service events as input. EvolveState
-//     is always called on each state machine, even if there are no service events, because
-//     reaching or exceeding a certain view can trigger a state change (e.g. Epoch Fallback Mode).
-//   - We collect the deferred database updates necessary to persist each of the updated sub-states
-//     including all of their dependencies and respective indices. The subsequent `Build` step will
-//     add further db updates. Executing the deferred database updates is the responsibility of
-//     the calling code.
-//
-// SAFETY REQUIREMENT:
-// The StateMutator assumes that the proposal has passed the following correctness checks!
-//   - The seals in the payload continuously follow the ancestry of this fork. Specifically,
-//     there are no gaps in the seals.
-//   - The seals guarantee correctness of the sealed execution result, including the contained
-//     service events. This is actively checked by the verification node, whose aggregated
-//     approvals in the form of a seal attest to the correctness of the sealed execution result
-//     (specifically the Service Events contained in the result and their order).
-//   - `EvolveState` must be called before `Build`
-//
-// Consensus nodes actively verify protocol compliance for any block proposal they receive,
-// including integrity of each seal individually as well as the seals continuously following
-// the fork. Light clients only process certified blocks, which guarantees that consensus nodes
-// already ran those checks and found the proposal to be valid.
-//
-// Details on SERVICE EVENTS:
-// Consider a chain where a service event is emitted during execution of block A. Block B contains
-// an execution receipt `RA` for A. Block C contains a seal `SA` for A's execution result.
-//
-//	A <- .. <- B(RA) <- .. <- C(SA)
-//
-// Service Events are included within execution results, which are stored opaquely as part of the
-// block payload (block B in our example). We only validate, process and persist the typed service
-// event to storage once we process C, the block containing the seal for block A. This is because
-// we rely on the sealing subsystem to validate correctness of the service event before processing
-// it. Consequently, any change to the protocol state introduced by a service event emitted during
-// execution of block A would only become visible when querying C or its descendants.
-//
-// Error returns:
-// [TLDR] All error returns indicate potential state corruption and should therefore be treated as fatal.
-//   - Per convention, the input seals from the block payload have already been confirmed to be protocol compliant.
-//     Hence, the service events in the sealed execution results represent the honest execution path.
-//     Therefore, the sealed service events should encode a valid evolution of the protocol state -- provided
-//     the system smart contracts are correct.
-//   - As we can rule out byzantine attacks as the source of failures, the only remaining sources of problems
-//     can be (a) bugs in the system smart contracts or (b) bugs in the node implementation. A service event
-//     not representing a valid state transition despite all consistency checks passing is interpreted as
-//     case (a) and _should be_ handled internally by the respective state machine. Otherwise, any bug or
-//     unforeseen edge cases in the system smart contracts would in consensus halt, due to errors while
-//     evolving the protocol state.
-//   - A consistency or sanity check failing within the StateMutator is likely the symptom of an internal bug
-//     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
-//     of this function is not nil. If such an exception is returned, continuing is not an option.
 func (m *stateMutator) EvolveState(seals []*flow.Seal) error {
 	// block payload may not specify seals in order, so order them by block height before processing
 	orderedSeals, err := protocol.OrderedSeals(seals, m.headers)

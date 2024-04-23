@@ -105,7 +105,7 @@ var _ protocol_state.KeyValueStoreStateMachine = (*EpochStateMachine)(nil)
 // No errors are expected during normal operations.
 func NewEpochStateMachine(
 	candidateView uint64,
-	parentID flow.Identifier,
+	parentBlockID flow.Identifier,
 	params protocol.GlobalParams,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
@@ -115,9 +115,9 @@ func NewEpochStateMachine(
 	happyPathStateMachineFactory StateMachineFactoryMethod,
 	epochFallbackStateMachineFactory StateMachineFactoryMethod,
 ) (*EpochStateMachine, error) {
-	parentEpochState, err := epochProtocolStateDB.ByBlockID(parentID)
+	parentEpochState, err := epochProtocolStateDB.ByBlockID(parentBlockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", parentID, err)
+		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", parentBlockID, err)
 	}
 
 	// sanity check: the parent epoch state ID must be set in KV store

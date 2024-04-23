@@ -2678,7 +2678,7 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 	}
 }
 
-// ProtocolStateFixture creates a fixture with correctly structured data. The returned Identity Table
+// EpochStateFixture creates a fixture with correctly structured data. The returned Identity Table
 // represents the common situation during the staking phase of Epoch N+1:
 //   - we are currently in Epoch N
 //   - previous epoch N-1 is known (specifically EpochSetup and EpochCommit events)
@@ -2689,7 +2689,7 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 //   - Epoch setup and commit counters are set to match.
 //   - Identities are constructed from setup events.
 //   - Identities are sorted in canonical order.
-func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.RichProtocolStateEntry {
+func EpochStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.RichProtocolStateEntry {
 	prevEpochSetup := EpochSetupFixture()
 	prevEpochCommit := EpochCommitFixture(func(commit *flow.EpochCommit) {
 		commit.Counter = prevEpochSetup.Counter

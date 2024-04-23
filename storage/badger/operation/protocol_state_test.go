@@ -14,7 +14,7 @@ import (
 // TestInsertProtocolState tests if basic badger operations on EpochProtocolState work as expected.
 func TestInsertProtocolState(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		expected := unittest.ProtocolStateFixture().ProtocolStateEntry
+		expected := unittest.EpochStateFixture().ProtocolStateEntry
 
 		protocolStateID := expected.ID()
 		err := db.Update(InsertProtocolState(protocolStateID, expected))

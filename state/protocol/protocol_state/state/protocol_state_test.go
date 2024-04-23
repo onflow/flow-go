@@ -5,12 +5,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol/mock"
+	psmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -18,8 +20,8 @@ import (
 // TestProtocolState_AtBlockID tests different scenarios of retrieving a protocol state by block ID.
 // Happy and unhappy paths are covered.
 func TestProtocolState_AtBlockID(t *testing.T) {
-	entry := unittest.ProtocolStateFixture(unittest.WithValidDKG())
-	otherEntry := unittest.ProtocolStateFixture(unittest.WithValidDKG())
+	entry := unittest.EpochStateFixture(unittest.WithValidDKG())
+	otherEntry := unittest.EpochStateFixture(unittest.WithValidDKG())
 	blockID := unittest.IdentifierFixture()
 	otherBlockID := unittest.IdentifierFixture()
 
@@ -29,7 +31,7 @@ func TestProtocolState_AtBlockID(t *testing.T) {
 
 	protocolKVStoreDB := storagemock.NewProtocolKVStore(t)
 
-	globalParams := mock.NewGlobalParams(t)
+	globalParams := psmock.NewGlobalParams(t)
 	protocolState := NewProtocolState(protocolStateDB, protocolKVStoreDB, globalParams)
 	t.Run("retrieve state for existing blocks", func(t *testing.T) {
 		dynamicProtocolState, err := protocolState.AtBlockID(blockID)
@@ -64,64 +66,10 @@ func TestProtocolState_AtBlockID(t *testing.T) {
 
 // TestMutableProtocolState_Mutator tests happy path of creating a state mutator, and that `Mutator` returns an error
 // if the parent protocol state has not been found.
-// TODO: remove
-func TestMutableProtocolState_Mutator_old(t *testing.T) {
-	protocolStateDB := storagemock.NewProtocolState(t)
-	kvStoreSnapshotsDB := storagemock.NewProtocolKVStore(t)
-	globalParams := mock.NewGlobalParams(t)
-	globalParams.On("EpochCommitSafetyThreshold").Return(uint64(1000))
-	headersDB := storagemock.NewHeaders(t)
-	resultsDB := storagemock.NewExecutionResults(t)
-	setupsDB := storagemock.NewEpochSetups(t)
-	commitsDB := storagemock.NewEpochCommits(t)
-
-	NewMutableProtocolState(
-		protocolStateDB,
-		kvStoreSnapshotsDB,
-		globalParams,
-		headersDB,
-		resultsDB,
-		setupsDB,
-		commitsDB)
-
-	t.Run("happy-path", func(t *testing.T) {
-		parentEpochState := unittest.ProtocolStateFixture()
-		candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(parentEpochState.CurrentEpochSetup.FirstView + 1))
-		protocolStateDB.On("ByBlockID", candidate.ParentID).Return(parentEpochState, nil).Once()
-
-		version, data, err := (&kvstore.Modelv1{
-			Modelv0: kvstore.Modelv0{
-				UpgradableModel: kvstore.UpgradableModel{},
-				EpochStateID:    parentEpochState.ID(),
-			},
-			InvalidEpochTransitionAttempted: false,
-		}).VersionedEncode()
-		parentState := &storage.KeyValueStoreData{
-			Version: version,
-			Data:    data,
-		}
-		require.NoError(t, err)
-		kvStoreSnapshotsDB.On("ByBlockID", candidate.ParentID).Return(parentState, nil)
-		//
-		//mutator, err := mutableState.Mutator(candidate.View, candidate.ParentID)
-		//require.NoError(t, err)
-		//require.NotNil(t, mutator)
-	})
-	t.Run("parent-not-found", func(t *testing.T) {
-		candidate := unittest.BlockHeaderFixture()
-		kvStoreSnapshotsDB.On("ByBlockID", candidate.ParentID).Return(nil, storage.ErrNotFound)
-		//mutator, err := mutableState.Mutator(candidate.View, candidate.ParentID)
-		//require.ErrorIs(t, err, storage.ErrNotFound)
-		//require.Nil(t, mutator)
-	})
-}
-
-// TestMutableProtocolState_Mutator tests happy path of creating a state mutator, and that `Mutator` returns an error
-// if the parent protocol state has not been found.
 func TestMutableProtocolState_Mutator(t *testing.T) {
 	protocolStateDB := storagemock.NewProtocolState(t)
 	kvStoreSnapshotsDB := storagemock.NewProtocolKVStore(t)
-	globalParams := mock.NewGlobalParams(t)
+	globalParams := psmock.NewGlobalParams(t)
 	globalParams.On("EpochCommitSafetyThreshold").Return(uint64(1000))
 	headersDB := storagemock.NewHeaders(t)
 	resultsDB := storagemock.NewExecutionResults(t)
@@ -137,29 +85,34 @@ func TestMutableProtocolState_Mutator(t *testing.T) {
 		setupsDB,
 		commitsDB)
 
+	// TODO update testnames (and test structure maybe) to test happy path leaving state invariant separately from happy path state change
 	t.Run("happy-path", func(t *testing.T) {
-		parentEpochState := unittest.ProtocolStateFixture()
+		parentEpochState := unittest.EpochStateFixture()
 		candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(parentEpochState.CurrentEpochSetup.FirstView + 1))
 		protocolStateDB.On("ByBlockID", candidate.ParentID).Return(parentEpochState, nil).Once()
 
-		version, data, err := (&kvstore.Modelv1{
+		parentProtocolState := &kvstore.Modelv1{
 			Modelv0: kvstore.Modelv0{
 				UpgradableModel: kvstore.UpgradableModel{},
 				EpochStateID:    parentEpochState.ID(),
 			},
 			InvalidEpochTransitionAttempted: false,
-		}).VersionedEncode()
-		parentState := &storage.KeyValueStoreData{
-			Version: version,
-			Data:    data,
 		}
+		//serializedParentProtocolState := &storage.KeyValueStoreData{}
+
+		parentProtocolStateVersion, parentProtocolStateEnc, err := parentProtocolState.VersionedEncode()
 		require.NoError(t, err)
+		parentState := &storage.KeyValueStoreData{
+			Version: parentProtocolStateVersion,
+			Data:    parentProtocolStateEnc,
+		}
 		kvStoreSnapshotsDB.On("ByBlockID", candidate.ParentID).Return(parentState, nil)
+		kvStoreSnapshotsDB.On("StoreTx", mock.Anything, mock.Anything).Return(func(*transaction.Tx) error { return nil }).Once()
 
 		stateID, dbUpdates, err := mutableState.EvolveState(candidate.ParentID, candidate.View, []*flow.Seal{})
 		require.NoError(t, err)
 		require.False(t, dbUpdates.IsEmpty())
-		require.False(t, stateID != flow.ZeroID)
+		require.False(t, stateID == flow.ZeroID)
 	})
 	t.Run("parent-not-found", func(t *testing.T) {
 		candidate := unittest.BlockHeaderFixture()

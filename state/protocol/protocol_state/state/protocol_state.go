@@ -87,9 +87,9 @@ func (s *ProtocolState) GlobalParams() protocol.GlobalParams {
 // by acting as factory for protocol.StateMutator which can be used to apply state-changing operations.
 type MutableProtocolState struct {
 	ProtocolState
-	headers          storage.Headers
-	results          storage.ExecutionResults
-	kvStoreFactories []protocol_state.KeyValueStoreStateMachineFactory
+	headers                 storage.Headers
+	results                 storage.ExecutionResults
+	kvStateMachineFactories []protocol_state.KeyValueStoreStateMachineFactory
 }
 
 var _ protocol.MutableProtocolState = (*MutableProtocolState)(nil)
@@ -106,11 +106,11 @@ func NewMutableProtocolState(
 ) *MutableProtocolState {
 	// an ordered list of factories to create state machines for different sub-states of the Dynamic Protocol State.
 	// all factories are expected to be called in order defined here.
-	kvStoreFactories := []protocol_state.KeyValueStoreStateMachineFactory{
+	kvStateMachineFactories := []protocol_state.KeyValueStoreStateMachineFactory{
 		kvstore.NewPSVersionUpgradeStateMachineFactory(globalParams),
 		epochs.NewEpochStateMachineFactory(globalParams, setups, commits, epochProtocolStateDB),
 	}
-	return newMutableProtocolState(epochProtocolStateDB, kvStoreSnapshots, globalParams, headers, results, kvStoreFactories)
+	return newMutableProtocolState(epochProtocolStateDB, kvStoreSnapshots, globalParams, headers, results, kvStateMachineFactories)
 }
 
 // newMutableProtocolState creates a new instance of MutableProtocolState, where we inject factories for the orthogonal
@@ -124,13 +124,13 @@ func newMutableProtocolState(
 	globalParams protocol.GlobalParams,
 	headers storage.Headers,
 	results storage.ExecutionResults,
-	kvStoreFactories []protocol_state.KeyValueStoreStateMachineFactory,
+	kvStateMachineFactories []protocol_state.KeyValueStoreStateMachineFactory,
 ) *MutableProtocolState {
 	return &MutableProtocolState{
-		ProtocolState:    *NewProtocolState(epochProtocolStateDB, kvStoreSnapshots, globalParams),
-		headers:          headers,
-		results:          results,
-		kvStoreFactories: kvStoreFactories,
+		ProtocolState:           *NewProtocolState(epochProtocolStateDB, kvStoreSnapshots, globalParams),
+		headers:                 headers,
+		results:                 results,
+		kvStateMachineFactories: kvStateMachineFactories,
 	}
 }
 
@@ -138,7 +138,7 @@ func newMutableProtocolState(
 // Has to be called for each block to evolve the protocol state.
 // Expected errors during normal operations:
 func (s *MutableProtocolState) EvolveState(
-	parentStateID flow.Identifier,
+	parentBlockID flow.Identifier,
 	candidateView uint64,
 	candidateSeals []*flow.Seal,
 ) (flow.Identifier, *transaction.DeferredBlockPersist, error) {
@@ -147,7 +147,7 @@ func (s *MutableProtocolState) EvolveState(
 		return flow.ZeroID, transaction.NewDeferredBlockPersist(), irrecoverable.NewExceptionf("extracting service events from candidate seals failed: %w", err)
 	}
 
-	stateMachines, evolvingState, err := s.initializeOrthogonalStateMachines(parentStateID, candidateView)
+	parentStateID, stateMachines, evolvingState, err := s.initializeOrthogonalStateMachines(parentBlockID, candidateView)
 	if err != nil {
 		return flow.ZeroID, transaction.NewDeferredBlockPersist(), irrecoverable.NewExceptionf("failure initializing sub-state machines for evolving the Protocol State: %w", err)
 	}
@@ -162,13 +162,12 @@ func (s *MutableProtocolState) EvolveState(
 // initializeOrthogonalStateMachines
 // TODO: Documentation
 func (s *MutableProtocolState) initializeOrthogonalStateMachines(
-	parentStateID flow.Identifier,
+	parentBlockID flow.Identifier,
 	candidateView uint64,
-) ([]protocol_state.KeyValueStoreStateMachine, protocol_state.KVStoreMutator, error) {
-
-	parentState, err := s.kvStoreAtBlockID(parentStateID)
+) (flow.Identifier, []protocol_state.KeyValueStoreStateMachine, protocol_state.KVStoreMutator, error) {
+	parentState, err := s.kvStoreAtBlockID(parentBlockID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to retrieve parent Protocol State %v: %w", parentStateID, err)
+		return flow.ZeroID, nil, nil, fmt.Errorf("failed to retrieve Protocol State at parent block %v: %w", parentBlockID, err)
 	}
 
 	protocolVersion := parentState.GetProtocolStateVersion()
@@ -180,18 +179,18 @@ func (s *MutableProtocolState) initializeOrthogonalStateMachines(
 
 	evolvingState, err := parentState.Replicate(protocolVersion)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not replicate parent KV store (version=%d) to protocol version %d: %w", parentState.GetProtocolStateVersion(), protocolVersion, err)
+		return flow.ZeroID, nil, nil, fmt.Errorf("could not replicate parent KV store (version=%d) to protocol version %d: %w", parentState.GetProtocolStateVersion(), protocolVersion, err)
 	}
 
-	stateMachines := make([]protocol_state.KeyValueStoreStateMachine, 0, len(s.kvStoreFactories))
-	for _, factory := range s.kvStoreFactories {
-		stateMachine, err := factory.Create(candidateView, parentStateID, parentState, evolvingState)
+	stateMachines := make([]protocol_state.KeyValueStoreStateMachine, 0, len(s.kvStateMachineFactories))
+	for _, factory := range s.kvStateMachineFactories {
+		stateMachine, err := factory.Create(candidateView, parentBlockID, parentState, evolvingState)
 		if err != nil {
-			return nil, nil, fmt.Errorf("could not create state machine: %w", err)
+			return flow.ZeroID, nil, nil, fmt.Errorf("could not create state machine: %w", err)
 		}
 		stateMachines = append(stateMachines, stateMachine)
 	}
-	return stateMachines, evolvingState, nil
+	return parentState.ID(), stateMachines, evolvingState, nil
 }
 
 // serviceEventsFromSeals
@@ -253,17 +252,18 @@ func (s *MutableProtocolState) build(
 		dbUpdates.AddIndexingOps(dbOps.Pending())
 	}
 	resultingStateID := evolvingState.ID()
-	version, data, err := evolvingState.VersionedEncode()
-	if err != nil {
-		return flow.ZeroID, transaction.NewDeferredBlockPersist(), fmt.Errorf("could not encode resutling protocol state: %w", err)
-	}
 
-	// deferred dbUpdate for indexing the protocol state by the candidate block's ID:
+	// We _always_ index the protocol state by the candidate block's ID. But only if the
+	// state actually changed, we add a database operation to persist it.
 	dbUpdates.AddIndexingOp(func(blockID flow.Identifier, tx *transaction.Tx) error {
 		return s.kvStoreSnapshots.IndexTx(blockID, resultingStateID)(tx)
 	})
-	// deferred dbUpdate: persist new protocol state iff it has changed (otherwise, we have already persisted it for the parent block)
 	if parentStateID != resultingStateID {
+		version, data, err := evolvingState.VersionedEncode()
+		if err != nil {
+			return flow.ZeroID, transaction.NewDeferredBlockPersist(), fmt.Errorf("could not encode resutling protocol state: %w", err)
+		}
+		// note that `SkipDuplicatesTx` is still required, because the result might equal a state much
 		dbUpdates.AddDbOp(operation.SkipDuplicatesTx(s.kvStoreSnapshots.StoreTx(resultingStateID, &storage.KeyValueStoreData{
 			Version: version,
 			Data:    data,

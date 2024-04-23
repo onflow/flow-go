@@ -52,7 +52,7 @@ func (s *EpochStateMachineSuite) SetupTest() {
 	s.globalParams = protocolmock.NewGlobalParams(s.T())
 	s.globalParams.On("EpochCommitSafetyThreshold").Return(uint64(1_000))
 	s.parentState = protocolmock.NewKVStoreReader(s.T())
-	s.parentEpochState = unittest.ProtocolStateFixture()
+	s.parentEpochState = unittest.EpochStateFixture()
 	s.mutator = protocol_statemock.NewKVStoreMutator(s.T())
 	s.candidate = unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FirstView + 1))
 	s.happyPathStateMachine = mock.NewStateMachine(s.T())
@@ -117,7 +117,7 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 // This test also ensures that updated state ID is committed in the KV store.
 func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState)
-	updatedState := unittest.ProtocolStateFixture().ProtocolStateEntry
+	updatedState := unittest.EpochStateFixture().ProtocolStateEntry
 	updatedStateID := updatedState.ID()
 	s.happyPathStateMachine.On("Build").Return(updatedState, updatedStateID, true).Once()
 
@@ -221,7 +221,7 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 	})
 
 	s.Run("EpochSetup phase", func() {
-		s.parentEpochState = unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
+		s.parentEpochState = unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 		s.parentEpochState.NextEpochCommit = nil
 		s.parentEpochState.NextEpoch.CommitID = flow.ZeroID
 
@@ -279,7 +279,7 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 	})
 
 	s.Run("EpochCommitted phase", func() {
-		s.parentEpochState = unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
+		s.parentEpochState = unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 		// Since we are before the epoch commitment deadline, we should instantiate a happy-path state machine
 		s.Run("before commitment deadline", func() {
 			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
@@ -479,7 +479,7 @@ func (s *EpochStateMachineSuite) TestEvolveState_InvalidEpochCommit() {
 // TestEvolveStateTransitionToNextEpoch tests that EpochStateMachine transitions to the next epoch
 // when the epoch has been committed, and we are at the first block of the next epoch.
 func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch() {
-	parentState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
+	parentState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 	s.happyPathStateMachine.On("ParentState").Unset()
 	s.happyPathStateMachine.On("ParentState").Return(parentState)
 	// we are at the first block of the next epoch
@@ -492,7 +492,7 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch() {
 // TestEvolveStateTransitionToNextEpoch_Error tests that error that has been
 // observed when transitioning to the next epoch and propagated to the caller.
 func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_Error() {
-	parentState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
+	parentState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 	s.happyPathStateMachine.On("ParentState").Unset()
 	s.happyPathStateMachine.On("ParentState").Return(parentState)
 	// we are at the first block of the next epoch

@@ -1,32 +1,20 @@
-package storage
+package protocol_state
 
 import (
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// KeyValueStoreData is a binary blob with a version attached, specifying the format
-// of the marshaled data. In a nutshell, it serves as a binary snapshot of a ProtocolKVStore.
-// This structure is useful for version-agnostic storage, where snapshots with different versions
-// can co-exist. The KeyValueStoreData is a generic format that can be later decoded to
-// potentially different strongly typed structures based on version. When reading from the store,
-// callers must know how to deal with the binary representation.
-type KeyValueStoreData struct {
-	Version uint64
-	Data    []byte
-}
-
-// ProtocolKVStore persists different snapshots of key-value stores [KV-stores]. At this level, the API
-// deals with versioned data blobs, each representing a Snapshot of the Protocol State. Utilizing this API,
-// we can read legacy snapshots from the data base (eg. to answer external API calls) even for protocol state
-// versions that the node software does not explicitly support anymore.
-// TODO: rename to ProtocolStateSnapshots because at this low level, we are not exposing the KV-store, it is just an encoded data blob
+// ProtocolKVStore persists different snapshots of key-value stores [KV-stores]. Here, we augment
+// the low-level primitives provided by `storage.ProtocolKVStore` with logic for encoding and
+// decoding the state snapshots into abstract representation `protocol_state.KVStoreAPI`.
 type ProtocolKVStore interface {
 	// StoreTx returns an anonymous function (intended to be executed as part of a badger transaction),
 	// which persists the given KV-store snapshot as part of a DB tx.
 	// Expected errors of the returned anonymous function:
 	//   - storage.ErrAlreadyExists if a KV-store snapshot with the given id is already stored.
-	StoreTx(stateID flow.Identifier, data *KeyValueStoreData) func(*transaction.Tx) error
+	StoreTx(stateID flow.Identifier, kvStore protocol.KVStoreReader) func(*transaction.Tx) error
 
 	// IndexTx returns an anonymous function intended to be executed as part of a database transaction.
 	// In a nutshell, we want to maintain a map from `blockID` to `stateID`, where `blockID` references the
@@ -46,7 +34,7 @@ type ProtocolKVStore interface {
 	// ByID retrieves the KV store snapshot with the given ID.
 	// Expected errors during normal operations:
 	//   - storage.ErrNotFound if no snapshot with the given Identifier is known.
-	ByID(id flow.Identifier) (*KeyValueStoreData, error)
+	ByID(id flow.Identifier) (KVStoreAPI, error)
 
 	// ByBlockID retrieves the kv-store snapshot that the block with the given ID proposes.
 	// CAUTION: this store snapshot requires confirmation by a QC and will only become active at the child block,
@@ -60,5 +48,5 @@ type ProtocolKVStore interface {
 	//
 	// Expected errors during normal operations:
 	//   - storage.ErrNotFound if no snapshot has been indexed for the given block.
-	ByBlockID(blockID flow.Identifier) (*KeyValueStoreData, error)
+	ByBlockID(blockID flow.Identifier) (KVStoreAPI, error)
 }
