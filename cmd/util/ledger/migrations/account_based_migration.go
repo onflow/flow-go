@@ -186,22 +186,6 @@ func MigrateGroupConcurrently(
 						continue
 					}
 
-					if _, ok := knownProblematicAccounts[job.Address]; ok {
-						log.Info().
-							Hex("address", job.Address[:]).
-							Int("payload_count", len(job.Payloads)).
-							Msg("skipping problematic account")
-						resultCh <- &migrationResult{
-							migrationDuration: migrationDuration{
-								Address:      job.Address,
-								Duration:     time.Since(start),
-								PayloadCount: len(job.Payloads),
-							},
-							Migrated: job.Payloads,
-						}
-						continue
-					}
-
 					var err error
 					accountMigrated := job.Payloads
 					for m, migrator := range migrations {
