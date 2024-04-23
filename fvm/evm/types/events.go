@@ -115,6 +115,11 @@ func (p *TransactionExecutedPayload) CadenceEvent() (cadence.Event, error) {
 		}
 	}
 
+	deployedAddress := cadence.String("")
+	if p.Result.DeployedContractAddress != nil {
+		deployedAddress = cadence.String(p.Result.DeployedContractAddress.String())
+	}
+
 	return cadence.Event{
 		EventType: cadence.NewEventType(
 			EVMLocation{},
@@ -143,7 +148,7 @@ func (p *TransactionExecutedPayload) CadenceEvent() (cadence.Event, error) {
 			cadence.String(p.Result.VMErrorString()),
 			cadence.NewUInt8(p.Result.TxType),
 			cadence.NewUInt64(p.Result.GasConsumed),
-			cadence.String(p.Result.DeployedContractAddress.String()),
+			deployedAddress,
 			cadence.String(hex.EncodeToString(p.Result.ReturnedValue)),
 			cadence.String(hex.EncodeToString(encodedLogs)),
 		},

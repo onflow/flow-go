@@ -110,7 +110,9 @@ func (res *Result) Receipt() *gethTypes.Receipt {
 		Type:              res.TxType,
 		CumulativeGasUsed: res.GasConsumed, // TODO: update to capture cumulative
 		Logs:              res.Logs,
-		ContractAddress:   res.DeployedContractAddress.ToCommon(),
+	}
+	if res.DeployedContractAddress != nil {
+		receipt.ContractAddress = res.DeployedContractAddress.ToCommon()
 	}
 	if res.Failed() {
 		receipt.Status = gethTypes.ReceiptStatusFailed
