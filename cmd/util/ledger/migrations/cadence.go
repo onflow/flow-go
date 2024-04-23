@@ -384,7 +384,7 @@ type Options struct {
 	StagedContracts                   []StagedContract
 	Prune                             bool
 	MaxAccountSize                    uint64
-	FixSlabWithBrokenReferences       bool
+	FixSlabsWithBrokenReferences      bool
 }
 
 func NewCadence1Migrations(
@@ -413,7 +413,7 @@ func NewCadence1Migrations(
 		)
 	}
 
-	if opts.FixSlabWithBrokenReferences {
+	if opts.FixSlabsWithBrokenReferences {
 		migrations = append(migrations, NamedMigration{
 			Name: "clean-state",
 			Migrate: NewAccountBasedMigration(
