@@ -50,9 +50,8 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					aa := handler.NewAddressAllocator()
 
 					result := &types.Result{
-						DeployedContractAddress: types.Address(testutils.RandomAddress(t)),
-						ReturnedValue:           testutils.RandomData(t),
-						GasConsumed:             testutils.RandomGas(1000),
+						ReturnedValue: testutils.RandomData(t),
+						GasConsumed:   testutils.RandomGas(1000),
 						Logs: []*gethTypes.Log{
 							testutils.GetRandomLogFixture(t),
 							testutils.GetRandomLogFixture(t),
@@ -591,7 +590,8 @@ func TestHandler_COA(t *testing.T) {
 
 				testContract := testutils.GetStorageTestContract(t)
 				result := foa.Deploy(testContract.ByteCode, math.MaxUint64, types.NewBalanceFromUFix64(0))
-				addr := result.DeployedContractAddress
+				require.NotNil(t, result.DeployedContractAddress)
+				addr := *result.DeployedContractAddress
 				// skip first few bytes as they are deploy codes
 				assert.Equal(t, testContract.ByteCode[17:], []byte(result.ReturnedValue))
 				require.NotNil(t, addr)
@@ -659,8 +659,8 @@ func TestHandler_COA(t *testing.T) {
 
 				testContract := testutils.GetStorageTestContract(t)
 				result := foa.Deploy(testContract.ByteCode, math.MaxUint64, types.EmptyBalance)
-				addr := result.DeployedContractAddress
-				require.NotNil(t, addr)
+				require.NotNil(t, result.DeployedContractAddress)
+				addr := *result.DeployedContractAddress
 				require.Equal(t, types.StatusSuccessful, result.Status)
 				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
 
@@ -692,9 +692,8 @@ func TestHandler_TransactionRun(t *testing.T) {
 					aa := handler.NewAddressAllocator()
 
 					result := &types.Result{
-						DeployedContractAddress: types.Address(testutils.RandomAddress(t)),
-						ReturnedValue:           testutils.RandomData(t),
-						GasConsumed:             testutils.RandomGas(1000),
+						ReturnedValue: testutils.RandomData(t),
+						GasConsumed:   testutils.RandomGas(1000),
 						Logs: []*gethTypes.Log{
 							testutils.GetRandomLogFixture(t),
 							testutils.GetRandomLogFixture(t),
@@ -737,10 +736,9 @@ func TestHandler_TransactionRun(t *testing.T) {
 					aa := handler.NewAddressAllocator()
 
 					result := &types.Result{
-						VMError:                 gethVM.ErrOutOfGas,
-						DeployedContractAddress: types.Address(testutils.RandomAddress(t)),
-						ReturnedValue:           testutils.RandomData(t),
-						GasConsumed:             testutils.RandomGas(1000),
+						VMError:       gethVM.ErrOutOfGas,
+						ReturnedValue: testutils.RandomData(t),
+						GasConsumed:   testutils.RandomGas(1000),
 						Logs: []*gethTypes.Log{
 							testutils.GetRandomLogFixture(t),
 							testutils.GetRandomLogFixture(t),
