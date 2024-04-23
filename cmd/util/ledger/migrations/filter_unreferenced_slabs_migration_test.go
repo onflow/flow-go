@@ -96,18 +96,24 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 		testAddress,
 	)
 
-	// NOTE: InsertWithoutTransfer isn't available in Cadence v0.42.
-	//       Number of payloads is increased by 1 by using Insert().
+	arrayCount := 100
+	arrayValues := make([]interpreter.Value, arrayCount)
+	for i := 0; i < arrayCount; i++ {
+		arrayValues[i] = interpreter.NewUnmeteredIntValueFromInt64(int64(i))
+	}
+
+	array := interpreter.NewArrayValue(
+		inter,
+		interpreter.EmptyLocationRange,
+		arrayStaticType,
+		common.ZeroAddress,
+		arrayValues...,
+	)
+
 	dict2.Insert(
 		inter, interpreter.EmptyLocationRange,
 		interpreter.NewUnmeteredIntValueFromInt64(2),
-		interpreter.NewArrayValue(
-			inter,
-			interpreter.EmptyLocationRange,
-			arrayStaticType,
-			testAddress,
-			interpreter.NewUnmeteredIntValueFromInt64(3),
-		),
+		array,
 	)
 
 	storageMap := storage.GetStorageMap(
@@ -131,12 +137,19 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 	oldPayloads := make([]*ledger.Payload, 0, len(payloads))
 
 	for _, payload := range payloadsLedger.Payloads {
+		if len(payload.Value()) == 0 {
+			// Don't count empty slabs as result of inlining.
+			continue
+		}
 		oldPayloads = append(oldPayloads, payload)
 	}
 
-	// NOTE: InsertWithoutTransfer isn't available in Cadence v0.42.
-	//       Number of payloads is increased by 1 by using Insert().
-	const totalSlabCount = 6
+	// Storage has 4 non-empty payloads:
+	// - storage map
+	// - dict1
+	// - dict2
+	// - nested array in dict2
+	const totalSlabCount = 4
 
 	require.Len(t, oldPayloads, totalSlabCount)
 
