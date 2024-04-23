@@ -3,12 +3,13 @@ package evm_test
 import (
 	"encoding/hex"
 	"fmt"
+	"math/big"
+	"testing"
+
 	"github.com/onflow/cadence/encoding/ccf"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	"github.com/onflow/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
-	"math/big"
-	"testing"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
