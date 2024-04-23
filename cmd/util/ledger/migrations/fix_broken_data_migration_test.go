@@ -7,11 +7,14 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/flow-go/ledger"
 	"github.com/rs/zerolog"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/cadence/runtime/common"
+
+	"github.com/onflow/flow-go/ledger"
 )
 
 func TestFixSlabsWithBrokenReferences(t *testing.T) {
