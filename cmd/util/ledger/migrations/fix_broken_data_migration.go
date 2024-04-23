@@ -141,9 +141,9 @@ func (m *FixSlabsWithBrokenReferencesMigration) MigrateAccount(
 			continue
 		}
 
-		storageID := atree.NewStorageID(
+		storageID := atree.NewSlabID(
 			atree.Address([]byte(registerID.Owner)),
-			atree.StorageIndex([]byte(registerID.Key[1:])),
+			atree.SlabIndex([]byte(registerID.Key[1:])),
 		)
 
 		if _, ok := fixedStorageIDs[storageID]; ok {

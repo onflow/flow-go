@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"fmt"
 	"runtime"
+	"sync"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -14,6 +16,7 @@ import (
 
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/ledger"
 )
 
@@ -104,14 +107,14 @@ func TestFixSlabsWithBrokenReferences(t *testing.T) {
 	slabIndexWithBrokenReferences := mustDecodeHex("240000000000000003")
 	fixedSlabWithBrokenReferences := ledger.NewPayload(
 		ledger.NewKey([]ledger.KeyPart{ownerKey, {Type: 2, Value: slabIndexWithBrokenReferences}}),
-		ledger.Value(mustDecodeHex("008883d8d982d8d582d8c0824848602d8056ff9d937046616e546f705065726d697373696f6e7546616e546f705065726d697373696f6e2e526f6c65d8ddf6001b535c9de83a38cab0008883005b00000000000000009b0000000000000000")),
+		ledger.Value(mustDecodeHex("108883d8d982d8d582d8c0824848602d8056ff9d937046616e546f705065726d697373696f6e7546616e546f705065726d697373696f6e2e526f6c65d8ddf6001b535c9de83a38cab08300590000990000")),
 	)
 
 	// Account status register is updated to include address ID counter and new storage used.
 	accountStatusRegisterID := mustDecodeHex("612e73")
 	updatedAccountStatusRegister := ledger.NewPayload(
 		ledger.NewKey([]ledger.KeyPart{ownerKey, {Type: 2, Value: accountStatusRegisterID}}),
-		ledger.Value([]byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x7, 0xcc, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x9, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}),
+		ledger.Value([]byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x7, 0xbe, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x9, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}),
 	)
 
 	expectedNewPayloads := make([]*ledger.Payload, len(oldPayloads))
@@ -185,3 +188,39 @@ func mustDecodeHex(s string) []byte {
 	}
 	return b
 }
+
+type testReportWriterFactory struct {
+	lock          sync.Mutex
+	reportWriters map[string]*testReportWriter
+}
+
+func (f *testReportWriterFactory) ReportWriter(dataNamespace string) reporters.ReportWriter {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	if f.reportWriters == nil {
+		f.reportWriters = make(map[string]*testReportWriter)
+	}
+	reportWriter := &testReportWriter{}
+	if _, ok := f.reportWriters[dataNamespace]; ok {
+		panic(fmt.Sprintf("report writer already exists for namespace %s", dataNamespace))
+	}
+	f.reportWriters[dataNamespace] = reportWriter
+	return reportWriter
+}
+
+type testReportWriter struct {
+	lock    sync.Mutex
+	entries []any
+}
+
+var _ reporters.ReportWriter = &testReportWriter{}
+
+func (r *testReportWriter) Write(entry any) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	r.entries = append(r.entries, entry)
+}
+
+func (r *testReportWriter) Close() {}
