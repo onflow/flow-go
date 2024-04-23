@@ -51,6 +51,7 @@ func TestEVMRun(t *testing.T) {
 
 							assert(res.status == EVM.Status.successful, message: "unexpected status")
 							assert(res.errorCode == 0, message: "unexpected error code")
+							assert(res.deployedContract == nil, message: "unexpected deployed contract")
 						}
 					}
 					`,
@@ -100,7 +101,12 @@ func TestEVMRun(t *testing.T) {
 					access(all)
 					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
 						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-						return EVM.run(tx: tx, coinbase: coinbase)
+						let res = EVM.run(tx: tx, coinbase: coinbase)
+
+						assert(res.status == EVM.Status.successful, message: "unexpected status")
+						assert(res.errorCode == 0, message: "unexpected error code")
+						
+						return res
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
@@ -134,7 +140,7 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
-				require.Equal(t, types.EmptyAddress, res.DeployedContractAddress)
+				require.Nil(t, res.DeployedContractAddress)
 				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue).Int64())
 			})
 	})
