@@ -348,32 +348,44 @@ func createTrieFromPayloads(logger zerolog.Logger, payloads []*ledger.Payload) (
 
 func newMigrations(
 	log zerolog.Logger,
-	dir string,
+	outputDir string,
 	nWorker int, // number of concurrent worker to migation payloads
 	runMigrations bool,
 ) []ledger.Migration {
 	if runMigrations {
-		rwf := reporters.NewReportFileWriterFactory(dir, log)
+		rwf := reporters.NewReportFileWriterFactory(outputDir, log)
+
+		var acctBasedMigrations []migrators.AccountBasedMigration
+
+		if flagFilterUnreferencedSlabs {
+			acctBasedMigrations = append(acctBasedMigrations, migrators.NewFilterUnreferencedSlabsMigration(
+				outputDir,
+				rwf,
+			))
+		}
+
+		acctBasedMigrations = append(acctBasedMigrations,
+			migrators.NewAtreeRegisterMigrator(
+				rwf,
+				flagValidateMigration,
+				flagLogVerboseValidationError,
+				flagContinueMigrationOnValidationError,
+				flagCheckStorageHealthBeforeMigration,
+				flagCheckStorageHealthAfterMigration,
+			),
+
+			&migrators.DeduplicateContractNamesMigration{},
+
+			// This will fix storage used discrepancies caused by the previous migrations
+			&migrators.AccountUsageMigrator{},
+		)
 
 		migrations := []ledger.Migration{
 			migrators.CreateAccountBasedMigration(
 				log,
 				nWorker,
-				[]migrators.AccountBasedMigration{
-					migrators.NewAtreeRegisterMigrator(
-						rwf,
-						flagValidateMigration,
-						flagLogVerboseValidationError,
-						flagContinueMigrationOnValidationError,
-						flagCheckStorageHealthBeforeMigration,
-						flagCheckStorageHealthAfterMigration,
-					),
-
-					&migrators.DeduplicateContractNamesMigration{},
-
-					// This will fix storage used discrepancies caused by the previous migrations
-					&migrators.AccountUsageMigrator{},
-				}),
+				acctBasedMigrations,
+			),
 		}
 
 		return migrations
