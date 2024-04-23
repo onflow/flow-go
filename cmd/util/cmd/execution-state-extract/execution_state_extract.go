@@ -348,7 +348,7 @@ func createTrieFromPayloads(logger zerolog.Logger, payloads []*ledger.Payload) (
 
 func newMigrations(
 	log zerolog.Logger,
-	dir string,
+	outputDir string,
 	nWorker int, // number of concurrent worker to migation payloads
 	runMigrations bool,
 ) []ledger.Migration {
