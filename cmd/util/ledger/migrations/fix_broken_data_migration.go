@@ -72,26 +72,9 @@ func (m *FixSlabsWithBrokenReferencesMigration) MigrateAccount(
 	storage := migrationRuntime.Storage
 
 	// Load all atree registers in storage
-	for _, payload := range oldPayloads {
-		registerID, _, err := convert.PayloadToRegister(payload)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert payload to register: %w", err)
-		}
-
-		if !registerID.IsSlabIndex() {
-			continue
-		}
-
-		// Convert the register ID to a storage ID.
-		slabID := atree.NewStorageID(
-			atree.Address([]byte(registerID.Owner)),
-			atree.StorageIndex([]byte(registerID.Key[1:])))
-
-		// Retrieve the slab.
-		_, _, err = storage.Retrieve(slabID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to retrieve slab %s: %w", slabID, err)
-		}
+	err = loadAtreeSlabsInStorge(storage, oldPayloads)
+	if err != nil {
+		return nil, err
 	}
 
 	// Fix broken references
