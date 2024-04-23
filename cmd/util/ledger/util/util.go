@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -94,6 +95,56 @@ func (p PayloadSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 		return nil, nil
 	}
 	return value.Value(), nil
+}
+
+// ApplyChangesAndGetNewPayloads applies the given changes to the snapshot and returns the new payloads.
+// the snapshot is destroyed.
+func (p *PayloadSnapshot) ApplyChangesAndGetNewPayloads(
+	changes map[flow.RegisterID]flow.RegisterValue,
+	expectedChangeAddresses map[flow.Address]struct{},
+	logger zerolog.Logger,
+) ([]*ledger.Payload, error) {
+	originalPayloads := p.Payloads
+
+	newPayloads := make([]*ledger.Payload, 0, len(originalPayloads))
+
+	// Add all new payloads.
+	for id, value := range changes {
+		delete(originalPayloads, id)
+		if len(value) == 0 {
+			continue
+		}
+
+		if expectedChangeAddresses != nil {
+			ownerAddress := flow.BytesToAddress([]byte(id.Owner))
+
+			if _, ok := expectedChangeAddresses[ownerAddress]; !ok {
+				// something was changed that does not belong to this account. Log it.
+				logger.Error().
+					Str("key", id.String()).
+					Str("actual_address", ownerAddress.Hex()).
+					Interface("expected_addresses", expectedChangeAddresses).
+					Hex("value", value).
+					Msg("key is part of the change set, but is for a different account")
+			}
+		}
+
+		key := convert.RegisterIDToLedgerKey(id)
+		newPayloads = append(newPayloads, ledger.NewPayload(key, value))
+	}
+
+	// Add any old payload that wasn't updated.
+	for id, value := range originalPayloads {
+		if len(value.Value()) == 0 {
+			// This is strange, but we don't want to add empty values. Log it.
+			logger.Warn().Msgf("empty value for key %s", id)
+			continue
+		}
+
+		newPayloads = append(newPayloads, value)
+	}
+
+	return newPayloads, nil
 }
 
 type PayloadsReadonlyLedger struct {
