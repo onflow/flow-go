@@ -300,7 +300,7 @@ func MigrateGroupConcurrently(
 	return migrated, nil
 }
 
-var testnetAccountsWithBrokenSlabReferences = func() map[common.Address]struct{} {
+var TestnetAccountsWithBrokenSlabReferences = func() map[common.Address]struct{} {
 	testnetAddresses := map[common.Address]struct{}{
 		mustHexToAddress("434a1f199a7ae3ba"): {},
 		mustHexToAddress("454c9991c2b8d947"): {},

@@ -39,7 +39,7 @@ func extractExecutionState(
 	runMigrations bool,
 	outputPayloadFile string,
 	exportPayloadsByAddresses []common.Address,
-	fixSlabWithBrokenReferences bool,
+	fixSlabsWithBrokenReferences bool,
 ) error {
 
 	log.Info().Msg("init WAL")
@@ -90,7 +90,13 @@ func extractExecutionState(
 		<-compactor.Done()
 	}()
 
-	migrations := newMigrations(log, dir, nWorker, runMigrations)
+	migrations := newMigrations(
+		log,
+		dir,
+		nWorker,
+		runMigrations,
+		fixSlabsWithBrokenReferences,
+	)
 
 	newState := ledger.State(targetHash)
 
@@ -214,7 +220,7 @@ func extractExecutionStateFromPayloads(
 	inputPayloadFile string,
 	outputPayloadFile string,
 	exportPayloadsByAddresses []common.Address,
-	fixSlabWithBrokenReferences bool,
+	fixSlabsWithBrokenReferences bool,
 ) error {
 
 	inputPayloadsFromPartialState, payloads, err := util.ReadPayloadFile(log, inputPayloadFile)
@@ -224,7 +230,13 @@ func extractExecutionStateFromPayloads(
 
 	log.Info().Msgf("read %d payloads", len(payloads))
 
-	migrations := newMigrations(log, dir, nWorker, runMigrations)
+	migrations := newMigrations(
+		log,
+		dir,
+		nWorker,
+		runMigrations,
+		fixSlabsWithBrokenReferences,
+	)
 
 	payloads, err = migratePayloads(log, payloads, migrations)
 	if err != nil {
@@ -353,32 +365,52 @@ func newMigrations(
 	dir string,
 	nWorker int, // number of concurrent worker to migation payloads
 	runMigrations bool,
+	fixSlabsWithBrokenReferences bool,
 ) []ledger.Migration {
 	if runMigrations {
+
 		rwf := reporters.NewReportFileWriterFactory(dir, log)
 
-		migrations := []ledger.Migration{
+		var accountBasedMigrations []migrators.AccountBasedMigration
+
+		if fixSlabsWithBrokenReferences {
+			accountBasedMigrations = append(
+				accountBasedMigrations,
+				migrators.NewFixBrokenReferencesInSlabsMigration(
+					rwf,
+					migrators.TestnetAccountsWithBrokenSlabReferences,
+				),
+			)
+		}
+
+		accountBasedMigrations = append(
+			accountBasedMigrations,
+			migrators.NewFixBrokenReferencesInSlabsMigration(
+				rwf,
+				migrators.TestnetAccountsWithBrokenSlabReferences,
+			),
+			migrators.NewAtreeRegisterMigrator(
+				rwf,
+				flagValidateMigration,
+				flagLogVerboseValidationError,
+				flagContinueMigrationOnValidationError,
+				flagCheckStorageHealthBeforeMigration,
+				flagCheckStorageHealthAfterMigration,
+			),
+
+			&migrators.DeduplicateContractNamesMigration{},
+
+			// This will fix storage used discrepancies caused by the previous migrations
+			&migrators.AccountUsageMigrator{},
+		)
+
+		return []ledger.Migration{
 			migrators.CreateAccountBasedMigration(
 				log,
 				nWorker,
-				[]migrators.AccountBasedMigration{
-					migrators.NewAtreeRegisterMigrator(
-						rwf,
-						flagValidateMigration,
-						flagLogVerboseValidationError,
-						flagContinueMigrationOnValidationError,
-						flagCheckStorageHealthBeforeMigration,
-						flagCheckStorageHealthAfterMigration,
-					),
-
-					&migrators.DeduplicateContractNamesMigration{},
-
-					// This will fix storage used discrepancies caused by the previous migrations
-					&migrators.AccountUsageMigrator{},
-				}),
+				accountBasedMigrations,
+			),
 		}
-
-		return migrations
 	}
 
 	return nil
