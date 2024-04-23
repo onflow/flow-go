@@ -64,7 +64,7 @@ func NewContractHandler(
 func (h *ContractHandler) DeployCOA(uuid uint64) types.Address {
 	res, err := h.deployCOA(uuid)
 	panicOnErrorOrInvalidOrFailedState(res, err)
-	return res.DeployedContractAddress
+	return *res.DeployedContractAddress
 }
 
 func (h *ContractHandler) deployCOA(uuid uint64) (*types.Result, error) {

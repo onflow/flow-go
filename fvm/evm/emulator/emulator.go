@@ -382,7 +382,7 @@ func (proc *procedure) deployAt(
 		return res, nil
 	}
 
-	res.DeployedContractAddress = to
+	res.DeployedContractAddress = &to
 
 	proc.state.SetCode(addr, ret)
 	return res, proc.commitAndFinalize()
@@ -445,7 +445,8 @@ func (proc *procedure) run(
 			res.ReturnedValue = execResult.ReturnData
 			// If the transaction created a contract, store the creation address in the receipt,
 			if msg.To == nil {
-				res.DeployedContractAddress = types.NewAddress(gethCrypto.CreateAddress(msg.From, msg.Nonce))
+				deployedAddress := types.NewAddress(gethCrypto.CreateAddress(msg.From, msg.Nonce))
+				res.DeployedContractAddress = &deployedAddress
 			}
 			// replace tx index and tx hash
 			res.Logs = proc.state.Logs(

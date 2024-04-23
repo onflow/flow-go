@@ -3604,7 +3604,7 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 
 					return &types.ResultSummary{
 						Status:                  types.StatusSuccessful,
-						DeployedContractAddress: types.Address{4},
+						DeployedContractAddress: &types.Address{4},
 						ReturnedValue:           types.Data{4},
 					}
 				},
