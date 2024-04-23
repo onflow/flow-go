@@ -364,19 +364,21 @@ func newMigrations(
 			))
 		}
 
-		acctBasedMigrations = append(acctBasedMigrations, migrators.NewAtreeRegisterMigrator(
-			rwf,
-			flagValidateMigration,
-			flagLogVerboseValidationError,
-			flagContinueMigrationOnValidationError,
-			flagCheckStorageHealthBeforeMigration,
-			flagCheckStorageHealthAfterMigration,
-		))
+		acctBasedMigrations = append(acctBasedMigrations,
+			migrators.NewAtreeRegisterMigrator(
+				rwf,
+				flagValidateMigration,
+				flagLogVerboseValidationError,
+				flagContinueMigrationOnValidationError,
+				flagCheckStorageHealthBeforeMigration,
+				flagCheckStorageHealthAfterMigration,
+			),
 
-		acctBasedMigrations = append(acctBasedMigrations, &migrators.DeduplicateContractNamesMigration{})
+			&migrators.DeduplicateContractNamesMigration{},
 
-		// This will fix storage used discrepancies caused by the previous migrations
-		acctBasedMigrations = append(acctBasedMigrations, &migrators.AccountUsageMigrator{})
+			// This will fix storage used discrepancies caused by the previous migrations
+			&migrators.AccountUsageMigrator{},
+		)
 
 		migrations := []ledger.Migration{
 			migrators.CreateAccountBasedMigration(
