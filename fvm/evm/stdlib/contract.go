@@ -1052,6 +1052,11 @@ func NewResultValue(
 			Name:  "deployedContract",
 			Value: EVMAddressToAddressBytesArrayValue(inter, *result.DeployedContractAddress),
 		})
+	} else {
+		fields = append(fields, interpreter.CompositeField{
+			Name:  "deployedContract",
+			Value: interpreter.NilOptionalValue,
+		})
 	}
 
 	return interpreter.NewCompositeValue(
@@ -2056,9 +2061,30 @@ func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, e
 		return nil, fmt.Errorf("invalid input: unexpected type for data field")
 	}
 
-	deployedAddress, ok := str.Fields[4].(cadence.Array)
-	if !ok {
-		return nil, fmt.Errorf("invalid input: unexpected type for deployed adddress field")
+	var deployedAddress *cadence.Array
+	switch v := str.Fields[4].(type) {
+	case cadence.Optional:
+		if v.Value != nil {
+			arr, ok := v.Value.(cadence.Array)
+			if !ok {
+				return nil, fmt.Errorf("invalid input: unexpected type for deployed contract field")
+			}
+			deployedAddress = &arr
+		}
+	case cadence.Array:
+		deployedAddress = &v
+	default:
+		return nil, fmt.Errorf("invalid input: unexpected type for deployed contract field")
+	}
+
+	var convertedDeployedAddress *types.Address
+	if deployedAddress != nil {
+		convertedAddress := make([]byte, len(deployedAddress.Values))
+		for i, val := range deployedAddress.Values {
+			convertedAddress[i] = val.(cadence.UInt8).ToGoValue().(uint8)
+		}
+		addr := types.Address(convertedAddress)
+		convertedDeployedAddress = &addr
 	}
 
 	convertedData := make([]byte, len(data.Values))
@@ -2066,18 +2092,12 @@ func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, e
 		convertedData[i] = value.(cadence.UInt8).ToGoValue().(uint8)
 	}
 
-	convertedAddress := make([]byte, len(deployedAddress.Values))
-	for i, val := range deployedAddress.Values {
-		convertedAddress[i] = val.(cadence.UInt8).ToGoValue().(uint8)
-	}
-	convertedDeployedAddress := types.Address(convertedAddress)
-
 	return &types.ResultSummary{
 		Status:                  types.Status(status),
 		ErrorCode:               types.ErrorCode(errorCode),
 		GasConsumed:             uint64(gasUsed),
 		ReturnedValue:           convertedData,
-		DeployedContractAddress: &convertedDeployedAddress,
+		DeployedContractAddress: convertedDeployedAddress,
 	}, nil
 
 }
