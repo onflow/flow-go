@@ -46,8 +46,9 @@ func NewFilterUnreferencedSlabsMigration(
 	rwf reporters.ReportWriterFactory,
 ) *FilterUnreferencedSlabsMigration {
 	return &FilterUnreferencedSlabsMigration{
-		outputDir: outputDir,
-		rw:        rwf.ReportWriter(filterUnreferencedSlabsName),
+		outputDir:        outputDir,
+		rw:               rwf.ReportWriter(filterUnreferencedSlabsName),
+		filteredPayloads: make([]*ledger.Payload, 0, 50_000),
 	}
 }
 
