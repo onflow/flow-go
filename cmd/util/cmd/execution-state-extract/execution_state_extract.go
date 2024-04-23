@@ -39,6 +39,7 @@ func extractExecutionState(
 	runMigrations bool,
 	outputPayloadFile string,
 	exportPayloadsByAddresses []common.Address,
+	fixSlabsWithBrokenReferences bool,
 ) error {
 
 	log.Info().Msg("init WAL")
@@ -89,7 +90,13 @@ func extractExecutionState(
 		<-compactor.Done()
 	}()
 
-	migrations := newMigrations(log, dir, nWorker, runMigrations)
+	migrations := newMigrations(
+		log,
+		dir,
+		nWorker,
+		runMigrations,
+		fixSlabsWithBrokenReferences,
+	)
 
 	newState := ledger.State(targetHash)
 
@@ -213,6 +220,7 @@ func extractExecutionStateFromPayloads(
 	inputPayloadFile string,
 	outputPayloadFile string,
 	exportPayloadsByAddresses []common.Address,
+	fixSlabsWithBrokenReferences bool,
 ) error {
 
 	inputPayloadsFromPartialState, payloads, err := util.ReadPayloadFile(log, inputPayloadFile)
@@ -222,7 +230,13 @@ func extractExecutionStateFromPayloads(
 
 	log.Info().Msgf("read %d payloads", len(payloads))
 
-	migrations := newMigrations(log, dir, nWorker, runMigrations)
+	migrations := newMigrations(
+		log,
+		dir,
+		nWorker,
+		runMigrations,
+		fixSlabsWithBrokenReferences,
+	)
 
 	payloads, err = migratePayloads(log, payloads, migrations)
 	if err != nil {
@@ -351,20 +365,35 @@ func newMigrations(
 	outputDir string,
 	nWorker int, // number of concurrent worker to migation payloads
 	runMigrations bool,
+	fixSlabsWithBrokenReferences bool,
 ) []ledger.Migration {
 	if runMigrations {
 		rwf := reporters.NewReportFileWriterFactory(outputDir, log)
 
-		var acctBasedMigrations []migrators.AccountBasedMigration
+		var accountBasedMigrations []migrators.AccountBasedMigration
 
-		if flagFilterUnreferencedSlabs {
-			acctBasedMigrations = append(acctBasedMigrations, migrators.NewFilterUnreferencedSlabsMigration(
-				outputDir,
-				rwf,
-			))
+		if fixSlabsWithBrokenReferences {
+			accountBasedMigrations = append(
+				accountBasedMigrations,
+				migrators.NewFixBrokenReferencesInSlabsMigration(
+					rwf,
+					migrators.TestnetAccountsWithBrokenSlabReferences,
+				),
+			)
 		}
 
-		acctBasedMigrations = append(acctBasedMigrations,
+		if flagFilterUnreferencedSlabs {
+			accountBasedMigrations = append(
+				accountBasedMigrations,
+				migrators.NewFilterUnreferencedSlabsMigration(
+					outputDir,
+					rwf,
+				),
+			)
+		}
+
+		accountBasedMigrations = append(
+			accountBasedMigrations,
 			migrators.NewAtreeRegisterMigrator(
 				rwf,
 				flagValidateMigration,
@@ -380,15 +409,13 @@ func newMigrations(
 			&migrators.AccountUsageMigrator{},
 		)
 
-		migrations := []ledger.Migration{
+		return []ledger.Migration{
 			migrators.CreateAccountBasedMigration(
 				log,
 				nWorker,
-				acctBasedMigrations,
+				accountBasedMigrations,
 			),
 		}
-
-		return migrations
 	}
 
 	return nil

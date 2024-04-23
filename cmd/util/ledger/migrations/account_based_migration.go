@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
 	moduleUtil "github.com/onflow/flow-go/module/util"
 )
 
@@ -186,22 +187,6 @@ func MigrateGroupConcurrently(
 						continue
 					}
 
-					if _, ok := knownProblematicAccounts[job.Address]; ok {
-						log.Info().
-							Hex("address", job.Address[:]).
-							Int("payload_count", len(job.Payloads)).
-							Msg("skipping problematic account")
-						resultCh <- &migrationResult{
-							migrationDuration: migrationDuration{
-								Address:      job.Address,
-								Duration:     time.Since(start),
-								PayloadCount: len(job.Payloads),
-							},
-							Migrated: job.Payloads,
-						}
-						continue
-					}
-
 					var err error
 					accountMigrated := job.Payloads
 					for m, migrator := range migrations {
@@ -315,19 +300,27 @@ func MigrateGroupConcurrently(
 	return migrated, nil
 }
 
-var knownProblematicAccounts = map[common.Address]string{
-	// Testnet accounts with broken contracts
-	mustHexToAddress("434a1f199a7ae3ba"): "Broken contract FanTopPermission",
-	mustHexToAddress("454c9991c2b8d947"): "Broken contract Test",
-	mustHexToAddress("48602d8056ff9d93"): "Broken contract FanTopPermission",
-	mustHexToAddress("5d63c34d7f05e5a4"): "Broken contract FanTopPermission",
-	mustHexToAddress("5e3448b3cffb97f2"): "Broken contract FanTopPermission",
-	mustHexToAddress("7d8c7e050c694eaa"): "Broken contract Test",
-	mustHexToAddress("ba53f16ede01972d"): "Broken contract FanTopPermission",
-	mustHexToAddress("c843c1f5a4805c3a"): "Broken contract FanTopPermission",
-	mustHexToAddress("48d3be92e6e4a973"): "Broken contract FanTopPermission",
-	// Mainnet account
-}
+var TestnetAccountsWithBrokenSlabReferences = func() map[common.Address]struct{} {
+	testnetAddresses := map[common.Address]struct{}{
+		mustHexToAddress("434a1f199a7ae3ba"): {},
+		mustHexToAddress("454c9991c2b8d947"): {},
+		mustHexToAddress("48602d8056ff9d93"): {},
+		mustHexToAddress("5d63c34d7f05e5a4"): {},
+		mustHexToAddress("5e3448b3cffb97f2"): {},
+		mustHexToAddress("7d8c7e050c694eaa"): {},
+		mustHexToAddress("ba53f16ede01972d"): {},
+		mustHexToAddress("c843c1f5a4805c3a"): {},
+		mustHexToAddress("48d3be92e6e4a973"): {},
+	}
+
+	for address := range testnetAddresses {
+		if !flow.Testnet.Chain().IsValid(flow.Address(address)) {
+			panic(fmt.Sprintf("invalid testnet address: %s", address.Hex()))
+		}
+	}
+
+	return testnetAddresses
+}()
 
 func mustHexToAddress(hex string) common.Address {
 	address, err := common.HexToAddress(hex)
