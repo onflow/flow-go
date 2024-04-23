@@ -72,16 +72,15 @@ var findEmptyEvents = &cobra.Command{
 				continue
 			}
 
-			if len(events) == 0 {
-				log.Info().Msgf("no events found for block height %v", height)
+			if len(events) > 0 {
 				events2, err := storages2.Events.ByBlockID(blockID)
 				if err != nil {
 					log.Error().Err(err).Msgf("could not get events fro block id from storages2: %v", blockID)
 					continue
 				}
 
-				if len(events2) > 0 {
-					log.Info().Msgf("mismatching events for block height %v, actual events: %v", height, len(events2))
+				if len(events) != len(events2) {
+					log.Info().Msgf("mismatching events for height %v, expecting len: %v, actual lens: %v", height, len(events2), len(events))
 				}
 			}
 		}
