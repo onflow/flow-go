@@ -675,51 +675,6 @@ func TestHandler_COA(t *testing.T) {
 func TestHandler_TransactionRun(t *testing.T) {
 	t.Parallel()
 
-	t.Run("test - transaction run (success)", func(t *testing.T) {
-		t.Parallel()
-
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
-			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
-
-					bs := handler.NewBlockStore(backend, rootAddr)
-					aa := handler.NewAddressAllocator()
-
-					result := &types.Result{
-						DeployedContractAddress: types.Address(testutils.RandomAddress(t)),
-						ReturnedValue:           testutils.RandomData(t),
-						GasConsumed:             testutils.RandomGas(1000),
-						Logs: []*gethTypes.Log{
-							testutils.GetRandomLogFixture(t),
-							testutils.GetRandomLogFixture(t),
-						},
-					}
-
-					em := &testutils.TestEmulator{
-						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
-							return result, nil
-						},
-					}
-					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, bs, aa, backend, em)
-					tx := eoa.PrepareSignAndEncodeTx(
-						t,
-						gethCommon.Address{},
-						nil,
-						nil,
-						100_000,
-						big.NewInt(1),
-					)
-
-					rs := handler.Run(tx, types.NewAddress(gethCommon.Address{}))
-					require.Equal(t, types.StatusSuccessful, rs.Status)
-					require.Equal(t, result.GasConsumed, rs.GasConsumed)
-					require.Equal(t, types.ErrCodeNoError, rs.ErrorCode)
-
-				})
-			})
-		})
-	})
-
 	t.Run("test - transaction run (failed)", func(t *testing.T) {
 		t.Parallel()
 
@@ -812,6 +767,99 @@ func TestHandler_TransactionRun(t *testing.T) {
 					rs := handler.Run([]byte(tx), coinbase)
 					require.Equal(t, types.StatusInvalid, rs.Status)
 					require.Equal(t, types.ValidationErrCodeNonceTooLow, rs.ErrorCode)
+				})
+			})
+		})
+	})
+
+	t.Run("test - transaction run (success)", func(t *testing.T) {
+		t.Parallel()
+
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+
+					bs := handler.NewBlockStore(backend, rootAddr)
+					aa := handler.NewAddressAllocator()
+
+					result := &types.Result{
+						DeployedContractAddress: types.Address(testutils.RandomAddress(t)),
+						ReturnedValue:           testutils.RandomData(t),
+						GasConsumed:             testutils.RandomGas(1000),
+						Logs: []*gethTypes.Log{
+							testutils.GetRandomLogFixture(t),
+							testutils.GetRandomLogFixture(t),
+						},
+					}
+
+					em := &testutils.TestEmulator{
+						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
+							return result, nil
+						},
+					}
+					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, bs, aa, backend, em)
+					tx := eoa.PrepareSignAndEncodeTx(
+						t,
+						gethCommon.Address{},
+						nil,
+						nil,
+						100_000,
+						big.NewInt(1),
+					)
+
+					rs := handler.Run(tx, types.NewAddress(gethCommon.Address{}))
+					require.Equal(t, types.StatusSuccessful, rs.Status)
+					require.Equal(t, result.GasConsumed, rs.GasConsumed)
+					require.Equal(t, types.ErrCodeNoError, rs.ErrorCode)
+
+				})
+			})
+		})
+	})
+
+	t.Run("test dry run successful", func(t *testing.T) {
+		t.Parallel()
+
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+
+					bs := handler.NewBlockStore(backend, rootAddr)
+					aa := handler.NewAddressAllocator()
+
+					gas := types.GasLimit(15)
+					value := types.NewBalance(big.NewInt(13))
+					data := []byte{1}
+
+					result := &types.Result{
+						DeployedContractAddress: testutils.RandomAddress(t),
+						ReturnedValue:           testutils.RandomData(t),
+						GasConsumed:             testutils.RandomGas(1000),
+						Logs: []*gethTypes.Log{
+							testutils.GetRandomLogFixture(t),
+							testutils.GetRandomLogFixture(t),
+						},
+					}
+
+					called := false
+					em := &testutils.TestEmulator{
+						DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
+							called = true
+							assert.Equal(t, uint64(gas), call.GasLimit)
+							assert.Equal(t, call.Value.Cmp(value), 0)
+							assert.Equal(t, data, call.Data)
+							assert.Equal(t, eoa.Address(), call.From)
+							assert.Equal(t, call.To, types.EmptyAddress)
+							return result, nil
+						},
+					}
+
+					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, bs, aa, backend, em)
+					rs := handler.DryRun(eoa.Address(), nil, &gas, value, data)
+					require.Equal(t, types.StatusSuccessful, rs.Status)
+					require.Equal(t, result.GasConsumed, rs.GasConsumed)
+					require.Equal(t, types.ErrCodeNoError, rs.ErrorCode)
+					require.True(t, called)
 				})
 			})
 		})
