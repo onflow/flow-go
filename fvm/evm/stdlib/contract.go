@@ -1028,31 +1028,24 @@ func newInternalEVMTypeDryRunFunction(
 			}
 
 			// Get to address
-			optToAddressValue, ok := invocation.Arguments[1].(*interpreter.SomeValue)
-			if !ok {
-				panic(errors.NewUnreachableError())
-			}
-
 			var toAddress *types.Address
-			if val := optToAddressValue.InnerValue(inter, locationRange); val != nil {
-				toAddressValue, ok := val.(*interpreter.ArrayValue)
+			if optToAddressValue, ok := invocation.Arguments[1].(*interpreter.SomeValue); ok {
+				toValue, ok := optToAddressValue.InnerValue(inter, locationRange).(*interpreter.ArrayValue)
 				if !ok {
 					panic(errors.NewUnreachableError())
 				}
 
-				converted, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, toAddressValue)
+				converted, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, toValue)
 				if err != nil {
 					panic(err)
 				}
 				toAddress = &converted
 			}
 
-			// Get gas
+			// Get gas limit
 			var gasLimit *types.GasLimit
-			x := invocation.Arguments[2].(type)
-			fmt.Println(x)
-			if _, notNil := invocation.Arguments[2].(interpreter.NilValue); notNil {
-				gasValue, ok := invocation.Arguments[2].(interpreter.UInt64Value)
+			if optGasValue, ok := invocation.Arguments[2].(*interpreter.SomeValue); ok {
+				gasValue, ok := optGasValue.InnerValue(inter, locationRange).(interpreter.UInt64Value)
 				if !ok {
 					panic(errors.NewUnreachableError())
 				}
