@@ -1,7 +1,6 @@
 package inmem
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/encodable"
@@ -70,107 +69,6 @@ func FromParams(from protocol.GlobalParams) (*Params, error) {
 		EpochCommitSafetyThreshold: from.EpochCommitSafetyThreshold(),
 	}
 	return &Params{params}, nil
-}
-
-// FromEpoch converts any protocol.Epoch to a memory-backed Epoch.
-// Error returns:
-// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-func FromEpoch(from protocol.Epoch) (*Epoch, error) {
-	var (
-		epoch EncodableEpoch
-		err   error
-	)
-
-	// convert top-level fields
-	epoch.Counter, err = from.Counter()
-	if err != nil {
-		return nil, fmt.Errorf("could not get counter: %w", err)
-	}
-	epoch.InitialIdentities, err = from.InitialIdentities()
-	if err != nil {
-		return nil, fmt.Errorf("could not get initial identities: %w", err)
-	}
-	epoch.FirstView, err = from.FirstView()
-	if err != nil {
-		return nil, fmt.Errorf("could not get first view: %w", err)
-	}
-	epoch.FinalView, err = from.FinalView()
-	if err != nil {
-		return nil, fmt.Errorf("could not get final view: %w", err)
-	}
-	epoch.RandomSource, err = from.RandomSource()
-	if err != nil {
-		return nil, fmt.Errorf("could not get random source: %w", err)
-	}
-	epoch.TargetDuration, err = from.TargetDuration()
-	if err != nil {
-		return nil, fmt.Errorf("could not get target epoch duration: %w", err)
-	}
-	epoch.TargetEndTime, err = from.TargetEndTime()
-	if err != nil {
-		return nil, fmt.Errorf("could not get target end time: %w", err)
-	}
-	epoch.DKGPhase1FinalView, epoch.DKGPhase2FinalView, epoch.DKGPhase3FinalView, err = protocol.DKGPhaseViews(from)
-	if err != nil {
-		return nil, fmt.Errorf("could not get dkg final views")
-	}
-	clustering, err := from.Clustering()
-	if err != nil {
-		return nil, fmt.Errorf("could not get clustering: %w", err)
-	}
-	epoch.Clustering = clustering
-
-	// convert dkg
-	dkg, err := from.DKG()
-	// if this epoch hasn't been committed yet, return the epoch as-is
-	if errors.Is(err, protocol.ErrNextEpochNotCommitted) {
-		return &Epoch{epoch}, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("could not get dkg: %w", err)
-	}
-	convertedDKG, err := FromDKG(dkg, epoch.InitialIdentities.Filter(filter.HasRole[flow.IdentitySkeleton](flow.RoleConsensus)))
-	if err != nil {
-		return nil, err
-	}
-	epoch.DKG = &convertedDKG.enc
-
-	// convert clusters
-	for index := range clustering {
-		cluster, err := from.Cluster(uint(index))
-		if err != nil {
-			return nil, fmt.Errorf("could not get cluster %d: %w", index, err)
-		}
-		convertedCluster, err := FromCluster(cluster)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert cluster %d: %w", index, err)
-		}
-		epoch.Clusters = append(epoch.Clusters, convertedCluster.enc)
-	}
-
-	// convert height bounds
-	firstHeight, err := from.FirstHeight()
-	if errors.Is(err, protocol.ErrEpochTransitionNotFinalized) {
-		// if this epoch hasn't been started yet, return the epoch as-is
-		return &Epoch{epoch}, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("could not get first height: %w", err)
-	}
-	epoch.FirstHeight = &firstHeight
-	finalHeight, err := from.FinalHeight()
-	if errors.Is(err, protocol.ErrEpochTransitionNotFinalized) {
-		// if this epoch hasn't ended yet, return the epoch as-is
-		return &Epoch{epoch}, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("could not get final height: %w", err)
-	}
-	epoch.FinalHeight = &finalHeight
-
-	return &Epoch{epoch}, nil
 }
 
 // FromCluster converts any protocol.Cluster to a memory-backed Cluster.

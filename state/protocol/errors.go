@@ -24,6 +24,8 @@ var (
 
 	// ErrEpochTransitionNotFinalized is a sentinel returned when a query is made
 	// for a block at an epoch boundary which has not yet been finalized.
+	// TODO enhance docs
+	// TODO add badger/state test cases
 	ErrEpochTransitionNotFinalized = fmt.Errorf("cannot query block at un-finalized epoch transition")
 
 	// ErrSealingSegmentBelowRootBlock is a sentinel error returned for queries
