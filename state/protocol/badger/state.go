@@ -606,31 +606,9 @@ func bootstrapSporkInfo(root protocol.Snapshot) func(*transaction.Tx) error {
 	}
 }
 
-// indexFirstHeight indexes the first height for the epoch, as part of bootstrapping.
-// The input epoch must have been started (the first block of the epoch has been finalized).
-// TODO index first height by parsing sealing segment
-// No errors are expected during normal operation.
-func indexFirstHeight(epoch protocol.Epoch) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-		counter, err := epoch.Counter()
-		if err != nil {
-			return fmt.Errorf("could not get epoch counter: %w", err)
-		}
-		firstHeight, err := epoch.FirstHeight()
-		if err != nil {
-			return fmt.Errorf("could not get epoch first height: %w", err)
-		}
-		err = operation.InsertEpochFirstHeight(counter, firstHeight)(tx)
-		if err != nil {
-			return fmt.Errorf("could not index first height %d for epoch %d: %w", firstHeight, counter, err)
-		}
-		return nil
-	}
-}
-
-// indexEpochHeights populates the epoch height index for a mid-spork snapshot.
-// For such snapshots, we index the FirstHeight for every epoch where the transition occurs within
-// the sealing segment of the root snapshot.
+// indexEpochHeights populates the epoch height index from the root snapshot.
+// We index the FirstHeight for every epoch where the transition occurs within the sealing segment of the root snapshot,
+// or for the first epoch of a spork if the snapshot is a spork root snapshot (1 block sealing segment).
 // No errors are expected during normal operation.
 func indexEpochHeights(segment *flow.SealingSegment) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
