@@ -147,7 +147,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("reading intermediary bootstrapping data")
-	intermediaryData, epochSetup, epochCommit := readIntermediaryBootstrappingData()
+	intermediaryData := readIntermediaryBootstrappingData()
 
 	log.Info().Msg("constructing root QC")
 	rootQC := constructRootQC(
@@ -170,7 +170,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	}
 
 	log.Info().Msg("constructing root execution result and block seal")
-	result, seal := constructRootResultAndSeal(flagRootCommit, block, epochSetup, epochCommit)
+	result, seal := constructRootResultAndSeal(flagRootCommit, block, intermediaryData.RootEpochSetup, intermediaryData.RootEpochCommit)
 	log.Info().Msg("")
 
 	// construct serializable root protocol snapshot
@@ -537,13 +537,12 @@ func loadRootProtocolSnapshot(path string) (*inmem.Snapshot, error) {
 
 // readIntermediaryBootstrappingData reads intermediary bootstrapping data file from disk.
 // This file needs to be prepared with rootblock command
-// TODO just return IntermediaryBootstrappingData
-func readIntermediaryBootstrappingData() (*IntermediaryBootstrappingData, *flow.EpochSetup, *flow.EpochCommit) {
+func readIntermediaryBootstrappingData() *IntermediaryBootstrappingData {
 	intermediaryData, err := utils.ReadData[IntermediaryBootstrappingData](flagIntermediaryBootstrappingDataPath)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read root epoch data")
 	}
-	return intermediaryData, intermediaryData.RootEpochSetup, intermediaryData.RootEpochCommit
+	return intermediaryData
 }
 
 // generateEmptyExecutionState generates a new empty execution state with the
