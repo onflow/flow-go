@@ -1690,7 +1690,7 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Len(t, logWriter.logs, 1)
-		require.Contains(t, logWriter.logs[0], "conformances does not match in `A`")
+		require.Contains(t, logWriter.logs[0], "conformances do not match in `A`")
 
 		require.Len(t, accountPayloads, 1)
 		assert.Equal(t, oldCode, string(accountPayloads[0].Value()))
