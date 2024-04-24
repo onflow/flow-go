@@ -79,6 +79,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 
 	migrations := NewCadence1Migrations(
 		logger,
+		t.TempDir(),
 		rwf,
 		Options{
 			NWorker:              nWorker,
@@ -698,6 +699,7 @@ func TestBootstrappedStateMigration(t *testing.T) {
 
 	migrations := NewCadence1Migrations(
 		logger,
+		t.TempDir(),
 		rwf,
 		Options{
 			NWorker:              nWorker,
@@ -823,6 +825,7 @@ func TestProgramParsingError(t *testing.T) {
 
 	migrations := NewCadence1Migrations(
 		logger,
+		t.TempDir(),
 		rwf,
 		Options{
 			NWorker:              nWorker,
@@ -948,6 +951,7 @@ func TestCoreContractUsage(t *testing.T) {
 
 		migrations := NewCadence1Migrations(
 			logger,
+			t.TempDir(),
 			rwf,
 			Options{
 				NWorker:              nWorker,

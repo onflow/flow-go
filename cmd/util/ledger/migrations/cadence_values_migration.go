@@ -9,7 +9,6 @@ import (
 
 	"errors"
 
-	"github.com/onflow/atree"
 	"github.com/onflow/cadence/migrations"
 	"github.com/onflow/cadence/migrations/capcons"
 	"github.com/onflow/cadence/migrations/entitlements"
@@ -122,38 +121,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 	var storageHealthErrorBefore error
 	if m.checkStorageHealthBeforeMigration {
 
-		// TODO: use checkStorageHealth
-
-		// Retrieve all slabs before migration.
-		for _, payload := range oldPayloads {
-			registerID, _, err := convert.PayloadToRegister(payload)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert payload to register: %w", err)
-			}
-
-			if !registerID.IsSlabIndex() {
-				continue
-			}
-
-			// Convert the register ID to a storage ID.
-			storageID := atree.NewSlabID(
-				atree.Address([]byte(registerID.Owner)),
-				atree.SlabIndex([]byte(registerID.Key[1:])),
-			)
-
-			// Retrieve the slab.
-			_, _, err = storage.Retrieve(storageID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to retrieve slab %s: %w", storageID, err)
-			}
-		}
-
-		// Load storage map.
-		for _, domain := range allStorageMapDomains {
-			_ = storage.GetStorageMap(address, domain, false)
-		}
-
-		storageHealthErrorBefore = storage.CheckHealth()
+		storageHealthErrorBefore = checkStorageHealth(address, storage, oldPayloads)
 		if storageHealthErrorBefore != nil {
 			m.log.Warn().
 				Err(storageHealthErrorBefore).
