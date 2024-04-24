@@ -117,8 +117,8 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 		return proc.mintTo(call, txHash)
 	case types.WithdrawCallSubType:
 		return proc.withdrawFrom(call, txHash)
-	case types.EstimateGasSubType:
-		return proc.estimateGas(call)
+	case types.DryRunSubType:
+		return proc.dryRun(call)
 	case types.DeployCallSubType:
 		if !call.EmptyToField() {
 			return proc.deployAt(call.From, call.To, call.Data, call.GasLimit, call.Value, txHash)
@@ -272,14 +272,14 @@ func (proc *procedure) withdrawFrom(
 	return res, proc.commitAndFinalize()
 }
 
-func (proc *procedure) estimateGas(call *types.DirectCall) (*types.Result, error) {
+func (proc *procedure) dryRun(call *types.DirectCall) (*types.Result, error) {
 
 	// run the procedure, hash and index don't matter since it won't be emitted anywhere
 	res, err := proc.run(
 		call.Message(),
 		gethCommon.Hash{},
 		0,
-		types.EstimateGasSubType,
+		types.DryRunSubType,
 	)
 	if err != nil {
 		return nil, err

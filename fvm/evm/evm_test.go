@@ -702,10 +702,10 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 	})
 }
 
-func TestGasEstimation(t *testing.T) {
+func TestDryRun(t *testing.T) {
 	t.Parallel()
 
-	t.Run("test successful gas estimation", func(t *testing.T) {
+	t.Run("test successful dry run storing a value", func(t *testing.T) {
 		chain := flow.Emulator.Chain()
 		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 		RunWithNewEnvironment(t,
@@ -721,12 +721,11 @@ func TestGasEstimation(t *testing.T) {
 					import EVM from %s
 
 					access(all)
-					fun main(contract: [UInt8; 20], data: [UInt8]): UInt64 {
-						return EVM.estimateGas(
+					fun main(contract: [UInt8; 20], data: [UInt8]): EVM.Result {
+						return EVM.dryRun(
 							from: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], // random address 
 							to: contract, 
-							gasLimit: 25216, 
-							gasPrice: 100, 
+							gasLimit: 555, 
 							value: EVM.Balance(attoflow: 0), 
 							data: data
 						)
@@ -753,7 +752,13 @@ func TestGasEstimation(t *testing.T) {
 					snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
-				fmt.Println("val", output.Value)
+
+				result, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+				fmt.Println(result, int(result.ErrorCode))
+				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
+				require.Equal(t, types.StatusSuccessful, result.Status)
+				require.True(t, result.GasConsumed > 0)
 			})
 	})
 }

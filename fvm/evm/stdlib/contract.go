@@ -50,6 +50,7 @@ var EVMTransactionBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.T
 var evmTransactionBytesType = sema.NewVariableSizedType(nil, sema.UInt8Type)
 
 var evmAddressBytesType = sema.NewConstantSizedType(nil, sema.UInt8Type, types.AddressLength)
+var evmOptionalAddressBytesType = sema.NewOptionalType(nil, evmAddressBytesType)
 var evmAddressBytesStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, evmAddressBytesType)
 var EVMAddressBytesCadenceType = cadence.NewConstantSizedArrayType(types.AddressLength, cadence.TheUInt8Type)
 
@@ -974,9 +975,9 @@ func newInternalEVMTypeRunFunction(
 
 // estimate gas
 
-const internalEVMTypeEstimateGasFunctionName = "estimateGas"
+const internalEVMTypeDryRunFunctionName = "dryRun"
 
-var internalEVMTypeEstimateGasFunctionType = &sema.FunctionType{
+var internalEVMTypeDryRunFunctionType = &sema.FunctionType{
 	Parameters: []sema.Parameter{
 		{
 			Label:          "from",
@@ -984,15 +985,11 @@ var internalEVMTypeEstimateGasFunctionType = &sema.FunctionType{
 		},
 		{
 			Label:          "to",
-			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+			TypeAnnotation: sema.NewTypeAnnotation(evmOptionalAddressBytesType),
 		},
 		{
 			Label:          "gasLimit",
-			TypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
-		},
-		{
-			Label:          "gasPrice",
-			TypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
+			TypeAnnotation: sema.NewTypeAnnotation(sema.NewOptionalType(nil, sema.UInt64Type)),
 		},
 		{
 			Label:          "value",
@@ -1003,16 +1000,17 @@ var internalEVMTypeEstimateGasFunctionType = &sema.FunctionType{
 			TypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
 		},
 	},
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
+	// Actually EVM.Result, but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 
-func newInternalEVMTypeEstimateGasFunction(
+func newInternalEVMTypeDryRunFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewHostFunctionValue(
 		gauge,
-		internalEVMTypeEstimateGasFunctionType,
+		internalEVMTypeDryRunFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			inter := invocation.Interpreter
 			locationRange := invocation.LocationRange
@@ -1030,38 +1028,41 @@ func newInternalEVMTypeEstimateGasFunction(
 			}
 
 			// Get to address
-
-			toAddressValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			optToAddressValue, ok := invocation.Arguments[1].(*interpreter.SomeValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			toAddress, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, toAddressValue)
-			if err != nil {
-				panic(err)
+			var toAddress *types.Address
+			if val := optToAddressValue.InnerValue(inter, locationRange); val != nil {
+				toAddressValue, ok := val.(*interpreter.ArrayValue)
+				if !ok {
+					panic(errors.NewUnreachableError())
+				}
+
+				converted, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, toAddressValue)
+				if err != nil {
+					panic(err)
+				}
+				toAddress = &converted
 			}
 
 			// Get gas
-
-			gasLimitValue, ok := invocation.Arguments[2].(interpreter.UInt64Value)
-			if !ok {
-				panic(errors.NewUnreachableError())
+			var gasLimit *types.GasLimit
+			x := invocation.Arguments[2].(type)
+			fmt.Println(x)
+			if _, notNil := invocation.Arguments[2].(interpreter.NilValue); notNil {
+				gasValue, ok := invocation.Arguments[2].(interpreter.UInt64Value)
+				if !ok {
+					panic(errors.NewUnreachableError())
+				}
+				converted := types.GasLimit(gasValue)
+				gasLimit = &converted
 			}
-
-			gasLimit := types.GasLimit(gasLimitValue)
-
-			// Get gas price
-
-			gasPriceValue, ok := invocation.Arguments[3].(interpreter.UInt64Value)
-			if !ok {
-				panic(errors.NewUnreachableError())
-			}
-
-			gasPrice := uint64(gasPriceValue)
 
 			// Get balance
 
-			balanceValue, ok := invocation.Arguments[4].(interpreter.UIntValue)
+			balanceValue, ok := invocation.Arguments[3].(interpreter.UIntValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
@@ -1070,7 +1071,7 @@ func newInternalEVMTypeEstimateGasFunction(
 
 			// Get data
 
-			dataValue, ok := invocation.Arguments[5].(*interpreter.ArrayValue)
+			dataValue, ok := invocation.Arguments[4].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
@@ -1082,12 +1083,8 @@ func newInternalEVMTypeEstimateGasFunction(
 
 			// call estimate
 
-			val, err := handler.EstimateGas(fromAddress, toAddress, gasLimit, gasPrice, balance, data)
-			if err != nil {
-				panic(err) // todo change
-			}
-
-			return interpreter.NewUnmeteredUInt64Value(val)
+			res := handler.DryRun(fromAddress, toAddress, gasLimit, balance, data)
+			return NewResultValue(handler, gauge, inter, locationRange, res)
 		},
 	)
 }
@@ -1928,7 +1925,7 @@ func NewInternalEVMContractValue(
 			internalEVMTypeCastToAttoFLOWFunctionName:            newInternalEVMTypeCastToAttoFLOWFunction(gauge, handler),
 			internalEVMTypeCastToFLOWFunctionName:                newInternalEVMTypeCastToFLOWFunction(gauge, handler),
 			internalEVMTypeGetLatestBlockFunctionName:            newInternalEVMTypeGetLatestBlockFunction(gauge, handler),
-			internalEVMTypeEstimateGasFunctionName:               newInternalEVMTypeEstimateGasFunction(gauge, handler),
+			internalEVMTypeDryRunFunctionName:                    newInternalEVMTypeDryRunFunction(gauge, handler),
 		},
 		nil,
 		nil,
@@ -1953,8 +1950,8 @@ var InternalEVMContractType = func() *sema.CompositeType {
 		),
 		sema.NewUnmeteredPublicFunctionMember(
 			ty,
-			internalEVMTypeEstimateGasFunctionName,
-			internalEVMTypeEstimateGasFunctionType,
+			internalEVMTypeDryRunFunctionName,
+			internalEVMTypeDryRunFunctionType,
 			"",
 		),
 		sema.NewUnmeteredPublicFunctionMember(
