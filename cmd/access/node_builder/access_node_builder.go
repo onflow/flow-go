@@ -252,7 +252,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		scriptExecMaxBlock:           math.MaxUint64,
 		registerCacheType:            pStorage.CacheTypeTwoQueue.String(),
 		registerCacheSize:            0,
-		programCacheSize:             10, // 10 blocks
+		programCacheSize:             0,
 	}
 }
 
@@ -1249,7 +1249,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.UintVar(&builder.programCacheSize,
 			"program-cache-size",
 			defaultConfig.programCacheSize,
-			"number of cadence programs to cache for script execution. use 0 to disable cache. default: 1000")
+			"[experimental] number of blocks to cache for cadence programs. use 0 to disable cache. default: 0. Note: this is an experimental feature and may cause nodes to become unstable under certain workloads. Use with caution.")
 
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
