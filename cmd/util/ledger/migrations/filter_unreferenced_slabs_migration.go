@@ -35,6 +35,7 @@ type FilterUnreferencedSlabsMigration struct {
 	mutex            sync.Mutex
 	filteredPayloads []*ledger.Payload
 	payloadsFile     string
+	nWorkers         int
 }
 
 var _ AccountBasedMigration = &FilterUnreferencedSlabsMigration{}
@@ -55,12 +56,14 @@ func NewFilterUnreferencedSlabsMigration(
 func (m *FilterUnreferencedSlabsMigration) InitMigration(
 	log zerolog.Logger,
 	_ []*ledger.Payload,
-	_ int,
+	nWorkers int,
 ) error {
 	m.log = log.
 		With().
 		Str("migration", filterUnreferencedSlabsName).
 		Logger()
+
+	m.nWorkers = nWorkers
 
 	return nil
 }
@@ -73,7 +76,7 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 	newPayloads []*ledger.Payload,
 	err error,
 ) {
-	migrationRuntime, err := NewAtreeRegisterMigratorRuntime(address, oldPayloads)
+	migrationRuntime, err := NewAtreeRegisterMigratorRuntime(m.log, address, oldPayloads, m.nWorkers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
 	}
