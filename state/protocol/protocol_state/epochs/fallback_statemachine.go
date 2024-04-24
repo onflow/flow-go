@@ -26,8 +26,9 @@ var _ StateMachine = (*FallbackStateMachine)(nil)
 func NewFallbackStateMachine(params protocol.GlobalParams, view uint64, parentState *flow.RichProtocolStateEntry) *FallbackStateMachine {
 	state := parentState.ProtocolStateEntry.Copy()
 	nextEpochCommitted := state.EpochPhase() == flow.EpochPhaseCommitted
+	// we are entering fallback mode, this logic needs to be executed only once
 	if !state.InvalidEpochTransitionAttempted {
-		// we are entering fallback mode, this logic needs to be executed only once
+		// the next epoch has not been committed, but possibly setup, make sure it is cleared
 		if !nextEpochCommitted {
 			state.NextEpoch = nil
 		}

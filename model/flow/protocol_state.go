@@ -297,7 +297,7 @@ func (e *RichProtocolStateEntry) Copy() *RichProtocolStateEntry {
 }
 
 func (e *RichProtocolStateEntry) CurrentEpochFinalView() uint64 {
-	if len(e.CurrentEpoch.EpochExtensions) > 1 {
+	if len(e.CurrentEpoch.EpochExtensions) > 0 {
 		return e.CurrentEpoch.EpochExtensions[len(e.CurrentEpoch.EpochExtensions)-1].FinalView
 	}
 	return e.CurrentEpochSetup.FinalView

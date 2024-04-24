@@ -144,3 +144,54 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 			"No extension should be added to the current epoch since next epoch has benn committed")
 	})
 }
+
+// TestEpochFallbackStateMachineInjectsMultipleExtensions tests that the state machine injects multiple extensions
+// as it reaches the safety threshold of the current epoch and the extensions themselves.
+// In this test we are simulating the scenario where the current epoch enters fallback mode when the next epoch has not been committed yet.
+func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMultipleExtensions() {
+	parentProtocolState := s.parentProtocolState.Copy()
+	parentProtocolState.InvalidEpochTransitionAttempted = false
+
+	// finalBlockView is the cumulative number of views that will be produced in the current epoch and its extensions
+	finalBlockView := DefaultEpochExtensionLength*2 +
+		(parentProtocolState.CurrentEpochSetup.FinalView - parentProtocolState.CurrentEpochSetup.FirstView) + 1
+	candidateView := parentProtocolState.CurrentEpochSetup.FirstView + 1
+	for i := uint64(0); i < finalBlockView; i++ {
+		stateMachine := NewFallbackStateMachine(s.params, candidateView, parentProtocolState.Copy())
+		updatedState, _, _ := stateMachine.Build()
+
+		var err error
+		parentProtocolState, err = flow.NewRichProtocolStateEntry(updatedState,
+			parentProtocolState.PreviousEpochSetup,
+			parentProtocolState.PreviousEpochCommit,
+			parentProtocolState.CurrentEpochSetup,
+			parentProtocolState.CurrentEpochCommit,
+			parentProtocolState.NextEpochSetup,
+			parentProtocolState.NextEpochCommit)
+
+		require.NoError(s.T(), err)
+		candidateView++
+	}
+
+	// assert the validity of extensions after producing multiple extensions
+	// we expect 3 extensions to be added to the current epoch
+	// 1 after we reach the commit threshold of the epoch and two more after reaching the threshold of the extensions themselves
+	require.Len(s.T(), parentProtocolState.CurrentEpoch.EpochExtensions, 3)
+	require.Equal(s.T(), flow.EpochExtension{
+		FirstView:     parentProtocolState.CurrentEpochSetup.FinalView + 1,
+		FinalView:     parentProtocolState.CurrentEpochSetup.FinalView + 1 + DefaultEpochExtensionLength,
+		TargetEndTime: 0,
+	}, parentProtocolState.CurrentEpoch.EpochExtensions[0])
+
+	require.Equal(s.T(), flow.EpochExtension{
+		FirstView:     parentProtocolState.CurrentEpoch.EpochExtensions[0].FinalView + 1,
+		FinalView:     parentProtocolState.CurrentEpoch.EpochExtensions[0].FinalView + 1 + DefaultEpochExtensionLength,
+		TargetEndTime: 0,
+	}, parentProtocolState.CurrentEpoch.EpochExtensions[1])
+
+	require.Equal(s.T(), flow.EpochExtension{
+		FirstView:     parentProtocolState.CurrentEpoch.EpochExtensions[1].FinalView + 1,
+		FinalView:     parentProtocolState.CurrentEpoch.EpochExtensions[1].FinalView + 1 + DefaultEpochExtensionLength,
+		TargetEndTime: 0,
+	}, parentProtocolState.CurrentEpoch.EpochExtensions[2])
+}
