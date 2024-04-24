@@ -1714,6 +1714,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			builder.IngestEng, err = ingestion.New(
 				node.Logger,
+				node.EngineRegistry,
 				node.State,
 				node.Me,
 				builder.RequestEng,
@@ -1722,6 +1723,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Collections,
 				node.Storage.Transactions,
 				node.Storage.Results,
+				node.Storage.Receipts,
 				builder.collectionExecutedMetric,
 				processedBlockHeight,
 			)

@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -18,6 +19,8 @@ import (
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/module/util"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -43,6 +46,9 @@ const (
 	// this is to ensure that if a collection is missing for a long time (in terms of block height) it is eventually re-requested
 	missingCollsForAgeThreshold = 100
 
+	// default queue capacity
+	defaultQueueCapacity = 10_000
+
 	// how many workers will concurrently process the tasks in the jobqueue
 	workersCount = 1
 
@@ -65,26 +71,29 @@ var (
 // No errors are expected during normal operation.
 type Engine struct {
 	*component.ComponentManager
-
-	log     zerolog.Logger   // used to log relevant actions with context
-	state   protocol.State   // used to access the  protocol state
-	me      module.Local     // used to access local node information
-	request module.Requester // used to request collections
-
+	messageHandler            *engine.MessageHandler
+	executionReceiptsNotifier engine.Notifier
+	executionReceiptsQueue    engine.MessageStore
 	// Job queue
 	finalizedBlockConsumer *jobqueue.ComponentConsumer
 
 	// Notifier for queue consumer
 	finalizedBlockNotifier engine.Notifier
 
+	log     zerolog.Logger   // used to log relevant actions with context
+	state   protocol.State   // used to access the  protocol state
+	me      module.Local     // used to access local node information
+	request module.Requester // used to request collections
+
 	// storage
 	// FIX: remove direct DB access by substituting indexer module
-	blocks           storage.Blocks
-	headers          storage.Headers
-	collections      storage.Collections
-	transactions     storage.Transactions
-	maxReceiptHeight uint64
-	executionResults storage.ExecutionResults
+	blocks            storage.Blocks
+	headers           storage.Headers
+	collections       storage.Collections
+	transactions      storage.Transactions
+	executionReceipts storage.ExecutionReceipts
+	maxReceiptHeight  uint64
+	executionResults  storage.ExecutionResults
 
 	// metrics
 	collectionExecutedMetric module.CollectionExecutedMetric
@@ -95,6 +104,7 @@ type Engine struct {
 // No errors are expected during normal operation.
 func New(
 	log zerolog.Logger,
+	net network.EngineRegistry,
 	state protocol.State,
 	me module.Local,
 	request module.Requester,
@@ -103,9 +113,29 @@ func New(
 	collections storage.Collections,
 	transactions storage.Transactions,
 	executionResults storage.ExecutionResults,
+	executionReceipts storage.ExecutionReceipts,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	processedHeight storage.ConsumerProgress,
 ) (*Engine, error) {
+	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
+	if err != nil {
+		return nil, fmt.Errorf("could not create execution receipts queue: %w", err)
+	}
+
+	executionReceiptsQueue := &engine.FifoMessageStore{FifoQueue: executionReceiptsRawQueue}
+
+	messageHandler := engine.NewMessageHandler(
+		log,
+		engine.NewNotifier(),
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(*flow.ExecutionReceipt)
+				return ok
+			},
+			Store: executionReceiptsQueue,
+		},
+	)
+
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		log:                      log.With().Str("engine", "ingestion").Logger(),
@@ -117,9 +147,15 @@ func New(
 		collections:              collections,
 		transactions:             transactions,
 		executionResults:         executionResults,
+		executionReceipts:        executionReceipts,
 		maxReceiptHeight:         0,
 		collectionExecutedMetric: collectionExecutedMetric,
 		finalizedBlockNotifier:   engine.NewNotifier(),
+
+		// queue / notifier for execution receipts
+		executionReceiptsNotifier: engine.NewNotifier(),
+		executionReceiptsQueue:    executionReceiptsQueue,
+		messageHandler:            messageHandler,
 	}
 
 	// jobqueue Jobs object that tracks finalized blocks by height. This is used by the finalizedBlockConsumer
@@ -150,8 +186,15 @@ func New(
 	// Add workers
 	e.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(e.processBackground).
+		AddWorker(e.processExecutionReceipts).
 		AddWorker(e.runFinalizedBlockConsumer).
 		Build()
+
+	// register engine with the execution receipt provider
+	_, err = net.Register(channels.ReceiveReceipts, e)
+	if err != nil {
+		return nil, fmt.Errorf("could not register for results: %w", err)
+	}
 
 	return e, nil
 }
@@ -279,10 +322,102 @@ func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready comp
 	}
 }
 
+// processExecutionReceipts is responsible for processing the execution receipts.
+// It listens for incoming execution receipts and processes them asynchronously.
+func (e *Engine) processExecutionReceipts(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+	notifier := e.executionReceiptsNotifier.Channel()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-notifier:
+			err := e.processAvailableExecutionReceipts(ctx)
+			if err != nil {
+				// if an error reaches this point, it is unexpected
+				ctx.Throw(err)
+				return
+			}
+		}
+	}
+}
+
+// processAvailableExecutionReceipts processes available execution receipts in the queue and handles it.
+// It continues processing until the context is canceled.
+//
+// No errors are expected during normal operation.
+func (e *Engine) processAvailableExecutionReceipts(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+		msg, ok := e.executionReceiptsQueue.Get()
+		if !ok {
+			return nil
+		}
+
+		receipt := msg.Payload.(*flow.ExecutionReceipt)
+
+		if err := e.handleExecutionReceipt(msg.OriginID, receipt); err != nil {
+			return err
+		}
+	}
+
+}
+
+// handleExecutionReceipt persists the execution receipt locally.
+// Storing the execution receipt and updates the collection executed metric.
+//
+// No errors are expected during normal operation.
+func (e *Engine) handleExecutionReceipt(_ flow.Identifier, r *flow.ExecutionReceipt) error {
+	// persist the execution receipt locally, storing will also index the receipt
+	err := e.executionReceipts.Store(r)
+	if err != nil {
+		return fmt.Errorf("failed to store execution receipt: %w", err)
+	}
+
+	e.collectionExecutedMetric.ExecutionReceiptReceived(r)
+	return nil
+}
+
+// ProcessLocal processes an event originating on the local node.
+func (e *Engine) ProcessLocal(event interface{}) error {
+	return e.process(e.me.NodeID(), event)
+}
+
+// Process processes the given event from the node with the given origin ID in
+// a blocking manner. It returns the potential processing error when done.
+func (e *Engine) Process(_ channels.Channel, originID flow.Identifier, event interface{}) error {
+	return e.process(originID, event)
+}
+
 // OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
 // Receives block finalized events from the finalization distributor and forwards them to the finalizedBlockConsumer.
 func (e *Engine) OnFinalizedBlock(*model.Block) {
 	e.finalizedBlockNotifier.Notify()
+}
+
+// process processes the given ingestion engine event. Events that are given
+// to this function originate within the expulsion engine on the node with the
+// given origin ID.
+func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+	select {
+	case <-e.ComponentManager.ShutdownSignal():
+		return component.ErrComponentShutdown
+	default:
+	}
+
+	switch event.(type) {
+	case *flow.ExecutionReceipt:
+		err := e.messageHandler.Process(originID, event)
+		e.executionReceiptsNotifier.Notify()
+		return err
+	default:
+		return fmt.Errorf("invalid event type (%T)", event)
+	}
 }
 
 // processFinalizedBlock handles an incoming finalized block.

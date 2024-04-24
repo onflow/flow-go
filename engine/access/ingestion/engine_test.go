@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	downloadermock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -26,6 +27,7 @@ import (
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
@@ -52,6 +54,7 @@ type Suite struct {
 	headers        *storage.Headers
 	collections    *storage.Collections
 	transactions   *storage.Transactions
+	receipts       *storage.ExecutionReceipts
 	results        *storage.ExecutionResults
 	seals          *storage.Seals
 	downloader     *downloadermock.Downloader
@@ -92,11 +95,17 @@ func (s *Suite) SetupTest() {
 	s.proto.params = new(protocol.Params)
 	s.me = new(mockmodule.Local)
 	s.me.On("NodeID").Return(obsIdentity.NodeID)
+	net := new(mocknetwork.Network)
+	conduit := new(mocknetwork.Conduit)
+	net.On("Register", channels.ReceiveReceipts, mock.Anything).
+		Return(conduit, nil).
+		Once()
 	s.request = new(mockmodule.Requester)
 
 	s.provider = new(mocknetwork.Engine)
 	s.headers = new(storage.Headers)
 	s.collections = new(storage.Collections)
+	s.receipts = new(storage.ExecutionReceipts)
 	s.transactions = new(storage.Transactions)
 	s.results = new(storage.ExecutionResults)
 	collectionsToMarkFinalized, err := stdmap.NewTimes(100)
@@ -151,8 +160,8 @@ func (s *Suite) SetupTest() {
 
 	processedHeight := bstorage.NewConsumerProgress(s.db, module.ConsumeProgressIngestionEngineBlockHeight)
 
-	eng, err := New(s.log, s.proto.state, s.me, s.request, s.blocks, s.headers, s.collections,
-		s.transactions, s.results, s.collectionExecutedMetric, processedHeight)
+	eng, err := New(s.log, net, s.proto.state, s.me, s.request, s.blocks, s.headers, s.collections,
+		s.transactions, s.results, s.receipts, s.collectionExecutedMetric, processedHeight)
 	require.NoError(s.T(), err)
 
 	s.blocks.On("GetLastFullBlockHeight").Once().Return(uint64(0), errors.New("do nothing"))
@@ -278,6 +287,53 @@ func (s *Suite) TestOnCollection() {
 	// check that the collection was stored and indexed, and we stored all transactions
 	s.collections.AssertExpectations(s.T())
 	s.transactions.AssertNumberOfCalls(s.T(), "Store", len(collection.Transactions))
+}
+
+// TestExecutionReceiptsAreIndexed checks that execution receipts are properly indexed
+func (s *Suite) TestExecutionReceiptsAreIndexed() {
+
+	originID := unittest.IdentifierFixture()
+	collection := unittest.CollectionFixture(5)
+	light := collection.Light()
+
+	// we should store the light collection and index its transactions
+	s.collections.On("StoreLightAndIndexByTransaction", &light).Return(nil).Once()
+	block := &flow.Block{
+		Header:  &flow.Header{Height: 0},
+		Payload: &flow.Payload{Guarantees: []*flow.CollectionGuarantee{}},
+	}
+	s.blocks.On("ByID", mock.Anything).Return(block, nil)
+
+	// for each transaction in the collection, we should store it
+	needed := make(map[flow.Identifier]struct{})
+	for _, txID := range light.Transactions {
+		needed[txID] = struct{}{}
+	}
+	s.transactions.On("Store", mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			tx := args.Get(0).(*flow.TransactionBody)
+			_, pending := needed[tx.ID()]
+			s.Assert().True(pending, "tx not pending (%x)", tx.ID())
+		},
+	)
+	er1 := unittest.ExecutionReceiptFixture()
+	er2 := unittest.ExecutionReceiptFixture()
+
+	s.receipts.On("Store", mock.Anything).Return(nil)
+	s.blocks.On("ByID", er1.ExecutionResult.BlockID).Return(nil, storerr.ErrNotFound)
+
+	s.receipts.On("Store", mock.Anything).Return(nil)
+	s.blocks.On("ByID", er2.ExecutionResult.BlockID).Return(nil, storerr.ErrNotFound)
+
+	err := s.eng.handleExecutionReceipt(originID, er1)
+	require.NoError(s.T(), err)
+
+	err = s.eng.handleExecutionReceipt(originID, er2)
+	require.NoError(s.T(), err)
+
+	s.receipts.AssertExpectations(s.T())
+	s.results.AssertExpectations(s.T())
+	s.receipts.AssertExpectations(s.T())
 }
 
 // TestOnCollectionDuplicate checks that when a duplicate collection is received, the node doesn't
@@ -615,4 +671,14 @@ func (s *Suite) TestProcessBackgroundCalls() {
 		// last full blk index is not advanced
 		s.blocks.AssertExpectations(s.T()) // not new call to UpdateLastFullBlockHeight should be made
 	})
+}
+
+func (s *Suite) TestComponentShutdown() {
+	// start then shut down the engine
+	unittest.AssertClosesBefore(s.T(), s.eng.Ready(), 10*time.Millisecond)
+	s.cancel()
+	unittest.AssertClosesBefore(s.T(), s.eng.Done(), 10*time.Millisecond)
+
+	err := s.eng.ProcessLocal(&flow.ExecutionReceipt{})
+	s.Assert().ErrorIs(err, component.ErrComponentShutdown)
 }

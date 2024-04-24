@@ -8,9 +8,6 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/google/go-cmp/cmp"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -40,6 +37,7 @@ import (
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
@@ -48,6 +46,10 @@ import (
 	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 type Suite struct {
@@ -605,6 +607,9 @@ func (suite *Suite) TestGetSealedTransaction() {
 		block, collection := suite.createChain()
 
 		// setup mocks
+		conduit := new(mocknetwork.Conduit)
+		suite.net.On("Register", channels.ReceiveReceipts, mock.Anything).Return(conduit, nil).
+			Once()
 		suite.request.On("Request", mock.Anything, mock.Anything).Return()
 
 		colIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
@@ -674,8 +679,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 		// create the ingest engine
 		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
 
-		ingestEng, err := ingestion.New(suite.log, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
-			transactions, results, collectionExecutedMetric, processedHeight)
+		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
+			transactions, results, receipts, collectionExecutedMetric, processedHeight)
 		require.NoError(suite.T(), err)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
@@ -710,7 +715,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 
 		for _, r := range executionReceipts {
-			err = all.Receipts.Store(r)
+			err = ingestEng.Process(channels.ReceiveReceipts, enNodeIDs[0], r)
 			require.NoError(suite.T(), err)
 		}
 
@@ -775,11 +780,13 @@ func (suite *Suite) TestGetTransactionResult() {
 		}, nil)
 
 		// setup mocks
+		conduit := new(mocknetwork.Conduit)
+		suite.net.On("Register", channels.ReceiveReceipts, mock.Anything).Return(conduit, nil).Once()
 		suite.request.On("Request", mock.Anything, mock.Anything).Return()
 
 		// create a mock connection factory
 		connFactory := connectionmock.NewConnectionFactory(suite.T())
-		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil).Maybe()
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 		// initialize storage
 		metrics := metrics.NewNoopCollector()
@@ -831,8 +838,8 @@ func (suite *Suite) TestGetTransactionResult() {
 		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
 
 		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
-			transactions, results, collectionExecutedMetric, processedHeight)
+		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
+			transactions, results, receipts, collectionExecutedMetric, processedHeight)
 		require.NoError(suite.T(), err)
 
 		background, cancel := context.WithCancel(context.Background())
@@ -842,7 +849,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		ingestEng.Start(ctx)
 		<-ingestEng.Ready()
 
-		processNewBlock := func(
+		processExecutionReceipts := func(
 			block *flow.Block,
 			collection *flow.Collection,
 			enNodeIDs flow.IdentifierList,
@@ -862,7 +869,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			require.NoError(suite.T(), err)
 
 			for _, r := range executionReceipts {
-				err = all.Receipts.Store(r)
+				err = ingestEng.Process(channels.ReceiveReceipts, enNodeIDs[0], r)
 				require.NoError(suite.T(), err)
 			}
 		}
@@ -870,8 +877,8 @@ func (suite *Suite) TestGetTransactionResult() {
 		require.NoError(suite.T(), err)
 		finalSnapshot.On("Head").Return(block.Header, nil)
 
-		processNewBlock(block, collection, enNodeIDs, originID, ingestEng)
-		processNewBlock(blockNegative, collectionNegative, enNodeIDs, originID, ingestEng)
+		processExecutionReceipts(block, collection, enNodeIDs, originID, ingestEng)
+		processExecutionReceipts(blockNegative, collectionNegative, enNodeIDs, originID, ingestEng)
 
 		txId := collection.Transactions[0].ID()
 		collectionId := collection.ID()
@@ -1029,6 +1036,37 @@ func (suite *Suite) TestExecuteScript() {
 
 		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
 
+		// initialize metrics related storage
+		metrics := metrics.NewNoopCollector()
+		collectionsToMarkFinalized, err := stdmap.NewTimes(100)
+		require.NoError(suite.T(), err)
+		collectionsToMarkExecuted, err := stdmap.NewTimes(100)
+		require.NoError(suite.T(), err)
+		blocksToMarkExecuted, err := stdmap.NewTimes(100)
+		require.NoError(suite.T(), err)
+
+		collectionExecutedMetric, err := indexer.NewCollectionExecutedMetricImpl(
+			suite.log,
+			metrics,
+			collectionsToMarkFinalized,
+			collectionsToMarkExecuted,
+			blocksToMarkExecuted,
+			collections,
+			all.Blocks,
+		)
+		require.NoError(suite.T(), err)
+
+		conduit := new(mocknetwork.Conduit)
+		suite.net.On("Register", channels.ReceiveReceipts, mock.Anything).Return(conduit, nil).
+			Once()
+
+		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+
+		// create the ingest engine
+		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
+			transactions, results, receipts, collectionExecutedMetric, processedHeight)
+		require.NoError(suite.T(), err)
+
 		// create another block as a predecessor of the block created earlier
 		prevBlock := unittest.BlockWithParentFixture(suite.finalizedBlock)
 
@@ -1042,9 +1080,9 @@ func (suite *Suite) TestExecuteScript() {
 		suite.sealedBlock = lastBlock.Header
 		// create execution receipts for each of the execution node and the last block
 		executionReceipts := unittest.ReceiptsForBlockFixture(lastBlock, identities.NodeIDs())
-
+		// notify the ingest engine about the receipts
 		for _, r := range executionReceipts {
-			err = all.Receipts.Store(r)
+			err = ingestEng.ProcessLocal(r)
 			require.NoError(suite.T(), err)
 		}
 
@@ -1055,9 +1093,9 @@ func (suite *Suite) TestExecuteScript() {
 
 		// create execution receipts for each of the execution node and the previous block
 		executionReceipts = unittest.ReceiptsForBlockFixture(prevBlock, identities.NodeIDs())
-
+		// notify the ingest engine about the receipts
 		for _, r := range executionReceipts {
-			err = all.Receipts.Store(r)
+			err = ingestEng.ProcessLocal(r)
 			require.NoError(suite.T(), err)
 		}
 
