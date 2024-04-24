@@ -732,7 +732,7 @@ func TestDryRun(t *testing.T) {
 							data: data
 						)
 					}
-                    `,
+					`,
 						sc.EVMContract.Address.HexWithPrefix(),
 						gasLimit,
 					))
