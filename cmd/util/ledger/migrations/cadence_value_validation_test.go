@@ -53,10 +53,12 @@ func TestValidateCadenceValues(t *testing.T) {
 			)
 
 			mr, err := NewAtreeRegisterMigratorRuntime(
+				zerolog.Nop(),
 				address,
 				[]*ledger.Payload{
 					accountStatusPayload,
 				},
+				1,
 			)
 			require.NoError(t, err)
 
@@ -146,10 +148,12 @@ func createTestPayloads(t *testing.T, address common.Address, domain string) []*
 	)
 
 	mr, err := NewAtreeRegisterMigratorRuntime(
+		zerolog.Nop(),
 		address,
 		[]*ledger.Payload{
 			accountStatusPayload,
 		},
+		1,
 	)
 	require.NoError(t, err)
 
