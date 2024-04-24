@@ -30,7 +30,9 @@ func (s *EpochFallbackStateMachineSuite) SetupTest() {
 	s.params.On("EpochCommitSafetyThreshold").Return(uint64(200))
 	s.parentProtocolState.InvalidEpochTransitionAttempted = true
 
-	s.stateMachine = NewFallbackStateMachine(s.params, s.candidate.View, s.parentProtocolState.Copy())
+	var err error
+	s.stateMachine, err = NewFallbackStateMachine(s.params, s.candidate.View, s.parentProtocolState.Copy())
+	require.NoError(s.T(), err)
 }
 
 // ProcessEpochSetupIsNoop ensures that processing epoch setup event is noop.
@@ -80,7 +82,8 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 	candidateView := parentProtocolState.CurrentEpochSetup.FinalView - s.params.EpochCommitSafetyThreshold() + 1
 	s.Run("staking-phase", func() {
 
-		stateMachine := NewFallbackStateMachine(s.params, candidateView, parentProtocolState.Copy())
+		stateMachine, err := NewFallbackStateMachine(s.params, candidateView, parentProtocolState.Copy())
+		require.NoError(s.T(), err)
 		require.Equal(s.T(), parentProtocolState.ID(), stateMachine.ParentState().ID())
 		require.Equal(s.T(), candidateView, stateMachine.View())
 
@@ -104,7 +107,8 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 		parentProtocolState.NextEpoch.CommitID = flow.ZeroID
 		parentProtocolState.NextEpochCommit = nil
 
-		stateMachine := NewFallbackStateMachine(s.params, candidateView, parentProtocolState)
+		stateMachine, err := NewFallbackStateMachine(s.params, candidateView, parentProtocolState)
+		require.NoError(s.T(), err)
 		require.Equal(s.T(), parentProtocolState.ID(), stateMachine.ParentState().ID())
 		require.Equal(s.T(), candidateView, stateMachine.View())
 
@@ -130,7 +134,8 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 		// if the next epoch has been committed, the extension shouldn't be added to the current epoch
 		// instead it will be added to the next epoch when **next** epoch reaches its safety threshold.
 
-		stateMachine := NewFallbackStateMachine(s.params, candidateView, parentProtocolState)
+		stateMachine, err := NewFallbackStateMachine(s.params, candidateView, parentProtocolState)
+		require.NoError(s.T(), err)
 		require.Equal(s.T(), parentProtocolState.ID(), stateMachine.ParentState().ID())
 		require.Equal(s.T(), candidateView, stateMachine.View())
 
@@ -161,10 +166,10 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 		(parentProtocolState.CurrentEpochSetup.FinalView - parentProtocolState.CurrentEpochSetup.FirstView) + 1
 	candidateView := parentProtocolState.CurrentEpochSetup.FirstView + 1
 	for i := uint64(0); i < finalBlockView; i++ {
-		stateMachine := NewFallbackStateMachine(s.params, candidateView, parentProtocolState.Copy())
+		stateMachine, err := NewFallbackStateMachine(s.params, candidateView, parentProtocolState.Copy())
+		require.NoError(s.T(), err)
 		updatedState, _, _ := stateMachine.Build()
 
-		var err error
 		parentProtocolState, err = flow.NewRichProtocolStateEntry(updatedState,
 			parentProtocolState.PreviousEpochSetup,
 			parentProtocolState.PreviousEpochCommit,
@@ -216,7 +221,8 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 		1
 	candidateView := parentProtocolState.CurrentEpochSetup.FirstView + 1
 	for i := uint64(0); i < finalBlockView; i++ {
-		stateMachine := NewFallbackStateMachine(s.params, candidateView, parentProtocolState.Copy())
+		stateMachine, err := NewFallbackStateMachine(s.params, candidateView, parentProtocolState.Copy())
+		require.NoError(s.T(), err)
 
 		if candidateView > parentProtocolState.CurrentEpochFinalView() {
 			require.NoError(s.T(), stateMachine.TransitionToNextEpoch())
@@ -224,7 +230,6 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 
 		updatedState, _, _ := stateMachine.Build()
 
-		var err error
 		parentProtocolState, err = flow.NewRichProtocolStateEntry(updatedState,
 			parentProtocolState.PreviousEpochSetup,
 			parentProtocolState.PreviousEpochCommit,

@@ -1,6 +1,7 @@
 package epochs
 
 import (
+	"fmt"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 )
@@ -23,7 +24,8 @@ var _ StateMachine = (*FallbackStateMachine)(nil)
 
 // NewFallbackStateMachine constructs a state machine for epoch fallback, it automatically sets
 // InvalidEpochTransitionAttempted to true, thereby recording that we have entered epoch fallback mode.
-func NewFallbackStateMachine(params protocol.GlobalParams, view uint64, parentState *flow.RichProtocolStateEntry) *FallbackStateMachine {
+// No errors are expected during normal operations.
+func NewFallbackStateMachine(params protocol.GlobalParams, view uint64, parentState *flow.RichProtocolStateEntry) (*FallbackStateMachine, error) {
 	state := parentState.ProtocolStateEntry.Copy()
 	nextEpochCommitted := state.EpochPhase() == flow.EpochPhaseCommitted
 	// we are entering fallback mode, this logic needs to be executed only once
@@ -38,11 +40,14 @@ func NewFallbackStateMachine(params protocol.GlobalParams, view uint64, parentSt
 	if !nextEpochCommitted && view+params.EpochCommitSafetyThreshold() >= parentState.CurrentEpochFinalView() {
 		// we have reached safety threshold and we are still in the fallback mode
 		// prepare a new extension for the current epoch.
-		state.CurrentEpoch.EpochExtensions = append(state.CurrentEpoch.EpochExtensions, flow.EpochExtension{
+		err := state.CurrentEpoch.ExtendEpoch(flow.EpochExtension{
 			FirstView:     parentState.CurrentEpochFinalView() + 1,
 			FinalView:     parentState.CurrentEpochFinalView() + 1 + DefaultEpochExtensionLength, // TODO: replace with EpochExtensionLength
 			TargetEndTime: 0,                                                                     // TODO: calculate and set target end time
 		})
+		if err != nil {
+			return nil, fmt.Errorf("could not produce a valid epoch extension: %w", err)
+		}
 	}
 
 	return &FallbackStateMachine{
@@ -51,7 +56,7 @@ func NewFallbackStateMachine(params protocol.GlobalParams, view uint64, parentSt
 			state:       state,
 			view:        view,
 		},
-	}
+	}, nil
 }
 
 // ProcessEpochSetup processes epoch setup service events, for epoch fallback we are ignoring this event.
