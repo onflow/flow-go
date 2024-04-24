@@ -147,17 +147,81 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 
 // TestEpochFallbackStateMachineInjectsMultipleExtensions tests that the state machine injects multiple extensions
 // as it reaches the safety threshold of the current epoch and the extensions themselves.
-// In this test we are simulating the scenario where the current epoch enters fallback mode when the next epoch has not been committed yet.
+// In this test, we are simulating the scenario where the current epoch enters fallback mode when the next epoch has not been committed yet.
+// When the next epoch has been committed the extension should be added to the next epoch, this is covered in separate test.
 func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMultipleExtensions() {
 	parentProtocolState := s.parentProtocolState.Copy()
 	parentProtocolState.InvalidEpochTransitionAttempted = false
+	unittest.WithNextEpochProtocolState()(parentProtocolState)
+	parentProtocolState.NextEpoch.CommitID = flow.ZeroID
+	parentProtocolState.NextEpochCommit = nil
 
 	// finalBlockView is the cumulative number of views that will be produced in the current epoch and its extensions
-	finalBlockView := DefaultEpochExtensionLength*2 +
+	finalBlockView := DefaultEpochExtensionLength +
 		(parentProtocolState.CurrentEpochSetup.FinalView - parentProtocolState.CurrentEpochSetup.FirstView) + 1
 	candidateView := parentProtocolState.CurrentEpochSetup.FirstView + 1
 	for i := uint64(0); i < finalBlockView; i++ {
 		stateMachine := NewFallbackStateMachine(s.params, candidateView, parentProtocolState.Copy())
+		updatedState, _, _ := stateMachine.Build()
+
+		var err error
+		parentProtocolState, err = flow.NewRichProtocolStateEntry(updatedState,
+			parentProtocolState.PreviousEpochSetup,
+			parentProtocolState.PreviousEpochCommit,
+			parentProtocolState.CurrentEpochSetup,
+			parentProtocolState.CurrentEpochCommit,
+			parentProtocolState.NextEpochSetup,
+			parentProtocolState.NextEpochCommit)
+
+		require.NoError(s.T(), err)
+		candidateView++
+	}
+
+	// assert the validity of extensions after producing multiple extensions,
+	// we expect 2 extensions to be added to the current epoch
+	// 1 after we reach the commit threshold of the epoch and another one after reaching the threshold of the extension themselves
+	require.Len(s.T(), parentProtocolState.CurrentEpoch.EpochExtensions, 2)
+	require.Equal(s.T(), flow.EpochExtension{
+		FirstView:     parentProtocolState.CurrentEpochSetup.FinalView + 1,
+		FinalView:     parentProtocolState.CurrentEpochSetup.FinalView + 1 + DefaultEpochExtensionLength,
+		TargetEndTime: 0,
+	}, parentProtocolState.CurrentEpoch.EpochExtensions[0])
+
+	require.Equal(s.T(), flow.EpochExtension{
+		FirstView:     parentProtocolState.CurrentEpoch.EpochExtensions[0].FinalView + 1,
+		FinalView:     parentProtocolState.CurrentEpoch.EpochExtensions[0].FinalView + 1 + DefaultEpochExtensionLength,
+		TargetEndTime: 0,
+	}, parentProtocolState.CurrentEpoch.EpochExtensions[1])
+
+	require.Greater(s.T(), parentProtocolState.CurrentEpochFinalView(), candidateView,
+		"final view should be greater than final view of test")
+}
+
+// TestEpochFallbackStateMachineInjectsMultipleExtensions_NextEpochCommitted tests that the state machine injects multiple extensions
+// as it reaches the safety threshold of the current epoch and the extensions themselves.
+// In this test we are simulating the scenario where the current epoch enters fallback mode when the next epoch has been committed.
+// It is expected that it will transition into the next epoch (since it was committed)
+// then reach the safety threshold and add the extension to the next epoch, which at that point will be considered 'current'.
+func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMultipleExtensions_NextEpochCommitted() {
+	unittest.SkipUnless(s.T(), unittest.TEST_TODO,
+		"This test doesn't work since it misses logic to transition to the next epoch when we are in EFM.")
+	parentProtocolState := s.parentProtocolState.Copy()
+	parentProtocolState.InvalidEpochTransitionAttempted = false
+	unittest.WithNextEpochProtocolState()(parentProtocolState)
+
+	// finalBlockView is the cumulative number of views that will be produced in the current epoch and its extensions
+	finalBlockView := DefaultEpochExtensionLength +
+		(parentProtocolState.CurrentEpochSetup.FinalView - parentProtocolState.CurrentEpochSetup.FirstView) +
+		(parentProtocolState.NextEpochSetup.FinalView - parentProtocolState.NextEpochSetup.FirstView) +
+		1
+	candidateView := parentProtocolState.CurrentEpochSetup.FirstView + 1
+	for i := uint64(0); i < finalBlockView; i++ {
+		stateMachine := NewFallbackStateMachine(s.params, candidateView, parentProtocolState.Copy())
+
+		if candidateView > parentProtocolState.CurrentEpochFinalView() {
+			require.NoError(s.T(), stateMachine.TransitionToNextEpoch())
+		}
+
 		updatedState, _, _ := stateMachine.Build()
 
 		var err error
@@ -194,4 +258,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 		FinalView:     parentProtocolState.CurrentEpoch.EpochExtensions[1].FinalView + 1 + DefaultEpochExtensionLength,
 		TargetEndTime: 0,
 	}, parentProtocolState.CurrentEpoch.EpochExtensions[2])
+
+	require.Greater(s.T(), parentProtocolState.CurrentEpochFinalView(), candidateView,
+		"final view should be greater than final view of test")
 }
