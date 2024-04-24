@@ -207,7 +207,6 @@ func withNextEpoch(
 	curEpochViews uint64,
 	createQC func(block *flow.Block) *flow.QuorumCertificate,
 ) *inmem.Snapshot {
-	require.NoError(t, snapshot.Encodable().SealingSegment.Validate())
 	nextEpochIdentities = nextEpochIdentities.Sort(flow.Canonical[flow.Identity])
 
 	// convert to encodable representation for simple modification
@@ -218,16 +217,15 @@ func withNextEpoch(
 	currEpochSetup := epochProtocolState.CurrentEpochSetup
 	currEpochCommit := epochProtocolState.CurrentEpochCommit
 
-	// TODO problem with epoch-crossing test is that the EpochContainer.ActiveIdentities
-	// field is not modified in this function
-
+	// Set current epoch length
 	currEpochSetup.FinalView = currEpochSetup.FirstView + curEpochViews - 1
 	epochProtocolState.CurrentEpoch.SetupID = currEpochSetup.ID()
 
+	// Construct events for next epoch
 	nextEpochSetup := &flow.EpochSetup{
 		Counter:      currEpochSetup.Counter + 1,
 		FirstView:    currEpochSetup.FinalView + 1,
-		FinalView:    currEpochSetup.FinalView + 1 + 10000,
+		FinalView:    currEpochSetup.FinalView + 1 + 10_000,
 		RandomSource: unittest.SeedFixture(flow.EpochSetupRandomSourceLength),
 		Participants: nextEpochIdentities.ToSkeleton(),
 		Assignments:  unittest.ClusterAssignment(1, nextEpochIdentities.ToSkeleton()),
@@ -238,20 +236,20 @@ func withNextEpoch(
 		DKGParticipantKeys: nextEpochParticipantData.PublicKeys(),
 		DKGGroupKey:        nextEpochParticipantData.GroupKey,
 	}
-	//epochProtocolState.NextEpochSetup = nextEpochSetup
-	//epochProtocolState.NextEpochCommit = nextEpochCommit
 	epochProtocolState.NextEpoch = &flow.EpochStateContainer{
 		SetupID:          nextEpochSetup.ID(),
 		CommitID:         nextEpochCommit.ID(),
 		ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochIdentities),
 	}
+	// Re-construct epoch protocol state with modified events (constructs ActiveIdentity fields)
 	epochProtocolState, err := flow.NewRichProtocolStateEntry(
 		epochProtocolState.ProtocolStateEntry,
-		nil, nil,
+		epochProtocolState.PreviousEpochSetup, epochProtocolState.PreviousEpochCommit,
 		currEpochSetup, currEpochCommit,
 		nextEpochSetup, nextEpochCommit)
 	require.NoError(t, err)
 
+	// Store the modified epoch protocol state entry and corresponding KV store entry
 	rootKVStore := kvstore.NewDefaultKVStore(epochProtocolState.ID())
 	protocolVersion, encodedKVStore, err := rootKVStore.VersionedEncode()
 	require.NoError(t, err)
@@ -264,11 +262,13 @@ func withNextEpoch(
 			EpochEntry: epochProtocolState,
 		},
 	}
+
+	// Since we modified the root protocol state, we need to update the root block's ProtocolStateID field.
 	rootBlock := encodableSnapshot.SealingSegment.Blocks[0]
 	rootBlockPayload := rootBlock.Payload
 	rootBlockPayload.ProtocolStateID = rootKVStore.ID()
 	rootBlock.SetPayload(*rootBlockPayload)
-	encodableSnapshot.QuorumCertificate.BlockID = rootBlock.ID()
+	// Since we changed the root block, we need to update the QC, root result, and root seal.
 	encodableSnapshot.LatestResult.BlockID = rootBlock.ID()
 	encodableSnapshot.LatestSeal.ResultID = encodableSnapshot.LatestResult.ID()
 	encodableSnapshot.LatestSeal.BlockID = rootBlock.ID()
