@@ -223,7 +223,9 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractsMigratio
 			NewSystemContractChange(
 				systemContracts.EVMContract,
 				evm.ContractCode(
-					flow.HexToAddress(env.FlowTokenAddress),
+					systemContracts.NonFungibleToken.Address,
+					systemContracts.FungibleToken.Address,
+					systemContracts.FlowToken.Address,
 				),
 			),
 		)

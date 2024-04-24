@@ -19,6 +19,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -144,11 +145,18 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	}
 
 	log.Info().Msg("collecting partner network and staking keys")
-	partnerNodes := readPartnerNodeInfos()
+	partnerNodes, err := common.ReadFullPartnerNodeInfos(log, flagPartnerWeights, flagPartnerNodeInfoDir)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read full partner node infos")
+	}
 	log.Info().Msg("")
 
 	log.Info().Msg("generating internal private networking and staking keys")
-	internalNodes := readInternalNodeInfos()
+	internalNodes, err := common.ReadFullInternalNodeInfos(log, flagInternalNodePrivInfoDir, flagConfig)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read full internal node infos")
+	}
+
 	log.Info().Msg("")
 
 	log.Info().Msg("checking constraints on consensus nodes")
@@ -157,7 +165,11 @@ func rootBlock(cmd *cobra.Command, args []string) {
 
 	log.Info().Msg("assembling network and staking keys")
 	stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
-	writeJSON(model.PathNodeInfosPub, model.ToPublicNodeInfoList(stakingNodes))
+	err = common.WriteJSON(model.PathNodeInfosPub, flagOutdir, model.ToPublicNodeInfoList(stakingNodes))
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathNodeInfosPub)
 	log.Info().Msg("")
 
 	log.Info().Msg("running DKG for consensus nodes")
@@ -168,7 +180,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	participants := model.ToIdentityList(stakingNodes).Sort(flow.Canonical[flow.Identity])
 
 	log.Info().Msg("computing collection node clusters")
-	assignments, clusters, err := constructClusterAssignment(partnerNodes, internalNodes)
+	assignments, clusters, err := common.ConstructClusterAssignment(log, model.ToIdentityList(partnerNodes), model.ToIdentityList(internalNodes), int(flagCollectionClusters))
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate cluster assignment")
 	}
@@ -179,7 +191,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root QCs for collection node clusters")
-	clusterQCs := constructRootQCsForClusters(clusters, internalNodes, clusterBlocks)
+	clusterQCs := common.ConstructRootQCsForClusters(log, clusters, internalNodes, clusterBlocks)
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root header")
@@ -206,12 +218,20 @@ func rootBlock(cmd *cobra.Command, args []string) {
 		IntermediaryEpochData:  intermediaryEpochData,
 		IntermediaryParamsData: intermediaryParamsData,
 	}
-	writeJSON(model.PathIntermediaryBootstrappingData, intermediaryData)
+	err = common.WriteJSON(model.PathIntermediaryBootstrappingData, flagOutdir, intermediaryData)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathIntermediaryBootstrappingData)
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root block")
 	block := constructRootBlock(header, epochSetup, epochCommit)
-	writeJSON(model.PathRootBlockData, block)
+	err = common.WriteJSON(model.PathRootBlockData, flagOutdir, block)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathRootBlockData)
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing and writing votes")

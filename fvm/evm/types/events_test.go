@@ -23,6 +23,7 @@ import (
 type blockEventPayload struct {
 	Height            uint64           `cadence:"height"`
 	Hash              string           `cadence:"hash"`
+	Timestamp         uint64           `cadence:"timestamp"`
 	TotalSupply       cadence.Int      `cadence:"totalSupply"`
 	ParentBlockHash   string           `cadence:"parentHash"`
 	ReceiptRoot       string           `cadence:"receiptRoot"`
@@ -48,6 +49,7 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 
 	block := &types.Block{
 		Height:          2,
+		Timestamp:       100,
 		TotalSupply:     big.NewInt(1500),
 		ParentBlockHash: gethCommon.HexToHash("0x2813452cff514c3054ac9f40cd7ce1b016cc78ab7f99f1c6d49708837f6e06d1"),
 		ReceiptRoot:     gethCommon.Hash{},
@@ -71,6 +73,7 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 	assert.Equal(t, bep.Hash, blockHash.Hex())
 
 	assert.Equal(t, bep.TotalSupply.Value, block.TotalSupply)
+	assert.Equal(t, bep.Timestamp, block.Timestamp)
 	assert.Equal(t, bep.ParentBlockHash, block.ParentBlockHash.Hex())
 	assert.Equal(t, bep.ReceiptRoot, block.ReceiptRoot.Hex())
 
