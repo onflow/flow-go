@@ -191,6 +191,7 @@ func buildEpochLookupList(epochs ...protocol.Epoch) []epochInfo {
 func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot protocol.Snapshot, stopper *Stopper) (nodes []*Node, hub *Hub, runFor func(time.Duration)) {
 	consensus, err := rootSnapshot.Identities(filter.HasRole[flow.Identity](flow.RoleConsensus))
 	require.NoError(t, err)
+	fmt.Println("found consensus nodes: ", consensus.NodeIDs())
 
 	epochViewLookup := buildEpochLookupList(rootSnapshot.Epochs().Current(),
 		rootSnapshot.Epochs().Next())

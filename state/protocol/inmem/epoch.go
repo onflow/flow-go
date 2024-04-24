@@ -132,19 +132,10 @@ func (eq Epochs) Previous() protocol.Epoch {
 }
 
 func (eq Epochs) Current() protocol.Epoch {
-	fmt.Println("Epochs.Current", eq.entry.ProtocolStateEntry)
-	fmt.Println("Epochs.Current", eq.entry.CurrentEpochSetup)
-	fmt.Println("Epochs.Current", eq.entry.CurrentEpochCommit)
-
 	return NewCommittedEpoch(eq.entry.CurrentEpochSetup, eq.entry.CurrentEpochCommit)
 }
 
 func (eq Epochs) Next() protocol.Epoch {
-	fmt.Println("Epochs.Next", eq.entry.ProtocolStateEntry)
-	fmt.Println("Epochs.Next", eq.entry.NextEpoch)
-	fmt.Println("Epochs.Next", eq.entry.NextEpochSetup)
-	fmt.Println("Epochs.Next", eq.entry.NextEpochCommit)
-	fmt.Println("Epochs.Next", eq.entry.EpochPhase())
 	switch eq.entry.EpochPhase() {
 	case flow.EpochPhaseStaking:
 		return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
