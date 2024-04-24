@@ -6,13 +6,15 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// ProtocolKVStore persists different snapshots of key-value stores [KV-stores]. Here, we augment
-// the low-level primitives provided by `storage.ProtocolKVStore` with logic for encoding and
-// decoding the state snapshots into abstract representation `protocol_state.KVStoreAPI`.
+// ProtocolKVStore persists different snapshots of the Protocol State's Key-Calue stores [KV-stores].
+// Here, we augment the low-level primitives provided by `storage.ProtocolKVStore` with logic for
+// encoding and decoding the state snapshots into abstract representation `protocol_state.KVStoreAPI`.
 type ProtocolKVStore interface {
-	// StoreTx returns an anonymous function (intended to be executed as part of a badger transaction),
+	// StoreTx returns an anonymous function (intended to be executed as part of a database transaction),
 	// which persists the given KV-store snapshot as part of a DB tx. Per convention, all implementations
-	// of `protocol.KVStoreReader` should be able to successfully  encode their state into a data blob.
+	// of `protocol.KVStoreReader` should be able to successfully encode their state into a data blob.
+	// If the encoding fails, the anonymous function returns an error upon call.
+	//
 	// Expected errors of the returned anonymous function:
 	//   - storage.ErrAlreadyExists if a KV-store snapshot with the given id is already stored.
 	StoreTx(stateID flow.Identifier, kvStore protocol.KVStoreReader) func(*transaction.Tx) error
@@ -28,7 +30,7 @@ type ProtocolKVStore interface {
 	//   - CAUTION: The updated state requires confirmation by a QC and will only become active at the
 	//     child block, _after_ validating the QC.
 	//
-	// Expected errors during normal operations:
+	// Expected errors of the returned anonymous function:
 	//   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed.
 	IndexTx(blockID flow.Identifier, stateID flow.Identifier) func(*transaction.Tx) error
 
