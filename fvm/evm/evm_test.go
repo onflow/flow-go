@@ -885,6 +885,61 @@ func TestDryRun(t *testing.T) {
 				require.NotEqual(t, updatedValue, new(big.Int).SetBytes(res.ReturnedValue).Int64())
 			})
 	})
+
+	t.Run("test dry run contract deployment", func(t *testing.T) {
+		chain := flow.Emulator.Chain()
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					access(all)
+					fun main(data: [UInt8]): EVM.Result {
+						return EVM.dryRun(
+							from: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], // random address 
+							to: nil, 
+							gasLimit: nil, 
+							value: EVM.Balance(attoflow: 0), 
+							data: data
+						)
+					}
+                    `,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				script := fvm.Script(code).WithArguments(
+					json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(testContract.ByteCode),
+						).WithType(stdlib.EVMTransactionBytesCadenceType),
+					),
+				)
+				_, output, err := vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				result, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
+				require.Equal(t, types.StatusSuccessful, result.Status)
+				require.Greater(t, result.GasConsumed, uint64(0))
+				require.NotNil(t, result.ReturnedValue)
+				// todo add once https://github.com/onflow/flow-go/pull/5606 is merged
+				//require.NotNil(t, result.DeployedContractAddress)
+				//require.NotEmpty(t, result.DeployedContractAddress.String())
+			})
+	})
 }
 
 func TestCadenceArch(t *testing.T) {
