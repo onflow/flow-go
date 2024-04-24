@@ -87,7 +87,7 @@ func NewCore(
 	executor BlockExecutor,
 	collectionFetcher CollectionFetcher,
 	eventConsumer EventConsumer,
-) *Core {
+) (*Core, error) {
 	e := &Core{
 		log:               logger.With().Str("engine", "ingestion_core").Logger(),
 		processables:      make(chan flow.Identifier, MaxProcessableBlocks),
@@ -106,7 +106,7 @@ func NewCore(
 
 	err := e.throttle.Init(e.processables)
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("fail to initialize throttle engine")
+		return nil, fmt.Errorf("fail to initialize throttle engine: %w", err)
 	}
 
 	e.log.Info().Msgf("throttle engine initialized")
@@ -119,7 +119,7 @@ func NewCore(
 
 	e.ComponentManager = builder.Build()
 
-	return e
+	return e, nil
 }
 
 func (e *Core) launchWorkerToHandleBlocks(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
