@@ -120,6 +120,9 @@ func TestEventsMerkleRootHash(t *testing.T) {
 	assert.Equal(t, expectedRootHashHex, ABHash.String())
 }
 
+// TestEmptyEventsMerkleRootHash validates that the `EmptyEventCollectionID` constant
+// is equal to the hash of an empty events list. If this test fails, change the hex string constant
+// populating `EmptyEventCollectionID` accordingly.
 func TestEmptyEventsMerkleRootHash(t *testing.T) {
 	actualHash, err := flow.EventsMerkleRootHash([]flow.Event{})
 	require.NoError(t, err)
