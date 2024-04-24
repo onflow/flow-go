@@ -699,8 +699,6 @@ func (suite *Suite) TestGetSealedTransaction() {
 		ingestEng.Start(ctx)
 		<-ingestEng.Ready()
 
-		suite.finalizedBlock = block.Header
-
 		// 2. Ingest engine was notified by the follower engine about a new block.
 		// Follower engine --> Ingest engine
 		mb := &model.Block{
