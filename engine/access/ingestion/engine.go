@@ -365,39 +365,6 @@ func (e *Engine) processAvailableExecutionReceipts(ctx context.Context) error {
 			return err
 		}
 	}
-
-}
-
-// handleExecutionReceipt persists the execution receipt locally.
-// Storing the execution receipt and updates the collection executed metric.
-//
-// No errors are expected during normal operation.
-func (e *Engine) handleExecutionReceipt(_ flow.Identifier, r *flow.ExecutionReceipt) error {
-	// persist the execution receipt locally, storing will also index the receipt
-	err := e.executionReceipts.Store(r)
-	if err != nil {
-		return fmt.Errorf("failed to store execution receipt: %w", err)
-	}
-
-	e.collectionExecutedMetric.ExecutionReceiptReceived(r)
-	return nil
-}
-
-// ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.process(e.me.NodeID(), event)
-}
-
-// Process processes the given event from the node with the given origin ID in
-// a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(_ channels.Channel, originID flow.Identifier, event interface{}) error {
-	return e.process(originID, event)
-}
-
-// OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
-// Receives block finalized events from the finalization distributor and forwards them to the finalizedBlockConsumer.
-func (e *Engine) OnFinalizedBlock(*model.Block) {
-	e.finalizedBlockNotifier.Notify()
 }
 
 // process processes the given ingestion engine event. Events that are given
@@ -418,6 +385,23 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
+}
+
+// ProcessLocal processes an event originating on the local node.
+func (e *Engine) ProcessLocal(event interface{}) error {
+	return e.process(e.me.NodeID(), event)
+}
+
+// Process processes the given event from the node with the given origin ID in
+// a blocking manner. It returns the potential processing error when done.
+func (e *Engine) Process(_ channels.Channel, originID flow.Identifier, event interface{}) error {
+	return e.process(originID, event)
+}
+
+// OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
+// Receives block finalized events from the finalization distributor and forwards them to the finalizedBlockConsumer.
+func (e *Engine) OnFinalizedBlock(*model.Block) {
+	e.finalizedBlockNotifier.Notify()
 }
 
 // processFinalizedBlock handles an incoming finalized block.
@@ -466,6 +450,21 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 
 	e.collectionExecutedMetric.BlockFinalized(block)
 
+	return nil
+}
+
+// handleExecutionReceipt persists the execution receipt locally.
+// Storing the execution receipt and updates the collection executed metric.
+//
+// No errors are expected during normal operation.
+func (e *Engine) handleExecutionReceipt(_ flow.Identifier, r *flow.ExecutionReceipt) error {
+	// persist the execution receipt locally, storing will also index the receipt
+	err := e.executionReceipts.Store(r)
+	if err != nil {
+		return fmt.Errorf("failed to store execution receipt: %w", err)
+	}
+
+	e.collectionExecutedMetric.ExecutionReceiptReceived(r)
 	return nil
 }
 
