@@ -220,12 +220,12 @@ func (e *Engine) runFinalizedBlockConsumer(ctx irrecoverable.SignalerContext, re
 // processFinalizedBlockJob is a handler function for processing finalized block jobs.
 // It converts the job to a block, processes the block, and logs any errors encountered during processing.
 func (e *Engine) processFinalizedBlockJob(ctx irrecoverable.SignalerContext, job module.Job, done func()) {
-	header, err := jobqueue.JobToBlock(job)
+	block, err := jobqueue.JobToBlock(job)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
 	}
 
-	err = e.processFinalizedBlock(header.ID())
+	err = e.processFinalizedBlock(block)
 	if err == nil {
 		done()
 		return
@@ -289,23 +289,18 @@ func (e *Engine) OnFinalizedBlock(*model.Block) {
 // It processes the block, indexes it for further processing, and requests missing collections if necessary.
 //
 // Expected errors during normal operation:
-//   - storage.ErrNotFound - if the block or ast full block height do not exist in the database.
+//   - storage.ErrNotFound - if last full block height does not exist in the database.
+//   - storage.ErrAlreadyExists - if the collection within block or an execution result ID already exists in the database.
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value.
-func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
-	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
-	block, err := e.blocks.ByID(blockID)
-	if err != nil {
-		return fmt.Errorf("failed to lookup block: %w", err)
-	}
-
+func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized
 
 	// TODO: substitute an indexer module as layer between engine and storage
 
 	// index the block storage with each of the collection guarantee
-	err = e.blocks.IndexBlockForCollections(block.Header.ID(), flow.GetIDs(block.Payload.Guarantees))
+	err := e.blocks.IndexBlockForCollections(block.Header.ID(), flow.GetIDs(block.Payload.Guarantees))
 	if err != nil {
 		return fmt.Errorf("could not index block for collections: %w", err)
 	}
