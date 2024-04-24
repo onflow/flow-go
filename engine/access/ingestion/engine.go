@@ -46,7 +46,7 @@ const (
 	// how many workers will concurrently process the tasks in the jobqueue
 	workersCount = 1
 
-	// how many block heights ahead of the current will be requested and tasked for jobqueue
+	// ensure blocks are processed sequentially by jobqueue
 	searchAhead = 1
 )
 
@@ -134,7 +134,7 @@ func New(
 	// create a jobqueue that will process new available finalized block. The `finalizedBlockNotifier` is used to
 	// signal new work, which is being triggered on the `processFinalizedBlockJob` handler.
 	e.finalizedBlockConsumer, err = jobqueue.NewComponentConsumer(
-		e.log.With().Str("module", "finalized_block_consumer").Logger(),
+		e.log.With().Str("module", "ingestion_block_consumer").Logger(),
 		e.finalizedBlockNotifier.Channel(),
 		processedHeight,
 		finalizedBlockReader,
