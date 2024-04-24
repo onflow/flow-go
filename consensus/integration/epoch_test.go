@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -18,7 +17,6 @@ import (
 
 // should be able to reach consensus when identity table contains nodes which are joining in next epoch.
 func TestUnweightedNode(t *testing.T) {
-	unittest.LogVerbose()
 	// stop after building 2 blocks to ensure we can tolerate 0-weight (joining next
 	// epoch) identities, but don't cross an epoch boundary
 	stopper := NewStopper(2, 0)
@@ -97,7 +95,6 @@ func TestStaticEpochTransition(t *testing.T) {
 // test consensus across an epoch boundary, where the identity table changes
 // but the new epoch overlaps with the previous epoch.
 func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
-	unittest.LogVerbose()
 	// must finalize 8 blocks, we specify the epoch transition after 4 views
 	stopper := NewStopper(8, 0)
 	privateNodeInfos := createPrivateNodeIdentities(4)
@@ -113,15 +110,12 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 	firstEpochIdentities, err := rootSnapshot.Identities(filter.Any)
 	require.NoError(t, err)
 
-	fmt.Println("epoch 1 ids: ", firstEpochIdentities.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus)).NodeIDs())
-
 	removedIdentity := privateNodeInfos[0].Identity()
 	newIdentity := privateNodeInfos[3].Identity()
 	nextEpochIdentities := append(
 		firstEpochIdentities.Filter(filter.Not(filter.HasNodeID[flow.Identity](removedIdentity.NodeID))),
 		newIdentity,
 	)
-	fmt.Println("epoch 2 ids: ", nextEpochIdentities.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus)).NodeIDs())
 
 	// generate new identities for next epoch, it will generate new DKG keys for random beacon participants
 	nextEpochParticipantData := completeConsensusIdentities(t, privateNodeInfos[1:])
