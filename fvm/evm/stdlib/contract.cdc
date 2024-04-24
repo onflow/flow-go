@@ -78,28 +78,6 @@ contract EVM {
             )
             emit FLOWTokensDeposited(addressBytes: self.bytes, amount: amount)
         }
-
-        /// Constructs and runs a transaction from the given arguments but
-        /// DOES NOT commit the state, this means the transaction will not
-        /// persist any changes. This is useful for estimating gas it takes
-        /// for transaction to execute, or for calling contract functions
-        /// to retrieve any values. Execution of this function does not
-        /// consume any gas and the gas price is set to 0.
-        access(all)
-        fun dryCall(
-            to: [UInt8; 20],
-            gasLimit: UInt64,
-            value: Balance,
-            data: [UInt8]
-        ): Result {
-            return InternalEVM.dryCall(
-                from: self.bytes,
-                to: to,
-                gasLimit: gasLimit,
-                value: value.attoflow,
-                data: data
-            )
-        }
     }
 
     access(all)
@@ -345,6 +323,28 @@ contract EVM {
             message: "tx is not valid for execution"
         )
         return runResult
+    }
+
+    /// Constructs and runs a transaction from the given arguments but
+    /// DOES NOT commit the state, this means the transaction will not
+    /// persist any changes. This is useful for estimating gas it takes
+    /// for transaction to execute, or for calling contract functions
+    /// to retrieve any values.
+    access(all)
+    fun dryRun(
+        from: [UInt8; 20],
+        to: [UInt8; 20]?,
+        gasLimit: UInt64?,
+        value: Balance,
+        data: [UInt8]
+    ): Result {
+        return InternalEVM.dryRun(
+            from: from,
+            to: to,
+            gasLimit: gasLimit,
+            value: value.attoflow,
+            data: data
+        ) as! Result
     }
 
     access(all)
