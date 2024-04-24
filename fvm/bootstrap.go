@@ -6,7 +6,6 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -345,38 +344,25 @@ func (b *bootstrapExecutor) Execute() error {
 		return err
 	}
 
-	env := templates.Environment{
-		ServiceAccountAddress: service.String(),
-	}
-
-	b.deployViewResolver(service, &env)
-	b.deployBurner(service, &env)
-
-	err = expectAccounts(1)
-	if err != nil {
-		return err
-	}
-
-	fungibleToken := b.deployFungibleToken(&env)
+	fungibleToken := b.deployFungibleToken()
 
 	err = expectAccounts(systemcontracts.FungibleTokenAccountIndex)
 	if err != nil {
 		return err
 	}
 
-	nonFungibleToken := b.deployNonFungibleToken(service, &env)
+	nonFungibleToken := b.deployNonFungibleToken(service)
+	b.deployMetadataViews(fungibleToken, nonFungibleToken)
+	flowToken := b.deployFlowToken(service, fungibleToken, nonFungibleToken)
 
-	b.deployMetadataViews(fungibleToken, nonFungibleToken, &env)
-	b.deployFungibleTokenSwitchboard(fungibleToken, &env)
-
-	flowToken := b.deployFlowToken(service, &env)
 	err = expectAccounts(systemcontracts.FlowTokenAccountIndex)
 	if err != nil {
 		return err
 	}
 
-	b.deployStorageFees(service, &env)
-	feeContract := b.deployFlowFees(service, &env)
+	storageFees := b.deployStorageFees(service, fungibleToken, flowToken)
+	feeContract := b.deployFlowFees(service, fungibleToken, flowToken, storageFees)
+
 	err = expectAccounts(systemcontracts.FlowFeesAccountIndex)
 	if err != nil {
 		return err
