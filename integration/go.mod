@@ -14,7 +14,7 @@ require (
 	github.com/go-git/go-git/v5 v5.5.2
 	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/gorilla/websocket v1.5.0
-	github.com/ipfs/boxo v0.17.0
+	github.com/ipfs/boxo v0.19.0
 	github.com/ipfs/go-cid v0.4.1
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-badger2 v0.1.3
