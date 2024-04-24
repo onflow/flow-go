@@ -2,8 +2,8 @@ package flow
 
 import (
 	"fmt"
-	clone "github.com/huandu/go-clone/generic"
 
+	clone "github.com/huandu/go-clone/generic"
 	"golang.org/x/exp/slices"
 )
 
