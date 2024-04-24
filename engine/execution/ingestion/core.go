@@ -61,10 +61,20 @@ type Core struct {
 	eventConsumer     EventConsumer
 }
 
+// Throttle is used to throttle the blocks to be added to the processables channel
 type Throttle interface {
+	// Init initializes the throttle with the processables channel to forward the blocks
 	Init(processables chan<- flow.Identifier) error
+	// OnBlock is called when a block is received, the throttle will check if the execution
+	// is falling far behind the finalization, and add the block to the processables channel
+	// if it's not falling far behind.
 	OnBlock(blockID flow.Identifier) error
+	// OnBlockExecuted is called when a block is executed, the throttle will check whether
+	// the execution is caught up with the finalization, and allow all the remaining blocks
+	// to be added to the processables channel.
 	OnBlockExecuted(blockID flow.Identifier, height uint64) error
+	// Done stops the throttle, and stop sending new blocks to the processables channel
+	Done() error
 }
 
 type BlockExecutor interface {
@@ -87,7 +97,7 @@ func NewCore(
 	executor BlockExecutor,
 	collectionFetcher CollectionFetcher,
 	eventConsumer EventConsumer,
-) *Core {
+) (*Core, error) {
 	e := &Core{
 		log:               logger.With().Str("engine", "ingestion_core").Logger(),
 		processables:      make(chan flow.Identifier, MaxProcessableBlocks),
@@ -106,7 +116,7 @@ func NewCore(
 
 	err := e.throttle.Init(e.processables)
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("fail to initialize throttle engine")
+		return nil, fmt.Errorf("fail to initialize throttle engine: %w", err)
 	}
 
 	e.log.Info().Msgf("throttle engine initialized")
@@ -119,7 +129,7 @@ func NewCore(
 
 	e.ComponentManager = builder.Build()
 
-	return e
+	return e, nil
 }
 
 func (e *Core) launchWorkerToHandleBlocks(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -182,7 +192,19 @@ func (e *Core) launchWorkerToConsumeThrottledBlocks(ctx irrecoverable.SignalerCo
 	for {
 		select {
 		case <-ctx.Done():
-			e.log.Info().Msgf("irrecoverable.Done() is called")
+			// if the engine has shut down, then mark throttle as Done, which
+			// will stop sending new blocks to e.processables
+			err := e.throttle.Done()
+			if err != nil {
+				ctx.Throw(fmt.Errorf("execution ingestion engine failed to stop throttle: %w", err))
+			}
+
+			// drain the processables
+			e.log.Info().Msgf("draining processables")
+			close(e.processables)
+			for range e.processables {
+			}
+			e.log.Info().Msgf("finish draining processables")
 			return
 
 		case blockID := <-e.processables:
