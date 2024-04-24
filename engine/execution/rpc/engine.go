@@ -294,14 +294,14 @@ func (h *handler) GetEventsForBlockIDs(
 		// result has no events as well, otherwise return an error.
 		// we check the execution result has no event by checking if each chunk's EventCollection is
 		// the default hash for empty event collection.
-		if len(blockEvents) == 0 {
+		if len(blockAllEvents) == 0 {
 			executionResult, err := h.exeResults.ByBlockID(bID)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "failed to get execution result for block: %v", err)
 			}
 
 			for _, chunk := range executionResult.Chunks {
-				if chunk.EventCollection != flow.EmptyEventCollection {
+				if chunk.EventCollection != flow.EmptyEventCollectionID {
 					return nil, status.Errorf(codes.Internal, "events not found for block %s, but chunk %d has events", bID, chunk.Index)
 				}
 			}
