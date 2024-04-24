@@ -94,6 +94,13 @@ func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.State
 	// check if the block already exists
 	blockID := block.ID()
 	executable, ok := q.blocks[blockID]
+
+	q.log.Debug().
+		Str("blockID", blockID.String()).
+		Uint64("height", block.Header.Height).
+		Bool("parent executed", parentFinalState != nil).
+		Msg("handle block")
+
 	if ok {
 		// handle the case where the block has seen before
 		return q.handleKnownBlock(executable, parentFinalState)
@@ -101,14 +108,37 @@ func (q *BlockQueue) HandleBlock(block *flow.Block, parentFinalState *flow.State
 
 	// handling a new block
 
+	_, parentExists := q.blocks[block.Header.ParentID]
 	// if parentFinalState is not provided, then its parent block must exists in the queue
 	// otherwise it's an exception
 	if parentFinalState == nil {
-		_, parentExists := q.blocks[block.Header.ParentID]
 		if !parentExists {
 			return nil, nil,
 				fmt.Errorf("block %s has no parent commitment, but its parent block %s does not exist in the queue: %w",
 					blockID, block.Header.ParentID, ErrMissingParent)
+		}
+	} else {
+		if parentExists {
+			// this is an edge case where A <- B, and B is received with A's final state, however,
+			// A is not executed yet.
+			// the reason this could happen is that there is a race condition in `OnBlockExecuted` and
+			// `HandleBlock`, when A's execution result (which contains the final state) has been
+			// saved to database, and B is received before `blockQueue.OnBlockExecuted(A)` is called, so
+			// `blockQueue.HandleBlock(B, A's final state)` will be called, which run into this case.
+			// In this case, if we consider A is executed, then return B as executables, and later
+			// when `OnBlockExecuted(A)` is called, it will return B as executables again, which
+			// will cause B to be executed twice.
+			// In order to prevent B to be executed twice, we will simply ignore A's final state,
+			// as if its parent has not been executed yet, then B is not executable. And when `OnBlockExecuted(A)`
+			// is called, it will return B as executables, so that both A and B will be executed only once.
+			// See test case: TestHandleBlockChildCalledBeforeOnBlockExecutedParent
+			q.log.Warn().
+				Str("blockID", blockID.String()).
+				Uint64("height", block.Header.Height).
+				Msgf("edge case: receiving block with parent commitment, but its parent block %s still exists",
+					block.Header.ParentID)
+
+			parentFinalState = nil
 		}
 	}
 
@@ -226,6 +256,11 @@ func (q *BlockQueue) OnBlockExecuted(
 	q.Lock()
 	defer q.Unlock()
 
+	q.log.Debug().
+		Str("blockID", blockID.String()).
+		Hex("commit", commit[:]).
+		Msg("block executed")
+
 	return q.onBlockExecuted(blockID, commit)
 }
 
@@ -244,6 +279,12 @@ func (q *BlockQueue) handleKnownBlock(executable *entity.ExecutableBlock, parent
 	// in this case, we will internally call OnBlockExecuted(parentBlockID, parentFinalState).
 	// there is no need to create the executable block again, since it's already created.
 	if executable.StartState == nil && parentFinalState != nil {
+		q.log.Warn().
+			Str("blockID", executable.ID().String()).
+			Uint64("height", executable.Block.Header.Height).
+			Hex("parentID", executable.Block.Header.ParentID[:]).
+			Msg("edge case: receiving block with no parent commitment, but its parent block actually has been executed")
+
 		executables, err := q.onBlockExecuted(executable.Block.Header.ParentID, *parentFinalState)
 		if err != nil {
 			return nil, nil, fmt.Errorf("receiving block %v with parent commitment %v, but parent block %v already exists with no commitment, fail to call mark parent as executed: %w",
