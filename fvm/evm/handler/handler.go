@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"math"
 	"math/big"
 
 	"github.com/onflow/cadence/runtime/common"
@@ -219,52 +220,69 @@ func (h *ContractHandler) run(
 	return res, nil
 }
 
-func (h *ContractHandler) EstimateGas(
+func (h *ContractHandler) DryRun(
 	from types.Address,
-	to types.Address,
-	gasLimit types.GasLimit,
-	gasPrice uint64,
+	to *types.Address,
+	gasLimit *types.GasLimit,
 	value types.Balance,
 	data []byte,
-) (uint64, error) {
+) *types.ResultSummary {
+	res, err := h.dryRun(from, to, gasLimit, value, data)
+	panicOnError(err)
+	return res.ResultSummary()
+}
+
+func (h *ContractHandler) dryRun(
+	from types.Address,
+	to *types.Address,
+	gasLimit *types.GasLimit,
+	value types.Balance,
+	data []byte,
+) (*types.Result, error) {
 
 	ctx, err := h.getBlockContext()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	blk, err := h.emulator.NewBlockView(ctx)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	// todo create a factory
 	call := &types.DirectCall{
-		Type:     types.DirectCallTxType,
-		SubType:  types.EstimateGasSubType,
-		From:     from,
-		To:       to,
-		Data:     data,
-		Value:    value,
-		GasLimit: uint64(gasLimit), // todo gas price
+		Type:    types.DirectCallTxType,
+		SubType: types.DryRunSubType,
+		From:    from,
+		Data:    data,
+		Value:   value,
+	}
+
+	if to != nil {
+		call.To = *to
+	}
+	if gasLimit != nil {
+		call.GasLimit = uint64(*gasLimit)
+	} else {
+		call.GasLimit = math.MaxUint
 	}
 
 	res, err := blk.DirectCall(call)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	// saftey check for result
 	if res == nil {
-		return 0, types.ErrUnexpectedEmptyResult
+		return nil, types.ErrUnexpectedEmptyResult
 	}
 
 	// if invalid return the invalid error
 	if res.Invalid() {
-		return 0, res.ValidationError
+		return nil, res.ValidationError
 	}
 
-	return res.GasConsumed, nil
+	return res, nil
 }
 
 func (h *ContractHandler) checkGasLimit(limit types.GasLimit) error {
