@@ -238,13 +238,19 @@ func withNextEpoch(
 		DKGParticipantKeys: nextEpochParticipantData.PublicKeys(),
 		DKGGroupKey:        nextEpochParticipantData.GroupKey,
 	}
-	epochProtocolState.NextEpochSetup = nextEpochSetup
-	epochProtocolState.NextEpochCommit = nextEpochCommit
+	//epochProtocolState.NextEpochSetup = nextEpochSetup
+	//epochProtocolState.NextEpochCommit = nextEpochCommit
 	epochProtocolState.NextEpoch = &flow.EpochStateContainer{
 		SetupID:          nextEpochSetup.ID(),
 		CommitID:         nextEpochCommit.ID(),
 		ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochIdentities),
 	}
+	epochProtocolState, err := flow.NewRichProtocolStateEntry(
+		epochProtocolState.ProtocolStateEntry,
+		nil, nil,
+		currEpochSetup, currEpochCommit,
+		nextEpochSetup, nextEpochCommit)
+	require.NoError(t, err)
 
 	rootKVStore := kvstore.NewDefaultKVStore(epochProtocolState.ID())
 	protocolVersion, encodedKVStore, err := rootKVStore.VersionedEncode()
