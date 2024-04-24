@@ -18,6 +18,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+func newRegisterID(owner []byte, key []byte) flow.RegisterID {
+	return flow.NewRegisterID(flow.BytesToAddress(owner), string(key))
+}
+
 type AccountsAtreeLedger struct {
 	Accounts environment.Accounts
 }
@@ -29,10 +33,9 @@ func NewAccountsAtreeLedger(accounts environment.Accounts) *AccountsAtreeLedger 
 var _ atree.Ledger = &AccountsAtreeLedger{}
 
 func (a *AccountsAtreeLedger) GetValue(owner, key []byte) ([]byte, error) {
+	registerID := newRegisterID(owner, key)
 	v, err := a.Accounts.GetValue(
-		flow.NewRegisterID(
-			flow.BytesToAddress(owner),
-			string(key)))
+		registerID)
 	if err != nil {
 		return nil, fmt.Errorf("getting value failed: %w", err)
 	}
@@ -40,11 +43,8 @@ func (a *AccountsAtreeLedger) GetValue(owner, key []byte) ([]byte, error) {
 }
 
 func (a *AccountsAtreeLedger) SetValue(owner, key, value []byte) error {
-	err := a.Accounts.SetValue(
-		flow.NewRegisterID(
-			flow.BytesToAddress(owner),
-			string(key)),
-		value)
+	registerID := newRegisterID(owner, key)
+	err := a.Accounts.SetValue(registerID, value)
 	if err != nil {
 		return fmt.Errorf("setting value failed: %w", err)
 	}
@@ -76,8 +76,11 @@ type PayloadsReadonlyLedger struct {
 	SetValueFunc             func(owner, key, value []byte) (err error)
 }
 
+var _ atree.Ledger = &PayloadsReadonlyLedger{}
+
 func (p *PayloadsReadonlyLedger) GetValue(owner, key []byte) (value []byte, err error) {
-	v, err := p.Snapshot.Get(flow.NewRegisterID(flow.BytesToAddress(owner), string(key)))
+	registerID := newRegisterID(owner, key)
+	v, err := p.Snapshot.Get(registerID)
 	if err != nil {
 		return nil, fmt.Errorf("getting value failed: %w", err)
 	}
@@ -93,7 +96,8 @@ func (p *PayloadsReadonlyLedger) SetValue(owner, key, value []byte) (err error) 
 }
 
 func (p *PayloadsReadonlyLedger) ValueExists(owner, key []byte) (bool, error) {
-	exists := p.Snapshot.Exists(flow.NewRegisterID(flow.BytesToAddress(owner), string(key)))
+	registerID := newRegisterID(owner, key)
+	exists := p.Snapshot.Exists(registerID)
 	return exists, nil
 }
 
@@ -237,4 +241,49 @@ func registerIDKeyFromString(s string) (flow.RegisterID, common.Address) {
 
 type PayloadMetaInfo struct {
 	Height, Version uint64
+}
+
+// PayloadsLedger is a simple read/write in-memory atree.Ledger implementation
+type PayloadsLedger struct {
+	Payloads map[flow.RegisterID]*ledger.Payload
+
+	AllocateSlabIndexFunc func(owner []byte) (atree.SlabIndex, error)
+}
+
+var _ atree.Ledger = &PayloadsLedger{}
+
+func NewPayloadsLedger(payloads map[flow.RegisterID]*ledger.Payload) *PayloadsLedger {
+	return &PayloadsLedger{
+		Payloads: payloads,
+	}
+}
+
+func (p *PayloadsLedger) GetValue(owner, key []byte) (value []byte, err error) {
+	registerID := newRegisterID(owner, key)
+	v, ok := p.Payloads[registerID]
+	if !ok {
+		return nil, nil
+	}
+	return v.Value(), nil
+}
+
+func (p *PayloadsLedger) SetValue(owner, key, value []byte) (err error) {
+	registerID := newRegisterID(owner, key)
+	ledgerKey := convert.RegisterIDToLedgerKey(registerID)
+	p.Payloads[registerID] = ledger.NewPayload(ledgerKey, value)
+	return nil
+}
+
+func (p *PayloadsLedger) ValueExists(owner, key []byte) (exists bool, err error) {
+	registerID := newRegisterID(owner, key)
+	_, ok := p.Payloads[registerID]
+	return ok, nil
+}
+
+func (p *PayloadsLedger) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
+	if p.AllocateSlabIndexFunc != nil {
+		return p.AllocateSlabIndexFunc(owner)
+	}
+
+	panic("AllocateStorageIndex not expected to be called")
 }
