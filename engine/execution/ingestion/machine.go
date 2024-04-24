@@ -74,7 +74,7 @@ func NewMachine(
 		return nil, nil, fmt.Errorf("failed to create block throttle: %w", err)
 	}
 
-	core := NewCore(
+	core, err := NewCore(
 		logger,
 		throttle,
 		execState,
@@ -86,6 +86,10 @@ func NewMachine(
 		collectionFetcher,
 		e,
 	)
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create ingestion core: %w", err)
+	}
 
 	e.core = core
 
