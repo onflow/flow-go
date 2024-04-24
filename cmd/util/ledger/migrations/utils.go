@@ -12,12 +12,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/convert"
 )
 
-func checkStorageHealth(
-	address common.Address,
-	storage *runtime.Storage,
-	payloads []*ledger.Payload,
-) error {
-
+func loadAtreeSlabsInStorge(storage *runtime.Storage, payloads []*ledger.Payload) error {
 	for _, payload := range payloads {
 		registerID, _, err := convert.PayloadToRegister(payload)
 		if err != nil {
@@ -38,6 +33,20 @@ func checkStorageHealth(
 		if err != nil {
 			return fmt.Errorf("failed to retrieve slab %s: %w", slabID, err)
 		}
+	}
+
+	return nil
+}
+
+func checkStorageHealth(
+	address common.Address,
+	storage *runtime.Storage,
+	payloads []*ledger.Payload,
+) error {
+
+	err := loadAtreeSlabsInStorge(storage, payloads)
+	if err != nil {
+		return err
 	}
 
 	for _, domain := range allStorageMapDomains {

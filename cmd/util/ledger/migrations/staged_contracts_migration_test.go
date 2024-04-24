@@ -1797,6 +1797,7 @@ func TestConcurrentContractUpdate(t *testing.T) {
 
 	migrations := NewCadence1Migrations(
 		logger,
+		t.TempDir(),
 		rwf,
 		Options{
 			NWorker:              nWorker,
