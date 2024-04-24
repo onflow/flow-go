@@ -33,6 +33,7 @@ type testContractHandler struct {
 	lastExecutedBlock    func() *types.Block
 	run                  func(tx []byte, coinbase types.Address) *types.ResultSummary
 	generateResourceUUID func() uint64
+	dryRun               func(from types.Address, to *types.Address, gasLimit *types.GasLimit, value types.Balance, data []byte) *types.ResultSummary
 }
 
 var _ types.ContractHandler = &testContractHandler{}
@@ -73,6 +74,19 @@ func (t *testContractHandler) Run(tx []byte, coinbase types.Address) *types.Resu
 		panic("unexpected Run")
 	}
 	return t.run(tx, coinbase)
+}
+
+func (t *testContractHandler) DryRun(
+	from types.Address,
+	to *types.Address,
+	gasLimit *types.GasLimit,
+	value types.Balance,
+	data []byte,
+) *types.ResultSummary {
+	if t.dryRun == nil {
+		panic("unexpected DryRun")
+	}
+	return t.dryRun(from, to, gasLimit, value, data)
 }
 
 func (t *testContractHandler) GenerateResourceUUID() uint64 {
@@ -2882,6 +2896,109 @@ func TestEVMRun(t *testing.T) {
 
 	assert.Equal(t, types.StatusSuccessful, types.Status(val.(cadence.UInt8)))
 	assert.True(t, runCalled)
+}
+
+func TestEVMDryRun(t *testing.T) {
+
+	t.Parallel()
+
+	dryRunCalled := false
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+	handler := &testContractHandler{
+		evmContractAddress: common.Address(contractsAddress),
+		dryRun: func(from types.Address, to *types.Address, gasLimit *types.GasLimit, value types.Balance, data []byte) *types.ResultSummary {
+			dryRunCalled = true
+			assert.Equal(t, types.Address{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19}, from)
+			assert.Nil(t, to)
+			require.NotNil(t, gasLimit)
+			assert.Equal(t, uint64(123), uint64(*gasLimit))
+			assert.Equal(t, types.NewBalance(big.NewInt(1)), value)
+			assert.Equal(t, []byte{1, 3, 3, 7}, data)
+
+			return &types.ResultSummary{
+				Status: types.StatusSuccessful,
+			}
+		},
+	}
+
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: LocationResolver,
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
+
+	// Run script
+
+	script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.Result {
+          return EVM.dryRun(
+			from: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], // random address 
+			to: nil, 
+			gasLimit: 123, 
+			value: EVM.Balance(attoflow: 1), 
+			data: [1, 3, 3, 7]
+          )
+      }
+    `)
+
+	val, err := rt.ExecuteScript(
+		runtime.Script{
+			Source: script,
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+	res, err := stdlib.ResultSummaryFromEVMResultValue(val)
+	require.NoError(t, err)
+	assert.Equal(t, types.StatusSuccessful, res.Status)
+	assert.True(t, dryRunCalled)
 }
 
 func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
