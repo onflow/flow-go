@@ -2,13 +2,13 @@ package ingestion
 
 import (
 	"context"
-	"errors"
 	"math/rand"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -17,18 +17,20 @@ import (
 	hotmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	downloadermock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
-	module "github.com/onflow/flow-go/module/mock"
+	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -43,8 +45,8 @@ type Suite struct {
 		params   *protocol.Params
 	}
 
-	me             *module.Local
-	request        *module.Requester
+	me             *modulemock.Local
+	request        *modulemock.Requester
 	provider       *mocknetwork.Engine
 	blocks         *storage.Blocks
 	headers        *storage.Headers
@@ -59,10 +61,12 @@ type Suite struct {
 	log            zerolog.Logger
 
 	collectionExecutedMetric *indexer.CollectionExecutedMetricImpl
-	lastFullBlockHeight      *storage.ConsumerProgress
 
 	eng    *Engine
 	cancel context.CancelFunc
+
+	db                  *badger.DB
+	lastFullBlockHeight *bstorage.MonotonicConsumerProgress
 }
 
 func TestIngestEngine(t *testing.T) {
@@ -95,7 +99,7 @@ func (s *Suite) SetupTest() {
 		nil,
 	).Maybe()
 
-	s.me = new(module.Local)
+	s.me = new(modulemock.Local)
 	s.me.On("NodeID").Return(obsIdentity.NodeID)
 
 	net := new(mocknetwork.Network)
@@ -103,7 +107,7 @@ func (s *Suite) SetupTest() {
 	net.On("Register", channels.ReceiveReceipts, mock.Anything).
 		Return(conduit, nil).
 		Once()
-	s.request = new(module.Requester)
+	s.request = new(modulemock.Requester)
 
 	s.provider = new(mocknetwork.Engine)
 	s.blocks = new(storage.Blocks)
@@ -118,7 +122,6 @@ func (s *Suite) SetupTest() {
 	require.NoError(s.T(), err)
 	blocksToMarkExecuted, err := stdmap.NewTimes(100)
 	require.NoError(s.T(), err)
-	s.lastFullBlockHeight = new(storage.ConsumerProgress)
 
 	s.collectionExecutedMetric, err = indexer.NewCollectionExecutedMetricImpl(
 		s.log,
@@ -131,7 +134,13 @@ func (s *Suite) SetupTest() {
 	)
 	require.NoError(s.T(), err)
 
-	s.lastFullBlockHeight.On("ProcessedIndex").Return(uint64(0), errors.New("do nothing")).Once()
+	s.db, _ = unittest.TempBadgerDB(s.T())
+	s.lastFullBlockHeight, err = bstorage.NewMonotonicConsumerProgress(
+		s.db,
+		module.ConsumeProgressLastFullBlockHeight,
+		s.finalizedBlock.Height,
+	)
+	require.NoError(s.T(), err)
 
 	eng, err := New(s.log, net, s.proto.state, s.me, s.request, s.blocks, s.headers, s.collections,
 		s.transactions, s.results, s.receipts, s.collectionExecutedMetric, s.lastFullBlockHeight)
@@ -146,8 +155,6 @@ func (s *Suite) SetupTest() {
 
 // TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
 func (s *Suite) TestOnFinalizedBlock() {
-	s.lastFullBlockHeight.On("ProcessedIndex").Return(uint64(0), nil).Once()
-
 	block := unittest.BlockFixture()
 	block.SetPayload(unittest.PayloadFixture(
 		unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
@@ -331,7 +338,6 @@ func (s *Suite) TestOnCollectionDuplicate() {
 
 // TestRequestMissingCollections tests that the all missing collections are requested on the call to requestMissingCollections
 func (s *Suite) TestRequestMissingCollections() {
-
 	blkCnt := 3
 	startHeight := uint64(1000)
 	blocks := make([]flow.Block, blkCnt)
@@ -380,7 +386,9 @@ func (s *Suite) TestRequestMissingCollections() {
 			return storerr.ErrNotFound
 		})
 	// consider collections are missing for all blocks
-	s.lastFullBlockHeight.On("ProcessedIndex").Return(startHeight-1, nil)
+	err := s.lastFullBlockHeight.Store(startHeight - 1)
+	require.NoError(s.T(), err)
+
 	// consider the last test block as the head
 	s.finalizedBlock = blocks[blkCnt-1].Header
 
@@ -562,36 +570,11 @@ func (s *Suite) TestProcessBackgroundCalls() {
 	// consider the last test block as the head
 	s.finalizedBlock = finalizedBlk.Header
 
-	s.Run("full block height index is advanced if newer full blocks are discovered", func() {
-		block := blocks[1]
-		s.lastFullBlockHeight.On("SetProcessedIndex", finalizedHeight).Return(nil).Once()
-		s.lastFullBlockHeight.On("ProcessedIndex").Return(func() (uint64, error) {
-			return block.Header.Height, nil
-		}).Once()
-
-		err := s.eng.updateLastFullBlockReceivedIndex()
-		s.Require().NoError(err)
-
-		s.blocks.AssertExpectations(s.T())
-	})
-
-	s.Run("full block height index is not advanced beyond finalized blocks", func() {
-		s.lastFullBlockHeight.On("ProcessedIndex").Return(func() (uint64, error) {
-			return finalizedHeight, nil
-		}).Once()
-
-		err := s.eng.updateLastFullBlockReceivedIndex()
-		s.Require().NoError(err)
-
-		s.blocks.AssertExpectations(s.T()) // not new call to UpdateLastFullBlockHeight should be made
-	})
+	// root block is the last complete block
+	err := s.lastFullBlockHeight.Store(rootBlkHeight)
+	require.NoError(s.T(), err)
 
 	s.Run("missing collections are requested when count exceeds defaultMissingCollsForBlkThreshold", func() {
-		// root block is the last complete block
-		s.lastFullBlockHeight.On("ProcessedIndex").Return(func() (uint64, error) {
-			return rootBlkHeight, nil
-		}).Once()
-
 		// lower the block threshold to request missing collections
 		defaultMissingCollsForBlkThreshold = 2
 
@@ -615,11 +598,6 @@ func (s *Suite) TestProcessBackgroundCalls() {
 	})
 
 	s.Run("missing collections are requested when count exceeds defaultMissingCollsForAgeThreshold", func() {
-		// root block is the last complete block
-		s.lastFullBlockHeight.On("ProcessedIndex").Return(func() (uint64, error) {
-			return rootBlkHeight, nil
-		}).Once()
-
 		// lower the height threshold to request missing collections
 		defaultMissingCollsForAgeThreshold = 1
 
@@ -646,11 +624,6 @@ func (s *Suite) TestProcessBackgroundCalls() {
 	})
 
 	s.Run("missing collections are not requested if defaultMissingCollsForBlkThreshold not reached", func() {
-		// root block is the last complete block
-		s.lastFullBlockHeight.On("ProcessedIndex").Return(func() (uint64, error) {
-			return rootBlkHeight, nil
-		}).Once()
-
 		// raise the thresholds to avoid requesting missing collections
 		defaultMissingCollsForAgeThreshold = 3
 		defaultMissingCollsForBlkThreshold = 3
@@ -667,6 +640,26 @@ func (s *Suite) TestProcessBackgroundCalls() {
 		s.request.AssertExpectations(s.T())
 
 		// last full blk index is not advanced
+		s.blocks.AssertExpectations(s.T()) // not new call to UpdateLastFullBlockHeight should be made
+	})
+
+	s.Run("full block height index is advanced if newer full blocks are discovered", func() {
+		block := blocks[1]
+		err := s.lastFullBlockHeight.Store(block.Header.Height)
+		require.NoError(s.T(), err)
+		err = s.eng.updateLastFullBlockReceivedIndex()
+		s.Require().NoError(err)
+
+		s.blocks.AssertExpectations(s.T())
+	})
+
+	s.Run("full block height index is not advanced beyond finalized blocks", func() {
+		err = s.lastFullBlockHeight.Store(finalizedHeight)
+		s.Require().NoError(err)
+
+		err := s.eng.updateLastFullBlockReceivedIndex()
+		s.Require().NoError(err)
+
 		s.blocks.AssertExpectations(s.T()) // not new call to UpdateLastFullBlockHeight should be made
 	})
 }

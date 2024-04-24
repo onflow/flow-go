@@ -675,8 +675,11 @@ func (suite *Suite) TestGetSealedTransaction() {
 		)
 		require.NoError(suite.T(), err)
 
-		lastFullBlockHeight := bstorage.NewMonotonousConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight)
-		err = lastFullBlockHeight.InitProcessedIndex(suite.rootBlock.Height)
+		lastFullBlockHeight, err := bstorage.NewMonotonicConsumerProgress(
+			db,
+			module.ConsumeProgressLastFullBlockHeight,
+			suite.rootBlock.Height,
+		)
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
@@ -830,8 +833,11 @@ func (suite *Suite) TestGetTransactionResult() {
 		)
 		require.NoError(suite.T(), err)
 
-		lastFullBlockHeight := bstorage.NewMonotonousConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight)
-		err = lastFullBlockHeight.InitProcessedIndex(suite.rootBlock.Height)
+		lastFullBlockHeight, err := bstorage.NewMonotonicConsumerProgress(
+			db,
+			module.ConsumeProgressLastFullBlockHeight,
+			suite.rootBlock.Height,
+		)
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
@@ -1053,8 +1059,11 @@ func (suite *Suite) TestExecuteScript() {
 		suite.net.On("Register", channels.ReceiveReceipts, mock.Anything).Return(conduit, nil).
 			Once()
 
-		lastFullBlockHeight := bstorage.NewMonotonousConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight)
-		err = lastFullBlockHeight.InitProcessedIndex(suite.rootBlock.Height)
+		lastFullBlockHeight, err := bstorage.NewMonotonicConsumerProgress(
+			db,
+			module.ConsumeProgressLastFullBlockHeight,
+			suite.rootBlock.Height,
+		)
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine

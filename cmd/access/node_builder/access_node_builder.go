@@ -1379,7 +1379,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 	ingestionDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(ingestionDependable)
-	var lastFullBlockHeight storage.ConsumerProgress
+	var lastFullBlockHeight *bstorage.MonotonicConsumerProgress
 
 	builder.
 		BuildConsensusFollower().
@@ -1554,14 +1554,19 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Storage.LightTransactionResults)
 			return nil
 		}).
-		Module("processed last full block height monotonous consumer progress", func(node *cmd.NodeConfig) error {
-			lastFullBlockHeight = bstorage.NewMonotonousConsumerProgress(builder.DB, module.ConsumeProgressLastFullBlockHeight)
-			// initializes the index of full blocks to the root block height
+		Module("processed last full block height monotonic consumer progress", func(node *cmd.NodeConfig) error {
 			rootBlockHeight := node.State.Params().FinalizedRoot().Height
-			err := lastFullBlockHeight.InitProcessedIndex(rootBlockHeight)
+
+			var err error
+			lastFullBlockHeight, err = bstorage.NewMonotonicConsumerProgress(
+				builder.DB,
+				module.ConsumeProgressLastFullBlockHeight,
+				rootBlockHeight,
+			)
 			if err != nil {
-				return fmt.Errorf("failed to init last full block height: %w", err)
+				return fmt.Errorf("failed to initialize monotonic consumer progress: %w", err)
 			}
+
 			builder.collectionExecutedMetric.UpdateLastFullBlockHeight(rootBlockHeight)
 			return nil
 		}).

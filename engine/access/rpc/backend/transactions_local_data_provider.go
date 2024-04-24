@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 // ErrTransactionNotInBlock represents an error indicating that the transaction is not found in the block.
@@ -56,7 +57,7 @@ type TransactionsLocalDataProvider struct {
 	txResultsIndex      *index.TransactionResultsIndex
 	txErrorMessages     TransactionErrorMessage
 	systemTxID          flow.Identifier
-	lastFullBlockHeight storage.ConsumerProgress
+	lastFullBlockHeight *bstorage.MonotonicConsumerProgress
 }
 
 // GetTransactionResultFromStorage retrieves a transaction result from storage by block ID and transaction ID.
@@ -323,7 +324,7 @@ func (t *TransactionsLocalDataProvider) DeriveUnknownTransactionStatus(refBlockI
 
 	// the last full height is the height where we have received all
 	// collections  for all blocks with a lower height
-	fullHeight, err := t.lastFullBlockHeight.ProcessedIndex()
+	fullHeight, err := t.lastFullBlockHeight.Load()
 	if err != nil {
 		return flow.TransactionStatusUnknown, err
 	}

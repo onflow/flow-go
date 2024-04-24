@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 // minExecutionNodesCnt is the minimum number of execution nodes expected to have sent the execution receipt for a block
@@ -116,7 +117,7 @@ type Params struct {
 	EventsIndex         *index.EventsIndex
 	TxResultQueryMode   IndexQueryMode
 	TxResultsIndex      *index.TransactionResultsIndex
-	LastFullBlockHeight storage.ConsumerProgress
+	LastFullBlockHeight *bstorage.MonotonicConsumerProgress
 }
 
 var _ TransactionErrorMessage = (*Backend)(nil)

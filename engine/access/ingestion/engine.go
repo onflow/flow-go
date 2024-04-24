@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 const (
@@ -82,7 +83,7 @@ type Engine struct {
 	maxReceiptHeight  uint64
 	executionResults  storage.ExecutionResults
 
-	lastFullBlockHeight storage.ConsumerProgress
+	lastFullBlockHeight *bstorage.MonotonicConsumerProgress
 
 	// metrics
 	collectionExecutedMetric module.CollectionExecutedMetric
@@ -102,7 +103,7 @@ func New(
 	executionResults storage.ExecutionResults,
 	executionReceipts storage.ExecutionReceipts,
 	collectionExecutedMetric module.CollectionExecutedMetric,
-	lastFullBlockHeight storage.ConsumerProgress,
+	lastFullBlockHeight *bstorage.MonotonicConsumerProgress,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
@@ -386,7 +387,7 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 	// skip requesting collections, if this block is below the last full block height
 	// this means that either we have already received these collections, or the block
 	// may contain unverifiable guarantees (in case this node has just joined the network)
-	lastFullBlockHeight, err := e.lastFullBlockHeight.ProcessedIndex()
+	lastFullBlockHeight, err := e.lastFullBlockHeight.Load()
 	if err != nil {
 		return fmt.Errorf("could not get last full block height: %w", err)
 	}
@@ -437,7 +438,7 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 	var startHeight, endHeight uint64
 
 	// get the height of the last block for which all collections were received
-	lastFullHeight, err := e.lastFullBlockHeight.ProcessedIndex()
+	lastFullHeight, err := e.lastFullBlockHeight.Load()
 	if err != nil {
 		return fmt.Errorf("failed to complete requests for missing collections: %w", err)
 	}
@@ -536,7 +537,7 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 // updateLastFullBlockReceivedIndex finds the next highest height where all previous collections
 // have been indexed, and updates the LastFullBlockReceived index to that height
 func (e *Engine) updateLastFullBlockReceivedIndex() error {
-	lastFullHeight, err := e.lastFullBlockHeight.ProcessedIndex()
+	lastFullHeight, err := e.lastFullBlockHeight.Load()
 	if err != nil {
 		return fmt.Errorf("failed to get last full block height: %w", err)
 	}
@@ -555,7 +556,7 @@ func (e *Engine) updateLastFullBlockReceivedIndex() error {
 
 	// if more contiguous blocks are now complete, update db
 	if newLastFullHeight > lastFullHeight {
-		err = e.lastFullBlockHeight.SetProcessedIndex(newLastFullHeight)
+		err = e.lastFullBlockHeight.Store(newLastFullHeight)
 		if err != nil {
 			return fmt.Errorf("failed to update last full block height: %w", err)
 		}
@@ -594,7 +595,7 @@ func (e *Engine) lowestHeightWithMissingCollection(lastFullHeight, finalizedHeig
 // checkMissingCollections requests missing collections if the number of blocks missing collections
 // have reached the defaultMissingCollsForBlkThreshold value.
 func (e *Engine) checkMissingCollections() error {
-	lastFullHeight, err := e.lastFullBlockHeight.ProcessedIndex()
+	lastFullHeight, err := e.lastFullBlockHeight.Load()
 	if err != nil {
 		return err
 	}
