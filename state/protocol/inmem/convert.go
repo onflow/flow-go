@@ -41,33 +41,6 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 		return nil, fmt.Errorf("could not get qc: %w", err)
 	}
 
-	// convert epochs
-	previous, err := FromEpoch(from.Epochs().Previous())
-	// it is possible for valid snapshots to have no previous epoch
-	if errors.Is(err, protocol.ErrNoPreviousEpoch) {
-		snap.Epochs.Previous = nil
-	} else if err != nil {
-		return nil, fmt.Errorf("could not get previous epoch: %w", err)
-	} else {
-		snap.Epochs.Previous = &previous.enc
-	}
-
-	current, err := FromEpoch(from.Epochs().Current())
-	if err != nil {
-		return nil, fmt.Errorf("could not get current epoch: %w", err)
-	}
-	snap.Epochs.Current = current.enc
-
-	next, err := FromEpoch(from.Epochs().Next())
-	// it is possible for valid snapshots to have no next epoch
-	if errors.Is(err, protocol.ErrNextEpochNotSetup) {
-		snap.Epochs.Next = nil
-	} else if err != nil {
-		return nil, fmt.Errorf("could not get next epoch: %w", err)
-	} else {
-		snap.Epochs.Next = &next.enc
-	}
-
 	// convert global state parameters
 	params, err := FromParams(from.Params())
 	if err != nil {
@@ -310,13 +283,6 @@ func SnapshotFromBootstrapStateWithParams(
 			return nil, fmt.Errorf("mismatching cluster and qc: %w", err)
 		}
 	}
-	encodable, err := FromEpoch(NewStartedEpoch(setup, commit, root.Header.Height))
-	if err != nil {
-		return nil, fmt.Errorf("could not convert epoch: %w", err)
-	}
-	epochs := EncodableEpochs{
-		Current: encodable.enc,
-	}
 
 	params := EncodableParams{
 		ChainID:                    root.Header.ChainID,        // chain ID must match the root block
@@ -366,7 +332,6 @@ func SnapshotFromBootstrapStateWithParams(
 			ExtraBlocks: make([]*flow.Block, 0),
 		},
 		QuorumCertificate:   qc,
-		Epochs:              epochs,
 		Params:              params,
 		SealedVersionBeacon: nil,
 	})

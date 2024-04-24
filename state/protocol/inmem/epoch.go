@@ -13,6 +13,7 @@ import (
 )
 
 // Epoch is a memory-backed implementation of protocol.Epoch.
+// TODO remove
 type Epoch struct {
 	enc EncodableEpoch
 }
@@ -124,20 +125,35 @@ type Epochs struct {
 var _ protocol.EpochQuery = (*Epochs)(nil)
 
 func (eq Epochs) Previous() protocol.Epoch {
-	if eq.entry.PreviousEpoch != nil {
-		return
-		return setupEpoch{*eq.enc.Previous}
+	if eq.entry.PreviousEpoch == nil {
+		return invalid.NewEpoch(protocol.ErrNoPreviousEpoch)
 	}
-	return invalid.NewEpoch(protocol.ErrNoPreviousEpoch)
+	return NewCommittedEpoch(eq.entry.PreviousEpochSetup, eq.entry.PreviousEpochCommit)
 }
+
 func (eq Epochs) Current() protocol.Epoch {
-	return Epoch{eq.enc.Current}
+	fmt.Println("Epochs.Current", eq.entry.ProtocolStateEntry)
+	fmt.Println("Epochs.Current", eq.entry.CurrentEpochSetup)
+	fmt.Println("Epochs.Current", eq.entry.CurrentEpochCommit)
+
+	return NewCommittedEpoch(eq.entry.CurrentEpochSetup, eq.entry.CurrentEpochCommit)
 }
+
 func (eq Epochs) Next() protocol.Epoch {
-	if eq.enc.Next != nil {
-		return Epoch{*eq.enc.Next}
+	fmt.Println("Epochs.Next", eq.entry.ProtocolStateEntry)
+	fmt.Println("Epochs.Next", eq.entry.NextEpoch)
+	fmt.Println("Epochs.Next", eq.entry.NextEpochSetup)
+	fmt.Println("Epochs.Next", eq.entry.NextEpochCommit)
+	fmt.Println("Epochs.Next", eq.entry.EpochPhase())
+	switch eq.entry.EpochPhase() {
+	case flow.EpochPhaseStaking:
+		return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
+	case flow.EpochPhaseSetup:
+		return NewSetupEpoch(eq.entry.NextEpochSetup)
+	case flow.EpochPhaseCommitted:
+		return NewCommittedEpoch(eq.entry.NextEpochSetup, eq.entry.NextEpochCommit)
 	}
-	return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
+	return invalid.NewEpochf("unexpected unknown phase in protocol state entry")
 }
 
 // setupEpoch is an implementation of protocol.Epoch backed by an EpochSetup

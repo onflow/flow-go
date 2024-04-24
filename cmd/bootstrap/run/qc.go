@@ -30,6 +30,17 @@ type ParticipantData struct {
 	GroupKey     crypto.PublicKey
 }
 
+// PublicKeys returns all individual public keys (excluding the group public key).
+// The keys are returned in the same order as they appear in the Participants list,
+// which must be DKG index order.
+func (pd *ParticipantData) PublicKeys() []crypto.PublicKey {
+	keys := make([]crypto.PublicKey, len(pd.Participants))
+	for i, participant := range pd.Participants {
+		keys[i] = participant.RandomBeaconPrivKey.PublicKey()
+	}
+	return keys
+}
+
 func (pd *ParticipantData) Identities() flow.IdentityList {
 	nodes := make([]bootstrap.NodeInfo, 0, len(pd.Participants))
 	for _, participant := range pd.Participants {

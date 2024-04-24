@@ -102,6 +102,12 @@ func (segment *SealingSegment) AllBlocks() []*Block {
 	return append(segment.ExtraBlocks, segment.Blocks...)
 }
 
+// IsSporkRoot returns true if this SealingSegment represents a spork root snapshot.
+// Spork root blocks are uniquely self-sealing, and form a sealing segment of length 1.
+func (segment *SealingSegment) IsSporkRoot() bool {
+	return len(segment.Blocks) == 1
+}
+
 // FinalizedSeal returns the seal that seals the lowest block.
 // Per specification, this seal must be included in a SealingSegment.
 // The SealingSegment must be validated.

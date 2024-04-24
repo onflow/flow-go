@@ -2655,13 +2655,14 @@ func assertEpochEmergencyFallbackTriggered(t *testing.T, state realprotocol.Stat
 // mockMetricsForRootSnapshot mocks the given metrics mock object to expect all
 // metrics which are set during bootstrapping and building blocks.
 func mockMetricsForRootSnapshot(metricsMock *mockmodule.ComplianceMetrics, rootSnapshot *inmem.Snapshot) {
-	metricsMock.On("CurrentEpochCounter", rootSnapshot.Encodable().Epochs.Current.Counter)
-	phase, _ := rootSnapshot.Phase()
-	metricsMock.On("CurrentEpochPhase", phase)
-	metricsMock.On("CurrentEpochFinalView", rootSnapshot.Encodable().Epochs.Current.FinalView)
-	metricsMock.On("CurrentDKGPhase1FinalView", rootSnapshot.Encodable().Epochs.Current.DKGPhase1FinalView)
-	metricsMock.On("CurrentDKGPhase2FinalView", rootSnapshot.Encodable().Epochs.Current.DKGPhase2FinalView)
-	metricsMock.On("CurrentDKGPhase3FinalView", rootSnapshot.Encodable().Epochs.Current.DKGPhase3FinalView)
+	epochProtocolState := rootSnapshot.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry
+	epochSetup := epochProtocolState.CurrentEpochSetup
+	metricsMock.On("CurrentEpochCounter", epochSetup.Counter)
+	metricsMock.On("CurrentEpochPhase", epochProtocolState.EpochPhase())
+	metricsMock.On("CurrentEpochFinalView", epochSetup.FinalView)
+	metricsMock.On("CurrentDKGPhase1FinalView", epochSetup.DKGPhase1FinalView)
+	metricsMock.On("CurrentDKGPhase2FinalView", epochSetup.DKGPhase2FinalView)
+	metricsMock.On("CurrentDKGPhase3FinalView", epochSetup.DKGPhase3FinalView)
 	metricsMock.On("BlockSealed", mock.Anything)
 	metricsMock.On("BlockFinalized", mock.Anything)
 	metricsMock.On("FinalizedHeight", mock.Anything)

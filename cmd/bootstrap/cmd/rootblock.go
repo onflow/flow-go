@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/module/epochs"
-	"github.com/onflow/flow-go/state/protocol/inmem"
-
-	"github.com/onflow/cadence"
 
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/state/protocol"
@@ -188,15 +186,11 @@ func rootBlock(cmd *cobra.Command, args []string) {
 
 	log.Info().Msg("constructing intermediary bootstrapping data")
 	epochSetup, epochCommit := constructRootEpochEvents(header.View, participants, assignments, clusterQCs, dkgData)
-	committedEpoch := inmem.NewCommittedEpoch(epochSetup, epochCommit)
-	encodableEpoch, err := inmem.FromEpoch(committedEpoch)
-	if err != nil {
-		log.Fatal().Msg("could not convert root epoch to encodable")
-	}
 	epochConfig := generateExecutionStateEpochConfig(epochSetup, clusterQCs, dkgData)
 	intermediaryEpochData := IntermediaryEpochData{
-		ProtocolStateRootEpoch: encodableEpoch.Encodable(),
-		ExecutionStateConfig:   epochConfig,
+		RootEpochSetup:       epochSetup,
+		RootEpochCommit:      epochCommit,
+		ExecutionStateConfig: epochConfig,
 	}
 	intermediaryParamsData := IntermediaryParamsData{
 		EpochCommitSafetyThreshold: flagEpochCommitSafetyThreshold,

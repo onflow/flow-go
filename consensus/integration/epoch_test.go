@@ -8,10 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
-	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -39,13 +37,7 @@ func TestUnweightedNode(t *testing.T) {
 			currentEpochCollectionNodes,
 			nextEpochParticipantsData.Identities()...)...,
 	)
-	rootSnapshot = withNextEpoch(
-		rootSnapshot,
-		nextEpochIdentities,
-		nextEpochParticipantsData,
-		consensusParticipants,
-		10_000,
-	)
+	rootSnapshot = withNextEpoch(t, rootSnapshot, nextEpochIdentities, nextEpochParticipantsData, consensusParticipants, 10_000)
 
 	nodes, hub, runFor := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
@@ -73,13 +65,7 @@ func TestStaticEpochTransition(t *testing.T) {
 	// set up next epoch beginning in 4 views, with same identities as first epoch
 	nextEpochIdentities, err := rootSnapshot.Identities(filter.Any)
 	require.NoError(t, err)
-	rootSnapshot = withNextEpoch(
-		rootSnapshot,
-		nextEpochIdentities,
-		participantsData,
-		consensusParticipants,
-		4,
-	)
+	rootSnapshot = withNextEpoch(t, rootSnapshot, nextEpochIdentities, participantsData, consensusParticipants, 4)
 
 	nodes, hub, runFor := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
@@ -126,13 +112,7 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 
 	// generate new identities for next epoch, it will generate new DKG keys for random beacon participants
 	nextEpochParticipantData := completeConsensusIdentities(t, privateNodeInfos[1:])
-	rootSnapshot = withNextEpoch(
-		rootSnapshot,
-		nextEpochIdentities,
-		nextEpochParticipantData,
-		consensusParticipants,
-		4,
-	)
+	rootSnapshot = withNextEpoch(t, rootSnapshot, nextEpochIdentities, nextEpochParticipantData, consensusParticipants, 4)
 
 	nodes, hub, runFor := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
@@ -175,13 +155,7 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 		nextEpochParticipantData.Identities()...,                                                   // add new consensus nodes
 	)
 
-	rootSnapshot = withNextEpoch(
-		rootSnapshot,
-		nextEpochIdentities,
-		nextEpochParticipantData,
-		consensusParticipants,
-		4,
-	)
+	rootSnapshot = withNextEpoch(t, rootSnapshot, nextEpochIdentities, nextEpochParticipantData, consensusParticipants, 4)
 
 	nodes, hub, runFor := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
@@ -207,80 +181,60 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 // We make the first (current) epoch start in committed phase so we can transition
 // to the next epoch upon reaching the appropriate view without any further changes
 // to the protocol state.
-func withNextEpoch(
-	snapshot *inmem.Snapshot,
-	nextEpochIdentities flow.IdentityList,
-	nextEpochParticipantData *run.ParticipantData,
-	participantsCache *ConsensusParticipants,
-	curEpochViews uint64,
-) *inmem.Snapshot {
+func withNextEpoch(t *testing.T, snapshot *inmem.Snapshot, nextEpochIdentities flow.IdentityList, nextEpochParticipantData *run.ParticipantData, participantsCache *ConsensusParticipants, curEpochViews uint64) *inmem.Snapshot {
+	nextEpochIdentities = nextEpochIdentities.Sort(flow.Canonical[flow.Identity])
 
 	// convert to encodable representation for simple modification
 	encodableSnapshot := snapshot.Encodable()
 
-	currEpoch := &encodableSnapshot.Epochs.Current // take pointer so assignments apply
-	nextEpochIdentities = nextEpochIdentities.Sort(flow.Canonical[flow.Identity])
+	rootProtocolState := encodableSnapshot.SealingSegment.LatestProtocolStateEntry()
+	epochProtocolState := rootProtocolState.EpochEntry
+	currEpochSetup := epochProtocolState.CurrentEpochSetup
+	currEpochCommit := epochProtocolState.CurrentEpochCommit
 
-	currEpoch.FinalView = currEpoch.FirstView + curEpochViews - 1 // first epoch lasts curEpochViews
-	encodableSnapshot.Epochs.Next = &inmem.EncodableEpoch{
-		Counter:           currEpoch.Counter + 1,
-		FirstView:         currEpoch.FinalView + 1,
-		FinalView:         currEpoch.FinalView + 1 + 10000,
-		RandomSource:      unittest.SeedFixture(flow.EpochSetupRandomSourceLength),
-		InitialIdentities: nextEpochIdentities.ToSkeleton(),
-		// must include info corresponding to EpochCommit event, since we are
-		// starting in committed phase
-		Clustering: unittest.ClusterList(1, nextEpochIdentities.ToSkeleton()),
-		Clusters:   currEpoch.Clusters,
-		DKG: &inmem.EncodableDKG{
-			GroupKey: encodable.RandomBeaconPubKey{
-				PublicKey: nextEpochParticipantData.GroupKey,
-			},
-			Participants: nextEpochParticipantData.Lookup,
-		},
+	currEpochSetup.FinalView = currEpochSetup.FirstView + curEpochViews - 1
+
+	nextEpochSetup := &flow.EpochSetup{
+		Counter:      currEpochSetup.Counter + 1,
+		FirstView:    currEpochSetup.FinalView + 1,
+		FinalView:    currEpochSetup.FinalView + 1 + 10000,
+		RandomSource: unittest.SeedFixture(flow.EpochSetupRandomSourceLength),
+		Participants: nextEpochIdentities.ToSkeleton(),
+		Assignments:  unittest.ClusterAssignment(1, nextEpochIdentities.ToSkeleton()),
 	}
-
-	participantsCache.Update(encodableSnapshot.Epochs.Next.Counter, nextEpochParticipantData)
-
-	encodableSnapshot.LatestSeal.ResultID = encodableSnapshot.LatestResult.ID()
-
-	// update protocol state
-	protocolStateEntry := encodableSnapshot.SealingSegment.LatestProtocolStateEntry()
-	epochProtocolState := protocolStateEntry.EpochEntry.ProtocolStateEntry
-
-	// setup ID has changed, need to update it
-	convertedCurrentEpochSetup, _ := protocol.ToEpochSetup(inmem.NewEpoch(*currEpoch))
-	currentEpochCommit, _ := protocol.ToEpochCommit(inmem.NewEpoch(*currEpoch))
-	epochProtocolState.CurrentEpoch.SetupID = convertedCurrentEpochSetup.ID()
-	// create next epoch protocol state
-	convertedNextEpochSetup, _ := protocol.ToEpochSetup(inmem.NewEpoch(*encodableSnapshot.Epochs.Next))
-	convertedNextEpochCommit, _ := protocol.ToEpochCommit(inmem.NewEpoch(*encodableSnapshot.Epochs.Next))
+	nextEpochCommit := &flow.EpochCommit{
+		Counter: nextEpochSetup.Counter,
+		// TODO do we need these values?
+		ClusterQCs:         currEpochCommit.ClusterQCs,
+		DKGParticipantKeys: nextEpochParticipantData.PublicKeys(),
+		DKGGroupKey:        nextEpochParticipantData.GroupKey,
+	}
+	epochProtocolState.NextEpochSetup = nextEpochSetup
+	epochProtocolState.NextEpochCommit = nextEpochCommit
 	epochProtocolState.NextEpoch = &flow.EpochStateContainer{
-		SetupID:          convertedNextEpochSetup.ID(),
-		CommitID:         convertedNextEpochCommit.ID(),
+		SetupID:          nextEpochSetup.ID(),
+		CommitID:         nextEpochCommit.ID(),
 		ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochIdentities),
 	}
-	richEpochStateEntry, err := flow.NewRichProtocolStateEntry(epochProtocolState, nil, nil, convertedCurrentEpochSetup, currentEpochCommit, convertedNextEpochSetup, convertedNextEpochCommit)
-	if err != nil {
-		panic(err)
-	}
 
-	// need to fix genesis block to contain the correct protocol state ID
-	updatedKVStore := kvstore.NewDefaultKVStore(epochProtocolState.ID())
-	version, data, err := updatedKVStore.VersionedEncode()
-	if err != nil {
-		panic(err)
-	}
-	encodableSnapshot.SealingSegment.Blocks[0].Payload.ProtocolStateID = updatedKVStore.ID()
+	rootKVStore := kvstore.NewDefaultKVStore(epochProtocolState.ID())
+	protocolVersion, encodedKVStore, err := rootKVStore.VersionedEncode()
+	require.NoError(t, err)
 	encodableSnapshot.SealingSegment.ProtocolStateEntries = map[flow.Identifier]*flow.ProtocolStateEntryWrapper{
-		updatedKVStore.ID(): {
+		rootKVStore.ID(): {
 			KVStore: flow.PSKeyValueStoreData{
-				Version: version,
-				Data:    data,
+				Version: protocolVersion,
+				Data:    encodedKVStore,
 			},
-			EpochEntry: richEpochStateEntry,
+			EpochEntry: epochProtocolState,
 		},
 	}
+	encodableSnapshot.SealingSegment.Blocks[0].Payload.ProtocolStateID = rootKVStore.ID()
+
+	participantsCache.Update(nextEpochSetup.Counter, nextEpochParticipantData)
+
+	// TODO necessary?
+	encodableSnapshot.LatestSeal.ResultID = encodableSnapshot.LatestResult.ID()
 
 	return inmem.SnapshotFromEncodable(encodableSnapshot)
 }

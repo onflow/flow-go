@@ -22,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
@@ -538,21 +537,13 @@ func loadRootProtocolSnapshot(path string) (*inmem.Snapshot, error) {
 
 // readIntermediaryBootstrappingData reads intermediary bootstrapping data file from disk.
 // This file needs to be prepared with rootblock command
+// TODO just return IntermediaryBootstrappingData
 func readIntermediaryBootstrappingData() (*IntermediaryBootstrappingData, *flow.EpochSetup, *flow.EpochCommit) {
 	intermediaryData, err := utils.ReadData[IntermediaryBootstrappingData](flagIntermediaryBootstrappingDataPath)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read root epoch data")
 	}
-	epoch := inmem.NewEpoch(intermediaryData.ProtocolStateRootEpoch)
-	setup, err := protocol.ToEpochSetup(epoch)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not extract setup event")
-	}
-	commit, err := protocol.ToEpochCommit(epoch)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not extract commit event")
-	}
-	return intermediaryData, setup, commit
+	return intermediaryData, intermediaryData.RootEpochSetup, intermediaryData.RootEpochCommit
 }
 
 // generateEmptyExecutionState generates a new empty execution state with the

@@ -2,7 +2,6 @@ package flow
 
 import (
 	"fmt"
-
 	"golang.org/x/exp/slices"
 )
 
@@ -292,6 +291,12 @@ func (e *ProtocolStateEntry) EpochPhase() EpochPhase {
 		return EpochPhaseSetup // if only the Setup event is known for the next epoch but not the Commit event, we are in the Setup Phase
 	}
 	return EpochPhaseCommitted // if the Setup and Commit events are known for the next epoch, we are in the Committed Phase
+}
+
+// EpochCounter returns the current epoch counter.
+// The receiver RichProtocolStateEntry must be properly constructed.
+func (e *RichProtocolStateEntry) EpochCounter() uint64 {
+	return e.CurrentEpochSetup.Counter
 }
 
 func (ll DynamicIdentityEntryList) Lookup() map[Identifier]*DynamicIdentityEntry {
