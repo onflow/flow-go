@@ -157,7 +157,9 @@ jobs:
       #env:
       #  RACE_DETECTOR: 1
     - name: Upload coverage report
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
+      timeout-minutes: 1
+      continue-on-error: true
       with:
         file: ./coverage.txt
         flags: unittests
@@ -193,7 +195,9 @@ jobs:
         #env:
         #  RACE_DETECTOR: 1
       - name: Upload coverage report
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
+        timeout-minutes: 1
+        continue-on-error: true
         with:
           file: ./coverage.txt
           flags: unittests
@@ -270,7 +274,9 @@ jobs:
         #env:
         #  RACE_DETECTOR: 1
       - name: Upload coverage report
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
+        timeout-minutes: 1
+        continue-on-error: true
         with:
           file: ./coverage.txt
           flags: unittests
