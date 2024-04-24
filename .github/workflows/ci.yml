@@ -164,6 +164,7 @@ jobs:
         file: ./coverage.txt
         flags: unittests
         name: codecov-umbrella
+        token: ${{ secrets.CODECOV_TOKEN }}
 
   unit-test-insecure:
     name: Unit Tests Insecure (${{ matrix.targets.name }})
@@ -202,6 +203,7 @@ jobs:
           file: ./coverage.txt
           flags: unittests
           name: codecov-umbrella
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   docker-build:
     name: Docker Build
@@ -281,6 +283,7 @@ jobs:
           file: ./coverage.txt
           flags: unittests
           name: codecov-umbrella
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   integration-test:
     name: Integration Tests
