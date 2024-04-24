@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ipfs/go-blockservice"
+	"github.com/ipfs/boxo/blockservice"
+	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/component"
