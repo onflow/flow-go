@@ -34,6 +34,7 @@ import (
 // TODO add test for fatal errors
 
 var flowTokenAddress = common.MustBytesToAddress(systemcontracts.SystemContractsForChain(flow.Emulator).FlowToken.Address.Bytes())
+var randomBeaconAddress = systemcontracts.SystemContractsForChain(flow.Emulator).RandomBeaconHistory.Address
 
 func TestHandler_TransactionRunOrPanic(t *testing.T) {
 	t.Parallel()
@@ -831,9 +832,10 @@ func TestHandler_TransactionRun(t *testing.T) {
 					aa := handler.NewAddressAllocator()
 
 					gasConsumed := testutils.RandomGas(1000)
+					addr := testutils.RandomAddress(t)
 					result := func(tx *gethTypes.Transaction) *types.Result {
 						return &types.Result{
-							DeployedContractAddress: testutils.RandomAddress(t),
+							DeployedContractAddress: &addr,
 							ReturnedValue:           testutils.RandomData(t),
 							GasConsumed:             gasConsumed,
 							TxHash:                  tx.Hash(),
@@ -854,7 +856,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 							return runResults, nil
 						},
 					}
-					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, bs, aa, backend, em)
+					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em)
 
 					coinbase := types.NewAddress(gethCommon.Address{})
 					gasLimit := uint64(100_000)
@@ -941,9 +943,10 @@ func TestHandler_TransactionRun(t *testing.T) {
 					aa := handler.NewAddressAllocator()
 
 					gasConsumed := testutils.RandomGas(1000)
+					addr := testutils.RandomAddress(t)
 					result := func() *types.Result {
 						return &types.Result{
-							DeployedContractAddress: testutils.RandomAddress(t),
+							DeployedContractAddress: &addr,
 							ReturnedValue:           testutils.RandomData(t),
 							GasConsumed:             gasConsumed,
 							Logs: []*gethTypes.Log{
@@ -962,7 +965,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 							return res, nil
 						},
 					}
-					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, bs, aa, backend, em)
+					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em)
 					coinbase := types.NewAddress(gethCommon.Address{})
 
 					// batch run empty transactions
