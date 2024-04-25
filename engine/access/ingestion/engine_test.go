@@ -88,7 +88,7 @@ func (s *Suite) SetupTest() {
 
 	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 
-	s.blocks = new(storage.Blocks)
+	s.blocks = storage.NewBlocks(s.T())
 	// mock out protocol state
 	s.proto.state = new(protocol.FollowerState)
 	s.proto.snapshot = new(protocol.Snapshot)
@@ -205,7 +205,6 @@ func (s *Suite) TestOnFinalizedBlock() {
 	}
 
 	// we should query the block once and index the guarantee payload once
-	s.blocks.On("ByID", block.ID()).Return(&block, nil).Twice()
 	for _, g := range block.Payload.Guarantees {
 		collection := unittest.CollectionFixture(1)
 		light := collection.Light()
@@ -244,11 +243,9 @@ func (s *Suite) TestOnFinalizedBlock() {
 			wg.Done()
 		},
 	)
-	s.blocks.On("UpdateLastFullBlockHeight", s.finalizedBlock.Height).Return(nil).Once()
 
 	// process the block through the finalized callback
 	s.eng.OnFinalizedBlock(&hotstuffBlock)
-
 	s.Assertions.Eventually(func() bool {
 		wg.Wait()
 		return true
