@@ -193,6 +193,30 @@ func BlockFixture() flow.Block {
 	return *BlockWithParentFixture(header)
 }
 
+func ChainBlockFixtureWithRoot(root *flow.Header, n int) []*flow.Block {
+	bs := make([]*flow.Block, 0, n)
+	parent := root
+	for i := 0; i < n; i++ {
+		b := BlockWithParentFixture(parent)
+		bs = append(bs, b)
+		parent = b.Header
+	}
+	return bs
+}
+
+func RechainBlocks(blocks []*flow.Block) {
+	if len(blocks) == 0 {
+		return
+	}
+
+	parent := blocks[0]
+
+	for _, block := range blocks[1:] {
+		block.Header.ParentID = parent.ID()
+		parent = block
+	}
+}
+
 func FullBlockFixture() flow.Block {
 	block := BlockFixture()
 	payload := block.Payload
@@ -584,6 +608,17 @@ func WithCollection(collection *flow.Collection) func(guarantee *flow.Collection
 	return func(guarantee *flow.CollectionGuarantee) {
 		guarantee.CollectionID = collection.ID()
 	}
+}
+
+func AddCollectionsToBlock(block *flow.Block, collections []*flow.Collection) {
+	gs := make([]*flow.CollectionGuarantee, 0, len(collections))
+	for _, collection := range collections {
+		g := collection.Guarantee()
+		gs = append(gs, &g)
+	}
+
+	block.Payload.Guarantees = gs
+	block.SetPayload(*block.Payload)
 }
 
 func CollectionGuaranteeFixture(options ...func(*flow.CollectionGuarantee)) *flow.CollectionGuarantee {

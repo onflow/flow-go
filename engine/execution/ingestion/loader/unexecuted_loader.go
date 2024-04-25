@@ -60,7 +60,7 @@ func (e *UnexecutedLoader) LoadUnexecuted(ctx context.Context) ([]flow.Identifie
 	// don't reload root block
 	rootBlock, err := e.state.Params().SealedRoot()
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve root block: %w", err)
+		return nil, fmt.Errorf("could not get sealed root block: %w", err)
 	}
 
 	blockIDs := make([]flow.Identifier, 0)
@@ -153,7 +153,7 @@ func (e *UnexecutedLoader) finalizedUnexecutedBlocks(ctx context.Context, finali
 	// [sealedRoot.Height + 1, finalizedRoot.Height] and execute them on startup.
 	rootBlock, err := e.state.Params().SealedRoot()
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve root block: %w", err)
+		return nil, fmt.Errorf("could not get sealed root block: %w", err)
 	}
 
 	for ; lastExecuted > rootBlock.Height; lastExecuted-- {
