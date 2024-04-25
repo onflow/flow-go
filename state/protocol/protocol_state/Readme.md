@@ -4,11 +4,11 @@
   and supplemental protocol-data into each block. Think about it as a key value store in each block. 
 - The Flow network uses its Dynamic Protocol State to orchestrate Epoch switchovers and more generally control participation privileges
   for the network (including ejection of misbehaving or compromised nodes).
-- Furthermore, the Dynamic Protocol State makes it easily possible update operational protocol parameters on the live network via a governance transaction.
+- Furthermore, the Dynamic Protocol State makes it easily possible to update operational protocol parameters on the live network via a governance transaction.
   For example, we could update consensus timing parameters such as `hotstuff-min-timeout`.
 
 These examples from above all use the same primitives provided by the Dynamic Protocol State: 
- - (i) a Key-value store, whose hash-commitment is included at the end of every block,
+ - (i) a Key-value store, whose hash-commitment is included in the payload of every block,
  - (ii) a set of rules (represented as a state machine) that updates the key-value-store from block to block, and
  - (iii) dedicated `Service Events` originating from the System Smart Contracts (via verification and sealing) are the inputs to the state machines (ii).  
 
