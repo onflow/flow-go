@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
-	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -144,18 +144,23 @@ func New(
 
 // getExecutionData returns the execution data for the given block height.
 // Expected errors during normal operation:
-// - storage.ErrNotFound or execution_data.BlobNotFoundError: execution data for the given block height is not available.
+// - subscription.ErrBlockNotReady: execution data for the given block height is not available.
 func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64) (*execution_data.BlockExecutionDataEntity, error) {
 	highestHeight := b.ExecutionDataTracker.GetHighestHeight()
 	// fail early if no notification has been received for the given block height.
 	// note: it's possible for the data to exist in the data store before the notification is
 	// received. this ensures a consistent view is available to all streams.
 	if height > highestHeight {
-		return nil, fmt.Errorf("execution data for block %d is not available yet: %w", height, storage.ErrNotFound)
+		return nil, fmt.Errorf("execution data for block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
 	}
 
 	execData, err := b.execDataCache.ByHeight(ctx, height)
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) ||
+			execution_data.IsBlobNotFoundError(err) {
+			err = errors.Join(err, subscription.ErrBlockNotReady)
+			return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
+		}
 		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
 	}
 
