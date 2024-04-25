@@ -106,17 +106,6 @@ func NewMachine(
 	return e, core, nil
 }
 
-var _ module.ReadyDoneAware = (*Machine)(nil)
-
-// ReadyDoneAware implementation
-func (e *Machine) Ready() <-chan struct{} {
-	return e.core.Ready()
-}
-
-func (e *Machine) Done() <-chan struct{} {
-	return e.core.Done()
-}
-
 // Protocol Events implementation
 func (e *Machine) BlockProcessable(b *flow.Header, qc *flow.QuorumCertificate) {
 	e.core.OnBlock(b, qc)
