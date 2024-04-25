@@ -164,7 +164,9 @@ func (e *Core) launchWorkerToExecuteBlocks(ctx irrecoverable.SignalerContext, re
 }
 
 func (e *Core) OnBlock(header *flow.Header, qc *flow.QuorumCertificate) {
-	e.log.Debug().Msgf("received block %v (%v)", header.Height, qc.BlockID)
+	e.log.Debug().
+		Hex("block_id", qc.BlockID[:]).Uint64("height", header.Height).
+		Msgf("received block")
 
 	// qc.Block is equivalent to header.ID()
 	err := e.throttle.OnBlock(qc.BlockID)
@@ -236,7 +238,7 @@ func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
 	}
 
 	if executed {
-		e.log.Debug().Msg("block has been executed already")
+		e.log.Debug().Hex("block_id", blockID[:]).Uint64("height", header.Height).Msg("block has been executed already")
 		return nil
 	}
 
@@ -250,7 +252,9 @@ func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
 		return fmt.Errorf("failed to enqueue block %v: %w", blockID, err)
 	}
 
-	e.log.Debug().Int("executables", len(executables)).Msgf("executeConcurrently block is executable")
+	e.log.Debug().
+		Hex("block_id", blockID[:]).Uint64("height", header.Height).
+		Int("executables", len(executables)).Msgf("executeConcurrently block is executable")
 	e.executeConcurrently(executables)
 
 	err = e.fetch(missingColls)
@@ -367,12 +371,18 @@ func (e *Core) onBlockExecuted(
 		return fmt.Errorf("cannot persist execution state: %w", err)
 	}
 
-	e.log.Debug().Uint64("height", block.Block.Header.Height).Msgf("execution state saved")
+	blockID := block.ID()
+	lg := e.log.With().
+		Hex("block_id", blockID[:]).
+		Uint64("height", block.Block.Header.Height).
+		Logger()
+
+	lg.Debug().Msgf("execution state saved")
 
 	// must call OnBlockExecuted AFTER saving the execution result to storage
 	// because when enqueuing a block, we rely on execState.StateCommitmentByBlockID
 	// to determine whether a block has been executed or not.
-	executables, err := e.blockQueue.OnBlockExecuted(block.ID(), commit)
+	executables, err := e.blockQueue.OnBlockExecuted(blockID, commit)
 	if err != nil {
 		return fmt.Errorf("unexpected error while marking block as executed: %w", err)
 	}
@@ -384,9 +394,7 @@ func (e *Core) onBlockExecuted(
 	logs := e.eventConsumer.OnComputationResultSaved(ctx, computationResult)
 
 	receipt := computationResult.ExecutionReceipt
-	e.log.Info().
-		Hex("block_id", logging.Entity(block)).
-		Uint64("height", block.Block.Header.Height).
+	lg.Info().
 		Int("collections", len(block.CompleteCollections)).
 		Hex("parent_block", block.Block.Header.ParentID[:]).
 		Int("collections", len(block.Block.Payload.Guarantees)).
@@ -399,6 +407,7 @@ func (e *Core) onBlockExecuted(
 		Uint64("num_txs", nonSystemTransactionCount(receipt.ExecutionResult)).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Str("logs", logs). // broadcasted
+		Int("executables", len(executables)).
 		Msgf("block executed")
 
 	// we ensures that the child blocks are only executed after the execution result of
@@ -406,16 +415,16 @@ func (e *Core) onBlockExecuted(
 	// this ensures OnBlockExecuted would not be called with blocks in a wrong order, such as
 	// OnBlockExecuted(childBlock) being called before OnBlockExecuted(parentBlock).
 
-	e.log.Debug().Int("executables", len(executables)).Msgf("executeConcurrently: parent block is executed")
 	e.executeConcurrently(executables)
 
 	return nil
 }
 
 func (e *Core) onCollection(col *flow.Collection) error {
-	e.log.Info().
+	lg := e.log.With().
 		Hex("collection_id", logging.Entity(col)).
-		Msgf("handle collection")
+		Logger()
+	lg.Info().Msgf("handle collection")
 	// EN might request a collection from multiple collection nodes,
 	// therefore might receive multiple copies of the same collection.
 	// we only need to store it once.
@@ -435,7 +444,8 @@ func (e *Core) onCollection(col *flow.Collection) error {
 		return fmt.Errorf("unexpected error while adding collection to block queue")
 	}
 
-	e.log.Debug().Int("executables", len(executables)).Msgf("executeConcurrently: collection is handled, ready to execute block")
+	lg.Debug().
+		Int("executables", len(executables)).Msgf("executeConcurrently: collection is handled, ready to execute block")
 	e.executeConcurrently(executables)
 
 	return nil
