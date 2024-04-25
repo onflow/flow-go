@@ -94,7 +94,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
-	txStatus, err := t.DeriveTransactionStatus(blockID, block.Header.Height, true)
+	txStatus, err := t.DeriveTransactionStatus(block.Header.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
@@ -178,7 +178,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 			txStatusCode = 1
 		}
 
-		txStatus, err := t.DeriveTransactionStatus(blockID, block.Header.Height, true)
+		txStatus, err := t.DeriveTransactionStatus(block.Header.Height, true)
 		if err != nil {
 			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 				irrecoverable.Throw(ctx, err)
@@ -255,7 +255,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
-	txStatus, err := t.DeriveTransactionStatus(blockID, block.Header.Height, true)
+	txStatus, err := t.DeriveTransactionStatus(block.Header.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
@@ -338,9 +338,9 @@ func (t *TransactionsLocalDataProvider) DeriveUnknownTransactionStatus(refBlockI
 	return flow.TransactionStatusPending, nil
 }
 
-// DeriveTransactionStatus is used to determine the status of a transaction based on the provided block ID, block height, and execution status.
+// DeriveTransactionStatus is used to determine the status of a transaction based on the provided block height, and execution status.
 // No errors expected during normal operations.
-func (t *TransactionsLocalDataProvider) DeriveTransactionStatus(blockID flow.Identifier, blockHeight uint64, executed bool) (flow.TransactionStatus, error) {
+func (t *TransactionsLocalDataProvider) DeriveTransactionStatus(blockHeight uint64, executed bool) (flow.TransactionStatus, error) {
 	if !executed {
 		// If we've gotten here, but the block has not yet been executed, report it as only been finalized
 		return flow.TransactionStatusFinalized, nil
