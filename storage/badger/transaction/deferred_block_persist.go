@@ -6,11 +6,11 @@ import (
 
 // TODO: maybe move this into the package `storage/badger/transaction` (?)
 
-// DeferredBlockPersistOp is a shorthand notation for an anonymous function that takes
+// DeferredBlockPersistOp is a shorthand notation for an anonymous function that takes the ID of
 // a fully constructed block and a `transaction.Tx` as inputs and runs some database operations
 // as part of that transaction. It is a "Future Pattern", essentially saying:
 // once we have the completed the block's construction, we persist data structures that are
-// referenced by the block or populate database indices. This patter is necessary, because
+// referenced by the block or populate database indices. This pattern is necessary, because
 // internally to the protocol_state package we don't have access to the candidate block ID yet because
 // we are still determining the protocol state ID for that block.
 type DeferredBlockPersistOp func(blockID flow.Identifier, tx *Tx) error
@@ -39,13 +39,13 @@ func (d DeferredBlockPersistOp) WithBlock(blockID flow.Identifier) DeferredDBUpd
 // callbacks, and executed the callbacks. Specifically, DeferredDbOps proceeds as follows:
 //
 //  0. Record functors added via `AddBadgerOp`, `AddDbOp`, `OnSucceed` ...
-//     • some functor's may schedule callbacks (depending on their type), which are executed
+//     • some functors may schedule callbacks (depending on their type), which are executed
 //     after the underlying database transaction completed _successfully_.
 //     • `OnSucceed` is treated exactly the same way:
 //     it schedules a callback during its execution, but it has no database actions.
 //  1. Execute the functors in the order they were added
 //  2. During each functor's execution:
-//     • some functor's may schedule callbacks (depending on their type)
+//     • some functors may schedule callbacks (depending on their type)
 //     • record those callbacks in the order they are scheduled (no execution yet)
 //  3. If and only if the underlying database transaction succeeds, run the callbacks
 //
@@ -70,7 +70,7 @@ func NewDeferredBlockPersist() *DeferredBlockPersist {
 	}
 }
 
-// IsEmpty returns true if and only if
+// IsEmpty returns true if and only if there are zero pending database operations.
 func (d *DeferredBlockPersist) IsEmpty() bool {
 	if d == nil {
 		return true
