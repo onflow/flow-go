@@ -1,8 +1,22 @@
 package flow
 
 import (
+	"log"
+
 	"github.com/ipfs/go-cid"
 )
+
+var EmptyEventCollectionID Identifier
+
+func init() {
+	// Convert hexadecimal string to a byte slice.
+	var err error
+	emptyEventCollectionHex := "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8"
+	EmptyEventCollectionID, err = HexStringToIdentifier(emptyEventCollectionHex)
+	if err != nil {
+		log.Fatalf("Failed to decode hex: %v", err)
+	}
+}
 
 type ChunkBody struct {
 	CollectionIndex uint

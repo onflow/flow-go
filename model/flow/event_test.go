@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/encoding/rlp"
 	"github.com/onflow/flow-go/model/fingerprint"
@@ -117,4 +118,13 @@ func TestEventsMerkleRootHash(t *testing.T) {
 	ABHash, err := flow.EventsMerkleRootHash([]flow.Event{eventA, eventB})
 	assert.NoError(t, err)
 	assert.Equal(t, expectedRootHashHex, ABHash.String())
+}
+
+// TestEmptyEventsMerkleRootHash validates that the `EmptyEventCollectionID` constant
+// is equal to the hash of an empty events list. If this test fails, change the hex string constant
+// populating `EmptyEventCollectionID` accordingly.
+func TestEmptyEventsMerkleRootHash(t *testing.T) {
+	actualHash, err := flow.EventsMerkleRootHash([]flow.Event{})
+	require.NoError(t, err)
+	require.Equal(t, flow.EmptyEventCollectionID, actualHash)
 }
