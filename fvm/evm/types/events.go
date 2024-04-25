@@ -167,6 +167,7 @@ func (p *transactionEvent) ToCadence() (cadence.Event, error) {
 				cadence.NewField("contractAddress", cadence.StringType{}),
 				cadence.NewField("logs", cadence.StringType{}),
 				cadence.NewField("blockHeight", cadence.UInt64Type{}),
+				// todo we can remove hash and just reference block by height (evm-gateway dependency)
 				cadence.NewField("blockHash", cadence.StringType{}),
 			},
 			nil,
