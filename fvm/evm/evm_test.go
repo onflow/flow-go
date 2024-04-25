@@ -51,6 +51,7 @@ func TestEVMRun(t *testing.T) {
 
 							assert(res.status == EVM.Status.successful, message: "unexpected status")
 							assert(res.errorCode == 0, message: "unexpected error code")
+							assert(res.deployedContract == nil, message: "unexpected deployed contract")
 						}
 					}
 					`,
@@ -100,7 +101,12 @@ func TestEVMRun(t *testing.T) {
 					access(all)
 					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
 						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-						return EVM.run(tx: tx, coinbase: coinbase)
+						let res = EVM.run(tx: tx, coinbase: coinbase)
+
+						assert(res.status == EVM.Status.successful, message: "unexpected status")
+						assert(res.errorCode == 0, message: "unexpected error code")
+						
+						return res
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
@@ -134,6 +140,7 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				require.Nil(t, res.DeployedContractAddress)
 				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue).Int64())
 			})
 	})
@@ -666,7 +673,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					import FlowToken from %s
 	
 					access(all)
-					fun main(): [UInt8; 20] {
+					fun main(code: [UInt8]): EVM.Result {
 						let admin = getAuthAccount(%s)
 							.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
 						let minter <- admin.createNewMinter(allowedAmount: 2.34)
@@ -676,13 +683,13 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 						let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
 						cadenceOwnedAccount.deposit(from: <-vault)
 	
-						let address = cadenceOwnedAccount.deploy(
-							code: [],
-							gasLimit: 53000,
+						let res = cadenceOwnedAccount.deploy(
+							code: code,
+							gasLimit: 1000000,
 							value: EVM.Balance(attoflow: 1230000000000000000)
 						)
 						destroy cadenceOwnedAccount
-						return address.bytes
+						return res
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
@@ -690,7 +697,12 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					sc.FlowServiceAccount.Address.HexWithPrefix(),
 				))
 
-				script := fvm.Script(code)
+				script := fvm.Script(code).
+					WithArguments(json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(testContract.ByteCode),
+						).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type{})),
+					))
 
 				_, output, err := vm.Run(
 					ctx,
@@ -698,6 +710,14 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
+
+				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+				require.Equal(t, types.StatusSuccessful, res.Status)
+				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				require.NotNil(t, res.DeployedContractAddress)
+				// we strip away first few bytes because they contain deploy code
+				require.Equal(t, testContract.ByteCode[17:], []byte(res.ReturnedValue))
 			})
 	})
 }
