@@ -393,25 +393,15 @@ contract EVM {
         return runResult
     }
 
-    /// Constructs and runs a transaction from the given arguments but
-    /// DOES NOT commit the state, this means the transaction will not
-    /// persist any changes. This is useful for estimating gas it takes
-    /// for transaction to execute, or for calling contract functions
-    /// to retrieve any values.
+    /// Simulates running unsigned RLP-encoded transaction using
+    /// the from address as the signer.
+    /// The transaction state changes are not persisted.
+    /// This is useful for gas estimation or calling view contract functions.
     access(all)
-    fun dryRun(
-        from: [UInt8; 20],
-        to: [UInt8; 20]?,
-        gasLimit: UInt64?,
-        value: Balance,
-        data: [UInt8]
-    ): Result {
+    fun dryRun(tx: [UInt8], from: EVMAddress): Result {
         return InternalEVM.dryRun(
-            from: from,
-            to: to,
-            gasLimit: gasLimit,
-            value: value.attoflow,
-            data: data
+            tx: tx,
+            from: from.bytes,
         ) as! Result
     }
 

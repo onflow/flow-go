@@ -991,24 +991,12 @@ const internalEVMTypeDryRunFunctionName = "dryRun"
 var internalEVMTypeDryRunFunctionType = &sema.FunctionType{
 	Parameters: []sema.Parameter{
 		{
+			Label:          "tx",
+			TypeAnnotation: sema.NewTypeAnnotation(evmTransactionBytesType),
+		},
+		{
 			Label:          "from",
 			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
-		},
-		{
-			Label:          "to",
-			TypeAnnotation: sema.NewTypeAnnotation(evmOptionalAddressBytesType),
-		},
-		{
-			Label:          "gasLimit",
-			TypeAnnotation: sema.NewTypeAnnotation(sema.NewOptionalType(nil, sema.UInt64Type)),
-		},
-		{
-			Label:          "value",
-			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
-		},
-		{
-			Label:          "data",
-			TypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
 		},
 	},
 	// Actually EVM.Result, but cannot refer to it here
@@ -1026,68 +1014,33 @@ func newInternalEVMTypeDryRunFunction(
 			inter := invocation.Interpreter
 			locationRange := invocation.LocationRange
 
-			// Get from address
+			// Get transaction argument
 
-			fromAddressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			transactionValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			fromAddress, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, fromAddressValue)
+			transaction, err := interpreter.ByteArrayValueToByteSlice(inter, transactionValue, locationRange)
 			if err != nil {
 				panic(err)
 			}
 
-			// Get to address
-			var toAddress *types.Address
-			if optToAddressValue, ok := invocation.Arguments[1].(*interpreter.SomeValue); ok {
-				toValue, ok := optToAddressValue.InnerValue(inter, locationRange).(*interpreter.ArrayValue)
-				if !ok {
-					panic(errors.NewUnreachableError())
-				}
+			// Get from argument
 
-				converted, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, toValue)
-				if err != nil {
-					panic(err)
-				}
-				toAddress = &converted
-			}
-
-			// Get gas limit
-			var gasLimit *types.GasLimit
-			if optGasValue, ok := invocation.Arguments[2].(*interpreter.SomeValue); ok {
-				gasValue, ok := optGasValue.InnerValue(inter, locationRange).(interpreter.UInt64Value)
-				if !ok {
-					panic(errors.NewUnreachableError())
-				}
-				converted := types.GasLimit(gasValue)
-				gasLimit = &converted
-			}
-
-			// Get balance
-
-			balanceValue, ok := invocation.Arguments[3].(interpreter.UIntValue)
+			fromValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			balance := types.NewBalance(balanceValue.BigInt)
-
-			// Get data
-
-			dataValue, ok := invocation.Arguments[4].(*interpreter.ArrayValue)
-			if !ok {
-				panic(errors.NewUnreachableError())
-			}
-
-			data, err := interpreter.ByteArrayValueToByteSlice(inter, dataValue, locationRange)
+			from, err := interpreter.ByteArrayValueToByteSlice(inter, fromValue, locationRange)
 			if err != nil {
 				panic(err)
 			}
 
 			// call estimate
 
-			res := handler.DryRun(fromAddress, toAddress, gasLimit, balance, data)
+			res := handler.DryRun(transaction, types.NewAddressFromBytes(from))
 			return NewResultValue(handler, gauge, inter, locationRange, res)
 		},
 	)
