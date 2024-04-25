@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-type ErrorCode uint64
+type ErrorCode uint16
 
 // internal error codes
 const ( // code reserved for no error
