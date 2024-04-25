@@ -195,18 +195,12 @@ func (h *ContractHandler) run(
 	}
 
 	// step 4 - emit events
-	err = h.emitEvent(types.NewTransactionExecutedEvent(
-		bp.Height,
-		rlpEncodedTx,
-		blockHash,
-		res.TxHash,
-		res,
-	))
+	err = h.emitEvent(types.NewTransactionEvent(res, rlpEncodedTx, bp.Height, blockHash))
 	if err != nil {
 		return nil, err
 	}
 
-	err = h.emitEvent(types.NewBlockExecutedEvent(bp))
+	err = h.emitEvent(types.NewBlockEvent(bp))
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +226,7 @@ func (h *ContractHandler) meterGasUsage(res *types.Result) error {
 }
 
 func (h *ContractHandler) emitEvent(event *types.Event) error {
-	ev, err := event.Payload.CadenceEvent()
+	ev, err := event.Payload.ToCadence()
 	if err != nil {
 		return err
 	}
@@ -333,19 +327,13 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	err = h.emitEvent(
-		types.NewTransactionExecutedEvent(
-			bp.Height,
-			encoded,
-			blockHash,
-			res.TxHash,
-			res,
-		),
+		types.NewTransactionEvent(res, encoded, bp.Height, blockHash),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	err = h.emitEvent(types.NewBlockExecutedEvent(bp))
+	err = h.emitEvent(types.NewBlockEvent(bp))
 	if err != nil {
 		return nil, err
 	}

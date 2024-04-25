@@ -2,7 +2,7 @@ package types_test
 
 import (
 	"encoding/hex"
-	"fmt"
+	"github.com/onflow/go-ethereum/core/vm"
 	"math/big"
 	"testing"
 
@@ -19,30 +19,6 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
-type blockEventPayload struct {
-	Height            uint64           `cadence:"height"`
-	Hash              string           `cadence:"hash"`
-	Timestamp         uint64           `cadence:"timestamp"`
-	TotalSupply       cadence.Int      `cadence:"totalSupply"`
-	ParentBlockHash   string           `cadence:"parentHash"`
-	ReceiptRoot       string           `cadence:"receiptRoot"`
-	TransactionHashes []cadence.String `cadence:"transactionHashes"`
-}
-
-type txEventPayload struct {
-	BlockHeight             uint64 `cadence:"blockHeight"`
-	BlockHash               string `cadence:"blockHash"`
-	TransactionHash         string `cadence:"transactionHash"`
-	Transaction             string `cadence:"transaction"`
-	Failed                  bool   `cadence:"failed"`
-	VMError                 string `cadence:"vmError"`
-	TransactionType         uint8  `cadence:"transactionType"`
-	GasConsumed             uint64 `cadence:"gasConsumed"`
-	DeployedContractAddress string `cadence:"deployedContractAddress"`
-	ReturnedValue           string `cadence:"returnedValue"`
-	Logs                    string `cadence:"logs"`
-}
-
 func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 	t.Parallel()
 
@@ -57,11 +33,11 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 		},
 	}
 
-	event := types.NewBlockExecutedEvent(block)
-	ev, err := event.Payload.CadenceEvent()
+	event := types.NewBlockEvent(block)
+	ev, err := event.Payload.ToCadence()
 	require.NoError(t, err)
 
-	var bep blockEventPayload
+	var bep types.BlockEventPayload
 	err = cadence.DecodeFields(ev, &bep)
 	require.NoError(t, err)
 
@@ -122,7 +98,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 			gethCommon.HexToHash("0x24abdb5865df5079dcc5ac590ff6f01d5c16edbc5fab4e195d9febd1114503da"),
 		},
 	}
-	vmError := fmt.Errorf("ran out of gas")
+	vmError := vm.ErrOutOfGas
 	txResult := &types.Result{
 		VMError:                 vmError,
 		TxType:                  255,
@@ -130,37 +106,29 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		DeployedContractAddress: types.NewAddress(gethCommon.HexToAddress("0x99466ed2e37b892a2ee3e9cd55a98b68f5735db2")),
 		ReturnedValue:           dataBytes,
 		Logs:                    []*gethTypes.Log{log},
+		TxHash:                  txHash,
 	}
 
 	t.Run("evm.TransactionExecuted with failed status", func(t *testing.T) {
-		event := types.NewTransactionExecutedEvent(
-			blockHeight,
-			txBytes,
-			blockHash,
-			txHash,
-			txResult,
-		)
-		ev, err := event.Payload.CadenceEvent()
+		event := types.NewTransactionEvent(txResult, txBytes, blockHeight, blockHash)
+		ev, err := event.Payload.ToCadence()
 		require.NoError(t, err)
 
-		var tep txEventPayload
-		err = cadence.DecodeFields(ev, &tep)
+		tep, err := types.DecodeTransactionEventPayload(ev)
 		require.NoError(t, err)
 
 		assert.Equal(t, tep.BlockHeight, blockHeight)
 		assert.Equal(t, tep.BlockHash, blockHash.Hex())
-		assert.Equal(t, tep.TransactionHash, txHash.Hex())
-		assert.Equal(t, tep.Transaction, txEncoded)
-		assert.True(t, tep.Failed)
-		assert.Equal(t, tep.VMError, vmError.Error())
+		assert.Equal(t, tep.Hash, txHash.Hex())
+		assert.Equal(t, tep.Payload, txEncoded)
+		assert.Equal(t, types.ErrorCode(tep.Error), types.ExecutionErrCodeOutOfGas)
 		assert.Equal(t, tep.TransactionType, txResult.TxType)
 		assert.Equal(t, tep.GasConsumed, txResult.GasConsumed)
 		assert.Equal(
 			t,
-			tep.DeployedContractAddress,
+			tep.ContractAddress,
 			txResult.DeployedContractAddress.ToCommon().Hex(),
 		)
-		assert.Equal(t, tep.ReturnedValue, data)
 
 		encodedLogs, err := rlp.EncodeToBytes(txResult.Logs)
 		require.NoError(t, err)
@@ -185,34 +153,25 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 	t.Run("evm.TransactionExecuted with non-failed status", func(t *testing.T) {
 		txResult.VMError = nil
 
-		event := types.NewTransactionExecutedEvent(
-			blockHeight,
-			txBytes,
-			blockHash,
-			txHash,
-			txResult,
-		)
-		ev, err := event.Payload.CadenceEvent()
+		event := types.NewTransactionEvent(txResult, txBytes, blockHeight, blockHash)
+		ev, err := event.Payload.ToCadence()
 		require.NoError(t, err)
 
-		var tep txEventPayload
-		err = cadence.DecodeFields(ev, &tep)
+		tep, err := types.DecodeTransactionEventPayload(ev)
 		require.NoError(t, err)
 
 		assert.Equal(t, tep.BlockHeight, blockHeight)
 		assert.Equal(t, tep.BlockHash, blockHash.Hex())
-		assert.Equal(t, tep.TransactionHash, txHash.Hex())
-		assert.Equal(t, tep.Transaction, txEncoded)
-		assert.False(t, tep.Failed)
-		assert.Equal(t, "", tep.VMError)
+		assert.Equal(t, tep.Hash, txHash.Hex())
+		assert.Equal(t, tep.Payload, txEncoded)
+		assert.Equal(t, types.ErrCodeNoError, types.ErrorCode(tep.Error))
 		assert.Equal(t, tep.TransactionType, txResult.TxType)
 		assert.Equal(t, tep.GasConsumed, txResult.GasConsumed)
 		assert.Equal(
 			t,
-			tep.DeployedContractAddress,
+			tep.ContractAddress,
 			txResult.DeployedContractAddress.ToCommon().Hex(),
 		)
-		assert.Equal(t, tep.ReturnedValue, data)
 
 		encodedLogs, err := rlp.EncodeToBytes(txResult.Logs)
 		require.NoError(t, err)

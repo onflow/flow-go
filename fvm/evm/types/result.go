@@ -43,7 +43,7 @@ type ResultSummary struct {
 }
 
 // Result captures the result of an interaction to the emulator
-// it could be the out put of a direct call or output of running an
+// it could be the output of a direct call or output of running an
 // evm transaction.
 // Its more comprehensive than typical evm receipt, usually
 // the receipt generation requires some extra calculation (e.g. Deployed contract address)
