@@ -2,6 +2,8 @@ package evm_test
 
 import (
 	"fmt"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	"math"
 	"math/big"
 	"testing"
 
@@ -704,11 +706,62 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 func TestDryRun(t *testing.T) {
 	t.Parallel()
+	chain := flow.Emulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+	storeValueWithLimit := func(
+		gasLimit uint64,
+		value int64,
+		ctx fvm.Context,
+		vm fvm.VM,
+		snapshot snapshot.SnapshotTree,
+		testContract *TestContract,
+	) *types.ResultSummary {
+		code := []byte(fmt.Sprintf(`
+						import EVM from %s
+	
+						access(all)
+						fun main(tx: [UInt8]): EVM.Result {
+							return EVM.dryRun(
+								tx: tx, 
+								from: EVM.EVMAddress(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
+							)
+						}`,
+			sc.EVMContract.Address.HexWithPrefix(),
+		))
+
+		tx := gethTypes.NewTransaction(
+			0,
+			testContract.DeployedAt.ToCommon(),
+			big.NewInt(0),
+			gasLimit,
+			big.NewInt(0),
+			testContract.MakeCallData(t, "store", big.NewInt(value)),
+		)
+		innerTxBytes, err := tx.MarshalBinary()
+		require.NoError(t, err)
+
+		script := fvm.Script(code).WithArguments(
+			json.MustEncode(
+				cadence.NewArray(
+					ConvertToCadence(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType),
+			),
+		)
+		_, output, err := vm.Run(
+			ctx,
+			script,
+			snapshot)
+		require.NoError(t, err)
+		require.NoError(t, output.Err)
+
+		result, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+		require.NoError(t, err)
+		return result
+	}
 
 	// this test checks that gas limit is correctly used and gas usage correctly reported
 	t.Run("test dry run storing a value with different gas limits", func(t *testing.T) {
-		chain := flow.Emulator.Chain()
-		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 		RunWithNewEnvironment(t,
 			chain, func(
 				ctx fvm.Context,
@@ -717,65 +770,23 @@ func TestDryRun(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				runWithGasLimit := func(gasLimit string) *types.ResultSummary {
-					code := []byte(fmt.Sprintf(
-						`
-					import EVM from %s
 
-					access(all)
-					fun main(contract: [UInt8; 20], data: [UInt8]): EVM.Result {
-						return EVM.dryRun(
-							from: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], // random address 
-							to: contract, 
-							gasLimit: %s, 
-							value: EVM.Balance(attoflow: 0), 
-							data: data
-						)
-					}
-					`,
-						sc.EVMContract.Address.HexWithPrefix(),
-						gasLimit,
-					))
-
-					script := fvm.Script(code).WithArguments(
-						json.MustEncode(
-							cadence.NewArray(
-								ConvertToCadence(testContract.DeployedAt.ToCommon().Bytes()),
-							).WithType(stdlib.EVMAddressBytesCadenceType),
-						),
-						json.MustEncode(
-							cadence.NewArray(
-								ConvertToCadence(testContract.MakeCallData(t, "store", big.NewInt(1337))),
-							).WithType(stdlib.EVMTransactionBytesCadenceType),
-						),
-					)
-					_, output, err := vm.Run(
-						ctx,
-						script,
-						snapshot)
-					require.NoError(t, err)
-					require.NoError(t, output.Err)
-
-					result, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
-					require.NoError(t, err)
-					return result
-				}
-
-				result := runWithGasLimit("nil")
+				result := storeValueWithLimit(math.MaxUint64-1, 1, ctx, vm, snapshot, testContract)
 				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, result.Status)
 				require.Greater(t, result.GasConsumed, uint64(0))
 
-				result = runWithGasLimit("55555555")
+				result = storeValueWithLimit(uint64(5555555555), 1, ctx, vm, snapshot, testContract)
 				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, result.Status)
 				require.Greater(t, result.GasConsumed, uint64(0))
 
-				// gas limit too low
-				result = runWithGasLimit("21220")
+				// gas limit too low, but still bigger than intrinsic gas value
+				limit := uint64(21216)
+				result = storeValueWithLimit(limit, 1, ctx, vm, snapshot, testContract)
 				require.Equal(t, types.ExecutionErrCodeOutOfGas, result.ErrorCode)
 				require.Equal(t, types.StatusFailed, result.Status)
-				require.Greater(t, result.GasConsumed, uint64(555))
+				require.Equal(t, result.GasConsumed, limit) // burn it all!!!
 			})
 	})
 
@@ -792,52 +803,15 @@ func TestDryRun(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
-					`
-					import EVM from %s
-
-					access(all)
-					fun main(contract: [UInt8; 20], data: [UInt8]): EVM.Result {
-						return EVM.dryRun(
-							from: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], // random address 
-							to: contract, 
-							gasLimit: nil, 
-							value: EVM.Balance(attoflow: 0), 
-							data: data
-						)
-					}
-                    `,
-					sc.EVMContract.Address.HexWithPrefix(),
-				))
-
 				updatedValue := int64(1337)
-				script := fvm.Script(code).WithArguments(
-					json.MustEncode(
-						cadence.NewArray(
-							ConvertToCadence(testContract.DeployedAt.ToCommon().Bytes()),
-						).WithType(stdlib.EVMAddressBytesCadenceType),
-					),
-					json.MustEncode(
-						cadence.NewArray(
-							ConvertToCadence(testContract.MakeCallData(t, "store", big.NewInt(updatedValue))),
-						).WithType(stdlib.EVMTransactionBytesCadenceType),
-					),
-				)
-				_, output, err := vm.Run(
-					ctx,
-					script,
-					snapshot)
-				require.NoError(t, err)
-				require.NoError(t, output.Err)
 
-				result, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
-				require.NoError(t, err)
+				result := storeValueWithLimit(uint64(100000), updatedValue, ctx, vm, snapshot, testContract)
 				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, result.Status)
 				require.Greater(t, result.GasConsumed, uint64(0))
 
 				// query the value make sure it's not updated
-				code = []byte(fmt.Sprintf(
+				code := []byte(fmt.Sprintf(
 					`
 					import EVM from %s
 					access(all)
@@ -865,12 +839,12 @@ func TestDryRun(t *testing.T) {
 					ConvertToCadence(testAccount.Address().Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
-				script = fvm.Script(code).WithArguments(
+				script := fvm.Script(code).WithArguments(
 					json.MustEncode(innerTx),
 					json.MustEncode(coinbase),
 				)
 
-				_, output, err = vm.Run(
+				_, output, err := vm.Run(
 					ctx,
 					script,
 					snapshot)
