@@ -114,6 +114,8 @@ func (s *EmulatorSuite) initEmulator() {
 	blockchain, err := emulator.New(
 		emulator.WithTransactionExpiry(flow.DefaultTransactionExpiry),
 		emulator.WithStorageLimitEnabled(false),
+		// this can be removed when the Emulator bootstraps with EVM by default
+		emulator.WithEVMEnabled(true),
 	)
 	s.Require().NoError(err)
 

@@ -46,7 +46,11 @@ func (s *Suite) SetupTest() {
 
 	// create a new instance of the emulated blockchain
 	var err error
-	s.blockchain, err = emulator.New(emulator.WithStorageLimitEnabled(false))
+	s.blockchain, err = emulator.New(
+		emulator.WithStorageLimitEnabled(false),
+		// this can be removed when the Emulator bootstraps with EVM by default
+		emulator.WithEVMEnabled(true),
+	)
 	s.Require().NoError(err)
 	s.emulatorClient = utils.NewEmulatorClient(s.blockchain)
 

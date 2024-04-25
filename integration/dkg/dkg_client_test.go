@@ -50,7 +50,11 @@ func TestDKGClient(t *testing.T) {
 // Setup Test creates the blockchain client, the emulated blockchain and deploys
 // the DKG contract to the emulator
 func (s *ClientSuite) SetupTest() {
-	blockchain, err := emulator.New(emulator.WithStorageLimitEnabled(false))
+	blockchain, err := emulator.New(
+		emulator.WithStorageLimitEnabled(false),
+		// this can be removed when the Emulator bootstraps with EVM by default
+		emulator.WithEVMEnabled(true),
+	)
 	require.NoError(s.T(), err)
 
 	s.blockchain = blockchain
