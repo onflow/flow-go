@@ -189,6 +189,7 @@ func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
 		return fmt.Errorf("failed to enqueue block %v: %w", blockID, err)
 	}
 
+	e.log.Debug().Int("executables", len(executables)).Msgf("executeConcurrently block is executable")
 	e.executeConcurrently(executables)
 
 	err = e.fetch(missingColls)
@@ -304,6 +305,8 @@ func (e *Core) onBlockExecuted(
 		return fmt.Errorf("cannot persist execution state: %w", err)
 	}
 
+	e.log.Debug().Uint64("height", block.Block.Header.Height).Msgf("execution state saved")
+
 	// must call OnBlockExecuted AFTER saving the execution result to storage
 	// because when enqueuing a block, we rely on execState.StateCommitmentByBlockID
 	// to determine whether a block has been executed or not.
@@ -340,6 +343,8 @@ func (e *Core) onBlockExecuted(
 	// its parent block has been successfully saved to storage.
 	// this ensures OnBlockExecuted would not be called with blocks in a wrong order, such as
 	// OnBlockExecuted(childBlock) being called before OnBlockExecuted(parentBlock).
+
+	e.log.Debug().Int("executables", len(executables)).Msgf("executeConcurrently: parent block is executed")
 	e.executeConcurrently(executables)
 
 	return nil
@@ -365,6 +370,7 @@ func (e *Core) onCollection(col *flow.Collection) error {
 		return fmt.Errorf("unexpected error while adding collection to block queue")
 	}
 
+	e.log.Debug().Int("executables", len(executables)).Msgf("executeConcurrently: collection is handled, ready to execute block")
 	e.executeConcurrently(executables)
 
 	return nil
