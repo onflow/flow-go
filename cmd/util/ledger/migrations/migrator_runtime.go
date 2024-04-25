@@ -3,6 +3,8 @@ package migrations
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -97,15 +99,17 @@ func (c MigratorRuntimeConfig) NewRuntimeInterface(
 
 // NewMigratorRuntime returns a runtime that can be used in migrations.
 func NewMigratorRuntime(
+	log zerolog.Logger,
 	payloads []*ledger.Payload,
 	chainID flow.ChainID,
 	config MigratorRuntimeConfig,
 	snapshotType snapshot.MigrationSnapshotType,
+	nWorkers int,
 ) (
 	*MigratorRuntime,
 	error,
 ) {
-	snapshot, err := snapshot.NewPayloadSnapshot(payloads, snapshotType)
+	snapshot, err := snapshot.NewPayloadSnapshot(log, payloads, snapshotType, nWorkers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
 	}

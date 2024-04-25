@@ -124,10 +124,12 @@ func checkMigratedPayloads(
 	chainID flow.ChainID,
 ) {
 	mr, err := NewMigratorRuntime(
+		zerolog.Nop(),
 		newPayloads,
 		chainID,
 		MigratorRuntimeConfig{},
 		snapshot.SmallChangeSetSnapshot,
+		1,
 	)
 	require.NoError(t, err)
 
@@ -266,14 +268,14 @@ func checkMigratedPayloads(
 
 		interpreter.NewUnmeteredSomeValueNonCopying(
 			interpreter.NewUnmeteredCapabilityValue(
-				interpreter.NewUnmeteredUInt64Value(2),
+				2,
 				interpreter.NewAddressValue(nil, address),
 				interpreter.NewReferenceStaticType(nil, entitlementAuthorization(), rResourceType),
 			),
 		),
 
 		interpreter.NewUnmeteredCapabilityValue(
-			interpreter.NewUnmeteredUInt64Value(2),
+			2,
 			interpreter.NewAddressValue(nil, address),
 			interpreter.NewReferenceStaticType(nil, entitlementAuthorization(), rResourceType),
 		),
@@ -744,10 +746,12 @@ func TestProgramParsingError(t *testing.T) {
 	require.NoError(t, err)
 
 	runtime, err := NewMigratorRuntime(
+		zerolog.Nop(),
 		payloads,
 		chainID,
 		MigratorRuntimeConfig{},
 		snapshot.SmallChangeSetSnapshot,
+		1,
 	)
 	require.NoError(t, err)
 
@@ -765,7 +769,7 @@ func TestProgramParsingError(t *testing.T) {
 	const nonExistingStructQualifiedIdentifier = contractName + ".NonExistingStruct"
 
 	capabilityValue := interpreter.NewUnmeteredCapabilityValue(
-		0,
+		1,
 		interpreter.AddressValue(testAddress),
 		interpreter.NewReferenceStaticType(
 			nil,
@@ -889,10 +893,12 @@ func TestCoreContractUsage(t *testing.T) {
 		require.NoError(t, err)
 
 		runtime, err := NewMigratorRuntime(
+			zerolog.Nop(),
 			payloads,
 			chainID,
 			MigratorRuntimeConfig{},
 			snapshot.SmallChangeSetSnapshot,
+			1,
 		)
 		require.NoError(t, err)
 
@@ -911,7 +917,7 @@ func TestCoreContractUsage(t *testing.T) {
 		)
 
 		capabilityValue := interpreter.NewUnmeteredCapabilityValue(
-			0,
+			1,
 			interpreter.AddressValue(testAddress),
 			staticType,
 		)
@@ -979,10 +985,12 @@ func TestCoreContractUsage(t *testing.T) {
 		// Get result
 
 		mr, err := NewMigratorRuntime(
+			zerolog.Nop(),
 			payloads,
 			chainID,
 			MigratorRuntimeConfig{},
 			snapshot.SmallChangeSetSnapshot,
+			nWorker,
 		)
 		require.NoError(t, err)
 
@@ -1163,7 +1171,7 @@ func TestCoreContractUsage(t *testing.T) {
 		require.Equal(t, expected, actual)
 	})
 
-	t.Run("&NonFungibleToken.Collection => auth(Withdraw, Owner) &{NonFungibleToken.Collection}", func(t *testing.T) {
+	t.Run("&NonFungibleToken.Collection => auth(Withdraw | Owner) &{NonFungibleToken.Collection}", func(t *testing.T) {
 		t.Parallel()
 
 		systemContracts := systemcontracts.SystemContractsForChain(chainID)
@@ -1201,7 +1209,7 @@ func TestCoreContractUsage(t *testing.T) {
 					}
 				},
 				2,
-				sema.Conjunction,
+				sema.Disjunction,
 			),
 			interpreter.NewIntersectionStaticType(
 				nil,

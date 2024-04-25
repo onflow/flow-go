@@ -15,6 +15,36 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+func Test_PayloadSnapshot(t *testing.T) {
+	t.Parallel()
+
+	payloads := createPayloads(1_000_000)
+
+	f := func(t *testing.T, ty snapshot.MigrationSnapshotType) {
+		t.Parallel()
+
+		snapshot1, err := snapshot.NewPayloadSnapshot(zerolog.Nop(), payloads, ty, 1)
+		require.NoError(t, err)
+
+		snapshot2, err := snapshot.NewPayloadSnapshot(zerolog.Nop(), payloads, ty, 4)
+		require.NoError(t, err)
+
+		payloads1 := snapshot1.PayloadMap()
+		payloads2 := snapshot2.PayloadMap()
+		for k, v := range payloads1 {
+			require.Equal(t, v, payloads2[k])
+		}
+	}
+
+	t.Run("IndexMapBased", func(t *testing.T) {
+		f(t, snapshot.SmallChangeSetSnapshot)
+	})
+
+	t.Run("MapBased", func(t *testing.T) {
+		f(t, snapshot.LargeChangeSetOrReadonlySnapshot)
+	})
+}
+
 func Benchmark_PayloadSnapshot(b *testing.B) {
 	benchMerge := func(
 		b *testing.B,
@@ -37,6 +67,7 @@ func Benchmark_PayloadSnapshot(b *testing.B) {
 	benchCreate(b, 1000)
 	benchCreate(b, 100000)
 	benchCreate(b, 10000000)
+	benchCreate(b, 100000000)
 
 	benchMerge(b, 1000, []int{10, 100, 1000})
 	benchMerge(b, 100000, []int{10, 1000, 100000})
@@ -134,28 +165,24 @@ func benchmarkMerge(b *testing.B, payloadsNum int, changes []int) {
 
 			changes := creatChanges(len(payloads), change, remove, add)
 
-			b.Run("IndexMapSnapshot", func(b *testing.B) {
+			f := func(b *testing.B, ty snapshot.MigrationSnapshotType) {
 				for i := 0; i < b.N; i++ {
 					b.StopTimer()
-					snap, err := snapshot.NewPayloadSnapshot(payloads, snapshot.SmallChangeSetSnapshot)
+					snap, err := snapshot.NewPayloadSnapshot(zerolog.Nop(), payloads, ty, 1)
 					require.NoError(b, err)
 					b.StartTimer()
 
 					_, err = snap.ApplyChangesAndGetNewPayloads(changes, nil, zerolog.Nop())
 					require.NoError(b, err)
 				}
+			}
+
+			b.Run("IndexMapBased", func(b *testing.B) {
+				f(b, snapshot.SmallChangeSetSnapshot)
 			})
 
-			b.Run("mapSnapshot", func(b *testing.B) {
-				for i := 0; i < b.N; i++ {
-					b.StopTimer()
-					snap, err := snapshot.NewPayloadSnapshot(payloads, snapshot.LargeChangeSetOrReadonlySnapshot)
-					require.NoError(b, err)
-					b.StartTimer()
-
-					_, err = snap.ApplyChangesAndGetNewPayloads(changes, nil, zerolog.Nop())
-					require.NoError(b, err)
-				}
+			b.Run("MapBased", func(b *testing.B) {
+				f(b, snapshot.LargeChangeSetOrReadonlySnapshot)
 			})
 		})
 	}
@@ -168,17 +195,22 @@ func benchmarkCreate(
 
 	payloads := createPayloads(payloadsNum)
 
-	b.Run("IndexMapSnapshot", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			_, err := snapshot.NewPayloadSnapshot(payloads, snapshot.SmallChangeSetSnapshot)
-			require.NoError(b, err)
+	f := func(b *testing.B, ty snapshot.MigrationSnapshotType) {
+		for _, workers := range []int{1, 2, 4, 8, 12} {
+			b.Run("workers_"+strconv.Itoa(workers), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					_, err := snapshot.NewPayloadSnapshot(zerolog.Nop(), payloads, ty, workers)
+					require.NoError(b, err)
+				}
+			})
 		}
+	}
+
+	b.Run("IndexMapBased", func(b *testing.B) {
+		f(b, snapshot.SmallChangeSetSnapshot)
 	})
 
-	b.Run("mapSnapshot", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			_, err := snapshot.NewPayloadSnapshot(payloads, snapshot.LargeChangeSetOrReadonlySnapshot)
-			require.NoError(b, err)
-		}
+	b.Run("MapBased", func(b *testing.B) {
+		f(b, snapshot.LargeChangeSetOrReadonlySnapshot)
 	})
 }

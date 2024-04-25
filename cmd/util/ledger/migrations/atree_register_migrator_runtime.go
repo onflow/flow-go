@@ -3,6 +3,8 @@ package migrations
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -16,13 +18,20 @@ import (
 
 // NewAtreeRegisterMigratorRuntime returns a new runtime to be used with the AtreeRegisterMigrator.
 func NewAtreeRegisterMigratorRuntime(
+	log zerolog.Logger,
 	address common.Address,
 	payloads []*ledger.Payload,
+	nWorkers int,
 ) (
 	*AtreeRegisterMigratorRuntime,
 	error,
 ) {
-	snapshot, err := migrationSnapshot.NewPayloadSnapshot(payloads, migrationSnapshot.LargeChangeSetOrReadonlySnapshot)
+	snapshot, err := migrationSnapshot.NewPayloadSnapshot(
+		log,
+		payloads,
+		migrationSnapshot.LargeChangeSetOrReadonlySnapshot,
+		nWorkers,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
 	}

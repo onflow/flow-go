@@ -278,12 +278,13 @@ func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
 
 	// Send and subscribe to the transaction status using the access API
 	subClient, err := accessClient.SendAndSubscribeTransactionStatuses(s.ctx, &accessproto.SendAndSubscribeTransactionStatusesRequest{
-		Transaction: transactionMsg,
+		Transaction:          transactionMsg,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	})
 	s.Require().NoError(err)
 
 	expectedCounter := uint64(0)
-	var finalTxStatus entities.TransactionStatus
+	lastReportedTxStatus := entities.TransactionStatus_UNKNOWN
 	var txID sdk.Identifier
 
 	for {
@@ -297,17 +298,22 @@ func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
 		}
 
 		if txID == sdk.EmptyID {
-			txID = sdk.Identifier(resp.GetId())
+			txID = sdk.Identifier(resp.TransactionResults.TransactionId)
 		}
 
 		s.Assert().Equal(expectedCounter, resp.GetMessageIndex())
-		s.Assert().Equal(txID, sdk.Identifier(resp.GetId()))
+		s.Assert().Equal(txID, sdk.Identifier(resp.TransactionResults.TransactionId))
+		// Check if all statuses received one by one. The subscription should send responses for each of the statuses,
+		// and the message should be sent in the order of transaction statuses.
+		// Expected order: pending(1) -> finalized(2) -> executed(3) -> sealed(4)
+		s.Assert().Equal(lastReportedTxStatus, resp.TransactionResults.Status-1)
 
 		expectedCounter++
-		finalTxStatus = resp.Status
+		lastReportedTxStatus = resp.TransactionResults.Status
 	}
 
-	s.Assert().Equal(entities.TransactionStatus_SEALED, finalTxStatus)
+	// Check, if the final transaction status is sealed.
+	s.Assert().Equal(entities.TransactionStatus_SEALED, lastReportedTxStatus)
 }
 
 func (s *AccessAPISuite) testGetAccount(client *client.Client) {
