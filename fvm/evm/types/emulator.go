@@ -68,7 +68,7 @@ type ReadOnlyBlockView interface {
 // EVM validation errors and EVM execution errors are part of the returned result
 // and should be handled separately.
 type BlockView interface {
-	// executes a direct call
+	// DirectCall executes a direct call
 	DirectCall(call *DirectCall) (*Result, error)
 
 	// RunTransaction executes an evm transaction
