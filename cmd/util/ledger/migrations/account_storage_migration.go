@@ -17,15 +17,18 @@ func NewAccountStorageMigration(
 	address common.Address,
 	log zerolog.Logger,
 	chainID flow.ChainID,
+	nWorkers int,
 	migrate func(*runtime.Storage, *interpreter.Interpreter) error,
 ) ledger.Migration {
 	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
 
 		migrationRuntime, err := NewMigratorRuntime(
+			log,
 			payloads,
 			chainID,
 			MigratorRuntimeConfig{},
 			snapshot.SmallChangeSetSnapshot,
+			nWorkers,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
