@@ -708,36 +708,28 @@ func TestDryRun(t *testing.T) {
 	t.Parallel()
 	chain := flow.Emulator.Chain()
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	evmAddress := sc.EVMContract.Address.HexWithPrefix()
 
-	storeValueWithLimit := func(
-		gasLimit uint64,
-		value int64,
+	dryRunTx := func(
+		tx *gethTypes.Transaction,
 		ctx fvm.Context,
 		vm fvm.VM,
 		snapshot snapshot.SnapshotTree,
 		testContract *TestContract,
 	) *types.ResultSummary {
 		code := []byte(fmt.Sprintf(`
-						import EVM from %s
-	
-						access(all)
-						fun main(tx: [UInt8]): EVM.Result {
-							return EVM.dryRun(
-								tx: tx, 
-								from: EVM.EVMAddress(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
-							)
-						}`,
-			sc.EVMContract.Address.HexWithPrefix(),
+			import EVM from %s
+
+			access(all)
+			fun main(tx: [UInt8]): EVM.Result {
+				return EVM.dryRun(
+					tx: tx, 
+					from: EVM.EVMAddress(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
+				)
+			}`,
+			evmAddress,
 		))
 
-		tx := gethTypes.NewTransaction(
-			0,
-			testContract.DeployedAt.ToCommon(),
-			big.NewInt(0),
-			gasLimit,
-			big.NewInt(0),
-			testContract.MakeCallData(t, "store", big.NewInt(value)),
-		)
 		innerTxBytes, err := tx.MarshalBinary()
 		require.NoError(t, err)
 
@@ -770,20 +762,34 @@ func TestDryRun(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
+				data := testContract.MakeCallData(t, "store", big.NewInt(1337))
 
-				result := storeValueWithLimit(math.MaxUint64-1, 1, ctx, vm, snapshot, testContract)
+				limit := uint64(math.MaxUint64 - 1)
+				tx := gethTypes.NewTransaction(
+					0,
+					testContract.DeployedAt.ToCommon(),
+					big.NewInt(0),
+					limit,
+					big.NewInt(0),
+					data,
+				)
+				result := dryRunTx(tx, ctx, vm, snapshot, testContract)
 				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, result.Status)
 				require.Greater(t, result.GasConsumed, uint64(0))
-
-				result = storeValueWithLimit(uint64(5555555555), 1, ctx, vm, snapshot, testContract)
-				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
-				require.Equal(t, types.StatusSuccessful, result.Status)
-				require.Greater(t, result.GasConsumed, uint64(0))
+				require.Less(t, result.GasConsumed, limit)
 
 				// gas limit too low, but still bigger than intrinsic gas value
-				limit := uint64(21216)
-				result = storeValueWithLimit(limit, 1, ctx, vm, snapshot, testContract)
+				limit = uint64(21216)
+				tx = gethTypes.NewTransaction(
+					0,
+					testContract.DeployedAt.ToCommon(),
+					big.NewInt(0),
+					limit,
+					big.NewInt(0),
+					data,
+				)
+				result = dryRunTx(tx, ctx, vm, snapshot, testContract)
 				require.Equal(t, types.ExecutionErrCodeOutOfGas, result.ErrorCode)
 				require.Equal(t, types.StatusFailed, result.Status)
 				require.Equal(t, result.GasConsumed, limit) // burn it all!!!
@@ -793,8 +799,6 @@ func TestDryRun(t *testing.T) {
 	// this test makes sure the dry-run that updates the value on the contract
 	// doesn't persist the change, and after when the value is read it isn't updated.
 	t.Run("test dry run for any side-effects", func(t *testing.T) {
-		chain := flow.Emulator.Chain()
-		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 		RunWithNewEnvironment(t,
 			chain, func(
 				ctx fvm.Context,
@@ -804,8 +808,17 @@ func TestDryRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				updatedValue := int64(1337)
+				data := testContract.MakeCallData(t, "store", big.NewInt(updatedValue))
+				tx := gethTypes.NewTransaction(
+					0,
+					testContract.DeployedAt.ToCommon(),
+					big.NewInt(0),
+					uint64(1000000),
+					big.NewInt(0),
+					data,
+				)
 
-				result := storeValueWithLimit(uint64(100000), updatedValue, ctx, vm, snapshot, testContract)
+				result := dryRunTx(tx, ctx, vm, snapshot, testContract)
 				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, result.Status)
 				require.Greater(t, result.GasConsumed, uint64(0))
@@ -820,7 +833,7 @@ func TestDryRun(t *testing.T) {
 						return EVM.run(tx: tx, coinbase: coinbase)
 					}
 					`,
-					sc.EVMContract.Address.HexWithPrefix(),
+					evmAddress,
 				))
 
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
@@ -861,8 +874,6 @@ func TestDryRun(t *testing.T) {
 	})
 
 	t.Run("test dry run contract deployment", func(t *testing.T) {
-		chain := flow.Emulator.Chain()
-		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 		RunWithNewEnvironment(t,
 			chain, func(
 				ctx fvm.Context,
@@ -871,40 +882,15 @@ func TestDryRun(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
-					`
-					import EVM from %s
-
-					access(all)
-					fun main(data: [UInt8]): EVM.Result {
-						return EVM.dryRun(
-							from: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], // random address 
-							to: nil, 
-							gasLimit: nil, 
-							value: EVM.Balance(attoflow: 0), 
-							data: data
-						)
-					}
-                    `,
-					sc.EVMContract.Address.HexWithPrefix(),
-				))
-
-				script := fvm.Script(code).WithArguments(
-					json.MustEncode(
-						cadence.NewArray(
-							ConvertToCadence(testContract.ByteCode),
-						).WithType(stdlib.EVMTransactionBytesCadenceType),
-					),
+				tx := gethTypes.NewContractCreation(
+					0,
+					big.NewInt(0),
+					uint64(1000000),
+					big.NewInt(0),
+					testContract.ByteCode,
 				)
-				_, output, err := vm.Run(
-					ctx,
-					script,
-					snapshot)
-				require.NoError(t, err)
-				require.NoError(t, output.Err)
 
-				result, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
-				require.NoError(t, err)
+				result := dryRunTx(tx, ctx, vm, snapshot, testContract)
 				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, result.Status)
 				require.Greater(t, result.GasConsumed, uint64(0))
