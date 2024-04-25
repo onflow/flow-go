@@ -33,7 +33,7 @@ type testContractHandler struct {
 	lastExecutedBlock    func() *types.Block
 	run                  func(tx []byte, coinbase types.Address) *types.ResultSummary
 	generateResourceUUID func() uint64
-	dryRun               func(from types.Address, to *types.Address, gasLimit *types.GasLimit, value types.Balance, data []byte) *types.ResultSummary
+	dryRun               func(tx []byte, from types.Address) *types.ResultSummary
 }
 
 var _ types.ContractHandler = &testContractHandler{}
@@ -76,17 +76,11 @@ func (t *testContractHandler) Run(tx []byte, coinbase types.Address) *types.Resu
 	return t.run(tx, coinbase)
 }
 
-func (t *testContractHandler) DryRun(
-	from types.Address,
-	to *types.Address,
-	gasLimit *types.GasLimit,
-	value types.Balance,
-	data []byte,
-) *types.ResultSummary {
+func (t *testContractHandler) DryRun(tx []byte, from types.Address) *types.ResultSummary {
 	if t.dryRun == nil {
 		panic("unexpected DryRun")
 	}
-	return t.dryRun(from, to, gasLimit, value, data)
+	return t.dryRun(tx, from)
 }
 
 func (t *testContractHandler) GenerateResourceUUID() uint64 {
@@ -2903,18 +2897,19 @@ func TestEVMDryRun(t *testing.T) {
 	t.Parallel()
 
 	dryRunCalled := false
+	evmTx := cadence.NewArray([]cadence.Value{
+		cadence.UInt8(1),
+		cadence.UInt8(2),
+		cadence.UInt8(3),
+	}).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 	handler := &testContractHandler{
 		evmContractAddress: common.Address(contractsAddress),
-		dryRun: func(from types.Address, to *types.Address, gasLimit *types.GasLimit, value types.Balance, data []byte) *types.ResultSummary {
+		dryRun: func(tx []byte, from types.Address) *types.ResultSummary {
 			dryRunCalled = true
 			assert.Equal(t, types.Address{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19}, from)
-			assert.Nil(t, to)
-			require.NotNil(t, gasLimit)
-			assert.Equal(t, uint64(123), uint64(*gasLimit))
-			assert.Equal(t, types.NewBalance(big.NewInt(1)), value)
-			assert.Equal(t, []byte{1, 3, 3, 7}, data)
+			assert.Equal(t, tx, []byte{1, 2, 3})
 
 			return &types.ResultSummary{
 				Status: types.StatusSuccessful,
@@ -2973,20 +2968,18 @@ func TestEVMDryRun(t *testing.T) {
       import EVM from 0x1
 
       access(all)
-      fun main(): EVM.Result {
+      fun main(tx: [UInt8]): EVM.Result {
           return EVM.dryRun(
-			from: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], // random address 
-			to: nil, 
-			gasLimit: 123, 
-			value: EVM.Balance(attoflow: 1), 
-			data: [1, 3, 3, 7]
+			tx: tx,
+			from: EVM.EVMAddress(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]), // random address 
           )
       }
     `)
 
 	val, err := rt.ExecuteScript(
 		runtime.Script{
-			Source: script,
+			Source:    script,
+			Arguments: EncodeArgs([]cadence.Value{evmTx}),
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
