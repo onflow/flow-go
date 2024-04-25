@@ -23,8 +23,12 @@ var (
 	ErrNextEpochNotCommitted = fmt.Errorf("queried info from EpochCommit event before it was emitted")
 
 	// ErrEpochTransitionNotFinalized is a sentinel returned when a query is made
-	// for a block at an epoch boundary which has not yet been finalized.
-	// TODO enhance docs
+	// for an epoch boundary which has not been finalized by this node.
+	// We say an epoch boundary between epoch N and M=N+1 is finalized when the first
+	// block within epoch M is finalized.
+	// There are two cases where this can occur:
+	//   1. Epoch M is in the future and no block has been finalized within it yet.
+	//   2. Epoch M is in the past, but its boundary occurred prior to the start of this node's local history.
 	// TODO add badger/state test cases
 	ErrEpochTransitionNotFinalized = fmt.Errorf("cannot query block at un-finalized epoch transition")
 
