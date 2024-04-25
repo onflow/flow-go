@@ -14,6 +14,7 @@ import (
 	psmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -389,6 +390,16 @@ func (s *StateMutatorSuite) Test_SealsOrdered() {
 
 }
 
+// Test_ParentNotFound checks the behaviour of `MutableProtocolState.EvolveState` when the specified parent block is not found.
+func (s *StateMutatorSuite) Test_InvalidParent() {
+	unknownParent := unittest.IdentifierFixture()
+	s.protocolKVStoreDB.On("ByBlockID", unknownParent).Return(nil, storage.ErrNotFound)
+
+	_, dbUpdates, err := s.mutableState.EvolveState(unknownParent, s.candidate.View, []*flow.Seal{})
+	require.Error(s.T(), err)
+	require.True(s.T(), dbUpdates.IsEmpty())
+}
+
 // Test_ReplicateFails verifies that errors during the parent state replication are escalated to the caller.
 // Because the failure is arising early, we don't expect calls to the state machine constructors to be called
 // (they require a replica of the parent state as target, which is not available if replication fails)
@@ -413,7 +424,7 @@ func (s *StateMutatorSuite) Test_ReplicateFails() {
 //   - The Orthogonal Store State Machines have a 3-step process to evolve their respective sub-states:
 //     (i) construction (via the injected factories)
 //     (ii) processing ordered service events from sealed results (in `EvolveState` call)
-//     (iii) in the `build` step, the state machine assembles their resulting sub-state and the corresponding database operations
+//     (iii) in the `Build` step, the state machine assembles their resulting sub-state and the corresponding database operations
 //     to index and persist its substate.
 //   - The protocol convention is that `MutableProtocolState` executes first step (i) on all state machines, then step (ii) and lastly (iii)
 //
@@ -427,16 +438,16 @@ func (s *StateMutatorSuite) Test_StateMachineFactoryFails() {
 	failingFactory := *protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
 	failingFactory.On("Create", s.candidate.View, s.candidate.ParentID, &s.parentState, &s.evolvingState).Return(nil, exception).Once()
 
-	s.Run("failing factory last", func() {
-		s.kvStateMachineFactories[0], s.kvStateMachineFactories[1] = workingFactory, failingFactory
+	s.Run("failing factory is last", func() {
+		s.kvStateMachineFactories[0], s.kvStateMachineFactories[1] = workingFactory, failingFactory //nolint:govet
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.Error(s.T(), err)
 		require.True(s.T(), dbUpdates.IsEmpty())
 	})
 
 	failingFactory.On("Create", s.candidate.View, s.candidate.ParentID, &s.parentState, &s.evolvingState).Return(nil, exception).Once()
-	s.Run("failing factory first", func() {
-		s.kvStateMachineFactories[0], s.kvStateMachineFactories[1] = failingFactory, workingFactory
+	s.Run("failing factory is first", func() {
+		s.kvStateMachineFactories[0], s.kvStateMachineFactories[1] = failingFactory, workingFactory //nolint:govet
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.Error(s.T(), err)
 		require.True(s.T(), dbUpdates.IsEmpty())
@@ -451,7 +462,7 @@ func (s *StateMutatorSuite) Test_StateMachineFactoryFails() {
 //   - The Orthogonal Store State Machines have a 3-step process to evolve their respective sub-states:
 //     (i) construction (via the injected factories)
 //     (ii) processing ordered service events from sealed results (in `EvolveState` call)
-//     (iii) in the `build` step, the state machine assembles their resulting sub-state and the corresponding database operations
+//     (iii) in the `Build` step, the state machine assembles their resulting sub-state and the corresponding database operations
 //     to index and persist its substate.
 //   - The protocol convention is that `MutableProtocolState` executes first step (i) on all state machines, then step (ii) and lastly (iii)
 //
@@ -464,8 +475,8 @@ func (s *StateMutatorSuite) Test_StateMachineProcessingServiceEventsFails() {
 	failingStateMachine := *protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
 	failingStateMachine.On("EvolveState", mock.MatchedBy(emptySlice[flow.ServiceEvent]())).Return(exception).Once()
 
-	s.Run("failing factory last", func() {
-		s.kvStateMachines[0], s.kvStateMachines[1] = workingStateMachine, failingStateMachine
+	s.Run("failing state machine is last", func() {
+		s.kvStateMachines[0], s.kvStateMachines[1] = workingStateMachine, failingStateMachine //nolint:govet
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.Error(s.T(), err)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
@@ -473,8 +484,39 @@ func (s *StateMutatorSuite) Test_StateMachineProcessingServiceEventsFails() {
 	})
 
 	failingStateMachine.On("EvolveState", mock.MatchedBy(emptySlice[flow.ServiceEvent]())).Return(exception).Once()
-	s.Run("failing factory first", func() {
-		s.kvStateMachines[0], s.kvStateMachines[1] = failingStateMachine, workingStateMachine
+	s.Run("failing state machine is first", func() {
+		s.kvStateMachines[0], s.kvStateMachines[1] = failingStateMachine, workingStateMachine //nolint:govet
+		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
+		require.Error(s.T(), err)
+		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
+		require.True(s.T(), dbUpdates.IsEmpty())
+	})
+}
+
+// Test_StateMachineBuildFails verifies that errors are escalated to the caller that any of the sub-state machines return
+// during their `Build` step. Specifically, the state machine should handle invalid events internally and only escalate internal
+// errors in case of an irrecoverable problem.
+func (s *StateMutatorSuite) Test_StateMachineBuildFails() {
+	workingStateMachine := *protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
+	workingStateMachine.On("EvolveState", mock.MatchedBy(emptySlice[flow.ServiceEvent]())).Return(nil).Twice()
+	workingStateMachine.On("Build").Return(transaction.NewDeferredBlockPersist(), nil).Maybe()
+
+	exception := errors.New("exception")
+	failingStateMachine := *protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](s.T())
+	failingStateMachine.On("EvolveState", mock.MatchedBy(emptySlice[flow.ServiceEvent]())).Return(nil).Twice()
+	failingStateMachine.On("Build").Return(nil, exception).Once()
+
+	s.Run("failing state machine is last", func() {
+		s.kvStateMachines[0], s.kvStateMachines[1] = workingStateMachine, failingStateMachine //nolint:govet
+		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
+		require.Error(s.T(), err)
+		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
+		require.True(s.T(), dbUpdates.IsEmpty())
+	})
+
+	failingStateMachine.On("Build").Return(nil, exception).Once()
+	s.Run("failing state machine is first", func() {
+		s.kvStateMachines[0], s.kvStateMachines[1] = failingStateMachine, workingStateMachine //nolint:govet
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
 		require.Error(s.T(), err)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
@@ -604,5 +646,5 @@ func (m *mockStateTransition) Mock() protocol_statemock.OrthogonalStoreStateMach
 		require.False(m.T, buildCalled, "Method `OrthogonalStoreStateMachine.Build` called repeatedly!")
 		buildCalled = true
 	}).Return(deferredDBUpdates, nil).Once()
-	return *stateMachine
+	return *stateMachine //nolint:govet
 }

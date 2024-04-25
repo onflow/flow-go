@@ -5,121 +5,125 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 	psmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
-	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestProtocolState_AtBlockID tests different scenarios of retrieving a protocol state by block ID.
-// Happy and unhappy paths are covered.
-func TestProtocolState_AtBlockID(t *testing.T) {
-	entry := unittest.EpochStateFixture(unittest.WithValidDKG())
-	otherEntry := unittest.EpochStateFixture(unittest.WithValidDKG())
-	blockID := unittest.IdentifierFixture()
-	otherBlockID := unittest.IdentifierFixture()
-
-	protocolStateDB := storagemock.NewProtocolState(t)
-	protocolStateDB.On("ByBlockID", blockID).Return(entry, nil).Once()
-	protocolStateDB.On("ByBlockID", otherBlockID).Return(otherEntry, nil).Once()
-
-	protocolKVStoreDB := protocol_statemock.NewProtocolKVStore(t)
-
+// Test_ProtocolState verifies the different scenarios of retrieving a protocol state, global parameters
+// and KV store snapshots by block ID for the `ProtocolState`. Happy and unhappy paths are covered.
+func Test_ProtocolState(t *testing.T) {
+	epochProtocolStateDB := storagemock.NewProtocolState(t)
+	protocolKVStoreDB := storagemock.NewProtocolKVStore(t)
 	globalParams := psmock.NewGlobalParams(t)
-	protocolState := NewProtocolState(protocolStateDB, protocolKVStoreDB, globalParams)
-	t.Run("retrieve state for existing blocks", func(t *testing.T) {
-		dynamicProtocolState, err := protocolState.AtBlockID(blockID)
-		require.NoError(t, err)
+	protocolState := NewProtocolState(epochProtocolStateDB, protocolKVStoreDB, globalParams)
 
-		assert.Equal(t, entry.CurrentEpochIdentityTable, dynamicProtocolState.Identities())
-
-		other, err := protocolState.AtBlockID(otherBlockID)
-		require.NoError(t, err)
-		require.NotEqual(t, dynamicProtocolState.Identities(), other.Identities())
+	t.Run("testing `ProtocolState.AtBlockID`", func(t *testing.T) {
+		test_AtBlockID(t, protocolState, epochProtocolStateDB)
 	})
-	t.Run("retrieve state for non-existing block yields storage.ErrNotFound error", func(t *testing.T) {
-		blockID := unittest.IdentifierFixture()
-		protocolStateDB.On("ByBlockID", blockID).Return(nil, storage.ErrNotFound).Once()
-		_, err := protocolState.AtBlockID(blockID)
-		require.ErrorIs(t, err, storage.ErrNotFound)
+	t.Run("testing `ProtocolState.GlobalParams`", func(t *testing.T) {
+		test_GlobalParams(t, protocolState, globalParams)
 	})
-	t.Run("exception during retrieve is propagated", func(t *testing.T) {
-		blockID := unittest.IdentifierFixture()
-		exception := errors.New("exception")
-		protocolStateDB.On("ByBlockID", blockID).Return(nil, exception).Once()
-		_, err := protocolState.AtBlockID(blockID)
-		require.ErrorIs(t, err, exception)
-	})
-	t.Run("retrieve global-params", func(t *testing.T) {
-		expectedChainID := flow.Testnet
-		globalParams.On("ChainID").Return(expectedChainID, nil).Once()
-		actualChainID := protocolState.GlobalParams().ChainID()
-		assert.Equal(t, expectedChainID, actualChainID)
+	t.Run("testing `ProtocolState.KVStoreAtBlockID`", func(t *testing.T) {
+		test_KVStoreAtBlockID(t, protocolState, protocolKVStoreDB)
 	})
 }
 
-// TestMutableProtocolState_Mutator tests happy path of creating a state mutator, and that `Mutator` returns an error
-// if the parent protocol state has not been found.
-func TestMutableProtocolState_Mutator(t *testing.T) {
-	protocolStateDB := storagemock.NewProtocolState(t)
-	kvStoreSnapshotsDB := protocol_statemock.NewProtocolKVStore(t)
+// Test_MutableProtocolState verifies the different scenarios of retrieving a protocol state, global parameters
+// and KV store snapshots by block ID for the `MutableProtocolState`. Happy and unhappy paths are covered.
+func Test_MutableProtocolState(t *testing.T) {
+	epochProtocolStateDB := storagemock.NewProtocolState(t)
+	protocolKVStoreDB := storagemock.NewProtocolKVStore(t)
 	globalParams := psmock.NewGlobalParams(t)
-	globalParams.On("EpochCommitSafetyThreshold").Return(uint64(1000))
 	headersDB := storagemock.NewHeaders(t)
 	resultsDB := storagemock.NewExecutionResults(t)
 	setupsDB := storagemock.NewEpochSetups(t)
 	commitsDB := storagemock.NewEpochCommits(t)
 
-	mutableState := NewMutableProtocolState(
-		protocolStateDB,
-		kvStoreSnapshotsDB,
+	mutableProtocolState := NewMutableProtocolState(
+		epochProtocolStateDB,
+		protocolKVStoreDB,
 		globalParams,
 		headersDB,
 		resultsDB,
 		setupsDB,
 		commitsDB)
 
-	// TODO update testnames (and test structure maybe) to test happy path leaving state invariant separately from happy path state change
-	t.Run("happy-path", func(t *testing.T) {
-		parentEpochState := unittest.EpochStateFixture()
-		candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(parentEpochState.CurrentEpochSetup.FirstView + 1))
-		protocolStateDB.On("ByBlockID", candidate.ParentID).Return(parentEpochState, nil).Once()
-
-		parentProtocolState := &kvstore.Modelv1{
-			Modelv0: kvstore.Modelv0{
-				UpgradableModel: kvstore.UpgradableModel{},
-				EpochStateID:    parentEpochState.ID(),
-			},
-			InvalidEpochTransitionAttempted: false,
-		}
-		//serializedParentProtocolState := &storage.KeyValueStoreData{}
-
-		parentProtocolStateVersion, parentProtocolStateEnc, err := parentProtocolState.VersionedEncode()
-		require.NoError(t, err)
-		parentState := &storage.KeyValueStoreData{
-			Version: parentProtocolStateVersion,
-			Data:    parentProtocolStateEnc,
-		}
-		kvStoreSnapshotsDB.On("ByBlockID", candidate.ParentID).Return(parentState, nil)
-		kvStoreSnapshotsDB.On("StoreTx", mock.Anything, mock.Anything).Return(func(*transaction.Tx) error { return nil }).Once()
-
-		stateID, dbUpdates, err := mutableState.EvolveState(candidate.ParentID, candidate.View, []*flow.Seal{})
-		require.NoError(t, err)
-		require.False(t, dbUpdates.IsEmpty())
-		require.False(t, stateID == flow.ZeroID)
+	t.Run("testing `MutableProtocolState.AtBlockID`", func(t *testing.T) {
+		test_AtBlockID(t, mutableProtocolState, epochProtocolStateDB)
 	})
-	t.Run("parent-not-found", func(t *testing.T) {
-		candidate := unittest.BlockHeaderFixture()
-		kvStoreSnapshotsDB.On("ByBlockID", candidate.ParentID).Return(nil, storage.ErrNotFound)
-		_, dbUpdates, err := mutableState.EvolveState(candidate.ParentID, candidate.View, []*flow.Seal{})
+	t.Run("testing `MutableProtocolState.GlobalParams`", func(t *testing.T) {
+		test_GlobalParams(t, mutableProtocolState, globalParams)
+	})
+	t.Run("testing `MutableProtocolState.KVStoreAtBlockID`", func(t *testing.T) {
+		test_KVStoreAtBlockID(t, mutableProtocolState, protocolKVStoreDB)
+	})
+}
+
+func test_AtBlockID(t *testing.T, protocolState protocol.ProtocolState, epochProtocolStateDB *storagemock.ProtocolState) {
+	blockID := unittest.IdentifierFixture()
+
+	t.Run("retrieve epoch state for existing blocks", func(t *testing.T) {
+		epochState := unittest.EpochStateFixture(unittest.WithValidDKG())
+		epochProtocolStateDB.On("ByBlockID", blockID).Return(epochState, nil).Once()
+
+		dynamicProtocolState, err := protocolState.AtBlockID(blockID)
+		require.NoError(t, err)
+		assert.Equal(t, epochState.CurrentEpochIdentityTable, dynamicProtocolState.Identities())
+	})
+	t.Run("retrieving epoch state for non-existing block yields storage.ErrNotFound error", func(t *testing.T) {
+		epochProtocolStateDB.On("ByBlockID", blockID).Return(nil, storage.ErrNotFound).Once()
+		_, err := protocolState.AtBlockID(blockID)
 		require.ErrorIs(t, err, storage.ErrNotFound)
-		require.True(t, dbUpdates.IsEmpty())
+	})
+	t.Run("exception during retrieve is propagated", func(t *testing.T) {
+		exception := errors.New("exception")
+		epochProtocolStateDB.On("ByBlockID", blockID).Return(nil, exception).Once()
+		_, err := protocolState.AtBlockID(blockID)
+		require.ErrorIs(t, err, exception)
+	})
+}
+
+func test_GlobalParams(t *testing.T, protocolState protocol.ProtocolState, globalParams *psmock.GlobalParams) {
+	expectedChainID := flow.Testnet
+	globalParams.On("ChainID").Return(expectedChainID, nil).Once()
+	actualChainID := protocolState.GlobalParams().ChainID()
+	assert.Equal(t, expectedChainID, actualChainID)
+}
+
+func test_KVStoreAtBlockID(t *testing.T, protocolState protocol.ProtocolState, protocolKVStoreDB *storagemock.ProtocolKVStore) {
+	blockID := unittest.IdentifierFixture()
+	expectedState := &kvstore.Modelv1{
+		Modelv0: kvstore.Modelv0{
+			UpgradableModel: kvstore.UpgradableModel{},
+			EpochStateID:    unittest.IdentifierFixture(),
+		},
+		InvalidEpochTransitionAttempted: false,
+	}
+	version, encStateData, err := expectedState.VersionedEncode()
+	require.NoError(t, err)
+	encExpectedState := &storage.KeyValueStoreData{
+		Version: version,
+		Data:    encStateData,
+	}
+
+	t.Run("retrieve KVStoreReader", func(t *testing.T) {
+		protocolKVStoreDB.On("ByBlockID", blockID).Return(encExpectedState, nil).Once()
+		state, err := protocolState.KVStoreAtBlockID(blockID)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedState, state)
+	})
+
+	t.Run("error retrieving KVStoreReader", func(t *testing.T) {
+		exception := errors.New("exception")
+		protocolKVStoreDB.On("ByBlockID", blockID).Return(nil, exception).Once()
+		_, err := protocolState.KVStoreAtBlockID(blockID)
+		assert.ErrorIs(t, err, exception)
 	})
 }

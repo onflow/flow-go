@@ -14,21 +14,34 @@ import (
 // the low-level primitives provided by `storage.ProtocolKVStore` with logic for encoding and
 // decoding the state snapshots into abstract representation `protocol_state.KVStoreAPI`.
 //
-// TODO: include a cache of the _decoded_ Protocol States, so we don't decode+encode on each consensus view (hot-path)
+// TODO (optional): include a cache of the _decoded_ Protocol States, so we don't decode+encode on each consensus view (hot-path)
 type ProtocolKVStore struct {
 	storage.ProtocolKVStore
 }
 
 var _ protocol_state.ProtocolKVStore = (*ProtocolKVStore)(nil)
 
-// StoreTx returns an anonymous function (intended to be executed as part of a badger transaction),
-// which persists the given KV-store snapshot as part of a DB tx.
+// NewProtocolKVStore instantiates a ProtocolKVStore for querying & storing deserialized `protocol_state.KVStoreAPIs`.
+// At this abstraction level, we can only handle protocol state snapshots, whose data models are supported by the current
+// software version. There might be serialized snapshots with legacy versions in the database, that are not supported
+// anymore by this software version and can only be retrieved as versioned binary blobs via `storage.ProtocolKVStore`.
+func NewProtocolKVStore(protocolStateSnapshots storage.ProtocolKVStore) *ProtocolKVStore {
+	return &ProtocolKVStore{
+		ProtocolKVStore: protocolStateSnapshots,
+	}
+}
+
+// StoreTx returns an anonymous function (intended to be executed as part of a badger transaction), which persists
+// the given KV-store snapshot as part of a DB tx. Per convention, all implementations of `protocol.KVStoreReader`
+// must support encoding their state into a version and data blob.
 // Expected errors of the returned anonymous function:
 //   - storage.ErrAlreadyExists if a KV-store snapshot with the given id is already stored.
 func (p *ProtocolKVStore) StoreTx(stateID flow.Identifier, kvStore protocol.KVStoreReader) func(*transaction.Tx) error {
 	version, data, err := kvStore.VersionedEncode()
-	return func(*transaction.Tx) error {
-		return fmt.Errorf("failed to VersionedEncode protocol state: %w", err)
+	if err != nil {
+		return func(*transaction.Tx) error {
+			return fmt.Errorf("failed to VersionedEncode protocol state: %w", err)
+		}
 	}
 	return p.ProtocolKVStore.StoreTx(stateID, &storage.KeyValueStoreData{
 		Version: version,
@@ -41,7 +54,7 @@ func (p *ProtocolKVStore) StoreTx(stateID flow.Identifier, kvStore protocol.KVSt
 //   - storage.ErrNotFound if no snapshot with the given Identifier is known.
 //   - ErrUnsupportedVersion if input version is not supported
 func (p *ProtocolKVStore) ByID(protocolStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
-	versionedData, err := p.ProtocolKVStore.ByBlockID(protocolStateID)
+	versionedData, err := p.ProtocolKVStore.ByID(protocolStateID)
 	if err != nil {
 		return nil, fmt.Errorf("could not query KV store with ID %x: %w", protocolStateID, err)
 	}

@@ -42,18 +42,18 @@ func (_m *MutableProtocolState) AtBlockID(blockID flow.Identifier) (protocol.Dyn
 	return r0, r1
 }
 
-// EvolveState provides a mock function with given fields: parentStateID, candidateView, candidateSeals
-func (_m *MutableProtocolState) EvolveState(parentStateID flow.Identifier, candidateView uint64, candidateSeals []*flow.Seal) (flow.Identifier, *transaction.DeferredBlockPersist, error) {
-	ret := _m.Called(parentStateID, candidateView, candidateSeals)
+// EvolveState provides a mock function with given fields: parentBlockID, candidateView, candidateSeals
+func (_m *MutableProtocolState) EvolveState(parentBlockID flow.Identifier, candidateView uint64, candidateSeals []*flow.Seal) (flow.Identifier, *transaction.DeferredBlockPersist, error) {
+	ret := _m.Called(parentBlockID, candidateView, candidateSeals)
 
 	var r0 flow.Identifier
 	var r1 *transaction.DeferredBlockPersist
 	var r2 error
 	if rf, ok := ret.Get(0).(func(flow.Identifier, uint64, []*flow.Seal) (flow.Identifier, *transaction.DeferredBlockPersist, error)); ok {
-		return rf(parentStateID, candidateView, candidateSeals)
+		return rf(parentBlockID, candidateView, candidateSeals)
 	}
 	if rf, ok := ret.Get(0).(func(flow.Identifier, uint64, []*flow.Seal) flow.Identifier); ok {
-		r0 = rf(parentStateID, candidateView, candidateSeals)
+		r0 = rf(parentBlockID, candidateView, candidateSeals)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(flow.Identifier)
@@ -61,7 +61,7 @@ func (_m *MutableProtocolState) EvolveState(parentStateID flow.Identifier, candi
 	}
 
 	if rf, ok := ret.Get(1).(func(flow.Identifier, uint64, []*flow.Seal) *transaction.DeferredBlockPersist); ok {
-		r1 = rf(parentStateID, candidateView, candidateSeals)
+		r1 = rf(parentBlockID, candidateView, candidateSeals)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).(*transaction.DeferredBlockPersist)
@@ -69,7 +69,7 @@ func (_m *MutableProtocolState) EvolveState(parentStateID flow.Identifier, candi
 	}
 
 	if rf, ok := ret.Get(2).(func(flow.Identifier, uint64, []*flow.Seal) error); ok {
-		r2 = rf(parentStateID, candidateView, candidateSeals)
+		r2 = rf(parentBlockID, candidateView, candidateSeals)
 	} else {
 		r2 = ret.Error(2)
 	}

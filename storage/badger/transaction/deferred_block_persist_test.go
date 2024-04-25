@@ -5,205 +5,214 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
-	ps "github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+func TestDeferredBlockPersist(t *testing.T) {
+	suite.Run(t, new(DeferredBlockPersistSuite))
+}
+
+type DeferredBlockPersistSuite struct {
+	suite.Suite
+}
+
 // TestEmpty verifies that DeferredBlockPersist behaves like a no-op if nothing is scheduled
-func TestEmpty(t *testing.T) {
-	deferredPersistOps := ps.NewDeferredBlockPersist()
-	require.True(t, deferredPersistOps.IsEmpty())
+func (s *DeferredBlockPersistSuite) TestEmpty() {
+	deferredPersistOps := transaction.NewDeferredBlockPersist()
+	require.True(s.T(), deferredPersistOps.IsEmpty())
 
 	// NewDeferredBlockPersist.Pending() should be a no-op and therefore not care that transaction.Tx is nil
 	err := deferredPersistOps.Pending()(unittest.IdentifierFixture(), nil)
-	require.NoError(t, err)
+	require.NoError(s.T(), err)
 }
 
 // TestAddBaderOp adds 1 or 2 DeferredBadgerUpdate(s) and verifies that they are executed in the expected order
-func Test_AddBaderOp(t *testing.T) {
+func (s *DeferredBlockPersistSuite) Test_AddBaderOp() {
 	blockID := unittest.IdentifierFixture()
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		t.Run("single DeferredBadgerUpdate", func(t *testing.T) {
-			m := NewCallMonitor(t)
-			deferredPersistOps := ps.NewDeferredBlockPersist().AddBadgerOp(m.MakeBadgerUpdate())
-			require.False(t, deferredPersistOps.IsEmpty())
-			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
-			require.NoError(t, err)
+	unittest.RunWithBadgerDB(s.T(), func(db *badger.DB) {
+		s.Run("single DeferredBadgerUpdate", func() {
+			m := NewBlockPersistCallMonitor(s.T())
+			deferredPersistOps := transaction.NewDeferredBlockPersist().AddBadgerOp(m.MakeBadgerUpdate())
+			require.False(s.T(), deferredPersistOps.IsEmpty())
+			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			require.NoError(s.T(), err)
 		})
 
-		t.Run("two DeferredBadgerUpdates added individually", func(t *testing.T) {
-			m := NewCallMonitor(t)
-			deferredPersistOps := ps.NewDeferredBlockPersist().
+		s.Run("two DeferredBadgerUpdates added individually", func() {
+			m := NewBlockPersistCallMonitor(s.T())
+			deferredPersistOps := transaction.NewDeferredBlockPersist().
 				AddBadgerOp(m.MakeBadgerUpdate()).
 				AddBadgerOp(m.MakeBadgerUpdate())
-			require.False(t, deferredPersistOps.IsEmpty())
-			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
-			require.NoError(t, err)
+			require.False(s.T(), deferredPersistOps.IsEmpty())
+			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			require.NoError(s.T(), err)
 		})
 
-		t.Run("two DeferredBadgerUpdates added as a sequence", func(t *testing.T) {
-			m := NewCallMonitor(t)
-			deferredPersistOps := ps.NewDeferredBlockPersist().AddBadgerOps(
+		s.Run("two DeferredBadgerUpdates added as a sequence", func() {
+			m := NewBlockPersistCallMonitor(s.T())
+			deferredPersistOps := transaction.NewDeferredBlockPersist().AddBadgerOps(
 				m.MakeBadgerUpdate(),
 				m.MakeBadgerUpdate())
-			require.False(t, deferredPersistOps.IsEmpty())
-			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
-			require.NoError(t, err)
+			require.False(s.T(), deferredPersistOps.IsEmpty())
+			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			require.NoError(s.T(), err)
 		})
 	})
 }
 
 // TestDbOp adds 1 or 2 DeferredDBUpdate(s) and verifies that they are executed in the expected order
-func Test_AddDbOp(t *testing.T) {
+func (s *DeferredBlockPersistSuite) Test_AddDbOp() {
 	blockID := unittest.IdentifierFixture()
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		t.Run("single DeferredDBUpdate without callback", func(t *testing.T) {
-			m := NewCallMonitor(t)
-			deferredPersistOps := ps.NewDeferredBlockPersist().
+	unittest.RunWithBadgerDB(s.T(), func(db *badger.DB) {
+		s.Run("single DeferredDBUpdate without callback", func() {
+			m := NewBlockPersistCallMonitor(s.T())
+			deferredPersistOps := transaction.NewDeferredBlockPersist().
 				AddDbOp(m.MakeDBUpdate(0))
-			require.False(t, deferredPersistOps.IsEmpty())
-			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
-			require.NoError(t, err)
+			require.False(s.T(), deferredPersistOps.IsEmpty())
+			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			require.NoError(s.T(), err)
 		})
 
-		t.Run("single DeferredDBUpdate with one callback", func(t *testing.T) {
-			m := NewCallMonitor(t)
-			deferredPersistOps := ps.NewDeferredBlockPersist().
+		s.Run("single DeferredDBUpdate with one callback", func() {
+			m := NewBlockPersistCallMonitor(s.T())
+			deferredPersistOps := transaction.NewDeferredBlockPersist().
 				AddDbOp(m.MakeDBUpdate(1))
-			require.False(t, deferredPersistOps.IsEmpty())
-			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
-			require.NoError(t, err)
+			require.False(s.T(), deferredPersistOps.IsEmpty())
+			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			require.NoError(s.T(), err)
 		})
 
-		t.Run("single DeferredDBUpdate with multiple callbacks", func(t *testing.T) {
-			m := NewCallMonitor(t)
-			deferredPersistOps := ps.NewDeferredBlockPersist().
+		s.Run("single DeferredDBUpdate with multiple callbacks", func() {
+			m := NewBlockPersistCallMonitor(s.T())
+			deferredPersistOps := transaction.NewDeferredBlockPersist().
 				AddDbOp(m.MakeDBUpdate(21))
-			require.False(t, deferredPersistOps.IsEmpty())
-			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
-			require.NoError(t, err)
+			require.False(s.T(), deferredPersistOps.IsEmpty())
+			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			require.NoError(s.T(), err)
 		})
 
-		t.Run("two DeferredDBUpdates added individually", func(t *testing.T) {
-			m := NewCallMonitor(t)
-			deferredPersistOps := ps.NewDeferredBlockPersist().
+		s.Run("two DeferredDBUpdates added individually", func() {
+			m := NewBlockPersistCallMonitor(s.T())
+			deferredPersistOps := transaction.NewDeferredBlockPersist().
 				AddDbOp(m.MakeDBUpdate(17)).
 				AddDbOp(m.MakeDBUpdate(0))
-			require.False(t, deferredPersistOps.IsEmpty())
-			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
-			require.NoError(t, err)
+			require.False(s.T(), deferredPersistOps.IsEmpty())
+			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			require.NoError(s.T(), err)
 		})
 
-		t.Run("two DeferredDBUpdates added as a sequence", func(t *testing.T) {
-			m := NewCallMonitor(t)
-			deferredPersistOps := ps.NewDeferredBlockPersist()
+		s.Run("two DeferredDBUpdates added as a sequence", func() {
+			m := NewBlockPersistCallMonitor(s.T())
+			deferredPersistOps := transaction.NewDeferredBlockPersist()
 			deferredPersistOps.AddDbOps(
 				m.MakeDBUpdate(0),
 				m.MakeDBUpdate(17))
-			require.False(t, deferredPersistOps.IsEmpty())
-			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
-			require.NoError(t, err)
+			require.False(s.T(), deferredPersistOps.IsEmpty())
+			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			require.NoError(s.T(), err)
 		})
 	})
 }
 
 // Test_AddIndexingOp adds 1 or 2 DeferredBlockPersistOp(s) and verifies that they are executed in the expected order
-func Test_AddIndexingOp(t *testing.T) {
+func (s *DeferredBlockPersistSuite) Test_AddIndexingOp() {
 	blockID := unittest.IdentifierFixture()
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		t.Run("single DeferredBlockPersistOp without callback", func(t *testing.T) {
-			m := NewCallMonitor(t)
-			deferredPersistOps := ps.NewDeferredBlockPersist().
+	unittest.RunWithBadgerDB(s.T(), func(db *badger.DB) {
+		s.Run("single DeferredBlockPersistOp without callback", func() {
+			m := NewBlockPersistCallMonitor(s.T())
+			deferredPersistOps := transaction.NewDeferredBlockPersist().
 				AddIndexingOp(m.MakeIndexingOp(blockID, 0))
-			require.False(t, deferredPersistOps.IsEmpty())
-			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
-			require.NoError(t, err)
+			require.False(s.T(), deferredPersistOps.IsEmpty())
+			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			require.NoError(s.T(), err)
 		})
 
-		t.Run("single DeferredBlockPersistOp with one callback", func(t *testing.T) {
-			m := NewCallMonitor(t)
-			deferredPersistOps := ps.NewDeferredBlockPersist().
+		s.Run("single DeferredBlockPersistOp with one callback", func() {
+			m := NewBlockPersistCallMonitor(s.T())
+			deferredPersistOps := transaction.NewDeferredBlockPersist().
 				AddIndexingOp(m.MakeIndexingOp(blockID, 1))
-			require.False(t, deferredPersistOps.IsEmpty())
-			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
-			require.NoError(t, err)
+			require.False(s.T(), deferredPersistOps.IsEmpty())
+			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			require.NoError(s.T(), err)
 		})
 
-		t.Run("single DeferredBlockPersistOp with multiple callbacks", func(t *testing.T) {
-			m := NewCallMonitor(t)
-			deferredPersistOps := ps.NewDeferredBlockPersist().
+		s.Run("single DeferredBlockPersistOp with multiple callbacks", func() {
+			m := NewBlockPersistCallMonitor(s.T())
+			deferredPersistOps := transaction.NewDeferredBlockPersist().
 				AddIndexingOp(m.MakeIndexingOp(blockID, 21))
-			require.False(t, deferredPersistOps.IsEmpty())
-			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
-			require.NoError(t, err)
+			require.False(s.T(), deferredPersistOps.IsEmpty())
+			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			require.NoError(s.T(), err)
 		})
 
-		t.Run("two DeferredBlockPersistOp added individually", func(t *testing.T) {
-			m := NewCallMonitor(t)
-			deferredPersistOps := ps.NewDeferredBlockPersist().
+		s.Run("two DeferredBlockPersistOp added individually", func() {
+			m := NewBlockPersistCallMonitor(s.T())
+			deferredPersistOps := transaction.NewDeferredBlockPersist().
 				AddIndexingOp(m.MakeIndexingOp(blockID, 17)).
 				AddIndexingOp(m.MakeIndexingOp(blockID, 0))
-			require.False(t, deferredPersistOps.IsEmpty())
-			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
-			require.NoError(t, err)
+			require.False(s.T(), deferredPersistOps.IsEmpty())
+			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			require.NoError(s.T(), err)
 		})
 
-		t.Run("two DeferredBlockPersistOp added as a sequence", func(t *testing.T) {
-			m := NewCallMonitor(t)
-			deferredPersistOps := ps.NewDeferredBlockPersist()
+		s.Run("two DeferredBlockPersistOp added as a sequence", func() {
+			m := NewBlockPersistCallMonitor(s.T())
+			deferredPersistOps := transaction.NewDeferredBlockPersist()
 			deferredPersistOps.AddIndexingOps(
 				m.MakeIndexingOp(blockID, 0),
 				m.MakeIndexingOp(blockID, 17))
-			require.False(t, deferredPersistOps.IsEmpty())
-			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
-			require.NoError(t, err)
+			require.False(s.T(), deferredPersistOps.IsEmpty())
+			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			require.NoError(s.T(), err)
 		})
 	})
 }
 
 // Test_AddOnSucceedCallback adds 1 or 2 callback(s) and verifies that they are executed in the expected order
-func Test_AddOnSucceedCallback(t *testing.T) {
+func (s *DeferredBlockPersistSuite) Test_AddOnSucceedCallback() {
 	blockID := unittest.IdentifierFixture()
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		t.Run("single callback", func(t *testing.T) {
-			m := NewCallMonitor(t)
-			deferredPersistOps := ps.NewDeferredBlockPersist().
+	unittest.RunWithBadgerDB(s.T(), func(db *badger.DB) {
+		s.Run("single callback", func() {
+			m := NewBlockPersistCallMonitor(s.T())
+			deferredPersistOps := transaction.NewDeferredBlockPersist().
 				OnSucceed(m.MakeCallback())
-			require.False(t, deferredPersistOps.IsEmpty())
-			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
-			require.NoError(t, err)
+			require.False(s.T(), deferredPersistOps.IsEmpty())
+			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			require.NoError(s.T(), err)
 		})
 
-		t.Run("two callbacks added individually", func(t *testing.T) {
-			m := NewCallMonitor(t)
-			deferredPersistOps := ps.NewDeferredBlockPersist().
+		s.Run("two callbacks added individually", func() {
+			m := NewBlockPersistCallMonitor(s.T())
+			deferredPersistOps := transaction.NewDeferredBlockPersist().
 				OnSucceed(m.MakeCallback()).
 				OnSucceed(m.MakeCallback())
-			require.False(t, deferredPersistOps.IsEmpty())
-			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
-			require.NoError(t, err)
+			require.False(s.T(), deferredPersistOps.IsEmpty())
+			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			require.NoError(s.T(), err)
 		})
 
-		t.Run("many callbacks added as a sequence", func(t *testing.T) {
-			m := NewCallMonitor(t)
-			deferredPersistOps := ps.NewDeferredBlockPersist().
+		s.Run("many callbacks added as a sequence", func() {
+			m := NewBlockPersistCallMonitor(s.T())
+			deferredPersistOps := transaction.NewDeferredBlockPersist().
 				OnSucceeds(m.MakeCallbacks(11)...)
-			require.False(t, deferredPersistOps.IsEmpty())
-			err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
-			require.NoError(t, err)
+			require.False(s.T(), deferredPersistOps.IsEmpty())
+			err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+			require.NoError(s.T(), err)
 		})
 	})
 }
 
 // Test_EverythingMixed uses all ways to add functors in combination and verifies that they are executed in the expected order
-func Test_EverythingMixed(t *testing.T) {
+func (s *DeferredBlockPersistSuite) Test_EverythingMixed() {
 	blockID := unittest.IdentifierFixture()
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		m := NewCallMonitor(t)
-		deferredPersistOps := ps.NewDeferredBlockPersist().
+	unittest.RunWithBadgerDB(s.T(), func(db *badger.DB) {
+		m := NewBlockPersistCallMonitor(s.T())
+		deferredPersistOps := transaction.NewDeferredBlockPersist().
 			OnSucceed(m.MakeCallback()).
 			AddDbOp(m.MakeDBUpdate(1)).
 			AddBadgerOp(m.MakeBadgerUpdate()).
@@ -225,15 +234,15 @@ func Test_EverythingMixed(t *testing.T) {
 				m.MakeDBUpdate(0),
 				m.MakeDBUpdate(1)).
 			OnSucceed(m.MakeCallback())
-		require.False(t, deferredPersistOps.IsEmpty())
-		err := Update(db, deferredPersistOps.Pending().WithBlock(blockID))
-		require.NoError(t, err)
+		require.False(s.T(), deferredPersistOps.IsEmpty())
+		err := transaction.Update(db, deferredPersistOps.Pending().WithBlock(blockID))
+		require.NoError(s.T(), err)
 	})
 }
 
-/* ***************************************** Testing Utility CallMonitor ***************************************** */
+/* ***************************************** Testing Utility BlockPersistCallMonitor ***************************************** */
 
-// CallMonitor is a utility for testing that DeferredBlockPersist calls its input functors and callbacks
+// BlockPersistCallMonitor is a utility for testing that DeferredBlockPersist calls its input functors and callbacks
 // in the correct order. DeferredBlockPersist is expected to proceed as follows:
 //
 //  0. Record functors added via `AddBadgerOp`, `AddDbOp`, `AddIndexingOp`, `OnSucceed` ...
@@ -244,19 +253,19 @@ func Test_EverythingMixed(t *testing.T) {
 //     `OnSucceed` schedules its callback during its execution at this step as well
 //  3. If and only if the underlying database transaction _successfully_ completed, run the callbacks
 //
-// To verify the correct order of calls, the CallMonitor generates functors. Each functor has a
+// To verify the correct order of calls, the BlockPersistCallMonitor generates functors. Each functor has a
 // dedicated index value. When the functor is called, it checks that its index matches the functor index
-// that the CallMonitor expects to be executed next. For callbacks, we proceed analogously.
+// that the BlockPersistCallMonitor expects to be executed next. For callbacks, we proceed analogously.
 //
 // Usage note:
-// The call CallMonitor assumes that functors are added to DeferredBlockPersist exactly in the order that
-// CallMonitor generates them. This works very intuitively, when the tests proceed as in the following example:
+// The call BlockPersistCallMonitor assumes that functors are added to DeferredBlockPersist exactly in the order that
+// BlockPersistCallMonitor generates them. This works very intuitively, when the tests proceed as in the following example:
 //
-//	m := NewCallMonitor(t)
-//	deferredPersistOps := ps.NewDeferredBlockPersist()
+//	m := NewBlockPersistCallMonitor(t)
+//	deferredPersistOps :=  transaction.NewDeferredBlockPersist()
 //	deferredPersistOps.AddBadgerOp(m.MakeBadgerUpdate()) // here, we add the functor right when it is generated
 //	transaction.Update(db, deferredPersistOps.Pending())
-type CallMonitor struct {
+type BlockPersistCallMonitor struct {
 	generatedTxFunctors int
 	generatedCallbacks  int
 
@@ -265,14 +274,14 @@ type CallMonitor struct {
 	nextExpectedCallbackIdx  int
 }
 
-func NewCallMonitor(t *testing.T) *CallMonitor {
-	return &CallMonitor{T: t}
+func NewBlockPersistCallMonitor(t *testing.T) *BlockPersistCallMonitor {
+	return &BlockPersistCallMonitor{T: t}
 }
 
-func (cm *CallMonitor) MakeIndexingOp(expectedBlockID flow.Identifier, withCallbacks int) ps.DeferredBlockPersistOp {
+func (cm *BlockPersistCallMonitor) MakeIndexingOp(expectedBlockID flow.Identifier, withCallbacks int) transaction.DeferredBlockPersistOp {
 	myFunctorIdx := cm.generatedTxFunctors       // copy into local scope. Determined when we construct functor
 	callbacks := cm.MakeCallbacks(withCallbacks) // pre-generate callback functors
-	functor := func(blockID flow.Identifier, tx *Tx) error {
+	functor := func(blockID flow.Identifier, tx *transaction.Tx) error {
 		if expectedBlockID != blockID {
 			cm.T.Errorf("expected block ID %v but got %v", expectedBlockID, blockID)
 			return fmt.Errorf("expected block ID %v but got %v", expectedBlockID, blockID)
@@ -296,10 +305,10 @@ func (cm *CallMonitor) MakeIndexingOp(expectedBlockID flow.Identifier, withCallb
 	return functor
 }
 
-func (cm *CallMonitor) MakeDBUpdate(withCallbacks int) DeferredDBUpdate {
+func (cm *BlockPersistCallMonitor) MakeDBUpdate(withCallbacks int) transaction.DeferredDBUpdate {
 	myFunctorIdx := cm.generatedTxFunctors       // copy into local scope. Determined when we construct functor
 	callbacks := cm.MakeCallbacks(withCallbacks) // pre-generate callback functors
-	functor := func(tx *Tx) error {
+	functor := func(tx *transaction.Tx) error {
 		for _, c := range callbacks {
 			tx.OnSucceed(c) // schedule callback
 		}
@@ -319,7 +328,7 @@ func (cm *CallMonitor) MakeDBUpdate(withCallbacks int) DeferredDBUpdate {
 	return functor
 }
 
-func (cm *CallMonitor) MakeBadgerUpdate() DeferredBadgerUpdate {
+func (cm *BlockPersistCallMonitor) MakeBadgerUpdate() transaction.DeferredBadgerUpdate {
 	myFunctorIdx := cm.generatedTxFunctors // copy into local scope. Determined when we construct functor
 	functor := func(tx *badger.Txn) error {
 		if cm.nextExpectedTxFunctorIdx != myFunctorIdx {
@@ -338,7 +347,7 @@ func (cm *CallMonitor) MakeBadgerUpdate() DeferredBadgerUpdate {
 	return functor
 }
 
-func (cm *CallMonitor) MakeCallback() func() {
+func (cm *BlockPersistCallMonitor) MakeCallback() func() {
 	myFunctorIdx := cm.generatedCallbacks // copy into local scope. Determined when we construct callback
 	functor := func() {
 		if cm.nextExpectedCallbackIdx != myFunctorIdx {
@@ -353,7 +362,7 @@ func (cm *CallMonitor) MakeCallback() func() {
 	return functor
 }
 
-func (cm *CallMonitor) MakeCallbacks(numberCallbacks int) []func() {
+func (cm *BlockPersistCallMonitor) MakeCallbacks(numberCallbacks int) []func() {
 	callbacks := make([]func(), 0, numberCallbacks)
 	for ; 0 < numberCallbacks; numberCallbacks-- {
 		callbacks = append(callbacks, cm.MakeCallback())

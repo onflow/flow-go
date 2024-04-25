@@ -72,6 +72,9 @@ func NewDeferredBlockPersist() *DeferredBlockPersist {
 
 // IsEmpty returns true if and only if
 func (d *DeferredBlockPersist) IsEmpty() bool {
+	if d == nil {
+		return true
+	}
 	return d.isEmpty
 }
 
@@ -80,6 +83,9 @@ func (d *DeferredBlockPersist) IsEmpty() bool {
 // Pending() can be called multiple times, but should only be executed in a database transaction
 // once to avoid conflicts.
 func (d *DeferredBlockPersist) Pending() DeferredBlockPersistOp {
+	if d == nil {
+		return noOpPersist
+	}
 	return d.pending
 }
 
