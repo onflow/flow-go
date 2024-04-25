@@ -86,6 +86,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 	dataBytes, err := hex.DecodeString(data)
 	require.NoError(t, err)
 	blockHeight := uint64(2)
+	deployedAddress := types.NewAddress(gethCommon.HexToAddress("0x99466ed2e37b892a2ee3e9cd55a98b68f5735db2"))
 	log := &gethTypes.Log{
 		Index:       1,
 		BlockNumber: blockHeight,
@@ -103,7 +104,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		VMError:                 vmError,
 		TxType:                  255,
 		GasConsumed:             23200,
-		DeployedContractAddress: types.NewAddress(gethCommon.HexToAddress("0x99466ed2e37b892a2ee3e9cd55a98b68f5735db2")),
+		DeployedContractAddress: &deployedAddress,
 		ReturnedValue:           dataBytes,
 		Logs:                    []*gethTypes.Log{log},
 		TxHash:                  txHash,
@@ -167,6 +168,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		assert.Equal(t, types.ErrCodeNoError, types.ErrorCode(tep.Error))
 		assert.Equal(t, tep.TransactionType, txResult.TxType)
 		assert.Equal(t, tep.GasConsumed, txResult.GasConsumed)
+		assert.NotNil(t, txResult.DeployedContractAddress)
 		assert.Equal(
 			t,
 			tep.ContractAddress,
