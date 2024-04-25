@@ -24,7 +24,7 @@
       {"name": "network/alsp"},
       {"name": "network/p2p/connection"},
       {"name": "network/p2p/scoring"},
-      {"name": "network/p2p", "runner":  "buildjet-16vcpu-ubuntu-2204"},
+      {"name": "network/p2p", "runner":  "ubuntu-22.04-16core"},
       {"name": "network/test/cohort1", "runner":  "buildjet-16vcpu-ubuntu-2204"},
       {"name": "network/test/cohort2", "runner":  "buildjet-4vcpu-ubuntu-2204"},
       {"name": "network/p2p/node", "runner":  "buildjet-4vcpu-ubuntu-2204"}
