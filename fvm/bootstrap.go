@@ -434,7 +434,7 @@ func (b *bootstrapExecutor) Execute() error {
 	b.deployStakingCollection(service, &env)
 
 	// sets up the EVM environment
-	b.setupEVM(service, fungibleToken, flowToken)
+	b.setupEVM(service, nonFungibleToken, fungibleToken, flowToken)
 
 	err = expectAccounts(systemcontracts.EVMStorageAccountIndex)
 	if err != nil {
@@ -895,7 +895,7 @@ func (b *bootstrapExecutor) setStakingAllowlist(
 	panicOnMetaInvokeErrf("failed to set staking allow-list: %s", txError, err)
 }
 
-func (b *bootstrapExecutor) setupEVM(serviceAddress, fungibleTokenAddress, flowTokenAddress flow.Address) {
+func (b *bootstrapExecutor) setupEVM(serviceAddress, nonFungibleTokenAddress, fungibleTokenAddress, flowTokenAddress flow.Address) {
 	if b.setupEVMEnabled {
 		// account for storage
 		// we dont need to deploy anything to this account, but it needs to exist
@@ -906,7 +906,7 @@ func (b *bootstrapExecutor) setupEVM(serviceAddress, fungibleTokenAddress, flowT
 		// deploy the EVM contract to the service account
 		tx := blueprints.DeployContractTransaction(
 			serviceAddress,
-			stdlib.ContractCode(flowTokenAddress),
+			stdlib.ContractCode(nonFungibleTokenAddress, fungibleTokenAddress, flowTokenAddress),
 			stdlib.ContractName,
 		)
 		// WithEVMEnabled should only be used after we create an account for storage

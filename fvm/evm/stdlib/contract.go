@@ -27,13 +27,24 @@ import (
 //go:embed contract.cdc
 var contractCode string
 
-var flowTokenImportPattern = regexp.MustCompile(`(?m)^import "FlowToken"\n`)
+var nftImportPattern = regexp.MustCompile(`(?m)^import "NonFungibleToken"`)
+var fungibleTokenImportPattern = regexp.MustCompile(`(?m)^import "FungibleToken"`)
+var flowTokenImportPattern = regexp.MustCompile(`(?m)^import "FlowToken"`)
 
-func ContractCode(flowTokenAddress flow.Address) []byte {
-	return []byte(flowTokenImportPattern.ReplaceAllString(
+func ContractCode(nonFungibleTokenAddress, fungibleTokenAddress, flowTokenAddress flow.Address) []byte {
+	evmContract := nftImportPattern.ReplaceAllString(
 		contractCode,
+		fmt.Sprintf("import NonFungibleToken from %s", nonFungibleTokenAddress.HexWithPrefix()),
+	)
+	evmContract = fungibleTokenImportPattern.ReplaceAllString(
+		evmContract,
+		fmt.Sprintf("import FungibleToken from %s", fungibleTokenAddress.HexWithPrefix()),
+	)
+	evmContract = flowTokenImportPattern.ReplaceAllString(
+		evmContract,
 		fmt.Sprintf("import FlowToken from %s", flowTokenAddress.HexWithPrefix()),
-	))
+	)
+	return []byte(evmContract)
 }
 
 const ContractName = "EVM"
@@ -1830,6 +1841,10 @@ func NewEVMBlockValue(
 					},
 				),
 			},
+			{
+				Name:  "timestamp",
+				Value: interpreter.UInt64Value(block.Timestamp),
+			},
 		},
 		common.ZeroAddress,
 	)
@@ -1995,8 +2010,12 @@ var internalEVMStandardLibraryType = stdlib.StandardLibraryType{
 	Kind: common.DeclarationKindContract,
 }
 
-func SetupEnvironment(env runtime.Environment, handler types.ContractHandler, service flow.Address) {
-	location := common.NewAddressLocation(nil, common.Address(service), ContractName)
+func SetupEnvironment(
+	env runtime.Environment,
+	handler types.ContractHandler,
+	contractAddress flow.Address,
+) {
+	location := common.NewAddressLocation(nil, common.Address(contractAddress), ContractName)
 
 	env.DeclareType(
 		internalEVMStandardLibraryType,
@@ -2100,6 +2119,10 @@ func NewEVMBlockCadenceType(address common.Address) *cadence.StructType {
 			{
 				Identifier: "totalSupply",
 				Type:       cadence.IntType,
+			},
+			{
+				Identifier: "timestamp",
+				Type:       cadence.UInt64Type,
 			},
 		},
 		nil,
