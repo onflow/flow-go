@@ -2,12 +2,15 @@ package backend
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 type EventsBackend struct {
@@ -126,12 +129,16 @@ func (b *EventsBackend) SubscribeEventsFromLatest(ctx context.Context, filter st
 // - filter: The event filter used to filter events.
 //
 // Expected errors during normal operation:
-// - codes.NotFound: If block header for the specified block height is not found, if events for the specified block height are not found.
+// - subscription.ErrBlockNotReady: execution data for the given block height is not available.
 func (b *EventsBackend) getResponseFactory(filter state_stream.EventFilter) subscription.GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (response interface{}, err error) {
 		eventsResponse, err := b.eventsRetriever.GetAllEventsResponse(ctx, height)
 		if err != nil {
-			return nil, err
+			if errors.Is(err, storage.ErrNotFound) ||
+				errors.Is(err, storage.ErrHeightNotIndexed) {
+				return nil, subscription.ErrBlockNotReady
+			}
+			return nil, fmt.Errorf("block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
 		}
 
 		eventsResponse.Events = filter.Filter(eventsResponse.Events)
