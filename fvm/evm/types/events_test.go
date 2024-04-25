@@ -2,9 +2,10 @@ package types_test
 
 import (
 	"encoding/hex"
-	"github.com/onflow/go-ethereum/core/vm"
 	"math/big"
 	"testing"
+
+	"github.com/onflow/go-ethereum/core/vm"
 
 	"github.com/onflow/cadence/encoding/ccf"
 	cdcCommon "github.com/onflow/cadence/runtime/common"
