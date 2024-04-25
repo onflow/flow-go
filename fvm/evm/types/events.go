@@ -216,7 +216,7 @@ var blockExecutedEventCadenceType = &cadence.EventType{
 		cadence.NewField("hash", cadence.StringType{}),
 		cadence.NewField("timestamp", cadence.UInt64Type{}),
 		cadence.NewField("totalSupply", cadence.IntType{}),
-		cadence.NewField("totalGasUsage", cadence.UInt64Type{}),
+		cadence.NewField("totalGasUsed", cadence.UInt64Type{}),
 		cadence.NewField("parentHash", cadence.StringType{}),
 		cadence.NewField("receiptRoot", cadence.StringType{}),
 		cadence.NewField(
