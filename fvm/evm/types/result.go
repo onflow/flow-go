@@ -67,6 +67,8 @@ type Result struct {
 	Logs []*gethTypes.Log
 	// TX hash holdes the cached value of tx hash
 	TxHash gethCommon.Hash
+	// transaction block inclusion index
+	Index uint16
 }
 
 // Invalid returns true if transaction has been rejected
