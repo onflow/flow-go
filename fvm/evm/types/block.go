@@ -34,6 +34,9 @@ type Block struct {
 
 	// transaction hashes
 	TransactionHashes []gethCommon.Hash
+
+	// stores gas used by all transactions included in the block.
+	TotalGasUsed uint64
 }
 
 // ToBytes encodes the block into bytes
@@ -59,6 +62,13 @@ func (b *Block) PopulateReceiptRoot(results []Result) {
 		receipts[i] = res.Receipt()
 	}
 	b.ReceiptRoot = gethTypes.DeriveSha(receipts, gethTrie.NewStackTrie(nil))
+}
+
+// CalculateGasUsage sums up all the gas transactions in the block used
+func (b *Block) CalculateGasUsage(results []Result) {
+	for _, res := range results {
+		b.TotalGasUsed += res.GasConsumed
+	}
 }
 
 // AppendTxHash appends a transaction hash to the list of transaction hashes of the block

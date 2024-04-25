@@ -186,8 +186,9 @@ func (h *ContractHandler) run(
 
 	bp.AppendTxHash(res.TxHash)
 
-	// Populate receipt root
+	// populate receipt root
 	bp.PopulateReceiptRoot([]types.Result{*res})
+	bp.CalculateGasUsage([]types.Result{*res})
 
 	blockHash, err := bp.Hash()
 	if err != nil {
