@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	cdcCommon "github.com/onflow/cadence/runtime/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
@@ -28,6 +27,7 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 		TotalSupply:     big.NewInt(1500),
 		ParentBlockHash: gethCommon.HexToHash("0x2813452cff514c3054ac9f40cd7ce1b016cc78ab7f99f1c6d49708837f6e06d1"),
 		ReceiptRoot:     gethCommon.Hash{},
+		TotalGasUsed:    15,
 		TransactionHashes: []gethCommon.Hash{
 			gethCommon.HexToHash("0x70b67ce6710355acf8d69b2ea013d34e212bc4824926c5d26f189c1ca9667246"),
 		},
@@ -37,8 +37,7 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 	ev, err := event.Payload.ToCadence()
 	require.NoError(t, err)
 
-	var bep types.BlockEventPayload
-	err = cadence.DecodeFields(ev, &bep)
+	bep, err := types.DecodeBlockEventPayload(ev)
 	require.NoError(t, err)
 
 	assert.Equal(t, bep.Height, block.Height)
@@ -49,6 +48,7 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 
 	assert.Equal(t, bep.TotalSupply.Value, block.TotalSupply)
 	assert.Equal(t, bep.Timestamp, block.Timestamp)
+	assert.Equal(t, bep.TotalGasUsed, block.TotalGasUsed)
 	assert.Equal(t, bep.ParentBlockHash, block.ParentBlockHash.Hex())
 	assert.Equal(t, bep.ReceiptRoot, block.ReceiptRoot.Hex())
 

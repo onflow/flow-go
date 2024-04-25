@@ -30,6 +30,7 @@ type BlockEventPayload struct {
 	Hash              string           `cadence:"hash"`
 	Timestamp         uint64           `cadence:"timestamp"`
 	TotalSupply       cadence.Int      `cadence:"totalSupply"`
+	TotalGasUsed      uint64           `cadence:"totalGasUsed"`
 	ParentBlockHash   string           `cadence:"parentHash"`
 	ReceiptRoot       string           `cadence:"receiptRoot"`
 	TransactionHashes []cadence.String `cadence:"transactionHashes"`
