@@ -37,6 +37,12 @@ type ContractHandler interface {
 	// collects the gas fees, and transfers the gas fees to the given coinbase account.
 	Run(tx []byte, coinbase Address) *ResultSummary
 
+	// DryRun simulates execution of the provided RLP-encoded and unsigned transaction.
+	// Because the transaction is unsigned the from address is required, since
+	// from address is normally derived from the transaction signature.
+	// The function should not have any persisted changes made to the state.
+	DryRun(tx []byte, from Address) *ResultSummary
+
 	// FlowTokenAddress returns the address where FLOW token is deployed
 	FlowTokenAddress() common.Address
 
@@ -45,17 +51,6 @@ type ContractHandler interface {
 
 	// GenerateResourceUUID generates a new UUID for a resource
 	GenerateResourceUUID() uint64
-
-	// DryRun estimates gas requires for the transaction to succesfully execute.
-	// No changes are persisted to the state.
-	// Error is returned if transaction is not valid or unexpected error happens.
-	DryRun(
-		from Address,
-		to *Address,
-		gasLimit *GasLimit,
-		value Balance,
-		data []byte,
-	) *ResultSummary
 }
 
 // AddressAllocator allocates addresses, used by the handler

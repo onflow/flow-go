@@ -2,7 +2,6 @@ package handler
 
 import (
 	"bytes"
-	"math"
 	"math/big"
 
 	"github.com/onflow/cadence/runtime/common"
@@ -221,24 +220,30 @@ func (h *ContractHandler) run(
 }
 
 func (h *ContractHandler) DryRun(
+	rlpEncodedTx []byte,
 	from types.Address,
-	to *types.Address,
-	gasLimit *types.GasLimit,
-	value types.Balance,
-	data []byte,
 ) *types.ResultSummary {
-	res, err := h.dryRun(from, to, gasLimit, value, data)
+	res, err := h.dryRun(rlpEncodedTx, from)
 	panicOnError(err)
 	return res.ResultSummary()
 }
 
 func (h *ContractHandler) dryRun(
+	rlpEncodedTx []byte,
 	from types.Address,
-	to *types.Address,
-	gasLimit *types.GasLimit,
-	value types.Balance,
-	data []byte,
 ) (*types.Result, error) {
+	// step 1 - transaction decoding
+	encodedLen := uint(len(rlpEncodedTx))
+	err := h.backend.MeterComputation(environment.ComputationKindRLPDecoding, encodedLen)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := gethTypes.Transaction{}
+	err = tx.UnmarshalBinary(rlpEncodedTx)
+	if err != nil {
+		return nil, err
+	}
 
 	ctx, err := h.getBlockContext()
 	if err != nil {
@@ -250,27 +255,7 @@ func (h *ContractHandler) dryRun(
 		return nil, err
 	}
 
-	call := &types.DirectCall{
-		Type:    types.DirectCallTxType,
-		SubType: types.DryRunSubType,
-		From:    from,
-		Data:    data,
-		Value:   value,
-	}
-
-	if to != nil {
-		call.To = *to
-	}
-	if gasLimit != nil {
-		call.GasLimit = uint64(*gasLimit)
-	} else {
-		call.GasLimit = math.MaxUint
-	}
-
-	res, err := blk.DirectCall(call)
-	if err != nil {
-		return nil, err
-	}
+	res, err := blk.DryRunTransaction(&tx, from.ToCommon())
 
 	// saftey check for result
 	if res == nil {
