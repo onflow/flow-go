@@ -183,10 +183,10 @@ func (net *FlowNetwork) Identities() flow.IdentityList {
 }
 
 // ContainersByRole returns all the containers in the network with the specified role
-func (net *FlowNetwork) ContainersByRole(role flow.Role) []*Container {
+func (net *FlowNetwork) ContainersByRole(role flow.Role, ghost bool) []*Container {
 	cl := make([]*Container, 0, len(net.Containers))
 	for _, c := range net.Containers {
-		if c.Config.Role == role {
+		if c.Config.Role == role && c.Config.Ghost == ghost {
 			cl = append(cl, c)
 		}
 	}

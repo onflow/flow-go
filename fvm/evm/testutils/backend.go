@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/onflow/cadence/runtime/stdlib"
+
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -35,7 +37,7 @@ func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
 		TestValueStore:              GetSimpleValueStore(),
 		testEventEmitter:            getSimpleEventEmitter(),
 		testMeter:                   getSimpleMeter(),
-		TestBlockInfo:               &TestBlockInfo{},
+		TestBlockInfo:               getSimpleBlockStore(),
 		TestRandomGenerator:         getSimpleRandomGenerator(),
 		TestContractFunctionInvoker: &TestContractFunctionInvoker{},
 	}
@@ -153,6 +155,24 @@ func getSimpleMeter() *testMeter {
 		},
 		computationUsed: func() (uint64, error) {
 			return uint64(compUsed), nil
+		},
+	}
+}
+
+func getSimpleBlockStore() *TestBlockInfo {
+	var index int64 = 1
+	return &TestBlockInfo{
+		GetCurrentBlockHeightFunc: func() (uint64, error) {
+			index++
+			return uint64(index), nil
+		},
+		GetBlockAtHeightFunc: func(height uint64) (runtime.Block, bool, error) {
+			return runtime.Block{
+				Height:    height,
+				View:      0,
+				Hash:      stdlib.BlockHash{},
+				Timestamp: int64(height),
+			}, true, nil
 		},
 	}
 }

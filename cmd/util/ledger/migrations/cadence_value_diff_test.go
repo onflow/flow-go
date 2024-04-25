@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
@@ -171,12 +173,14 @@ func TestDiffCadenceValues(t *testing.T) {
 			)
 
 			mr, err := NewMigratorRuntime(
+				zerolog.Nop(),
 				[]*ledger.Payload{
 					accountStatusPayload,
 				},
 				flow.Emulator,
 				MigratorRuntimeConfig{},
 				snapshot.LargeChangeSetOrReadonlySnapshot,
+				1,
 			)
 			require.NoError(t, err)
 
@@ -274,12 +278,14 @@ func TestDiffCadenceValues(t *testing.T) {
 			)
 
 			mr, err := NewMigratorRuntime(
+				zerolog.Nop(),
 				[]*ledger.Payload{
 					accountStatusPayload,
 				},
 				flow.Emulator,
 				MigratorRuntimeConfig{},
 				snapshot.LargeChangeSetOrReadonlySnapshot,
+				1,
 			)
 			require.NoError(t, err)
 
@@ -384,12 +390,14 @@ func TestDiffCadenceValues(t *testing.T) {
 			)
 
 			mr, err := NewMigratorRuntime(
+				zerolog.Nop(),
 				[]*ledger.Payload{
 					accountStatusPayload,
 				},
 				flow.Emulator,
 				MigratorRuntimeConfig{},
 				snapshot.LargeChangeSetOrReadonlySnapshot,
+				1,
 			)
 			require.NoError(t, err)
 
@@ -505,12 +513,14 @@ func TestDiffCadenceValues(t *testing.T) {
 			)
 
 			mr, err := NewMigratorRuntime(
+				zerolog.Nop(),
 				[]*ledger.Payload{
 					accountStatusPayload,
 				},
 				flow.Emulator,
 				MigratorRuntimeConfig{},
 				snapshot.LargeChangeSetOrReadonlySnapshot,
+				1,
 			)
 			require.NoError(t, err)
 
@@ -633,12 +643,14 @@ func createStorageMapPayloads(t *testing.T, address common.Address, domain strin
 	)
 
 	mr, err := NewMigratorRuntime(
+		zerolog.Nop(),
 		[]*ledger.Payload{
 			accountStatusPayload,
 		},
 		flow.Emulator,
 		MigratorRuntimeConfig{},
 		snapshot.LargeChangeSetOrReadonlySnapshot,
+		1,
 	)
 	require.NoError(t, err)
 
