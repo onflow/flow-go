@@ -827,9 +827,24 @@ func TestHandler_TransactionRun(t *testing.T) {
 					bs := handler.NewBlockStore(backend, rootAddr)
 					aa := handler.NewAddressAllocator()
 
-					gas := types.GasLimit(15)
-					value := types.NewBalance(big.NewInt(13))
-					data := []byte{1}
+					nonce := uint64(1)
+					to := gethCommon.Address{1, 2}
+					amount := big.NewInt(13)
+					gasLimit := uint64(1337)
+					gasPrice := big.NewInt(2000)
+					data := []byte{1, 5}
+					from := types.Address{3, 4}
+
+					tx := gethTypes.NewTransaction(
+						nonce,
+						to,
+						amount,
+						gasLimit,
+						gasPrice,
+						data,
+					)
+					rlpTx, err := tx.MarshalBinary()
+					require.NoError(t, err)
 
 					result := &types.Result{
 						DeployedContractAddress: testutils.RandomAddress(t),
@@ -843,19 +858,21 @@ func TestHandler_TransactionRun(t *testing.T) {
 
 					called := false
 					em := &testutils.TestEmulator{
-						DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
+						DryRunTransactionFunc: func(tx *gethTypes.Transaction, address gethCommon.Address) (*types.Result, error) {
+							assert.Equal(t, nonce, tx.Nonce())
+							assert.Equal(t, &to, tx.To())
+							assert.Equal(t, gasLimit, tx.Gas())
+							assert.Equal(t, gasPrice, tx.GasPrice())
+							assert.Equal(t, data, tx.Data())
+							assert.Equal(t, from.ToCommon(), address)
 							called = true
-							assert.Equal(t, uint64(gas), call.GasLimit)
-							assert.Equal(t, call.Value.Cmp(value), 0)
-							assert.Equal(t, data, call.Data)
-							assert.Equal(t, eoa.Address(), call.From)
-							assert.Equal(t, call.To, types.EmptyAddress)
 							return result, nil
 						},
 					}
 
 					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, bs, aa, backend, em)
-					rs := handler.DryRun(eoa.Address(), nil, &gas, value, data)
+
+					rs := handler.DryRun(rlpTx, from)
 					require.Equal(t, types.StatusSuccessful, rs.Status)
 					require.Equal(t, result.GasConsumed, rs.GasConsumed)
 					require.Equal(t, types.ErrCodeNoError, rs.ErrorCode)

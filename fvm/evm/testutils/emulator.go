@@ -1,6 +1,7 @@
 package testutils
 
 import (
+	gethCommon "github.com/onflow/go-ethereum/common"
 	"math/big"
 
 	gethTypes "github.com/onflow/go-ethereum/core/types"
@@ -9,12 +10,13 @@ import (
 )
 
 type TestEmulator struct {
-	BalanceOfFunc      func(address types.Address) (*big.Int, error)
-	NonceOfFunc        func(address types.Address) (uint64, error)
-	CodeOfFunc         func(address types.Address) (types.Code, error)
-	CodeHashOfFunc     func(address types.Address) ([]byte, error)
-	DirectCallFunc     func(call *types.DirectCall) (*types.Result, error)
-	RunTransactionFunc func(tx *gethTypes.Transaction) (*types.Result, error)
+	BalanceOfFunc         func(address types.Address) (*big.Int, error)
+	NonceOfFunc           func(address types.Address) (uint64, error)
+	CodeOfFunc            func(address types.Address) (types.Code, error)
+	CodeHashOfFunc        func(address types.Address) ([]byte, error)
+	DirectCallFunc        func(call *types.DirectCall) (*types.Result, error)
+	RunTransactionFunc    func(tx *gethTypes.Transaction) (*types.Result, error)
+	DryRunTransactionFunc func(tx *gethTypes.Transaction, address gethCommon.Address) (*types.Result, error)
 }
 
 var _ types.Emulator = &TestEmulator{}
@@ -75,4 +77,12 @@ func (em *TestEmulator) RunTransaction(tx *gethTypes.Transaction) (*types.Result
 		panic("method not set")
 	}
 	return em.RunTransactionFunc(tx)
+}
+
+// DryRunTransaction simulates transaction execution
+func (em *TestEmulator) DryRunTransaction(tx *gethTypes.Transaction, address gethCommon.Address) (*types.Result, error) {
+	if em.DryRunTransactionFunc == nil {
+		panic("method not set")
+	}
+	return em.DryRunTransactionFunc(tx, address)
 }
