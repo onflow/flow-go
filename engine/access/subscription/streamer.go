@@ -10,8 +10,6 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/storage"
 )
 
 // ErrBlockNotReady represents an error indicating that a block is not yet available or ready.
@@ -105,10 +103,7 @@ func (s *Streamer) sendAllAvailable(ctx context.Context) error {
 		}
 
 		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) ||
-				errors.Is(err, storage.ErrHeightNotIndexed) ||
-				execution_data.IsBlobNotFoundError(err) ||
-				errors.Is(err, ErrBlockNotReady) {
+			if errors.Is(err, ErrBlockNotReady) {
 				// no more available
 				return nil
 			}
