@@ -26,6 +26,7 @@ func NewContractCheckingMigration(
 	chainID flow.ChainID,
 	verboseErrorOutput bool,
 	programs map[common.Location]*interpreter.Program,
+	nWorkers int,
 ) ledger.Migration {
 	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
 
@@ -41,10 +42,12 @@ func NewContractCheckingMigration(
 		}
 
 		mr, err := NewMigratorRuntime(
+			log,
 			contractPayloads,
 			chainID,
 			MigratorRuntimeConfig{},
 			snapshot.LargeChangeSetOrReadonlySnapshot,
+			nWorkers,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create migrator runtime: %w", err)

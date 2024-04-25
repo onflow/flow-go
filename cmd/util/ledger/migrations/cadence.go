@@ -245,6 +245,7 @@ func NewCadence1ValueMigrations(
 				opts.ChainID,
 				opts.VerboseErrorOutput,
 				programs,
+				opts.NWorker,
 			),
 		},
 	}
@@ -384,6 +385,7 @@ type Options struct {
 	StagedContracts                   []StagedContract
 	Prune                             bool
 	MaxAccountSize                    uint64
+	FixSlabsWithBrokenReferences      bool
 	FilterUnreferencedSlabs           bool
 }
 
@@ -414,21 +416,38 @@ func NewCadence1Migrations(
 		)
 	}
 
-	if opts.FilterUnreferencedSlabs {
+	if opts.FixSlabsWithBrokenReferences || opts.FilterUnreferencedSlabs {
+
+		var accountBasedMigrations []AccountBasedMigration
+
+		if opts.FixSlabsWithBrokenReferences {
+			accountBasedMigrations = append(
+				accountBasedMigrations,
+				NewFixBrokenReferencesInSlabsMigration(rwf, testnetAccountsWithBrokenSlabReferences),
+			)
+		}
+
+		if opts.FilterUnreferencedSlabs {
+			accountBasedMigrations = append(
+				accountBasedMigrations,
+				// NOTE: migration to filter unreferenced slabs should happen
+				// after migration to fix slabs with references to nonexistent slabs.
+				NewFilterUnreferencedSlabsMigration(outputDir, rwf),
+			)
+		}
+
 		migrations = append(migrations, NamedMigration{
-			Name: "filter-unreferenced-slabs-migration",
+			Name: "fix-slabs-migration",
 			Migrate: NewAccountBasedMigration(
 				log,
 				opts.NWorker,
-				[]AccountBasedMigration{
-					NewFilterUnreferencedSlabsMigration(outputDir, rwf),
-				},
+				accountBasedMigrations,
 			),
 		})
 	}
 
 	if opts.Prune {
-		migration := NewCadence1PruneMigration(opts.ChainID, log)
+		migration := NewCadence1PruneMigration(opts.ChainID, log, opts.NWorker)
 		if migration != nil {
 			migrations = append(
 				migrations,

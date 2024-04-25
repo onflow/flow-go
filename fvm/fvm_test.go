@@ -2687,9 +2687,9 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 						prepare(account: auth(Storage) &Account) {
 							var total = 0
 							account.storage.forEachPublic(fun (path: PublicPath, type: Type): Bool {
-								if let cap = account.capabilities.get<&AnyStruct>(path) {
-								    cap.borrow()
-								    total = total + 1
+								let cap = account.capabilities.get<&AnyStruct>(path)
+								if cap.check() {
+									total = total + 1
 								}
                                 return true
 							})

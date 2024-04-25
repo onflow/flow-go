@@ -25,7 +25,7 @@ transaction() {
             let storageReservation <- tokenVault.withdraw(amount: FlowStorageFees.minimumStorageReservation) as! @FlowToken.Vault
 
             let receiverCap = account.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
-            if receiverCap == nil || !receiverCap!.check() {
+            if !receiverCap.check() {
                 FlowServiceAccount.initDefaultToken(account)
             }
 

@@ -529,12 +529,14 @@ func TestStagedContractsMigration(t *testing.T) {
 			)
 
 			mr, err := NewMigratorRuntime(
+				zerolog.Nop(),
 				[]*ledger.Payload{
 					accountStatusPayload,
 				},
 				chainID,
 				MigratorRuntimeConfig{},
 				snapshot.SmallChangeSetSnapshot,
+				2,
 			)
 			require.NoError(t, err)
 
@@ -1688,7 +1690,7 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Len(t, logWriter.logs, 1)
-		require.Contains(t, logWriter.logs[0], "conformances does not match in `A`")
+		require.Contains(t, logWriter.logs[0], "conformances do not match in `A`")
 
 		require.Len(t, accountPayloads, 1)
 		assert.Equal(t, oldCode, string(accountPayloads[0].Value()))
@@ -1892,6 +1894,7 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 			newContractPayload(common.Address(address), "A", []byte(oldCodeA)),
 		}
 
+		var err error
 		err = migration.InitMigration(log, payloads, 0)
 		require.NoError(t, err)
 
@@ -1902,7 +1905,6 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		var err error
 		err = migration.Close()
 		require.NoError(t, err)
 

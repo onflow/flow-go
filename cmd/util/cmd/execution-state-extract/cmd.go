@@ -46,6 +46,7 @@ var (
 	flagOutputPayloadFileName              string
 	flagOutputPayloadByAddresses           string
 	flagMaxAccountSize                     uint64
+	flagFixSlabsWithBrokenReferences       bool
 	flagFilterUnreferencedSlabs            bool
 )
 
@@ -152,6 +153,9 @@ func init() {
 
 	Cmd.Flags().Uint64Var(&flagMaxAccountSize, "max-account-size", 0,
 		"max account size")
+
+	Cmd.Flags().BoolVar(&flagFixSlabsWithBrokenReferences, "fix-testnet-slabs-with-broken-references", false,
+		"fix slabs with broken references in testnet")
 
 	Cmd.Flags().BoolVar(&flagFilterUnreferencedSlabs, "filter-unreferenced-slabs", false,
 		"filter unreferenced slabs")
@@ -375,6 +379,7 @@ func run(*cobra.Command, []string) {
 		Prune:                             flagPrune,
 		MaxAccountSize:                    flagMaxAccountSize,
 		VerboseErrorOutput:                flagVerboseErrorOutput,
+		FixSlabsWithBrokenReferences:      chainID == flow.Testnet && flagFixSlabsWithBrokenReferences,
 		FilterUnreferencedSlabs:           flagFilterUnreferencedSlabs,
 	}
 
