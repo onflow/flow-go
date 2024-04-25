@@ -215,6 +215,7 @@ var blockExecutedEventCadenceType = &cadence.EventType{
 		cadence.NewField("hash", cadence.StringType{}),
 		cadence.NewField("timestamp", cadence.UInt64Type{}),
 		cadence.NewField("totalSupply", cadence.IntType{}),
+		cadence.NewField("totalGasUsage", cadence.UInt64Type{}),
 		cadence.NewField("parentHash", cadence.StringType{}),
 		cadence.NewField("receiptRoot", cadence.StringType{}),
 		cadence.NewField(
@@ -244,6 +245,7 @@ func (p *blockEvent) ToCadence() (cadence.Event, error) {
 		cadence.String(blockHash.String()),
 		cadence.NewUInt64(p.Timestamp),
 		cadence.NewIntFromBig(p.TotalSupply),
+		cadence.NewUInt64(p.TotalGasUsed),
 		cadence.String(p.ParentBlockHash.String()),
 		cadence.String(p.ReceiptRoot.String()),
 		cadence.NewArray(hashes).WithType(cadence.NewVariableSizedArrayType(cadence.StringType{})),
