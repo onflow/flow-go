@@ -48,7 +48,7 @@ type TransactionEventPayload struct {
 	Index           uint16 `cadence:"index"`
 	TransactionType uint8  `cadence:"type"`
 	Payload         string `cadence:"payload"`
-	Error           uint16 `cadence:"error"`
+	ErrorCode       uint16 `cadence:"errorCode"`
 	GasConsumed     uint64 `cadence:"gasConsumed"`
 	ContractAddress string `cadence:"contractAddress"`
 	Logs            string `cadence:"logs"`
@@ -167,7 +167,7 @@ func (p *transactionEvent) ToCadence() (cadence.Event, error) {
 				cadence.NewField("index", cadence.UInt16Type{}),
 				cadence.NewField("type", cadence.UInt8Type{}),
 				cadence.NewField("payload", cadence.StringType{}),
-				cadence.NewField("error", cadence.UInt16Type{}),
+				cadence.NewField("errorCode", cadence.UInt16Type{}),
 				cadence.NewField("gasConsumed", cadence.UInt64Type{}),
 				cadence.NewField("contractAddress", cadence.StringType{}),
 				cadence.NewField("logs", cadence.StringType{}),

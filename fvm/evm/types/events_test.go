@@ -122,7 +122,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		assert.Equal(t, tep.BlockHash, blockHash.Hex())
 		assert.Equal(t, tep.Hash, txHash.Hex())
 		assert.Equal(t, tep.Payload, txEncoded)
-		assert.Equal(t, types.ErrorCode(tep.Error), types.ExecutionErrCodeOutOfGas)
+		assert.Equal(t, types.ErrorCode(tep.ErrorCode), types.ExecutionErrCodeOutOfGas)
 		assert.Equal(t, tep.TransactionType, txResult.TxType)
 		assert.Equal(t, tep.GasConsumed, txResult.GasConsumed)
 		assert.Equal(
@@ -165,7 +165,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		assert.Equal(t, tep.BlockHash, blockHash.Hex())
 		assert.Equal(t, tep.Hash, txHash.Hex())
 		assert.Equal(t, tep.Payload, txEncoded)
-		assert.Equal(t, types.ErrCodeNoError, types.ErrorCode(tep.Error))
+		assert.Equal(t, types.ErrCodeNoError, types.ErrorCode(tep.ErrorCode))
 		assert.Equal(t, tep.TransactionType, txResult.TxType)
 		assert.Equal(t, tep.GasConsumed, txResult.GasConsumed)
 		assert.NotNil(t, txResult.DeployedContractAddress)
