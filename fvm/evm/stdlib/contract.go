@@ -1120,46 +1120,62 @@ func NewResultValue(
 	result *types.ResultSummary,
 ) *interpreter.CompositeValue {
 	loc := common.NewAddressLocation(gauge, handler.EVMContractAddress(), ContractName)
+
+	fields := []interpreter.CompositeField{
+		{
+			Name: "status",
+			Value: interpreter.NewEnumCaseValue(
+				inter,
+				locationRange,
+				&sema.CompositeType{
+					Location:   loc,
+					Identifier: evmStatusTypeQualifiedIdentifier,
+					Kind:       common.CompositeKindEnum,
+				},
+				interpreter.NewUInt8Value(gauge, func() uint8 {
+					return uint8(result.Status)
+				}),
+				nil,
+			),
+		},
+		{
+			Name: "errorCode",
+			Value: interpreter.NewUInt64Value(gauge, func() uint64 {
+				return uint64(result.ErrorCode)
+			}),
+		},
+		{
+			Name: "gasUsed",
+			Value: interpreter.NewUInt64Value(gauge, func() uint64 {
+				return result.GasConsumed
+			}),
+		},
+		{
+			Name:  "data",
+			Value: interpreter.ByteSliceToByteArrayValue(inter, result.ReturnedValue),
+		},
+	}
+
+	// we made the deployed contract address optional
+	if result.DeployedContractAddress != nil {
+		fields = append(fields, interpreter.CompositeField{
+			Name:  "deployedContract",
+			Value: EVMAddressToAddressBytesArrayValue(inter, *result.DeployedContractAddress),
+		})
+	} else {
+		fields = append(fields, interpreter.CompositeField{
+			Name:  "deployedContract",
+			Value: interpreter.NilOptionalValue,
+		})
+	}
+
 	return interpreter.NewCompositeValue(
 		inter,
 		locationRange,
 		loc,
 		evmResultTypeQualifiedIdentifier,
 		common.CompositeKindStructure,
-		[]interpreter.CompositeField{
-			{
-				Name: "status",
-				Value: interpreter.NewEnumCaseValue(
-					inter,
-					locationRange,
-					&sema.CompositeType{
-						Location:   loc,
-						Identifier: evmStatusTypeQualifiedIdentifier,
-						Kind:       common.CompositeKindEnum,
-					},
-					interpreter.NewUInt8Value(gauge, func() uint8 {
-						return uint8(result.Status)
-					}),
-					nil,
-				),
-			},
-			{
-				Name: "errorCode",
-				Value: interpreter.NewUInt64Value(gauge, func() uint64 {
-					return uint64(result.ErrorCode)
-				}),
-			},
-			{
-				Name: "gasUsed",
-				Value: interpreter.NewUInt64Value(gauge, func() uint64 {
-					return result.GasConsumed
-				}),
-			},
-			{
-				Name:  "data",
-				Value: interpreter.ByteSliceToByteArrayValue(inter, result.ReturnedValue),
-			},
-		},
+		fields,
 		common.ZeroAddress,
 	)
 }
@@ -1712,7 +1728,8 @@ var internalEVMTypeDeployFunctionType = &sema.FunctionType{
 			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
 		},
 	},
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+	// Actually EVM.Result, but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 
 func newInternalEVMTypeDeployFunction(
@@ -1772,9 +1789,10 @@ func newInternalEVMTypeDeployFunction(
 
 			const isAuthorized = true
 			account := handler.AccountByAddress(fromAddress, isAuthorized)
-			address := account.Deploy(code, gasLimit, amount)
+			result := account.Deploy(code, gasLimit, amount)
 
-			return EVMAddressToAddressBytesArrayValue(inter, address)
+			res := NewResultValue(handler, gauge, inter, locationRange, result)
+			return res
 		},
 	)
 }
@@ -2139,7 +2157,7 @@ func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, e
 	if !ok {
 		return nil, fmt.Errorf("invalid input: unexpected value type")
 	}
-	if len(str.Fields) != 4 {
+	if len(str.Fields) != 5 {
 		return nil, fmt.Errorf("invalid input: field count mismatch")
 	}
 
@@ -2168,16 +2186,43 @@ func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, e
 		return nil, fmt.Errorf("invalid input: unexpected type for data field")
 	}
 
+	var deployedAddress *cadence.Array
+	switch v := str.Fields[4].(type) {
+	case cadence.Optional:
+		if v.Value != nil {
+			arr, ok := v.Value.(cadence.Array)
+			if !ok {
+				return nil, fmt.Errorf("invalid input: unexpected type for deployed contract field")
+			}
+			deployedAddress = &arr
+		}
+	case cadence.Array:
+		deployedAddress = &v
+	default:
+		return nil, fmt.Errorf("invalid input: unexpected type for deployed contract field")
+	}
+
+	var convertedDeployedAddress *types.Address
+	if deployedAddress != nil {
+		convertedAddress := make([]byte, len(deployedAddress.Values))
+		for i, val := range deployedAddress.Values {
+			convertedAddress[i] = val.(cadence.UInt8).ToGoValue().(uint8)
+		}
+		addr := types.Address(convertedAddress)
+		convertedDeployedAddress = &addr
+	}
+
 	convertedData := make([]byte, len(data.Values))
 	for i, value := range data.Values {
 		convertedData[i] = value.(cadence.UInt8).ToGoValue().(uint8)
 	}
 
 	return &types.ResultSummary{
-		Status:        types.Status(status),
-		ErrorCode:     types.ErrorCode(errorCode),
-		GasConsumed:   uint64(gasUsed),
-		ReturnedValue: convertedData,
+		Status:                  types.Status(status),
+		ErrorCode:               types.ErrorCode(errorCode),
+		GasConsumed:             uint64(gasUsed),
+		ReturnedValue:           convertedData,
+		DeployedContractAddress: convertedDeployedAddress,
 	}, nil
 
 }

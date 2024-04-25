@@ -41,6 +41,7 @@ func NewContractHandler(
 	flowChainID flow.ChainID,
 	evmContractAddress flow.Address,
 	flowTokenAddress common.Address,
+	randomBeaconAddress flow.Address,
 	blockStore types.BlockStore,
 	addressAllocator types.AddressAllocator,
 	backend types.Backend,
@@ -54,7 +55,7 @@ func NewContractHandler(
 		addressAllocator:   addressAllocator,
 		backend:            backend,
 		emulator:           emulator,
-		precompiles:        preparePrecompiles(evmContractAddress, addressAllocator, backend),
+		precompiles:        preparePrecompiles(evmContractAddress, randomBeaconAddress, addressAllocator, backend),
 	}
 }
 
@@ -62,7 +63,7 @@ func NewContractHandler(
 func (h *ContractHandler) DeployCOA(uuid uint64) types.Address {
 	res, err := h.deployCOA(uuid)
 	panicOnErrorOrInvalidOrFailedState(res, err)
-	return res.DeployedContractAddress
+	return *res.DeployedContractAddress
 }
 
 func (h *ContractHandler) deployCOA(uuid uint64) (*types.Result, error) {
@@ -681,12 +682,13 @@ func (a *Account) transfer(to types.Address, balance types.Balance) (*types.Resu
 }
 
 // Deploy deploys a contract to the EVM environment
-// the new deployed contract would be at the returned address and
+// the new deployed contract would be at the returned address
+// contained in the result summary as data and
 // the contract data is not controlled by the caller accounts
-func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types.Balance) types.Address {
+func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types.Balance) *types.ResultSummary {
 	res, err := a.deploy(code, gaslimit, balance)
-	panicOnErrorOrInvalidOrFailedState(res, err)
-	return types.Address(res.DeployedContractAddress)
+	panicOnError(err)
+	return res.ResultSummary()
 }
 
 func (a *Account) deploy(code types.Code, gaslimit types.GasLimit, balance types.Balance) (*types.Result, error) {

@@ -423,8 +423,9 @@ func (proc *procedure) deployAt(
 		return res, nil
 	}
 
+	res.DeployedContractAddress = &to
+
 	proc.state.SetCode(addr, ret)
-	res.DeployedContractAddress = to
 	return res, proc.commit(true)
 }
 
@@ -483,9 +484,10 @@ func (proc *procedure) run(
 		res.GasConsumed = execResult.UsedGas
 		if !execResult.Failed() { // collect vm errors
 			res.ReturnedValue = execResult.ReturnData
-			// If the transaction created a contract, store the creation address in the receipt.
+			// If the transaction created a contract, store the creation address in the receipt,
 			if msg.To == nil {
-				res.DeployedContractAddress = types.NewAddress(gethCrypto.CreateAddress(msg.From, msg.Nonce))
+				deployedAddress := types.NewAddress(gethCrypto.CreateAddress(msg.From, msg.Nonce))
+				res.DeployedContractAddress = &deployedAddress
 			}
 			// replace tx index and tx hash
 			res.Logs = proc.state.Logs(

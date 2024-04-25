@@ -146,7 +146,8 @@ func TestContractInteraction(t *testing.T) {
 							nonce)
 						res, err := blk.DirectCall(call)
 						require.NoError(t, err)
-						contractAddr = res.DeployedContractAddress
+						require.NotNil(t, res.DeployedContractAddress)
+						contractAddr = *res.DeployedContractAddress
 						expectedHash, err := call.Hash()
 						require.NoError(t, err)
 						require.Equal(t, expectedHash, res.TxHash)
@@ -496,7 +497,8 @@ func TestDeployAtFunctionality(t *testing.T) {
 							),
 						)
 						require.NoError(t, err)
-						require.Equal(t, target, res.DeployedContractAddress)
+						require.NotNil(t, res.DeployedContractAddress)
+						require.Equal(t, target, *res.DeployedContractAddress)
 					})
 					RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
 						require.NotNil(t, target)
@@ -581,7 +583,8 @@ func TestSelfdestruct(t *testing.T) {
 								0),
 						)
 						require.NoError(t, err)
-						contractAddr = res.DeployedContractAddress
+						require.NotNil(t, res.DeployedContractAddress)
+						contractAddr = *res.DeployedContractAddress
 					})
 
 					RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
