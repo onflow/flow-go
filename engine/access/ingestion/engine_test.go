@@ -46,6 +46,7 @@ type Suite struct {
 	}
 
 	me             *modulemock.Local
+	obsIdentity    *flow.Identity
 	request        *modulemock.Requester
 	provider       *mocknetwork.Engine
 	blocks         *storage.Blocks
@@ -82,14 +83,14 @@ func (s *Suite) SetupTest() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 
-	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
+	s.obsIdentity = unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 
 	// mock out protocol state
 	s.proto.state = new(protocol.FollowerState)
 	s.proto.snapshot = new(protocol.Snapshot)
 	s.proto.params = new(protocol.Params)
 	s.finalizedBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
-	s.proto.state.On("Identity").Return(obsIdentity, nil)
+	s.proto.state.On("Identity").Return(s.obsIdentity, nil)
 	s.proto.state.On("Final").Return(s.proto.snapshot, nil)
 	s.proto.state.On("Params").Return(s.proto.params)
 	s.proto.snapshot.On("Head").Return(
@@ -99,19 +100,18 @@ func (s *Suite) SetupTest() {
 		nil,
 	).Maybe()
 
-	s.me = new(modulemock.Local)
-	s.me.On("NodeID").Return(obsIdentity.NodeID)
+	s.me = modulemock.NewLocal(s.T())
 
-	net := new(mocknetwork.Network)
-	conduit := new(mocknetwork.Conduit)
+	net := mocknetwork.NewNetwork(s.T())
+	conduit := mocknetwork.NewConduit(s.T())
 	net.On("Register", channels.ReceiveReceipts, mock.Anything).
 		Return(conduit, nil).
 		Once()
-	s.request = new(modulemock.Requester)
+	s.request = modulemock.NewRequester(s.T())
 
-	s.provider = new(mocknetwork.Engine)
-	s.blocks = new(storage.Blocks)
-	s.headers = new(storage.Headers)
+	s.provider = mocknetwork.NewEngine(s.T())
+	s.blocks = storage.NewBlocks(s.T())
+	s.headers = storage.NewHeaders(s.T())
 	s.collections = new(storage.Collections)
 	s.transactions = new(storage.Transactions)
 	s.receipts = new(storage.ExecutionReceipts)
@@ -155,6 +155,8 @@ func (s *Suite) SetupTest() {
 
 // TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
 func (s *Suite) TestOnFinalizedBlock() {
+	s.me.On("NodeID").Return(s.obsIdentity.NodeID)
+
 	block := unittest.BlockFixture()
 	block.SetPayload(unittest.PayloadFixture(
 		unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
@@ -178,7 +180,7 @@ func (s *Suite) TestOnFinalizedBlock() {
 	}
 
 	// we should query the block once and index the guarantee payload once
-	s.blocks.On("ByID", block.ID()).Return(&block, nil).Twice()
+	s.blocks.On("ByID", block.ID()).Return(&block, nil).Once()
 	for _, g := range block.Payload.Guarantees {
 		collection := unittest.CollectionFixture(1)
 		light := collection.Light()
@@ -665,6 +667,8 @@ func (s *Suite) TestProcessBackgroundCalls() {
 }
 
 func (s *Suite) TestComponentShutdown() {
+	s.me.On("NodeID").Return(s.obsIdentity.NodeID)
+
 	// start then shut down the engine
 	unittest.AssertClosesBefore(s.T(), s.eng.Ready(), 10*time.Millisecond)
 	s.cancel()
