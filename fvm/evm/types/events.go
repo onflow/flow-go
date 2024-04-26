@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/hex"
+
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/cadence"

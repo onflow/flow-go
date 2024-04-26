@@ -3278,10 +3278,9 @@ func TestEVM(t *testing.T) {
 			require.NoError(t, output.Err)
 			require.Len(t, output.Events, 7)
 
-			evmLocation := types.EVMLocation{}
 			txExe, blockExe := output.Events[4], output.Events[5]
-			assert.Equal(t, evmLocation.TypeID(nil, string(types.EventTypeTransactionExecuted)), common.TypeID(txExe.Type))
-			assert.Equal(t, evmLocation.TypeID(nil, string(types.EventTypeBlockExecuted)), common.TypeID(blockExe.Type))
+			assert.Equal(t, fmt.Sprintf("A.%s.%s", sc.EVMContract.Address, types.EventTypeTransactionExecuted), string(txExe.Type))
+			assert.Equal(t, fmt.Sprintf("A.%s.%s", sc.EVMContract.Address, types.EventTypeBlockExecuted), string(blockExe.Type))
 		}),
 	)
 }
