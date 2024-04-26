@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
-	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -246,18 +245,24 @@ func withNextEpoch(
 	encodableSnapshot.LatestSeal.ResultID = encodableSnapshot.LatestResult.ID()
 
 	// update protocol state
-	epochProtocolState := encodableSnapshot.EpochProtocolState
+	protocolStateEntry := encodableSnapshot.SealingSegment.LatestProtocolStateEntry()
+	epochProtocolState := protocolStateEntry.EpochEntry.ProtocolStateEntry
 
 	// setup ID has changed, need to update it
-	convertedEpochSetup, _ := protocol.ToEpochSetup(inmem.NewEpoch(*currEpoch))
-	epochProtocolState.CurrentEpoch.SetupID = convertedEpochSetup.ID()
+	convertedCurrentEpochSetup, _ := protocol.ToEpochSetup(inmem.NewEpoch(*currEpoch))
+	currentEpochCommit, _ := protocol.ToEpochCommit(inmem.NewEpoch(*currEpoch))
+	epochProtocolState.CurrentEpoch.SetupID = convertedCurrentEpochSetup.ID()
 	// create next epoch protocol state
-	convertedEpochSetup, _ = protocol.ToEpochSetup(inmem.NewEpoch(*encodableSnapshot.Epochs.Next))
-	convertedEpochCommit, _ := protocol.ToEpochCommit(inmem.NewEpoch(*encodableSnapshot.Epochs.Next))
+	convertedNextEpochSetup, _ := protocol.ToEpochSetup(inmem.NewEpoch(*encodableSnapshot.Epochs.Next))
+	convertedNextEpochCommit, _ := protocol.ToEpochCommit(inmem.NewEpoch(*encodableSnapshot.Epochs.Next))
 	epochProtocolState.NextEpoch = &flow.EpochStateContainer{
-		SetupID:          convertedEpochSetup.ID(),
-		CommitID:         convertedEpochCommit.ID(),
+		SetupID:          convertedNextEpochSetup.ID(),
+		CommitID:         convertedNextEpochCommit.ID(),
 		ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochIdentities),
+	}
+	richEpochStateEntry, err := flow.NewRichProtocolStateEntry(epochProtocolState, nil, nil, convertedCurrentEpochSetup, currentEpochCommit, convertedNextEpochSetup, convertedNextEpochCommit)
+	if err != nil {
+		panic(err)
 	}
 
 	// need to fix genesis block to contain the correct protocol state ID
@@ -266,11 +271,16 @@ func withNextEpoch(
 	if err != nil {
 		panic(err)
 	}
-	encodableSnapshot.KVStore = storage.KeyValueStoreData{
-		Version: version,
-		Data:    data,
-	}
 	encodableSnapshot.SealingSegment.Blocks[0].Payload.ProtocolStateID = updatedKVStore.ID()
+	encodableSnapshot.SealingSegment.ProtocolStateEntries = map[flow.Identifier]*flow.ProtocolStateEntryWrapper{
+		updatedKVStore.ID(): {
+			KVStore: flow.PSKeyValueStoreData{
+				Version: version,
+				Data:    data,
+			},
+			EpochEntry: richEpochStateEntry,
+		},
+	}
 
 	return inmem.SnapshotFromEncodable(encodableSnapshot)
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/invalid"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
@@ -147,7 +148,7 @@ func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 //   - protocol.UnfinalizedSealingSegmentError if sealing segment would contain unfinalized blocks (including orphaned blocks)
 func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	// Lets denote the highest block in the sealing segment `head` (initialized below).
-	// Based on the tech spec `flow/sealing_segment.md`, the Sealing Segment must contain contain
+	// Based on the tech spec `flow/sealing_segment.md`, the Sealing Segment must contain
 	//  enough history to satisfy _all_ of the following conditions:
 	//   (i) The highest sealed block as of `head` needs to be included in the sealing segment.
 	//       This is relevant if `head` does not contain any seals.
@@ -186,9 +187,34 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 		return nil, fmt.Errorf("could not get block: %w", err)
 	}
 
+	// TODO this is a temporary measure resulting from epoch data being stored outside the
+	//  protocol KV Store, once epoch data is in the KV Store, we can pass protocolKVStoreSnapshotsDB.ByID
+	//  directly to NewSealingSegmentBuilder (similar to other getters)
+	getProtocolStateEntry := func(protocolStateID flow.Identifier) (*flow.ProtocolStateEntryWrapper, error) {
+		kvStoreEntry, err := s.state.protocolKVStoreSnapshotsDB.ByID(protocolStateID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get kv store entry: %w", err)
+		}
+		kvStoreReader, err := kvstore.VersionedDecode(kvStoreEntry.Version, kvStoreEntry.Data)
+		if err != nil {
+			return nil, fmt.Errorf("could not decode kv store entry: %w", err)
+		}
+		epochDataEntry, err := s.state.protocolStateSnapshotsDB.ByID(kvStoreReader.GetEpochStateID())
+		if err != nil {
+			return nil, fmt.Errorf("could not get epoch data: %w", err)
+		}
+		return &flow.ProtocolStateEntryWrapper{
+			KVStore: flow.PSKeyValueStoreData{
+				Version: kvStoreEntry.Version,
+				Data:    kvStoreEntry.Data,
+			},
+			EpochEntry: epochDataEntry,
+		}, nil
+	}
+
 	// walk through the chain backward until we reach the block referenced by
 	// the latest seal - the returned segment includes this block
-	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID, s.state.seals.HighestInFork)
+	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID, s.state.seals.HighestInFork, getProtocolStateEntry)
 	scraper := func(header *flow.Header) error {
 		blockID := header.ID()
 		block, err := s.state.blocks.ByID(blockID)

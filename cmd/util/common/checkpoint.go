@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/snapshots"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -122,7 +121,7 @@ func GenerateProtocolSnapshotForCheckpoint(
 	}
 	endHeight := sealed.Height
 
-	return GenerateProtocolSnapshotForCheckpointWithHeights(logger, state, headers, seals,
+	return GenerateProtocolSnapshotForCheckpointWithHeight(logger, state, headers, seals,
 		checkpointDir,
 		blocksToSkip,
 		endHeight,
@@ -146,9 +145,9 @@ func findLatestCheckpointFilePath(checkpointDir string) (string, error) {
 	return checkpointFilePath, nil
 }
 
-// GenerateProtocolSnapshotForCheckpointWithHeights does the same thing as GenerateProtocolSnapshotForCheckpoint
+// GenerateProtocolSnapshotForCheckpointWithHeight does the same thing as GenerateProtocolSnapshotForCheckpoint
 // except that it allows the caller to specify the end height of the sealed block that we iterate backwards from.
-func GenerateProtocolSnapshotForCheckpointWithHeights(
+func GenerateProtocolSnapshotForCheckpointWithHeight(
 	logger zerolog.Logger,
 	state protocol.State,
 	headers storage.Headers,
@@ -184,12 +183,7 @@ func GenerateProtocolSnapshotForCheckpointWithHeights(
 	}
 
 	snapshot := state.AtHeight(finalizedHeight)
-	validSnapshot, err := snapshots.GetDynamicBootstrapSnapshot(state, snapshot)
-	if err != nil {
-		return nil, 0, flow.DummyStateCommitment, fmt.Errorf("could not get dynamic bootstrap snapshot: %w", err)
-	}
-
-	return validSnapshot, sealedHeight, commit, nil
+	return snapshot, sealedHeight, commit, nil
 }
 
 // hashesToCommits converts a list of ledger.RootHash to a list of flow.StateCommitment
