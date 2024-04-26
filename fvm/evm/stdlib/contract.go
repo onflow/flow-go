@@ -47,32 +47,33 @@ func ContractCode(nonFungibleTokenAddress, fungibleTokenAddress, flowTokenAddres
 	return []byte(evmContract)
 }
 
-const (ContractName = "EVM"
+const (
+	ContractName = "EVM"
 
- evmAddressTypeBytesFieldName = "bytes"
+	evmAddressTypeBytesFieldName = "bytes"
 
- evmAddressTypeQualifiedIdentifier = "EVM.EVMAddress"
+	evmAddressTypeQualifiedIdentifier = "EVM.EVMAddress"
 
- evmBalanceTypeQualifiedIdentifier = "EVM.Balance"
+	evmBalanceTypeQualifiedIdentifier = "EVM.Balance"
 
- evmResultTypeQualifiedIdentifier = "EVM.Result"
+	evmResultTypeQualifiedIdentifier = "EVM.Result"
 
- evmStatusTypeQualifiedIdentifier = "EVM.Status"
+	evmStatusTypeQualifiedIdentifier = "EVM.Status"
 
-evmBlockTypeQualifiedIdentifier   = "EVM.EVMBlock"
-	abiEncodingByteSize               = 32
+	evmBlockTypeQualifiedIdentifier = "EVM.EVMBlock"
+	abiEncodingByteSize             = 32
 )
 
 var (
 	EVMTransactionBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.UInt8Type)
 
-evmTransactionBytesType        = sema.NewVariableSizedType(nil, sema.UInt8Type)
-	evmTransactionsBatchBytesType  = sema.NewVariableSizedType(nil, evmTransactionBytesType)
-	 evmAddressBytesType = sema.NewConstantSizedType(nil, sema.UInt8Type, types.AddressLength)
+	evmTransactionBytesType       = sema.NewVariableSizedType(nil, sema.UInt8Type)
+	evmTransactionsBatchBytesType = sema.NewVariableSizedType(nil, evmTransactionBytesType)
+	evmAddressBytesType           = sema.NewConstantSizedType(nil, sema.UInt8Type, types.AddressLength)
 
- evmAddressBytesStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, evmAddressBytesType)
+	evmAddressBytesStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, evmAddressBytesType)
 
-EVMAddressBytesCadenceType     = cadence.NewConstantSizedArrayType(types.AddressLength, cadence.UInt8Type)
+	EVMAddressBytesCadenceType = cadence.NewConstantSizedArrayType(types.AddressLength, cadence.UInt8Type)
 )
 
 // abiEncodingError
