@@ -132,7 +132,11 @@ func (segment *SealingSegment) FinalizedSeal() (*Seal, error) {
 
 // LatestProtocolStateEntry returns the Protocol State entry corresponding to
 // the highest block in the sealing segment. This represents the Dynamic Protocol State
+<<<<<<< HEAD
 // after applying all state changes in `SealingSegment.Highest().Payload`.
+=======
+// after applying all state changes sealed in `SealingSegment.Highest().Payload`.
+>>>>>>> feature/protocol-state-kvstore
 // Caution: `segment` must be a valid SealingSegment.
 func (segment *SealingSegment) LatestProtocolStateEntry() *ProtocolStateEntryWrapper {
 	highest := segment.Highest()
