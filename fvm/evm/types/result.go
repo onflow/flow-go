@@ -42,6 +42,17 @@ type ResultSummary struct {
 	ReturnedValue           Data
 }
 
+// NewInvalidResult creates a new result that hold transaction validation
+// error as well as the defined gas cost for validation.
+func NewInvalidResult(tx *gethTypes.Transaction, err error) *Result {
+	return &Result{
+		TxType:          tx.Type(),
+		TxHash:          tx.Hash(),
+		ValidationError: err,
+		GasConsumed:     InvalidTransactionGasCost,
+	}
+}
+
 // Result captures the result of an interaction to the emulator
 // it could be the out put of a direct call or output of running an
 // evm transaction.

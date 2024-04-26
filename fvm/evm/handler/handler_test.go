@@ -34,6 +34,7 @@ import (
 // TODO add test for fatal errors
 
 var flowTokenAddress = common.MustBytesToAddress(systemcontracts.SystemContractsForChain(flow.Emulator).FlowToken.Address.Bytes())
+var randomBeaconAddress = systemcontracts.SystemContractsForChain(flow.Emulator).RandomBeaconHistory.Address
 
 func TestHandler_TransactionRunOrPanic(t *testing.T) {
 	t.Parallel()
@@ -816,6 +817,163 @@ func TestHandler_TransactionRun(t *testing.T) {
 					rs := handler.Run([]byte(tx), coinbase)
 					require.Equal(t, types.StatusInvalid, rs.Status)
 					require.Equal(t, types.ValidationErrCodeNonceTooLow, rs.ErrorCode)
+				})
+			})
+		})
+	})
+
+	t.Run("test - transaction batch run (success)", func(t *testing.T) {
+		t.Parallel()
+
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+					bs := handler.NewBlockStore(backend, rootAddr)
+					aa := handler.NewAddressAllocator()
+
+					gasConsumed := testutils.RandomGas(1000)
+					addr := testutils.RandomAddress(t)
+					result := func(tx *gethTypes.Transaction) *types.Result {
+						return &types.Result{
+							DeployedContractAddress: &addr,
+							ReturnedValue:           testutils.RandomData(t),
+							GasConsumed:             gasConsumed,
+							TxHash:                  tx.Hash(),
+							Logs: []*gethTypes.Log{
+								testutils.GetRandomLogFixture(t),
+								testutils.GetRandomLogFixture(t),
+							},
+						}
+					}
+
+					var runResults []*types.Result
+					em := &testutils.TestEmulator{
+						BatchRunTransactionFunc: func(txs []*gethTypes.Transaction) ([]*types.Result, error) {
+							runResults = make([]*types.Result, len(txs))
+							for i, tx := range txs {
+								runResults[i] = result(tx)
+							}
+							return runResults, nil
+						},
+					}
+					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em)
+
+					coinbase := types.NewAddress(gethCommon.Address{})
+					gasLimit := uint64(100_000)
+
+					// run multiple successful transactions
+					const batchSize = 3
+					txs := make([][]byte, batchSize)
+					for i := range txs {
+						txs[i] = eoa.PrepareSignAndEncodeTx(
+							t,
+							gethCommon.Address{},
+							nil,
+							nil,
+							gasLimit,
+							big.NewInt(1),
+						)
+					}
+
+					results := handler.BatchRun(txs, coinbase)
+					for _, rs := range results {
+						require.Equal(t, types.StatusSuccessful, rs.Status)
+						require.Equal(t, gasConsumed, rs.GasConsumed)
+						require.Equal(t, types.ErrCodeNoError, rs.ErrorCode)
+					}
+
+					events := backend.Events()
+					require.Len(t, events, batchSize+1) // +1 block event
+
+					for i, event := range events {
+						if i == batchSize {
+							continue // don't check last block event
+						}
+						assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
+						ev, err := jsoncdc.Decode(nil, event.Payload)
+						require.NoError(t, err)
+						cadenceEvent, ok := ev.(cadence.Event)
+						require.True(t, ok)
+						for j, f := range cadenceEvent.GetFields() {
+							if f.Identifier == "logs" {
+								cadenceLogs := cadenceEvent.GetFieldValues()[j]
+								encodedLogs, err := hex.DecodeString(strings.ReplaceAll(cadenceLogs.String(), "\"", ""))
+								require.NoError(t, err)
+
+								var logs []*gethTypes.Log
+								err = rlp.DecodeBytes(encodedLogs, &logs)
+								require.NoError(t, err)
+
+								for k, l := range runResults[i].Logs {
+									assert.Equal(t, l, logs[k])
+								}
+							}
+						}
+					}
+
+					// run single transaction passed in as batch
+					txs = make([][]byte, 1)
+					for i := range txs {
+						txs[i] = eoa.PrepareSignAndEncodeTx(
+							t,
+							gethCommon.Address{},
+							nil,
+							nil,
+							gasLimit,
+							big.NewInt(1),
+						)
+					}
+
+					results = handler.BatchRun(txs, coinbase)
+					for _, rs := range results {
+						require.Equal(t, types.StatusSuccessful, rs.Status)
+					}
+				})
+			})
+		})
+	})
+
+	t.Run("test - transaction batch run (unhappy case)", func(t *testing.T) {
+		t.Parallel()
+
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+					bs := handler.NewBlockStore(backend, rootAddr)
+					aa := handler.NewAddressAllocator()
+
+					gasConsumed := testutils.RandomGas(1000)
+					addr := testutils.RandomAddress(t)
+					result := func() *types.Result {
+						return &types.Result{
+							DeployedContractAddress: &addr,
+							ReturnedValue:           testutils.RandomData(t),
+							GasConsumed:             gasConsumed,
+							Logs: []*gethTypes.Log{
+								testutils.GetRandomLogFixture(t),
+								testutils.GetRandomLogFixture(t),
+							},
+						}
+					}
+
+					em := &testutils.TestEmulator{
+						BatchRunTransactionFunc: func(txs []*gethTypes.Transaction) ([]*types.Result, error) {
+							res := make([]*types.Result, len(txs))
+							for i := range res {
+								res[i] = result()
+							}
+							return res, nil
+						},
+					}
+					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em)
+					coinbase := types.NewAddress(gethCommon.Address{})
+
+					// batch run empty transactions
+					txs := make([][]byte, 1)
+					assertPanic(t, isNotFatal, func() {
+						handler.BatchRun(txs, coinbase)
+					})
+
 				})
 			})
 		})

@@ -37,6 +37,10 @@ type ContractHandler interface {
 	// collects the gas fees, and transfers the gas fees to the given coinbase account.
 	Run(tx []byte, coinbase Address) *ResultSummary
 
+	// BatchRun runs transaction batch in the evm environment,
+	// collect all the gas fees and transfers the gas fees to the given coinbase account.
+	BatchRun(txs [][]byte, coinbase Address) []*ResultSummary
+
 	// FlowTokenAddress returns the address where FLOW token is deployed
 	FlowTokenAddress() common.Address
 
