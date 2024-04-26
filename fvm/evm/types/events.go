@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	EventTypeBlockExecuted       flow.EventType = "BlockExecuted"
-	EventTypeTransactionExecuted flow.EventType = "TransactionExecuted"
+	EventTypeBlockExecuted       flow.EventType = "EVM.BlockExecuted"
+	EventTypeTransactionExecuted flow.EventType = "EVM.TransactionExecuted"
 )
 
 type EventPayload interface {
