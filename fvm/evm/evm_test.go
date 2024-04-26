@@ -287,7 +287,7 @@ func TestEVMRun(t *testing.T) {
 					import EVM from %s
 
 					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
-						prepare(account: AuthAccount) {
+						prepare(account: &Account) {
 							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
 							let res = EVM.run(tx: tx, coinbase: coinbase)
 
@@ -378,7 +378,7 @@ func TestEVMBatchRun(t *testing.T) {
 					import EVM from %s
 
 					transaction(txs: [[UInt8]], coinbaseBytes: [UInt8; 20]) {
-						prepare(account: AuthAccount) {
+						prepare(account: &Account) {
 							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
 							let batchResults = EVM.batchRun(txs: txs, coinbase: coinbase)
 							
@@ -535,7 +535,7 @@ func TestEVMBatchRun(t *testing.T) {
 					import EVM from %s
 
 					transaction(txs: [[UInt8]], coinbaseBytes: [UInt8; 20]) {
-						prepare(account: AuthAccount) {
+						prepare(account: &Account) {
 							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
 							let batchResults = EVM.batchRun(txs: txs, coinbase: coinbase)
 							
@@ -1245,7 +1245,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					WithArguments(json.MustEncode(
 						cadence.NewArray(
 							ConvertToCadence(testContract.ByteCode),
-						).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type{})),
+						).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
 					))
 
 				_, output, err := vm.Run(
@@ -1347,8 +1347,8 @@ func TestCadenceArch(t *testing.T) {
 						import RandomBeaconHistory from %s
 
 						transaction {
-							prepare(serviceAccount: AuthAccount) {
-								let randomBeaconHistoryHeartbeat = serviceAccount.borrow<&RandomBeaconHistory.Heartbeat>(
+							prepare(serviceAccount: auth(Capabilities, Storage) &Account) {
+								let randomBeaconHistoryHeartbeat = serviceAccount.storage.borrow<&RandomBeaconHistory.Heartbeat>(
 									from: RandomBeaconHistory.HeartbeatStoragePath)
 										?? panic("Couldn't borrow RandomBeaconHistory.Heartbeat Resource")
 								randomBeaconHistoryHeartbeat.heartbeat(randomSourceHistory: randomSourceHistory())
@@ -1442,8 +1442,8 @@ func TestCadenceArch(t *testing.T) {
 						import RandomBeaconHistory from %s
 
 						transaction {
-							prepare(serviceAccount: AuthAccount) {
-								let randomBeaconHistoryHeartbeat = serviceAccount.borrow<&RandomBeaconHistory.Heartbeat>(
+							prepare(serviceAccount: auth(Capabilities, Storage) &Account) {
+								let randomBeaconHistoryHeartbeat = serviceAccount.storage.borrow<&RandomBeaconHistory.Heartbeat>(
 									from: RandomBeaconHistory.HeartbeatStoragePath)
 										?? panic("Couldn't borrow RandomBeaconHistory.Heartbeat Resource")
 								randomBeaconHistoryHeartbeat.heartbeat(randomSourceHistory: randomSourceHistory())

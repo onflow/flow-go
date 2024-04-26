@@ -2915,7 +2915,7 @@ func TestEVMBatchRun(t *testing.T) {
 		cadence.NewArray([]cadence.Value{cadence.UInt8(1), cadence.UInt8(2), cadence.UInt8(3)}),
 		cadence.NewArray([]cadence.Value{cadence.UInt8(4), cadence.UInt8(5), cadence.UInt8(6)}),
 		cadence.NewArray([]cadence.Value{cadence.UInt8(7), cadence.UInt8(8), cadence.UInt8(9)}),
-	}).WithType(cadence.NewVariableSizedArrayType(cadence.NewVariableSizedArrayType(cadence.UInt8Type{})))
+	}).WithType(cadence.NewVariableSizedArrayType(cadence.NewVariableSizedArrayType(cadence.UInt8Type)))
 
 	coinbase := cadence.NewArray([]cadence.Value{
 		cadence.UInt8(1), cadence.UInt8(1),
@@ -3315,7 +3315,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 					deposited = true
 					assert.Equal(
 						t,
-						types.Balance(expectedBalance),
+						expectedBalance,
 						vault.Balance(),
 					)
 				},

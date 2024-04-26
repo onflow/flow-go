@@ -1090,7 +1090,7 @@ func newInternalEVMTypeBatchRunFunction(
 					transactionBatch[i] = t
 					i++
 					return true
-				})
+				}, false, locationRange)
 			}
 
 			// Get coinbase argument
