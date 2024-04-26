@@ -17,6 +17,7 @@ type TestEmulator struct {
 	DirectCallFunc        func(call *types.DirectCall) (*types.Result, error)
 	RunTransactionFunc    func(tx *gethTypes.Transaction) (*types.Result, error)
 	DryRunTransactionFunc func(tx *gethTypes.Transaction, address gethCommon.Address) (*types.Result, error)
+	BatchRunTransactionFunc func(txs []*gethTypes.Transaction) ([]*types.Result, error)
 }
 
 var _ types.Emulator = &TestEmulator{}
@@ -77,6 +78,14 @@ func (em *TestEmulator) RunTransaction(tx *gethTypes.Transaction) (*types.Result
 		panic("method not set")
 	}
 	return em.RunTransactionFunc(tx)
+}
+
+// BatchRunTransactions batch runs transactions and collect gas fees to the coinbase account
+func (em *TestEmulator) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*types.Result, error) {
+	if em.BatchRunTransactionFunc == nil {
+		panic("method not set")
+	}
+	return em.BatchRunTransactionFunc(txs)
 }
 
 // DryRunTransaction simulates transaction execution

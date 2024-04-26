@@ -23,6 +23,10 @@ func StorageAccountAddress(chainID flow.ChainID) (flow.Address, error) {
 	return sc.EVMStorage.Address, nil
 }
 
+func RandomBeaconAddress(chainID flow.ChainID) flow.Address {
+	return systemcontracts.SystemContractsForChain(chainID).RandomBeaconHistory.Address
+}
+
 func SetupEnvironment(
 	chainID flow.ChainID,
 	fvmEnv environment.Environment,
@@ -39,6 +43,8 @@ func SetupEnvironment(
 		return err
 	}
 
+	randomBeaconAddress := RandomBeaconAddress(chainID)
+
 	backend := backends.NewWrappedEnvironment(fvmEnv)
 
 	emulator := evm.NewEmulator(backend, evmStorageAccountAddress)
@@ -51,6 +57,7 @@ func SetupEnvironment(
 		chainID,
 		evmContractAccountAddress,
 		common.Address(flowToken),
+		randomBeaconAddress,
 		blockStore,
 		addressAllocator,
 		backend,

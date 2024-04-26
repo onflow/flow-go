@@ -3,19 +3,19 @@ package blob
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/boxo/bitswap"
 	bsmsg "github.com/ipfs/boxo/bitswap/message"
 	bsnet "github.com/ipfs/boxo/bitswap/network"
+	"github.com/ipfs/boxo/blockservice"
+	"github.com/ipfs/boxo/blockstore"
+	"github.com/ipfs/boxo/provider"
 	blocks "github.com/ipfs/go-block-format"
-	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	provider "github.com/ipfs/go-ipfs-provider"
-	"github.com/ipfs/go-ipfs-provider/simple"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -41,7 +41,7 @@ type blobService struct {
 	component.Component
 	blockService blockservice.BlockService
 	blockStore   blockstore.Blockstore
-	reprovider   provider.Reprovider
+	reprovider   provider.System
 	config       *BlobServiceConfig
 }
 
@@ -142,11 +142,18 @@ func NewBlobService(
 			}
 		}).
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			bs.reprovider = simple.NewReprovider(ctx, bs.config.ReprovideInterval, r, simple.NewBlockstoreProvider(bs.blockStore))
+			// New creates and starts the reprovider (non-blocking)
+			reprovider, err := provider.New(ds,
+				provider.Online(r),
+				provider.KeyProvider(provider.NewBlockstoreProvider(bs.blockStore)),
+				provider.ReproviderInterval(bs.config.ReprovideInterval),
+			)
+			if err != nil {
+				ctx.Throw(fmt.Errorf("failed to start reprovider: %w", err))
+			}
 
+			bs.reprovider = reprovider
 			ready()
-
-			bs.reprovider.Run()
 		}).
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
@@ -171,7 +178,7 @@ func NewBlobService(
 }
 
 func (bs *blobService) TriggerReprovide(ctx context.Context) error {
-	return bs.reprovider.Trigger(ctx)
+	return bs.reprovider.Reprovide(ctx)
 }
 
 func (bs *blobService) GetBlob(ctx context.Context, c cid.Cid) (blobs.Blob, error) {

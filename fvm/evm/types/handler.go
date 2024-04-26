@@ -43,6 +43,10 @@ type ContractHandler interface {
 	// The function should not have any persisted changes made to the state.
 	DryRun(tx []byte, from Address) *ResultSummary
 
+	// BatchRun runs transaction batch in the evm environment,
+	// collect all the gas fees and transfers the gas fees to the given coinbase account.
+	BatchRun(txs [][]byte, coinbase Address) []*ResultSummary
+
 	// FlowTokenAddress returns the address where FLOW token is deployed
 	FlowTokenAddress() common.Address
 

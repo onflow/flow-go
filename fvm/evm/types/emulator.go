@@ -77,6 +77,11 @@ type BlockView interface {
 	// DryRunTransaction executes unsigned transaction but does not persist the state changes,
 	// since transaction is not signed, from address is used as the signer.
 	DryRunTransaction(tx *gethTypes.Transaction, from gethCommon.Address) (*Result, error)
+
+	// BatchRunTransactions executes a batch of evm transactions producing
+	// a slice of execution Result where each result corresponds to each
+	// item in the txs slice.
+	BatchRunTransactions(txs []*gethTypes.Transaction) ([]*Result, error)
 }
 
 // Emulator emulates an evm-compatible chain
