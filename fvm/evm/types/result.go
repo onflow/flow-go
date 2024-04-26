@@ -54,7 +54,7 @@ func NewInvalidResult(tx *gethTypes.Transaction, err error) *Result {
 }
 
 // Result captures the result of an interaction to the emulator
-// it could be the out put of a direct call or output of running an
+// it could be the output of a direct call or output of running an
 // evm transaction.
 // Its more comprehensive than typical evm receipt, usually
 // the receipt generation requires some extra calculation (e.g. Deployed contract address)
@@ -78,6 +78,8 @@ type Result struct {
 	Logs []*gethTypes.Log
 	// TX hash holdes the cached value of tx hash
 	TxHash gethCommon.Hash
+	// transaction block inclusion index
+	Index uint16
 }
 
 // Invalid returns true if transaction has been rejected
