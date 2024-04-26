@@ -16,6 +16,7 @@ func Test_BlockHash(t *testing.T) {
 		Height:          1,
 		TotalSupply:     big.NewInt(1000),
 		ReceiptRoot:     gethCommon.Hash{0x2, 0x3, 0x4},
+		TotalGasUsed:    135,
 		TransactionHashes: []gethCommon.Hash{
 			gethCommon.HexToHash("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
 		},

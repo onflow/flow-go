@@ -104,9 +104,9 @@ func TestEVMRun(t *testing.T) {
 				cadenceEvent, ok := ev.(cadence.Event)
 				require.True(t, ok)
 
-				event := txEventType{}
-				require.NoError(t, cadence.DecodeFields(cadenceEvent, &event))
-				require.NotEmpty(t, event.TransactionHash)
+				event, err := types.DecodeTransactionEventPayload(cadenceEvent)
+				require.NoError(t, err)
+				require.NotEmpty(t, event.Hash)
 
 				// append the state
 				snapshot = snapshot.Append(state)
@@ -339,9 +339,9 @@ func TestEVMRun(t *testing.T) {
 				cadenceEvent, ok := ev.(cadence.Event)
 				require.True(t, ok)
 
-				event := txEventType{}
-				require.NoError(t, cadence.DecodeFields(cadenceEvent, &event))
-				require.NotEmpty(t, event.TransactionHash)
+				event, err := types.DecodeTransactionEventPayload(cadenceEvent)
+				require.NoError(t, err)
+				require.NotEmpty(t, event.Hash)
 
 				encodedLogs, err := hex.DecodeString(event.Logs)
 				require.NoError(t, err)
@@ -448,8 +448,8 @@ func TestEVMBatchRun(t *testing.T) {
 					cadenceEvent, ok := ev.(cadence.Event)
 					require.True(t, ok)
 
-					event := txEventType{}
-					require.NoError(t, cadence.DecodeFields(cadenceEvent, &event))
+					event, err := types.DecodeTransactionEventPayload(cadenceEvent)
+					require.NoError(t, err)
 
 					encodedLogs, err := hex.DecodeString(event.Logs)
 					require.NoError(t, err)
@@ -2109,9 +2109,4 @@ func RunWithNewEnvironment(
 			})
 		})
 	})
-}
-
-type txEventType struct {
-	TransactionHash string `cadence:"transactionHash"`
-	Logs            string `cadence:"logs"`
 }

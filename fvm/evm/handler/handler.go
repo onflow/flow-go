@@ -215,19 +215,18 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		if r.Invalid() { // don't emit events for invalid tx
 			continue
 		}
-		err = h.emitEvent(types.NewTransactionExecutedEvent(
-			bp.Height,
-			rlpEncodedTxs[i],
-			blockHash,
-			r.TxHash,
+		err = h.emitEvent(types.NewTransactionEvent(
 			r,
+			rlpEncodedTxs[i],
+			bp.Height,
+			blockHash,
 		))
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	err = h.emitEvent(types.NewBlockExecutedEvent(bp))
+	err = h.emitEvent(types.NewBlockEvent(bp))
 	if err != nil {
 		return nil, err
 	}
@@ -295,8 +294,9 @@ func (h *ContractHandler) run(
 
 	bp.AppendTxHash(res.TxHash)
 
-	// Populate receipt root
+	// populate receipt root
 	bp.PopulateReceiptRoot([]*types.Result{res})
+	bp.CalculateGasUsage([]types.Result{*res})
 
 	blockHash, err := bp.Hash()
 	if err != nil {
@@ -304,18 +304,12 @@ func (h *ContractHandler) run(
 	}
 
 	// step 4 - emit events
-	err = h.emitEvent(types.NewTransactionExecutedEvent(
-		bp.Height,
-		rlpEncodedTx,
-		blockHash,
-		res.TxHash,
-		res,
-	))
+	err = h.emitEvent(types.NewTransactionEvent(res, rlpEncodedTx, bp.Height, blockHash))
 	if err != nil {
 		return nil, err
 	}
 
-	err = h.emitEvent(types.NewBlockExecutedEvent(bp))
+	err = h.emitEvent(types.NewBlockEvent(bp))
 	if err != nil {
 		return nil, err
 	}
@@ -411,7 +405,7 @@ func (h *ContractHandler) meterGasUsage(res *types.Result) error {
 }
 
 func (h *ContractHandler) emitEvent(event *types.Event) error {
-	ev, err := event.Payload.CadenceEvent()
+	ev, err := event.Payload.ToCadence()
 	if err != nil {
 		return err
 	}
@@ -512,19 +506,13 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	err = h.emitEvent(
-		types.NewTransactionExecutedEvent(
-			bp.Height,
-			encoded,
-			blockHash,
-			res.TxHash,
-			res,
-		),
+		types.NewTransactionEvent(res, encoded, bp.Height, blockHash),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	err = h.emitEvent(types.NewBlockExecutedEvent(bp))
+	err = h.emitEvent(types.NewBlockEvent(bp))
 	if err != nil {
 		return nil, err
 	}
