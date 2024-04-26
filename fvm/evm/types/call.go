@@ -21,7 +21,6 @@ const (
 	TransferCallSubType = byte(3)
 	DeployCallSubType   = byte(4)
 	ContractCallSubType = byte(5)
-	DryRunSubType       = byte(6)
 
 	// Note that these gas values might need to change if we
 	// change the transaction (e.g. add accesslist),
