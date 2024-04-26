@@ -10,13 +10,13 @@ import (
 )
 
 type TestEmulator struct {
-	BalanceOfFunc         func(address types.Address) (*big.Int, error)
-	NonceOfFunc           func(address types.Address) (uint64, error)
-	CodeOfFunc            func(address types.Address) (types.Code, error)
-	CodeHashOfFunc        func(address types.Address) ([]byte, error)
-	DirectCallFunc        func(call *types.DirectCall) (*types.Result, error)
-	RunTransactionFunc    func(tx *gethTypes.Transaction) (*types.Result, error)
-	DryRunTransactionFunc func(tx *gethTypes.Transaction, address gethCommon.Address) (*types.Result, error)
+	BalanceOfFunc           func(address types.Address) (*big.Int, error)
+	NonceOfFunc             func(address types.Address) (uint64, error)
+	CodeOfFunc              func(address types.Address) (types.Code, error)
+	CodeHashOfFunc          func(address types.Address) ([]byte, error)
+	DirectCallFunc          func(call *types.DirectCall) (*types.Result, error)
+	RunTransactionFunc      func(tx *gethTypes.Transaction) (*types.Result, error)
+	DryRunTransactionFunc   func(tx *gethTypes.Transaction, address gethCommon.Address) (*types.Result, error)
 	BatchRunTransactionFunc func(txs []*gethTypes.Transaction) ([]*types.Result, error)
 }
 

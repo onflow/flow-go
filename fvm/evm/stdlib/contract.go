@@ -63,7 +63,7 @@ var (
 	evmTransactionBytesType        = sema.NewVariableSizedType(nil, sema.UInt8Type)
 	evmTransactionsBatchBytesType  = sema.NewVariableSizedType(nil, evmTransactionBytesType)
 	evmAddressBytesType            = sema.NewConstantSizedType(nil, sema.UInt8Type, types.AddressLength)
-	evmOptionalAddressBytesType = sema.NewOptionalType(nil, evmAddressBytesType)
+	evmOptionalAddressBytesType    = sema.NewOptionalType(nil, evmAddressBytesType)
 	evmAddressBytesStaticType      = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, evmAddressBytesType)
 	EVMAddressBytesCadenceType     = cadence.NewConstantSizedArrayType(types.AddressLength, cadence.TheUInt8Type)
 )

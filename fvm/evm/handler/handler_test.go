@@ -1008,8 +1008,9 @@ func TestHandler_TransactionRun(t *testing.T) {
 					rlpTx, err := tx.MarshalBinary()
 					require.NoError(t, err)
 
+					addr := testutils.RandomAddress(t)
 					result := &types.Result{
-						DeployedContractAddress: testutils.RandomAddress(t),
+						DeployedContractAddress: &addr,
 						ReturnedValue:           testutils.RandomData(t),
 						GasConsumed:             testutils.RandomGas(1000),
 						Logs: []*gethTypes.Log{
@@ -1032,7 +1033,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 						},
 					}
 
-					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, bs, aa, backend, em)
+					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em)
 
 					rs := handler.DryRun(rlpTx, from)
 					require.Equal(t, types.StatusSuccessful, rs.Status)

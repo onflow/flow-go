@@ -3,7 +3,6 @@ package evm_test
 import (
 	"encoding/hex"
 	"fmt"
-	gethTypes "github.com/onflow/go-ethereum/core/types"
 	"math"
 	"math/big"
 	"testing"
