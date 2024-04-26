@@ -121,7 +121,7 @@ func GenerateProtocolSnapshotForCheckpoint(
 	}
 	endHeight := sealed.Height
 
-	return GenerateProtocolSnapshotForCheckpointWithHeights(logger, state, headers, seals,
+	return GenerateProtocolSnapshotForCheckpointWithHeight(logger, state, headers, seals,
 		checkpointDir,
 		blocksToSkip,
 		endHeight,
@@ -145,9 +145,9 @@ func findLatestCheckpointFilePath(checkpointDir string) (string, error) {
 	return checkpointFilePath, nil
 }
 
-// GenerateProtocolSnapshotForCheckpointWithHeights does the same thing as GenerateProtocolSnapshotForCheckpoint
+// GenerateProtocolSnapshotForCheckpointWithHeight does the same thing as GenerateProtocolSnapshotForCheckpoint
 // except that it allows the caller to specify the end height of the sealed block that we iterate backwards from.
-func GenerateProtocolSnapshotForCheckpointWithHeights(
+func GenerateProtocolSnapshotForCheckpointWithHeight(
 	logger zerolog.Logger,
 	state protocol.State,
 	headers storage.Headers,
