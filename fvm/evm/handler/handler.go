@@ -365,6 +365,9 @@ func (h *ContractHandler) dryRun(
 	}
 
 	res, err := blk.DryRunTransaction(&tx, from.ToCommon())
+	if err != nil {
+		return nil, err
+	}
 
 	// saftey check for result
 	if res == nil {
