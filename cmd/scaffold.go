@@ -759,7 +759,7 @@ func (fnb *FlowNodeBuilder) ParseAndPrintFlags() error {
 			info.Str(flag.Name, fmt.Sprintf("%v", flag.Value))
 		}
 	})
-	info.Msg("configuration loaded")
+	info.Msg("configuration loaded (logged as error for visibility)")
 	return fnb.extraFlagsValidation()
 }
 
