@@ -2,13 +2,14 @@ package upgrades
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"testing"
-	"time"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	sdk "github.com/onflow/flow-go-sdk"
@@ -77,7 +78,7 @@ func (s *ProtocolVersionUpgradeSuite) TestProtocolStateVersionUpgradeServiceEven
 	txResult = s.sendUpgradeProtocolVersionTx(ctx, env, NEXT_PROTOCOL_VERSION, ACTIVE_VIEW_DIFF)
 	s.Require().NoError(txResult.Error)
 
-	sealed = s.ReceiptState.WaitForReceiptFromAny(s.T(), flow.Identifier(txResult.BlockID))
+	_ = s.ReceiptState.WaitForReceiptFromAny(s.T(), flow.Identifier(txResult.BlockID))
 
 	executedInBlock, ok = s.BlockState.ByBlockID(flow.Identifier(txResult.BlockID))
 	require.True(s.T(), ok)
@@ -92,7 +93,7 @@ func (s *ProtocolVersionUpgradeSuite) TestProtocolStateVersionUpgradeServiceEven
 	txResult = s.sendUpgradeProtocolVersionTx(ctx, env, UNKNOWN_PROTOCOL_VERSION, ACTIVE_VIEW_DIFF)
 	s.Require().NoError(txResult.Error)
 
-	sealed = s.ReceiptState.WaitForReceiptFromAny(s.T(), flow.Identifier(txResult.BlockID))
+	_ = s.ReceiptState.WaitForReceiptFromAny(s.T(), flow.Identifier(txResult.BlockID))
 
 	executedInBlock, ok = s.BlockState.ByBlockID(flow.Identifier(txResult.BlockID))
 	require.True(s.T(), ok)

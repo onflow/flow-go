@@ -5,7 +5,6 @@ import (
 	crand "crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	gonet "net"
 	"net/http"
 	"os"
@@ -15,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types"

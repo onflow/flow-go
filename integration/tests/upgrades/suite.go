@@ -2,10 +2,10 @@ package upgrades
 
 import (
 	"context"
-	"fmt"
+	"time"
+
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -57,8 +57,8 @@ func (s *Suite) SetupTest() {
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=500ms"),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=0")),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=0")),
+		testnet.WithAdditionalFlag("--required-verification-seal-approvals=0"),
+		testnet.WithAdditionalFlag("--required-construction-seal-approvals=0"),
 		testnet.WithLogLevel(zerolog.InfoLevel),
 	}
 

@@ -65,7 +65,7 @@ func (bs *BlockState) WaitForHalt(t *testing.T, requiredDurationWithoutProgress,
 			lastView = latestView
 			lastProgress = time.Now()
 		}
-		timeSinceLastProgress = time.Now().Sub(lastProgress)
+		timeSinceLastProgress = time.Since(lastProgress)
 	}
 	t.Logf("successfully observed progress halt for %s after %s of waiting", requiredDurationWithoutProgress, time.Since(start))
 }
@@ -205,7 +205,7 @@ func (bs *BlockState) WaitForHighestFinalizedProgress(t *testing.T, currentFinal
 		bs.RLock()
 		defer bs.RUnlock()
 
-		t.Logf("%v checking highest finalized: %d, highest proposed: %d\n", time.Now().UTC(), bs.highestFinalized, bs.highestProposed)
+		t.Logf("%v checking highest finalized: %d, highest proposed: %v\n", time.Now().UTC(), bs.highestFinalized, bs.highestProposed)
 		return bs.highestFinalized > currentFinalized
 	}, blockStateTimeout, 100*time.Millisecond,
 		fmt.Sprintf("did not receive progress on highest finalized height (%v) from (%v) within %v seconds",
