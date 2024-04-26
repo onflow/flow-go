@@ -215,19 +215,18 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		if r.Invalid() { // don't emit events for invalid tx
 			continue
 		}
-		err = h.emitEvent(types.NewTransactionExecutedEvent(
-			bp.Height,
-			rlpEncodedTxs[i],
-			blockHash,
-			r.TxHash,
+		err = h.emitEvent(types.NewTransactionEvent(
 			r,
+			rlpEncodedTxs[i],
+			bp.Height,
+			blockHash,
 		))
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	err = h.emitEvent(types.NewBlockExecutedEvent(bp))
+	err = h.emitEvent(types.NewBlockEvent(bp))
 	if err != nil {
 		return nil, err
 	}
