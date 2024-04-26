@@ -106,6 +106,9 @@ func (e *Engine) pingLoop(ctx irrecoverable.SignalerContext, ready component.Rea
 }
 
 func (e *Engine) pingAllNodes(ctx context.Context) {
+	start := time.Now()
+	e.log.Debug().Msg("pinging all nodes")
+
 	g := new(errgroup.Group)
 
 	// restrict the number of concurrently running ping requests.
@@ -129,6 +132,11 @@ func (e *Engine) pingAllNodes(ctx context.Context) {
 	}
 
 	_ = g.Wait()
+
+	e.log.Debug().
+		Dur("duration", time.Since(start)).
+		Int("node_count", len(peers)).
+		Msg("finished pinging all nodes")
 }
 
 // pingNode pings the given peer and updates the metrics with the result and the additional node information
