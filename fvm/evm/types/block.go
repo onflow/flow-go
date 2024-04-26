@@ -48,15 +48,19 @@ func (b *Block) Hash() (gethCommon.Hash, error) {
 }
 
 // PopulateReceiptRoot populates receipt root with the given results
-func (b *Block) PopulateReceiptRoot(results []Result) {
+func (b *Block) PopulateReceiptRoot(results []*Result) {
 	if len(results) == 0 {
 		b.ReceiptRoot = gethTypes.EmptyReceiptsHash
 		return
 	}
 
-	receipts := make(gethTypes.Receipts, len(results))
-	for i, res := range results {
-		receipts[i] = res.Receipt()
+	receipts := make(gethTypes.Receipts, 0)
+	for _, res := range results {
+		r := res.Receipt()
+		if r == nil {
+			continue
+		}
+		receipts = append(receipts, r)
 	}
 	b.ReceiptRoot = gethTypes.DeriveSha(receipts, gethTrie.NewStackTrie(nil))
 }

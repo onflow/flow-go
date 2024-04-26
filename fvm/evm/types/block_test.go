@@ -38,6 +38,6 @@ func Test_BlockHash(t *testing.T) {
 	res := Result{
 		GasConsumed: 10,
 	}
-	b.PopulateReceiptRoot([]Result{res})
+	b.PopulateReceiptRoot([]*Result{&res})
 	require.NotEqual(t, gethTypes.EmptyReceiptsHash, b.ReceiptRoot)
 }

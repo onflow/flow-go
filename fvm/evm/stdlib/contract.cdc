@@ -190,21 +190,34 @@ contract EVM {
 
         /// returns the data that is returned from
         /// the evm for the call. For coa.deploy
-        /// calls it returns the address bytes of the
-        /// newly deployed contract.
+        /// calls it returns the code deployed to
+        /// the address provided in the contractAddress field.
         access(all)
         let data: [UInt8]
+
+        /// returns the newly deployed contract address
+        /// if the transaction caused such a deployment
+        /// otherwise the value is nil.
+        access(all)
+        let deployedContract: EVMAddress?
 
         init(
             status: Status,
             errorCode: UInt64,
             gasUsed: UInt64,
-            data: [UInt8]
+            data: [UInt8],
+            contractAddress: [UInt8; 20]?
         ) {
             self.status = status
             self.errorCode = errorCode
             self.gasUsed = gasUsed
             self.data = data
+
+            if let addressBytes = contractAddress {
+                self.deployedContract = EVMAddress(bytes: addressBytes)
+            } else {
+                self.deployedContract = nil
+            }
         }
     }
 
@@ -283,20 +296,20 @@ contract EVM {
         }
 
         /// Deploys a contract to the EVM environment.
-        /// Returns the address of the newly deployed contract
+        /// Returns the result which contains address of
+        /// the newly deployed contract
         access(Owner | Deploy)
         fun deploy(
             code: [UInt8],
             gasLimit: UInt64,
             value: Balance
-        ): EVMAddress {
-            let addressBytes = InternalEVM.deploy(
+        ): Result {
+            return InternalEVM.deploy(
                 from: self.addressBytes,
                 code: code,
                 gasLimit: gasLimit,
                 value: value.attoflow
-            )
-            return EVMAddress(bytes: addressBytes)
+            ) as! Result
         }
 
         /// Calls a function with the given data.
@@ -408,6 +421,17 @@ contract EVM {
             message: "tx is not valid for execution"
         )
         return runResult
+    }
+
+    /// Runs a batch of RLP-encoded EVM transactions, deducts the gas fees,
+    /// and deposits the gas fees into the provided coinbase address.
+    /// An invalid transaction is not executed and not included in the block.
+    access(all)
+    fun batchRun(txs: [[UInt8]], coinbase: EVMAddress): [Result] {
+        return InternalEVM.batchRun(
+            txs: txs,
+            coinbase: coinbase.bytes,
+        ) as! [Result]
     }
 
     access(all)
