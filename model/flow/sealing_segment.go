@@ -126,7 +126,7 @@ func (segment *SealingSegment) FinalizedSeal() (*Seal, error) {
 
 // LatestProtocolStateEntry returns the Protocol State entry corresponding to
 // the highest block in the sealing segment. This represents the Dynamic Protocol State
-// after applying all state changes in `SealingSegment.Highest().Payload`.
+// after applying all state changes sealed in `SealingSegment.Highest().Payload`.
 // Caution: `segment` must be a valid SealingSegment.
 func (segment *SealingSegment) LatestProtocolStateEntry() *ProtocolStateEntryWrapper {
 	highest := segment.Highest()
@@ -345,8 +345,8 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 	return nil
 }
 
-// addProtocolStateEntryIfUnseen checks whether the given protocolStateID corresponds
-// to a previously unseen protocol state entry. If it does, retrieves the state entry
+// addProtocolStateEntryIfUnseen checks whether the given protocolStateID was already
+// added to the SealingSegmentBuilder. If it was not, retrieves the state entry
 // and persists it for inclusion in the resulting SealingSegment.
 // No errors expected during normal operation.
 func (builder *SealingSegmentBuilder) addProtocolStateEntryIfUnseen(protocolStateID Identifier) error {
