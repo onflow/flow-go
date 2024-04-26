@@ -22,7 +22,6 @@ import (
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	flowSdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"

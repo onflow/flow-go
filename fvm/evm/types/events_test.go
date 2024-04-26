@@ -19,7 +19,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	flowSdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 )

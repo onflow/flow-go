@@ -9,8 +9,6 @@ import (
 	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/onflow/go-ethereum/rlp"
 
-	flowSdk "github.com/onflow/flow-go-sdk"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
