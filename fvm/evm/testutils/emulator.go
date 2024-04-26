@@ -3,6 +3,8 @@ package testutils
 import (
 	"math/big"
 
+	gethCommon "github.com/onflow/go-ethereum/common"
+
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -15,6 +17,7 @@ type TestEmulator struct {
 	CodeHashOfFunc          func(address types.Address) ([]byte, error)
 	DirectCallFunc          func(call *types.DirectCall) (*types.Result, error)
 	RunTransactionFunc      func(tx *gethTypes.Transaction) (*types.Result, error)
+	DryRunTransactionFunc   func(tx *gethTypes.Transaction, address gethCommon.Address) (*types.Result, error)
 	BatchRunTransactionFunc func(txs []*gethTypes.Transaction) ([]*types.Result, error)
 }
 
@@ -84,4 +87,12 @@ func (em *TestEmulator) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*t
 		panic("method not set")
 	}
 	return em.BatchRunTransactionFunc(txs)
+}
+
+// DryRunTransaction simulates transaction execution
+func (em *TestEmulator) DryRunTransaction(tx *gethTypes.Transaction, address gethCommon.Address) (*types.Result, error) {
+	if em.DryRunTransactionFunc == nil {
+		panic("method not set")
+	}
+	return em.DryRunTransactionFunc(tx, address)
 }

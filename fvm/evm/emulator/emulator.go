@@ -205,6 +205,32 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 	return batchResults, nil
 }
 
+// DryRunTransaction run unsigned transaction without persisting the state
+func (bl *BlockView) DryRunTransaction(
+	tx *gethTypes.Transaction,
+	from gethCommon.Address,
+) (*types.Result, error) {
+	proc, err := bl.newProcedure()
+	if err != nil {
+		return nil, err
+	}
+
+	// here we ignore the error because the only reason an error occurs
+	// is if the signature is invalid, which we don't care about since
+	// we use the from address as the signer
+	msg, _ := gethCore.TransactionToMessage(
+		tx,
+		GetSigner(bl.config),
+		proc.config.BlockContext.BaseFee)
+
+	// use the from as the signer
+	proc.evm.TxContext.Origin = from
+	msg.From = from
+
+	// return without commiting the state
+	return proc.run(msg, tx.Hash(), 0, tx.Type())
+}
+
 func (bl *BlockView) newProcedure() (*procedure, error) {
 	execState, err := state.NewStateDB(bl.ledger, bl.rootAddr)
 	if err != nil {
