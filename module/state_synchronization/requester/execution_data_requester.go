@@ -410,6 +410,9 @@ func (e *executionDataRequester) processFetchRequest(parentCtx irrecoverable.Sig
 		Hex("execution_data_id", logging.ID(execData.ID())).
 		Msg("execution data fetched")
 
+	// warm the cache
+	_ = e.execDataCache.Add(execData)
+
 	return nil
 }
 

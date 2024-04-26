@@ -115,3 +115,9 @@ func (c *ExecutionDataCache) LookupID(blockID flow.Identifier) (flow.Identifier,
 
 	return result.ExecutionDataID, nil
 }
+
+// Add adds a block execution data to the cache.
+// It returns false if the execution data was already in the cache.
+func (c *ExecutionDataCache) Add(execData *execution_data.BlockExecutionDataEntity) bool {
+	return c.cache.Add(execData)
+}
