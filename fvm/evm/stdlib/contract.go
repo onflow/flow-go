@@ -1841,6 +1841,10 @@ func NewEVMBlockValue(
 					},
 				),
 			},
+			{
+				Name:  "timestamp",
+				Value: interpreter.UInt64Value(block.Timestamp),
+			},
 		},
 		common.ZeroAddress,
 	)
@@ -2006,8 +2010,12 @@ var internalEVMStandardLibraryType = stdlib.StandardLibraryType{
 	Kind: common.DeclarationKindContract,
 }
 
-func SetupEnvironment(env runtime.Environment, handler types.ContractHandler, service flow.Address) {
-	location := common.NewAddressLocation(nil, common.Address(service), ContractName)
+func SetupEnvironment(
+	env runtime.Environment,
+	handler types.ContractHandler,
+	contractAddress flow.Address,
+) {
+	location := common.NewAddressLocation(nil, common.Address(contractAddress), ContractName)
 
 	env.DeclareType(
 		internalEVMStandardLibraryType,
@@ -2111,6 +2119,10 @@ func NewEVMBlockCadenceType(address common.Address) *cadence.StructType {
 			{
 				Identifier: "totalSupply",
 				Type:       cadence.IntType,
+			},
+			{
+				Identifier: "timestamp",
+				Type:       cadence.UInt64Type,
 			},
 		},
 		nil,

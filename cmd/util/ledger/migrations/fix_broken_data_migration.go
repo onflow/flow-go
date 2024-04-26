@@ -64,7 +64,7 @@ func (m *FixSlabsWithBrokenReferencesMigration) MigrateAccount(
 		return oldPayloads, nil
 	}
 
-	migrationRuntime, err := NewAtreeRegisterMigratorRuntime(address, oldPayloads)
+	migrationRuntime, err := NewAtreeRegisterMigratorRuntime(m.log, address, oldPayloads, m.nWorkers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cadence runtime: %w", err)
 	}

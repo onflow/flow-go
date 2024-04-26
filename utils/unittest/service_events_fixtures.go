@@ -3,9 +3,15 @@ package unittest
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/crypto"
 
@@ -537,7 +543,7 @@ func createEpochNodes() cadence.Array {
 
 func createEpochCollectors() cadence.Array {
 
-	clusterType := newFlowClusterQCClusterStructType()
+	clusterType := NewFlowClusterQCClusterStructType()
 
 	voteType := newFlowClusterQCVoteStructType()
 
@@ -699,76 +705,6 @@ func createVersionBeaconEvent() cadence.Event {
 	}).WithType(NewNodeVersionBeaconVersionBeaconEventType())
 }
 
-func newFlowClusterQCVoteStructType() cadence.Type {
-
-	// A.01cf0e2f2f715450.FlowClusterQC.Vote
-
-	address, _ := common.HexToAddress("01cf0e2f2f715450")
-	location := common.NewAddressLocation(nil, address, "FlowClusterQC")
-
-	return &cadence.StructType{
-		Location:            location,
-		QualifiedIdentifier: "FlowClusterQC.Vote",
-		Fields: []cadence.Field{
-			{
-				Identifier: "nodeID",
-				Type:       cadence.StringType,
-			},
-			{
-				Identifier: "signature",
-				Type:       cadence.NewOptionalType(cadence.StringType),
-			},
-			{
-				Identifier: "message",
-				Type:       cadence.NewOptionalType(cadence.StringType),
-			},
-			{
-				Identifier: "clusterIndex",
-				Type:       cadence.UInt16Type,
-			},
-			{
-				Identifier: "weight",
-				Type:       cadence.UInt64Type,
-			},
-		},
-	}
-}
-
-func newFlowClusterQCClusterStructType() *cadence.StructType {
-
-	// A.01cf0e2f2f715450.FlowClusterQC.Cluster
-
-	address, _ := common.HexToAddress("01cf0e2f2f715450")
-	location := common.NewAddressLocation(nil, address, "FlowClusterQC")
-
-	return &cadence.StructType{
-		Location:            location,
-		QualifiedIdentifier: "FlowClusterQC.Cluster",
-		Fields: []cadence.Field{
-			{
-				Identifier: "index",
-				Type:       cadence.UInt16Type,
-			},
-			{
-				Identifier: "nodeWeights",
-				Type:       cadence.NewDictionaryType(cadence.StringType, cadence.UInt64Type),
-			},
-			{
-				Identifier: "totalWeight",
-				Type:       cadence.UInt64Type,
-			},
-			{
-				Identifier: "generatedVotes",
-				Type:       cadence.NewDictionaryType(cadence.StringType, newFlowClusterQCVoteStructType()),
-			},
-			{
-				Identifier: "uniqueVoteMessageTotalWeights",
-				Type:       cadence.NewDictionaryType(cadence.StringType, cadence.UInt64Type),
-			},
-		},
-	}
-}
-
 func newFlowIDTableStakingNodeInfoStructType() *cadence.StructType {
 
 	// A.01cf0e2f2f715450.FlowIDTableStaking.NodeInfo
@@ -869,7 +805,7 @@ func newFlowEpochEpochSetupEventType() *cadence.EventType {
 			},
 			{
 				Identifier: "collectorClusters",
-				Type:       cadence.NewVariableSizedArrayType(newFlowClusterQCClusterStructType()),
+				Type:       cadence.NewVariableSizedArrayType(NewFlowClusterQCClusterStructType()),
 			},
 			{
 				Identifier: "randomSource",
@@ -1098,3 +1034,89 @@ var VersionBeaconFixtureCCF = func() []byte {
 	}
 	return b
 }()
+
+func newFlowClusterQCVoteStructType() *cadence.StructType {
+
+	// A.01cf0e2f2f715450.FlowClusterQC.Vote
+
+	address, _ := common.HexToAddress("01cf0e2f2f715450")
+	location := common.NewAddressLocation(nil, address, "FlowClusterQC")
+
+	return &cadence.StructType{
+		Location:            location,
+		QualifiedIdentifier: "FlowClusterQC.Vote",
+		Fields: []cadence.Field{
+			{
+				Identifier: "nodeID",
+				Type:       cadence.StringType,
+			},
+			{
+				Identifier: "signature",
+				Type:       cadence.NewOptionalType(cadence.StringType),
+			},
+			{
+				Identifier: "message",
+				Type:       cadence.NewOptionalType(cadence.StringType),
+			},
+			{
+				Identifier: "clusterIndex",
+				Type:       cadence.UInt16Type,
+			},
+			{
+				Identifier: "weight",
+				Type:       cadence.UInt64Type,
+			},
+		},
+	}
+}
+
+func VerifyCdcArguments(t *testing.T, expected []cadence.Value, actual []interface{}) {
+
+	for index, arg := range actual {
+
+		// marshal to bytes
+		bz, err := json.Marshal(arg)
+		require.NoError(t, err)
+
+		// parse cadence value
+		decoded, err := jsoncdc.Decode(nil, bz)
+		require.NoError(t, err)
+
+		assert.Equal(t, expected[index], decoded)
+	}
+}
+
+func NewFlowClusterQCClusterStructType() *cadence.StructType {
+
+	// A.01cf0e2f2f715450.FlowClusterQC.Cluster
+
+	address, _ := common.HexToAddress("01cf0e2f2f715450")
+	location := common.NewAddressLocation(nil, address, "FlowClusterQC")
+
+	return &cadence.StructType{
+		Location:            location,
+		QualifiedIdentifier: "FlowClusterQC.Cluster",
+		Fields: []cadence.Field{
+			{
+				Identifier: "index",
+				Type:       cadence.UInt16Type,
+			},
+			{
+				Identifier: "nodeWeights",
+				Type:       cadence.NewDictionaryType(cadence.StringType, cadence.UInt64Type),
+			},
+			{
+				Identifier: "totalWeight",
+				Type:       cadence.UInt64Type,
+			},
+			{
+				Identifier: "generatedVotes",
+				Type:       cadence.NewDictionaryType(cadence.StringType, newFlowClusterQCVoteStructType()),
+			},
+			{
+				Identifier: "uniqueVoteMessageTotalWeights",
+				Type:       cadence.NewDictionaryType(cadence.StringType, cadence.UInt64Type),
+			},
+		},
+	}
+}

@@ -557,10 +557,14 @@ contract EVM {
         access(all)
         let totalSupply: Int
 
-        init(height: UInt64, hash: String, totalSupply: Int) {
+        access(all)
+        let timestamp: UInt64
+
+        init(height: UInt64, hash: String, totalSupply: Int, timestamp: UInt64) {
             self.height = height
             self.hash = hash
             self.totalSupply = totalSupply
+            self.timestamp = timestamp
         }
     }
 

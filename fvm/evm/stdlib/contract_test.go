@@ -268,25 +268,25 @@ func deployContracts(
 
 }
 
-func newEVMTransactionEnvironment(handler types.ContractHandler, service flow.Address) runtime.Environment {
+func newEVMTransactionEnvironment(handler types.ContractHandler, contractAddress flow.Address) runtime.Environment {
 	transactionEnvironment := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
 	stdlib.SetupEnvironment(
 		transactionEnvironment,
 		handler,
-		service,
+		contractAddress,
 	)
 
 	return transactionEnvironment
 }
 
-func newEVMScriptEnvironment(handler types.ContractHandler, service flow.Address) runtime.Environment {
+func newEVMScriptEnvironment(handler types.ContractHandler, contractAddress flow.Address) runtime.Environment {
 	scriptEnvironment := runtime.NewScriptInterpreterEnvironment(runtime.Config{})
 
 	stdlib.SetupEnvironment(
 		scriptEnvironment,
 		handler,
-		service,
+		contractAddress,
 	)
 
 	return scriptEnvironment
@@ -4151,6 +4151,7 @@ func TestEVMGetLatestBlock(t *testing.T) {
 	latestBlock := &types.Block{
 		Height:      uint64(2),
 		TotalSupply: big.NewInt(1500000000000000000),
+		Timestamp:   uint64(1337),
 	}
 	handler := &testContractHandler{
 		evmContractAddress: common.Address(contractsAddress),
@@ -4178,6 +4179,7 @@ func TestEVMGetLatestBlock(t *testing.T) {
 	blockHash, err := cadence.NewString(hash.Hex())
 	require.NoError(t, err)
 	blockTotalSupply := cadence.NewIntFromBig(latestBlock.TotalSupply)
+	timestamp := cadence.NewUInt64(latestBlock.Timestamp)
 
 	expectedEVMBlock := cadence.Struct{
 		StructType: evmBlockCadenceType,
@@ -4185,6 +4187,7 @@ func TestEVMGetLatestBlock(t *testing.T) {
 			blockHeight,
 			blockHash,
 			blockTotalSupply,
+			timestamp,
 		},
 	}
 

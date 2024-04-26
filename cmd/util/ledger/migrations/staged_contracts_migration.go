@@ -42,6 +42,7 @@ type StagedContractsMigration struct {
 	contractNamesProvider          stdlib.AccountContractNamesProvider
 	reporter                       reporters.ReportWriter
 	verboseErrorOutput             bool
+	nWorkers                       int
 }
 
 type StagedContract struct {
@@ -124,7 +125,7 @@ func (m *StagedContractsMigration) Close() error {
 func (m *StagedContractsMigration) InitMigration(
 	log zerolog.Logger,
 	allPayloads []*ledger.Payload,
-	_ int,
+	nWorkers int,
 ) error {
 	m.log = log.
 		With().
@@ -161,10 +162,13 @@ func (m *StagedContractsMigration) InitMigration(
 
 	// Pass empty address. We are only interested in the created `env` object.
 	mr, err := NewMigratorRuntime(
+		log,
 		allPayloads,
 		m.chainID,
 		config,
-		snapshot.SmallChangeSetSnapshot)
+		snapshot.SmallChangeSetSnapshot,
+		nWorkers,
+	)
 	if err != nil {
 		return err
 	}
@@ -172,6 +176,7 @@ func (m *StagedContractsMigration) InitMigration(
 	m.elaborations = elaborations
 	m.contractAdditionHandler = mr.ContractAdditionHandler
 	m.contractNamesProvider = mr.ContractNamesProvider
+	m.nWorkers = nWorkers
 
 	return nil
 }
@@ -220,10 +225,12 @@ func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads
 		Msgf("found %d payloads in account %s", len(stagingAccountPayloads), stagingAccount)
 
 	mr, err := NewMigratorRuntime(
+		m.log,
 		stagingAccountPayloads,
 		m.chainID,
 		MigratorRuntimeConfig{},
 		snapshot.SmallChangeSetSnapshot,
+		m.nWorkers,
 	)
 	if err != nil {
 		return err
