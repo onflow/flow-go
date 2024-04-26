@@ -4,10 +4,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 
 	"github.com/onflow/cadence"
 
