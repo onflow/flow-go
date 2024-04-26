@@ -243,12 +243,11 @@ func bootstrapProtocolState(
 	verifyNetworkAddress bool,
 ) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
-
 		// The sealing segment contains a protocol state entry for every block in the segment, including the root block.
 		for protocolStateID, stateEntry := range segment.ProtocolStateEntries {
 			// Store the protocol KV Store entry
-			err := protocolKVStoreSnapshots.StoreTx(protocolStateID, &stateEntry.KVStore)(tx)
-			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+			err := operation.SkipDuplicatesTx(protocolKVStoreSnapshots.StoreTx(protocolStateID, &stateEntry.KVStore))(tx)
+			if err != nil {
 				return fmt.Errorf("could not store protocol state kvstore: %w", err)
 			}
 
