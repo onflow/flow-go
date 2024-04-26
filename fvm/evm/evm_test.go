@@ -51,6 +51,7 @@ func TestEVMRun(t *testing.T) {
 
 							assert(res.status == EVM.Status.successful, message: "unexpected status")
 							assert(res.errorCode == 0, message: "unexpected error code")
+							assert(res.deployedContract == nil, message: "unexpected deployed contract")
 						}
 					}
 					`,
@@ -100,7 +101,12 @@ func TestEVMRun(t *testing.T) {
 					access(all)
 					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
 						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-						return EVM.run(tx: tx, coinbase: coinbase)
+						let res = EVM.run(tx: tx, coinbase: coinbase)
+
+						assert(res.status == EVM.Status.successful, message: "unexpected status")
+						assert(res.errorCode == 0, message: "unexpected error code")
+						
+						return res
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
@@ -134,6 +140,7 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				require.Nil(t, res.DeployedContractAddress)
 				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue).Int64())
 			})
 	})
@@ -247,6 +254,69 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, int64(0), new(big.Int).SetBytes(res.ReturnedValue).Int64())
 			})
 	})
+}
+
+func TestEVMBlockData(t *testing.T) {
+	t.Parallel()
+	chain := flow.Emulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	RunWithNewEnvironment(t,
+		chain, func(
+			ctx fvm.Context,
+			vm fvm.VM,
+			snapshot snapshot.SnapshotTree,
+			testContract *TestContract,
+			testAccount *EOATestAccount,
+		) {
+
+			// query the block timestamp
+			code := []byte(fmt.Sprintf(
+				`
+					import EVM from %s
+					access(all)
+					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
+						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+						return EVM.run(tx: tx, coinbase: coinbase)
+					}
+				`,
+				sc.EVMContract.Address.HexWithPrefix(),
+			))
+
+			innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+				testContract.DeployedAt.ToCommon(),
+				testContract.MakeCallData(t, "blockTime"),
+				big.NewInt(0),
+				uint64(100_000),
+				big.NewInt(0),
+			)
+
+			coinbase := cadence.NewArray(
+				ConvertToCadence(testAccount.Address().Bytes()),
+			).WithType(stdlib.EVMAddressBytesCadenceType)
+
+			innerTx := cadence.NewArray(
+				ConvertToCadence(innerTxBytes),
+			).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+			script := fvm.Script(code).WithArguments(
+				json.MustEncode(innerTx),
+				json.MustEncode(coinbase),
+			)
+
+			_, output, err := vm.Run(
+				ctx,
+				script,
+				snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+			require.NoError(t, err)
+			require.Equal(t, types.StatusSuccessful, res.Status)
+			require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+			require.Equal(t, ctx.BlockHeader.Timestamp.Unix(), new(big.Int).SetBytes(res.ReturnedValue).Int64())
+
+		})
 }
 
 func TestEVMAddressDeposit(t *testing.T) {
@@ -603,7 +673,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					import FlowToken from %s
 	
 					access(all)
-					fun main(): [UInt8; 20] {
+					fun main(code: [UInt8]): EVM.Result {
 						let admin = getAuthAccount(%s)
 							.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
 						let minter <- admin.createNewMinter(allowedAmount: 2.34)
@@ -613,13 +683,13 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 						let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
 						cadenceOwnedAccount.deposit(from: <-vault)
 	
-						let address = cadenceOwnedAccount.deploy(
-							code: [],
-							gasLimit: 53000,
+						let res = cadenceOwnedAccount.deploy(
+							code: code,
+							gasLimit: 1000000,
 							value: EVM.Balance(attoflow: 1230000000000000000)
 						)
 						destroy cadenceOwnedAccount
-						return address.bytes
+						return res
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
@@ -627,7 +697,12 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					sc.FlowServiceAccount.Address.HexWithPrefix(),
 				))
 
-				script := fvm.Script(code)
+				script := fvm.Script(code).
+					WithArguments(json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(testContract.ByteCode),
+						).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type{})),
+					))
 
 				_, output, err := vm.Run(
 					ctx,
@@ -635,6 +710,14 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
+
+				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+				require.Equal(t, types.StatusSuccessful, res.Status)
+				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				require.NotNil(t, res.DeployedContractAddress)
+				// we strip away first few bytes because they contain deploy code
+				require.Equal(t, testContract.ByteCode[17:], []byte(res.ReturnedValue))
 			})
 	})
 }
@@ -690,6 +773,193 @@ func TestCadenceArch(t *testing.T) {
 					snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
+			})
+	})
+
+	t.Run("testing calling Cadence arch - random source (happy case)", func(t *testing.T) {
+		chain := flow.Emulator.Chain()
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				entropy := []byte{13, 37}
+				source := []byte{91, 161, 206, 171, 100, 17, 141, 44} // coresponding out to the above entropy
+
+				// we must record a new heartbeat with a fixed block, we manually execute a transaction to do so,
+				// since doing this automatically would require a block computer and whole execution setup
+				height := uint64(1)
+				block1 := unittest.BlockFixture()
+				block1.Header.Height = height
+				ctx.BlockHeader = block1.Header
+				ctx.EntropyProvider = testutil.EntropyProviderFixture(entropy) // fix the entropy
+
+				txBody := flow.NewTransactionBody().
+					SetScript([]byte(fmt.Sprintf(`
+						import RandomBeaconHistory from %s
+
+						transaction {
+							prepare(serviceAccount: AuthAccount) {
+								let randomBeaconHistoryHeartbeat = serviceAccount.borrow<&RandomBeaconHistory.Heartbeat>(
+									from: RandomBeaconHistory.HeartbeatStoragePath)
+										?? panic("Couldn't borrow RandomBeaconHistory.Heartbeat Resource")
+								randomBeaconHistoryHeartbeat.heartbeat(randomSourceHistory: randomSourceHistory())
+							}
+						}`, sc.RandomBeaconHistory.Address.HexWithPrefix())),
+					).
+					AddAuthorizer(sc.FlowServiceAccount.Address)
+
+				s, out, err := vm.Run(ctx, fvm.Transaction(txBody, 0), snapshot)
+				require.NoError(t, err)
+				require.NoError(t, out.Err)
+
+				snapshot = snapshot.Append(s)
+
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					access(all)
+					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): [UInt8] {
+						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+						let res = EVM.run(tx: tx, coinbase: coinbase)
+						assert(res.status == EVM.Status.successful, message: "evm tx wrong status")
+						return res.data
+					}
+                    `,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				// we fake progressing to new block height since random beacon does the check the
+				// current height (2) is bigger than the height requested (1)
+				block1.Header.Height = 2
+				ctx.BlockHeader = block1.Header
+
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "verifyArchCallToRandomSource", height),
+					big.NewInt(0),
+					uint64(10_000_000),
+					big.NewInt(0),
+				)
+				script := fvm.Script(code).WithArguments(
+					json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(innerTxBytes),
+						).WithType(stdlib.EVMTransactionBytesCadenceType),
+					),
+					json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(testAccount.Address().Bytes()),
+						).WithType(stdlib.EVMAddressBytesCadenceType),
+					),
+				)
+				_, output, err := vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				res := make([]byte, 8)
+				vals := output.Value.(cadence.Array).Values
+				vals = vals[len(vals)-8:] // only last 8 bytes is the value
+				for i := range res {
+					res[i] = vals[i].ToGoValue().(byte)
+				}
+				require.Equal(t, source, res)
+			})
+	})
+
+	t.Run("testing calling Cadence arch - random source (failed due to incorrect height)", func(t *testing.T) {
+		chain := flow.Emulator.Chain()
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				// we must record a new heartbeat with a fixed block, we manually execute a transaction to do so,
+				// since doing this automatically would require a block computer and whole execution setup
+				height := uint64(1)
+				block1 := unittest.BlockFixture()
+				block1.Header.Height = height
+				ctx.BlockHeader = block1.Header
+
+				txBody := flow.NewTransactionBody().
+					SetScript([]byte(fmt.Sprintf(`
+						import RandomBeaconHistory from %s
+
+						transaction {
+							prepare(serviceAccount: AuthAccount) {
+								let randomBeaconHistoryHeartbeat = serviceAccount.borrow<&RandomBeaconHistory.Heartbeat>(
+									from: RandomBeaconHistory.HeartbeatStoragePath)
+										?? panic("Couldn't borrow RandomBeaconHistory.Heartbeat Resource")
+								randomBeaconHistoryHeartbeat.heartbeat(randomSourceHistory: randomSourceHistory())
+							}
+						}`, sc.RandomBeaconHistory.Address.HexWithPrefix())),
+					).
+					AddAuthorizer(sc.FlowServiceAccount.Address)
+
+				s, out, err := vm.Run(ctx, fvm.Transaction(txBody, 0), snapshot)
+				require.NoError(t, err)
+				require.NoError(t, out.Err)
+
+				snapshot = snapshot.Append(s)
+
+				height = 1337 // invalid
+				// we make sure the transaction fails, due to requested height being invalid
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					access(all)
+					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
+						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+						let res = EVM.run(tx: tx, coinbase: coinbase)
+					}
+                    `,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				// we fake progressing to new block height since random beacon does the check the
+				// current height (2) is bigger than the height requested (1)
+				block1.Header.Height = 2
+				ctx.BlockHeader = block1.Header
+
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "verifyArchCallToRandomSource", height),
+					big.NewInt(0),
+					uint64(10_000_000),
+					big.NewInt(0),
+				)
+				script := fvm.Script(code).WithArguments(
+					json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(innerTxBytes),
+						).WithType(stdlib.EVMTransactionBytesCadenceType),
+					),
+					json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(testAccount.Address().Bytes()),
+						).WithType(stdlib.EVMAddressBytesCadenceType),
+					),
+				)
+				_, output, err := vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				// make sure the error is correct
+				require.ErrorContains(t, output.Err, "Source of randomness not yet recorded")
 			})
 	})
 
@@ -1058,6 +1328,8 @@ func RunWithNewEnvironment(
 					fvm.WithAuthorizationChecksEnabled(false),
 					fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 					fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
+					fvm.WithRandomSourceHistoryCallAllowed(true),
+					fvm.WithBlocks(blocks),
 				}
 				ctx := fvm.NewContext(opts...)
 
@@ -1077,7 +1349,13 @@ func RunWithNewEnvironment(
 
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
-				f(fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true)), vm, snapshotTree, testContract, testAccount)
+				f(
+					fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true)),
+					vm,
+					snapshotTree,
+					testContract,
+					testAccount,
+				)
 			})
 		})
 	})

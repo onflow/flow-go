@@ -95,5 +95,6 @@ func DeployContract(t testing.TB, caller types.Address, tc *TestContract, led at
 		),
 	)
 	require.NoError(t, err)
-	tc.SetDeployedAt(res.DeployedContractAddress)
+	require.NotNil(t, res.DeployedContractAddress)
+	tc.SetDeployedAt(*res.DeployedContractAddress)
 }

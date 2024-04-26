@@ -1,4 +1,6 @@
 import Crypto
+import "NonFungibleToken"
+import "FungibleToken"
 import "FlowToken"
 
 access(all)
@@ -18,6 +20,19 @@ contract EVM {
     /// for transfer of flow tokens between two EVM addresses.
     access(all)
     event FLOWTokensWithdrawn(addressBytes: [UInt8; 20], amount: UFix64)
+
+    /// BridgeAccessorUpdated is emitted when the BridgeAccessor Capability
+    /// is updated in the stored BridgeRouter along with identifying
+    /// information about both.
+    access(all)
+    event BridgeAccessorUpdated(
+        routerType: Type,
+        routerUUID: UInt64,
+        routerAddress: Address,
+        accessorType: Type,
+        accessorUUID: UInt64,
+        accessorAddress: Address
+    )
 
     /// EVMAddress is an EVM-compatible address
     access(all)
@@ -168,21 +183,34 @@ contract EVM {
 
         /// returns the data that is returned from
         /// the evm for the call. For coa.deploy
-        /// calls it returns the address bytes of the
-        /// newly deployed contract.
+        /// calls it returns the code deployed to
+        /// the address provided in the contractAddress field.
         access(all)
         let data: [UInt8]
+
+        /// returns the newly deployed contract address
+        /// if the transaction caused such a deployment
+        /// otherwise the value is nil.
+        access(all)
+        let deployedContract: EVMAddress?
 
         init(
             status: Status,
             errorCode: UInt64,
             gasUsed: UInt64,
-            data: [UInt8]
+            data: [UInt8],
+            contractAddress: [UInt8; 20]?
         ) {
             self.status = status
             self.errorCode = errorCode
             self.gasUsed = gasUsed
             self.data = data
+
+            if let addressBytes = contractAddress {
+                self.deployedContract = EVMAddress(bytes: addressBytes)
+            } else {
+                self.deployedContract = nil
+            }
         }
     }
 
@@ -255,20 +283,20 @@ contract EVM {
         }
 
         /// Deploys a contract to the EVM environment.
-        /// Returns the address of the newly deployed contract
+        /// Returns the result which contains address of
+        /// the newly deployed contract
         access(all)
         fun deploy(
             code: [UInt8],
             gasLimit: UInt64,
             value: Balance
-        ): EVMAddress {
-            let addressBytes = InternalEVM.deploy(
+        ): Result {
+            return InternalEVM.deploy(
                 from: self.addressBytes,
                 code: code,
                 gasLimit: gasLimit,
                 value: value.attoflow
-            )
-            return EVMAddress(bytes: addressBytes)
+            ) as! Result
         }
 
         /// Calls a function with the given data.
@@ -287,6 +315,59 @@ contract EVM {
                 gasLimit: gasLimit,
                 value: value.attoflow
             ) as! Result
+        }
+
+        /// Bridges the given NFT to the EVM environment, requiring a Provider from which to withdraw a fee to fulfill
+        /// the bridge request
+        access(all)
+        fun depositNFT(
+            nft: @NonFungibleToken.NFT,
+            feeProvider: &{FungibleToken.Provider}
+        ) {
+            EVM.borrowBridgeAccessor().depositNFT(nft: <-nft, to: self.address(), feeProvider: feeProvider)
+        }
+
+        /// Bridges the given NFT from the EVM environment, requiring a Provider from which to withdraw a fee to fulfill
+        /// the bridge request. Note: the caller should own the requested NFT in EVM
+        access(all)
+        fun withdrawNFT(
+            type: Type,
+            id: UInt256,
+            feeProvider: &{FungibleToken.Provider}
+        ): @NonFungibleToken.NFT {
+            return <- EVM.borrowBridgeAccessor().withdrawNFT(
+                caller: &self as &CadenceOwnedAccount,
+                type: type,
+                id: id,
+                feeProvider: feeProvider
+            )
+        }
+
+        /// Bridges the given Vault to the EVM environment, requiring a Provider from which to withdraw a fee to fulfill
+        /// the bridge request
+        access(all)
+        fun depositTokens(
+            vault: @FungibleToken.Vault,
+            feeProvider: &{FungibleToken.Provider}
+        ) {
+            EVM.borrowBridgeAccessor().depositTokens(vault: <-vault, to: self.address(), feeProvider: feeProvider)
+        }
+
+        /// Bridges the given fungible tokens from the EVM environment, requiring a Provider from which to withdraw a
+        /// fee to fulfill the bridge request. Note: the caller should own the requested tokens & sufficient balance of
+        /// requested tokens in EVM
+        access(all)
+        fun withdrawTokens(
+            type: Type,
+            amount: UInt256,
+            feeProvider: &{FungibleToken.Provider}
+        ): @FungibleToken.Vault {
+            return <- EVM.borrowBridgeAccessor().withdrawTokens(
+                caller: &self as &CadenceOwnedAccount,
+                type: type,
+                amount: amount,
+                feeProvider: feeProvider
+            )
         }
     }
 
@@ -476,10 +557,14 @@ contract EVM {
         access(all)
         let totalSupply: Int
 
-        init(height: UInt64, hash: String, totalSupply: Int) {
+        access(all)
+        let timestamp: UInt64
+
+        init(height: UInt64, hash: String, totalSupply: Int, timestamp: UInt64) {
             self.height = height
             self.hash = hash
             self.totalSupply = totalSupply
+            self.timestamp = timestamp
         }
     }
 
@@ -487,5 +572,67 @@ contract EVM {
     access(all)
     fun getLatestBlock(): EVMBlock {
         return InternalEVM.getLatestBlock() as! EVMBlock
+    }
+
+    /// Interface for a resource which acts as an entrypoint to the VM bridge
+    access(all)
+    resource interface BridgeAccessor {
+
+        /// Endpoint enabling the bridging of an NFT to EVM
+        access(all)
+        fun depositNFT(
+            nft: @NonFungibleToken.NFT,
+            to: EVMAddress,
+            feeProvider: &{FungibleToken.Provider}
+        )
+
+        /// Endpoint enabling the bridging of an NFT from EVM
+        access(all)
+        fun withdrawNFT(
+            caller: &CadenceOwnedAccount,
+            type: Type,
+            id: UInt256,
+            feeProvider: &{FungibleToken.Provider}
+        ): @NonFungibleToken.NFT
+
+        /// Endpoint enabling the bridging of a fungible token vault to EVM
+        access(all)
+        fun depositTokens(
+            vault: @FungibleToken.Vault,
+            to: EVMAddress,
+            feeProvider: &{FungibleToken.Provider}
+        )
+
+        /// Endpoint enabling the bridging of fungible tokens from EVM
+        access(all)
+        fun withdrawTokens(
+            caller: &CadenceOwnedAccount,
+            type: Type,
+            amount: UInt256,
+            feeProvider: &{FungibleToken.Provider}
+        ): @FungibleToken.Vault
+    }
+
+    /// Interface which captures a Capability to the bridge Accessor, saving it within the BridgeRouter resource
+    access(all)
+    resource interface BridgeRouter {
+
+        /// Returns a reference to the BridgeAccessor designated for internal bridge requests
+        access(all) view fun borrowBridgeAccessor(): &{BridgeAccessor}
+
+        /// Sets the BridgeAccessor Capability in the BridgeRouter
+        access(all) fun setBridgeAccessor(_ accessor: Capability<&{BridgeAccessor}>) {
+            pre {
+                accessor.check(): "Invalid BridgeAccessor Capability provided"
+            }
+        }
+    }
+
+    /// Returns a reference to the BridgeAccessor designated for internal bridge requests
+    access(self)
+    view fun borrowBridgeAccessor(): &{BridgeAccessor} {
+        return self.account.borrow<&{BridgeRouter}>(from: /storage/evmBridgeRouter)
+            ?.borrowBridgeAccessor()
+            ?? panic("Could not borrow reference to the EVM bridge")
     }
 }

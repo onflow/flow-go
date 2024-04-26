@@ -91,7 +91,7 @@ type testFlowAccount struct {
 	transfer func(address types.Address, balance types.Balance)
 	deposit  func(vault *types.FLOWTokenVault)
 	withdraw func(balance types.Balance) *types.FLOWTokenVault
-	deploy   func(code types.Code, limit types.GasLimit, balance types.Balance) types.Address
+	deploy   func(code types.Code, limit types.GasLimit, balance types.Balance) *types.ResultSummary
 	call     func(address types.Address, data types.Data, limit types.GasLimit, balance types.Balance) *types.ResultSummary
 }
 
@@ -150,7 +150,7 @@ func (t *testFlowAccount) Withdraw(balance types.Balance) *types.FLOWTokenVault 
 	return t.withdraw(balance)
 }
 
-func (t *testFlowAccount) Deploy(code types.Code, limit types.GasLimit, balance types.Balance) types.Address {
+func (t *testFlowAccount) Deploy(code types.Code, limit types.GasLimit, balance types.Balance) *types.ResultSummary {
 	if t.deploy == nil {
 		panic("unexpected Deploy")
 	}
@@ -223,7 +223,7 @@ func deployContracts(
 		},
 		{
 			name: stdlib.ContractName,
-			code: stdlib.ContractCode(contractsAddress),
+			code: stdlib.ContractCode(contractsAddress, contractsAddress, contractsAddress),
 		},
 	}
 
@@ -253,25 +253,25 @@ func deployContracts(
 
 }
 
-func newEVMTransactionEnvironment(handler types.ContractHandler, service flow.Address) runtime.Environment {
+func newEVMTransactionEnvironment(handler types.ContractHandler, contractAddress flow.Address) runtime.Environment {
 	transactionEnvironment := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
 	stdlib.SetupEnvironment(
 		transactionEnvironment,
 		handler,
-		service,
+		contractAddress,
 	)
 
 	return transactionEnvironment
 }
 
-func newEVMScriptEnvironment(handler types.ContractHandler, service flow.Address) runtime.Environment {
+func newEVMScriptEnvironment(handler types.ContractHandler, contractAddress flow.Address) runtime.Environment {
 	scriptEnvironment := runtime.NewScriptInterpreterEnvironment(runtime.Config{})
 
 	stdlib.SetupEnvironment(
 		scriptEnvironment,
 		handler,
-		service,
+		contractAddress,
 	)
 
 	return scriptEnvironment
@@ -3559,20 +3559,24 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 	require.NoError(t, err)
 
 	handler := &testContractHandler{
-		flowTokenAddress: common.Address(contractsAddress),
+		evmContractAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
 			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.True(t, isAuthorized)
 
 			return &testFlowAccount{
 				address: fromAddress,
-				deploy: func(code types.Code, limit types.GasLimit, balance types.Balance) types.Address {
+				deploy: func(code types.Code, limit types.GasLimit, balance types.Balance) *types.ResultSummary {
 					deployed = true
 					assert.Equal(t, types.Code{4, 5, 6}, code)
 					assert.Equal(t, types.GasLimit(9999), limit)
 					assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
 
-					return types.Address{4}
+					return &types.ResultSummary{
+						Status:                  types.StatusSuccessful,
+						DeployedContractAddress: &types.Address{4},
+						ReturnedValue:           types.Data{4},
+					}
 				},
 			}
 		},
@@ -3585,18 +3589,17 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 
 	script := []byte(`
       import EVM from 0x1
-      import FlowToken from 0x1
 
       access(all)
-      fun main(): [UInt8; 20] {
+      fun main(): [UInt8] {
           let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
-          let address = cadenceOwnedAccount.deploy(
+          let res = cadenceOwnedAccount.deploy(
               code: [4, 5, 6],
               gasLimit: 9999,
               value: EVM.Balance(flow: 1230000000000000000)
           )
           destroy cadenceOwnedAccount
-          return address.bytes
+          return res.data
       }
    `)
 
@@ -3654,21 +3657,9 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	expected := cadence.NewArray([]cadence.Value{
-		cadence.UInt8(4), cadence.UInt8(0),
-		cadence.UInt8(0), cadence.UInt8(0),
-		cadence.UInt8(0), cadence.UInt8(0),
-		cadence.UInt8(0), cadence.UInt8(0),
-		cadence.UInt8(0), cadence.UInt8(0),
-		cadence.UInt8(0), cadence.UInt8(0),
-		cadence.UInt8(0), cadence.UInt8(0),
-		cadence.UInt8(0), cadence.UInt8(0),
-		cadence.UInt8(0), cadence.UInt8(0),
-		cadence.UInt8(0), cadence.UInt8(0),
-	}).WithType(cadence.NewConstantSizedArrayType(
-		types.AddressLength,
-		cadence.UInt8Type{},
-	))
+	expected := cadence.
+		NewArray([]cadence.Value{cadence.UInt8(4)}).
+		WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type{}))
 
 	require.Equal(t, expected, actual)
 
@@ -4131,6 +4122,7 @@ func TestEVMGetLatestBlock(t *testing.T) {
 	latestBlock := &types.Block{
 		Height:      uint64(2),
 		TotalSupply: big.NewInt(1500000000000000000),
+		Timestamp:   uint64(1337),
 	}
 	handler := &testContractHandler{
 		evmContractAddress: common.Address(contractsAddress),
@@ -4158,6 +4150,7 @@ func TestEVMGetLatestBlock(t *testing.T) {
 	blockHash, err := cadence.NewString(hash.Hex())
 	require.NoError(t, err)
 	blockTotalSupply := cadence.NewIntFromBig(latestBlock.TotalSupply)
+	timestamp := cadence.NewUInt64(latestBlock.Timestamp)
 
 	expectedEVMBlock := cadence.Struct{
 		StructType: evmBlockCadenceType,
@@ -4165,6 +4158,7 @@ func TestEVMGetLatestBlock(t *testing.T) {
 			blockHeight,
 			blockHash,
 			blockTotalSupply,
+			timestamp,
 		},
 	}
 

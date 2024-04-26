@@ -22,6 +22,7 @@ import (
 type blockEventPayload struct {
 	Height            uint64           `cadence:"height"`
 	Hash              string           `cadence:"hash"`
+	Timestamp         uint64           `cadence:"timestamp"`
 	TotalSupply       cadence.Int      `cadence:"totalSupply"`
 	ParentBlockHash   string           `cadence:"parentHash"`
 	ReceiptRoot       string           `cadence:"receiptRoot"`
@@ -47,6 +48,7 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 
 	block := &types.Block{
 		Height:          2,
+		Timestamp:       100,
 		TotalSupply:     big.NewInt(1500),
 		ParentBlockHash: gethCommon.HexToHash("0x2813452cff514c3054ac9f40cd7ce1b016cc78ab7f99f1c6d49708837f6e06d1"),
 		ReceiptRoot:     gethCommon.Hash{},
@@ -70,6 +72,7 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 	assert.Equal(t, bep.Hash, blockHash.Hex())
 
 	assert.Equal(t, bep.TotalSupply.Value, block.TotalSupply)
+	assert.Equal(t, bep.Timestamp, block.Timestamp)
 	assert.Equal(t, bep.ParentBlockHash, block.ParentBlockHash.Hex())
 	assert.Equal(t, bep.ReceiptRoot, block.ReceiptRoot.Hex())
 
@@ -107,6 +110,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 	dataBytes, err := hex.DecodeString(data)
 	require.NoError(t, err)
 	blockHeight := uint64(2)
+	deployedAddress := types.NewAddress(gethCommon.HexToAddress("0x99466ed2e37b892a2ee3e9cd55a98b68f5735db2"))
 	log := &gethTypes.Log{
 		Index:       1,
 		BlockNumber: blockHeight,
@@ -124,7 +128,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		VMError:                 vmError,
 		TxType:                  255,
 		GasConsumed:             23200,
-		DeployedContractAddress: types.NewAddress(gethCommon.HexToAddress("0x99466ed2e37b892a2ee3e9cd55a98b68f5735db2")),
+		DeployedContractAddress: &deployedAddress,
 		ReturnedValue:           dataBytes,
 		Logs:                    []*gethTypes.Log{log},
 	}
@@ -204,6 +208,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		assert.Equal(t, "", tep.VMError)
 		assert.Equal(t, tep.TransactionType, txResult.TxType)
 		assert.Equal(t, tep.GasConsumed, txResult.GasConsumed)
+		assert.NotNil(t, txResult.DeployedContractAddress)
 		assert.Equal(
 			t,
 			tep.DeployedContractAddress,
