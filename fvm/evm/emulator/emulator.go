@@ -133,13 +133,11 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 func (bl *BlockView) RunTransaction(
 	tx *gethTypes.Transaction,
 ) (*types.Result, error) {
-	var res *types.Result
-	var err error
 	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
 	}
-	txHash := tx.Hash()
+
 	msg, err := gethCore.TransactionToMessage(
 		tx,
 		GetSigner(bl.config),
@@ -147,22 +145,64 @@ func (bl *BlockView) RunTransaction(
 	if err != nil {
 		// this is not a fatal error (e.g. due to bad signature)
 		// not a valid transaction
-		res = &types.Result{
-			TxType: tx.Type(),
-			TxHash: txHash,
-		}
-		res.SetValidationError(err)
-		return res, nil
+		return types.NewInvalidResult(tx, err), nil
 	}
 
 	// update tx context origin
 	proc.evm.TxContext.Origin = msg.From
-	res, err = proc.run(msg, txHash, 0, tx.Type())
+	res, err := proc.run(msg, tx.Hash(), 0, tx.Type())
 	if err != nil {
 		return nil, err
 	}
 	// all commmit errors (StateDB errors) has to be returned
-	return res, proc.commitAndFinalize()
+	if err := proc.commit(true); err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*types.Result, error) {
+	batchResults := make([]*types.Result, len(txs))
+
+	proc, err := bl.newProcedure()
+	if err != nil {
+		return nil, err
+	}
+
+	for i, tx := range txs {
+		msg, err := gethCore.TransactionToMessage(
+			tx,
+			GetSigner(bl.config),
+			proc.config.BlockContext.BaseFee)
+		if err != nil {
+			batchResults[i] = types.NewInvalidResult(tx, err)
+			continue
+		}
+
+		// update tx context origin
+		proc.evm.TxContext.Origin = msg.From
+		res, err := proc.run(msg, tx.Hash(), uint(i), tx.Type())
+		if err != nil {
+			return nil, err
+		}
+		// all commmit errors (StateDB errors) has to be returned
+		if err := proc.commit(false); err != nil {
+			return nil, err
+		}
+
+		// this clears state for any subsequent transaction runs
+		proc.state.Reset()
+
+		batchResults[i] = res
+	}
+
+	// finalize after all the batch transactions are executed to save resources
+	if err := proc.state.Finalize(); err != nil {
+		return nil, err
+	}
+
+	return batchResults, nil
 }
 
 func (bl *BlockView) newProcedure() (*procedure, error) {
@@ -190,9 +230,9 @@ type procedure struct {
 	state  types.StateDB
 }
 
-// commit commits the changes to the state (with finalization)
-func (proc *procedure) commitAndFinalize() error {
-	err := proc.state.Commit(true)
+// commit commits the changes to the state (with optional finalization)
+func (proc *procedure) commit(finalize bool) error {
+	err := proc.state.Commit(finalize)
 	if err != nil {
 		// if known types (state errors) don't do anything and return
 		if types.IsAFatalError(err) || types.IsAStateError(err) {
@@ -236,7 +276,7 @@ func (proc *procedure) mintTo(
 	}
 
 	// all commmit errors (StateDB errors) has to be returned
-	return res, proc.commitAndFinalize()
+	return res, proc.commit(true)
 }
 
 func (proc *procedure) withdrawFrom(
@@ -267,7 +307,7 @@ func (proc *procedure) withdrawFrom(
 	// now deduct the balance from the bridge
 	proc.state.SubBalance(bridge, call.Value)
 	// all commmit errors (StateDB errors) has to be returned
-	return res, proc.commitAndFinalize()
+	return res, proc.commit(true)
 }
 
 // deployAt deploys a contract at the given target address
@@ -386,7 +426,7 @@ func (proc *procedure) deployAt(
 	res.DeployedContractAddress = &to
 
 	proc.state.SetCode(addr, ret)
-	return res, proc.commitAndFinalize()
+	return res, proc.commit(true)
 }
 
 func (proc *procedure) runDirect(
@@ -402,7 +442,7 @@ func (proc *procedure) runDirect(
 		return nil, err
 	}
 	// all commmit errors (StateDB errors) has to be returned
-	return res, proc.commitAndFinalize()
+	return res, proc.commit(true)
 }
 
 // run runs a geth core.message and returns the
