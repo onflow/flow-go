@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"

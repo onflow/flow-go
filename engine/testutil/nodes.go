@@ -10,13 +10,15 @@ import (
 	"time"
 
 	"github.com/coreos/go-semver/semver"
+	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
+
+	"github.com/onflow/flow-go/crypto"
 
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/consensus"
@@ -26,7 +28,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"

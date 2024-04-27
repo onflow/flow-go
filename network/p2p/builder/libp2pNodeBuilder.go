@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 
+	none "github.com/ipfs/boxo/routing/none"
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/config"
@@ -21,6 +22,7 @@ import (
 	"github.com/rs/zerolog"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -33,14 +35,12 @@ import (
 	gossipsubbuilder "github.com/onflow/flow-go/network/p2p/builder/gossipsub"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	p2pnode "github.com/onflow/flow-go/network/p2p/node"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
-	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/stream"
 	"github.com/onflow/flow-go/network/p2p/utils"
 )
@@ -452,7 +452,10 @@ func DefaultNodeBuilder(
 		if dhtSystemActivation == DhtSystemEnabled {
 			builder.SetRoutingSystem(
 				func(ctx context.Context, host host.Host) (routing.Routing, error) {
-					return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), logger, metricsCfg.Metrics, dht.AsServer())
+					// bitswap requires a content routing system. this returns a stub instead of a
+					// full DHT since the DHT adds a non-trivial amount of overhead but provides
+					// limited value on the staked network.
+					return none.ConstructNilRouting(nil, nil, nil, nil)
 				})
 		}
 	}
