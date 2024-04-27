@@ -414,13 +414,10 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			return publicLibp2pNode, nil
 		}
 
-		// dhtActivationStatus, err := DhtSystemActivationStatus(fnb.NodeRole)
-		// if err != nil {
-		// 	return nil, fmt.Errorf("could not determine dht activation status: %w", err)
-		// }
-
-		dhtActivationStatus := p2pbuilder.DhtSystemDisabled
-
+		dhtActivationStatus, err := DhtSystemActivationStatus(fnb.NodeRole)
+		if err != nil {
+			return nil, fmt.Errorf("could not determine dht activation status: %w", err)
+		}
 		builder, err := p2pbuilder.DefaultNodeBuilder(fnb.Logger,
 			myAddr,
 			network.PrivateNetwork,
