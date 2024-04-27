@@ -36,6 +36,12 @@ import (
 	ipld "github.com/ipfs/go-ipld-format"
 )
 
+const (
+	// DefaultReprovideInterval is the default interval at which DHT provider entries are refreshed
+	// Disabled by default
+	DefaultReprovideInterval = -1
+)
+
 type blobService struct {
 	prefix string
 	component.Component
@@ -67,7 +73,7 @@ func WithBitswapOptions(opts ...bitswap.Option) network.BlobServiceOption {
 	}
 }
 
-// WithHashOnRead sets whether or not the blobstore will rehash the blob data on read
+// WithHashOnRead sets whether the blobstore will rehash the blob data on read
 // When set, calls to GetBlob will fail with an error if the hash of the data in storage does not
 // match its CID
 func WithHashOnRead(enabled bool) network.BlobServiceOption {
@@ -109,7 +115,7 @@ func NewBlobService(
 	bs := &blobService{
 		prefix: prefix,
 		config: &BlobServiceConfig{
-			ReprovideInterval: -1, // 12 * time.Hour,
+			ReprovideInterval: DefaultReprovideInterval,
 		},
 		blockStore: blockStore,
 	}

@@ -465,6 +465,9 @@ func DefaultNodeBuilder(
 		if dhtSystemActivation == DhtSystemEnabled {
 			builder.SetRoutingSystem(
 				func(ctx context.Context, host host.Host) (routing.Routing, error) {
+					// bitswap requires a content routing system. this returns a stub instead of a
+					// full DHT since the DHT adds a non-trivial amount of overhead but provides
+					// limited value on the staked network.
 					return none.ConstructNilRouting(nil, nil, nil, nil)
 				})
 		}
