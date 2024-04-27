@@ -455,7 +455,7 @@ func DefaultNodeBuilder(
 					// bitswap requires a content routing system. this returns a stub instead of a
 					// full DHT since the DHT adds a non-trivial amount of overhead but provides
 					// limited value on the staked network.
-					return none.ConstructNilRouting(nil, nil, nil, nil)
+					return none.ConstructNilRouting(ctx, host, nil, nil)
 				})
 		}
 	}
