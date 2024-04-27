@@ -109,7 +109,7 @@ func NewBlobService(
 	bs := &blobService{
 		prefix: prefix,
 		config: &BlobServiceConfig{
-			ReprovideInterval: 12 * time.Hour,
+			ReprovideInterval: -1, // 12 * time.Hour,
 		},
 		blockStore: blockStore,
 	}
