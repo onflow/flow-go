@@ -68,13 +68,13 @@ func (i Import) ToCadence() string {
 	return ""
 }
 
-type UpdateAccountCode struct {
+type SetAccountCode struct {
 	Code   string
 	Name   string
 	Update bool
 }
 
-func (u UpdateAccountCode) ToCadence() string {
+func (u SetAccountCode) ToCadence() string {
 
 	bytes := []byte(u.Code)
 

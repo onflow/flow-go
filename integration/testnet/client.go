@@ -114,7 +114,7 @@ func (c *Client) DeployContract(ctx context.Context, refID sdk.Identifier, contr
 	return c.deployContract(ctx, refID, dsl.Transaction{
 		Import: dsl.Import{},
 		Content: dsl.Prepare{
-			Content: dsl.UpdateAccountCode{
+			Content: dsl.SetAccountCode{
 				Code: contract.ToCadence(),
 				Name: contract.Name,
 			},
@@ -128,7 +128,7 @@ func (c *Client) UpdateContract(ctx context.Context, refID sdk.Identifier, contr
 	return c.deployContract(ctx, refID, dsl.Transaction{
 		Import: dsl.Import{},
 		Content: dsl.Prepare{
-			Content: dsl.UpdateAccountCode{
+			Content: dsl.SetAccountCode{
 				Code:   contract.ToCadence(),
 				Name:   contract.Name,
 				Update: true,
