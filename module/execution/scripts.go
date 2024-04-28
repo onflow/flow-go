@@ -61,6 +61,7 @@ func NewScripts(
 	registerAtHeight RegisterAtHeight,
 	queryConf query.QueryConfig,
 	derivedChainData *derived.DerivedChainData,
+	enableProgramCacheWrites bool,
 ) *Scripts {
 	vm := fvm.NewVirtualMachine()
 
@@ -68,7 +69,7 @@ func NewScripts(
 	blocks := environment.NewBlockFinder(header)
 	options = append(options, fvm.WithBlocks(blocks)) // add blocks for getBlocks calls in scripts
 	options = append(options, fvm.WithMetricsReporter(metrics))
-	options = append(options, fvm.WithAllowProgramCacheWritesInScriptsEnabled(true))
+	options = append(options, fvm.WithAllowProgramCacheWritesInScriptsEnabled(enableProgramCacheWrites))
 	vmCtx := fvm.NewContext(options...)
 
 	queryExecutor := query.NewQueryExecutor(

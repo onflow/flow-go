@@ -185,6 +185,7 @@ func (s *scriptTestSuite) SetupTest() {
 		index.RegisterValue,
 		query.NewDefaultConfig(),
 		derivedChainData,
+		true,
 	)
 
 	s.bootstrap()

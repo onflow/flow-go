@@ -857,6 +857,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.ExecutionIndexerCore.RegisterValue,
 					builder.scriptExecutorConfig,
 					queryDerivedChainData,
+					builder.programCacheSize > 0,
 				)
 
 				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts)
