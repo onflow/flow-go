@@ -819,7 +819,7 @@ func (h *handler) getEventsByBlockID(blockID flow.Identifier) ([]flow.Event, err
 		}
 
 		for _, chunk := range executionResult.Chunks {
-			if chunk.EventCollection != flow.EmptyEventCollectionID {
+			if chunk.EventCollection != flow.EmptyEventCollectionID && chunk.EventCollection != flow.ZeroID {
 				return nil, status.Errorf(codes.Internal, "events not found for block %s, but chunk %v has non-empty events with hash %v",
 					blockID, chunk.Index, chunk.EventCollection)
 			}
