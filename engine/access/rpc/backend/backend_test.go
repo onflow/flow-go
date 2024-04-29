@@ -1258,8 +1258,8 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 			headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry + 1
 			// we have NOT observed all intermediary Collections
 			fullHeight = block.Header.Height + flow.DefaultTransactionExpiry/2
-			err = suite.lastFullBlockHeight.Set(fullHeight)
-			require.NoError(suite.T(), err)
+			res := suite.lastFullBlockHeight.Set(fullHeight)
+			suite.Require().True(res)
 
 			result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 			suite.checkResponse(result, err)
@@ -1268,8 +1268,8 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 
 		// we have observed all intermediary Collections
 		fullHeight = block.Header.Height + flow.DefaultTransactionExpiry + 1
-		err = suite.lastFullBlockHeight.Set(fullHeight)
-		require.NoError(suite.T(), err)
+		res := suite.lastFullBlockHeight.Set(fullHeight)
+		suite.Require().True(res)
 
 		suite.Run("ONLY observed intermediary Collections", func() {
 			// we have NOT finalized an expiry block

@@ -547,9 +547,8 @@ func (e *Engine) updateLastFullBlockReceivedIndex() error {
 
 	// if more contiguous blocks are now complete, update db
 	if newLastFullHeight > lastFullHeight {
-		err = e.lastFullBlockHeight.Set(newLastFullHeight)
-		if err != nil {
-			return fmt.Errorf("failed to update last full block height: %w", err)
+		if !e.lastFullBlockHeight.Set(newLastFullHeight) {
+			return fmt.Errorf("failed to update last full block height")
 		}
 
 		e.collectionExecutedMetric.UpdateLastFullBlockHeight(newLastFullHeight)

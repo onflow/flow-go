@@ -1,7 +1,6 @@
 package persistent_strict_counters
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -27,14 +26,13 @@ func TestMonotonicConsumer(t *testing.T) {
 
 		// try to update value with less than current
 		var lessHeight = uint64(1233)
-		err = persistentStrictMonotonicCounter.Set(lessHeight)
-		require.Error(t, err)
-		require.Equal(t, err, fmt.Errorf("could not update to height that is lower than the current height"))
+		res := persistentStrictMonotonicCounter.Set(lessHeight)
+		require.False(t, res)
 
 		// update the value with bigger height
 		var height2 = uint64(1235)
-		err = persistentStrictMonotonicCounter.Set(height2)
-		require.NoError(t, err)
+		res = persistentStrictMonotonicCounter.Set(height2)
+		require.True(t, res)
 
 		// check that the new value can be retrieved
 		actual = persistentStrictMonotonicCounter.Value()

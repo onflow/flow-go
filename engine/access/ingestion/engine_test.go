@@ -388,8 +388,8 @@ func (s *Suite) TestRequestMissingCollections() {
 			return storerr.ErrNotFound
 		})
 	// consider collections are missing for all blocks
-	err := s.lastFullBlockHeight.Set(startHeight - 1)
-	require.NoError(s.T(), err)
+	res := s.lastFullBlockHeight.Set(startHeight - 1)
+	s.Require().True(res)
 
 	// consider the last test block as the head
 	s.finalizedBlock = blocks[blkCnt-1].Header
@@ -573,8 +573,8 @@ func (s *Suite) TestProcessBackgroundCalls() {
 	s.finalizedBlock = finalizedBlk.Header
 
 	// root block is the last complete block
-	err := s.lastFullBlockHeight.Set(rootBlkHeight)
-	require.NoError(s.T(), err)
+	res := s.lastFullBlockHeight.Set(rootBlkHeight)
+	s.Require().True(res)
 
 	s.Run("missing collections are requested when count exceeds defaultMissingCollsForBlkThreshold", func() {
 		// lower the block threshold to request missing collections
@@ -647,17 +647,17 @@ func (s *Suite) TestProcessBackgroundCalls() {
 
 	s.Run("full block height index is advanced if newer full blocks are discovered", func() {
 		block := blocks[1]
-		err := s.lastFullBlockHeight.Set(block.Header.Height)
-		require.NoError(s.T(), err)
-		err = s.eng.updateLastFullBlockReceivedIndex()
+		res := s.lastFullBlockHeight.Set(block.Header.Height)
+		s.Require().True(res)
+		err := s.eng.updateLastFullBlockReceivedIndex()
 		s.Require().NoError(err)
 
 		s.blocks.AssertExpectations(s.T())
 	})
 
 	s.Run("full block height index is not advanced beyond finalized blocks", func() {
-		err = s.lastFullBlockHeight.Set(finalizedHeight)
-		s.Require().NoError(err)
+		res := s.lastFullBlockHeight.Set(finalizedHeight)
+		s.Require().True(res)
 
 		err := s.eng.updateLastFullBlockReceivedIndex()
 		s.Require().NoError(err)

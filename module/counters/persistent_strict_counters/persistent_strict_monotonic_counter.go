@@ -50,15 +50,13 @@ func NewPersistentStrictMonotonicCounter(db *badger.DB, consumer string, default
 }
 
 // Set sets the processed index, ensuring it is strictly monotonically increasing.
-//
-// Expected errors during normal operation:
-//   - generic error in case of unexpected failure from the database layer or encoding failure
-//     or if stored value is larger than processed.
-func (m *PersistentStrictMonotonicCounter) Set(processed uint64) error {
+// Returns true if update was successful or false if stored value is larger.
+func (m *PersistentStrictMonotonicCounter) Set(processed uint64) bool {
 	if !m.counter.Set(processed) {
-		return fmt.Errorf("could not update to height that is lower than the current height")
+		return false
 	}
-	return m.consumerProgress.SetProcessedIndex(processed)
+	err := m.consumerProgress.SetProcessedIndex(processed)
+	return err == nil
 }
 
 // Value loads the current stored index.
