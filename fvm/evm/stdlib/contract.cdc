@@ -11,19 +11,19 @@ contract EVM {
     access(all)
     event BlockExecuted(
         // height or number of the block
-        height: UInt64
+        height: UInt64,
         // hash of the block
-        hash: String
+        hash: String,
         // timestamp of the block creation
-        timestamp: UInt64
+        timestamp: UInt64,
         // total Flow supply
-        totalSupply: Int
+        totalSupply: Int,
         // all gas used in the block by transactions included
-        totalGasUsed: UInt64
+        totalGasUsed: UInt64,
         // parent block hash
-        parentHash: String
+        parentHash: String,
         // hash of all the transaction receipts
-        receiptRoot: String
+        receiptRoot: String,
         // all the transactions included in the block
         transactionHashes: [String]
     )
