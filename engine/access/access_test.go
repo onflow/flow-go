@@ -34,6 +34,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	scounters "github.com/onflow/flow-go/module/counters/persistent_strict_counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -675,7 +676,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		)
 		require.NoError(suite.T(), err)
 
-		lastFullBlockHeight, err := bstorage.NewMonotonicConsumerProgress(
+		lastFullBlockHeight, err := scounters.NewPersistentStrictMonotonicCounter(
 			db,
 			module.ConsumeProgressLastFullBlockHeight,
 			suite.rootBlock.Height,
@@ -833,7 +834,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		)
 		require.NoError(suite.T(), err)
 
-		lastFullBlockHeight, err := bstorage.NewMonotonicConsumerProgress(
+		lastFullBlockHeight, err := scounters.NewPersistentStrictMonotonicCounter(
 			db,
 			module.ConsumeProgressLastFullBlockHeight,
 			suite.rootBlock.Height,
@@ -1059,7 +1060,7 @@ func (suite *Suite) TestExecuteScript() {
 		suite.net.On("Register", channels.ReceiveReceipts, mock.Anything).Return(conduit, nil).
 			Once()
 
-		lastFullBlockHeight, err := bstorage.NewMonotonicConsumerProgress(
+		lastFullBlockHeight, err := scounters.NewPersistentStrictMonotonicCounter(
 			db,
 			module.ConsumeProgressLastFullBlockHeight,
 			suite.rootBlock.Height,

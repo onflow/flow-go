@@ -24,11 +24,11 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	scounters "github.com/onflow/flow-go/module/counters/persistent_strict_counters"
 	"github.com/onflow/flow-go/module/metrics"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	protocolint "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
-	bstorage "github.com/onflow/flow-go/storage/badger"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
@@ -78,7 +78,7 @@ type TransactionStatusSuite struct {
 	backend *Backend
 
 	db                  *badger.DB
-	lastFullBlockHeight *bstorage.MonotonicConsumerProgress
+	lastFullBlockHeight *scounters.PersistentStrictMonotonicCounter
 }
 
 func TestTransactionStatusSuite(t *testing.T) {
@@ -129,7 +129,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.resultsMap[s.rootBlock.ID()] = rootResult
 
 	var err error
-	s.lastFullBlockHeight, err = bstorage.NewMonotonicConsumerProgress(
+	s.lastFullBlockHeight, err = scounters.NewPersistentStrictMonotonicCounter(
 		s.db,
 		module.ConsumeProgressLastFullBlockHeight,
 		s.rootBlock.Header.Height,
@@ -395,7 +395,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 	// Generate final blocks and check transaction expired
 	s.sealedBlock = s.finalizedBlock
 	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
-	err := s.lastFullBlockHeight.Store(s.sealedBlock.Header.Height)
+	err := s.lastFullBlockHeight.Set(s.sealedBlock.Header.Height)
 	s.Require().NoError(err)
 
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusExpired)

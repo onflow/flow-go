@@ -60,6 +60,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
+	scounters "github.com/onflow/flow-go/module/counters/persistent_strict_counters"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
@@ -1379,7 +1380,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 	ingestionDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(ingestionDependable)
-	var lastFullBlockHeight *bstorage.MonotonicConsumerProgress
+	var lastFullBlockHeight *scounters.PersistentStrictMonotonicCounter
 
 	builder.
 		BuildConsensusFollower().
@@ -1558,7 +1559,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			rootBlockHeight := node.State.Params().FinalizedRoot().Height
 
 			var err error
-			lastFullBlockHeight, err = bstorage.NewMonotonicConsumerProgress(
+			lastFullBlockHeight, err = scounters.NewPersistentStrictMonotonicCounter(
 				builder.DB,
 				module.ConsumeProgressLastFullBlockHeight,
 				rootBlockHeight,

@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	scounters "github.com/onflow/flow-go/module/counters/persistent_strict_counters"
 	downloadermock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -30,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -67,7 +67,7 @@ type Suite struct {
 	cancel context.CancelFunc
 
 	db                  *badger.DB
-	lastFullBlockHeight *bstorage.MonotonicConsumerProgress
+	lastFullBlockHeight *scounters.PersistentStrictMonotonicCounter
 }
 
 func TestIngestEngine(t *testing.T) {
@@ -135,7 +135,7 @@ func (s *Suite) SetupTest() {
 	require.NoError(s.T(), err)
 
 	s.db, _ = unittest.TempBadgerDB(s.T())
-	s.lastFullBlockHeight, err = bstorage.NewMonotonicConsumerProgress(
+	s.lastFullBlockHeight, err = scounters.NewPersistentStrictMonotonicCounter(
 		s.db,
 		module.ConsumeProgressLastFullBlockHeight,
 		s.finalizedBlock.Height,
@@ -388,7 +388,7 @@ func (s *Suite) TestRequestMissingCollections() {
 			return storerr.ErrNotFound
 		})
 	// consider collections are missing for all blocks
-	err := s.lastFullBlockHeight.Store(startHeight - 1)
+	err := s.lastFullBlockHeight.Set(startHeight - 1)
 	require.NoError(s.T(), err)
 
 	// consider the last test block as the head
@@ -573,7 +573,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 	s.finalizedBlock = finalizedBlk.Header
 
 	// root block is the last complete block
-	err := s.lastFullBlockHeight.Store(rootBlkHeight)
+	err := s.lastFullBlockHeight.Set(rootBlkHeight)
 	require.NoError(s.T(), err)
 
 	s.Run("missing collections are requested when count exceeds defaultMissingCollsForBlkThreshold", func() {
@@ -647,7 +647,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 
 	s.Run("full block height index is advanced if newer full blocks are discovered", func() {
 		block := blocks[1]
-		err := s.lastFullBlockHeight.Store(block.Header.Height)
+		err := s.lastFullBlockHeight.Set(block.Header.Height)
 		require.NoError(s.T(), err)
 		err = s.eng.updateLastFullBlockReceivedIndex()
 		s.Require().NoError(err)
@@ -656,7 +656,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 	})
 
 	s.Run("full block height index is not advanced beyond finalized blocks", func() {
-		err = s.lastFullBlockHeight.Store(finalizedHeight)
+		err = s.lastFullBlockHeight.Set(finalizedHeight)
 		s.Require().NoError(err)
 
 		err := s.eng.updateLastFullBlockReceivedIndex()
