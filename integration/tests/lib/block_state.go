@@ -291,45 +291,45 @@ func (bs *BlockState) HighestFinalizedHeight() uint64 {
 // WaitForSealedHeight returns the highest sealed block once the sealed height reaches
 // or exceeds `height`. The returned block may have height equal to or greater than `height`.
 func (bs *BlockState) WaitForSealedHeight(t *testing.T, height uint64) *flow.Block {
-	require.Eventually(t,
+	require.Eventuallyf(t,
 		func() bool {
-			bs.RLock()
-			defer bs.RUnlock()
-
-			if bs.highestSealed != nil {
-				t.Logf("%v waiting for sealed height (%d/%d), last finalized %d", time.Now().UTC(), bs.highestSealed.Header.Height, height, bs.highestFinalized)
+			highestSealed, ok := bs.HighestSealed()
+			if !ok {
+				return false
 			}
-			return bs.highestSealed != nil && bs.highestSealed.Header.Height >= height
+
+			t.Logf("%v waiting for sealed height (%d/%d), last finalized %d", time.Now().UTC(), bs.highestSealed.Header.Height, height, bs.highestFinalized)
+			return highestSealed.Header.Height >= height
 		},
 		blockStateTimeout,
 		100*time.Millisecond,
-		fmt.Sprintf("did not receive sealed block for height (%v) within %v seconds", height, blockStateTimeout))
+		"did not receive sealed block for height (%v) within %v seconds", height, blockStateTimeout)
 
-	bs.RLock()
-	defer bs.RUnlock()
-	return bs.highestSealed
+	highestSealed, ok := bs.HighestSealed()
+	require.True(t, ok)
+	return highestSealed
 }
 
 // WaitForSealedView returns the highest sealed block once the sealed view reaches
 // or exceeds `view`. The returned block may have view equal to or greater than `view`.
 func (bs *BlockState) WaitForSealedView(t *testing.T, view uint64) *flow.Block {
-	require.Eventually(t,
+	require.Eventuallyf(t,
 		func() bool {
-			bs.RLock()
-			defer bs.RUnlock()
-
-			if bs.highestSealed != nil {
-				t.Logf("%v waiting for sealed view (%d/%d), last finalized %d", time.Now().UTC(), bs.highestSealed.Header.Height, view, bs.highestFinalized)
+			highestSealed, ok := bs.HighestSealed()
+			if !ok {
+				return false
 			}
-			return bs.highestSealed != nil && bs.highestSealed.Header.View >= view
+
+			t.Logf("%v waiting for sealed view (%d/%d), last finalized %d", time.Now().UTC(), bs.highestSealed.Header.Height, view, bs.highestFinalized)
+			return highestSealed.Header.View >= view
 		},
 		blockStateTimeout,
 		100*time.Millisecond,
-		fmt.Sprintf("did not receive sealed block for view (%v) within %v seconds", view, blockStateTimeout))
+		"did not receive sealed block for view (%v) within %v seconds", view, blockStateTimeout)
 
-	bs.RLock()
-	defer bs.RUnlock()
-	return bs.highestSealed
+	highestSealed, ok := bs.HighestSealed()
+	require.True(t, ok)
+	return highestSealed
 }
 
 func (bs *BlockState) HighestSealed() (*flow.Block, bool) {
