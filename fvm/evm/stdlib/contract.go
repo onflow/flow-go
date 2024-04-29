@@ -1000,6 +1000,68 @@ func newInternalEVMTypeRunFunction(
 	)
 }
 
+// dry run
+
+const internalEVMTypeDryRunFunctionName = "dryRun"
+
+var internalEVMTypeDryRunFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "tx",
+			TypeAnnotation: sema.NewTypeAnnotation(evmTransactionBytesType),
+		},
+		{
+			Label:          "from",
+			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+		},
+	},
+	// Actually EVM.Result, but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
+}
+
+func newInternalEVMTypeDryRunFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		internalEVMTypeDryRunFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			// Get transaction argument
+
+			transactionValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			transaction, err := interpreter.ByteArrayValueToByteSlice(inter, transactionValue, locationRange)
+			if err != nil {
+				panic(err)
+			}
+
+			// Get from argument
+
+			fromValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			from, err := interpreter.ByteArrayValueToByteSlice(inter, fromValue, locationRange)
+			if err != nil {
+				panic(err)
+			}
+
+			// call estimate
+
+			res := handler.DryRun(transaction, types.NewAddressFromBytes(from))
+			return NewResultValue(handler, gauge, inter, locationRange, res)
+		},
+	)
+}
+
 const internalEVMTypeBatchRunFunctionName = "batchRun"
 
 var internalEVMTypeBatchRunFunctionType = &sema.FunctionType{
@@ -1967,6 +2029,7 @@ func NewInternalEVMContractValue(
 			internalEVMTypeCastToAttoFLOWFunctionName:            newInternalEVMTypeCastToAttoFLOWFunction(gauge, handler),
 			internalEVMTypeCastToFLOWFunctionName:                newInternalEVMTypeCastToFLOWFunction(gauge, handler),
 			internalEVMTypeGetLatestBlockFunctionName:            newInternalEVMTypeGetLatestBlockFunction(gauge, handler),
+			internalEVMTypeDryRunFunctionName:                    newInternalEVMTypeDryRunFunction(gauge, handler),
 		},
 		nil,
 		nil,
@@ -1987,6 +2050,12 @@ var InternalEVMContractType = func() *sema.CompositeType {
 			ty,
 			internalEVMTypeRunFunctionName,
 			internalEVMTypeRunFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeDryRunFunctionName,
+			internalEVMTypeDryRunFunctionType,
 			"",
 		),
 		sema.NewUnmeteredPublicFunctionMember(
