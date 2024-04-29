@@ -37,6 +37,12 @@ type ContractHandler interface {
 	// collects the gas fees, and transfers the gas fees to the given coinbase account.
 	Run(tx []byte, coinbase Address) *ResultSummary
 
+	// DryRun simulates execution of the provided RLP-encoded and unsigned transaction.
+	// Because the transaction is unsigned the from address is required, since
+	// from address is normally derived from the transaction signature.
+	// The function should not have any persisted changes made to the state.
+	DryRun(tx []byte, from Address) *ResultSummary
+
 	// BatchRun runs transaction batch in the evm environment,
 	// collect all the gas fees and transfers the gas fees to the given coinbase account.
 	BatchRun(txs [][]byte, coinbase Address) []*ResultSummary

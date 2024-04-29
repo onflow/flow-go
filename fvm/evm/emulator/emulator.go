@@ -1,6 +1,7 @@
 package emulator
 
 import (
+	"errors"
 	"math/big"
 
 	"github.com/onflow/atree"
@@ -203,6 +204,34 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 	}
 
 	return batchResults, nil
+}
+
+// DryRunTransaction run unsigned transaction without persisting the state
+func (bl *BlockView) DryRunTransaction(
+	tx *gethTypes.Transaction,
+	from gethCommon.Address,
+) (*types.Result, error) {
+	proc, err := bl.newProcedure()
+	if err != nil {
+		return nil, err
+	}
+
+	msg, err := gethCore.TransactionToMessage(
+		tx,
+		GetSigner(bl.config),
+		proc.config.BlockContext.BaseFee,
+	)
+	// we can ignore invalid signature errors since we don't expect signed transctions
+	if !errors.Is(err, gethTypes.ErrInvalidSig) {
+		return nil, err
+	}
+
+	// use the from as the signer
+	proc.evm.TxContext.Origin = from
+	msg.From = from
+
+	// return without commiting the state
+	return proc.run(msg, tx.Hash(), 0, tx.Type())
 }
 
 func (bl *BlockView) newProcedure() (*procedure, error) {
