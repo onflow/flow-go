@@ -227,7 +227,7 @@ func withNextEpoch(
 	nextEpochCommit := &flow.EpochCommit{
 		Counter:            nextEpochSetup.Counter,
 		ClusterQCs:         currEpochCommit.ClusterQCs,
-		DKGParticipantKeys: nextEpochParticipantData.PublicKeys(),
+		DKGParticipantKeys: nextEpochParticipantData.PublicBeaconKeys(),
 		DKGGroupKey:        nextEpochParticipantData.GroupKey,
 	}
 	epochProtocolState.NextEpoch = &flow.EpochStateContainer{
