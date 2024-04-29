@@ -1,6 +1,7 @@
 package emulator
 
 import (
+	"errors"
 	"math/big"
 
 	"github.com/onflow/atree"
@@ -215,13 +216,15 @@ func (bl *BlockView) DryRunTransaction(
 		return nil, err
 	}
 
-	// here we ignore the error because the only reason an error occurs
-	// is if the signature is invalid, which we don't care about since
-	// we use the from address as the signer
-	msg, _ := gethCore.TransactionToMessage(
+	msg, err := gethCore.TransactionToMessage(
 		tx,
 		GetSigner(bl.config),
-		proc.config.BlockContext.BaseFee)
+		proc.config.BlockContext.BaseFee,
+	)
+	// we can ignore invalid signature errors since we don't expect signed transctions
+	if !errors.Is(err, gethTypes.ErrInvalidSig) {
+		return nil, err
+	}
 
 	// use the from as the signer
 	proc.evm.TxContext.Origin = from
