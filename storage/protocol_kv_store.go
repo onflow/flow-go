@@ -17,9 +17,10 @@ type KeyValueStoreData struct {
 }
 
 // ProtocolKVStore persists different snapshots of key-value stores [KV-stores]. At this level, the API
-// deals with versioned data blobs, each representing a Snapshot of the Protocol State. Utilizing this API,
-// we can read legacy snapshots from the database (e.g. to answer external API calls) even for protocol state
-// versions that the node software does not support anymore.
+// deals with versioned data blobs, each representing a Snapshot of the Protocol State. The *current*
+// implementation allows to retrieve snapshots from the database (e.g. to answer external API calls) even
+// for legacy protocol states whose versions are not support anymore. However, this _may_ change in the
+// future, where only versioned snapshots can be retrieved that are also supported by the current software.
 // TODO maybe rename to `ProtocolStateSnapshots` (?) because at this low level, we are not exposing the KV-store, it is just an encoded data blob
 type ProtocolKVStore interface {
 	// StoreTx returns an anonymous function (intended to be executed as part of a badger transaction),

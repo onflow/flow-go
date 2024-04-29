@@ -12,8 +12,7 @@ import (
 //
 // At the abstraction level here, we can only handle protocol state snapshots, whose data models are
 // supported by the current software version. There might be serialized snapshots with legacy versions
-// in the database, that are not supported anymore by this software version and can only be retrieved
-// as versioned binary blobs via `storage.ProtocolKVStore`.
+// in the database that are not supported anymore by this software version.
 type ProtocolKVStore interface {
 	// StoreTx returns an anonymous function (intended to be executed as part of a database transaction),
 	// which persists the given KV-store snapshot as part of a DB tx. Per convention, all implementations
@@ -42,7 +41,7 @@ type ProtocolKVStore interface {
 	// ByID retrieves the KV store snapshot with the given ID.
 	// Expected errors during normal operations:
 	//   - storage.ErrNotFound if no snapshot with the given Identifier is known.
-	//   - ErrUnsupportedVersion if input version is not supported
+	//   - kvstore.ErrUnsupportedVersion if the version of the stored snapshot not supported by this implementation
 	ByID(id flow.Identifier) (KVStoreAPI, error)
 
 	// ByBlockID retrieves the kv-store snapshot that the block with the given ID proposes.
@@ -57,6 +56,6 @@ type ProtocolKVStore interface {
 	//
 	// Expected errors during normal operations:
 	//   - storage.ErrNotFound if no snapshot has been indexed for the given block.
-	//   - ErrUnsupportedVersion if input version is not supported
+	//   - kvstore.ErrUnsupportedVersion if the version of the stored snapshot not supported by this implementation
 	ByBlockID(blockID flow.Identifier) (KVStoreAPI, error)
 }
