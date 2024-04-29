@@ -96,11 +96,6 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 		return nil, fmt.Errorf("storage health check failed: %w", err)
 	}
 
-	m.log.Warn().
-		Err(err).
-		Str("account", address.Hex()).
-		Msg("filtering unreferenced root slabs")
-
 	// Create a set of unreferenced slabs: root slabs, and all slabs they reference.
 
 	unreferencedSlabIDs := map[atree.SlabID]struct{}{}
@@ -128,6 +123,10 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 
 	filteredPayloads := make([]*ledger.Payload, 0, len(unreferencedSlabIDs))
 
+	m.log.Warn().
+		Str("account", address.Hex()).
+		Msgf("filtering %d unreferenced slabs", len(unreferencedSlabIDs))
+
 	for _, payload := range oldPayloads {
 		registerID, _, err := convert.PayloadToRegister(payload)
 		if err != nil {
@@ -147,7 +146,7 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 	}
 
 	m.rw.Write(unreferencedSlabs{
-		Account:      address,
+		Account:      address.Hex(),
 		PayloadCount: len(filteredPayloads),
 	})
 
@@ -210,6 +209,6 @@ func (m *FilterUnreferencedSlabsMigration) writeFilteredPayloads() error {
 }
 
 type unreferencedSlabs struct {
-	Account      common.Address `json:"account"`
-	PayloadCount int            `json:"payload_count"`
+	Account      string `json:"account"`
+	PayloadCount int    `json:"payload_count"`
 }

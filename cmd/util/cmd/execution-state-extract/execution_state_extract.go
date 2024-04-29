@@ -376,6 +376,7 @@ func newMigrations(
 			accountBasedMigrations = append(
 				accountBasedMigrations,
 				migrators.NewFixBrokenReferencesInSlabsMigration(
+					outputDir,
 					rwf,
 					migrators.TestnetAccountsWithBrokenSlabReferences,
 				),
