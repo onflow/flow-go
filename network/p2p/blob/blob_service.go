@@ -38,8 +38,7 @@ import (
 
 const (
 	// DefaultReprovideInterval is the default interval at which DHT provider entries are refreshed
-	// Disabled by default
-	DefaultReprovideInterval = -1
+	DefaultReprovideInterval = 12 * time.Hour
 )
 
 type blobService struct {

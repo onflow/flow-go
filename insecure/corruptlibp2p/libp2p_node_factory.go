@@ -76,7 +76,7 @@ func InitCorruptLibp2pNode(
 		Metrics:          metricsCfg,
 	}
 
-	dhtActivationStatus, err := cmd.DhtSystemActivationStatus(role)
+	dhtActivationStatus, err := cmd.DhtSystemActivationStatus(role, true)
 	if err != nil {
 		return nil, fmt.Errorf("could not get dht system activation status: %w", err)
 	}

@@ -35,12 +35,14 @@ import (
 	gossipsubbuilder "github.com/onflow/flow-go/network/p2p/builder/gossipsub"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	p2pnode "github.com/onflow/flow-go/network/p2p/node"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/stream"
 	"github.com/onflow/flow-go/network/p2p/utils"
 )
@@ -437,7 +439,9 @@ func DefaultNodeBuilder(
 		idProvider,
 		rCfg, peerManagerCfg,
 		disallowListCacheCfg,
-		uniCfg).
+		uniCfg)
+
+	builder.
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater)
@@ -449,16 +453,28 @@ func DefaultNodeBuilder(
 		}
 		builder.SetSubscriptionFilter(subscription.NewRoleBasedFilter(r, idProvider))
 
-		if dhtSystemActivation == DhtSystemEnabled {
-			builder.SetRoutingSystem(
-				func(ctx context.Context, host host.Host) (routing.Routing, error) {
-					// bitswap requires a content routing system. this returns a stub instead of a
-					// full DHT since the DHT adds a non-trivial amount of overhead but provides
-					// limited value on the staked network.
-					return none.ConstructNilRouting(ctx, host, nil, nil)
-				})
-		}
+		builder.configureRoutingSystem(r, dhtSystemActivation)
 	}
 
 	return builder, nil
+}
+
+func (b *LibP2PNodeBuilder) configureRoutingSystem(
+	role flow.Role,
+	dhtSystemActivation DhtSystemActivation,
+) {
+	if role != flow.RoleAccess && role != flow.RoleExecution {
+		return // routing only required for Access and Execution nodes
+	}
+
+	if dhtSystemActivation == DhtSystemEnabled {
+		b.SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
+			return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(b.sporkId), b.logger, b.metricsConfig.Metrics, dht.AsServer())
+		})
+	}
+
+	// bitswap requires a content routing system. this returns a stub instead of a full DHT
+	b.SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
+		return none.ConstructNilRouting(ctx, host, nil, nil)
+	})
 }
