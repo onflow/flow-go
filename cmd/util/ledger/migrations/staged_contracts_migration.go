@@ -239,7 +239,17 @@ func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads
 	inter := mr.Interpreter
 	locationRange := interpreter.EmptyLocationRange
 
-	storageMap := mr.Storage.GetStorageMap(stagingAccountAddress, common.PathDomainStorage.Identifier(), false)
+	storageMap := mr.Storage.GetStorageMap(
+		stagingAccountAddress,
+		common.PathDomainStorage.Identifier(),
+		false,
+	)
+	if storageMap == nil {
+		m.log.Error().
+			Msgf("failed to get staged contracts from account %s", stagingAccount)
+		return nil
+	}
+
 	iterator := storageMap.Iterator(inter)
 
 	stagedContractCapsuleStaticType := interpreter.NewCompositeStaticTypeComputeTypeID(
