@@ -751,7 +751,7 @@ func (fnb *FlowNodeBuilder) ParseAndPrintFlags() error {
 		fnb.Logger.Fatal().Err(err).Msg("flow configuration validation failed")
 	}
 
-	info := fnb.Logger.Info()
+	info := fnb.Logger.Error()
 
 	noPrint := config.LogConfig(info, fnb.flags)
 	fnb.flags.VisitAll(func(flag *pflag.Flag) {
@@ -759,7 +759,7 @@ func (fnb *FlowNodeBuilder) ParseAndPrintFlags() error {
 			info.Str(flag.Name, fmt.Sprintf("%v", flag.Value))
 		}
 	})
-	info.Msg("configuration loaded")
+	info.Msg("configuration loaded (logged as error for visibility)")
 	return fnb.extraFlagsValidation()
 }
 
