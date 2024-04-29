@@ -1229,6 +1229,64 @@ func TestCoreContractUsage(t *testing.T) {
 		require.Equal(t, expected, actual)
 	})
 
+	t.Run("&NonFungibleToken.Provider => auth(Withdraw | Owner) &{NonFungibleToken.Provider}", func(t *testing.T) {
+		t.Parallel()
+
+		systemContracts := systemcontracts.SystemContractsForChain(chainID)
+
+		const nonFungibleTokenContractName = "NonFungibleToken"
+		nonFungibleTokenContractLocation := common.NewAddressLocation(
+			nil,
+			common.Address(systemContracts.NonFungibleToken.Address),
+			nonFungibleTokenContractName,
+		)
+
+		const nonFungibleTokenProviderTypeQualifiedIdentifier = nonFungibleTokenContractName + ".Provider"
+
+		input := interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.UnauthorizedAccess,
+			interpreter.NewInterfaceStaticType(
+				nil,
+				nonFungibleTokenContractLocation,
+				nonFungibleTokenProviderTypeQualifiedIdentifier,
+				nonFungibleTokenContractLocation.TypeID(nil, nonFungibleTokenProviderTypeQualifiedIdentifier),
+			),
+		)
+
+		const nonFungibleTokenWithdrawTypeQualifiedIdentifier = nonFungibleTokenContractName + ".Withdraw"
+		const nonFungibleTokenOwnerTypeQualifiedIdentifier = nonFungibleTokenContractName + ".Owner"
+		expected := interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.NewEntitlementSetAuthorization(
+				nil,
+				func() []common.TypeID {
+					return []common.TypeID{
+						nonFungibleTokenContractLocation.TypeID(nil, nonFungibleTokenWithdrawTypeQualifiedIdentifier),
+						nonFungibleTokenContractLocation.TypeID(nil, nonFungibleTokenOwnerTypeQualifiedIdentifier),
+					}
+				},
+				2,
+				sema.Disjunction,
+			),
+			interpreter.NewIntersectionStaticType(
+				nil,
+				[]*interpreter.InterfaceStaticType{
+					interpreter.NewInterfaceStaticType(
+						nil,
+						nonFungibleTokenContractLocation,
+						nonFungibleTokenProviderTypeQualifiedIdentifier,
+						nonFungibleTokenContractLocation.TypeID(nil, nonFungibleTokenProviderTypeQualifiedIdentifier),
+					),
+				},
+			),
+		)
+
+		actual := migrate(t, input)
+
+		require.Equal(t, expected, actual)
+	})
+
 	t.Run("&NonFungibleToken.Collection{NonFungibleToken.CollectionPublic} => &{NonFungibleToken.Collection}", func(t *testing.T) {
 		t.Parallel()
 
