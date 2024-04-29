@@ -423,7 +423,7 @@ func NewCadence1Migrations(
 		if opts.FixSlabsWithBrokenReferences {
 			accountBasedMigrations = append(
 				accountBasedMigrations,
-				NewFixBrokenReferencesInSlabsMigration(rwf, testnetAccountsWithBrokenSlabReferences),
+				NewFixBrokenReferencesInSlabsMigration(outputDir, rwf, testnetAccountsWithBrokenSlabReferences),
 			)
 		}
 
