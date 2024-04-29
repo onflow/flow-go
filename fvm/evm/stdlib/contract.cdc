@@ -6,6 +6,54 @@ import "FlowToken"
 access(all)
 contract EVM {
 
+    /// Block executed event is emitted when a new block is created,
+    /// which always happens when a transaction is executed.
+    access(all)
+    event BlockExecuted(
+        // height or number of the block
+        height: UInt64
+        // hash of the block
+        hash: String
+        // timestamp of the block creation
+        timestamp: UInt64
+        // total Flow supply
+        totalSupply: Int
+        // all gas used in the block by transactions included
+        totalGasUsed: UInt64
+        // parent block hash
+        parentHash: String
+        // hash of all the transaction receipts
+        receiptRoot: String
+        // all the transactions included in the block
+        transactionHashes: [String]
+    )
+
+    /// Transaction executed event is emitted everytime a transaction
+    /// is executed by the EVM (even if failed).
+    access(all)
+    event TransactionExecuted(
+        // hash of the transaction
+        hash: String,
+        // index of the transaction in a block
+        index: UInt16,
+        // type of the transaction
+        type: UInt8,
+        // RLP and hex encoded transaction payload
+        payload: String,
+        // code indicating a specific validation (201-300) or execution (301-400) error
+        errorCode: UInt16,
+        // the amount of gas transaction used
+        gasConsumed: UInt64,
+        // if transaction was a deployment contains a newly deployed contract address
+        contractAddress: String,
+        // RLP and hex encoded logs
+        logs: String,
+        // block height in which transaction was inclued
+        blockHeight: UInt64,
+        // block hash in which transaction was included
+        blockHash: String
+    )
+
     access(all)
     event CadenceOwnedAccountCreated(addressBytes: [UInt8; 20])
 
