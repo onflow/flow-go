@@ -103,7 +103,12 @@ func (segment *SealingSegment) AllBlocks() []*Block {
 }
 
 // IsSporkRoot returns true if this SealingSegment represents a spork root snapshot.
-// Spork root blocks are uniquely self-sealing, and form a sealing segment of length 1.
+// The Flow protocol explicitly defines a spork root block (incl. also the network's
+// genesis block) to be finalized and sealed and to have a specific execution state
+// commitment attached. Mathematically, this is a protocol axiom, as no block exists
+// that contains an execution result or seal for the spork root block (nor any children
+// at the time of the spork that could possibly finalize the root block).
+// Therefore, a spork root block is a degenerate sealing segment with a length of 1.
 func (segment *SealingSegment) IsSporkRoot() bool {
 	return len(segment.Blocks) == 1
 }
