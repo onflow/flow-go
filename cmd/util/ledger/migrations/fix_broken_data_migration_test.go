@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
 )
 
@@ -102,6 +103,12 @@ func TestFixSlabsWithBrokenReferences(t *testing.T) {
 	}
 
 	slabIndexWithBrokenReferences := mustDecodeHex("240000000000000003")
+
+	slabWithBrokenReferences := ledger.NewPayload(
+		ledger.NewKey([]ledger.KeyPart{ownerKey, {Type: 2, Value: slabIndexWithBrokenReferences}}),
+		ledger.Value(mustDecodeHex("00c883d8d982d8d582d8c0824848602d8056ff9d937046616e546f705065726d697373696f6e7546616e546f705065726d697373696f6e2e526f6c65d8ddf6011b535c9de83a38cab000c883005b000000000000000856c1dcdf34d761b79b000000000000000182d8ff500000000000000000000000000000002dd8c983d8834848602d8056ff9d93d8c882026b46616e546f7041646d696ed8db82f4d8d582d8c0824848602d8056ff9d937046616e546f705065726d697373696f6e7646616e546f705065726d697373696f6e2e41646d696e")),
+	)
+
 	fixedSlabWithBrokenReferences := ledger.NewPayload(
 		ledger.NewKey([]ledger.KeyPart{ownerKey, {Type: 2, Value: slabIndexWithBrokenReferences}}),
 		ledger.Value(mustDecodeHex("108883d8d982d8d582d8c0824848602d8056ff9d937046616e546f705065726d697373696f6e7546616e546f705065726d697373696f6e2e526f6c65d8ddf6001b535c9de83a38cab08300590000990000")),
@@ -136,12 +143,10 @@ func TestFixSlabsWithBrokenReferences(t *testing.T) {
 		address: struct{}{},
 	}
 
-	migration := NewFixBrokenReferencesInSlabsMigration(rwf, accountsToFix)
+	migration := NewFixBrokenReferencesInSlabsMigration(t.TempDir(), rwf, accountsToFix)
 
 	err := migration.InitMigration(log, nil, runtime.NumCPU())
 	require.NoError(t, err)
-
-	defer migration.Close()
 
 	newPayloads, err := migration.MigrateAccount(
 		context.Background(),
@@ -149,6 +154,10 @@ func TestFixSlabsWithBrokenReferences(t *testing.T) {
 		oldPayloads,
 	)
 	require.NoError(t, err)
+
+	err = migration.Close()
+	require.NoError(t, err)
+
 	require.Equal(t, len(expectedNewPayloads), len(newPayloads))
 
 	for _, expected := range expectedNewPayloads {
@@ -170,12 +179,18 @@ func TestFixSlabsWithBrokenReferences(t *testing.T) {
 	assert.Equal(t,
 		[]any{
 			fixedSlabsWithBrokenReferences{
-				Account:  address,
-				Payloads: []*ledger.Payload{fixedSlabWithBrokenReferences},
+				Account:        address.Hex(),
+				BrokenPayloads: []*ledger.Payload{slabWithBrokenReferences},
+				FixedPayloads:  []*ledger.Payload{fixedSlabWithBrokenReferences},
 			},
 		},
 		writer.entries,
 	)
+
+	readIsPartial, readBrokenPayloads, err := util.ReadPayloadFile(log, migration.payloadsFile)
+	require.NoError(t, err)
+	assert.True(t, readIsPartial)
+	assert.Equal(t, []*ledger.Payload{slabWithBrokenReferences}, readBrokenPayloads)
 }
 
 func mustDecodeHex(s string) []byte {
