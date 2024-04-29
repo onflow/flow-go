@@ -613,7 +613,7 @@ func bootstrapSporkInfo(root protocol.Snapshot) func(*transaction.Tx) error {
 func indexEpochHeights(segment *flow.SealingSegment) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// CASE 1: For spork root snapshots, there is exactly one block B and one epoch E.
-		// Index `E.counter => B.Height`.
+		// Index `E.counter → B.Height`.
 		if segment.IsSporkRoot() {
 			counter := segment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
 			firstHeight := segment.Highest().Header.Height
@@ -627,7 +627,7 @@ func indexEpochHeights(segment *flow.SealingSegment) func(*badger.Txn) error {
 		// CASE 2: For all other snapshots, there is a segment of blocks which may span several epochs.
 		// We traverse all blocks in the segment in ascending height order.
 		// If we find two consecutive blocks B1, B2 so that `B1.EpochCounter` != `B2.EpochCounter`,
-		// then index`B2.EpochCounter => B2.Height`.
+		// then index `B2.EpochCounter → B2.Height`.
 		allBlocks := segment.AllBlocks()
 		lastBlock := allBlocks[0]
 		lastBlockEpochCounter := segment.ProtocolStateEntries[lastBlock.Payload.ProtocolStateID].EpochEntry.EpochCounter()
