@@ -99,6 +99,8 @@ type Engine struct {
 	collectionExecutedMetric module.CollectionExecutedMetric
 }
 
+var _ network.MessageProcessor = (*Engine)(nil)
+
 // New creates a new access ingestion engine
 //
 // No errors are expected during normal operation.
@@ -385,11 +387,6 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
-}
-
-// ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.process(e.me.NodeID(), event)
 }
 
 // Process processes the given event from the node with the given origin ID in

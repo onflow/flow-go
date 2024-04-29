@@ -1080,7 +1080,7 @@ func (suite *Suite) TestExecuteScript() {
 		executionReceipts := unittest.ReceiptsForBlockFixture(lastBlock, identities.NodeIDs())
 		// notify the ingest engine about the receipts
 		for _, r := range executionReceipts {
-			err = ingestEng.ProcessLocal(r)
+			err = ingestEng.Process(channels.ReceiveReceipts, unittest.IdentifierFixture(), r)
 			require.NoError(suite.T(), err)
 		}
 
@@ -1093,7 +1093,7 @@ func (suite *Suite) TestExecuteScript() {
 		executionReceipts = unittest.ReceiptsForBlockFixture(prevBlock, identities.NodeIDs())
 		// notify the ingest engine about the receipts
 		for _, r := range executionReceipts {
-			err = ingestEng.ProcessLocal(r)
+			err = ingestEng.Process(channels.ReceiveReceipts, unittest.IdentifierFixture(), r)
 			require.NoError(suite.T(), err)
 		}
 
