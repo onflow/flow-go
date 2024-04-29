@@ -80,7 +80,7 @@ func (s Snapshot) RandomSource() ([]byte, error) {
 
 func (s Snapshot) Epochs() protocol.EpochQuery {
 	return Epochs{
-		entry: s.enc.SealingSegment.LatestProtocolStateEntry().EpochEntry,
+		entry: *s.enc.SealingSegment.LatestProtocolStateEntry().EpochEntry,
 	}
 }
 

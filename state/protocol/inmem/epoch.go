@@ -14,7 +14,7 @@ import (
 
 // Epochs provides access to epoch data, backed by a rich protocol state entry.
 type Epochs struct {
-	entry *flow.RichProtocolStateEntry
+	entry flow.RichProtocolStateEntry
 }
 
 var _ protocol.EpochQuery = (*Epochs)(nil)
