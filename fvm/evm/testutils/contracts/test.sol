@@ -5,13 +5,19 @@ pragma solidity >=0.7.0 <0.9.0;
 contract Storage {
 
     address constant public cadenceArch = 0x0000000000000000000000010000000000000001;
-    
+    event NewStore(address indexed caller, uint256 indexed value);
+
     uint256 number;
 
     constructor() payable {
     }
 
     function store(uint256 num) public {
+        number = num;
+    }
+
+    function storeWithLog(uint256 num) public {
+        emit NewStore(msg.sender, num);
         number = num;
     }
 
