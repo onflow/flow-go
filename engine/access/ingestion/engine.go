@@ -138,6 +138,8 @@ func New(
 		},
 	)
 
+	collectionExecutedMetric.UpdateLastFullBlockHeight(lastFullBlockHeight.Value())
+
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		log:                      log.With().Str("engine", "ingestion").Logger(),

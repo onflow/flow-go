@@ -1568,7 +1568,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return fmt.Errorf("failed to initialize monotonic consumer progress: %w", err)
 			}
 
-			builder.collectionExecutedMetric.UpdateLastFullBlockHeight(rootBlockHeight)
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
