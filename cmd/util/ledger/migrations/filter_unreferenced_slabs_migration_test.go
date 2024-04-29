@@ -183,7 +183,7 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 	assert.Equal(t,
 		[]any{
 			unreferencedSlabs{
-				Account:      testAddress,
+				Account:      testAddress.Hex(),
 				PayloadCount: len(expectedFilteredPayloads),
 			},
 		},
