@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+
 	sdk "github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/flow-go/integration/utils"
