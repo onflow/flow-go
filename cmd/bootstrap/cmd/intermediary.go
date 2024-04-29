@@ -22,7 +22,8 @@ type IntermediaryParamsData struct {
 	EpochCommitSafetyThreshold uint64
 }
 
-// IntermediaryEpochData stores the root epoch and the epoch config for the execution state.
+// IntermediaryEpochData stores the root epoch and the epoch config for the execution state
+// and to bootstrap the Protocol State.
 // This is used to pass data between the rootblock command and the finalize command.
 type IntermediaryEpochData struct {
 	ExecutionStateConfig epochs.EpochConfig
