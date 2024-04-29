@@ -406,6 +406,18 @@ contract EVM {
         return runResult
     }
 
+    /// Simulates running unsigned RLP-encoded transaction using
+    /// the from address as the signer.
+    /// The transaction state changes are not persisted.
+    /// This is useful for gas estimation or calling view contract functions.
+    access(all)
+    fun dryRun(tx: [UInt8], from: EVMAddress): Result {
+        return InternalEVM.dryRun(
+            tx: tx,
+            from: from.bytes,
+        ) as! Result
+    }
+
     /// Runs a batch of RLP-encoded EVM transactions, deducts the gas fees,
     /// and deposits the gas fees into the provided coinbase address.
     /// An invalid transaction is not executed and not included in the block.
