@@ -405,7 +405,8 @@ func (h *ContractHandler) meterGasUsage(res *types.Result) error {
 }
 
 func (h *ContractHandler) emitEvent(event *types.Event) error {
-	ev, err := event.Payload.ToCadence()
+	location := common.NewAddressLocation(nil, common.Address(h.evmContractAddress), "EVM")
+	ev, err := event.Payload.ToCadence(location)
 	if err != nil {
 		return err
 	}

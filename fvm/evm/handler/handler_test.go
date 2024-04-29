@@ -122,6 +122,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 
 					// check block event
 					event = events[1]
+
 					assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
 					ev, err = jsoncdc.Decode(nil, event.Payload)
 					require.NoError(t, err)
@@ -129,20 +130,12 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					// make sure block transaction list references the above transaction id
 					cadenceEvent, ok = ev.(cadence.Event)
 					require.True(t, ok)
-
-					for j, f := range cadenceEvent.GetFields() {
-						if f.Identifier == "transactionHashes" {
-							txsRaw := cadenceEvent.GetFieldValues()[j]
-							txs, ok := txsRaw.(cadence.Array)
-							require.True(t, ok)
-							// we know there's only one tx for now in block
-							eventTxID := txs.Values[0].ToGoValue().(string)
-							// make sure the transaction id included in the block transaction list is the same as tx sumbmitted
-							assert.Equal(t, evmTx.Hash().String(), eventTxID)
-						}
-					}
-
+					blockEvent, err := types.DecodeBlockEventPayload(cadenceEvent)
 					require.NoError(t, err)
+
+					eventTxID := blockEvent.TransactionHashes[0] // only one hash in block
+					// make sure the transaction id included in the block transaction list is the same as tx sumbmitted
+					assert.Equal(t, evmTx.Hash().String(), eventTxID.ToGoValue())
 				})
 			})
 		})
