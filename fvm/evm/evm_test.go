@@ -3,6 +3,7 @@ package evm_test
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/onflow/cadence/runtime/common"
 	"math/big"
 	"testing"
 
@@ -102,11 +103,11 @@ func TestEVMRun(t *testing.T) {
 
 				blockEvent := output.Events[1]
 
-				assert.Equal(t, fmt.Sprintf(
-					"A.%s.%s",
-					sc.EVMContract.Address.String(),
-					types.EventTypeBlockExecuted,
-				), string(blockEvent.Type))
+				assert.Equal(
+					t,
+					common.NewAddressLocation(nil, common.Address(sc.EVMContract.Address), string(types.EventTypeBlockExecuted)).ID(),
+					string(blockEvent.Type),
+				)
 
 				ev, err := ccf.Decode(nil, blockEvent.Payload)
 				require.NoError(t, err)
@@ -119,11 +120,11 @@ func TestEVMRun(t *testing.T) {
 
 				txEvent := output.Events[0]
 
-				assert.Equal(t, fmt.Sprintf(
-					"A.%s.%s",
-					sc.EVMContract.Address.String(),
-					types.EventTypeTransactionExecuted,
-				), string(txEvent.Type))
+				assert.Equal(
+					t,
+					common.NewAddressLocation(nil, common.Address(sc.EVMContract.Address), string(types.EventTypeTransactionExecuted)).ID(),
+					string(txEvent.Type),
+				)
 
 				ev, err = ccf.Decode(nil, txEvent.Payload)
 				require.NoError(t, err)
