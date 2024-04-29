@@ -1,9 +1,15 @@
 package evm_test
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"testing"
+
+	"github.com/onflow/cadence/encoding/ccf"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	"github.com/onflow/go-ethereum/rlp"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
@@ -90,6 +96,16 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 				require.NotEmpty(t, state.WriteSet)
+
+				txEvent := output.Events[0]
+				ev, err := ccf.Decode(nil, txEvent.Payload)
+				require.NoError(t, err)
+				cadenceEvent, ok := ev.(cadence.Event)
+				require.True(t, ok)
+
+				event, err := types.DecodeTransactionEventPayload(cadenceEvent)
+				require.NoError(t, err)
+				require.NotEmpty(t, event.Hash)
 
 				// append the state
 				snapshot = snapshot.Append(state)
@@ -252,6 +268,530 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 				require.Equal(t, int64(0), new(big.Int).SetBytes(res.ReturnedValue).Int64())
+			})
+	})
+
+	t.Run("testing EVM.run (with event emitted)", func(t *testing.T) {
+		t.Parallel()
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: AuthAccount) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let res = EVM.run(tx: tx, coinbase: coinbase)
+
+							assert(res.status == EVM.Status.successful, message: "unexpected status")
+							assert(res.errorCode == 0, message: "unexpected error code")
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				num := int64(12)
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "storeWithLog", big.NewInt(num)),
+					big.NewInt(0),
+					uint64(100_000),
+					big.NewInt(0),
+				)
+
+				innerTx := cadence.NewArray(
+					ConvertToCadence(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					ConvertToCadence(testAccount.Address().Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				tx := fvm.Transaction(
+					flow.NewTransactionBody().
+						SetScript(code).
+						AddAuthorizer(sc.FlowServiceAccount.Address).
+						AddArgument(json.MustEncode(innerTx)).
+						AddArgument(json.MustEncode(coinbase)),
+					0)
+
+				state, output, err := vm.Run(
+					ctx,
+					tx,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				require.NotEmpty(t, state.WriteSet)
+
+				txEvent := output.Events[0]
+				ev, err := ccf.Decode(nil, txEvent.Payload)
+				require.NoError(t, err)
+				cadenceEvent, ok := ev.(cadence.Event)
+				require.True(t, ok)
+
+				event, err := types.DecodeTransactionEventPayload(cadenceEvent)
+				require.NoError(t, err)
+				require.NotEmpty(t, event.Hash)
+
+				encodedLogs, err := hex.DecodeString(event.Logs)
+				require.NoError(t, err)
+
+				var logs []*gethTypes.Log
+				err = rlp.DecodeBytes(encodedLogs, &logs)
+				require.NoError(t, err)
+				require.Len(t, logs, 1)
+				log := logs[0]
+				last := log.Topics[len(log.Topics)-1] // last topic is the value set in the store method
+				assert.Equal(t, num, last.Big().Int64())
+			})
+	})
+}
+
+func TestEVMBatchRun(t *testing.T) {
+	chain := flow.Emulator.Chain()
+
+	// run a batch of valid transactions which update a value on the contract
+	// after the batch is run check that the value updated on the contract matches
+	// the last transaction update in the batch.
+	t.Run("Batch run multiple valid transactions", func(t *testing.T) {
+		t.Parallel()
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				batchRunCode := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(txs: [[UInt8]], coinbaseBytes: [UInt8; 20]) {
+						prepare(account: AuthAccount) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let batchResults = EVM.batchRun(txs: txs, coinbase: coinbase)
+							
+							assert(batchResults.length == txs.length, message: "invalid result length")
+							for res in batchResults {
+								assert(res.status == EVM.Status.successful, message: "unexpected status")
+								assert(res.errorCode == 0, message: "unexpected error code")
+							}
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				batchCount := 5
+				var storedValues []int64
+				txBytes := make([]cadence.Value, batchCount)
+				for i := 0; i < batchCount; i++ {
+					num := int64(i)
+					storedValues = append(storedValues, num)
+					// prepare batch of transaction payloads
+					tx := testAccount.PrepareSignAndEncodeTx(t,
+						testContract.DeployedAt.ToCommon(),
+						testContract.MakeCallData(t, "storeWithLog", big.NewInt(num)),
+						big.NewInt(0),
+						uint64(100_000),
+						big.NewInt(0),
+					)
+
+					// build txs argument
+					txBytes[i] = cadence.NewArray(
+						ConvertToCadence(tx),
+					).WithType(stdlib.EVMTransactionBytesCadenceType)
+				}
+
+				coinbase := cadence.NewArray(
+					ConvertToCadence(testAccount.Address().Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				txs := cadence.NewArray(txBytes).
+					WithType(cadence.NewVariableSizedArrayType(
+						stdlib.EVMTransactionBytesCadenceType,
+					))
+
+				tx := fvm.Transaction(
+					flow.NewTransactionBody().
+						SetScript(batchRunCode).
+						AddAuthorizer(sc.FlowServiceAccount.Address).
+						AddArgument(json.MustEncode(txs)).
+						AddArgument(json.MustEncode(coinbase)),
+					0)
+
+				state, output, err := vm.Run(ctx, tx, snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				require.NotEmpty(t, state.WriteSet)
+
+				require.Len(t, output.Events, batchCount+1) // +1 block executed
+				for i, event := range output.Events {
+					if i == batchCount { // last one is block executed
+						continue
+					}
+
+					ev, err := ccf.Decode(nil, event.Payload)
+					require.NoError(t, err)
+					cadenceEvent, ok := ev.(cadence.Event)
+					require.True(t, ok)
+
+					event, err := types.DecodeTransactionEventPayload(cadenceEvent)
+					require.NoError(t, err)
+
+					encodedLogs, err := hex.DecodeString(event.Logs)
+					require.NoError(t, err)
+
+					var logs []*gethTypes.Log
+					err = rlp.DecodeBytes(encodedLogs, &logs)
+					require.NoError(t, err)
+
+					require.Len(t, logs, 1)
+
+					log := logs[0]
+					last := log.Topics[len(log.Topics)-1] // last topic is the value set in the store method
+					assert.Equal(t, storedValues[i], last.Big().Int64())
+				}
+
+				// append the state
+				snapshot = snapshot.Append(state)
+
+				// retrieve the values
+				retrieveCode := []byte(fmt.Sprintf(
+					`
+						import EVM from %s
+						access(all)
+						fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							return EVM.run(tx: tx, coinbase: coinbase)
+						}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "retrieve"),
+					big.NewInt(0),
+					uint64(100_000),
+					big.NewInt(0),
+				)
+
+				innerTx := cadence.NewArray(
+					ConvertToCadence(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				script := fvm.Script(retrieveCode).WithArguments(
+					json.MustEncode(innerTx),
+					json.MustEncode(coinbase),
+				)
+
+				_, output, err = vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				// make sure the retrieved value is the same as the last value
+				// that was stored by transaction batch
+				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+				require.Equal(t, types.StatusSuccessful, res.Status)
+				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				require.Equal(t, storedValues[len(storedValues)-1], new(big.Int).SetBytes(res.ReturnedValue).Int64())
+			})
+	})
+
+	// run batch with one invalid transaction that has an invalid nonce
+	// this should produce invalid result on that specific transaction
+	// but other transaction should successfuly update the value on the contract
+	t.Run("Batch run with one invalid transaction", func(t *testing.T) {
+		t.Parallel()
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				// we make transaction at specific index invalid to fail
+				const failedTxIndex = 3
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				batchRunCode := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(txs: [[UInt8]], coinbaseBytes: [UInt8; 20]) {
+						prepare(account: AuthAccount) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let batchResults = EVM.batchRun(txs: txs, coinbase: coinbase)
+							
+							assert(batchResults.length == txs.length, message: "invalid result length")
+							for i, res in batchResults {
+								if i != %d {
+									assert(res.status == EVM.Status.successful, message: "unexpected status")
+									assert(res.errorCode == 0, message: "unexpected error code")
+								} else {
+									assert(res.status == EVM.Status.invalid, message: "unexpected status")
+									assert(res.errorCode == 201, message: "unexpected error code")
+								}
+							}
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+					failedTxIndex,
+				))
+
+				batchCount := 5
+				var num int64
+				txBytes := make([]cadence.Value, batchCount)
+				for i := 0; i < batchCount; i++ {
+					num = int64(i)
+
+					if i == failedTxIndex {
+						// make one transaction in the batch have an invalid nonce
+						testAccount.SetNonce(testAccount.Nonce() - 1)
+					}
+					// prepare batch of transaction payloads
+					tx := testAccount.PrepareSignAndEncodeTx(t,
+						testContract.DeployedAt.ToCommon(),
+						testContract.MakeCallData(t, "store", big.NewInt(num)),
+						big.NewInt(0),
+						uint64(100_000),
+						big.NewInt(0),
+					)
+
+					// build txs argument
+					txBytes[i] = cadence.NewArray(
+						ConvertToCadence(tx),
+					).WithType(stdlib.EVMTransactionBytesCadenceType)
+				}
+
+				coinbase := cadence.NewArray(
+					ConvertToCadence(testAccount.Address().Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				txs := cadence.NewArray(txBytes).
+					WithType(cadence.NewVariableSizedArrayType(
+						stdlib.EVMTransactionBytesCadenceType,
+					))
+
+				tx := fvm.Transaction(
+					flow.NewTransactionBody().
+						SetScript(batchRunCode).
+						AddAuthorizer(sc.FlowServiceAccount.Address).
+						AddArgument(json.MustEncode(txs)).
+						AddArgument(json.MustEncode(coinbase)),
+					0)
+
+				state, output, err := vm.Run(ctx, tx, snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				require.NotEmpty(t, state.WriteSet)
+
+				// append the state
+				snapshot = snapshot.Append(state)
+
+				// retrieve the values
+				retrieveCode := []byte(fmt.Sprintf(
+					`
+						import EVM from %s
+						access(all)
+						fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							return EVM.run(tx: tx, coinbase: coinbase)
+						}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "retrieve"),
+					big.NewInt(0),
+					uint64(100_000),
+					big.NewInt(0),
+				)
+
+				innerTx := cadence.NewArray(
+					ConvertToCadence(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				script := fvm.Script(retrieveCode).WithArguments(
+					json.MustEncode(innerTx),
+					json.MustEncode(coinbase),
+				)
+
+				_, output, err = vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				// make sure the retrieved value is the same as the last value
+				// that was stored by transaction batch
+				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+				require.Equal(t, types.StatusSuccessful, res.Status)
+				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue).Int64())
+			})
+	})
+
+	// fail every other transaction with gas set too low for execution to succeed
+	// but high enough to pass intristic gas check, then check the updated values on the
+	// contract to match the last successful transaction execution
+	t.Run("Batch run with with failed transactions", func(t *testing.T) {
+		t.Parallel()
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				batchRunCode := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(txs: [[UInt8]], coinbaseBytes: [UInt8; 20]) {
+						execute {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let batchResults = EVM.batchRun(txs: txs, coinbase: coinbase)
+
+							log("results")
+							log(batchResults)
+							assert(batchResults.length == txs.length, message: "invalid result length")
+
+							for i, res in batchResults {
+								if i %% 2 != 0 {
+									assert(res.status == EVM.Status.successful, message: "unexpected success status")
+									assert(res.errorCode == 0, message: "unexpected error code")
+								} else {
+									assert(res.status == EVM.Status.failed, message: "unexpected failed status")
+									assert(res.errorCode == 301, message: "unexpected error code")
+								}
+							}
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				batchCount := 6
+				var num int64
+				txBytes := make([]cadence.Value, batchCount)
+				for i := 0; i < batchCount; i++ {
+					gas := uint64(100_000)
+					if i%2 == 0 {
+						// fail with too low gas limit
+						gas = 22_000
+					} else {
+						// update number with only valid transactions
+						num = int64(i)
+					}
+
+					// prepare batch of transaction payloads
+					tx := testAccount.PrepareSignAndEncodeTx(t,
+						testContract.DeployedAt.ToCommon(),
+						testContract.MakeCallData(t, "store", big.NewInt(num)),
+						big.NewInt(0),
+						gas,
+						big.NewInt(0),
+					)
+
+					// build txs argument
+					txBytes[i] = cadence.NewArray(
+						ConvertToCadence(tx),
+					).WithType(stdlib.EVMTransactionBytesCadenceType)
+				}
+
+				coinbase := cadence.NewArray(
+					ConvertToCadence(testAccount.Address().Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				txs := cadence.NewArray(txBytes).
+					WithType(cadence.NewVariableSizedArrayType(
+						stdlib.EVMTransactionBytesCadenceType,
+					))
+
+				tx := fvm.Transaction(
+					flow.NewTransactionBody().
+						SetScript(batchRunCode).
+						AddArgument(json.MustEncode(txs)).
+						AddArgument(json.MustEncode(coinbase)),
+					0)
+
+				state, output, err := vm.Run(ctx, tx, snapshot)
+
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				//require.NotEmpty(t, state.WriteSet)
+
+				// append the state
+				snapshot = snapshot.Append(state)
+
+				// retrieve the values
+				retrieveCode := []byte(fmt.Sprintf(
+					`
+						import EVM from %s
+						access(all)
+						fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							return EVM.run(tx: tx, coinbase: coinbase)
+						}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "retrieve"),
+					big.NewInt(0),
+					uint64(100_000),
+					big.NewInt(0),
+				)
+
+				innerTx := cadence.NewArray(
+					ConvertToCadence(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				script := fvm.Script(retrieveCode).WithArguments(
+					json.MustEncode(innerTx),
+					json.MustEncode(coinbase),
+				)
+
+				_, output, err = vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				// make sure the retrieved value is the same as the last value
+				// that was stored by transaction batch
+				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				require.Equal(t, types.StatusSuccessful, res.Status)
+				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue).Int64())
 			})
 	})
 }
@@ -1330,6 +1870,7 @@ func RunWithNewEnvironment(
 					fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
 					fvm.WithRandomSourceHistoryCallAllowed(true),
 					fvm.WithBlocks(blocks),
+					fvm.WithCadenceLogging(true),
 				}
 				ctx := fvm.NewContext(opts...)
 
