@@ -352,39 +352,6 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 	return builder
 }
 
-// BuildBlocks builds blocks on top of the finalized state, each of which contains
-// exactly one receipt (for its parent) and one seal (for its grandparent).
-// This maintains the evenly distributed structure of the resulting epoch.
-// It is used to build epochs that are not the minimum possible length,
-// which is the default result from chaining BuildEpoch and CompleteEpoch.
-// Must be used after at least one call to BuildEpoch.
-// Returns the receiver EpochBuilder for chaining.
-// todo remove
-func (builder *EpochBuilder) BuildBlocks(n uint) *EpochBuilder {
-	head, err := builder.states[0].Final().Head()
-	require.NoError(builder.t, err)
-
-	for i := uint(0); i < n; i++ {
-		next := BlockWithParentFixture(head)
-		require.NoError(builder.t, err)
-		parent := builder.blocksByID[head.ID()]
-
-		receiptForParent := ReceiptForBlockFixture(parent)
-		resultForGrandParent := parent.Payload.Results[0]
-		sealForGrandParent := Seal.Fixture(Seal.WithResult(resultForGrandParent))
-
-		next.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceiptMeta{receiptForParent.Meta()},
-			Results:  []*flow.ExecutionResult{&receiptForParent.ExecutionResult},
-			Seals:    []*flow.Seal{sealForGrandParent},
-		})
-
-		builder.addBlock(next)
-		head = next.Header
-	}
-	return builder
-}
-
 // addBlock adds the given block to the state by: extending the state,
 // finalizing the block, and caching the block.
 func (builder *EpochBuilder) addBlock(block *flow.Block) {
