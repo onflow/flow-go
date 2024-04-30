@@ -19,6 +19,8 @@ while read -r input; do
     hash="${remainder%%:*}"; remainder="${remainder#*:}"
     load="${remainder%%:*}"; remainder="${remainder#*:}"
 
+    git pull
+    git checkout master
     git checkout "$branch" || continue
     git reset --hard "$hash"  || continue
 
