@@ -2663,12 +2663,9 @@ func TestEVMAddressConstructionAndReturn(t *testing.T) {
 	evmAddressCadenceType := stdlib.NewEVMAddressCadenceType(common.Address(contractsAddress))
 
 	assert.Equal(t,
-		cadence.Struct{
-			StructType: evmAddressCadenceType,
-			Fields: []cadence.Value{
-				addressBytesArray,
-			},
-		},
+		cadence.NewStruct([]cadence.Value{
+			addressBytesArray,
+		}).WithType(evmAddressCadenceType),
 		result,
 	)
 }
@@ -2757,12 +2754,9 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 	evmBalanceCadenceType := stdlib.NewBalanceCadenceType(common.Address(contractsAddress))
 
 	assert.Equal(t,
-		cadence.Struct{
-			StructType: evmBalanceCadenceType,
-			Fields: []cadence.Value{
-				flowValue,
-			},
-		},
+		cadence.NewStruct([]cadence.Value{
+			flowValue,
+		}).WithType(evmBalanceCadenceType),
 		result,
 	)
 }
@@ -3271,10 +3265,22 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 
 	// check cadence owned account created events
 	expectedCoaAddress := types.Address{3}
-	require.Equal(t, expectedCoaAddress.ToCadenceValue().ToGoValue(), events[0].Fields[0].ToGoValue())
+	require.Equal(t,
+		expectedCoaAddress.ToCadenceValue(),
+		cadence.SearchFieldByName(
+			events[0],
+			types.CadenceOwnedAccountCreatedTypeAddressBytesFieldName,
+		),
+	)
 
 	expectedCoaAddress = types.Address{4}
-	require.Equal(t, expectedCoaAddress.ToCadenceValue().ToGoValue(), events[1].Fields[0].ToGoValue())
+	require.Equal(t,
+		expectedCoaAddress.ToCadenceValue(),
+		cadence.SearchFieldByName(
+			events[1],
+			types.CadenceOwnedAccountCreatedTypeAddressBytesFieldName,
+		),
+	)
 }
 
 func TestCadenceOwnedAccountCall(t *testing.T) {
@@ -3642,10 +3648,18 @@ func TestCOADeposit(t *testing.T) {
 
 	// token deposit event
 	tokenDepositEvent := events[3]
+	tokenDepositEventFields := cadence.FieldsMappedByName(tokenDepositEvent)
+
 	// check address
-	require.Equal(t, expectedCoaAddress.ToCadenceValue().ToGoValue(), tokenDepositEvent.Fields[0].ToGoValue())
+	require.Equal(t,
+		expectedCoaAddress.ToCadenceValue(),
+		tokenDepositEventFields["addressBytes"],
+	)
 	// check amount
-	require.Equal(t, expectedBalance.ToGoValue(), tokenDepositEvent.Fields[1].ToGoValue())
+	require.Equal(t,
+		expectedBalance,
+		tokenDepositEventFields["amount"],
+	)
 }
 
 func TestCadenceOwnedAccountWithdraw(t *testing.T) {
@@ -3807,10 +3821,18 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 
 	// token deposit event
 	tokenWithdrawEvent := events[4]
+	tokenWithdrawEventFields := cadence.FieldsMappedByName(tokenWithdrawEvent)
+
 	// check address
-	require.Equal(t, expectedCoaAddress.ToCadenceValue().ToGoValue(), tokenWithdrawEvent.Fields[0].ToGoValue())
+	require.Equal(t,
+		expectedCoaAddress.ToCadenceValue(),
+		tokenWithdrawEventFields["addressBytes"],
+	)
 	// check amount
-	require.Equal(t, expectedWithdrawBalance.ToGoValue(), tokenWithdrawEvent.Fields[1].ToGoValue())
+	require.Equal(t,
+		expectedWithdrawBalance,
+		tokenWithdrawEventFields["amount"],
+	)
 }
 
 func TestCadenceOwnedAccountDeploy(t *testing.T) {
@@ -3998,8 +4020,7 @@ func RunEVMScript(
 	)
 	require.NoError(t, err)
 
-	require.NoError(t, err)
-	require.Equal(t, expectedValue.ToGoValue(), actual.ToGoValue())
+	require.Equal(t, expectedValue, actual)
 }
 
 func TestEVMAccountBalance(t *testing.T) {
@@ -4423,15 +4444,12 @@ func TestEVMGetLatestBlock(t *testing.T) {
 	blockTotalSupply := cadence.NewIntFromBig(latestBlock.TotalSupply)
 	timestamp := cadence.NewUInt64(latestBlock.Timestamp)
 
-	expectedEVMBlock := cadence.Struct{
-		StructType: evmBlockCadenceType,
-		Fields: []cadence.Value{
-			blockHeight,
-			blockHash,
-			blockTotalSupply,
-			timestamp,
-		},
-	}
+	expectedEVMBlock := cadence.NewStruct([]cadence.Value{
+		blockHeight,
+		blockHash,
+		blockTotalSupply,
+		timestamp,
+	}).WithType(evmBlockCadenceType)
 
 	RunEVMScript(t, handler, script, expectedEVMBlock)
 }

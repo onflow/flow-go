@@ -1656,7 +1656,7 @@ func TestCadenceArch(t *testing.T) {
 				vals := output.Value.(cadence.Array).Values
 				vals = vals[len(vals)-8:] // only last 8 bytes is the value
 				for i := range res {
-					res[i] = vals[i].ToGoValue().(byte)
+					res[i] = byte(vals[i].(cadence.UInt8))
 				}
 				require.Equal(t, source, res)
 			})
@@ -1981,7 +1981,7 @@ func setupCOA(
 	snap = snap.Append(es)
 
 	// 3rd event is the cadence owned account created event
-	coaAddress, err := types.COAAddressFromFlowEvent(sc.EVMContract.Address, output.Events[2])
+	coaAddress, err := types.COAAddressFromFlowCOACreatedEvent(sc.EVMContract.Address, output.Events[2])
 	require.NoError(t, err)
 
 	return coaAddress, snap

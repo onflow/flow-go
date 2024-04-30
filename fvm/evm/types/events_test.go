@@ -65,7 +65,7 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 
 	hashes := make([]gethCommon.Hash, len(bep.TransactionHashes))
 	for i, h := range bep.TransactionHashes {
-		hashes[i] = gethCommon.HexToHash(h.ToGoValue().(string))
+		hashes[i] = gethCommon.HexToHash(string(h))
 	}
 	assert.Equal(t, hashes, block.TransactionHashes)
 
