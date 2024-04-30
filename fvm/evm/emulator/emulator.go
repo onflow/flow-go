@@ -229,6 +229,8 @@ func (bl *BlockView) DryRunTransaction(
 	// use the from as the signer
 	proc.evm.TxContext.Origin = from
 	msg.From = from
+	// we need to skip nonce check for dry run
+	msg.SkipAccountChecks = true
 
 	// return without commiting the state
 	return proc.run(msg, tx.Hash(), 0, tx.Type())
@@ -511,6 +513,8 @@ func (proc *procedure) run(
 	// if prechecks are passed, the exec result won't be nil
 	if execResult != nil {
 		res.GasConsumed = execResult.UsedGas
+		res.Index = uint16(txIndex)
+
 		if !execResult.Failed() { // collect vm errors
 			res.ReturnedValue = execResult.ReturnData
 			// If the transaction created a contract, store the creation address in the receipt,
