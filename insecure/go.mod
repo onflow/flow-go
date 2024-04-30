@@ -2,8 +2,6 @@ module github.com/onflow/flow-go/insecure
 
 go 1.21
 
-toolchain go1.22.2
-
 require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
 	github.com/golang/protobuf v1.5.4

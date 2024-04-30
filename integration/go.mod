@@ -2,8 +2,6 @@ module github.com/onflow/flow-go/integration
 
 go 1.21
 
-toolchain go1.22.2
-
 require (
 	cloud.google.com/go/bigquery v1.59.1
 	github.com/VividCortex/ewma v1.2.0
