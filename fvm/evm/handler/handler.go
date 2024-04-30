@@ -1,13 +1,11 @@
 package handler
 
 import (
-	"bytes"
 	"math/big"
 
 	"github.com/onflow/cadence/runtime/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
-	"github.com/onflow/go-ethereum/rlp"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
@@ -122,22 +120,131 @@ func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) *type
 	return res.ResultSummary()
 }
 
+// BatchRun tries to run batch of rlp-encoded transactions and
+// collects the gas fees and pay it to the coinbase address provided.
+// All transactions provided in the batch are included in a single block,
+// except for invalid transactions
+func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte, coinbase types.Address) []*types.ResultSummary {
+	res, err := h.batchRun(rlpEncodedTxs, coinbase)
+	panicOnError(err)
+
+	resSummary := make([]*types.ResultSummary, len(res))
+	for i, r := range res {
+		resSummary[i] = r.ResultSummary()
+	}
+	return resSummary
+}
+
+func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Address) ([]*types.Result, error) {
+	// prepare block view used to run the batch
+	ctx, err := h.getBlockContext()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx.GasFeeCollector = coinbase
+	blk, err := h.emulator.NewBlockView(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	bp, err := h.blockStore.BlockProposal()
+	if err != nil {
+		return nil, err
+	}
+
+	// decode all transactions and calculate total gas limit
+	var totalGasLimit types.GasLimit
+	batchLen := len(rlpEncodedTxs)
+	txs := make([]*gethTypes.Transaction, batchLen)
+
+	for i, rlpEncodedTx := range rlpEncodedTxs {
+		tx, err := h.decodeTransaction(rlpEncodedTx)
+		if err != nil {
+			return nil, err
+		}
+
+		txs[i] = tx
+		totalGasLimit += types.GasLimit(tx.Gas())
+	}
+
+	// check if all transactions in the batch are below gas limit
+	err = h.checkGasLimit(totalGasLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := blk.BatchRunTransactions(txs)
+	if err != nil {
+		return nil, err
+	}
+
+	// saftey check for result
+	if len(res) == 0 {
+		return nil, types.ErrUnexpectedEmptyResult
+	}
+
+	bp.PopulateReceiptRoot(res)
+
+	// meter all the transaction gas usage and append hashes to the block
+	for _, r := range res {
+		// meter gas anyway (even for invalid or failed states)
+		err = h.meterGasUsage(r)
+		if err != nil {
+			return nil, err
+		}
+
+		// include it in a block only if valid (not invalid)
+		if !r.Invalid() {
+			bp.AppendTxHash(r.TxHash)
+		}
+	}
+
+	blockHash, err := bp.Hash()
+	if err != nil {
+		return nil, err
+	}
+
+	// if there were no valid transactions skip emitting events
+	// and commiting a new block
+	if len(bp.TransactionHashes) == 0 {
+		return res, nil
+	}
+
+	for i, r := range res {
+		if r.Invalid() { // don't emit events for invalid tx
+			continue
+		}
+		err = h.emitEvent(types.NewTransactionEvent(
+			r,
+			rlpEncodedTxs[i],
+			bp.Height,
+			blockHash,
+		))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = h.emitEvent(types.NewBlockEvent(bp))
+	if err != nil {
+		return nil, err
+	}
+
+	err = h.blockStore.CommitBlockProposal()
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
 func (h *ContractHandler) run(
 	rlpEncodedTx []byte,
 	coinbase types.Address,
 ) (*types.Result, error) {
 	// step 1 - transaction decoding
-	encodedLen := uint(len(rlpEncodedTx))
-	err := h.backend.MeterComputation(environment.ComputationKindRLPDecoding, encodedLen)
-	if err != nil {
-		return nil, err
-	}
-
-	tx := gethTypes.Transaction{}
-	err = tx.DecodeRLP(
-		rlp.NewStream(
-			bytes.NewReader(rlpEncodedTx),
-			uint64(encodedLen)))
+	tx, err := h.decodeTransaction(rlpEncodedTx)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +265,7 @@ func (h *ContractHandler) run(
 		return nil, err
 	}
 
-	res, err := blk.RunTransaction(&tx)
+	res, err := blk.RunTransaction(tx)
 	if err != nil {
 		return nil, err
 	}
@@ -187,8 +294,9 @@ func (h *ContractHandler) run(
 
 	bp.AppendTxHash(res.TxHash)
 
-	// Populate receipt root
-	bp.PopulateReceiptRoot([]types.Result{*res})
+	// populate receipt root
+	bp.PopulateReceiptRoot([]*types.Result{res})
+	bp.CalculateGasUsage([]types.Result{*res})
 
 	blockHash, err := bp.Hash()
 	if err != nil {
@@ -196,18 +304,12 @@ func (h *ContractHandler) run(
 	}
 
 	// step 4 - emit events
-	err = h.emitEvent(types.NewTransactionExecutedEvent(
-		bp.Height,
-		rlpEncodedTx,
-		blockHash,
-		res.TxHash,
-		res,
-	))
+	err = h.emitEvent(types.NewTransactionEvent(res, rlpEncodedTx, bp.Height, blockHash))
 	if err != nil {
 		return nil, err
 	}
 
-	err = h.emitEvent(types.NewBlockExecutedEvent(bp))
+	err = h.emitEvent(types.NewBlockEvent(bp))
 	if err != nil {
 		return nil, err
 	}
@@ -220,6 +322,60 @@ func (h *ContractHandler) run(
 	return res, nil
 }
 
+func (h *ContractHandler) DryRun(
+	rlpEncodedTx []byte,
+	from types.Address,
+) *types.ResultSummary {
+	res, err := h.dryRun(rlpEncodedTx, from)
+	panicOnError(err)
+	return res.ResultSummary()
+}
+
+func (h *ContractHandler) dryRun(
+	rlpEncodedTx []byte,
+	from types.Address,
+) (*types.Result, error) {
+	// step 1 - transaction decoding
+	encodedLen := uint(len(rlpEncodedTx))
+	err := h.backend.MeterComputation(environment.ComputationKindRLPDecoding, encodedLen)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := gethTypes.Transaction{}
+	err = tx.UnmarshalBinary(rlpEncodedTx)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, err := h.getBlockContext()
+	if err != nil {
+		return nil, err
+	}
+
+	blk, err := h.emulator.NewBlockView(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := blk.DryRunTransaction(&tx, from.ToCommon())
+	if err != nil {
+		return nil, err
+	}
+
+	// saftey check for result
+	if res == nil {
+		return nil, types.ErrUnexpectedEmptyResult
+	}
+
+	// if invalid return the invalid error
+	if res.Invalid() {
+		return nil, res.ValidationError
+	}
+
+	return res, nil
+}
+
 func (h *ContractHandler) checkGasLimit(limit types.GasLimit) error {
 	// check gas limit against what has been left on the transaction side
 	if !h.backend.ComputationAvailable(environment.ComputationKindEVMGasUsage, uint(limit)) {
@@ -228,12 +384,29 @@ func (h *ContractHandler) checkGasLimit(limit types.GasLimit) error {
 	return nil
 }
 
+// decodeTransaction decodes RLP encoded transaction payload and meters the resources used.
+func (h *ContractHandler) decodeTransaction(encodedTx []byte) (*gethTypes.Transaction, error) {
+	encodedLen := uint(len(encodedTx))
+	err := h.backend.MeterComputation(environment.ComputationKindRLPDecoding, encodedLen)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := gethTypes.Transaction{}
+	if err := tx.UnmarshalBinary(encodedTx); err != nil {
+		return nil, err
+	}
+
+	return &tx, nil
+}
+
 func (h *ContractHandler) meterGasUsage(res *types.Result) error {
 	return h.backend.MeterComputation(environment.ComputationKindEVMGasUsage, uint(res.GasConsumed))
 }
 
 func (h *ContractHandler) emitEvent(event *types.Event) error {
-	ev, err := event.Payload.CadenceEvent()
+	location := common.NewAddressLocation(nil, common.Address(h.evmContractAddress), "EVM")
+	ev, err := event.Payload.ToCadence(location)
 	if err != nil {
 		return err
 	}
@@ -309,7 +482,7 @@ func (h *ContractHandler) executeAndHandleCall(
 	bp.AppendTxHash(res.TxHash)
 
 	// Populate receipt root
-	bp.PopulateReceiptRoot([]types.Result{*res})
+	bp.PopulateReceiptRoot([]*types.Result{res})
 
 	if totalSupplyDiff != nil {
 		if deductSupplyDiff {
@@ -334,19 +507,13 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	err = h.emitEvent(
-		types.NewTransactionExecutedEvent(
-			bp.Height,
-			encoded,
-			blockHash,
-			res.TxHash,
-			res,
-		),
+		types.NewTransactionEvent(res, encoded, bp.Height, blockHash),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	err = h.emitEvent(types.NewBlockExecutedEvent(bp))
+	err = h.emitEvent(types.NewBlockEvent(bp))
 	if err != nil {
 		return nil, err
 	}
