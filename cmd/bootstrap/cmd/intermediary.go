@@ -26,6 +26,7 @@ type IntermediaryParamsData struct {
 // and to bootstrap the Protocol State.
 // This is used to pass data between the rootblock command and the finalize command.
 type IntermediaryEpochData struct {
+	// TODO remove redundant inclusion of the fields (currently storing them in cadence as well as in protocol-state representation). 
 	ExecutionStateConfig epochs.EpochConfig
 	RootEpochSetup       *flow.EpochSetup
 	RootEpochCommit      *flow.EpochCommit
