@@ -2,7 +2,7 @@ package tracer_test
 
 import (
 	"context"
-	"os"
+	"io"
 	"testing"
 	"time"
 
@@ -62,7 +62,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 			}
 		}
 	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).Hook(hook)
+	logger := zerolog.New(io.Discard).Level(zerolog.DebugLevel).Hook(hook)
 
 	// sets some fixed scores for the nodes for sake of testing based on their roles.
 	consensusScore := float64(87)
