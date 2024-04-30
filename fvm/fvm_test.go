@@ -22,7 +22,6 @@ import (
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	flowSdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
@@ -3052,7 +3051,19 @@ func TestEVM(t *testing.T) {
 			require.NoError(t, output.Err)
 			require.Len(t, output.Events, 7)
 
-			evmLocation := flowSdk.EVMLocation{}
+			txExe, blockExe := output.Events[4], output.Events[5]
+			txExecutedID := common.NewAddressLocation(
+				nil,
+				common.Address(sc.EVMContract.Address),
+				string(types.EventTypeTransactionExecuted),
+			).ID()
+			blockExecutedID := common.NewAddressLocation(
+				nil,
+				common.Address(sc.EVMContract.Address),
+				string(types.EventTypeBlockExecuted),
+			).ID()
+			assert.Equal(t, txExecutedID, string(txExe.Type))
+			assert.Equal(t, blockExecutedID, string(blockExe.Type))
 
 			// convert events to type ids
 			eventTypeIDs := make([]common.TypeID, 0, len(output.Events))
@@ -3064,12 +3075,12 @@ func TestEVM(t *testing.T) {
 			assert.ElementsMatch(
 				t,
 				[]common.TypeID{
-					evmLocation.TypeID(nil, string(types.EventTypeTransactionExecuted)),
-					evmLocation.TypeID(nil, string(types.EventTypeBlockExecuted)),
+					common.TypeID(txExecutedID),
+					common.TypeID(blockExecutedID),
 					"A.f8d6e0586b0a20c7.EVM.CadenceOwnedAccountCreated",
 					"A.ee82856bf20e2aa6.FungibleToken.Withdrawn",
-					evmLocation.TypeID(nil, string(types.EventTypeTransactionExecuted)),
-					evmLocation.TypeID(nil, string(types.EventTypeBlockExecuted)),
+					common.TypeID(txExecutedID),
+					common.TypeID(blockExecutedID),
 					"A.f8d6e0586b0a20c7.EVM.FLOWTokensDeposited",
 				},
 				eventTypeIDs,
