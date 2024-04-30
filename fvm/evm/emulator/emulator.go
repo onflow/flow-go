@@ -229,6 +229,8 @@ func (bl *BlockView) DryRunTransaction(
 	// use the from as the signer
 	proc.evm.TxContext.Origin = from
 	msg.From = from
+	// we need to skip nonce check for dry run
+	msg.SkipAccountChecks = true
 
 	// return without commiting the state
 	return proc.run(msg, tx.Hash(), 0, tx.Type())
