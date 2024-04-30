@@ -684,25 +684,34 @@ contract EVM {
         ): @FungibleToken.Vault
     }
 
-    /// Interface which captures a Capability to the bridge Accessor, saving it within the BridgeRouter resource
-    access(all)
-    resource interface BridgeRouter {
+    /// BridgeRouter captures a BridgeAccessor Capability and routes bridge calls from COAs to the BridgeAccessor
+    access(all) resource BridgeRouter {
+        /// Capability to the BridgeAccessor resource, initialized to nil
+        access(self) var bridgeAccessorCap: Capability<&{BridgeAccessor}>?
 
-        /// Returns a reference to the BridgeAccessor designated for internal bridge requests
-        access(all) view fun borrowBridgeAccessor(): &{BridgeAccessor}
+        init() {
+            self.bridgeAccessorCap = nil
+        }
 
-        /// Sets the BridgeAccessor Capability in the BridgeRouter
-        access(all) fun setBridgeAccessor(_ accessor: Capability<&{BridgeAccessor}>) {
+        /// Returns a Bridge entitled reference to the underlying BridgeAccessor resource
+        access(all) view fun borrowBridgeAccessor(): &{BridgeAccessor} {
+            let cap = self.bridgeAccessorCap ?? panic("BridgeAccessor Capabaility is not yet set")
+            return cap.borrow() ?? panic("Problem retrieving BridgeAccessor reference")
+        }
+
+        /// Sets the BridgeAccessor Capability
+        access(all) fun setBridgeAccessor(_ accessorCap: Capability<&{BridgeAccessor}>) {
             pre {
-                accessor.check(): "Invalid BridgeAccessor Capability provided"
+                accessorCap.check(): "Invalid BridgeAccessor Capability provided"
             }
+            self.bridgeAccessorCap = accessorCap
         }
     }
 
     /// Returns a reference to the BridgeAccessor designated for internal bridge requests
     access(self)
     view fun borrowBridgeAccessor(): &{BridgeAccessor} {
-        return self.account.borrow<&{BridgeRouter}>(from: /storage/evmBridgeRouter)
+        return self.account.borrow<&BridgeRouter>(from: /storage/evmBridgeRouter)
             ?.borrowBridgeAccessor()
             ?? panic("Could not borrow reference to the EVM bridge")
     }
