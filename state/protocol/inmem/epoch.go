@@ -23,16 +23,10 @@ func (eq Epochs) Previous() protocol.Epoch {
 	if eq.entry.PreviousEpoch == nil {
 		return invalid.NewEpoch(protocol.ErrNoPreviousEpoch)
 	}
-	// TODO need to change this
-	//  - we might know the FinalHeight
-	//  - should use more specific sentinel
 	return NewCommittedEpoch(eq.entry.PreviousEpochSetup, eq.entry.PreviousEpochCommit)
 }
 
 func (eq Epochs) Current() protocol.Epoch {
-	// TODO need to change this
-	//  - we might not know First/FinalHeight
-	//  - should use more specific sentinel
 	return NewCommittedEpoch(eq.entry.CurrentEpochSetup, eq.entry.CurrentEpochCommit)
 }
 

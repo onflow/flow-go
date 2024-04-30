@@ -609,7 +609,6 @@ func bootstrapSporkInfo(root protocol.Snapshot) func(*transaction.Tx) error {
 // We index the FirstHeight for every epoch where the transition occurs within the sealing segment of the root snapshot,
 // or for the first epoch of a spork if the snapshot is a spork root snapshot (1 block sealing segment).
 // No errors are expected during normal operation.
-// TODO do this within the sealing segment instead? (then inmem.Snapshot can provide height info)
 func indexEpochHeights(segment *flow.SealingSegment) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// CASE 1: For spork root snapshots, there is exactly one block B and one epoch E.
