@@ -3,8 +3,11 @@ package evm_test
 import (
 	"encoding/hex"
 	"fmt"
+	"math"
 	"math/big"
 	"testing"
+
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/cadence/encoding/ccf"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
@@ -97,15 +100,49 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, output.Err)
 				require.NotEmpty(t, state.WriteSet)
 
-				txEvent := output.Events[0]
-				ev, err := ccf.Decode(nil, txEvent.Payload)
+				// assert event fiedls are correct
+				require.Len(t, output.Events, 2)
+
+				blockEvent := output.Events[1]
+
+				assert.Equal(
+					t,
+					common.NewAddressLocation(nil, common.Address(sc.EVMContract.Address), string(types.EventTypeBlockExecuted)).ID(),
+					string(blockEvent.Type),
+				)
+
+				ev, err := ccf.Decode(nil, blockEvent.Payload)
 				require.NoError(t, err)
 				cadenceEvent, ok := ev.(cadence.Event)
 				require.True(t, ok)
 
-				event := txEventType{}
-				require.NoError(t, cadence.DecodeFields(cadenceEvent, &event))
-				require.NotEmpty(t, event.TransactionHash)
+				blockEventPayload, err := types.DecodeBlockEventPayload(cadenceEvent)
+				require.NoError(t, err)
+				require.NotEmpty(t, blockEventPayload.Hash)
+
+				txEvent := output.Events[0]
+
+				assert.Equal(
+					t,
+					common.NewAddressLocation(nil, common.Address(sc.EVMContract.Address), string(types.EventTypeTransactionExecuted)).ID(),
+					string(txEvent.Type),
+				)
+
+				ev, err = ccf.Decode(nil, txEvent.Payload)
+				require.NoError(t, err)
+				cadenceEvent, ok = ev.(cadence.Event)
+				require.True(t, ok)
+
+				txEventPayload, err := types.DecodeTransactionEventPayload(cadenceEvent)
+				require.NoError(t, err)
+				require.NotEmpty(t, txEventPayload.Hash)
+				require.Equal(t, hex.EncodeToString(innerTxBytes), txEventPayload.Payload)
+				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
+				require.Equal(t, uint16(0), txEventPayload.Index)
+				require.Equal(t, blockEventPayload.Hash, txEventPayload.BlockHash)
+				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
+				require.Equal(t, blockEventPayload.TotalGasUsed, txEventPayload.GasConsumed)
+				require.Empty(t, txEventPayload.ContractAddress)
 
 				// append the state
 				snapshot = snapshot.Append(state)
@@ -338,9 +375,9 @@ func TestEVMRun(t *testing.T) {
 				cadenceEvent, ok := ev.(cadence.Event)
 				require.True(t, ok)
 
-				event := txEventType{}
-				require.NoError(t, cadence.DecodeFields(cadenceEvent, &event))
-				require.NotEmpty(t, event.TransactionHash)
+				event, err := types.DecodeTransactionEventPayload(cadenceEvent)
+				require.NoError(t, err)
+				require.NotEmpty(t, event.Hash)
 
 				encodedLogs, err := hex.DecodeString(event.Logs)
 				require.NoError(t, err)
@@ -447,8 +484,8 @@ func TestEVMBatchRun(t *testing.T) {
 					cadenceEvent, ok := ev.(cadence.Event)
 					require.True(t, ok)
 
-					event := txEventType{}
-					require.NoError(t, cadence.DecodeFields(cadenceEvent, &event))
+					event, err := types.DecodeTransactionEventPayload(cadenceEvent)
+					require.NoError(t, err)
 
 					encodedLogs, err := hex.DecodeString(event.Logs)
 					require.NoError(t, err)
@@ -1262,6 +1299,204 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 	})
 }
 
+func TestDryRun(t *testing.T) {
+	t.Parallel()
+	chain := flow.Emulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	evmAddress := sc.EVMContract.Address.HexWithPrefix()
+
+	dryRunTx := func(
+		tx *gethTypes.Transaction,
+		ctx fvm.Context,
+		vm fvm.VM,
+		snapshot snapshot.SnapshotTree,
+		testContract *TestContract,
+	) *types.ResultSummary {
+		code := []byte(fmt.Sprintf(`
+			import EVM from %s
+
+			access(all)
+			fun main(tx: [UInt8]): EVM.Result {
+				return EVM.dryRun(
+					tx: tx, 
+					from: EVM.EVMAddress(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
+				)
+			}`,
+			evmAddress,
+		))
+
+		innerTxBytes, err := tx.MarshalBinary()
+		require.NoError(t, err)
+
+		script := fvm.Script(code).WithArguments(
+			json.MustEncode(
+				cadence.NewArray(
+					ConvertToCadence(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType),
+			),
+		)
+		_, output, err := vm.Run(
+			ctx,
+			script,
+			snapshot)
+		require.NoError(t, err)
+		require.NoError(t, output.Err)
+
+		result, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+		require.NoError(t, err)
+		return result
+	}
+
+	// this test checks that gas limit is correctly used and gas usage correctly reported
+	t.Run("test dry run storing a value with different gas limits", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				data := testContract.MakeCallData(t, "store", big.NewInt(1337))
+
+				limit := uint64(math.MaxUint64 - 1)
+				tx := gethTypes.NewTransaction(
+					0,
+					testContract.DeployedAt.ToCommon(),
+					big.NewInt(0),
+					limit,
+					big.NewInt(0),
+					data,
+				)
+				result := dryRunTx(tx, ctx, vm, snapshot, testContract)
+				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
+				require.Equal(t, types.StatusSuccessful, result.Status)
+				require.Greater(t, result.GasConsumed, uint64(0))
+				require.Less(t, result.GasConsumed, limit)
+
+				// gas limit too low, but still bigger than intrinsic gas value
+				limit = uint64(21216)
+				tx = gethTypes.NewTransaction(
+					0,
+					testContract.DeployedAt.ToCommon(),
+					big.NewInt(0),
+					limit,
+					big.NewInt(0),
+					data,
+				)
+				result = dryRunTx(tx, ctx, vm, snapshot, testContract)
+				require.Equal(t, types.ExecutionErrCodeOutOfGas, result.ErrorCode)
+				require.Equal(t, types.StatusFailed, result.Status)
+				require.Equal(t, result.GasConsumed, limit) // burn it all!!!
+			})
+	})
+
+	// this test makes sure the dry-run that updates the value on the contract
+	// doesn't persist the change, and after when the value is read it isn't updated.
+	t.Run("test dry run for any side-effects", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				updatedValue := int64(1337)
+				data := testContract.MakeCallData(t, "store", big.NewInt(updatedValue))
+				tx := gethTypes.NewTransaction(
+					0,
+					testContract.DeployedAt.ToCommon(),
+					big.NewInt(0),
+					uint64(1000000),
+					big.NewInt(0),
+					data,
+				)
+
+				result := dryRunTx(tx, ctx, vm, snapshot, testContract)
+				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
+				require.Equal(t, types.StatusSuccessful, result.Status)
+				require.Greater(t, result.GasConsumed, uint64(0))
+
+				// query the value make sure it's not updated
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+					access(all)
+					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
+						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+						return EVM.run(tx: tx, coinbase: coinbase)
+					}
+					`,
+					evmAddress,
+				))
+
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "retrieve"),
+					big.NewInt(0),
+					uint64(100_000),
+					big.NewInt(0),
+				)
+
+				innerTx := cadence.NewArray(
+					ConvertToCadence(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					ConvertToCadence(testAccount.Address().Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				script := fvm.Script(code).WithArguments(
+					json.MustEncode(innerTx),
+					json.MustEncode(coinbase),
+				)
+
+				_, output, err := vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+				require.Equal(t, types.StatusSuccessful, res.Status)
+				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				// make sure the value we used in the dry-run is not the same as the value stored in contract
+				require.NotEqual(t, updatedValue, new(big.Int).SetBytes(res.ReturnedValue).Int64())
+			})
+	})
+
+	t.Run("test dry run contract deployment", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				tx := gethTypes.NewContractCreation(
+					0,
+					big.NewInt(0),
+					uint64(1000000),
+					big.NewInt(0),
+					testContract.ByteCode,
+				)
+
+				result := dryRunTx(tx, ctx, vm, snapshot, testContract)
+				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
+				require.Equal(t, types.StatusSuccessful, result.Status)
+				require.Greater(t, result.GasConsumed, uint64(0))
+				require.NotNil(t, result.ReturnedValue)
+				// todo add once https://github.com/onflow/flow-go/pull/5606 is merged
+				//require.NotNil(t, result.DeployedContractAddress)
+				//require.NotEmpty(t, result.DeployedContractAddress.String())
+			})
+	})
+}
+
 func TestCadenceArch(t *testing.T) {
 	t.Parallel()
 
@@ -1900,9 +2135,4 @@ func RunWithNewEnvironment(
 			})
 		})
 	})
-}
-
-type txEventType struct {
-	TransactionHash string `cadence:"transactionHash"`
-	Logs            string `cadence:"logs"`
 }

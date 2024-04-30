@@ -215,19 +215,18 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		if r.Invalid() { // don't emit events for invalid tx
 			continue
 		}
-		err = h.emitEvent(types.NewTransactionExecutedEvent(
-			bp.Height,
-			rlpEncodedTxs[i],
-			blockHash,
-			r.TxHash,
+		err = h.emitEvent(types.NewTransactionEvent(
 			r,
+			rlpEncodedTxs[i],
+			bp.Height,
+			blockHash,
 		))
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	err = h.emitEvent(types.NewBlockExecutedEvent(bp))
+	err = h.emitEvent(types.NewBlockEvent(bp))
 	if err != nil {
 		return nil, err
 	}
@@ -295,8 +294,9 @@ func (h *ContractHandler) run(
 
 	bp.AppendTxHash(res.TxHash)
 
-	// Populate receipt root
+	// populate receipt root
 	bp.PopulateReceiptRoot([]*types.Result{res})
+	bp.CalculateGasUsage([]types.Result{*res})
 
 	blockHash, err := bp.Hash()
 	if err != nil {
@@ -304,18 +304,12 @@ func (h *ContractHandler) run(
 	}
 
 	// step 4 - emit events
-	err = h.emitEvent(types.NewTransactionExecutedEvent(
-		bp.Height,
-		rlpEncodedTx,
-		blockHash,
-		res.TxHash,
-		res,
-	))
+	err = h.emitEvent(types.NewTransactionEvent(res, rlpEncodedTx, bp.Height, blockHash))
 	if err != nil {
 		return nil, err
 	}
 
-	err = h.emitEvent(types.NewBlockExecutedEvent(bp))
+	err = h.emitEvent(types.NewBlockEvent(bp))
 	if err != nil {
 		return nil, err
 	}
@@ -325,6 +319,60 @@ func (h *ContractHandler) run(
 	if err != nil {
 		return nil, err
 	}
+	return res, nil
+}
+
+func (h *ContractHandler) DryRun(
+	rlpEncodedTx []byte,
+	from types.Address,
+) *types.ResultSummary {
+	res, err := h.dryRun(rlpEncodedTx, from)
+	panicOnError(err)
+	return res.ResultSummary()
+}
+
+func (h *ContractHandler) dryRun(
+	rlpEncodedTx []byte,
+	from types.Address,
+) (*types.Result, error) {
+	// step 1 - transaction decoding
+	encodedLen := uint(len(rlpEncodedTx))
+	err := h.backend.MeterComputation(environment.ComputationKindRLPDecoding, encodedLen)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := gethTypes.Transaction{}
+	err = tx.UnmarshalBinary(rlpEncodedTx)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, err := h.getBlockContext()
+	if err != nil {
+		return nil, err
+	}
+
+	blk, err := h.emulator.NewBlockView(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := blk.DryRunTransaction(&tx, from.ToCommon())
+	if err != nil {
+		return nil, err
+	}
+
+	// saftey check for result
+	if res == nil {
+		return nil, types.ErrUnexpectedEmptyResult
+	}
+
+	// if invalid return the invalid error
+	if res.Invalid() {
+		return nil, res.ValidationError
+	}
+
 	return res, nil
 }
 
@@ -357,7 +405,8 @@ func (h *ContractHandler) meterGasUsage(res *types.Result) error {
 }
 
 func (h *ContractHandler) emitEvent(event *types.Event) error {
-	ev, err := event.Payload.CadenceEvent()
+	location := common.NewAddressLocation(nil, common.Address(h.evmContractAddress), "EVM")
+	ev, err := event.Payload.ToCadence(location)
 	if err != nil {
 		return err
 	}
@@ -458,19 +507,13 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	err = h.emitEvent(
-		types.NewTransactionExecutedEvent(
-			bp.Height,
-			encoded,
-			blockHash,
-			res.TxHash,
-			res,
-		),
+		types.NewTransactionEvent(res, encoded, bp.Height, blockHash),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	err = h.emitEvent(types.NewBlockExecutedEvent(bp))
+	err = h.emitEvent(types.NewBlockEvent(bp))
 	if err != nil {
 		return nil, err
 	}

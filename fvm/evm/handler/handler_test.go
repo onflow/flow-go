@@ -122,6 +122,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 
 					// check block event
 					event = events[1]
+
 					assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
 					ev, err = jsoncdc.Decode(nil, event.Payload)
 					require.NoError(t, err)
@@ -129,20 +130,12 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					// make sure block transaction list references the above transaction id
 					cadenceEvent, ok = ev.(cadence.Event)
 					require.True(t, ok)
-
-					for j, f := range cadenceEvent.GetFields() {
-						if f.Identifier == "transactionHashes" {
-							txsRaw := cadenceEvent.GetFieldValues()[j]
-							txs, ok := txsRaw.(cadence.Array)
-							require.True(t, ok)
-							// we know there's only one tx for now in block
-							eventTxID := txs.Values[0].ToGoValue().(string)
-							// make sure the transaction id included in the block transaction list is the same as tx sumbmitted
-							assert.Equal(t, evmTx.Hash().String(), eventTxID)
-						}
-					}
-
+					blockEvent, err := types.DecodeBlockEventPayload(cadenceEvent)
 					require.NoError(t, err)
+
+					eventTxID := blockEvent.TransactionHashes[0] // only one hash in block
+					// make sure the transaction id included in the block transaction list is the same as tx sumbmitted
+					assert.Equal(t, evmTx.Hash().String(), eventTxID.ToGoValue())
 				})
 			})
 		})
@@ -974,6 +967,72 @@ func TestHandler_TransactionRun(t *testing.T) {
 						handler.BatchRun(txs, coinbase)
 					})
 
+				})
+			})
+		})
+	})
+
+	t.Run("test dry run successful", func(t *testing.T) {
+		t.Parallel()
+
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+
+					bs := handler.NewBlockStore(backend, rootAddr)
+					aa := handler.NewAddressAllocator()
+
+					nonce := uint64(1)
+					to := gethCommon.Address{1, 2}
+					amount := big.NewInt(13)
+					gasLimit := uint64(1337)
+					gasPrice := big.NewInt(2000)
+					data := []byte{1, 5}
+					from := types.Address{3, 4}
+
+					tx := gethTypes.NewTransaction(
+						nonce,
+						to,
+						amount,
+						gasLimit,
+						gasPrice,
+						data,
+					)
+					rlpTx, err := tx.MarshalBinary()
+					require.NoError(t, err)
+
+					addr := testutils.RandomAddress(t)
+					result := &types.Result{
+						DeployedContractAddress: &addr,
+						ReturnedValue:           testutils.RandomData(t),
+						GasConsumed:             testutils.RandomGas(1000),
+						Logs: []*gethTypes.Log{
+							testutils.GetRandomLogFixture(t),
+							testutils.GetRandomLogFixture(t),
+						},
+					}
+
+					called := false
+					em := &testutils.TestEmulator{
+						DryRunTransactionFunc: func(tx *gethTypes.Transaction, address gethCommon.Address) (*types.Result, error) {
+							assert.Equal(t, nonce, tx.Nonce())
+							assert.Equal(t, &to, tx.To())
+							assert.Equal(t, gasLimit, tx.Gas())
+							assert.Equal(t, gasPrice, tx.GasPrice())
+							assert.Equal(t, data, tx.Data())
+							assert.Equal(t, from.ToCommon(), address)
+							called = true
+							return result, nil
+						},
+					}
+
+					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em)
+
+					rs := handler.DryRun(rlpTx, from)
+					require.Equal(t, types.StatusSuccessful, rs.Status)
+					require.Equal(t, result.GasConsumed, rs.GasConsumed)
+					require.Equal(t, types.ErrCodeNoError, rs.ErrorCode)
+					require.True(t, called)
 				})
 			})
 		})
