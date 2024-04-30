@@ -184,7 +184,7 @@ func (e *Engine) checkShouldStartPreviousEpochComponentsOnStartup(engineCtx irre
 	}
 	prevEpochFinalHeight, err := prevEpoch.FinalHeight()
 	if err != nil {
-		if errors.Is(err, protocol.ErrEpochTransitionNotFinalized) {
+		if errors.Is(err, protocol.ErrUnknownEpochBoundary) {
 			return nil
 		}
 		// no expected errors because we are querying finalized snapshot

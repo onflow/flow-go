@@ -399,7 +399,7 @@ func (suite *Suite) TestStartAfterEpochBoundary_PreviousEpochTransitionBeforeRoo
 	suite.TransitionEpoch()
 	prevEpoch := suite.epochs[suite.counter-1]
 	// the finalized height is within [1,tx_expiry] heights of previous epoch final height
-	prevEpoch.On("FinalHeight").Return(uint64(0), realprotocol.ErrEpochTransitionNotFinalized)
+	prevEpoch.On("FinalHeight").Return(uint64(0), realprotocol.ErrUnknownEpochBoundary)
 
 	suite.StartEngine()
 	// only current epoch components should have been started

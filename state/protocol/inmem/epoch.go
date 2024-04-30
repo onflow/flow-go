@@ -23,10 +23,16 @@ func (eq Epochs) Previous() protocol.Epoch {
 	if eq.entry.PreviousEpoch == nil {
 		return invalid.NewEpoch(protocol.ErrNoPreviousEpoch)
 	}
+	// TODO need to change this
+	//  - we might know the FinalHeight
+	//  - should use more specific sentinel
 	return NewCommittedEpoch(eq.entry.PreviousEpochSetup, eq.entry.PreviousEpochCommit)
 }
 
 func (eq Epochs) Current() protocol.Epoch {
+	// TODO need to change this
+	//  - we might not know First/FinalHeight
+	//  - should use more specific sentinel
 	return NewCommittedEpoch(eq.entry.CurrentEpochSetup, eq.entry.CurrentEpochCommit)
 }
 
@@ -121,11 +127,11 @@ func (es *setupEpoch) DKG() (protocol.DKG, error) {
 }
 
 func (es *setupEpoch) FirstHeight() (uint64, error) {
-	return 0, protocol.ErrEpochTransitionNotFinalized
+	return 0, protocol.ErrUnknownEpochBoundary
 }
 
 func (es *setupEpoch) FinalHeight() (uint64, error) {
-	return 0, protocol.ErrEpochTransitionNotFinalized
+	return 0, protocol.ErrUnknownEpochBoundary
 }
 
 // committedEpoch is an implementation of protocol.Epoch backed by an EpochSetup
@@ -206,25 +212,37 @@ func (es *committedEpoch) DKG() (protocol.DKG, error) {
 	return DKGFromEncodable(encodable)
 }
 
-// startedEpoch represents an epoch (with counter N) that has started, but there is no _finalized_ transition
-// to the next epoch yet. Note that nodes can already be in views belonging to the _next_ Epoch, and it is
-// possible that there are already unfinalized blocks in that next epoch. However, without finalized blocks
-// in Epoch N+1, there is no definition of "last block" for Epoch N.
+// heightBoundedEpoch represents an epoch (with counter N) for which we know either
+// its start boundary, end boundary, or both. A boundary is included when:
+//   - it occurred after this node's lowest known block AND
+//   - it occurred before the latest finalized block (ie. the boundary is defined)
 //
-// startedEpoch has all the information of a committedEpoch, plus the epoch's first block height.
-type startedEpoch struct {
+// heightBoundedEpoch has all the information of a committedEpoch, plus one or
+// both height boundaries for the epoch.
+type heightBoundedEpoch struct {
 	committedEpoch
-	firstHeight uint64
+	firstHeight *uint64
+	finalHeight *uint64
 }
 
-func (e *startedEpoch) FirstHeight() (uint64, error) {
-	return e.firstHeight, nil
+func (e *heightBoundedEpoch) FirstHeight() (uint64, error) {
+	if e.firstHeight != nil {
+		return *e.firstHeight, nil
+	}
+	return 0, protocol.ErrUnknownEpochBoundary
+}
+
+func (e *heightBoundedEpoch) FinalHeight() (uint64, error) {
+	if e.finalHeight != nil {
+		return *e.finalHeight, nil
+	}
+	return 0, protocol.ErrUnknownEpochBoundary
 }
 
 // endedEpoch is an epoch which has ended (ie. the previous epoch). It has all the
-// information of a startedEpoch, plus the epoch's final block height.
+// information of a heightBoundedEpoch, plus the epoch's final block height.
 type endedEpoch struct {
-	startedEpoch
+	heightBoundedEpoch
 	finalHeight uint64
 }
 
@@ -254,35 +272,50 @@ func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommi
 	}
 }
 
-// NewStartedEpoch returns a memory-backed epoch implementation based on an
-// EpochSetup and EpochCommit events, and the epoch's first block height.
+// NewEpochWithStartBoundary returns a memory-backed epoch implementation based on an
+// EpochSetup and EpochCommit events, and the epoch's first block height (start boundary).
 // No errors are expected during normal operations.
-func NewStartedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, firstHeight uint64) protocol.Epoch {
-	return &startedEpoch{
+func NewEpochWithStartBoundary(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, firstHeight uint64) protocol.Epoch {
+	return &heightBoundedEpoch{
 		committedEpoch: committedEpoch{
 			setupEpoch: setupEpoch{
 				setupEvent: setupEvent,
 			},
 			commitEvent: commitEvent,
 		},
-		firstHeight: firstHeight,
+		firstHeight: &firstHeight,
+		finalHeight: nil,
 	}
 }
 
-// NewEndedEpoch returns a memory-backed epoch implementation based on an
-// EpochSetup and EpochCommit events, and the epoch's final block height.
+// NewEpochWithEndBoundary returns a memory-backed epoch implementation based on an
+// EpochSetup and EpochCommit events, and the epoch's final block height (end boundary).
 // No errors are expected during normal operations.
-func NewEndedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, firstHeight, finalHeight uint64) protocol.Epoch {
-	return &endedEpoch{
-		startedEpoch: startedEpoch{
-			committedEpoch: committedEpoch{
-				setupEpoch: setupEpoch{
-					setupEvent: setupEvent,
-				},
-				commitEvent: commitEvent,
+func NewEpochWithEndBoundary(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, finalHeight uint64) protocol.Epoch {
+	return &heightBoundedEpoch{
+		committedEpoch: committedEpoch{
+			setupEpoch: setupEpoch{
+				setupEvent: setupEvent,
 			},
-			firstHeight: firstHeight,
+			commitEvent: commitEvent,
 		},
-		finalHeight: finalHeight,
+		firstHeight: nil,
+		finalHeight: &finalHeight,
+	}
+}
+
+// NewEpochWithStartAndEndBoundaries returns a memory-backed epoch implementation based on an
+// EpochSetup and EpochCommit events, and the epoch's first and final block heights (start+end boundaries).
+// No errors are expected during normal operations.
+func NewEpochWithStartAndEndBoundaries(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, firstHeight, finalHeight uint64) protocol.Epoch {
+	return &heightBoundedEpoch{
+		committedEpoch: committedEpoch{
+			setupEpoch: setupEpoch{
+				setupEvent: setupEvent,
+			},
+			commitEvent: commitEvent,
+		},
+		firstHeight: &firstHeight,
+		finalHeight: &finalHeight,
 	}
 }

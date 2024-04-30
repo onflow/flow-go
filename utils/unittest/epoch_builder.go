@@ -359,6 +359,7 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 // which is the default result from chaining BuildEpoch and CompleteEpoch.
 // Must be used after at least one call to BuildEpoch.
 // Returns the receiver EpochBuilder for chaining.
+// todo remove
 func (builder *EpochBuilder) BuildBlocks(n uint) *EpochBuilder {
 	head, err := builder.states[0].Final().Head()
 	require.NoError(builder.t, err)

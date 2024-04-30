@@ -87,6 +87,14 @@ func (segment *SealingSegment) Highest() *Block {
 	return segment.Blocks[len(segment.Blocks)-1]
 }
 
+// Lowest is the lowest block in the sealing segment by height.
+func (segment *SealingSegment) Lowest() *Block {
+	if len(segment.ExtraBlocks) > 0 {
+		return segment.ExtraBlocks[0]
+	}
+	return segment.Blocks[0]
+}
+
 // Finalized returns the last finalized block, which is an alias of Highest
 func (segment *SealingSegment) Finalized() *Block {
 	return segment.Highest()
@@ -111,6 +119,11 @@ func (segment *SealingSegment) AllBlocks() []*Block {
 // Therefore, a spork root block is a degenerate sealing segment with a length of 1.
 func (segment *SealingSegment) IsSporkRoot() bool {
 	return len(segment.Blocks) == 1
+}
+
+func (segment *SealingSegment) IncludesSporkRootBlock() bool {
+	lowest := segment.Lowest()
+	segment.LatestSeals
 }
 
 // FinalizedSeal returns the seal that seals the lowest block.

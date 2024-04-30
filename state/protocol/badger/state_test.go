@@ -175,7 +175,9 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
 	epoch1FirstHeight := rootSnapshot.Encodable().Head.Height
 
-	t.Run("root snapshot", func(t *testing.T) {
+	// For the spork root snapshot, only the first height of the root epoch should be indexed.
+	// [x]
+	t.Run("spork root snapshot", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 			// first height of started current epoch should be known
 			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
@@ -183,42 +185,116 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 			assert.Equal(t, epoch1FirstHeight, firstHeight)
 			// final height of not completed current epoch should be unknown
 			_, err = state.Final().Epochs().Current().FinalHeight()
-			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
+			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
+		})
+	})
+
+	t.Run("root epoch, next epoch committed", func(t *testing.T) {
+		// [<--->]
+		t.Run("snapshot extends to first block", func(t *testing.T) {
+			var epochHeights *unittest.EpochHeights
+			after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
+				builder := unittest.NewEpochBuilder(t, mutableState, state)
+				builder.BuildEpoch().CompleteEpoch() // build epoch 1 (prepare epoch 2)
+				var ok bool
+				epochHeights, ok = builder.EpochHeights(1)
+				require.True(t, ok)
+				// return a snapshot with reference block in the Committed phase of Epoch 1
+				return state.AtHeight(epochHeights.Committed)
+			})
+			ss, _ := after.SealingSegment()
+			fmt.Println("block heights in sealing segment", ss.ExtraBlocks[0].Header.Height, ss.Highest().Header.Height)
+
+			bootstrap(t, after, func(state *bprotocol.State, err error) {
+				require.NoError(t, err)
+				// first height of started current epoch should be known
+				firstHeight, err := state.Final().Epochs().Current().FirstHeight()
+				assert.Equal(t, epochHeights.FirstHeight(), firstHeight)
+				// todo returning ErrUnknownEpochBoundary
+				//require.NoError(t, err)
+				// final height of not completed current epoch should be unknown
+				_, err = state.Final().Epochs().Current().FinalHeight()
+				assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
+				// first and final height of not started next epoch should be unknown
+				_, err = state.Final().Epochs().Next().FirstHeight()
+				assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
+				_, err = state.Final().Epochs().Next().FinalHeight()
+				assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
+			})
+		})
+		// [---<--->]
+		t.Run("snapshot does not extend to first block", func(t *testing.T) {
+			var epochHeights *unittest.EpochHeights
+			after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
+				builder := unittest.NewEpochBuilder(t, mutableState, state)
+				builder.BuildEpoch().
+					AddBlocksWithSeals(flow.DefaultTransactionExpiry, 1).
+					CompleteEpoch() // build epoch 1 (prepare epoch 2)
+				var ok bool
+				epochHeights, ok = builder.EpochHeights(1)
+				require.True(t, ok)
+				// return a snapshot with reference block in the Committed phase of Epoch 1
+				return state.AtHeight(epochHeights.CommittedFinal)
+			})
+			ss, _ := after.SealingSegment()
+			fmt.Println("block heights in sealing segment", ss.ExtraBlocks[0].Header.Height, ss.Highest().Header.Height)
+
+			bootstrap(t, after, func(state *bprotocol.State, err error) {
+				require.NoError(t, err)
+				// first height of started current epoch should be known
+				_, err = state.Final().Epochs().Current().FirstHeight()
+				assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary) // todo use different sentinel
+				// final height of not completed current epoch should be unknown
+				_, err = state.Final().Epochs().Current().FinalHeight()
+				assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
+				// first and final height of not started next epoch should be unknown
+				_, err = state.Final().Epochs().Next().FirstHeight()
+				assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
+				_, err = state.Final().Epochs().Next().FinalHeight()
+				assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
+			})
 		})
 	})
 
 	t.Run("with next epoch", func(t *testing.T) {
-		unittest.SkipUnless(t, unittest.TEST_TODO, "such behavior is not supported yet since SealingSegment should"+
-			"contain blocks with the same protocol state ID. For this test it means that blocks needs to be selected"+
-			"from the same epoch phase and cannot cross epoch boundaries")
+		var epoch2Heights *unittest.EpochHeights
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
 			builder := unittest.NewEpochBuilder(t, mutableState, state)
-			builder.BuildEpoch().CompleteEpoch()
-			heights, ok := builder.EpochHeights(1)
+			builder.
+				BuildEpoch(). // build epoch 1 (prepare epoch 2)
+				BuildBlocks(flow.DefaultTransactionExpiry).
+				CompleteEpoch().
+				BuildEpoch().CompleteEpoch() // build epoch 2 (prepare epoch 3)
+			heights, ok := builder.EpochHeights(2)
 			require.True(t, ok)
+			epoch2Heights = heights
+			// return a snapshot with reference block in the Committed phase of Epoch 2
 			return state.AtHeight(heights.Committed)
 		})
+		ss, _ := after.SealingSegment()
+		fmt.Println("block heights in sealing segment", ss.ExtraBlocks[0].Header.Height, ss.Highest().Header.Height)
 
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
 			// first height of started current epoch should be known
 			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
-			assert.Equal(t, epoch1FirstHeight, firstHeight)
-			require.NoError(t, err)
+			assert.Equal(t, epoch2Heights.FirstHeight(), firstHeight)
+			require.NoError(t, err) // todo returning ErrUnknownEpochBoundary
 			// final height of not completed current epoch should be unknown
 			_, err = state.Final().Epochs().Current().FinalHeight()
-			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
+			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 			// first and final height of not started next epoch should be unknown
 			_, err = state.Final().Epochs().Next().FirstHeight()
-			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
+			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 			_, err = state.Final().Epochs().Next().FinalHeight()
-			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
+			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 		})
 	})
 	t.Run("with previous epoch", func(t *testing.T) {
-		unittest.SkipUnless(t, unittest.TEST_TODO, "such behavior is not supported yet since SealingSegment should"+
-			"contain blocks with the same protocol state ID. For this test it means that blocks needs to be selected"+
-			"from the same epoch phase and cannot cross epoch boundaries")
+		// TODO
+		//unittest.SkipUnless(t, unittest.TEST_TODO, "such behavior is not supported yet since SealingSegment should"+
+		//	"contain blocks with the same protocol state ID. For this test it means that blocks needs to be selected"+
+		//	"from the same epoch phase and cannot cross epoch boundaries")
 
 		var epoch1FinalHeight uint64
 		var epoch2FirstHeight uint64
@@ -243,7 +319,7 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 			require.NoError(t, err)
 			// final height of not completed current epoch should be unknown
 			_, err = state.Final().Epochs().Current().FinalHeight()
-			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
+			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 			// first and final height of completed previous epoch should be known
 			firstHeight, err = state.Final().Epochs().Previous().FirstHeight()
 			require.NoError(t, err)
