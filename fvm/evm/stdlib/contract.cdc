@@ -708,6 +708,14 @@ contract EVM {
         }
     }
 
+    /// Initializes the BridgeRouter resource. Can only be executed if there is not already a BridgeRouter resource.
+    access(all) fun initBridgeRouter() {
+        pre {
+            self.account.type(at: /storage/evmBridgeRouter) == nil: "BridgeRouter has already been initialized"
+        }
+        self.account.save(<-create BridgeRouter(), to: /storage/evmBridgeRouter)
+    }
+
     /// Returns a reference to the BridgeAccessor designated for internal bridge requests
     access(self)
     view fun borrowBridgeAccessor(): &{BridgeAccessor} {
