@@ -30,7 +30,7 @@ import (
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	scounters "github.com/onflow/flow-go/module/counters/persistent_strict_counters"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	realstate "github.com/onflow/flow-go/state"
@@ -41,6 +41,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/snapshots"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/generator"
@@ -70,7 +71,7 @@ type Suite struct {
 	events             *storagemock.Events
 
 	db                  *badger.DB
-	lastFullBlockHeight *scounters.PersistentStrictMonotonicCounter
+	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 
 	colClient              *access.AccessAPIClient
 	execClient             *access.ExecutionAPIClient
@@ -121,7 +122,10 @@ func (suite *Suite) SetupTest() {
 	suite.Require().NoError(err)
 
 	suite.db, _ = unittest.TempBadgerDB(suite.T())
-	suite.lastFullBlockHeight, err = scounters.NewPersistentStrictMonotonicCounter(suite.db, module.ConsumeProgressLastFullBlockHeight, 0)
+	suite.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(
+		bstorage.NewConsumerProgress(suite.db, module.ConsumeProgressLastFullBlockHeight),
+		0,
+	)
 	suite.Require().NoError(err)
 }
 

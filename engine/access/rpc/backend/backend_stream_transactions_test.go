@@ -24,11 +24,12 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	scounters "github.com/onflow/flow-go/module/counters/persistent_strict_counters"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/metrics"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	protocolint "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
@@ -78,7 +79,7 @@ type TransactionStatusSuite struct {
 	backend *Backend
 
 	db                  *badger.DB
-	lastFullBlockHeight *scounters.PersistentStrictMonotonicCounter
+	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 }
 
 func TestTransactionStatusSuite(t *testing.T) {
@@ -129,9 +130,8 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.resultsMap[s.rootBlock.ID()] = rootResult
 
 	var err error
-	s.lastFullBlockHeight, err = scounters.NewPersistentStrictMonotonicCounter(
-		s.db,
-		module.ConsumeProgressLastFullBlockHeight,
+	s.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(
+		bstorage.NewConsumerProgress(s.db, module.ConsumeProgressLastFullBlockHeight),
 		s.rootBlock.Header.Height,
 	)
 	require.NoError(s.T(), err)

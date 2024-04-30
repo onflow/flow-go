@@ -20,7 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	scounters "github.com/onflow/flow-go/module/counters/persistent_strict_counters"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -117,7 +117,7 @@ type Params struct {
 	EventsIndex         *index.EventsIndex
 	TxResultQueryMode   IndexQueryMode
 	TxResultsIndex      *index.TransactionResultsIndex
-	LastFullBlockHeight *scounters.PersistentStrictMonotonicCounter
+	LastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 }
 
 var _ TransactionErrorMessage = (*Backend)(nil)

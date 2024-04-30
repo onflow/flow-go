@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
-	scounters "github.com/onflow/flow-go/module/counters/persistent_strict_counters"
+	"github.com/onflow/flow-go/module/counters"
 	downloadermock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -67,7 +68,7 @@ type Suite struct {
 	cancel context.CancelFunc
 
 	db                  *badger.DB
-	lastFullBlockHeight *scounters.PersistentStrictMonotonicCounter
+	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 }
 
 func TestIngestEngine(t *testing.T) {
@@ -135,9 +136,8 @@ func (s *Suite) SetupTest() {
 	require.NoError(s.T(), err)
 
 	s.db, _ = unittest.TempBadgerDB(s.T())
-	s.lastFullBlockHeight, err = scounters.NewPersistentStrictMonotonicCounter(
-		s.db,
-		module.ConsumeProgressLastFullBlockHeight,
+	s.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(
+		bstorage.NewConsumerProgress(s.db, module.ConsumeProgressLastFullBlockHeight),
 		s.finalizedBlock.Height,
 	)
 	require.NoError(s.T(), err)

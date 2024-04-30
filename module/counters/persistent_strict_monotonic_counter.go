@@ -1,22 +1,18 @@
-package persistent_strict_counters
+package counters
 
 import (
 	"errors"
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
-
-	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 // PersistentStrictMonotonicCounter represents the consumer progress with strict monotonic counter.
 type PersistentStrictMonotonicCounter struct {
-	consumerProgress *bstorage.ConsumerProgress
+	consumerProgress storage.ConsumerProgress
 
 	// used to skip heights that are lower than the current height
-	counter counters.StrictMonotonousCounter
+	counter StrictMonotonousCounter
 }
 
 // NewPersistentStrictMonotonicCounter creates a new PersistentStrictMonotonicCounter which inserts the default
@@ -25,9 +21,9 @@ type PersistentStrictMonotonicCounter struct {
 // otherwise the state may become inconsistent.
 //
 // No errors are expected during normal operation.
-func NewPersistentStrictMonotonicCounter(db *badger.DB, consumer string, defaultIndex uint64) (*PersistentStrictMonotonicCounter, error) {
+func NewPersistentStrictMonotonicCounter(consumerProgress storage.ConsumerProgress, defaultIndex uint64) (*PersistentStrictMonotonicCounter, error) {
 	m := &PersistentStrictMonotonicCounter{
-		consumerProgress: bstorage.NewConsumerProgress(db, consumer),
+		consumerProgress: consumerProgress,
 	}
 
 	// sync with storage for the processed index to ensure the consistency
@@ -36,14 +32,14 @@ func NewPersistentStrictMonotonicCounter(db *badger.DB, consumer string, default
 		if errors.Is(err, storage.ErrNotFound) {
 			err := m.consumerProgress.InitProcessedIndex(defaultIndex)
 			if err != nil {
-				return nil, fmt.Errorf("could not init %s consumer progress: %w", consumer, err)
+				return nil, fmt.Errorf("could not init consumer progress: %w", err)
 			}
-			m.counter = counters.NewMonotonousCounter(defaultIndex)
+			m.counter = NewMonotonousCounter(defaultIndex)
 		} else {
-			return nil, fmt.Errorf("could not read %s consumer progress: %w", consumer, err)
+			return nil, fmt.Errorf("could not read consumer progress: %w", err)
 		}
 	} else {
-		m.counter = counters.NewMonotonousCounter(value)
+		m.counter = NewMonotonousCounter(value)
 	}
 
 	return m, nil

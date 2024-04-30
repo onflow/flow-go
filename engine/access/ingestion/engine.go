@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
-	scounters "github.com/onflow/flow-go/module/counters/persistent_strict_counters"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/network"
@@ -83,7 +83,7 @@ type Engine struct {
 	maxReceiptHeight  uint64
 	executionResults  storage.ExecutionResults
 
-	lastFullBlockHeight *scounters.PersistentStrictMonotonicCounter
+	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 
 	// metrics
 	collectionExecutedMetric module.CollectionExecutedMetric
@@ -103,7 +103,7 @@ func New(
 	executionResults storage.ExecutionResults,
 	executionReceipts storage.ExecutionReceipts,
 	collectionExecutedMetric module.CollectionExecutedMetric,
-	lastFullBlockHeight *scounters.PersistentStrictMonotonicCounter,
+	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {

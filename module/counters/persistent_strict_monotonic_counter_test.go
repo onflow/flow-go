@@ -1,4 +1,4 @@
-package persistent_strict_counters
+package counters_test
 
 import (
 	"testing"
@@ -7,15 +7,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/counters"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestMonotonicConsumer(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		var height1 = uint64(1234)
-		persistentStrictMonotonicCounter, err := NewPersistentStrictMonotonicCounter(
-			db,
-			module.ConsumeProgressLastFullBlockHeight,
+		persistentStrictMonotonicCounter, err := counters.NewPersistentStrictMonotonicCounter(
+			bstorage.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight),
 			height1,
 		)
 		require.NoError(t, err)
@@ -39,9 +40,8 @@ func TestMonotonicConsumer(t *testing.T) {
 		require.Equal(t, height2, actual)
 
 		// check that new persistent strict monotonic counter has the same value
-		persistentStrictMonotonicCounter2, err := NewPersistentStrictMonotonicCounter(
-			db,
-			module.ConsumeProgressLastFullBlockHeight,
+		persistentStrictMonotonicCounter2, err := counters.NewPersistentStrictMonotonicCounter(
+			bstorage.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight),
 			height1,
 		)
 		require.NoError(t, err)
