@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/onflow/cadence/runtime/common"
+
 	"github.com/onflow/cadence/encoding/ccf"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	"github.com/onflow/go-ethereum/rlp"
@@ -98,15 +100,49 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, output.Err)
 				require.NotEmpty(t, state.WriteSet)
 
-				txEvent := output.Events[0]
-				ev, err := ccf.Decode(nil, txEvent.Payload)
+				// assert event fiedls are correct
+				require.Len(t, output.Events, 2)
+
+				blockEvent := output.Events[1]
+
+				assert.Equal(
+					t,
+					common.NewAddressLocation(nil, common.Address(sc.EVMContract.Address), string(types.EventTypeBlockExecuted)).ID(),
+					string(blockEvent.Type),
+				)
+
+				ev, err := ccf.Decode(nil, blockEvent.Payload)
 				require.NoError(t, err)
 				cadenceEvent, ok := ev.(cadence.Event)
 				require.True(t, ok)
 
-				event, err := types.DecodeTransactionEventPayload(cadenceEvent)
+				blockEventPayload, err := types.DecodeBlockEventPayload(cadenceEvent)
 				require.NoError(t, err)
-				require.NotEmpty(t, event.Hash)
+				require.NotEmpty(t, blockEventPayload.Hash)
+
+				txEvent := output.Events[0]
+
+				assert.Equal(
+					t,
+					common.NewAddressLocation(nil, common.Address(sc.EVMContract.Address), string(types.EventTypeTransactionExecuted)).ID(),
+					string(txEvent.Type),
+				)
+
+				ev, err = ccf.Decode(nil, txEvent.Payload)
+				require.NoError(t, err)
+				cadenceEvent, ok = ev.(cadence.Event)
+				require.True(t, ok)
+
+				txEventPayload, err := types.DecodeTransactionEventPayload(cadenceEvent)
+				require.NoError(t, err)
+				require.NotEmpty(t, txEventPayload.Hash)
+				require.Equal(t, hex.EncodeToString(innerTxBytes), txEventPayload.Payload)
+				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
+				require.Equal(t, uint16(0), txEventPayload.Index)
+				require.Equal(t, blockEventPayload.Hash, txEventPayload.BlockHash)
+				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
+				require.Equal(t, blockEventPayload.TotalGasUsed, txEventPayload.GasConsumed)
+				require.Empty(t, txEventPayload.ContractAddress)
 
 				// append the state
 				snapshot = snapshot.Append(state)

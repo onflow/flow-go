@@ -2,8 +2,12 @@ package types_test
 
 import (
 	"encoding/hex"
+	"fmt"
 	"math/big"
 	"testing"
+
+	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/go-ethereum/core/vm"
 
@@ -17,6 +21,12 @@ import (
 
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
+)
+
+var evmLocation = cdcCommon.NewAddressLocation(
+	nil,
+	cdcCommon.Address(systemcontracts.SystemContractsForChain(flow.Emulator).EVMContract.Address),
+	"EVM",
 )
 
 func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
@@ -35,7 +45,7 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 	}
 
 	event := types.NewBlockEvent(block)
-	ev, err := event.Payload.ToCadence()
+	ev, err := event.Payload.ToCadence(evmLocation)
 	require.NoError(t, err)
 
 	bep, err := types.DecodeBlockEventPayload(ev)
@@ -66,13 +76,10 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 	evt, err := ccf.Decode(nil, v)
 	require.NoError(t, err)
 
-	assert.Equal(t, evt.Type().ID(), "evm.BlockExecuted")
-
-	location, qualifiedIdentifier, err := cdcCommon.DecodeTypeID(nil, "evm.BlockExecuted")
-	require.NoError(t, err)
-
-	assert.Equal(t, types.EVMLocation{}, location)
-	assert.Equal(t, "BlockExecuted", qualifiedIdentifier)
+	assert.Equal(t, evt.Type().ID(), fmt.Sprintf(
+		"A.%s.EVM.BlockExecuted",
+		systemcontracts.SystemContractsForChain(flow.Emulator).EVMContract.Address,
+	))
 }
 
 func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
@@ -113,7 +120,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 
 	t.Run("evm.TransactionExecuted with failed status", func(t *testing.T) {
 		event := types.NewTransactionEvent(txResult, txBytes, blockHeight, blockHash)
-		ev, err := event.Payload.ToCadence()
+		ev, err := event.Payload.ToCadence(evmLocation)
 		require.NoError(t, err)
 
 		tep, err := types.DecodeTransactionEventPayload(ev)
@@ -143,20 +150,17 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		evt, err := ccf.Decode(nil, v)
 		require.NoError(t, err)
 
-		assert.Equal(t, evt.Type().ID(), "evm.TransactionExecuted")
-
-		location, qualifiedIdentifier, err := cdcCommon.DecodeTypeID(nil, "evm.TransactionExecuted")
-		require.NoError(t, err)
-
-		assert.Equal(t, types.EVMLocation{}, location)
-		assert.Equal(t, "TransactionExecuted", qualifiedIdentifier)
+		assert.Equal(t, evt.Type().ID(), fmt.Sprintf(
+			"A.%s.EVM.TransactionExecuted",
+			systemcontracts.SystemContractsForChain(flow.Emulator).EVMContract.Address,
+		))
 	})
 
 	t.Run("evm.TransactionExecuted with non-failed status", func(t *testing.T) {
 		txResult.VMError = nil
 
 		event := types.NewTransactionEvent(txResult, txBytes, blockHeight, blockHash)
-		ev, err := event.Payload.ToCadence()
+		ev, err := event.Payload.ToCadence(evmLocation)
 		require.NoError(t, err)
 
 		tep, err := types.DecodeTransactionEventPayload(ev)
@@ -187,12 +191,9 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		evt, err := ccf.Decode(nil, v)
 		require.NoError(t, err)
 
-		assert.Equal(t, evt.Type().ID(), "evm.TransactionExecuted")
-
-		location, qualifiedIdentifier, err := cdcCommon.DecodeTypeID(nil, "evm.TransactionExecuted")
-		require.NoError(t, err)
-
-		assert.Equal(t, types.EVMLocation{}, location)
-		assert.Equal(t, "TransactionExecuted", qualifiedIdentifier)
+		assert.Equal(t, evt.Type().ID(), fmt.Sprintf(
+			"A.%s.EVM.TransactionExecuted",
+			systemcontracts.SystemContractsForChain(flow.Emulator).EVMContract.Address,
+		))
 	})
 }
