@@ -260,10 +260,10 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 			// final height of not completed current epoch should be unknown
 			_, err = state.Final().Epochs().Current().FinalHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
-			// first height should be unknown
-			firstHeight, err = state.Final().Epochs().Previous().FirstHeight()
+			// first height of previous epoch should be unknown
+			_, err = state.Final().Epochs().Previous().FirstHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
-			// final height of completed previous epoch should be known
+			// final height of previous epoch should be known
 			finalHeight, err := state.Final().Epochs().Previous().FinalHeight()
 			require.NoError(t, err)
 			assert.Equal(t, finalHeight, epoch2Heights.FirstHeight()-1)
@@ -272,7 +272,7 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 
 	// In this test we construct a root snapshot such that the Previous epoch w.r.t
 	// the snapshot reference block has both start and end boundaries included in the
-	// sealing segment. Therefore, both boundaries should be queriable in the API.
+	// sealing segment. Therefore, both boundaries should be queryable in the API.
 	// [---<---|---|--->---]
 	t.Run("root snapshot includes previous epoch start and end boundary", func(t *testing.T) {
 		var epoch3Heights *unittest.EpochHeights
@@ -302,7 +302,7 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 			// final height of not completed current epoch should be unknown
 			_, err = state.Final().Epochs().Current().FinalHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
-			// first height should be known
+			// first height of previous epoch should be known
 			firstHeight, err = state.Final().Epochs().Previous().FirstHeight()
 			require.NoError(t, err)
 			assert.Equal(t, epoch2Heights.FirstHeight(), firstHeight)

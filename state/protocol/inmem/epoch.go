@@ -233,17 +233,6 @@ func (e *heightBoundedEpoch) FinalHeight() (uint64, error) {
 	return 0, protocol.ErrUnknownEpochBoundary
 }
 
-// endedEpoch is an epoch which has ended (ie. the previous epoch). It has all the
-// information of a heightBoundedEpoch, plus the epoch's final block height.
-type endedEpoch struct {
-	heightBoundedEpoch
-	finalHeight uint64
-}
-
-func (e *endedEpoch) FinalHeight() (uint64, error) {
-	return e.finalHeight, nil
-}
-
 // NewSetupEpoch returns a memory-backed epoch implementation based on an
 // EpochSetup event. Epoch information available after the setup phase will
 // not be accessible in the resulting epoch instance.
