@@ -3,11 +3,14 @@ package migrations
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	migrationSnapshot "github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
@@ -15,13 +18,20 @@ import (
 
 // NewAtreeRegisterMigratorRuntime returns a new runtime to be used with the AtreeRegisterMigrator.
 func NewAtreeRegisterMigratorRuntime(
+	log zerolog.Logger,
 	address common.Address,
 	payloads []*ledger.Payload,
+	nWorkers int,
 ) (
 	*AtreeRegisterMigratorRuntime,
 	error,
 ) {
-	snapshot, err := util.NewPayloadSnapshot(payloads)
+	snapshot, err := migrationSnapshot.NewPayloadSnapshot(
+		log,
+		payloads,
+		migrationSnapshot.LargeChangeSetOrReadonlySnapshot,
+		nWorkers,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
 	}
@@ -54,7 +64,7 @@ func NewAtreeRegisterMigratorRuntime(
 }
 
 type AtreeRegisterMigratorRuntime struct {
-	Snapshot            *util.PayloadSnapshot
+	Snapshot            migrationSnapshot.MigrationSnapshot
 	TransactionState    state.NestedTransactionPreparer
 	Interpreter         *interpreter.Interpreter
 	Storage             *runtime.Storage

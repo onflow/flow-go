@@ -88,6 +88,8 @@ func parseChainID(chainID string) flow.ChainID {
 		return flow.Mainnet
 	case "test":
 		return flow.Testnet
+	case "preview":
+		return flow.Previewnet
 	case "sandbox":
 		return flow.Sandboxnet
 	case "bench":

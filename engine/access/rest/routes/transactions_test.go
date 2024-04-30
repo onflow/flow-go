@@ -84,7 +84,7 @@ func TestGetTransactions(t *testing.T) {
 		expected := fmt.Sprintf(`
 			{
 			   "id":"%s",
-			   "script":"cHViIGZ1biBtYWluKCkge30=",
+			   "script":"YWNjZXNzKGFsbCkgZnVuIG1haW4oKSB7fQ==",
                "arguments": [],
 			   "reference_block_id":"%s",
 			   "gas_limit":"10",
@@ -136,7 +136,7 @@ func TestGetTransactions(t *testing.T) {
 		expected := fmt.Sprintf(`
 			{
 			   "id":"%s",
-			   "script":"cHViIGZ1biBtYWluKCkge30=",
+			   "script":"YWNjZXNzKGFsbCkgZnVuIG1haW4oKSB7fQ==",
                "arguments": [],
 			   "reference_block_id":"%s",
 			   "gas_limit":"10",
@@ -356,7 +356,7 @@ func TestCreateTransaction(t *testing.T) {
 		expected := fmt.Sprintf(`
 			{
 			   "id":"%s",
-			   "script":"cHViIGZ1biBtYWluKCkge30=",
+			   "script":"YWNjZXNzKGFsbCkgZnVuIG1haW4oKSB7fQ==",
 			   "arguments": [],
 			   "reference_block_id":"%s",
 			   "gas_limit":"10",
