@@ -2,6 +2,7 @@ package uploader
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/rs/zerolog/log"
@@ -174,32 +175,26 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 	// Get EDID from ExecutionResult in BadgerDB
 	executionResult, err := b.results.ByBlockID(blockID)
 	if err != nil {
-		log.Error().Err(err).Msgf(
-			"failed to retrieve ExecutionResult from Badger with BlockID %s", blockID.String())
-		return nil, err
+		return nil, fmt.Errorf("failed to retrieve ExecutionResult with BlockID %s. %w", blockID.String(), err)
 	}
 	executionDataID := executionResult.ExecutionDataID
 
 	// retrieving BlockExecutionData from EDS
 	executionData, err := b.execDataDownloader.Get(b.unit.Ctx(), executionDataID)
 	if executionData == nil || err != nil {
-		log.Error().Err(err).Msgf(
-			"failed to retrieve BlockExecutionData from EDS with ID %s", executionDataID.String())
-		return nil, err
+		return nil, fmt.Errorf("failed to retrieve BlockExecutionData with ID %s. %w", executionDataID.String(), err)
 	}
 
 	// retrieving events from local BadgerDB
 	events, err := b.events.ByBlockID(blockID)
 	if err != nil {
-		log.Warn().Msgf(
-			"failed to retrieve events for BlockID %s. Error: %s", blockID.String(), err.Error())
+		return nil, fmt.Errorf("failed to retrieve events for BlockID %s: %w", blockID.String(), err)
 	}
 
 	// retrieving Block from local BadgerDB
 	block, err := b.blocks.ByID(blockID)
 	if err != nil {
-		log.Warn().Msgf(
-			"failed to retrieve Block with BlockID %s. Error: %s", blockID.String(), err.Error())
+		return nil, fmt.Errorf("failed to retrieve Block with BlockID %s. %w", blockID.String(), err)
 	}
 
 	// grabbing collections and guarantees from BadgerDB
@@ -213,9 +208,8 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 		collectionID := guarantee.CollectionID
 		collection, err := b.collections.ByID(collectionID)
 		if err != nil {
-			log.Warn().Msgf(
-				"failed to retrieve collections with CollectionID %s. Error: %s", collectionID, err.Error())
-			continue
+			return nil, fmt.Errorf(
+				"failed to retrieve collections with CollectionID %s. %w", collectionID, err)
 		}
 
 		completeCollections[collectionID] = &entity.CompleteCollection{
@@ -227,14 +221,14 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 	// retrieving TransactionResults from BadgerDB
 	transactionResults, err := b.transactionResults.ByBlockID(blockID)
 	if err != nil {
-		log.Warn().Msgf(
-			"failed to retrieve TransactionResults with BlockID %s. Error: %s", blockID.String(), err.Error())
+		return nil, fmt.Errorf(
+			"failed to retrieve TransactionResults with BlockID %s. %w", blockID.String(), err)
 	}
 
 	// retrieving CommitStatement from BadgerDB
 	endState, err := b.commits.ByBlockID(blockID)
 	if err != nil {
-		log.Warn().Msgf("failed to retrieve StateCommitment with BlockID %s. Error: %s", blockID.String(), err.Error())
+		return nil, fmt.Errorf("failed to retrieve StateCommitment with BlockID %s. %w", blockID.String(), err)
 	}
 
 	executableBlock := &entity.ExecutableBlock{
@@ -261,11 +255,16 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 		)
 	}
 
+	eventHash, err := flow.EventsMerkleRootHash(events)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate event hash for BlockID %s. %w", blockID.String(), err)
+	}
+
 	compRes.AppendCollectionAttestationResult(
 		endState,
 		endState,
 		nil,
-		flow.ZeroID,
+		eventHash,
 		nil,
 	)
 
