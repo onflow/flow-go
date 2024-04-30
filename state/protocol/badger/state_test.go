@@ -169,6 +169,13 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 
 // TestBootstrap_EpochHeightBoundaries tests that epoch height indexes are indexed
 // when they are available in the input snapshot.
+//
+// DIAGRAM LEGEND:
+//
+//	< = low endpoint of a sealing segment
+//	> = high endpoint of a sealing segment
+//	x = root sealing segment
+//	| = epoch boundary
 func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 	t.Parallel()
 	// start with a regular post-spork root snapshot
@@ -189,10 +196,11 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 		})
 	})
 
-	// For a snapshot within the first epoch after a spork, no epoch heights should be indexed
-	// because no boundaries are included within the root snapshot.
+	// In this test we construct a snapshot where the sealing segment is entirely
+	// within a particular epoch (does not cross any boundary). In this case,
+	// no boundaries should be queriable in the API.
 	// [---<--->--]
-	t.Run("root epoch - snapshot excludes start boundary", func(t *testing.T) {
+	t.Run("snapshot excludes start boundary", func(t *testing.T) {
 		var epochHeights *unittest.EpochHeights
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
 			builder := unittest.NewEpochBuilder(t, mutableState, state)
@@ -222,6 +230,10 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 		})
 	})
 
+	// In this test we construct a root snapshot such that the Previous epoch w.r.t
+	// the snapshot reference block has only the end boundary included in the
+	// sealing segment. Therefore, only FinalBlock should be queriable in the API.
+	// [---<---|--->---]
 	t.Run("root snapshot includes previous epoch end boundary only", func(t *testing.T) {
 		var epoch2Heights *unittest.EpochHeights
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
@@ -258,6 +270,10 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 		})
 	})
 
+	// In this test we construct a root snapshot such that the Previous epoch w.r.t
+	// the snapshot reference block has both start and end boundaries included in the
+	// sealing segment. Therefore, both boundaries should be queriable in the API.
+	// [---<---|---|--->---]
 	t.Run("root snapshot includes previous epoch start and end boundary", func(t *testing.T) {
 		var epoch3Heights *unittest.EpochHeights
 		var epoch2Heights *unittest.EpochHeights
