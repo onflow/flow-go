@@ -767,7 +767,6 @@ func (state *State) AtHeight(height uint64) protocol.Snapshot {
 		// critical storage error
 		return invalid.NewSnapshotf("could not look up block by height: %w", err)
 	}
-	// easy to add
 	return newSnapshotWithIncorporatedReferenceBlock(state, blockID)
 }
 
