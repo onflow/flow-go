@@ -513,6 +513,8 @@ func (proc *procedure) run(
 	// if prechecks are passed, the exec result won't be nil
 	if execResult != nil {
 		res.GasConsumed = execResult.UsedGas
+		res.Index = uint16(txIndex)
+
 		if !execResult.Failed() { // collect vm errors
 			res.ReturnedValue = execResult.ReturnData
 			// If the transaction created a contract, store the creation address in the receipt,
