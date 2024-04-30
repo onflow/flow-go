@@ -3,8 +3,8 @@ package scoring_test
 import (
 	"context"
 	"fmt"
+	"io"
 	"math"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -1167,7 +1167,7 @@ func TestScoringRegistrySilencePeriod(t *testing.T) {
 			}
 		}
 	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.TraceLevel).Hook(hook)
+	logger := zerolog.New(io.Discard).Level(zerolog.TraceLevel).Hook(hook)
 
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
