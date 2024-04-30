@@ -10,6 +10,7 @@ import (
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/crypto/hash"
+
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/result"
 	"github.com/onflow/flow-go/engine/execution/utils"
@@ -151,6 +152,13 @@ func NewBlockComputer(
 	if maxConcurrency < 1 {
 		return nil, fmt.Errorf("invalid maxConcurrency: %d", maxConcurrency)
 	}
+
+	// this is a safeguard to prevent scripts from writing to the program cache on Execution nodes.
+	// writes are only allowed by transactions.
+	if vmCtx.AllowProgramCacheWritesInScripts {
+		return nil, fmt.Errorf("program cache writes are not allowed in scripts on Execution nodes")
+	}
+
 	systemChunkCtx := SystemChunkContext(vmCtx)
 	vmCtx = fvm.NewContextFromParent(
 		vmCtx,

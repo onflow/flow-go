@@ -127,4 +127,8 @@ func TestEmptyEventsMerkleRootHash(t *testing.T) {
 	actualHash, err := flow.EventsMerkleRootHash([]flow.Event{})
 	require.NoError(t, err)
 	require.Equal(t, flow.EmptyEventCollectionID, actualHash)
+
+	actualHash, err = flow.EventsMerkleRootHash(nil)
+	require.NoError(t, err)
+	require.Equal(t, flow.EmptyEventCollectionID, actualHash)
 }
