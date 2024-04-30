@@ -121,11 +121,6 @@ func (segment *SealingSegment) IsSporkRoot() bool {
 	return len(segment.Blocks) == 1
 }
 
-func (segment *SealingSegment) IncludesSporkRootBlock() bool {
-	lowest := segment.Lowest()
-	segment.LatestSeals
-}
-
 // FinalizedSeal returns the seal that seals the lowest block.
 // Per specification, this seal must be included in a SealingSegment.
 // The SealingSegment must be validated.

@@ -396,15 +396,6 @@ func (q *EpochQuery) Current() protocol.Epoch {
 	if err != nil {
 		return invalid.NewEpochf("could not get current epoch height bounds: %s", err.Error())
 	}
-	// I'm in Current Epoch, an I observe an unkown first height.
-	// CASE 1: I have queried an unfinalized block, no blocks have been finalized in this epoch yet
-	// CASE 2: I have queried any block in an epoch whose first block is
-	//         below my root block.
-	//         - such a block may be finalized or unfinalized
-	// How do I tell the difference?
-	// A: If I know whether the block is finalized, then I can tell:
-	//   - if finalized and no height indexed => boundary below root
-	//   - if unfinalized and no height indexed => boundary unfinalized
 	if isFirstHeightKnown {
 		return inmem.NewEpochWithStartBoundary(setup, commit, firstHeight)
 	}
@@ -460,14 +451,6 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 	setup := entry.PreviousEpochSetup
 	commit := entry.PreviousEpochCommit
 
-	// TODO it is possible that firstHeight and/or finalHeight is unknown here
-	// if firstHeight is unknown -> below root block
-	// if finalHeight is unknown:
-	//   if ref block is finalized -> below root block
-	//   if ref block unfinalized ->
-	//   There are two cases:
-	//     [--|---<---->-*-|--] -> below root block
-	//     [--|---<---->---|*-] -> unfinalized transition
 	firstHeight, finalHeight, firstHeightKnown, finalHeightKnown, err := q.retrieveEpochHeightBounds(setup.Counter)
 	if err != nil {
 		return invalid.NewEpochf("could not get epoch height bounds: %w", err)
