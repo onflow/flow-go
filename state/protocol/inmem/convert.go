@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 )
 
@@ -139,7 +140,7 @@ func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, 
 	if err != nil {
 		return nil, fmt.Errorf("could not get default epoch commit safety threshold: %w", err)
 	}
-	return SnapshotFromBootstrapStateWithParams(root, result, seal, qc, version, threshold)
+	return SnapshotFromBootstrapStateWithParams(root, result, seal, qc, version, threshold, kvstore.NewDefaultKVStore)
 }
 
 // SnapshotFromBootstrapStateWithParams is SnapshotFromBootstrapState
@@ -151,6 +152,7 @@ func SnapshotFromBootstrapStateWithParams(
 	qc *flow.QuorumCertificate,
 	protocolVersion uint,
 	epochCommitSafetyThreshold uint64,
+	kvStoreFactory func(epochStateID flow.Identifier) protocol_state.KVStoreAPI,
 ) (*Snapshot, error) {
 	setup, ok := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	if !ok {
@@ -192,7 +194,7 @@ func SnapshotFromBootstrapStateWithParams(
 
 	rootEpochState := ProtocolStateFromEpochServiceEvents(setup, commit)
 	rootEpochStateID := rootEpochState.ID()
-	rootKvStore := kvstore.NewDefaultKVStore(rootEpochStateID)
+	rootKvStore := kvStoreFactory(rootEpochStateID)
 	if rootKvStore.ID() != root.Payload.ProtocolStateID {
 		return nil, fmt.Errorf("incorrect protocol state ID in root block, expected (%x) but got (%x)",
 			root.Payload.ProtocolStateID, rootKvStore.ID())

@@ -30,30 +30,6 @@ func (_m *KVStoreMutator) GetEpochStateID() flow.Identifier {
 	return r0
 }
 
-// GetInvalidEpochTransitionAttempted provides a mock function with given fields:
-func (_m *KVStoreMutator) GetInvalidEpochTransitionAttempted() (bool, error) {
-	ret := _m.Called()
-
-	var r0 bool
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (bool, error)); ok {
-		return rf()
-	}
-	if rf, ok := ret.Get(0).(func() bool); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetProtocolStateVersion provides a mock function with given fields:
 func (_m *KVStoreMutator) GetProtocolStateVersion() uint64 {
 	ret := _m.Called()
@@ -103,20 +79,6 @@ func (_m *KVStoreMutator) ID() flow.Identifier {
 // SetEpochStateID provides a mock function with given fields: stateID
 func (_m *KVStoreMutator) SetEpochStateID(stateID flow.Identifier) {
 	_m.Called(stateID)
-}
-
-// SetInvalidEpochTransitionAttempted provides a mock function with given fields: attempted
-func (_m *KVStoreMutator) SetInvalidEpochTransitionAttempted(attempted bool) error {
-	ret := _m.Called(attempted)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(bool) error); ok {
-		r0 = rf(attempted)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
 }
 
 // SetVersionUpgrade provides a mock function with given fields: version
