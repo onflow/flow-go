@@ -184,6 +184,11 @@ func (e *Engine) checkShouldStartPreviousEpochComponentsOnStartup(engineCtx irre
 	}
 	prevEpochFinalHeight, err := prevEpoch.FinalHeight()
 	if err != nil {
+		// If we don't know the end boundary of the previous epoch, then our root snapshot
+		// is relatively recent and excludes the most recent epoch boundary.
+		// In this case, because sealing segments contain flow.DefaultTransactionExpiry
+		// many blocks, this is also an indication that we do not need to start up the
+		// previous epoch's consensus components.
 		if errors.Is(err, protocol.ErrUnknownEpochBoundary) {
 			return nil
 		}

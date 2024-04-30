@@ -387,9 +387,8 @@ func (suite *Suite) TestStartAfterEpochBoundary_NotApprovedForCurrentEpoch() {
 }
 
 // TestStartAfterEpochBoundary_PreviousEpochTransitionBeforeRoot tests starting the engine
-// shortly after an epoch transition. However, we have started up with a root snapshot whose
-// sealing segment does not span the previous epoch boundary, hence we should only start up
-// current-epoch components.
+// with a root snapshot whose sealing segment excludes the last epoch boundary.
+// In this case we should only start up current-epoch components.
 func (suite *Suite) TestStartAfterEpochBoundary_PreviousEpochTransitionBeforeRoot() {
 	// we expect 1 ActiveClustersChanged events when the current epoch components are started
 	suite.engineEventsDistributor.On("ActiveClustersChanged", mock.AnythingOfType("flow.ChainIDList")).Once()
@@ -398,7 +397,7 @@ func (suite *Suite) TestStartAfterEpochBoundary_PreviousEpochTransitionBeforeRoo
 	// transition epochs, so that a Previous epoch is queryable
 	suite.TransitionEpoch()
 	prevEpoch := suite.epochs[suite.counter-1]
-	// the finalized height is within [1,tx_expiry] heights of previous epoch final height
+	// Previous epoch end boundary is unknown because it is before our root snapshot
 	prevEpoch.On("FinalHeight").Return(uint64(0), realprotocol.ErrUnknownEpochBoundary)
 
 	suite.StartEngine()
