@@ -167,6 +167,7 @@ func (s *GrpcStateStreamSuite) Ghost() *client.GhostClient {
 
 // TestRestEventStreaming tests gRPC event streaming
 func (s *GrpcStateStreamSuite) TestHappyPath() {
+	unittest.SkipUnless(s.T(), unittest.TEST_FLAKY, "flaky tests: https://github.com/onflow/flow-go/issues/5825")
 	testANURL := fmt.Sprintf("localhost:%s", s.net.ContainerByName(testnet.PrimaryAN).Port(testnet.ExecutionStatePort))
 	sdkClientTestAN, err := getClient(testANURL)
 	s.Require().NoError(err)
