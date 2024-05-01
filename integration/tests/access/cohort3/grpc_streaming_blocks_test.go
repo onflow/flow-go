@@ -104,7 +104,7 @@ func (s *GrpcBlocksStreamSuite) SetupTest() {
 	// add the observer node config
 	observers := []testnet.ObserverConfig{{
 		ContainerName: testnet.PrimaryON,
-		LogLevel:      zerolog.DebugLevel,
+		LogLevel:      zerolog.InfoLevel,
 		AdditionalFlags: []string{
 			fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 			fmt.Sprintf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),

@@ -19,6 +19,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-go-sdk/test"
+
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/engine/ghost/client"
@@ -136,7 +137,7 @@ func (s *GrpcStateStreamSuite) SetupTest() {
 	// add the observer node config
 	observers := []testnet.ObserverConfig{{
 		ContainerName: testnet.PrimaryON,
-		LogLevel:      zerolog.DebugLevel,
+		LogLevel:      zerolog.InfoLevel,
 		AdditionalFlags: []string{
 			fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 			fmt.Sprintf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
@@ -167,6 +168,7 @@ func (s *GrpcStateStreamSuite) Ghost() *client.GhostClient {
 
 // TestRestEventStreaming tests gRPC event streaming
 func (s *GrpcStateStreamSuite) TestHappyPath() {
+	unittest.SkipUnless(s.T(), unittest.TEST_FLAKY, "flaky tests: https://github.com/onflow/flow-go/issues/5825")
 	testANURL := fmt.Sprintf("localhost:%s", s.net.ContainerByName(testnet.PrimaryAN).Port(testnet.ExecutionStatePort))
 	sdkClientTestAN, err := getClient(testANURL)
 	s.Require().NoError(err)
@@ -319,7 +321,8 @@ func (s *GrpcStateStreamSuite) getRPCs() []subscribeEventsRPCTest {
 		{
 			name: "SubscribeEvents",
 			call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, _ interface{}, filter *executiondata.EventFilter) func() (*executiondata.SubscribeEventsResponse, error) {
-				//nolint: staticcheck
+				// Ignore deprecation warning. keeping these tests until endpoint is removed
+				//nolint:staticcheck
 				stream, err := client.SubscribeEvents(ctx, &executiondata.SubscribeEventsRequest{
 					StartBlockId:         convert.IdentifierToMessage(flow.ZeroID),
 					StartBlockHeight:     0,
