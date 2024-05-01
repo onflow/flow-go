@@ -116,7 +116,7 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 	s.observerName = testnet.PrimaryON
 	observers := []testnet.ObserverConfig{{
 		ContainerName: s.observerName,
-		LogLevel:      zerolog.DebugLevel,
+		LogLevel:      zerolog.InfoLevel,
 		AdditionalFlags: []string{
 			fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 			"--execution-data-sync-enabled=true",
