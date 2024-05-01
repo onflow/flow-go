@@ -1740,6 +1740,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.unsecureGrpcServer,
 			builder.stateStreamBackend,
 			builder.stateStreamConf,
+			builder.ExecutionIndexer,
 		)
 		if err != nil {
 			return nil, err

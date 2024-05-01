@@ -1673,6 +1673,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.unsecureGrpcServer,
 				builder.stateStreamBackend,
 				builder.stateStreamConf,
+				builder.ExecutionIndexer,
 			)
 			if err != nil {
 				return nil, err

@@ -215,6 +215,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		suite.unsecureGrpcServer,
 		nil,
 		stateStreamConfig,
+		nil,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()

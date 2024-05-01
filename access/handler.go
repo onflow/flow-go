@@ -7,6 +7,8 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -27,6 +29,7 @@ type Handler struct {
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
 	finalizedHeaderCache module.FinalizedHeaderCache
 	me                   module.Local
+	executionIndexer     *indexer.Indexer
 }
 
 // HandlerOption is used to hand over optional constructor parameters
@@ -196,7 +199,10 @@ func (h *Handler) GetCollectionByID(
 	ctx context.Context,
 	req *access.GetCollectionByIDRequest,
 ) (*access.CollectionResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	id, err := convert.CollectionID(req.GetId())
 	if err != nil {
@@ -224,7 +230,10 @@ func (h *Handler) SendTransaction(
 	ctx context.Context,
 	req *access.SendTransactionRequest,
 ) (*access.SendTransactionResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	txMsg := req.GetTransaction()
 
@@ -251,7 +260,10 @@ func (h *Handler) GetTransaction(
 	ctx context.Context,
 	req *access.GetTransactionRequest,
 ) (*access.TransactionResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	id, err := convert.TransactionID(req.GetId())
 	if err != nil {
@@ -274,7 +286,10 @@ func (h *Handler) GetTransactionResult(
 	ctx context.Context,
 	req *access.GetTransactionRequest,
 ) (*access.TransactionResultResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	transactionID, err := convert.TransactionID(req.GetId())
 	if err != nil {
@@ -315,7 +330,10 @@ func (h *Handler) GetTransactionResultsByBlockID(
 	ctx context.Context,
 	req *access.GetTransactionsByBlockIDRequest,
 ) (*access.TransactionResultsResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	id, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
@@ -339,7 +357,10 @@ func (h *Handler) GetSystemTransaction(
 	ctx context.Context,
 	req *access.GetSystemTransactionRequest,
 ) (*access.TransactionResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	id, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
@@ -361,7 +382,10 @@ func (h *Handler) GetSystemTransactionResult(
 	ctx context.Context,
 	req *access.GetSystemTransactionResultRequest,
 ) (*access.TransactionResultResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	id, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
@@ -383,7 +407,10 @@ func (h *Handler) GetTransactionsByBlockID(
 	ctx context.Context,
 	req *access.GetTransactionsByBlockIDRequest,
 ) (*access.TransactionsResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	id, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
@@ -407,7 +434,10 @@ func (h *Handler) GetTransactionResultByIndex(
 	ctx context.Context,
 	req *access.GetTransactionByIndexRequest,
 ) (*access.TransactionResultResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	blockID, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
@@ -432,7 +462,10 @@ func (h *Handler) GetAccount(
 	ctx context.Context,
 	req *access.GetAccountRequest,
 ) (*access.GetAccountResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	address, err := convert.Address(req.GetAddress(), h.chain)
 	if err != nil {
@@ -460,7 +493,10 @@ func (h *Handler) GetAccountAtLatestBlock(
 	ctx context.Context,
 	req *access.GetAccountAtLatestBlockRequest,
 ) (*access.AccountResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	address, err := convert.Address(req.GetAddress(), h.chain)
 	if err != nil {
@@ -487,7 +523,10 @@ func (h *Handler) GetAccountAtBlockHeight(
 	ctx context.Context,
 	req *access.GetAccountAtBlockHeightRequest,
 ) (*access.AccountResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	address, err := convert.Address(req.GetAddress(), h.chain)
 	if err != nil {
@@ -515,7 +554,10 @@ func (h *Handler) ExecuteScriptAtLatestBlock(
 	ctx context.Context,
 	req *access.ExecuteScriptAtLatestBlockRequest,
 ) (*access.ExecuteScriptResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	script := req.GetScript()
 	arguments := req.GetArguments()
@@ -536,7 +578,10 @@ func (h *Handler) ExecuteScriptAtBlockHeight(
 	ctx context.Context,
 	req *access.ExecuteScriptAtBlockHeightRequest,
 ) (*access.ExecuteScriptResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	script := req.GetScript()
 	arguments := req.GetArguments()
@@ -558,8 +603,10 @@ func (h *Handler) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	req *access.ExecuteScriptAtBlockIDRequest,
 ) (*access.ExecuteScriptResponse, error) {
-	metadata := h.buildMetadataResponse()
-
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 	script := req.GetScript()
 	arguments := req.GetArguments()
 	blockID := convert.MessageToIdentifier(req.GetBlockId())
@@ -580,7 +627,10 @@ func (h *Handler) GetEventsForHeightRange(
 	ctx context.Context,
 	req *access.GetEventsForHeightRangeRequest,
 ) (*access.EventsResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	eventType, err := convert.EventType(req.GetType())
 	if err != nil {
@@ -612,7 +662,10 @@ func (h *Handler) GetEventsForBlockIDs(
 	ctx context.Context,
 	req *access.GetEventsForBlockIDsRequest,
 ) (*access.EventsResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	eventType, err := convert.EventType(req.GetType())
 	if err != nil {
@@ -644,7 +697,10 @@ func (h *Handler) GetEventsForBlockIDs(
 
 // GetLatestProtocolStateSnapshot returns the latest serializable Snapshot
 func (h *Handler) GetLatestProtocolStateSnapshot(ctx context.Context, req *access.GetLatestProtocolStateSnapshotRequest) (*access.ProtocolStateSnapshotResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	snapshot, err := h.api.GetLatestProtocolStateSnapshot(ctx)
 	if err != nil {
@@ -659,7 +715,10 @@ func (h *Handler) GetLatestProtocolStateSnapshot(ctx context.Context, req *acces
 
 // GetProtocolStateSnapshotByBlockID returns serializable Snapshot by blockID
 func (h *Handler) GetProtocolStateSnapshotByBlockID(ctx context.Context, req *access.GetProtocolStateSnapshotByBlockIDRequest) (*access.ProtocolStateSnapshotResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	blockID := convert.MessageToIdentifier(req.GetBlockId())
 
@@ -676,7 +735,10 @@ func (h *Handler) GetProtocolStateSnapshotByBlockID(ctx context.Context, req *ac
 
 // GetProtocolStateSnapshotByHeight returns serializable Snapshot by block height
 func (h *Handler) GetProtocolStateSnapshotByHeight(ctx context.Context, req *access.GetProtocolStateSnapshotByHeightRequest) (*access.ProtocolStateSnapshotResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	snapshot, err := h.api.GetProtocolStateSnapshotByHeight(ctx, req.GetBlockHeight())
 	if err != nil {
@@ -693,7 +755,10 @@ func (h *Handler) GetProtocolStateSnapshotByHeight(ctx context.Context, req *acc
 // AN might receive multiple receipts with conflicting results for unsealed blocks.
 // If this case happens, since AN is not able to determine which result is the correct one until the block is sealed, it has to pick one result to respond to this query. For now, we return the result from the latest received receipt.
 func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *access.GetExecutionResultForBlockIDRequest) (*access.ExecutionResultForBlockIDResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	blockID := convert.MessageToIdentifier(req.GetBlockId())
 
@@ -707,7 +772,10 @@ func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *access.
 
 // GetExecutionResultByID returns the execution result for the given ID.
 func (h *Handler) GetExecutionResultByID(ctx context.Context, req *access.GetExecutionResultByIDRequest) (*access.ExecutionResultByIDResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	resultID := convert.MessageToIdentifier(req.GetId())
 
@@ -1137,7 +1205,10 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 }
 
 func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flow.BlockStatus) (*access.BlockResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(block.Header)
 	if err != nil {
@@ -1162,7 +1233,10 @@ func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flo
 }
 
 func (h *Handler) blockHeaderResponse(header *flow.Header, status flow.BlockStatus) (*access.BlockHeaderResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(header)
 	if err != nil {
@@ -1182,16 +1256,26 @@ func (h *Handler) blockHeaderResponse(header *flow.Header, status flow.BlockStat
 }
 
 // buildMetadataResponse builds and returns the metadata response object.
-func (h *Handler) buildMetadataResponse() *entities.Metadata {
+func (h *Handler) buildMetadataResponse() (*entities.Metadata, error) {
 	lastFinalizedHeader := h.finalizedHeaderCache.Get()
 	blockId := lastFinalizedHeader.ID()
 	nodeId := h.me.NodeID()
+
+	var highestIndexedHeight uint64
+	if h.executionIndexer != nil {
+		var err error
+		highestIndexedHeight, err = h.executionIndexer.HighestIndexedHeight()
+		if err != nil {
+			return nil, rpc.ConvertError(err, "could not get highest indexed height", codes.Internal)
+		}
+	}
 
 	return &entities.Metadata{
 		LatestFinalizedBlockId: blockId[:],
 		LatestFinalizedHeight:  lastFinalizedHeader.Height,
 		NodeId:                 nodeId[:],
-	}
+		HighestIndexedHeight:   highestIndexedHeight,
+	}, nil
 }
 
 func executionResultToMessages(er *flow.ExecutionResult, metadata *entities.Metadata) (*access.ExecutionResultForBlockIDResponse, error) {
@@ -1210,6 +1294,12 @@ func executionResultToMessages(er *flow.ExecutionResult, metadata *entities.Meta
 func WithBlockSignerDecoder(signerIndicesDecoder hotstuff.BlockSignerDecoder) func(*Handler) {
 	return func(handler *Handler) {
 		handler.signerIndicesDecoder = signerIndicesDecoder
+	}
+}
+
+func WithExecutionIndexer(executionIndexer *indexer.Indexer) func(*Handler) {
+	return func(handler *Handler) {
+		handler.executionIndexer = executionIndexer
 	}
 }
 

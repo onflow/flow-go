@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
+
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/credentials"
 
@@ -87,6 +89,7 @@ func NewBuilder(log zerolog.Logger,
 	unsecureGrpcServer *grpcserver.GrpcServer,
 	stateStreamBackend state_stream.API,
 	stateStreamConfig statestreambackend.Config,
+	executionIndexer *indexer.Indexer,
 ) (*RPCEngineBuilder, error) {
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -132,7 +135,7 @@ func NewBuilder(log zerolog.Logger,
 		AddWorker(eng.shutdownWorker).
 		Build()
 
-	builder := NewRPCEngineBuilder(eng, me, finalizedCache)
+	builder := NewRPCEngineBuilder(eng, me, finalizedCache, executionIndexer)
 	if rpcMetricsEnabled {
 		builder.WithMetrics()
 	}
