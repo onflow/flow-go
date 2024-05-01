@@ -113,7 +113,7 @@ require (
 )
 
 require (
-	github.com/ipfs/boxo v0.19.0
+	github.com/ipfs/boxo v0.17.1-0.20240131173518-89bceff34bf1
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.3 // indirect
 	github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 // indirect
 	go.uber.org/mock v0.4.0 // indirect
