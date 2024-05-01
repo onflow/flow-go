@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -344,8 +345,13 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 				if err != nil {
 					tb.Fatal("setup account failed, error decoding events")
 				}
-				addr = flow.ConvertAddress(
-					data.(cadence.Event).Fields[0].(cadence.Address))
+
+				address := cadence.SearchFieldByName(
+					data.(cadence.Event),
+					stdlib.AccountEventAddressParameter.Identifier,
+				).(cadence.Address)
+
+				addr = flow.ConvertAddress(address)
 				break
 			}
 		}

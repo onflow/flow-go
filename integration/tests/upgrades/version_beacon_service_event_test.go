@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 
@@ -243,7 +244,7 @@ func (s *TestServiceEventVersionControl) getFreezePeriod(
 
 	s.Require().True(is, "version freezePeriod script returned unknown type")
 
-	return cadenceBuffer.ToGoValue().(uint64)
+	return uint64(cadenceBuffer)
 }
 
 type versionBoundary struct {

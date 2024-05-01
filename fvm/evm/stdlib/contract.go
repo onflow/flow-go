@@ -56,7 +56,12 @@ const (
 
 	evmBalanceTypeQualifiedIdentifier = "EVM.Balance"
 
-	evmResultTypeQualifiedIdentifier = "EVM.Result"
+	evmResultTypeQualifiedIdentifier       = "EVM.Result"
+	evmResultTypeStatusFieldName           = "status"
+	evmResultTypeErrorCodeFieldName        = "errorCode"
+	evmResultTypeGasUsedFieldName          = "gasUsed"
+	evmResultTypeDataFieldName             = "data"
+	evmResultTypeDeployedContractFieldName = "deployedContract"
 
 	evmStatusTypeQualifiedIdentifier = "EVM.Status"
 
@@ -2269,37 +2274,45 @@ func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, e
 	if !ok {
 		return nil, fmt.Errorf("invalid input: unexpected value type")
 	}
-	if len(str.Fields) != 5 {
-		return nil, fmt.Errorf("invalid input: field count mismatch")
+
+	fields := cadence.FieldsMappedByName(str)
+
+	const expectedFieldCount = 5
+	if len(fields) != expectedFieldCount {
+		return nil, fmt.Errorf(
+			"invalid input: field count mismatch: expected %d, got %d",
+			expectedFieldCount,
+			len(fields),
+		)
 	}
 
-	statusEnum, ok := str.Fields[0].(cadence.Enum)
+	statusEnum, ok := fields[evmResultTypeStatusFieldName].(cadence.Enum)
 	if !ok {
 		return nil, fmt.Errorf("invalid input: unexpected type for status field")
 	}
 
-	status, ok := statusEnum.Fields[0].(cadence.UInt8)
+	status, ok := cadence.FieldsMappedByName(statusEnum)[sema.EnumRawValueFieldName].(cadence.UInt8)
 	if !ok {
 		return nil, fmt.Errorf("invalid input: unexpected type for status field")
 	}
 
-	errorCode, ok := str.Fields[1].(cadence.UInt64)
+	errorCode, ok := fields[evmResultTypeErrorCodeFieldName].(cadence.UInt64)
 	if !ok {
 		return nil, fmt.Errorf("invalid input: unexpected type for error code field")
 	}
 
-	gasUsed, ok := str.Fields[2].(cadence.UInt64)
+	gasUsed, ok := fields[evmResultTypeGasUsedFieldName].(cadence.UInt64)
 	if !ok {
 		return nil, fmt.Errorf("invalid input: unexpected type for gas field")
 	}
 
-	data, ok := str.Fields[3].(cadence.Array)
+	data, ok := fields[evmResultTypeDataFieldName].(cadence.Array)
 	if !ok {
 		return nil, fmt.Errorf("invalid input: unexpected type for data field")
 	}
 
 	var deployedAddress *cadence.Array
-	switch v := str.Fields[4].(type) {
+	switch v := fields[evmResultTypeDeployedContractFieldName].(type) {
 	case cadence.Optional:
 		if v.Value != nil {
 			arr, ok := v.Value.(cadence.Array)
@@ -2318,7 +2331,7 @@ func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, e
 	if deployedAddress != nil {
 		convertedAddress := make([]byte, len(deployedAddress.Values))
 		for i, val := range deployedAddress.Values {
-			convertedAddress[i] = val.(cadence.UInt8).ToGoValue().(uint8)
+			convertedAddress[i] = byte(val.(cadence.UInt8))
 		}
 		addr := types.Address(convertedAddress)
 		convertedDeployedAddress = &addr
@@ -2326,7 +2339,7 @@ func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, e
 
 	convertedData := make([]byte, len(data.Values))
 	for i, value := range data.Values {
-		convertedData[i] = value.(cadence.UInt8).ToGoValue().(uint8)
+		convertedData[i] = byte(value.(cadence.UInt8))
 	}
 
 	return &types.ResultSummary{

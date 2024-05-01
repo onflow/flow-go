@@ -327,7 +327,7 @@ func (c *balanceProcessor) balance(address flow.Address) (uint64, bool, error) {
 	var balance uint64
 	var hasVault bool
 	if output.Err == nil && output.Value != nil {
-		balance = output.Value.ToGoValue().(uint64)
+		balance = uint64(output.Value.(cadence.UFix64))
 		hasVault = true
 	} else {
 		hasVault = false
@@ -347,7 +347,7 @@ func (c *balanceProcessor) fusdBalance(address flow.Address) (uint64, error) {
 
 	var balance uint64
 	if output.Err == nil && output.Value != nil {
-		balance = output.Value.ToGoValue().(uint64)
+		balance = uint64(output.Value.(cadence.UFix64))
 	}
 	return balance, nil
 }
