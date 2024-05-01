@@ -133,7 +133,7 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
 	}
 
-	dkgPhase2FinalView, err := getField[cadence.UInt64](fields, "DKGPhase3FinalView")
+	dkgPhase2FinalView, err := getField[cadence.UInt64](fields, "DKGPhase2FinalView")
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
 	}
