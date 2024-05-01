@@ -6,6 +6,54 @@ import "FlowToken"
 access(all)
 contract EVM {
 
+    /// Block executed event is emitted when a new block is created,
+    /// which always happens when a transaction is executed.
+    access(all)
+    event BlockExecuted(
+        // height or number of the block
+        height: UInt64,
+        // hash of the block
+        hash: String,
+        // timestamp of the block creation
+        timestamp: UInt64,
+        // total Flow supply
+        totalSupply: Int,
+        // all gas used in the block by transactions included
+        totalGasUsed: UInt64,
+        // parent block hash
+        parentHash: String,
+        // hash of all the transaction receipts
+        receiptRoot: String,
+        // all the transactions included in the block
+        transactionHashes: [String]
+    )
+
+    /// Transaction executed event is emitted everytime a transaction
+    /// is executed by the EVM (even if failed).
+    access(all)
+    event TransactionExecuted(
+        // hash of the transaction
+        hash: String,
+        // index of the transaction in a block
+        index: UInt16,
+        // type of the transaction
+        type: UInt8,
+        // RLP and hex encoded transaction payload
+        payload: String,
+        // code indicating a specific validation (201-300) or execution (301-400) error
+        errorCode: UInt16,
+        // the amount of gas transaction used
+        gasConsumed: UInt64,
+        // if transaction was a deployment contains a newly deployed contract address
+        contractAddress: String,
+        // RLP and hex encoded logs
+        logs: String,
+        // block height in which transaction was inclued
+        blockHeight: UInt64,
+        // block hash in which transaction was included
+        blockHash: String
+    )
+
     access(all)
     event CadenceOwnedAccountCreated(addressBytes: [UInt8; 20])
 
@@ -183,21 +231,34 @@ contract EVM {
 
         /// returns the data that is returned from
         /// the evm for the call. For coa.deploy
-        /// calls it returns the address bytes of the
-        /// newly deployed contract.
+        /// calls it returns the code deployed to
+        /// the address provided in the contractAddress field.
         access(all)
         let data: [UInt8]
+
+        /// returns the newly deployed contract address
+        /// if the transaction caused such a deployment
+        /// otherwise the value is nil.
+        access(all)
+        let deployedContract: EVMAddress?
 
         init(
             status: Status,
             errorCode: UInt64,
             gasUsed: UInt64,
-            data: [UInt8]
+            data: [UInt8],
+            contractAddress: [UInt8; 20]?
         ) {
             self.status = status
             self.errorCode = errorCode
             self.gasUsed = gasUsed
             self.data = data
+
+            if let addressBytes = contractAddress {
+                self.deployedContract = EVMAddress(bytes: addressBytes)
+            } else {
+                self.deployedContract = nil
+            }
         }
     }
 
@@ -270,20 +331,20 @@ contract EVM {
         }
 
         /// Deploys a contract to the EVM environment.
-        /// Returns the address of the newly deployed contract
+        /// Returns the result which contains address of
+        /// the newly deployed contract
         access(all)
         fun deploy(
             code: [UInt8],
             gasLimit: UInt64,
             value: Balance
-        ): EVMAddress {
-            let addressBytes = InternalEVM.deploy(
+        ): Result {
+            return InternalEVM.deploy(
                 from: self.addressBytes,
                 code: code,
                 gasLimit: gasLimit,
                 value: value.attoflow
-            )
-            return EVMAddress(bytes: addressBytes)
+            ) as! Result
         }
 
         /// Calls a function with the given data.
@@ -391,6 +452,29 @@ contract EVM {
             message: "tx is not valid for execution"
         )
         return runResult
+    }
+
+    /// Simulates running unsigned RLP-encoded transaction using
+    /// the from address as the signer.
+    /// The transaction state changes are not persisted.
+    /// This is useful for gas estimation or calling view contract functions.
+    access(all)
+    fun dryRun(tx: [UInt8], from: EVMAddress): Result {
+        return InternalEVM.dryRun(
+            tx: tx,
+            from: from.bytes,
+        ) as! Result
+    }
+
+    /// Runs a batch of RLP-encoded EVM transactions, deducts the gas fees,
+    /// and deposits the gas fees into the provided coinbase address.
+    /// An invalid transaction is not executed and not included in the block.
+    access(all)
+    fun batchRun(txs: [[UInt8]], coinbase: EVMAddress): [Result] {
+        return InternalEVM.batchRun(
+            txs: txs,
+            coinbase: coinbase.bytes,
+        ) as! [Result]
     }
 
     access(all)
