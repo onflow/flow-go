@@ -232,7 +232,7 @@ func (s *Suite) NodeHasVoted(nodeID flow.Identifier) bool {
 		return false
 	}
 
-	return result.Value.ToGoValue().(bool)
+	return bool(result.Value.(cadence.Bool))
 }
 
 /**

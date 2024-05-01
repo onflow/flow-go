@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/mock"
@@ -1629,11 +1630,14 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		// to flow.address)
 		data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 		require.NoError(t, err)
-		address := flow.ConvertAddress(
-			data.(cadence.Event).Fields[0].(cadence.Address))
 
-		return address, privateKey.PublicKey(
-			fvm.AccountKeyWeightThreshold).PublicKey
+		address := flow.ConvertAddress(
+			cadence.SearchFieldByName(
+				data.(cadence.Event),
+				stdlib.AccountEventAddressParameter.Identifier,
+			).(cadence.Address),
+		)
+		return address, privateKey.PublicKey(fvm.AccountKeyWeightThreshold).PublicKey
 	}
 
 	addressGen := chain.NewAddressGenerator()
@@ -1814,8 +1818,13 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 
 	data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 	require.NoError(t, err)
+
 	address := flow.ConvertAddress(
-		data.(cadence.Event).Fields[0].(cadence.Address))
+		cadence.SearchFieldByName(
+			data.(cadence.Event),
+			stdlib.AccountEventAddressParameter.Identifier,
+		).(cadence.Address),
+	)
 
 	// convert LastSystemAccountIndex + 1 to a flow.Address
 	expected := flow.HexToAddress(fmt.Sprintf("0x%02x", systemcontracts.LastSystemAccountIndex+1))
@@ -1855,7 +1864,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		_, output, err := vm.Run(ctx, script, storageSnapshot)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
-		return output.Value.ToGoValue().(uint64)
+		return uint64(output.Value.(cadence.UFix64))
 	}
 
 	t.Run("Transaction fails because of storage", newVMTest().withBootstrapProcedureOptions(

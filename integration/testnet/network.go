@@ -740,7 +740,7 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 			Image: "gcr.io/flow-container-registry/observer:latest",
 			User:  currentUser(),
 			Cmd: append([]string{
-				"--bind=0.0.0.0:0",
+				"--bind=0.0.0.0:3569",
 				fmt.Sprintf("--bootstrapdir=%s", DefaultBootstrapDir),
 				fmt.Sprintf("--datadir=%s", DefaultFlowDBDir),
 				fmt.Sprintf("--secretsdir=%s", DefaultFlowSecretsDBDir),

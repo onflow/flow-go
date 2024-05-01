@@ -476,7 +476,12 @@ func (c *Container) SDKClient() (*sdkclient.Client, error) {
 		return nil, fmt.Errorf("container does not implement flow.access.AccessAPI")
 	}
 
-	return sdkclient.NewClient(c.Addr(GRPCPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	return sdkclient.NewClient(
+		c.Addr(GRPCPort),
+		sdkclient.WithGRPCDialOptions(
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		),
+	)
 }
 
 // GhostClient returns a ghostnode client that connects to this node.

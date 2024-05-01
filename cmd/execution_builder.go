@@ -17,6 +17,7 @@ import (
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
 	badger "github.com/ipfs/go-ds-badger2"
+	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -1424,8 +1425,8 @@ func getContractEpochCounter(
 		return 0, fmt.Errorf("could not read epoch counter, script returned no value")
 	}
 
-	epochCounter := output.Value.ToGoValue().(uint64)
-	return epochCounter, nil
+	epochCounter := output.Value.(cadence.UInt64)
+	return uint64(epochCounter), nil
 }
 
 // copy the checkpoint files from the bootstrap folder to the execution state folder

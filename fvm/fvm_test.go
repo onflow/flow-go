@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	stdlib2 "github.com/onflow/cadence/runtime/stdlib"
+
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 
 	"github.com/onflow/cadence"
@@ -22,7 +24,6 @@ import (
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	flowSdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
@@ -351,7 +352,7 @@ func TestHashing(t *testing.T) {
 			if err == nil && output.Err == nil {
 				cadenceArray := output.Value.(cadence.Array)
 				for _, value := range cadenceArray.Values {
-					byteResult = append(byteResult, value.(cadence.UInt8).ToGoValue().(uint8))
+					byteResult = append(byteResult, uint8(value.(cadence.UInt8)))
 				}
 			}
 
@@ -383,7 +384,7 @@ func TestHashing(t *testing.T) {
 			result1 := make([]byte, 0)
 			cadenceArray := output.Value.(cadence.Array)
 			for _, value := range cadenceArray.Values {
-				result1 = append(result1, value.(cadence.UInt8).ToGoValue().(uint8))
+				result1 = append(result1, uint8(value.(cadence.UInt8)))
 			}
 
 			code = hashScript(algo.Name())
@@ -398,7 +399,7 @@ func TestHashing(t *testing.T) {
 			result2 := make([]byte, 0)
 			cadenceArray = output.Value.(cadence.Array)
 			for _, value := range cadenceArray.Values {
-				result2 = append(result2, value.(cadence.UInt8).ToGoValue().(uint8))
+				result2 = append(result2, uint8(value.(cadence.UInt8)))
 			}
 
 			result3, err := fvmCrypto.HashWithTag(fvmCrypto.RuntimeToCryptoHashingAlgorithm(algo), "", data)
@@ -623,7 +624,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		_, output, err := vm.Run(ctx, script, snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
-		return output.Value.ToGoValue().(uint64)
+		return uint64(output.Value.(cadence.UFix64))
 	}
 
 	type testCase struct {
@@ -637,7 +638,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 	txFees := uint64(1_000)              // 0.00001
 	fundingAmount := uint64(100_000_000) // 1.0
 	transferAmount := uint64(123_456)
-	minimumStorageReservation := fvm.DefaultMinimumStorageReservation.ToGoValue().(uint64)
+	minimumStorageReservation := uint64(fvm.DefaultMinimumStorageReservation)
 
 	chain := flow.Testnet.Chain()
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
@@ -712,23 +713,21 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 				event := payload.(cadence.Event)
 
-				var actualTXFees any
-				var actualInclusionEffort any
-				var actualExecutionEffort any
-				for i, f := range event.EventType.Fields {
-					switch f.Identifier {
-					case "amount":
-						actualTXFees = event.Fields[i].ToGoValue()
-					case "executionEffort":
-						actualExecutionEffort = event.Fields[i].ToGoValue()
-					case "inclusionEffort":
-						actualInclusionEffort = event.Fields[i].ToGoValue()
-					}
-				}
+				fields := cadence.FieldsMappedByName(event)
 
-				require.Equal(t, txFees, actualTXFees)
+				actualTXFees := fields["amount"]
+				actualExecutionEffort := fields["executionEffort"]
+				actualInclusionEffort := fields["inclusionEffort"]
+
+				require.Equal(t,
+					txFees,
+					uint64(actualTXFees.(cadence.UFix64)),
+				)
 				// Inclusion effort should be equivalent to 1.0 UFix64
-				require.Equal(t, uint64(100_000_000), actualInclusionEffort)
+				require.Equal(t,
+					uint64(100_000_000),
+					uint64(actualInclusionEffort.(cadence.UFix64)),
+				)
 				// Execution effort should be non-0
 				require.Greater(t, actualExecutionEffort, uint64(0))
 
@@ -963,8 +962,13 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			// read the address of the account created (e.g. "0x01" and convert it to flow.address)
 			data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 			require.NoError(t, err)
+
 			address := flow.ConvertAddress(
-				data.(cadence.Event).Fields[0].(cadence.Address))
+				cadence.SearchFieldByName(
+					data.(cadence.Event),
+					stdlib2.AccountEventAddressParameter.Identifier,
+				).(cadence.Address),
+			)
 
 			// ==== Transfer tokens to new account ====
 			txBody = transferTokensTx(chain).
@@ -1465,17 +1469,14 @@ func TestSettingExecutionWeights(t *testing.T) {
 					require.NoError(t, err)
 
 					ev := v.(cadence.Event)
-					var actualExecutionEffort any
-					for i, f := range ev.Type().(*cadence.EventType).Fields {
-						if f.Identifier == "executionEffort" {
-							actualExecutionEffort = ev.Fields[i].ToGoValue()
-						}
-					}
+
+					actualExecutionEffort := cadence.SearchFieldByName(ev, "executionEffort")
 
 					require.Equal(
 						t,
 						maxExecutionEffort,
-						actualExecutionEffort)
+						uint64(actualExecutionEffort.(cadence.UFix64)),
+					)
 				}
 			}
 			unittest.EnsureEventsIndexSeq(t, output.Events, chain.ChainID())
@@ -2322,8 +2323,13 @@ func TestInteractionLimit(t *testing.T) {
 			if err != nil {
 				return snapshotTree, err
 			}
+
 			address = flow.ConvertAddress(
-				data.(cadence.Event).Fields[0].(cadence.Address))
+				cadence.SearchFieldByName(
+					data.(cadence.Event),
+					stdlib2.AccountEventAddressParameter.Identifier,
+				).(cadence.Address),
+			)
 
 			// ==== Transfer tokens to new account ====
 			txBody = transferTokensTx(chain).
@@ -3052,7 +3058,19 @@ func TestEVM(t *testing.T) {
 			require.NoError(t, output.Err)
 			require.Len(t, output.Events, 7)
 
-			evmLocation := flowSdk.EVMLocation{}
+			txExe, blockExe := output.Events[4], output.Events[5]
+			txExecutedID := common.NewAddressLocation(
+				nil,
+				common.Address(sc.EVMContract.Address),
+				string(types.EventTypeTransactionExecuted),
+			).ID()
+			blockExecutedID := common.NewAddressLocation(
+				nil,
+				common.Address(sc.EVMContract.Address),
+				string(types.EventTypeBlockExecuted),
+			).ID()
+			assert.Equal(t, txExecutedID, string(txExe.Type))
+			assert.Equal(t, blockExecutedID, string(blockExe.Type))
 
 			// convert events to type ids
 			eventTypeIDs := make([]common.TypeID, 0, len(output.Events))
@@ -3064,12 +3082,12 @@ func TestEVM(t *testing.T) {
 			assert.ElementsMatch(
 				t,
 				[]common.TypeID{
-					evmLocation.TypeID(nil, string(types.EventTypeTransactionExecuted)),
-					evmLocation.TypeID(nil, string(types.EventTypeBlockExecuted)),
+					common.TypeID(txExecutedID),
+					common.TypeID(blockExecutedID),
 					"A.f8d6e0586b0a20c7.EVM.CadenceOwnedAccountCreated",
 					"A.ee82856bf20e2aa6.FungibleToken.Withdrawn",
-					evmLocation.TypeID(nil, string(types.EventTypeTransactionExecuted)),
-					evmLocation.TypeID(nil, string(types.EventTypeBlockExecuted)),
+					common.TypeID(txExecutedID),
+					common.TypeID(blockExecutedID),
 					"A.f8d6e0586b0a20c7.EVM.FLOWTokensDeposited",
 				},
 				eventTypeIDs,

@@ -1171,7 +1171,7 @@ func TestCoreContractUsage(t *testing.T) {
 		require.Equal(t, expected, actual)
 	})
 
-	t.Run("&NonFungibleToken.Collection => auth(Withdraw | Owner) &{NonFungibleToken.Collection}", func(t *testing.T) {
+	t.Run("&NonFungibleToken.Collection => auth(Withdraw) &{NonFungibleToken.Collection}", func(t *testing.T) {
 		t.Parallel()
 
 		systemContracts := systemcontracts.SystemContractsForChain(chainID)
@@ -1197,7 +1197,6 @@ func TestCoreContractUsage(t *testing.T) {
 		)
 
 		const nonFungibleTokenWithdrawTypeQualifiedIdentifier = nonFungibleTokenContractName + ".Withdraw"
-		const nonFungibleTokenOwnerTypeQualifiedIdentifier = nonFungibleTokenContractName + ".Owner"
 		expected := interpreter.NewReferenceStaticType(
 			nil,
 			interpreter.NewEntitlementSetAuthorization(
@@ -1205,11 +1204,10 @@ func TestCoreContractUsage(t *testing.T) {
 				func() []common.TypeID {
 					return []common.TypeID{
 						nonFungibleTokenContractLocation.TypeID(nil, nonFungibleTokenWithdrawTypeQualifiedIdentifier),
-						nonFungibleTokenContractLocation.TypeID(nil, nonFungibleTokenOwnerTypeQualifiedIdentifier),
 					}
 				},
-				2,
-				sema.Disjunction,
+				1,
+				sema.Conjunction,
 			),
 			interpreter.NewIntersectionStaticType(
 				nil,

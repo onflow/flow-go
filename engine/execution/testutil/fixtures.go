@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -290,11 +291,20 @@ func CreateAccountsWithSimpleAddresses(
 			if event.Type == flow.EventAccountCreated {
 				data, err := ccf.Decode(nil, event.Payload)
 				if err != nil {
-					return snapshotTree, nil, errors.New(
-						"error decoding events")
+					return snapshotTree, nil, errors.New("error decoding events")
 				}
-				addr = flow.ConvertAddress(
-					data.(cadence.Event).Fields[0].(cadence.Address))
+
+				event, ok := data.(cadence.Event)
+				if !ok {
+					return snapshotTree, nil, errors.New("error decoding events")
+				}
+
+				address := cadence.SearchFieldByName(
+					event,
+					stdlib.AccountEventAddressParameter.Identifier,
+				).(cadence.Address)
+
+				addr = flow.ConvertAddress(address)
 				break
 			}
 		}
