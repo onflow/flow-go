@@ -90,11 +90,13 @@ func main() {
 	for _, addr := range accessNodeAddrs {
 		client, err := client.NewClient(
 			addr,
-			grpc.WithDefaultCallOptions(
-				grpc.MaxCallRecvMsgSize(defaultMaxMsgSize),
-				grpc.MaxCallSendMsgSize(defaultMaxMsgSize),
+			client.WithGRPCDialOptions(
+				grpc.WithDefaultCallOptions(
+					grpc.MaxCallRecvMsgSize(defaultMaxMsgSize),
+					grpc.MaxCallSendMsgSize(defaultMaxMsgSize),
+				),
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
 			),
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
 		)
 		if err != nil {
 			log.Fatal().Str("addr", addr).Err(err).Msgf("unable to initialize flow client")

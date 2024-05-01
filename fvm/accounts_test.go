@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/format"
+	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -73,8 +74,15 @@ func createAccount(
 
 	data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 	require.NoError(t, err)
+
+	event := data.(cadence.Event)
+
 	address := flow.ConvertAddress(
-		data.(cadence.Event).Fields[0].(cadence.Address))
+		cadence.SearchFieldByName(
+			event,
+			stdlib.AccountEventAddressParameter.Identifier,
+		).(cadence.Address),
+	)
 
 	return snapshotTree, address
 }
@@ -373,8 +381,15 @@ func TestCreateAccount(t *testing.T) {
 
 				data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 				require.NoError(t, err)
+
+				event := data.(cadence.Event)
+
 				address := flow.ConvertAddress(
-					data.(cadence.Event).Fields[0].(cadence.Address))
+					cadence.SearchFieldByName(
+						event,
+						stdlib.AccountEventAddressParameter.Identifier,
+					).(cadence.Address),
+				)
 
 				account, err := vm.GetAccount(ctx, address, snapshotTree)
 				require.NoError(t, err)
@@ -416,9 +431,15 @@ func TestCreateAccount(t *testing.T) {
 
 					data, err := ccf.Decode(nil, event.Payload)
 					require.NoError(t, err)
-					address := flow.ConvertAddress(
-						data.(cadence.Event).Fields[0].(cadence.Address))
 
+					event := data.(cadence.Event)
+
+					address := flow.ConvertAddress(
+						cadence.SearchFieldByName(
+							event,
+							stdlib.AccountEventAddressParameter.Identifier,
+						).(cadence.Address),
+					)
 					account, err := vm.GetAccount(ctx, address, snapshotTree)
 					require.NoError(t, err)
 					require.NotNil(t, account)

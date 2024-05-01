@@ -208,7 +208,8 @@ func (impl *contractUpdaterStubsImpl) getIsContractDeploymentRestricted() (
 				"service account. Using value from context instead.")
 		return false, false
 	}
-	restricted = restrictedCadence.ToGoValue().(bool)
+	restricted = bool(restrictedCadence)
+
 	return restricted, true
 }
 
