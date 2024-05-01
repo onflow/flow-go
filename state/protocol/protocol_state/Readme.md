@@ -24,11 +24,11 @@ Correct application of this state machine (i.e. correct evolution of data in the
 Orthogonality means that state machines can operate completely independently and work on disjoint
 sub-states. By convention, they all consume the same inputs (incl. the ordered sequence of
 Service Events sealed in one block). In other words, each state machine $S_0, S_1,\ldots$ has full visibility
-into the inputs, but each draws their on independent conclusions (maintaining their own exclusive state).
-There is no information exchange between the state machines; one state machines cannot read the current state
+into the inputs, but each draws their own independent conclusions (maintaining their own exclusive state).
+There is no information exchange between the state machines; one state machine cannot read the current state
 of another.
 
-We emphasize that this architecture choice does not prevent us of from implementing sequential state
+We emphasize that this architecture choice does not prevent us from implementing sequential state
 machines for certain use-cases. For example: state machine $A$ provides its output as input to another
 state machine $B$. Here, the order of running the state machines matters. This order-dependency is not
 supported by the Protocol State, which executes the state machines in an arbitrary order. Therefore,
@@ -46,11 +46,11 @@ $P_0, P_1, \ldots, P_j$. Formally, we write $\mathcal{P} = P0 \otimes P1 \otimes
 loosely associate each $P_0, P_1,\ldots$ with one specific key-value entry in the store. Correspondingly,
 we have conceptually independent state machines $S_0, S_1,\ldots$ operating each on their own respective
 sub-state $P_0, P_1, \ldots$ A one-to-one correspondence between key-value-pair and state machine should be the
-default, but is not strictly required. However, the strong requirement is that no key-value-pair is operated
-on my more than one state machine.
+default, but is not strictly required. However, **the strong requirement is that no key-value-pair is operated
+on my more than one state machine**.
 
 Formally we write:
-- The overall protocol state $\mathcal{P}$ is composed of disjoint substates  $\mathcal{P} = P0 \otimes P1 \otimes\ldots\otimes Pj$
+- The overall protocol state $\mathcal{P}$ is composed of disjoint substates  $\mathcal{P} = P_0 \otimes P_1 \otimes\ldots\otimes P_j$
 - For each state $P_i$, we have a dedicated state machine $S_i$ that exclusively operates on $P_i$
 - The state machines can be formalized as orthogonal regions of the composite state machine
   $\mathcal{S} = S_0 \otimes S_1 \otimes \ldots \otimes S_j$. (Technically, we represent the state machine by its state-transition
@@ -66,7 +66,7 @@ Formally we write:
 Conceptually, the consensus leader first executes these state machines during their block building
 process. At this point, the `ID` of the final block is unknown. Nevertheless, some part of the payload
 construction already happened, because the sealed execution results are used as an input below.
-There is a large degree of freedom what data of the partially-constructed block we permit as possible inputs to the state
+There is a large degree of freedom in which data fields of the partially-constructed block we permit as possible inputs to the state
 machines. At the moment, the primary purpose is for the execution environment (with results undergone
 verification and sealing) to send Service Events to the protocol layer. Therefore, the current
 convention is:

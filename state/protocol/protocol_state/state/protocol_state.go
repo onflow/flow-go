@@ -189,7 +189,7 @@ func (s *MutableProtocolState) EvolveState(
 //  2. We determine which Protocol State version should be active at the candidate block's view. Note that there might be a
 //     pending Version Upgrade that was supposed to take effect at an earlier view `activationView` < `candidateView`. However,
 //     it is possible that there are no blocks in the current fork with views in [activationView, …, candidateView]. In this
-//     case, the version upgrade is still pending, despite its activationView having already passed.
+//     case, the version upgrade is still pending and should be activated now, despite its activationView having already passed.
 //  3. We replicate the parent block Protocol State -- if necessary changing the data model in accordance with the Protocol
 //     State version that should be active at the candidate block's view. Essentially, this replication is a deep copy, which
 //     guarantees that we are not accidentally modifying the parent block's protocol state.
@@ -295,7 +295,7 @@ func (s *MutableProtocolState) build(
 		return s.kvStoreSnapshots.IndexTx(blockID, resultingStateID)(tx)
 	})
 	if parentStateID != resultingStateID {
-		// note that `SkipDuplicatesTx` is still required, because the result might equal to an earlier known state (we explicitly want to do-duplicate)
+		// note that `SkipDuplicatesTx` is still required, because the result might equal to an earlier known state (we explicitly want to de-duplicate)
 		dbUpdates.AddDbOp(operation.SkipDuplicatesTx(s.kvStoreSnapshots.StoreTx(resultingStateID, evolvingState)))
 	}
 

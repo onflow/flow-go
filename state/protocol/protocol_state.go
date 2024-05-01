@@ -118,7 +118,7 @@ type MutableProtocolState interface {
 	//     to the correctness of the sealed execution result (specifically the Service Events contained in the result
 	//     and their order).
 	//  2. For Consensus Participants that are replicas, the calling code must check that the returned `stateID` matches
-	//     the commitment in the block proposal! If they don't match, the proposal is byzantine and should be slashed.
+	//     the commitment in the block proposal! If they don't match, the proposer is byzantine and should be slashed.
 	//
 	// Consensus nodes actively verify protocol compliance for any block proposal they receive, including integrity of
 	// each seal individually as well as the seals continuously following the fork. Light clients only process certified
