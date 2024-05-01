@@ -51,6 +51,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -1300,6 +1301,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Storage.Collections,
 				builder.Storage.Transactions,
 				builder.Storage.LightTransactionResults,
+				builder.RootChainID.Chain(),
+				nil,
 				collectionExecutedMetric,
 			)
 			if err != nil {
@@ -1329,9 +1332,15 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil, err
 			}
 
+			// cache is disabled on observers for now
+			derivedChainData, err := derived.NewDerivedChainData(1)
+			if err != nil {
+				return nil, err
+			}
+
 			// create script execution module, this depends on the indexer being initialized and the
 			// having the register storage bootstrapped
-			scripts, err := execution.NewScripts(
+			scripts := execution.NewScripts(
 				builder.Logger,
 				metrics.NewExecutionCollector(builder.Tracer),
 				builder.RootChainID,
@@ -1339,10 +1348,9 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Storage.Headers,
 				builder.ExecutionIndexerCore.RegisterValue,
 				builder.scriptExecutorConfig,
+				derivedChainData,
+				false,
 			)
-			if err != nil {
-				return nil, err
-			}
 
 			err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts)
 			if err != nil {
