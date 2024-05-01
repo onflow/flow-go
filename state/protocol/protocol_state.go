@@ -93,7 +93,7 @@ type ProtocolState interface {
 }
 
 // MutableProtocolState is the read-write interface for protocol state. It allows evolving the protocol
-// state by creating a StateMutator for each block and applying state-changing service events.
+// state by calling `EvolveState` for each block with arguments that might trigger state change.
 type MutableProtocolState interface {
 	ProtocolState
 
