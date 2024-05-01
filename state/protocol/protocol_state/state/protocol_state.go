@@ -168,17 +168,17 @@ func (s *MutableProtocolState) EvolveState(
 ) (flow.Identifier, *transaction.DeferredBlockPersist, error) {
 	serviceEvents, err := s.serviceEventsFromSeals(candidateSeals)
 	if err != nil {
-		return flow.ZeroID, transaction.NewDeferredBlockPersist(), irrecoverable.NewExceptionf("extracting service events from candidate seals failed: %w", err)
+		return flow.ZeroID, nil, irrecoverable.NewExceptionf("extracting service events from candidate seals failed: %w", err)
 	}
 
 	parentStateID, stateMachines, evolvingState, err := s.initializeOrthogonalStateMachines(parentBlockID, candidateView)
 	if err != nil {
-		return flow.ZeroID, transaction.NewDeferredBlockPersist(), irrecoverable.NewExceptionf("failure initializing sub-state machines for evolving the Protocol State: %w", err)
+		return flow.ZeroID, nil, irrecoverable.NewExceptionf("failure initializing sub-state machines for evolving the Protocol State: %w", err)
 	}
 
 	resultingStateID, dbUpdates, err := s.build(parentStateID, stateMachines, serviceEvents, evolvingState)
 	if err != nil {
-		return flow.ZeroID, transaction.NewDeferredBlockPersist(), irrecoverable.NewExceptionf("evolving and building the resulting Protocol State failed: %w", err)
+		return flow.ZeroID, nil, irrecoverable.NewExceptionf("evolving and building the resulting Protocol State failed: %w", err)
 	}
 	return resultingStateID, dbUpdates, nil
 }
@@ -274,7 +274,7 @@ func (s *MutableProtocolState) build(
 	for _, stateMachine := range stateMachines {
 		err := stateMachine.EvolveState(serviceEvents) // state machine should only bubble up exceptions
 		if err != nil {
-			return flow.ZeroID, transaction.NewDeferredBlockPersist(), fmt.Errorf("exception from sub-state machine during state evolution: %w", err)
+			return flow.ZeroID, nil, fmt.Errorf("exception from sub-state machine during state evolution: %w", err)
 		}
 	}
 
@@ -283,7 +283,7 @@ func (s *MutableProtocolState) build(
 	for _, stateMachine := range stateMachines {
 		dbOps, err := stateMachine.Build()
 		if err != nil {
-			return flow.ZeroID, transaction.NewDeferredBlockPersist(), fmt.Errorf("unexpected exception building state machine's output state: %w", err)
+			return flow.ZeroID, nil, fmt.Errorf("unexpected exception building state machine's output state: %w", err)
 		}
 		dbUpdates.AddIndexingOps(dbOps.Pending())
 	}

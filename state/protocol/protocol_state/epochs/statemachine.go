@@ -252,7 +252,7 @@ func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(orderedUpdates 
 		case *flow.EpochSetup:
 			processed, err := e.activeStateMachine.ProcessEpochSetup(ev)
 			if err != nil {
-				return transaction.NewDeferredBlockPersist(), fmt.Errorf("could not process epoch setup event: %w", err)
+				return nil, fmt.Errorf("could not process epoch setup event: %w", err)
 			}
 			if processed {
 				dbUpdates.AddDbOp(e.setups.StoreTx(ev)) // we'll insert the setup event when we insert the block
@@ -261,7 +261,7 @@ func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(orderedUpdates 
 		case *flow.EpochCommit:
 			processed, err := e.activeStateMachine.ProcessEpochCommit(ev)
 			if err != nil {
-				return transaction.NewDeferredBlockPersist(), fmt.Errorf("could not process epoch commit event: %w", err)
+				return nil, fmt.Errorf("could not process epoch commit event: %w", err)
 			}
 			if processed {
 				dbUpdates.AddDbOp(e.commits.StoreTx(ev)) // we'll insert the commit event when we insert the block
@@ -280,11 +280,11 @@ func (e *EpochStateMachine) transitionToEpochFallbackMode(orderedUpdates []flow.
 	var err error
 	e.activeStateMachine, err = e.epochFallbackStateMachineFactory()
 	if err != nil {
-		return transaction.NewDeferredBlockPersist(), fmt.Errorf("could not create epoch fallback state machine: %w", err)
+		return nil, fmt.Errorf("could not create epoch fallback state machine: %w", err)
 	}
 	dbUpdates, err := e.applyServiceEventsFromOrderedResults(orderedUpdates)
 	if err != nil {
-		return transaction.NewDeferredBlockPersist(), irrecoverable.NewExceptionf("could not apply service events after transition to epoch fallback mode: %w", err)
+		return nil, irrecoverable.NewExceptionf("could not apply service events after transition to epoch fallback mode: %w", err)
 	}
 	return dbUpdates, nil
 }

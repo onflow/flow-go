@@ -41,8 +41,9 @@ func NewPSVersionUpgradeStateMachine(
 	}
 }
 
-// Build is a no-op, because scheduled version upgrades are stored in the KVStore only.
-// (There is no secondary database operations to persist version upgrade data.)
+// Build is a no-op, because scheduled version upgrades are stored in the KVStore only, which the
+// caller `protocol.MutableProtocolState` persist. (There is no secondary database operations to
+// index or persist version upgrade data separately)
 func (m *PSVersionUpgradeStateMachine) Build() (*transaction.DeferredBlockPersist, error) {
 	return transaction.NewDeferredBlockPersist(), nil
 }
