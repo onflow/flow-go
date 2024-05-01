@@ -417,7 +417,7 @@ func (s *EmulatorSuite) getResult() []string {
 	for _, item := range value.(cadence.Array).Values {
 		dkgResult = append(
 			dkgResult,
-			string(item.(cadence.String)),
+			string(item.(cadence.Optional).Value.(cadence.String)),
 		)
 	}
 
