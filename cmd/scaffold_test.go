@@ -767,14 +767,14 @@ func TestDhtSystemActivationStatus(t *testing.T) {
 			name:      "access role with disabled returns disabled",
 			roleStr:   "access",
 			enabled:   false,
-			expected:  p2pbuilder.DhtSystemEnabled,
+			expected:  p2pbuilder.DhtSystemDisabled,
 			expectErr: false,
 		},
 		{
 			name:      "execution role with disabled returns disabled",
 			roleStr:   "execution",
 			enabled:   false,
-			expected:  p2pbuilder.DhtSystemEnabled,
+			expected:  p2pbuilder.DhtSystemDisabled,
 			expectErr: false,
 		},
 		{
@@ -809,7 +809,7 @@ func TestDhtSystemActivationStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := DhtSystemActivationStatus(tt.roleStr, true)
+			result, err := DhtSystemActivationStatus(tt.roleStr, tt.enabled)
 			require.Equal(t, tt.expectErr, err != nil, "unexpected error status")
 			require.Equal(t, tt.expected, result, "unexpected activation status")
 		})
