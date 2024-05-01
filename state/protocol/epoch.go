@@ -15,8 +15,8 @@ type EpochQuery interface {
 	// Next returns the next epoch as of this snapshot. Valid snapshots must
 	// have a next epoch available after the transition to epoch setup phase.
 	//
-	// Returns ErrNextEpochNotSetup in the case that this method is queried w.r.t.
-	// a snapshot within the flow.EpochPhaseStaking phase.
+	// Returns invalid.Epoch with ErrNextEpochNotSetup in the case that this method
+	// is queried w.r.t. a snapshot within the flow.EpochPhaseStaking phase.
 	Next() Epoch
 
 	// Previous returns the previous epoch as of this snapshot. Valid snapshots
@@ -24,8 +24,8 @@ type EpochQuery interface {
 	// the root block - in other words, if a previous epoch exists, implementations
 	// must arrange to expose it here.
 	//
-	// Returns ErrNoPreviousEpoch in the case that this method is queried w.r.t.
-	// a snapshot from the first epoch after the root block.
+	// Returns invalid.Epoch with ErrNoPreviousEpoch in the case that this method
+	// is queried w.r.t. a snapshot from the first epoch after the root block.
 	Previous() Epoch
 }
 
