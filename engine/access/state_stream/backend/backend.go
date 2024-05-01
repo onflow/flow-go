@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,11 +10,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
-	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -67,6 +66,7 @@ type StateStreamBackend struct {
 
 	ExecutionDataBackend
 	EventsBackend
+	AccountStatusesBackend
 
 	log                  zerolog.Logger
 	state                protocol.State
@@ -75,24 +75,23 @@ type StateStreamBackend struct {
 	results              storage.ExecutionResults
 	execDataStore        execution_data.ExecutionDataStore
 	execDataCache        *cache.ExecutionDataCache
-	broadcaster          *engine.Broadcaster
 	registers            *execution.RegistersAsyncStore
 	registerRequestLimit int
 }
 
 func New(
 	log zerolog.Logger,
-	config Config,
 	state protocol.State,
 	headers storage.Headers,
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	execDataStore execution_data.ExecutionDataStore,
 	execDataCache *cache.ExecutionDataCache,
-	broadcaster *engine.Broadcaster,
 	registers *execution.RegistersAsyncStore,
 	eventsIndex *index.EventsIndex,
 	useEventsIndex bool,
+	registerIDsRequestLimit int,
+	subscriptionHandler *subscription.SubscriptionHandler,
 	executionDataTracker subscription.ExecutionDataTracker,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
@@ -106,33 +105,38 @@ func New(
 		results:              results,
 		execDataStore:        execDataStore,
 		execDataCache:        execDataCache,
-		broadcaster:          broadcaster,
 		registers:            registers,
-		registerRequestLimit: int(config.RegisterIDsRequestLimit),
+		registerRequestLimit: registerIDsRequestLimit,
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
+		log:                  logger,
+		headers:              headers,
+		subscriptionHandler:  subscriptionHandler,
+		getExecutionData:     b.getExecutionData,
+		executionDataTracker: executionDataTracker,
+	}
+
+	eventsRetriever := EventsRetriever{
 		log:              logger,
 		headers:          headers,
-		broadcaster:      broadcaster,
-		sendTimeout:      config.ClientSendTimeout,
-		responseLimit:    config.ResponseLimit,
-		sendBufferSize:   int(config.ClientSendBufferSize),
 		getExecutionData: b.getExecutionData,
-		getStartHeight:   b.GetStartHeight,
+		useEventsIndex:   useEventsIndex,
+		eventsIndex:      eventsIndex,
 	}
 
 	b.EventsBackend = EventsBackend{
-		log:              logger,
-		headers:          headers,
-		broadcaster:      broadcaster,
-		sendTimeout:      config.ClientSendTimeout,
-		responseLimit:    config.ResponseLimit,
-		sendBufferSize:   int(config.ClientSendBufferSize),
-		getExecutionData: b.getExecutionData,
-		getStartHeight:   b.GetStartHeight,
-		useIndex:         useEventsIndex,
-		eventsIndex:      eventsIndex,
+		log:                  logger,
+		subscriptionHandler:  subscriptionHandler,
+		executionDataTracker: executionDataTracker,
+		eventsRetriever:      eventsRetriever,
+	}
+
+	b.AccountStatusesBackend = AccountStatusesBackend{
+		log:                  logger,
+		subscriptionHandler:  subscriptionHandler,
+		executionDataTracker: b.ExecutionDataTracker,
+		eventsRetriever:      eventsRetriever,
 	}
 
 	return b, nil
@@ -140,18 +144,23 @@ func New(
 
 // getExecutionData returns the execution data for the given block height.
 // Expected errors during normal operation:
-// - storage.ErrNotFound or execution_data.BlobNotFoundError: execution data for the given block height is not available.
+// - subscription.ErrBlockNotReady: execution data for the given block height is not available.
 func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64) (*execution_data.BlockExecutionDataEntity, error) {
 	highestHeight := b.ExecutionDataTracker.GetHighestHeight()
 	// fail early if no notification has been received for the given block height.
 	// note: it's possible for the data to exist in the data store before the notification is
 	// received. this ensures a consistent view is available to all streams.
 	if height > highestHeight {
-		return nil, fmt.Errorf("execution data for block %d is not available yet: %w", height, storage.ErrNotFound)
+		return nil, fmt.Errorf("execution data for block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
 	}
 
 	execData, err := b.execDataCache.ByHeight(ctx, height)
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) ||
+			execution_data.IsBlobNotFoundError(err) {
+			err = errors.Join(err, subscription.ErrBlockNotReady)
+			return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
+		}
 		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
 	}
 

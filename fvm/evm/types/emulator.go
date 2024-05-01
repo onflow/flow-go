@@ -26,6 +26,7 @@ type Precompile interface {
 type BlockContext struct {
 	ChainID                *big.Int
 	BlockNumber            uint64
+	BlockTimestamp         uint64
 	DirectCallBaseGasUsage uint64
 	DirectCallGasPrice     uint64
 	GasFeeCollector        Address
@@ -61,18 +62,26 @@ type ReadOnlyBlockView interface {
 	CodeHashOf(address Address) ([]byte, error)
 }
 
-// BlockView facilitates execution of a transaction or a direct evm  call in the context of a block
-// Errors returned by the methods are one of the followings:
-// - Fatal error
-// - Database error (non-fatal)
-// - EVM validation error
-// - EVM execution error
+// BlockView facilitates execution of a transaction or a direct evm call in the context of a block
+// Any error returned by any of the methods (e.g. stateDB errors) if non-fatal stops the outer flow transaction
+// if fatal stops the node.
+// EVM validation errors and EVM execution errors are part of the returned result
+// and should be handled separately.
 type BlockView interface {
-	// executes a direct call
+	// DirectCall executes a direct call
 	DirectCall(call *DirectCall) (*Result, error)
 
 	// RunTransaction executes an evm transaction
 	RunTransaction(tx *gethTypes.Transaction) (*Result, error)
+
+	// DryRunTransaction executes unsigned transaction but does not persist the state changes,
+	// since transaction is not signed, from address is used as the signer.
+	DryRunTransaction(tx *gethTypes.Transaction, from gethCommon.Address) (*Result, error)
+
+	// BatchRunTransactions executes a batch of evm transactions producing
+	// a slice of execution Result where each result corresponds to each
+	// item in the txs slice.
+	BatchRunTransactions(txs []*gethTypes.Transaction) ([]*Result, error)
 }
 
 // Emulator emulates an evm-compatible chain

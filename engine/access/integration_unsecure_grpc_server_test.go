@@ -23,6 +23,7 @@ import (
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
@@ -240,6 +241,14 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		ClientSendBufferSize: subscription.DefaultSendBufferSize,
 	}
 
+	subscriptionHandler := subscription.NewSubscriptionHandler(
+		suite.log,
+		suite.broadcaster,
+		subscription.DefaultSendTimeout,
+		subscription.DefaultResponseLimit,
+		subscription.DefaultSendBufferSize,
+	)
+
 	eventIndexer := index.NewEventsIndex(suite.events)
 
 	suite.executionDataTracker = subscription.NewExecutionDataTracker(
@@ -255,17 +264,17 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 
 	stateStreamBackend, err := statestreambackend.New(
 		suite.log,
-		conf,
 		suite.state,
 		suite.headers,
 		suite.seals,
 		suite.results,
 		nil,
 		suite.execDataCache,
-		nil,
 		suite.registers,
 		eventIndexer,
 		false,
+		state_stream.DefaultRegisterIDsRequestLimit,
+		subscriptionHandler,
 		suite.executionDataTracker,
 	)
 	assert.NoError(suite.T(), err)
@@ -323,11 +332,11 @@ func (suite *SameGRPCPortTestSuite) TestEnginesOnTheSameGrpcPort() {
 	})
 
 	suite.Run("happy path - grpc execution data api client can connect successfully", func() {
-		req := &executiondataproto.SubscribeEventsRequest{}
+		req := &executiondataproto.SubscribeEventsFromLatestRequest{}
 
 		client := suite.unsecureExecutionDataAPIClient(conn)
 
-		_, err := client.SubscribeEvents(ctx, req)
+		_, err := client.SubscribeEventsFromLatest(ctx, req)
 		assert.NoError(suite.T(), err, "failed to subscribe events")
 	})
 	defer closer.Close()

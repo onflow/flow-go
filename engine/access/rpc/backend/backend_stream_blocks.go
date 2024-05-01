@@ -2,12 +2,11 @@ package backend
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"time"
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -17,16 +16,13 @@ import (
 
 // backendSubscribeBlocks is a struct representing a backend implementation for subscribing to blocks.
 type backendSubscribeBlocks struct {
-	log            zerolog.Logger
-	state          protocol.State
-	blocks         storage.Blocks
-	headers        storage.Headers
-	broadcaster    *engine.Broadcaster
-	sendTimeout    time.Duration
-	responseLimit  float64
-	sendBufferSize int
+	log     zerolog.Logger
+	state   protocol.State
+	blocks  storage.Blocks
+	headers storage.Headers
 
-	blockTracker subscription.BlockTracker
+	subscriptionHandler *subscription.SubscriptionHandler
+	blockTracker        subscription.BlockTracker
 }
 
 // SubscribeBlocksFromStartBlockID subscribes to the finalized or sealed blocks starting at the requested
@@ -201,7 +197,7 @@ func (b *backendSubscribeBlocks) subscribeFromStartBlockID(ctx context.Context, 
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from block id")
 	}
-	return b.subscribe(ctx, nextHeight, getData)
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, getData)
 }
 
 // subscribeFromStartHeight is common method that allows clients to subscribe starting at the requested start block height.
@@ -217,7 +213,7 @@ func (b *backendSubscribeBlocks) subscribeFromStartHeight(ctx context.Context, s
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from block height")
 	}
-	return b.subscribe(ctx, nextHeight, getData)
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, getData)
 }
 
 // subscribeFromLatest is common method that allows clients to subscribe starting at the latest sealed block.
@@ -232,22 +228,7 @@ func (b *backendSubscribeBlocks) subscribeFromLatest(ctx context.Context, getDat
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height from latest")
 	}
-	return b.subscribe(ctx, nextHeight, getData)
-}
-
-// subscribe is common method that allows clients to subscribe to different types of data.
-//
-// Parameters:
-// - ctx: The context for the subscription.
-// - nextHeight: The height of the starting block.
-// - getData: The callback used by subscriptions to retrieve data information for the specified height and block status.
-//
-// No errors are expected during normal operation.
-func (b *backendSubscribeBlocks) subscribe(ctx context.Context, nextHeight uint64, getData subscription.GetDataByHeightFunc) subscription.Subscription {
-	sub := subscription.NewHeightBasedSubscription(b.sendBufferSize, nextHeight, getData)
-	go subscription.NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
-
-	return sub
+	return b.subscriptionHandler.Subscribe(ctx, nextHeight, getData)
 }
 
 // getBlockResponse returns a GetDataByHeightFunc that retrieves block information for the specified height.
@@ -303,7 +284,7 @@ func (b *backendSubscribeBlocks) getBlockDigestResponse(blockStatus flow.BlockSt
 
 // getBlockHeader returns the block header for the given block height.
 // Expected errors during normal operation:
-// - storage.ErrNotFound: block for the given block height is not available.
+// - subscription.ErrBlockNotReady: block for the given block height is not available.
 func (b *backendSubscribeBlocks) getBlockHeader(height uint64, expectedBlockStatus flow.BlockStatus) (*flow.Header, error) {
 	err := b.validateHeight(height, expectedBlockStatus)
 	if err != nil {
@@ -313,6 +294,9 @@ func (b *backendSubscribeBlocks) getBlockHeader(height uint64, expectedBlockStat
 	// since we are querying a finalized or sealed block header, we can use the height index and save an ID computation
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, fmt.Errorf("failed to retrieve block header for height %d: %w", height, subscription.ErrBlockNotReady)
+		}
 		return nil, err
 	}
 
@@ -321,7 +305,7 @@ func (b *backendSubscribeBlocks) getBlockHeader(height uint64, expectedBlockStat
 
 // getBlock returns the block for the given block height.
 // Expected errors during normal operation:
-// - storage.ErrNotFound: block for the given block height is not available.
+// - subscription.ErrBlockNotReady: block for the given block height is not available.
 func (b *backendSubscribeBlocks) getBlock(height uint64, expectedBlockStatus flow.BlockStatus) (*flow.Block, error) {
 	err := b.validateHeight(height, expectedBlockStatus)
 	if err != nil {
@@ -331,6 +315,9 @@ func (b *backendSubscribeBlocks) getBlock(height uint64, expectedBlockStatus flo
 	// since we are querying a finalized or sealed block, we can use the height index and save an ID computation
 	block, err := b.blocks.ByHeight(height)
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, fmt.Errorf("failed to retrieve block for height %d: %w", height, subscription.ErrBlockNotReady)
+		}
 		return nil, err
 	}
 
@@ -339,7 +326,7 @@ func (b *backendSubscribeBlocks) getBlock(height uint64, expectedBlockStatus flo
 
 // validateHeight checks if the given block height is valid and available based on the expected block status.
 // Expected errors during normal operation:
-// - storage.ErrNotFound: block for the given block height is not available.
+// - subscription.ErrBlockNotReady when unable to retrieve the block by height.
 func (b *backendSubscribeBlocks) validateHeight(height uint64, expectedBlockStatus flow.BlockStatus) error {
 	highestHeight, err := b.blockTracker.GetHighestHeight(expectedBlockStatus)
 	if err != nil {
@@ -350,7 +337,7 @@ func (b *backendSubscribeBlocks) validateHeight(height uint64, expectedBlockStat
 	// note: it's possible for the data to exist in the data store before the notification is
 	// received. this ensures a consistent view is available to all streams.
 	if height > highestHeight {
-		return fmt.Errorf("block %d is not available yet: %w", height, storage.ErrNotFound)
+		return fmt.Errorf("block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
 	}
 
 	return nil

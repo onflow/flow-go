@@ -20,6 +20,7 @@ import (
 	extract "github.com/onflow/flow-go/cmd/util/cmd/execution-state-extract"
 	ledger_json_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-json-execution-state"
 	export_json_transactions "github.com/onflow/flow-go/cmd/util/cmd/export-json-transactions"
+	extractpayloads "github.com/onflow/flow-go/cmd/util/cmd/extract-payloads-by-address"
 	read_badger "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd"
 	read_execution_state "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
 	read_hotstuff "github.com/onflow/flow-go/cmd/util/cmd/read-hotstuff/cmd"
@@ -84,6 +85,7 @@ func addCommands() {
 	rootCmd.AddCommand(read_hotstuff.RootCmd)
 	rootCmd.AddCommand(addresses.Cmd)
 	rootCmd.AddCommand(bootstrap_execution_state_payloads.Cmd)
+	rootCmd.AddCommand(extractpayloads.Cmd)
 }
 
 func initConfig() {

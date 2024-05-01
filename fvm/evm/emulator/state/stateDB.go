@@ -291,7 +291,7 @@ func (db *StateDB) Preimages() map[gethCommon.Hash][]byte {
 }
 
 // Commit commits state changes back to the underlying
-func (db *StateDB) Commit() error {
+func (db *StateDB) Commit(finalize bool) error {
 	// return error if any has been acumulated
 	if db.cachedError != nil {
 		return wrapError(db.cachedError)
@@ -388,11 +388,17 @@ func (db *StateDB) Commit() error {
 	}
 
 	// don't purge views yet, people might call the logs etc
-	err = db.baseView.Commit()
-	if err != nil {
-		return wrapError(err)
+	if finalize {
+		return db.Finalize()
 	}
 	return nil
+}
+
+// Finalize flushes all the changes
+// to the permanent storage
+func (db *StateDB) Finalize() error {
+	err := db.baseView.Commit()
+	return wrapError(err)
 }
 
 // Prepare is a highlevel logic that sadly is considered to be part of the
@@ -419,6 +425,14 @@ func (db *StateDB) Prepare(rules gethParams.Rules, sender, coinbase gethCommon.A
 			db.AddAddressToAccessList(coinbase)
 		}
 	}
+}
+
+// Reset resets uncommitted changes and transient artifacts such as error, logs,
+// preimages, access lists, ...
+// The method is often called between execution of different transactions
+func (db *StateDB) Reset() {
+	db.views = []*DeltaView{NewDeltaView(db.baseView)}
+	db.cachedError = nil
 }
 
 // Error returns the memorized database failure occurred earlier.
