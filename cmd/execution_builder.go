@@ -365,6 +365,10 @@ func (exeNode *ExecutionNode) LoadBlobService(
 		),
 	}
 
+	if !node.BitswapReprovideEnabled {
+		opts = append(opts, blob.WithReprovideInterval(-1))
+	}
+
 	if exeNode.exeConf.blobstoreRateLimit > 0 && exeNode.exeConf.blobstoreBurstLimit > 0 {
 		opts = append(opts, blob.WithRateLimit(float64(exeNode.exeConf.blobstoreRateLimit), exeNode.exeConf.blobstoreBurstLimit))
 	}
@@ -1322,7 +1326,6 @@ func (exeNode *ExecutionNode) LoadSynchronizationEngine(
 	error,
 ) {
 	// initialize the synchronization engine
-	//var err error
 	spamConfig, err := synchronization.NewSpamDetectionConfig()
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize spam detection config: %w", err)

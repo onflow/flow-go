@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 
+	none "github.com/ipfs/boxo/routing/none"
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/config"
@@ -451,7 +452,9 @@ func DefaultNodeBuilder(
 		idProvider,
 		rCfg, peerManagerCfg,
 		disallowListCacheCfg,
-		uniCfg).
+		uniCfg)
+
+	builder.
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater)
@@ -463,13 +466,28 @@ func DefaultNodeBuilder(
 		}
 		builder.SetSubscriptionFilter(subscription.NewRoleBasedFilter(r, idProvider))
 
-		if dhtSystemActivation == DhtSystemEnabled {
-			builder.SetRoutingSystem(
-				func(ctx context.Context, host host.Host) (routing.Routing, error) {
-					return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), logger, metricsCfg.Metrics, dht.AsServer())
-				})
-		}
+		builder.configureRoutingSystem(r, dhtSystemActivation)
 	}
 
 	return builder, nil
+}
+
+func (b *LibP2PNodeBuilder) configureRoutingSystem(
+	role flow.Role,
+	dhtSystemActivation DhtSystemActivation,
+) {
+	if role != flow.RoleAccess && role != flow.RoleExecution {
+		return // routing only required for Access and Execution nodes
+	}
+
+	if dhtSystemActivation == DhtSystemEnabled {
+		b.SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
+			return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(b.sporkId), b.logger, b.metricsConfig.Metrics, dht.AsServer())
+		})
+	}
+
+	// bitswap requires a content routing system. this returns a stub instead of a full DHT
+	b.SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
+		return none.ConstructNilRouting(ctx, host, nil, nil)
+	})
 }
