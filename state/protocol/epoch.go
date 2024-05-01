@@ -189,7 +189,7 @@ type Epoch interface {
 	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
 	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
 	// * protocol.ErrNextEpochNotCommitted - if epoch has not been committed yet
-	// * protocol.ErrUnknownEpochBoundary - if the first block of the epoch is unknown.
+	// * protocol.ErrUnknownEpochBoundary - if the first block of the next epoch is unknown.
 	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 	FinalHeight() (uint64, error)
 }

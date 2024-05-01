@@ -41,7 +41,7 @@ var (
 	// CASE 2: `f.Height < m.Height`
 	// The boundary has not been finalized yet. Note that we may have finalized
 	// n but not m.
-	ErrUnknownEpochBoundary = fmt.Errorf("cannot query un-finalized epoch transition")
+	ErrUnknownEpochBoundary = fmt.Errorf("unknown epoch boundary for current chain state")
 
 	// ErrSealingSegmentBelowRootBlock is a sentinel error returned for queries
 	// for a sealing segment below the root block (local history cutoff).

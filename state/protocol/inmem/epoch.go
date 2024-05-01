@@ -219,6 +219,9 @@ type heightBoundedEpoch struct {
 	finalHeight *uint64
 }
 
+var _ protocol.Epoch = (*heightBoundedEpoch)(nil)
+
+
 func (e *heightBoundedEpoch) FirstHeight() (uint64, error) {
 	if e.firstHeight != nil {
 		return *e.firstHeight, nil
