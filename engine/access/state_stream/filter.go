@@ -129,7 +129,7 @@ func (f *EventFilter) Match(event flow.Event) bool {
 	}
 
 	if fieldFilter, ok := f.EventFieldFilters[event.Type]; ok {
-		return f.matchFieldFilter(event, fieldFilter)
+		return f.matchFieldFilter(&event, fieldFilter)
 	}
 
 	if _, ok := f.EventTypes[event.Type]; ok {
@@ -156,7 +156,7 @@ func (f *EventFilter) Match(event flow.Event) bool {
 
 // matchFieldFilter checks if the given event matches the specified field filters.
 // It returns true if the event matches any of the provided field filters, otherwise false.
-func (f *EventFilter) matchFieldFilter(event flow.Event, fieldFilters FieldFilter) bool {
+func (f *EventFilter) matchFieldFilter(event *flow.Event, fieldFilters FieldFilter) bool {
 	if len(fieldFilters) == 0 {
 		return true // empty list always matches
 	}
@@ -188,7 +188,7 @@ func (f *EventFilter) matchFieldFilter(event flow.Event, fieldFilters FieldFilte
 // Returns:
 // - map[string]cadence.Value: A map containing name and value for each field extracted from the event payload.
 // - error: An error, if any, encountered during event decoding or if the fields are empty.
-func getEventFields(event flow.Event) (map[string]cadence.Value, error) {
+func getEventFields(event *flow.Event) (map[string]cadence.Value, error) {
 	data, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
 		return nil, err

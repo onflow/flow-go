@@ -168,7 +168,7 @@ func (f *AccountStatusFilter) GroupCoreEventsByAccountAddress(events flow.Events
 	allAccountProtocolEvents := make(map[string]flow.EventsList)
 
 	for _, event := range events {
-		fields, err := getEventFields(event)
+		fields, err := getEventFields(&event)
 		if err != nil {
 			log.Info().Err(err).Msg("could not get event fields")
 			continue
