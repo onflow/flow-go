@@ -87,14 +87,6 @@ func (segment *SealingSegment) Highest() *Block {
 	return segment.Blocks[len(segment.Blocks)-1]
 }
 
-// Lowest is the lowest block in the sealing segment by height.
-func (segment *SealingSegment) Lowest() *Block {
-	if len(segment.ExtraBlocks) > 0 {
-		return segment.ExtraBlocks[0]
-	}
-	return segment.Blocks[0]
-}
-
 // Finalized returns the last finalized block, which is an alias of Highest
 func (segment *SealingSegment) Finalized() *Block {
 	return segment.Highest()
