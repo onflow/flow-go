@@ -106,11 +106,13 @@ func main() {
 
 	flowClient, err := client.NewClient(
 		accessNodeAddress,
-		grpc.WithDefaultCallOptions(
-			grpc.MaxCallRecvMsgSize(defaultMaxMsgSize),
-			grpc.MaxCallSendMsgSize(defaultMaxMsgSize),
+		client.WithGRPCDialOptions(
+			grpc.WithDefaultCallOptions(
+				grpc.MaxCallRecvMsgSize(defaultMaxMsgSize),
+				grpc.MaxCallSendMsgSize(defaultMaxMsgSize),
+			),
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
 		),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to initialize Flow client")

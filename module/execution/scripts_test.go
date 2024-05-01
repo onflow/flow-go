@@ -68,7 +68,7 @@ func (s *scriptTestSuite) TestScriptExecution() {
 		val, err := jsoncdc.Decode(nil, result)
 		s.Require().NoError(err)
 		// make sure that the returned block height matches the current one set
-		s.Assert().Equal(s.height, val.(cadence.UInt64).ToGoValue())
+		s.Assert().Equal(s.height, uint64(val.(cadence.UInt64)))
 	})
 
 	s.Run("Handle not found Register", func() {

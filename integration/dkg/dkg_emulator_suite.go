@@ -20,6 +20,7 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
+
 	"github.com/onflow/flow-go/module/metrics"
 
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
@@ -393,7 +394,7 @@ func (s *EmulatorSuite) sendDummyTx() (*flow.Block, error) {
 func (s *EmulatorSuite) isDKGCompleted() bool {
 	template := templates.GenerateGetDKGCompletedScript(s.env)
 	value := s.executeScript(template, nil)
-	return value.ToGoValue().(bool)
+	return bool(value.(cadence.Bool))
 }
 
 func (s *EmulatorSuite) getResult() []string {
@@ -407,14 +408,17 @@ func (s *EmulatorSuite) getResult() []string {
 	)
 
 	res := s.executeScript([]byte(script), nil)
-	value := res.(cadence.Optional).ToGoValue()
+	value := res.(cadence.Optional).Value
 	if value == nil {
 		return []string{}
 	}
+
 	dkgResult := []string{}
-	for _, item := range value.([]interface{}) {
-		s := item.(string)
-		dkgResult = append(dkgResult, s)
+	for _, item := range value.(cadence.Array).Values {
+		dkgResult = append(
+			dkgResult,
+			string(item.(cadence.String)),
+		)
 	}
 
 	return dkgResult
