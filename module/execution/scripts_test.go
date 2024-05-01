@@ -6,6 +6,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/onflow/cadence/runtime/stdlib"
+
 	"github.com/onflow/flow-go/fvm/errors"
 
 	"github.com/onflow/cadence"
@@ -247,9 +249,13 @@ func (s *scriptTestSuite) createAccount() flow.Address {
 
 	data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 	s.Require().NoError(err)
-	address := flow.ConvertAddress(data.(cadence.Event).Fields[0].(cadence.Address))
 
-	return address
+	return flow.ConvertAddress(
+		cadence.SearchFieldByName(
+			data.(cadence.Event),
+			stdlib.AccountEventAddressParameter.Identifier,
+		).(cadence.Address),
+	)
 }
 
 func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
