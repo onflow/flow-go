@@ -129,7 +129,7 @@ func (f *EventFilter) Match(event flow.Event) bool {
 	}
 
 	if fieldFilter, ok := f.EventFieldFilters[event.Type]; ok {
-		return f.matchFieldFilter(&event, fieldFilter)
+		return f.matchFieldFilter(event, fieldFilter)
 	}
 
 	if _, ok := f.EventTypes[event.Type]; ok {
@@ -156,23 +156,23 @@ func (f *EventFilter) Match(event flow.Event) bool {
 
 // matchFieldFilter checks if the given event matches the specified field filters.
 // It returns true if the event matches any of the provided field filters, otherwise false.
-func (f *EventFilter) matchFieldFilter(event *flow.Event, fieldFilters FieldFilter) bool {
+func (f *EventFilter) matchFieldFilter(event flow.Event, fieldFilters FieldFilter) bool {
 	if len(fieldFilters) == 0 {
 		return true // empty list always matches
 	}
 
-	fields, fieldValues, err := getEventFields(event)
+	fields, err := getEventFields(event)
 	if err != nil {
 		return false
 	}
 
-	for i, field := range fields {
-		filters, ok := fieldFilters[field.Identifier]
+	for name, value := range fields {
+		filters, ok := fieldFilters[name]
 		if !ok {
 			continue // no filter for this field
 		}
 
-		fieldValue := fieldValues[i].String()
+		fieldValue := value.String()
 		if _, ok := filters[fieldValue]; ok {
 			return true
 		}
@@ -186,26 +186,24 @@ func (f *EventFilter) matchFieldFilter(event *flow.Event, fieldFilters FieldFilt
 // Parameters:
 // - event: The Flow event to extract field values and field names from.
 // Returns:
-// - []cadence.Field: A slice containing names for each field extracted from the event payload.
-// - []cadence.Value: A slice containing the values of the fields extracted from the event payload.
+// - map[string]cadence.Value: A map containing name and value for each field extracted from the event payload.
 // - error: An error, if any, encountered during event decoding or if the fields are empty.
-func getEventFields(event *flow.Event) ([]cadence.Field, []cadence.Value, error) {
+func getEventFields(event flow.Event) (map[string]cadence.Value, error) {
 	data, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	cdcEvent, ok := data.(cadence.Event)
 	if !ok {
-		return nil, nil, err
+		return nil, err
 	}
 
-	fieldValues := cdcEvent.GetFieldValues()
-	fields := cdcEvent.GetFields()
-	if fieldValues == nil || fields == nil {
-		return nil, nil, fmt.Errorf("fields are empty")
+	fields := cadence.FieldsMappedByName(cdcEvent)
+	if fields == nil {
+		return nil, fmt.Errorf("fields are empty")
 	}
-	return fields, fieldValues, nil
+	return fields, nil
 }
 
 // validateEventType ensures that the event type matches the expected format
