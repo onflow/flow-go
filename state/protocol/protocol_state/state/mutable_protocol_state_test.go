@@ -123,6 +123,11 @@ func (s *StateMutatorSuite) testEvolveState(seals []*flow.Seal, expectedResultin
 	err = dbUpdates.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
 	require.NoError(s.T(), err)
 
+	// The testify framework calls `AssertExpectations` on all mocks when the test finishes. However, note that we are calling
+	// `testEvolveState` repeatedly across multiple sub-tests, which re-use mocks from the `StateMutatorSuite`. Therefore, by
+	// default testify would only enforce that the expected mock calls happened in all sub-tests combined, but not specifically
+	// in the sub-test where we expect them to. To avoid any problems, we call `AssertExpectations` below to enforce the expected
+	// mock calls happened that `testEvolveState` added.
 	s.protocolKVStoreDB.AssertExpectations(s.T())
 	indexTxDeferredUpdate.AssertExpectations(s.T())
 	storeTxDeferredUpdate.AssertExpectations(s.T())
