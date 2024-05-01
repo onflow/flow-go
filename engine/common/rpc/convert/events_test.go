@@ -71,6 +71,7 @@ func TestConvertEventWithPayloadConversion(t *testing.T) {
 	var err error
 	ccfEvent := unittest.EventFixture(flow.EventAccountCreated, 2, 3, txID, 0)
 	ccfEvent.Payload, err = ccf.Encode(cadenceValue)
+	require.NoError(t, err)
 
 	jsonEvent := unittest.EventFixture(flow.EventAccountCreated, 2, 3, txID, 0)
 	jsonEvent.Payload, err = jsoncdc.Encode(cadenceValue)
