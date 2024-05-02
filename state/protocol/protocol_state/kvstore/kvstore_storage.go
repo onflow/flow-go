@@ -43,7 +43,7 @@ func (p *ProtocolKVStore) StoreTx(stateID flow.Identifier, kvStore protocol.KVSt
 			return fmt.Errorf("failed to VersionedEncode protocol state: %w", err)
 		}
 	}
-	return p.ProtocolKVStore.StoreTx(stateID, &storage.KeyValueStoreData{
+	return p.ProtocolKVStore.StoreTx(stateID, &flow.PSKeyValueStoreData{
 		Version: version,
 		Data:    data,
 	})

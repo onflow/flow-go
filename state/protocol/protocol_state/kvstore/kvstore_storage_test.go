@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
-	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -31,7 +31,7 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		expectedVersion := uint64(13)
 		encData := unittest.RandomBytes(117)
-		versionedSnapshot := &storage.KeyValueStoreData{
+		versionedSnapshot := &flow.PSKeyValueStoreData{
 			Version: expectedVersion,
 			Data:    encData,
 		}
@@ -117,11 +117,10 @@ func TestProtocolKVStore_ByBlockID(t *testing.T) {
 				UpgradableModel: kvstore.UpgradableModel{},
 				EpochStateID:    unittest.IdentifierFixture(),
 			},
-			InvalidEpochTransitionAttempted: false,
 		}
 		version, encStateData, err := expectedState.VersionedEncode()
 		require.NoError(t, err)
-		encExpectedState := &storage.KeyValueStoreData{
+		encExpectedState := &flow.PSKeyValueStoreData{
 			Version: version,
 			Data:    encStateData,
 		}
@@ -142,7 +141,7 @@ func TestProtocolKVStore_ByBlockID(t *testing.T) {
 		require.ErrorIs(t, err, someError)
 	})
 	t.Run("decoding fails with `ErrUnsupportedVersion`", func(t *testing.T) {
-		versionedSnapshot := &storage.KeyValueStoreData{
+		versionedSnapshot := &flow.PSKeyValueStoreData{
 			Version: math.MaxUint64,
 			Data:    unittest.RandomBytes(117),
 		}
@@ -152,7 +151,7 @@ func TestProtocolKVStore_ByBlockID(t *testing.T) {
 		require.ErrorIs(t, err, kvstore.ErrUnsupportedVersion)
 	})
 	t.Run("decoding yields exception", func(t *testing.T) {
-		versionedSnapshot := &storage.KeyValueStoreData{
+		versionedSnapshot := &flow.PSKeyValueStoreData{
 			Version: 1, // model version 1 is known, but data is random, which should yield an `irrecoverable.Exception`
 			Data:    unittest.RandomBytes(117),
 		}
@@ -180,11 +179,10 @@ func TestProtocolKVStore_ByID(t *testing.T) {
 				UpgradableModel: kvstore.UpgradableModel{},
 				EpochStateID:    unittest.IdentifierFixture(),
 			},
-			InvalidEpochTransitionAttempted: false,
 		}
 		version, encStateData, err := expectedState.VersionedEncode()
 		require.NoError(t, err)
-		encExpectedState := &storage.KeyValueStoreData{
+		encExpectedState := &flow.PSKeyValueStoreData{
 			Version: version,
 			Data:    encStateData,
 		}
@@ -205,7 +203,7 @@ func TestProtocolKVStore_ByID(t *testing.T) {
 		require.ErrorIs(t, err, someError)
 	})
 	t.Run("decoding fails with `ErrUnsupportedVersion`", func(t *testing.T) {
-		versionedSnapshot := &storage.KeyValueStoreData{
+		versionedSnapshot := &flow.PSKeyValueStoreData{
 			Version: math.MaxUint64,
 			Data:    unittest.RandomBytes(117),
 		}
@@ -215,7 +213,7 @@ func TestProtocolKVStore_ByID(t *testing.T) {
 		require.ErrorIs(t, err, kvstore.ErrUnsupportedVersion)
 	})
 	t.Run("decoding yields exception", func(t *testing.T) {
-		versionedSnapshot := &storage.KeyValueStoreData{
+		versionedSnapshot := &flow.PSKeyValueStoreData{
 			Version: 1, // model version 1 is known, but data is random, which should yield an `irrecoverable.Exception`
 			Data:    unittest.RandomBytes(117),
 		}
