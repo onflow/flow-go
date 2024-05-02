@@ -432,6 +432,7 @@ func TestEVMBatchRun(t *testing.T) {
 
 				batchCount := 5
 				var storedValues []int64
+				rawTxBytes := make([][]uint8, batchCount)
 				txBytes := make([]cadence.Value, batchCount)
 				for i := 0; i < batchCount; i++ {
 					num := int64(i)
@@ -444,7 +445,7 @@ func TestEVMBatchRun(t *testing.T) {
 						uint64(100_000),
 						big.NewInt(0),
 					)
-
+					rawTxBytes[i] = tx
 					// build txs argument
 					txBytes[i] = cadence.NewArray(
 						ConvertToCadence(tx),
@@ -473,19 +474,55 @@ func TestEVMBatchRun(t *testing.T) {
 				require.NoError(t, output.Err)
 				require.NotEmpty(t, state.WriteSet)
 
+				hashes := make([]string, batchCount)
+				var gasUsed uint64
+				var blockHeight uint64
+				var blockHash string
+
 				require.Len(t, output.Events, batchCount+1) // +1 block executed
 				for i, event := range output.Events {
-					if i == batchCount { // last one is block executed
-						continue
-					}
-
 					ev, err := ccf.Decode(nil, event.Payload)
 					require.NoError(t, err)
 					cadenceEvent, ok := ev.(cadence.Event)
 					require.True(t, ok)
 
+					if i == batchCount { // last event is block executed
+						blockPayload, err := types.DecodeBlockEventPayload(cadenceEvent)
+						require.NoError(t, err)
+
+						require.Equal(t, blockHeight, blockPayload.Height)
+						require.Equal(t, blockHash, blockPayload.Hash)
+						require.Equal(t, gasUsed, blockPayload.TotalGasUsed)
+						require.NotEmpty(t, blockPayload.Timestamp)
+
+						for j, h := range blockPayload.TransactionHashes {
+							require.Equal(t, hashes[j], h.ToGoValue())
+						}
+
+						break
+					}
+
 					event, err := types.DecodeTransactionEventPayload(cadenceEvent)
 					require.NoError(t, err)
+
+					b, err := hex.DecodeString(event.Payload)
+					require.NoError(t, err)
+					require.Equal(t, rawTxBytes[i], b)
+					require.Equal(t, uint16(i), event.Index)
+					require.Empty(t, event.ContractAddress)
+					require.Equal(t, types.ErrCodeNoError, types.ErrorCode(event.ErrorCode))
+					require.Equal(t, uint8(0), event.TransactionType)
+
+					hashes[i] = event.Hash
+					gasUsed += event.GasConsumed
+
+					if blockHeight == 0 {
+						blockHeight = event.BlockHeight
+						blockHash = event.BlockHash
+					}
+					// make sure all block heights and hashes are same between transactions
+					require.Equal(t, blockHeight, event.BlockHeight)
+					require.Equal(t, blockHash, event.BlockHash)
 
 					encodedLogs, err := hex.DecodeString(event.Logs)
 					require.NoError(t, err)
