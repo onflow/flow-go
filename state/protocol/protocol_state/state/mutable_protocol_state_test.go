@@ -629,15 +629,12 @@ func (m *mockStateTransition) DuringEvolveState(fn func(mock.Arguments)) *mockSt
 // Mock constructs and configures the OrthogonalStoreStateMachine mock.
 func (m *mockStateTransition) Mock() protocol_statemock.OrthogonalStoreStateMachine[protocol.KVStoreReader] {
 	evolveStateCalled := false
-	buildCalled := false
 	stateMachine := protocol_statemock.NewOrthogonalStoreStateMachine[protocol.KVStoreReader](m.T)
 	if m.expectedServiceEvents == nil {
 		m.expectedServiceEvents = mock.Anything
 	}
 	stateMachine.On("EvolveState", m.expectedServiceEvents).Run(func(args mock.Arguments) {
-		require.False(m.T, evolveStateCalled, "Method `OrthogonalStoreStateMachine.EvolveState` called repeatedly!")
-		require.False(m.T, buildCalled, "Method `OrthogonalStoreStateMachine.Build` was called before `EvolveState`!")
-		evolveStateCalled = true
+		evolveStateCalled = true // repeated `EvolveState` calls will be denied by the mock
 		if m.runInEvolveState != nil {
 			m.runInEvolveState(args)
 		}
@@ -648,8 +645,6 @@ func (m *mockStateTransition) Mock() protocol_statemock.OrthogonalStoreStateMach
 	deferredDBUpdates := transaction.NewDeferredBlockPersist().AddDbOp(deferredUpdate.Execute)
 	stateMachine.On("Build").Run(func(args mock.Arguments) {
 		require.True(m.T, evolveStateCalled, "Method `OrthogonalStoreStateMachine.Build` called before `EvolveState`!")
-		require.False(m.T, buildCalled, "Method `OrthogonalStoreStateMachine.Build` called repeatedly!")
-		buildCalled = true
 	}).Return(deferredDBUpdates, nil).Once()
 	return *stateMachine //nolint:govet
 }

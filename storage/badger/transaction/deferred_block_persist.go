@@ -4,10 +4,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-
 // DeferredBlockPersistOp is a shorthand notation for an anonymous function that takes the ID of
 // a fully constructed block and a `transaction.Tx` as inputs and runs some database operations
-// as part of that transaction. It is a "Future Pattern", essentially saying:
+// as part of that transaction. It is a "Promise Pattern", essentially saying:
 // once we have the completed the block's construction, we persist data structures that are
 // referenced by the block or populate database indices. This pattern is necessary, because
 // internally to the protocol_state package we don't have access to the candidate block ID yet because
@@ -32,7 +31,7 @@ func (d DeferredBlockPersistOp) WithBlock(blockID flow.Identifier) DeferredDBUpd
 //     Tx is a storage-layer abstraction, with support for callbacks that are executed
 //     after the underlying database transaction completed _successfully_.
 //   - Deferred database operations that depend on the ID of the block under construction
-//     and `transaction.Tx`. Usually, these are operations to populate some `ByBlockID` index.
+//     and `transaction.Tx`. Especially useful for populating `ByBlockID` indices.
 //
 // ORDER OF EXECUTION
 // We extend the process in which `transaction.Tx` executes database operations, schedules
