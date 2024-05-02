@@ -1,6 +1,7 @@
 package state
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -168,17 +169,17 @@ func (s *MutableProtocolState) EvolveState(
 ) (flow.Identifier, *transaction.DeferredBlockPersist, error) {
 	serviceEvents, err := s.serviceEventsFromSeals(candidateSeals)
 	if err != nil {
-		return flow.ZeroID, nil, irrecoverable.NewExceptionf("extracting service events from candidate seals failed: %w", err)
+		return flow.ZeroID, nil, fmt.Errorf("extracting service events from candidate seals failed: %w", err)
 	}
 
 	parentStateID, stateMachines, evolvingState, err := s.initializeOrthogonalStateMachines(parentBlockID, candidateView)
 	if err != nil {
-		return flow.ZeroID, nil, irrecoverable.NewExceptionf("failure initializing sub-state machines for evolving the Protocol State: %w", err)
+		return flow.ZeroID, nil, fmt.Errorf("failure initializing sub-state machines for evolving the Protocol State: %w", err)
 	}
 
 	resultingStateID, dbUpdates, err := s.build(parentStateID, stateMachines, serviceEvents, evolvingState)
 	if err != nil {
-		return flow.ZeroID, nil, irrecoverable.NewExceptionf("evolving and building the resulting Protocol State failed: %w", err)
+		return flow.ZeroID, nil, fmt.Errorf("evolving and building the resulting Protocol State failed: %w", err)
 	}
 	return resultingStateID, dbUpdates, nil
 }
@@ -201,7 +202,10 @@ func (s *MutableProtocolState) initializeOrthogonalStateMachines(
 ) (flow.Identifier, []protocol_state.KeyValueStoreStateMachine, protocol_state.KVStoreMutator, error) {
 	parentState, err := s.kvStoreSnapshots.ByBlockID(parentBlockID)
 	if err != nil {
-		return flow.ZeroID, nil, nil, fmt.Errorf("failed to retrieve Protocol State at parent block %v: %w", parentBlockID, err)
+		if errors.Is(err, storage.ErrNotFound) {
+			return flow.ZeroID, nil, nil, irrecoverable.NewExceptionf("Protocol State at parent block %v was not found: %w", parentBlockID, err)
+		}
+		return flow.ZeroID, nil, nil, fmt.Errorf("unexpected exception while retrieving Protocol State at parent block %v: %w", parentBlockID, err)
 	}
 
 	protocolVersion := parentState.GetProtocolStateVersion()
@@ -213,6 +217,9 @@ func (s *MutableProtocolState) initializeOrthogonalStateMachines(
 
 	evolvingState, err := parentState.Replicate(protocolVersion)
 	if err != nil {
+		if errors.Is(err, kvstore.ErrIncompatibleVersionChange) {
+			return flow.ZeroID, nil, nil, irrecoverable.NewExceptionf("replicating parent block's protocol state failed due to unsupported version: %w", err)
+		}
 		return flow.ZeroID, nil, nil, fmt.Errorf("could not replicate parent KV store (version=%d) to protocol version %d: %w", parentState.GetProtocolStateVersion(), protocolVersion, err)
 	}
 
@@ -239,14 +246,20 @@ func (s *MutableProtocolState) serviceEventsFromSeals(candidateSeals []*flow.Sea
 		// Per API contract, the input seals must have already passed verification, which necessitates
 		// successful ordering. Hence, calling protocol.OrderedSeals with the same inputs that succeeded
 		// earlier now failed. In all cases, this is an exception.
-		return nil, fmt.Errorf("ordering already validated seals unexpectedly failed: %w", err)
+		if errors.Is(err, protocol.ErrMultipleSealsForSameHeight) || errors.Is(err, protocol.ErrDiscontinuousSeals) || errors.Is(err, storage.ErrNotFound) {
+			return nil, irrecoverable.NewExceptionf("ordering already validated seals unexpectedly failed: %w", err)
+		}
+		return nil, fmt.Errorf("ordering already validated seals resulted in unexpected exception: %w", err)
 	}
 
 	serviceEvents := make([]flow.ServiceEvent, 0) // we expect that service events are rare; most blocks have none
 	for _, seal := range orderedSeals {
 		result, err := s.results.ByID(seal.ResultID)
 		if err != nil {
-			return nil, fmt.Errorf("could not get result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
+			if errors.Is(err, storage.ErrNotFound) {
+				return nil, irrecoverable.NewExceptionf("could not get result %x sealed by valid seal %x: %w", seal.ResultID, seal.ID(), err)
+			}
+			return nil, fmt.Errorf("retrieving result %x resulted in unexpected exception: %w", seal.ResultID, err)
 		}
 		serviceEvents = append(serviceEvents, result.ServiceEvents...)
 	}
@@ -283,7 +296,7 @@ func (s *MutableProtocolState) build(
 	for _, stateMachine := range stateMachines {
 		dbOps, err := stateMachine.Build()
 		if err != nil {
-			return flow.ZeroID, nil, fmt.Errorf("unexpected exception building state machine's output state: %w", err)
+			return flow.ZeroID, nil, fmt.Errorf("unexpected exception from sub-state machine while building its output state: %w", err)
 		}
 		dbUpdates.AddIndexingOps(dbOps.Pending())
 	}

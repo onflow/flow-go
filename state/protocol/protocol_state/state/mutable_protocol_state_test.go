@@ -402,6 +402,7 @@ func (s *StateMutatorSuite) Test_InvalidParent() {
 
 	_, dbUpdates, err := s.mutableState.EvolveState(unknownParent, s.candidate.View, []*flow.Seal{})
 	require.Error(s.T(), err)
+	require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 	require.True(s.T(), dbUpdates.IsEmpty())
 }
 
@@ -420,7 +421,7 @@ func (s *StateMutatorSuite) Test_ReplicateFails() {
 	s.kvStateMachineFactories[1] = *protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())
 
 	_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
-	require.Error(s.T(), err)
+	require.ErrorIs(s.T(), err, exception)
 	require.True(s.T(), dbUpdates.IsEmpty())
 }
 
@@ -446,7 +447,7 @@ func (s *StateMutatorSuite) Test_StateMachineFactoryFails() {
 	s.Run("failing factory is last", func() {
 		s.kvStateMachineFactories[0], s.kvStateMachineFactories[1] = workingFactory, failingFactory //nolint:govet
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
-		require.Error(s.T(), err)
+		require.ErrorIs(s.T(), err, exception)
 		require.True(s.T(), dbUpdates.IsEmpty())
 	})
 
@@ -454,7 +455,7 @@ func (s *StateMutatorSuite) Test_StateMachineFactoryFails() {
 	s.Run("failing factory is first", func() {
 		s.kvStateMachineFactories[0], s.kvStateMachineFactories[1] = failingFactory, workingFactory //nolint:govet
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
-		require.Error(s.T(), err)
+		require.ErrorIs(s.T(), err, exception)
 		require.True(s.T(), dbUpdates.IsEmpty())
 	})
 }
@@ -483,7 +484,7 @@ func (s *StateMutatorSuite) Test_StateMachineProcessingServiceEventsFails() {
 	s.Run("failing state machine is last", func() {
 		s.kvStateMachines[0], s.kvStateMachines[1] = workingStateMachine, failingStateMachine //nolint:govet
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
-		require.Error(s.T(), err)
+		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 		require.True(s.T(), dbUpdates.IsEmpty())
 	})
@@ -492,7 +493,7 @@ func (s *StateMutatorSuite) Test_StateMachineProcessingServiceEventsFails() {
 	s.Run("failing state machine is first", func() {
 		s.kvStateMachines[0], s.kvStateMachines[1] = failingStateMachine, workingStateMachine //nolint:govet
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
-		require.Error(s.T(), err)
+		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 		require.True(s.T(), dbUpdates.IsEmpty())
 	})
@@ -514,7 +515,7 @@ func (s *StateMutatorSuite) Test_StateMachineBuildFails() {
 	s.Run("failing state machine is last", func() {
 		s.kvStateMachines[0], s.kvStateMachines[1] = workingStateMachine, failingStateMachine //nolint:govet
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
-		require.Error(s.T(), err)
+		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 		require.True(s.T(), dbUpdates.IsEmpty())
 	})
@@ -523,7 +524,7 @@ func (s *StateMutatorSuite) Test_StateMachineBuildFails() {
 	s.Run("failing state machine is first", func() {
 		s.kvStateMachines[0], s.kvStateMachines[1] = failingStateMachine, workingStateMachine //nolint:govet
 		_, dbUpdates, err := s.mutableState.EvolveState(s.candidate.ParentID, s.candidate.View, []*flow.Seal{})
-		require.Error(s.T(), err)
+		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 		require.True(s.T(), dbUpdates.IsEmpty())
 	})
@@ -551,7 +552,6 @@ func (s *StateMutatorSuite) Test_EncodeFailed() {
 	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
 	// the expected mock methods should be called, which is asserted by the testify framework
 	err = dbUpdates.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
-	require.Error(s.T(), err)
 	require.ErrorIs(s.T(), err, exception)
 
 	s.protocolKVStoreDB.AssertExpectations(s.T())
