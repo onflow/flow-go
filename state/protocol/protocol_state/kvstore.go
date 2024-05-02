@@ -38,7 +38,7 @@ type KVStoreAPI interface {
 	// to the given `protocolVersion`. It is required that outcome of `Replicate` is a valid KV store model which can be
 	// incorporated in the protocol state without extra operations.
 	// Expected errors during normal operations:
-	//  - ErrIncompatibleVersionChange if replicating the Parent Snapshot into a Snapshot
+	//  - kvstore.ErrIncompatibleVersionChange if replicating the Parent Snapshot into a Snapshot
 	//    with the specified `protocolVersion` is not supported.
 	Replicate(protocolVersion uint64) (KVStoreMutator, error)
 }
