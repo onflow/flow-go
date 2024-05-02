@@ -2,6 +2,7 @@ package cohort1
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/integration/tests/mvp"
+	"github.com/onflow/flow-go/utils/dsl"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
@@ -39,6 +41,36 @@ import (
 var (
 	simpleScript       = `pub fun main(): Int { return 42; }`
 	simpleScriptResult = cadence.NewInt(42)
+
+	OriginalContract = dsl.Contract{
+		Name: "TestingContract",
+		Members: []dsl.CadenceCode{
+			dsl.Code(`
+				access(all) fun message(): String {
+					return "Initial Contract"
+				}`,
+			),
+		},
+	}
+
+	UpdatedContract = dsl.Contract{
+		Name: "TestingContract",
+		Members: []dsl.CadenceCode{
+			dsl.Code(`
+				access(all) fun message(): String {
+					return "Updated Contract"
+				}`,
+			),
+		},
+	}
+)
+
+const (
+	GetMessageScript = `
+import TestingContract from 0x%s
+pub fun main(): String {
+	return TestingContract.message()
+}`
 )
 
 func TestAccessAPI(t *testing.T) {
@@ -166,7 +198,8 @@ func (s *AccessAPISuite) SetupTest() {
 // and should not interfere with each other.
 func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN1() {
 	// deploy the test contract
-	txResult := s.deployContract()
+	_ = s.deployContract(lib.CounterContract, false)
+	txResult := s.deployCounter()
 	targetHeight := txResult.BlockHeight + 1
 	s.waitUntilIndexed(targetHeight)
 
@@ -183,7 +216,8 @@ func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN1() {
 // and should not interfere with each other.
 func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN2() {
 	// deploy the test contract
-	txResult := s.deployContract()
+	_ = s.deployContract(lib.CounterContract, false)
+	txResult := s.deployCounter()
 	targetHeight := txResult.BlockHeight + 1
 	s.waitUntilIndexed(targetHeight)
 
@@ -316,6 +350,30 @@ func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
 	s.Assert().Equal(entities.TransactionStatus_SEALED, lastReportedTxStatus)
 }
 
+// TestContractUpdate tests that the Access API can index contract updates, and that the program cache
+// is invalidated when a contract is updated.
+func (s *AccessAPISuite) TestContractUpdate() {
+	txResult := s.deployContract(OriginalContract, false)
+	targetHeight := txResult.BlockHeight + 1
+	s.waitUntilIndexed(targetHeight)
+
+	script := fmt.Sprintf(GetMessageScript, s.serviceClient.SDKServiceAddress().Hex())
+
+	// execute script and verify we get the original message
+	result, err := s.an2Client.ExecuteScriptAtBlockHeight(s.ctx, targetHeight, []byte(script), nil)
+	s.Require().NoError(err)
+	s.Require().Equal("Initial Contract", result.ToGoValue().(string))
+
+	txResult = s.deployContract(UpdatedContract, true)
+	targetHeight = txResult.BlockHeight + 1
+	s.waitUntilIndexed(targetHeight)
+
+	// execute script and verify we get the updated message
+	result, err = s.an2Client.ExecuteScriptAtBlockHeight(s.ctx, targetHeight, []byte(script), nil)
+	s.Require().NoError(err)
+	s.Require().Equal("Updated Contract", result.ToGoValue().(string))
+}
+
 func (s *AccessAPISuite) testGetAccount(client *client.Client) {
 	header, err := client.GetLatestBlockHeader(s.ctx, true)
 	s.Require().NoError(err)
@@ -431,20 +489,33 @@ func (s *AccessAPISuite) testExecuteScriptWithSimpleContract(client *client.Clie
 	})
 }
 
-func (s *AccessAPISuite) deployContract() *sdk.TransactionResult {
+func (s *AccessAPISuite) deployContract(contract dsl.Contract, isUpdate bool) *sdk.TransactionResult {
 	header, err := s.serviceClient.GetLatestSealedBlockHeader(s.ctx)
 	s.Require().NoError(err)
 
 	// Deploy the contract
-	tx, err := s.serviceClient.DeployContract(s.ctx, header.ID, lib.CounterContract)
+	var tx *sdk.Transaction
+	if isUpdate {
+		tx, err = s.serviceClient.UpdateContract(s.ctx, header.ID, contract)
+	} else {
+		tx, err = s.serviceClient.DeployContract(s.ctx, header.ID, contract)
+	}
 	s.Require().NoError(err)
 
-	_, err = s.serviceClient.WaitForExecuted(s.ctx, tx.ID())
+	result, err := s.serviceClient.WaitForExecuted(s.ctx, tx.ID())
+	s.Require().NoError(err)
+	s.Require().Empty(result.Error, "deploy tx should be accepted but got: %s", result.Error)
+
+	return result
+}
+
+func (s *AccessAPISuite) deployCounter() *sdk.TransactionResult {
+	header, err := s.serviceClient.GetLatestSealedBlockHeader(s.ctx)
 	s.Require().NoError(err)
 
 	// Add counter to service account
 	serviceAddress := s.serviceClient.SDKServiceAddress()
-	createCounterTx := sdk.NewTransaction().
+	tx := sdk.NewTransaction().
 		SetScript([]byte(lib.CreateCounterTx(serviceAddress).ToCadence())).
 		SetReferenceBlockID(sdk.Identifier(header.ID)).
 		SetProposalKey(serviceAddress, 0, s.serviceClient.GetSeqNumber()).
@@ -452,10 +523,10 @@ func (s *AccessAPISuite) deployContract() *sdk.TransactionResult {
 		AddAuthorizer(serviceAddress).
 		SetComputeLimit(9999)
 
-	err = s.serviceClient.SignAndSendTransaction(s.ctx, createCounterTx)
+	err = s.serviceClient.SignAndSendTransaction(s.ctx, tx)
 	s.Require().NoError(err)
 
-	result, err := s.serviceClient.WaitForSealed(s.ctx, createCounterTx.ID())
+	result, err := s.serviceClient.WaitForSealed(s.ctx, tx.ID())
 	s.Require().NoError(err)
 	s.Require().Empty(result.Error, "create counter tx should be accepted but got: %s", result.Error)
 
