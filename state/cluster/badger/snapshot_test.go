@@ -54,7 +54,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
 	root := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
-	suite.epochCounter = root.Encodable().Epochs.Current.Counter
+	suite.epochCounter = root.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
 
 	suite.protoState, err = pbadger.Bootstrap(
 		metrics,

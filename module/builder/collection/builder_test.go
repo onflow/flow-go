@@ -93,7 +93,7 @@ func (suite *BuilderSuite) SetupTest() {
 	).ID()).ID()
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID())))
 	require.NoError(suite.T(), err)
-	suite.epochCounter = rootSnapshot.Encodable().Epochs.Current.Counter
+	suite.epochCounter = rootSnapshot.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
 
 	clusterQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
 	root.Payload.ProtocolStateID = kvstore.NewDefaultKVStore(inmem.ProtocolStateFromEpochServiceEvents(

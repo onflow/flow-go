@@ -466,20 +466,10 @@ func bootstrapStatePointers(root protocol.Snapshot) func(*transaction.Tx) error 
 			return fmt.Errorf("could not index sealed block: %w", err)
 		}
 
-		// insert first-height indices for epochs which have started
-		hasPrevious, err := protocol.PreviousEpochExists(root)
+		// insert first-height indices for epochs which begin within the sealing segment
+		err = indexEpochHeights(segment)(bdtx)
 		if err != nil {
-			return fmt.Errorf("could not check existence of previous epoch: %w", err)
-		}
-		if hasPrevious {
-			err = indexFirstHeight(root.Epochs().Previous())(bdtx)
-			if err != nil {
-				return fmt.Errorf("could not index previous epoch first height: %w", err)
-			}
-		}
-		err = indexFirstHeight(root.Epochs().Current())(bdtx)
-		if err != nil {
-			return fmt.Errorf("could not index current epoch first height: %w", err)
+			return fmt.Errorf("could not index epoch heights: %w", err)
 		}
 
 		return nil
@@ -615,22 +605,41 @@ func bootstrapSporkInfo(root protocol.Snapshot) func(*transaction.Tx) error {
 	}
 }
 
-// indexFirstHeight indexes the first height for the epoch, as part of bootstrapping.
-// The input epoch must have been started (the first block of the epoch has been finalized).
+// indexEpochHeights populates the epoch height index from the root snapshot.
+// We index the FirstHeight for every epoch where the transition occurs within the sealing segment of the root snapshot,
+// or for the first epoch of a spork if the snapshot is a spork root snapshot (1 block sealing segment).
 // No errors are expected during normal operation.
-func indexFirstHeight(epoch protocol.Epoch) func(*badger.Txn) error {
+func indexEpochHeights(segment *flow.SealingSegment) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
-		counter, err := epoch.Counter()
-		if err != nil {
-			return fmt.Errorf("could not get epoch counter: %w", err)
+		// CASE 1: For spork root snapshots, there is exactly one block B and one epoch E.
+		// Index `E.counter → B.Height`.
+		if segment.IsSporkRoot() {
+			counter := segment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
+			firstHeight := segment.Highest().Header.Height
+			err := operation.InsertEpochFirstHeight(counter, firstHeight)(tx)
+			if err != nil {
+				return fmt.Errorf("could not index first height %d for epoch %d: %w", firstHeight, counter, err)
+			}
+			return nil
 		}
-		firstHeight, err := epoch.FirstHeight()
-		if err != nil {
-			return fmt.Errorf("could not get epoch first height: %w", err)
-		}
-		err = operation.InsertEpochFirstHeight(counter, firstHeight)(tx)
-		if err != nil {
-			return fmt.Errorf("could not index first height %d for epoch %d: %w", firstHeight, counter, err)
+
+		// CASE 2: For all other snapshots, there is a segment of blocks which may span several epochs.
+		// We traverse all blocks in the segment in ascending height order.
+		// If we find two consecutive blocks B1, B2 so that `B1.EpochCounter` != `B2.EpochCounter`,
+		// then index `B2.EpochCounter → B2.Height`.
+		allBlocks := segment.AllBlocks()
+		lastBlock := allBlocks[0]
+		lastBlockEpochCounter := segment.ProtocolStateEntries[lastBlock.Payload.ProtocolStateID].EpochEntry.EpochCounter()
+		for _, block := range allBlocks[1:] {
+			thisBlockEpochCounter := segment.ProtocolStateEntries[block.Payload.ProtocolStateID].EpochEntry.EpochCounter()
+			if lastBlockEpochCounter != thisBlockEpochCounter {
+				firstHeight := block.Header.Height
+				err := operation.InsertEpochFirstHeight(thisBlockEpochCounter, firstHeight)(tx)
+				if err != nil {
+					return fmt.Errorf("could not index first height %d for epoch %d: %w", firstHeight, thisBlockEpochCounter, err)
+				}
+			}
+			lastBlockEpochCounter = thisBlockEpochCounter
 		}
 		return nil
 	}

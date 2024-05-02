@@ -14,6 +14,9 @@ type EpochQuery interface {
 
 	// Next returns the next epoch as of this snapshot. Valid snapshots must
 	// have a next epoch available after the transition to epoch setup phase.
+	//
+	// Returns invalid.Epoch with ErrNextEpochNotSetup in the case that this method
+	// is queried w.r.t. a snapshot within the flow.EpochPhaseStaking phase.
 	Next() Epoch
 
 	// Previous returns the previous epoch as of this snapshot. Valid snapshots
@@ -21,8 +24,8 @@ type EpochQuery interface {
 	// the root block - in other words, if a previous epoch exists, implementations
 	// must arrange to expose it here.
 	//
-	// Returns ErrNoPreviousEpoch in the case that this method is queried w.r.t.
-	// a snapshot from the first epoch after the root block.
+	// Returns invalid.Epoch with ErrNoPreviousEpoch in the case that this method
+	// is queried w.r.t. a snapshot from the first epoch after the root block.
 	Previous() Epoch
 }
 
@@ -169,26 +172,24 @@ type Epoch interface {
 	// FirstHeight returns the height of the first block of the epoch.
 	// The first block of an epoch E is defined as the block B with the lowest
 	// height so that: B.View >= E.FirstView
-	// The first block of an epoch is not defined until it is finalized, so this
-	// value is only guaranteed to be defined for `Current` epochs of finalized snapshots.
+	// The first block of an epoch is not defined until it is finalized.
 	// Error returns:
 	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
 	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
 	// * protocol.ErrNextEpochNotCommitted if epoch has not been committed yet
-	// * protocol.ErrEpochTransitionNotFinalized - if the first block of the epoch has not been finalized yet.
+	// * protocol.ErrUnknownEpochBoundary - if the first block of the epoch is unknown.
 	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 	FirstHeight() (uint64, error)
 
 	// FinalHeight returns the height of the final block of the epoch.
 	// The final block of an epoch E is defined as the parent of the first
 	// block in epoch E+1 (see definition from FirstHeight).
-	// The final block of an epoch is not defined until its child is finalized,
-	// so this value is only guaranteed to be defined for `Previous` epochs of finalized snapshots.
+	// The final block of an epoch is not defined until its child is finalized.
 	// Error returns:
 	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
 	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
 	// * protocol.ErrNextEpochNotCommitted - if epoch has not been committed yet
-	// * protocol.ErrEpochTransitionNotFinalized - if the first block of the next epoch has not been finalized yet.
+	// * protocol.ErrUnknownEpochBoundary - if the first block of the next epoch is unknown.
 	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 	FinalHeight() (uint64, error)
 }
