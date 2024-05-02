@@ -15,6 +15,7 @@ import (
 // we are still determining the protocol state ID for that block.
 type DeferredBlockPersistOp func(blockID flow.Identifier, tx *Tx) error
 
+// noOpPersist intended as constant
 var noOpPersist DeferredBlockPersistOp = func(blockID flow.Identifier, tx *Tx) error { return nil }
 
 // WithBlock adds the still missing block ID information to a `DeferredBlockPersistOp`, thereby converting

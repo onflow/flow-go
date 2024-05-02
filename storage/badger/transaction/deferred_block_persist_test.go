@@ -31,8 +31,8 @@ func (s *DeferredBlockPersistSuite) TestEmpty() {
 	require.NoError(s.T(), err)
 }
 
-// TestAddBaderOp adds 1 or 2 DeferredBadgerUpdate(s) and verifies that they are executed in the expected order
-func (s *DeferredBlockPersistSuite) Test_AddBaderOp() {
+// Test_AddBadgerOp adds 1 or 2 DeferredBadgerUpdate(s) and verifies that they are executed in the expected order
+func (s *DeferredBlockPersistSuite) Test_AddBadgerOp() {
 	blockID := unittest.IdentifierFixture()
 	unittest.RunWithBadgerDB(s.T(), func(db *badger.DB) {
 		s.Run("single DeferredBadgerUpdate", func() {
