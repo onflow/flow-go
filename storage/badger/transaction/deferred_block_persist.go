@@ -4,7 +4,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TODO: maybe move this into the package `storage/badger/transaction` (?)
 
 // DeferredBlockPersistOp is a shorthand notation for an anonymous function that takes the ID of
 // a fully constructed block and a `transaction.Tx` as inputs and runs some database operations

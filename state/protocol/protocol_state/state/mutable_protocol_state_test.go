@@ -24,7 +24,7 @@ func TestProtocolStateMutator(t *testing.T) {
 	suite.Run(t, new(StateMutatorSuite))
 }
 
-// StateMutatorSuite is a test suite for the stateMutator, it holds the minimum mocked state to set up a stateMutator.
+// StateMutatorSuite is a test suite for the MutableProtocolState, it holds the minimum mocked state to set up a tested instance.
 // Tests in this suite are designed to rely on automatic assertions when leaving the scope of the test.
 type StateMutatorSuite struct {
 	suite.Suite
