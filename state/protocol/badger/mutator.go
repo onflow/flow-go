@@ -745,6 +745,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			return fmt.Errorf("could not update sealed height: %w", err)
 		}
 		if epochFallbackTriggered {
+			m.logger.Warn().Msg("epoch emergency fallback triggered")
 			err = operation.SetEpochEmergencyFallbackTriggered(blockID)(tx)
 			if err != nil {
 				return fmt.Errorf("could not set epoch fallback flag: %w", err)

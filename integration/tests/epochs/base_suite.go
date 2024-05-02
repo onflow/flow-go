@@ -118,6 +118,13 @@ func (s *BaseSuite) SetupTest() {
 	go lib.LogStatusPeriodically(s.T(), s.Ctx, s.log, s.Client, 5*time.Second)
 }
 
+func (s *BaseSuite) TearDownTest() {
+	s.log.Info().Msg("================> Start TearDownTest")
+	s.net.Remove()
+	s.cancel()
+	s.log.Info().Msg("================> Finish TearDownTest")
+}
+
 func (s *BaseSuite) Ghost() *client.GhostClient {
 	client, err := s.net.ContainerByID(s.ghostID).GhostClient()
 	require.NoError(s.T(), err, "could not get ghost Client")
@@ -155,4 +162,32 @@ func (s *BaseSuite) GetContainersByRole(role flow.Role) []*testnet.Container {
 	nodes := s.net.ContainersByRole(role, false)
 	require.True(s.T(), len(nodes) > 0)
 	return nodes
+}
+
+// AwaitFinalizedView polls until it observes that the latest finalized block has a view
+// greater than or equal to the input view. This is used to wait until when an epoch
+// transition must have happened.
+func (s *BaseSuite) AwaitFinalizedView(ctx context.Context, view uint64, waitFor, tick time.Duration) {
+	require.Eventually(s.T(), func() bool {
+		sealed := s.getLatestFinalizedHeader(ctx)
+		return sealed.View >= view
+	}, waitFor, tick)
+}
+
+// getLatestFinalizedHeader retrieves the latest finalized block, as reported in LatestSnapshot.
+func (s *BaseSuite) getLatestFinalizedHeader(ctx context.Context) *flow.Header {
+	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+	finalized, err := snapshot.Head()
+	require.NoError(s.T(), err)
+	return finalized
+}
+
+// AssertInEpoch requires actual epoch counter is equal to counter provided.
+func (s *BaseSuite) AssertInEpoch(ctx context.Context, expectedEpoch uint64) {
+	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+	actualEpoch, err := snapshot.Epochs().Current().Counter()
+	require.NoError(s.T(), err)
+	require.Equalf(s.T(), expectedEpoch, actualEpoch, "expected to be in epoch %d got %d", expectedEpoch, actualEpoch)
 }
