@@ -559,17 +559,6 @@ func (s *StateMutatorSuite) Test_EncodeFailed() {
 
 /* *************************************************** utility methods *************************************************** */
 
-// hasID returns a functor for asserting that an input `entity` (expected to be of type `flow.Entity`)
-// objects, whether its ID corresponds to `id`. This functor is intended to be used with testify's `Matchby`
-func hasID(id flow.Identifier) func(interface{}) bool {
-	type IDable interface {
-		ID() flow.Identifier
-	}
-	return func(entity interface{}) bool {
-		return entity.(IDable).ID() == id
-	}
-}
-
 // emptySlice returns a functor for testing that the input `slice` (with element type `T`)
 // is empty. This functor is intended to be used with testify's `Matchby`
 func emptySlice[T any]() func(interface{}) bool {
