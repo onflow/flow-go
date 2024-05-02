@@ -341,25 +341,6 @@ func (s *DynamicEpochTransitionSuite) StakeNewNode(ctx context.Context, env temp
 	return info, testContainer
 }
 
-// AwaitFinalizedView polls until it observes that the latest finalized block has a view
-// greater than or equal to the input view. This is used to wait until when an epoch
-// transition must have happened.
-func (s *DynamicEpochTransitionSuite) AwaitFinalizedView(ctx context.Context, view uint64, waitFor, tick time.Duration) {
-	require.Eventually(s.T(), func() bool {
-		sealed := s.getLatestFinalizedHeader(ctx)
-		return sealed.View >= view
-	}, waitFor, tick)
-}
-
-// getLatestFinalizedHeader retrieves the latest finalized block, as reported in LatestSnapshot.
-func (s *DynamicEpochTransitionSuite) getLatestFinalizedHeader(ctx context.Context) *flow.Header {
-	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
-	require.NoError(s.T(), err)
-	finalized, err := snapshot.Head()
-	require.NoError(s.T(), err)
-	return finalized
-}
-
 // AssertInEpochPhase checks if we are in the phase of the given epoch.
 func (s *DynamicEpochTransitionSuite) AssertInEpochPhase(ctx context.Context, expectedEpoch uint64, expectedPhase flow.EpochPhase) {
 	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
@@ -374,15 +355,6 @@ func (s *DynamicEpochTransitionSuite) AssertInEpochPhase(ctx context.Context, ex
 	head, err := snapshot.Head()
 	require.NoError(s.T(), err)
 	s.TimedLogf("asserted in epoch %d, phase %s, finalized height/view: %d/%d", expectedEpoch, expectedPhase, head.Height, head.View)
-}
-
-// AssertInEpoch requires actual epoch counter is equal to counter provided.
-func (s *DynamicEpochTransitionSuite) AssertInEpoch(ctx context.Context, expectedEpoch uint64) {
-	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
-	require.NoError(s.T(), err)
-	actualEpoch, err := snapshot.Epochs().Current().Counter()
-	require.NoError(s.T(), err)
-	require.Equalf(s.T(), expectedEpoch, actualEpoch, "expected to be in epoch %d got %d", expectedEpoch, actualEpoch)
 }
 
 // AssertNodeNotParticipantInEpoch asserts that the given node ID does not exist
