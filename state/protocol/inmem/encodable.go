@@ -4,7 +4,6 @@ import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage"
 )
 
 // EncodableSnapshot is the encoding format for protocol.Snapshot
@@ -16,8 +15,6 @@ type EncodableSnapshot struct {
 	QuorumCertificate   *flow.QuorumCertificate
 	Epochs              EncodableEpochs
 	Params              EncodableParams
-	EpochProtocolState  *flow.ProtocolStateEntry
-	KVStore             storage.KeyValueStoreData
 	SealedVersionBeacon *flow.SealedVersionBeacon
 }
 

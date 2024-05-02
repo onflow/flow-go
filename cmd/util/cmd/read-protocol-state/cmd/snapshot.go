@@ -76,7 +76,7 @@ func runSnapshot(*cobra.Command, []string) {
 				log.Logger, state, storages.Headers, storages.Seals, flagCheckpointDir, flagCheckpointScanStep)
 		} else {
 			// using customized end height
-			protocolSnapshot, sealedHeight, sealedCommit, err = commonFuncs.GenerateProtocolSnapshotForCheckpointWithHeights(
+			protocolSnapshot, sealedHeight, sealedCommit, err = commonFuncs.GenerateProtocolSnapshotForCheckpointWithHeight(
 				log.Logger, state, storages.Headers, storages.Seals, flagCheckpointDir, flagCheckpointScanStep, uint64(flagCheckpointScanEndHeight))
 		}
 

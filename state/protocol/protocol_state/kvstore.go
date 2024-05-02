@@ -53,7 +53,7 @@ type KVStoreAPI interface {
 type KVStoreMutator interface {
 	protocol.KVStoreReader
 
-	// v0
+	// v0/v1
 
 	// SetVersionUpgrade sets the protocol upgrade version. This method is used
 	// to update the Protocol State version when a flow.ProtocolStateVersionUpgrade is processed.
@@ -63,13 +63,6 @@ type KVStoreMutator interface {
 	// SetEpochStateID sets the state ID of the epoch state.
 	// This method is used to commit the epoch state to the KV store when the state of the epoch is updated.
 	SetEpochStateID(stateID flow.Identifier)
-
-	// v1
-
-	// SetInvalidEpochTransitionAttempted sets the epoch fallback mode flag.
-	// Errors:
-	//  - ErrKeyNotSupported if the key does not exist in the current model version.
-	SetInvalidEpochTransitionAttempted(attempted bool) error
 }
 
 // OrthogonalStoreStateMachine represents a state machine that exclusively evolves its state P.

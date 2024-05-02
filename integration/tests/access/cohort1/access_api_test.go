@@ -235,7 +235,7 @@ func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
 	s.Require().NoError(err)
 	tx.SetComputeLimit(1000).
 		SetReferenceBlockID(sdk.HexToID(latestBlockID.String())).
-		SetProposalKey(payer, 0, serviceClient.GetSeqNumber()).
+		SetProposalKey(payer, 0, serviceClient.GetAndIncrementSeqNumber()).
 		SetPayer(payer)
 
 	tx, err = serviceClient.SignTransaction(tx)
@@ -441,7 +441,7 @@ func (s *AccessAPISuite) deployContract() *sdk.TransactionResult {
 	createCounterTx := sdk.NewTransaction().
 		SetScript([]byte(lib.CreateCounterTx(serviceAddress).ToCadence())).
 		SetReferenceBlockID(sdk.Identifier(header.ID)).
-		SetProposalKey(serviceAddress, 0, s.serviceClient.GetSeqNumber()).
+		SetProposalKey(serviceAddress, 0, s.serviceClient.GetAndIncrementSeqNumber()).
 		SetPayer(serviceAddress).
 		AddAuthorizer(serviceAddress).
 		SetComputeLimit(9999)

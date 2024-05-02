@@ -301,11 +301,11 @@ func TestBootstrapNonRoot(t *testing.T) {
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
-			// should be able to read all QCs
 			segment, err := state.Final().SealingSegment()
 			require.NoError(t, err)
 			for _, block := range segment.Blocks {
 				snapshot := state.AtBlockID(block.ID())
+				// should be able to read all QCs
 				_, err := snapshot.QuorumCertificate()
 				require.NoError(t, err)
 				_, err = snapshot.RandomSource()
@@ -315,7 +315,6 @@ func TestBootstrapNonRoot(t *testing.T) {
 	})
 
 	t.Run("with setup next epoch", func(t *testing.T) {
-		unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: sealing segment doesn't support multiple protocol states")
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
 			unittest.NewEpochBuilder(t, mutableState, state).BuildEpoch()
 
@@ -332,11 +331,21 @@ func TestBootstrapNonRoot(t *testing.T) {
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
+
+			segment, err := state.Final().SealingSegment()
+			require.NoError(t, err)
+			assert.GreaterOrEqual(t, len(segment.ProtocolStateEntries), 2, "should have >2 distinct protocol state entries")
+			for _, block := range segment.Blocks {
+				snapshot := state.AtBlockID(block.ID())
+				// should be able to read all protocol state entries
+				protocolStateEntry, err := snapshot.ProtocolState()
+				require.NoError(t, err)
+				assert.Equal(t, block.Payload.ProtocolStateID, protocolStateEntry.ID())
+			}
 		})
 	})
 
 	t.Run("with committed next epoch", func(t *testing.T) {
-		unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: sealing segment doesn't support multiple protocol states")
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
 			unittest.NewEpochBuilder(t, mutableState, state).BuildEpoch().CompleteEpoch()
 
@@ -353,11 +362,21 @@ func TestBootstrapNonRoot(t *testing.T) {
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
+
+			segment, err := state.Final().SealingSegment()
+			require.NoError(t, err)
+			assert.GreaterOrEqual(t, len(segment.ProtocolStateEntries), 2, "should have >2 distinct protocol state entries")
+			for _, block := range segment.Blocks {
+				snapshot := state.AtBlockID(block.ID())
+				// should be able to read all protocol state entries
+				protocolStateEntry, err := snapshot.ProtocolState()
+				require.NoError(t, err)
+				assert.Equal(t, block.Payload.ProtocolStateID, protocolStateEntry.ID())
+			}
 		})
 	})
 
 	t.Run("with previous and next epoch", func(t *testing.T) {
-		unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: sealing segment doesn't support multiple protocol states")
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
 			unittest.NewEpochBuilder(t, mutableState, state).
 				BuildEpoch().CompleteEpoch(). // build epoch 2
@@ -381,6 +400,17 @@ func TestBootstrapNonRoot(t *testing.T) {
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
+
+			segment, err := state.Final().SealingSegment()
+			require.NoError(t, err)
+			assert.GreaterOrEqual(t, len(segment.ProtocolStateEntries), 2, "should have >2 distinct protocol state entries")
+			for _, block := range segment.Blocks {
+				snapshot := state.AtBlockID(block.ID())
+				// should be able to read all protocol state entries
+				protocolStateEntry, err := snapshot.ProtocolState()
+				require.NoError(t, err)
+				assert.Equal(t, block.Payload.ProtocolStateID, protocolStateEntry.ID())
+			}
 		})
 	})
 }
@@ -437,13 +467,20 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 
 	t.Run("non-canonical ordering", func(t *testing.T) {
 		participants := unittest.IdentityListFixture(20, unittest.WithAllRoles())
+		// randomly shuffle the identities so they are not canonically ordered
+		unorderedParticipants, err := participants.ToSkeleton().Shuffle()
+		require.NoError(t, err)
 
 		root := unittest.RootSnapshotFixture(participants)
-		// randomly shuffle the identities so they are not canonically ordered
 		encodable := root.Encodable()
-		var err error
-		encodable.Epochs.Current.InitialIdentities, err = participants.ToSkeleton().Shuffle()
-		require.NoError(t, err)
+
+		// modify EpochSetup participants, making them unordered
+		latestProtocolStateEntry := encodable.SealingSegment.LatestProtocolStateEntry()
+		currentEpochSetup := latestProtocolStateEntry.EpochEntry.CurrentEpochSetup
+		currentEpochSetup.Participants = unorderedParticipants
+		currentEpochSetup.Participants = unorderedParticipants
+		latestProtocolStateEntry.EpochEntry.CurrentEpoch.SetupID = currentEpochSetup.ID()
+
 		root = inmem.SnapshotFromEncodable(encodable)
 		bootstrap(t, root, func(state *bprotocol.State, err error) {
 			assert.Error(t, err)

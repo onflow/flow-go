@@ -9,8 +9,8 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
-	"github.com/onflow/flow-go/storage"
 )
 
 // FromSnapshot generates a memory-backed snapshot from the input snapshot.
@@ -75,25 +75,6 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 		return nil, fmt.Errorf("could not get params: %w", err)
 	}
 	snap.Params = params.enc
-
-	protocolEpochState, err := from.EpochProtocolState()
-	if err != nil {
-		return nil, fmt.Errorf("could not get protocol epoch state: %w", err)
-	}
-	snap.EpochProtocolState = protocolEpochState.Entry().ProtocolStateEntry
-
-	protocolState, err := from.ProtocolState()
-	if err != nil {
-		return nil, fmt.Errorf("could not get protocol state: %w", err)
-	}
-	kvStoreVersion, kvStoreData, err := protocolState.VersionedEncode()
-	if err != nil {
-		return nil, fmt.Errorf("could not encode kvstore: %w", err)
-	}
-	snap.KVStore = storage.KeyValueStoreData{
-		Version: kvStoreVersion,
-		Data:    kvStoreData,
-	}
 
 	// convert version beacon
 	versionBeacon, err := from.VersionBeacon()
@@ -288,7 +269,7 @@ func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, 
 	if err != nil {
 		return nil, fmt.Errorf("could not get default epoch commit safety threshold: %w", err)
 	}
-	return SnapshotFromBootstrapStateWithParams(root, result, seal, qc, version, threshold)
+	return SnapshotFromBootstrapStateWithParams(root, result, seal, qc, version, threshold, kvstore.NewDefaultKVStore)
 }
 
 // SnapshotFromBootstrapStateWithParams is SnapshotFromBootstrapState
@@ -300,6 +281,7 @@ func SnapshotFromBootstrapStateWithParams(
 	qc *flow.QuorumCertificate,
 	protocolVersion uint,
 	epochCommitSafetyThreshold uint64,
+	kvStoreFactory func(epochStateID flow.Identifier) protocol_state.KVStoreAPI,
 ) (*Snapshot, error) {
 	setup, ok := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	if !ok {
@@ -347,7 +329,8 @@ func SnapshotFromBootstrapStateWithParams(
 	}
 
 	rootEpochState := ProtocolStateFromEpochServiceEvents(setup, commit)
-	rootKvStore := kvstore.NewDefaultKVStore(rootEpochState.ID())
+	rootEpochStateID := rootEpochState.ID()
+	rootKvStore := kvStoreFactory(rootEpochStateID)
 	if rootKvStore.ID() != root.Payload.ProtocolStateID {
 		return nil, fmt.Errorf("incorrect protocol state ID in root block, expected (%x) but got (%x)",
 			root.Payload.ProtocolStateID, rootKvStore.ID())
@@ -355,6 +338,19 @@ func SnapshotFromBootstrapStateWithParams(
 	kvStoreVersion, kvStoreData, err := rootKvStore.VersionedEncode()
 	if err != nil {
 		return nil, fmt.Errorf("could not encode kvstore: %w", err)
+	}
+
+	richRootEpochState, err := flow.NewRichProtocolStateEntry(rootEpochState, nil, nil, setup, commit, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct root rich epoch state entry: %w", err)
+	}
+
+	rootProtocolStateEntryWrapper := &flow.ProtocolStateEntryWrapper{
+		KVStore: flow.PSKeyValueStoreData{
+			Version: kvStoreVersion,
+			Data:    kvStoreData,
+		},
+		EpochEntry: richRootEpochState,
 	}
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{
@@ -365,17 +361,15 @@ func SnapshotFromBootstrapStateWithParams(
 			Blocks:           []*flow.Block{root},
 			ExecutionResults: flow.ExecutionResultList{result},
 			LatestSeals:      map[flow.Identifier]flow.Identifier{root.ID(): seal.ID()},
-			FirstSeal:        seal,
-			ExtraBlocks:      make([]*flow.Block, 0),
+			ProtocolStateEntries: map[flow.Identifier]*flow.ProtocolStateEntryWrapper{
+				rootKvStore.ID(): rootProtocolStateEntryWrapper,
+			},
+			FirstSeal:   seal,
+			ExtraBlocks: make([]*flow.Block, 0),
 		},
-		QuorumCertificate:  qc,
-		Epochs:             epochs,
-		Params:             params,
-		EpochProtocolState: rootEpochState,
-		KVStore: storage.KeyValueStoreData{
-			Version: kvStoreVersion,
-			Data:    kvStoreData,
-		},
+		QuorumCertificate:   qc,
+		Epochs:              epochs,
+		Params:              params,
 		SealedVersionBeacon: nil,
 	})
 
