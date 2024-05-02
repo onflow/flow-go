@@ -392,12 +392,12 @@ func (q *EpochQuery) Current() protocol.Epoch {
 
 	setup := psSnapshot.EpochSetup()
 	commit := psSnapshot.EpochCommit()
-	firstHeight, _, epochStarted, _, err := q.retrieveEpochHeightBounds(setup.Counter)
+	firstHeight, _, isFirstHeightKnown, _, err := q.retrieveEpochHeightBounds(setup.Counter)
 	if err != nil {
 		return invalid.NewEpochf("could not get current epoch height bounds: %s", err.Error())
 	}
-	if epochStarted {
-		return inmem.NewStartedEpoch(setup, commit, firstHeight)
+	if isFirstHeightKnown {
+		return inmem.NewEpochWithStartBoundary(setup, commit, firstHeight)
 	}
 	return inmem.NewCommittedEpoch(setup, commit)
 }
@@ -451,14 +451,30 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 	setup := entry.PreviousEpochSetup
 	commit := entry.PreviousEpochCommit
 
-	firstHeight, finalHeight, _, epochEnded, err := q.retrieveEpochHeightBounds(setup.Counter)
+	firstHeight, finalHeight, firstHeightKnown, finalHeightKnown, err := q.retrieveEpochHeightBounds(setup.Counter)
 	if err != nil {
 		return invalid.NewEpochf("could not get epoch height bounds: %w", err)
 	}
-	if epochEnded {
-		return inmem.NewEndedEpoch(setup, commit, firstHeight, finalHeight)
+	if firstHeightKnown && finalHeightKnown {
+		// typical case - we usually know both boundaries for a past epoch
+		return inmem.NewEpochWithStartAndEndBoundaries(setup, commit, firstHeight, finalHeight)
 	}
-	return inmem.NewStartedEpoch(setup, commit, firstHeight)
+	if firstHeightKnown && !finalHeightKnown {
+		// this case is possible when the snapshot reference block is un-finalized
+		// and is past an un-finalized epoch boundary
+		return inmem.NewEpochWithStartBoundary(setup, commit, firstHeight)
+	}
+	if !firstHeightKnown && finalHeightKnown {
+		// this case is possible when this node's lowest known block is after
+		// the queried epoch's start boundary
+		return inmem.NewEpochWithEndBoundary(setup, commit, finalHeight)
+	}
+	if !firstHeightKnown && !finalHeightKnown {
+		// this case is possible when this node's lowest known block is after
+		// the queried epoch's end boundary
+		return inmem.NewCommittedEpoch(setup, commit)
+	}
+	return invalid.NewEpochf("sanity check failed: impossible combination of boundaries for previous epoch")
 }
 
 // retrieveEpochHeightBounds retrieves the height bounds for an epoch.
@@ -482,41 +498,47 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 //	     ╰ X <-|- X <- Y <- Z
 //
 // Returns:
-//   - (0, 0, false, false, nil) if epoch is not started
-//   - (firstHeight, 0, true, false, nil) if epoch is started but not ended
-//   - (firstHeight, finalHeight, true, true, nil) if epoch is ended
+//   - (0, 0, false, false, nil) if neither boundary is known
+//   - (firstHeight, 0, true, false, nil) if epoch start boundary is known but end boundary is not known
+//   - (firstHeight, finalHeight, true, true, nil) if epoch start and end boundary are known
+//   - (0, finalHeight, false, true, nil) if epoch start boundary is known but end boundary is not known
 //
 // No errors are expected during normal operation.
-func (q *EpochQuery) retrieveEpochHeightBounds(epoch uint64) (firstHeight, finalHeight uint64, isFirstBlockFinalized, isLastBlockFinalized bool, err error) {
+func (q *EpochQuery) retrieveEpochHeightBounds(epoch uint64) (
+	firstHeight, finalHeight uint64,
+	isFirstHeightKnown, isLastHeightKnown bool,
+	err error,
+) {
 	err = q.snap.state.db.View(func(tx *badger.Txn) error {
 		// Retrieve the epoch's first height
 		err = operation.RetrieveEpochFirstHeight(epoch, &firstHeight)(tx)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
-				isFirstBlockFinalized = false
-				isLastBlockFinalized = false
-				return nil
+				isFirstHeightKnown = false // unknown boundary
+			} else {
+				return err // unexpected error
 			}
-			return err // unexpected error
+		} else {
+			isFirstHeightKnown = true // known boundary
 		}
-		isFirstBlockFinalized = true
 
 		var subsequentEpochFirstHeight uint64
 		err = operation.RetrieveEpochFirstHeight(epoch+1, &subsequentEpochFirstHeight)(tx)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
-				isLastBlockFinalized = false
-				return nil
+				isLastHeightKnown = false // unknown boundary
+			} else {
+				return err // unexpected error
 			}
-			return err // unexpected error
+		} else { // known boundary
+			isLastHeightKnown = true
+			finalHeight = subsequentEpochFirstHeight - 1
 		}
-		finalHeight = subsequentEpochFirstHeight - 1
-		isLastBlockFinalized = true
 
 		return nil
 	})
 	if err != nil {
 		return 0, 0, false, false, err
 	}
-	return firstHeight, finalHeight, isFirstBlockFinalized, isLastBlockFinalized, nil
+	return firstHeight, finalHeight, isFirstHeightKnown, isLastHeightKnown, nil
 }
