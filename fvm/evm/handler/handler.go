@@ -185,6 +185,7 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 	}
 
 	bp.PopulateReceiptRoot(res)
+	bp.CalculateGasUsage(res)
 
 	// meter all the transaction gas usage and append hashes to the block
 	for _, r := range res {
@@ -296,7 +297,7 @@ func (h *ContractHandler) run(
 
 	// populate receipt root
 	bp.PopulateReceiptRoot([]*types.Result{res})
-	bp.CalculateGasUsage([]types.Result{*res})
+	bp.CalculateGasUsage([]*types.Result{res})
 
 	blockHash, err := bp.Hash()
 	if err != nil {
