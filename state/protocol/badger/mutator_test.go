@@ -2678,13 +2678,7 @@ func getRootProtocolStateID(t *testing.T, rootSnapshot *inmem.Snapshot) flow.Ide
 // calculateExpectedStateId is a utility function which makes easier to get expected protocol state ID after applying service events contained in seals.
 func calculateExpectedStateId(t *testing.T, mutableProtocolState realprotocol.MutableProtocolState) func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
 	return func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
-		stateMutator, err := mutableProtocolState.Mutator(header.View, header.ParentID)
-		require.NoError(t, err)
-
-		err = stateMutator.ApplyServiceEventsFromValidatedSeals(seals)
-		require.NoError(t, err)
-
-		expectedStateID, _, err := stateMutator.Build()
+		expectedStateID, _, err := mutableProtocolState.EvolveState(header.ParentID, header.View, seals)
 		require.NoError(t, err)
 		return expectedStateID
 	}

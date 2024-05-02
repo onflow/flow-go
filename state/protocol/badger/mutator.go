@@ -597,25 +597,18 @@ func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorEvolveProtocolState)
 	defer span.End()
 
-	// instantiate Protocol State Mutator from the parent block's state and apply any state-changing service events sealed by this block
-	stateMutator, err := m.protocolState.Mutator(candidate.Header.View, candidate.Header.ParentID)
+	// Evolve the Protocol State starting from the parent block's state. Information that may change the state is:
+	// the candidate block's view and Service Events from execution results sealed in the candidate block.
+	updatedStateID, dbUpdates, err := m.protocolState.EvolveState(candidate.Header.ParentID, candidate.Header.View, candidate.Payload.Seals)
 	if err != nil {
-		return fmt.Errorf("could not create protocol state mutator for view %d: %w", candidate.Header.View, err)
-	}
-	err = stateMutator.ApplyServiceEventsFromValidatedSeals(candidate.Payload.Seals)
-	if err != nil {
-		return fmt.Errorf("could not process service events: %w", err)
+		return fmt.Errorf("evolving protocol state failed: %w", err)
 	}
 
 	// verify Protocol State commitment in the candidate block matches the locally-constructed value
-	updatedStateID, dbUpdates, err := stateMutator.Build()
-	if err != nil {
-		return fmt.Errorf("could not build dynamic protocol state: %w", err)
-	}
 	if updatedStateID != candidate.Payload.ProtocolStateID {
 		return state.NewInvalidExtensionErrorf("invalid protocol state commitment %x in block, which should be %x", candidate.Payload.ProtocolStateID, updatedStateID)
 	}
-	deferredDbOps.AddDbOps(dbUpdates.Decorate(candidate.ID())...)
+	deferredDbOps.AddDbOps(dbUpdates.Pending().WithBlock(candidate.ID()))
 	return nil
 }
 

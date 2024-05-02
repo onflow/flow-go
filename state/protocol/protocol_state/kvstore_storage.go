@@ -1,23 +1,27 @@
-package storage
+package protocol_state
 
 import (
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// ProtocolKVStore persists different snapshots of key-value stores [KV-stores]. At this level, the API
-// deals with versioned data blobs, each representing a Snapshot of the Protocol State. The *current*
-// implementation allows to retrieve snapshots from the database (e.g. to answer external API calls) even
-// for legacy protocol states whose versions are not support anymore. However, this _may_ change in the
-// future, where only versioned snapshots can be retrieved that are also supported by the current software.
-// TODO maybe rename to `ProtocolStateSnapshots` (?) because at this low level, we are not exposing the
-// KV-store, it is just an encoded data blob
+// ProtocolKVStore persists different snapshots of the Protocol State's Key-Calue stores [KV-stores].
+// Here, we augment the low-level primitives provided by `storage.ProtocolKVStore` with logic for
+// encoding and decoding the state snapshots into abstract representation `protocol_state.KVStoreAPI`.
+//
+// At the abstraction level here, we can only handle protocol state snapshots, whose data models are
+// supported by the current software version. There might be serialized snapshots with legacy versions
+// in the database that are not supported anymore by this software version.
 type ProtocolKVStore interface {
-	// StoreTx returns an anonymous function (intended to be executed as part of a badger transaction),
-	// which persists the given KV-store snapshot as part of a DB tx.
+	// StoreTx returns an anonymous function (intended to be executed as part of a database transaction),
+	// which persists the given KV-store snapshot as part of a DB tx. Per convention, all implementations
+	// of `protocol.KVStoreReader` should be able to successfully encode their state into a data blob.
+	// If the encoding fails, the anonymous function returns an error upon call.
+	//
 	// Expected errors of the returned anonymous function:
 	//   - storage.ErrAlreadyExists if a KV-store snapshot with the given id is already stored.
-	StoreTx(stateID flow.Identifier, data *flow.PSKeyValueStoreData) func(*transaction.Tx) error
+	StoreTx(stateID flow.Identifier, kvStore protocol.KVStoreReader) func(*transaction.Tx) error
 
 	// IndexTx returns an anonymous function intended to be executed as part of a database transaction.
 	// In a nutshell, we want to maintain a map from `blockID` to `stateID`, where `blockID` references the
@@ -30,14 +34,15 @@ type ProtocolKVStore interface {
 	//   - CAUTION: The updated state requires confirmation by a QC and will only become active at the
 	//     child block, _after_ validating the QC.
 	//
-	// Expected errors during normal operations:
+	// Expected errors of the returned anonymous function:
 	//   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed.
 	IndexTx(blockID flow.Identifier, stateID flow.Identifier) func(*transaction.Tx) error
 
 	// ByID retrieves the KV store snapshot with the given ID.
 	// Expected errors during normal operations:
 	//   - storage.ErrNotFound if no snapshot with the given Identifier is known.
-	ByID(id flow.Identifier) (*flow.PSKeyValueStoreData, error)
+	//   - kvstore.ErrUnsupportedVersion if the version of the stored snapshot not supported by this implementation
+	ByID(id flow.Identifier) (KVStoreAPI, error)
 
 	// ByBlockID retrieves the kv-store snapshot that the block with the given ID proposes.
 	// CAUTION: this store snapshot requires confirmation by a QC and will only become active at the child block,
@@ -51,5 +56,6 @@ type ProtocolKVStore interface {
 	//
 	// Expected errors during normal operations:
 	//   - storage.ErrNotFound if no snapshot has been indexed for the given block.
-	ByBlockID(blockID flow.Identifier) (*flow.PSKeyValueStoreData, error)
+	//   - kvstore.ErrUnsupportedVersion if the version of the stored snapshot not supported by this implementation
+	ByBlockID(blockID flow.Identifier) (KVStoreAPI, error)
 }
