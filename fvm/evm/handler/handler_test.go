@@ -826,8 +826,9 @@ func TestHandler_TransactionRun(t *testing.T) {
 
 					gasConsumed := testutils.RandomGas(1000)
 					addr := testutils.RandomAddress(t)
-					result := func(tx *gethTypes.Transaction) *types.Result {
+					result := func(i uint16, tx *gethTypes.Transaction) *types.Result {
 						return &types.Result{
+							Index:                   i,
 							DeployedContractAddress: &addr,
 							ReturnedValue:           testutils.RandomData(t),
 							GasConsumed:             gasConsumed,
@@ -844,7 +845,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 						BatchRunTransactionFunc: func(txs []*gethTypes.Transaction) ([]*types.Result, error) {
 							runResults = make([]*types.Result, len(txs))
 							for i, tx := range txs {
-								runResults[i] = result(tx)
+								runResults[i] = result(uint16(i), tx)
 							}
 							return runResults, nil
 						},
@@ -877,6 +878,8 @@ func TestHandler_TransactionRun(t *testing.T) {
 
 					events := backend.Events()
 					require.Len(t, events, batchSize+1) // +1 block event
+					var blockHeight uint64
+					var blockHash string
 
 					for i, event := range events {
 						if i == batchSize {
@@ -887,20 +890,35 @@ func TestHandler_TransactionRun(t *testing.T) {
 						require.NoError(t, err)
 						cadenceEvent, ok := ev.(cadence.Event)
 						require.True(t, ok)
-						for j, f := range cadenceEvent.GetFields() {
-							if f.Identifier == "logs" {
-								cadenceLogs := cadenceEvent.GetFieldValues()[j]
-								encodedLogs, err := hex.DecodeString(strings.ReplaceAll(cadenceLogs.String(), "\"", ""))
-								require.NoError(t, err)
 
-								var logs []*gethTypes.Log
-								err = rlp.DecodeBytes(encodedLogs, &logs)
-								require.NoError(t, err)
+						eventPayload, err := types.DecodeTransactionEventPayload(cadenceEvent)
+						require.NoError(t, err)
 
-								for k, l := range runResults[i].Logs {
-									assert.Equal(t, l, logs[k])
-								}
-							}
+						txBytes, err := hex.DecodeString(eventPayload.Payload)
+						require.NoError(t, err)
+						require.Equal(t, txs[i], txBytes)
+						require.Equal(t, uint16(i), eventPayload.Index)
+						require.Equal(t, types.ErrCodeNoError, types.ErrorCode(eventPayload.ErrorCode))
+
+						// make sure all block heights are same
+						if blockHeight == 0 {
+							blockHeight = eventPayload.BlockHeight
+							blockHash = eventPayload.BlockHash
+						}
+						require.Equal(t, eventPayload.BlockHeight, blockHeight)
+						require.Equal(t, eventPayload.BlockHash, blockHash)
+
+						require.Equal(t, addr.String(), eventPayload.ContractAddress)
+
+						encodedLogs, err := hex.DecodeString(eventPayload.Logs)
+						require.NoError(t, err)
+
+						var logs []*gethTypes.Log
+						err = rlp.DecodeBytes(encodedLogs, &logs)
+						require.NoError(t, err)
+
+						for k, l := range runResults[i].Logs {
+							assert.Equal(t, l, logs[k])
 						}
 					}
 
