@@ -72,6 +72,13 @@ func WithBitswapOptions(opts ...bitswap.Option) network.BlobServiceOption {
 	}
 }
 
+// WithParentBlobService configures the blob service to use the parent's blockstore
+func WithParentBlobService(parent network.BlobService) network.BlobServiceOption {
+	return func(bs network.BlobService) {
+		bs.(*blobService).blockStore = parent.(*blobService).blockStore
+	}
+}
+
 // WithHashOnRead sets whether the blobstore will rehash the blob data on read
 // When set, calls to GetBlob will fail with an error if the hash of the data in storage does not
 // match its CID
