@@ -114,12 +114,11 @@ func (dc *DirectCall) EmptyToField() bool {
 }
 
 func (dc *DirectCall) to() *gethCommon.Address {
-	var to *gethCommon.Address
 	if !dc.EmptyToField() {
 		ct := dc.To.ToCommon()
-		to = &ct
+		return &ct
 	}
-	return to
+	return nil
 }
 
 func NewDepositCall(

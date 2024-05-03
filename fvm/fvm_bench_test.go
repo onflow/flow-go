@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
@@ -24,6 +24,7 @@ import (
 
 	flow2 "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/templates"
+
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
