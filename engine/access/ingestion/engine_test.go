@@ -68,6 +68,7 @@ type Suite struct {
 	cancel context.CancelFunc
 
 	db                  *badger.DB
+	dbDir               string
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 }
 
@@ -75,8 +76,11 @@ func TestIngestEngine(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
 
+// TearDownTest stops the engine and cleans up the db
 func (s *Suite) TearDownTest() {
 	s.cancel()
+	err := os.RemoveAll(s.dbDir)
+	s.Require().NoError(err)
 }
 
 func (s *Suite) SetupTest() {
@@ -135,7 +139,7 @@ func (s *Suite) SetupTest() {
 	)
 	require.NoError(s.T(), err)
 
-	s.db, _ = unittest.TempBadgerDB(s.T())
+	s.db, s.dbDir = unittest.TempBadgerDB(s.T())
 	s.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(
 		bstorage.NewConsumerProgress(s.db, module.ConsumeProgressLastFullBlockHeight),
 		s.finalizedBlock.Height,

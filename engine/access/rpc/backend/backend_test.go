@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -71,6 +72,7 @@ type Suite struct {
 	events             *storagemock.Events
 
 	db                  *badger.DB
+	dbDir               string
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 
 	colClient              *access.AccessAPIClient
@@ -121,11 +123,17 @@ func (suite *Suite) SetupTest() {
 	suite.systemTx, err = blueprints.SystemChunkTransaction(flow.Testnet.Chain())
 	suite.Require().NoError(err)
 
-	suite.db, _ = unittest.TempBadgerDB(suite.T())
+	suite.db, suite.dbDir = unittest.TempBadgerDB(suite.T())
 	suite.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(
 		bstorage.NewConsumerProgress(suite.db, module.ConsumeProgressLastFullBlockHeight),
 		0,
 	)
+	suite.Require().NoError(err)
+}
+
+// TearDownTest cleans up the db
+func (suite *Suite) TearDownTest() {
+	err := os.RemoveAll(suite.dbDir)
 	suite.Require().NoError(err)
 }
 

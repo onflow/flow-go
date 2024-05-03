@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -79,6 +80,7 @@ type TransactionStatusSuite struct {
 	backend *Backend
 
 	db                  *badger.DB
+	dbDir               string
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 }
 
@@ -93,7 +95,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.sealedSnapshot = protocol.NewSnapshot(s.T())
 	s.finalSnapshot = protocol.NewSnapshot(s.T())
 	s.tempSnapshot = &protocol.Snapshot{}
-	s.db, _ = unittest.TempBadgerDB(s.T())
+	s.db, s.dbDir = unittest.TempBadgerDB(s.T())
 
 	header := unittest.BlockHeaderFixture()
 
@@ -186,6 +188,12 @@ func (s *TransactionStatusSuite) SetupTest() {
 
 	s.backend, err = New(backendParams)
 	require.NoError(s.T(), err)
+}
+
+// TearDownTest cleans up the db
+func (s *TransactionStatusSuite) TearDownTest() {
+	err := os.RemoveAll(s.dbDir)
+	s.Require().NoError(err)
 }
 
 // backendParams returns the Params configuration for the backend.
