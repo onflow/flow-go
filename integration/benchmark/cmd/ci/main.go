@@ -67,7 +67,6 @@ func main() {
 	bigQueryProjectFlag := flag.String("bigquery-project", "dapperlabs-data", "project name for the bigquery uploader")
 	bigQueryDatasetFlag := flag.String("bigquery-dataset", "dev_src_flow_tps_metrics", "dataset name for the bigquery uploader")
 	bigQueryRawTableFlag := flag.String("bigquery-raw-table", "rawResults", "table name for the bigquery raw results")
-	loadTypeFlag := flag.String("load-type", defaultLoadType, "load type (token-transfer / const-exec / evm)")
 	flag.Parse()
 
 	log := setupLogger(logLvl)
