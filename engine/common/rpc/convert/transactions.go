@@ -6,14 +6,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TransactionSubscribeInfo represents information about a subscribed transaction.
-// It contains the ID of the transaction, its status, and the index of the associated message.
-type TransactionSubscribeInfo struct {
-	ID           flow.Identifier
-	Status       flow.TransactionStatus
-	MessageIndex uint64
-}
-
 // TransactionToMessage converts a flow.TransactionBody to a protobuf message
 func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 	proposalKeyMessage := &entities.Transaction_ProposalKey{
