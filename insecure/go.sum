@@ -2137,8 +2137,8 @@ github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f/go.mod h1:xvP61FoOs
 github.com/onflow/atree v0.7.0-rc.1 h1:g2DFhC3JeaA+L7/HZOp4NwE+OfxvfJ8nibymHHw7i3g=
 github.com/onflow/atree v0.7.0-rc.1/go.mod h1:xvP61FoOs95K7IYdIYRnNcYQGf4nbF/uuJ0tHf4DRuM=
 github.com/onflow/cadence v1.0.0-M3/go.mod h1:odXGZZ/wGNA5mwT8bC9v8u8EXACHllB2ABSZK65TGL8=
-github.com/onflow/cadence v1.0.0-preview.25 h1:kSmWjxmg9PS+bsk8C3j1NUTkFAl/jNrintVhlh6miM0=
-github.com/onflow/cadence v1.0.0-preview.25/go.mod h1:fGhLBbuEmv5rh48qv0ZS0tUz53gxWsHpB4dPsF09h6E=
+github.com/onflow/cadence v1.0.0-preview.25.0.20240503144130-39b3fd879e0d h1:htl4rq4IpP4tfP+W6BWVmUhfK9XI3Pj0nCd3saQ27CQ=
+github.com/onflow/cadence v1.0.0-preview.25.0.20240503144130-39b3fd879e0d/go.mod h1:fGhLBbuEmv5rh48qv0ZS0tUz53gxWsHpB4dPsF09h6E=
 github.com/onflow/crypto v0.25.0/go.mod h1:C8FbaX0x8y+FxWjbkHy0Q4EASCDR9bSPWZqlpCLYyVI=
 github.com/onflow/crypto v0.25.1 h1:0txy2PKPMM873JbpxQNbJmuOJtD56bfs48RQfm0ts5A=
 github.com/onflow/crypto v0.25.1/go.mod h1:C8FbaX0x8y+FxWjbkHy0Q4EASCDR9bSPWZqlpCLYyVI=
