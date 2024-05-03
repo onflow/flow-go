@@ -51,7 +51,7 @@ func NewPersistentStrictMonotonicCounter(consumerProgress storage.ConsumerProgre
 //     or if stored value is larger than processed.
 func (m *PersistentStrictMonotonicCounter) Set(processed uint64) error {
 	if !m.counter.Set(processed) {
-		return fmt.Errorf("could not update consumer progress to height that is lower than the current height")
+		return fmt.Errorf("could not update to height that is lower than the current height")
 	}
 	return m.consumerProgress.SetProcessedIndex(processed)
 }
