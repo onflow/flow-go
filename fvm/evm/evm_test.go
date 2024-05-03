@@ -154,16 +154,12 @@ func TestEVMRun(t *testing.T) {
 					access(all)
 					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
 						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-<<<<<<< HEAD
-						return EVM.run(tx: tx, coinbase: coinbase)
-=======
 						let res = EVM.run(tx: tx, coinbase: coinbase)
 
 						assert(res.status == EVM.Status.successful, message: "unexpected status")
 						assert(res.errorCode == 0, message: "unexpected error code")
 						
 						return res
->>>>>>> master
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
@@ -395,6 +391,7 @@ func TestEVMRun(t *testing.T) {
 				assert.Equal(t, num, last.Big().Int64())
 			})
 	})
+}
 
 func TestEVMBatchRun(t *testing.T) {
 	chain := flow.Emulator.Chain()
@@ -1253,11 +1250,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					import FlowToken from %s
 	
 					access(all)
-<<<<<<< HEAD
-					fun main(): [UInt8; 20] {
-=======
 					fun main(code: [UInt8]): EVM.Result {
->>>>>>> master
 						let admin = getAuthAccount(%s)
 							.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
 						let minter <- admin.createNewMinter(allowedAmount: 2.34)
@@ -1267,15 +1260,6 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 						let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
 						cadenceOwnedAccount.deposit(from: <-vault)
 	
-<<<<<<< HEAD
-						let address = cadenceOwnedAccount.deploy(
-							code: [],
-							gasLimit: 53000,
-							value: EVM.Balance(attoflow: 1230000000000000000)
-						)
-						destroy cadenceOwnedAccount
-						return address.bytes
-=======
 						let res = cadenceOwnedAccount.deploy(
 							code: code,
 							gasLimit: 1000000,
@@ -1283,7 +1267,6 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 						)
 						destroy cadenceOwnedAccount
 						return res
->>>>>>> master
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
@@ -1291,16 +1274,12 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					sc.FlowServiceAccount.Address.HexWithPrefix(),
 				))
 
-<<<<<<< HEAD
-				script := fvm.Script(code)
-=======
 				script := fvm.Script(code).
 					WithArguments(json.MustEncode(
 						cadence.NewArray(
 							ConvertToCadence(testContract.ByteCode),
 						).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type{})),
 					))
->>>>>>> master
 
 				_, output, err := vm.Run(
 					ctx,
@@ -1308,8 +1287,6 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
-<<<<<<< HEAD
-=======
 
 				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
@@ -1516,7 +1493,6 @@ func TestDryRun(t *testing.T) {
 				// todo add once https://github.com/onflow/flow-go/pull/5606 is merged
 				//require.NotNil(t, result.DeployedContractAddress)
 				//require.NotEmpty(t, result.DeployedContractAddress.String())
->>>>>>> master
 			})
 	})
 }
@@ -1575,8 +1551,6 @@ func TestCadenceArch(t *testing.T) {
 			})
 	})
 
-<<<<<<< HEAD
-=======
 	t.Run("testing calling Cadence arch - random source (happy case)", func(t *testing.T) {
 		chain := flow.Emulator.Chain()
 		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
@@ -1764,7 +1738,6 @@ func TestCadenceArch(t *testing.T) {
 			})
 	})
 
->>>>>>> master
 	t.Run("testing calling Cadence arch - COA ownership proof (happy case)", func(t *testing.T) {
 		chain := flow.Emulator.Chain()
 		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
@@ -2130,12 +2103,9 @@ func RunWithNewEnvironment(
 					fvm.WithAuthorizationChecksEnabled(false),
 					fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 					fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
-<<<<<<< HEAD
-=======
 					fvm.WithRandomSourceHistoryCallAllowed(true),
 					fvm.WithBlocks(blocks),
 					fvm.WithCadenceLogging(true),
->>>>>>> master
 				}
 				ctx := fvm.NewContext(opts...)
 
@@ -2155,9 +2125,6 @@ func RunWithNewEnvironment(
 
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
-<<<<<<< HEAD
-				f(fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true)), vm, snapshotTree, testContract, testAccount)
-=======
 				f(
 					fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true)),
 					vm,
@@ -2165,7 +2132,6 @@ func RunWithNewEnvironment(
 					testContract,
 					testAccount,
 				)
->>>>>>> master
 			})
 		})
 	})
