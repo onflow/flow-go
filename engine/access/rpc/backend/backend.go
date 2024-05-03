@@ -242,15 +242,6 @@ func New(params Params) (*Backend, error) {
 		nodeInfo:          nodeInfo,
 	}
 
-	transactionsLocalDataProvider := &TransactionsLocalDataProvider{
-		state:          params.State,
-		collections:    params.Collections,
-		blocks:         params.Blocks,
-		eventsIndex:    params.EventsIndex,
-		txResultsIndex: params.TxResultsIndex,
-		systemTxID:     systemTxID,
-	}
-
 	b.backendTransactions = backendTransactions{
 		TransactionsLocalDataProvider: transactionsLocalDataProvider,
 		log:                           params.Log,

@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/snapshots"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -68,17 +67,7 @@ func (b *backendNetwork) GetNodeVersionInfo(_ context.Context) (*access.NodeVers
 // GetLatestProtocolStateSnapshot returns the latest finalized snapshot.
 func (b *backendNetwork) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {
 	snapshot := b.state.Final()
-<<<<<<< HEAD
 	data, err := convert.SnapshotToBytes(snapshot)
-=======
-
-	validSnapshot, err := snapshots.GetClosestDynamicBootstrapSnapshot(b.state, snapshot, b.snapshotHistoryLimit)
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := convert.SnapshotToBytes(validSnapshot)
->>>>>>> master
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert snapshot to bytes: %v", err)
 	}
@@ -125,21 +114,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, bl
 			"failed to retrieve snapshot for block: block not finalized and is below finalized height")
 	}
 
-<<<<<<< HEAD
 	data, err := convert.SnapshotToBytes(snapshot)
-=======
-	validSnapshot, err := snapshots.GetDynamicBootstrapSnapshot(b.state, snapshot)
-	if err != nil {
-		if errors.Is(err, snapshots.ErrSnapshotPhaseMismatch) {
-			return nil, status.Errorf(codes.InvalidArgument,
-				"failed to retrieve snapshot for block, try again with different block: "+
-					"%v", err)
-		}
-		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
-	}
-
-	data, err := convert.SnapshotToBytes(validSnapshot)
->>>>>>> master
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert snapshot to bytes: %v", err)
 	}
@@ -161,21 +136,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByHeight(_ context.Context, blo
 		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
 	}
 
-<<<<<<< HEAD
 	data, err := convert.SnapshotToBytes(snapshot)
-=======
-	validSnapshot, err := snapshots.GetDynamicBootstrapSnapshot(b.state, snapshot)
-	if err != nil {
-		if errors.Is(err, snapshots.ErrSnapshotPhaseMismatch) {
-			return nil, status.Errorf(codes.InvalidArgument,
-				"failed to retrieve snapshot for block, try again with different block: "+
-					"%v", err)
-		}
-		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
-	}
-
-	data, err := convert.SnapshotToBytes(validSnapshot)
->>>>>>> master
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert snapshot to bytes: %v", err)
 	}
