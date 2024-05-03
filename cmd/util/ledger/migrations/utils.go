@@ -57,19 +57,9 @@ func checkStorageHealth(
 		}
 	}
 
-	for _, domain := range domains {
+	for _, domain := range allStorageMapDomains {
 		_ = storage.GetStorageMap(address, domain, false)
 	}
 
 	return storage.CheckHealth()
-}
-
-// convert all domains
-var domains = []string{
-	common.PathDomainStorage.Identifier(),
-	common.PathDomainPrivate.Identifier(),
-	common.PathDomainPublic.Identifier(),
-	runtime.StorageDomainContract,
-	stdlib.InboxStorageDomain,
-	stdlib.CapabilityControllerStorageDomain,
 }
