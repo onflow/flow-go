@@ -29,18 +29,17 @@ func NewPersistentStrictMonotonicCounter(consumerProgress storage.ConsumerProgre
 	// sync with storage for the processed index to ensure the consistency
 	value, err := m.consumerProgress.ProcessedIndex()
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			err := m.consumerProgress.InitProcessedIndex(defaultIndex)
-			if err != nil {
-				return nil, fmt.Errorf("could not init consumer progress: %w", err)
-			}
-			m.counter = NewMonotonousCounter(defaultIndex)
-		} else {
+		if !errors.Is(err, storage.ErrNotFound) {
 			return nil, fmt.Errorf("could not read consumer progress: %w", err)
 		}
-	} else {
-		m.counter = NewMonotonousCounter(value)
+		err := m.consumerProgress.InitProcessedIndex(defaultIndex)
+		if err != nil {
+			return nil, fmt.Errorf("could not init consumer progress: %w", err)
+		}
+		value = defaultIndex
 	}
+
+	m.counter = NewMonotonousCounter(value)
 
 	return m, nil
 }
