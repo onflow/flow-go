@@ -764,41 +764,6 @@ func newFlowClusterQCVoteStructType() cadence.Type {
 	}
 }
 
-func newFlowClusterQCClusterStructType() *cadence.StructType {
-
-	// A.01cf0e2f2f715450.FlowClusterQC.Cluster
-
-	address, _ := common.HexToAddress("01cf0e2f2f715450")
-	location := common.NewAddressLocation(nil, address, "FlowClusterQC")
-
-	return &cadence.StructType{
-		Location:            location,
-		QualifiedIdentifier: "FlowClusterQC.Cluster",
-		Fields: []cadence.Field{
-			{
-				Identifier: "index",
-				Type:       cadence.UInt16Type{},
-			},
-			{
-				Identifier: "nodeWeights",
-				Type:       cadence.NewDictionaryType(cadence.StringType{}, cadence.UInt64Type{}),
-			},
-			{
-				Identifier: "totalWeight",
-				Type:       cadence.UInt64Type{},
-			},
-			{
-				Identifier: "generatedVotes",
-				Type:       cadence.NewDictionaryType(cadence.StringType{}, newFlowClusterQCVoteStructType()),
-			},
-			{
-				Identifier: "uniqueVoteMessageTotalWeights",
-				Type:       cadence.NewDictionaryType(cadence.StringType{}, cadence.UInt64Type{}),
-			},
-		},
-	}
-}
-
 func newFlowIDTableStakingNodeInfoStructType() *cadence.StructType {
 
 	// A.01cf0e2f2f715450.FlowIDTableStaking.NodeInfo
