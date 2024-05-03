@@ -549,7 +549,7 @@ func (e *Engine) updateLastFullBlockReceivedIndex() error {
 	if newLastFullHeight > lastFullHeight {
 		err := e.lastFullBlockHeight.Set(newLastFullHeight)
 		if err != nil {
-			return fmt.Errorf("failed to update last full block height")
+			return fmt.Errorf("failed to update last full block height: %w", err)
 		}
 
 		e.collectionExecutedMetric.UpdateLastFullBlockHeight(newLastFullHeight)
