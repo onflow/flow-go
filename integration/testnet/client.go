@@ -77,18 +77,18 @@ func NewClient(addr string, chain flow.Chain) (*Client, error) {
 	}
 	// Uncomment for debugging keys
 
-	//json, err := key.MarshalJSON()
-	//if err != nil {
+	// json, err := key.MarshalJSON()
+	// if err != nil {
 	//	return nil, fmt.Errorf("cannot marshal key json: %w", err)
-	//}
-	//public := key.PublicKey(1000)
-	//publicJson, err := public.MarshalJSON()
-	//if err != nil {
+	// }
+	// public := key.PublicKey(1000)
+	// publicJson, err := public.MarshalJSON()
+	// if err != nil {
 	//	return nil, fmt.Errorf("cannot marshal key json: %w", err)
-	//}
+	// }
 	//
-	//fmt.Printf("New client with private key: \n%s\n", json)
-	//fmt.Printf("and public key: \n%s\n", publicJson)
+	// fmt.Printf("New client with private key: \n%s\n", json)
+	// fmt.Printf("and public key: \n%s\n", publicJson)
 
 	return NewClientWithKey(addr, sdk.Address(chain.ServiceAddress()), privateKey, chain)
 }
@@ -111,14 +111,33 @@ func (c *Client) Events(ctx context.Context, typ string) ([]sdk.BlockEvents, err
 // DeployContract submits a transaction to deploy a contract with the given
 // code to the root account.
 func (c *Client) DeployContract(ctx context.Context, refID sdk.Identifier, contract dsl.Contract) (*sdk.Transaction, error) {
-
-	code := dsl.Transaction{
+	return c.deployContract(ctx, refID, dsl.Transaction{
 		Import: dsl.Import{},
 		Content: dsl.Prepare{
-			Content: dsl.UpdateAccountCode{Code: contract.ToCadence(), Name: contract.Name},
+			Content: dsl.SetAccountCode{
+				Code: contract.ToCadence(),
+				Name: contract.Name,
+			},
 		},
-	}
+	})
+}
 
+// UpdateContract submits a transaction to deploy a contract update with the given
+// code to the root account.
+func (c *Client) UpdateContract(ctx context.Context, refID sdk.Identifier, contract dsl.Contract) (*sdk.Transaction, error) {
+	return c.deployContract(ctx, refID, dsl.Transaction{
+		Import: dsl.Import{},
+		Content: dsl.Prepare{
+			Content: dsl.SetAccountCode{
+				Code:   contract.ToCadence(),
+				Name:   contract.Name,
+				Update: true,
+			},
+		},
+	})
+}
+
+func (c *Client) deployContract(ctx context.Context, refID sdk.Identifier, code dsl.Transaction) (*sdk.Transaction, error) {
 	tx := sdk.NewTransaction().
 		SetScript([]byte(code.ToCadence())).
 		SetReferenceBlockID(refID).
