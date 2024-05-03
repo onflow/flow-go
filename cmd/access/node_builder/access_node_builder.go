@@ -691,6 +691,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 						blob.NewTracer(node.Logger.With().Str("public_blob_service", channels.PublicExecutionDataService.String()).Logger()),
 					),
 				),
+				blob.WithParentBlobService(bs),
 			}
 
 			net := builder.AccessNodeConfig.PublicNetworkConfig.Network
