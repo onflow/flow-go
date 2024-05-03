@@ -102,13 +102,13 @@ func (c *BlockThrottle) Init(processables chan<- BlockIDHeight) error {
 		if err != nil {
 			return err
 		}
-		c.log.Info().Msgf("loaded %d unexecuted blocks", len(unexecuted))
+		c.log.Info().Msgf("execution is caught up. loaded %d unexecuted blocks", len(unexecuted))
 	} else {
 		unexecuted, err = findFinalized(c.state, c.headers, c.loaded, c.loaded+uint64(c.threshold))
 		if err != nil {
 			return err
 		}
-		c.log.Info().Msgf("loaded %d unexecuted finalized blocks", len(unexecuted))
+		c.log.Info().Msgf("execution is not far behind finalization, loaded %d unexecuted finalized blocks", len(unexecuted))
 	}
 
 	c.log.Info().Msgf("throttle initializing with %d unexecuted blocks", len(unexecuted))
@@ -240,6 +240,7 @@ func (c *BlockThrottle) OnBlockFinalized(lastFinalized *flow.Header) {
 }
 
 func (c *BlockThrottle) loadNextBlock(height uint64) error {
+	c.log.Debug().Uint64("height", height).Msg("loading next block")
 	// load next block
 	next := height + 1
 	blockID, err := c.headers.BlockIDByHeight(next)
@@ -252,6 +253,7 @@ func (c *BlockThrottle) loadNextBlock(height uint64) error {
 		Height: next,
 	}
 	c.loaded = next
+	c.log.Debug().Uint64("height", next).Msg("loaded next block")
 
 	return nil
 }

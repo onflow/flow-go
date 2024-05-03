@@ -248,15 +248,19 @@ func (e *Core) onProcessableBlock(blockID flow.Identifier, height uint64) error 
 		return fmt.Errorf("failed to enqueue block %v: %w", blockID, err)
 	}
 
-	e.log.Debug().
+	lg := e.log.With().
 		Hex("block_id", blockID[:]).Uint64("height", height).
+		Logger()
+	lg.Debug().
 		Int("executables", len(executables)).Msgf("executeConcurrently block is executable")
 	e.executeConcurrently(executables)
 
-	err = e.fetch(missingColls)
+	missingCount, err := e.fetch(missingColls)
 	if err != nil {
 		return fmt.Errorf("failed to fetch missing collections: %w", err)
 	}
+
+	lg.Debug().Int("missing_collections", missingCount).Msgf("fetch missing collections")
 
 	return nil
 }
@@ -412,6 +416,10 @@ func (e *Core) onBlockExecuted(
 	// OnBlockExecuted(childBlock) being called before OnBlockExecuted(parentBlock).
 
 	e.executeConcurrently(executables)
+	err = e.throttle.OnBlockExecuted(blockID, block.Block.Header.Height)
+	if err != nil {
+		return fmt.Errorf("failed to notify throttle that block %v has been executed: %w", blockID, err)
+	}
 
 	return nil
 }
@@ -507,7 +515,7 @@ func (e *Core) execute(ctx context.Context, executable *entity.ExecutableBlock) 
 	return nil
 }
 
-func (e *Core) fetch(missingColls []*block_queue.MissingCollection) error {
+func (e *Core) fetch(missingColls []*block_queue.MissingCollection) (int, error) {
 	missingCount := 0
 	for _, col := range missingColls {
 
@@ -519,7 +527,7 @@ func (e *Core) fetch(missingColls []*block_queue.MissingCollection) error {
 			// we found the collection from storage, forward this collection to handler
 			err = e.handleCollection(col.Guarantee.CollectionID, collection)
 			if err != nil {
-				return fmt.Errorf("could not handle collection: %w", err)
+				return 0, fmt.Errorf("could not handle collection: %w", err)
 			}
 
 			continue
@@ -527,12 +535,12 @@ func (e *Core) fetch(missingColls []*block_queue.MissingCollection) error {
 
 		// check if there was exception
 		if !errors.Is(err, storage.ErrNotFound) {
-			return fmt.Errorf("error while querying for collection: %w", err)
+			return 0, fmt.Errorf("error while querying for collection: %w", err)
 		}
 
 		err = e.collectionFetcher.FetchCollection(col.BlockID, col.Height, col.Guarantee)
 		if err != nil {
-			return fmt.Errorf("failed to fetch collection %v for block %v (height: %v): %w",
+			return 0, fmt.Errorf("failed to fetch collection %v for block %v (height: %v): %w",
 				col.Guarantee.ID(), col.BlockID, col.Height, err)
 		}
 		missingCount++
@@ -542,5 +550,5 @@ func (e *Core) fetch(missingColls []*block_queue.MissingCollection) error {
 		e.collectionFetcher.Force()
 	}
 
-	return nil
+	return missingCount, nil
 }
