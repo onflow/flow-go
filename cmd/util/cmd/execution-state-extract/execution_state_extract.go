@@ -382,31 +382,38 @@ func newMigrations(
 
 	log.Info().Msgf("initializing migrations")
 
-	rwf := reporters.NewReportFileWriterFactory(outputDir, log)
-
-	namedMigrations := migrators.NewCadence1Migrations(
-		log,
-		outputDir,
-		rwf,
-		opts,
-	)
-
-	migrations := make([]ledger.Migration, 0, len(namedMigrations))
-	for _, migration := range namedMigrations {
-		migrations = append(migrations, migration.Migrate)
-	}
-
-	// At the end, fix up storage-used discrepancies
-	migrations = append(
-		migrations,
-		migrators.NewAccountBasedMigration(
+	//rwf := reporters.NewReportFileWriterFactory(outputDir, log)
+	//
+	//namedMigrations := migrators.NewCadence1Migrations(
+	//	log,
+	//	outputDir,
+	//	rwf,
+	//	opts,
+	//)
+	//
+	//migrations := make([]ledger.Migration, 0, len(namedMigrations))
+	//for _, migration := range namedMigrations {
+	//	migrations = append(migrations, migration.Migrate)
+	//}
+	//
+	//// At the end, fix up storage-used discrepancies
+	//migrations = append(
+	//	migrations,
+	//	migrators.NewAccountBasedMigration(
+	//		log,
+	//		opts.NWorker,
+	//		[]migrators.AccountBasedMigration{
+	//			&migrators.AccountUsageMigrator{},
+	//		},
+	//	),
+	//)
+	migrations := []ledger.Migration{
+		migrators.NewPreviewnetEVMContractMigration(
 			log,
+			opts.ChainID,
 			opts.NWorker,
-			[]migrators.AccountBasedMigration{
-				&migrators.AccountUsageMigrator{},
-			},
 		),
-	)
+	}
 
 	log.Info().Msgf("initialized migrations")
 
