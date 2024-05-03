@@ -17,6 +17,11 @@ import (
 // blocks until the execution has caught up
 const DefaultCatchUpThreshold = 500
 
+type BlockIDHeight struct {
+	ID     flow.Identifier
+	Height uint64
+}
+
 // BlockThrottle is a helper struct that helps throttle the unexecuted blocks to be sent
 // to the block queue for execution.
 // It is useful for case when execution is falling far behind the finalization, in which case
@@ -30,11 +35,11 @@ type BlockThrottle struct {
 	// state
 	mu        sync.Mutex
 	stopped   bool
-	executed  uint64
+	loaded    uint64
 	finalized uint64
 
 	// notifier
-	processables chan<- flow.Identifier
+	processables chan<- BlockIDHeight
 
 	// dependencies
 	log     zerolog.Logger
@@ -66,7 +71,7 @@ func NewBlockThrottle(
 
 	return &BlockThrottle{
 		threshold: catchupThreshold,
-		executed:  executed,
+		loaded:    executed,
 		finalized: finalized,
 		stopped:   false,
 
@@ -81,7 +86,7 @@ func (c *BlockThrottle) inited() bool {
 	return c.processables != nil
 }
 
-func (c *BlockThrottle) Init(processables chan<- flow.Identifier) error {
+func (c *BlockThrottle) Init(processables chan<- BlockIDHeight) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.inited() {
@@ -90,20 +95,20 @@ func (c *BlockThrottle) Init(processables chan<- flow.Identifier) error {
 
 	c.processables = processables
 
-	var unexecuted []flow.Identifier
+	var unexecuted []BlockIDHeight
 	var err error
-	if caughtUp(c.executed, c.finalized, c.threshold) {
-		unexecuted, err = findAllUnexecutedBlocks(c.state, c.headers, c.executed, c.finalized)
+	if caughtUp(c.loaded, c.finalized, c.threshold) {
+		unexecuted, err = findAllUnexecutedBlocks(c.state, c.headers, c.loaded, c.finalized)
 		if err != nil {
 			return err
 		}
-		c.log.Info().Msgf("loaded %d unexecuted blocks", len(unexecuted))
+		c.log.Info().Msgf("execution is caught up. loaded %d unexecuted blocks", len(unexecuted))
 	} else {
-		unexecuted, err = findFinalized(c.state, c.headers, c.executed, c.executed+uint64(c.threshold))
+		unexecuted, err = findFinalized(c.state, c.headers, c.loaded, c.loaded+uint64(c.threshold))
 		if err != nil {
 			return err
 		}
-		c.log.Info().Msgf("loaded %d unexecuted finalized blocks", len(unexecuted))
+		c.log.Info().Msgf("execution is not far behind finalization, loaded %d unexecuted finalized blocks", len(unexecuted))
 	}
 
 	c.log.Info().Msgf("throttle initializing with %d unexecuted blocks", len(unexecuted))
@@ -111,8 +116,9 @@ func (c *BlockThrottle) Init(processables chan<- flow.Identifier) error {
 	// the ingestion core engine must have initialized the 'processables' with 10000 (default) buffer size,
 	// and the 'unexecuted' will only contain up to DefaultCatchUpThreshold (500) blocks,
 	// so pushing all the unexecuted to processables won't be blocked.
-	for _, id := range unexecuted {
-		c.processables <- id
+	for _, b := range unexecuted {
+		c.processables <- b
+		c.loaded = b.Height
 	}
 
 	c.log.Info().Msgf("throttle initialized with %d unexecuted blocks", len(unexecuted))
@@ -137,26 +143,32 @@ func (c *BlockThrottle) OnBlockExecuted(_ flow.Identifier, executed uint64) erro
 		return nil
 	}
 
+	err := c.loadNextBlock(c.loaded)
+	if err != nil {
+		return fmt.Errorf("could not load next block: %w", err)
+	}
+
 	// the execution is still far behind from finalization
-	c.executed = executed
 	if !c.caughtUp() {
 		return nil
 	}
 
 	c.log.Info().Uint64("executed", executed).Uint64("finalized", c.finalized).
+		Uint64("loaded", c.loaded).
 		Msgf("execution has caught up, processing remaining unexecuted blocks")
 
 	// if the execution have just caught up close enough to the latest finalized blocks,
 	// then process all unexecuted blocks, including finalized unexecuted and pending unexecuted
-	unexecuted, err := findAllUnexecutedBlocks(c.state, c.headers, c.executed, c.finalized)
+	unexecuted, err := findAllUnexecutedBlocks(c.state, c.headers, c.loaded, c.finalized)
 	if err != nil {
 		return fmt.Errorf("could not find unexecuted blocks for processing: %w", err)
 	}
 
 	c.log.Info().Int("unexecuted", len(unexecuted)).Msgf("forwarding unexecuted blocks")
 
-	for _, id := range unexecuted {
-		c.processables <- id
+	for _, block := range unexecuted {
+		c.processables <- block
+		c.loaded = block.Height
 	}
 
 	c.log.Info().Msgf("all unexecuted blocks have been processed")
@@ -180,10 +192,10 @@ func (c *BlockThrottle) Done() error {
 	return nil
 }
 
-func (c *BlockThrottle) OnBlock(blockID flow.Identifier) error {
+func (c *BlockThrottle) OnBlock(blockID flow.Identifier, height uint64) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.log.Debug().Msgf("recieved block (%v)", blockID)
+	c.log.Debug().Msgf("recieved block (%v) height: %v", blockID, height)
 
 	if !c.inited() {
 		return fmt.Errorf("throttle not inited")
@@ -199,8 +211,12 @@ func (c *BlockThrottle) OnBlock(blockID flow.Identifier) error {
 	}
 
 	// if has caught up, then process the block
-	c.processables <- blockID
-	c.log.Debug().Msgf("processed block (%v)", blockID)
+	c.processables <- BlockIDHeight{
+		ID:     blockID,
+		Height: height,
+	}
+	c.loaded = height
+	c.log.Debug().Msgf("processed block (%v), height: %v", blockID, height)
 
 	return nil
 }
@@ -223,15 +239,34 @@ func (c *BlockThrottle) OnBlockFinalized(lastFinalized *flow.Header) {
 	c.finalized = lastFinalized.Height
 }
 
+func (c *BlockThrottle) loadNextBlock(height uint64) error {
+	c.log.Debug().Uint64("height", height).Msg("loading next block")
+	// load next block
+	next := height + 1
+	blockID, err := c.headers.BlockIDByHeight(next)
+	if err != nil {
+		return fmt.Errorf("could not get block ID by height %v: %w", next, err)
+	}
+
+	c.processables <- BlockIDHeight{
+		ID:     blockID,
+		Height: next,
+	}
+	c.loaded = next
+	c.log.Debug().Uint64("height", next).Msg("loaded next block")
+
+	return nil
+}
+
 func (c *BlockThrottle) caughtUp() bool {
-	return caughtUp(c.executed, c.finalized, c.threshold)
+	return caughtUp(c.loaded, c.finalized, c.threshold)
 }
 
-func caughtUp(executed, finalized uint64, threshold int) bool {
-	return finalized <= executed+uint64(threshold)
+func caughtUp(loaded, finalized uint64, threshold int) bool {
+	return finalized <= loaded+uint64(threshold)
 }
 
-func findFinalized(state protocol.State, headers storage.Headers, lastExecuted, finalizedHeight uint64) ([]flow.Identifier, error) {
+func findFinalized(state protocol.State, headers storage.Headers, lastExecuted, finalizedHeight uint64) ([]BlockIDHeight, error) {
 	// get finalized height
 	finalized := state.AtHeight(finalizedHeight)
 	final, err := finalized.Head()
@@ -242,25 +277,26 @@ func findFinalized(state protocol.State, headers storage.Headers, lastExecuted, 
 	// dynamically bootstrapped execution node will have highest finalized executed as sealed root,
 	// which is lower than finalized root. so we will reload blocks from
 	// [sealedRoot.Height + 1, finalizedRoot.Height] and execute them on startup.
-	unexecutedFinalized := make([]flow.Identifier, 0)
+	unexecutedFinalized := make([]BlockIDHeight, 0)
 
 	// starting from the first unexecuted block, go through each unexecuted and finalized block
-	// reload its block to execution queues
-	// loading finalized blocks
 	for height := lastExecuted + 1; height <= final.Height; height++ {
 		finalizedID, err := headers.BlockIDByHeight(height)
 		if err != nil {
 			return nil, fmt.Errorf("could not get block ID by height %v: %w", height, err)
 		}
 
-		unexecutedFinalized = append(unexecutedFinalized, finalizedID)
+		unexecutedFinalized = append(unexecutedFinalized, BlockIDHeight{
+			ID:     finalizedID,
+			Height: height,
+		})
 	}
 
 	return unexecutedFinalized, nil
 }
 
-func findAllUnexecutedBlocks(state protocol.State, headers storage.Headers, lastExecuted, finalizedHeight uint64) ([]flow.Identifier, error) {
-	unexecutedFinalized, err := findFinalized(state, headers, lastExecuted, finalizedHeight)
+func findAllUnexecutedBlocks(state protocol.State, headers storage.Headers, lastExecuted, finalizedHeight uint64) ([]BlockIDHeight, error) {
+	unexecuted, err := findFinalized(state, headers, lastExecuted, finalizedHeight)
 	if err != nil {
 		return nil, fmt.Errorf("could not find finalized unexecuted blocks: %w", err)
 	}
@@ -271,6 +307,16 @@ func findAllUnexecutedBlocks(state protocol.State, headers storage.Headers, last
 		return nil, fmt.Errorf("could not get descendants of finalized block: %w", err)
 	}
 
-	unexecuted := append(unexecutedFinalized, pendings...)
+	for _, id := range pendings {
+		header, err := headers.ByBlockID(id)
+		if err != nil {
+			return nil, fmt.Errorf("could not get header by block ID %v: %w", id, err)
+		}
+		unexecuted = append(unexecuted, BlockIDHeight{
+			ID:     id,
+			Height: header.Height,
+		})
+	}
+
 	return unexecuted, nil
 }

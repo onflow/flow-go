@@ -43,7 +43,7 @@ type Core struct {
 	// will be pushed to the blockExecutors channel, and the worker will execute the block.
 	// during startup, the throttle will limit the number of blocks to be added to the processables channel.
 	// once caught up, the throttle will allow all the remaining blocks to be added to the processables channel.
-	processables   chan flow.Identifier         // block IDs that are received and waiting to be processed
+	processables   chan BlockIDHeight           // block IDs that are received and waiting to be processed
 	throttle       Throttle                     // to throttle the blocks to be added to processables during startup and catchup
 	blockQueue     *block_queue.BlockQueue      // blocks are waiting for the data to be fetched
 	blockExecutors chan *entity.ExecutableBlock // blocks that are ready to be executed
@@ -51,7 +51,7 @@ type Core struct {
 
 	// data storage
 	execState   state.ExecutionState
-	headers     storage.Headers
+	headers     storage.Headers // deprecated
 	blocks      storage.Blocks
 	collections storage.Collections
 
@@ -64,11 +64,11 @@ type Core struct {
 // Throttle is used to throttle the blocks to be added to the processables channel
 type Throttle interface {
 	// Init initializes the throttle with the processables channel to forward the blocks
-	Init(processables chan<- flow.Identifier) error
+	Init(processables chan<- BlockIDHeight) error
 	// OnBlock is called when a block is received, the throttle will check if the execution
 	// is falling far behind the finalization, and add the block to the processables channel
 	// if it's not falling far behind.
-	OnBlock(blockID flow.Identifier) error
+	OnBlock(blockID flow.Identifier, height uint64) error
 	// OnBlockExecuted is called when a block is executed, the throttle will check whether
 	// the execution is caught up with the finalization, and allow all the remaining blocks
 	// to be added to the processables channel.
@@ -100,7 +100,7 @@ func NewCore(
 ) (*Core, error) {
 	e := &Core{
 		log:               logger.With().Str("engine", "ingestion_core").Logger(),
-		processables:      make(chan flow.Identifier, MaxProcessableBlocks),
+		processables:      make(chan BlockIDHeight, MaxProcessableBlocks),
 		blockExecutors:    make(chan *entity.ExecutableBlock),
 		throttle:          throttle,
 		execState:         execState,
@@ -169,7 +169,7 @@ func (e *Core) OnBlock(header *flow.Header, qc *flow.QuorumCertificate) {
 		Msgf("received block")
 
 	// qc.Block is equivalent to header.ID()
-	err := e.throttle.OnBlock(qc.BlockID)
+	err := e.throttle.OnBlock(qc.BlockID, header.Height)
 	if err != nil {
 		e.log.Fatal().Err(err).Msgf("error processing block %v (qc.BlockID: %v, blockID: %v)",
 			header.Height, qc.BlockID, header.ID())
@@ -209,11 +209,12 @@ func (e *Core) launchWorkerToConsumeThrottledBlocks(ctx irrecoverable.SignalerCo
 			e.log.Info().Msgf("finish draining processables")
 			return
 
-		case blockID := <-e.processables:
-			e.log.Debug().Hex("block_id", blockID[:]).Msg("ingestion core processing block")
-			err := e.onProcessableBlock(blockID)
+		case blockIDHeight := <-e.processables:
+			e.log.Debug().Hex("block_id", blockIDHeight.ID[:]).Uint64("height", blockIDHeight.Height).Msg("ingestion core processing block")
+			err := e.onProcessableBlock(blockIDHeight.ID, blockIDHeight.Height)
 			if err != nil {
-				ctx.Throw(fmt.Errorf("execution ingestion engine fail to process block %v: %w", blockID, err))
+				ctx.Throw(fmt.Errorf("execution ingestion engine fail to process block %v (height: %v): %w",
+					blockIDHeight.ID, blockIDHeight.Height, err))
 				return
 			}
 		}
@@ -221,24 +222,19 @@ func (e *Core) launchWorkerToConsumeThrottledBlocks(ctx irrecoverable.SignalerCo
 
 }
 
-func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
-	header, err := e.headers.ByBlockID(blockID)
-	if err != nil {
-		return fmt.Errorf("could not get block: %w", err)
-	}
-
+func (e *Core) onProcessableBlock(blockID flow.Identifier, height uint64) error {
 	// skip if stopControl tells to skip
-	if !e.stopControl.ShouldExecuteBlock(header) {
+	if !e.stopControl.ShouldExecuteBlock(blockID, height) {
 		return nil
 	}
 
-	executed, err := e.execState.IsBlockExecuted(header.Height, blockID)
+	executed, err := e.execState.IsBlockExecuted(height, blockID)
 	if err != nil {
 		return fmt.Errorf("could not check whether block %v is executed: %w", blockID, err)
 	}
 
 	if executed {
-		e.log.Debug().Hex("block_id", blockID[:]).Uint64("height", header.Height).Msg("block has been executed already")
+		e.log.Debug().Hex("block_id", blockID[:]).Uint64("height", height).Msg("block has been executed already")
 		return nil
 	}
 
@@ -252,15 +248,19 @@ func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
 		return fmt.Errorf("failed to enqueue block %v: %w", blockID, err)
 	}
 
-	e.log.Debug().
-		Hex("block_id", blockID[:]).Uint64("height", header.Height).
+	lg := e.log.With().
+		Hex("block_id", blockID[:]).Uint64("height", height).
+		Logger()
+	lg.Debug().
 		Int("executables", len(executables)).Msgf("executeConcurrently block is executable")
 	e.executeConcurrently(executables)
 
-	err = e.fetch(missingColls)
+	missingCount, err := e.fetch(missingColls)
 	if err != nil {
 		return fmt.Errorf("failed to fetch missing collections: %w", err)
 	}
+
+	lg.Debug().Int("missing_collections", missingCount).Msgf("fetch missing collections")
 
 	return nil
 }
@@ -416,6 +416,10 @@ func (e *Core) onBlockExecuted(
 	// OnBlockExecuted(childBlock) being called before OnBlockExecuted(parentBlock).
 
 	e.executeConcurrently(executables)
+	err = e.throttle.OnBlockExecuted(blockID, block.Block.Header.Height)
+	if err != nil {
+		return fmt.Errorf("failed to notify throttle that block %v has been executed: %w", blockID, err)
+	}
 
 	return nil
 }
@@ -486,7 +490,7 @@ func (e *Core) executeConcurrently(executables []*entity.ExecutableBlock) {
 }
 
 func (e *Core) execute(ctx context.Context, executable *entity.ExecutableBlock) error {
-	if !e.stopControl.ShouldExecuteBlock(executable.Block.Header) {
+	if !e.stopControl.ShouldExecuteBlock(executable.Block.Header.ID(), executable.Block.Header.Height) {
 		return nil
 	}
 
@@ -511,7 +515,7 @@ func (e *Core) execute(ctx context.Context, executable *entity.ExecutableBlock) 
 	return nil
 }
 
-func (e *Core) fetch(missingColls []*block_queue.MissingCollection) error {
+func (e *Core) fetch(missingColls []*block_queue.MissingCollection) (int, error) {
 	missingCount := 0
 	for _, col := range missingColls {
 
@@ -523,7 +527,7 @@ func (e *Core) fetch(missingColls []*block_queue.MissingCollection) error {
 			// we found the collection from storage, forward this collection to handler
 			err = e.handleCollection(col.Guarantee.CollectionID, collection)
 			if err != nil {
-				return fmt.Errorf("could not handle collection: %w", err)
+				return 0, fmt.Errorf("could not handle collection: %w", err)
 			}
 
 			continue
@@ -531,12 +535,12 @@ func (e *Core) fetch(missingColls []*block_queue.MissingCollection) error {
 
 		// check if there was exception
 		if !errors.Is(err, storage.ErrNotFound) {
-			return fmt.Errorf("error while querying for collection: %w", err)
+			return 0, fmt.Errorf("error while querying for collection: %w", err)
 		}
 
 		err = e.collectionFetcher.FetchCollection(col.BlockID, col.Height, col.Guarantee)
 		if err != nil {
-			return fmt.Errorf("failed to fetch collection %v for block %v (height: %v): %w",
+			return 0, fmt.Errorf("failed to fetch collection %v for block %v (height: %v): %w",
 				col.Guarantee.ID(), col.BlockID, col.Height, err)
 		}
 		missingCount++
@@ -546,5 +550,5 @@ func (e *Core) fetch(missingColls []*block_queue.MissingCollection) error {
 		e.collectionFetcher.Force()
 	}
 
-	return nil
+	return missingCount, nil
 }

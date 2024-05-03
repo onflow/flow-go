@@ -251,8 +251,9 @@ func (e *Engine) BlockProcessable(b *flow.Header, _ *flow.QuorumCertificate) {
 
 	// TODO: this should not be blocking: https://github.com/onflow/flow-go/issues/4400
 
-	// skip if stopControl tells to skip
-	if !e.stopControl.ShouldExecuteBlock(b) {
+	// skip if stopControl tells to skip, so that we can avoid fetching collections
+	// for this block
+	if !e.stopControl.ShouldExecuteBlock(b.ID(), b.Height) {
 		return
 	}
 
@@ -409,6 +410,12 @@ func (e *Engine) executeBlock(
 	ctx context.Context,
 	executableBlock *entity.ExecutableBlock,
 ) {
+
+	// don't execute the block if the stop control says no
+	if !e.stopControl.ShouldExecuteBlock(executableBlock.Block.Header.ID(), executableBlock.Block.Header.Height) {
+		return
+	}
+
 	lg := e.log.With().
 		Hex("block_id", logging.Entity(executableBlock)).
 		Uint64("height", executableBlock.Block.Header.Height).
