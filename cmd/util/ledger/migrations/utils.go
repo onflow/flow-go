@@ -73,12 +73,3 @@ var domains = []string{
 	stdlib.InboxStorageDomain,
 	stdlib.CapabilityControllerStorageDomain,
 }
-
-var domainsLookupMap = map[string]struct{}{
-	common.PathDomainStorage.Identifier():    {},
-	common.PathDomainPrivate.Identifier():    {},
-	common.PathDomainPublic.Identifier():     {},
-	runtime.StorageDomainContract:            {},
-	stdlib.InboxStorageDomain:                {},
-	stdlib.CapabilityControllerStorageDomain: {},
-}
