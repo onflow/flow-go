@@ -641,8 +641,8 @@ github.com/influxdata/influxdb v1.2.3-0.20180221223340-01288bdb0883/go.mod h1:qZ
 github.com/insomniacslk/dhcp v0.0.0-20230516061539-49801966e6cb/go.mod h1:7474bZ1YNCvarT6WFKie4kEET6J0KYRDC4XJqqXzQW4=
 github.com/ipfs/bbloom v0.0.4 h1:Gi+8EGJ2y5qiD5FbsbpX/TMNcJw8gSqr7eyjHa4Fhvs=
 github.com/ipfs/bbloom v0.0.4/go.mod h1:cS9YprKXpoZ9lT0n/Mw/a6/aFV6DTjTLYHeA+gyqMG0=
-github.com/ipfs/boxo v0.19.0 h1:UbX9FBJQF19ACLqRZOgdEla6jR/sC4H1O+iGE0NToXA=
-github.com/ipfs/boxo v0.19.0/go.mod h1:V5gJzbIMwKEXrg3IdvAxIdF7UPgU4RsXmNGS8MQ/0D4=
+github.com/ipfs/boxo v0.17.1-0.20240131173518-89bceff34bf1 h1:5H/HYvdmbxp09+sAvdqJzyrWoyCS6OroeW9Ym06Tb+0=
+github.com/ipfs/boxo v0.17.1-0.20240131173518-89bceff34bf1/go.mod h1:pIZgTWdm3k3pLF9Uq6MB8JEcW07UDwNJjlXW1HELW80=
 github.com/ipfs/go-block-format v0.2.0 h1:ZqrkxBA2ICbDRbK8KJs/u0O3dlp6gmAuuXUJNiW1Ycs=
 github.com/ipfs/go-block-format v0.2.0/go.mod h1:+jpL11nFx5A/SPpsoBn6Bzkra/zaArfSmsknbPMYgzM=
 github.com/ipfs/go-cid v0.0.7/go.mod h1:6Ux9z5e+HpkQdckYoX1PG/6xqKspzlEIR5SDmgqgC/I=
