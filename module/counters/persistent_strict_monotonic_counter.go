@@ -45,13 +45,15 @@ func NewPersistentStrictMonotonicCounter(consumerProgress storage.ConsumerProgre
 }
 
 // Set sets the processed index, ensuring it is strictly monotonically increasing.
-// Returns true if update was successful or false if stored value is larger.
-func (m *PersistentStrictMonotonicCounter) Set(processed uint64) bool {
+//
+// Expected errors during normal operation:
+//   - generic error in case of unexpected failure from the database layer or encoding failure
+//     or if stored value is larger than processed.
+func (m *PersistentStrictMonotonicCounter) Set(processed uint64) error {
 	if !m.counter.Set(processed) {
-		return false
+		return fmt.Errorf("could not update consumer progress to height that is lower than the current height")
 	}
-	err := m.consumerProgress.SetProcessedIndex(processed)
-	return err == nil
+	return m.consumerProgress.SetProcessedIndex(processed)
 }
 
 // Value loads the current stored index.

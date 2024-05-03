@@ -27,13 +27,13 @@ func TestMonotonicConsumer(t *testing.T) {
 
 		// try to update value with less than current
 		var lessHeight = uint64(1233)
-		res := persistentStrictMonotonicCounter.Set(lessHeight)
-		require.False(t, res)
+		err = persistentStrictMonotonicCounter.Set(lessHeight)
+		require.Error(t, err, "could not update consumer progress to height that is lower than the current height")
 
 		// update the value with bigger height
 		var height2 = uint64(1235)
-		res = persistentStrictMonotonicCounter.Set(height2)
-		require.True(t, res)
+		err = persistentStrictMonotonicCounter.Set(height2)
+		require.NoError(t, err)
 
 		// check that the new value can be retrieved
 		actual = persistentStrictMonotonicCounter.Value()

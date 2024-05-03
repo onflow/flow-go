@@ -403,8 +403,8 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 	// Generate final blocks and check transaction expired
 	s.sealedBlock = s.finalizedBlock
 	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
-	res := s.lastFullBlockHeight.Set(s.sealedBlock.Header.Height)
-	s.Require().True(res)
+	err := s.lastFullBlockHeight.Set(s.sealedBlock.Header.Height)
+	s.Require().NoError(err)
 
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusExpired)
 
