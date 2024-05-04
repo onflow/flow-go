@@ -1306,6 +1306,7 @@ func TestDryRun(t *testing.T) {
 	evmAddress := sc.EVMContract.Address.HexWithPrefix()
 
 	dryRunTx := func(
+		t *testing.T,
 		tx *gethTypes.Transaction,
 		ctx fvm.Context,
 		vm fvm.VM,
@@ -1368,7 +1369,7 @@ func TestDryRun(t *testing.T) {
 					big.NewInt(0),
 					data,
 				)
-				result := dryRunTx(tx, ctx, vm, snapshot, testContract)
+				result := dryRunTx(t, tx, ctx, vm, snapshot, testContract)
 				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, result.Status)
 				require.Greater(t, result.GasConsumed, uint64(0))
@@ -1384,7 +1385,7 @@ func TestDryRun(t *testing.T) {
 					big.NewInt(0),
 					data,
 				)
-				result = dryRunTx(tx, ctx, vm, snapshot, testContract)
+				result = dryRunTx(t, tx, ctx, vm, snapshot, testContract)
 				require.Equal(t, types.ExecutionErrCodeOutOfGas, result.ErrorCode)
 				require.Equal(t, types.StatusFailed, result.Status)
 				require.Equal(t, result.GasConsumed, limit) // burn it all!!!
@@ -1413,7 +1414,7 @@ func TestDryRun(t *testing.T) {
 					data,
 				)
 
-				result := dryRunTx(tx, ctx, vm, snapshot, testContract)
+				result := dryRunTx(t, tx, ctx, vm, snapshot, testContract)
 				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, result.Status)
 				require.Greater(t, result.GasConsumed, uint64(0))
@@ -1485,14 +1486,13 @@ func TestDryRun(t *testing.T) {
 					testContract.ByteCode,
 				)
 
-				result := dryRunTx(tx, ctx, vm, snapshot, testContract)
+				result := dryRunTx(t, tx, ctx, vm, snapshot, testContract)
 				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, result.Status)
 				require.Greater(t, result.GasConsumed, uint64(0))
 				require.NotNil(t, result.ReturnedValue)
-				// todo add once https://github.com/onflow/flow-go/pull/5606 is merged
-				//require.NotNil(t, result.DeployedContractAddress)
-				//require.NotEmpty(t, result.DeployedContractAddress.String())
+				require.NotNil(t, result.DeployedContractAddress)
+				require.NotEmpty(t, result.DeployedContractAddress.String())
 			})
 	})
 }
@@ -1525,7 +1525,7 @@ func TestCadenceArch(t *testing.T) {
 				))
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
-					testContract.MakeCallData(t, "verifyArchCallToFlowBlockHeight", uint64(ctx.BlockHeader.Height)),
+					testContract.MakeCallData(t, "verifyArchCallToFlowBlockHeight", ctx.BlockHeader.Height),
 					big.NewInt(0),
 					uint64(10_000_000),
 					big.NewInt(0),
