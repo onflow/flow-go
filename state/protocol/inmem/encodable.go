@@ -17,6 +17,27 @@ type EncodableSnapshot struct {
 	SealedVersionBeacon *flow.SealedVersionBeacon
 }
 
+func (snap EncodableSnapshot) getHead() *flow.Header {
+	return snap.SealingSegment.Highest().Header
+}
+
+func (snap EncodableSnapshot) getLatestSeal() *flow.Seal {
+	head := snap.getHead()
+	latestSealID := snap.SealingSegment.LatestSeals[head.ID()]
+	_ = latestSealID
+	// iterate backward through payloads of snap.SealingSegment.Blocks
+	// search for seal with matching ID
+	return nil
+}
+
+func (snap EncodableSnapshot) getLatestResult() *flow.ExecutionResult {
+	latestSeal := snap.getLatestSeal()
+	_ = latestSeal
+	// iterate backward through payloads of snap.SealingSegment.Blocks
+	// search for result with ID matching latestSeal.ResultID
+	return nil
+}
+
 // EncodableDKG is the encoding format for protocol.DKG
 type EncodableDKG struct {
 	GroupKey     encodable.RandomBeaconPubKey
