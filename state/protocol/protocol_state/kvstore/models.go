@@ -183,17 +183,22 @@ func NewKVStoreV0(epochStateID flow.Identifier) protocol_state.KVStoreAPI {
 	}
 }
 
+// versionedModel generically represents a versioned protocol state model.
 type versionedModel interface {
 	GetProtocolStateVersion() uint64
 	*Modelv0 | *Modelv1
 }
 
-func makeVersionedModelID[T versionedModel](m T) flow.Identifier {
+// makeVersionedModelID produces an Identifier which includes both the model's
+// internal fields and its version. This guarantees that two models with different
+// versions but otherwise identical fields will have different IDs, a requirement
+// of the protocol.KVStoreReader API.
+func makeVersionedModelID[T versionedModel](model T) flow.Identifier {
 	return flow.MakeID(struct {
 		Version uint64
 		Model   T
 	}{
-		Version: m.GetProtocolStateVersion(),
-		Model:   m,
+		Version: model.GetProtocolStateVersion(),
+		Model:   model,
 	})
 }
