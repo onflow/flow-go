@@ -24,6 +24,7 @@ const (
 	LabelMethod              = "method"
 	LabelService             = "service"
 	LabelRejectionReason     = "rejection_reason"
+	LabelAccountAddress      = "acct_address" // Account address for a machine account
 )
 
 const (
