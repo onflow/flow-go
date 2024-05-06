@@ -180,6 +180,20 @@ func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.Versio
 	return event, expected
 }
 
+func ProtocolStateVersionUpgradeFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.ProtocolStateVersionUpgrade) {
+	events := systemcontracts.ServiceEventsForChain(chain)
+
+	event := EventFixture(events.ProtocolStateVersionUpgrade.EventType(), 1, 1, IdentifierFixture(), 0)
+	event.Payload = ProtocolStateVersionUpgradeFixtureCCF
+
+	expected := &flow.ProtocolStateVersionUpgrade{
+		NewProtocolStateVersion: 1,
+		ActiveView:              1000,
+	}
+
+	return event, expected
+}
+
 func createEpochSetupEvent(randomSourceHex string) cadence.Event {
 
 	return cadence.NewEvent([]cadence.Value{
@@ -705,6 +719,51 @@ func createVersionBeaconEvent() cadence.Event {
 	}).WithType(NewNodeVersionBeaconVersionBeaconEventType())
 }
 
+func createProtocolStateVersionUpgradeEvent() cadence.Event {
+	newVersion := cadence.NewUInt64(1)
+	activeView := cadence.NewUInt64(1000)
+
+	return cadence.NewEvent([]cadence.Value{
+		newVersion,
+		activeView,
+	}).WithType(NewProtocolStateVersionUpgradeEventType())
+}
+
+func newFlowClusterQCVoteStructType() cadence.Type {
+
+	// A.01cf0e2f2f715450.FlowClusterQC.Vote
+
+	address, _ := common.HexToAddress("01cf0e2f2f715450")
+	location := common.NewAddressLocation(nil, address, "FlowClusterQC")
+
+	return &cadence.StructType{
+		Location:            location,
+		QualifiedIdentifier: "FlowClusterQC.Vote",
+		Fields: []cadence.Field{
+			{
+				Identifier: "nodeID",
+				Type:       cadence.StringType{},
+			},
+			{
+				Identifier: "signature",
+				Type:       cadence.NewOptionalType(cadence.StringType{}),
+			},
+			{
+				Identifier: "message",
+				Type:       cadence.NewOptionalType(cadence.StringType{}),
+			},
+			{
+				Identifier: "clusterIndex",
+				Type:       cadence.UInt16Type{},
+			},
+			{
+				Identifier: "weight",
+				Type:       cadence.UInt64Type{},
+			},
+		},
+	}
+}
+
 func newFlowIDTableStakingNodeInfoStructType() *cadence.StructType {
 
 	// A.01cf0e2f2f715450.FlowIDTableStaking.NodeInfo
@@ -970,6 +1029,29 @@ func NewNodeVersionBeaconSemverStructType() *cadence.StructType {
 	}
 }
 
+func NewProtocolStateVersionUpgradeEventType() *cadence.EventType {
+
+	// A.01cf0e2f2f715450.NodeVersionBeacon.ProtocolStateVersionUpgrade
+
+	address, _ := common.HexToAddress("01cf0e2f2f715450")
+	location := common.NewAddressLocation(nil, address, "ProtocolStateVersionUpgrade")
+
+	return &cadence.EventType{
+		Location:            location,
+		QualifiedIdentifier: "NodeVersionBeacon.ProtocolStateVersionUpgrade",
+		Fields: []cadence.Field{
+			{
+				Identifier: "newProtocolVersion",
+				Type:       cadence.UInt64Type{},
+			},
+			{
+				Identifier: "activeView",
+				Type:       cadence.UInt64Type{},
+			},
+		},
+	}
+}
+
 func ufix64FromString(s string) cadence.UFix64 {
 	f, err := cadence.NewUFix64(s)
 	if err != nil {
@@ -1035,40 +1117,17 @@ var VersionBeaconFixtureCCF = func() []byte {
 	return b
 }()
 
-func newFlowClusterQCVoteStructType() *cadence.StructType {
-
-	// A.01cf0e2f2f715450.FlowClusterQC.Vote
-
-	address, _ := common.HexToAddress("01cf0e2f2f715450")
-	location := common.NewAddressLocation(nil, address, "FlowClusterQC")
-
-	return &cadence.StructType{
-		Location:            location,
-		QualifiedIdentifier: "FlowClusterQC.Vote",
-		Fields: []cadence.Field{
-			{
-				Identifier: "nodeID",
-				Type:       cadence.StringType{},
-			},
-			{
-				Identifier: "signature",
-				Type:       cadence.NewOptionalType(cadence.StringType{}),
-			},
-			{
-				Identifier: "message",
-				Type:       cadence.NewOptionalType(cadence.StringType{}),
-			},
-			{
-				Identifier: "clusterIndex",
-				Type:       cadence.UInt16Type{},
-			},
-			{
-				Identifier: "weight",
-				Type:       cadence.UInt64Type{},
-			},
-		},
+var ProtocolStateVersionUpgradeFixtureCCF = func() []byte {
+	b, err := ccf.Encode(createProtocolStateVersionUpgradeEvent())
+	if err != nil {
+		panic(err)
 	}
-}
+	_, err = ccf.Decode(nil, b)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}()
 
 func VerifyCdcArguments(t *testing.T, expected []cadence.Value, actual []interface{}) {
 

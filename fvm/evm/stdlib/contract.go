@@ -1181,7 +1181,26 @@ func NewResultValue(
 	locationRange interpreter.LocationRange,
 	result *types.ResultSummary,
 ) *interpreter.CompositeValue {
-	loc := common.NewAddressLocation(gauge, handler.EVMContractAddress(), ContractName)
+
+	evmContractLocation := common.NewAddressLocation(
+		gauge,
+		handler.EVMContractAddress(),
+		ContractName,
+	)
+
+	deployedContractAddress := result.DeployedContractAddress
+	deployedContractValue := interpreter.NilOptionalValue
+	if deployedContractAddress != nil {
+		deployedContractValue = interpreter.NewSomeValueNonCopying(
+			inter,
+			NewEVMAddress(
+				inter,
+				locationRange,
+				evmContractLocation,
+				*deployedContractAddress,
+			),
+		)
+	}
 
 	fields := []interpreter.CompositeField{
 		{
@@ -1190,7 +1209,7 @@ func NewResultValue(
 				inter,
 				locationRange,
 				&sema.CompositeType{
-					Location:   loc,
+					Location:   evmContractLocation,
 					Identifier: evmStatusTypeQualifiedIdentifier,
 					Kind:       common.CompositeKindEnum,
 				},
@@ -1216,25 +1235,16 @@ func NewResultValue(
 			Name:  "data",
 			Value: interpreter.ByteSliceToByteArrayValue(inter, result.ReturnedValue),
 		},
-	}
-
-	// we made the deployed contract address optional
-	if result.DeployedContractAddress != nil {
-		fields = append(fields, interpreter.CompositeField{
+		{
 			Name:  "deployedContract",
-			Value: EVMAddressToAddressBytesArrayValue(inter, *result.DeployedContractAddress),
-		})
-	} else {
-		fields = append(fields, interpreter.CompositeField{
-			Name:  "deployedContract",
-			Value: interpreter.NilOptionalValue,
-		})
+			Value: deployedContractValue,
+		},
 	}
 
 	return interpreter.NewCompositeValue(
 		inter,
 		locationRange,
-		loc,
+		evmContractLocation,
 		evmResultTypeQualifiedIdentifier,
 		common.CompositeKindStructure,
 		fields,
@@ -2255,35 +2265,35 @@ func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, e
 		return nil, fmt.Errorf("invalid input: unexpected type for data field")
 	}
 
-	var deployedAddress *cadence.Array
-	switch v := str.Fields[4].(type) {
-	case cadence.Optional:
-		if v.Value != nil {
-			arr, ok := v.Value.(cadence.Array)
-			if !ok {
-				return nil, fmt.Errorf("invalid input: unexpected type for deployed contract field")
-			}
-			deployedAddress = &arr
-		}
-	case cadence.Array:
-		deployedAddress = &v
-	default:
-		return nil, fmt.Errorf("invalid input: unexpected type for deployed contract field")
+	convertedData := make([]byte, len(data.Values))
+	for i, value := range data.Values {
+		convertedData[i] = value.(cadence.UInt8).ToGoValue().(uint8)
 	}
 
 	var convertedDeployedAddress *types.Address
-	if deployedAddress != nil {
-		convertedAddress := make([]byte, len(deployedAddress.Values))
-		for i, val := range deployedAddress.Values {
+
+	deployedAddressField, ok := str.Fields[4].(cadence.Optional)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for deployed contract field")
+	}
+
+	if deployedAddressField.Value != nil {
+		evmAddress, ok := deployedAddressField.Value.(cadence.Struct)
+		if !ok {
+			return nil, fmt.Errorf("invalid input: unexpected type for deployed contract field")
+		}
+
+		bytes, ok := evmAddress.Fields[0].(cadence.Array)
+		if !ok {
+			return nil, fmt.Errorf("invalid input: unexpected type for deployed contract field")
+		}
+
+		convertedAddress := make([]byte, len(bytes.Values))
+		for i, val := range bytes.Values {
 			convertedAddress[i] = val.(cadence.UInt8).ToGoValue().(uint8)
 		}
 		addr := types.Address(convertedAddress)
 		convertedDeployedAddress = &addr
-	}
-
-	convertedData := make([]byte, len(data.Values))
-	for i, value := range data.Values {
-		convertedData[i] = value.(cadence.UInt8).ToGoValue().(uint8)
 	}
 
 	return &types.ResultSummary{

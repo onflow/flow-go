@@ -150,7 +150,7 @@ func (s *GrpcBlocksStreamSuite) TestHappyPath() {
 	// Let the network run for this many blocks
 	blockCount := uint64(5)
 	// wait for the requested number of sealed blocks
-	s.BlockState.WaitForSealed(s.T(), blockA.Header.Height+blockCount)
+	s.BlockState.WaitForSealedHeight(s.T(), blockA.Header.Height+blockCount)
 
 	var startValue interface{}
 	txCount := 10

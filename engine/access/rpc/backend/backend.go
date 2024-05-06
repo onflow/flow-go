@@ -162,6 +162,15 @@ func New(params Params) (*Backend, error) {
 	// initialize node version info
 	nodeInfo := getNodeVersionInfo(params.State.Params())
 
+	transactionsLocalDataProvider := &TransactionsLocalDataProvider{
+		state:          params.State,
+		collections:    params.Collections,
+		blocks:         params.Blocks,
+		eventsIndex:    params.EventsIndex,
+		txResultsIndex: params.TxResultsIndex,
+		systemTxID:     systemTxID,
+	}
+
 	b := &Backend{
 		state:        params.State,
 		BlockTracker: params.BlockTracker,
@@ -231,15 +240,6 @@ func New(params Params) (*Backend, error) {
 		connFactory:       params.ConnFactory,
 		chainID:           params.ChainID,
 		nodeInfo:          nodeInfo,
-	}
-
-	transactionsLocalDataProvider := &TransactionsLocalDataProvider{
-		state:          params.State,
-		collections:    params.Collections,
-		blocks:         params.Blocks,
-		eventsIndex:    params.EventsIndex,
-		txResultsIndex: params.TxResultsIndex,
-		systemTxID:     systemTxID,
 	}
 
 	b.backendTransactions = backendTransactions{
