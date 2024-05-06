@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/coreos/go-semver/semver"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/crypto"
@@ -17,8 +16,10 @@ import (
 // ServiceEvent converts a service event encoded as the generic flow.Event
 // type to a flow.ServiceEvent type for use within protocol software and protocol
 // state. This acts as the conversion from the Cadence type to the flow-go type.
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
 func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, error) {
-
 	events := systemcontracts.ServiceEventsForChain(chainID)
 
 	// depending on type of service event construct Go type
@@ -29,6 +30,8 @@ func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, e
 		return convertServiceEventEpochCommit(event)
 	case events.VersionBeacon.EventType():
 		return convertServiceEventVersionBeacon(event)
+	case events.ProtocolStateVersionUpgrade.EventType():
+		return convertServiceEventProtocolStateVersionUpgrade(event)
 	default:
 		return nil, fmt.Errorf("invalid event type: %s", event.Type)
 	}
@@ -58,6 +61,10 @@ func getField[T cadence.Value](fields map[string]cadence.Value, fieldName string
 // CONVENTION: in the returned `EpochSetup` event,
 //   - Node identities listed in `EpochSetup.Participants` are in CANONICAL ORDER
 //   - for each cluster assignment (i.e. element in `EpochSetup.Assignments`), the nodeIDs are listed in CANONICAL ORDER
+//
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
 func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error) {
 	// decode bytes using ccf
 	payload, err := ccf.Decode(nil, event.Payload)
@@ -195,7 +202,10 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 }
 
 // convertServiceEventEpochCommit converts a service event encoded as the generic
-// flow.Event type to a ServiceEvent type for an EpochCommit event
+// flow.Event type to a ServiceEvent type for an EpochCommit event.
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
 func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error) {
 	// decode bytes using ccf
 	payload, err := ccf.Decode(nil, event.Payload)
@@ -680,6 +690,81 @@ func invalidCadenceTypeError(
 	)
 }
 
+// convertServiceEventProtocolStateVersionUpgrade converts a Cadence instance of the VersionBeacon
+// service event to the protocol-internal representation.
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
+func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.ServiceEvent, error) {
+	payload, err := ccf.Decode(nil, event.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
+	}
+
+	versionUpgrade, err := DecodeCadenceValue("ProtocolStateVersionUpgrade payload", payload,
+		func(cdcEvent cadence.Event) (*flow.ProtocolStateVersionUpgrade, error) {
+
+			if cdcEvent.Type() == nil {
+				return nil, fmt.Errorf("ProtocolStateVersionUpgrade event doesn't have type")
+			}
+
+			fields := cadence.FieldsMappedByName(cdcEvent)
+
+			const expectedFieldCount = 2
+			if len(fields) < expectedFieldCount {
+				return nil, fmt.Errorf("unexpected number of fields in ProtocolStateVersionUpgrade (%d < %d)",
+					len(fields), expectedFieldCount)
+			}
+
+			newProtocolVersionValue, err := getField[cadence.Value](fields, "newProtocolVersion")
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode VersionBeacon event: %w", err)
+			}
+
+			activeViewValue, err := getField[cadence.Value](fields, "activeView")
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode VersionBeacon event: %w", err)
+			}
+
+			newProtocolVersion, err := DecodeCadenceValue(
+				".newProtocolVersion", newProtocolVersionValue, func(cadenceVal cadence.UInt64) (uint64, error) {
+					return uint64(cadenceVal), err
+				},
+			)
+			if err != nil {
+				return nil, err
+			}
+			activeView, err := DecodeCadenceValue(
+				".activeView", activeViewValue, func(cadenceVal cadence.UInt64) (uint64, error) {
+					return uint64(cadenceVal), err
+				},
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			return &flow.ProtocolStateVersionUpgrade{
+				NewProtocolStateVersion: newProtocolVersion,
+				ActiveView:              activeView,
+			}, nil
+		})
+	if err != nil {
+		return nil, fmt.Errorf("could not decode cadence value: %w", err)
+	}
+
+	// create the service event
+	serviceEvent := &flow.ServiceEvent{
+		Type:  flow.ServiceEventProtocolStateVersionUpgrade,
+		Event: versionUpgrade,
+	}
+	return serviceEvent, nil
+}
+
+// convertServiceEventVersionBeacon converts a Cadence instance of the VersionBeacon
+// service event to the protocol-internal representation.
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
 func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, error) {
 	payload, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
@@ -687,19 +772,17 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 	}
 
 	versionBeacon, err := DecodeCadenceValue(
-		"VersionBeacon payload", payload, func(cdcEvent cadence.Event) (
-			flow.VersionBeacon,
-			error,
-		) {
+		"VersionBeacon payload", payload, func(cdcEvent cadence.Event) (*flow.VersionBeacon, error) {
+
 			if cdcEvent.Type() == nil {
-				return flow.VersionBeacon{}, fmt.Errorf("VersionBeacon event doesn't have type")
+				return nil, fmt.Errorf("VersionBeacon event doesn't have type")
 			}
 
 			fields := cadence.FieldsMappedByName(cdcEvent)
 
 			const expectedFieldCount = 2
 			if len(fields) != expectedFieldCount {
-				return flow.VersionBeacon{}, fmt.Errorf(
+				return nil, fmt.Errorf(
 					"unexpected number of fields in VersionBeacon event (%d != %d)",
 					len(fields),
 					expectedFieldCount,
@@ -708,19 +791,19 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 
 			versionBoundariesValue, err := getField[cadence.Value](fields, "versionBoundaries")
 			if err != nil {
-				return flow.VersionBeacon{}, fmt.Errorf("failed to decode VersionBeacon event: %w", err)
+				return nil, fmt.Errorf("failed to decode VersionBeacon event: %w", err)
 			}
 
 			sequenceValue, err := getField[cadence.Value](fields, "sequence")
 			if err != nil {
-				return flow.VersionBeacon{}, fmt.Errorf("failed to decode VersionBeacon event: %w", err)
+				return nil, fmt.Errorf("failed to decode VersionBeacon event: %w", err)
 			}
 
 			versionBoundaries, err := DecodeCadenceValue(
 				".versionBoundaries", versionBoundariesValue, convertVersionBoundaries,
 			)
 			if err != nil {
-				return flow.VersionBeacon{}, err
+				return nil, err
 			}
 
 			sequence, err := DecodeCadenceValue(
@@ -732,10 +815,10 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 				},
 			)
 			if err != nil {
-				return flow.VersionBeacon{}, err
+				return nil, err
 			}
 
-			return flow.VersionBeacon{
+			return &flow.VersionBeacon{
 				VersionBoundaries: versionBoundaries,
 				Sequence:          sequence,
 			}, err
@@ -753,7 +836,7 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 	// create the service event
 	serviceEvent := &flow.ServiceEvent{
 		Type:  flow.ServiceEventVersionBeacon,
-		Event: &versionBeacon,
+		Event: versionBeacon,
 	}
 
 	return serviceEvent, nil

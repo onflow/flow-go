@@ -103,7 +103,6 @@ func TestFromSnapshot(t *testing.T) {
 
 		// ensure last version beacon is included
 		t.Run("version beacon", func(t *testing.T) {
-
 			expectedVB := &flow.SealedVersionBeacon{
 				VersionBeacon: unittest.VersionBeaconFixture(
 					unittest.WithBoundaries(

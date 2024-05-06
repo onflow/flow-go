@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
+
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -49,6 +51,7 @@ import (
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -426,6 +429,7 @@ type NetworkConfig struct {
 	ViewsInStakingAuction      uint64
 	ViewsInEpoch               uint64
 	EpochCommitSafetyThreshold uint64
+	KVStoreFactory             func(epochStateID flow.Identifier) protocol_state.KVStoreAPI
 }
 
 type NetworkConfigOpt func(*NetworkConfig)
@@ -439,6 +443,7 @@ func NewNetworkConfig(name string, nodes NodeConfigs, opts ...NetworkConfigOpt) 
 		ViewsInDKGPhase:            DefaultViewsInDKGPhase,
 		ViewsInEpoch:               DefaultViewsInEpoch,
 		EpochCommitSafetyThreshold: DefaultEpochCommitSafetyThreshold,
+		KVStoreFactory:             kvstore.NewDefaultKVStore,
 	}
 
 	for _, apply := range opts {
@@ -449,15 +454,11 @@ func NewNetworkConfig(name string, nodes NodeConfigs, opts ...NetworkConfigOpt) 
 }
 
 func NewNetworkConfigWithEpochConfig(name string, nodes NodeConfigs, viewsInStakingAuction, viewsInDKGPhase, viewsInEpoch, safetyThreshold uint64, opts ...NetworkConfigOpt) NetworkConfig {
-	c := NetworkConfig{
-		Nodes:                      nodes,
-		Name:                       name,
-		NClusters:                  1, // default to 1 cluster
-		ViewsInStakingAuction:      viewsInStakingAuction,
-		ViewsInDKGPhase:            viewsInDKGPhase,
-		ViewsInEpoch:               viewsInEpoch,
-		EpochCommitSafetyThreshold: safetyThreshold,
-	}
+	c := NewNetworkConfig(name, nodes,
+		WithViewsInStakingAuction(viewsInStakingAuction),
+		WithViewsInDKGPhase(viewsInDKGPhase),
+		WithViewsInEpoch(viewsInEpoch),
+		WithEpochCommitSafetyThreshold(safetyThreshold))
 
 	for _, apply := range opts {
 		apply(&c)
@@ -487,6 +488,12 @@ func WithViewsInDKGPhase(views uint64) func(*NetworkConfig) {
 func WithEpochCommitSafetyThreshold(threshold uint64) func(*NetworkConfig) {
 	return func(config *NetworkConfig) {
 		config.EpochCommitSafetyThreshold = threshold
+	}
+}
+
+func WithKVStoreFactory(factory func(flow.Identifier) protocol_state.KVStoreAPI) func(*NetworkConfig) {
+	return func(config *NetworkConfig) {
+		config.KVStoreFactory = factory
 	}
 }
 
@@ -1157,7 +1164,10 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		Header: rootHeader,
 	}
 	root.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(
-		inmem.ProtocolStateFromEpochServiceEvents(epochSetup, epochCommit).ID())))
+		networkConf.KVStoreFactory(
+			inmem.ProtocolStateFromEpochServiceEvents(epochSetup, epochCommit).ID(),
+		).ID(),
+	)))
 
 	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
 	if err != nil {
@@ -1221,7 +1231,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		return nil, fmt.Errorf("has invalid votes: %v", invalidVotesErr)
 	}
 
-	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(root, result, seal, qc, flow.DefaultProtocolVersion, networkConf.EpochCommitSafetyThreshold)
+	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(root, result, seal, qc, flow.DefaultProtocolVersion, networkConf.EpochCommitSafetyThreshold, networkConf.KVStoreFactory)
 	if err != nil {
 		return nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
 	}

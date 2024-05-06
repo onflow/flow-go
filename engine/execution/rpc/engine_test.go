@@ -142,7 +142,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		suite.commits.On("ByBlockID", id).Return(nil, nil).Once()
 
 		// expect one call to lookup events for each block ID
-		suite.events.On("ByBlockIDEventType", id, flow.EventAccountCreated).Return(eventsForBlock, nil).Once()
+		suite.events.On("ByBlockID", id).Return(eventsForBlock, nil).Once()
 
 		// expect one call to lookup each block
 		suite.headers.On("ByBlockID", id).Return(block.Header, nil).Once()

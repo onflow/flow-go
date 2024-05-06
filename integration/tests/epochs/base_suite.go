@@ -75,7 +75,7 @@ func (s *BaseSuite) SetupTest() {
 		testnet.WithAdditionalFlag("--cruise-ctl-enabled=false"), // disable cruise control for integration tests
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", s.RequiredSealApprovals)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", s.RequiredSealApprovals)),
-		testnet.WithLogLevel(zerolog.DebugLevel)}
+		testnet.WithLogLevel(zerolog.InfoLevel)}
 
 	// a ghost node masquerading as an access node
 	s.ghostID = unittest.IdentifierFixture()
