@@ -68,7 +68,9 @@ var (
 const (
 	GetMessageScript = `
 import TestingContract from 0x%s
-pub fun main(): String {
+
+access(all)
+fun main(): String {
 	return TestingContract.message()
 }`
 )

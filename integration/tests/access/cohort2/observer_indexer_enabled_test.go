@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	simpleScript = `pub fun main(): Int { return 42; }`
+	simpleScript = `access(all) fun main(): Int { return 42; }`
 )
 
 func TestObserverIndexerEnabled(t *testing.T) {
