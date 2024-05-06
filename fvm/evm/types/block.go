@@ -114,7 +114,7 @@ func NewBlockFromBytes(encoded []byte) (*Block, error) {
 			TransactionHashes []gethCommon.Hash
 			TotalGasUsed      uint64
 		}{}
-		if e := gethRLP.DecodeBytes(encoded, r); e != nil {
+		if e := gethRLP.DecodeBytes(encoded, &r); e != nil {
 			// if both error out, return first error since it's more relevant
 			return nil, err
 		}
