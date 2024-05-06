@@ -102,8 +102,34 @@ func NewBlock(
 // NewBlockFromBytes constructs a new block from encoded data
 func NewBlockFromBytes(encoded []byte) (*Block, error) {
 	res := &Block{}
+
 	err := gethRLP.DecodeBytes(encoded, res)
-	return res, err
+	if err != nil {
+		// if decoding fails, try to decode to previous block type (without timestamp)
+		r := struct {
+			ParentBlockHash   gethCommon.Hash
+			Height            uint64
+			TotalSupply       *big.Int
+			ReceiptRoot       gethCommon.Hash
+			TransactionHashes []gethCommon.Hash
+			TotalGasUsed      uint64
+		}{}
+		if e := gethRLP.DecodeBytes(encoded, r); e != nil {
+			// if both error out, return first error since it's more relevant
+			return nil, err
+		}
+
+		return &Block{
+			ParentBlockHash:   r.ParentBlockHash,
+			Height:            r.Height,
+			TotalSupply:       r.TotalSupply,
+			ReceiptRoot:       r.ReceiptRoot,
+			TransactionHashes: r.TransactionHashes,
+			TotalGasUsed:      r.TotalGasUsed,
+		}, nil
+	}
+
+	return res, nil
 }
 
 // GenesisBlock is the genesis block in the EVM environment
