@@ -79,7 +79,6 @@ func NewMachine(
 		throttle,
 		execState,
 		stopControl,
-		headers,
 		blocks,
 		collections,
 		e,

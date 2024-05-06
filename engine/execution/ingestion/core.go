@@ -51,7 +51,6 @@ type Core struct {
 
 	// data storage
 	execState   state.ExecutionState
-	headers     storage.Headers // deprecated
 	blocks      storage.Blocks
 	collections storage.Collections
 
@@ -91,7 +90,6 @@ func NewCore(
 	throttle Throttle,
 	execState state.ExecutionState,
 	stopControl *stop.StopControl,
-	headers storage.Headers,
 	blocks storage.Blocks,
 	collections storage.Collections,
 	executor BlockExecutor,
@@ -106,7 +104,6 @@ func NewCore(
 		execState:         execState,
 		blockQueue:        block_queue.NewBlockQueue(logger),
 		stopControl:       stopControl,
-		headers:           headers,
 		blocks:            blocks,
 		collections:       collections,
 		executor:          executor,
