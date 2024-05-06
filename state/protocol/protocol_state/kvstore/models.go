@@ -3,7 +3,7 @@ package kvstore
 import (
 	"fmt"
 
-	"github.com/huandu/go-clone/generic" //nolint:goimports
+	clone "github.com/huandu/go-clone/generic" //nolint:goimports
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -59,8 +59,10 @@ type Modelv0 struct {
 var _ protocol_state.KVStoreAPI = (*Modelv0)(nil)
 var _ protocol_state.KVStoreMutator = (*Modelv0)(nil)
 
-// ID returns an identifier for this key-value store snapshot by hashing internal fields.
-func (model *Modelv0) ID() flow.Identifier { return flow.MakeID(model) }
+// ID returns an identifier for this key-value store snapshot by hashing internal fields and version number.
+func (model *Modelv0) ID() flow.Identifier {
+	return makeVersionedModelID(model)
+}
 
 // Replicate instantiates a Protocol State Snapshot of the given `protocolVersion`.
 // It clones existing snapshot and performs a migration if `protocolVersion = 1`.
@@ -122,8 +124,10 @@ type Modelv1 struct {
 var _ protocol_state.KVStoreAPI = (*Modelv1)(nil)
 var _ protocol_state.KVStoreMutator = (*Modelv1)(nil)
 
-// ID returns an identifier for this key-value store snapshot by hashing internal fields.
-func (model *Modelv1) ID() flow.Identifier { return flow.MakeID(model) }
+// ID returns an identifier for this key-value store snapshot by hashing internal fields and version number.
+func (model *Modelv1) ID() flow.Identifier {
+	return makeVersionedModelID(model)
+}
 
 // Replicate instantiates a Protocol State Snapshot of the given `protocolVersion`.
 // It clones existing snapshot if `protocolVersion = 1`, other versions are not supported yet.
@@ -177,4 +181,19 @@ func NewKVStoreV0(epochStateID flow.Identifier) protocol_state.KVStoreAPI {
 		UpgradableModel: UpgradableModel{},
 		EpochStateID:    epochStateID,
 	}
+}
+
+type versionedModel interface {
+	GetProtocolStateVersion() uint64
+	*Modelv0 | *Modelv1
+}
+
+func makeVersionedModelID[T versionedModel](m T) flow.Identifier {
+	return flow.MakeID(struct {
+		Version uint64
+		Model   T
+	}{
+		Version: m.GetProtocolStateVersion(),
+		Model:   m,
+	})
 }
