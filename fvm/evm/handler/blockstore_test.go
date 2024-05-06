@@ -1,6 +1,7 @@
 package handler_test
 
 import (
+	gethRLP "github.com/onflow/go-ethereum/rlp"
 	"math/big"
 	"testing"
 
@@ -69,4 +70,53 @@ func TestBlockStore(t *testing.T) {
 
 	})
 
+}
+
+// This test reproduces a state before a breaking change on the Block type,
+// which added a timestamp, then it adds new blocks and makes sure the retrival
+// and storage of blocks works as it should, the breaking change was introduced
+// in this PR https://github.com/onflow/flow-go/pull/5660
+func TestBlockStore_AddedTimestamp(t *testing.T) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(root flow.Address) {
+
+			bs := handler.NewBlockStore(backend, root)
+
+			// block type before breaking change
+			type blockNoTimestamp struct {
+				ParentBlockHash   gethCommon.Hash
+				Height            uint64
+				TotalSupply       *big.Int
+				ReceiptRoot       gethCommon.Hash
+				TransactionHashes []gethCommon.Hash
+				TotalGasUsed      uint64
+			}
+
+			g := types.GenesisBlock
+			h, err := g.Hash()
+			require.NoError(t, err)
+
+			b := blockNoTimestamp{
+				ParentBlockHash: h,
+				Height:          1,
+				TotalSupply:     g.TotalSupply,
+				ReceiptRoot:     g.ReceiptRoot,
+			}
+			blockBytes, err := gethRLP.EncodeToBytes(b)
+			require.NoError(t, err)
+
+			// store a block without timestamp, simulate existing state before the breaking change
+			err = backend.SetValue(root[:], []byte(handler.BlockStoreLatestBlockKey), blockBytes)
+			require.NoError(t, err)
+
+			block, err := bs.LatestBlock()
+			require.NoError(t, err)
+
+			require.Empty(t, block.Timestamp)
+			require.Equal(t, b.Height, block.Height)
+			require.Equal(t, b.ParentBlockHash, block.ParentBlockHash)
+			require.Equal(t, b.TotalSupply, block.TotalSupply)
+			require.Equal(t, b.ReceiptRoot, block.ReceiptRoot)
+		})
+	})
 }
