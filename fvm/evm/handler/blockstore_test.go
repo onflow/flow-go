@@ -117,6 +117,21 @@ func TestBlockStore_AddedTimestamp(t *testing.T) {
 			require.Equal(t, b.ParentBlockHash, block.ParentBlockHash)
 			require.Equal(t, b.TotalSupply, block.TotalSupply)
 			require.Equal(t, b.ReceiptRoot, block.ReceiptRoot)
+
+			bp, err := bs.BlockProposal()
+			require.NoError(t, err)
+
+			blockBytes, err = bp.ToBytes()
+			require.NoError(t, err)
+
+			err = backend.SetValue(root[:], []byte(handler.BlockStoreLatestBlockKey), blockBytes)
+			require.NoError(t, err)
+
+			bb, err := bs.LatestBlock()
+			require.NoError(t, err)
+			require.NotNil(t, bb.ParentBlockHash)
+			require.NotNil(t, bb.Timestamp)
+			require.Equal(t, b.Height+1, bb.Height)
 		})
 	})
 }
