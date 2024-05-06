@@ -1,11 +1,11 @@
 package handler_test
 
 import (
-	gethRLP "github.com/onflow/go-ethereum/rlp"
 	"math/big"
 	"testing"
 
 	gethCommon "github.com/onflow/go-ethereum/common"
+	gethRLP "github.com/onflow/go-ethereum/rlp"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/handler"
