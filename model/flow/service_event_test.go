@@ -21,6 +21,7 @@ func TestEncodeDecode(t *testing.T) {
 	setup := unittest.EpochSetupFixture()
 	commit := unittest.EpochCommitFixture()
 	versionBeacon := unittest.VersionBeaconFixture()
+	protocolVersionUpgrade := unittest.ProtocolStateVersionUpgradeFixture()
 
 	comparePubKey := cmp.FilterValues(func(a, b crypto.PublicKey) bool {
 		return true
@@ -59,6 +60,15 @@ func TestEncodeDecode(t *testing.T) {
 			err = json.Unmarshal(b, gotVersionBeacon)
 			require.NoError(t, err)
 			assert.DeepEqual(t, versionBeacon, gotVersionBeacon)
+
+			// ProtocolStateVersionUpgrade
+			b, err = json.Marshal(protocolVersionUpgrade)
+			require.NoError(t, err)
+
+			gotProtocolVersionUpgrade := new(flow.ProtocolStateVersionUpgrade)
+			err = json.Unmarshal(b, gotProtocolVersionUpgrade)
+			require.NoError(t, err)
+			assert.DeepEqual(t, protocolVersionUpgrade, gotProtocolVersionUpgrade)
 		})
 
 		t.Run("generic type", func(t *testing.T) {
@@ -79,9 +89,9 @@ func TestEncodeDecode(t *testing.T) {
 			require.NoError(t, err)
 
 			outer = new(flow.ServiceEvent)
-			t.Logf("- debug: outer=%+v <-- before .Unmarshal()\n", outer)
+			t.Logf("- debug: outer=%+v <-- before .UnmarshalWrapped()\n", outer)
 			err = json.Unmarshal(b, outer)
-			t.Logf("- debug: outer=%+v <-- after .Unmarshal()\n", outer)
+			t.Logf("- debug: outer=%+v <-- after .UnmarshalWrapped()\n", outer)
 			require.NoError(t, err)
 			gotCommit, ok := outer.Event.(*flow.EpochCommit)
 			require.True(t, ok)
@@ -93,13 +103,24 @@ func TestEncodeDecode(t *testing.T) {
 			require.NoError(t, err)
 
 			outer = new(flow.ServiceEvent)
-			t.Logf("- debug: outer=%+v <-- before .Unmarshal()\n", outer)
+			t.Logf("- debug: outer=%+v <-- before .UnmarshalWrapped()\n", outer)
 			err = json.Unmarshal(b, outer)
-			t.Logf("- debug: outer=%+v <-- after .Unmarshal()\n", outer)
+			t.Logf("- debug: outer=%+v <-- after .UnmarshalWrapped()\n", outer)
 			require.NoError(t, err)
 			gotVersionTable, ok := outer.Event.(*flow.VersionBeacon)
 			require.True(t, ok)
 			assert.DeepEqual(t, versionBeacon, gotVersionTable)
+
+			// ProtocolStateVersionUpgrade
+			b, err = json.Marshal(protocolVersionUpgrade.ServiceEvent())
+			require.NoError(t, err)
+
+			outer = new(flow.ServiceEvent)
+			err = json.Unmarshal(b, outer)
+			require.NoError(t, err)
+			gotProtocolVersionUpgrade, ok := outer.Event.(*flow.ProtocolStateVersionUpgrade)
+			require.True(t, ok)
+			assert.DeepEqual(t, protocolVersionUpgrade, gotProtocolVersionUpgrade)
 		})
 	})
 
@@ -131,6 +152,15 @@ func TestEncodeDecode(t *testing.T) {
 			err = msgpack.Unmarshal(b, gotVersionTable)
 			require.NoError(t, err)
 			assert.DeepEqual(t, versionBeacon, gotVersionTable)
+
+			// ProtocolStateVersionUpgrade
+			b, err = msgpack.Marshal(protocolVersionUpgrade)
+			require.NoError(t, err)
+
+			gotProtocolVersionUpgrade := new(flow.ProtocolStateVersionUpgrade)
+			err = msgpack.Unmarshal(b, gotProtocolVersionUpgrade)
+			require.NoError(t, err)
+			assert.DeepEqual(t, protocolVersionUpgrade, gotProtocolVersionUpgrade)
 		})
 
 		t.Run("generic type", func(t *testing.T) {
@@ -150,9 +180,9 @@ func TestEncodeDecode(t *testing.T) {
 			require.NoError(t, err)
 
 			outer = new(flow.ServiceEvent)
-			t.Logf("- debug: outer=%+v <-- before .Unmarshal()\n", outer)
+			t.Logf("- debug: outer=%+v <-- before .UnmarshalWrapped()\n", outer)
 			err = msgpack.Unmarshal(b, outer)
-			t.Logf("- debug: outer=%+v <-- after .Unmarshal()\n", outer)
+			t.Logf("- debug: outer=%+v <-- after .UnmarshalWrapped()\n", outer)
 			require.NoError(t, err)
 			gotCommit, ok := outer.Event.(*flow.EpochCommit)
 			require.True(t, ok)
@@ -164,13 +194,24 @@ func TestEncodeDecode(t *testing.T) {
 			require.NoError(t, err)
 
 			outer = new(flow.ServiceEvent)
-			t.Logf("- debug: outer=%+v <-- before .Unmarshal()\n", outer)
+			t.Logf("- debug: outer=%+v <-- before .UnmarshalWrapped()\n", outer)
 			err = msgpack.Unmarshal(b, outer)
-			t.Logf("- debug: outer=%+v <-- after .Unmarshal()\n", outer)
+			t.Logf("- debug: outer=%+v <-- after .UnmarshalWrapped()\n", outer)
 			require.NoError(t, err)
 			gotVersionTable, ok := outer.Event.(*flow.VersionBeacon)
 			require.True(t, ok)
 			assert.DeepEqual(t, versionBeacon, gotVersionTable, comparePubKey)
+
+			// ProtocolStateVersionUpgrade
+			b, err = msgpack.Marshal(protocolVersionUpgrade.ServiceEvent())
+			require.NoError(t, err)
+
+			outer = new(flow.ServiceEvent)
+			err = msgpack.Unmarshal(b, outer)
+			require.NoError(t, err)
+			gotProtocolVersionUpgrade, ok := outer.Event.(*flow.ProtocolStateVersionUpgrade)
+			require.True(t, ok)
+			assert.DeepEqual(t, protocolVersionUpgrade, gotProtocolVersionUpgrade)
 		})
 	})
 
@@ -203,6 +244,14 @@ func TestEncodeDecode(t *testing.T) {
 			require.NoError(t, err)
 			assert.DeepEqual(t, versionBeacon, gotVersionTable)
 
+			// ProtocolStateVersionUpgrade
+			b, err = cborcodec.EncMode.Marshal(protocolVersionUpgrade)
+			require.NoError(t, err)
+
+			gotProtocolVersionUpgrade := new(flow.ProtocolStateVersionUpgrade)
+			err = cbor.Unmarshal(b, gotProtocolVersionUpgrade)
+			require.NoError(t, err)
+			assert.DeepEqual(t, protocolVersionUpgrade, gotProtocolVersionUpgrade)
 		})
 
 		t.Run("generic type", func(t *testing.T) {
@@ -212,9 +261,9 @@ func TestEncodeDecode(t *testing.T) {
 			require.NoError(t, err)
 
 			outer := new(flow.ServiceEvent)
-			t.Logf("- debug: outer=%+v <-- before .Unmarshal()\n", outer)
+			t.Logf("- debug: outer=%+v <-- before .UnmarshalWrapped()\n", outer)
 			err = cbor.Unmarshal(b, outer)
-			t.Logf("- debug: outer=%+v <-- after .Unmarshal()\n", outer)
+			t.Logf("- debug: outer=%+v <-- after .UnmarshalWrapped()\n", outer)
 			require.NoError(t, err)
 			gotSetup, ok := outer.Event.(*flow.EpochSetup)
 			require.True(t, ok)
@@ -242,6 +291,17 @@ func TestEncodeDecode(t *testing.T) {
 			gotVersionTable, ok := outer.Event.(*flow.VersionBeacon)
 			require.True(t, ok)
 			assert.DeepEqual(t, versionBeacon, gotVersionTable)
+
+			// ProtocolStateVersionUpgrade
+			b, err = cborcodec.EncMode.Marshal(protocolVersionUpgrade.ServiceEvent())
+			require.NoError(t, err)
+
+			outer = new(flow.ServiceEvent)
+			err = cbor.Unmarshal(b, outer)
+			require.NoError(t, err)
+			gotProtocolVersionUpgrade, ok := outer.Event.(*flow.ProtocolStateVersionUpgrade)
+			require.True(t, ok)
+			assert.DeepEqual(t, protocolVersionUpgrade, gotProtocolVersionUpgrade)
 		})
 	})
 }

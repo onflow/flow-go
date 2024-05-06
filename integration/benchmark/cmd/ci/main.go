@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onflow/flow-go/integration/benchmark/load"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -18,7 +20,6 @@ import (
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
 	"github.com/onflow/flow-go/integration/benchmark"
-	"github.com/onflow/flow-go/integration/benchmark/load"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"

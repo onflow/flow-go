@@ -12,6 +12,23 @@ import (
 	"github.com/onflow/flow-go/ledger/common/convert"
 )
 
+var allStorageMapDomains = []string{
+	common.PathDomainStorage.Identifier(),
+	common.PathDomainPrivate.Identifier(),
+	common.PathDomainPublic.Identifier(),
+	runtime.StorageDomainContract,
+	stdlib.InboxStorageDomain,
+	stdlib.CapabilityControllerStorageDomain,
+}
+
+var allStorageMapDomainsSet = map[string]struct{}{}
+
+func init() {
+	for _, domain := range allStorageMapDomains {
+		allStorageMapDomainsSet[domain] = struct{}{}
+	}
+}
+
 func loadAtreeSlabsInStorge(storage *runtime.Storage, payloads []*ledger.Payload) error {
 	for _, payload := range payloads {
 		registerID, _, err := convert.PayloadToRegister(payload)
@@ -54,21 +71,4 @@ func checkStorageHealth(
 	}
 
 	return storage.CheckHealth()
-}
-
-var allStorageMapDomains = []string{
-	common.PathDomainStorage.Identifier(),
-	common.PathDomainPrivate.Identifier(),
-	common.PathDomainPublic.Identifier(),
-	runtime.StorageDomainContract,
-	stdlib.InboxStorageDomain,
-	stdlib.CapabilityControllerStorageDomain,
-}
-
-var allStorageMapDomainsSet = map[string]struct{}{}
-
-func init() {
-	for _, domain := range allStorageMapDomains {
-		allStorageMapDomainsSet[domain] = struct{}{}
-	}
 }

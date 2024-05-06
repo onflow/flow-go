@@ -399,11 +399,14 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		panic(err)
 	}
 
+	enableNewIngestionEngine := true
+
 	service.Command = append(service.Command,
 		"--triedir=/trie",
 		fmt.Sprintf("--rpc-addr=%s:%s", container.ContainerName, testnet.GRPCPort),
 		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
 		fmt.Sprintf("--extensive-tracing=%t", extesiveTracing),
+		fmt.Sprintf("--enable-new-ingestion-engine=%v", enableNewIngestionEngine),
 		"--execution-data-dir=/data/execution-data",
 		"--chunk-data-pack-dir=/data/chunk-data-pack",
 	)

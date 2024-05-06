@@ -45,9 +45,10 @@ const (
 
 	// Unqualified names of service events (not including address prefix or contract name)
 
-	EventNameEpochSetup    = "EpochSetup"
-	EventNameEpochCommit   = "EpochCommit"
-	EventNameVersionBeacon = "VersionBeacon"
+	EventNameEpochSetup                  = "EpochSetup"
+	EventNameEpochCommit                 = "EpochCommit"
+	EventNameVersionBeacon               = "VersionBeacon"               // VersionBeacon only controls version of ENs, describing software compatability via semantic versioning
+	EventNameProtocolStateVersionUpgrade = "ProtocolStateVersionUpgrade" // Protocol State version applies to all nodes and uses an _integer version_ of the _protocol state_
 
 	//  Unqualified names of service event contract functions (not including address prefix or contract name)
 
@@ -210,9 +211,10 @@ func (c SystemContracts) All() []SystemContract {
 
 // ServiceEvents is a container for all service events on a particular chain.
 type ServiceEvents struct {
-	EpochSetup    ServiceEvent
-	EpochCommit   ServiceEvent
-	VersionBeacon ServiceEvent
+	EpochSetup                  ServiceEvent
+	EpochCommit                 ServiceEvent
+	VersionBeacon               ServiceEvent
+	ProtocolStateVersionUpgrade ServiceEvent
 }
 
 // All returns all service events as a slice.
@@ -221,6 +223,7 @@ func (se ServiceEvents) All() []ServiceEvent {
 		se.EpochSetup,
 		se.EpochCommit,
 		se.VersionBeacon,
+		se.ProtocolStateVersionUpgrade,
 	}
 }
 
@@ -398,11 +401,11 @@ func init() {
 		}
 
 		events := &ServiceEvents{
-			EpochSetup:    event(ContractNameEpoch, EventNameEpochSetup),
-			EpochCommit:   event(ContractNameEpoch, EventNameEpochCommit),
-			VersionBeacon: event(ContractNameNodeVersionBeacon, EventNameVersionBeacon),
+			EpochSetup:                  event(ContractNameEpoch, EventNameEpochSetup),
+			EpochCommit:                 event(ContractNameEpoch, EventNameEpochCommit),
+			VersionBeacon:               event(ContractNameNodeVersionBeacon, EventNameVersionBeacon),
+			ProtocolStateVersionUpgrade: event(ContractNameNodeVersionBeacon, EventNameProtocolStateVersionUpgrade),
 		}
-
 		return events
 	}
 

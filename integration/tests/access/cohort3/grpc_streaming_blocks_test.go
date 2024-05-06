@@ -104,7 +104,7 @@ func (s *GrpcBlocksStreamSuite) SetupTest() {
 	// add the observer node config
 	observers := []testnet.ObserverConfig{{
 		ContainerName: testnet.PrimaryON,
-		LogLevel:      zerolog.DebugLevel,
+		LogLevel:      zerolog.InfoLevel,
 		AdditionalFlags: []string{
 			fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 			fmt.Sprintf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
@@ -150,7 +150,7 @@ func (s *GrpcBlocksStreamSuite) TestHappyPath() {
 	// Let the network run for this many blocks
 	blockCount := uint64(5)
 	// wait for the requested number of sealed blocks
-	s.BlockState.WaitForSealed(s.T(), blockA.Header.Height+blockCount)
+	s.BlockState.WaitForSealedHeight(s.T(), blockA.Header.Height+blockCount)
 
 	var startValue interface{}
 	txCount := 10

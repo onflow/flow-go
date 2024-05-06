@@ -29,6 +29,7 @@ type BlockThrottle struct {
 
 	// state
 	mu        sync.Mutex
+	stopped   bool
 	executed  uint64
 	finalized uint64
 
@@ -54,9 +55,10 @@ func NewBlockThrottle(
 	}
 
 	finalized := finalizedHead.Height
-	// TODO: implement GetHighestFinalizedExecuted for execution state when storehouse
-	// is not used
-	executed := execState.GetHighestFinalizedExecuted()
+	executed, err := execState.GetHighestFinalizedExecuted()
+	if err != nil {
+		return nil, fmt.Errorf("could not get highest finalized executed: %w", err)
+	}
 
 	if executed > finalized {
 		return nil, fmt.Errorf("executed finalized %v is greater than finalized %v", executed, finalized)
@@ -66,6 +68,7 @@ func NewBlockThrottle(
 		threshold: catchupThreshold,
 		executed:  executed,
 		finalized: finalized,
+		stopped:   false,
 
 		log:     log.With().Str("component", "block_throttle").Logger(),
 		state:   state,
@@ -125,6 +128,10 @@ func (c *BlockThrottle) OnBlockExecuted(_ flow.Identifier, executed uint64) erro
 		return fmt.Errorf("throttle not inited")
 	}
 
+	if c.stopped {
+		return nil
+	}
+
 	// we have already caught up, ignore
 	if c.caughtUp() {
 		return nil
@@ -157,6 +164,22 @@ func (c *BlockThrottle) OnBlockExecuted(_ flow.Identifier, executed uint64) erro
 	return nil
 }
 
+// Done marks the throttle as done, and no more blocks will be processed
+func (c *BlockThrottle) Done() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.log.Info().Msgf("throttle done")
+
+	if !c.inited() {
+		return fmt.Errorf("throttle not inited")
+	}
+
+	c.stopped = true
+
+	return nil
+}
+
 func (c *BlockThrottle) OnBlock(blockID flow.Identifier) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -164,6 +187,10 @@ func (c *BlockThrottle) OnBlock(blockID flow.Identifier) error {
 
 	if !c.inited() {
 		return fmt.Errorf("throttle not inited")
+	}
+
+	if c.stopped {
+		return nil
 	}
 
 	// ignore the block if has not caught up.

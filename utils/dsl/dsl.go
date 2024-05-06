@@ -68,16 +68,24 @@ func (i Import) ToCadence() string {
 	return ""
 }
 
-type UpdateAccountCode struct {
-	Code string
-	Name string
+type SetAccountCode struct {
+	Code   string
+	Name   string
+	Update bool
 }
 
-func (u UpdateAccountCode) ToCadence() string {
+func (u SetAccountCode) ToCadence() string {
 
 	bytes := []byte(u.Code)
 
 	hexCode := hex.EncodeToString(bytes)
+
+	if u.Update {
+		return fmt.Sprintf(`
+		let code = "%s"
+        signer.contracts.update(name: "%s", code: code.decodeHex())
+    `, hexCode, u.Name)
+	}
 
 	return fmt.Sprintf(`
 		let code = "%s"
