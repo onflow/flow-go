@@ -83,7 +83,7 @@ func (u SetAccountCode) ToCadence() string {
 	if u.Update {
 		return fmt.Sprintf(`
 		let code = "%s"
-        signer.contracts.update__experimental(name: "%s", code: code.decodeHex())
+        signer.contracts.update(name: "%s", code: code.decodeHex())
     `, hexCode, u.Name)
 	}
 
