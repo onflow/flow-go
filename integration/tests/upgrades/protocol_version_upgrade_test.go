@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/utils/unittest"
+
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	sdk "github.com/onflow/flow-go-sdk"
@@ -23,6 +25,9 @@ type ProtocolVersionUpgradeSuite struct {
 }
 
 func TestProtocolVersionUpgrade(t *testing.T) {
+	// See https://github.com/onflow/flow-go/pull/5840/files#r1589483631
+	// Must merge and pin https://github.com/onflow/flow-core-contracts/pull/419 to re-enable test
+	unittest.SkipUnless(t, unittest.TEST_TODO, "skipped as it depends on VersionBeacon contract upgrade")
 	suite.Run(t, new(ProtocolVersionUpgradeSuite))
 }
 

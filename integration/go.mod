@@ -21,12 +21,11 @@ require (
 	github.com/libp2p/go-libp2p v0.32.2
 	github.com/onflow/cadence v0.42.10
 	github.com/onflow/crypto v0.25.1
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.2-0.20240318135301-f59efe400a8b
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.2-0.20240318135301-f59efe400a8b
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1
 	github.com/onflow/flow-emulator v0.62.2-0.20240418140508-d969ff66d9cd
 	github.com/onflow/flow-go v0.33.2-0.20240412174857-015156b297b5
 	github.com/onflow/flow-go-sdk v0.46.2
-	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.4.1-0.20240412170550-911321113030
 	github.com/onflow/go-ethereum v1.13.4
 	github.com/plus3it/gorecurcopy v0.0.1
