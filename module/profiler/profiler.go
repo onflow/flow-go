@@ -139,11 +139,11 @@ func (p *AutoProfiler) runOnce(d time.Duration) {
 	p.log.Info().Msg("starting profile trace")
 
 	for _, prof := range [...]profileDef{
+		{profileName: "cpu", profileType: pb.ProfileType_WALL, profileFunc: p.pprofCpu},
 		{profileName: "goroutine", profileType: pb.ProfileType_THREADS, profileFunc: func(w io.Writer, _ time.Duration) error { return newProfileFunc("goroutine")(w) }},
 		{profileName: "heap", profileType: pb.ProfileType_HEAP, profileFunc: p.pprofHeap},
 		{profileName: "allocs", profileType: pb.ProfileType_HEAP_ALLOC, profileFunc: p.pprofAllocs},
 		{profileName: "block", profileType: pb.ProfileType_CONTENTION, profileFunc: p.pprofBlock},
-		{profileName: "cpu", profileType: pb.ProfileType_WALL, profileFunc: p.pprofCpu},
 	} {
 		path := filepath.Join(p.dir, fmt.Sprintf("%s-%s", prof.profileName, time.Now().Format(time.RFC3339)))
 
