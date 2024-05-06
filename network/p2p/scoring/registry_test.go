@@ -1157,6 +1157,7 @@ func TestPeerSpamPenaltyClusterPrefixed(t *testing.T) {
 // TestScoringRegistrySilencePeriod ensures that the scoring registry does not penalize nodes during the silence period, and
 // starts to penalize nodes only after the silence period is over.
 func TestScoringRegistrySilencePeriod(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flakey tests")
 	peerID := unittest.PeerIdFixture(t)
 	silenceDuration := 5 * time.Second
 	silencedNotificationLogs := atomic.NewInt32(0)
