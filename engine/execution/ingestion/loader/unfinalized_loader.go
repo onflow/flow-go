@@ -37,7 +37,10 @@ func NewUnfinalizedLoader(
 // LoadUnexecuted loads all unfinalized and validated blocks
 // any error returned are exceptions
 func (e *UnfinalizedLoader) LoadUnexecuted(ctx context.Context) ([]flow.Identifier, error) {
-	lastExecuted := e.execState.GetHighestFinalizedExecuted()
+	lastExecuted, err := e.execState.GetHighestFinalizedExecuted()
+	if err != nil {
+		return nil, fmt.Errorf("could not get highest finalized executed: %w", err)
+	}
 
 	// get finalized height
 	finalized := e.state.Final()

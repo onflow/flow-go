@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	simpleScript = `pub fun main(): Int { return 42; }`
+	simpleScript = `access(all) fun main(): Int { return 42; }`
 )
 
 func TestObserverIndexerEnabled(t *testing.T) {
@@ -180,7 +180,7 @@ func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCsHappyPath() {
 	require.NoError(t, err)
 	createAccountTx.
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
-		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
+		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetAndIncrementSeqNumber()).
 		SetPayer(serviceAddress).
 		SetComputeLimit(9999)
 
@@ -323,7 +323,7 @@ func (s *ObserverIndexerEnabledSuite) TestAllObserverIndexedRPCsHappyPath() {
 
 	createAccountTx.
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
-		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
+		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetAndIncrementSeqNumber()).
 		SetPayer(serviceAddress).
 		SetComputeLimit(9999)
 

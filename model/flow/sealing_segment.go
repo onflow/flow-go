@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"errors"
 	"fmt"
 
 	"golang.org/x/exp/slices"
@@ -60,6 +61,24 @@ type SealingSegment struct {
 	// This information is needed for the `Commit` method of protocol snapshot
 	// to return the sealed state, when the first block contains no seal.
 	FirstSeal *Seal
+
+	// ProtocolStateEntries contains every protocol state entry committed to
+	// by any block in the SealingSegment (including ExtraBlocks).
+	ProtocolStateEntries map[Identifier]*ProtocolStateEntryWrapper
+}
+
+// ProtocolStateEntryWrapper is a wrapper coupling two data sources.
+// Conceptually, the SealingSegment stores one Protocol State Entry (aka `KVStoreEntry`)
+// per unique ProtocolStateID field within the segment's blocks.
+// Currently, although epoch data is conceptually a part of the protocol data entry associated
+// with each block, it is stored separately as a matter of technical debt (only a hash commitment
+// `RichProtocolStateEntry.ID()` is stored within the `KVStoreEntry`.
+//
+// Deprecated: avoid using this in new code; this is a temporary measure until epoch data is moved into protocol KV store
+// TODO: move epoch data into the KVStore as part of a future upgrade
+type ProtocolStateEntryWrapper struct {
+	KVStore    PSKeyValueStoreData
+	EpochEntry *RichProtocolStateEntry
 }
 
 // Highest is the highest block in the sealing segment and the reference block from snapshot that was
@@ -81,6 +100,17 @@ func (segment *SealingSegment) Sealed() *Block {
 // AllBlocks returns all blocks within the sealing segment, including extra blocks, in ascending height order.
 func (segment *SealingSegment) AllBlocks() []*Block {
 	return append(segment.ExtraBlocks, segment.Blocks...)
+}
+
+// IsSporkRoot returns true if this SealingSegment represents a spork root snapshot.
+// The Flow protocol explicitly defines a spork root block (incl. also the network's
+// genesis block) to be finalized and sealed and to have a specific execution state
+// commitment attached. Mathematically, this is a protocol axiom, as no block exists
+// that contains an execution result or seal for the spork root block (nor any children
+// at the time of the spork that could possibly finalize the root block).
+// Therefore, a spork root block is a degenerate sealing segment with a length of 1.
+func (segment *SealingSegment) IsSporkRoot() bool {
+	return len(segment.Blocks) == 1
 }
 
 // FinalizedSeal returns the seal that seals the lowest block.
@@ -105,11 +135,21 @@ func (segment *SealingSegment) FinalizedSeal() (*Seal, error) {
 	return seal, nil
 }
 
+// LatestProtocolStateEntry returns the Protocol State entry corresponding to
+// the highest block in the sealing segment. This represents the Dynamic Protocol State
+// after applying all state changes sealed in `SealingSegment.Highest().Payload`.
+// Caution: `segment` must be a valid SealingSegment.
+func (segment *SealingSegment) LatestProtocolStateEntry() *ProtocolStateEntryWrapper {
+	highest := segment.Highest()
+	return segment.ProtocolStateEntries[highest.Payload.ProtocolStateID]
+}
+
 // Validate validates the sealing segment structure and returns an error if
 // the segment isn't valid. This is done by re-building the segment from scratch,
 // re-using the validation logic already present in the SealingSegmentBuilder.
 // The node logic requires a valid sealing segment to bootstrap.
-// No errors are expected during normal operation.
+// Errors expected during normal operation:
+//   - InvalidSealingSegmentError if `segment` is an invalid SealingSegment.
 func (segment *SealingSegment) Validate() error {
 
 	// populate lookup of seals and results in the segment to satisfy builder
@@ -146,8 +186,15 @@ func (segment *SealingSegment) Validate() error {
 		}
 		return seal, nil
 	}
+	getProtocolStateEntry := func(protocolStateID Identifier) (*ProtocolStateEntryWrapper, error) {
+		entry, ok := segment.ProtocolStateEntries[protocolStateID]
+		if !ok {
+			return nil, fmt.Errorf("protocol state (id=%x) not found in segment", protocolStateID)
+		}
+		return entry, nil
+	}
 
-	builder := NewSealingSegmentBuilder(getResult, getSeal)
+	builder := NewSealingSegmentBuilder(getResult, getSeal, getProtocolStateEntry)
 	for _, block := range segment.Blocks {
 		err := builder.AddBlock(block)
 		if err != nil {
@@ -170,13 +217,32 @@ func (segment *SealingSegment) Validate() error {
 	return nil
 }
 
-var (
-	ErrSegmentMissingSeal        = fmt.Errorf("sealing segment failed sanity check: missing seal referenced by segment")
-	ErrSegmentBlocksWrongLen     = fmt.Errorf("sealing segment failed sanity check: non-root sealing segment must have at least 2 blocks")
-	ErrSegmentInvalidBlockHeight = fmt.Errorf("sealing segment failed sanity check: blocks must be in ascending order")
-	ErrSegmentResultLookup       = fmt.Errorf("failed to lookup execution result")
-	ErrSegmentSealLookup         = fmt.Errorf("failed to lookup seal")
-)
+// InvalidSealingSegmentError is returned either when building or validating a SealingSegment,
+// when the segment is found to be invalid, or when attempting to add an entity to a segment
+// under construction would cause the resulting SealingSegment to become invalid.
+type InvalidSealingSegmentError struct {
+	err error
+}
+
+func NewInvalidSealingSegmentError(msg string, args ...any) InvalidSealingSegmentError {
+	return InvalidSealingSegmentError{
+		err: fmt.Errorf(msg, args...),
+	}
+}
+
+func (err InvalidSealingSegmentError) Error() string {
+	return err.err.Error()
+}
+
+func (err InvalidSealingSegmentError) Unwrap() error {
+	return err.err
+}
+
+// IsInvalidSealingSegmentError returns true if err is or wraps an instance of InvalidSealingSegmentError.
+func IsInvalidSealingSegmentError(err error) bool {
+	var invalidSealingSegmentError InvalidSealingSegmentError
+	return errors.As(err, &invalidSealingSegmentError)
+}
 
 // GetResultFunc is a getter function for results by ID.
 // No errors are expected during normal operation.
@@ -187,25 +253,32 @@ type GetResultFunc func(resultID Identifier) (*ExecutionResult, error)
 // No errors are expected during normal operation.
 type GetSealByBlockIDFunc func(blockID Identifier) (*Seal, error)
 
+// GetProtocolStateEntryFunc  is a getter function for protocol state entries
+// No errors are expected during normal operation.
+type GetProtocolStateEntryFunc func(protocolStateID Identifier) (*ProtocolStateEntryWrapper, error)
+
 // SealingSegmentBuilder is a utility for incrementally building a sealing segment.
 type SealingSegmentBuilder struct {
 	// access to storage to read referenced by not included resources
 	resultLookup        GetResultFunc
 	sealByBlockIDLookup GetSealByBlockIDFunc
+	protocolStateLookup GetProtocolStateEntryFunc
 	// keep track of resources included in payloads
 	includedResults map[Identifier]struct{}
 	// resources to include in the sealing segment
-	blocks      []*Block
-	results     []*ExecutionResult
-	latestSeals map[Identifier]Identifier
-	firstSeal   *Seal
+	blocks               []*Block
+	results              []*ExecutionResult
+	latestSeals          map[Identifier]Identifier
+	protocolStateEntries map[Identifier]*ProtocolStateEntryWrapper
+	firstSeal            *Seal
 	// extraBlocks included in sealing segment, must connect to the lowest block of segment
 	// stored in descending order for simpler population logic
 	extraBlocks []*Block
 }
 
 // AddBlock appends a block to the sealing segment under construction.
-// No errors are expected during normal operation.
+// Errors expected during normal operation:
+//   - InvalidSealingSegmentError if the added block would cause an invalid resulting segment
 func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 	// sanity check: all blocks have to be added before adding extra blocks
 	if len(builder.extraBlocks) > 0 {
@@ -214,7 +287,7 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 
 	// sanity check: block should be 1 height higher than current highest
 	if !builder.isValidHeight(block) {
-		return fmt.Errorf("invalid block height (%d): %w", block.Header.Height, ErrSegmentInvalidBlockHeight)
+		return NewInvalidSealingSegmentError("invalid block height (%d)", block.Header.Height)
 	}
 	blockID := block.ID()
 
@@ -230,7 +303,7 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 		if len(block.Payload.Seals) == 0 {
 			seal, err := builder.sealByBlockIDLookup(blockID)
 			if err != nil {
-				return fmt.Errorf("%w: %v", ErrSegmentSealLookup, err)
+				return fmt.Errorf("could not look up seal: %w", err)
 			}
 			builder.firstSeal = seal
 			// add first seal result ID here, since it isn't in payload
@@ -241,7 +314,7 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 	// index the latest seal for this block
 	latestSeal, err := builder.sealByBlockIDLookup(blockID)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrSegmentSealLookup, err)
+		return fmt.Errorf("could not look up seal: %w", err)
 	}
 	builder.latestSeals[blockID] = latestSeal.ID()
 
@@ -267,20 +340,45 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 		result, err := builder.resultLookup(resultID)
 
 		if err != nil {
-			return fmt.Errorf("%w: (%x) %v", ErrSegmentResultLookup, resultID, err)
+			return fmt.Errorf("could not look up result with id=%x: %w", resultID, err)
 		}
 		builder.addExecutionResult(result)
 		builder.includedResults[resultID] = struct{}{}
+	}
+
+	// if the block commits to an unseen ProtocolStateID, add the corresponding data entry
+	err = builder.addProtocolStateEntryIfUnseen(block.Payload.ProtocolStateID)
+	if err != nil {
+		return fmt.Errorf("could not check or add protocol state entry: %w", err)
 	}
 
 	builder.blocks = append(builder.blocks, block)
 	return nil
 }
 
+// addProtocolStateEntryIfUnseen checks whether the given protocolStateID corresponds
+// to a previously unseen protocol state entry. If it does, retrieves the state entry
+// and persists it for inclusion in the resulting SealingSegment.
+// No errors expected during normal operation.
+func (builder *SealingSegmentBuilder) addProtocolStateEntryIfUnseen(protocolStateID Identifier) error {
+	_, exists := builder.protocolStateEntries[protocolStateID]
+	if exists {
+		return nil
+	}
+
+	protocolStateEntry, err := builder.protocolStateLookup(protocolStateID)
+	if err != nil {
+		return fmt.Errorf("could not look up protocol state entry with id=%x: %w", protocolStateID, err)
+	}
+	builder.protocolStateEntries[protocolStateID] = protocolStateEntry
+	return nil
+}
+
 // AddExtraBlock appends an extra block to sealing segment under construction.
 // Extra blocks needs to be added in descending order and the first block must connect to the lowest block
 // of sealing segment, this way they form a continuous chain.
-// No errors are expected during normal operation.
+// Errors expected during normal operation:
+//   - InvalidSealingSegmentError if the added block would cause an invalid resulting segment
 func (builder *SealingSegmentBuilder) AddExtraBlock(block *Block) error {
 	if len(builder.extraBlocks) == 0 {
 		if len(builder.blocks) == 0 {
@@ -288,10 +386,16 @@ func (builder *SealingSegmentBuilder) AddExtraBlock(block *Block) error {
 		}
 		// first extra block has to match the lowest block of sealing segment
 		if (block.Header.Height + 1) != builder.lowest().Header.Height {
-			return fmt.Errorf("invalid extra block height (%d), doesn't connect to sealing segment: %w", block.Header.Height, ErrSegmentInvalidBlockHeight)
+			return NewInvalidSealingSegmentError("invalid extra block height (%d), doesn't connect to sealing segment", block.Header.Height)
 		}
 	} else if (block.Header.Height + 1) != builder.extraBlocks[len(builder.extraBlocks)-1].Header.Height {
-		return fmt.Errorf("invalid extra block height (%d), doesn't connect to last extra block: %w", block.Header.Height, ErrSegmentInvalidBlockHeight)
+		return NewInvalidSealingSegmentError("invalid extra block height (%d), doesn't connect to last extra block", block.Header.Height)
+	}
+
+	// if the block commits to an unseen ProtocolStateID, add the corresponding data entry
+	err := builder.addProtocolStateEntryIfUnseen(block.Payload.ProtocolStateID)
+	if err != nil {
+		return fmt.Errorf("could not check or add protocol state entry: %w", err)
 	}
 
 	builder.extraBlocks = append(builder.extraBlocks, block)
@@ -306,9 +410,8 @@ func (builder *SealingSegmentBuilder) addExecutionResult(result *ExecutionResult
 // SealingSegment completes building the sealing segment, validating the segment
 // constructed so far, and returning it as a SealingSegment if it is valid.
 //
-// All errors indicate the SealingSegmentBuilder internal state does not represent
-// a valid sealing segment.
-// No errors are expected during normal operation.
+// Errors expected during normal operation:
+//   - InvalidSealingSegmentError if the added block would cause an invalid resulting segment
 func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) {
 	if err := builder.validateSegment(); err != nil {
 		return nil, fmt.Errorf("failed to validate sealing segment: %w", err)
@@ -321,11 +424,12 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 	})
 
 	return &SealingSegment{
-		Blocks:           builder.blocks,
-		ExtraBlocks:      builder.extraBlocks,
-		ExecutionResults: builder.results,
-		LatestSeals:      builder.latestSeals,
-		FirstSeal:        builder.firstSeal,
+		Blocks:               builder.blocks,
+		ExtraBlocks:          builder.extraBlocks,
+		ExecutionResults:     builder.results,
+		ProtocolStateEntries: builder.protocolStateEntries,
+		LatestSeals:          builder.latestSeals,
+		FirstSeal:            builder.firstSeal,
 	}, nil
 }
 
@@ -340,40 +444,39 @@ func (builder *SealingSegmentBuilder) isValidHeight(block *Block) bool {
 
 // validateRootSegment will check that the current builder state represents a valid
 // root sealing segment. In particular:
-// * the root block must be the first block (least height) in the segment
-// * no blocks in the segment may contain any seals (by the minimality requirement)
+//   - the root block must be the first block (least height) in the segment
+//   - no blocks in the segment may contain any seals (by the minimality requirement)
 //
-// All errors indicate an invalid root segment, and either a bug in SealingSegmentBuilder
-// or a corrupted underlying protocol state.
-// No errors are expected during normal operation.
+// Errors expected during normal operation:
+//   - InvalidSealingSegmentError if the added block would cause an invalid resulting segment
 func (builder *SealingSegmentBuilder) validateRootSegment() error {
 	if len(builder.blocks) == 0 {
-		return fmt.Errorf("root segment must have at least 1 block")
+		return NewInvalidSealingSegmentError("root segment must have at least 1 block")
 	}
 	if len(builder.extraBlocks) > 0 {
-		return fmt.Errorf("root segment cannot have extra blocks")
+		return NewInvalidSealingSegmentError("root segment cannot have extra blocks")
 	}
 	if builder.lowest().Header.View != 0 {
-		return fmt.Errorf("root block has unexpected view (%d != 0)", builder.lowest().Header.View)
+		return NewInvalidSealingSegmentError("root block has unexpected view (%d != 0)", builder.lowest().Header.View)
 	}
 	if len(builder.results) != 1 {
-		return fmt.Errorf("expected %d results, got %d", 1, len(builder.results))
+		return NewInvalidSealingSegmentError("expected %d results, got %d", 1, len(builder.results))
 	}
 	if builder.firstSeal == nil {
-		return fmt.Errorf("firstSeal must not be nil for root segment")
+		return NewInvalidSealingSegmentError("firstSeal must not be nil for root segment")
 	}
 	if builder.results[0].BlockID != builder.lowest().ID() {
-		return fmt.Errorf("result (block_id=%x) is not for root block (id=%x)", builder.results[0].BlockID, builder.lowest().ID())
+		return NewInvalidSealingSegmentError("result (block_id=%x) is not for root block (id=%x)", builder.results[0].BlockID, builder.lowest().ID())
 	}
 	if builder.results[0].ID() != builder.firstSeal.ResultID {
-		return fmt.Errorf("firstSeal (result_id=%x) is not for root result (id=%x)", builder.firstSeal.ResultID, builder.results[0].ID())
+		return NewInvalidSealingSegmentError("firstSeal (result_id=%x) is not for root result (id=%x)", builder.firstSeal.ResultID, builder.results[0].ID())
 	}
 	if builder.results[0].BlockID != builder.firstSeal.BlockID {
-		return fmt.Errorf("root seal (block_id=%x) references different block than root result (block_id=%x)", builder.firstSeal.BlockID, builder.results[0].BlockID)
+		return NewInvalidSealingSegmentError("root seal (block_id=%x) references different block than root result (block_id=%x)", builder.firstSeal.BlockID, builder.results[0].BlockID)
 	}
 	for _, block := range builder.blocks {
 		if len(block.Payload.Seals) > 0 {
-			return fmt.Errorf("root segment cannot contain blocks with seals (minimality requirement) - block (height=%d,id=%x) has %d seals",
+			return NewInvalidSealingSegmentError("root segment cannot contain blocks with seals (minimality requirement) - block (height=%d,id=%x) has %d seals",
 				block.Header.Height, block.ID(), len(block.Payload.Seals))
 		}
 	}
@@ -381,16 +484,17 @@ func (builder *SealingSegmentBuilder) validateRootSegment() error {
 }
 
 // validateSegment will validate if builder satisfies conditions for a valid sealing segment.
-// No errors are expected during normal operation.
+// Errors expected during normal operation:
+//   - InvalidSealingSegmentError if the added block would cause an invalid resulting segment
 func (builder *SealingSegmentBuilder) validateSegment() error {
 	// sealing cannot be empty
 	if len(builder.blocks) == 0 {
-		return fmt.Errorf("expect at least 2 blocks in a sealing segment or 1 block in the case of root segments, but got an empty sealing segment: %w", ErrSegmentBlocksWrongLen)
+		return NewInvalidSealingSegmentError("expect at least 2 blocks in a sealing segment or 1 block in the case of root segments, but got an empty sealing segment")
 	}
 
 	if len(builder.extraBlocks) > 0 {
 		if builder.extraBlocks[0].Header.Height+1 != builder.lowest().Header.Height {
-			return fmt.Errorf("extra blocks don't connect to lowest block in segment")
+			return NewInvalidSealingSegmentError("extra blocks don't connect to lowest block in segment")
 		}
 	}
 
@@ -406,7 +510,7 @@ func (builder *SealingSegmentBuilder) validateSegment() error {
 	// validate the latest seal is for the lowest block
 	_, err := findLatestSealForLowestBlock(builder.blocks, builder.latestSeals)
 	if err != nil {
-		return fmt.Errorf("sealing segment missing seal (lowest block id: %x) (highest block id: %x) %v: %w", builder.lowest().ID(), builder.highest().ID(), err, ErrSegmentMissingSeal)
+		return NewInvalidSealingSegmentError("sealing segment missing seal (lowest block id: %x) (highest block id: %x): %w", builder.lowest().ID(), builder.highest().ID(), err)
 	}
 
 	return nil
@@ -427,15 +531,17 @@ func (builder *SealingSegmentBuilder) lowest() *Block {
 }
 
 // NewSealingSegmentBuilder returns *SealingSegmentBuilder
-func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBlockIDFunc) *SealingSegmentBuilder {
+func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBlockIDFunc, protocolStateLookup GetProtocolStateEntryFunc) *SealingSegmentBuilder {
 	return &SealingSegmentBuilder{
-		resultLookup:        resultLookup,
-		sealByBlockIDLookup: sealLookup,
-		includedResults:     make(map[Identifier]struct{}),
-		latestSeals:         make(map[Identifier]Identifier),
-		blocks:              make([]*Block, 0),
-		extraBlocks:         make([]*Block, 0),
-		results:             make(ExecutionResultList, 0),
+		resultLookup:         resultLookup,
+		sealByBlockIDLookup:  sealLookup,
+		protocolStateLookup:  protocolStateLookup,
+		includedResults:      make(map[Identifier]struct{}),
+		latestSeals:          make(map[Identifier]Identifier),
+		protocolStateEntries: make(map[Identifier]*ProtocolStateEntryWrapper),
+		blocks:               make([]*Block, 0, 10),
+		extraBlocks:          make([]*Block, 0, DefaultTransactionExpiry),
+		results:              make(ExecutionResultList, 0, 3),
 	}
 }
 
@@ -457,8 +563,8 @@ func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBl
 //	A <- B <- C <- D(seal_A) <- E(seal_B)  ==> invalid, because latest seal is B, but lowest block is A
 //	A(seal_A)                              ==> invalid, because this is impossible for non-root sealing segments
 //
-// The node logic requires a valid sealing segment to bootstrap. There are no
-// errors expected during normal operations.
+// The node logic requires a valid sealing segment to bootstrap.
+// No errors are expected during normal operations.
 func findLatestSealForLowestBlock(blocks []*Block, latestSeals map[Identifier]Identifier) (*Seal, error) {
 	lowestBlockID := blocks[0].ID()
 	highestBlockID := blocks[len(blocks)-1].ID()

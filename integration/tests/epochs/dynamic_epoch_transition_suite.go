@@ -393,23 +393,40 @@ func (s *DynamicEpochTransitionSuite) AssertNodeNotParticipantInEpoch(epoch prot
 	require.NotContains(s.T(), identities.NodeIDs(), nodeID)
 }
 
-// AwaitSealedBlockHeightExceedsSnapshot polls until it observes that the latest
-// sealed block height has exceeded the snapshot height by numOfBlocks
-// the snapshot height and latest finalized height is greater than numOfBlocks.
-func (s *DynamicEpochTransitionSuite) AwaitSealedBlockHeightExceedsSnapshot(ctx context.Context, snapshot *inmem.Snapshot, threshold uint64, waitFor, tick time.Duration) {
+// AwaitSealedHeightExceedsSnapshotByBuffer polls until it observes that the latest
+// sealed block height has exceeded the snapshot height by `buffer` blocks.
+func (s *DynamicEpochTransitionSuite) AwaitSealedHeightExceedsSnapshotByBuffer(ctx context.Context, snapshot *inmem.Snapshot, buffer uint64, waitFor, tick time.Duration) {
 	header, err := snapshot.Head()
 	require.NoError(s.T(), err)
 	snapshotHeight := header.Height
+	thresholdHeight := snapshotHeight + buffer
 
+	s.AwaitSealedHeight(ctx, thresholdHeight, waitFor, tick)
+}
+
+// AwaitSealedHeight polls until it observes that the latest finalized block has a height
+// greater than or equal to the input height.
+func (s *DynamicEpochTransitionSuite) AwaitSealedHeight(ctx context.Context, thresholdHeight uint64, waitFor, tick time.Duration) {
 	require.Eventually(s.T(), func() bool {
-		latestSealed := s.getLatestSealedHeader(ctx)
-		s.TimedLogf("waiting for sealed block height: %d+%d < %d", snapshotHeight, threshold, latestSealed.Height)
-		return snapshotHeight+threshold < latestSealed.Height
+		latestSealed := s.LatestSealedBlockHeader(ctx)
+		s.TimedLogf("waiting for sealed height: %d < %d", latestSealed.Height, thresholdHeight)
+		return latestSealed.Height >= thresholdHeight
 	}, waitFor, tick)
 }
 
-// getLatestSealedHeader retrieves the latest sealed block, as reported in LatestSnapshot.
-func (s *DynamicEpochTransitionSuite) getLatestSealedHeader(ctx context.Context) *flow.Header {
+// AwaitSealedView polls until it observes that the latest sealed block has a view
+// greater than or equal to the input view. This is used to wait until when an epoch
+// transition must have happened.
+func (s *DynamicEpochTransitionSuite) AwaitSealedView(ctx context.Context, thresholdView uint64, waitFor, tick time.Duration) {
+	require.Eventually(s.T(), func() bool {
+		latestSealed := s.LatestSealedBlockHeader(ctx)
+		s.TimedLogf("waiting for sealed view: %d < %d", latestSealed.View, thresholdView)
+		return latestSealed.View >= thresholdView
+	}, waitFor, tick)
+}
+
+// LatestSealedBlockHeader retrieves the latest sealed block, as reported in LatestSnapshot.
+func (s *DynamicEpochTransitionSuite) LatestSealedBlockHeader(ctx context.Context) *flow.Header {
 	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(s.T(), err)
 	segment, err := snapshot.SealingSegment()
@@ -442,7 +459,7 @@ func (s *DynamicEpochTransitionSuite) AssertNetworkHealthyAfterANChange(ctx cont
 	// overwrite Client to point to the new AN (since we have stopped the initial AN at this point)
 	s.Client = client
 	// assert atleast 20 blocks have been finalized since the node replacement
-	s.AwaitSealedBlockHeightExceedsSnapshot(ctx, snapshotInSecondEpoch, 10, 30*time.Second, time.Millisecond*100)
+	s.AwaitSealedHeightExceedsSnapshotByBuffer(ctx, snapshotInSecondEpoch, 10, 30*time.Second, time.Millisecond*100)
 
 	// execute script directly on new AN to ensure it's functional
 	proposedTable, err := client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
@@ -454,7 +471,7 @@ func (s *DynamicEpochTransitionSuite) AssertNetworkHealthyAfterANChange(ctx cont
 //  1. Ensure sealing continues into the second epoch (post-replacement) by observing
 //     at least 10 blocks of sealing progress within the epoch
 func (s *DynamicEpochTransitionSuite) AssertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, snapshotInSecondEpoch *inmem.Snapshot, _ *StakedNodeOperationInfo) {
-	s.AwaitSealedBlockHeightExceedsSnapshot(ctx, snapshotInSecondEpoch, 10, 30*time.Second, time.Millisecond*100)
+	s.AwaitSealedHeightExceedsSnapshotByBuffer(ctx, snapshotInSecondEpoch, 10, 30*time.Second, time.Millisecond*100)
 }
 
 // AssertNetworkHealthyAfterLNChange performs a basic network health check after replacing a collection node.
@@ -551,6 +568,10 @@ func (s *DynamicEpochTransitionSuite) RunTestEpochJoinAndLeave(role flow.Role, c
 	// if counter is still 0, epoch emergency fallback was triggered and we can fail early
 	s.AssertInEpoch(s.Ctx, 1)
 
+	// wait until we have sealed all blocks in epoch 1 before stopping the replaced container
+	// in particular, this avoids an edge case where sealing halts if we stop the single VN
+	// assigned in epoch 1 between finalizing and sealing the transition into epoch 2
+	s.AwaitSealedView(s.Ctx, epoch1FinalView+1, time.Minute, 500*time.Millisecond)
 	err = containerToReplace.Pause()
 	require.NoError(s.T(), err)
 

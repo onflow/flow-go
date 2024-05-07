@@ -35,7 +35,7 @@ func TestLoadingUnfinalizedBlocks(t *testing.T) {
 	require.NoError(t, ps.Finalize(blockC.ID()))
 
 	es := new(stateMock.FinalizedExecutionState)
-	es.On("GetHighestFinalizedExecuted").Return(genesis.Header.Height)
+	es.On("GetHighestFinalizedExecuted").Return(genesis.Header.Height, nil)
 	headers := new(storage.Headers)
 	headers.On("BlockIDByHeight", blockA.Header.Height).Return(blockA.Header.ID(), nil)
 	headers.On("BlockIDByHeight", blockB.Header.Height).Return(blockB.Header.ID(), nil)

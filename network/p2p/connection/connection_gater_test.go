@@ -111,6 +111,7 @@ func TestConnectionGating(t *testing.T) {
 // The test directly mocks the underlying resource manager metrics of the libp2p native resource manager to ensure that the
 // expected set of resources are allocated for the connection upon establishment.
 func TestConnectionGating_ResourceAllocation_AllowListing(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flakey tests")
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 

@@ -62,7 +62,7 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 			SetScript(setFreezePeriodScript).
 			SetReferenceBlockID(sdk.Identifier(latestBlockID)).
 			SetProposalKey(serviceAddress,
-				0, s.AccessClient().GetSeqNumber()). // todo track sequence number
+				0, s.AccessClient().GetAndIncrementSeqNumber()). // todo track sequence number
 			AddAuthorizer(serviceAddress).
 			SetPayer(serviceAddress)
 
@@ -266,7 +266,7 @@ func (s *TestServiceEventVersionControl) sendSetVersionBoundaryTransaction(
 
 	latestBlockId, err := s.AccessClient().GetLatestBlockID(ctx)
 	s.Require().NoError(err)
-	seq := s.AccessClient().GetSeqNumber()
+	seq := s.AccessClient().GetAndIncrementSeqNumber()
 
 	tx := sdk.NewTransaction().
 		SetScript(versionTableChangeScript).
