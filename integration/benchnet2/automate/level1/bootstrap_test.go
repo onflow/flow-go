@@ -58,11 +58,3 @@ type testData struct {
 	dockerTag      string
 	dockerRegistry string
 }
-
-func TestGenerateTestData(t *testing.T) {
-	// 		"2 AN, 6 LN, 3 CN, 2 EN, 1 VN": {
-	participants := unittest.IdentityListFixture(10, unittest.WithAllRoles())
-	unittest.RootSnapshotFixture(participants)
-
-	json.NewEncoder(os.Stdout)
-}
