@@ -572,7 +572,6 @@ func (s *Suite) TestProcessBackgroundCalls() {
 				})
 		}
 	}
-
 	// consider the last test block as the head
 	s.finalizedBlock = finalizedBlk.Header
 
@@ -649,24 +648,36 @@ func (s *Suite) TestProcessBackgroundCalls() {
 		s.blocks.AssertExpectations(s.T()) // not new call to UpdateLastFullBlockHeight should be made
 	})
 
+	// create new block
+	finalizedBlk = unittest.BlockFixture()
+	height := blocks[blkCnt-1].Header.Height + 1
+	finalizedBlk.Header.Height = height
+	heightMap[height] = &finalizedBlk
+
+	finalizedHeight = finalizedBlk.Header.Height
+	s.finalizedBlock = finalizedBlk.Header
+
+	blockBeforeFinalized := blocks[blkCnt-1].Header
+
 	s.Run("full block height index is advanced if newer full blocks are discovered", func() {
-		block := blocks[1]
-		err := s.lastFullBlockHeight.Set(block.Header.Height)
+		// set lastFullBlockHeight to block
+		err = s.lastFullBlockHeight.Set(blockBeforeFinalized.Height)
 		s.Require().NoError(err)
+
 		err = s.eng.updateLastFullBlockReceivedIndex()
+		s.Require().NoError(err)
+		s.Require().Equal(finalizedHeight, s.lastFullBlockHeight.Value())
 		s.Require().NoError(err)
 
 		s.blocks.AssertExpectations(s.T())
 	})
 
 	s.Run("full block height index is not advanced beyond finalized blocks", func() {
-		err := s.lastFullBlockHeight.Set(finalizedHeight)
-		s.Require().NoError(err)
-
 		err = s.eng.updateLastFullBlockReceivedIndex()
 		s.Require().NoError(err)
 
-		s.blocks.AssertExpectations(s.T()) // not new call to UpdateLastFullBlockHeight should be made
+		s.Require().Equal(finalizedHeight, s.lastFullBlockHeight.Value())
+		s.blocks.AssertExpectations(s.T())
 	})
 }
 
