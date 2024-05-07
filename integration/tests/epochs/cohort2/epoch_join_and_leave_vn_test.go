@@ -8,11 +8,9 @@ import (
 
 	"github.com/onflow/flow-go/integration/tests/epochs"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestEpochJoinAndLeaveVN(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "kvstore: sealing segment doesn't support multiple protocol states")
 	suite.Run(t, new(EpochJoinAndLeaveVNSuite))
 }
 
@@ -33,7 +31,7 @@ func (s *EpochJoinAndLeaveVNSuite) SetupTest() {
 	s.DKGPhaseLen = 100
 	s.EpochLen = 450
 	s.EpochCommitSafetyThreshold = 20
-	s.Suite.SetupTest()
+	s.BaseSuite.SetupTest()
 }
 
 // TestEpochJoinAndLeaveVN should update verification nodes and assert healthy network conditions

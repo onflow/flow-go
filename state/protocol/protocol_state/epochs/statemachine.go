@@ -93,7 +93,7 @@ type EpochStateMachine struct {
 	setups               storage.EpochSetups
 	commits              storage.EpochCommits
 	epochProtocolStateDB storage.ProtocolState
-	pendingDbUpdates     protocol.DeferredBlockPersistOps
+	pendingDbUpdates     *transaction.DeferredBlockPersist
 }
 
 var _ protocol_state.KeyValueStoreStateMachine = (*EpochStateMachine)(nil)
@@ -105,7 +105,7 @@ var _ protocol_state.KeyValueStoreStateMachine = (*EpochStateMachine)(nil)
 // No errors are expected during normal operations.
 func NewEpochStateMachine(
 	candidateView uint64,
-	parentID flow.Identifier,
+	parentBlockID flow.Identifier,
 	params protocol.GlobalParams,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
@@ -115,9 +115,9 @@ func NewEpochStateMachine(
 	happyPathStateMachineFactory StateMachineFactoryMethod,
 	epochFallbackStateMachineFactory StateMachineFactoryMethod,
 ) (*EpochStateMachine, error) {
-	parentEpochState, err := epochProtocolStateDB.ByBlockID(parentID)
+	parentEpochState, err := epochProtocolStateDB.ByBlockID(parentBlockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", parentID, err)
+		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", parentBlockID, err)
 	}
 
 	// sanity check: the parent epoch state ID must be set in KV store
@@ -155,6 +155,7 @@ func NewEpochStateMachine(
 		setups:               setups,
 		commits:              commits,
 		epochProtocolStateDB: epochProtocolStateDB,
+		pendingDbUpdates:     transaction.NewDeferredBlockPersist(),
 	}, nil
 }
 
@@ -165,28 +166,35 @@ func NewEpochStateMachine(
 // but the actual epoch state is stored separately, nevertheless, the epoch state ID is used to sanity check if the
 // epoch state is consistent with the KV Store. Using this approach, we commit the epoch sub-state to the KV Store which in
 // affects the Dynamic Protocol State ID which is essentially hash of the KV Store.
-func (e *EpochStateMachine) Build() protocol.DeferredBlockPersistOps {
+func (e *EpochStateMachine) Build() (*transaction.DeferredBlockPersist, error) {
 	updatedEpochState, updatedStateID, hasChanges := e.activeStateMachine.Build()
-	dbUpdates := e.pendingDbUpdates
-	dbUpdates.Add(func(tx *transaction.Tx, blockID flow.Identifier) error {
+	e.pendingDbUpdates.AddIndexingOp(func(blockID flow.Identifier, tx *transaction.Tx) error {
 		return e.epochProtocolStateDB.Index(blockID, updatedStateID)(tx)
 	})
 	if hasChanges {
-		dbUpdates.AddBadgerUpdate(operation.SkipDuplicatesTx(e.epochProtocolStateDB.StoreTx(updatedStateID, updatedEpochState)))
+		e.pendingDbUpdates.AddDbOp(operation.SkipDuplicatesTx(e.epochProtocolStateDB.StoreTx(updatedStateID, updatedEpochState)))
 	}
 	e.mutator.SetEpochStateID(updatedStateID)
 
-	return dbUpdates
+	return e.pendingDbUpdates, nil
 }
 
-// EvolveState applies the state changes that are delivered via sealed service events.
-// The block's payload might contain epoch preparation service events for the next
-// epoch. In this case, we need to update the tentative protocol state.
-// We need to validate whether all information is available in the protocol
-// state to go to the next epoch when needed. In cases where there is a bug
-// in the smart contract, it could be that this happens too late, and we should trigger epoch fallback mode.
+// EvolveState applies the state change(s) on the Epoch sub-state based on information from the candidate block
+// (under construction). Information that potentially changes the state (compared to the parent block's state):
+//   - Service Events sealed in the candidate block
+//   - the candidate block's view (already provided at construction time)
+//
+// CAUTION: EvolveState MUST be called for all candidate blocks, even if `sealedServiceEvents` is empty!
+// This is because also the absence of expected service events by a certain view can also result in the
+// Epoch state changing. (For example, not having received the EpochCommit event for the next epoch, but
+// approaching the end of the current epoch.)
+//
+// The block's payload might contain epoch preparation service events for the next epoch. In this case,
+// we need to update the tentative protocol state. We need to validate whether all information is available
+// in the protocol state to go to the next epoch when needed. In cases where there is a bug in the smart
+// contract, it could be that this happens too late, and we should trigger epoch fallback mode.
 // No errors are expected during normal operations.
-func (e *EpochStateMachine) EvolveState(update []flow.ServiceEvent) error {
+func (e *EpochStateMachine) EvolveState(sealedServiceEvents []flow.ServiceEvent) error {
 	parentProtocolState := e.activeStateMachine.ParentState()
 
 	// perform protocol state transition to next epoch if next epoch is committed, and we are at first block of epoch
@@ -205,10 +213,10 @@ func (e *EpochStateMachine) EvolveState(update []flow.ServiceEvent) error {
 		}
 	}
 
-	dbUpdates, err := e.applyServiceEventsFromOrderedResults(update)
+	dbUpdates, err := e.applyServiceEventsFromOrderedResults(sealedServiceEvents)
 	if err != nil {
 		if protocol.IsInvalidServiceEventError(err) {
-			dbUpdates, err = e.transitionToEpochFallbackMode(update)
+			dbUpdates, err = e.transitionToEpochFallbackMode(sealedServiceEvents)
 			if err != nil {
 				return irrecoverable.NewExceptionf("could not transition to epoch fallback mode: %w", err)
 			}
@@ -216,7 +224,7 @@ func (e *EpochStateMachine) EvolveState(update []flow.ServiceEvent) error {
 			return irrecoverable.NewExceptionf("could not apply service events from ordered results: %w", err)
 		}
 	}
-	e.pendingDbUpdates.AddBadgerUpdate(dbUpdates...)
+	e.pendingDbUpdates.AddIndexingOps(dbUpdates.Pending())
 	return nil
 }
 
@@ -237,8 +245,8 @@ func (e *EpochStateMachine) ParentState() protocol.KVStoreReader {
 // Results must be ordered by block height.
 // Expected errors during normal operations:
 // - `protocol.InvalidServiceEventError` if any service event is invalid or is not a valid state transition for the current protocol state
-func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(orderedUpdates []flow.ServiceEvent) ([]transaction.DeferredDBUpdate, error) {
-	var dbUpdates []transaction.DeferredDBUpdate
+func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(orderedUpdates []flow.ServiceEvent) (*transaction.DeferredBlockPersist, error) {
+	dbUpdates := transaction.NewDeferredBlockPersist()
 	for _, event := range orderedUpdates {
 		switch ev := event.Event.(type) {
 		case *flow.EpochSetup:
@@ -246,10 +254,8 @@ func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(orderedUpdates 
 			if err != nil {
 				return nil, fmt.Errorf("could not process epoch setup event: %w", err)
 			}
-
 			if processed {
-				// we'll insert the setup event when we insert the block
-				dbUpdates = append(dbUpdates, e.setups.StoreTx(ev))
+				dbUpdates.AddDbOp(e.setups.StoreTx(ev)) // we'll insert the setup event when we insert the block
 			}
 
 		case *flow.EpochCommit:
@@ -257,10 +263,8 @@ func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(orderedUpdates 
 			if err != nil {
 				return nil, fmt.Errorf("could not process epoch commit event: %w", err)
 			}
-
 			if processed {
-				// we'll insert the commit event when we insert the block
-				dbUpdates = append(dbUpdates, e.commits.StoreTx(ev))
+				dbUpdates.AddDbOp(e.commits.StoreTx(ev)) // we'll insert the commit event when we insert the block
 			}
 		default:
 			continue
@@ -272,7 +276,7 @@ func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(orderedUpdates 
 // transitionToEpochFallbackMode transitions the protocol state to Epoch Fallback Mode [EFM].
 // This is implemented by switching to a different state machine implementation, which ignores all service events and epoch transitions.
 // At the moment, this is a one-way transition: once we enter EFM, the only way to return to normal is with a spork.
-func (e *EpochStateMachine) transitionToEpochFallbackMode(orderedUpdates []flow.ServiceEvent) ([]transaction.DeferredDBUpdate, error) {
+func (e *EpochStateMachine) transitionToEpochFallbackMode(orderedUpdates []flow.ServiceEvent) (*transaction.DeferredBlockPersist, error) {
 	var err error
 	e.activeStateMachine, err = e.epochFallbackStateMachineFactory()
 	if err != nil {

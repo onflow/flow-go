@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/invalid"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
@@ -147,7 +148,7 @@ func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 //   - protocol.UnfinalizedSealingSegmentError if sealing segment would contain unfinalized blocks (including orphaned blocks)
 func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	// Lets denote the highest block in the sealing segment `head` (initialized below).
-	// Based on the tech spec `flow/sealing_segment.md`, the Sealing Segment must contain contain
+	// Based on the tech spec `flow/sealing_segment.md`, the Sealing Segment must contain
 	//  enough history to satisfy _all_ of the following conditions:
 	//   (i) The highest sealed block as of `head` needs to be included in the sealing segment.
 	//       This is relevant if `head` does not contain any seals.
@@ -186,9 +187,34 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 		return nil, fmt.Errorf("could not get block: %w", err)
 	}
 
+	// TODO this is a temporary measure resulting from epoch data being stored outside the
+	//  protocol KV Store, once epoch data is in the KV Store, we can pass protocolKVStoreSnapshotsDB.ByID
+	//  directly to NewSealingSegmentBuilder (similar to other getters)
+	getProtocolStateEntry := func(protocolStateID flow.Identifier) (*flow.ProtocolStateEntryWrapper, error) {
+		kvStoreEntry, err := s.state.protocolKVStoreSnapshotsDB.ByID(protocolStateID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get kv store entry: %w", err)
+		}
+		kvStoreReader, err := kvstore.VersionedDecode(kvStoreEntry.Version, kvStoreEntry.Data)
+		if err != nil {
+			return nil, fmt.Errorf("could not decode kv store entry: %w", err)
+		}
+		epochDataEntry, err := s.state.protocolStateSnapshotsDB.ByID(kvStoreReader.GetEpochStateID())
+		if err != nil {
+			return nil, fmt.Errorf("could not get epoch data: %w", err)
+		}
+		return &flow.ProtocolStateEntryWrapper{
+			KVStore: flow.PSKeyValueStoreData{
+				Version: kvStoreEntry.Version,
+				Data:    kvStoreEntry.Data,
+			},
+			EpochEntry: epochDataEntry,
+		}, nil
+	}
+
 	// walk through the chain backward until we reach the block referenced by
 	// the latest seal - the returned segment includes this block
-	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID, s.state.seals.HighestInFork)
+	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID, s.state.seals.HighestInFork, getProtocolStateEntry)
 	scraper := func(header *flow.Header) error {
 		blockID := header.ID()
 		block, err := s.state.blocks.ByID(blockID)
@@ -366,12 +392,12 @@ func (q *EpochQuery) Current() protocol.Epoch {
 
 	setup := psSnapshot.EpochSetup()
 	commit := psSnapshot.EpochCommit()
-	firstHeight, _, epochStarted, _, err := q.retrieveEpochHeightBounds(setup.Counter)
+	firstHeight, _, isFirstHeightKnown, _, err := q.retrieveEpochHeightBounds(setup.Counter)
 	if err != nil {
 		return invalid.NewEpochf("could not get current epoch height bounds: %s", err.Error())
 	}
-	if epochStarted {
-		return inmem.NewStartedEpoch(setup, commit, firstHeight)
+	if isFirstHeightKnown {
+		return inmem.NewEpochWithStartBoundary(setup, commit, firstHeight)
 	}
 	return inmem.NewCommittedEpoch(setup, commit)
 }
@@ -425,14 +451,30 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 	setup := entry.PreviousEpochSetup
 	commit := entry.PreviousEpochCommit
 
-	firstHeight, finalHeight, _, epochEnded, err := q.retrieveEpochHeightBounds(setup.Counter)
+	firstHeight, finalHeight, firstHeightKnown, finalHeightKnown, err := q.retrieveEpochHeightBounds(setup.Counter)
 	if err != nil {
 		return invalid.NewEpochf("could not get epoch height bounds: %w", err)
 	}
-	if epochEnded {
-		return inmem.NewEndedEpoch(setup, commit, firstHeight, finalHeight)
+	if firstHeightKnown && finalHeightKnown {
+		// typical case - we usually know both boundaries for a past epoch
+		return inmem.NewEpochWithStartAndEndBoundaries(setup, commit, firstHeight, finalHeight)
 	}
-	return inmem.NewStartedEpoch(setup, commit, firstHeight)
+	if firstHeightKnown && !finalHeightKnown {
+		// this case is possible when the snapshot reference block is un-finalized
+		// and is past an un-finalized epoch boundary
+		return inmem.NewEpochWithStartBoundary(setup, commit, firstHeight)
+	}
+	if !firstHeightKnown && finalHeightKnown {
+		// this case is possible when this node's lowest known block is after
+		// the queried epoch's start boundary
+		return inmem.NewEpochWithEndBoundary(setup, commit, finalHeight)
+	}
+	if !firstHeightKnown && !finalHeightKnown {
+		// this case is possible when this node's lowest known block is after
+		// the queried epoch's end boundary
+		return inmem.NewCommittedEpoch(setup, commit)
+	}
+	return invalid.NewEpochf("sanity check failed: impossible combination of boundaries for previous epoch")
 }
 
 // retrieveEpochHeightBounds retrieves the height bounds for an epoch.
@@ -456,41 +498,47 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 //	     ╰ X <-|- X <- Y <- Z
 //
 // Returns:
-//   - (0, 0, false, false, nil) if epoch is not started
-//   - (firstHeight, 0, true, false, nil) if epoch is started but not ended
-//   - (firstHeight, finalHeight, true, true, nil) if epoch is ended
+//   - (0, 0, false, false, nil) if neither boundary is known
+//   - (firstHeight, 0, true, false, nil) if epoch start boundary is known but end boundary is not known
+//   - (firstHeight, finalHeight, true, true, nil) if epoch start and end boundary are known
+//   - (0, finalHeight, false, true, nil) if epoch start boundary is known but end boundary is not known
 //
 // No errors are expected during normal operation.
-func (q *EpochQuery) retrieveEpochHeightBounds(epoch uint64) (firstHeight, finalHeight uint64, isFirstBlockFinalized, isLastBlockFinalized bool, err error) {
+func (q *EpochQuery) retrieveEpochHeightBounds(epoch uint64) (
+	firstHeight, finalHeight uint64,
+	isFirstHeightKnown, isLastHeightKnown bool,
+	err error,
+) {
 	err = q.snap.state.db.View(func(tx *badger.Txn) error {
 		// Retrieve the epoch's first height
 		err = operation.RetrieveEpochFirstHeight(epoch, &firstHeight)(tx)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
-				isFirstBlockFinalized = false
-				isLastBlockFinalized = false
-				return nil
+				isFirstHeightKnown = false // unknown boundary
+			} else {
+				return err // unexpected error
 			}
-			return err // unexpected error
+		} else {
+			isFirstHeightKnown = true // known boundary
 		}
-		isFirstBlockFinalized = true
 
 		var subsequentEpochFirstHeight uint64
 		err = operation.RetrieveEpochFirstHeight(epoch+1, &subsequentEpochFirstHeight)(tx)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
-				isLastBlockFinalized = false
-				return nil
+				isLastHeightKnown = false // unknown boundary
+			} else {
+				return err // unexpected error
 			}
-			return err // unexpected error
+		} else { // known boundary
+			isLastHeightKnown = true
+			finalHeight = subsequentEpochFirstHeight - 1
 		}
-		finalHeight = subsequentEpochFirstHeight - 1
-		isLastBlockFinalized = true
 
 		return nil
 	})
 	if err != nil {
 		return 0, 0, false, false, err
 	}
-	return firstHeight, finalHeight, isFirstBlockFinalized, isLastBlockFinalized, nil
+	return firstHeight, finalHeight, isFirstHeightKnown, isLastHeightKnown, nil
 }

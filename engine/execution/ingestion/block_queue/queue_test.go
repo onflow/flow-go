@@ -52,6 +52,47 @@ func TestSingleBlockBecomeReady(t *testing.T) {
 	requireQueueIsEmpty(t, q)
 }
 
+func TestHandleBlockChildCalledBeforeOnBlockExecutedParent(t *testing.T) {
+	t.Parallel()
+	// Given a chain
+	// R <- A(C1) <- B(C2,C3) <- C() <- D()
+	// -    ^------- E(C4,C5) <- F(C6)
+	// -             ^-----------G()
+	block, _, commitFor := makeChainABCDEFG()
+	// take block C and D
+	blockC, blockD := block("C"), block("D")
+
+	q := NewBlockQueue(unittest.Logger())
+
+	// Given block B has been executed, and block C is received,
+	// block C becomes executable
+	missing, executables, err := q.HandleBlock(blockC, commitFor("B"))
+	require.NoError(t, err)
+	requireExecutableHas(t, executables, blockC)
+	require.Empty(t, missing)
+
+	// Now we received blockD, with block C's commit, however,
+	// the block queue state shows block D's parent (C) has not been executed yet,
+	// because OnBlockExecuted(C) is not called.
+	// In this case, we will ignore block C's commit, as if block C has not
+	// been executed yet.
+	missing, executables, err = q.HandleBlock(blockD, commitFor("C"))
+	require.NoError(t, err)
+	requireExecutableHas(t, executables)
+	require.Empty(t, missing)
+
+	// later block C is executed, which will make block D to be executable
+	executables, err = q.OnBlockExecuted(blockC.ID(), *commitFor("C"))
+	require.NoError(t, err)
+	requireExecutableHas(t, executables, blockD)
+
+	// once block D is executed, the queue should be empty
+	executables, err = q.OnBlockExecuted(blockD.ID(), *commitFor("D"))
+	require.NoError(t, err)
+	requireExecutableHas(t, executables)
+	requireQueueIsEmpty(t, q)
+}
+
 func TestMultipleBlockBecomesReady(t *testing.T) {
 	t.Parallel()
 	// Given a chain

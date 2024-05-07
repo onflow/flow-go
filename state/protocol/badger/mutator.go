@@ -597,25 +597,18 @@ func (m *FollowerState) evolveProtocolState(ctx context.Context, candidate *flow
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorEvolveProtocolState)
 	defer span.End()
 
-	// instantiate Protocol State Mutator from the parent block's state and apply any state-changing service events sealed by this block
-	stateMutator, err := m.protocolState.Mutator(candidate.Header.View, candidate.Header.ParentID)
+	// Evolve the Protocol State starting from the parent block's state. Information that may change the state is:
+	// the candidate block's view and Service Events from execution results sealed in the candidate block.
+	updatedStateID, dbUpdates, err := m.protocolState.EvolveState(candidate.Header.ParentID, candidate.Header.View, candidate.Payload.Seals)
 	if err != nil {
-		return fmt.Errorf("could not create protocol state mutator for view %d: %w", candidate.Header.View, err)
-	}
-	err = stateMutator.ApplyServiceEventsFromValidatedSeals(candidate.Payload.Seals)
-	if err != nil {
-		return fmt.Errorf("could not process service events: %w", err)
+		return fmt.Errorf("evolving protocol state failed: %w", err)
 	}
 
 	// verify Protocol State commitment in the candidate block matches the locally-constructed value
-	updatedStateID, dbUpdates, err := stateMutator.Build()
-	if err != nil {
-		return fmt.Errorf("could not build dynamic protocol state: %w", err)
-	}
 	if updatedStateID != candidate.Payload.ProtocolStateID {
 		return state.NewInvalidExtensionErrorf("invalid protocol state commitment %x in block, which should be %x", candidate.Payload.ProtocolStateID, updatedStateID)
 	}
-	deferredDbOps.AddDbOps(dbUpdates.Decorate(candidate.ID())...)
+	deferredDbOps.AddDbOps(dbUpdates.Pending().WithBlock(candidate.ID()))
 	return nil
 }
 
@@ -877,6 +870,7 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 // Suppose an EpochSetup service event is emitted during execution of block A. C seals A, therefore
 // we apply the metrics/events when C is finalized. The first block of the EpochSetup
 // phase is block C.
+// TODO: this should read data from the KVStore/ProtocolStateEntry for the block rather than parsing service events
 //
 // This function should only be called when epoch fallback *has not already been triggered*.
 // No errors are expected during normal operation.
@@ -913,10 +907,8 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.B
 				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseCommitted) })
 				// track epoch phase transition (setup->committed)
 				events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(ev.Counter-1, block.Header) })
-			case *flow.VersionBeacon:
-				// do nothing for now
 			default:
-				return nil, nil, fmt.Errorf("invalid service event type in payload (%T)", ev)
+				// do nothing
 			}
 		}
 	}

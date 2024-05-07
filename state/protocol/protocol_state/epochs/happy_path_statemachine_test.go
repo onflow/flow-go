@@ -27,7 +27,7 @@ type BaseStateMachineSuite struct {
 }
 
 func (s *BaseStateMachineSuite) SetupTest() {
-	s.parentProtocolState = unittest.ProtocolStateFixture()
+	s.parentProtocolState = unittest.EpochStateFixture()
 	s.parentBlock = unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FirstView + 1))
 	s.candidate = unittest.BlockHeaderWithParentFixture(s.parentBlock)
 }
@@ -80,7 +80,7 @@ func (s *ProtocolStateMachineSuite) TestTransitionToNextEpoch() {
 // TestTransitionToNextEpochNotAllowed tests different scenarios where transition to next epoch is not allowed.
 func (s *ProtocolStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
 	s.Run("no next epoch protocol state", func() {
-		protocolState := unittest.ProtocolStateFixture()
+		protocolState := unittest.EpochStateFixture()
 		candidate := unittest.BlockHeaderFixture(
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView + 1))
 		stateMachine, err := NewHappyPathStateMachine(candidate.View, protocolState)
@@ -89,7 +89,7 @@ func (s *ProtocolStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
 		require.Error(s.T(), err, "should not allow transition to next epoch if there is no next epoch protocol state")
 	})
 	s.Run("next epoch not committed", func() {
-		protocolState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichProtocolStateEntry) {
+		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichProtocolStateEntry) {
 			entry.NextEpoch.CommitID = flow.ZeroID
 			entry.NextEpochCommit = nil
 		})
@@ -101,7 +101,7 @@ func (s *ProtocolStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
 		require.Error(s.T(), err, "should not allow transition to next epoch if it is not committed")
 	})
 	s.Run("candidate block is not from next epoch", func() {
-		protocolState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
+		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 		candidate := unittest.BlockHeaderFixture(
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView))
 		stateMachine, err := NewHappyPathStateMachine(candidate.View, protocolState)

@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
 	moduleUtil "github.com/onflow/flow-go/module/util"
 )
 
@@ -36,14 +37,14 @@ type AccountBasedMigration interface {
 	io.Closer
 }
 
-// CreateAccountBasedMigration creates a migration function that migrates the payloads
+// NewAccountBasedMigration creates a migration function that migrates the payloads
 // account by account using the given migrations
 // accounts are processed concurrently using the given number of workers
 // but each account is processed sequentially by the given migrations in order.
 // The migrations InitMigration function is called once before the migration starts
 // And the Close function is called once after the migration finishes if the migration
 // is a finisher.
-func CreateAccountBasedMigration(
+func NewAccountBasedMigration(
 	log zerolog.Logger,
 	nWorker int,
 	migrations []AccountBasedMigration,
@@ -127,7 +128,7 @@ func withMigrations(
 				Type("migration", migrator).
 				Msg("closing migration")
 			if cerr := migrator.Close(); cerr != nil {
-				log.Error().Err(cerr).Msg("error closing migration")
+				log.Err(cerr).Msg("error closing migration")
 				if err == nil {
 					// only set the error if it's not already set
 					// so that we don't overwrite the original error
@@ -175,22 +176,6 @@ func MigrateGroupConcurrently(
 
 					// This is not an account, but service level keys.
 					if util.IsServiceLevelAddress(job.Address) {
-						resultCh <- &migrationResult{
-							migrationDuration: migrationDuration{
-								Address:      job.Address,
-								Duration:     time.Since(start),
-								PayloadCount: len(job.Payloads),
-							},
-							Migrated: job.Payloads,
-						}
-						continue
-					}
-
-					if _, ok := knownProblematicAccounts[job.Address]; ok {
-						log.Info().
-							Hex("address", job.Address[:]).
-							Int("payload_count", len(job.Payloads)).
-							Msg("skipping problematic account")
 						resultCh <- &migrationResult{
 							migrationDuration: migrationDuration{
 								Address:      job.Address,
@@ -315,19 +300,27 @@ func MigrateGroupConcurrently(
 	return migrated, nil
 }
 
-var knownProblematicAccounts = map[common.Address]string{
-	// Testnet accounts with broken contracts
-	mustHexToAddress("434a1f199a7ae3ba"): "Broken contract FanTopPermission",
-	mustHexToAddress("454c9991c2b8d947"): "Broken contract Test",
-	mustHexToAddress("48602d8056ff9d93"): "Broken contract FanTopPermission",
-	mustHexToAddress("5d63c34d7f05e5a4"): "Broken contract FanTopPermission",
-	mustHexToAddress("5e3448b3cffb97f2"): "Broken contract FanTopPermission",
-	mustHexToAddress("7d8c7e050c694eaa"): "Broken contract Test",
-	mustHexToAddress("ba53f16ede01972d"): "Broken contract FanTopPermission",
-	mustHexToAddress("c843c1f5a4805c3a"): "Broken contract FanTopPermission",
-	mustHexToAddress("48d3be92e6e4a973"): "Broken contract FanTopPermission",
-	// Mainnet account
-}
+var testnetAccountsWithBrokenSlabReferences = func() map[common.Address]struct{} {
+	testnetAddresses := map[common.Address]struct{}{
+		mustHexToAddress("434a1f199a7ae3ba"): {},
+		mustHexToAddress("454c9991c2b8d947"): {},
+		mustHexToAddress("48602d8056ff9d93"): {},
+		mustHexToAddress("5d63c34d7f05e5a4"): {},
+		mustHexToAddress("5e3448b3cffb97f2"): {},
+		mustHexToAddress("7d8c7e050c694eaa"): {},
+		mustHexToAddress("ba53f16ede01972d"): {},
+		mustHexToAddress("c843c1f5a4805c3a"): {},
+		mustHexToAddress("48d3be92e6e4a973"): {},
+	}
+
+	for address := range testnetAddresses {
+		if !flow.Testnet.Chain().IsValid(flow.Address(address)) {
+			panic(fmt.Sprintf("invalid testnet address: %s", address.Hex()))
+		}
+	}
+
+	return testnetAddresses
+}()
 
 func mustHexToAddress(hex string) common.Address {
 	address, err := common.HexToAddress(hex)

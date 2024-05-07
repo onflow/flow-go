@@ -168,7 +168,7 @@ func (f *AccountStatusFilter) GroupCoreEventsByAccountAddress(events flow.Events
 	allAccountProtocolEvents := make(map[string]flow.EventsList)
 
 	for _, event := range events {
-		fields, fieldValues, err := getEventFields(&event)
+		fields, err := getEventFields(&event)
 		if err != nil {
 			log.Info().Err(err).Msg("could not get event fields")
 			continue
@@ -176,10 +176,10 @@ func (f *AccountStatusFilter) GroupCoreEventsByAccountAddress(events flow.Events
 
 		//accountField := f.EventFieldFilters[event.Type]
 		accountField := defaultCoreEventsMap[string(event.Type)]
-		for i, field := range fields {
-			_, ok := accountField[field.Identifier]
+		for name, value := range fields {
+			_, ok := accountField[name]
 			if ok {
-				address := fieldValues[i].String()
+				address := value.String()
 				allAccountProtocolEvents[address] = append(allAccountProtocolEvents[address], event)
 			}
 		}

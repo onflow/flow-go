@@ -28,7 +28,7 @@ var (
 	// but the output of the execution was an error
 	// for this case a block is formed and receipts are available
 	StatusFailed Status = 2
-	// StatusFailed shows that the transaction has been executed and the execution has returned success
+	// StatusSuccessful shows that the transaction has been executed and the execution has returned success
 	// for this case a block is formed and receipts are available
 	StatusSuccessful Status = 3
 )
@@ -38,12 +38,23 @@ type ResultSummary struct {
 	Status                  Status
 	ErrorCode               ErrorCode
 	GasConsumed             uint64
-	DeployedContractAddress Address
+	DeployedContractAddress *Address
 	ReturnedValue           Data
 }
 
+// NewInvalidResult creates a new result that hold transaction validation
+// error as well as the defined gas cost for validation.
+func NewInvalidResult(tx *gethTypes.Transaction, err error) *Result {
+	return &Result{
+		TxType:          tx.Type(),
+		TxHash:          tx.Hash(),
+		ValidationError: err,
+		GasConsumed:     InvalidTransactionGasCost,
+	}
+}
+
 // Result captures the result of an interaction to the emulator
-// it could be the out put of a direct call or output of running an
+// it could be the output of a direct call or output of running an
 // evm transaction.
 // Its more comprehensive than typical evm receipt, usually
 // the receipt generation requires some extra calculation (e.g. Deployed contract address)
@@ -60,13 +71,15 @@ type Result struct {
 	// total gas consumed during an opeartion
 	GasConsumed uint64
 	// the address where the contract is deployed (if any)
-	DeployedContractAddress Address
+	DeployedContractAddress *Address
 	// returned value from a function call
 	ReturnedValue []byte
 	// EVM logs (events that are emited by evm)
 	Logs []*gethTypes.Log
 	// TX hash holdes the cached value of tx hash
 	TxHash gethCommon.Hash
+	// transaction block inclusion index
+	Index uint16
 }
 
 // Invalid returns true if transaction has been rejected
@@ -110,7 +123,9 @@ func (res *Result) Receipt() *gethTypes.Receipt {
 		Type:              res.TxType,
 		CumulativeGasUsed: res.GasConsumed, // TODO: update to capture cumulative
 		Logs:              res.Logs,
-		ContractAddress:   res.DeployedContractAddress.ToCommon(),
+	}
+	if res.DeployedContractAddress != nil {
+		receipt.ContractAddress = res.DeployedContractAddress.ToCommon()
 	}
 	if res.Failed() {
 		receipt.Status = gethTypes.ReceiptStatusFailed
@@ -124,11 +139,12 @@ func (res *Result) Receipt() *gethTypes.Receipt {
 
 // ResultSummary constructs a result summary
 func (res *Result) ResultSummary() *ResultSummary {
-	rs := &ResultSummary{}
-
-	rs.GasConsumed = res.GasConsumed
-	rs.DeployedContractAddress = res.DeployedContractAddress
-	rs.ReturnedValue = res.ReturnedValue
+	rs := &ResultSummary{
+		GasConsumed:             res.GasConsumed,
+		DeployedContractAddress: res.DeployedContractAddress,
+		ReturnedValue:           res.ReturnedValue,
+		Status:                  StatusSuccessful,
+	}
 
 	if res.Invalid() {
 		rs.ErrorCode = ValidationErrorCode(res.ValidationError)
@@ -142,6 +158,5 @@ func (res *Result) ResultSummary() *ResultSummary {
 		return rs
 	}
 
-	rs.Status = StatusSuccessful
 	return rs
 }

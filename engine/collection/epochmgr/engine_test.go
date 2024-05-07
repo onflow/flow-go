@@ -364,7 +364,7 @@ func (suite *Suite) TestStartAfterEpochBoundary_NotApprovedForPreviousEpoch() {
 // TestStartAfterEpochBoundary_NotApprovedForCurrentEpoch tests starting the engine
 // shortly after an epoch transition. The finalized boundary is near enough the epoch
 // boundary that we should start the previous epoch cluster consensus. However, we are
-// not approved for the current epoch -> we should only start *current* epoch components.
+// not approved for the current epoch -> we should only start *previous* epoch components.
 func (suite *Suite) TestStartAfterEpochBoundary_NotApprovedForCurrentEpoch() {
 	// we expect 1 ActiveClustersChanged events when the current epoch components are started
 	suite.engineEventsDistributor.On("ActiveClustersChanged", mock.AnythingOfType("flow.ChainIDList")).Once()
@@ -383,6 +383,26 @@ func (suite *Suite) TestStartAfterEpochBoundary_NotApprovedForCurrentEpoch() {
 	suite.StartEngine()
 	// only previous epoch components should have been started
 	suite.AssertEpochStarted(suite.counter - 1)
+	suite.Assert().Len(suite.components, 1)
+}
+
+// TestStartAfterEpochBoundary_PreviousEpochTransitionBeforeRoot tests starting the engine
+// with a root snapshot whose sealing segment excludes the last epoch boundary.
+// In this case we should only start up current-epoch components.
+func (suite *Suite) TestStartAfterEpochBoundary_PreviousEpochTransitionBeforeRoot() {
+	// we expect 1 ActiveClustersChanged events when the current epoch components are started
+	suite.engineEventsDistributor.On("ActiveClustersChanged", mock.AnythingOfType("flow.ChainIDList")).Once()
+	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
+	suite.phase = flow.EpochPhaseStaking
+	// transition epochs, so that a Previous epoch is queryable
+	suite.TransitionEpoch()
+	prevEpoch := suite.epochs[suite.counter-1]
+	// Previous epoch end boundary is unknown because it is before our root snapshot
+	prevEpoch.On("FinalHeight").Return(uint64(0), realprotocol.ErrUnknownEpochBoundary)
+
+	suite.StartEngine()
+	// only current epoch components should have been started
+	suite.AssertEpochStarted(suite.counter)
 	suite.Assert().Len(suite.components, 1)
 }
 

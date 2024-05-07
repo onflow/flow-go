@@ -2,12 +2,16 @@ package backend
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
+
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 type AccountStatusesResponse struct {
@@ -54,7 +58,7 @@ func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartBlockID(
 // SubscribeAccountStatusesFromStartHeight subscribes to the streaming of account status changes starting from
 // a specific block height, with an optional status filter.
 // Errors:
-// - codes.ErrNotFound if could not get block by  start height.
+// - codes.ErrNotFound if could not get block by start height.
 // - codes.Internal if there is an internal error.
 func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartHeight(
 	ctx context.Context,
@@ -84,12 +88,20 @@ func (b *AccountStatusesBackend) SubscribeAccountStatusesFromLatestBlock(
 }
 
 // getAccountStatusResponseFactory returns a function that returns the account statuses response for a given height.
+//
+// Errors:
+// - subscription.ErrBlockNotReady: If block header for the specified block height is not found.
+// - error: An error, if any, encountered during getting events from storage or execution data.
 func (b *AccountStatusesBackend) getAccountStatusResponseFactory(
 	filter state_stream.AccountStatusFilter,
 ) subscription.GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
 		eventsResponse, err := b.eventsRetriever.GetAllEventsResponse(ctx, height)
 		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) ||
+				errors.Is(err, storage.ErrHeightNotIndexed) {
+				return nil, fmt.Errorf("block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
+			}
 			return nil, err
 		}
 		filteredProtocolEvents := filter.Filter(eventsResponse.Events)

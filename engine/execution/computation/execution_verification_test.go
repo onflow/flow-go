@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
@@ -66,10 +66,10 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 	t.Run("single transaction event", func(t *testing.T) {
 
 		deployTx := blueprints.DeployContractTransaction(chain.ServiceAddress(), []byte(""+
-			`pub contract Foo {
-				pub event FooEvent(x: Int, y: Int)
+			`access(all) contract Foo {
+				access(all) event FooEvent(x: Int, y: Int)
 
-				pub fun event() { 
+				access(all) fun emitEvent() { 
 					emit FooEvent(x: 2, y: 1)
 				}
 			}`), "Foo")
@@ -80,7 +80,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			transaction {
 				prepare() {}
 				execute {
-					Foo.event()
+					Foo.emitEvent()
 				}
 			}`, chain.ServiceAddress())),
 		}
@@ -110,10 +110,10 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 	t.Run("multiple collections events", func(t *testing.T) {
 
 		deployTx := blueprints.DeployContractTransaction(chain.ServiceAddress(), []byte(""+
-			`pub contract Foo {
-				pub event FooEvent(x: Int, y: Int)
+			`access(all) contract Foo {
+				access(all) event FooEvent(x: Int, y: Int)
 
-				pub fun event() { 
+				access(all) fun emitEvent() { 
 					emit FooEvent(x: 2, y: 1)
 				}
 			}`), "Foo")
@@ -124,7 +124,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			transaction {
 				prepare() {}
 				execute {
-					Foo.event()
+					Foo.emitEvent()
 				}
 			}`, chain.ServiceAddress())),
 		}
@@ -194,7 +194,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		accountPrivKey, createAccountTx := testutil.CreateAccountCreationTransaction(t, chain)
 
 		// this should return the address of newly created account
-		accountAddress, err := chain.AddressAtIndex(5)
+		accountAddress, err := chain.AddressAtIndex(systemcontracts.LastSystemAccountIndex + 1)
 		require.NoError(t, err)
 
 		err = testutil.SignTransactionAsServiceAccount(createAccountTx, 0, chain)
@@ -204,7 +204,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		err = testutil.SignTransaction(addKeyTx, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 
-		minimumStorage, err := cadence.NewUFix64("0.00010807")
+		minimumStorage, err := cadence.NewUFix64("0.00011661")
 		require.NoError(t, err)
 
 		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
@@ -220,9 +220,9 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		txResults := colResult.TransactionResults()
 		// storage limit error
 		assert.Len(t, txResults, 1)
-		assert.Equal(t, txResults[0].ErrorMessage, "")
+		assert.Equal(t, "", txResults[0].ErrorMessage)
 		// ensure events from the first transaction is emitted
-		require.Len(t, colResult.Events(), 10)
+		require.Len(t, colResult.Events(), 14)
 
 		colResult = cr.CollectionExecutionResultAt(1)
 		txResults = colResult.TransactionResults()
@@ -230,13 +230,13 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		// storage limit error
 		assert.Contains(t, txResults[0].ErrorMessage, errors.ErrCodeStorageCapacityExceeded.String())
 		// ensure fee deduction events are emitted even though tx fails
-		require.Len(t, colResult.Events(), 3)
+		require.Len(t, colResult.Events(), 5)
 	})
 
 	t.Run("with failed transaction fee deduction", func(t *testing.T) {
 		accountPrivKey, createAccountTx := testutil.CreateAccountCreationTransaction(t, chain)
 		// this should return the address of newly created account
-		accountAddress, err := chain.AddressAtIndex(5)
+		accountAddress, err := chain.AddressAtIndex(systemcontracts.LastSystemAccountIndex + 1)
 		require.NoError(t, err)
 
 		err = testutil.SignTransactionAsServiceAccount(createAccountTx, 0, chain)
@@ -302,7 +302,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 				transactionEvents += 1
 			}
 		}
-		require.Equal(t, 10, transactionEvents)
+		require.Equal(t, 14, transactionEvents)
 
 		assert.Contains(t, txResults[1].ErrorMessage, errors.ErrCodeStorageCapacityExceeded.String())
 
@@ -313,7 +313,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 				transactionEvents += 1
 			}
 		}
-		require.Equal(t, 3, transactionEvents)
+		require.Equal(t, 5, transactionEvents)
 	})
 
 }
@@ -362,7 +362,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 					}
 				}
 
-				require.Len(t, deposits, 2)
+				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 2)
 			},
 		},
@@ -391,7 +391,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 					}
 				}
 
-				require.Len(t, deposits, 2)
+				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 2)
 			},
 		},
@@ -422,7 +422,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 					}
 				}
 
-				require.Len(t, deposits, 2)
+				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 2)
 			},
 		},
@@ -483,7 +483,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 					}
 				}
 
-				require.Len(t, deposits, 2)
+				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 2)
 			},
 		},
@@ -512,7 +512,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 					}
 				}
 
-				require.Len(t, deposits, 2)
+				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 2)
 			},
 		},
@@ -592,12 +592,12 @@ func TestTransactionFeeDeduction(t *testing.T) {
 							transaction(amount: UFix64, to: Address) {
 							
 								// The Vault resource that holds the tokens that are being transferred
-								let sentVault: @FungibleToken.Vault
+								let sentVault: @{FungibleToken.Vault}
 							
-								prepare(signer: AuthAccount) {
+								prepare(signer: auth(BorrowValue) &Account) {
 							
 									// Get a reference to the signer's stored vault
-									let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
 							
 									// Withdraw tokens from the signer's stored vault
@@ -610,8 +610,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 									let recipient = getAccount(to)
 							
 									// Get a reference to the recipient's Receiver
-									let receiverRef = recipient.getCapability(/public/flowTokenReceiver)
-										.borrow<&{FungibleToken.Receiver}>()
+									let receiverRef = recipient.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 										?? panic("Could not borrow receiver reference to the recipient's Vault")
 							
 									// Deposit the withdrawn tokens in the recipient's receiver
@@ -629,7 +628,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			privateKey, createAccountTx := testutil.CreateAccountCreationTransaction(t, chain)
 
 			// this should return the address of newly created account
-			address, err := chain.AddressAtIndex(5)
+			address, err := chain.AddressAtIndex(systemcontracts.LastSystemAccountIndex + 1)
 			require.NoError(t, err)
 
 			err = testutil.SignTransactionAsServiceAccount(createAccountTx, 0, chain)
