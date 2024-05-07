@@ -7,6 +7,11 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// ErrIncorrectValue indicates that a processed value is lower or equal than current value.
+var (
+	ErrIncorrectValue = errors.New("incorrect value")
+)
+
 // PersistentStrictMonotonicCounter represents the consumer progress with strict monotonic counter.
 type PersistentStrictMonotonicCounter struct {
 	consumerProgress storage.ConsumerProgress
@@ -47,11 +52,12 @@ func NewPersistentStrictMonotonicCounter(consumerProgress storage.ConsumerProgre
 // Set sets the processed index, ensuring it is strictly monotonically increasing.
 //
 // Expected errors during normal operation:
-//   - generic error in case of unexpected failure from the database layer or encoding failure
-//     or if stored value is larger than processed.
+//   - codes.ErrIncorrectValue - if stored value is larger than processed.
+//   - generic error in case of unexpected failure from the database layer or
+//     encoding failure.
 func (m *PersistentStrictMonotonicCounter) Set(processed uint64) error {
 	if !m.counter.Set(processed) {
-		return fmt.Errorf("could not update to height that is lower than the current height")
+		return ErrIncorrectValue
 	}
 	return m.consumerProgress.SetProcessedIndex(processed)
 }
