@@ -521,7 +521,7 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	unittest.SkipUnless(s.T(), unittest.TEST_TODO,
 		"This test is broken with current implementation but must pass when EFM recovery has been implemented."+
 			"See for details https://github.com/onflow/flow-go/issues/5631.")
-	s.parentEpochState = unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
+	s.parentEpochState = unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 	s.candidate.View = s.parentEpochState.NextEpochSetup.FirstView
 	stateMachine, err := epochs.NewEpochStateMachineFactory(
 		s.globalParams,
@@ -551,13 +551,10 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	s.epochStateDB.On("StoreTx", expectedEpochState.ID(), expectedEpochState).Return(storeTxDeferredUpdate.Execute, nil).Once()
 	s.mutator.On("SetEpochStateID", expectedEpochState.ID()).Return().Once()
 
-	dbOps := stateMachine.Build()
-	// Calling `StoreTx` returns a deferred database update. Conceptually, it is possible that the EpochStateMachine wraps the
-	// deferred update in faulty code, such that it cannot be executed. Therefore, we execute the top-level deferred database
-	// update below and verify that the deferred database operation returned by `storage.ProtocolState.StoreTx` is actually reached.
-	tx := &transaction.Tx{}
-	for _, op := range dbOps.Decorate(s.candidate.ID()) {
-		err := op(tx)
-		require.NoError(s.T(), err)
-	}
+	dbOps, err := stateMachine.Build()
+	require.NoError(s.T(), err)
+	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
+	// the expected mock methods should be called, which is asserted by the testify framework
+	err = dbOps.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
+	require.NoError(s.T(), err)
 }
