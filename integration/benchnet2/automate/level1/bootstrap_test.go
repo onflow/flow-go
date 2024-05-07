@@ -7,8 +7,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const BootstrapPath = "../testdata/level1/data/"
