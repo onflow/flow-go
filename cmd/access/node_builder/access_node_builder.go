@@ -1257,7 +1257,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"script-execution-max-height",
 			defaultConfig.scriptExecMaxBlock,
 			"highest block height to allow for script execution. default: no limit")
-
 		flags.StringVar(&builder.registerCacheType,
 			"register-cache-type",
 			defaultConfig.registerCacheType,

@@ -23,7 +23,7 @@ func TestProtocolStateStorage(t *testing.T) {
 		commits := NewEpochCommits(metrics, db)
 		store := NewProtocolState(metrics, setups, commits, db, DefaultProtocolStateCacheSize, DefaultProtocolStateByBlockIDCacheSize)
 
-		expected := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
+		expected := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 		protocolStateID := expected.ID()
 		blockID := unittest.IdentifierFixture()
 
@@ -73,14 +73,14 @@ func TestProtocolStateStoreInvalidProtocolState(t *testing.T) {
 		setups := NewEpochSetups(metrics, db)
 		commits := NewEpochCommits(metrics, db)
 		store := NewProtocolState(metrics, setups, commits, db, DefaultProtocolStateCacheSize, DefaultProtocolStateByBlockIDCacheSize)
-		invalid := unittest.ProtocolStateFixture().ProtocolStateEntry
+		invalid := unittest.EpochStateFixture().ProtocolStateEntry
 		// swap first and second elements to break canonical order
 		invalid.CurrentEpoch.ActiveIdentities[0], invalid.CurrentEpoch.ActiveIdentities[1] = invalid.CurrentEpoch.ActiveIdentities[1], invalid.CurrentEpoch.ActiveIdentities[0]
 
 		err := transaction.Update(db, store.StoreTx(invalid.ID(), invalid))
 		require.Error(t, err)
 
-		invalid = unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState()).ProtocolStateEntry
+		invalid = unittest.EpochStateFixture(unittest.WithNextEpochProtocolState()).ProtocolStateEntry
 		// swap first and second elements to break canonical order
 		invalid.NextEpoch.ActiveIdentities[0], invalid.NextEpoch.ActiveIdentities[1] = invalid.NextEpoch.ActiveIdentities[1], invalid.NextEpoch.ActiveIdentities[0]
 
@@ -100,7 +100,7 @@ func TestProtocolStateMergeParticipants(t *testing.T) {
 		commits := NewEpochCommits(metrics, db)
 		store := NewProtocolState(metrics, setups, commits, db, DefaultProtocolStateCacheSize, DefaultProtocolStateByBlockIDCacheSize)
 
-		stateEntry := unittest.ProtocolStateFixture()
+		stateEntry := unittest.EpochStateFixture()
 		// change address of participant in current epoch, so we can distinguish it from the one in previous epoch
 		// when performing assertion.
 		newAddress := "123"

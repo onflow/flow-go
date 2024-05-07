@@ -98,7 +98,7 @@ func (c *Client) AccountKeyPriv() sdkcrypto.PrivateKey {
 	return c.accountKeyPriv
 }
 
-func (c *Client) GetSeqNumber() uint64 {
+func (c *Client) GetAndIncrementSeqNumber() uint64 {
 	n := c.accountKey.SequenceNumber
 	c.accountKey.SequenceNumber++
 	return n
@@ -141,7 +141,7 @@ func (c *Client) deployContract(ctx context.Context, refID sdk.Identifier, code 
 	tx := sdk.NewTransaction().
 		SetScript([]byte(code.ToCadence())).
 		SetReferenceBlockID(refID).
-		SetProposalKey(c.SDKServiceAddress(), 0, c.GetSeqNumber()).
+		SetProposalKey(c.SDKServiceAddress(), 0, c.GetAndIncrementSeqNumber()).
 		SetPayer(c.SDKServiceAddress()).
 		AddAuthorizer(c.SDKServiceAddress())
 
@@ -387,7 +387,7 @@ func (c *Client) CreateAccount(
 	}
 	tx.SetComputeLimit(1000).
 		SetReferenceBlockID(latestBlockID).
-		SetProposalKey(payer, 0, c.GetSeqNumber()).
+		SetProposalKey(payer, 0, c.GetAndIncrementSeqNumber()).
 		SetPayer(payer)
 
 	err = c.SignAndSendTransaction(ctx, tx)
