@@ -1313,11 +1313,11 @@ github.com/olekukonko/tablewriter v0.0.2-0.20190409134802-7e037d187b0c/go.mod h1
 github.com/olekukonko/tablewriter v0.0.5 h1:P2Ga83D34wi1o9J6Wh1mRuqd4mF/x/lgBS7N7AbDhec=
 github.com/olekukonko/tablewriter v0.0.5/go.mod h1:hPp6KlRPjbx+hW8ykQs1w3UBbZlj6HuIJcUGPhkA7kY=
 github.com/onflow/atree v0.1.0-beta1.0.20211027184039-559ee654ece9/go.mod h1:+6x071HgCF/0v5hQcaE5qqjc2UqN5gCU8h5Mk6uqpOg=
-github.com/onflow/atree v0.6.1-0.20240417191405-e11f55fa33a3 h1:K8LKxRn1rRdDXLCvYlDNdlQyB28b+fx2doYiIaNGnQU=
-github.com/onflow/atree v0.6.1-0.20240417191405-e11f55fa33a3/go.mod h1:7YNAyCd5JENq+NzH+fR1ABUZVzbSq9dkt0+5fZH3L2A=
+github.com/onflow/atree v0.6.1-0.20240429171214-e4400b25dfa9 h1:lS/47Nt8qRIEC+V8QPobTAWnudK982u/wJboucugndg=
+github.com/onflow/atree v0.6.1-0.20240429171214-e4400b25dfa9/go.mod h1:7YNAyCd5JENq+NzH+fR1ABUZVzbSq9dkt0+5fZH3L2A=
 github.com/onflow/cadence v0.20.1/go.mod h1:7mzUvPZUIJztIbr9eTvs+fQjWWHTF8veC+yk4ihcNIA=
-github.com/onflow/cadence v0.42.11-atree-register-inlining h1:WLZfTpUjyE6df/IS6cLur1CC13te9yohuHcl1GeURfg=
-github.com/onflow/cadence v0.42.11-atree-register-inlining/go.mod h1:yLghyxuE56vMMncpU9fC+Km/t/+Y0B+ZXhXOGRLd29g=
+github.com/onflow/cadence v0.42.11-atree-register-inlining.2 h1:gdKHbrGmW4ybv19j2kWu7lijHpEWwN9blMepxlmj7IM=
+github.com/onflow/cadence v0.42.11-atree-register-inlining.2/go.mod h1:8hS2bM6B5F7a870d+NWLDGUEk3yWvE2d+g0C75KuhUY=
 github.com/onflow/crypto v0.25.1 h1:0txy2PKPMM873JbpxQNbJmuOJtD56bfs48RQfm0ts5A=
 github.com/onflow/crypto v0.25.1/go.mod h1:C8FbaX0x8y+FxWjbkHy0Q4EASCDR9bSPWZqlpCLYyVI=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1 h1:xF5wHug6H8vKfz7p1LYy9jck6eD9K1HLjTdi6o4kg1k=
