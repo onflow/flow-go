@@ -2404,7 +2404,7 @@ func TestAttachments(t *testing.T) {
 					reusableRuntime.NewReusableCadenceRuntimePool(
 						1,
 						runtime.Config{
-							AttachmentsEnabled: attachmentsEnabled,
+							AttachmentsEnabled: true,
 						},
 					),
 				),
