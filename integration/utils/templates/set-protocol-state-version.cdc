@@ -1,4 +1,4 @@
-import NodeVersionBeacon from 0xNODEVERSIONBEACONADDRESS
+import NodeVersionBeacon from "NodeVersionBeacon"
 
 /// Transaction that allows NodeVersionAdmin to specify a new protocol state version.
 /// The new version will become active at view `activeView` if the service event
@@ -22,7 +22,7 @@ transaction(newProtocolVersion: UInt64, activeViewDiff: UInt64) {
 
   execute {
     let block = getCurrentBlock()
-    self.adminRef.setPendingProtocolStateVersionUpgrade(
+    self.adminRef.emitProtocolStateVersionUpgrade(
       newProtocolVersion: newProtocolVersion,
       activeView: block.view + activeViewDiff
     )

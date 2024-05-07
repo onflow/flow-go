@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type ProtocolVersionUpgradeSuite struct {
@@ -26,7 +25,7 @@ type ProtocolVersionUpgradeSuite struct {
 func TestProtocolVersionUpgrade(t *testing.T) {
 	// See https://github.com/onflow/flow-go/pull/5840/files#r1589483631
 	// Must merge and pin https://github.com/onflow/flow-core-contracts/pull/419 to re-enable test
-	unittest.SkipUnless(t, unittest.TEST_TODO, "skipped as it depends on VersionBeacon contract upgrade")
+	//unittest.SkipUnless(t, unittest.TEST_TODO, "skipped as it depends on VersionBeacon contract upgrade")
 	suite.Run(t, new(ProtocolVersionUpgradeSuite))
 }
 
