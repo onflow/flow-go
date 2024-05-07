@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -21,11 +22,11 @@ import (
 const (
 	// Index of each field in the cadence NodeInfo as it corresponds to cadence.Struct.Fields
 	// fields not needed are left out.
-	idField = iota
-	roleField
-	networkingAddressField
-	networkingKeyField
-	stakingKeyField
+	idField                = "id"
+	roleField              = "role"
+	networkingAddressField = "networkingAddress"
+	networkingKeyField     = "networkingKey"
+	stakingKeyField        = "stakingKey"
 )
 
 const (
@@ -146,7 +147,8 @@ func executeGetProposedNodesInfosScript(ctx context.Context, client *client.Clie
 
 // parseNodeInfo convert node info retrieved from cadence script
 func parseNodeInfo(info cadence.Value) (*bootstrap.NodeInfoPub, error) {
-	fields := info.(cadence.Struct).Fields
+	fields := cadence.FieldsMappedByName(info.(cadence.Struct))
+
 	nodeID, err := flow.HexStringToIdentifier(string(fields[idField].(cadence.String)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert flow node ID from hex string to identifier (%s): %w", string(fields[idField].(cadence.String)), err)
