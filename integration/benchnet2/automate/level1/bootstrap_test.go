@@ -14,17 +14,19 @@ import (
 const BootstrapPath = "../testdata/level1/data/"
 const ExpectedOutputPath = "../testdata/level1/expected"
 
+// TestGenerateBootstrap_DataTable validates that a root snapshot fixture produces the
+// expected output template. If this test fails, it is likely because the underlying
+// Snapshot model has changed. In that case, you can generate a new fixture file with
+// a script like:
+//
+//	participants := unittest.IdentityListFixture(10, unittest.WithAllRoles())
+//	snapshot := unittest.RootSnapshotFixture(participants)
+//	json.NewEncoder(os.Stdout).Encode(snapshot.Encodable())
 func TestGenerateBootstrap_DataTable(t *testing.T) {
 	testDataMap := map[string]testData{
-		//"2 AN, 6 LN, 3 CN, 2 EN, 1 VN": {
-		//	bootstrapPath:  filepath.Join(BootstrapPath, "root-protocol-state-snapshot1.json"),
-		//	expectedOutput: filepath.Join(ExpectedOutputPath, "template-data-input1.json"),
-		//	dockerTag:      "v0.27.6",
-		//	dockerRegistry: "gcr.io/flow-container-registry/",
-		//},
-		"testing new snapshot file": {
-			bootstrapPath:  filepath.Join(BootstrapPath, "snapshot.json"),
-			expectedOutput: filepath.Join(ExpectedOutputPath, "new-template-data-input.json"),
+		"10 nodes": {
+			bootstrapPath:  filepath.Join(BootstrapPath, "snapshot-fixture1.json"),
+			expectedOutput: filepath.Join(ExpectedOutputPath, "template-fixture1.json"),
 			dockerTag:      "v0.27.6",
 			dockerRegistry: "gcr.io/flow-container-registry/",
 		},
@@ -36,11 +38,6 @@ func TestGenerateBootstrap_DataTable(t *testing.T) {
 			bootstrap := NewBootstrap(testData.bootstrapPath)
 			actualNodeData := bootstrap.GenTemplateData(false, testData.dockerTag, testData.dockerRegistry)
 
-			//bz, err := json.Marshal(actualNodeData)
-			//require.NoError(t, err)
-			//err = os.WriteFile(filepath.Join(ExpectedOutputPath, "new-template-data-input.json"), bz, 0660)
-			//require.NoError(t, err)
-			//
 			// load expected template data file
 			var expectedNodeData []NodeData
 			expectedDataBytes, err := os.ReadFile(testData.expectedOutput)
