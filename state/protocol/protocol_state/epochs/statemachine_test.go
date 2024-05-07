@@ -518,7 +518,7 @@ func (s *EpochStateMachineSuite) TestEvolveState_EventsAreFiltered() {
 
 // TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition tests that EpochStateMachine transitions to the next epoch
 // if an invalid state transition has been detected in a block which triggers transitioning to the next epoch.
-// In such situation, we still need to enter the next epoch (because it has already been committed), but persist in the 
+// In such situation, we still need to enter the next epoch (because it has already been committed), but persist in the
 // state that we have entered Epoch fallback mode (`flow.ProtocolStateEntry.InvalidEpochTransitionAttempted` is set to `true`).
 // This test ensures that we don't drop previously committed next epoch.
 func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition() {
@@ -543,14 +543,17 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	indexTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
 	s.epochStateDB.On("Index", s.candidate.ID(), mocks.Anything).Return(indexTxDeferredUpdate.Execute, nil).Once()
 
+	expectedEpochState := &flow.ProtocolStateEntry{
+		PreviousEpoch:                   s.parentEpochState.CurrentEpoch.Copy(),
+		CurrentEpoch:                    *s.parentEpochState.NextEpoch.Copy(),
+		NextEpoch:                       nil,
+		InvalidEpochTransitionAttempted: true,
+	}
+
 	storeTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
 	storeTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
-	s.epochStateDB.On("StoreTx", mocks.Anything, mocks.Anything).Run(func(args mocks.Arguments) {
-		updatedState := args[1].(*flow.ProtocolStateEntry)
-		require.Equal(s.T(), flow.EpochPhaseStaking, updatedState.EpochPhase())
-	}).Return(storeTxDeferredUpdate.Execute, nil).Once()
-
-	s.mutator.On("SetEpochStateID", mocks.Anything).Return().Once()
+	s.epochStateDB.On("StoreTx", expectedEpochState.ID(), expectedEpochState).Return(storeTxDeferredUpdate.Execute, nil).Once()
+	s.mutator.On("SetEpochStateID", expectedEpochState.ID()).Return().Once()
 
 	dbOps := stateMachine.Build()
 	// Calling `StoreTx` returns a deferred database update. Conceptually, it is possible that the EpochStateMachine wraps the
