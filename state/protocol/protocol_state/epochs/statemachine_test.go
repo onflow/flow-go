@@ -517,8 +517,9 @@ func (s *EpochStateMachineSuite) TestEvolveState_EventsAreFiltered() {
 }
 
 // TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition tests that EpochStateMachine transitions to the next epoch
-// if an invalid state transition has been detected in a block which triggers transition to the next epoch.
-// In such situation we still need to enter the next epoch but with the fallback state machine.
+// if an invalid state transition has been detected in a block which triggers transitioning to the next epoch.
+// In such situation, we still need to enter the next epoch (because it has already been committed), but persist in the 
+// state that we have entered Epoch fallback mode (`flow.ProtocolStateEntry.InvalidEpochTransitionAttempted` is set to `true`).
 // This test ensures that we don't drop previously committed next epoch.
 func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition() {
 	unittest.SkipUnless(s.T(), unittest.TEST_TODO,
@@ -552,6 +553,9 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	s.mutator.On("SetEpochStateID", mocks.Anything).Return().Once()
 
 	dbOps := stateMachine.Build()
+	// Calling `StoreTx` returns a deferred database update. Conceptually, it is possible that the EpochStateMachine wraps the
+	// deferred update in faulty code, such that it cannot be executed. Therefore, we execute the top-level deferred database
+	// update below and verify that the deferred database operation returned by `storage.ProtocolState.StoreTx` is actually reached.
 	tx := &transaction.Tx{}
 	for _, op := range dbOps.Decorate(s.candidate.ID()) {
 		err := op(tx)
