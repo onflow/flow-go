@@ -11,10 +11,10 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestInsertProtocolState tests if basic badger operations on ProtocolState work as expected.
+// TestInsertProtocolState tests if basic badger operations on EpochProtocolState work as expected.
 func TestInsertProtocolState(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		expected := unittest.ProtocolStateFixture().ProtocolStateEntry
+		expected := unittest.EpochStateFixture().ProtocolStateEntry
 
 		protocolStateID := expected.ID()
 		err := db.Update(InsertProtocolState(protocolStateID, expected))

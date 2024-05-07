@@ -18,6 +18,10 @@ linters-settings:
       - G503
       - G505
 
+  staticcheck:
+    # Disable SA1019 to allow use of deprecated label
+    checks: ["all", "-SA1019"]
+
 linters:
   enable:
     - goimports

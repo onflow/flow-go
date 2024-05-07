@@ -4,10 +4,10 @@ import (
 	"encoding/hex"
 
 	"github.com/onflow/cadence/runtime/common"
-
-	"github.com/onflow/cadence"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/onflow/go-ethereum/rlp"
+
+	"github.com/onflow/cadence"
 
 	"github.com/onflow/flow-go/model/flow"
 )
