@@ -60,22 +60,6 @@ type Core struct {
 	eventConsumer     EventConsumer
 }
 
-// Throttle is used to throttle the blocks to be added to the processables channel
-type Throttle interface {
-	// Init initializes the throttle with the processables channel to forward the blocks
-	Init(processables chan<- BlockIDHeight) error
-	// OnBlock is called when a block is received, the throttle will check if the execution
-	// is falling far behind the finalization, and add the block to the processables channel
-	// if it's not falling far behind.
-	OnBlock(blockID flow.Identifier, height uint64) error
-	// OnBlockExecuted is called when a block is executed, the throttle will check whether
-	// the execution is caught up with the finalization, and allow all the remaining blocks
-	// to be added to the processables channel.
-	OnBlockExecuted(blockID flow.Identifier, height uint64) error
-	// Done stops the throttle, and stop sending new blocks to the processables channel
-	Done() error
-}
-
 type BlockExecutor interface {
 	ExecuteBlock(ctx context.Context, block *entity.ExecutableBlock) (*execution.ComputationResult, error)
 }
@@ -111,7 +95,7 @@ func NewCore(
 		eventConsumer:     eventConsumer,
 	}
 
-	err := e.throttle.Init(e.processables)
+	err := e.throttle.Init(e.processables, DefaultCatchUpThreshold)
 	if err != nil {
 		return nil, fmt.Errorf("fail to initialize throttle engine: %w", err)
 	}
@@ -157,19 +141,6 @@ func (e *Core) launchWorkerToExecuteBlocks(ctx irrecoverable.SignalerContext, re
 					executable.Block.ID(), err))
 			}
 		}
-	}
-}
-
-func (e *Core) OnBlock(header *flow.Header, qc *flow.QuorumCertificate) {
-	e.log.Debug().
-		Hex("block_id", qc.BlockID[:]).Uint64("height", header.Height).
-		Msgf("received block")
-
-	// qc.Block is equivalent to header.ID()
-	err := e.throttle.OnBlock(qc.BlockID, header.Height)
-	if err != nil {
-		e.log.Fatal().Err(err).Msgf("error processing block %v (qc.BlockID: %v, blockID: %v)",
-			header.Height, qc.BlockID, header.ID())
 	}
 }
 
