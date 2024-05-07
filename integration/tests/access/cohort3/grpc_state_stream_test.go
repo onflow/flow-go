@@ -188,7 +188,7 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 	// Let the network run for this many blocks
 	blockCount := uint64(5)
 	// wait for the requested number of sealed blocks
-	s.BlockState.WaitForSealed(s.T(), blockA.Header.Height+blockCount)
+	s.BlockState.WaitForSealedHeight(s.T(), blockA.Header.Height+blockCount)
 
 	txGenerator, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	s.Require().NoError(err)

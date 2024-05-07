@@ -1174,6 +1174,8 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
 	protocolState := bstorage.NewProtocolState(fnb.Metrics.Cache, setups, epochCommits, fnb.DB,
 		bstorage.DefaultProtocolStateCacheSize, bstorage.DefaultProtocolStateByBlockIDCacheSize)
+	protocolKVStores := bstorage.NewProtocolKVStore(fnb.Metrics.Cache, fnb.DB,
+		bstorage.DefaultProtocolKVStoreCacheSize, bstorage.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeacons := bstorage.NewVersionBeacons(fnb.DB)
 
 	fnb.Storage = Storage{
@@ -1191,7 +1193,8 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		Setups:             setups,
 		EpochCommits:       epochCommits,
 		VersionBeacons:     versionBeacons,
-		ProtocolState:      protocolState,
+		EpochProtocolState: protocolState,
+		ProtocolKVStore:    protocolKVStores,
 		Commits:            commits,
 	}
 
@@ -1281,7 +1284,8 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.QuorumCertificates,
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
-			fnb.Storage.ProtocolState,
+			fnb.Storage.EpochProtocolState,
+			fnb.Storage.ProtocolKVStore,
 			fnb.Storage.VersionBeacons,
 		)
 		if err != nil {
@@ -1329,7 +1333,8 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.QuorumCertificates,
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
-			fnb.Storage.ProtocolState,
+			fnb.Storage.EpochProtocolState,
+			fnb.Storage.ProtocolKVStore,
 			fnb.Storage.VersionBeacons,
 			fnb.RootSnapshot,
 			options...,
@@ -1507,12 +1512,21 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
 	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Sandboxnet || fnb.RootChainID == flow.Mainnet {
+	switch fnb.RootChainID {
+	case flow.Testnet,
+		flow.Sandboxnet,
+		flow.Previewnet,
+		flow.Mainnet:
 		vmOpts = append(vmOpts,
 			fvm.WithTransactionFeesEnabled(true),
 		)
 	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Sandboxnet || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet {
+	switch fnb.RootChainID {
+	case flow.Testnet,
+		flow.Sandboxnet,
+		flow.Previewnet,
+		flow.Localnet,
+		flow.Benchnet:
 		vmOpts = append(vmOpts,
 			fvm.WithContractDeploymentRestricted(false),
 		)

@@ -40,7 +40,12 @@ type Client struct {
 // address, using the given account key for signing transactions.
 func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.PrivateKey, chain flow.Chain) (*Client, error) {
 
-	flowClient, err := client.NewClient(accessAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	flowClient, err := client.NewClient(
+		accessAddr,
+		client.WithGRPCDialOptions(
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create new flow client: %w", err)
 	}
@@ -98,7 +103,7 @@ func (c *Client) AccountKeyPriv() sdkcrypto.PrivateKey {
 	return c.accountKeyPriv
 }
 
-func (c *Client) GetSeqNumber() uint64 {
+func (c *Client) GetAndIncrementSeqNumber() uint64 {
 	n := c.accountKey.SequenceNumber
 	c.accountKey.SequenceNumber++
 	return n
@@ -141,7 +146,7 @@ func (c *Client) deployContract(ctx context.Context, refID sdk.Identifier, code 
 	tx := sdk.NewTransaction().
 		SetScript([]byte(code.ToCadence())).
 		SetReferenceBlockID(refID).
-		SetProposalKey(c.SDKServiceAddress(), 0, c.GetSeqNumber()).
+		SetProposalKey(c.SDKServiceAddress(), 0, c.GetAndIncrementSeqNumber()).
 		SetPayer(c.SDKServiceAddress()).
 		AddAuthorizer(c.SDKServiceAddress())
 
@@ -387,7 +392,7 @@ func (c *Client) CreateAccount(
 	}
 	tx.SetComputeLimit(1000).
 		SetReferenceBlockID(latestBlockID).
-		SetProposalKey(payer, 0, c.GetSeqNumber()).
+		SetProposalKey(payer, 0, c.GetAndIncrementSeqNumber()).
 		SetPayer(payer)
 
 	err = c.SignAndSendTransaction(ctx, tx)

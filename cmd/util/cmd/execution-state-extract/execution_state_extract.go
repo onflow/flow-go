@@ -23,22 +23,19 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage"
 )
-
-func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flow.StateCommitment, error) {
-	return commits.ByBlockID(blockHash)
-}
 
 func extractExecutionState(
 	log zerolog.Logger,
 	dir string,
 	targetHash flow.StateCommitment,
 	outputDir string,
-	nWorker int, // number of concurrent worker to migation payloads
+	nWorker int, // number of concurrent worker to migration payloads
 	runMigrations bool,
 	outputPayloadFile string,
 	exportPayloadsByAddresses []common.Address,
+	sortPayloads bool,
+	opts migrators.Options,
 ) error {
 
 	log.Info().Msg("init WAL")
@@ -75,7 +72,16 @@ func extractExecutionState(
 
 	log.Info().Msg("init compactor")
 
-	compactor, err := complete.NewCompactor(led, diskWal, log, complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), &metrics.NoopCollector{})
+	compactor, err := complete.NewCompactor(
+		led,
+		diskWal,
+		log,
+		complete.DefaultCacheSize,
+		checkpointDistance,
+		checkpointsToKeep,
+		atomic.NewBool(false),
+		&metrics.NoopCollector{},
+	)
 	if err != nil {
 		return fmt.Errorf("cannot create compactor: %w", err)
 	}
@@ -89,7 +95,12 @@ func extractExecutionState(
 		<-compactor.Done()
 	}()
 
-	migrations := newMigrations(log, dir, nWorker, runMigrations)
+	migrations := newMigrations(
+		log,
+		dir,
+		runMigrations,
+		opts,
+	)
 
 	newState := ledger.State(targetHash)
 
@@ -107,43 +118,29 @@ func extractExecutionState(
 	// create reporter
 	reporter := reporters.NewExportReporter(
 		log,
-		func() flow.StateCommitment { return targetHash },
+		func() flow.StateCommitment {
+			return targetHash
+		},
 	)
 
 	newMigratedState := ledger.State(newTrie.RootHash())
 	err = reporter.Report(nil, newMigratedState)
 	if err != nil {
-		log.Error().Err(err).Msgf("can not generate report for migrated state: %v", newMigratedState)
+		log.Err(err).Msgf("can not generate report for migrated state: %v", newMigratedState)
 	}
 
-	exportPayloads := len(outputPayloadFile) > 0
-	if exportPayloads {
+	if len(outputPayloadFile) > 0 {
 		payloads := newTrie.AllPayloads()
 
-		log.Info().Msgf("sorting %d payloads", len(payloads))
-
-		// Sort payloads to produce deterministic payload file with
-		// same sequence of payloads inside.
-		payloads = util.SortPayloadsByAddress(payloads, nWorker)
-
-		log.Info().Msgf("sorted %d payloads", len(payloads))
-
-		log.Info().Msgf("creating payloads file %s", outputPayloadFile)
-
-		exportedPayloadCount, err := util.CreatePayloadFile(
+		return exportPayloads(
 			log,
-			outputPayloadFile,
 			payloads,
+			nWorker,
+			outputPayloadFile,
 			exportPayloadsByAddresses,
 			false, // payloads represents entire state.
+			sortPayloads,
 		)
-		if err != nil {
-			return fmt.Errorf("cannot generate payloads file: %w", err)
-		}
-
-		log.Info().Msgf("Exported %d payloads out of %d payloads", exportedPayloadCount, len(payloads))
-
-		return nil
 	}
 
 	migratedState, err := createCheckpoint(
@@ -171,9 +168,9 @@ func createCheckpoint(
 	outputDir,
 	outputFile string,
 ) (ledger.State, error) {
-	statecommitment := ledger.State(newTrie.RootHash())
+	stateCommitment := ledger.State(newTrie.RootHash())
 
-	log.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", statecommitment.String())
+	log.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", stateCommitment.String())
 
 	err := os.MkdirAll(outputDir, os.ModePerm)
 	if err != nil {
@@ -194,7 +191,7 @@ func createCheckpoint(
 	}
 
 	log.Info().Msgf("checkpoint file successfully stored at: %v %v", outputDir, outputFile)
-	return statecommitment, nil
+	return stateCommitment, nil
 }
 
 func writeStatusFile(fileName string, e error) error {
@@ -208,11 +205,13 @@ func extractExecutionStateFromPayloads(
 	log zerolog.Logger,
 	dir string,
 	outputDir string,
-	nWorker int, // number of concurrent worker to migation payloads
+	nWorker int, // number of concurrent worker to migration payloads
 	runMigrations bool,
 	inputPayloadFile string,
 	outputPayloadFile string,
 	exportPayloadsByAddresses []common.Address,
+	sortPayloads bool,
+	opts migrators.Options,
 ) error {
 
 	inputPayloadsFromPartialState, payloads, err := util.ReadPayloadFile(log, inputPayloadFile)
@@ -222,40 +221,28 @@ func extractExecutionStateFromPayloads(
 
 	log.Info().Msgf("read %d payloads", len(payloads))
 
-	migrations := newMigrations(log, dir, nWorker, runMigrations)
+	migrations := newMigrations(
+		log,
+		dir,
+		runMigrations,
+		opts,
+	)
 
 	payloads, err = migratePayloads(log, payloads, migrations)
 	if err != nil {
 		return err
 	}
 
-	exportPayloads := len(outputPayloadFile) > 0
-	if exportPayloads {
-
-		log.Info().Msgf("sorting %d payloads", len(payloads))
-
-		// Sort payloads to produce deterministic payload file with
-		// same sequence of payloads inside.
-		payloads = util.SortPayloadsByAddress(payloads, nWorker)
-
-		log.Info().Msgf("sorted %d payloads", len(payloads))
-
-		log.Info().Msgf("creating payloads file %s", outputPayloadFile)
-
-		exportedPayloadCount, err := util.CreatePayloadFile(
+	if len(outputPayloadFile) > 0 {
+		return exportPayloads(
 			log,
-			outputPayloadFile,
 			payloads,
+			nWorker,
+			outputPayloadFile,
 			exportPayloadsByAddresses,
 			inputPayloadsFromPartialState,
+			sortPayloads,
 		)
-		if err != nil {
-			return fmt.Errorf("cannot generate payloads file: %w", err)
-		}
-
-		log.Info().Msgf("Exported %d payloads out of %d payloads", exportedPayloadCount, len(payloads))
-
-		return nil
 	}
 
 	newTrie, err := createTrieFromPayloads(log, payloads)
@@ -282,6 +269,43 @@ func extractExecutionStateFromPayloads(
 	return nil
 }
 
+func exportPayloads(
+	log zerolog.Logger,
+	payloads []*ledger.Payload,
+	nWorker int,
+	outputPayloadFile string,
+	exportPayloadsByAddresses []common.Address,
+	inputPayloadsFromPartialState bool,
+	sortPayloads bool,
+) error {
+	if sortPayloads {
+		log.Info().Msgf("sorting %d payloads", len(payloads))
+
+		// Sort payloads to produce deterministic payload file with
+		// same sequence of payloads inside.
+		payloads = util.SortPayloadsByAddress(payloads, nWorker)
+
+		log.Info().Msgf("sorted %d payloads", len(payloads))
+	}
+
+	log.Info().Msgf("creating payloads file %s", outputPayloadFile)
+
+	exportedPayloadCount, err := util.CreatePayloadFile(
+		log,
+		outputPayloadFile,
+		payloads,
+		exportPayloadsByAddresses,
+		inputPayloadsFromPartialState,
+	)
+	if err != nil {
+		return fmt.Errorf("cannot generate payloads file: %w", err)
+	}
+
+	log.Info().Msgf("exported %d payloads out of %d payloads", exportedPayloadCount, len(payloads))
+
+	return nil
+}
+
 func migratePayloads(logger zerolog.Logger, payloads []*ledger.Payload, migrations []ledger.Migration) ([]*ledger.Payload, error) {
 
 	if len(migrations) == 0 {
@@ -293,7 +317,7 @@ func migratePayloads(logger zerolog.Logger, payloads []*ledger.Payload, migratio
 
 	// migrate payloads
 	for i, migrate := range migrations {
-		logger.Info().Msgf("migration %d/%d is underway", i, len(migrations))
+		logger.Info().Msgf("migration %d/%d is underway", i+1, len(migrations))
 
 		start := time.Now()
 		payloads, err = migrate(payloads)
@@ -348,36 +372,43 @@ func createTrieFromPayloads(logger zerolog.Logger, payloads []*ledger.Payload) (
 
 func newMigrations(
 	log zerolog.Logger,
-	dir string,
-	nWorker int, // number of concurrent worker to migation payloads
+	outputDir string,
 	runMigrations bool,
+	opts migrators.Options,
 ) []ledger.Migration {
-	if runMigrations {
-		rwf := reporters.NewReportFileWriterFactory(dir, log)
-
-		migrations := []ledger.Migration{
-			migrators.CreateAccountBasedMigration(
-				log,
-				nWorker,
-				[]migrators.AccountBasedMigration{
-					migrators.NewAtreeRegisterMigrator(
-						rwf,
-						flagValidateMigration,
-						flagLogVerboseValidationError,
-						flagContinueMigrationOnValidationError,
-						flagCheckStorageHealthBeforeMigration,
-						flagCheckStorageHealthAfterMigration,
-					),
-
-					&migrators.DeduplicateContractNamesMigration{},
-
-					// This will fix storage used discrepancies caused by the previous migrations
-					&migrators.AccountUsageMigrator{},
-				}),
-		}
-
-		return migrations
+	if !runMigrations {
+		return nil
 	}
 
-	return nil
+	log.Info().Msgf("initializing migrations")
+
+	rwf := reporters.NewReportFileWriterFactory(outputDir, log)
+
+	namedMigrations := migrators.NewCadence1Migrations(
+		log,
+		outputDir,
+		rwf,
+		opts,
+	)
+
+	migrations := make([]ledger.Migration, 0, len(namedMigrations))
+	for _, migration := range namedMigrations {
+		migrations = append(migrations, migration.Migrate)
+	}
+
+	// At the end, fix up storage-used discrepancies
+	migrations = append(
+		migrations,
+		migrators.NewAccountBasedMigration(
+			log,
+			opts.NWorker,
+			[]migrators.AccountBasedMigration{
+				&migrators.AccountUsageMigrator{},
+			},
+		),
+	)
+
+	log.Info().Msgf("initialized migrations")
+
+	return migrations
 }

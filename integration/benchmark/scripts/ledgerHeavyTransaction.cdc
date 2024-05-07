@@ -1,7 +1,7 @@
 import LedgerHeavy from 0x%s
 
 transaction {
-  prepare(acct: AuthAccount) {}
+  prepare(acct: &Account) {}
   execute {
     LedgerHeavy.LedgerInteractionHeavy(100)
   }
