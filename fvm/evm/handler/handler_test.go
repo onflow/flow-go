@@ -103,21 +103,19 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					require.NoError(t, err)
 					cadenceEvent, ok := ev.(cadence.Event)
 					require.True(t, ok)
-					for j, f := range cadenceEvent.GetFields() {
-						// todo add an event decoder in types.event
-						if f.Identifier == "logs" {
-							cadenceLogs := cadenceEvent.GetFieldValues()[j]
-							encodedLogs, err := hex.DecodeString(strings.ReplaceAll(cadenceLogs.String(), "\"", ""))
-							require.NoError(t, err)
 
-							var logs []*gethTypes.Log
-							err = rlp.DecodeBytes(encodedLogs, &logs)
-							require.NoError(t, err)
+					// TODO: add an event decoder in types.event
+					cadenceLogs := cadence.SearchFieldByName(cadenceEvent, "logs")
 
-							for i, l := range result.Logs {
-								assert.Equal(t, l, logs[i])
-							}
-						}
+					encodedLogs, err := hex.DecodeString(strings.ReplaceAll(cadenceLogs.String(), "\"", ""))
+					require.NoError(t, err)
+
+					var logs []*gethTypes.Log
+					err = rlp.DecodeBytes(encodedLogs, &logs)
+					require.NoError(t, err)
+
+					for i, l := range result.Logs {
+						assert.Equal(t, l, logs[i])
 					}
 
 					// check block event
@@ -135,7 +133,11 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 
 					eventTxID := blockEvent.TransactionHashes[0] // only one hash in block
 					// make sure the transaction id included in the block transaction list is the same as tx sumbmitted
-					assert.Equal(t, evmTx.Hash().String(), eventTxID.ToGoValue())
+					assert.Equal(
+						t,
+						evmTx.Hash().String(),
+						string(eventTxID),
+					)
 				})
 			})
 		})
@@ -887,20 +889,18 @@ func TestHandler_TransactionRun(t *testing.T) {
 						require.NoError(t, err)
 						cadenceEvent, ok := ev.(cadence.Event)
 						require.True(t, ok)
-						for j, f := range cadenceEvent.GetFields() {
-							if f.Identifier == "logs" {
-								cadenceLogs := cadenceEvent.GetFieldValues()[j]
-								encodedLogs, err := hex.DecodeString(strings.ReplaceAll(cadenceLogs.String(), "\"", ""))
-								require.NoError(t, err)
 
-								var logs []*gethTypes.Log
-								err = rlp.DecodeBytes(encodedLogs, &logs)
-								require.NoError(t, err)
+						// TODO: add an event decoder in types.event
+						cadenceLogs := cadence.SearchFieldByName(cadenceEvent, "logs")
+						encodedLogs, err := hex.DecodeString(strings.ReplaceAll(cadenceLogs.String(), "\"", ""))
+						require.NoError(t, err)
 
-								for k, l := range runResults[i].Logs {
-									assert.Equal(t, l, logs[k])
-								}
-							}
+						var logs []*gethTypes.Log
+						err = rlp.DecodeBytes(encodedLogs, &logs)
+						require.NoError(t, err)
+
+						for k, l := range runResults[i].Logs {
+							assert.Equal(t, l, logs[k])
 						}
 					}
 
