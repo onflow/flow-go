@@ -1,16 +1,14 @@
 package counters_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMonotonicConsumer(t *testing.T) {
@@ -30,7 +28,7 @@ func TestMonotonicConsumer(t *testing.T) {
 		var lessHeight = uint64(1233)
 		err = persistentStrictMonotonicCounter.Set(lessHeight)
 		require.Error(t, err)
-		require.Equal(t, err, fmt.Errorf("could not update to height that is lower than the current height"))
+		require.ErrorIs(t, err, counters.ErrIncorrectValue)
 
 		// update the value with bigger height
 		var height2 = uint64(1235)
