@@ -79,6 +79,21 @@ func ContractRegisterID(address Address, contractName string) RegisterID {
 	}
 }
 
+func IsContractCodeRegisterID(registerID RegisterID) bool {
+	return strings.HasPrefix(registerID.Key, CodeKeyPrefix)
+}
+
+func RegisterIDContractName(registerID RegisterID) string {
+	if !IsContractCodeRegisterID(registerID) {
+		return ""
+	}
+	return registerID.Key[len(CodeKeyPrefix):]
+}
+
+func IsContractNamesRegisterID(registerID RegisterID) bool {
+	return registerID.Key == ContractNamesKey
+}
+
 func CadenceRegisterID(owner []byte, key []byte) RegisterID {
 	return RegisterID{
 		Owner: addressToOwner(BytesToAddress(owner)),
@@ -126,6 +141,8 @@ func (id RegisterID) IsInternalState() bool {
 		id.Key == AccountStatusKey
 }
 
+const SlabIndexPrefix = '$'
+
 // IsSlabIndex returns true if the key is a slab index for an account's ordered fields
 // map.
 //
@@ -133,15 +150,15 @@ func (id RegisterID) IsInternalState() bool {
 // only to cadence.  Cadence encodes this map into bytes and split the bytes
 // into slab chunks before storing the slabs into the ledger.
 func (id RegisterID) IsSlabIndex() bool {
-	return len(id.Key) == 9 && id.Key[0] == '$'
+	return len(id.Key) == 9 && id.Key[0] == SlabIndexPrefix
 }
 
 // String returns formatted string representation of the RegisterID.
 func (id RegisterID) String() string {
 	formattedKey := ""
 	if id.IsSlabIndex() {
-		i := uint64(binary.BigEndian.Uint64([]byte(id.Key[1:])))
-		formattedKey = fmt.Sprintf("$%d", i)
+		i := binary.BigEndian.Uint64([]byte(id.Key[1:]))
+		formattedKey = fmt.Sprintf("%c%d", SlabIndexPrefix, i)
 	} else {
 		formattedKey = fmt.Sprintf("#%x", []byte(id.Key))
 	}
