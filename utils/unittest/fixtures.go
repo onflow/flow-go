@@ -507,6 +507,10 @@ func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 	}
 }
 
+func BlockHeaderWithHeight(height uint64) *flow.Header {
+	return BlockHeaderFixture(WithHeaderHeight(height))
+}
+
 func BlockHeaderWithParentWithSoRFixture(parent *flow.Header, source []byte) *flow.Header {
 	height := parent.Height + 1
 	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
