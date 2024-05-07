@@ -357,4 +357,4 @@ replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/insecure => ../insecure
 
-replace github.com/onflow/flow-emulator v0.62.2-0.20240418140508-d969ff66d9cd => github.com/The-K-R-O-K/flow-emulator v0.61.2-0.20240507111935-77ea08a5808d
+replace github.com/onflow/flow-emulator v0.62.2-0.20240418140508-d969ff66d9cd => github.com/onflow/flow-emulator v0.62.2-0.20240507141305-13dcdc35eecb
