@@ -80,6 +80,10 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 	parentProtocolState.InvalidEpochTransitionAttempted = false
 
 	thresholdView := parentProtocolState.CurrentEpochSetup.FinalView - s.params.EpochCommitSafetyThreshold()
+
+	// The view we enter EFM is in the staking phase. The resulting epoch state should be unchanged to the
+	// parent state _except_ that `InvalidEpochTransitionAttempted` is set to true.
+	// We expect no epoch extension to be added since we have not reached the threshold view.
 	s.Run("threshold-not-reached", func() {
 		candidateView := thresholdView - 1
 		stateMachine, err := NewFallbackStateMachine(s.params, candidateView, parentProtocolState.Copy())
@@ -95,8 +99,9 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 
 		require.Empty(s.T(), updatedState.CurrentEpoch.EpochExtensions, "No extension should be added if threshold is not reached")
 	})
-	// The view we enter EFM is in the staking phase. The resulting epoch state should be unchanged to the
-	// parent state _except_ that `InvalidEpochTransitionAttempted` is set to true.
+
+	// The view we enter EFM is in the staking phase. The resulting epoch state should set `InvalidEpochTransitionAttempted` to true.
+	// We expect an epoch extension to be added since we have reached the threshold view.
 	s.Run("staking-phase", func() {
 		stateMachine, err := NewFallbackStateMachine(s.params, thresholdView, parentProtocolState.Copy())
 		require.NoError(s.T(), err)
