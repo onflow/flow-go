@@ -292,8 +292,6 @@ func (collection *EventCollection) TotalEventCounter() uint32 {
 
 // IsServiceEvent determines whether an emitted Cadence event is considered a service event for the given chain.
 // An event is a service event if it is defined in the `systemcontracts` package allow-list.
-// All service events must be defined in system contracts.
-// Service events may
 func IsServiceEvent(eventType flow.EventType, chain flow.ChainID) (bool, error) {
 
 	// retrieve the service event information for this chain
