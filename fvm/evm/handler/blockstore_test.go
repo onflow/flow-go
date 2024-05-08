@@ -87,7 +87,9 @@ func TestBlockStore_AddedTimestamp(t *testing.T) {
 			type oldBlockV1 struct {
 				ParentBlockHash   gethCommon.Hash
 				Height            uint64
-				TotalSupply       *big.Int
+				UUIDIndex         uint64
+				TotalSupply       uint64
+				StateRoot         gethCommon.Hash
 				ReceiptRoot       gethCommon.Hash
 				TransactionHashes []gethCommon.Hash
 			}
@@ -97,10 +99,13 @@ func TestBlockStore_AddedTimestamp(t *testing.T) {
 			require.NoError(t, err)
 
 			b := oldBlockV1{
-				ParentBlockHash: h,
-				Height:          1,
-				TotalSupply:     g.TotalSupply,
-				ReceiptRoot:     g.ReceiptRoot,
+				ParentBlockHash:   h,
+				Height:            1,
+				ReceiptRoot:       g.ReceiptRoot,
+				UUIDIndex:         123,
+				TotalSupply:       1,
+				StateRoot:         h,
+				TransactionHashes: []gethCommon.Hash{h},
 			}
 			blockBytes, err := gethRLP.EncodeToBytes(b)
 			require.NoError(t, err)
@@ -116,17 +121,16 @@ func TestBlockStore_AddedTimestamp(t *testing.T) {
 			require.Empty(t, block.TotalGasUsed)
 			require.Equal(t, b.Height, block.Height)
 			require.Equal(t, b.ParentBlockHash, block.ParentBlockHash)
-			require.Equal(t, b.TotalSupply, block.TotalSupply)
 			require.Equal(t, b.ReceiptRoot, block.ReceiptRoot)
 
 			// added timestamp
 			type oldBlockV2 struct {
 				ParentBlockHash   gethCommon.Hash
 				Height            uint64
+				Timestamp         uint64
 				TotalSupply       *big.Int
 				ReceiptRoot       gethCommon.Hash
 				TransactionHashes []gethCommon.Hash
-				Timestamp         uint64
 			}
 
 			b2 := oldBlockV2{
