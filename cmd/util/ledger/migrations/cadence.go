@@ -231,7 +231,7 @@ func NewCadence1ValueMigrations(
 	// As the proper migrated static type is computed for each old type,
 	// the entitlements migration will store that info in this cache to be
 	// reused across accounts for instances of the same types
-	staticTypeCache := &migrations.StaticTypeCache{}
+	staticTypeCache := migrations.NewDefaultStaticTypeCache()
 
 	// The value migrations are run as account-based migrations,
 	// i.e. the migrations are only given the payloads for the account to be migrated.
