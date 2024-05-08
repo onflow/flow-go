@@ -20,6 +20,7 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
+
 	"github.com/onflow/flow-go/module/metrics"
 
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
@@ -212,16 +213,15 @@ func (s *EmulatorSuite) createAndFundAccount(netID bootstrap.NodeInfo) *nodeAcco
 				import FlowToken from 0x%s
 
 				transaction(amount: UFix64, recipient: Address) {
-				  let sentVault: @FungibleToken.Vault
-				  prepare(signer: AuthAccount) {
-					let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+				  let sentVault: @{FungibleToken.Vault}
+				  prepare(signer: auth(BorrowValue) &Account) {
+					let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 					  ?? panic("failed to borrow reference to sender vault")
 					self.sentVault <- vaultRef.withdraw(amount: amount)
 				  }
 				  execute {
 					let receiverRef =  getAccount(recipient)
-					  .getCapability(/public/flowTokenReceiver)
-					  .borrow<&{FungibleToken.Receiver}>()
+					  .capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 						?? panic("failed to borrow reference to recipient vault")
 					receiverRef.deposit(from: <-self.sentVault)
 				  }
@@ -394,28 +394,31 @@ func (s *EmulatorSuite) sendDummyTx() (*flow.Block, error) {
 func (s *EmulatorSuite) isDKGCompleted() bool {
 	template := templates.GenerateGetDKGCompletedScript(s.env)
 	value := s.executeScript(template, nil)
-	return value.ToGoValue().(bool)
+	return bool(value.(cadence.Bool))
 }
 
 func (s *EmulatorSuite) getResult() []string {
 	script := fmt.Sprintf(`
 	import FlowDKG from 0x%s
 
-	pub fun main(): [String?]? {
+	access(all) fun main(): [String?]? {
 		return FlowDKG.dkgCompleted()
 	} `,
 		s.env.DkgAddress,
 	)
 
 	res := s.executeScript([]byte(script), nil)
-	value := res.(cadence.Optional).ToGoValue()
+	value := res.(cadence.Optional).Value
 	if value == nil {
 		return []string{}
 	}
+
 	dkgResult := []string{}
-	for _, item := range value.([]interface{}) {
-		s := item.(string)
-		dkgResult = append(dkgResult, s)
+	for _, item := range value.(cadence.Array).Values {
+		dkgResult = append(
+			dkgResult,
+			string(item.(cadence.Optional).Value.(cadence.String)),
+		)
 	}
 
 	return dkgResult

@@ -17,8 +17,17 @@ const (
 type API interface {
 	// GetExecutionDataByBlockID retrieves execution data for a specific block by its block ID.
 	GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionData, error)
+	// SubscribeExecutionData is deprecated and will be removed in future versions.
+	// Use SubscribeExecutionDataFromStartBlockID, SubscribeExecutionDataFromStartBlockHeight or SubscribeExecutionDataFromLatest.
+	//
 	// SubscribeExecutionData subscribes to execution data starting from a specific block ID and block height.
 	SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startBlockHeight uint64) subscription.Subscription
+	// SubscribeExecutionDataFromStartBlockID subscribes to execution data starting from a specific block id.
+	SubscribeExecutionDataFromStartBlockID(ctx context.Context, startBlockID flow.Identifier) subscription.Subscription
+	// SubscribeExecutionDataFromStartBlockHeight subscribes to execution data starting from a specific block height.
+	SubscribeExecutionDataFromStartBlockHeight(ctx context.Context, startBlockHeight uint64) subscription.Subscription
+	// SubscribeExecutionDataFromLatest subscribes to execution data starting from latest block.
+	SubscribeExecutionDataFromLatest(ctx context.Context) subscription.Subscription
 	// SubscribeEvents is deprecated and will be removed in a future version.
 	// Use SubscribeEventsFromStartBlockID, SubscribeEventsFromStartHeight or SubscribeEventsFromLatest.
 	//
