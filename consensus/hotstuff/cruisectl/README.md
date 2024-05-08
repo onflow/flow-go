@@ -71,7 +71,9 @@ After a disturbance, we want the controller to drive the system back to a state,
     - setting the differential term $K_d=0$, the controller responds as expected with damped oscillatory behaviour
       to a singular strong disturbance. Setting $K_d=3$ suppresses oscillations and the controller's performance improves as it responds more effectively.  
 
-      <img src="/docs/CruiseControl_BlockTimeController/EpochSimulation_029.png" width="300">
+      <img src='docs/CruiseControl_BlockTimeController/EpochSimulation_029.png' width='300'>
+      <img src='docs/CruiseControl_BlockTimeController/EpochSimulation_030.png' width='300'>
+      
       ![](/docs/CruiseControl_BlockTimeController/EpochSimulation_029.png)
       ![](/docs/CruiseControl_BlockTimeController/EpochSimulation_030.png)
     
