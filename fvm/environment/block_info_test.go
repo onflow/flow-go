@@ -20,7 +20,7 @@ func TestBlockInfo(t *testing.T) {
 	blocks := &mockBlocks{
 		blocks: make(map[uint64]*flow.Header),
 	}
-	height := uint64(flow.DefaultTransactionExpiry)
+	height := uint64(flow.ExtraBlocksInRootSealingSegment)
 	header := unittest.BlockHeaderWithHeight(height)
 
 	bi := environment.NewBlockInfo(tracer, meter, header, blocks)
@@ -38,7 +38,7 @@ func TestBlockInfo(t *testing.T) {
 	require.False(t, exists)
 
 	// verify that the block at the height before the lowest accepted height exists
-	lowestAcceptedHeight := height - flow.DefaultTransactionExpiry
+	lowestAcceptedHeight := height - flow.ExtraBlocksInRootSealingSegment
 	lowestHeader := unittest.BlockHeaderWithHeight(lowestAcceptedHeight)
 	blocks.Add(lowestHeader)
 	b, exists, err = bi.GetBlockAtHeight(lowestAcceptedHeight)
