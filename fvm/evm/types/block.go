@@ -105,28 +105,50 @@ func NewBlockFromBytes(encoded []byte) (*Block, error) {
 
 	err := gethRLP.DecodeBytes(encoded, res)
 	if err != nil {
-		// if decoding fails, try to decode to previous block type (without timestamp)
-		r := struct {
+		// if decoding fails, try to decode into previous formats
+		// - v0 (no timestamp, no total gas used)
+		// - v1 (timestamp added, no total gas used)
+
+		// v0
+		v0 := struct {
 			ParentBlockHash   gethCommon.Hash
 			Height            uint64
 			TotalSupply       *big.Int
 			ReceiptRoot       gethCommon.Hash
 			TransactionHashes []gethCommon.Hash
-			TotalGasUsed      uint64
 		}{}
-		if e := gethRLP.DecodeBytes(encoded, &r); e != nil {
-			// if both error out, return first error since it's more relevant
-			return nil, err
+		if e := gethRLP.DecodeBytes(encoded, &v0); e == nil {
+			return &Block{
+				ParentBlockHash:   v0.ParentBlockHash,
+				Height:            v0.Height,
+				TotalSupply:       v0.TotalSupply,
+				ReceiptRoot:       v0.ReceiptRoot,
+				TransactionHashes: v0.TransactionHashes,
+			}, nil
 		}
 
-		return &Block{
-			ParentBlockHash:   r.ParentBlockHash,
-			Height:            r.Height,
-			TotalSupply:       r.TotalSupply,
-			ReceiptRoot:       r.ReceiptRoot,
-			TransactionHashes: r.TransactionHashes,
-			TotalGasUsed:      r.TotalGasUsed,
-		}, nil
+		// v1 timestamp added
+		v1 := struct {
+			ParentBlockHash   gethCommon.Hash
+			Height            uint64
+			TotalSupply       *big.Int
+			ReceiptRoot       gethCommon.Hash
+			TransactionHashes []gethCommon.Hash
+			Timestamp         uint64
+		}{}
+		if e := gethRLP.DecodeBytes(encoded, &v1); e == nil {
+			return &Block{
+				ParentBlockHash:   v1.ParentBlockHash,
+				Height:            v1.Height,
+				TotalSupply:       v1.TotalSupply,
+				ReceiptRoot:       v1.ReceiptRoot,
+				TransactionHashes: v1.TransactionHashes,
+				Timestamp:         v1.Timestamp,
+			}, nil
+		}
+
+		// if both error out, return first error since it's more relevant
+		return nil, err
 	}
 
 	return res, nil
