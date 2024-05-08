@@ -39,8 +39,10 @@ This recovery process has some constraints:
 		Run: generateRecoverEpochTxArgs(getSnapshot),
 	}
 
+	flagOutputDir                string
 	flagAnAddress                string
 	flagAnPubkey                 string
+	flagAnInsecure               bool
 	flagInternalNodePrivInfoDir  string
 	flagNodeConfigJson           string
 	flagCollectionClusters       int
@@ -58,6 +60,10 @@ func init() {
 }
 
 func addGenerateRecoverEpochTxArgsCmdFlags() error {
+	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagOutputDir, "out", "", "the path to the output dir")
+	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagAnAddress, "access-address", "", "the address of the access node used for client connections")
+	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagAnPubkey, "access-network-key", "", "the network key of the access node used for client connections in hex string format")
+	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagAnInsecure, "insecure", true, "set to true if the protocol snapshot should be retrieved from the secure AN endpoint")
 	generateRecoverEpochTxArgsCmd.Flags().IntVar(&flagCollectionClusters, "collection-clusters", 0,
 		"number of collection clusters")
 	// required parameters for network configuration and generation of root node identities
@@ -69,7 +75,19 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 0, "length of the epoch staking phase measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "the epoch counter used to generate the root cluster block")
 
-	err := generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-length")
+	err := generateRecoverEpochTxArgsCmd.MarkFlagRequired("access-address")
+	if err != nil {
+		return fmt.Errorf("failed to mark access-address flag as required")
+	}
+	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("access-network-key")
+	if err != nil {
+		return fmt.Errorf("failed to mark epoch-length flag as required")
+	}
+	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("insecure")
+	if err != nil {
+		return fmt.Errorf("failed to mark epoch-length flag as required")
+	}
+	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-length")
 	if err != nil {
 		return fmt.Errorf("failed to mark epoch-length flag as required")
 	}
@@ -90,7 +108,7 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 
 func getSnapshot() *inmem.Snapshot {
 	// get flow client with secure client connection to download protocol snapshot from access node
-	config, err := common.NewFlowClientConfig(flagAnAddress, flagAnPubkey, flow.ZeroID, false)
+	config, err := common.NewFlowClientConfig(flagAnAddress, flagAnPubkey, flow.ZeroID, flagAnInsecure)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create flow client config")
 	}
