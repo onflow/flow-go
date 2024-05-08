@@ -1,6 +1,7 @@
 package types
 
 import (
+	gethRLP "github.com/onflow/go-ethereum/rlp"
 	"math/big"
 	"testing"
 
@@ -41,4 +42,48 @@ func Test_BlockHash(t *testing.T) {
 	}
 	b.PopulateReceiptRoot([]*Result{&res})
 	require.NotEqual(t, gethTypes.EmptyReceiptsHash, b.ReceiptRoot)
+}
+
+func Test_DecodeBlocks(t *testing.T) {
+	bv0 := blockV0{
+		ParentBlockHash: GenesisBlockHash,
+		Height:          1,
+		UUIDIndex:       2,
+		TotalSupply:     3,
+		StateRoot:       gethCommon.Hash{0x01},
+		ReceiptRoot:     gethCommon.Hash{0x02},
+	}
+	b0, err := gethRLP.EncodeToBytes(bv0)
+	require.NoError(t, err)
+
+	b := decodeBlockBreakingChanges(b0)
+
+	require.Equal(t, b.TotalSupply.Uint64(), bv0.TotalSupply)
+	require.Equal(t, b.Height, bv0.Height)
+	require.Equal(t, b.ParentBlockHash, bv0.ParentBlockHash)
+	require.Empty(t, b.Timestamp)
+	require.Empty(t, b.TotalGasUsed)
+
+	bv1 := blockV1{
+		ParentBlockHash:   GenesisBlockHash,
+		Height:            1,
+		UUIDIndex:         2,
+		TotalSupply:       3,
+		StateRoot:         gethCommon.Hash{0x01},
+		ReceiptRoot:       gethCommon.Hash{0x02},
+		TransactionHashes: []gethCommon.Hash{{0x04}},
+	}
+
+	b1, err := gethRLP.EncodeToBytes(bv1)
+	require.NoError(t, err)
+
+	b = decodeBlockBreakingChanges(b1)
+
+	require.Equal(t, b.TotalSupply.Uint64(), bv1.TotalSupply)
+	require.Equal(t, b.Height, bv1.Height)
+	require.Equal(t, b.ParentBlockHash, bv1.ParentBlockHash)
+	require.Equal(t, b.TransactionHashes, bv1.TransactionHashes)
+	require.Empty(t, b.Timestamp)
+	require.Empty(t, b.TotalGasUsed)
+
 }
