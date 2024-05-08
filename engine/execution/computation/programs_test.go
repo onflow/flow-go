@@ -553,5 +553,8 @@ func prepareTx(t *testing.T,
 func hasValidEventValue(t *testing.T, event flow.Event, value int) {
 	data, err := ccf.Decode(nil, event.Payload)
 	require.NoError(t, err)
-	assert.Equal(t, int16(value), data.(cadence.Event).Fields[0].ToGoValue())
+	assert.Equal(t,
+		cadence.Int16(value),
+		cadence.SearchFieldByName(data.(cadence.Event), "value"),
+	)
 }

@@ -26,7 +26,7 @@ type Prepare struct {
 }
 
 func (p Prepare) ToCadence() string {
-	return fmt.Sprintf("prepare(signer: AuthAccount) { %s }", p.Content.ToCadence())
+	return fmt.Sprintf("prepare(signer: auth(Storage, Capabilities, Contracts) &Account) { %s }", p.Content.ToCadence())
 }
 
 type Contract struct {
@@ -83,7 +83,7 @@ func (u SetAccountCode) ToCadence() string {
 	if u.Update {
 		return fmt.Sprintf(`
 		let code = "%s"
-        signer.contracts.update__experimental(name: "%s", code: code.decodeHex())
+        signer.contracts.update(name: "%s", code: code.decodeHex())
     `, hexCode, u.Name)
 	}
 
@@ -100,7 +100,7 @@ type Main struct {
 }
 
 func (m Main) ToCadence() string {
-	return fmt.Sprintf("%s \npub fun main(): %s { %s }", m.Import.ToCadence(), m.ReturnType, m.Code)
+	return fmt.Sprintf("%s \naccess(all) fun main(): %s { %s }", m.Import.ToCadence(), m.ReturnType, m.Code)
 }
 
 type Code string
