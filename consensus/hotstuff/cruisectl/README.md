@@ -66,29 +66,32 @@ However, in the real-world system we have disturbances (varying message relay ti
 After a disturbance, we want the controller to drive the system back to a state, where it can closely follow the ideal behaviour from there on. 
 
 - Simulations have shown that this approach produces *very* stable controller with the intended behaviour.
-    
+
     **Controller driving  $e := \gamma - \Gamma \rightarrow 0$**
     - setting the differential term $K_d=0$, the controller responds as expected with damped oscillatory behaviour
       to a singular strong disturbance. Setting $K_d=3$ suppresses oscillations and the controller's performance improves as it responds more effectively.  
 
-      <img src='/docs/CruiseControl_BlockTimeController/EpochSimulation_029.png' width='300'>
-      
-      <img src='../../../docs/CruiseControl_BlockTimeController/EpochSimulation_030.png' width='300'>
-      
-      ![](/docs/CruiseControl_BlockTimeController/EpochSimulation_029.png)
-      ![](/docs/CruiseControl_BlockTimeController/EpochSimulation_030.png)
-    
+      <img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/EpochSimulation_029.png' width='300'>
+
+      <img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/EpochSimulation_030.png' width='300'>
+
     - controller very quickly compensates for moderate disturbances and observational noise in a well-behaved system:
 
       ![](/docs/CruiseControl_BlockTimeController/EpochSimulation_028.png)
-        
+      
+      <img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/EpochSimulation_030.png' width='300'>
+  
     - controller compensates massive anomaly (100s network partition) effectively:
 
       ![](/docs/CruiseControl_BlockTimeController/EpochSimulation_000.png)
-        
+
+      <img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/EpochSimulation_030.png' width='300'>
+
     - controller effectively stabilizes system with continued larger disturbances (20% of offline consensus participants) and notable observational noise:
 
       ![](/docs/CruiseControl_BlockTimeController/EpochSimulation_005-0.png)
+
+      <img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/EpochSimulation_030.png' width='300'>
          
     **References:**
     
