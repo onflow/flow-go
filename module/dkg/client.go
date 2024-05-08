@@ -64,8 +64,14 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 
 	// construct read latest broadcast messages transaction
 	template := templates.GenerateGetDKGLatestWhiteBoardMessagesScript(c.env)
-	value, err := c.FlowClient.ExecuteScriptAtBlockID(ctx,
-		sdk.Identifier(referenceBlock), template, []cadence.Value{cadence.NewInt(int(fromIndex))})
+	value, err := c.FlowClient.ExecuteScriptAtBlockID(
+		ctx,
+		sdk.Identifier(referenceBlock),
+		template,
+		[]cadence.Value{
+			cadence.NewInt(int(fromIndex)),
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not execute read broadcast script: %w", err)
 	}
@@ -74,7 +80,9 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 	// unpack return from contract to `model.DKGMessage`
 	messages := make([]model.BroadcastDKGMessage, 0, len(values))
 	for _, val := range values {
-		id, err := strconv.Unquote(val.(cadence.Struct).Fields[0].String())
+		fields := cadence.FieldsMappedByName(val.(cadence.Struct))
+
+		id, err := strconv.Unquote(fields["nodeID"].String())
 		if err != nil {
 			return nil, fmt.Errorf("could not unquote nodeID cadence string (%s): %w", id, err)
 		}
@@ -84,7 +92,7 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 			return nil, fmt.Errorf("could not parse nodeID (%v): %w", val, err)
 		}
 
-		content := val.(cadence.Struct).Fields[1]
+		content := fields["content"]
 		jsonString, err := strconv.Unquote(content.String())
 		if err != nil {
 			return nil, fmt.Errorf("could not unquote json string: %w", err)

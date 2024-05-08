@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	migrationSnapshot "github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/ledger"
 )
 
@@ -287,28 +288,45 @@ func cadenceCompositeValueEqual(
 
 	var err *validationError
 	vFieldNames := make([]string, 0, 10) // v's field names
-	v.ForEachField(nil, func(fieldName string, fieldValue interpreter.Value) bool {
-		otherFieldValue := otherComposite.GetField(otherInterpreter, interpreter.EmptyLocationRange, fieldName)
+	v.ForEachField(
+		vInterpreter,
+		func(fieldName string, fieldValue interpreter.Value) bool {
+			otherFieldValue := otherComposite.GetField(
+				otherInterpreter,
+				interpreter.EmptyLocationRange,
+				fieldName,
+			)
 
-		err = cadenceValueEqual(vInterpreter, fieldValue, otherInterpreter, otherFieldValue)
-		if err != nil {
-			err.addTrace(fmt.Sprintf("(%s.%s)", v.TypeID(), fieldName))
-			return false
-		}
+			err = cadenceValueEqual(
+				vInterpreter,
+				fieldValue,
+				otherInterpreter,
+				otherFieldValue,
+			)
+			if err != nil {
+				err.addTrace(fmt.Sprintf("(%s.%s)", v.TypeID(), fieldName))
+				return false
+			}
 
-		vFieldNames = append(vFieldNames, fieldName)
-		return true
-	})
+			vFieldNames = append(vFieldNames, fieldName)
+			return true
+		},
+		interpreter.EmptyLocationRange,
+	)
 	if err != nil {
 		return err
 	}
 
 	if len(vFieldNames) != otherComposite.FieldCount() {
 		otherFieldNames := make([]string, 0, len(vFieldNames)) // otherComposite's field names
-		otherComposite.ForEachField(nil, func(fieldName string, _ interpreter.Value) bool {
-			otherFieldNames = append(otherFieldNames, fieldName)
-			return true
-		})
+		otherComposite.ForEachField(
+			otherInterpreter,
+			func(fieldName string, _ interpreter.Value) bool {
+				otherFieldNames = append(otherFieldNames, fieldName)
+				return true
+			},
+			interpreter.EmptyLocationRange,
+		)
 
 		return newValidationErrorf(
 			"composite %s fields differ: %v != %v",
@@ -318,7 +336,7 @@ func cadenceCompositeValueEqual(
 		)
 	}
 
-	return err
+	return nil
 }
 
 func cadenceDictionaryValueEqual(
@@ -378,7 +396,7 @@ func newReadonlyStorageRuntime(payloads []*ledger.Payload) (
 	*readonlyStorageRuntime,
 	error,
 ) {
-	snapshot, err := util.NewPayloadSnapshot(payloads)
+	snapshot, err := migrationSnapshot.NewPayloadSnapshot(zerolog.Nop(), payloads, migrationSnapshot.LargeChangeSetOrReadonlySnapshot, 1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
 	}

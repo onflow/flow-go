@@ -12,6 +12,7 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
@@ -67,7 +68,12 @@ func checkMachineAccountRun(_ *cobra.Command, _ []string) {
 		Str("hash_algo", machineAccountInfo.HashAlgorithm.String()).
 		Msg("read machine account info from disk")
 
-	flowClient, err := client.NewClient(flagAccessAPIAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	flowClient, err := client.NewClient(
+		flagAccessAPIAddress,
+		client.WithGRPCDialOptions(
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		),
+	)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not connect to access API at address %s", flagAccessAPIAddress)
 	}
