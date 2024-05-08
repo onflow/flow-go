@@ -51,7 +51,7 @@ func RetrieveIndex(blockID flow.Identifier, index *flow.Index) func(tx *badger.T
 		var resultsIDs []flow.Identifier
 		err = operation.LookupPayloadResults(blockID, &resultsIDs)(tx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve receipts index: %w", err)
+			return fmt.Errorf("could not retrieve results index: %w", err)
 		}
 
 		*index = flow.Index{
