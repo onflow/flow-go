@@ -1,7 +1,13 @@
 package recover_epoch
 
 import (
+	"fmt"
+	"github.com/onflow/flow-go/cmd/util/cmd/epochs/cmd"
+	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/epochs"
+	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
+	"os"
 )
 
 // Suite encapsulates common functionality for epoch integration tests.
@@ -18,4 +24,48 @@ func (s *Suite) SetupTest() {
 
 	// run the generic setup, which starts up the network
 	s.BaseSuite.SetupTest()
+}
+
+// getNodeInfoDirs returns the internal node private info dir and the node config dir from a container with the specified role.
+func (s *Suite) getNodeInfoDirs(role flow.Role) (string, string) {
+	internalNodePrivInfoDir := fmt.Sprintf("%s/%s", s.GetContainersByRole(role)[0].BootstrapPath(), bootstrap.DirPrivateRoot)
+	nodeConfigJson := fmt.Sprintf("%s/%s", s.GetContainersByRole(role)[0].BootstrapPath(), bootstrap.PathNodeInfosPub)
+	return internalNodePrivInfoDir, nodeConfigJson
+}
+
+// executeEFMRecoverTXArgsCMD executes the efm-recover-tx-args CLI command to generate EpochRecover transaction arguments.
+// Args:
+//
+//	role: the container role that will be used to read internal node private info and the node config json.
+//	snapshot: the protocol state snapshot.
+//	collectionClusters: the number of collector clusters.
+//	numViewsInEpoch: the number of views in the recovery epoch.
+//	numViewsInStakingAuction: the number of views in the staking auction of the recovery epoch.
+//	epochCounter: the container role that will be used to read internal node private info and the node config json.
+func (s *Suite) executeEFMRecoverTXArgsCMD(role flow.Role, collectionClusters, numViewsInEpoch, numViewsInStakingAuction, epochCounter uint64) {
+	// read internal node info from one of the consensus nodes
+	internalNodePrivInfoDir, nodeConfigJson := s.getNodeInfoDirs(role)
+
+	an1 := s.GetContainersByRole(flow.RoleAccess)[0]
+	anAddress := an1.Addr(testnet.GRPCPort)
+
+	// set command line arguments
+	os.Args = []string{
+		"epochs", "efm-recover-tx-args",
+		"--insecure=true",
+		fmt.Sprintf("--access-address=%s", anAddress),
+		fmt.Sprintf("--collection-clusters=%d", collectionClusters),
+		fmt.Sprintf("--config=%s", nodeConfigJson),
+		fmt.Sprintf("--internal-priv-dir=%s", internalNodePrivInfoDir),
+		fmt.Sprintf("--epoch-length=%d", numViewsInEpoch),
+		fmt.Sprintf("--epoch-staking-phase-length=%d", numViewsInStakingAuction),
+		fmt.Sprintf("--epoch-counter=%d", epochCounter),
+	}
+
+	// execute the root command
+	rootCmd := cmd.RootCmd
+	rootCmd.SetArgs(os.Args[1:])
+	if err := rootCmd.Execute(); err != nil {
+		s.T().Fatalf("Failed to execute epochs efm-recover-tx-args command: %v", err)
+	}
 }
