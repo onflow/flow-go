@@ -45,14 +45,13 @@ func (s *Suite) getNodeInfoDirs(role flow.Role) (string, string) {
 func (s *Suite) executeEFMRecoverTXArgsCMD(role flow.Role, collectionClusters, numViewsInEpoch, numViewsInStakingAuction, epochCounter uint64) {
 	// read internal node info from one of the consensus nodes
 	internalNodePrivInfoDir, nodeConfigJson := s.getNodeInfoDirs(role)
-
 	an1 := s.GetContainersByRole(flow.RoleAccess)[0]
 	anAddress := an1.Addr(testnet.GRPCPort)
-
 	// set command line arguments
 	os.Args = []string{
 		"epochs", "efm-recover-tx-args",
 		"--insecure=true",
+		fmt.Sprintf("--out=%s", s.Net.BootstrapDir),
 		fmt.Sprintf("--access-address=%s", anAddress),
 		fmt.Sprintf("--collection-clusters=%d", collectionClusters),
 		fmt.Sprintf("--config=%s", nodeConfigJson),
