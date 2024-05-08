@@ -79,14 +79,29 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 	parentProtocolState := s.parentProtocolState.Copy()
 	parentProtocolState.InvalidEpochTransitionAttempted = false
 
-	candidateView := parentProtocolState.CurrentEpochSetup.FinalView - s.params.EpochCommitSafetyThreshold() + 1
-	// The view we enter EFM is in the staking phase. The resulting epoch state should be unchanged to the
-	// parent state _except_ that `InvalidEpochTransitionAttempted` is set to true.
-	s.Run("staking-phase", func() {
+	thresholdView := parentProtocolState.CurrentEpochSetup.FinalView - s.params.EpochCommitSafetyThreshold()
+	s.Run("threshold-not-reached", func() {
+		candidateView := thresholdView - 1
 		stateMachine, err := NewFallbackStateMachine(s.params, candidateView, parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), parentProtocolState.ID(), stateMachine.ParentState().ID())
 		require.Equal(s.T(), candidateView, stateMachine.View())
+
+		updatedState, stateID, hasChanges := stateMachine.Build()
+		require.True(s.T(), hasChanges, "InvalidEpochTransitionAttempted has to be updated")
+		require.True(s.T(), updatedState.InvalidEpochTransitionAttempted, "InvalidEpochTransitionAttempted has to be set")
+		require.Equal(s.T(), updatedState.ID(), stateID)
+		require.NotEqual(s.T(), parentProtocolState.ID(), stateID)
+
+		require.Empty(s.T(), updatedState.CurrentEpoch.EpochExtensions, "No extension should be added if threshold is not reached")
+	})
+	// The view we enter EFM is in the staking phase. The resulting epoch state should be unchanged to the
+	// parent state _except_ that `InvalidEpochTransitionAttempted` is set to true.
+	s.Run("staking-phase", func() {
+		stateMachine, err := NewFallbackStateMachine(s.params, thresholdView, parentProtocolState.Copy())
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), parentProtocolState.ID(), stateMachine.ParentState().ID())
+		require.Equal(s.T(), thresholdView, stateMachine.View())
 
 		updatedState, stateID, hasChanges := stateMachine.Build()
 		require.True(s.T(), hasChanges, "InvalidEpochTransitionAttempted has to be updated")
@@ -111,10 +126,10 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 		parentProtocolState.NextEpoch.CommitID = flow.ZeroID
 		parentProtocolState.NextEpochCommit = nil
 
-		stateMachine, err := NewFallbackStateMachine(s.params, candidateView, parentProtocolState)
+		stateMachine, err := NewFallbackStateMachine(s.params, thresholdView, parentProtocolState)
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), parentProtocolState.ID(), stateMachine.ParentState().ID())
-		require.Equal(s.T(), candidateView, stateMachine.View())
+		require.Equal(s.T(), thresholdView, stateMachine.View())
 
 		updatedState, stateID, hasChanges := stateMachine.Build()
 		require.True(s.T(), hasChanges, "InvalidEpochTransitionAttempted has to be updated")
@@ -142,10 +157,10 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 		// if the next epoch has been committed, the extension shouldn't be added to the current epoch
 		// instead it will be added to the next epoch when **next** epoch reaches its safety threshold.
 
-		stateMachine, err := NewFallbackStateMachine(s.params, candidateView, parentProtocolState)
+		stateMachine, err := NewFallbackStateMachine(s.params, thresholdView, parentProtocolState)
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), parentProtocolState.ID(), stateMachine.ParentState().ID())
-		require.Equal(s.T(), candidateView, stateMachine.View())
+		require.Equal(s.T(), thresholdView, stateMachine.View())
 
 		updatedState, stateID, hasChanges := stateMachine.Build()
 		require.True(s.T(), hasChanges, "InvalidEpochTransitionAttempted has to be updated")
