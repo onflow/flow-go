@@ -183,51 +183,66 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 // In this test, we are simulating the scenario where the current epoch enters EFM at a view when the next epoch has not been committed yet.
 // When the next epoch has been committed the extension should be added to the next epoch, this is covered in separate test.
 func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMultipleExtensions() {
-	parentProtocolState := s.parentProtocolState.Copy()
-	parentProtocolState.InvalidEpochTransitionAttempted = false
-	unittest.WithNextEpochProtocolState()(parentProtocolState)
-	parentProtocolState.NextEpoch.CommitID = flow.ZeroID
-	parentProtocolState.NextEpochCommit = nil
+	parentStateInStakingPhase := s.parentProtocolState.Copy()
+	parentStateInStakingPhase.InvalidEpochTransitionAttempted = false
 
-	// views2process is the cumulative number of views that will be produced in the current epoch and its extensions
-	views2process := DefaultEpochExtensionViewCount +
-		(parentProtocolState.CurrentEpochSetup.FinalView - parentProtocolState.CurrentEpochSetup.FirstView) + 1
-	candidateView := parentProtocolState.CurrentEpochSetup.FirstView + 1
-	for i := uint64(0); i < views2process; i++ {
-		stateMachine, err := NewFallbackStateMachine(s.params, candidateView, parentProtocolState.Copy())
-		require.NoError(s.T(), err)
-		updatedState, _, _ := stateMachine.Build()
+	parentStateInSetupPhase := parentStateInStakingPhase.Copy()
+	unittest.WithNextEpochProtocolState()(parentStateInSetupPhase)
+	parentStateInSetupPhase.NextEpoch.CommitID = flow.ZeroID
+	parentStateInSetupPhase.NextEpochCommit = nil
 
-		parentProtocolState, err = flow.NewRichProtocolStateEntry(updatedState,
-			parentProtocolState.PreviousEpochSetup,
-			parentProtocolState.PreviousEpochCommit,
-			parentProtocolState.CurrentEpochSetup,
-			parentProtocolState.CurrentEpochCommit,
-			parentProtocolState.NextEpochSetup,
-			parentProtocolState.NextEpochCommit)
+	for _, originalParentState := range []*flow.RichProtocolStateEntry{parentStateInStakingPhase, parentStateInSetupPhase} {
+		// views2process is the cumulative number of views that will be produced in the current epoch and its extensions
+		views2process := DefaultEpochExtensionViewCount +
+			(originalParentState.CurrentEpochSetup.FinalView - originalParentState.CurrentEpochSetup.FirstView) + 1
+		candidateView := originalParentState.CurrentEpochSetup.FirstView + 1
+		parentProtocolState := originalParentState.Copy()
+		for i := uint64(0); i < views2process; i++ {
+			stateMachine, err := NewFallbackStateMachine(s.params, candidateView, parentProtocolState.Copy())
+			require.NoError(s.T(), err)
+			updatedState, _, _ := stateMachine.Build()
 
-		require.NoError(s.T(), err)
-		candidateView++
+			parentProtocolState, err = flow.NewRichProtocolStateEntry(updatedState,
+				parentProtocolState.PreviousEpochSetup,
+				parentProtocolState.PreviousEpochCommit,
+				parentProtocolState.CurrentEpochSetup,
+				parentProtocolState.CurrentEpochCommit,
+				parentProtocolState.NextEpochSetup,
+				parentProtocolState.NextEpochCommit)
+
+			require.NoError(s.T(), err)
+			candidateView++
+		}
+
+		// assert the validity of extensions after producing multiple extensions,
+		// we expect 2 extensions to be added to the current epoch
+		// 1 after we reach the commit threshold of the epoch and another one after reaching the threshold of the extension themselves
+		firstExtension := flow.EpochExtension{
+			FirstView:     originalParentState.CurrentEpochSetup.FinalView + 1,
+			FinalView:     originalParentState.CurrentEpochSetup.FinalView + DefaultEpochExtensionViewCount,
+			TargetEndTime: 0,
+		}
+		secondExtension := flow.EpochExtension{
+			FirstView:     firstExtension.FinalView + 1,
+			FinalView:     firstExtension.FinalView + DefaultEpochExtensionViewCount,
+			TargetEndTime: 0,
+		}
+
+		expectedState := &flow.ProtocolStateEntry{
+			PreviousEpoch: originalParentState.PreviousEpoch,
+			CurrentEpoch: flow.EpochStateContainer{
+				SetupID:          originalParentState.CurrentEpoch.SetupID,
+				CommitID:         originalParentState.CurrentEpoch.CommitID,
+				ActiveIdentities: originalParentState.CurrentEpoch.ActiveIdentities,
+				EpochExtensions:  []flow.EpochExtension{firstExtension, secondExtension},
+			},
+			NextEpoch:                       nil,
+			InvalidEpochTransitionAttempted: true,
+		}
+		require.Equal(s.T(), expectedState, parentProtocolState.ProtocolStateEntry)
+		require.Greater(s.T(), parentProtocolState.CurrentEpochFinalView(), candidateView,
+			"final view should be greater than final view of test")
 	}
-
-	// assert the validity of extensions after producing multiple extensions,
-	// we expect 2 extensions to be added to the current epoch
-	// 1 after we reach the commit threshold of the epoch and another one after reaching the threshold of the extension themselves
-	require.Len(s.T(), parentProtocolState.CurrentEpoch.EpochExtensions, 2)
-	require.Equal(s.T(), flow.EpochExtension{
-		FirstView:     parentProtocolState.CurrentEpochSetup.FinalView + 1,
-		FinalView:     parentProtocolState.CurrentEpochSetup.FinalView + DefaultEpochExtensionViewCount,
-		TargetEndTime: 0,
-	}, parentProtocolState.CurrentEpoch.EpochExtensions[0])
-
-	require.Equal(s.T(), flow.EpochExtension{
-		FirstView:     parentProtocolState.CurrentEpoch.EpochExtensions[0].FinalView + 1,
-		FinalView:     parentProtocolState.CurrentEpoch.EpochExtensions[0].FinalView + DefaultEpochExtensionViewCount,
-		TargetEndTime: 0,
-	}, parentProtocolState.CurrentEpoch.EpochExtensions[1])
-
-	require.Greater(s.T(), parentProtocolState.CurrentEpochFinalView(), candidateView,
-		"final view should be greater than final view of test")
 }
 
 // TestEpochFallbackStateMachineInjectsMultipleExtensions_NextEpochCommitted tests that the state machine injects multiple extensions
@@ -238,16 +253,17 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMultipleExtensions_NextEpochCommitted() {
 	unittest.SkipUnless(s.T(), unittest.TEST_TODO,
 		"This test doesn't work since it misses logic to transition to the next epoch when we are in EFM.")
-	parentProtocolState := s.parentProtocolState.Copy()
-	parentProtocolState.InvalidEpochTransitionAttempted = false
-	unittest.WithNextEpochProtocolState()(parentProtocolState)
+	originalParentState := s.parentProtocolState.Copy()
+	originalParentState.InvalidEpochTransitionAttempted = false
+	unittest.WithNextEpochProtocolState()(originalParentState)
 
 	// views2process is the cumulative number of views that will be produced in the current epoch and its extensions
 	views2process := DefaultEpochExtensionViewCount +
-		(parentProtocolState.CurrentEpochSetup.FinalView - parentProtocolState.CurrentEpochSetup.FirstView) +
-		(parentProtocolState.NextEpochSetup.FinalView - parentProtocolState.NextEpochSetup.FirstView) +
+		(originalParentState.CurrentEpochSetup.FinalView - originalParentState.CurrentEpochSetup.FirstView) +
+		(originalParentState.NextEpochSetup.FinalView - originalParentState.NextEpochSetup.FirstView) +
 		1
-	candidateView := parentProtocolState.CurrentEpochSetup.FirstView + 1
+	candidateView := originalParentState.CurrentEpochSetup.FirstView + 1
+	parentProtocolState := originalParentState.Copy()
 	for i := uint64(0); i < views2process; i++ {
 		stateMachine, err := NewFallbackStateMachine(s.params, candidateView, parentProtocolState.Copy())
 		require.NoError(s.T(), err)
@@ -273,25 +289,34 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 	// assert the validity of extensions after producing multiple extensions
 	// we expect 3 extensions to be added to the current epoch
 	// 1 after we reach the commit threshold of the epoch and two more after reaching the threshold of the extensions themselves
-	require.Len(s.T(), parentProtocolState.CurrentEpoch.EpochExtensions, 3)
-	require.Equal(s.T(), flow.EpochExtension{
-		FirstView:     parentProtocolState.CurrentEpochSetup.FinalView + 1,
-		FinalView:     parentProtocolState.CurrentEpochSetup.FinalView + 1 + DefaultEpochExtensionViewCount,
+	firstExtension := flow.EpochExtension{
+		FirstView:     originalParentState.CurrentEpochSetup.FinalView + 1,
+		FinalView:     originalParentState.CurrentEpochSetup.FinalView + DefaultEpochExtensionViewCount,
 		TargetEndTime: 0,
-	}, parentProtocolState.CurrentEpoch.EpochExtensions[0])
-
-	require.Equal(s.T(), flow.EpochExtension{
-		FirstView:     parentProtocolState.CurrentEpoch.EpochExtensions[0].FinalView + 1,
-		FinalView:     parentProtocolState.CurrentEpoch.EpochExtensions[0].FinalView + 1 + DefaultEpochExtensionViewCount,
+	}
+	secondExtension := flow.EpochExtension{
+		FirstView:     firstExtension.FinalView + 1,
+		FinalView:     firstExtension.FinalView + DefaultEpochExtensionViewCount,
 		TargetEndTime: 0,
-	}, parentProtocolState.CurrentEpoch.EpochExtensions[1])
-
-	require.Equal(s.T(), flow.EpochExtension{
-		FirstView:     parentProtocolState.CurrentEpoch.EpochExtensions[1].FinalView + 1,
-		FinalView:     parentProtocolState.CurrentEpoch.EpochExtensions[1].FinalView + 1 + DefaultEpochExtensionViewCount,
+	}
+	thirdExtension := flow.EpochExtension{
+		FirstView:     secondExtension.FinalView + 1,
+		FinalView:     secondExtension.FinalView + DefaultEpochExtensionViewCount,
 		TargetEndTime: 0,
-	}, parentProtocolState.CurrentEpoch.EpochExtensions[2])
+	}
 
+	expectedState := &flow.ProtocolStateEntry{
+		PreviousEpoch: originalParentState.PreviousEpoch,
+		CurrentEpoch: flow.EpochStateContainer{
+			SetupID:          originalParentState.CurrentEpoch.SetupID,
+			CommitID:         originalParentState.CurrentEpoch.CommitID,
+			ActiveIdentities: originalParentState.CurrentEpoch.ActiveIdentities,
+			EpochExtensions:  []flow.EpochExtension{firstExtension, secondExtension, thirdExtension},
+		},
+		NextEpoch:                       nil,
+		InvalidEpochTransitionAttempted: true,
+	}
+	require.Equal(s.T(), expectedState, parentProtocolState.ProtocolStateEntry)
 	require.Greater(s.T(), parentProtocolState.CurrentEpochFinalView(), candidateView,
 		"final view should be greater than final view of test")
 }
