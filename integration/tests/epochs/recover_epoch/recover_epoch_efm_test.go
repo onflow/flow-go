@@ -1,13 +1,11 @@
 package recover_epoch
 
 import (
-	"testing"
-	"time"
-
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	
-	"github.com/onflow/flow-go/model/flow"
+	"testing"
+	"time"
 )
 
 func TestRecoverEpoch(t *testing.T) {
@@ -23,6 +21,7 @@ type RecoverEpochSuite struct {
 // CLI command to generate transaction arguments to submit a recover_epoch transaction, after submitting the transaction the test will
 // ensure the network is healthy.
 func (s *RecoverEpochSuite) TestRecoverEpoch() {
+	// wait until the epoch setup phase to force network into EFM
 	s.AwaitEpochPhase(s.Ctx, 0, flow.EpochPhaseSetup, 30*time.Second, 4*time.Second)
 
 	// pausing execution node will force the network into EFM
@@ -43,4 +42,13 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	// assert transition to second epoch did not happen
 	// if counter is still 0, epoch emergency fallback was triggered as expected
 	s.AssertInEpoch(s.Ctx, 0)
+
+	// generate epoch recover transaction args
+	collectionClusters := uint64(1)
+	numViewsInEpoch := uint64(4000)
+	numViewsInStakingAuction := uint64(100)
+	epochCounter := uint64(2)
+	s.executeEFMRecoverTXArgsCMD(flow.RoleConsensus, collectionClusters, numViewsInEpoch, numViewsInStakingAuction, epochCounter)
+
+	// submit recover epoch transaction to recover the network
 }

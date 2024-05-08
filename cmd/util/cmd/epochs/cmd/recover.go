@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -15,6 +16,10 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/grpcclient"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+)
+
+const (
+	outputFileName = "recover-epoch-tx-args.json"
 )
 
 // generateRecoverEpochTxArgsCmd represents a command to generate the data needed to submit an epoch-recovery transaction
@@ -80,14 +85,6 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	if err != nil {
 		return fmt.Errorf("failed to mark access-address flag as required")
 	}
-	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("access-network-key")
-	if err != nil {
-		return fmt.Errorf("failed to mark epoch-length flag as required")
-	}
-	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("insecure")
-	if err != nil {
-		return fmt.Errorf("failed to mark epoch-length flag as required")
-	}
 	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-length")
 	if err != nil {
 		return fmt.Errorf("failed to mark epoch-length flag as required")
@@ -130,8 +127,6 @@ func getSnapshot() *inmem.Snapshot {
 // generateRecoverEpochTxArgs generates recover epoch transaction arguments from a root protocol state snapshot and writes it to a JSON file
 func generateRecoverEpochTxArgs(getSnapshot func() *inmem.Snapshot) func(cmd *cobra.Command, args []string) {
 	return func(cmd *cobra.Command, args []string) {
-		stdout := cmd.OutOrStdout()
-
 		// extract arguments from recover epoch tx from snapshot
 		txArgs := extractRecoverEpochArgs(getSnapshot())
 
@@ -141,10 +136,20 @@ func generateRecoverEpochTxArgs(getSnapshot func() *inmem.Snapshot) func(cmd *co
 			log.Fatal().Err(err).Msg("could not encode recover epoch transaction arguments")
 		}
 
-		// write JSON args to stdout
-		_, err = stdout.Write(encodedTxArgs)
-		if err != nil {
-			log.Fatal().Err(err).Msg("could not write jsoncdc encoded arguments")
+		if flagOutputDir == "" {
+			// write JSON args to stdout
+			_, err = cmd.OutOrStdout().Write(encodedTxArgs)
+			if err != nil {
+				log.Fatal().Err(err).Msg("could not write jsoncdc encoded arguments")
+			}
+		} else {
+			// write JSON args to stdout
+			out := fmt.Sprintf("%s/%s", flagOutputDir, outputFileName)
+			err := os.WriteFile(out, encodedTxArgs, 0644)
+			if err != nil {
+				log.Fatal().Err(err).Msg(fmt.Sprintf("could not write jsoncdc encoded arguments to file %s", out))
+			}
+			log.Info().Msgf("wrote transaction args to output file %s", out)
 		}
 	}
 }
