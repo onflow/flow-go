@@ -561,7 +561,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 	t.Logf("BootstrapDir: %s \n", bootstrapDir)
 
 	bootstrapData, err := BootstrapNetwork(networkConf, bootstrapDir, chainID)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	root := bootstrapData.Root
 	result := bootstrapData.Result
@@ -1072,6 +1072,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 
 	// write staking and machine account private key files
 	writeJSONFile := func(relativePath string, val interface{}) error {
+		fmt.Println("BOOTSTRAP DIR: ", filepath.Join(bootstrapDir, relativePath))
 		return WriteJSON(filepath.Join(bootstrapDir, relativePath), val)
 	}
 	writeFile := func(relativePath string, data []byte) error {
@@ -1090,6 +1091,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	err = utils.WriteMachineAccountFiles(chainID, stakedNodeInfos, writeJSONFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to write machine account files: %w", err)
+	}
+
+	err = utils.WriteNodeInternalPubInfos(allNodeInfos, writeJSONFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to node pub info file: %w", err)
 	}
 
 	// define root block parameters
