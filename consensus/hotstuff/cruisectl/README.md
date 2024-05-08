@@ -112,7 +112,7 @@ $\tau_0 := \frac{<{\rm total\ epoch\ time}>}{<{\rm total\ views\ in\ epoch}>}$  
 
 - remaining views of the epoch $k[v] := F[v] +1 - v$
 - time remaining until the desired epoch switchover $\Gamma[v] := T[v]-t[v]$
-- error $e[v] := \underbrace{k\cdot\tau_0}_{\gamma[v]} - \Gamma[v] = t[v] + k\cdot\tau_0 - T[v]$
+- error $e[v] := \underbrace{k\cdot\tau_0}_{\gamma[v]} - \Gamma[v] = t[v] + k[v] \cdot\tau_0 - T[v]$
 
 ### Precise convention of View Timing
 
@@ -241,17 +241,17 @@ In general, there is no bound on the output of the controller output $u$. Howeve
   The current timeout threshold is set to 1045ms and the largest view duration we want to allow the controller to set is $\tau_\textrm{max}$ = 910ms.
   Thereby, we have a buffer $\beta$ = 135ms remaining for message propagation and the replicas validating the proposal for view $v$.
 
-  Note the subtle but important aspect: Primary for view $v+1$ controls duration of view $v$. This is because its proposal for view $v+1$
-  contains the proof (Quorum Certificate [QC]) that view $v$ concluded on the happy path. By observing the QC for view $v$, nodes enter the
-  subsequent view $v+1$.
+  Note the subtle but important aspect: Primary for view $v$ controls duration of view $v-1$. This is because its proposal for view $v$
+  contains the proof (Quorum Certificate [QC]) that view $v-1$ concluded on the happy path. By observing the QC for view $v-1$, nodes enter the
+  subsequent view $v$.
 
 
 - lower bound on the view duration:
     
   Let $t_\textnormal{p}[v]$ denote the time when the primary for view $v$ has constructed its block proposal.
-  On the happy path, a replica would conclude view $v-1$ and transition to view $v$ when it observes the proposal from view $v$.
-  The time difference $t_\textnormal{p}[v] - t[v-1]$ between the primary observing the parent block from view $v-1$, collecting votes for it,
-  constructing the QC and subsequently its own proposal for view $v$ is the minimally required time to execute the protocol.
+  On the happy path, a replica concludes view $v-1$ and transitions to view $v$, when it observes the proposal for view $v$.
+  The time difference $t_\textnormal{p}[v] - t[v-1]$ between the primary observing the parent block (view $v-1$), collecting votes for it,
+  constructing a QC for view $v-1$ and subsequently its own proposal for view $v$ is the minimally required time to execute the protocol.
   The controller can only *delay* broadcasting the block,
   but it cannot release the block before  $t_\textnormal{p}[v]$ simply because the proposal isn’t ready any earlier. 
     
@@ -260,8 +260,13 @@ In general, there is no bound on the output of the controller output $u$. Howeve
 👉 Let $\hat{t}[v]$ denote the time when the primary for view $v$ *broadcasts* its proposal. We assign:
 
 ```math
-\hat{t}[v] := \max\big(t[v] +\min(\widehat{\tau}[v],\ 2\textnormal{s}),\  t_\textnormal{p}[v]\big) 
+\hat{t}[v] := \max\big(t[v-1] +\min(\widehat{\tau}[v-1],\ \tau_\textrm{max}),\  t_\textnormal{p}[v]\big) 
 ```
+This equation guarantees that the controller does not drive consensus into a timeout, as long as message propagation and block validation
+in combination require less than $\beta$ time. Currently, we have $\tau_\textrm{max}$ = 800ms as the upper bound on a view duration the controller can set.
+In comparison, the timeout threshold is set to $\texttt{hotstuff-min-timeout} = \tau_\textrm{max} + \beta$, with $\beta$ = 135ms.  
+
+
 
 ### Further reading
 
@@ -276,19 +281,18 @@ In general, there is no bound on the output of the controller output $u$. Howeve
 
 ### A node is catching up
 
-When a node is catching up, it processes blocks more quickly than when it is up-to-date, and therefore observes a faster view rate. This would cause the node’s `BlockRateManager` to compensate by increasing the block rate delay.
+When a node is catching up, it observes the blocks significantly later than they were published. In other words, from the perspective
+of the node catching up, the blocks are too late. However, as it reaches the most recent blocks, also the observed timing error approaches zero
+(assuming approximately correct block publication by the honest supermajority). Nevertheless, due to its biased error observations, the node
+catching up could still try to compensate for the network being behind, and publish its proposal as early as possible.   
 
-As long as delay function is responsive, it doesn’t have a practical impact, because nodes catching up don’t propose anyway.
-
-To the extent the delay function is not responsive, this would cause the block rate to slow down slightly, when the node is caught up. 
-
-**Assumption:** as we assume that only a smaller fraction of nodes go offline, the effect is expected to be small and easily compensated for by the supermajority of online nodes.
+**Assumption:** With only a smaller fraction of nodes being offline or catching up, the effect is expected to be small and easily compensated for by the supermajority of online nodes.
 
 ### A node has a misconfigured clock
 
 Cap the maximum deviation from the default delay (limits the general impact of error introduced by the `BlockTimeController`). The node with misconfigured clock will contribute to the error in a limited way, but as long as the majority of nodes have an accurate clock, they will offset this error. 
 
-**Assumption:** few enough nodes will have a misconfigured clock, that the effect will be small enough to be easily compensated for by the supermajority of correct nodes.
+**Assumption:** With only a smaller fraction of nodes having misconfigured clocks, the effect will be small enough to be easily compensated for by the supermajority of correct nodes.
 
 ### Near epoch boundaries
 
@@ -298,7 +302,8 @@ We might incorrectly compute high error in the target view rate, if local curren
 
 ### EFM
 
-We need to detect EFM and revert to a default block-rate-delay (stop adjusting).
+When the network is in EFM, epoch timing is anyway disrupted. The main thing we want to avoid is that the controller drives consensus into a timeout.
+This is largely guaranteed, due to the limits of authority 
 
 ## Testing
 
