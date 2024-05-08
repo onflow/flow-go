@@ -61,15 +61,16 @@ type EpochStateContainer struct {
 	// nodes are _not_ part of `Identities`.
 	ActiveIdentities DynamicIdentityEntryList
 
-	// EpochExtensions represents extensions to the last successful epoch in EFM. In the happy path it is nil.
-	// Epochs in which EFM is triggered will have at least one EpochExtension.
-	// Extensions is an ordered list, such that for each consecutive pair of
-	// EpochExtensions e1, e2, e1.FinalView+1 = e2.FirstView.
+	// EpochExtensions contains potential EFM-extensions of this epoch. In the happy path
+	// it is nil or empty. An Epoch in which Epoch-Fallback-Mode [EFM] is triggered, will
+	// have at least one extension. By convention, the initial extension must satisfy
+	//   EpochSetup.FinalView + 1 = EpochExtensions[0].FirstView
+	// and each consecutive pair of slice elements must obey
+	//   EpochExtensions[i].FinalView+1 = EpochExtensions[i+1].FirstView
 	EpochExtensions []EpochExtension
 }
 
-// EpochExtension represents a range of views, which contiguously extends the
-// current epoch E.
+// EpochExtension represents a range of views, which contiguously extends this epoch.
 type EpochExtension struct {
 	FirstView     uint64
 	FinalView     uint64
@@ -310,7 +311,7 @@ func (e *RichProtocolStateEntry) Copy() *RichProtocolStateEntry {
 	}
 }
 
-// CurrentEpochFinalView returns the final view of the current epoch taking to account possible epoch extensions.
+// CurrentEpochFinalView returns the final view of the current epoch, taking into account possible epoch extensions.
 // If there are no epoch extensions, the final view is the final view of the current epoch setup,
 // otherwise it is the final view of the last epoch extension.
 func (e *RichProtocolStateEntry) CurrentEpochFinalView() uint64 {

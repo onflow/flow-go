@@ -73,15 +73,16 @@ func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpoch() {
 
 // TestNewEpochFallbackStateMachine tests that creating epoch fallback state machine sets
 // `InvalidEpochTransitionAttempted` to true to record that we have entered epoch fallback mode[EFM].
-// It tests scenarios where the EFM is entered in different phases of the epoch.
-// It is expected that the state machine will inject a new epoch extension for the current epoch.
+// It tests scenarios where the EFM is entered in different phases of the epoch, and verifies
+// protocol-compliant addition of epoch extensions, depending on the candidate view and epoch phase.  
 func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 	parentProtocolState := s.parentProtocolState.Copy()
 	parentProtocolState.InvalidEpochTransitionAttempted = false
 
 	candidateView := parentProtocolState.CurrentEpochSetup.FinalView - s.params.EpochCommitSafetyThreshold() + 1
+	// The view we enter EFM is in the staking phase. The resulting epoch state should be unchanged to the
+	// parent state _except_ that `InvalidEpochTransitionAttempted` is set to true.
 	s.Run("staking-phase", func() {
-
 		stateMachine, err := NewFallbackStateMachine(s.params, candidateView, parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), parentProtocolState.ID(), stateMachine.ParentState().ID())
@@ -100,6 +101,9 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 			TargetEndTime: 0,
 		}, updatedState.CurrentEpoch.EpochExtensions[0])
 	})
+
+	// The view we enter EFM is in the epoch setup phase. This means that a SetupEvent for the next epoch is in the parent block's
+	// protocol state. We expect an epoch extension to be added and the outdated information for the next epoch to be removed.
 	s.Run("setup-phase", func() {
 		parentProtocolState := parentProtocolState.Copy()
 		// setup next epoch but without commit event
@@ -115,6 +119,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 		updatedState, stateID, hasChanges := stateMachine.Build()
 		require.True(s.T(), hasChanges, "InvalidEpochTransitionAttempted has to be updated")
 		require.True(s.T(), updatedState.InvalidEpochTransitionAttempted, "InvalidEpochTransitionAttempted has to be set")
+		require.Nil(s.T(), updatedState.NextEpoch, "outdated information for the next epoch should have been removed")
 		require.Equal(s.T(), updatedState.ID(), stateID)
 		require.NotEqual(s.T(), parentProtocolState.ID(), stateID)
 
@@ -126,6 +131,9 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 		}, updatedState.CurrentEpoch.EpochExtensions[0])
 		require.Nil(s.T(), updatedState.NextEpoch, "Next epoch has to be nil even if it was previously setup")
 	})
+
+	// If the next epoch has been committed, the extension shouldn't be added to the current epoch (verified below). Instead, the
+	// extension should be added to the next epoch when **next** epoch reaches its safety threshold, which is covered in separate test.
 	s.Run("commit-phase", func() {
 		parentProtocolState := parentProtocolState.Copy()
 		// setup next committed epoch
@@ -152,7 +160,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 
 // TestEpochFallbackStateMachineInjectsMultipleExtensions tests that the state machine injects multiple extensions
 // as it reaches the safety threshold of the current epoch and the extensions themselves.
-// In this test, we are simulating the scenario where the current epoch enters fallback mode when the next epoch has not been committed yet.
+// In this test, we are simulating the scenario where the current epoch enters EFM at a view when the next epoch has not been committed yet.
 // When the next epoch has been committed the extension should be added to the next epoch, this is covered in separate test.
 func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMultipleExtensions() {
 	parentProtocolState := s.parentProtocolState.Copy()

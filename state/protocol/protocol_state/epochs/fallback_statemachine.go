@@ -8,7 +8,7 @@ import (
 )
 
 // DefaultEpochExtensionLength is a default length of epoch extension.
-// TODO: replace this with value from KV store or protocol.GlobalParams
+// TODO(efm-recovery): replace this with value from KV store or protocol.GlobalParams
 const DefaultEpochExtensionLength = 1_000
 
 // FallbackStateMachine is a special structure that encapsulates logic for processing service events
