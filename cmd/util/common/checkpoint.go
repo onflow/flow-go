@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/snapshots"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -184,12 +183,7 @@ func GenerateProtocolSnapshotForCheckpointWithHeights(
 	}
 
 	snapshot := state.AtHeight(finalizedHeight)
-	validSnapshot, err := snapshots.GetDynamicBootstrapSnapshot(state, snapshot)
-	if err != nil {
-		return nil, 0, flow.DummyStateCommitment, "", fmt.Errorf("could not get dynamic bootstrap snapshot: %w", err)
-	}
-
-	return validSnapshot, sealedHeight, commit, checkpointFilePath, nil
+	return snapshot, sealedHeight, commit, checkpointFilePath, nil
 }
 
 // hashesToCommits converts a list of ledger.RootHash to a list of flow.StateCommitment

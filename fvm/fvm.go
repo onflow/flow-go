@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/cadence"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	errors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
@@ -161,7 +161,12 @@ func (vm *VirtualMachine) Run(
 	var err error
 	switch proc.Type() {
 	case ScriptProcedureType:
-		storageTxn = blockDatabase.NewSnapshotReadTransaction(stateParameters)
+		if ctx.AllowProgramCacheWritesInScripts {
+			// if configured, allow scripts to update the programs cache
+			storageTxn, err = blockDatabase.NewCachingSnapshotReadTransaction(stateParameters)
+		} else {
+			storageTxn = blockDatabase.NewSnapshotReadTransaction(stateParameters)
+		}
 	case TransactionProcedureType, BootstrapProcedureType:
 		storageTxn, err = blockDatabase.NewTransaction(
 			proc.ExecutionTime(),

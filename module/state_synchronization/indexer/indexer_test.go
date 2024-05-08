@@ -169,11 +169,13 @@ func TestIndexer_Success(t *testing.T) {
 
 	test.setBlockDataByID(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
 		trie := trieUpdateFixture(t)
+		collection := unittest.CollectionFixture(0)
 		ed := &execution_data.BlockExecutionData{
 			BlockID: ID,
-			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
-				{TrieUpdate: trie},
-			},
+			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{{
+				Collection: &collection,
+				TrieUpdate: trie,
+			}},
 		}
 
 		// create this to capture the closure of the creation of block execution data, so we can for each returned
@@ -211,11 +213,13 @@ func TestIndexer_Failure(t *testing.T) {
 
 	test.setBlockDataByID(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
 		trie := trieUpdateFixture(t)
+		collection := unittest.CollectionFixture(0)
 		ed := &execution_data.BlockExecutionData{
 			BlockID: ID,
-			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
-				{TrieUpdate: trie},
-			},
+			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{{
+				Collection: &collection,
+				TrieUpdate: trie,
+			}},
 		}
 
 		// fail when trying to persist registers

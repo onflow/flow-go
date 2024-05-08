@@ -255,6 +255,7 @@ func NewCadence1ValueMigrator(
 	programs map[runtime.Location]*interpreter.Program,
 	compositeTypeConverter statictypes.CompositeTypeConverterFunc,
 	interfaceTypeConverter statictypes.InterfaceTypeConverterFunc,
+	staticTypeCache migrations.StaticTypeCache,
 	opts Options,
 ) *CadenceBaseMigrator {
 
@@ -279,7 +280,7 @@ func NewCadence1ValueMigrator(
 				statictypes.NewStaticTypeMigration().
 					WithCompositeTypeConverter(compositeTypeConverter).
 					WithInterfaceTypeConverter(interfaceTypeConverter),
-				entitlements.NewEntitlementsMigration(inter),
+				entitlements.NewEntitlementsMigrationWithCache(inter, staticTypeCache),
 				string_normalization.NewStringNormalizingMigration(),
 			}
 		},

@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 
+	"github.com/onflow/cadence/migrations"
 	"github.com/onflow/cadence/migrations/capcons"
 	"github.com/onflow/cadence/migrations/statictypes"
 	"github.com/onflow/cadence/runtime/common"
@@ -219,13 +220,18 @@ func NewCadence1ValueMigrations(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
 	opts Options,
-) (migrations []NamedMigration) {
+) (migs []NamedMigration) {
 
 	// Populated by CadenceLinkValueMigrator,
 	// used by CadenceCapabilityValueMigrator
 	capabilityMapping := &capcons.CapabilityMapping{}
 
 	errorMessageHandler := &errorMessageHandler{}
+
+	// As the proper migrated static type is computed for each old type,
+	// the entitlements migration will store that info in this cache to be
+	// reused across accounts for instances of the same types
+	staticTypeCache := migrations.NewDefaultStaticTypeCache()
 
 	// The value migrations are run as account-based migrations,
 	// i.e. the migrations are only given the payloads for the account to be migrated.
@@ -236,7 +242,7 @@ func NewCadence1ValueMigrations(
 
 	programs := make(map[common.Location]*interpreter.Program, 1000)
 
-	migrations = []NamedMigration{
+	migs = []NamedMigration{
 		{
 			Name: "check-contracts",
 			Migrate: NewContractCheckingMigration(
@@ -258,6 +264,7 @@ func NewCadence1ValueMigrations(
 				programs,
 				NewCadence1CompositeStaticTypeConverter(opts.ChainID),
 				NewCadence1InterfaceStaticTypeConverter(opts.ChainID),
+				staticTypeCache,
 				opts,
 			)
 		},
@@ -286,8 +293,8 @@ func NewCadence1ValueMigrations(
 
 		accountBasedMigration := migrationConstructor(opts)
 
-		migrations = append(
-			migrations,
+		migs = append(
+			migs,
 			NamedMigration{
 				Name: accountBasedMigration.name,
 				Migrate: NewAccountBasedMigration(

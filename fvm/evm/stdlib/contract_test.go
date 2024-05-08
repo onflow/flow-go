@@ -3863,7 +3863,7 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 					return &types.ResultSummary{
 						Status:                  types.StatusSuccessful,
 						DeployedContractAddress: &types.Address{4},
-						ReturnedValue:           types.Data{4},
+						ReturnedValue:           types.Data{5},
 					}
 				},
 			}
@@ -3887,6 +3887,8 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
               value: EVM.Balance(attoflow: 1230000000000000000)
           )
           destroy cadenceOwnedAccount
+
+          assert(res.deployedContract?.bytes == [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
           return res.data
       }
    `)
@@ -3946,7 +3948,7 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := cadence.
-		NewArray([]cadence.Value{cadence.UInt8(4)}).
+		NewArray([]cadence.Value{cadence.UInt8(5)}).
 		WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
 	require.Equal(t, expected, actual)

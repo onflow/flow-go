@@ -52,6 +52,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -153,6 +154,9 @@ type AccessNodeConfig struct {
 	scriptExecutorConfig              query.QueryConfig
 	scriptExecMinBlock                uint64
 	scriptExecMaxBlock                uint64
+	registerCacheType                 string
+	registerCacheSize                 uint
+	programCacheSize                  uint
 }
 
 type PublicNetworkConfig struct {
@@ -247,6 +251,9 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		scriptExecutorConfig:         query.NewDefaultConfig(),
 		scriptExecMinBlock:           0,
 		scriptExecMaxBlock:           math.MaxUint64,
+		registerCacheType:            pStorage.CacheTypeTwoQueue.String(),
+		registerCacheSize:            0,
+		programCacheSize:             0,
 	}
 }
 
@@ -784,7 +791,25 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, fmt.Errorf("could not create registers storage: %w", err)
 				}
 
-				builder.Storage.RegisterIndex = registers
+				if builder.registerCacheSize > 0 {
+					cacheType, err := pStorage.ParseCacheType(builder.registerCacheType)
+					if err != nil {
+						return nil, fmt.Errorf("could not parse register cache type: %w", err)
+					}
+					cacheMetrics := metrics.NewCacheCollector(builder.RootChainID)
+					registersCache, err := pStorage.NewRegistersCache(registers, cacheType, builder.registerCacheSize, cacheMetrics)
+					if err != nil {
+						return nil, fmt.Errorf("could not create registers cache: %w", err)
+					}
+					builder.Storage.RegisterIndex = registersCache
+				} else {
+					builder.Storage.RegisterIndex = registers
+				}
+
+				indexerDerivedChainData, queryDerivedChainData, err := builder.buildDerivedChainData()
+				if err != nil {
+					return nil, fmt.Errorf("could not create derived chain data: %w", err)
+				}
 
 				indexerCore, err := indexer.New(
 					builder.Logger,
@@ -796,6 +821,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.Storage.Collections,
 					builder.Storage.Transactions,
 					builder.Storage.LightTransactionResults,
+					builder.RootChainID.Chain(),
+					indexerDerivedChainData,
 					builder.collectionExecutedMetric,
 				)
 				if err != nil {
@@ -822,7 +849,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 				// create script execution module, this depends on the indexer being initialized and the
 				// having the register storage bootstrapped
-				scripts, err := execution.NewScripts(
+				scripts := execution.NewScripts(
 					builder.Logger,
 					metrics.NewExecutionCollector(builder.Tracer),
 					builder.RootChainID,
@@ -830,10 +857,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.Storage.Headers,
 					builder.ExecutionIndexerCore.RegisterValue,
 					builder.scriptExecutorConfig,
+					queryDerivedChainData,
+					builder.programCacheSize > 0,
 				)
-				if err != nil {
-					return nil, err
-				}
 
 				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts)
 				if err != nil {
@@ -949,6 +975,34 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	}
 
 	return builder
+}
+
+// buildDerivedChainData creates the derived chain data for the indexer and the query engine
+// If program caching is disabled, the function will return nil for the indexer cache, and a
+// derived chain data object for the query engine cache.
+func (builder *FlowAccessNodeBuilder) buildDerivedChainData() (
+	indexerCache *derived.DerivedChainData,
+	queryCache *derived.DerivedChainData,
+	err error,
+) {
+	cacheSize := builder.programCacheSize
+
+	// the underlying cache requires size > 0. no data will be written so 1 is fine.
+	if cacheSize == 0 {
+		cacheSize = 1
+	}
+
+	derivedChainData, err := derived.NewDerivedChainData(cacheSize)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// writes are done by the indexer. using a nil value effectively disables writes to the cache.
+	if builder.programCacheSize == 0 {
+		return nil, derivedChainData, nil
+	}
+
+	return derivedChainData, derivedChainData, nil
 }
 
 func FlowAccessNode(nodeBuilder *cmd.FlowNodeBuilder) *FlowAccessNodeBuilder {
@@ -1203,6 +1257,18 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"script-execution-max-height",
 			defaultConfig.scriptExecMaxBlock,
 			"highest block height to allow for script execution. default: no limit")
+		flags.StringVar(&builder.registerCacheType,
+			"register-cache-type",
+			defaultConfig.registerCacheType,
+			"type of backend cache to use for registers (lru, arc, 2q)")
+		flags.UintVar(&builder.registerCacheSize,
+			"register-cache-size",
+			defaultConfig.registerCacheSize,
+			"number of registers to cache for script execution. default: 0 (no cache)")
+		flags.UintVar(&builder.programCacheSize,
+			"program-cache-size",
+			defaultConfig.programCacheSize,
+			"[experimental] number of blocks to cache for cadence programs. use 0 to disable cache. default: 0. Note: this is an experimental feature and may cause nodes to become unstable under certain workloads. Use with caution.")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
