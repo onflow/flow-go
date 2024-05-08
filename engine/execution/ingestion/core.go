@@ -164,6 +164,10 @@ func (e *Core) launchWorkerToExecuteBlocks(ctx irrecoverable.SignalerContext, re
 }
 
 func (e *Core) OnBlock(header *flow.Header, qc *flow.QuorumCertificate) {
+	e.log.Debug().
+		Hex("block_id", qc.BlockID[:]).Uint64("height", header.Height).
+		Msgf("received block")
+
 	// qc.Block is equivalent to header.ID()
 	err := e.throttle.OnBlock(qc.BlockID)
 	if err != nil {
@@ -234,7 +238,7 @@ func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
 	}
 
 	if executed {
-		e.log.Debug().Msg("block has been executed already")
+		e.log.Debug().Hex("block_id", blockID[:]).Uint64("height", header.Height).Msg("block has been executed already")
 		return nil
 	}
 
@@ -248,7 +252,9 @@ func (e *Core) onProcessableBlock(blockID flow.Identifier) error {
 		return fmt.Errorf("failed to enqueue block %v: %w", blockID, err)
 	}
 
-	e.log.Debug().Int("executables", len(executables)).Msgf("executeConcurrently block is executable")
+	e.log.Debug().
+		Hex("block_id", blockID[:]).Uint64("height", header.Height).
+		Int("executables", len(executables)).Msgf("executeConcurrently block is executable")
 	e.executeConcurrently(executables)
 
 	err = e.fetch(missingColls)
@@ -365,12 +371,18 @@ func (e *Core) onBlockExecuted(
 		return fmt.Errorf("cannot persist execution state: %w", err)
 	}
 
-	e.log.Debug().Uint64("height", block.Block.Header.Height).Msgf("execution state saved")
+	blockID := block.ID()
+	lg := e.log.With().
+		Hex("block_id", blockID[:]).
+		Uint64("height", block.Block.Header.Height).
+		Logger()
+
+	lg.Debug().Msgf("execution state saved")
 
 	// must call OnBlockExecuted AFTER saving the execution result to storage
 	// because when enqueuing a block, we rely on execState.StateCommitmentByBlockID
 	// to determine whether a block has been executed or not.
-	executables, err := e.blockQueue.OnBlockExecuted(block.ID(), commit)
+	executables, err := e.blockQueue.OnBlockExecuted(blockID, commit)
 	if err != nil {
 		return fmt.Errorf("unexpected error while marking block as executed: %w", err)
 	}
@@ -382,9 +394,7 @@ func (e *Core) onBlockExecuted(
 	logs := e.eventConsumer.OnComputationResultSaved(ctx, computationResult)
 
 	receipt := computationResult.ExecutionReceipt
-	e.log.Info().
-		Hex("block_id", logging.Entity(block)).
-		Uint64("height", block.Block.Header.Height).
+	lg.Info().
 		Int("collections", len(block.CompleteCollections)).
 		Hex("parent_block", block.Block.Header.ParentID[:]).
 		Int("collections", len(block.Block.Payload.Guarantees)).
@@ -397,6 +407,7 @@ func (e *Core) onBlockExecuted(
 		Uint64("num_txs", nonSystemTransactionCount(receipt.ExecutionResult)).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Str("logs", logs). // broadcasted
+		Int("executables", len(executables)).
 		Msgf("block executed")
 
 	// we ensures that the child blocks are only executed after the execution result of
@@ -404,15 +415,15 @@ func (e *Core) onBlockExecuted(
 	// this ensures OnBlockExecuted would not be called with blocks in a wrong order, such as
 	// OnBlockExecuted(childBlock) being called before OnBlockExecuted(parentBlock).
 
-	e.log.Debug().Int("executables", len(executables)).Msgf("executeConcurrently: parent block is executed")
 	e.executeConcurrently(executables)
 
 	return nil
 }
 
 func (e *Core) onCollection(col *flow.Collection) error {
+	colID := col.ID()
 	e.log.Info().
-		Hex("collection_id", logging.Entity(col)).
+		Hex("collection_id", colID[:]).
 		Msgf("handle collection")
 	// EN might request a collection from multiple collection nodes,
 	// therefore might receive multiple copies of the same collection.
@@ -422,6 +433,10 @@ func (e *Core) onCollection(col *flow.Collection) error {
 		return fmt.Errorf("failed to store collection %v: %w", col.ID(), err)
 	}
 
+	return e.handleCollection(colID, col)
+}
+
+func (e *Core) handleCollection(colID flow.Identifier, col *flow.Collection) error {
 	// if the collection is a duplication, it's still good to add it to the block queue,
 	// because chances are the collection was stored before a restart, and
 	// is not in the queue after the restart.
@@ -433,7 +448,10 @@ func (e *Core) onCollection(col *flow.Collection) error {
 		return fmt.Errorf("unexpected error while adding collection to block queue")
 	}
 
-	e.log.Debug().Int("executables", len(executables)).Msgf("executeConcurrently: collection is handled, ready to execute block")
+	e.log.Debug().
+		Hex("collection_id", colID[:]).
+		Int("executables", len(executables)).Msgf("executeConcurrently: collection is handled, ready to execute block")
+
 	e.executeConcurrently(executables)
 
 	return nil
@@ -494,15 +512,37 @@ func (e *Core) execute(ctx context.Context, executable *entity.ExecutableBlock) 
 }
 
 func (e *Core) fetch(missingColls []*block_queue.MissingCollection) error {
+	missingCount := 0
 	for _, col := range missingColls {
-		err := e.collectionFetcher.FetchCollection(col.BlockID, col.Height, col.Guarantee)
+
+		// if we've requested this collection, we will store it in the storage,
+		// so check the storage to see whether we've seen it.
+		collection, err := e.collections.ByID(col.Guarantee.CollectionID)
+
+		if err == nil {
+			// we found the collection from storage, forward this collection to handler
+			err = e.handleCollection(col.Guarantee.CollectionID, collection)
+			if err != nil {
+				return fmt.Errorf("could not handle collection: %w", err)
+			}
+
+			continue
+		}
+
+		// check if there was exception
+		if !errors.Is(err, storage.ErrNotFound) {
+			return fmt.Errorf("error while querying for collection: %w", err)
+		}
+
+		err = e.collectionFetcher.FetchCollection(col.BlockID, col.Height, col.Guarantee)
 		if err != nil {
 			return fmt.Errorf("failed to fetch collection %v for block %v (height: %v): %w",
 				col.Guarantee.ID(), col.BlockID, col.Height, err)
 		}
+		missingCount++
 	}
 
-	if len(missingColls) > 0 {
+	if missingCount > 0 {
 		e.collectionFetcher.Force()
 	}
 

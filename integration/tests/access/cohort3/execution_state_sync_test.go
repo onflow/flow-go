@@ -116,7 +116,7 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 	s.observerName = testnet.PrimaryON
 	observers := []testnet.ObserverConfig{{
 		ContainerName: s.observerName,
-		LogLevel:      zerolog.DebugLevel,
+		LogLevel:      zerolog.InfoLevel,
 		AdditionalFlags: []string{
 			fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 			"--execution-data-sync-enabled=true",
@@ -145,7 +145,7 @@ func (s *ExecutionStateSyncSuite) TestHappyPath() {
 	s.T().Logf("got block height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 
 	// wait for the requested number of sealed blocks, then pause the network so we can inspect the dbs
-	s.BlockState.WaitForSealed(s.T(), blockA.Header.Height+runBlocks)
+	s.BlockState.WaitForSealedHeight(s.T(), blockA.Header.Height+runBlocks)
 	s.net.StopContainers()
 
 	metrics := metrics.NewNoopCollector()

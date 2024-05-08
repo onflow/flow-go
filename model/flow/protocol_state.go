@@ -294,6 +294,12 @@ func (e *ProtocolStateEntry) EpochPhase() EpochPhase {
 	return EpochPhaseCommitted // if the Setup and Commit events are known for the next epoch, we are in the Committed Phase
 }
 
+// EpochCounter returns the current epoch counter.
+// The receiver RichProtocolStateEntry must be properly constructed.
+func (e *RichProtocolStateEntry) EpochCounter() uint64 {
+	return e.CurrentEpochSetup.Counter
+}
+
 func (ll DynamicIdentityEntryList) Lookup() map[Identifier]*DynamicIdentityEntry {
 	result := make(map[Identifier]*DynamicIdentityEntry, len(ll))
 	for _, entry := range ll {
@@ -447,4 +453,15 @@ func ComposeFullIdentities(
 		})
 	}
 	return result, nil
+}
+
+// PSKeyValueStoreData is a binary blob with a version attached, specifying the format
+// of the marshaled data. In a nutshell, it serves as a binary snapshot of a ProtocolKVStore.
+// This structure is useful for version-agnostic storage, where snapshots with different versions
+// can co-exist. The PSKeyValueStoreData is a generic format that can be later decoded to
+// potentially different strongly typed structures based on version. When reading from the store,
+// callers must know how to deal with the binary representation.
+type PSKeyValueStoreData struct {
+	Version uint64
+	Data    []byte
 }

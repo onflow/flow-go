@@ -47,6 +47,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/utils/dsl"
 )
 
@@ -529,6 +530,10 @@ func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 		ProposerSigData:    SignatureFixture(),
 		LastViewTC:         lastViewTC,
 	}
+}
+
+func BlockHeaderWithHeight(height uint64) *flow.Header {
+	return BlockHeaderFixture(WithHeaderHeight(height))
 }
 
 func BlockHeaderWithParentWithSoRFixture(parent *flow.Header, source []byte) *flow.Header {
@@ -1454,7 +1459,7 @@ func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
 
 func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.TransactionBody {
 	tb := flow.TransactionBody{
-		Script:             []byte("pub fun main() {}"),
+		Script:             []byte("access(all) fun main() {}"),
 		ReferenceBlockID:   IdentifierFixture(),
 		GasLimit:           10,
 		ProposalKey:        ProposalKeyFixture(),
@@ -1496,7 +1501,7 @@ func TransactionDSLFixture(chain flow.Chain) dsl.Transaction {
 		Import: dsl.Import{Address: sdk.Address(chain.ServiceAddress())},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
-				pub fun main() {}
+				access(all) fun main() {}
 			`),
 		},
 	}
@@ -2183,6 +2188,13 @@ func VersionBeaconFixture(options ...func(*flow.VersionBeacon)) *flow.VersionBea
 	return versionTable
 }
 
+func ProtocolStateVersionUpgradeFixture() *flow.ProtocolStateVersionUpgrade {
+	return &flow.ProtocolStateVersionUpgrade{
+		NewProtocolStateVersion: rand.Uint64(),
+		ActiveView:              rand.Uint64(),
+	}
+}
+
 // BootstrapFixture generates all the artifacts necessary to bootstrap the
 // protocol state.
 func BootstrapFixture(
@@ -2216,7 +2228,9 @@ func BootstrapFixtureWithChainID(
 		WithDKGFromParticipants(participants.ToSkeleton()),
 	)
 
-	root.SetPayload(flow.Payload{ProtocolStateID: inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()})
+	rootEpochState := inmem.ProtocolStateFromEpochServiceEvents(setup, commit)
+	rootProtocolStateID := kvstore.NewDefaultKVStore(rootEpochState.ID()).ID()
+	root.SetPayload(flow.Payload{ProtocolStateID: rootProtocolStateID})
 	stateCommit := GenesisStateCommitmentByChainID(chainID)
 
 	result := BootstrapExecutionResultFixture(root, stateCommit)
@@ -2668,7 +2682,7 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 	}
 }
 
-// ProtocolStateFixture creates a fixture with correctly structured data. The returned Identity Table
+// EpochStateFixture creates a fixture with correctly structured data. The returned Identity Table
 // represents the common situation during the staking phase of Epoch N+1:
 //   - we are currently in Epoch N
 //   - previous epoch N-1 is known (specifically EpochSetup and EpochCommit events)
@@ -2679,7 +2693,7 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 //   - Epoch setup and commit counters are set to match.
 //   - Identities are constructed from setup events.
 //   - Identities are sorted in canonical order.
-func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.RichProtocolStateEntry {
+func EpochStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.RichProtocolStateEntry {
 	prevEpochSetup := EpochSetupFixture()
 	prevEpochCommit := EpochCommitFixture(func(commit *flow.EpochCommit) {
 		commit.Counter = prevEpochSetup.Counter

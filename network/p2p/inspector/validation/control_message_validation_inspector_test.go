@@ -3,8 +3,8 @@ package validation_test
 import (
 	"context"
 	"fmt"
+	"io"
 	"math/rand"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -1813,7 +1813,7 @@ func hookedLogger(counter *atomic.Int64, expectedLogLevel zerolog.Level, expecte
 			}
 		}
 	})
-	return zerolog.New(os.Stdout).Level(expectedLogLevel).Hook(hook)
+	return zerolog.New(io.Discard).Level(expectedLogLevel).Hook(hook)
 }
 
 // ensureMessageIdsLen ensures RPC IHave and IWant message ids are the expected len.

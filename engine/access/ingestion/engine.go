@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/network"
@@ -82,6 +83,8 @@ type Engine struct {
 	maxReceiptHeight  uint64
 	executionResults  storage.ExecutionResults
 
+	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
+
 	// metrics
 	collectionExecutedMetric module.CollectionExecutedMetric
 }
@@ -100,6 +103,7 @@ func New(
 	executionResults storage.ExecutionResults,
 	executionReceipts storage.ExecutionReceipts,
 	collectionExecutedMetric module.CollectionExecutedMetric,
+	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
@@ -134,6 +138,8 @@ func New(
 		},
 	)
 
+	collectionExecutedMetric.UpdateLastFullBlockHeight(lastFullBlockHeight.Value())
+
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		log:                      log.With().Str("engine", "ingestion").Logger(),
@@ -148,6 +154,7 @@ func New(
 		executionReceipts:        executionReceipts,
 		maxReceiptHeight:         0,
 		collectionExecutedMetric: collectionExecutedMetric,
+		lastFullBlockHeight:      lastFullBlockHeight,
 
 		// queue / notifier for execution receipts
 		executionReceiptsNotifier: engine.NewNotifier(),
@@ -174,38 +181,6 @@ func New(
 	}
 
 	return e, nil
-}
-
-func (e *Engine) Start(parent irrecoverable.SignalerContext) {
-	err := e.initLastFullBlockHeightIndex()
-	if err != nil {
-		parent.Throw(fmt.Errorf("unexpected error initializing full block index: %w", err))
-	}
-
-	e.ComponentManager.Start(parent)
-}
-
-// initializeLastFullBlockHeightIndex initializes the index of full blocks
-// (blocks for which we have ingested all collections) to the root block height.
-// This means that the Access Node will ingest all collections for all blocks
-// ingested after state bootstrapping is complete (all blocks received from the network).
-// If the index has already been initialized, this is a no-op.
-// No errors are expected during normal operation.
-func (e *Engine) initLastFullBlockHeightIndex() error {
-	rootBlock := e.state.Params().FinalizedRoot()
-	err := e.blocks.InsertLastFullBlockHeightIfNotExists(rootBlock.Height)
-	if err != nil {
-		return fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err)
-	}
-
-	lastFullHeight, err := e.blocks.GetLastFullBlockHeight()
-	if err != nil {
-		return fmt.Errorf("failed to get last full block height during ingestion engine startup: %w", err)
-	}
-
-	e.collectionExecutedMetric.UpdateLastFullBlockHeight(lastFullHeight)
-
-	return nil
 }
 
 func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -414,11 +389,7 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 	// skip requesting collections, if this block is below the last full block height
 	// this means that either we have already received these collections, or the block
 	// may contain unverifiable guarantees (in case this node has just joined the network)
-	lastFullBlockHeight, err := e.blocks.GetLastFullBlockHeight()
-	if err != nil {
-		return fmt.Errorf("could not get last full block height: %w", err)
-	}
-
+	lastFullBlockHeight := e.lastFullBlockHeight.Value()
 	if block.Header.Height <= lastFullBlockHeight {
 		e.log.Info().Msgf("skipping requesting collections for finalized block below last full block height (%d<=%d)", block.Header.Height, lastFullBlockHeight)
 		return nil
@@ -465,11 +436,7 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 	var startHeight, endHeight uint64
 
 	// get the height of the last block for which all collections were received
-	lastFullHeight, err := e.blocks.GetLastFullBlockHeight()
-	if err != nil {
-		return fmt.Errorf("failed to complete requests for missing collections: %w", err)
-	}
-
+	lastFullHeight := e.lastFullBlockHeight.Value()
 	// start from the next block
 	startHeight = lastFullHeight + 1
 
@@ -564,10 +531,7 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 // updateLastFullBlockReceivedIndex finds the next highest height where all previous collections
 // have been indexed, and updates the LastFullBlockReceived index to that height
 func (e *Engine) updateLastFullBlockReceivedIndex() error {
-	lastFullHeight, err := e.blocks.GetLastFullBlockHeight()
-	if err != nil {
-		return fmt.Errorf("failed to get last full block height: %w", err)
-	}
+	lastFullHeight := e.lastFullBlockHeight.Value()
 
 	finalBlk, err := e.state.Final().Head()
 	if err != nil {
@@ -583,9 +547,9 @@ func (e *Engine) updateLastFullBlockReceivedIndex() error {
 
 	// if more contiguous blocks are now complete, update db
 	if newLastFullHeight > lastFullHeight {
-		err = e.blocks.UpdateLastFullBlockHeight(newLastFullHeight)
+		err := e.lastFullBlockHeight.Set(newLastFullHeight)
 		if err != nil {
-			return fmt.Errorf("failed to update last full block height")
+			return fmt.Errorf("failed to update last full block height: %w", err)
 		}
 
 		e.collectionExecutedMetric.UpdateLastFullBlockHeight(newLastFullHeight)
@@ -622,10 +586,7 @@ func (e *Engine) lowestHeightWithMissingCollection(lastFullHeight, finalizedHeig
 // checkMissingCollections requests missing collections if the number of blocks missing collections
 // have reached the defaultMissingCollsForBlkThreshold value.
 func (e *Engine) checkMissingCollections() error {
-	lastFullHeight, err := e.blocks.GetLastFullBlockHeight()
-	if err != nil {
-		return err
-	}
+	lastFullHeight := e.lastFullBlockHeight.Value()
 
 	finalBlk, err := e.state.Final().Head()
 	if err != nil {

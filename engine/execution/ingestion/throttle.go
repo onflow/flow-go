@@ -55,9 +55,10 @@ func NewBlockThrottle(
 	}
 
 	finalized := finalizedHead.Height
-	// TODO: implement GetHighestFinalizedExecuted for execution state when storehouse
-	// is not used
-	executed := execState.GetHighestFinalizedExecuted()
+	executed, err := execState.GetHighestFinalizedExecuted()
+	if err != nil {
+		return nil, fmt.Errorf("could not get highest finalized executed: %w", err)
+	}
 
 	if executed > finalized {
 		return nil, fmt.Errorf("executed finalized %v is greater than finalized %v", executed, finalized)
