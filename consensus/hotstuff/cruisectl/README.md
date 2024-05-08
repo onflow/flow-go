@@ -61,7 +61,7 @@ The desired idealized system behaviour would a constant view duration $\tau_0$ t
 
 However, in the real-world system we have disturbances (varying message relay times, slow or offline nodes, etc) and measurement uncertainty (node can only observe its local view times, but not the committee’s collective swarm behaviour).
 
-<img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/PID_controller_for_block-rate-delay.png' width='800'>
+<img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/PID_controller_for_block-rate-delay.png' width='600'>
 
 
 After a disturbance, we want the controller to drive the system back to a state, where it can closely follow the ideal behaviour from there on. 
@@ -72,9 +72,9 @@ After a disturbance, we want the controller to drive the system back to a state,
     - setting the differential term $K_d=0$, the controller responds as expected with damped oscillatory behaviour
       to a singular strong disturbance. Setting $K_d=3$ suppresses oscillations and the controller's performance improves as it responds more effectively.  
 
-      <img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/EpochSimulation_029.png' width='600'>
+      <img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/EpochSimulation_029.png' width='900'>
 
-      <img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/EpochSimulation_030.png' width='800'>
+      <img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/EpochSimulation_030.png' width='900'>
 
     - controller very quickly compensates for moderate disturbances and observational noise in a well-behaved system:
 
@@ -82,11 +82,11 @@ After a disturbance, we want the controller to drive the system back to a state,
   
     - controller compensates massive anomaly (100s network partition) effectively:
 
-      <img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/EpochSimulation_000.png' width='1000'>
+      <img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/EpochSimulation_000.png' width='900'>
 
     - controller effectively stabilizes system with continued larger disturbances (20% of offline consensus participants) and notable observational noise:
 
-      <img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/EpochSimulation_005-0.png' width='300'>
+      <img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/EpochSimulation_005-0.png' width='900'>
          
     **References:**
     
@@ -120,7 +120,7 @@ Upon observing block `B` with view $v$, the controller updates its internal stat
 
 Note the '+1' term in the computation of the remaining views $k[v] := F[v] +1 - v$  . This is related to our convention that the epoch begins (happy path) when observing the first block of the epoch. Only by observing this block, the nodes transition to the first view of the epoch. Up to that point, the consensus replicas remain in the last view of the previous epoch, in the state of `having processed the last block of the old epoch and voted for it` (happy path). Replicas remain in this state until they see a confirmation of the view (either QC or TC for the last view of the previous epoch). 
 
-![](/docs/CruiseControl_BlockTimeController/ViewDurationConvention.png)
+<img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/ViewDurationConvention.png' width='600'>
 
 In accordance with this convention, observing the proposal for the last view of an epoch, marks the start of the last view. By observing the proposal, nodes enter the last view, verify the block, vote for it, the primary aggregates the votes, constructs the child (for first view of new epoch). The last view of the epoch ends, when the child proposal is published.
 
