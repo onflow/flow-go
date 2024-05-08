@@ -97,7 +97,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 		require.Len(s.T(), updatedState.CurrentEpoch.EpochExtensions, 1)
 		require.Equal(s.T(), flow.EpochExtension{
 			FirstView:     parentProtocolState.CurrentEpochFinalView() + 1,
-			FinalView:     parentProtocolState.CurrentEpochFinalView() + 1 + DefaultEpochExtensionLength,
+			FinalView:     parentProtocolState.CurrentEpochFinalView() + DefaultEpochExtensionViewCount,
 			TargetEndTime: 0,
 		}, updatedState.CurrentEpoch.EpochExtensions[0])
 	})
@@ -126,7 +126,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 		require.Len(s.T(), updatedState.CurrentEpoch.EpochExtensions, 1)
 		require.Equal(s.T(), flow.EpochExtension{
 			FirstView:     parentProtocolState.CurrentEpochFinalView() + 1,
-			FinalView:     parentProtocolState.CurrentEpochFinalView() + 1 + DefaultEpochExtensionLength,
+			FinalView:     parentProtocolState.CurrentEpochFinalView() + DefaultEpochExtensionViewCount,
 			TargetEndTime: 0,
 		}, updatedState.CurrentEpoch.EpochExtensions[0])
 		require.Nil(s.T(), updatedState.NextEpoch, "Next epoch has to be nil even if it was previously setup")
@@ -169,11 +169,11 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 	parentProtocolState.NextEpoch.CommitID = flow.ZeroID
 	parentProtocolState.NextEpochCommit = nil
 
-	// finalBlockView is the cumulative number of views that will be produced in the current epoch and its extensions
-	finalBlockView := DefaultEpochExtensionLength +
+	// views2process is the cumulative number of views that will be produced in the current epoch and its extensions
+	views2process := DefaultEpochExtensionViewCount +
 		(parentProtocolState.CurrentEpochSetup.FinalView - parentProtocolState.CurrentEpochSetup.FirstView) + 1
 	candidateView := parentProtocolState.CurrentEpochSetup.FirstView + 1
-	for i := uint64(0); i < finalBlockView; i++ {
+	for i := uint64(0); i < views2process; i++ {
 		stateMachine, err := NewFallbackStateMachine(s.params, candidateView, parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		updatedState, _, _ := stateMachine.Build()
@@ -196,13 +196,13 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 	require.Len(s.T(), parentProtocolState.CurrentEpoch.EpochExtensions, 2)
 	require.Equal(s.T(), flow.EpochExtension{
 		FirstView:     parentProtocolState.CurrentEpochSetup.FinalView + 1,
-		FinalView:     parentProtocolState.CurrentEpochSetup.FinalView + 1 + DefaultEpochExtensionLength,
+		FinalView:     parentProtocolState.CurrentEpochSetup.FinalView + DefaultEpochExtensionViewCount,
 		TargetEndTime: 0,
 	}, parentProtocolState.CurrentEpoch.EpochExtensions[0])
 
 	require.Equal(s.T(), flow.EpochExtension{
 		FirstView:     parentProtocolState.CurrentEpoch.EpochExtensions[0].FinalView + 1,
-		FinalView:     parentProtocolState.CurrentEpoch.EpochExtensions[0].FinalView + 1 + DefaultEpochExtensionLength,
+		FinalView:     parentProtocolState.CurrentEpoch.EpochExtensions[0].FinalView + DefaultEpochExtensionViewCount,
 		TargetEndTime: 0,
 	}, parentProtocolState.CurrentEpoch.EpochExtensions[1])
 
@@ -222,13 +222,13 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 	parentProtocolState.InvalidEpochTransitionAttempted = false
 	unittest.WithNextEpochProtocolState()(parentProtocolState)
 
-	// finalBlockView is the cumulative number of views that will be produced in the current epoch and its extensions
-	finalBlockView := DefaultEpochExtensionLength +
+	// views2process is the cumulative number of views that will be produced in the current epoch and its extensions
+	views2process := DefaultEpochExtensionViewCount +
 		(parentProtocolState.CurrentEpochSetup.FinalView - parentProtocolState.CurrentEpochSetup.FirstView) +
 		(parentProtocolState.NextEpochSetup.FinalView - parentProtocolState.NextEpochSetup.FirstView) +
 		1
 	candidateView := parentProtocolState.CurrentEpochSetup.FirstView + 1
-	for i := uint64(0); i < finalBlockView; i++ {
+	for i := uint64(0); i < views2process; i++ {
 		stateMachine, err := NewFallbackStateMachine(s.params, candidateView, parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 
@@ -256,19 +256,19 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 	require.Len(s.T(), parentProtocolState.CurrentEpoch.EpochExtensions, 3)
 	require.Equal(s.T(), flow.EpochExtension{
 		FirstView:     parentProtocolState.CurrentEpochSetup.FinalView + 1,
-		FinalView:     parentProtocolState.CurrentEpochSetup.FinalView + 1 + DefaultEpochExtensionLength,
+		FinalView:     parentProtocolState.CurrentEpochSetup.FinalView + 1 + DefaultEpochExtensionViewCount,
 		TargetEndTime: 0,
 	}, parentProtocolState.CurrentEpoch.EpochExtensions[0])
 
 	require.Equal(s.T(), flow.EpochExtension{
 		FirstView:     parentProtocolState.CurrentEpoch.EpochExtensions[0].FinalView + 1,
-		FinalView:     parentProtocolState.CurrentEpoch.EpochExtensions[0].FinalView + 1 + DefaultEpochExtensionLength,
+		FinalView:     parentProtocolState.CurrentEpoch.EpochExtensions[0].FinalView + 1 + DefaultEpochExtensionViewCount,
 		TargetEndTime: 0,
 	}, parentProtocolState.CurrentEpoch.EpochExtensions[1])
 
 	require.Equal(s.T(), flow.EpochExtension{
 		FirstView:     parentProtocolState.CurrentEpoch.EpochExtensions[1].FinalView + 1,
-		FinalView:     parentProtocolState.CurrentEpoch.EpochExtensions[1].FinalView + 1 + DefaultEpochExtensionLength,
+		FinalView:     parentProtocolState.CurrentEpoch.EpochExtensions[1].FinalView + 1 + DefaultEpochExtensionViewCount,
 		TargetEndTime: 0,
 	}, parentProtocolState.CurrentEpoch.EpochExtensions[2])
 

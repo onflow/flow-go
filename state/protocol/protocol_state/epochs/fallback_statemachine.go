@@ -7,9 +7,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// DefaultEpochExtensionLength is a default length of epoch extension.
+// DefaultEpochExtensionViewCount is a default length of epoch extension in views, approximately 1 day.
 // TODO(efm-recovery): replace this with value from KV store or protocol.GlobalParams
-const DefaultEpochExtensionLength = 100_000
+const DefaultEpochExtensionViewCount = 100_000
 
 // FallbackStateMachine is a special structure that encapsulates logic for processing service events
 // when protocol is in epoch fallback mode. The FallbackStateMachine ignores EpochSetup and EpochCommit
@@ -43,8 +43,8 @@ func NewFallbackStateMachine(params protocol.GlobalParams, view uint64, parentSt
 		// prepare a new extension for the current epoch.
 		err := state.CurrentEpoch.ExtendEpoch(flow.EpochExtension{
 			FirstView:     parentState.CurrentEpochFinalView() + 1,
-			FinalView:     parentState.CurrentEpochFinalView() + 1 + DefaultEpochExtensionLength, // TODO: replace with EpochExtensionLength
-			TargetEndTime: 0,                                                                     // TODO: calculate and set target end time
+			FinalView:     parentState.CurrentEpochFinalView() + DefaultEpochExtensionViewCount, // TODO: replace with EpochExtensionLength
+			TargetEndTime: 0,                                                                    // TODO: calculate and set target end time
 		})
 		if err != nil {
 			return nil, fmt.Errorf("could not produce a valid epoch extension: %w", err)
