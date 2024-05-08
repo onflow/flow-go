@@ -79,6 +79,13 @@ type BackendExecutionDataSuite struct {
 	highestBlockHeader *flow.Header
 }
 
+type executionDataTestType struct {
+	name            string
+	highestBackfill int
+	startBlockID    flow.Identifier
+	startHeight     uint64
+}
+
 func TestBackendExecutionDataSuite(t *testing.T) {
 	suite.Run(t, new(BackendExecutionDataSuite))
 }
@@ -339,15 +346,7 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 }
 
 func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	tests := []struct {
-		name            string
-		highestBackfill int
-		startBlockID    flow.Identifier
-		startHeight     uint64
-	}{
+	tests := []executionDataTestType{
 		{
 			name:            "happy path - all new blocks",
 			highestBackfill: -1, // no backfill
@@ -380,6 +379,123 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 		},
 	}
 
+	subFunc := func(ctx context.Context, blockID flow.Identifier, startHeight uint64) subscription.Subscription {
+		return s.backend.SubscribeExecutionData(ctx, blockID, startHeight)
+	}
+
+	s.subscribe(subFunc, tests)
+}
+
+func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartBlockID() {
+	tests := []executionDataTestType{
+		{
+			name:            "happy path - all new blocks",
+			highestBackfill: -1, // no backfill
+			startBlockID:    s.rootBlock.ID(),
+		},
+		{
+			name:            "happy path - partial backfill",
+			highestBackfill: 2, // backfill the first 3 blocks
+			startBlockID:    s.blocks[0].ID(),
+		},
+		{
+			name:            "happy path - complete backfill",
+			highestBackfill: len(s.blocks) - 1, // backfill all blocks
+			startBlockID:    s.blocks[0].ID(),
+		},
+		{
+			name:            "happy path - start from root block by id",
+			highestBackfill: len(s.blocks) - 1, // backfill all blocks
+			startBlockID:    s.rootBlock.ID(),  // start from root block
+		},
+	}
+
+	s.executionDataTracker.On(
+		"GetStartHeightFromBlockID",
+		mock.AnythingOfType("flow.Identifier"),
+	).Return(func(startBlockID flow.Identifier) (uint64, error) {
+		return s.executionDataTrackerReal.GetStartHeightFromBlockID(startBlockID)
+	}, nil)
+
+	subFunc := func(ctx context.Context, blockID flow.Identifier, startHeight uint64) subscription.Subscription {
+		return s.backend.SubscribeExecutionDataFromStartBlockID(ctx, blockID)
+	}
+
+	s.subscribe(subFunc, tests)
+}
+
+func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartBlockHeight() {
+	tests := []executionDataTestType{
+		{
+			name:            "happy path - all new blocks",
+			highestBackfill: -1, // no backfill
+			startHeight:     s.rootBlock.Header.Height,
+		},
+		{
+			name:            "happy path - partial backfill",
+			highestBackfill: 2, // backfill the first 3 blocks
+			startHeight:     s.blocks[0].Header.Height,
+		},
+		{
+			name:            "happy path - complete backfill",
+			highestBackfill: len(s.blocks) - 1, // backfill all blocks
+			startHeight:     s.blocks[0].Header.Height,
+		},
+		{
+			name:            "happy path - start from root block by id",
+			highestBackfill: len(s.blocks) - 1,         // backfill all blocks
+			startHeight:     s.rootBlock.Header.Height, // start from root block
+		},
+	}
+
+	s.executionDataTracker.On(
+		"GetStartHeightFromHeight",
+		mock.AnythingOfType("uint64"),
+	).Return(func(startHeight uint64) (uint64, error) {
+		return s.executionDataTrackerReal.GetStartHeightFromHeight(startHeight)
+	}, nil)
+
+	subFunc := func(ctx context.Context, blockID flow.Identifier, startHeight uint64) subscription.Subscription {
+		return s.backend.SubscribeExecutionDataFromStartBlockHeight(ctx, startHeight)
+	}
+
+	s.subscribe(subFunc, tests)
+}
+
+func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromLatest() {
+	tests := []executionDataTestType{
+		{
+			name:            "happy path - all new blocks",
+			highestBackfill: -1, // no backfill
+		},
+		{
+			name:            "happy path - partial backfill",
+			highestBackfill: 2, // backfill the first 3 blocks
+		},
+		{
+			name:            "happy path - complete backfill",
+			highestBackfill: len(s.blocks) - 1, // backfill all blocks
+		},
+	}
+
+	s.executionDataTracker.On(
+		"GetStartHeightFromLatest",
+		mock.Anything,
+	).Return(func(ctx context.Context) (uint64, error) {
+		return s.executionDataTrackerReal.GetStartHeightFromLatest(ctx)
+	}, nil)
+
+	subFunc := func(ctx context.Context, blockID flow.Identifier, startHeight uint64) subscription.Subscription {
+		return s.backend.SubscribeExecutionDataFromLatest(ctx)
+	}
+
+	s.subscribe(subFunc, tests)
+}
+
+func (s *BackendExecutionDataSuite) subscribe(subscribeFunc func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) subscription.Subscription, tests []executionDataTestType) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	for _, test := range tests {
 		s.Run(test.name, func() {
 			// make sure we're starting with a fresh cache
@@ -395,7 +511,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 			}
 
 			subCtx, subCancel := context.WithCancel(ctx)
-			sub := s.backend.SubscribeExecutionData(subCtx, test.startBlockID, test.startHeight)
+			sub := subscribeFunc(subCtx, test.startBlockID, test.startHeight)
 
 			// loop over of the all blocks
 			for i, b := range s.blocks {
