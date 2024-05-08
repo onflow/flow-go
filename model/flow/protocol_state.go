@@ -110,20 +110,6 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 	}
 }
 
-// ExtendEpoch appends an epoch extension to the EpochStateContainer.
-// It is expected that the epoch extension is contiguous with the last extension, otherwise an exception is returned.
-// No errors are expected during normal operation.
-func (c *EpochStateContainer) ExtendEpoch(epochExtension EpochExtension) error {
-	if len(c.EpochExtensions) > 0 {
-		lastExtension := c.EpochExtensions[len(c.EpochExtensions)-1]
-		if lastExtension.FinalView+1 != epochExtension.FirstView {
-			return fmt.Errorf("epoch extension is not contiguous with the last extension")
-		}
-	}
-	c.EpochExtensions = append(c.EpochExtensions, epochExtension)
-	return nil
-}
-
 // RichProtocolStateEntry is a ProtocolStateEntry which has additional fields that are cached
 // from storage layer for convenience.
 // Using this structure instead of ProtocolStateEntry allows us to avoid querying

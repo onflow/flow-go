@@ -38,26 +38,53 @@ func NewFallbackStateMachine(params protocol.GlobalParams, view uint64, parentSt
 		state.InvalidEpochTransitionAttempted = true
 	}
 
-	if !nextEpochCommitted && view+params.EpochCommitSafetyThreshold() >= parentState.CurrentEpochFinalView() {
-		// we have reached safety threshold and we are still in the fallback mode
-		// prepare a new extension for the current epoch.
-		err := state.CurrentEpoch.ExtendEpoch(flow.EpochExtension{
-			FirstView:     parentState.CurrentEpochFinalView() + 1,
-			FinalView:     parentState.CurrentEpochFinalView() + DefaultEpochExtensionViewCount, // TODO: replace with EpochExtensionLength
-			TargetEndTime: 0,                                                                    // TODO: calculate and set target end time
-		})
-		if err != nil {
-			return nil, fmt.Errorf("could not produce a valid epoch extension: %w", err)
-		}
-	}
-
-	return &FallbackStateMachine{
+	sm := &FallbackStateMachine{
 		baseStateMachine: baseStateMachine{
 			parentState: parentState,
 			state:       state,
 			view:        view,
 		},
-	}, nil
+	}
+
+	if !nextEpochCommitted && view+params.EpochCommitSafetyThreshold() >= parentState.CurrentEpochFinalView() {
+		// we have reached safety threshold and we are still in the fallback mode
+		// prepare a new extension for the current epoch.
+		err := sm.extendCurrentEpoch(flow.EpochExtension{
+			FirstView:     parentState.CurrentEpochFinalView() + 1,
+			FinalView:     parentState.CurrentEpochFinalView() + DefaultEpochExtensionViewCount, // TODO: replace with EpochExtensionLength
+			TargetEndTime: 0,                                                                    // TODO: calculate and set target end time
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return sm, nil
+}
+
+// extendCurrentEpoch appends an epoch extension to the current epoch from underlying state.
+// Internally, it performs sanity checks to ensure that the epoch extension is contiguous with the current epoch.
+// It also ensures that the next epoch is not present, as epoch extensions are only allowed for the current epoch.
+// No errors are expected during normal operation.
+func (m *FallbackStateMachine) extendCurrentEpoch(epochExtension flow.EpochExtension) error {
+	state := m.state
+	if len(state.CurrentEpoch.EpochExtensions) > 0 {
+		lastExtension := state.CurrentEpoch.EpochExtensions[len(state.CurrentEpoch.EpochExtensions)-1]
+		if lastExtension.FinalView+1 != epochExtension.FirstView {
+			return fmt.Errorf("epoch extension is not contiguous with the last extension")
+		}
+	} else {
+		if epochExtension.FirstView != m.parentState.CurrentEpochSetup.FinalView+1 {
+			return fmt.Errorf("first epoch extension is not contiguous with current epoch")
+		}
+	}
+
+	if state.NextEpoch != nil {
+		return fmt.Errorf("cannot extend current epoch when next epoch is present")
+	}
+
+	state.CurrentEpoch.EpochExtensions = append(state.CurrentEpoch.EpochExtensions, epochExtension)
+	return nil
 }
 
 // ProcessEpochSetup processes epoch setup service events, for epoch fallback we are ignoring this event.
