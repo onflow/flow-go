@@ -20,7 +20,8 @@ type All struct {
 	TransactionResults      TransactionResults
 	Collections             Collections
 	Events                  Events
-	ProtocolState           ProtocolState
+	EpochProtocolState      ProtocolState
+	ProtocolKVStore         ProtocolKVStore
 	VersionBeacons          VersionBeacons
 	RegisterIndex           RegisterIndex
 }

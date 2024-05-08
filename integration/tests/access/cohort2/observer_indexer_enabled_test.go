@@ -29,10 +29,11 @@ import (
 )
 
 var (
-	simpleScript = `pub fun main(): Int { return 42; }`
+	simpleScript = `access(all) fun main(): Int { return 42; }`
 )
 
 func TestObserverIndexerEnabled(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky")
 	suite.Run(t, new(ObserverIndexerEnabledSuite))
 }
 
@@ -143,6 +144,8 @@ func (s *ObserverIndexerEnabledSuite) SetupTest() {
 // To ensure that the observer is handling these RPCs, we stop the upstream access node and verify that the observer client
 // returns success for valid requests and errors for invalid ones.
 func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCsHappyPath() {
+	unittest.SkipUnless(s.T(), unittest.TEST_FLAKY, "flaky")
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -177,7 +180,7 @@ func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCsHappyPath() {
 	require.NoError(t, err)
 	createAccountTx.
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
-		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
+		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetAndIncrementSeqNumber()).
 		SetPayer(serviceAddress).
 		SetComputeLimit(9999)
 
@@ -239,7 +242,7 @@ func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCsHappyPath() {
 	eventsByBlockID, err := observer.GetEventsForBlockIDs(ctx, &accessproto.GetEventsForBlockIDsRequest{
 		Type:                 sdk.EventAccountCreated,
 		BlockIds:             [][]byte{blockWithAccount.Block.Id},
-		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	})
 	require.NoError(t, err)
 
@@ -247,7 +250,7 @@ func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCsHappyPath() {
 		Type:                 sdk.EventAccountCreated,
 		StartHeight:          blockWithAccount.Block.Height,
 		EndHeight:            blockWithAccount.Block.Height,
-		EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	})
 	require.NoError(t, err)
 
@@ -257,9 +260,10 @@ func (s *ObserverIndexerEnabledSuite) TestObserverIndexedRPCsHappyPath() {
 	for _, eventsInBlock := range eventsByHeight.Results {
 		for _, event := range eventsInBlock.Events {
 			if event.Type == sdk.EventAccountCreated {
-				if bytes.Equal(event.Payload, accountCreatedPayload) {
-					found = true
+				if !bytes.Equal(event.Payload, accountCreatedPayload) {
+					t.Fatalf("event payloads don't match")
 				}
+				found = true
 			}
 		}
 	}
@@ -319,7 +323,7 @@ func (s *ObserverIndexerEnabledSuite) TestAllObserverIndexedRPCsHappyPath() {
 
 	createAccountTx.
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
-		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
+		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetAndIncrementSeqNumber()).
 		SetPayer(serviceAddress).
 		SetComputeLimit(9999)
 

@@ -15,7 +15,7 @@ import (
 // using constructor passing a RichProtocolStateEntry.
 func TestInitialProtocolStateAdapter(t *testing.T) {
 	// construct a valid protocol state entry that has semantically correct DKGParticipantKeys
-	entry := unittest.ProtocolStateFixture(unittest.WithValidDKG())
+	entry := unittest.EpochStateFixture(unittest.WithValidDKG())
 
 	adapter := inmem.NewInitialProtocolStateAdapter(entry)
 

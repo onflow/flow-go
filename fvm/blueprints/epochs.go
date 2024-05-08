@@ -44,6 +44,7 @@ func DeployEpochTransaction(service flow.Address, contract []byte, epochConfig e
 				},
 			),
 		)).
+		AddArgument(jsoncdc.MustEncode(cadence.String("FlowEpoch"))).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddArgument(jsoncdc.MustEncode(epochConfig.CurrentEpochCounter)).
 		AddArgument(jsoncdc.MustEncode(epochConfig.NumViewsInEpoch)).
@@ -128,12 +129,14 @@ func DeployLockedTokensTransaction(service flow.Address, contract []byte, public
 func RegisterNodeTransaction(
 	service flow.Address,
 	flowTokenAddress flow.Address,
+	fungibleTokenAddress flow.Address,
 	nodeAddress flow.Address,
 	id *flow.Identity,
 ) *flow.TransactionBody {
 
 	env := templates.Environment{
 		FlowTokenAddress:         flowTokenAddress.HexWithPrefix(),
+		FungibleTokenAddress:     fungibleTokenAddress.HexWithPrefix(),
 		IDTableAddress:           service.HexWithPrefix(),
 		QuorumCertificateAddress: service.HexWithPrefix(),
 		DkgAddress:               service.HexWithPrefix(),

@@ -397,6 +397,8 @@ func (c *Container) OpenState() (*state.State, error) {
 	commits := storage.NewEpochCommits(metrics, db)
 	protocolState := storage.NewProtocolState(metrics, setups, commits, db,
 		storage.DefaultProtocolStateCacheSize, storage.DefaultProtocolStateByBlockIDCacheSize)
+	protocolKVStates := storage.NewProtocolKVStore(metrics, db,
+		storage.DefaultProtocolKVStoreCacheSize, storage.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeacons := storage.NewVersionBeacons(db)
 
 	return state.OpenState(
@@ -410,6 +412,7 @@ func (c *Container) OpenState() (*state.State, error) {
 		setups,
 		commits,
 		protocolState,
+		protocolKVStates,
 		versionBeacons,
 	)
 }
@@ -476,7 +479,12 @@ func (c *Container) SDKClient() (*sdkclient.Client, error) {
 		return nil, fmt.Errorf("container does not implement flow.access.AccessAPI")
 	}
 
-	return sdkclient.NewClient(c.Addr(GRPCPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	return sdkclient.NewClient(
+		c.Addr(GRPCPort),
+		sdkclient.WithGRPCDialOptions(
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		),
+	)
 }
 
 // GhostClient returns a ghostnode client that connects to this node.

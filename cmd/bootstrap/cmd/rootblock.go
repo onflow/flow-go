@@ -6,22 +6,18 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/module/epochs"
-	"github.com/onflow/flow-go/state/protocol/inmem"
-
 	"github.com/onflow/cadence"
-
-	"github.com/onflow/flow-go/model/dkg"
-	"github.com/onflow/flow-go/state/protocol"
-
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/dkg"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/epochs"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 var (
@@ -89,7 +85,7 @@ func addRootBlockCmdFlags() {
 	cmd.MarkFlagRequired(rootBlockCmd, "epoch-dkg-phase-length")
 
 	// required parameters for generation of root block, root execution result and root block seal
-	rootBlockCmd.Flags().StringVar(&flagRootChain, "root-chain", "local", "chain ID for the root block (can be 'main', 'test', 'sandbox', 'bench', or 'local'")
+	rootBlockCmd.Flags().StringVar(&flagRootChain, "root-chain", "local", "chain ID for the root block (can be 'main', 'test', 'sandbox', 'preview', 'bench', or 'local'")
 	rootBlockCmd.Flags().StringVar(&flagRootParent, "root-parent", "0000000000000000000000000000000000000000000000000000000000000000", "ID for the parent of the root block")
 	rootBlockCmd.Flags().Uint64Var(&flagRootHeight, "root-height", 0, "height of the root block")
 	rootBlockCmd.Flags().StringVar(&flagRootTimestamp, "root-timestamp", time.Now().UTC().Format(time.RFC3339), "timestamp of the root block (RFC3339)")
@@ -200,15 +196,11 @@ func rootBlock(cmd *cobra.Command, args []string) {
 
 	log.Info().Msg("constructing intermediary bootstrapping data")
 	epochSetup, epochCommit := constructRootEpochEvents(header.View, participants, assignments, clusterQCs, dkgData)
-	committedEpoch := inmem.NewCommittedEpoch(epochSetup, epochCommit)
-	encodableEpoch, err := inmem.FromEpoch(committedEpoch)
-	if err != nil {
-		log.Fatal().Msg("could not convert root epoch to encodable")
-	}
 	epochConfig := generateExecutionStateEpochConfig(epochSetup, clusterQCs, dkgData)
 	intermediaryEpochData := IntermediaryEpochData{
-		ProtocolStateRootEpoch: encodableEpoch.Encodable(),
-		ExecutionStateConfig:   epochConfig,
+		RootEpochSetup:       epochSetup,
+		RootEpochCommit:      epochCommit,
+		ExecutionStateConfig: epochConfig,
 	}
 	intermediaryParamsData := IntermediaryParamsData{
 		EpochCommitSafetyThreshold: flagEpochCommitSafetyThreshold,

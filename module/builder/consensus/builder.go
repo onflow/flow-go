@@ -635,17 +635,11 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		return nil, fmt.Errorf("could not apply setter: %w", err)
 	}
 
-	stateMutator, err := b.mutableProtocolState.Mutator(header.View, header.ParentID)
+	// Evolve the Protocol State starting from the parent block's state. Information that may change the state is:
+	// the candidate block's view and Service Events from execution results sealed in the candidate block.
+	protocolStateID, _, err := b.mutableProtocolState.EvolveState(header.ParentID, header.View, seals)
 	if err != nil {
-		return nil, fmt.Errorf("could not create protocol state stateMutator for view %d: %w", header.View, err)
-	}
-	err = stateMutator.ApplyServiceEventsFromValidatedSeals(seals)
-	if err != nil {
-		return nil, fmt.Errorf("could not apply service events as leader: %w", err)
-	}
-	_, _, protocolStateID, _ := stateMutator.Build()
-	if err != nil {
-		return nil, fmt.Errorf("could not build updated protocol state: %w", err)
+		return nil, fmt.Errorf("evolving protocol state failed: %w", err)
 	}
 
 	proposal := &flow.Block{
