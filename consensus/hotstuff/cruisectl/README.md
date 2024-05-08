@@ -230,7 +230,9 @@ The controller output $u[v]$ represents the amount of time by which the controll
 ```
 ---    
 
-### Limits of authority
+### Limits of authority 
+
+[Latest update: Crescendo Upgrade, June 2024]
 
 In general, there is no bound on the output of the controller output $u$. However, it is important to limit the controller’s influence to keep $u$ within a sensible range.
 
@@ -239,13 +241,18 @@ In general, there is no bound on the output of the controller output $u$. Howeve
   The current timeout threshold is set to 1045ms and the largest view duration we want to allow the controller to set is $\tau_\textrm{max}$ = 910ms.
   Thereby, we have a buffer $\beta$ = 135ms remaining for message propagation and the replicas validating the proposal for view $v$.
 
-  Note the subtle but important aspect: the leader for view  
-    
+  Note the subtle but important aspect: Primary for view $v+1$ controls duration of view $v$. This is because its proposal for view $v+1$
+  contains the proof (Quorum Certificate [QC]) that view $v$ concluded on the happy path. By observing the QC for view $v$, nodes enter the
+  subsequent view $v+1$.
+
+
 - lower bound on the view duration:
     
-  Let $t_\textnormal{p}[v]$ denote the time when the primary for view $v$ has constructed its block proposal. 
-  The time difference $t_\textnormal{p}[v] - t[v]$ between the primary entering the view and having its proposal
-  ready is the minimally required time to execute the protocol. The controller can only *delay* broadcasting the block,
+  Let $t_\textnormal{p}[v]$ denote the time when the primary for view $v$ has constructed its block proposal.
+  On the happy path, a replica would conclude view $v-1$ and transition to view $v$ when it observes the proposal from view $v$.
+  The time difference $t_\textnormal{p}[v] - t[v-1]$ between the primary observing the parent block from view $v-1$, collecting votes for it,
+  constructing the QC and subsequently its own proposal for view $v$ is the minimally required time to execute the protocol.
+  The controller can only *delay* broadcasting the block,
   but it cannot release the block before  $t_\textnormal{p}[v]$ simply because the proposal isn’t ready any earlier. 
     
 
