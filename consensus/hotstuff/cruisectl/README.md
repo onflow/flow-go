@@ -38,7 +38,6 @@ The process variable is the variable which:
 👉 The `BlockTimeController` controls the progression through views, such that the epoch switchover happens at the intended point in time. We define:
 
 - $\gamma = k\cdot \tau_0$ is the remaining epoch duration of a hypothetical ideal system, where *all* remaining $k$ views of the epoch progress with the ideal view time  $\tau_0$.
-- $\gamma = k\cdot \tau_0$ is the remaining epoch duration of a hypothetical ideal system, where *all* remaining $k$ views of the epoch progress with the ideal view time  $\tau_0$.
 - The parameter $\tau_0$ is computed solely based on the Epoch configuration as
   $\tau_0 := \frac{<{\rm total\ epoch\ time}>}{<{\rm total\ views\ in\ epoch}>}$ (for mainnet 22, Epoch 75, we have $\tau_0 \simeq$  1250ms).
 - $\Gamma$ is the *actual* time remaining until the desired epoch switchover.
@@ -72,6 +71,7 @@ After a disturbance, we want the controller to drive the system back to a state,
     - setting the differential term $K_d=0$, the controller responds as expected with damped oscillatory behaviour
       to a singular strong disturbance. Setting $K_d=3$ suppresses oscillations and the controller's performance improves as it responds more effectively.  
 
+      <img src="/docs/CruiseControl_BlockTimeController/EpochSimulation_029.png" width="300">
       ![](/docs/CruiseControl_BlockTimeController/EpochSimulation_029.png)
       ![](/docs/CruiseControl_BlockTimeController/EpochSimulation_030.png)
     
@@ -229,20 +229,16 @@ The controller output $u[v]$ represents the amount of time by which the controll
 ```
 ---    
 
-
-For further details about 
-
-- the statistical model of the view duration, see [ID controller for ``block-rate-delay``](https://www.notion.so/ID-controller-for-block-rate-delay-cc9c2d9785ac4708a37bb952557b5ef4?pvs=21)
-- the simulation and controller tuning, see  [flow-internal/analyses/pacemaker_timing/2023-05_Blocktime_PID-controller](https://github.com/dapperlabs/flow-internal/tree/master/analyses/pacemaker_timing/2023-05_Blocktime_PID-controller) → [controller_tuning_v01.py](https://github.com/dapperlabs/flow-internal/blob/master/analyses/pacemaker_timing/2023-05_Blocktime_PID-controller/controller_tuning_v01.py)
-
 ### Limits of authority
 
 In general, there is no bound on the output of the controller output $u$. However, it is important to limit the controller’s influence to keep $u$ within a sensible range.
 
 - upper bound on view duration $\widehat{\tau}[v]$ that we allow the controller to set:
   
-  The current timeout threshold is set to 2.5s. Therefore, the largest view duration we want to allow the  controller to set is 1.6s.
-  Thereby, approx. 900ms remain for message propagation, voting and constructing the child block, which will prevent the controller to drive the node into timeout with high probability. 
+  The current timeout threshold is set to 1045ms and the largest view duration we want to allow the controller to set is $\tau_\textrm{max}$ = 910ms.
+  Thereby, we have a buffer $\beta$ = 135ms remaining for message propagation and the replicas validating the proposal for view $v$.
+
+  Note the subtle but important aspect: the leader for view  
     
 - lower bound on the view duration:
     
@@ -259,6 +255,13 @@ In general, there is no bound on the output of the controller output $u$. Howeve
 \hat{t}[v] := \max\big(t[v] +\min(\widehat{\tau}[v],\ 2\textnormal{s}),\  t_\textnormal{p}[v]\big) 
 ```
 
+### Further reading
+
+- the statistical model of the view duration, see [PID controller for ``block-rate-delay``](https://www.notion.so/ID-controller-for-block-rate-delay-cc9c2d9785ac4708a37bb952557b5ef4?pvs=21)
+- the simulation and controller tuning, see  [flow-internal/analyses/pacemaker_timing/2023-05_Blocktime_PID-controller](https://github.com/dapperlabs/flow-internal/tree/master/analyses/pacemaker_timing/2023-05_Blocktime_PID-controller) → [controller_tuning_v01.py](https://github.com/dapperlabs/flow-internal/blob/master/analyses/pacemaker_timing/2023-05_Blocktime_PID-controller/controller_tuning_v01.py)
+- The most recent parameter setting was derived here:
+    - [Cruise-Control headroom for speedups](https://www.notion.so/flowfoundation/Cruise-Control-headroom-for-speedups-46dc17e07ae14462b03341e4432a907d?pvs=4) contains the formal analysis and discusses the numerical results in detail
+    - Python code for figures and calculating the final parameter settings: [flow-internal/analyses/pacemaker_timing/2024-03_Block-timing-update](https://github.com/dapperlabs/flow-internal/tree/master/analyses/pacemaker_timing/2024-03_Block-timing-update) → [timeout-attacks.py](https://github.com/dapperlabs/flow-internal/blob/master/analyses/pacemaker_timing/2024-03_Block-timing-update/timeout-attacks.py)
 
 
 ## Edge Cases

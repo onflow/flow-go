@@ -90,7 +90,7 @@ type ProposalDurationProvider interface {
 	// wants to publish a new proposal. The event handler inputs
 	//  - proposalView: the view it is proposing for,
 	//  - timeViewEntered: the time when the EventHandler entered this view
-	//  - parentBlockId: the ID of the parent block , which the EventHandler is building on
+	//  - parentBlockId: the ID of the parent block, which the EventHandler is building on
 	// TargetPublicationTime returns the time stamp when the new proposal should be broadcasted.
 	// For a given view where we are the primary, suppose the actual time we are done building our proposal is P:
 	//   - if P < TargetPublicationTime(..), then the EventHandler should wait until
