@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -29,6 +30,8 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	realstate "github.com/onflow/flow-go/state"
@@ -38,6 +41,7 @@ import (
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/generator"
@@ -65,6 +69,10 @@ type Suite struct {
 	results            *storagemock.ExecutionResults
 	transactionResults *storagemock.LightTransactionResults
 	events             *storagemock.Events
+
+	db                  *badger.DB
+	dbDir               string
+	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 
 	colClient              *access.AccessAPIClient
 	execClient             *access.ExecutionAPIClient
@@ -112,6 +120,19 @@ func (suite *Suite) SetupTest() {
 
 	var err error
 	suite.systemTx, err = blueprints.SystemChunkTransaction(flow.Testnet.Chain())
+	suite.Require().NoError(err)
+
+	suite.db, suite.dbDir = unittest.TempBadgerDB(suite.T())
+	suite.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(
+		bstorage.NewConsumerProgress(suite.db, module.ConsumeProgressLastFullBlockHeight),
+		0,
+	)
+	suite.Require().NoError(err)
+}
+
+// TearDownTest cleans up the db
+func (suite *Suite) TearDownTest() {
+	err := os.RemoveAll(suite.dbDir)
 	suite.Require().NoError(err)
 }
 
@@ -1138,10 +1159,6 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 
 	// set up GetLastFullBlockHeight mock
 	fullHeight := headBlock.Header.Height
-	suite.blocks.On("GetLastFullBlockHeight").Return(
-		func() uint64 { return fullHeight },
-		func() error { return nil },
-	)
 
 	suite.snapshot.
 		On("Head").
@@ -1183,41 +1200,43 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	// should return pending status when we have observed an expiry block but
 	// have not observed all intermediary Collections
 	suite.Run("expiry un-confirmed", func() {
-
 		suite.Run("ONLY finalized expiry block", func() {
 			// we have finalized an expiry block
 			headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry + 1
 			// we have NOT observed all intermediary Collections
 			fullHeight = block.Header.Height + flow.DefaultTransactionExpiry/2
+			err := suite.lastFullBlockHeight.Set(fullHeight)
+			suite.Require().NoError(err)
 
 			result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 			suite.checkResponse(result, err)
 			suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 		})
+
+		// we have observed all intermediary Collections
+		fullHeight = block.Header.Height + flow.DefaultTransactionExpiry + 1
+		err = suite.lastFullBlockHeight.Set(fullHeight)
+		suite.Require().NoError(err)
+
 		suite.Run("ONLY observed intermediary Collections", func() {
 			// we have NOT finalized an expiry block
 			headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry/2
-			// we have observed all intermediary Collections
-			fullHeight = block.Header.Height + flow.DefaultTransactionExpiry + 1
 
 			result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 			suite.checkResponse(result, err)
 			suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 		})
 
-	})
+		// should return expired status only when we have observed an expiry block
+		// and have observed all intermediary Collections
+		suite.Run("expired", func() {
+			// we have finalized an expiry block
+			headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry + 1
 
-	// should return expired status only when we have observed an expiry block
-	// and have observed all intermediary Collections
-	suite.Run("expired", func() {
-		// we have finalized an expiry block
-		headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry + 1
-		// we have observed all intermediary Collections
-		fullHeight = block.Header.Height + flow.DefaultTransactionExpiry + 1
-
-		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-		suite.checkResponse(result, err)
-		suite.Assert().Equal(flow.TransactionStatusExpired, result.Status)
+			result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+			suite.checkResponse(result, err)
+			suite.Assert().Equal(flow.TransactionStatusExpired, result.Status)
+		})
 	})
 
 	suite.assertAllExpectations()
@@ -2091,5 +2110,6 @@ func (suite *Suite) defaultBackendParams() Params {
 		TxErrorMessagesCacheSize: 1000,
 		BlockTracker:             nil,
 		TxResultQueryMode:        IndexQueryModeExecutionNodesOnly,
+		LastFullBlockHeight:      suite.lastFullBlockHeight,
 	}
 }
