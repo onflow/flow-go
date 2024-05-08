@@ -131,10 +131,10 @@ func NewBlockFromBytes(encoded []byte) (*Block, error) {
 		v1 := struct {
 			ParentBlockHash   gethCommon.Hash
 			Height            uint64
+			Timestamp         uint64
 			TotalSupply       *big.Int
 			ReceiptRoot       gethCommon.Hash
 			TransactionHashes []gethCommon.Hash
-			Timestamp         uint64
 		}{}
 		if e := gethRLP.DecodeBytes(encoded, &v1); e == nil {
 			return &Block{
@@ -163,3 +163,74 @@ var GenesisBlock = &Block{
 }
 
 var GenesisBlockHash, _ = GenesisBlock.Hash()
+
+// Below block type section, defines earlier block types,
+// this is being used to decode blocks that were stored
+// before block type changes. It allows us to still decode
+// a block that would otherwise be invalid if decoded into
+// latest version of the above Block type.
+
+type blockV0 struct {
+	ParentBlockHash gethCommon.Hash
+	Height          uint64
+	UUIDIndex       uint64
+	TotalSupply     uint64
+	StateRoot       gethCommon.Hash
+	ReceiptRoot     gethCommon.Hash
+}
+
+// adds TransactionHashes
+
+type blockV1 struct {
+	blockV0
+	TransactionHashes []gethCommon.Hash
+}
+
+// removes UUIDIndex
+
+type blockV2 struct {
+	ParentBlockHash   gethCommon.Hash
+	Height            uint64
+	TotalSupply       uint64
+	StateRoot         gethCommon.Hash
+	ReceiptRoot       gethCommon.Hash
+	TransactionHashes []gethCommon.Hash
+}
+
+// removes state root
+
+type blockV3 struct {
+	ParentBlockHash   gethCommon.Hash
+	Height            uint64
+	TotalSupply       uint64
+	ReceiptRoot       gethCommon.Hash
+	TransactionHashes []gethCommon.Hash
+}
+
+// change total supply type
+
+type blockV4 struct {
+	ParentBlockHash   gethCommon.Hash
+	Height            uint64
+	TotalSupply       *big.Int
+	ReceiptRoot       gethCommon.Hash
+	TransactionHashes []gethCommon.Hash
+}
+
+// adds timestamp
+
+type blockV5 struct {
+	ParentBlockHash   gethCommon.Hash
+	Height            uint64
+	Timestamp         uint64
+	TotalSupply       *big.Int
+	ReceiptRoot       gethCommon.Hash
+	TransactionHashes []gethCommon.Hash
+}
+
+// adds total gas used
+
+type blockV6 struct {
+	blockV5
+	TotalGasUsed uint64
+}
