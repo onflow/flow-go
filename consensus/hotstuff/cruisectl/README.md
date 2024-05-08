@@ -260,11 +260,11 @@ In general, there is no bound on the output of the controller output $u$. Howeve
 👉 Let $\hat{t}[v]$ denote the time when the primary for view $v$ *broadcasts* its proposal. We assign:
 
 ```math
-\hat{t}[v] := \max\big(t[v-1] +\min(\widehat{\tau}[v-1],\ \tau_\textrm{max}),\  t_\textnormal{p}[v]\big) 
+\hat{t}[v] := \max\Big(t[v-1] +\min(\widehat{\tau}[v-1],\ \tau_\textrm{max}),\  t_\textnormal{p}[v]\Big) 
 ```
-This equation guarantees that the controller does not drive consensus into a timeout, as long as message propagation and block validation
-in combination require less than $\beta$ time. Currently, we have $\tau_\textrm{max}$ = 800ms as the upper bound on a view duration the controller can set.
-In comparison, the timeout threshold is set to $\texttt{hotstuff-min-timeout} = \tau_\textrm{max} + \beta$, with $\beta$ = 135ms.  
+This equation guarantees that the controller does not drive consensus into a timeout, as long broadcasting the block and its validation
+together require less than time $\beta$. Currently, we have $\tau_\textrm{max}$ = 800ms as the upper bound for view durations that the controller can set.
+In comparison, for HotStuff's timeout threshold we set $\texttt{hotstuff-min-timeout} = \tau_\textrm{max} + \beta$, with $\beta$ = 135ms.  
 
 
 
@@ -303,7 +303,8 @@ We might incorrectly compute high error in the target view rate, if local curren
 ### EFM
 
 When the network is in EFM, epoch timing is anyway disrupted. The main thing we want to avoid is that the controller drives consensus into a timeout.
-This is largely guaranteed, due to the limits of authority 
+This is largely guaranteed, due to the limits of authority. Beyond that, pretty much any block timing on the happy path is acceptable.
+Through, the optimal solution would be a consistent view time throughout normal Epochs as well as EFM.  
 
 ## Testing
 
