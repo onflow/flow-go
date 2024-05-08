@@ -142,7 +142,12 @@ type blockV0 struct {
 // adds TransactionHashes
 
 type blockV1 struct {
-	blockV0
+	ParentBlockHash   gethCommon.Hash
+	Height            uint64
+	UUIDIndex         uint64
+	TotalSupply       uint64
+	StateRoot         gethCommon.Hash
+	ReceiptRoot       gethCommon.Hash
 	TransactionHashes []gethCommon.Hash
 }
 
