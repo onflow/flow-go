@@ -181,11 +181,11 @@ In particular systematic observation bias are a problem, as it leads to a diverg
 ```math
 \eqalign{
 \textnormal{initialization: }\quad \bar{\mathcal{I}} :&= 0 \\
-\textnormal{update with instantaneous error\ } e[v]:\quad \bar{\mathcal{I}}[v] &= e[v] + (1-\beta)\cdot\bar{\mathcal{I}}[v-1]
+\textnormal{update with instantaneous error\ } e[v]:\quad \bar{\mathcal{I}}[v] &= e[v] + (1-\lambda)\cdot\bar{\mathcal{I}}[v-1]
 }
 ```
 
-Intuitively, the loss factor $\beta$ relates to the time window of the integrator. A factor of 0 means an infinite time horizon, while $\beta =1$  makes the integrator only memorize the last input. Let  $\beta \equiv \frac{1}{N_\textnormal{itg}}$ and consider a constant input value $x$. Then $N_\textnormal{itg}$ relates to the number of past samples that the integrator remembers: 
+Intuitively, the loss factor $\lambda$ relates to the time window of the integrator. A factor of 0 means an infinite time horizon, while $\lambda =1$  makes the integrator only memorize the last input. Let  $\lambda \equiv \frac{1}{N_\textnormal{itg}}$ and consider a constant input value $x$. Then $N_\textnormal{itg}$ relates to the number of past samples that the integrator remembers: 
 
 - the integrators output will saturate at $x\cdot N_\textnormal{itg}$
 - an integrator initialized with 0, reaches 2/3 of the saturation value $x\cdot N_\textnormal{itg}$ after consuming $N_\textnormal{itg}$ inputs
@@ -222,7 +222,7 @@ with parameters:
 - $K_i = 0.6$
 - $K_d = 3.0$
 - $N_\textnormal{ewma} = 5$, i.e. $\alpha = \frac{1}{N_\textnormal{ewma}} = 0.2$
-- $N_\textnormal{itg} = 50$, i.e.  $\beta = \frac{1}{N_\textnormal{itg}} = 0.02$
+- $N_\textnormal{itg} = 50$, i.e.  $\lambda = \frac{1}{N_\textnormal{itg}} = 0.02$
     
 The controller output $u[v]$ represents the amount of time by which the controller wishes to deviate from the ideal view duration $\tau_0$. In other words, the duration of view $v$ that the controller wants to set is
 ```math
@@ -263,7 +263,7 @@ In general, there is no bound on the output of the controller output $u$. Howeve
 \hat{t}[v] := \max\Big(t[v-1] +\min(\widehat{\tau}[v-1],\ \tau_\textrm{max}),\  t_\textnormal{p}[v]\Big) 
 ```
 This equation guarantees that the controller does not drive consensus into a timeout, as long broadcasting the block and its validation
-together require less than time $\beta$. Currently, we have $\tau_\textrm{max}$ = 800ms as the upper bound for view durations that the controller can set.
+together require less than time $\beta$. Currently, we have $\tau_\textrm{max}$ = 910ms as the upper bound for view durations that the controller can set.
 In comparison, for HotStuff's timeout threshold we set $\texttt{hotstuff-min-timeout} = \tau_\textrm{max} + \beta$, with $\beta$ = 135ms.  
 
 
