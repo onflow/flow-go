@@ -1,11 +1,16 @@
 package recover_epoch
 
 import (
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
+	"fmt"
+	"os"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/flow-go/integration/utils"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestRecoverEpoch(t *testing.T) {
@@ -48,7 +53,30 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	numViewsInEpoch := uint64(4000)
 	numViewsInStakingAuction := uint64(100)
 	epochCounter := uint64(2)
-	s.executeEFMRecoverTXArgsCMD(flow.RoleConsensus, collectionClusters, numViewsInEpoch, numViewsInStakingAuction, epochCounter)
+	randomSource := "ohsorandom"
+	targetDuration := uint64(3000)
+	targetEndTime := uint64(4000)
+	out := fmt.Sprintf("%s/recover-epoch-tx-args.josn", s.Net.BootstrapDir)
 
+	s.executeEFMRecoverTXArgsCMD(
+		flow.RoleConsensus,
+		collectionClusters,
+		numViewsInEpoch,
+		numViewsInStakingAuction,
+		epochCounter,
+		targetDuration,
+		targetEndTime,
+		randomSource,
+		out,
+	)
+	b, err := os.ReadFile(out)
+	require.NoError(s.T(), err)
+
+	txArgs, err := utils.ParseJSON(b)
+	require.NoError(s.T(), err)
+
+	env := utils.LocalnetEnv()
+	result := s.recoverEpoch(env, txArgs)
+	fmt.Println("TX RESULT: ", result)
 	// submit recover epoch transaction to recover the network
 }
