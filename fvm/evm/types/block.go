@@ -124,6 +124,8 @@ var GenesisBlock = &Block{
 
 var GenesisBlockHash, _ = GenesisBlock.Hash()
 
+// todo remove this if confirmed we no longer need it on testnet, mainnet and previewnet.
+
 // Below block type section, defines earlier block types,
 // this is being used to decode blocks that were stored
 // before block type changes. It allows us to still decode
