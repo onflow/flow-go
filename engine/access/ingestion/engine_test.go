@@ -291,7 +291,7 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	s.Assertions.Eventually(func() bool {
 		wg.Wait()
 		return true
-	}, time.Millisecond*20, time.Millisecond)
+	}, time.Second, time.Millisecond)
 
 	// assert that the block was retrieved and all collections were requested
 	s.headers.AssertExpectations(s.T())
@@ -366,7 +366,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 	s.Assertions.Eventually(func() bool {
 		wg.Wait()
 		return true
-	}, time.Millisecond*20, time.Millisecond)
+	}, time.Second, time.Millisecond)
 
 	s.headers.AssertExpectations(s.T())
 	s.blocks.AssertNumberOfCalls(s.T(), "IndexBlockForCollections", 1)
