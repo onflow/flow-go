@@ -114,7 +114,7 @@ func (suite *ReactorEngineSuite_SetupPhase) SetupTest() {
 	// expectedPrivKey is the expected private share produced by the dkg run. We
 	// will mock the controller to return this value, and we will check it
 	// against the value that gets inserted in the DB at the end.
-	suite.expectedPrivateKey = unittest.PrivateKeyFixture(crypto.BLSBLS12381, 48)
+	suite.expectedPrivateKey = unittest.PrivateKeyFixture(crypto.BLSBLS12381)
 
 	// mock protocol state
 	suite.currentEpoch = new(protocol.Epoch)

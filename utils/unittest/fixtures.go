@@ -52,8 +52,7 @@ import (
 )
 
 const (
-	DefaultSeedFixtureLength = 64
-	DefaultAddress           = "localhost:0"
+	DefaultAddress = "localhost:0"
 )
 
 // returns a deterministic math/rand PRG that can be used for deterministic randomness in tests only.
@@ -2404,9 +2403,9 @@ func DKGBroadcastMessageFixture() *messages.BroadcastDKGMessage {
 	}
 }
 
-// PrivateKeyFixture returns a random private key with specified signature algorithm and seed length
-func PrivateKeyFixture(algo crypto.SigningAlgorithm, seedLength int) crypto.PrivateKey {
-	sk, err := crypto.GeneratePrivateKey(algo, SeedFixture(seedLength))
+// PrivateKeyFixture returns a random private key with specified signature algorithm
+func PrivateKeyFixture(algo crypto.SigningAlgorithm) crypto.PrivateKey {
+	sk, err := crypto.GeneratePrivateKey(algo, SeedFixture(crypto.KeyGenSeedMinLen))
 	if err != nil {
 		panic(err)
 	}
@@ -2435,18 +2434,18 @@ func StakingPrivKeyByIdentifier(id flow.Identifier) crypto.PrivateKey {
 
 // NetworkingPrivKeyFixture returns random ECDSAP256 private key
 func NetworkingPrivKeyFixture() crypto.PrivateKey {
-	return PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen)
+	return PrivateKeyFixture(crypto.ECDSAP256)
 }
 
 // StakingPrivKeyFixture returns a random BLS12381 private keyf
 func StakingPrivKeyFixture() crypto.PrivateKey {
-	return PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLen)
+	return PrivateKeyFixture(crypto.BLSBLS12381)
 }
 
 func NodeMachineAccountInfoFixture() bootstrap.NodeMachineAccountInfo {
 	return bootstrap.NodeMachineAccountInfo{
 		Address:           RandomAddressFixture().String(),
-		EncodedPrivateKey: PrivateKeyFixture(crypto.ECDSAP256, DefaultSeedFixtureLength).Encode(),
+		EncodedPrivateKey: PrivateKeyFixture(crypto.ECDSAP256).Encode(),
 		HashAlgorithm:     bootstrap.DefaultMachineAccountHashAlgo,
 		SigningAlgorithm:  bootstrap.DefaultMachineAccountSignAlgo,
 		KeyIndex:          bootstrap.DefaultMachineAccountKeyIndex,

@@ -165,13 +165,13 @@ func (s *DynamicEpochTransitionSuite) generateAccountKeys(role flow.Role) (
 	machineAccountKey crypto.PrivateKey,
 	machineAccountPubKey *sdk.AccountKey,
 ) {
-	operatorAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen)
+	operatorAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256)
 	networkingKey = unittest.NetworkingPrivKeyFixture()
 	stakingKey = unittest.StakingPrivKeyFixture()
 
 	// create a machine account
 	if role == flow.RoleConsensus || role == flow.RoleCollection {
-		machineAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen)
+		machineAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256)
 
 		machineAccountPubKey = &sdk.AccountKey{
 			PublicKey: machineAccountKey.PublicKey(),

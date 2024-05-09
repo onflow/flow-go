@@ -40,7 +40,7 @@ func createAggregationData(t *testing.T, signersNumber int) (
 	pks := make([]crypto.PublicKey, 0, signersNumber)
 	view := 10 + uint64(rand.Uint32())
 	for i := 0; i < signersNumber; i++ {
-		sk := unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLen)
+		sk := unittest.PrivateKeyFixture(crypto.BLSBLS12381)
 		identity := unittest.IdentityFixture(unittest.WithStakingPubKey(sk.PublicKey()))
 		// id
 		ids = append(ids, &identity.IdentitySkeleton)
@@ -70,7 +70,7 @@ func createAggregationData(t *testing.T, signersNumber int) (
 func TestNewTimeoutSignatureAggregator(t *testing.T) {
 	tag := "random_tag"
 
-	sk := unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen)
+	sk := unittest.PrivateKeyFixture(crypto.ECDSAP256)
 	signer := unittest.IdentityFixture(unittest.WithStakingPubKey(sk.PublicKey()))
 	// wrong key type
 	_, err := NewTimeoutSignatureAggregator(0, flow.IdentitySkeletonList{&signer.IdentitySkeleton}, tag)
@@ -191,7 +191,7 @@ func TestTimeoutSignatureAggregator_Aggregate(t *testing.T) {
 		var err error
 		aggregator, ids, pks, sigs, signersInfo, msgs, hashers := createAggregationData(t, signersNum)
 		// replace sig with random one
-		sk := unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLen)
+		sk := unittest.PrivateKeyFixture(crypto.BLSBLS12381)
 		sigs[0], err = sk.Sign([]byte("dummy"), hashers[0])
 		require.NoError(t, err)
 

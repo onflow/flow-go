@@ -218,7 +218,7 @@ func MakeSetProtocolStateVersionTx(
 // This ensures a single transaction can be sealed by the network.
 func CreateFlowAccount(ctx context.Context, client *testnet.Client) (sdk.Address, error) {
 	fullAccountKey := sdk.NewAccountKey().
-		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen).PublicKey()).
+		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256).PublicKey()).
 		SetHashAlgo(sdkcrypto.SHA2_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
 
