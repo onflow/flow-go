@@ -471,10 +471,10 @@ func (b *LibP2PNodeBuilder) configureRoutingSystem(
 		b.SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
 			return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(b.sporkId), b.logger, b.metricsConfig.Metrics, dht.AsServer())
 		})
+	} else {
+		// bitswap requires a content routing system. this returns a stub instead of a full DHT
+		b.SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
+			return none.ConstructNilRouting(ctx, host, nil, nil)
+		})
 	}
-
-	// bitswap requires a content routing system. this returns a stub instead of a full DHT
-	b.SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
-		return none.ConstructNilRouting(ctx, host, nil, nil)
-	})
 }
