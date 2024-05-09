@@ -435,7 +435,7 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 	// build the epoch, ending on the first block on the next epoch
 	tc.builder.BuildEpoch().CompleteEpoch()
 	// build halfway through the grace period for the epoch 1 cluster
-	tc.builder.BuildBlocks(flow.DefaultTransactionExpiry / 2)
+	tc.builder.AddBlocksWithSeals(flow.DefaultTransactionExpiry/2, 1)
 
 	epoch1 := tc.State().Final().Epochs().Previous()
 	epoch2 := tc.State().Final().Epochs().Current()
@@ -466,7 +466,7 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 	// NOTE: this is here solely to improve test reliability, as it means that
 	// while we are waiting for a guarantee there is only one cluster consensus
 	// instance running (per node) rather than two.
-	tc.builder.BuildBlocks(flow.DefaultTransactionExpiry/2 + 1)
+	tc.builder.AddBlocksWithSeals(flow.DefaultTransactionExpiry/2+1, 1)
 
 	// wait for epoch 2 transactions to be guaranteed
 	unittest.RequireReturnsBefore(tc.T(), waitForGuarantees.Wait, tc.Timeout(), "did not receive guarantees at consensus node")

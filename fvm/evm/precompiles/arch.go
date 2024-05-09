@@ -14,6 +14,8 @@ var (
 		[]string{"address", "bytes32", "bytes"},
 	)
 
+	RandomSourceFuncSig = ComputeFunctionSelector("getRandomSource", []string{"uint64"})
+
 	// FlowBlockHeightFixedGas is set to match the `number` opCode (0x43)
 	FlowBlockHeightFixedGas = uint64(2)
 	// ProofVerifierBaseGas covers the cost of decoding, checking capability the resource
@@ -22,6 +24,13 @@ var (
 	// ProofVerifierGasMultiplerPerSignature is set to match `ECRECOVER`
 	// but we might increase this in the future
 	ProofVerifierGasMultiplerPerSignature = uint64(3_000)
+
+	// RandomSourceGas covers the cost of calculating a revertible random bytes
+	RandomSourceGas = uint64(1_000) // todo define
+
+	// errUnexpectedInput is returned when the function that doesn't expect an input
+	// argument, receives one
+	errUnexpectedInput = fmt.Errorf("unexpected input is provided")
 )
 
 // ArchContract return a procompile for the Cadence Arch contract
@@ -31,12 +40,14 @@ func ArchContract(
 	address types.Address,
 	heightProvider func() (uint64, error),
 	proofVer func(*types.COAOwnershipProofInContext) (bool, error),
+	randomSourceProvider func(uint64) (uint64, error),
 ) types.Precompile {
 	return MultiFunctionPrecompileContract(
 		address,
 		[]Function{
 			&flowBlockHeight{heightProvider},
 			&proofVerifier{proofVer},
+			&randomnessSource{randomSourceProvider},
 		},
 	)
 }
@@ -57,7 +68,7 @@ func (c *flowBlockHeight) ComputeGas(input []byte) uint64 {
 
 func (c *flowBlockHeight) Run(input []byte) ([]byte, error) {
 	if len(input) > 0 {
-		return nil, fmt.Errorf("unexpected input is provided")
+		return nil, errUnexpectedInput
 	}
 	bh, err := c.flowBlockHeightLookUp()
 	if err != nil {
@@ -116,6 +127,39 @@ func (f *proofVerifier) Run(input []byte) ([]byte, error) {
 
 	buffer := make([]byte, EncodedBoolSize)
 	return buffer, EncodeBool(verified, buffer, 0)
+}
+
+var _ Function = &randomnessSource{}
+
+type randomnessSource struct {
+	randomSourceProvider func(uint64) (uint64, error)
+}
+
+func (r *randomnessSource) FunctionSelector() FunctionSelector {
+	return RandomSourceFuncSig
+}
+
+func (r *randomnessSource) ComputeGas(input []byte) uint64 {
+	return RandomSourceGas
+}
+
+func (r *randomnessSource) Run(input []byte) ([]byte, error) {
+	height, err := ReadUint64(input, 0)
+	if err != nil {
+		return nil, err
+	}
+	rand, err := r.randomSourceProvider(height)
+	if err != nil {
+		return nil, err
+	}
+
+	buf := make([]byte, EncodedUint64Size)
+	err = EncodeUint64(rand, buf, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf, nil
 }
 
 func DecodeABIEncodedProof(input []byte) (*types.COAOwnershipProofInContext, error) {

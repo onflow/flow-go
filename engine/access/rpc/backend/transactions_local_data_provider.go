@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
@@ -49,13 +50,14 @@ type TransactionErrorMessage interface {
 
 // TransactionsLocalDataProvider provides functionality for retrieving transaction results and error messages from local storages
 type TransactionsLocalDataProvider struct {
-	state           protocol.State
-	collections     storage.Collections
-	blocks          storage.Blocks
-	eventsIndex     *index.EventsIndex
-	txResultsIndex  *index.TransactionResultsIndex
-	txErrorMessages TransactionErrorMessage
-	systemTxID      flow.Identifier
+	state               protocol.State
+	collections         storage.Collections
+	blocks              storage.Blocks
+	eventsIndex         *index.EventsIndex
+	txResultsIndex      *index.TransactionResultsIndex
+	txErrorMessages     TransactionErrorMessage
+	systemTxID          flow.Identifier
+	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 }
 
 // GetTransactionResultFromStorage retrieves a transaction result from storage by block ID and transaction ID.
@@ -94,7 +96,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
-	txStatus, err := t.DeriveTransactionStatus(blockID, block.Header.Height, true)
+	txStatus, err := t.DeriveTransactionStatus(block.Header.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
@@ -178,7 +180,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 			txStatusCode = 1
 		}
 
-		txStatus, err := t.DeriveTransactionStatus(blockID, block.Header.Height, true)
+		txStatus, err := t.DeriveTransactionStatus(block.Header.Height, true)
 		if err != nil {
 			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 				irrecoverable.Throw(ctx, err)
@@ -255,7 +257,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
-	txStatus, err := t.DeriveTransactionStatus(blockID, block.Header.Height, true)
+	txStatus, err := t.DeriveTransactionStatus(block.Header.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
@@ -322,10 +324,7 @@ func (t *TransactionsLocalDataProvider) DeriveUnknownTransactionStatus(refBlockI
 
 	// the last full height is the height where we have received all
 	// collections  for all blocks with a lower height
-	fullHeight, err := t.blocks.GetLastFullBlockHeight()
-	if err != nil {
-		return flow.TransactionStatusUnknown, err
-	}
+	fullHeight := t.lastFullBlockHeight.Value()
 
 	// if we have received collections  for all blocks up to the expiry block, the transaction is expired
 	if isExpired(refHeight, fullHeight) {
@@ -338,9 +337,9 @@ func (t *TransactionsLocalDataProvider) DeriveUnknownTransactionStatus(refBlockI
 	return flow.TransactionStatusPending, nil
 }
 
-// DeriveTransactionStatus is used to determine the status of a transaction based on the provided block ID, block height, and execution status.
+// DeriveTransactionStatus is used to determine the status of a transaction based on the provided block height, and execution status.
 // No errors expected during normal operations.
-func (t *TransactionsLocalDataProvider) DeriveTransactionStatus(blockID flow.Identifier, blockHeight uint64, executed bool) (flow.TransactionStatus, error) {
+func (t *TransactionsLocalDataProvider) DeriveTransactionStatus(blockHeight uint64, executed bool) (flow.TransactionStatus, error) {
 	if !executed {
 		// If we've gotten here, but the block has not yet been executed, report it as only been finalized
 		return flow.TransactionStatusFinalized, nil

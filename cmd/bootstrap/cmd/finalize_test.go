@@ -2,17 +2,18 @@ package cmd
 
 import (
 	"encoding/hex"
-	"fmt"
 	"math/rand"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	utils "github.com/onflow/flow-go/cmd/bootstrap/utils"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -91,7 +92,6 @@ func TestFinalize_HappyPath(t *testing.T) {
 		log = log.Hook(hook)
 
 		finalize(nil, nil)
-		fmt.Println(hook.logs.String())
 		assert.Regexp(t, finalizeHappyPathRegex, hook.logs.String())
 		hook.logs.Reset()
 
@@ -110,15 +110,16 @@ func TestClusterAssignment(t *testing.T) {
 	partners := unittest.NodeInfosFixture(partnersLen, unittest.WithRole(flow.RoleCollection))
 	internals := unittest.NodeInfosFixture(internalLen, unittest.WithRole(flow.RoleCollection))
 
+	log := zerolog.Nop()
 	// should not error
-	_, clusters, err := constructClusterAssignment(partners, internals)
+	_, clusters, err := common.ConstructClusterAssignment(log, model.ToIdentityList(partners), model.ToIdentityList(internals), int(flagCollectionClusters))
 	require.NoError(t, err)
 	require.True(t, checkClusterConstraint(clusters, partners, internals))
 
 	// unhappy Path
 	internals = internals[:21] // reduce one internal node
 	// should error
-	_, _, err = constructClusterAssignment(partners, internals)
+	_, _, err = common.ConstructClusterAssignment(log, model.ToIdentityList(partners), model.ToIdentityList(internals), int(flagCollectionClusters))
 	require.Error(t, err)
 	// revert the flag value
 	flagCollectionClusters = tmp

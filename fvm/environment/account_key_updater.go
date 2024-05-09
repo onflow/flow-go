@@ -81,28 +81,6 @@ func NewAccountPublicKey(publicKey *runtime.PublicKey,
 // Note that scripts cannot modify account keys, but must expose the API in
 // compliance with the runtime environment interface.
 type AccountKeyUpdater interface {
-	// AddEncodedAccountKey adds an encoded public key to an existing account.
-	//
-	// This function returns an error if the specified account does not exist or
-	// if the key insertion fails.
-	//
-	// Note that the script variant will return OperationNotSupportedError.
-	AddEncodedAccountKey(runtimeAddress common.Address, publicKey []byte) error
-
-	// RevokeEncodedAccountKey revokes a public key by index from an existing
-	// account.
-	//
-	// This function returns an error if the specified account does not exist,
-	// the provided key is invalid, or if key revoking fails.
-	//
-	// Note that the script variant will return OperationNotSupportedError.
-	RevokeEncodedAccountKey(
-		runtimeAddress common.Address,
-		index int,
-	) (
-		[]byte,
-		error,
-	)
 
 	// AddAccountKey adds a public key to an existing account.
 	//
@@ -153,33 +131,6 @@ func NewParseRestrictedAccountKeyUpdater(
 	}
 }
 
-func (updater ParseRestrictedAccountKeyUpdater) AddEncodedAccountKey(
-	runtimeAddress common.Address,
-	publicKey []byte,
-) error {
-	return parseRestrict2Arg(
-		updater.txnState,
-		trace.FVMEnvAddEncodedAccountKey,
-		updater.impl.AddEncodedAccountKey,
-		runtimeAddress,
-		publicKey)
-}
-
-func (updater ParseRestrictedAccountKeyUpdater) RevokeEncodedAccountKey(
-	runtimeAddress common.Address,
-	index int,
-) (
-	[]byte,
-	error,
-) {
-	return parseRestrict2Arg1Ret(
-		updater.txnState,
-		trace.FVMEnvRevokeEncodedAccountKey,
-		updater.impl.RevokeEncodedAccountKey,
-		runtimeAddress,
-		index)
-}
-
 func (updater ParseRestrictedAccountKeyUpdater) AddAccountKey(
 	runtimeAddress common.Address,
 	publicKey *runtime.PublicKey,
@@ -215,23 +166,6 @@ func (updater ParseRestrictedAccountKeyUpdater) RevokeAccountKey(
 }
 
 type NoAccountKeyUpdater struct{}
-
-func (NoAccountKeyUpdater) AddEncodedAccountKey(
-	runtimeAddress common.Address,
-	publicKey []byte,
-) error {
-	return errors.NewOperationNotSupportedError("AddEncodedAccountKey")
-}
-
-func (NoAccountKeyUpdater) RevokeEncodedAccountKey(
-	runtimeAddress common.Address,
-	index int,
-) (
-	[]byte,
-	error,
-) {
-	return nil, errors.NewOperationNotSupportedError("RevokeEncodedAccountKey")
-}
 
 func (NoAccountKeyUpdater) AddAccountKey(
 	runtimeAddress common.Address,
@@ -418,151 +352,6 @@ func (updater *accountKeyUpdater) revokeAccountKey(
 		Weight:    publicKey.Weight,
 		IsRevoked: publicKey.Revoked,
 	}, nil
-}
-
-// InternalAddEncodedAccountKey adds an encoded public key to an existing
-// account.
-//
-// This function returns following error
-// * NewAccountNotFoundError - if the specified account does not exist
-// * ValueError - if the provided encodedPublicKey is not valid public key
-func (updater *accountKeyUpdater) InternalAddEncodedAccountKey(
-	address flow.Address,
-	encodedPublicKey []byte,
-) error {
-	ok, err := updater.accounts.Exists(address)
-	if err != nil {
-		return fmt.Errorf("adding encoded account key failed: %w", err)
-	}
-
-	if !ok {
-		return errors.NewAccountNotFoundError(address)
-	}
-
-	var publicKey flow.AccountPublicKey
-
-	publicKey, err = flow.DecodeRuntimeAccountPublicKey(encodedPublicKey, 0)
-	if err != nil {
-		hexEncodedPublicKey := hex.EncodeToString(encodedPublicKey)
-		return fmt.Errorf(
-			"adding encoded account key failed: %w",
-			errors.NewValueErrorf(
-				hexEncodedPublicKey,
-				"invalid encoded public key value: %w",
-				err))
-	}
-
-	err = updater.accounts.AppendPublicKey(address, publicKey)
-	if err != nil {
-		return fmt.Errorf("adding encoded account key failed: %w", err)
-	}
-
-	return nil
-}
-
-// RemoveAccountKey revokes a public key by index from an existing account.
-//
-// This function returns an error if the specified account does not exist, the
-// provided key is invalid, or if key revoking fails.
-func (updater *accountKeyUpdater) removeAccountKey(
-	address flow.Address,
-	keyIndex int,
-) (
-	[]byte,
-	error,
-) {
-	ok, err := updater.accounts.Exists(address)
-	if err != nil {
-		return nil, fmt.Errorf("remove account key failed: %w", err)
-	}
-
-	if !ok {
-		issue := errors.NewAccountNotFoundError(address)
-		return nil, fmt.Errorf("remove account key failed: %w", issue)
-	}
-
-	if keyIndex < 0 {
-		err = errors.NewValueErrorf(
-			fmt.Sprint(keyIndex),
-			"key index must be positive")
-		return nil, fmt.Errorf("remove account key failed: %w", err)
-	}
-
-	var publicKey flow.AccountPublicKey
-	publicKey, err = updater.accounts.GetPublicKey(
-		address,
-		uint64(keyIndex))
-	if err != nil {
-		return nil, fmt.Errorf("remove account key failed: %w", err)
-	}
-
-	// mark this key as revoked
-	publicKey.Revoked = true
-
-	encodedPublicKey, err := updater.accounts.SetPublicKey(
-		address,
-		uint64(keyIndex),
-		publicKey)
-	if err != nil {
-		return nil, fmt.Errorf("remove account key failed: %w", err)
-	}
-
-	return encodedPublicKey, nil
-}
-
-func (updater *accountKeyUpdater) AddEncodedAccountKey(
-	runtimeAddress common.Address,
-	publicKey []byte,
-) error {
-	defer updater.tracer.StartChildSpan(
-		trace.FVMEnvAddEncodedAccountKey).End()
-
-	err := updater.meter.MeterComputation(
-		ComputationKindAddEncodedAccountKey,
-		1)
-	if err != nil {
-		return fmt.Errorf("add encoded account key failed: %w", err)
-	}
-
-	address := flow.ConvertAddress(runtimeAddress)
-
-	// TODO do a call to track the computation usage and memory usage
-	//
-	// don't enforce limit during adding a key
-	updater.txnState.RunWithAllLimitsDisabled(func() {
-		err = updater.InternalAddEncodedAccountKey(address, publicKey)
-	})
-
-	if err != nil {
-		return fmt.Errorf("add encoded account key failed: %w", err)
-	}
-	return nil
-}
-
-func (updater *accountKeyUpdater) RevokeEncodedAccountKey(
-	runtimeAddress common.Address,
-	index int,
-) (
-	[]byte,
-	error,
-) {
-	defer updater.tracer.StartChildSpan(trace.FVMEnvRevokeEncodedAccountKey).End()
-
-	err := updater.meter.MeterComputation(
-		ComputationKindRevokeEncodedAccountKey,
-		1)
-	if err != nil {
-		return nil, fmt.Errorf("revoke encoded account key failed: %w", err)
-	}
-
-	address := flow.ConvertAddress(runtimeAddress)
-
-	encodedKey, err := updater.removeAccountKey(address, index)
-	if err != nil {
-		return nil, fmt.Errorf("revoke encoded account key failed: %w", err)
-	}
-
-	return encodedKey, nil
 }
 
 func (updater *accountKeyUpdater) AddAccountKey(

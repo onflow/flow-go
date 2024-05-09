@@ -31,7 +31,7 @@ func TestDebugger_RunTransaction(t *testing.T) {
 	const scriptTemplate = `
 	import FlowServiceAccount from 0x%s
 	transaction() {
-		prepare(signer: AuthAccount) {
+		prepare(signer: &Account) {
 			log(signer.balance)
 		}
 	  }

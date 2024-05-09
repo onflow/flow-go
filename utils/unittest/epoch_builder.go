@@ -352,30 +352,12 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 	return builder
 }
 
-// BuildBlocks builds empty blocks on top of the finalized state. It is used
-// to build epochs that are not the minimum possible length, which is the
-// default result from chaining BuildEpoch and CompleteEpoch.
-func (builder *EpochBuilder) BuildBlocks(n uint) {
-	head, err := builder.states[0].Final().Head()
-	require.NoError(builder.t, err)
-	for i := uint(0); i < n; i++ {
-		next := BlockWithParentFixture(head)
-		builder.addBlock(next)
-		head = next.Header
-	}
-}
-
 // addBlock adds the given block to the state by: extending the state,
 // finalizing the block, and caching the block.
 func (builder *EpochBuilder) addBlock(block *flow.Block) {
-	stateMutator, err := builder.mutableProtocolState.Mutator(block.Header.View, block.Header.ParentID)
+	updatedStateId, dbUpdates, err := builder.mutableProtocolState.EvolveState(block.Header.ParentID, block.Header.View, block.Payload.Seals)
 	require.NoError(builder.t, err)
-
-	err = stateMutator.ApplyServiceEventsFromValidatedSeals(block.Payload.Seals)
-	require.NoError(builder.t, err)
-
-	updatedStateId, _, err := stateMutator.Build()
-	require.NoError(builder.t, err)
+	require.False(builder.t, dbUpdates.IsEmpty())
 
 	block.Payload.ProtocolStateID = updatedStateId
 	block.Header.PayloadHash = block.Payload.Hash()

@@ -5,13 +5,19 @@ pragma solidity >=0.7.0 <0.9.0;
 contract Storage {
 
     address constant public cadenceArch = 0x0000000000000000000000010000000000000001;
-    
+    event NewStore(address indexed caller, uint256 indexed value);
+
     uint256 number;
 
     constructor() payable {
     }
 
     function store(uint256 num) public {
+        number = num;
+    }
+
+    function storeWithLog(uint256 num) public {
+        emit NewStore(msg.sender, num);
         number = num;
     }
 
@@ -46,6 +52,13 @@ contract Storage {
 
     function destroy() public {
         selfdestruct(payable(msg.sender));
+    }
+
+    function verifyArchCallToRandomSource(uint64 height) public view returns (uint64) {
+        (bool ok, bytes memory data) = cadenceArch.staticcall(abi.encodeWithSignature("getRandomSource(uint64)", height));
+        require(ok, "unsuccessful call to arch ");
+        uint64 output = abi.decode(data, (uint64));
+        return output;
     }
 
     function verifyArchCallToFlowBlockHeight(uint64 expected) public view returns (uint64){

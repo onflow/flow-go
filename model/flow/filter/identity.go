@@ -145,3 +145,20 @@ var IsVotingConsensusCommitteeMember = And[flow.Identity](
 // equivalent to the filter for consensus committee members, as these are
 // the same group for now.
 var IsValidDKGParticipant = IsConsensusCommitteeMember
+
+// NotEjectedFilter is an identity filter for peers that are not ejected.
+var NotEjectedFilter = Not(HasParticipationStatus(flow.EpochParticipationStatusEjected))
+
+// HasWeightGreaterThanZero returns a filter for nodes with a weight greater than zero.
+func HasWeightGreaterThanZero[T flow.GenericIdentity](identity *T) bool {
+	return (*identity).GetInitialWeight() > 0
+}
+
+// IsValidProtocolParticipant is an identity filter for all valid protocol participants.
+// A protocol participant is considered valid if and only if the following are both true.
+// 1. The node is not ejected.
+// 2. The node has a weight greater than 0.
+var IsValidProtocolParticipant = And[flow.Identity](
+	NotEjectedFilter,                        // enforces 1
+	HasWeightGreaterThanZero[flow.Identity], // enforces 2
+)

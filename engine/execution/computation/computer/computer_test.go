@@ -15,9 +15,9 @@ import (
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 
+	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -1172,14 +1172,6 @@ func (e *testRuntime) ReadStored(
 	return e.readStored(a, p, c)
 }
 
-func (*testRuntime) ReadLinked(
-	_ common.Address,
-	_ cadence.Path,
-	_ runtime.Context,
-) (cadence.Value, error) {
-	panic("ReadLinked not expected")
-}
-
 func (*testRuntime) SetDebugger(_ *interpreter.Debugger) {
 	panic("SetDebugger not expected")
 }
@@ -1256,7 +1248,8 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	noopCollector := metrics.NewNoopCollector()
 
 	expectedNumberOfEvents := 3
-	expectedEventSize := 1493
+	expectedEventSize := 1497
+
 	// bootstrapping does not cache programs
 	expectedCachedPrograms := 0
 

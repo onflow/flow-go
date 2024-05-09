@@ -31,7 +31,7 @@ type ProtocolKVStore struct {
 	// ID as key for retrieving the versioned binary snapshot of the kv-store. Consumers must know how to
 	// deal with the binary representation. `cache` only holds the distinct snapshots. On the happy path,
 	// we expect single-digit number of unique snapshots within an epoch.
-	cache *Cache[flow.Identifier, *storage.KeyValueStoreData]
+	cache *Cache[flow.Identifier, *flow.PSKeyValueStoreData]
 
 	// byBlockIdCache is essentially an in-memory map from `Block.ID()` -> `KeyValueStore.ID()`. The full
 	// kv-store snapshot can be retrieved from the `cache` above.
@@ -49,17 +49,17 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 	kvStoreCacheSize uint,
 	kvStoreByBlockIDCacheSize uint,
 ) *ProtocolKVStore {
-	retrieveByStateID := func(stateID flow.Identifier) func(tx *badger.Txn) (*storage.KeyValueStoreData, error) {
-		return func(tx *badger.Txn) (*storage.KeyValueStoreData, error) {
-			var kvStore storage.KeyValueStoreData
+	retrieveByStateID := func(stateID flow.Identifier) func(tx *badger.Txn) (*flow.PSKeyValueStoreData, error) {
+		return func(tx *badger.Txn) (*flow.PSKeyValueStoreData, error) {
+			var kvStore flow.PSKeyValueStoreData
 			err := operation.RetrieveProtocolKVStore(stateID, &kvStore)(tx)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("could not get kv snapshot by id: %w", err)
 			}
 			return &kvStore, nil
 		}
 	}
-	storeByStateID := func(stateID flow.Identifier, data *storage.KeyValueStoreData) func(*transaction.Tx) error {
+	storeByStateID := func(stateID flow.Identifier, data *flow.PSKeyValueStoreData) func(*transaction.Tx) error {
 		return transaction.WithTx(operation.InsertProtocolKVStore(stateID, data))
 	}
 
@@ -86,8 +86,8 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 
 	return &ProtocolKVStore{
 		db: db,
-		cache: newCache[flow.Identifier, *storage.KeyValueStoreData](collector, metrics.ResourceProtocolKVStore,
-			withLimit[flow.Identifier, *storage.KeyValueStoreData](kvStoreCacheSize),
+		cache: newCache[flow.Identifier, *flow.PSKeyValueStoreData](collector, metrics.ResourceProtocolKVStore,
+			withLimit[flow.Identifier, *flow.PSKeyValueStoreData](kvStoreCacheSize),
 			withStore(storeByStateID),
 			withRetrieve(retrieveByStateID)),
 		byBlockIdCache: newCache[flow.Identifier, flow.Identifier](collector, metrics.ResourceProtocolKVStoreByBlockID,
@@ -101,7 +101,7 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 // which persists the given KV-store snapshot as part of a DB tx.
 // Expected errors of the returned anonymous function:
 //   - storage.ErrAlreadyExists if a KV-store snapshot with the given id is already stored.
-func (s *ProtocolKVStore) StoreTx(stateID flow.Identifier, data *storage.KeyValueStoreData) func(*transaction.Tx) error {
+func (s *ProtocolKVStore) StoreTx(stateID flow.Identifier, data *flow.PSKeyValueStoreData) func(*transaction.Tx) error {
 	return s.cache.PutTx(stateID, data)
 }
 
@@ -125,7 +125,7 @@ func (s *ProtocolKVStore) IndexTx(blockID flow.Identifier, stateID flow.Identifi
 // ByID retrieves the KV store snapshot with the given ID.
 // Expected errors during normal operations:
 //   - storage.ErrNotFound if no snapshot with the given Identifier is known.
-func (s *ProtocolKVStore) ByID(id flow.Identifier) (*storage.KeyValueStoreData, error) {
+func (s *ProtocolKVStore) ByID(id flow.Identifier) (*flow.PSKeyValueStoreData, error) {
 	tx := s.db.NewTransaction(false)
 	defer tx.Discard()
 	return s.cache.Get(id)(tx)
@@ -143,7 +143,7 @@ func (s *ProtocolKVStore) ByID(id flow.Identifier) (*storage.KeyValueStoreData, 
 //
 // Expected errors during normal operations:
 //   - storage.ErrNotFound if no snapshot has been indexed for the given block.
-func (s *ProtocolKVStore) ByBlockID(blockID flow.Identifier) (*storage.KeyValueStoreData, error) {
+func (s *ProtocolKVStore) ByBlockID(blockID flow.Identifier) (*flow.PSKeyValueStoreData, error) {
 	tx := s.db.NewTransaction(false)
 	defer tx.Discard()
 	stateID, err := s.byBlockIdCache.Get(blockID)(tx)

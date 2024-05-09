@@ -151,6 +151,13 @@ func NewBlockComputer(
 	if maxConcurrency < 1 {
 		return nil, fmt.Errorf("invalid maxConcurrency: %d", maxConcurrency)
 	}
+
+	// this is a safeguard to prevent scripts from writing to the program cache on Execution nodes.
+	// writes are only allowed by transactions.
+	if vmCtx.AllowProgramCacheWritesInScripts {
+		return nil, fmt.Errorf("program cache writes are not allowed in scripts on Execution nodes")
+	}
+
 	systemChunkCtx := SystemChunkContext(vmCtx)
 	vmCtx = fvm.NewContextFromParent(
 		vmCtx,

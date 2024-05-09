@@ -532,6 +532,10 @@ func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 	}
 }
 
+func BlockHeaderWithHeight(height uint64) *flow.Header {
+	return BlockHeaderFixture(WithHeaderHeight(height))
+}
+
 func BlockHeaderWithParentWithSoRFixture(parent *flow.Header, source []byte) *flow.Header {
 	height := parent.Height + 1
 	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
@@ -1455,7 +1459,7 @@ func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
 
 func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.TransactionBody {
 	tb := flow.TransactionBody{
-		Script:             []byte("pub fun main() {}"),
+		Script:             []byte("access(all) fun main() {}"),
 		ReferenceBlockID:   IdentifierFixture(),
 		GasLimit:           10,
 		ProposalKey:        ProposalKeyFixture(),
@@ -1497,7 +1501,7 @@ func TransactionDSLFixture(chain flow.Chain) dsl.Transaction {
 		Import: dsl.Import{Address: sdk.Address(chain.ServiceAddress())},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
-				pub fun main() {}
+				access(all) fun main() {}
 			`),
 		},
 	}
@@ -2678,7 +2682,7 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 	}
 }
 
-// ProtocolStateFixture creates a fixture with correctly structured data. The returned Identity Table
+// EpochStateFixture creates a fixture with correctly structured data. The returned Identity Table
 // represents the common situation during the staking phase of Epoch N+1:
 //   - we are currently in Epoch N
 //   - previous epoch N-1 is known (specifically EpochSetup and EpochCommit events)
@@ -2689,7 +2693,7 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 //   - Epoch setup and commit counters are set to match.
 //   - Identities are constructed from setup events.
 //   - Identities are sorted in canonical order.
-func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.RichProtocolStateEntry {
+func EpochStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.RichProtocolStateEntry {
 	prevEpochSetup := EpochSetupFixture()
 	prevEpochCommit := EpochCommitFixture(func(commit *flow.EpochCommit) {
 		commit.Counter = prevEpochSetup.Counter

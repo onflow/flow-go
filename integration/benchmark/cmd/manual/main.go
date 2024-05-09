@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onflow/flow-go/integration/benchmark/load"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -92,11 +90,13 @@ func main() {
 	for _, addr := range accessNodeAddrs {
 		client, err := client.NewClient(
 			addr,
-			grpc.WithDefaultCallOptions(
-				grpc.MaxCallRecvMsgSize(defaultMaxMsgSize),
-				grpc.MaxCallSendMsgSize(defaultMaxMsgSize),
+			client.WithGRPCDialOptions(
+				grpc.WithDefaultCallOptions(
+					grpc.MaxCallRecvMsgSize(defaultMaxMsgSize),
+					grpc.MaxCallSendMsgSize(defaultMaxMsgSize),
+				),
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
 			),
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
 		)
 		if err != nil {
 			log.Fatal().Str("addr", addr).Err(err).Msgf("unable to initialize flow client")
@@ -132,8 +132,14 @@ func main() {
 		},
 		benchmark.LoadParams{
 			NumberOfAccounts: int(maxTPS) * *accountMultiplierFlag,
-			LoadType:         load.LoadType(*loadTypeFlag),
-			FeedbackEnabled:  *feedbackEnabled,
+			LoadConfig: benchmark.LoadConfig{
+				LoadName:   *loadTypeFlag,
+				LoadType:   *loadTypeFlag,
+				TpsMax:     int(maxTPS),
+				TpsMin:     int(maxTPS),
+				TPSInitial: int(maxTPS),
+			},
+			FeedbackEnabled: *feedbackEnabled,
 		},
 	)
 	if err != nil {

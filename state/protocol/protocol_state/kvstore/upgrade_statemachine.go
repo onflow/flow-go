@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // PSVersionUpgradeStateMachine encapsulates the logic for evolving the version of the Protocol State.
@@ -40,10 +41,11 @@ func NewPSVersionUpgradeStateMachine(
 	}
 }
 
-// Build is a no-op, because scheduled version upgrades are stored in the KVStore only.
-// (There is no secondary database operations to persist version upgrade data.)
-func (m *PSVersionUpgradeStateMachine) Build() protocol.DeferredBlockPersistOps {
-	return protocol.DeferredBlockPersistOps{}
+// Build is a no-op, because scheduled version upgrades are stored in the KVStore only, which the
+// caller `protocol.MutableProtocolState` persist. (There is no secondary database operations to
+// index or persist version upgrade data separately)
+func (m *PSVersionUpgradeStateMachine) Build() (*transaction.DeferredBlockPersist, error) {
+	return transaction.NewDeferredBlockPersist(), nil
 }
 
 // EvolveState applies the state change(s) on sub-state P for the candidate block (under construction).

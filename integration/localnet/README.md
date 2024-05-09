@@ -313,9 +313,10 @@ Create a file (for example `my_script.cdc`) containing following cadence code:
 import FungibleToken from 0xee82856bf20e2aa6
 import FlowToken from 0x0ae53cb6e3f42a79
 
-pub fun main(address: Address): UFix64 {
+access(all)
+fun main(address: Address): UFix64 {
 	let acct = getAccount(address)
-	let vaultRef = acct.getCapability(/public/flowTokenBalance)!.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
+	let vaultRef = acct.capabilities.borrow<&FlowToken.Vault{FungibleToken.Balance}>(/public/flowTokenBalance)
 		?? panic("Could not borrow Balance reference to the Vault")
 	return vaultRef.balance
 }
@@ -331,7 +332,8 @@ The script should output the account balance of the specified account.
 You can also execute simple script without creating files, by providing the script in the command, for example:
 ```
 # flow scripts execute -n localnet <(echo """
-pub fun main(address: Address): UFix64 {
+access(all)
+fun main(address: Address): UFix64 {
     return getAccount(address).balance
 }
 """) "<ACCOUNT_ADDRESS>"
