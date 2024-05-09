@@ -18,9 +18,9 @@ Code structure:
 The bootstrapping will generate the following information:
 
 #### Per node
-* Staking key (BLS key on curve BLS12-381)
-* Networking key (ECDSA key on curve P-256)
-* Random beacon key; _only_ for consensus nodes (BLS key on curve BLS12-381, used for a BLS-based threshold signatures)
+* Staking private key (BLS key on curve BLS12-381)
+* Networking private key (ECDSA key on curve P-256)
+* Random beacon private key; _only_ for consensus nodes (BLS key on curve BLS12-381, used for a BLS-based threshold signatures)
 
 #### Node Identities
 * List of all authorized Flow nodes
@@ -78,7 +78,7 @@ go run ./cmd/bootstrap key --address "example.com:1234" --role "consensus" -o ./
      file needs to be available to respective partner node at boot up (or recovery after crash)
 * file `<NodeID>.node-info.pub.json`
    - public information
-   - file needs to be delivered to Dapper Labs for Phase 2 of generating root information,
+   - file needs to be delivered to the Flow Foundation team for Phase 2 of generating root information,
      but is not required at node start
 
 
