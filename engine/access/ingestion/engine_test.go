@@ -48,6 +48,7 @@ type Suite struct {
 	}
 
 	me             *mockmodule.Local
+	net            *mocknetwork.Network
 	request        *mockmodule.Requester
 	provider       *mocknetwork.Engine
 	blocks         *storage.Blocks
@@ -57,6 +58,7 @@ type Suite struct {
 	receipts       *storage.ExecutionReceipts
 	results        *storage.ExecutionResults
 	seals          *storage.Seals
+	conduit        *mocknetwork.Conduit
 	downloader     *downloadermock.Downloader
 	sealedBlock    *flow.Header
 	finalizedBlock *flow.Header
@@ -67,8 +69,7 @@ type Suite struct {
 	collectionExecutedMetric *indexer.CollectionExecutedMetricImpl
 	db                       *badger.DB
 
-	eng *Engine
-
+	ctx    context.Context
 	cancel context.CancelFunc
 }
 
@@ -82,8 +83,7 @@ func (s *Suite) TearDownTest() {
 
 func (s *Suite) SetupTest() {
 	s.log = zerolog.New(os.Stderr)
-	ctx, cancel := context.WithCancel(context.Background())
-	s.cancel = cancel
+	s.ctx, s.cancel = context.WithCancel(context.Background())
 	s.db, _ = unittest.TempBadgerDB(s.T())
 
 	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
@@ -95,10 +95,10 @@ func (s *Suite) SetupTest() {
 	s.proto.params = new(protocol.Params)
 	s.me = new(mockmodule.Local)
 	s.me.On("NodeID").Return(obsIdentity.NodeID)
-	net := new(mocknetwork.Network)
-	conduit := new(mocknetwork.Conduit)
-	net.On("Register", channels.ReceiveReceipts, mock.Anything).
-		Return(conduit, nil).
+	s.net = new(mocknetwork.Network)
+	s.conduit = new(mocknetwork.Conduit)
+	s.net.On("Register", channels.ReceiveReceipts, mock.Anything).
+		Return(s.conduit, nil).
 		Once()
 	s.request = new(mockmodule.Requester)
 
@@ -157,37 +157,38 @@ func (s *Suite) SetupTest() {
 		s.blocks,
 	)
 	require.NoError(s.T(), err)
+	s.blocks.On("GetLastFullBlockHeight").Once().Return(uint64(0), errors.New("do nothing"))
+}
 
+func (s *Suite) initIngestionEngine(ctx irrecoverable.SignalerContext) *Engine {
 	processedHeight := bstorage.NewConsumerProgress(s.db, module.ConsumeProgressIngestionEngineBlockHeight)
 
-	eng, err := New(s.log, net, s.proto.state, s.me, s.request, s.blocks, s.headers, s.collections,
+	eng, err := New(s.log, s.net, s.proto.state, s.me, s.request, s.blocks, s.headers, s.collections,
 		s.transactions, s.results, s.receipts, s.collectionExecutedMetric, processedHeight)
 	require.NoError(s.T(), err)
 
-	s.blocks.On("GetLastFullBlockHeight").Once().Return(uint64(0), errors.New("do nothing"))
-
-	irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
-	eng.ComponentManager.Start(irrecoverableCtx)
+	eng.ComponentManager.Start(ctx)
 	<-eng.Ready()
 
-	s.eng = eng
+	return eng
 }
 
-// TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
-func (s *Suite) TestOnFinalizedBlock() {
-	lastFinalizedHeight := s.finalizedBlock.Height
-	s.blocks.On("GetLastFullBlockHeight").Return(lastFinalizedHeight, nil).Maybe()
+func (s *Suite) mockCollectionsForBlock(block flow.Block) {
+	// we should query the block once and index the guarantee payload once
+	for _, g := range block.Payload.Guarantees {
+		collection := unittest.CollectionFixture(1)
+		light := collection.Light()
+		s.collections.On("LightByID", g.CollectionID).Return(&light, nil).Twice()
+	}
+}
 
+func (s *Suite) generateBlock(clusterCommittee flow.IdentitySkeletonList, snap *protocol.Snapshot) flow.Block {
 	block := unittest.BlockFixture()
-	block.Header.Height = s.finalizedBlock.Height + 1
-
 	block.SetPayload(unittest.PayloadFixture(
 		unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
 		unittest.WithExecutionResults(unittest.ExecutionResultFixture()),
 	))
 
-	// prepare cluster committee members
-	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 	refBlockID := unittest.IdentifierFixture()
 	for _, guarantee := range block.Payload.Guarantees {
 		guarantee.ReferenceBlockID = refBlockID
@@ -197,32 +198,45 @@ func (s *Suite) TestOnFinalizedBlock() {
 		require.NoError(s.T(), err)
 		guarantee.SignerIndices = indices
 	}
+
+	s.proto.state.On("AtBlockID", refBlockID).Return(snap)
+
+	return block
+}
+
+// TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
+func (s *Suite) TestOnFinalizedBlockSingle() {
+	cluster := new(protocol.Cluster)
+	epoch := new(protocol.Epoch)
+	epochs := new(protocol.EpochQuery)
+	snap := new(protocol.Snapshot)
+
+	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
+	epochs.On("Current").Return(epoch)
+	snap.On("Epochs").Return(epochs)
+
+	// prepare cluster committee members
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
+	cluster.On("Members").Return(clusterCommittee, nil)
+
+	irrecoverableCtx, _ := irrecoverable.WithSignaler(s.ctx)
+	eng := s.initIngestionEngine(irrecoverableCtx)
+
+	lastFinalizedHeight := s.finalizedBlock.Height
+	s.blocks.On("GetLastFullBlockHeight").Return(lastFinalizedHeight, nil).Maybe()
+
+	block := s.generateBlock(clusterCommittee, snap)
+	block.Header.Height = s.finalizedBlock.Height + 1
 	s.blockMap[block.Header.Height] = &block
+	s.mockCollectionsForBlock(block)
 	s.finalizedBlock = block.Header
 
 	hotstuffBlock := hotmodel.Block{
 		BlockID: block.ID(),
 	}
 
-	// we should query the block once and index the guarantee payload once
-	for _, g := range block.Payload.Guarantees {
-		collection := unittest.CollectionFixture(1)
-		light := collection.Light()
-		s.collections.On("LightByID", g.CollectionID).Return(&light, nil).Twice()
-	}
-
 	// expect that the block storage is indexed with each of the collection guarantee
 	s.blocks.On("IndexBlockForCollections", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
-
-	cluster := new(protocol.Cluster)
-	cluster.On("Members").Return(clusterCommittee, nil)
-	epoch := new(protocol.Epoch)
-	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
-	epochs := new(protocol.EpochQuery)
-	epochs.On("Current").Return(epoch)
-	snap := new(protocol.Snapshot)
-	snap.On("Epochs").Return(epochs)
-	s.proto.state.On("AtBlockID", refBlockID).Return(snap)
 	s.results.On("Index", mock.Anything, mock.Anything).Return(nil)
 
 	// for each of the guarantees, we should request the corresponding collection once
@@ -245,7 +259,7 @@ func (s *Suite) TestOnFinalizedBlock() {
 	)
 
 	// process the block through the finalized callback
-	s.eng.OnFinalizedBlock(&hotstuffBlock)
+	eng.OnFinalizedBlock(&hotstuffBlock)
 	s.Assertions.Eventually(func() bool {
 		wg.Wait()
 		return true
@@ -257,8 +271,86 @@ func (s *Suite) TestOnFinalizedBlock() {
 	s.request.AssertNumberOfCalls(s.T(), "Index", len(block.Payload.Seals))
 }
 
+// TestOnFinalizedBlockSeveralBlocksAhead checks OnFinalizedBlock with a block several blocks newer than the last block processed
+func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
+	cluster := new(protocol.Cluster)
+	epoch := new(protocol.Epoch)
+	epochs := new(protocol.EpochQuery)
+	snap := new(protocol.Snapshot)
+
+	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
+	epochs.On("Current").Return(epoch)
+	snap.On("Epochs").Return(epochs)
+
+	// prepare cluster committee members
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
+	cluster.On("Members").Return(clusterCommittee, nil)
+
+	lastFinalizedHeight := s.finalizedBlock.Height
+	s.blocks.On("GetLastFullBlockHeight").Return(lastFinalizedHeight, nil).Maybe()
+
+	irrecoverableCtx, _ := irrecoverable.WithSignaler(s.ctx)
+	eng := s.initIngestionEngine(irrecoverableCtx)
+
+	blkCnt := 3
+	startHeight := s.finalizedBlock.Height + 1
+	blocks := make([]flow.Block, blkCnt)
+
+	// generate the test blocks, cgs and collections
+	for i := 0; i < blkCnt; i++ {
+		block := s.generateBlock(clusterCommittee, snap)
+		block.Header.Height = startHeight + uint64(i)
+		s.blockMap[block.Header.Height] = &block
+		blocks[i] = block
+		s.mockCollectionsForBlock(block)
+		s.finalizedBlock = block.Header
+	}
+
+	// block several blocks newer than the last block processed
+	hotstuffBlock := hotmodel.Block{
+		BlockID: blocks[2].ID(),
+	}
+	// for each of the guarantees, we should request the corresponding collection once
+	needed := make(map[flow.Identifier]struct{})
+	for _, guarantee := range blocks[0].Payload.Guarantees {
+		needed[guarantee.ID()] = struct{}{}
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(4)
+
+	s.request.On("EntityByID", mock.Anything, mock.Anything).Run(
+		func(args mock.Arguments) {
+			collID := args.Get(0).(flow.Identifier)
+			_, pending := needed[collID]
+			s.Assert().True(pending, "collection should be pending (%x)", collID)
+			delete(needed, collID)
+			wg.Done()
+		},
+	)
+
+	// expected next block after last block processed
+	s.blocks.On("IndexBlockForCollections", blocks[0].ID(), []flow.Identifier(flow.GetIDs(blocks[0].Payload.Guarantees))).Return(nil).Once()
+	s.results.On("Index", mock.Anything, mock.Anything).Return(nil)
+
+	eng.OnFinalizedBlock(&hotstuffBlock)
+
+	s.Assertions.Eventually(func() bool {
+		wg.Wait()
+		return true
+	}, time.Millisecond*20, time.Millisecond)
+
+	s.headers.AssertExpectations(s.T())
+	s.blocks.AssertNumberOfCalls(s.T(), "IndexBlockForCollections", 1)
+	s.request.AssertNumberOfCalls(s.T(), "EntityByID", len(blocks[0].Payload.Guarantees))
+	s.request.AssertNumberOfCalls(s.T(), "Index", len(blocks[0].Payload.Seals))
+}
+
 // TestOnCollection checks that when a Collection is received, it is persisted
 func (s *Suite) TestOnCollection() {
+	irrecoverableCtx, _ := irrecoverable.WithSignaler(s.ctx)
+	s.initIngestionEngine(irrecoverableCtx)
+
 	collection := unittest.CollectionFixture(5)
 	light := collection.Light()
 
@@ -288,6 +380,8 @@ func (s *Suite) TestOnCollection() {
 
 // TestExecutionReceiptsAreIndexed checks that execution receipts are properly indexed
 func (s *Suite) TestExecutionReceiptsAreIndexed() {
+	irrecoverableCtx, _ := irrecoverable.WithSignaler(s.ctx)
+	eng := s.initIngestionEngine(irrecoverableCtx)
 
 	originID := unittest.IdentifierFixture()
 	collection := unittest.CollectionFixture(5)
@@ -322,10 +416,10 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 	s.receipts.On("Store", mock.Anything).Return(nil)
 	s.blocks.On("ByID", er2.ExecutionResult.BlockID).Return(nil, storerr.ErrNotFound)
 
-	err := s.eng.handleExecutionReceipt(originID, er1)
+	err := eng.handleExecutionReceipt(originID, er1)
 	require.NoError(s.T(), err)
 
-	err = s.eng.handleExecutionReceipt(originID, er2)
+	err = eng.handleExecutionReceipt(originID, er2)
 	require.NoError(s.T(), err)
 
 	s.receipts.AssertExpectations(s.T())
@@ -336,6 +430,9 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 // TestOnCollectionDuplicate checks that when a duplicate collection is received, the node doesn't
 // crash but just ignores its transactions.
 func (s *Suite) TestOnCollectionDuplicate() {
+	irrecoverableCtx, _ := irrecoverable.WithSignaler(s.ctx)
+	s.initIngestionEngine(irrecoverableCtx)
+
 	collection := unittest.CollectionFixture(5)
 	light := collection.Light()
 
@@ -365,6 +462,9 @@ func (s *Suite) TestOnCollectionDuplicate() {
 
 // TestRequestMissingCollections tests that the all missing collections are requested on the call to requestMissingCollections
 func (s *Suite) TestRequestMissingCollections() {
+	irrecoverableCtx, _ := irrecoverable.WithSignaler(s.ctx)
+	eng := s.initIngestionEngine(irrecoverableCtx)
+
 	blkCnt := 3
 	startHeight := uint64(1000)
 
@@ -462,7 +562,7 @@ func (s *Suite) TestRequestMissingCollections() {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*defaultCollectionCatchupDBPollInterval)
 		defer cancel()
 
-		err := s.eng.requestMissingCollections(ctx)
+		err := eng.requestMissingCollections(ctx)
 
 		require.Error(s.T(), err)
 		require.Contains(s.T(), err.Error(), "context deadline exceeded")
@@ -478,7 +578,7 @@ func (s *Suite) TestRequestMissingCollections() {
 		ctx, cancel := context.WithTimeout(context.Background(), defaultCollectionCatchupTimeout)
 		defer cancel()
 
-		err := s.eng.requestMissingCollections(ctx)
+		err := eng.requestMissingCollections(ctx)
 
 		require.NoError(s.T(), err)
 		require.Len(s.T(), rcvdColl, len(collIDs))
@@ -491,6 +591,9 @@ func (s *Suite) TestRequestMissingCollections() {
 // function calls keep the FullBlockIndex up-to-date and request collections if blocks with missing
 // collections exceed the threshold.
 func (s *Suite) TestProcessBackgroundCalls() {
+	irrecoverableCtx, _ := irrecoverable.WithSignaler(s.ctx)
+	eng := s.initIngestionEngine(irrecoverableCtx)
+
 	blkCnt := 3
 	collPerBlk := 10
 	startHeight := uint64(1000)
@@ -568,7 +671,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 			return block.Header.Height, nil
 		}).Once()
 
-		err := s.eng.updateLastFullBlockReceivedIndex()
+		err := eng.updateLastFullBlockReceivedIndex()
 		s.Require().NoError(err)
 
 		s.blocks.AssertExpectations(s.T())
@@ -579,7 +682,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 			return finalizedHeight, nil
 		}).Once()
 
-		err := s.eng.updateLastFullBlockReceivedIndex()
+		err := eng.updateLastFullBlockReceivedIndex()
 		s.Require().NoError(err)
 
 		s.blocks.AssertExpectations(s.T()) // not new call to UpdateLastFullBlockHeight should be made
@@ -603,7 +706,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 			}
 		}
 
-		err := s.eng.checkMissingCollections()
+		err := eng.checkMissingCollections()
 		s.Require().NoError(err)
 
 		// assert that missing collections are requested
@@ -634,7 +737,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 			}
 		}
 
-		err := s.eng.checkMissingCollections()
+		err := eng.checkMissingCollections()
 		s.Require().NoError(err)
 
 		// assert that missing collections are requested
@@ -659,7 +762,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 			blkMissingColl[i] = true
 		}
 
-		err := s.eng.checkMissingCollections()
+		err := eng.checkMissingCollections()
 		s.Require().NoError(err)
 
 		// assert that missing collections are not requested even though there are collections missing
@@ -671,11 +774,13 @@ func (s *Suite) TestProcessBackgroundCalls() {
 }
 
 func (s *Suite) TestComponentShutdown() {
+	irrecoverableCtx, _ := irrecoverable.WithSignaler(s.ctx)
+	eng := s.initIngestionEngine(irrecoverableCtx)
 	// start then shut down the engine
-	unittest.AssertClosesBefore(s.T(), s.eng.Ready(), 10*time.Millisecond)
+	unittest.AssertClosesBefore(s.T(), eng.Ready(), 10*time.Millisecond)
 	s.cancel()
-	unittest.AssertClosesBefore(s.T(), s.eng.Done(), 10*time.Millisecond)
+	unittest.AssertClosesBefore(s.T(), eng.Done(), 10*time.Millisecond)
 
-	err := s.eng.Process(channels.ReceiveReceipts, unittest.IdentifierFixture(), &flow.ExecutionReceipt{})
+	err := eng.Process(channels.ReceiveReceipts, unittest.IdentifierFixture(), &flow.ExecutionReceipt{})
 	s.Assert().ErrorIs(err, component.ErrComponentShutdown)
 }
