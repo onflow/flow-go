@@ -293,6 +293,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionIndexerCore       *indexer.IndexerCore
 	ScriptExecutor             *backend.ScriptExecutor
 	RegistersAsyncStore        *execution.RegistersAsyncStore
+	SimpleIndex                *index.SimpleIndex
 	EventsIndex                *index.EventsIndex
 	TxResultsIndex             *index.TransactionResultsIndex
 	IndexerDependencies        *cmd.DependencyList
@@ -863,6 +864,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				)
 
 				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts)
+				if err != nil {
+					return nil, err
+				}
+
+				err = builder.SimpleIndex.Initialize(builder.ExecutionIndexer)
 				if err != nil {
 					return nil, err
 				}
@@ -1613,6 +1619,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
 			return nil
 		}).
+		Module("simple index", func(node *cmd.NodeConfig) error {
+			builder.SimpleIndex = index.NewSimpleIndex()
+			return nil
+		}).
 		Module("events index", func(node *cmd.NodeConfig) error {
 			builder.EventsIndex = index.NewEventsIndex(builder.Storage.Events)
 			return nil
@@ -1756,7 +1766,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.unsecureGrpcServer,
 				builder.stateStreamBackend,
 				builder.stateStreamConf,
-				builder.ExecutionIndexer,
+				builder.SimpleIndex,
 			)
 			if err != nil {
 				return nil, err

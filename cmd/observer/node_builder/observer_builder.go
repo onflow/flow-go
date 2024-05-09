@@ -266,6 +266,7 @@ type ObserverServiceBuilder struct {
 	ExecutionDataStore      execution_data.ExecutionDataStore
 
 	RegistersAsyncStore *execution.RegistersAsyncStore
+	SimpleIndex         *index.SimpleIndex
 	EventsIndex         *index.EventsIndex
 	ScriptExecutor      *backend.ScriptExecutor
 
@@ -1363,6 +1364,11 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			// setup requester to notify indexer when new execution data is received
 			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
 
+			err = builder.SimpleIndex.Initialize(builder.ExecutionIndexer)
+			if err != nil {
+				return nil, err
+			}
+
 			err = builder.EventsIndex.Initialize(builder.ExecutionIndexer)
 			if err != nil {
 				return nil, err
@@ -1682,6 +1688,10 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
 		return nil
 	})
+	builder.Module("simple index", func(node *cmd.NodeConfig) error {
+		builder.SimpleIndex = index.NewSimpleIndex()
+		return nil
+	})
 	builder.Module("events index", func(node *cmd.NodeConfig) error {
 		builder.EventsIndex = index.NewEventsIndex(builder.Storage.Events)
 		return nil
@@ -1806,7 +1816,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.unsecureGrpcServer,
 			builder.stateStreamBackend,
 			builder.stateStreamConf,
-			builder.ExecutionIndexer,
+			builder.SimpleIndex,
 		)
 		if err != nil {
 			return nil, err

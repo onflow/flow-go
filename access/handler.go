@@ -7,8 +7,6 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
-
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -17,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/state_synchronization"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -29,7 +28,7 @@ type Handler struct {
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
 	finalizedHeaderCache module.FinalizedHeaderCache
 	me                   module.Local
-	executionIndexer     *indexer.Indexer
+	indexReporter        state_synchronization.IndexReporter
 }
 
 // HandlerOption is used to hand over optional constructor parameters
@@ -1264,11 +1263,11 @@ func (h *Handler) buildMetadataResponse() (*entities.Metadata, error) {
 	nodeId := h.me.NodeID()
 
 	var highestIndexedHeight uint64
-	if h.executionIndexer != nil {
+	if h.indexReporter != nil {
 		var err error
-		highestIndexedHeight, err = h.executionIndexer.HighestIndexedHeight()
+		highestIndexedHeight, err = h.indexReporter.HighestIndexedHeight()
 		if err != nil {
-			return nil, rpc.ConvertError(err, "could not get highest indexed height", codes.Internal)
+			return nil, rpc.ConvertIndexError(err, lastFinalizedHeader.Height, "could not get highest indexed height")
 		}
 	}
 
@@ -1299,10 +1298,10 @@ func WithBlockSignerDecoder(signerIndicesDecoder hotstuff.BlockSignerDecoder) fu
 	}
 }
 
-// WithExecutionIndexer configures the Handler to work with execution indexer
-func WithExecutionIndexer(executionIndexer *indexer.Indexer) func(*Handler) {
+// WithIndexReporter configures the Handler to work with index reporter
+func WithIndexReporter(indexReporter state_synchronization.IndexReporter) func(*Handler) {
 	return func(handler *Handler) {
-		handler.executionIndexer = executionIndexer
+		handler.indexReporter = indexReporter
 	}
 }
 
