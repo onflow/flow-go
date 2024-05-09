@@ -1,12 +1,12 @@
 package types
 
 import (
-	gethRLP "github.com/onflow/go-ethereum/rlp"
 	"math/big"
 	"testing"
 
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethRLP "github.com/onflow/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
