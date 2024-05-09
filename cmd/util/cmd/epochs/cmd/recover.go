@@ -45,7 +45,7 @@ This recovery process has some constraints:
 		Run: generateRecoverEpochTxArgs(getSnapshot),
 	}
 
-	flagOutputDir                string
+	flagOut                      string
 	flagAnAddress                string
 	flagAnPubkey                 string
 	flagAnInsecure               bool
@@ -55,6 +55,9 @@ This recovery process has some constraints:
 	flagNumViewsInEpoch          uint64
 	flagNumViewsInStakingAuction uint64
 	flagEpochCounter             uint64
+	flagRandomSource             string
+	flagTargetDuration           uint64
+	flagTargetEndTime            uint64
 )
 
 func init() {
@@ -66,7 +69,7 @@ func init() {
 }
 
 func addGenerateRecoverEpochTxArgsCmdFlags() error {
-	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagOutputDir, "out", "", "the path to the output dir")
+	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagOut, "out", "", "file to write tx args output")
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagAnAddress, "access-address", "", "the address of the access node used for client connections")
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagAnPubkey, "access-network-key", "", "the network key of the access node used for client connections in hex string format")
 	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagAnInsecure, "insecure", true, "set to true if the protocol snapshot should be retrieved from the secure AN endpoint")
@@ -80,6 +83,9 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 0, "length of each epoch measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 0, "length of the epoch staking phase measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "the epoch counter used to generate the root cluster block")
+	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagRandomSource, "random-source", "", "the random source for the epoch")
+	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagTargetDuration, "target-duration", 0, "the target duration of the epoch")
+	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagTargetEndTime, "target-end-time", 0, "the target end time for the epoch")
 
 	err := generateRecoverEpochTxArgsCmd.MarkFlagRequired("access-address")
 	if err != nil {
@@ -100,6 +106,18 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("collection-clusters")
 	if err != nil {
 		return fmt.Errorf("failed to mark collection-clusters flag as required")
+	}
+	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("random-source")
+	if err != nil {
+		return fmt.Errorf("failed to mark random-source flag as required")
+	}
+	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("target-duration")
+	if err != nil {
+		return fmt.Errorf("failed to mark target-duration flag as required")
+	}
+	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("target-end-time")
+	if err != nil {
+		return fmt.Errorf("failed to mark target-end-time flag as required")
 	}
 	return nil
 }
@@ -136,7 +154,7 @@ func generateRecoverEpochTxArgs(getSnapshot func() *inmem.Snapshot) func(cmd *co
 			log.Fatal().Err(err).Msg("could not encode recover epoch transaction arguments")
 		}
 
-		if flagOutputDir == "" {
+		if flagOut == "" {
 			// write JSON args to stdout
 			_, err = cmd.OutOrStdout().Write(encodedTxArgs)
 			if err != nil {
@@ -144,12 +162,11 @@ func generateRecoverEpochTxArgs(getSnapshot func() *inmem.Snapshot) func(cmd *co
 			}
 		} else {
 			// write JSON args to stdout
-			out := fmt.Sprintf("%s/%s", flagOutputDir, outputFileName)
-			err := os.WriteFile(out, encodedTxArgs, 0644)
+			err := os.WriteFile(flagOut, encodedTxArgs, 0644)
 			if err != nil {
-				log.Fatal().Err(err).Msg(fmt.Sprintf("could not write jsoncdc encoded arguments to file %s", out))
+				log.Fatal().Err(err).Msg(fmt.Sprintf("could not write jsoncdc encoded arguments to file %s", flagOut))
 			}
-			log.Info().Msgf("wrote transaction args to output file %s", out)
+			log.Info().Msgf("wrote transaction args to output file %s", flagOut)
 		}
 	}
 }
@@ -255,18 +272,25 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 	}
 
 	args := []cadence.Value{
+		// random source
+		cadence.String(flagRandomSource),
 		// epoch start view
 		cadence.NewUInt64(currEpochFinalView + 1),
 		// staking phase end view
 		cadence.NewUInt64(currEpochFinalView + flagNumViewsInStakingAuction),
 		// epoch end view
 		cadence.NewUInt64(currEpochFinalView + flagNumViewsInEpoch),
+		// target duration
+		cadence.NewUInt64(flagTargetDuration),
+		// target end time
+		cadence.NewUInt64(flagTargetEndTime),
+		// clusters,
+		common.ConvertClusterAssignmentsCdc(assignments),
+		// @TODO: cluster QC voter data
 		// dkg pub keys
 		cadence.NewArray(dkgPubKeys),
 		// node ids
 		cadence.NewArray(nodeIds),
-		// clusters,
-		common.ConvertClusterAssignmentsCdc(assignments),
 	}
 
 	return args
