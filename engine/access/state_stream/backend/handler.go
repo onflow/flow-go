@@ -32,6 +32,10 @@ type Handler struct {
 // SubscribeEventsResponse to the client stream.
 type sendSubscribeEventsResponseFunc func(*executiondata.SubscribeEventsResponse) error
 
+// sendSubscribeExecutionDataResponseFunc is a callback function used to send
+// SubscribeExecutionDataResponse to the client stream.
+type sendSubscribeExecutionDataResponseFunc func(*executiondata.SubscribeExecutionDataResponse) error
+
 var _ executiondata.ExecutionDataAPIServer = (*Handler)(nil)
 
 func NewHandler(api state_stream.API, chain flow.Chain, config Config) *Handler {
@@ -69,6 +73,16 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *execut
 	return &executiondata.GetExecutionDataByBlockIDResponse{BlockExecutionData: message}, nil
 }
 
+// SubscribeExecutionData is deprecated and will be removed in a future version.
+// Use SubscribeExecutionDataFromStartBlockID, SubscribeExecutionDataFromStartBlockHeight or SubscribeExecutionDataFromLatest.
+//
+// SubscribeExecutionData handles subscription requests for execution data starting at the specified block ID or block height.
+// The handler manages the subscription and sends the subscribed information to the client via the provided stream.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument   - if request contains invalid startBlockID.
+// - codes.ResourceExhausted - if the maximum number of streams is reached.
+// - codes.Internal          - if stream got unexpected response or could not send response.
 func (h *Handler) SubscribeExecutionData(request *executiondata.SubscribeExecutionDataRequest, stream executiondata.ExecutionDataAPI_SubscribeExecutionDataServer) error {
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {
@@ -88,38 +102,76 @@ func (h *Handler) SubscribeExecutionData(request *executiondata.SubscribeExecuti
 
 	sub := h.api.SubscribeExecutionData(stream.Context(), startBlockID, request.GetStartBlockHeight())
 
-	for {
-		v, ok := <-sub.Channel()
-		if !ok {
-			if sub.Err() != nil {
-				return rpc.ConvertError(sub.Err(), "stream encountered an error", codes.Internal)
-			}
-			return nil
-		}
+	return subscription.HandleSubscription(sub, handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()))
+}
 
-		resp, ok := v.(*ExecutionDataResponse)
-		if !ok {
-			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
-		}
-
-		execData, err := convert.BlockExecutionDataToMessage(resp.ExecutionData)
-		if err != nil {
-			return status.Errorf(codes.Internal, "could not convert execution data to entity: %v", err)
-		}
-
-		err = convert.BlockExecutionDataEventPayloadsToVersion(execData, request.GetEventEncodingVersion())
-		if err != nil {
-			return status.Errorf(codes.Internal, "could not convert execution data event payloads to JSON: %v", err)
-		}
-
-		err = stream.Send(&executiondata.SubscribeExecutionDataResponse{
-			BlockHeight:        resp.Height,
-			BlockExecutionData: execData,
-		})
-		if err != nil {
-			return rpc.ConvertError(err, "could not send response", codes.Internal)
-		}
+// SubscribeExecutionDataFromStartBlockID handles subscription requests for
+// execution data starting at the specified block ID. The handler manages the
+// subscription and sends the subscribed information to the client via the
+// provided stream.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument   - if request contains invalid startBlockID.
+// - codes.ResourceExhausted - if the maximum number of streams is reached.
+// - codes.Internal          - if stream got unexpected response or could not send response.
+func (h *Handler) SubscribeExecutionDataFromStartBlockID(request *executiondata.SubscribeExecutionDataFromStartBlockIDRequest, stream executiondata.ExecutionDataAPI_SubscribeExecutionDataFromStartBlockIDServer) error {
+	// check if the maximum number of streams is reached
+	if h.StreamCount.Load() >= h.MaxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
+
+	startBlockID, err := convert.BlockID(request.GetStartBlockId())
+	if err != nil {
+		return status.Errorf(codes.InvalidArgument, "could not convert start block ID: %v", err)
+	}
+
+	sub := h.api.SubscribeExecutionDataFromStartBlockID(stream.Context(), startBlockID)
+
+	return subscription.HandleSubscription(sub, handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()))
+}
+
+// SubscribeExecutionDataFromStartBlockHeight handles subscription requests for
+// execution data starting at the specified block height. The handler manages the
+// subscription and sends the subscribed information to the client via the
+// provided stream.
+//
+// Expected errors during normal operation:
+// - codes.ResourceExhausted - if the maximum number of streams is reached.
+// - codes.Internal          - if stream got unexpected response or could not send response.
+func (h *Handler) SubscribeExecutionDataFromStartBlockHeight(request *executiondata.SubscribeExecutionDataFromStartBlockHeightRequest, stream executiondata.ExecutionDataAPI_SubscribeExecutionDataFromStartBlockHeightServer) error {
+	// check if the maximum number of streams is reached
+	if h.StreamCount.Load() >= h.MaxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
+
+	sub := h.api.SubscribeExecutionDataFromStartBlockHeight(stream.Context(), request.GetStartBlockHeight())
+
+	return subscription.HandleSubscription(sub, handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()))
+}
+
+// SubscribeExecutionDataFromLatest handles subscription requests for
+// execution data starting at the latest block. The handler manages the
+// subscription and sends the subscribed information to the client via the
+// provided stream.
+//
+// Expected errors during normal operation:
+// - codes.ResourceExhausted - if the maximum number of streams is reached.
+// - codes.Internal          - if stream got unexpected response or could not send response.
+func (h *Handler) SubscribeExecutionDataFromLatest(request *executiondata.SubscribeExecutionDataFromLatestRequest, stream executiondata.ExecutionDataAPI_SubscribeExecutionDataFromLatestServer) error {
+	// check if the maximum number of streams is reached
+	if h.StreamCount.Load() >= h.MaxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
+
+	sub := h.api.SubscribeExecutionDataFromLatest(stream.Context())
+
+	return subscription.HandleSubscription(sub, handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()))
 }
 
 // SubscribeEvents is deprecated and will be removed in a future version.
@@ -257,6 +309,38 @@ func (h *Handler) SubscribeEventsFromLatest(request *executiondata.SubscribeEven
 	sub := h.api.SubscribeEventsFromLatest(stream.Context(), filter)
 
 	return subscription.HandleSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
+}
+
+// handleSubscribeExecutionData handles the subscription to execution data and sends it to the client via the provided stream.
+// This function is designed to be used as a callback for execution data updates in a subscription.
+//
+// Parameters:
+// - send: The function responsible for sending execution data in response to the client.
+//
+// Returns a function that can be used as a callback for execution data updates.
+//
+// Expected errors during normal operation:
+//   - codes.Internal - could not convert execution data to entity or could not convert execution data event payloads to JSON.
+func handleSubscribeExecutionData(send sendSubscribeExecutionDataResponseFunc, eventEncodingVersion entities.EventEncodingVersion) func(response *ExecutionDataResponse) error {
+	return func(resp *ExecutionDataResponse) error {
+		execData, err := convert.BlockExecutionDataToMessage(resp.ExecutionData)
+		if err != nil {
+			return status.Errorf(codes.Internal, "could not convert execution data to entity: %v", err)
+		}
+
+		err = convert.BlockExecutionDataEventPayloadsToVersion(execData, eventEncodingVersion)
+		if err != nil {
+			return status.Errorf(codes.Internal, "could not convert execution data event payloads to JSON: %v", err)
+		}
+
+		err = send(&executiondata.SubscribeExecutionDataResponse{
+			BlockHeight:        resp.Height,
+			BlockExecutionData: execData,
+			BlockTimestamp:     timestamppb.New(resp.BlockTimestamp),
+		})
+
+		return err
+	}
 }
 
 // handleEventsResponse handles the event subscription and sends subscribed events to the client via the provided stream.

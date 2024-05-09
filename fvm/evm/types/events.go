@@ -73,38 +73,37 @@ func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, e
 		deployedAddress = cadence.String(p.Result.DeployedContractAddress.String())
 	}
 
-	return cadence.Event{
-		EventType: cadence.NewEventType(
-			location,
-			string(EventTypeTransactionExecuted),
-			[]cadence.Field{
-				cadence.NewField("hash", cadence.StringType{}),
-				cadence.NewField("index", cadence.UInt16Type{}),
-				cadence.NewField("type", cadence.UInt8Type{}),
-				cadence.NewField("payload", cadence.StringType{}),
-				cadence.NewField("errorCode", cadence.UInt16Type{}),
-				cadence.NewField("gasConsumed", cadence.UInt64Type{}),
-				cadence.NewField("contractAddress", cadence.StringType{}),
-				cadence.NewField("logs", cadence.StringType{}),
-				cadence.NewField("blockHeight", cadence.UInt64Type{}),
-				// todo we can remove hash and just reference block by height (evm-gateway dependency)
-				cadence.NewField("blockHash", cadence.StringType{}),
-			},
-			nil,
-		),
-		Fields: []cadence.Value{
-			cadence.String(p.Result.TxHash.String()),
-			cadence.NewUInt16(p.Result.Index),
-			cadence.NewUInt8(p.Result.TxType),
-			cadence.String(hex.EncodeToString(p.Payload)),
-			cadence.NewUInt16(uint16(p.Result.ResultSummary().ErrorCode)),
-			cadence.NewUInt64(p.Result.GasConsumed),
-			deployedAddress,
-			cadence.String(hex.EncodeToString(encodedLogs)),
-			cadence.NewUInt64(p.BlockHeight),
-			cadence.String(p.BlockHash.String()),
+	eventType := cadence.NewEventType(
+		location,
+		string(EventTypeTransactionExecuted),
+		[]cadence.Field{
+			cadence.NewField("hash", cadence.StringType),
+			cadence.NewField("index", cadence.UInt16Type),
+			cadence.NewField("type", cadence.UInt8Type),
+			cadence.NewField("payload", cadence.StringType),
+			cadence.NewField("errorCode", cadence.UInt16Type),
+			cadence.NewField("gasConsumed", cadence.UInt64Type),
+			cadence.NewField("contractAddress", cadence.StringType),
+			cadence.NewField("logs", cadence.StringType),
+			cadence.NewField("blockHeight", cadence.UInt64Type),
+			// todo we can remove hash and just reference block by height (evm-gateway dependency)
+			cadence.NewField("blockHash", cadence.StringType),
 		},
-	}, nil
+		nil,
+	)
+
+	return cadence.NewEvent([]cadence.Value{
+		cadence.String(p.Result.TxHash.String()),
+		cadence.NewUInt16(p.Result.Index),
+		cadence.NewUInt8(p.Result.TxType),
+		cadence.String(hex.EncodeToString(p.Payload)),
+		cadence.NewUInt16(uint16(p.Result.ResultSummary().ErrorCode)),
+		cadence.NewUInt64(p.Result.GasConsumed),
+		deployedAddress,
+		cadence.String(hex.EncodeToString(encodedLogs)),
+		cadence.NewUInt64(p.BlockHeight),
+		cadence.String(p.BlockHash.String()),
+	}).WithType(eventType), nil
 }
 
 type blockEvent struct {
@@ -130,36 +129,35 @@ func (p *blockEvent) ToCadence(location common.Location) (cadence.Event, error) 
 		return cadence.Event{}, err
 	}
 
-	return cadence.Event{
-		EventType: cadence.NewEventType(
-			location,
-			string(EventTypeBlockExecuted),
-			[]cadence.Field{
-				cadence.NewField("height", cadence.UInt64Type{}),
-				cadence.NewField("hash", cadence.StringType{}),
-				cadence.NewField("timestamp", cadence.UInt64Type{}),
-				cadence.NewField("totalSupply", cadence.IntType{}),
-				cadence.NewField("totalGasUsed", cadence.UInt64Type{}),
-				cadence.NewField("parentHash", cadence.StringType{}),
-				cadence.NewField("receiptRoot", cadence.StringType{}),
-				cadence.NewField(
-					"transactionHashes",
-					cadence.NewVariableSizedArrayType(cadence.StringType{}),
-				),
-			},
-			nil,
-		),
-		Fields: []cadence.Value{
-			cadence.NewUInt64(p.Height),
-			cadence.String(blockHash.String()),
-			cadence.NewUInt64(p.Timestamp),
-			cadence.NewIntFromBig(p.TotalSupply),
-			cadence.NewUInt64(p.TotalGasUsed),
-			cadence.String(p.ParentBlockHash.String()),
-			cadence.String(p.ReceiptRoot.String()),
-			cadence.NewArray(hashes).WithType(cadence.NewVariableSizedArrayType(cadence.StringType{})),
+	eventType := cadence.NewEventType(
+		location,
+		string(EventTypeBlockExecuted),
+		[]cadence.Field{
+			cadence.NewField("height", cadence.UInt64Type),
+			cadence.NewField("hash", cadence.StringType),
+			cadence.NewField("timestamp", cadence.UInt64Type),
+			cadence.NewField("totalSupply", cadence.IntType),
+			cadence.NewField("totalGasUsed", cadence.UInt64Type),
+			cadence.NewField("parentHash", cadence.StringType),
+			cadence.NewField("receiptRoot", cadence.StringType),
+			cadence.NewField(
+				"transactionHashes",
+				cadence.NewVariableSizedArrayType(cadence.StringType),
+			),
 		},
-	}, nil
+		nil,
+	)
+
+	return cadence.NewEvent([]cadence.Value{
+		cadence.NewUInt64(p.Height),
+		cadence.String(blockHash.String()),
+		cadence.NewUInt64(p.Timestamp),
+		cadence.NewIntFromBig(p.TotalSupply),
+		cadence.NewUInt64(p.TotalGasUsed),
+		cadence.String(p.ParentBlockHash.String()),
+		cadence.String(p.ReceiptRoot.String()),
+		cadence.NewArray(hashes).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
+	}).WithType(eventType), nil
 }
 
 type BlockEventPayload struct {

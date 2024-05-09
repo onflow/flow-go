@@ -511,3 +511,50 @@ func (s *EpochStateMachineSuite) TestEvolveState_EventsAreFiltered() {
 	})
 	require.NoError(s.T(), err)
 }
+
+// TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition tests that EpochStateMachine transitions to the next epoch
+// if an invalid state transition has been detected in a block which triggers transitioning to the next epoch.
+// In such situation, we still need to enter the next epoch (because it has already been committed), but persist in the
+// state that we have entered Epoch fallback mode (`flow.ProtocolStateEntry.InvalidEpochTransitionAttempted` is set to `true`).
+// This test ensures that we don't drop previously committed next epoch.
+func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition() {
+	unittest.SkipUnless(s.T(), unittest.TEST_TODO,
+		"This test is broken with current implementation but must pass when EFM recovery has been implemented."+
+			"See for details https://github.com/onflow/flow-go/issues/5631.")
+	s.parentEpochState = unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
+	s.candidate.View = s.parentEpochState.NextEpochSetup.FirstView
+	stateMachine, err := epochs.NewEpochStateMachineFactory(
+		s.globalParams,
+		s.setupsDB,
+		s.commitsDB,
+		s.epochStateDB,
+	).Create(s.candidate.View, s.candidate.ParentID, s.parentState, s.mutator)
+	require.NoError(s.T(), err)
+
+	invalidServiceEvent := unittest.EpochSetupFixture()
+	err = stateMachine.EvolveState([]flow.ServiceEvent{invalidServiceEvent.ServiceEvent()})
+	require.NoError(s.T(), err)
+
+	indexTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
+	indexTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
+	s.epochStateDB.On("Index", s.candidate.ID(), mocks.Anything).Return(indexTxDeferredUpdate.Execute, nil).Once()
+
+	expectedEpochState := &flow.ProtocolStateEntry{
+		PreviousEpoch:                   s.parentEpochState.CurrentEpoch.Copy(),
+		CurrentEpoch:                    *s.parentEpochState.NextEpoch.Copy(),
+		NextEpoch:                       nil,
+		InvalidEpochTransitionAttempted: true,
+	}
+
+	storeTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
+	storeTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
+	s.epochStateDB.On("StoreTx", expectedEpochState.ID(), expectedEpochState).Return(storeTxDeferredUpdate.Execute, nil).Once()
+	s.mutator.On("SetEpochStateID", expectedEpochState.ID()).Return().Once()
+
+	dbOps, err := stateMachine.Build()
+	require.NoError(s.T(), err)
+	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
+	// the expected mock methods should be called, which is asserted by the testify framework
+	err = dbOps.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
+	require.NoError(s.T(), err)
+}

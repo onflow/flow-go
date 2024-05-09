@@ -63,17 +63,28 @@ func parseAccountContractUpdated(event *flow.Event) (common.AddressLocation, err
 		return common.AddressLocation{}, fmt.Errorf("invalid event payload type: %T", payload)
 	}
 
-	address, ok := cdcEvent.Fields[0].(cadence.Address)
+	fields := cadence.FieldsMappedByName(cdcEvent)
+
+	addressField := fields[stdlib.AccountEventAddressParameter.Identifier]
+	address, ok := addressField.(cadence.Address)
 	if !ok {
-		return common.AddressLocation{}, fmt.Errorf("invalid cadence type for address: %T", cdcEvent.Fields[0])
+		return common.AddressLocation{}, fmt.Errorf("invalid Cadence type for address field: %T", addressField)
 	}
 
-	contractName, ok := cdcEvent.Fields[2].ToGoValue().(string)
+	contractNameField := fields[stdlib.AccountEventContractParameter.Identifier]
+	contractName, ok := contractNameField.(cadence.String)
 	if !ok {
-		return common.AddressLocation{}, fmt.Errorf("invalid cadence type for contract name: %T", cdcEvent.Fields[2])
+		return common.AddressLocation{}, fmt.Errorf(
+			"invalid Cadence type for contract name field: %T",
+			contractNameField,
+		)
 	}
 
-	return common.NewAddressLocation(nil, common.Address(address), contractName), nil
+	return common.NewAddressLocation(
+		nil,
+		common.Address(address),
+		string(contractName),
+	), nil
 }
 
 var _ derived.TransactionInvalidator = (*accessInvalidator)(nil)

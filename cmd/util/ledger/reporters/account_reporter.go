@@ -176,10 +176,9 @@ func newAccountDataProcessor(
 	bp.balanceScript = []byte(fmt.Sprintf(`
 				import FungibleToken from 0x%s
 				import FlowToken from 0x%s
-				pub fun main(account: Address): UFix64 {
+				access(all) fun main(account: Address): UFix64 {
 					let acct = getAccount(account)
-					let vaultRef = acct.getCapability(/public/flowTokenBalance)
-						.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
+					let vaultRef = acct.capabilities.borrow<&FlowToken.Vault>(/public/flowTokenBalance)
 						?? panic("Could not borrow Balance reference to the Vault")
 					return vaultRef.balance
 				}
@@ -188,10 +187,9 @@ func newAccountDataProcessor(
 	bp.fusdScript = []byte(fmt.Sprintf(`
 			import FungibleToken from 0x%s
 			import FUSD from 0x%s
-			pub fun main(address: Address): UFix64 {
+			access(all) fun main(address: Address): UFix64 {
 				let account = getAccount(address)
-				let vaultRef = account.getCapability(/public/fusdBalance)!
-					.borrow<&FUSD.Vault{FungibleToken.Balance}>()
+				let vaultRef = account.capabilities.borrow<&FUSD.Vault>(/public/fusdBalance)
 					?? panic("Could not borrow Balance reference to the Vault")
 				return vaultRef.balance
 			}
@@ -199,10 +197,9 @@ func newAccountDataProcessor(
 
 	bp.momentsScript = []byte(`
 			import TopShot from 0x0b2a3299cc857e29
-			pub fun main(account: Address): Int {
+			access(all) fun main(account: Address): Int {
 				let acct = getAccount(account)
-				let collectionRef = acct.getCapability(/public/MomentCollection)
-										.borrow<&{TopShot.MomentCollectionPublic}>()!
+				let collectionRef = acct.capabilities.borrow<&{TopShot.MomentCollectionPublic}>(/public/MomentCollection)!
 				return collectionRef.getIDs().length
 			}
 			`)
@@ -330,7 +327,7 @@ func (c *balanceProcessor) balance(address flow.Address) (uint64, bool, error) {
 	var balance uint64
 	var hasVault bool
 	if output.Err == nil && output.Value != nil {
-		balance = output.Value.ToGoValue().(uint64)
+		balance = uint64(output.Value.(cadence.UFix64))
 		hasVault = true
 	} else {
 		hasVault = false
@@ -350,7 +347,7 @@ func (c *balanceProcessor) fusdBalance(address flow.Address) (uint64, error) {
 
 	var balance uint64
 	if output.Err == nil && output.Value != nil {
-		balance = output.Value.ToGoValue().(uint64)
+		balance = uint64(output.Value.(cadence.UFix64))
 	}
 	return balance, nil
 }
