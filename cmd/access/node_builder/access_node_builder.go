@@ -27,6 +27,7 @@ import (
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -39,6 +40,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/ingestion"
+	"github.com/onflow/flow-go/engine/access/ingestion/version"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
@@ -52,6 +54,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
+	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -158,6 +161,8 @@ type AccessNodeConfig struct {
 	registerCacheType                 string
 	registerCacheSize                 uint
 	programCacheSize                  uint
+	maxGracefulStopDuration           time.Duration
+	ingestionUnit                     *engine.Unit
 }
 
 type PublicNetworkConfig struct {
@@ -255,6 +260,8 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registerCacheType:            pStorage.CacheTypeTwoQueue.String(),
 		registerCacheSize:            0,
 		programCacheSize:             0,
+		maxGracefulStopDuration:      stop.DefaultMaxGracefulStopDuration,
+		ingestionUnit:                engine.NewUnit(),
 	}
 }
 
@@ -297,6 +304,7 @@ type FlowAccessNodeBuilder struct {
 	TxResultsIndex             *index.TransactionResultsIndex
 	IndexerDependencies        *cmd.DependencyList
 	collectionExecutedMetric   module.CollectionExecutedMetric
+	versionControl             *version.VersionControl
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -1270,6 +1278,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"program-cache-size",
 			defaultConfig.programCacheSize,
 			"[experimental] number of blocks to cache for cadence programs. use 0 to disable cache. default: 0. Note: this is an experimental feature and may cause nodes to become unstable under certain workloads. Use with caution.")
+
+		// Version Control
+		flags.DurationVar(&builder.maxGracefulStopDuration, "max-graceful-stop-duration", defaultConfig.maxGracefulStopDuration, "the maximum amount of time stop control will wait for ingestion engine to gracefully shutdown before crashing")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -1771,6 +1782,43 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
 
 			return builder.RpcEng, nil
+		}).
+		Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			ver, err := build.Semver()
+			if err != nil {
+				err = fmt.Errorf("could not set semver version for version control. "+
+					"version %s is not semver compliant: %w", build.Version(), err)
+
+				// The node would not know its own version. Without this the node would not know
+				// how to reach to version boundaries.
+				builder.Logger.
+					Err(err).
+					Msg("error starting version control")
+
+				return nil, err
+			}
+
+			latestFinalizedBlock, err := node.State.Final().Head()
+			if err != nil {
+				return nil, fmt.Errorf("could not get latest finalized block: %w", err)
+			}
+
+			versionControl := version.NewVersionControl(
+				builder.ingestionUnit,
+				builder.maxGracefulStopDuration,
+				builder.Logger,
+				node.Storage.Headers,
+				node.Storage.VersionBeacons,
+				ver,
+				latestFinalizedBlock,
+				true,
+			)
+			// VersionControl needs to consume BlockFinalized events.
+			node.ProtocolEvents.AddConsumer(versionControl)
+
+			builder.versionControl = versionControl
+
+			return versionControl, nil
 		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
