@@ -1975,9 +1975,12 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			require.NoError(t, err)
 			assertEpochEmergencyFallbackTriggered(t, state, true) // triggered after finalization
 
-			// block 5 is the first block past the current epoch boundary
-			block4 := unittest.BlockWithParentProtocolState(block3)
+			// block 4 is the first block past the current epoch boundary
+			block4 := unittest.BlockWithParentFixture(block3.Header)
 			block4.Header.View = epoch1Setup.FinalView + 1
+			block4.SetPayload(flow.Payload{
+				ProtocolStateID: calculateExpectedStateId(t, mutableState)(block4.Header, nil),
+			})
 			err = state.Extend(context.Background(), block4)
 			require.NoError(t, err)
 			err = state.Finalize(context.Background(), block4.ID())
