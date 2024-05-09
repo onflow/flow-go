@@ -23,6 +23,11 @@ func (_m *CruiseCtlMetrics) PIDError(p float64, i float64, d float64) {
 	_m.Called(p, i, d)
 }
 
+// ProposalPublicationDelay provides a mock function with given fields: duration
+func (_m *CruiseCtlMetrics) ProposalPublicationDelay(duration time.Duration) {
+	_m.Called(duration)
+}
+
 // TargetProposalDuration provides a mock function with given fields: duration
 func (_m *CruiseCtlMetrics) TargetProposalDuration(duration time.Duration) {
 	_m.Called(duration)

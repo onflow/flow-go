@@ -6,7 +6,8 @@ import (
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/ledger"
+	evm "github.com/onflow/flow-go/fvm/evm/stdlib"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -16,7 +17,7 @@ func NewDeploymentMigration(
 	authorizer flow.Address,
 	expectedWriteAddresses map[flow.Address]struct{},
 	logger zerolog.Logger,
-) ledger.Migration {
+) RegistersMigration {
 
 	script := []byte(`
       transaction(name: String, code: String) {
@@ -43,13 +44,37 @@ func NewDeploymentMigration(
 func NewBurnerDeploymentMigration(
 	chainID flow.ChainID,
 	logger zerolog.Logger,
-) ledger.Migration {
+) RegistersMigration {
 	address := BurnerAddressForChain(chainID)
 	return NewDeploymentMigration(
 		chainID,
 		Contract{
 			Name: "Burner",
 			Code: coreContracts.Burner(),
+		},
+		address,
+		map[flow.Address]struct{}{
+			address: {},
+		},
+		logger,
+	)
+}
+
+func NewEVMDeploymentMigration(
+	chainID flow.ChainID,
+	logger zerolog.Logger,
+) RegistersMigration {
+	systemContracts := systemcontracts.SystemContractsForChain(chainID)
+	address := systemContracts.EVMContract.Address
+	return NewDeploymentMigration(
+		chainID,
+		Contract{
+			Name: systemContracts.EVMContract.Name,
+			Code: evm.ContractCode(
+				systemContracts.NonFungibleToken.Address,
+				systemContracts.FungibleToken.Address,
+				systemContracts.FlowToken.Address,
+			),
 		},
 		address,
 		map[flow.Address]struct{}{

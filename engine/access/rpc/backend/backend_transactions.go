@@ -609,42 +609,7 @@ func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, bl
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	req := &execproto.GetTransactionsByBlockIDRequest{
-		BlockId: blockID[:],
-	}
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
-	if err != nil {
-		if IsInsufficientExecutionReceipts(err) {
-			return nil, status.Errorf(codes.NotFound, err.Error())
-		}
-		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
-	}
-
-	resp, err := b.getTransactionResultsByBlockIDFromAnyExeNode(ctx, execNodes, req)
-	if err != nil {
-		return nil, rpc.ConvertError(err, "failed to retrieve result from execution node", codes.Internal)
-	}
-
-	systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
-	systemTxStatus, err := b.DeriveTransactionStatus(block.Header.Height, true)
-	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
-	}
-
-	events, err := convert.MessagesToEventsWithEncodingConversion(systemTxResult.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
-	if err != nil {
-		return nil, rpc.ConvertError(err, "failed to convert events from system tx result", codes.Internal)
-	}
-
-	return &access.TransactionResult{
-		Status:        systemTxStatus,
-		StatusCode:    uint(systemTxResult.GetStatusCode()),
-		Events:        events,
-		ErrorMessage:  systemTxResult.GetErrorMessage(),
-		BlockID:       blockID,
-		TransactionID: b.systemTxID,
-		BlockHeight:   block.Header.Height,
-	}, nil
+	return b.lookupTransactionResult(ctx, b.systemTxID, block, requiredEventEncodingVersion)
 }
 
 // Error returns:

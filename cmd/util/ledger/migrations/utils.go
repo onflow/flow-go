@@ -1,16 +1,16 @@
 package migrations
 
 import (
-	"fmt"
-
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/stdlib"
 
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
+	"github.com/onflow/flow-go/model/flow"
 )
+
+type RegistersMigration func(registersByAccount *registers.ByAccount) error
 
 var allStorageMapDomains = []string{
 	common.PathDomainStorage.Identifier(),
@@ -29,39 +29,53 @@ func init() {
 	}
 }
 
-func loadAtreeSlabsInStorge(storage *runtime.Storage, payloads []*ledger.Payload) error {
-	for _, payload := range payloads {
-		registerID, _, err := convert.PayloadToRegister(payload)
-		if err != nil {
-			return fmt.Errorf("failed to convert payload to register: %w", err)
+func getSlabIDsFromRegisters(registers registers.Registers) ([]atree.StorageID, error) {
+	storageIDs := make([]atree.StorageID, 0, registers.Count())
+
+	err := registers.ForEach(func(owner string, key string, value []byte) error {
+
+		if !flow.IsSlabIndexKey(key) {
+			return nil
 		}
 
-		if !registerID.IsSlabIndex() {
-			continue
-		}
+		storageID := atree.NewStorageID(
+			atree.Address([]byte(owner)),
+			atree.StorageIndex([]byte(key[1:])),
+		)
 
-		// Convert the register ID to a storage ID.
-		slabID := atree.NewStorageID(
-			atree.Address([]byte(registerID.Owner)),
-			atree.StorageIndex([]byte(registerID.Key[1:])))
+		storageIDs = append(storageIDs, storageID)
 
-		// Retrieve the slab.
-		_, _, err = storage.Retrieve(slabID)
-		if err != nil {
-			return fmt.Errorf("failed to retrieve slab %s: %w", slabID, err)
-		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
+	return storageIDs, nil
+}
+
+func loadAtreeSlabsInStorage(
+	storage *runtime.Storage,
+	registers registers.Registers,
+	nWorkers int,
+) error {
+
+	storageIDs, err := getSlabIDsFromRegisters(registers)
+	if err != nil {
+		return err
+	}
+
+	return storage.PersistentSlabStorage.BatchPreload(storageIDs, nWorkers)
 }
 
 func checkStorageHealth(
 	address common.Address,
 	storage *runtime.Storage,
-	payloads []*ledger.Payload,
+	registers registers.Registers,
+	nWorkers int,
 ) error {
 
-	err := loadAtreeSlabsInStorge(storage, payloads)
+	err := loadAtreeSlabsInStorage(storage, registers, nWorkers)
 	if err != nil {
 		return err
 	}

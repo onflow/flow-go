@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,17 +17,21 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func StorageIDFromRegisterID(registerID flow.RegisterID) atree.StorageID {
-	storageID := atree.StorageID{
-		Address: atree.Address([]byte(registerID.Owner)),
-	}
-	copy(storageID.Index[:], registerID.Key[1:])
-	return storageID
+func registerFromStorageID(storageID atree.StorageID) (owner, key string) {
+	owner = string(storageID.Address[:])
+
+	var sb strings.Builder
+	sb.WriteByte(flow.SlabIndexPrefix)
+	sb.Write(storageID.Index[:])
+	key = sb.String()
+
+	return owner, key
 }
 
 type FilterUnreferencedSlabsMigration struct {
@@ -55,7 +61,7 @@ func NewFilterUnreferencedSlabsMigration(
 
 func (m *FilterUnreferencedSlabsMigration) InitMigration(
 	log zerolog.Logger,
-	_ []*ledger.Payload,
+	_ *registers.ByAccount,
 	nWorkers int,
 ) error {
 	m.log = log.
@@ -71,23 +77,19 @@ func (m *FilterUnreferencedSlabsMigration) InitMigration(
 func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 	_ context.Context,
 	address common.Address,
-	oldPayloads []*ledger.Payload,
-) (
-	newPayloads []*ledger.Payload,
-	err error,
-) {
-	migrationRuntime, err := NewAtreeRegisterMigratorRuntime(m.log, address, oldPayloads, m.nWorkers)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
-	}
+	accountRegisters *registers.AccountRegisters,
+) error {
 
-	storage := migrationRuntime.Storage
+	storage := runtime.NewStorage(
+		registers.ReadOnlyLedger{
+			Registers: accountRegisters,
+		},
+		nil,
+	)
 
-	newPayloads = oldPayloads
-
-	err = checkStorageHealth(address, storage, oldPayloads)
+	err := checkStorageHealth(address, storage, accountRegisters, m.nWorkers)
 	if err == nil {
-		return
+		return nil
 	}
 
 	// The storage health check failed.
@@ -96,7 +98,7 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 
 	var unreferencedRootSlabsErr runtime.UnreferencedRootSlabsError
 	if !errors.As(err, &unreferencedRootSlabsErr) {
-		return nil, fmt.Errorf("storage health check failed: %w", err)
+		return fmt.Errorf("storage health check failed: %w", err)
 	}
 
 	// Create a set of unreferenced slabs: root slabs, and all slabs they reference.
@@ -107,7 +109,7 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 
 		childReferences, _, err := storage.GetAllChildReferences(rootSlabID)
 		if err != nil {
-			return nil, fmt.Errorf(
+			return fmt.Errorf(
 				"failed to get all child references for root slab %s: %w",
 				rootSlabID,
 				err,
@@ -121,31 +123,54 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 
 	// Filter out unreferenced slabs.
 
-	newCount := len(oldPayloads) - len(unreferencedSlabIDs)
-	newPayloads = make([]*ledger.Payload, 0, newCount)
-
 	filteredPayloads := make([]*ledger.Payload, 0, len(unreferencedSlabIDs))
 
 	m.log.Warn().
-		Str("account", address.Hex()).
+		Str("account", address.HexWithPrefix()).
 		Msgf("filtering %d unreferenced slabs", len(unreferencedSlabIDs))
 
-	for _, payload := range oldPayloads {
-		registerID, _, err := convert.PayloadToRegister(payload)
+	var storageIDs []atree.StorageID
+	for storageID := range unreferencedSlabIDs {
+		storageIDs = append(storageIDs, storageID)
+	}
+	sort.Slice(
+		storageIDs,
+		func(i, j int) bool {
+			a := storageIDs[i]
+			b := storageIDs[j]
+			return a.Compare(b) < 0
+		},
+	)
+
+	for _, storageID := range storageIDs {
+		owner, key := registerFromStorageID(storageID)
+
+		value, err := accountRegisters.Get(owner, key)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert payload to register: %w", err)
+			return fmt.Errorf(
+				"failed to get register for slab %x/%x: %w",
+				owner,
+				storageID.Index,
+				err,
+			)
 		}
 
-		// Filter unreferenced slabs.
-		if registerID.IsSlabIndex() {
-			storageID := StorageIDFromRegisterID(registerID)
-			if _, ok := unreferencedSlabIDs[storageID]; ok {
-				filteredPayloads = append(filteredPayloads, payload)
-				continue
-			}
+		err = accountRegisters.Set(owner, key, nil)
+		if err != nil {
+			return fmt.Errorf(
+				"failed to set register for slab %x/%x: %w",
+				owner,
+				storageID.Index,
+				err,
+			)
 		}
 
-		newPayloads = append(newPayloads, payload)
+		ledgerKey := convert.RegisterIDToLedgerKey(flow.RegisterID{
+			Owner: owner,
+			Key:   key,
+		})
+		payload := ledger.NewPayload(ledgerKey, value)
+		filteredPayloads = append(filteredPayloads, payload)
 	}
 
 	m.rw.Write(unreferencedSlabs{
@@ -159,7 +184,7 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 	// The health check error is only reported if it is not due to unreferenced slabs.
 	// If it is due to unreferenced slabs, we filter them out and continue.
 
-	return newPayloads, nil
+	return nil
 }
 
 func (m *FilterUnreferencedSlabsMigration) mergeFilteredPayloads(payloads []*ledger.Payload) {

@@ -61,6 +61,13 @@ contract Storage {
         return output;
     }
 
+    function verifyArchCallToRevertibleRandom() public view returns (uint64) {
+        (bool ok, bytes memory data) = cadenceArch.staticcall(abi.encodeWithSignature("revertibleRandom()"));
+        require(ok, "unsuccessful call to arch");
+        uint64 output = abi.decode(data, (uint64));
+        return output;
+    }
+
     function verifyArchCallToFlowBlockHeight(uint64 expected) public view returns (uint64){
         (bool ok, bytes memory data) = cadenceArch.staticcall(abi.encodeWithSignature("flowBlockHeight()"));
         require(ok, "unsuccessful call to arch ");

@@ -200,6 +200,54 @@ func (_m *API) SubscribeExecutionData(ctx context.Context, startBlockID flow.Ide
 	return r0
 }
 
+// SubscribeExecutionDataFromLatest provides a mock function with given fields: ctx
+func (_m *API) SubscribeExecutionDataFromLatest(ctx context.Context) subscription.Subscription {
+	ret := _m.Called(ctx)
+
+	var r0 subscription.Subscription
+	if rf, ok := ret.Get(0).(func(context.Context) subscription.Subscription); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(subscription.Subscription)
+		}
+	}
+
+	return r0
+}
+
+// SubscribeExecutionDataFromStartBlockHeight provides a mock function with given fields: ctx, startBlockHeight
+func (_m *API) SubscribeExecutionDataFromStartBlockHeight(ctx context.Context, startBlockHeight uint64) subscription.Subscription {
+	ret := _m.Called(ctx, startBlockHeight)
+
+	var r0 subscription.Subscription
+	if rf, ok := ret.Get(0).(func(context.Context, uint64) subscription.Subscription); ok {
+		r0 = rf(ctx, startBlockHeight)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(subscription.Subscription)
+		}
+	}
+
+	return r0
+}
+
+// SubscribeExecutionDataFromStartBlockID provides a mock function with given fields: ctx, startBlockID
+func (_m *API) SubscribeExecutionDataFromStartBlockID(ctx context.Context, startBlockID flow.Identifier) subscription.Subscription {
+	ret := _m.Called(ctx, startBlockID)
+
+	var r0 subscription.Subscription
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) subscription.Subscription); ok {
+		r0 = rf(ctx, startBlockID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(subscription.Subscription)
+		}
+	}
+
+	return r0
+}
+
 type mockConstructorTestingTNewAPI interface {
 	mock.TestingT
 	Cleanup(func())
