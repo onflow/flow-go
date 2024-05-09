@@ -162,7 +162,7 @@ func Test_DecodeBlocks(t *testing.T) {
 	b = decodeBlockBreakingChanges(b5)
 
 	require.Equal(t, b.Timestamp, bv5.Timestamp)
-	require.Equal(t, b.TotalSupply.Uint64(), bv5.TotalSupply)
+	require.Equal(t, b.TotalSupply, bv5.TotalSupply)
 	require.Equal(t, b.Height, bv5.Height)
 	require.Equal(t, b.ParentBlockHash, bv5.ParentBlockHash)
 	require.Equal(t, b.TransactionHashes, bv5.TransactionHashes)
