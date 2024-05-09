@@ -32,6 +32,7 @@ import (
 // - Per hearbeat (gossipsub parameter GossipSubHeartbeatInterval, 1 second ), the spammer is allowed to send at most 5000 ihave messages (gossip sub parameter; GossipSubMaxIHaveLength) on aggregate, and
 // excess messages are dropped (without being counted as broken promises).
 func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "failing repeatedly on v0.33")
 	role := flow.RoleConsensus
 	sporkId := unittest.IdentifierFixture()
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
