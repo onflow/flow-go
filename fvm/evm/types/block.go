@@ -198,7 +198,7 @@ type blockV5 struct {
 // migrated block, otherwise it will return nil.
 func decodeBlockBreakingChanges(encoded []byte) *Block {
 	b0 := &blockV0{}
-	if e := gethRLP.DecodeBytes(encoded, b0); e == nil {
+	if err := gethRLP.DecodeBytes(encoded, b0); err == nil {
 		return &Block{
 			ParentBlockHash: b0.ParentBlockHash,
 			Height:          b0.Height,
@@ -208,7 +208,7 @@ func decodeBlockBreakingChanges(encoded []byte) *Block {
 	}
 
 	b1 := &blockV1{}
-	if e := gethRLP.DecodeBytes(encoded, b1); e == nil {
+	if err := gethRLP.DecodeBytes(encoded, b1); err == nil {
 		return &Block{
 			ParentBlockHash:   b1.ParentBlockHash,
 			Height:            b1.Height,
@@ -219,7 +219,7 @@ func decodeBlockBreakingChanges(encoded []byte) *Block {
 	}
 
 	b2 := &blockV2{}
-	if e := gethRLP.DecodeBytes(encoded, b2); e == nil {
+	if err := gethRLP.DecodeBytes(encoded, b2); err == nil {
 		return &Block{
 			ParentBlockHash:   b2.ParentBlockHash,
 			Height:            b2.Height,
@@ -230,7 +230,7 @@ func decodeBlockBreakingChanges(encoded []byte) *Block {
 	}
 
 	b3 := &blockV3{}
-	if e := gethRLP.DecodeBytes(encoded, b3); e == nil {
+	if err := gethRLP.DecodeBytes(encoded, b3); err == nil {
 		return &Block{
 			ParentBlockHash:   b3.ParentBlockHash,
 			Height:            b3.Height,
@@ -241,7 +241,7 @@ func decodeBlockBreakingChanges(encoded []byte) *Block {
 	}
 
 	b4 := &blockV4{}
-	if e := gethRLP.DecodeBytes(encoded, b4); e == nil {
+	if err := gethRLP.DecodeBytes(encoded, b4); err == nil {
 		return &Block{
 			ParentBlockHash:   b4.ParentBlockHash,
 			Height:            b4.Height,
@@ -252,7 +252,7 @@ func decodeBlockBreakingChanges(encoded []byte) *Block {
 	}
 
 	b5 := &blockV5{}
-	if e := gethRLP.DecodeBytes(encoded, b5); e == nil {
+	if err := gethRLP.DecodeBytes(encoded, b5); err == nil {
 		return &Block{
 			ParentBlockHash:   b5.ParentBlockHash,
 			Height:            b5.Height,
